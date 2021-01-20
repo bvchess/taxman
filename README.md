@@ -18,8 +18,8 @@ The player wins by 3.
 
 My son built an interactive version of Taxman for N = 16.  You can play it online here: <http://xvade.com/taxman>
 
-The game caught my attention as an interesting optimization problem. How large a game can a computer play? What is the expected outcome? I wrote code that can play an optimal game (achieve the best possible score) for values of N up to 200. I coded a second approach I call G2 that can accommodate larger values of N but is not guaranteed to achieve the best possible score. On average G2 garners more than 99% of the optimal score and takes only a small fraction of the time required to play an optimal game.
+The game caught my attention as an interesting optimization problem. How large a game can a computer play? This project can play an optimal game (achieve the best possible score) for values of N up to 683.
 
 Usage:  
-`python taxman.py <board size or range> [solver name]`  
-Where `board size or range` is an integer or range of integers (examples: `1`, `20-25`) and the optional solver name is one of `set`, `g2`, or `greedy`.
+`bin/taxman [options] <board size or range`  
+Where `board size or range` is an integer or range of integers (examples: `1`, `20-25`).  Run the taxman command with no options in order to learn more.
