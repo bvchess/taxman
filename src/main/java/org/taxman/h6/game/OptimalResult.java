@@ -61,7 +61,27 @@ public class OptimalResult {  // would make a nice record, but Moshi doesn't kno
         return result;
     }
 
-    public static synchronized OptimalResult get(int n) {
+    public String oeisFormat() {
+        return String.format("%d %d", n, score);
+    }
+
+    public String movesToString(String sep) {
+        String moveString;
+        if (moves != null) {
+            moveString = Arrays.stream(moves)
+                    .mapToObj(String::valueOf)
+                    .collect(Collectors.joining(sep));
+        } else {
+            moveString = "(none)";
+        }
+        return moveString;
+    }
+
+    public String hoeySolutionFormat() {
+        return String.format("a(%d)=%d: %s", n, score, movesToString(","));
+    }
+
+    private static synchronized void loadMap() {
         if (resultMap == null) {
             var is = OptimalResult.class.getResourceAsStream(JSON_DATA_FILE);
             var r = new BufferedReader(new InputStreamReader(is));
@@ -72,7 +92,19 @@ public class OptimalResult {  // would make a nice record, but Moshi doesn't kno
                 throw new RuntimeException("failed loading json", e);
             }
         }
+    }
+
+    public static OptimalResult get(int n) {
+        loadMap();
         return resultMap.getOrDefault(n, null);
+    }
+
+    public static List<OptimalResult> getAll() {
+        loadMap();
+        return resultMap.keySet().stream()
+                .sorted()
+                .map(k -> resultMap.get(k))
+                .collect(Collectors.toList());
     }
 
     private static JsonAdapter<List<OptimalResult>> makeAdapter() {

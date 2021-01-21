@@ -5,6 +5,7 @@ import org.taxman.h6.game.OptimalResult;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.stream.IntStream;
 
 public class OptimalResultTest {
 
@@ -39,13 +40,13 @@ public class OptimalResultTest {
         assert result.equals(expect) : "expected " + expect + ", got " + result;
     }
 
-    /*
-    @Test
-    public void dump() {
-        IntStream.rangeClosed(1, 519).forEach(n -> {
-            var result = OptimalResult.get(n);
-            System.out.println(String.format("%d, %d", n, result.score));
-        });
+
+    //@Test
+    public void dumpInOeisFormat() {
+        OptimalResult.getAll()
+                .forEach(optRes -> System.out.println(optRes.oeisFormat()));
+        System.out.println();
+        OptimalResult.getAll()
+                .forEach(optRes -> System.out.println(optRes.hoeySolutionFormat()));
     }
-    */
 }
