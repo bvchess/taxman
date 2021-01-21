@@ -23,3 +23,8 @@ The game caught my attention as an interesting optimization problem. How large a
 Usage:  
 `bin/taxman [options] <board size or range`  
 Where `board size or range` is an integer or range of integers (examples: `1`, `20-25`).  Run the taxman command with no options in order to learn more.
+
+Approach:
+For game N, roughly 75% of the time an optimal solution can be quickly derived from the optimal solution to game N-1.  For games where an optimal solution is not as easy to find, the program takes advantage of the fact that the maximum feasible score for game N is no more than N larger than the optimal score for game N-1.  The program tries to find a solution totalling this maximum possible score and, if none can be found, looks for a score totalling N-2, and so on.
+
+The program speeds up the search process by decomposing the game into a series of simpler games that can be played in polynomial time and then finding an optimal set of "trades" moving numbers between these games.
