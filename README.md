@@ -1,5 +1,5 @@
 # taxman
-Find solutions to the taxman game.
+Find optimal solutions to the taxman game.
 
 Here are the rules:
 * Create a pot of numbers from 1 to N.
