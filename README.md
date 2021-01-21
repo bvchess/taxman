@@ -3,7 +3,7 @@ Find optimal solutions to the taxman game
 
 Overview
 ---------------
-Here are the rules:
+Here are the rules of the game:
 * Create a pot of numbers from 1 to N.
 *	Make a move by choosing a number from the pot, removing it from the pot, and adding it to your score. The tax man
      then claims all other factors of your number that are in the pot and adds these factors to his score. You may not
@@ -24,14 +24,15 @@ The final scores are:
 The player wins by 3.
 
 The game caught my attention as an interesting optimization problem. How large a game can a computer play? There are
-N factorial potential sequences of moves, so the search space is large.  This project can play an optimal game (achieve the
-best possible score) for values of N up to 683.  Past that I run out of patience and/or CPU time.
+N factorial potential sequences of moves, so the search space is large.  This project can play an optimal game (achieve
+the best possible score) for values of N up to 683.  Past that I run out of patience and/or CPU time.
 
 Usage
 ---------------
 `bin/taxman [options] <board size or range>`  
 
-Where `board size or range` is an integer or range of integers.  Run the taxman command with no options in order to learn more.
+Where `board size or range` is an integer or range of integers.  Run the taxman command with no options in order to
+learn more.
 
 This command will show the optimal games from N=1 to
 N=10:  
@@ -45,13 +46,14 @@ Approach
 In roughly 75% of cases, an optimal solution for game N can be quickly derived from the optimal solution to game N-1.
 For games where an optimal solution is not as easy to find, the program takes advantage of the fact that the maximum
 feasible score for game N is no more than N larger than the optimal score for game N-1.  The program tries to find a
-solution totalling this maximum possible score and, if none can be found, looks for a score totalling N-2, and so on.
+solution totalling the maximum feasible score and, if none can be found, targets a score one less than that.  It
+proceeds downward until a solution can be found.
 
-The program speeds up the search process for each potential solution by decomposing the game into a series of simpler
-games (where a number is allowed to be a factor or a composite but not both) where an optimal solution can be found in
-polynomial time and then finding an optimal set of "promotions" that elevate a number from being a factor in one
-game to being a move in the next game.  Finding an optimal set of trades takes an exponential amount of time in the
-worst case.
+The program speeds up the search process for each potential solution total by decomposing the game into a series of simpler
+games (where a number is allowed to be a factor or a composite but not both). Optimal solutions to these simpler
+games can be found in polynomial time. Finding an optimal solution to the over-all game involves finding an optimal
+set of "promotions" that elevate a number from being a factor in one game to being a move in the next game. Identifying
+an optimal set of promotions takes an exponential amount of time in the worst case.
 
 Implementation
 ---------------
@@ -65,10 +67,15 @@ The program includes pre-computed solutions to games from 1 to 683 so that it ca
 without having to compute it on every run.  These pre-computed solutions are available in JSON format
 [here](https://github.com/bvchess/taxman/blob/master/src/main/resources/optimal.json).
 
-References & Links
+References and Links
 ---------------
 - The On-Line Encyclopedia of Integer Sequences documents the Taxman Sequence (the optimal player score)
 as [A019312](https://oeis.org/A019312).
 - My son built an interactive version of Taxman for N = 16.  You can play it online here: <http://xvade.com/taxman>.
 Other online implementations are <http://davidbau.com/archives/2008/12/07/taxman_game.html> and
 <https://www.cryptool.org/en/cto/highlights/taxman>.
+  
+Notes
+---------------
+- I suspect the optimal set of promotions for N=684 sum to 11,052, but I've only been able to demonstrate that the
+total must be smaller than 11,135.
