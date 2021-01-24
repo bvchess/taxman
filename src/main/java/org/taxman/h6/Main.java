@@ -1,15 +1,16 @@
 package org.taxman.h6;
 
-import org.taxman.h6.frame.Multi;
+import org.taxman.h6.frame.FrameSolver;
+import org.taxman.h6.frame.GreedySolver;
 import org.taxman.h6.frame.Search;
 import org.taxman.h6.game.Solution;
+import org.taxman.h6.game.Solver;
 import org.taxman.h6.game.VerificationException;
 import org.taxman.h6.util.Stopwatch;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.util.*;
 import java.util.stream.IntStream;
 
 public class Main {
@@ -37,6 +38,7 @@ public class Main {
         public final int debugLevel;
         public final boolean announceGame;
         public final boolean quiet;
+        public final boolean greedy;
         public final List<BoardRange> boardRanges = new ArrayList<>();
 
         public Arguments(String[] argStrings) {
@@ -47,6 +49,7 @@ public class Main {
             boolean csv = false;
             boolean moves = false;
             boolean quiet = false;
+            boolean greedy = false;
 
             try {
                 while (iter.hasNext()) {
@@ -77,13 +80,17 @@ public class Main {
                             csv = true;
                             showGame = false;
                             break;
+                        case "-g":
+                        case "--greedy":
+                            greedy = true;
+                            break;
                         default:
                             if (arg.startsWith("-")) {
                                 throw new IllegalArgumentException("unrecognized argument: " + arg);
                             } else if (arg.contains("-")) {
                                 int dashSpot = arg.indexOf("-");
                                 var lowBoard = Integer.parseInt(arg.substring(0, dashSpot));
-                                var highBoard = Integer.parseInt(arg.substring(dashSpot + 1, arg.length()));
+                                var highBoard = Integer.parseInt(arg.substring(dashSpot + 1));
                                 boardRanges.add(new BoardRange(lowBoard, highBoard));
                             } else {
                                 var b = Integer.parseInt(arg);
@@ -116,6 +123,7 @@ public class Main {
             this.showHelp = showHelp;
             this.moves = moves;
             this.csv = csv;
+            this.greedy = greedy;
             this.announceGame = showGame || debugLevel > -1;
         }
 
@@ -141,6 +149,8 @@ public class Main {
                 "        Output summary statistics in CSV format.\n"+
                 "    -d --debug [level]\n"+
                 "        Display debug information as part of playing games.\n"+
+                "    -g, --greedy\n" +
+                "        Use a greedy algorithm instead of an optimal solver\n"+
                 "    -h, --help\n"+
                 "        Show this message and quit without playing any games.\n"+
                 "    -m --moves\n"+
@@ -152,18 +162,20 @@ public class Main {
                 "\n";
     }
 
-    private void playGame(Multi multi, int n) throws VerificationException {
+    private String getTimestamp() {
+        return ZonedDateTime.now().toString();
+    }
+
+    private void playGame(Solver solver, int n) {
         var name = "n="+n;
         if (args.announceGame) {
-            System.out.println("\nplaying " + name);
+            System.out.printf("\nplaying %s at %s\n", name, getTimestamp());
             System.out.flush();
         }
         System.gc(); // trying to get more precise timings on playing individual games
-        Stopwatch stopwatch = new Stopwatch();
-        stopwatch.start();
-        var sln = multi.solve(n);
+        var stopwatch = new Stopwatch().start();
+        var sln = solver.solve(n);
         stopwatch.stop();
-        sln.verify(n);
         if (args.csv) {
             outputCsv(n, stopwatch);
         } else {
@@ -173,13 +185,16 @@ public class Main {
         }
     }
 
-    private void summary(Multi multi, Stopwatch sw) {
+    private Solver makeSolver() {
+        if (args.greedy) return new GreedySolver(4);
+        return new FrameSolver();
+    }
+
+    private void summary(Solver solver, Stopwatch sw) {
+        solver.printInternalsReport(System.out);
         long gameCount = args.boardSizeRange().count();
         String g1 =  gameCount == 1 ? "game" : "games";
-        int accCount = multi.getCountOfAccelerated();
-        String g2 = accCount == 1 ? "game" : "games";
-        System.out.printf("accelerated %d %s, played %d %s in %.1f seconds\n",
-                multi.getCountOfAccelerated(), g2, gameCount, g1, sw.seconds());
+        System.out.printf("played %d %s in %.1f seconds\n", gameCount, g1, sw.seconds());
     }
 
     private String showMoves(int n, Solution sln) {
@@ -198,17 +213,17 @@ public class Main {
     private void setUpDebug() {
         if (args.debugLevel > 0) {
             Search.printSummary = true;
-            Multi.printAccelerations = true;
+            FrameSolver.printAccelerations = true;
         }
         if (args.debugLevel > 1) {
-            Multi.printSearch = true;
+            FrameSolver.printSearch = true;
         }
         if (args.debugLevel > 2) {
             Search.printStatsPerTarget = true;
-            Multi.printAccelerationFailures = true;
+            FrameSolver.printAccelerationFailures = true;
         }
         if (args.debugLevel > 3) {
-            Multi.printFrames = true;
+            FrameSolver.printFrames = true;
         }
     }
 
@@ -220,11 +235,11 @@ public class Main {
         setUpDebug();
         if (args.csv) outputCsvHeader();
         Stopwatch bigWatch = new Stopwatch().start();
-        var multi = new Multi();
+        var solver = makeSolver();
         try {
-            args.boardSizeRange().forEach(n -> playGame(multi, n));
+            args.boardSizeRange().forEach(n -> playGame(solver, n));
             bigWatch.stop();
-            if (!args.csv && args.boardSizeRange().count() > 1) summary(multi, bigWatch);
+            if (!args.csv && args.boardSizeRange().count() > 1) summary(solver, bigWatch);
         } catch (VerificationException ve) {
             System.out.println("ERROR: verification failed: " + ve.getMessage());
             System.out.println("BAD SOLUTION: " + ve.solutionString());

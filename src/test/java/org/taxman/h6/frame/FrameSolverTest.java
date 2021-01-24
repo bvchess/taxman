@@ -9,32 +9,47 @@ import org.taxman.h6.util.TxSet;
 
 import java.util.stream.IntStream;
 
-public class MultiTest {
+public class FrameSolverTest {
 
     void runRange(int top, int expectedAccelerated) throws VerificationException {
-        Multi multi = new Multi();
+        FrameSolver frameSolver = new FrameSolver();
         IntStream.rangeClosed(1, top).forEach(n -> {
-            var sln = multi.solve(n);
+            var sln = frameSolver.solve(n);
             sln.verify(n);
         });
-        var count = multi.getCountOfAccelerated();
+        var count = frameSolver.getCountOfAccelerated();
         assert count == expectedAccelerated : "expected "+expectedAccelerated+" accelerated games, got " + count;
     }
 
     @Test
     void medium() throws VerificationException {
-        runRange(200, 161);
+        runRange(200, 146);
+    }
+
+    //@Test
+    void accel() {
+        IntStream.rangeClosed(2, 683).forEach(n -> {
+            FrameSolver frameSolver = new FrameSolver();
+            var sln = frameSolver.solveBasedOnPrevOnly(n);
+            if (sln != null) {
+                var sln2 = frameSolver.solveTheHardWay(n);
+                assert sln.moves.sum() == sln2.moves.sum();
+                System.out.println("verified " + n);
+            }
+        });
+
+
     }
 
     //@Test
     void showPromotions() throws VerificationException {
-        Multi multi = new Multi();
+        FrameSolver frameSolver = new FrameSolver();
         var start = 450; //2;
         var last = 471;
-        var prev = multi.loadPreviouslyComputed(start-1);
+        var prev = frameSolver.loadPreviouslyComputed(start-1);
         for (int i=start; i <= last; i++) {
-            var sln = multi.loadPreviouslyComputed(i);
-            var basedOnPrev = multi.solveBasedOnPrevOnly(i) != null;
+            var sln = frameSolver.loadPreviouslyComputed(i);
+            var basedOnPrev = frameSolver.solveBasedOnPrevOnly(i) != null;
             if (!basedOnPrev) {
                 var added = TxSet.subtract(TxSet.of(sln.promotions), TxSet.of(prev.promotions));
                 var subtracted = TxSet.subtract(TxSet.of(prev.promotions), TxSet.of(sln.promotions));
@@ -62,9 +77,9 @@ public class MultiTest {
     //@Test
     void justOne() throws VerificationException {
         int targetGame = 180; //464;
-        Multi multi = new Multi();
+        FrameSolver frameSolver = new FrameSolver();
         System.out.println("playing n=" + targetGame);
-        var sln = multi.solve(targetGame);
+        var sln = frameSolver.solve(targetGame);
         sln.verify(targetGame);
     }
 

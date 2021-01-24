@@ -6,29 +6,45 @@ import org.taxman.h6.game.Solution;
 import org.taxman.h6.bombus.Apiary;
 import org.taxman.h6.bombus.BombusSolution;
 import org.taxman.h6.bombus.Namer;
+import org.taxman.h6.game.Solver;
+import org.taxman.h6.util.Stopwatch;
 import org.taxman.h6.util.TxList;
 import org.taxman.h6.util.TxPredicate;
 import org.taxman.h6.util.TxSet;
 import static org.taxman.h6.util.TxUnmodifiableSet.EmptySet;
 
+import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.Map;
 
 
-public class Multi {
+public class FrameSolver implements Solver {
+    // debug output flags
     public static boolean printFrames = false;
     public static boolean printAccelerations = false;
     public static boolean printAccelerationFailures = false;
     public static boolean printSearch = false;
+
+    // some debugging modes
+    public static boolean verifyAccelerations = false;
+    public static boolean cheatIfNoAcceleration = false;
+
 
     private final Map<Integer, BombusSolution> solutionMap = new HashMap<>();
     private int countOfAccelerated = 0;
 
     public BombusSolution solve(int n) {
         var sln = new Turbo(n).solve();
+        sln.verify(n);
         solutionMap.put(n, sln);
-        //System.out.println("!! " + n + " " + sln.promotions.size() + " " + sln.promotions.sum());
         return sln;
+    }
+
+    public void printInternalsReport(PrintStream ps) {
+        int accCount = getCountOfAccelerated();
+        String g2 = accCount == 1 ? "game" : "games";
+        System.out.printf("accelerated %d %s\n", accCount, g2);
     }
 
     public int getCountOfAccelerated() {
@@ -37,6 +53,10 @@ public class Multi {
 
     BombusSolution solveBasedOnPrevOnly(int n) {
         return new Turbo(n).solveBasedOnPrev();
+    }
+
+    BombusSolution solveTheHardWay(int n) {
+        return new Turbo(n).solveTheHardWay();
     }
 
     BombusSolution loadPreviouslyComputed(int n) {
@@ -64,8 +84,21 @@ public class Multi {
 
         BombusSolution solve() {
             BombusSolution sln = solveBasedOnPrev();
-            if (sln == null) sln = solveTheHardWay();
+            if (cheatIfNoAcceleration && sln == null) {
+                System.out.println("BIG CHEAT for " + n);
+                var cheat = loadPreviouslyComputed(n);
+                sln = BombusSolution.upgrade(cheat);
+            } else if (sln == null) {
+                sln = solveTheHardWay();
+            }
             return sln;
+        }
+
+        private void verifyAcceleration(BombusSolution sln) {
+            if (n < 2) return;
+            System.out.println("verifying acceleration for " + n);
+            var sln2 = solveTheHardWay();
+            assert sln.score() == sln2.score() : "accelerated solution for " + n + " did not verify";
         }
 
         private BombusSolution solveBasedOnPrev() {
@@ -91,11 +124,16 @@ public class Multi {
         }
 
         private BombusSolution solveTheHardWay() {
-            var prev = getPrevious();
+            return spinDown(getMaxPromotionSum());
+        }
+
+        private int getMaxPromotionSum() {
             var a = new Apiary(board, new Namer());
             var inTheBag = a.getSolution().sum();
-            var promotionSumMax = getPrevious().score() + n - inTheBag;
-            return spinDown(promotionSumMax);
+            var result = getPrevious().score() + n - inTheBag;
+            var hint = Hint.get(n);
+            if (hint != null && hint.maxPromotionSum > 0) result = hint.maxPromotionSum;
+            return result;
         }
 
         private BombusSolution getPrevious() {
@@ -106,21 +144,21 @@ public class Multi {
             return result;
         }
 
-        private BombusSolution spinDown(int promotionSumMax) {
+        private BombusSolution spinDown(int maxPromotionSum) {
             var maxPromotions = frame.estimateMaxPromotions(0);
             var candidates = frame.allCandidateNumbersIncludingDownstream();
-            if (candidates.largest(maxPromotions).sum() < promotionSumMax) {
+            if (candidates.largest(maxPromotions).sum() < maxPromotionSum) {
                 //System.out.println(n + ": lowering the max by " + (promotionSumMax - candidates.largest(maxPromotions).sum()));
-                promotionSumMax = candidates.largest(maxPromotions).sum();
+                maxPromotionSum = candidates.largest(maxPromotions).sum();
             }
 
             if (printSearch) {
-                System.out.printf("  searching for %d promotions totalling as much as %d among %d: %s\n",
-                        maxPromotions, promotionSumMax, candidates.size(), candidates);
+                System.out.printf("  searching for %d promotions totalling as much as %d among %d numbers: %s\n",
+                        maxPromotions, maxPromotionSum, candidates.size(), candidates);
             }
 
             var p = new TxPredicate<TxSet>(c -> frame.fits(EmptySet, c));
-            var promotions = Search.findLargest(candidates, maxPromotions, promotionSumMax, p);
+            var promotions = Search.findLargest(candidates, maxPromotions, maxPromotionSum, p);
             //var promotions =  Greedy.find(candidates, maxPromotions, p);
 
             if (printSearch) {
@@ -145,10 +183,8 @@ public class Multi {
             var recycledPromotions = TxSet.and(a1Candidates, prevMoves);
             var prudentPromotions = recycledPromotions.largest(maxPromotions);
             var newlyImpossibleMoves = TxSet.and(a1.getImpossible(), prevMoves);
-            var droppedPromotions = TxSet.subtract(recycledPromotions, prudentPromotions);
             var idealMoves = TxSet.or(prevMoves, n);
             idealMoves = TxSet.subtract(idealMoves, newlyImpossibleMoves);
-            idealMoves = TxSet.subtract(idealMoves, droppedPromotions);
             Apiary a2 = new Apiary(board, prudentPromotions, new Namer());
             var newMoves = a2.getSolution();
             //System.out.printf("%d: re-use new move sum: %d, ideal is %d, prudent promotions %s\n", n, newMoves.sum(), idealMoves.sum(), prudentPromotions);
@@ -156,6 +192,10 @@ public class Multi {
             if (newMoves.sum() == idealMoves.sum()) {
                 result = new BombusSolution(board, newMoves, prudentPromotions);
                 if (printSearch) {
+                    System.out.printf("  absolutely ideal score: %,d\n", TxSet.or(prevMoves, n).sum());
+                    System.out.printf("  newly impossible moves: %,d\n", newlyImpossibleMoves.sum());
+                    System.out.printf("           we settle for: %,d\n", idealMoves.sum());
+                    System.out.printf("   using %d of %d possible promotions\n", prudentPromotions.size(), maxPromotions);
                     System.out.printf(
                             "  found optimal promotions using previous solution: %d promotions totalling %d: %s\n",
                             prudentPromotions.size(), prudentPromotions.sum(), prudentPromotions
@@ -171,6 +211,8 @@ public class Multi {
                         newSum, delta, idealSum);
                 System.out.printf("  reusePrev: %d promotions totalled %d\n", achievedPromotions.size(), promoteSum);
             }
+
+            if (verifyAccelerations && result != null) verifyAcceleration(result);
             return result;
         }
     }

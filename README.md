@@ -1,5 +1,8 @@
-# Taxman
-Find optimal solutions to the taxman game
+# taxman
+A program to find optimal solutions to the taxman game.
+
+![game 10 move 3](img/10.3.png)
+
 
 Overview
 ---------------
@@ -23,9 +26,10 @@ The final scores are:
     
 The player wins by 3.
 
-The game caught my attention as an interesting optimization problem. How large a game can a computer play? There are
-N factorial potential sequences of moves, so the search space is large.  This project can play an optimal game (achieve
-the best possible score) for values of N up to 683.  Past that I run out of patience and/or CPU time.
+The game caught my attention as an interesting optimization problem. How large a game can a computer play and get the 
+best possible score? There are N factorial potential sequences of moves, so the search space is large.  This project
+can play an optimal game (achieve the best possible score) for values of N up to 683.  Past that I run out of patience
+and/or CPU time.
 
 Usage
 ---------------
@@ -43,7 +47,7 @@ This command will show debugging output as it looks for an optimal solution for 
 
 Approach
 ---------------
-In roughly 75% of cases, an optimal solution for game N can be quickly derived from the optimal solution to game N-1.
+In more than 70% of cases an optimal solution for game N can be quickly derived from the optimal solution to game N-1.
 For games where an optimal solution is not as easy to find, the program takes advantage of the fact that the maximum
 feasible score for game N is no more than N larger than the optimal score for game N-1.  The program tries to find a
 solution totalling the maximum feasible score and, if none can be found, targets a score one less than that.  It
@@ -57,15 +61,15 @@ an optimal set of promotions takes an exponential amount of time in the worst ca
 
 Implementation
 ---------------
+The program includes pre-computed solutions to games from 1 to 683 so that it can make use of the solution to N-1
+without having to compute it on every run.  These pre-computed solutions are available in JSON format
+[here](src/main/resources/optimal.json).
+
 I use the Java [BitSet](https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/BitSet.html) class for
 fast operations on sets of small integers.  I use
 Java [Streams](https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/stream/Stream.html)
 and [ForkJoinPool](https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/ForkJoinPool.html)
 to take advantage of multi-core CPUs.
-
-The program includes pre-computed solutions to games from 1 to 683 so that it can make use of the solution to N-1
-without having to compute it on every run.  These pre-computed solutions are available in JSON format
-[here](https://github.com/bvchess/taxman/blob/master/src/main/resources/optimal.json).
 
 References and Links
 ---------------
@@ -77,5 +81,5 @@ Other online implementations are <http://davidbau.com/archives/2008/12/07/taxman
   
 Notes
 ---------------
-- I suspect the optimal set of promotions for N=684 sum to 11,052, but I've only been able to demonstrate that the
-total must be smaller than 11,135.
+- The optimal set of promotions for N=684 sums to at least 11,052, but I've only been able to demonstrate that the
+total must be 11,107 or less.
