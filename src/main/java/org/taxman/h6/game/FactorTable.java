@@ -205,10 +205,10 @@ public class FactorTable {
         out.format("\nprimes: %s\n", primes.toString());
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args, boolean print) {
         int highest = Integer.parseInt(args[0]);
         FactorTable fm = new FactorTable(highest);
-        if (highest < 200)
+        if (print && highest < 200)
             fm.printTables(System.out);
     }
 }

@@ -20,6 +20,7 @@ import static org.taxman.h6.util.TxUnmodifiableSet.EmptySet;
 
 
 public class GreedySolver implements Solver {
+    public boolean warnOnImperfectScore = true;
     private final int maxComboSize;
 
     public GreedySolver(int maxComboSize) {
@@ -38,7 +39,7 @@ public class GreedySolver implements Solver {
         var sln = new BombusSolution(board, b.getSolution(), greedyPromotions);
         var opt = OptimalResult.get(n);
         if (opt != null) {
-            if (sln.score() != opt.score) {
+            if (warnOnImperfectScore && sln.score() != opt.score) {
                 System.out.printf("WARNING: greedy score is %,d but optimal score is %,d (a difference of %,d)\n",
                         sln.score(), opt.score, opt.score-sln.score());
             }

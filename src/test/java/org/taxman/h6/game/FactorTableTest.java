@@ -27,7 +27,7 @@ public class FactorTableTest {
     @Test
     public void main() {
         String[] args = {"10"};
-        FactorTable.main(args);
+        FactorTable.main(args, false);
     }
 
     @Test

@@ -63,22 +63,20 @@ public class Solution {
 
             var opt = OptimalResult.get(boardSize);
             if (opt != null) {
-                if (opt.moves != null) {
-                    TxSet thisMoves = TxSet.of(moves);
-                    TxSet optimalMoves = TxSet.of(opt.moves);
-                    if (!optimalMoves.equals(thisMoves)) {
+                int thisScore = moves.sum();
+                if (opt.score != thisScore) {
+                    if (opt.moves != null) {
+                        TxSet thisMoves = TxSet.of(moves);
+                        TxSet optimalMoves = TxSet.of(opt.moves);
                         var missing = TxSet.subtract(optimalMoves, thisMoves);
                         var extra = TxSet.subtract(thisMoves, optimalMoves);
                         System.out.println();
                         System.out.println("in optimal moves but not in this solution: " + missing);
                         System.out.println("in this solution but not in optimal moves: " + extra);
                     }
-                }
-                int thisScore = moves.sum();
-                if (opt.score != thisScore) {
                     throw new VerificationException(
                             String.format("for %d the sum of moves should be %,d but came out %,d",
-                            boardSize, opt.score, this.score())
+                                    boardSize, opt.score, this.score())
                     );
                 }
             }

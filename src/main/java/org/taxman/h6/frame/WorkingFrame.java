@@ -2,7 +2,6 @@ package org.taxman.h6.frame;
 
 import org.taxman.h6.bombus.Hive;
 import org.taxman.h6.util.TxSet;
-import static org.taxman.h6.util.TxUnmodifiableSet.EmptySet;
 
 import java.io.PrintStream;
 import java.util.List;

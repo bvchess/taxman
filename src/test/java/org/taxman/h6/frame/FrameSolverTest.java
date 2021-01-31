@@ -5,6 +5,7 @@ import org.taxman.h6.game.Board;
 import org.taxman.h6.bombus.Apiary;
 import org.taxman.h6.bombus.Namer;
 import org.taxman.h6.game.VerificationException;
+import org.taxman.h6.search.Search;
 import org.taxman.h6.util.TxSet;
 
 import java.util.stream.IntStream;
@@ -14,6 +15,7 @@ public class FrameSolverTest {
     void runRange(int top, int expectedAccelerated) throws VerificationException {
         FrameSolver frameSolver = new FrameSolver();
         IntStream.rangeClosed(1, top).forEach(n -> {
+            //System.out.println("running n=" + n);
             var sln = frameSolver.solve(n);
             sln.verify(n);
         });
@@ -76,7 +78,10 @@ public class FrameSolverTest {
 
     //@Test
     void justOne() throws VerificationException {
-        int targetGame = 180; //464;
+        int targetGame = 54;
+        FrameSolver.printSearch = true;
+        Search.printStatsPerTarget = true;
+        Search.printSummary = true;
         FrameSolver frameSolver = new FrameSolver();
         System.out.println("playing n=" + targetGame);
         var sln = frameSolver.solve(targetGame);

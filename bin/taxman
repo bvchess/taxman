@@ -5,6 +5,6 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 TAXMAN_JAR=$DIR/taxman.jar 
 
 # have to turn off compressedOops because of a bug in OpenJDK11 that prevents MaxRamPercentage from taking more than 32G
-OPTS="-ea -XX:MaxRAMPercentage=90 -XX:-UseCompressedOops"
+OPTS="-ea -XX:MaxRAMPercentage=100 -XX:-UseCompressedOops"
 
 java $OPTS -jar $TAXMAN_JAR $@

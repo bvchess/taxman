@@ -1,4 +1,4 @@
-package org.taxman.h6.frame;
+package org.taxman.h6.search;
 
 import org.taxman.h6.util.Stopwatch;
 import org.taxman.h6.util.TxSet;
@@ -7,16 +7,16 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.taxman.h6.util.TxUnmodifiableSet.EmptySet;
 
-public class Search {
+public class OldSearch {
     public static boolean printStatsPerTarget = false;
     public static boolean printSummary = false;
 
     private final Predicate<TxSet> predicate;
+    private final int searchMaxSize;
     private final ForkJoinPool pool = ForkJoinPool.commonPool();
     private int levelsExplored = 0;
     private AtomicLong taskCounter;
@@ -37,19 +37,20 @@ public class Search {
         return dflt;
     }
 
-    public Search(Predicate<TxSet> predicate) {
+    public OldSearch(Predicate<TxSet> predicate, int maxSize) {
         this.predicate = predicate;
+        this.searchMaxSize = maxSize;
     }
 
     public static TxSet findLargest(TxSet numbers, int maxSize, int maxSum, Predicate<TxSet> predicate) {
-        return new Search(predicate).findLargest(numbers, maxSize, maxSum);
+        return new OldSearch(predicate, maxSize).findLargest(numbers, maxSum);
     }
 
-    private TxSet findLargest(TxSet numbers, int maxSize, int maxSum) {
+    private TxSet findLargest(TxSet numbers, int maxSum) {
         var stopwatch = new Stopwatch().start();
         var result = IntStreamDescendingClosed(maxSum, 0)
                 .peek(i -> ++levelsExplored)
-                .mapToObj(i -> findTarget(numbers, maxSize, i))
+                .mapToObj(i -> findTarget(numbers, i))
                 .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
@@ -76,14 +77,14 @@ public class Search {
                 .map(i -> highest - (i-lowest));
     }
 
-    private TxSet findTarget(TxSet numbers, int maxSize, int target) {
+    private TxSet findTarget(TxSet numbers, int target) {
         Stopwatch stopwatch = null;
 
         if (printStatsPerTarget) {
             stopwatch = new Stopwatch().start();
         }
         taskCounter = new AtomicLong(0);
-        var task = new TargetFinder(numbers, EmptySet, maxSize, target);
+        var task = new TargetFinder(numbers, EmptySet, searchMaxSize, target);
         pool.execute(task);
         var result = task.join();
         taskTotal += taskCounter.get();
@@ -112,13 +113,13 @@ public class Search {
         @Override
         protected TxSet compute() {
             TxSet result;
-            if (target == 0) {
-                result = (predicate.test(base)) ? base : null;
-            } else if (maxSize == 0) {
-                result = null;
-            } else if (numbers.contains(target)) {
+            if (numbers.contains(target)) {
                 TxSet assembled = TxSet.or(base, target);
                 result = (predicate.test(assembled)) ? assembled : null;
+            } else if (maxSize == 1) {
+                result = null;
+            } else if (maxSize < searchMaxSize/2) {  // unclear when (or even if) we should switch to recursive
+                result = recursiveSearch(numbers, TxSet.of(base), maxSize, target);
             } else {
                 result = ForkJoinTask.invokeAll(createBranches()).stream()
                         .map(ForkJoinTask::join)
@@ -136,7 +137,7 @@ public class Search {
             for (int n: numbers.descendingArray()) {
                 int newTarget = target - n;
                 newNumbers = TxSet.subtract(newNumbers, n);
-                if (newNumbers.largest(maxSize-1).sum() < newTarget) break;
+                if (newNumbers.sumOfLargest(maxSize-1) < newTarget) break;
                 if (n < target) {
                     TxSet newBase = TxSet.or(base, n);
                     if (predicate.test(newBase)) {
@@ -144,6 +145,38 @@ public class Search {
                     }
                 }
             }
+            return result;
+        }
+
+        // Recursive doesn't use any parallelism, but it does get to reuse TxSets rather than creating new
+        // ones all over the place.  So we get the parallelism in the top half of the search tree
+        // from the Fork/Join tasks, and get some efficiency in the bottom half of the tree from the
+        // recursive search.
+        private TxSet recursiveSearch(TxSet numbers, TxSet base, int maxSize, int target) {
+            TxSet result;
+            if (numbers.contains(target)) {
+                TxSet assembled = TxSet.or(base, target);
+                result = (predicate.test(assembled)) ? assembled : null;
+            } else if (maxSize == 1) {
+                result = null;
+            } else {
+                result = null;
+                TxSet newNumbers = TxSet.of(numbers);
+                for (int n: numbers.descendingArray()) {
+                    int newTarget = target - n;
+                    newNumbers.remove(n);
+                    if (newNumbers.sumOfLargest(maxSize-1) < newTarget) break;
+                    if (n < target) {
+                        base.append(n);
+                        if (predicate.test(base)) {
+                            result = recursiveSearch(newNumbers, base, maxSize - 1, newTarget);
+                        }
+                        base.remove(n);
+                        if (result != null) break;
+                    }
+                }
+            }
+
             return result;
         }
 

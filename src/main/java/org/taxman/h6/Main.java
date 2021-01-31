@@ -2,13 +2,14 @@ package org.taxman.h6;
 
 import org.taxman.h6.frame.FrameSolver;
 import org.taxman.h6.frame.GreedySolver;
-import org.taxman.h6.frame.Search;
+import org.taxman.h6.search.OldSearch;
+import org.taxman.h6.search.Search;
 import org.taxman.h6.game.Solution;
 import org.taxman.h6.game.Solver;
 import org.taxman.h6.game.VerificationException;
+import org.taxman.h6.search.SearchQueue;
 import org.taxman.h6.util.Stopwatch;
 
-import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.stream.IntStream;
@@ -162,14 +163,15 @@ public class Main {
                 "\n";
     }
 
-    private String getTimestamp() {
+    private String getNowTimestamp() {
         return ZonedDateTime.now().toString();
     }
 
     private void playGame(Solver solver, int n) {
         var name = "n="+n;
         if (args.announceGame) {
-            System.out.printf("\nplaying %s at %s\n", name, getTimestamp());
+            var timestamp = (args.debugLevel > 0) ? " at " + getNowTimestamp() : "";
+            System.out.printf("\nplaying %s%s\n", name, timestamp);
             System.out.flush();
         }
         System.gc(); // trying to get more precise timings on playing individual games
@@ -212,6 +214,7 @@ public class Main {
 
     private void setUpDebug() {
         if (args.debugLevel > 0) {
+            OldSearch.printSummary = true;
             Search.printSummary = true;
             FrameSolver.printAccelerations = true;
         }
@@ -219,11 +222,14 @@ public class Main {
             FrameSolver.printSearch = true;
         }
         if (args.debugLevel > 2) {
+            OldSearch.printStatsPerTarget = true;
             Search.printStatsPerTarget = true;
             FrameSolver.printAccelerationFailures = true;
         }
         if (args.debugLevel > 3) {
             FrameSolver.printFrames = true;
+            //Search.queueStatusReport = true;
+            SearchQueue.showFileAccess = true;
         }
     }
 

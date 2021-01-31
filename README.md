@@ -50,7 +50,7 @@ Approach
 In more than 70% of cases an optimal solution for game N can be quickly derived from the optimal solution to game N-1.
 For games where an optimal solution is not as easy to find, the program takes advantage of the fact that the maximum
 feasible score for game N is no more than N larger than the optimal score for game N-1.  The program tries to find a
-solution totalling the maximum feasible score and, if none can be found, targets a score one less than that.  It
+solution totaling the maximum feasible score and, if none can be found, targets a score one less than that.  It
 proceeds downward until a solution can be found.
 
 The program speeds up the search process for each potential solution total by decomposing the game into a series of simpler
@@ -81,5 +81,10 @@ Other online implementations are <http://davidbau.com/archives/2008/12/07/taxman
   
 Notes
 ---------------
-- The optimal set of promotions for N=684 sums to at least 11,052, but I've only been able to demonstrate that the
-total must be 11,107 or less.
+The optimal set of promotions for N=684 sums to at least 11,052 (found via a greedy heuristic), but I've only been
+  able to demonstrate that the total must be 11,106 or less.
+
+Acknowledgements
+---------------
+Thanks to EJ Technologies for the use of their excellent
+[Java profiler](https://www.ej-technologies.com/products/jprofiler/overview.html).

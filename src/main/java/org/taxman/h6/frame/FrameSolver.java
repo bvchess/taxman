@@ -7,14 +7,13 @@ import org.taxman.h6.bombus.Apiary;
 import org.taxman.h6.bombus.BombusSolution;
 import org.taxman.h6.bombus.Namer;
 import org.taxman.h6.game.Solver;
-import org.taxman.h6.util.Stopwatch;
+import org.taxman.h6.search.Search;
 import org.taxman.h6.util.TxList;
 import org.taxman.h6.util.TxPredicate;
 import org.taxman.h6.util.TxSet;
 import static org.taxman.h6.util.TxUnmodifiableSet.EmptySet;
 
 import java.io.PrintStream;
-import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -153,22 +152,21 @@ public class FrameSolver implements Solver {
             }
 
             if (printSearch) {
-                System.out.printf("  searching for %d promotions totalling as much as %d among %d numbers: %s\n",
+                System.out.printf("  searching for %d promotions totaling as much as %d among %d numbers: %s\n",
                         maxPromotions, maxPromotionSum, candidates.size(), candidates);
             }
 
             var p = new TxPredicate<TxSet>(c -> frame.fits(EmptySet, c));
-            var promotions = Search.findLargest(candidates, maxPromotions, maxPromotionSum, p);
-            //var promotions =  Greedy.find(candidates, maxPromotions, p);
+            var promotions = Search.findLargest(candidates, maxPromotions, maxPromotionSum, maxPromotionSum - n, p);
+            //var promotions = OldSearch.findLargest(candidates, maxPromotions, maxPromotionSum, p);
+
 
             if (printSearch) {
-                System.out.printf("  found %d promotions totalling %d: %s\n",
+                System.out.printf("  found %d promotions totaling %d: %s\n",
                         promotions.size(), promotions.sum(), promotions);
             }
 
             Apiary a = new Apiary(board, promotions, new Namer());
-            //System.out.println("promotions are: " + promotions);
-            //System.out.println(a.debugDump("!!"));
             return new BombusSolution(board, a.getSolution(), promotions);
         }
 
@@ -197,7 +195,7 @@ public class FrameSolver implements Solver {
                     System.out.printf("           we settle for: %,d\n", idealMoves.sum());
                     System.out.printf("   using %d of %d possible promotions\n", prudentPromotions.size(), maxPromotions);
                     System.out.printf(
-                            "  found optimal promotions using previous solution: %d promotions totalling %d: %s\n",
+                            "  found optimal promotions using previous solution: %d promotions totaling %d: %s\n",
                             prudentPromotions.size(), prudentPromotions.sum(), prudentPromotions
                     );
                 }
@@ -209,7 +207,7 @@ public class FrameSolver implements Solver {
                 int promoteSum = achievedPromotions.sum();
                 System.out.printf("  reusePrev: scored %,d, %,d less than the ideal score of %,d\n",
                         newSum, delta, idealSum);
-                System.out.printf("  reusePrev: %d promotions totalled %d\n", achievedPromotions.size(), promoteSum);
+                System.out.printf("  reusePrev: %d promotions totaled %d\n", achievedPromotions.size(), promoteSum);
             }
 
             if (verifyAccelerations && result != null) verifyAcceleration(result);

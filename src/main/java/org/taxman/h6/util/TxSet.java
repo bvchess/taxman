@@ -61,12 +61,11 @@ public class TxSet extends TxCollection {
         bits = b;
     }
 
-
     @Override
     public int[] toArray() {
-        var sz = size();
+        int sz = size();
         var result = new int[sz];
-        var prev = 0;
+        int prev = 0;
         for (int i=0; i < sz; i++) {
             prev = bits.nextSetBit(prev+1);
             result[i] = prev;
@@ -90,7 +89,7 @@ public class TxSet extends TxCollection {
 
     @Override
     public int sum() {
-        var result = 0;
+        int result = 0;
         for (int i = bits.nextSetBit(1); i >= 0; i = bits.nextSetBit(i+1))
             result += i;
         return result;
@@ -230,8 +229,6 @@ public class TxSet extends TxCollection {
     }
 
     public TxSet largest(int sz) {
-        //return TxSet.of(streamDescending().limit(sz));
-
         if (sz >= size()) return TxSet.of(this);
         int j = bits.length();
         var newBits = new BitSet(j);
@@ -242,8 +239,37 @@ public class TxSet extends TxCollection {
         return new TxSet(newBits);
     }
 
+    public TxSet smallest(int sz) {
+        int fullSize = size();
+        if (sz >= fullSize) return TxSet.of(this);
+        int j = 0;
+        var newBits = new BitSet(fullSize);
+        for (int i=0; i < sz; i++) {
+            j = bits.nextSetBit(j+1);
+            newBits.set(j);
+        }
+        return new TxSet(newBits);
+    }
+
+    public int sumOfLargest(int sz) {
+        if (sz >= size()) return sum();
+        int j = bits.length();
+        int result = 0;
+        for (int i = 0; i < sz; i++) {
+            j = bits.previousSetBit(j-1);
+            result += j;
+        }
+        return result;
+    }
+
     public void remove(int n) {
         assert n >= 0 && n <= MAX_VALUE;
         bits.set(n, false);
+    }
+
+    public int nextHighest(int n) {
+        int result = bits.previousSetBit(n-1);
+        assert result < n;
+        return result;
     }
 }
