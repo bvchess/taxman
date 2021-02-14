@@ -28,7 +28,7 @@ The player wins by 3.
 
 The game caught my attention as an interesting optimization problem. How large a game can a computer play and get the 
 best possible score? There are N factorial potential sequences of moves, so the search space is large.  This project
-can play an optimal game (achieve the best possible score) for values of N up to 683.  Past that I run out of patience
+can play an optimal game (achieve the best possible score) for values of N up to 701.  Past that I run out of patience
 and/or CPU time.
 
 Usage
@@ -36,9 +36,9 @@ Usage
 `bin/taxman [options] <board size or range>`  
 
 Where `board size or range` is an integer or range of integers.  Run the taxman command with no options in order to
-learn more.
+learn more.  Here are some examples:
 
-This command will show the optimal games from N=1 to
+This command will show the moves made and the tax paid for optimal games from N=1 to
 N=10:  
     `bin/taxman -s 1-10`  
 

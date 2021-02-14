@@ -1,3 +1,4 @@
 .idea
 target
 bin/taxman.jar
+.DS_Store

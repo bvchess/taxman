@@ -66,7 +66,7 @@ public class Search {
             stopwatch.stop();
 
             if (printSummary) {
-                System.out.printf("  explored %d levels with %,d tasks in %.1f seconds\n",
+                System.out.printf("  explored %d levels with %,d tasks in %,.1f seconds\n",
                         levelsExplored, taskTotal, stopwatch.seconds());
                 System.out.printf("  parallelism: %d\n", pool.getParallelism());
             }
@@ -97,7 +97,7 @@ public class Search {
 
         if (stopwatch != null) {
             stopwatch.stop();
-            System.out.printf("    searching for %d took %.2f seconds with %,d starting points and %,d tasks\n",
+            System.out.printf("    searching for %d took %,.2f seconds with %,d starting points and %,d tasks\n",
                      target, stopwatch.seconds(), targetFinders.size(), taskCounter.get());
         }
         if (printSearchQueueStats) sqm.statusReport(System.out);

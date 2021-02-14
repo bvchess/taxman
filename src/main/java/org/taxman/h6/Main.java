@@ -180,7 +180,7 @@ public class Main {
             outputCsv(n, stopwatch);
         } else {
             if (args.showGame) sln.display(System.out);
-            if (!args.quiet) System.out.printf("played %s in %.1f seconds\n", name, stopwatch.seconds());
+            if (!args.quiet) System.out.printf("played %s in %,.1f seconds\n", name, stopwatch.seconds());
             if (args.moves) System.out.println(showMoves(n, sln));
         }
     }
