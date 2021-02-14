@@ -59,10 +59,10 @@ public class FrameSolver implements Solver {
     }
 
     BombusSolution loadPreviouslyComputed(int n) {
-        var or = OptimalResult.get(n);
+        var optResult = OptimalResult.get(n);
         BombusSolution result = null;
-        if (or != null && or.moves != null) {
-            return BombusSolution.upgrade(new Solution(Board.of(n), TxList.of(or.moves)));
+        if (optResult != null && optResult.moves != null) {
+            result = BombusSolution.upgrade(new Solution(Board.of(n), TxList.of(optResult.moves)));
         }
         return result;
     }
@@ -152,14 +152,13 @@ public class FrameSolver implements Solver {
             }
 
             if (printSearch) {
-                System.out.printf("  searching for %d promotions totaling as much as %d among %d numbers: %s\n",
-                        maxPromotions, maxPromotionSum, candidates.size(), candidates);
+                System.out.printf("  searching for %d promotions totaling as much as %d among %d numbers\n",
+                        maxPromotions, maxPromotionSum, candidates.size());
             }
 
             var p = new TxPredicate<TxSet>(c -> frame.fits(EmptySet, c));
-            var promotions = Search.findLargest(candidates, maxPromotions, maxPromotionSum, maxPromotionSum - n, p);
-            //var promotions = OldSearch.findLargest(candidates, maxPromotions, maxPromotionSum, p);
-
+            int minSum = Math.max(maxPromotionSum-n, 0);
+            var promotions = Search.findLargest(candidates, maxPromotions, maxPromotionSum, minSum, n, p);
 
             if (printSearch) {
                 System.out.printf("  found %d promotions totaling %d: %s\n",
@@ -185,7 +184,6 @@ public class FrameSolver implements Solver {
             idealMoves = TxSet.subtract(idealMoves, newlyImpossibleMoves);
             Apiary a2 = new Apiary(board, prudentPromotions, new Namer());
             var newMoves = a2.getSolution();
-            //System.out.printf("%d: re-use new move sum: %d, ideal is %d, prudent promotions %s\n", n, newMoves.sum(), idealMoves.sum(), prudentPromotions);
             BombusSolution result = null;
             if (newMoves.sum() == idealMoves.sum()) {
                 result = new BombusSolution(board, newMoves, prudentPromotions);
@@ -203,11 +201,8 @@ public class FrameSolver implements Solver {
                 int newSum = newMoves.sum();
                 int idealSum = idealMoves.sum();
                 int delta = idealSum - newSum;
-                var achievedPromotions = TxSet.and(prudentPromotions, TxSet.of(newMoves));
-                int promoteSum = achievedPromotions.sum();
-                System.out.printf("  reusePrev: scored %,d, %,d less than the ideal score of %,d\n",
-                        newSum, delta, idealSum);
-                System.out.printf("  reusePrev: %d promotions totaled %d\n", achievedPromotions.size(), promoteSum);
+                var fmt = "reusePrev: scored %,d, %,d less than the score of %,d necessary to reuse previous solution";
+                System.out.printf("  " + fmt + "\n", newSum, delta, idealSum);
             }
 
             if (verifyAccelerations && result != null) verifyAcceleration(result);

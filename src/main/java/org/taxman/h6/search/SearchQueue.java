@@ -1,127 +1,68 @@
 package org.taxman.h6.search;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.PrintStream;
-import java.nio.ByteBuffer;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
-import java.util.Iterator;
+
+import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class SearchQueue {
-    private static final int MAX_LIST_LEN = 1000000;  // allow list to grow to this size before writing to file
-    public static boolean showFileAccess = false;
+    // allow a thread list to grow to this size before sending to disk helper
+    private static final int MAX_LIST_LEN = 1000;
 
-    private final int name;
-    private int count = 0;
-    private final List<byte[]> taskData;
-    private Path tmpFile = null;
+    private final DiskHelper diskHelper;
+    private final ConcurrentHashMap<String, List<TaskData>> taskData;
 
-
-    public SearchQueue(int name) {
-        this.name = name;
-        this.taskData = new ArrayList<>();
+    public SearchQueue(int name, SearchQueueManager sqm) {
+        this.taskData = new ConcurrentHashMap<>(Runtime.getRuntime().availableProcessors()*2);
+        this.diskHelper = new DiskHelper(sqm.game, name);
     }
 
     public void add(TaskData td) {
-        var bytes = td.toByteArray();
-        synchronized (this) {
-            if (taskData.size() >= MAX_LIST_LEN) taskDataToFile();
-            taskData.add(bytes);
-            ++count;
+        var threadName = Thread.currentThread().getName();
+        var list = taskData.computeIfAbsent(threadName, x -> new LinkedList<>());
+        list.add(td);
+
+        if (list.size() >= MAX_LIST_LEN) {
+            diskHelper.sendToDisk(list);
+            taskData.put(threadName, new LinkedList<>());
         }
     }
 
-    private void taskDataToFile() {
-        try {
-            if (tmpFile == null) tmpFile = Files.createTempFile("taxman", ".tmp");
-            var baos = new ByteArrayOutputStream();
-            for (var td: taskData) baos.write(td);
-            Files.write(tmpFile, baos.toByteArray(), StandardOpenOption.APPEND);
-            if (showFileAccess) System.out.printf("      wrote %,d tasks to disk for target %d\n", taskData.size(), name);
-            taskData.clear();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    public void onDeck() {
+        diskHelper.switchToLoading();
     }
 
     public Stream<TaskData> stream() {
-        return Stream.concat(streamList(), streamFile());
-    }
-
-    private Stream<TaskData> streamFile() {
-        Stream<TaskData> result;
-        if (tmpFile == null) {
-            result = Stream.empty();
-        } else {
-            var iter = iterateFile();
-            result = Stream.generate(() -> null)
-                .takeWhile(x -> iter.hasNext())
-                .map(x -> iter.next());
-        }
-        return result;
-    }
-
-    private Iterator<TaskData> iterateFile() {
-        try {
-            byte[] bytes = Files.readAllBytes(tmpFile);
-            Files.delete(tmpFile);
-            tmpFile = null;
-            ByteBuffer bb = ByteBuffer.wrap(bytes);
-
-            return new Iterator<>() {
-                int count = 0;
-
-                @Override
-                public boolean hasNext() {
-                    boolean result = bb.hasRemaining();
-                    if (!result && showFileAccess) {
-                        System.out.printf("      read %,d tasks from disk for %d\n", count, name);
-                    }
-                    return result;
-                }
-
-                @Override
-                public TaskData next() {
-                    ++count;
-                    return TaskData.readFromBuffer(bb);
-                }
-            };
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        return Stream.concat(streamList(), diskHelper.stream());
     }
 
     private Stream<TaskData> streamList() {
-        var listCopy = List.copyOf(taskData);
+        var listCopy = taskData.values().stream()
+                .flatMap(List::stream)
+                .collect(Collectors.toList());
         taskData.clear();
-        return listCopy.stream()
-                .parallel()
-                .map(TaskData::fromByteArray);
+        return listCopy.stream();
     }
 
     public void shutdown() {
-        //System.out.println("shutting down " + name + " that had a count of " + count);
-        count = 0;
         taskData.clear();
-        if (tmpFile != null) {
-            try {
-                Files.delete(tmpFile);
-                tmpFile = null;
-            }
-            catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
+        diskHelper.shutdown();
     }
 
-    public void statusReport(PrintStream ps) {
-        if (count > 0) {
-            ps.printf("      %d: %,7d tasks\n", name, count);
-        }
+    public long getCountOfTasksInMemory() {
+        long local = taskData.values().stream()
+                .mapToLong(List::size)
+                .sum();
+        return local + diskHelper.getCountOfTasksInMemory();
+    }
+
+    public long getCountOfTasksOnDisk() {
+        return diskHelper.getTaskCountOnDisk();
+    }
+
+    public long getTotalTaskCount() {
+        return getCountOfTasksInMemory() + getCountOfTasksOnDisk();
     }
 }

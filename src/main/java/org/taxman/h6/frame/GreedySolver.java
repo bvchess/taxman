@@ -29,10 +29,9 @@ public class GreedySolver implements Solver {
 
     public BombusSolution solve(int n) {
         var board = Board.of(n);
-        var a = new Apiary(board, new Namer());
         var frame = FrameBuilder.build(board);
         var p = new TxPredicate<TxSet>(c -> frame.fits(EmptySet, c));
-        var candidates = a.getPromotionCandidateNumbers();
+        var candidates = frame.allCandidateNumbersIncludingDownstream();
         int maxPromotions = frame.estimateMaxPromotions(0);
         var greedyPromotions = new GreedyPromotionMaximizer(candidates, maxPromotions, p).find();
         var b = new Apiary(board, greedyPromotions, new Namer());

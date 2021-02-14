@@ -80,12 +80,15 @@ public class FrameSolverTest {
     void justOne() throws VerificationException {
         int targetGame = 54;
         FrameSolver.printSearch = true;
+        FrameSolver.printAccelerationFailures = true;
         Search.printStatsPerTarget = true;
         Search.printSummary = true;
+
         FrameSolver frameSolver = new FrameSolver();
         System.out.println("playing n=" + targetGame);
         var sln = frameSolver.solve(targetGame);
         sln.verify(targetGame);
+        //ksln.display(System.out);
     }
 
 }

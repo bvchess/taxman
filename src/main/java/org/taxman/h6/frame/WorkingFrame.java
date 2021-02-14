@@ -1,18 +1,22 @@
 package org.taxman.h6.frame;
 
 import org.taxman.h6.bombus.Hive;
+import org.taxman.h6.util.Memo;
 import org.taxman.h6.util.TxSet;
 
 import java.io.PrintStream;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
 public class WorkingFrame extends BaseFrame {
     final Hive hive;
     final TxSet allPromotionCandidateNumbers = TxSet.empty();
-    private final ConcurrentHashMap<TxSet, Boolean> fitsMemo = new ConcurrentHashMap<>();
+    //private final ConcurrentHashMap<TxSet, Boolean> fitsMemo = new ConcurrentHashMap<>();
+    //private final Map<TxSet, Boolean> fitsMemo = LRUCache.make(1000000);
+    private final Memo fitsMemo;
+
     private final AtomicInteger fitsCallCount = new AtomicInteger(0);
 
 
@@ -23,6 +27,7 @@ public class WorkingFrame extends BaseFrame {
             allPromotionCandidateNumbers.appendAll(candidates);
         });
         this.hive = (hives.size() == 1) ? hives.get(0) : hives.get(0).apiary.merge(hives);
+        fitsMemo = new Memo(this.hive.getName());
     }
 
     @Override
@@ -80,15 +85,10 @@ public class WorkingFrame extends BaseFrame {
     }
 
     @Override
-    public boolean fits(TxSet toPromote, TxSet allPromotions) {
+    public boolean fits(TxSet promoteIntoThisHive, TxSet allPromotions) {
         var myPromotions = TxSet.and(factors(), allPromotions);
-        var allRemaining = TxSet.subtract(allPromotions, toPromote);
-        var lump = TxSet.or(toPromote, myPromotions);
-        var result = fitsMemo.getOrDefault(lump, null);
-        if (result == null) {
-            result = fitsInHive(toPromote, myPromotions);
-            fitsMemo.put(lump, result);
-        }
-        return result && downstream.fits(myPromotions, allRemaining);
+        var lump = TxSet.or(promoteIntoThisHive, myPromotions);
+        var fitsInThisHive = fitsMemo.test(lump, () -> fitsInHive(promoteIntoThisHive, myPromotions));
+        return fitsInThisHive && downstream.fits(myPromotions, allPromotions);
     }
 }

@@ -91,6 +91,10 @@ public class Apiary {
         }
     }
 
+    public void finishFrameSetup() {
+        finishSetup();
+        for (var h: hives) h.finishFrameSetup();
+    }
 
     TxSet allSources() {
         return TxSet.of(
@@ -210,13 +214,6 @@ public class Apiary {
         }
     }
 
-    TxList getPromotionCandidates() {
-        TxList candidates = TxList.concat(hives.stream()
-                .map(Hive::getPromotionCandidateNumbers)
-        );
-        return TxList.of(TxSet.of(candidates).streamDescending());  // sort candidates from largest to smallest
-        //return TxList.of(candidates.reverse());  // sort candidates from back to front
-    }
 
     public TxList getSolution() {
         return hives.stream()
@@ -238,7 +235,8 @@ public class Apiary {
 
 
     /*
-    int maxCandidatePromotions() {
+
+    public int maxCandidatePromotions() {
         int result = 0;
         Map<Hive, Integer> freeCount = new HashMap<>();
         hives.forEach(h -> freeCount.put(h, h.freeFactorCount()));
@@ -255,6 +253,14 @@ public class Apiary {
             }
         }
         return result;
+    }
+
+    TxList getPromotionCandidates() {
+        TxList candidates = TxList.concat(hives.stream()
+                .map(Hive::getPromotionCandidateNumbers)
+        );
+        return TxList.of(TxSet.of(candidates).streamDescending());  // sort candidates from largest to smallest
+        //return TxList.of(candidates.reverse());  // sort candidates from back to front
     }
 
     Board boardWithoutClosedHives() {

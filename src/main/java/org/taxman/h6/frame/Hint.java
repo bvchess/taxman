@@ -13,6 +13,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/*
+Here's an example of the kind of thing you can put in hint.json:
+
+  {  "n": 684,
+    "comment": "Ran through 11,135 on Jan 16, 2021, 11107 on Jan 24.",
+    "maxPromotionSum": 11106 }
+ */
+
 public class Hint {
     public final int n;
     public final String comment;

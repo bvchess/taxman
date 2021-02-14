@@ -13,7 +13,7 @@ public class Hive {
     public final Apiary apiary;
     private String name = "";
     private TxSet sources = TxSet.empty();
-    private final TxSet factors = TxSet.empty();
+    private TxSet factors = TxSet.empty();
     private final TxSet mandatoryMoves = TxSet.empty();
     private final TxSet claimedFactors = TxSet.empty();
     private final TxSet impossibleMoves = TxSet.empty();
@@ -64,12 +64,11 @@ public class Hive {
 
     public TxSet sources() {
         //todo: figure out how to have this return an unmodifiable set without calling unmodifiable every time
-        return sources; //.unmodifiable();
+        return sources;
     }
 
     public TxSet factors() {
-        //todo: figure out how to have this return an unmodifiable set without calling unmodifiable every time
-        return factors; //.unmodifiable();
+        return factors;
     }
 
     TxSet allNumbers() {
@@ -93,10 +92,8 @@ public class Hive {
     }
 
     public Set<Hive> upstream() {
-        //        return remainingFactors().stream()
         return allNumbers().stream()
                 .mapToObj(apiary.board::composites)
-                //.mapToObj(apiary::composites)
                 .flatMapToInt(TxSet::stream)
                 .mapToObj(apiary::getHiveForNumber)
                 .filter(h -> h != this)
@@ -127,6 +124,14 @@ public class Hive {
         freeFactorCount = factors.size() - sources.size();
 
         return madeChanges;
+    }
+
+    void finishFrameSetup() {
+        factors = factors.unmodifiable();
+        sources = sources.unmodifiable();
+        //limitedFactors = remainingFactors().unmodifiable();  // trying to avoid doing this over and over
+        //limitedSources = remainingSources().unmodifiable();  // ditto
+
     }
 
     /*
@@ -217,8 +222,6 @@ public class Hive {
     }
 
     public boolean worksWithMods(TxSet promoteIntoHive, TxSet promoteOutOfHive) {
-        if (promoteIntoHive.size() + promoteOutOfHive.size() == 0)
-            return true;
         TxSet newFactors = TxSet.subtract(remainingFactors(), promoteOutOfHive);
         TxSet newSources = TxSet.or(remainingSources(), promoteIntoHive);
         return countFreedoms(newSources, newFactors) > -1;

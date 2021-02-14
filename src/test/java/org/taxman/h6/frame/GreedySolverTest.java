@@ -21,14 +21,15 @@ public class GreedySolverTest {
     }
 
     void doOne(int n) {
+        var printSuboptimal = false;
         var g = new GreedySolver(4);
         g.warnOnImperfectScore = false;
         var sln = g.solve(n);
         var optimal = getExistingSolution(n);
-        //if (optimal.score() != sln.score()) {
-        //    System.out.printf("%d: got %d, optimal is %d, difference is %d\n",
-        //            n, sln.score(), optimal.score(), optimal.score() - sln.score());
-        //}
+        if (printSuboptimal && optimal.score() != sln.score()) {
+            System.out.printf("%d: got %d, optimal is %d, difference is %d\n",
+                    n, sln.score(), optimal.score(), optimal.score() - sln.score());
+        }
     }
 
     @Test

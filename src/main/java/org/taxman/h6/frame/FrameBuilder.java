@@ -20,12 +20,8 @@ public class FrameBuilder {
         this.namer = new Namer();
     }
 
-    private Apiary makeApiary(Board b) {
-        return new Apiary(b, EmptySet, namer);
-    }
-
     private BaseFrame build() {
-            Apiary apiary = makeApiary(board);
+            var apiary = new Apiary(board, EmptySet, namer);
 
             Set<Hive> done = new HashSet<>();
             List<Hive> hives = apiary.hives().stream()
@@ -53,7 +49,7 @@ public class FrameBuilder {
             BaseFrame result = new BaseFrame(levels.size() + 1);
             for(List<Hive> l: levels)
                 result = result.addFrame(l);
-            apiary.finishSetup();
+            apiary.finishFrameSetup();
 
             return result;
     }

@@ -3,8 +3,10 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 TAXMAN_JAR=$DIR/taxman.jar 
+# MEMO_LIMIT="-Dtaxman.memoLimit=30000000"
+
 
 # have to turn off compressedOops because of a bug in OpenJDK11 that prevents MaxRamPercentage from taking more than 32G
-OPTS="-ea -XX:MaxRAMPercentage=100 -XX:-UseCompressedOops"
+OPTS="-ea -XX:MaxRAMPercentage=100 -XX:-UseCompressedOops $MEMO_LIMIT"
 
 java $OPTS -jar $TAXMAN_JAR $@

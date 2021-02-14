@@ -42,12 +42,12 @@ This command will show the optimal games from N=1 to
 N=10:  
     `bin/taxman -s 1-10`  
 
-This command will show debugging output as it looks for an optimal solution for N=450:  
+This command will show debugging output as it searches for an optimal solution for N=450:  
     `bin/taxman -d 3 450`
 
 Approach
 ---------------
-In more than 70% of cases an optimal solution for game N can be quickly derived from the optimal solution to game N-1.
+In about 70% of cases an optimal solution for game N can be quickly derived from the optimal solution to game N-1.
 For games where an optimal solution is not as easy to find, the program takes advantage of the fact that the maximum
 feasible score for game N is no more than N larger than the optimal score for game N-1.  The program tries to find a
 solution totaling the maximum feasible score and, if none can be found, targets a score one less than that.  It
@@ -61,7 +61,7 @@ an optimal set of promotions takes an exponential amount of time in the worst ca
 
 Implementation
 ---------------
-The program includes pre-computed solutions to games from 1 to 683 so that it can make use of the solution to N-1
+The program includes pre-computed solutions to games from 1 to 701 so that it can make use of the solution to N-1
 without having to compute it on every run.  These pre-computed solutions are available in JSON format
 [here](src/main/resources/optimal.json).
 
@@ -79,10 +79,6 @@ as [A019312](https://oeis.org/A019312).
 Other online implementations are <http://davidbau.com/archives/2008/12/07/taxman_game.html> and
 <https://www.cryptool.org/en/cto/highlights/taxman>.
   
-Notes
----------------
-The optimal set of promotions for N=684 sums to at least 11,052 (found via a greedy heuristic), but I've only been
-  able to demonstrate that the total must be 11,106 or less.
 
 Acknowledgements
 ---------------

@@ -2,12 +2,10 @@ package org.taxman.h6;
 
 import org.taxman.h6.frame.FrameSolver;
 import org.taxman.h6.frame.GreedySolver;
-import org.taxman.h6.search.OldSearch;
 import org.taxman.h6.search.Search;
 import org.taxman.h6.game.Solution;
 import org.taxman.h6.game.Solver;
 import org.taxman.h6.game.VerificationException;
-import org.taxman.h6.search.SearchQueue;
 import org.taxman.h6.util.Stopwatch;
 
 import java.time.ZonedDateTime;
@@ -214,7 +212,6 @@ public class Main {
 
     private void setUpDebug() {
         if (args.debugLevel > 0) {
-            OldSearch.printSummary = true;
             Search.printSummary = true;
             FrameSolver.printAccelerations = true;
         }
@@ -222,14 +219,14 @@ public class Main {
             FrameSolver.printSearch = true;
         }
         if (args.debugLevel > 2) {
-            OldSearch.printStatsPerTarget = true;
             Search.printStatsPerTarget = true;
             FrameSolver.printAccelerationFailures = true;
         }
         if (args.debugLevel > 3) {
+            Search.printSearchQueueStats = true;
+        }
+        if (args.debugLevel > 4) {
             FrameSolver.printFrames = true;
-            //Search.queueStatusReport = true;
-            SearchQueue.showFileAccess = true;
         }
     }
 
