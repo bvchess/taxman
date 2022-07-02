@@ -111,6 +111,11 @@ public class FrameSolver implements Solver {
             return result;
         }
 
+        /**
+         *  Primes are easy: just replace the largest prime that's the first move in the solution to N-1 with
+         *  the new prime, N.  The method reusePrev performs a generalization of this function that works for
+         *  some numbers that aren't prime, but I'm keeping this special case because it's a fast shortcut.
+         */
         private BombusSolution solutionForPrime() {
             if (printSearch) {
                 System.out.println("  n is prime, so solution is built from solution to n-1");
@@ -189,7 +194,7 @@ public class FrameSolver implements Solver {
                 result = new BombusSolution(board, newMoves, prudentPromotions);
                 if (printSearch) {
                     System.out.printf("  absolutely ideal score: %,d\n", TxSet.or(prevMoves, n).sum());
-                    System.out.printf("  newly impossible moves: %,d\n", newlyImpossibleMoves.sum());
+                    System.out.printf("  sum of newly impossible moves: %,d\n", newlyImpossibleMoves.sum());
                     System.out.printf("           we settle for: %,d\n", idealMoves.sum());
                     System.out.printf("   using %d of %d possible promotions\n", prudentPromotions.size(), maxPromotions);
                     System.out.printf(

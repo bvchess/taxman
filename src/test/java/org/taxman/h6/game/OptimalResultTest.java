@@ -44,7 +44,7 @@ public class OptimalResultTest {
     }
 
 
-    //@Test
+    @Test
     public void dumpInOeisFormat() {
         String dateFormat = "MMMM dd, yyyy";
         String name = "Brian Chess";

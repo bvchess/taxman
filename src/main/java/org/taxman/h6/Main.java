@@ -214,9 +214,11 @@ public class Main {
         if (args.debugLevel > 0) {
             Search.printSummary = true;
             FrameSolver.printAccelerations = true;
+            GreedySolver.printPromotions = true;
         }
         if (args.debugLevel > 1) {
             FrameSolver.printSearch = true;
+            GreedySolver.printUpgrades = true;
         }
         if (args.debugLevel > 2) {
             Search.printStatsPerTarget = true;

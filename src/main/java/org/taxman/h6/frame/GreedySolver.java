@@ -20,6 +20,9 @@ import static org.taxman.h6.util.TxUnmodifiableSet.EmptySet;
 
 
 public class GreedySolver implements Solver {
+    public static boolean printPromotions = false;
+    public static boolean printUpgrades = false;
+
     public boolean warnOnImperfectScore = true;
     private final int maxComboSize;
 
@@ -104,15 +107,27 @@ public class GreedySolver implements Solver {
 
         private TxSet find() {
             var bestPromotions = baseCase(allCandidates);
-            //System.out.printf("  greedy search initial: %d=%s from %s\n", bestPromotions.sum(), bestPromotions, allCandidates);
+
+            if (printPromotions) {
+                System.out.printf("  greedy search initial promotions: %d=%s\n"
+                        , bestPromotions.sum(), bestPromotions);
+            }
 
             while (true) {
                 var result = improveSkipVector(bestPromotions);
                 if (result.sum() <= bestPromotions.sum()) break;
-                //var dropped = TxSet.subtract(bestPromotions, result);
-                //var added = TxSet.subtract(result, bestPromotions);
-                //System.out.printf("         greedy upgrade: %d = %s: added %s, dropped %s\n", result.sum(), result, added, dropped);
+                if (printUpgrades) {
+                    var dropped = TxSet.subtract(bestPromotions, result);
+                    var added = TxSet.subtract(result, bestPromotions);
+                    System.out.printf("    added %s, dropped %s\n", added, dropped);
+                    System.out.printf("    best promotions are now %d = %s\n", result.sum(), result);
+                }
                 bestPromotions = result;
+            }
+
+            if (printPromotions) {
+                System.out.printf("  greedy search final promotions: %d=%s\n"
+                        , bestPromotions.sum(), bestPromotions);
             }
 
             return bestPromotions;
