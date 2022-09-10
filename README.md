@@ -37,7 +37,7 @@ to take advantage of multi-core CPUs.
 as [A019312](https://oeis.org/A019312).
 - My son built an interactive version of Taxman for N = 16.  You can play it online here: <http://xvade.com/taxman>.
 Other online implementations are <http://davidbau.com/archives/2008/12/07/taxman_game.html> and
-<https://www.cryptool.org/en/cto/highlights/taxman>.
+<https://www.cryptool.org/en/cto/taxman>.
   
 ## Build
 Build using Maven:  
