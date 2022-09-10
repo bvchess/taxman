@@ -1,18 +1,15 @@
 package org.taxman.h6.util;
 
-import java.util.Arrays;
-import java.util.BitSet;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.stream.Collector;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.util.*;
+import java.util.stream.*;
 
 public class TxSet extends TxCollection {
     public static final int MAX_VALUE = 1023;
 
-    final BitSet bits;
+    public final BitSet bits;
 
     static BitSet cloneBits(BitSet bits) {
         return (BitSet) bits.clone();
@@ -31,6 +28,10 @@ public class TxSet extends TxCollection {
     }
 
     public static TxSet of(int... arr) {
+        return new TxSet(intsToBitSet(arr));
+    }
+
+    public static BitSet intsToBitSet(int... arr) {
         int max = 0;
         for (int i : arr) max = Math.max(i, max);
         BitSet bits = new BitSet(max+1);
@@ -38,7 +39,7 @@ public class TxSet extends TxCollection {
             assert i > 0 && i <= MAX_VALUE : "cannot insert " + i + " with max value of " + MAX_VALUE;
             bits.set(i);
         }
-        return new TxSet(bits);
+        return bits;
     }
 
     public static TxSet of(Stream<TxSet> s) {
@@ -59,6 +60,10 @@ public class TxSet extends TxCollection {
 
     TxSet(BitSet b) {
         bits = b;
+    }
+
+    TxSet(int... arr) {
+        this(intsToBitSet(arr));
     }
 
     @Override
@@ -121,12 +126,24 @@ public class TxSet extends TxCollection {
     }
 
     public boolean contains(TxSet other) {
-        return TxSet.subtract(other, this).isEmpty();
+        for (int n = other.max(); n > 0; n = other.nextHighest(n)) {
+            if (!this.contains(n)) return false;
+        }
+        return true;
     }
 
-    public static TxSet and(TxSet first, TxSet second) {
-        BitSet newBits = cloneBits(first.bits);
-        newBits.and(second.bits);
+    public static TxSet and(TxSet s1, TxSet s2) {
+        var newBits = TxSet.cloneBits(s1.bits);
+        newBits.and(s2.bits);
+        return new TxSet(newBits);
+    }
+
+    public static TxSet and(TxSet... sets) {
+        if (sets.length == 0) return empty();
+        var newBits = TxSet.cloneBits(sets[0].bits);
+        for (int i = 1; i < sets.length; i++) {
+            newBits.and(sets[i].bits);
+        }
         return new TxSet(newBits);
     }
 
@@ -139,11 +156,15 @@ public class TxSet extends TxCollection {
     }
 
     public static TxSet or(TxSet... sets) {
-        TxSet result = TxSet.empty();
-        for (TxSet s: sets) {
-            result.bits.or(s.bits);
+        if (sets.length == 0) {
+            return empty();
+        } else {
+            TxSet result = TxSet.of(sets[0]);
+            for (int i = 1; i < sets.length; i++) {
+                result.bits.or(sets[i].bits);
+            }
+            return result;
         }
-        return result;
     }
 
     public static TxSet or(TxSet first, int n) {
@@ -174,6 +195,10 @@ public class TxSet extends TxCollection {
         bits.set(n);
     }
 
+    public void appendAll(TxSet other) {
+        this.bits.or(other.bits);
+    }
+
     @Override
     public int compareTo(TxCollection o) {
         return toString().compareTo(o.toString());
@@ -193,7 +218,7 @@ public class TxSet extends TxCollection {
     }
 
     public String toString(String start, String end) {
-        String meat = stream()
+        String meat = streamDescending()
                 .mapToObj(Integer::toString)
                 .collect(Collectors.joining(", "));
         return start + meat + end;
@@ -267,9 +292,87 @@ public class TxSet extends TxCollection {
         bits.set(n, false);
     }
 
+    public void removeAll(TxSet other) {
+        bits.andNot(other.bits);
+    }
+
     public int nextHighest(int n) {
         int result = bits.previousSetBit(n-1);
         assert result < n;
         return result;
+    }
+
+    public byte[] toBytes() {
+        var arr = descendingArray();
+        ByteBuffer bb = ByteBuffer.allocate(arr.length*2 + 2);
+        bb.putChar((char) arr.length);
+        for (int n: arr) bb.putChar((char) n);
+        return bb.array();
+    }
+
+    public static TxSet read(InputStream is) throws IOException {
+        int length = readShort(is);
+        if (length < 0) return null;
+        var bits = new BitSet();
+        for (int i = 0; i < length; i++) bits.set(readShort(is));
+        return new TxSet(bits);
+    }
+
+    public static TxSet readFromBigArray(byte[] bigArray, int start) {
+        int length = readShortFromBigArray(bigArray, start);
+        if (length < 0) return null;
+        var bits = new BitSet();
+        for (int i = start+2; i < start+1+length*2; i += 2) {
+            bits.set(readShortFromBigArray(bigArray, i));
+        }
+        return new TxSet(bits);
+    }
+
+    static int readShortFromBigArray(byte[] bigArray, int position) {
+        int first = bigArray[position];
+        if (first == -1) return -1;
+        int second = bigArray[position+1] & 0xFF;
+        return (first << 8) + second;
+    }
+
+    protected static int readShort(InputStream is) throws IOException {
+        int first = is.read();
+        if (first == -1) return -1;
+        int second = is.read();
+        return (first << 8) + second;
+    }
+
+    public BitSet toBits() {
+        return cloneBits(bits);
+    }
+
+    /**
+     * Return a stream of combinations from the numbers set of all sizes equal to the size parameter or smaller
+     */
+    public static Stream<TxSet> combinationsUpToSize(TxSet numbers, int size) {
+        return IntStream.rangeClosed(1, size)
+                .mapToObj(x -> combinations(numbers, x))
+                .flatMap(x -> x);
+    }
+
+    /**
+     * Return a stream of all combinations of numbers from the numbers set up to the size given
+     * by the size parameter.
+     */
+    public static Stream<TxSet> combinations(TxSet numbers, int size) {
+        if (numbers.size() < size) {
+            return Stream.of();  // empty
+        } else if (numbers.size() == size) {
+            return Stream.of(numbers);
+        } else if (size == 1) {
+            return numbers.stream()
+                    .mapToObj(TxSet::of);
+        } else {
+            return numbers.stream()
+                    .mapToObj(n -> combinations(TxSet.of(numbers.filter(x -> x < n)), size-1)
+                            .map(set -> TxSet.or(set, n))
+                    )
+                    .flatMap(x -> x);
+        }
     }
 }

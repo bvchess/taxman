@@ -1,6 +1,7 @@
-package org.taxman.h6.search;
+package org.taxman.h6.oldsearch;
 
 import org.taxman.h6.util.Stopwatch;
+import org.taxman.h6.util.TxPredicate;
 import org.taxman.h6.util.TxSet;
 import org.taxman.h6.util.TxWorkerThread;
 
@@ -10,44 +11,44 @@ import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveTask;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.taxman.h6.util.TxUnmodifiableSet.EmptySet;
 
-public class Search {
+public class OldSearch {
     public static boolean printStatsPerTarget = false;
     public static boolean printSummary = false;
     public static boolean printSearchQueueStats = false;
 
 
     private final TxSet candidateNumbers;
-    private final Predicate<TxSet> predicate;
+    private final TxPredicate<TxSet> predicate;
     private final int searchMaxSize;
     private final int searchMaxSum;
     private final int searchMinSum;
     private final SearchQueueManager sqm;
 
-    private final ForkJoinPool pool = TxWorkerThread.pool;
+    private final ForkJoinPool pool;
     private AtomicLong taskCounter;
     private int currentTopLevelTarget;
     private volatile boolean finished = false;
     private boolean forkTasks = true;
 
 
-    public Search(TxSet candidateNumbers, Predicate<TxSet> predicate, int maxSize, int maxSum, int minSum, int game) {
+    public OldSearch(TxSet candidateNumbers, TxPredicate<TxSet> predicate, int maxSize, int maxSum, int minSum, int game) {
         this.candidateNumbers = candidateNumbers;
         this.predicate = predicate;
         this.searchMaxSize = maxSize;
         this.searchMaxSum = maxSum;
         this.searchMinSum = minSum;
         this.sqm = new SearchQueueManager(maxSum, minSum, game);
+        this.pool = TxWorkerThread.getWorkerPool();
     }
 
     public static TxSet findLargest(TxSet numbers, int maxSize, int maxSum, int minSum, int game,
-                                    Predicate<TxSet> predicate) {
-        return new Search(numbers, predicate, maxSize, maxSum, minSum, game).findLargest();
+                                    TxPredicate<TxSet> predicate) {
+        return new OldSearch(numbers, predicate, maxSize, maxSum, minSum, game).findLargest();
     }
 
     private TxSet findLargest() {
@@ -81,10 +82,11 @@ public class Search {
     private TxSet findTarget(int target) {
         Stopwatch stopwatch = (printStatsPerTarget) ? new Stopwatch().start() : null;
 
-        var targetFinders = streamTargetFinders(target)
-                .map(this::submit)
-                .collect(Collectors.toList());
-        if (target < this.searchMaxSum) sqm.shutdown(target);
+        List<TargetFinder> targetFinders;
+        try (var strm=streamTargetFinders(target)) {
+            targetFinders = strm.map(this::submit).collect(Collectors.toList());
+        }
+
         var result = targetFinders.stream()
                 .map(ForkJoinTask::join)
                 .filter(Objects::nonNull)
@@ -98,7 +100,7 @@ public class Search {
         if (stopwatch != null) {
             stopwatch.stop();
             System.out.printf("    searching for %d took %,.2f seconds with %,d starting points and %,d tasks\n",
-                     target, stopwatch.seconds(), targetFinders.size(), taskCounter.get());
+                    target, stopwatch.seconds(), targetFinders.size(), taskCounter.get());
         }
         if (printSearchQueueStats) sqm.statusReport(System.out);
         return result;
@@ -146,7 +148,7 @@ public class Search {
 
             if (wakeAt >= searchMinSum) {
                 //System.out.printf("waking at %d: %d=%s\n", wakeAt, base.sum(), base);
-                sqm.add(wakeAt, new TaskData(candidates, base, maxPotential));
+                sqm.add(wakeAt, new TaskData(candidates, base, maxPotential, EmptySet));
             }
         }
 
@@ -157,7 +159,7 @@ public class Search {
 
             //System.out.printf("      base: %s, target %d, maxSize: %d\n", base, target, maxSize);
 
-            TxSet result = null;
+            TxSet result;
             if (target == 0) {
                 result = base;
             } else {

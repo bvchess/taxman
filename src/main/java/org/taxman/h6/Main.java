@@ -2,10 +2,12 @@ package org.taxman.h6;
 
 import org.taxman.h6.frame.FrameSolver;
 import org.taxman.h6.frame.GreedySolver;
-import org.taxman.h6.search.Search;
+import org.taxman.h6.search.SearchManager;
+import org.taxman.h6.oldsearch.OldSearch;
 import org.taxman.h6.game.Solution;
 import org.taxman.h6.game.Solver;
 import org.taxman.h6.game.VerificationException;
+import org.taxman.h6.util.Memo;
 import org.taxman.h6.util.Stopwatch;
 
 import java.time.ZonedDateTime;
@@ -35,20 +37,24 @@ public class Main {
         public final boolean csv;
         public final boolean moves;
         public final int debugLevel;
+        public final int memoizationSizeLimitMillions;
         public final boolean announceGame;
         public final boolean quiet;
         public final boolean greedy;
+        public final boolean oldSearch;
         public final List<BoardRange> boardRanges = new ArrayList<>();
 
         public Arguments(String[] argStrings) {
             Iterator<String> iter = Arrays.stream(argStrings).iterator();
             int debugLevel = -1;
+            int memoizationSizeLimitMillions = Memo.sizeLimitMillions;
             boolean showGame = false;
             boolean showHelp = (argStrings.length == 0);
             boolean csv = false;
             boolean moves = false;
             boolean quiet = false;
             boolean greedy = false;
+            boolean oldSearch = false;
 
             try {
                 while (iter.hasNext()) {
@@ -82,6 +88,14 @@ public class Main {
                         case "-g":
                         case "--greedy":
                             greedy = true;
+                            break;
+                        case "-o":
+                        case "--old":
+                            oldSearch = true;
+                            break;
+                        case "-l":
+                        case "--limit":
+                            memoizationSizeLimitMillions = Integer.parseInt(iter.next());
                             break;
                         default:
                             if (arg.startsWith("-")) {
@@ -117,12 +131,14 @@ public class Main {
             csv = csv && debugLevel < 0;
 
             this.debugLevel = debugLevel;
+            this.memoizationSizeLimitMillions = memoizationSizeLimitMillions;
             this.quiet = quiet;
             this.showGame = showGame;
             this.showHelp = showHelp;
             this.moves = moves;
             this.csv = csv;
             this.greedy = greedy;
+            this.oldSearch = oldSearch;
             this.announceGame = showGame || debugLevel > -1;
         }
 
@@ -152,8 +168,12 @@ public class Main {
                 "        Use a greedy algorithm instead of an optimal solver\n"+
                 "    -h, --help\n"+
                 "        Show this message and quit without playing any games.\n"+
+                "    -l, --limit\n"+
+                "        Old search memoization cache size limit in millions (defaults to 10)\n"+
                 "    -m --moves\n"+
                 "        Output the list of moves\n"+
+                "    -o --old\n"+
+                "        Use the search procedure from 2021\n"+
                 "    -q, --quiet\n"+
                 "        Don't show the game\n"+
                 "    -s, --show\n"+
@@ -212,24 +232,32 @@ public class Main {
 
     private void setUpDebug() {
         if (args.debugLevel > 0) {
-            Search.printSummary = true;
+            OldSearch.printSummary = true;
             FrameSolver.printAccelerations = true;
             GreedySolver.printPromotions = true;
         }
         if (args.debugLevel > 1) {
+            SearchManager.debugPrintSummary = true;
             FrameSolver.printSearch = true;
             GreedySolver.printUpgrades = true;
         }
         if (args.debugLevel > 2) {
-            Search.printStatsPerTarget = true;
+            OldSearch.printStatsPerTarget = true;
             FrameSolver.printAccelerationFailures = true;
         }
         if (args.debugLevel > 3) {
-            Search.printSearchQueueStats = true;
+            SearchManager.debugPrintDetail = true;
+            OldSearch.printSearchQueueStats = true;
         }
         if (args.debugLevel > 4) {
             FrameSolver.printFrames = true;
+            FrameSolver.printCacheStats = true;
+            Memo.trackHits = true;
         }
+        if (args.debugLevel > 5) {
+            SearchManager.debugPrintFineGrainDetail = true;
+        }
+
     }
 
     private void go() {
@@ -237,7 +265,16 @@ public class Main {
             System.out.println(helpString());
             return;
         }
+        if (args.memoizationSizeLimitMillions != Memo.sizeLimitMillions) {
+            Memo.sizeLimitMillions = args.memoizationSizeLimitMillions;
+            System.out.printf("memoization cache size limit set to %d million", Memo.sizeLimitMillions);
+        }
+
         setUpDebug();
+        if (args.oldSearch) {
+            FrameSolver.useOldSearch = true;
+            if (args.debugLevel > 0) System.out.println("using 2021 search procedure");
+        }
         if (args.csv) outputCsvHeader();
         Stopwatch bigWatch = new Stopwatch().start();
         var solver = makeSolver();

@@ -1,8 +1,8 @@
 package org.taxman.h6.bombus;
 
+import org.taxman.h6.frame.FrameTestResult;
 import org.taxman.h6.util.TxList;
 import org.taxman.h6.util.TxSet;
-import org.taxman.h6.util.TxUnmodifiableSet;
 
 import java.io.PrintStream;
 import java.util.List;
@@ -100,11 +100,11 @@ public class Hive {
                 .collect(Collectors.toSet());
     }
 
-    TxSet remainingSources() {
+    public TxSet remainingSources() {
         return TxSet.subtract(sources, TxSet.or(mandatoryMoves, impossibleMoves));
     }
 
-    TxSet remainingFactors() {
+    public TxSet remainingFactors() {
         return TxSet.subtract(factors, claimedFactors);
     }
 
@@ -131,7 +131,6 @@ public class Hive {
         sources = sources.unmodifiable();
         //limitedFactors = remainingFactors().unmodifiable();  // trying to avoid doing this over and over
         //limitedSources = remainingSources().unmodifiable();  // ditto
-
     }
 
     /*
@@ -221,13 +220,51 @@ public class Hive {
         return countFreedoms(remainingSources, remainingFactors) > -1;
     }
 
-    public boolean worksWithMods(TxSet promoteIntoHive, TxSet promoteOutOfHive) {
-        TxSet newFactors = TxSet.subtract(remainingFactors(), promoteOutOfHive);
-        TxSet newSources = TxSet.or(remainingSources(), promoteIntoHive);
-        return countFreedoms(newSources, newFactors) > -1;
+    public FrameTestResult worksWithMods(TxSet promoteIntoHive, TxSet promoteOutOfHive, TxSet alreadyRemoved) {
+        //System.out.printf("worksWithMods for %s and %s removals\n", getName(), alreadyRemoved);
+        TxSet remainingFactors = TxSet.subtract(TxSet.subtract(remainingFactors(), promoteOutOfHive), alreadyRemoved);
+        TxSet remainingMoves = TxSet.subtract(TxSet.or(remainingSources(), promoteIntoHive), alreadyRemoved);
+        if (remainingMoves.size() > remainingFactors.size()) return FrameTestResult.FAIL;
+
+        TxSet newRemovals = null;
+        boolean progress = true;
+        while (progress) {
+            //modEvalCount.incrementAndGet();
+            if (remainingMoves.size() == 0) return FrameTestResult.reportSuccess(newRemovals);
+            progress = false;
+            // take out any moves that have only a single factor
+            for (int m = remainingMoves.max(); m > 0;  m = remainingMoves.nextHighest(m)) {
+                TxSet factorsForMove = TxSet.and(apiary.factors(m), remainingFactors);
+                switch (factorsForMove.size()) {
+                    case 0:
+                        return FrameTestResult.FAIL;
+                    case 1:
+                        int f = factorsForMove.max();
+                        remainingMoves.remove(m);
+                        remainingFactors.remove(f);
+                        if (newRemovals == null) newRemovals = TxSet.empty();
+                        newRemovals.appendAll(m, f);
+                        progress = true;
+                }
+            }
+            // take out any factors that have only a single move
+            for (int f = remainingFactors.max(); f > 0;  f = remainingFactors.nextHighest(f)) {
+                TxSet movesForFactor = TxSet.and(apiary.composites(f), remainingMoves);
+                if (movesForFactor.size() == 1) {
+                    int m = movesForFactor.max();
+                    remainingMoves.remove(m);
+                    remainingFactors.remove(f);
+                    // can't add m and f to removed here because the move has more than one factor, so
+                    // we don't know which factor m really should take
+                    progress = true;
+                }
+            }
+        }
+        return FrameTestResult.FAIL;
     }
 
-    // if all moves can be taken, return the number of free factors.  If not all moves can be taken, return -1
+
+        // if all moves can be taken, return the number of free factors.  If not all moves can be taken, return -1
     private int countFreedoms(TxSet moves, TxSet factors) {
         if (moves.size() == 0) {
             return factors.size();

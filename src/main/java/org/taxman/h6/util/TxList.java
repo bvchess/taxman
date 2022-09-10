@@ -5,6 +5,10 @@ import java.util.*;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+/**
+ * List of integers stored in an array.  Could use ArrayList, but then you get Integer objects rather than
+ * just ints.
+ */
 public class TxList extends TxCollection {
     public static final int DEFAULT_SIZE = 10;
 
@@ -82,6 +86,10 @@ public class TxList extends TxCollection {
     TxList(int[] arr, int count) {
         this.arr = arr;
         elementCount = count;
+    }
+
+    public static TxList empty() {
+        return new TxList();
     }
 
     public void append(int n) {

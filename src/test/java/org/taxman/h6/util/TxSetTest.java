@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.stream.IntStream;
 
@@ -40,19 +42,19 @@ public class TxSetTest {
         TxSet set = TxSet.of(17, 19);
         set.append(21);
         set.append(29);
-        assert(set.equals(TxSet.of(29, 21, 19, 17)));
+        assert (set.equals(TxSet.of(29, 21, 19, 17)));
     }
 
     @Test
     public void subtract() {
-        assert(TxSet.subtract(oneTwoThreeSet, threeFourFiveSet).equals(oneTwoSet));
-        assert(TxSet.subtract(oneTwoThreeSet, 3).equals(oneTwoSet));
+        assert (TxSet.subtract(oneTwoThreeSet, threeFourFiveSet).equals(oneTwoSet));
+        assert (TxSet.subtract(oneTwoThreeSet, 3).equals(oneTwoSet));
     }
 
     @Test
     public void members() {
         oneTwoThreeSet.appendAll(threeFourFiveSet);
-        assert(Arrays.equals(oneTwoThreeSet.toArray(), oneThroughFiveArray));
+        assert (Arrays.equals(oneTwoThreeSet.toArray(), oneThroughFiveArray));
     }
 
     @Test
@@ -60,23 +62,23 @@ public class TxSetTest {
         TxSet set = TxSet.of(1);
         set.append(2);
         set.append(10);
-        assert(set.contains(2));
-        assert(TxSet.of(ninetyNineOneHundred).contains(99));
-        assert(!TxSet.of(1).contains(101));
+        assert (set.contains(2));
+        assert (TxSet.of(ninetyNineOneHundred).contains(99));
+        assert (!TxSet.of(1).contains(101));
     }
 
     @Test
     public void cardinality() {
-        assert(oneTwoSet.size() == 2);
-        assert(oneTwoThreeSet.size() == 3);
-        assert(TxSet.subtract(oneTwoSet, oneTwoThreeSet).isEmpty());
+        assert (oneTwoSet.size() == 2);
+        assert (oneTwoThreeSet.size() == 3);
+        assert (TxSet.subtract(oneTwoSet, oneTwoThreeSet).isEmpty());
     }
 
     @Test
     public void iterate() {
         int sum = 0;
-        for (int i: oneTwoThreeSet.toArray()) sum += i;
-        assert(sum == 6);
+        for (int i : oneTwoThreeSet.toArray()) sum += i;
+        assert (sum == 6);
     }
 
     @Test
@@ -85,22 +87,22 @@ public class TxSetTest {
         set.append(5);
         set.append(10);
         set.appendAll(TxList.of(15, 20));
-        assert(set.sum() == 50);
+        assert (set.sum() == 50);
     }
 
     @Test
     public void and() {
-        assert(TxSet.and(oneTwoThreeSet, oneTwoSet).equals(oneTwoSet));
+        assert (TxSet.and(oneTwoThreeSet, oneTwoSet).equals(oneTwoSet));
     }
 
     @Test
     public void unmodifiable() {
-        assert(oneTwoThreeSet.unmodifiable().equals(oneTwoThreeSet));
+        assert (oneTwoThreeSet.unmodifiable().equals(oneTwoThreeSet));
     }
 
     @Test
     public void unmodifiable2() {
-        assert(TxSet.or(TxSet.of(1, 2), 3).unmodifiable().equals(oneTwoThreeSet));
+        assert (TxSet.or(TxSet.of(1, 2), 3).unmodifiable().equals(oneTwoThreeSet));
     }
 
     @Test
@@ -108,5 +110,41 @@ public class TxSetTest {
         var lg = TxSet.of(1, 2, 5, 7).largest(2);
         var expected = TxSet.of(5, 7);
         assert lg.equals(expected) : "oops, got " + lg + " rather than " + expected;
+    }
+
+    @Test
+    void testReadWrite() throws IOException {
+        var x = TxSet.of(2, 3, 5, 7, 9, 11, 13);
+        var bytes = x.toBytes();
+        assert bytes.length == x.size() * 2 + 2;
+        var y = TxSet.read(new ByteArrayInputStream(bytes));
+        assert x.equals(y);
+        var z = TxUnmodifiableSet.read(new ByteArrayInputStream(bytes));
+        assert x.equals(z);
+    }
+
+    @Test
+    void testBigArray() {
+        var arr = new byte[1000];
+        var x = TxSet.of(80, 11, 9, 7, 6, 5, 3);
+        var positions = new int[3];
+        var head = 0;
+        for (int i = 0; i < positions.length; i++) {
+            var bytes = x.toBytes();
+            System.arraycopy(bytes, 0, arr, head, bytes.length);
+            positions[i] = head;
+            head += bytes.length;
+        }
+        for (int position : positions) {
+            var y = TxSet.readFromBigArray(arr, position);
+            assert x.equals(y);
+        }
+    }
+
+    @Test
+    void combos() {
+        var set = TxSet.of(1, 2, 3, 4, 5);
+        assert TxSet.combinations(set, 2).count() == 10;
+        assert TxSet.combinationsUpToSize(set, 2).count() == 15;
     }
 }

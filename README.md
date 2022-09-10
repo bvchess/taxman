@@ -15,7 +15,7 @@ learn more.  Here are some examples:
 
 This command will show the moves made and the tax paid for optimal games from N=1 to
 N=10:  
-    `bin/taxman -s 1-10`  
+    `bin/taxman -s 1-10`
 
 This command will show debugging output as it searches for an optimal solution for N=450:  
     `bin/taxman -d 3 450`
@@ -39,6 +39,11 @@ as [A019312](https://oeis.org/A019312).
 Other online implementations are <http://davidbau.com/archives/2008/12/07/taxman_game.html> and
 <https://www.cryptool.org/en/cto/highlights/taxman>.
   
+## Build
+Build using Maven:  
+    `mvn install`  
+
+Tested using Java 18.
 
 ## Acknowledgements
 Thanks to EJ Technologies for the use of their excellent

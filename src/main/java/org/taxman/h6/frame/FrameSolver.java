@@ -1,5 +1,6 @@
 package org.taxman.h6.frame;
 
+import org.taxman.h6.search.SearchManager;
 import org.taxman.h6.game.Board;
 import org.taxman.h6.game.OptimalResult;
 import org.taxman.h6.game.Solution;
@@ -7,10 +8,11 @@ import org.taxman.h6.bombus.Apiary;
 import org.taxman.h6.bombus.BombusSolution;
 import org.taxman.h6.bombus.Namer;
 import org.taxman.h6.game.Solver;
-import org.taxman.h6.search.Search;
+import org.taxman.h6.oldsearch.OldSearch;
 import org.taxman.h6.util.TxList;
 import org.taxman.h6.util.TxPredicate;
 import org.taxman.h6.util.TxSet;
+
 import static org.taxman.h6.util.TxUnmodifiableSet.EmptySet;
 
 import java.io.PrintStream;
@@ -24,10 +26,13 @@ public class FrameSolver implements Solver {
     public static boolean printAccelerations = false;
     public static boolean printAccelerationFailures = false;
     public static boolean printSearch = false;
+    public static boolean printCacheStats = false;
 
     // some debugging modes
     public static boolean verifyAccelerations = false;
     public static boolean cheatIfNoAcceleration = false;
+    public static boolean useOldSearch = false;
+
 
 
     private final Map<Integer, BombusSolution> solutionMap = new HashMap<>();
@@ -84,7 +89,7 @@ public class FrameSolver implements Solver {
         BombusSolution solve() {
             BombusSolution sln = solveBasedOnPrev();
             if (cheatIfNoAcceleration && sln == null) {
-                System.out.println("BIG CHEAT for " + n);
+                System.out.printf("BIG CHEAT for %d, using previously computed solution\n", n);
                 var cheat = loadPreviouslyComputed(n);
                 sln = BombusSolution.upgrade(cheat);
             } else if (sln == null) {
@@ -152,28 +157,41 @@ public class FrameSolver implements Solver {
             var maxPromotions = frame.estimateMaxPromotions(0);
             var candidates = frame.allCandidateNumbersIncludingDownstream();
             if (candidates.largest(maxPromotions).sum() < maxPromotionSum) {
-                //System.out.println(n + ": lowering the max by " + (promotionSumMax - candidates.largest(maxPromotions).sum()));
                 maxPromotionSum = candidates.largest(maxPromotions).sum();
             }
 
+
+            int minSum = Math.max(maxPromotionSum-n, 0);
+
             if (printSearch) {
-                System.out.printf("  searching for %d promotions totaling as much as %d among %d numbers\n",
-                        maxPromotions, maxPromotionSum, candidates.size());
+                System.out.printf("  searching for %d promotions totaling between %d and %d among %d numbers\n",
+                        maxPromotions, maxPromotionSum, minSum, candidates.size());
             }
 
-            var p = new TxPredicate<TxSet>(c -> frame.fits(EmptySet, c));
-            int minSum = Math.max(maxPromotionSum-n, 0);
-            var promotions = Search.findLargest(candidates, maxPromotions, maxPromotionSum, minSum, n, p);
+            TxSet promotions;
+            if (useOldSearch) {
+                var p = makeOldPredicate();
+                promotions = OldSearch.findLargest(candidates, maxPromotions, maxPromotionSum, minSum, n, p);
+            } else {
+                promotions = SearchManager.findLargest(board, frame);
+            }
 
             if (printSearch) {
                 System.out.printf("  found %d promotions totaling %d: %s\n",
                         promotions.size(), promotions.sum(), promotions);
             }
 
+            if (useOldSearch && printCacheStats) {
+                System.out.println(frame.getCacheStats());
+            }
+
             Apiary a = new Apiary(board, promotions, new Namer());
             return new BombusSolution(board, a.getSolution(), promotions);
         }
 
+        private TxPredicate<TxSet> makeOldPredicate() {
+            return new TxPredicate<>(c -> frame.fits(EmptySet, c, EmptySet));
+        }
 
         private BombusSolution reusePrev() {
             var a1 = new Apiary(board, new Namer());

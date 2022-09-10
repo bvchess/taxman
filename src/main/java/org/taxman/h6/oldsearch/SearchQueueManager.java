@@ -1,4 +1,4 @@
-package org.taxman.h6.search;
+package org.taxman.h6.oldsearch;
 
 import java.io.PrintStream;
 import java.time.ZonedDateTime;
@@ -26,6 +26,7 @@ public class SearchQueueManager {
     }
 
     Stream<TaskData> stream(int target) {
+        assert target >= min : String.format("target %d is less than the minimum of %d", target, min);
         if (target - 1 - min >= 0) searchQueues.get(target-1-min).onDeck();
         return searchQueues.get(target-min).stream();
     }
@@ -35,8 +36,16 @@ public class SearchQueueManager {
     }
 
     public void shutdown(int target) {
+        //System.out.printf("shutting down search queue %d\n", target);
         searchQueues.get(target-min).shutdown();
     }
+
+    public void shutdownAllBelowThreshold(int threshold) {
+        for (int i = min; i < threshold; i++) {
+            searchQueues.get(i-min).shutdown();
+        }
+    }
+
 
     public void shutdownAll() {
         searchQueues.stream()
@@ -48,7 +57,7 @@ public class SearchQueueManager {
         var timestamp = ZonedDateTime.now().format(timestampFormat);
         long total = getTotalTaskCount();
         long onDisk = getCountOfTasksOnDisk();
-        double onDiskPercent = 100.0 * onDisk / total;
+        double onDiskPercent = (total != 0) ? 100.0 * onDisk / total : 0;
 
         ps.printf("    %s active targets with %,d tasks (%.1f%% on disk) at %s\n",
                 getCountOfActiveSearchTargets(), total, onDiskPercent, timestamp

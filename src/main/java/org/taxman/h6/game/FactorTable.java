@@ -1,5 +1,6 @@
 package org.taxman.h6.game;
 
+import org.taxman.h6.util.TxList;
 import org.taxman.h6.util.TxSet;
 import org.taxman.h6.util.TxUnmodifiableSet;
 
@@ -19,6 +20,7 @@ public class FactorTable {
     private final TxSet[] abbreviatedComposites;
     public final TxSet primes;
     public final TxSet numbers;
+    public final TxList[] primeFactors;
 
     private static class ScratchSet extends BitSet {
         public final int n;
@@ -80,6 +82,7 @@ public class FactorTable {
             abbreviatedFactors = new TxSet[0];
             abbreviatedComposites = new TxSet[0];
             primes = TxUnmodifiableSet.EmptySet;
+            primeFactors = new TxList[0];
             return;
         }
 
@@ -153,6 +156,7 @@ public class FactorTable {
         abbreviatedFactors = scratchAbbreviatedFactors.toTxSetArray();
         abbreviatedComposites = scratchAbbreviatedComposites.toTxSetArray();
         primes = TxSet.of(getRange().filter(n -> scratchFactors.get(n).cardinality() == 2)).unmodifiable();
+        primeFactors = buildPrimeFactorTable();
     }
 
     public int getHighest() {
@@ -185,6 +189,25 @@ public class FactorTable {
 
     public boolean isPrime(int n) {
         return primes.contains(n);
+    }
+
+    private TxList computePrimeFactors(int n, TxList[] table) {
+        if (n == 1) {
+            return TxList.empty();
+        } else if (isPrime(n)) {
+            return TxList.of(n);
+        } else {
+            int largest = TxSet.subtract(getFactors(n), n).max();
+            return TxList.concat(TxList.of(table[largest]), table[n/largest]);
+        }
+    }
+
+    public TxList[] buildPrimeFactorTable() {
+        var table = new TxList[highest+1];
+        for (int i = 1; i <= highest; i++) {
+            table[i] = computePrimeFactors(i, table);
+        }
+        return table;
     }
 
     public void printTables(PrintStream out) {

@@ -35,8 +35,6 @@ public class Apiary {
         this.treatAsSources = treatAsSources;
         assert board.set.contains(treatAsSources) : "board does not contain all requested sources: "
                 + treatAsSources + " the board is missing " + TxSet.subtract(treatAsSources, board.set);
-        //assert board.set.contains(treatAsSinks) : "board does not contain all requested sinks: "
-        //        + treatAsSinks + " the board is missing " + TxSet.subtract(treatAsSinks, board.set);
         this.hiveMap = new HashMap<>();
         this.effectiveSources = TxSet.or(TxSet.of(sources()), treatAsSources);
         this.effectiveSinks =  TxSet.of(sinks());
@@ -232,54 +230,4 @@ public class Apiary {
                 .map(Hive::getPromotionCandidateNumbers)
                 .collect(TxSet.collector());
     }
-
-
-    /*
-
-    public int maxCandidatePromotions() {
-        int result = 0;
-        Map<Hive, Integer> freeCount = new HashMap<>();
-        hives.forEach(h -> freeCount.put(h, h.freeFactorCount()));
-        for (Hive h: hives) {
-            for (Hive h2: h.downstream()) {
-                int fcH = freeCount.get(h);
-                int fcH2 = freeCount.get(h2);
-                int numToMove = Math.min(fcH, fcH2);
-                if (numToMove > 0) {
-                    result += numToMove;
-                    freeCount.put(h, fcH - numToMove);
-                    freeCount.put(h2, fcH2 - numToMove);
-                }
-            }
-        }
-        return result;
-    }
-
-    TxList getPromotionCandidates() {
-        TxList candidates = TxList.concat(hives.stream()
-                .map(Hive::getPromotionCandidateNumbers)
-        );
-        return TxList.of(TxSet.of(candidates).streamDescending());  // sort candidates from largest to smallest
-        //return TxList.of(candidates.reverse());  // sort candidates from back to front
-    }
-
-    Board boardWithoutClosedHives() {
-        TxSet remainingNumbers = TxSet.of(hives.stream()
-                .filter(Hive::hasFreeFactors)
-                .map(Hive::allNumbers)
-        );
-        return new Board(remainingNumbers, board.fm);
-    }
-
-
-
-    int sumOfSourcesFromClosedHives() {
-        return hives.stream()
-                .filter(h -> !h.hasFreeFactors())
-                .map(Hive::sources)
-                .flatMapToInt(TxSet::stream)
-                .sum();
-    }
-
-     */
 }

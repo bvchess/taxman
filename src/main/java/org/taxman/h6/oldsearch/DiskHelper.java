@@ -1,4 +1,4 @@
-package org.taxman.h6.search;
+package org.taxman.h6.oldsearch;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -95,8 +95,6 @@ public class DiskHelper extends Thread {
         return mailbox.stream()
                 .flatMap(List::stream);
     }
-
-
 
     public void run() {
         try {

@@ -12,9 +12,7 @@ import org.taxman.h6.util.TxSet;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Predicate;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static org.taxman.h6.util.TxUnmodifiableSet.EmptySet;
 
@@ -33,7 +31,7 @@ public class GreedySolver implements Solver {
     public BombusSolution solve(int n) {
         var board = Board.of(n);
         var frame = FrameBuilder.build(board);
-        var p = new TxPredicate<TxSet>(c -> frame.fits(EmptySet, c));
+        var p = new TxPredicate<TxSet>(c -> frame.fits(EmptySet, c, EmptySet));
         var candidates = frame.allCandidateNumbersIncludingDownstream();
         int maxPromotions = frame.estimateMaxPromotions(0);
         var greedyPromotions = new GreedyPromotionMaximizer(candidates, maxPromotions, p).find();
@@ -55,10 +53,10 @@ public class GreedySolver implements Solver {
 
     public class GreedyPromotionMaximizer {
         private final TxSet allCandidates;
-        private final Predicate<TxSet> predicate;
+        private final TxPredicate<TxSet> predicate;
         private final int maxPromotions;
 
-        public GreedyPromotionMaximizer(TxSet allCandidates, int maxPromotions, Predicate<TxSet> predicate) {
+        public GreedyPromotionMaximizer(TxSet allCandidates, int maxPromotions, TxPredicate<TxSet> predicate) {
             this.allCandidates = allCandidates;
             this.predicate = predicate;
             this.maxPromotions = maxPromotions;
@@ -135,7 +133,8 @@ public class GreedySolver implements Solver {
 
         private TxSet improveSkipVector(TxSet base) {
             var bestVector = this.promotionsToSkipVector(base);
-            return GreedySolver.combinationsUpToSize(TxSet.of(IntStream.rangeClosed(1, maxPromotions)), maxComboSize)
+            //System.out.printf("best vector is %s\n", bestVector);
+            return TxSet.combinationsUpToSize(TxSet.of(IntStream.rangeClosed(1, maxPromotions)), maxComboSize)
                     .parallel()
                     .map(combo -> addToVector(bestVector, combo))
                     .map(this::skipVectorToPromotions)
@@ -149,27 +148,4 @@ public class GreedySolver implements Solver {
         return result;
     }
 
-    static Stream<TxSet> combinationsUpToSize(TxSet numbers, int size) {
-        return IntStream.rangeClosed(1, size)
-                .mapToObj(x -> combinations(numbers, x))
-                .flatMap(x -> x);
-    }
-
-    static Stream<TxSet> combinations(TxSet numbers, int size) {
-        if (numbers.size() < size) {
-            return Stream.of();
-        } else if (numbers.size() == size) {
-            return Stream.of(numbers);
-        } else if (size == 1) {
-            return numbers.stream()
-                    .mapToObj(TxSet::of);
-        } else {
-            return numbers.stream()
-                    .parallel()
-                    .mapToObj(n -> combinations(TxSet.of(numbers.filter(x -> x < n)), size-1)
-                            .map(set -> TxSet.or(set, n))
-                    )
-                    .flatMap(x -> x);
-        }
-    }
 }

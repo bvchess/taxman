@@ -5,8 +5,10 @@ import org.taxman.h6.game.Board;
 import org.taxman.h6.bombus.Apiary;
 import org.taxman.h6.bombus.Namer;
 import org.taxman.h6.game.VerificationException;
-import org.taxman.h6.search.Search;
+import org.taxman.h6.oldsearch.OldSearch;
+import org.taxman.h6.util.Memo;
 import org.taxman.h6.util.TxSet;
+import org.taxman.h6.util.TxWorkerThread;
 
 import java.util.stream.IntStream;
 
@@ -76,19 +78,26 @@ public class FrameSolverTest {
         }
     }
 
-    //@Test
-    void justOne() throws VerificationException {
-        int targetGame = 54;
-        FrameSolver.printSearch = true;
-        FrameSolver.printAccelerationFailures = true;
-        Search.printStatsPerTarget = true;
-        Search.printSummary = true;
+    void setDebugFlags(boolean value) {
+        FrameSolver.printFrames = value;
+        FrameSolver.printSearch = value;
+        FrameSolver.printAccelerationFailures = value;
+        OldSearch.printStatsPerTarget = value;
+        OldSearch.printSummary = value;
+        FrameSolver.printCacheStats = value;
+        Memo.trackHits = value;
+    }
 
+    @Test
+    void justOne() throws VerificationException {
+        int targetGame = 85;
+        TxWorkerThread.maxThreads = 1;
+        setDebugFlags(true);
         FrameSolver frameSolver = new FrameSolver();
         System.out.println("playing n=" + targetGame);
         var sln = frameSolver.solve(targetGame);
         sln.verify(targetGame);
-        //ksln.display(System.out);
+        setDebugFlags(false);
     }
 
 }

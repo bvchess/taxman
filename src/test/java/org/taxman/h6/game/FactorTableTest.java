@@ -3,7 +3,7 @@ package org.taxman.h6.game;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.taxman.h6.game.FactorTable;
+import org.taxman.h6.util.TxList;
 import org.taxman.h6.util.TxSet;
 
 public class FactorTableTest {
@@ -75,5 +75,13 @@ public class FactorTableTest {
         FactorTable fm = new FactorTable(TxSet.of(2, 3, 4, 5, 30));
         //fm.printTables(System.out);
         assertSetEquality(fm.getAbbreviatedFactors(30), 2, 3, 5);
+    }
+
+    @Test
+    public void primeFactors() {
+        FactorTable fm100 = new FactorTable(100);
+        assert TxList.of(2, 2, 2, 2).equals(fm100.primeFactors[16]);
+        assert TxList.of(5, 5, 2, 2).equals(fm100.primeFactors[100]);
+        assert TxList.of(5, 3, 2).equals(fm100.primeFactors[30]);
     }
 }

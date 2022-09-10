@@ -28,12 +28,12 @@ public class FrameBuilder {
                     .filter(Hive::hasFreeFactors)
                     .collect(Collectors.toList());
 
-            List<List<Hive>> levels = new ArrayList<>();
             List<Hive> level = hives.stream()
                     .filter(h -> h.downstream().stream().noneMatch(Hive::hasFreeFactors))  // start from sinks
                     .sorted(Comparator.comparingInt(h -> h.sources().min()))
                     .collect(Collectors.toList());
 
+            List<List<Hive>> levels = new ArrayList<>();
             while (!level.isEmpty()) {
                 levels.add(level);
                 done.addAll(level);
@@ -49,6 +49,7 @@ public class FrameBuilder {
             BaseFrame result = new BaseFrame(levels.size() + 1);
             for(List<Hive> l: levels)
                 result = result.addFrame(l);
+            result.finishFrameSetup();
             apiary.finishFrameSetup();
 
             return result;
