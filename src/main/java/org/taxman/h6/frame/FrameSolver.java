@@ -30,7 +30,6 @@ public class FrameSolver implements Solver {
 
     // some debugging modes
     public static boolean verifyAccelerations = false;
-    public static boolean cheatIfNoAcceleration = false;
     public static boolean useOldSearch = false;
 
 
@@ -88,13 +87,7 @@ public class FrameSolver implements Solver {
 
         BombusSolution solve() {
             BombusSolution sln = solveBasedOnPrev();
-            if (cheatIfNoAcceleration && sln == null) {
-                System.out.printf("BIG CHEAT for %d, using previously computed solution\n", n);
-                var cheat = loadPreviouslyComputed(n);
-                sln = BombusSolution.upgrade(cheat);
-            } else if (sln == null) {
-                sln = solveTheHardWay();
-            }
+            if (sln == null) sln = solveTheHardWay();
             return sln;
         }
 
@@ -106,6 +99,7 @@ public class FrameSolver implements Solver {
         }
 
         private BombusSolution solveBasedOnPrev() {
+            if (getPrevious() == null && n > 1) return null;
             BombusSolution result = board.fm.isPrime(n) ? solutionForPrime() : reusePrev();
             if (result != null) {
                 ++countOfAccelerated;
@@ -139,17 +133,14 @@ public class FrameSolver implements Solver {
         private int getMaxPromotionSum() {
             var a = new Apiary(board, new Namer());
             var inTheBag = a.getSolution().sum();
-            var result = getPrevious().score() + n - inTheBag;
-            var hint = Hint.get(n);
-            if (hint != null && hint.maxPromotionSum > 0) result = hint.maxPromotionSum;
-            return result;
+            var prev = getPrevious();
+            return (prev != null) ? prev.score() + n - inTheBag : -1;
         }
 
         private BombusSolution getPrevious() {
             var result = solutionMap.getOrDefault(n-1, null);
             if (result == null) result = loadPreviouslyComputed(n-1);
-            if (result == null) throw new RuntimeException("cannot find solution to " + (n-1));
-            //if (result == null) result = Multi.this.solve(n-1);
+            //if (result == null) throw new RuntimeException("cannot find solution to " + (n-1));
             return result;
         }
 

@@ -288,6 +288,18 @@ public class Main {
         }
     }
 
+    /**
+     * Simple solver interface for use by systems that want to include Taxman as a library
+     * @param n: the game to play
+     * @return an array of moves that result in an optimal score
+     */
+    public static int[] solve(int n) {
+        var main = new Main(new String[]{});
+        var solver = main.makeSolver();
+        var sln = solver.solve(n);
+        return sln.moves.toArray();
+    }
+
     public static void main(String[] argStrings) {
         new Main(argStrings).go();
     }

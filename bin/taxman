@@ -3,6 +3,6 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 TAXMAN_JAR=$DIR/taxman.jar 
 
-OPTS="-ea -XX:MaxRAMPercentage=90 -XX:+PrintCommandLineFlags"
+OPTS="-ea -XX:MaxRAMPercentage=90"
 
 java $OPTS -jar $TAXMAN_JAR $@
