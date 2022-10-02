@@ -22,7 +22,7 @@ This command will show debugging output as it searches for an optimal solution f
 
 
 ## Implementation
-The program includes pre-computed solutions to games from 1 to 701 so that it can make use of the solution to N-1
+The program includes pre-computed solutions to games from 1 to 1000 so that it can make use of the solution to N-1
 without having to compute it on every run.  These pre-computed solutions are available in JSON format
 [here](src/main/resources/optimal.json).
 
