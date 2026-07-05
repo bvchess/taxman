@@ -72,6 +72,33 @@ once per candidate for O(N·E) = O(N² log log N), and the final ordering is
 O(|C|²).  Comfortably polynomial; the full N=1..1000 verification runs in
 under a minute of pure Python.
 
+### Why the upper-half answer can be trusted
+
+Three provable facts pin the upper half down.  (1) A number above N/2
+has no multiples in the game, so it can never be taken as tax: it is a
+pure prize, either claimed by the player or inherited by the taxman at
+the end.  (2) Claiming a prize requires paying tax, and every divisor
+of a prize lies at or below N/2, so each claim spends one single-use
+lower-half coupon - distinct prizes need distinct coupons.  Sets of
+prizes that can be assigned distinct coupons form a transversal
+matroid, where greedy-by-value is provably optimal: **no legal game's
+upper half can outscore the greedy coupon-assignable prize set.**
+(3) Coupons must also survive until spent (a claim sweeps every
+remaining divisor of the claimed number), which is the peeling check.
+
+Measured against that proven matroid ceiling, the playable optimum
+sits a whisker below: the pure-matching bound overshoots in 911/999
+games, but only by ~101 points on average (257 points at N=1000, or
+0.09% of the upper sum).  N=39 is the minimal specimen: matching
+allows {22, ...} worth 486, but no claiming order delivers it, and the
+true optimum takes 21 for 485 - exactly this project's set.  So the
+answer is squeezed: a proven ceiling just above, a playable
+construction from below, and the known optima landing exactly on the
+construction in all 1000 games.  The one unproven step is that a
+full-game optimum never sacrifices upper value for lower gain; every
+prize outweighs any single coupon (prize > N/2 >= coupon), and no
+counterexample exists through N=1000.
+
 ## How much of the game is in the lower half?
 
 Since the upper half is solvable in polynomial time, the hard part of
