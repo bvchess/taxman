@@ -388,6 +388,39 @@ would extend below it.  (Also documented here: OneTax is not strictly
 one-tax - Moniot's rescue rule pays two taxes in ~23% of these kill
 events, e.g. pick 368 sweeping 92 and 184 at n=500.)
 
+## Transition anatomy: solving N by searching near N-1 (n=500-1000)
+
+`transitions.py` measures, for every transition n-1 -> n, the kind and
+depth of search needed to reach the optimal n solution from an adapted
+n-1 solution (exact upper set + previous lower roles + insertion).
+Full per-transition records in `transitions.json`.  Headlines:
+
+* **76.2% of transitions need no search at all**: pure insertion lands
+  exactly on the optimal solution (gap 0 in 382/501).
+* **Locality is perfect**: all 834 changed lower numbers across all
+  transitions lie within divisor-distance 2 of the arriving n.  The
+  search neighborhood is fully characterized and small.
+* **Geodesic depth**: 0 flips in 382 games, 1-3 flips in 51 more
+  (single flips and small compounds), **blocked in 68 (13.6%)** - real
+  landscape valleys where every improving move is an atomic bundle of
+  4+ flips (e.g. n=507: add 198+182, drop 154+220, net +6, every
+  smaller step strictly worse).  Blind steepest-ascent reaches optimal
+  in 78.4% of transitions; when it stalls, the residual averages just
+  82 points (~0.04% of score).
+* Discovered en route: the greedy strategy's playability test is
+  provably incomplete - forcing only the candidate's own coupons
+  cannot break cycles running through other picks' assignments, so
+  many of its 16K "cycle" rejections are false vetoes.  The two-tier
+  evaluator here (greedy test backed by a complete solve_mini oracle)
+  is the repair.
+
+Implication for a continuation solver: insertion + a depth-3 flip
+search over the distance-2 neighborhood of n reproduces the optimal
+solution in ~87% of transitions and lands within ~0.04% otherwise;
+closing the last 13.6% requires bundle moves (coupled add/remove sets)
+or accepting temporary score descents.  Per-transition cost of the
+full diagnostic protocol: ~0.5s.
+
 ## Performance
 
 Per-game wall time in pure Python (best of 3, `python3 bench.py`), with
@@ -442,6 +475,7 @@ python3 -m pytest test_taxman_mini.py
 | `bench.py` | per-strategy timing, scaling exponents, and profiling |
 | `diagnose.py` | divergence autopsy: per-miss fate logs for OneTax and greedy |
 | `chains.py` | funding-chain depth analysis of the missed numbers |
+| `transitions.py` | search kind/depth needed to solve n from the n-1 solution |
 | `moniot_table.json` | Robert Moniot's published N≤128 results (for validation) |
 | `approx_results.json` | per-game scores of every strategy for N=1..1000 |
 | `test_taxman_mini.py` | unit tests anchored to the wiki's examples |
