@@ -299,6 +299,29 @@ a single game.  The four-way portfolio with greedy - which still wins
 192 games outright, mostly via its 89 exact optima - reaches
 **99.427%**, leaving about 0.57% of optimal on the table.
 
+### Fixing greedy's false vetoes made it the champion
+
+The transition diagnostic later proved greedy's acceptance test
+incomplete: on a precedence cycle it only retried the candidate's own
+coupons, falsely vetoing playable picks whose cycles route through
+other selections' assignments.  try_select now falls back to a
+complete tier (the solve_mini bipartite reduction, verified against
+the full precedence) before rejecting.  The transformation:
+
+| greedy | before fix | after fix |
+|---|---|---|
+| mean % of optimal | 98.97% | **99.86%** |
+| worst game | 97.81% | **99.08%** |
+| exactly optimal | 89/999 | **214/999** |
+| share of all optimal points | 98.601% | **99.851%** |
+
+Fixed greedy is now the strongest single strategy by a wide margin
+(the fork oracle held 99.414%), gaining 1.32M points across the range
+with 891 games improved and 16 slightly regressed; cycle rejections
+fell ~62%, and the four-strategy portfolio (99.854%) is now
+essentially fixed greedy alone.  Earlier autopsy and rejection
+numbers for greedy in this README describe the pre-fix version.
+
 ## Why a 2-tax rule cannot be bolted onto OneTax
 
 The tax census above suggested an attractive idea: optimal games make
