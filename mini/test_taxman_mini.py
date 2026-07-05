@@ -97,6 +97,22 @@ def test_replay_rejects_taxless_selection():
     assert replay([5], {1, 5})
 
 
+def test_approx_strategies_are_legal_and_sane():
+    from approx import cascade, check_sequence, divisor_lists, greedy, one_tax
+
+    divs = divisor_lists(128)
+    for n in (2, 5, 10, 21, 50, 128):
+        greedy_score = check_sequence(n, greedy(n, divs))
+        cascade_score = check_sequence(n, cascade(n, divs))
+        assert greedy_score >= cascade_score
+        assert one_tax(n, divs) > 0
+
+    # greedy finds the known optimal for the wiki's walkthrough game...
+    assert check_sequence(21, greedy(21, divs)) == 144
+    # ...and reproduces the N=5 example from the wiki's game introduction.
+    assert check_sequence(5, greedy(5, divs)) == 9
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(pytest.main([__file__, "-q"]))

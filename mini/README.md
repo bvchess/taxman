@@ -72,13 +72,87 @@ once per candidate for O(N·E) = O(N² log log N), and the final ordering is
 O(|C|²).  Comfortably polynomial; the full N=1..1000 verification runs in
 under a minute of pure Python.
 
+## How much of the game is in the lower half?
+
+Since the upper half is solvable in polynomial time, the hard part of
+Taxman is choosing the selections at or below N/2.  From the known
+optimal solutions (`python3 halves.py`):
+
+| N range | lower-half selections | share of moves | share of points | max share |
+|---|---|---|---|---|
+| 2-100 | 1.9 | 8.6% | 4.28% | 8.11% |
+| 101-300 | 10.0 | 11.6% | 6.68% | 8.90% |
+| 301-600 | 24.8 | 12.7% | 7.35% | 8.08% |
+| 601-1000 | 45.2 | 13.0% | 7.53% | 7.94% |
+
+At N=1000, 58 of the 435 optimal selections are below N/2, worth 7.66%
+of the score.  The share never exceeds 8.90% (N=114), so playing the
+upper half perfectly already guarantees more than 91% of the optimal
+score — the entire computationally hard part of the game is fighting
+over the last ~8%.
+
+## Approximating the full game in O(n²)
+
+`approx.py` extends the upper-half machinery to the whole game.  It is
+built on a characterization of playability that generalizes the
+ordering argument above:
+
+> A set of selections can all be played, in some order, **iff** there is
+> a matching assigning each selection a distinct divisor still in the
+> game, such that the precedence relation *"a before b whenever a's
+> assigned divisor divides b, or a divides b"* is acyclic.  Any
+> topological order of the precedence is a legal game.
+
+The **greedy** strategy is then the full-game generalization of "take
+the highest prime": consider n, n-1, ..., 2 and accept each number if
+an augmenting path can add it to the matching (if no augmenting path
+exists, no matching covers it — a permanent, well-founded rejection)
+and a precedence-respecting assignment can be found.  This is O(n)
+augmenting searches of O(n log n) each, plus one acyclicity check per
+acceptance — about O(n² log n) worst case, a few hundred milliseconds
+at n=1000 in pure Python.
+
+Results for N=1..1000 against the known optima, alongside the pure
+band-by-band cascade of upper-half mini games (**cascade**) and two
+heuristics from [Robert Moniot's strategy comparison]
+(https://www.dsm.fordham.edu/~moniot/taxman-strategies-comparison.html)
+reimplemented here (**onetax**, **maxturn** — our implementations match
+his published N≤128 table in 128/128 games for MaxTurn and 127/128 for
+OneTax, where at N=128 ours scores 5289 vs his 5193):
+
+| strategy | mean % of optimal | worst game | exactly optimal |
+|---|---|---|---|
+| greedy (this project) | 98.97% | 97.81% | 89/999 |
+| onetax (Moniot) | 99.10% | 96.00% | 42/999 |
+| cascade (this project) | 93.02% | 91.10% | 19/999 |
+| maxturn (Carmony & Holliday) | 90.55% | 86.12% | 14/999 |
+
+Selected games:
+
+| n | optimal | greedy | onetax | cascade | maxturn |
+|---|---|---|---|---|---|
+| 21 | 144 | **144** | 144 | 135 | 135 |
+| 100 | 3164 | **3161** | 3148 | 2976 | 2904 |
+| 128 | 5301 | **5289** | 5289 | 4945 | 4816 |
+| 500 | 78934 | 77631 | **78284** | 72849 | 71100 |
+| 1000 | 315426 | 311260 | **312350** | 291258 | 286608 |
+
+So an O(n²)-class algorithm gets within about 1% of optimal: greedy has
+the best worst case (never below 97.8%) and finds the most exact optima
+(89, including every game up to N=52); OneTax has a slightly better
+mean for large N.  The cascade line quantifies what the verified
+upper-half theory achieves entirely on its own, with no promotions —
+about 93%, matching the lower-half share analysis above.
+
 ## Running it
 
 No dependencies beyond Python 3.8+ (pytest for the test suite).
 
 ```
-python3 verify.py                  # check N=1..1000 against optimal.json
+python3 verify.py                  # check the upper-half theory, N=1..1000
 python3 verify.py --max-n 200 -v   # smaller range, per-game detail
+python3 halves.py                  # lower-half share of the optimal score
+python3 approx.py                  # full-game strategy comparison (~9 min)
 python3 -m pytest test_taxman_mini.py
 ```
 
@@ -86,6 +160,10 @@ python3 -m pytest test_taxman_mini.py
 
 | file | contents |
 |---|---|
-| `taxman_mini.py` | the algorithm: `maximal_factors`, `solve_mini`, `optimize_mini`, `order_for_real_game`, `solve_upper_half` |
-| `verify.py` | checks the theory against `optimal.json` for N=1..1000 |
+| `taxman_mini.py` | the core algorithm: `maximal_factors`, `solve_mini`, `optimize_mini`, `order_for_real_game`, `solve_upper_half` |
+| `verify.py` | checks the upper-half theory against `optimal.json` for N=1..1000 |
+| `halves.py` | how much of the optimal score comes from selections ≤ N/2 |
+| `approx.py` | full-game approximation strategies and the Moniot comparison |
+| `moniot_table.json` | Robert Moniot's published N≤128 results (for validation) |
+| `approx_results.json` | per-game scores of every strategy for N=1..1000 |
 | `test_taxman_mini.py` | unit tests anchored to the wiki's examples |
