@@ -90,12 +90,32 @@ upper half can outscore the greedy coupon-assignable prize set.**
 (3) Coupons must also survive until spent (a claim sweeps every
 remaining divisor of the claimed number), which is the peeling check.
 
+Why does greedy-largest-first survive here when it fails for the game
+at large?  What makes Taxman hard is the one-for-two trade: skipping a
+larger number so that two smaller ones, summing to more, become
+claimable.  Above N/2 that trade cannot exist: every claim spends
+exactly one coupon, so skipping a prize frees exactly one coupon,
+which funds at most one other prize - a one-for-one market, where you
+always keep the bigger prize.  At the matching level this is provable
+(if one prize individually blocks each of two others, Hall's condition
+forces all three onto the same coupon, so the two block each other
+too - the matroid exchange property in plain clothes).  The trades
+that require backtracking live below N/2, where a number is dual-use -
+prize or coupon - and skipping one decision cascades value through
+chains of reassignments.  That is the promotions/bin-packing step, and
+it is why solving the one-for-one part exactly in O(n^2) collapses the
+search to the ~13% of selections that are contested.
+
 Measured against that proven matroid ceiling, the playable optimum
 sits a whisker below: the pure-matching bound overshoots in 911/999
 games, but only by ~101 points on average (257 points at N=1000, or
 0.09% of the upper sum).  N=39 is the minimal specimen: matching
 allows {22, ...} worth 486, but no claiming order delivers it, and the
-true optimum takes 21 for 485 - exactly this project's set.
+true optimum takes 21 for 485 - exactly this project's set.  The
+ordering constraint sits outside the one-for-one argument above, so
+greedy is not formally immune there - but brute force shows unique
+optimal upper sets through n=54, and no optimal game through n=1000
+ever skips a greedily-feasible prize above N/2.
 
 ### What is independently certified, and what is not
 
