@@ -59,7 +59,7 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
-from taxman_mini import optimize_mini, solve_mini
+from taxman_mini import MiniInfeasible, optimize_mini, solve_mini
 from verify import DEFAULT_OPTIMAL
 
 DEFAULT_MONIOT = Path(__file__).resolve().parent / "moniot_table.json"
@@ -108,6 +108,28 @@ def _rollback(owner: Dict[int, int], trail: List[Tuple[int, Optional[int]]]) -> 
             del owner[f]
         else:
             owner[f] = previous
+
+
+def _complete_matching(
+    target: Set[int], divs: Sequence[List[int]]
+) -> Optional[Dict[int, int]]:
+    """Decide playability of `target` exactly via the Taxman Mini reduction.
+
+    Tier 1's cycle retry only reshuffles the candidate's own coupon; a real
+    cycle can require OTHER picks' coupons to move too, which falsely
+    vetoes playable candidates (see transitions.py's SetEval, which proves
+    this out).  This is the complete tier: reduce target to a bipartite
+    Taxman Mini game -- each pick maps to the set of its proper divisors
+    NOT in target -- and let solve_mini decide exactly, returning a full
+    pick -> divisor matching, or None if no assignment covers every pick.
+    """
+    mf = {c: {d for d in divs[c] if d not in target} for c in target}
+    factors: Set[int] = set().union(*mf.values()) if mf else set()
+    try:
+        _, matching = solve_mini(target, factors, mf)
+    except MiniInfeasible:
+        return None
+    return matching
 
 
 def _is_acyclic(selected: Set[int], owner: Dict[int, int], n: int) -> bool:
@@ -218,6 +240,21 @@ def greedy(
                 if _is_acyclic(selected, owner, n):
                     return True
                 _rollback(owner, trail)
+
+        # Tier 1 exhausted every retry of m's own coupon and still cycles.
+        # Tier 2: ask the trusted oracle (solve_mini) whether the whole
+        # current pick set (selected already includes m here) admits ANY
+        # acyclic assignment, not just ones reachable by reshuffling m's
+        # coupon alone.  A hit replaces the owner map wholesale; a miss
+        # falls through to the same permanent "cycle" rejection as before.
+        matching = _complete_matching(selected, divs)
+        if matching is not None:
+            owner_candidate = {f: c for c, f in matching.items()}
+            if _is_acyclic(selected, owner_candidate, n):
+                owner.clear()
+                owner.update(owner_candidate)
+                return True
+
         selected.discard(m)
         _rollback(owner, pre_trail)
         if rejections is not None:
