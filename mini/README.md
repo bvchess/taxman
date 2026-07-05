@@ -15,8 +15,8 @@ Checked against the known optimal solutions in
 [`optimal.json`](../src/main/resources/optimal.json) - which were
 themselves produced by the frame-based solver, so see
 "What is independently certified" below for how much of this is
-verified without shared assumptions (everything through n=54,
-exhaustively):
+verified without shared assumptions (everything through n=63,
+exhaustively through n=62):
 
 ```
 games checked:        1000
@@ -114,7 +114,7 @@ allows {22, ...} worth 486, but no claiming order delivers it, and the
 true optimum takes 21 for 485 - exactly this project's set.  The
 ordering constraint sits outside the one-for-one argument above, so
 greedy is not formally immune there - but brute force shows unique
-optimal upper sets through n=54, and no optimal game through n=1000
+optimal upper sets through n=62, and no optimal game through n=1000
 ever skips a greedily-feasible prize above N/2.
 
 ### What is independently certified, and what is not
@@ -130,9 +130,11 @@ what it can using only arguments with no shared assumptions:
   score, so every entry of optimal.json is a sound lower bound.
 * **Brute force** - an exact solver over raw pot states (no frames, no
   matchings, no maximal factors) reproduces every optimal score for
-  **n = 1..54** and shows this project's upper-half set is the
-  **unique** optimal upper set in all 54 games.  The wall is n=55
-  (memoized state space, ~150s/game in pure Python).
+  **n = 1..62** and shows this project's upper-half set is the
+  **unique** optimal upper set in all 62 games; the certificate chain
+  then adds n=63.  The wall is n=63 at ~150s/game using bitmask states
+  (bitpot.py) under PyPy - 12.7x faster than the original pure-Python
+  sets, which stalled at n=54.
 * **Matching bound** - the maximum-weight-matching upper bound,
   recomputed here from scratch, equals the recorded score in 27 games;
   all of them lie below the brute-force frontier, so it adds nothing
@@ -143,8 +145,8 @@ what it can using only arguments with no shared assumptions:
   are scattered in runs of at most 4, and none sits directly on the
   frontier, so the chain currently certifies nothing further.
 
-Bottom line: games 1..54 are certified unconditionally, including the
-uniqueness of the upper-half set; for 55..1000, optimal.json is the
+Bottom line: games 1..63 are certified unconditionally, including the
+uniqueness of the upper-half set through 62; for 64..1000, optimal.json is the
 best known result and the 1000/1000 agreement between it and this
 algorithm is strong consistency between two implementations of one
 theory - not an independent proof of either.  The matroid ceiling and
