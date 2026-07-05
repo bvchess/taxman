@@ -449,6 +449,29 @@ closing the last 13.6% requires bundle moves (coupled add/remove sets)
 or accepting temporary score descents.  Per-transition cost of the
 full diagnostic protocol: ~0.5s.
 
+## The continuation solver (v1)
+
+`continuation.py` implements the search-near-N-1 system: exact upper
+half, previous solution's lower roles, certificate check, then
+single-flip ascent and bundle moves (SetEval, now shared in
+`seteval.py`, provides incremental matching with the complete
+solve_mini playability tier).  Every produced solution is replayed as
+a legal game in-solver.
+
+Seeded from optimal(499) and self-fed on 500..540: **25/41 games exact
+(61%), mean gap 12.1 points (~0.015% of score)** - about ten times
+closer to optimal than fixed greedy on the same slice - with 500..520
+solved 21/21.  The misses begin at n=525 and are exactly the
+documented "blocked valley" class: crossing them needs atomic swaps of
+3-4 simultaneous removals (n=525: remove {116,186,189,250}, add
+{147,174,210,248}), beyond v1's two-removal bundles, and they fail the
+same way even when seeded from the true optimal n-1 - genuine
+landscape, not accumulated drift.  Cost: certified games <0.2s;
+valley games 20-70s (the complete playability tier dominates).
+
+Open items: deeper bundles or temporary-descent moves for the ~13.6%
+valley class, and an incremental SetEval to cut valley-game cost.
+
 ## Performance
 
 Per-game wall time in pure Python (best of 3, `python3 bench.py`), with
@@ -504,6 +527,8 @@ python3 -m pytest test_taxman_mini.py
 | `diagnose.py` | divergence autopsy: per-miss fate logs for OneTax and greedy |
 | `chains.py` | funding-chain depth analysis of the missed numbers |
 | `transitions.py` | search kind/depth needed to solve n from the n-1 solution |
+| `seteval.py` | incremental set evaluator: matching + complete playability tier |
+| `continuation.py` | the continuation solver: solve n by searching near n-1 |
 | `moniot_table.json` | Robert Moniot's published N≤128 results (for validation) |
 | `approx_results.json` | per-game scores of every strategy for N=1..1000 |
 | `test_taxman_mini.py` | unit tests anchored to the wiki's examples |
