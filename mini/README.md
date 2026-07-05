@@ -365,6 +365,29 @@ matching is nearly perfect - only 32 upper misses in 501 games - but
 its cycle handling only retries the candidate's own coupon choices,
 never re-routing other selections to break the cycle.
 
+### How deep do the re-routing chains go?
+
+`chains.py` follows each missed number's funding chain backward through
+the OneTax game (full results in `divergence_chains.json`).  The answer
+is stark: **post-hoc re-routing recovers essentially nothing.**  Across
+all 5,649 taxed misses in 500..1000, not one chain resolves at depths
+1-8 by finding an idle alternative coupon; OneTax leaves nothing idle.
+The chains terminate at role decisions instead: in 2,598 cases (897K
+points, half the loss) the needed coupon **was itself picked by the
+player**; 1,376 (380K) exit the optimal solution entirely; 1,661 (455K)
+tangle in same-turn multi-sweeps from the rescue rule.  Moreover 80% of
+taxed misses had zero divisors left when swept - already dead as picks,
+the sweep a formality; the losing moment came much earlier, when their
+last own-coupon was consumed.
+
+Conclusion: the assignment failures cannot be fixed reactively.  They
+must be prevented prospectively - by deciding coupon-vs-pick roles in
+advance and protecting the reservations - which is exactly what the
+upper-half machinery does above N/2 and what a rolling band ledger
+would extend below it.  (Also documented here: OneTax is not strictly
+one-tax - Moniot's rescue rule pays two taxes in ~23% of these kill
+events, e.g. pick 368 sweeping 92 and 184 at n=500.)
+
 ## Performance
 
 Per-game wall time in pure Python (best of 3, `python3 bench.py`), with
@@ -418,6 +441,7 @@ python3 -m pytest test_taxman_mini.py
 | `bound.py` | the Franklín-Moniot upper bound (max-weight matching over maximal-factor edges) |
 | `bench.py` | per-strategy timing, scaling exponents, and profiling |
 | `diagnose.py` | divergence autopsy: per-miss fate logs for OneTax and greedy |
+| `chains.py` | funding-chain depth analysis of the missed numbers |
 | `moniot_table.json` | Robert Moniot's published N≤128 results (for validation) |
 | `approx_results.json` | per-game scores of every strategy for N=1..1000 |
 | `test_taxman_mini.py` | unit tests anchored to the wiki's examples |
