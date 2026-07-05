@@ -1,5 +1,6 @@
 [
 {
+"oracle": 2,
 "n": 2,
 "opt": 2,
 "onetax": 2,
@@ -10,6 +11,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 3,
 "n": 3,
 "opt": 3,
 "onetax": 3,
@@ -20,6 +22,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 7,
 "n": 4,
 "opt": 7,
 "onetax": 7,
@@ -30,6 +33,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 9,
 "n": 5,
 "opt": 9,
 "onetax": 9,
@@ -40,6 +44,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 15,
 "n": 6,
 "opt": 15,
 "onetax": 15,
@@ -50,6 +55,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 17,
 "n": 7,
 "opt": 17,
 "onetax": 17,
@@ -60,6 +66,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 21,
 "n": 8,
 "opt": 21,
 "onetax": 21,
@@ -70,6 +77,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 30,
 "n": 9,
 "opt": 30,
 "onetax": 30,
@@ -80,6 +88,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 40,
 "n": 10,
 "opt": 40,
 "onetax": 40,
@@ -90,6 +99,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 44,
 "n": 11,
 "opt": 44,
 "onetax": 44,
@@ -100,6 +110,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 50,
 "n": 12,
 "opt": 50,
 "onetax": 48,
@@ -110,6 +121,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 52,
 "n": 13,
 "opt": 52,
 "onetax": 50,
@@ -120,6 +132,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 66,
 "n": 14,
 "opt": 66,
 "onetax": 64,
@@ -130,6 +143,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 81,
 "n": 15,
 "opt": 81,
 "onetax": 81,
@@ -140,6 +154,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 89,
 "n": 16,
 "opt": 89,
 "onetax": 89,
@@ -150,6 +165,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 93,
 "n": 17,
 "opt": 93,
 "onetax": 93,
@@ -160,6 +176,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 111,
 "n": 18,
 "opt": 111,
 "onetax": 111,
@@ -170,6 +187,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 113,
 "n": 19,
 "opt": 113,
 "onetax": 113,
@@ -180,6 +198,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 123,
 "n": 20,
 "opt": 124,
 "onetax": 121,
@@ -190,6 +209,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 144,
 "n": 21,
 "opt": 144,
 "onetax": 144,
@@ -200,6 +220,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 166,
 "n": 22,
 "opt": 166,
 "onetax": 166,
@@ -210,6 +231,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 170,
 "n": 23,
 "opt": 170,
 "onetax": 170,
@@ -220,6 +242,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 182,
 "n": 24,
 "opt": 182,
 "onetax": 178,
@@ -230,6 +253,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 198,
 "n": 25,
 "opt": 198,
 "onetax": 198,
@@ -240,6 +264,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 224,
 "n": 26,
 "opt": 224,
 "onetax": 224,
@@ -250,6 +275,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 251,
 "n": 27,
 "opt": 251,
 "onetax": 247,
@@ -260,6 +286,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 279,
 "n": 28,
 "opt": 279,
 "onetax": 279,
@@ -270,6 +297,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 285,
 "n": 29,
 "opt": 285,
 "onetax": 285,
@@ -280,6 +308,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 301,
 "n": 30,
 "opt": 301,
 "onetax": 297,
@@ -290,6 +319,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 303,
 "n": 31,
 "opt": 303,
 "onetax": 299,
@@ -300,6 +330,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 319,
 "n": 32,
 "opt": 319,
 "onetax": 315,
@@ -310,6 +341,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 352,
 "n": 33,
 "opt": 352,
 "onetax": 352,
@@ -320,6 +352,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 386,
 "n": 34,
 "opt": 386,
 "onetax": 386,
@@ -330,6 +363,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 418,
 "n": 35,
 "opt": 418,
 "onetax": 418,
@@ -340,6 +374,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 442,
 "n": 36,
 "opt": 442,
 "onetax": 442,
@@ -350,6 +385,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 448,
 "n": 37,
 "opt": 448,
 "onetax": 448,
@@ -360,6 +396,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 486,
 "n": 38,
 "opt": 486,
 "onetax": 486,
@@ -370,6 +407,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 503,
 "n": 39,
 "opt": 503,
 "onetax": 503,
@@ -380,6 +418,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 523,
 "n": 40,
 "opt": 525,
 "onetax": 523,
@@ -390,6 +429,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 527,
 "n": 41,
 "opt": 529,
 "onetax": 527,
@@ -400,6 +440,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 569,
 "n": 42,
 "opt": 571,
 "onetax": 569,
@@ -410,6 +451,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 571,
 "n": 43,
 "opt": 573,
 "onetax": 571,
@@ -420,6 +462,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 615,
 "n": 44,
 "opt": 617,
 "onetax": 615,
@@ -430,6 +473,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 660,
 "n": 45,
 "opt": 660,
 "onetax": 660,
@@ -440,6 +484,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 706,
 "n": 46,
 "opt": 706,
 "onetax": 706,
@@ -450,6 +495,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 710,
 "n": 47,
 "opt": 710,
 "onetax": 710,
@@ -460,6 +506,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 734,
 "n": 48,
 "opt": 734,
 "onetax": 726,
@@ -470,6 +517,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 758,
 "n": 49,
 "opt": 758,
 "onetax": 750,
@@ -480,6 +528,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 808,
 "n": 50,
 "opt": 808,
 "onetax": 800,
@@ -490,6 +539,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 833,
 "n": 51,
 "opt": 833,
 "onetax": 825,
@@ -500,6 +550,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 885,
 "n": 52,
 "opt": 885,
 "onetax": 877,
@@ -510,6 +561,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 891,
 "n": 53,
 "opt": 891,
 "onetax": 883,
@@ -520,6 +572,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 935,
 "n": 54,
 "opt": 940,
 "onetax": 919,
@@ -530,6 +583,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 981,
 "n": 55,
 "opt": 981,
 "onetax": 981,
@@ -540,6 +594,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 1009,
 "n": 56,
 "opt": 1017,
 "onetax": 1009,
@@ -550,6 +605,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 1032,
 "n": 57,
 "opt": 1040,
 "onetax": 1032,
@@ -560,6 +616,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 1090,
 "n": 58,
 "opt": 1098,
 "onetax": 1090,
@@ -570,6 +627,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 1096,
 "n": 59,
 "opt": 1104,
 "onetax": 1096,
@@ -580,6 +638,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 1120,
 "n": 60,
 "opt": 1137,
 "onetax": 1120,
@@ -590,6 +649,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 1122,
 "n": 61,
 "opt": 1139,
 "onetax": 1122,
@@ -600,6 +660,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 1184,
 "n": 62,
 "opt": 1201,
 "onetax": 1184,
@@ -610,6 +671,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 1255,
 "n": 63,
 "opt": 1264,
 "onetax": 1255,
@@ -620,6 +682,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 1287,
 "n": 64,
 "opt": 1296,
 "onetax": 1287,
@@ -630,6 +693,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 1319,
 "n": 65,
 "opt": 1328,
 "onetax": 1319,
@@ -640,6 +704,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 1385,
 "n": 66,
 "opt": 1394,
 "onetax": 1385,
@@ -650,6 +715,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 1391,
 "n": 67,
 "opt": 1400,
 "onetax": 1391,
@@ -660,6 +726,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 1459,
 "n": 68,
 "opt": 1468,
 "onetax": 1459,
@@ -670,6 +737,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 1490,
 "n": 69,
 "opt": 1499,
 "onetax": 1490,
@@ -680,6 +748,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 1566,
 "n": 70,
 "opt": 1566,
 "onetax": 1566,
@@ -690,6 +759,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 1570,
 "n": 71,
 "opt": 1570,
 "onetax": 1570,
@@ -700,6 +770,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 1642,
 "n": 72,
 "opt": 1642,
 "onetax": 1642,
@@ -710,6 +781,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 1644,
 "n": 73,
 "opt": 1644,
 "onetax": 1644,
@@ -720,6 +792,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 1718,
 "n": 74,
 "opt": 1718,
 "onetax": 1718,
@@ -730,6 +803,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 1793,
 "n": 75,
 "opt": 1793,
 "onetax": 1793,
@@ -740,6 +814,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 1869,
 "n": 76,
 "opt": 1869,
 "onetax": 1869,
@@ -750,6 +825,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 1905,
 "n": 77,
 "opt": 1914,
 "onetax": 1905,
@@ -760,6 +836,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 1991,
 "n": 78,
 "opt": 1991,
 "onetax": 1991,
@@ -770,6 +847,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 1997,
 "n": 79,
 "opt": 1997,
 "onetax": 1997,
@@ -780,6 +858,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 2037,
 "n": 80,
 "opt": 2041,
 "onetax": 2029,
@@ -790,6 +869,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 2083,
 "n": 81,
 "opt": 2105,
 "onetax": 2083,
@@ -800,6 +880,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 2165,
 "n": 82,
 "opt": 2187,
 "onetax": 2165,
@@ -810,6 +891,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 2169,
 "n": 83,
 "opt": 2191,
 "onetax": 2169,
@@ -820,6 +902,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 2261,
 "n": 84,
 "opt": 2263,
 "onetax": 2261,
@@ -830,6 +913,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 2299,
 "n": 85,
 "opt": 2309,
 "onetax": 2299,
@@ -840,6 +924,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 2385,
 "n": 86,
 "opt": 2395,
 "onetax": 2385,
@@ -850,6 +935,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 2426,
 "n": 87,
 "opt": 2436,
 "onetax": 2426,
@@ -860,6 +946,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 2470,
 "n": 88,
 "opt": 2496,
 "onetax": 2470,
@@ -870,6 +957,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 2476,
 "n": 89,
 "opt": 2502,
 "onetax": 2476,
@@ -880,6 +968,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 2516,
 "n": 90,
 "opt": 2552,
 "onetax": 2512,
@@ -890,6 +979,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 2552,
 "n": 91,
 "opt": 2588,
 "onetax": 2548,
@@ -900,6 +990,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 2644,
 "n": 92,
 "opt": 2680,
 "onetax": 2640,
@@ -910,6 +1001,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 2679,
 "n": 93,
 "opt": 2715,
 "onetax": 2675,
@@ -920,6 +1012,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 2773,
 "n": 94,
 "opt": 2809,
 "onetax": 2769,
@@ -930,6 +1023,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 2817,
 "n": 95,
 "opt": 2853,
 "onetax": 2813,
@@ -940,6 +1034,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 2865,
 "n": 96,
 "opt": 2901,
 "onetax": 2861,
@@ -950,6 +1045,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 2873,
 "n": 97,
 "opt": 2909,
 "onetax": 2869,
@@ -960,6 +1056,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 2991,
 "n": 98,
 "opt": 3007,
 "onetax": 2991,
@@ -970,6 +1067,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 3068,
 "n": 99,
 "opt": 3106,
 "onetax": 3048,
@@ -980,6 +1078,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 3148,
 "n": 100,
 "opt": 3164,
 "onetax": 3148,
@@ -990,6 +1089,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 3152,
 "n": 101,
 "opt": 3168,
 "onetax": 3152,
@@ -1000,6 +1100,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 3254,
 "n": 102,
 "opt": 3270,
 "onetax": 3254,
@@ -1010,6 +1111,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 3256,
 "n": 103,
 "opt": 3272,
 "onetax": 3256,
@@ -1020,6 +1122,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 3308,
 "n": 104,
 "opt": 3332,
 "onetax": 3308,
@@ -1030,6 +1133,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 3363,
 "n": 105,
 "opt": 3434,
 "onetax": 3363,
@@ -1040,6 +1144,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 3469,
 "n": 106,
 "opt": 3540,
 "onetax": 3469,
@@ -1050,6 +1155,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 3473,
 "n": 107,
 "opt": 3544,
 "onetax": 3473,
@@ -1060,6 +1166,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 3581,
 "n": 108,
 "opt": 3652,
 "onetax": 3581,
@@ -1070,6 +1177,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 3583,
 "n": 109,
 "opt": 3654,
 "onetax": 3583,
@@ -1080,6 +1188,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 3693,
 "n": 110,
 "opt": 3764,
 "onetax": 3693,
@@ -1090,6 +1199,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 3742,
 "n": 111,
 "opt": 3813,
 "onetax": 3742,
@@ -1100,6 +1210,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 3854,
 "n": 112,
 "opt": 3925,
 "onetax": 3854,
@@ -1110,6 +1221,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 3858,
 "n": 113,
 "opt": 3929,
 "onetax": 3858,
@@ -1120,6 +1232,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 4014,
 "n": 114,
 "opt": 4043,
 "onetax": 3972,
@@ -1130,6 +1243,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 4030,
 "n": 115,
 "opt": 4101,
 "onetax": 4030,
@@ -1140,6 +1254,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 4146,
 "n": 116,
 "opt": 4217,
 "onetax": 4146,
@@ -1150,6 +1265,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 4250,
 "n": 117,
 "opt": 4334,
 "onetax": 4197,
@@ -1160,6 +1276,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 4368,
 "n": 118,
 "opt": 4452,
 "onetax": 4315,
@@ -1170,6 +1287,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 4422,
 "n": 119,
 "opt": 4506,
 "onetax": 4369,
@@ -1180,6 +1298,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 4512,
 "n": 120,
 "opt": 4593,
 "onetax": 4417,
@@ -1190,6 +1309,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 4687,
 "n": 121,
 "opt": 4689,
 "onetax": 4687,
@@ -1200,6 +1320,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 4809,
 "n": 122,
 "opt": 4811,
 "onetax": 4809,
@@ -1210,6 +1331,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 4858,
 "n": 123,
 "opt": 4860,
 "onetax": 4858,
@@ -1220,6 +1342,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 4982,
 "n": 124,
 "opt": 4984,
 "onetax": 4982,
@@ -1230,6 +1353,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 5107,
 "n": 125,
 "opt": 5109,
 "onetax": 5107,
@@ -1240,6 +1364,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 5179,
 "n": 126,
 "opt": 5191,
 "onetax": 5179,
@@ -1250,6 +1375,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 5193,
 "n": 127,
 "opt": 5205,
 "onetax": 5193,
@@ -1260,6 +1386,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 5289,
 "n": 128,
 "opt": 5301,
 "onetax": 5289,
@@ -1270,6 +1397,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 5336,
 "n": 129,
 "opt": 5348,
 "onetax": 5336,
@@ -1280,6 +1408,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 5466,
 "n": 130,
 "opt": 5478,
 "onetax": 5466,
@@ -1290,6 +1419,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 5470,
 "n": 131,
 "opt": 5482,
 "onetax": 5470,
@@ -1300,6 +1430,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 5542,
 "n": 132,
 "opt": 5572,
 "onetax": 5542,
@@ -1310,6 +1441,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 5590,
 "n": 133,
 "opt": 5620,
 "onetax": 5590,
@@ -1320,6 +1452,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 5724,
 "n": 134,
 "opt": 5754,
 "onetax": 5724,
@@ -1330,6 +1463,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 5778,
 "n": 135,
 "opt": 5844,
 "onetax": 5778,
@@ -1340,6 +1474,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 5846,
 "n": 136,
 "opt": 5928,
 "onetax": 5846,
@@ -1350,6 +1485,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 5852,
 "n": 137,
 "opt": 5934,
 "onetax": 5852,
@@ -1360,6 +1496,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 6006,
 "n": 138,
 "opt": 6072,
 "onetax": 6006,
@@ -1370,6 +1507,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 6008,
 "n": 139,
 "opt": 6074,
 "onetax": 6008,
@@ -1380,6 +1518,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 6061,
 "n": 140,
 "opt": 6164,
 "onetax": 6060,
@@ -1390,6 +1529,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 6116,
 "n": 141,
 "opt": 6219,
 "onetax": 6115,
@@ -1400,6 +1540,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 6258,
 "n": 142,
 "opt": 6361,
 "onetax": 6257,
@@ -1410,6 +1551,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 6324,
 "n": 143,
 "opt": 6427,
 "onetax": 6323,
@@ -1420,6 +1562,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 6396,
 "n": 144,
 "opt": 6523,
 "onetax": 6395,
@@ -1430,6 +1573,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 6459,
 "n": 145,
 "opt": 6599,
 "onetax": 6459,
@@ -1440,6 +1584,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 6605,
 "n": 146,
 "opt": 6745,
 "onetax": 6605,
@@ -1450,6 +1595,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 6766,
 "n": 147,
 "opt": 6892,
 "onetax": 6766,
@@ -1460,6 +1606,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 6914,
 "n": 148,
 "opt": 7040,
 "onetax": 6914,
@@ -1470,6 +1617,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 6924,
 "n": 149,
 "opt": 7050,
 "onetax": 6924,
@@ -1480,6 +1628,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 6988,
 "n": 150,
 "opt": 7137,
 "onetax": 6984,
@@ -1490,6 +1639,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 6990,
 "n": 151,
 "opt": 7139,
 "onetax": 6986,
@@ -1500,6 +1650,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 7066,
 "n": 152,
 "opt": 7223,
 "onetax": 7062,
@@ -1510,6 +1661,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 7231,
 "n": 153,
 "opt": 7376,
 "onetax": 7231,
@@ -1520,6 +1672,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 7385,
 "n": 154,
 "opt": 7530,
 "onetax": 7385,
@@ -1530,6 +1683,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 7453,
 "n": 155,
 "opt": 7598,
 "onetax": 7453,
@@ -1540,6 +1694,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 7521,
 "n": 156,
 "opt": 7688,
 "onetax": 7521,
@@ -1550,6 +1705,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 7527,
 "n": 157,
 "opt": 7694,
 "onetax": 7527,
@@ -1560,6 +1716,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 7685,
 "n": 158,
 "opt": 7852,
 "onetax": 7685,
@@ -1570,6 +1727,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 7750,
 "n": 159,
 "opt": 7917,
 "onetax": 7750,
@@ -1580,6 +1738,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 7830,
 "n": 160,
 "opt": 8005,
 "onetax": 7830,
@@ -1590,6 +1749,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 7896,
 "n": 161,
 "opt": 8071,
 "onetax": 7896,
@@ -1600,6 +1760,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 8086,
 "n": 162,
 "opt": 8233,
 "onetax": 8058,
@@ -1610,6 +1771,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 8092,
 "n": 163,
 "opt": 8239,
 "onetax": 8064,
@@ -1620,6 +1782,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 8256,
 "n": 164,
 "opt": 8403,
 "onetax": 8228,
@@ -1630,6 +1793,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 8451,
 "n": 165,
 "opt": 8568,
 "onetax": 8441,
@@ -1640,6 +1804,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 8617,
 "n": 166,
 "opt": 8734,
 "onetax": 8607,
@@ -1650,6 +1815,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 8621,
 "n": 167,
 "opt": 8738,
 "onetax": 8611,
@@ -1660,6 +1826,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 8789,
 "n": 168,
 "opt": 8906,
 "onetax": 8779,
@@ -1670,6 +1837,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 8837,
 "n": 169,
 "opt": 8954,
 "onetax": 8827,
@@ -1680,6 +1848,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 9007,
 "n": 170,
 "opt": 9124,
 "onetax": 8997,
@@ -1690,6 +1859,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 9186,
 "n": 171,
 "opt": 9295,
 "onetax": 9176,
@@ -1700,6 +1870,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 9358,
 "n": 172,
 "opt": 9467,
 "onetax": 9348,
@@ -1710,6 +1881,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 9364,
 "n": 173,
 "opt": 9473,
 "onetax": 9354,
@@ -1720,6 +1892,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 9538,
 "n": 174,
 "opt": 9647,
 "onetax": 9528,
@@ -1730,6 +1903,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 9789,
 "n": 175,
 "opt": 9822,
 "onetax": 9755,
@@ -1740,6 +1914,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 9955,
 "n": 176,
 "opt": 9985,
 "onetax": 9931,
@@ -1750,6 +1925,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 10026,
 "n": 177,
 "opt": 10056,
 "onetax": 10002,
@@ -1760,6 +1936,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 10204,
 "n": 178,
 "opt": 10234,
 "onetax": 10180,
@@ -1770,6 +1947,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 10210,
 "n": 179,
 "opt": 10240,
 "onetax": 10186,
@@ -1780,6 +1958,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 10390,
 "n": 180,
 "opt": 10401,
 "onetax": 10390,
@@ -1790,6 +1969,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 10392,
 "n": 181,
 "opt": 10403,
 "onetax": 10392,
@@ -1800,6 +1980,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 10508,
 "n": 182,
 "opt": 10543,
 "onetax": 10460,
@@ -1810,6 +1991,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 10573,
 "n": 183,
 "opt": 10608,
 "onetax": 10525,
@@ -1820,6 +2002,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 10665,
 "n": 184,
 "opt": 10744,
 "onetax": 10617,
@@ -1830,6 +2013,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 10757,
 "n": 185,
 "opt": 10836,
 "onetax": 10709,
@@ -1840,6 +2024,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 10943,
 "n": 186,
 "opt": 11022,
 "onetax": 10895,
@@ -1850,6 +2035,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 11105,
 "n": 187,
 "opt": 11132,
 "onetax": 11105,
@@ -1860,6 +2046,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 11293,
 "n": 188,
 "opt": 11320,
 "onetax": 11293,
@@ -1870,6 +2057,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 11401,
 "n": 189,
 "opt": 11447,
 "onetax": 11401,
@@ -1880,6 +2068,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 11591,
 "n": 190,
 "opt": 11637,
 "onetax": 11591,
@@ -1890,6 +2079,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 11601,
 "n": 191,
 "opt": 11647,
 "onetax": 11601,
@@ -1900,6 +2090,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 11745,
 "n": 192,
 "opt": 11787,
 "onetax": 11745,
@@ -1910,6 +2101,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 11747,
 "n": 193,
 "opt": 11789,
 "onetax": 11747,
@@ -1920,6 +2112,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 11941,
 "n": 194,
 "opt": 11983,
 "onetax": 11941,
@@ -1930,6 +2123,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 12108,
 "n": 195,
 "opt": 12164,
 "onetax": 12022,
@@ -1940,6 +2134,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 12298,
 "n": 196,
 "opt": 12332,
 "onetax": 12298,
@@ -1950,6 +2145,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 12302,
 "n": 197,
 "opt": 12336,
 "onetax": 12302,
@@ -1960,6 +2156,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 12364,
 "n": 198,
 "opt": 12471,
 "onetax": 12364,
@@ -1970,6 +2167,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 12366,
 "n": 199,
 "opt": 12473,
 "onetax": 12366,
@@ -1980,6 +2178,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 12614,
 "n": 200,
 "opt": 12648,
 "onetax": 12614,
@@ -1990,6 +2189,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 12693,
 "n": 201,
 "opt": 12727,
 "onetax": 12693,
@@ -2000,6 +2200,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 12895,
 "n": 202,
 "opt": 12929,
 "onetax": 12895,
@@ -2010,6 +2211,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 12983,
 "n": 203,
 "opt": 13017,
 "onetax": 12983,
@@ -2020,6 +2222,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 13085,
 "n": 204,
 "opt": 13146,
 "onetax": 13083,
@@ -2030,6 +2233,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 13179,
 "n": 205,
 "opt": 13240,
 "onetax": 13177,
@@ -2040,6 +2244,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 13385,
 "n": 206,
 "opt": 13446,
 "onetax": 13383,
@@ -2050,6 +2255,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 13608,
 "n": 207,
 "opt": 13653,
 "onetax": 13606,
@@ -2060,6 +2266,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 13814,
 "n": 208,
 "opt": 13832,
 "onetax": 13814,
@@ -2070,6 +2277,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 13904,
 "n": 209,
 "opt": 13922,
 "onetax": 13904,
@@ -2080,6 +2288,7 @@
 "hybrid_forced": 0
 },
 {
+"oracle": 14024,
 "n": 210,
 "opt": 14066,
 "onetax": 14024,
@@ -2090,6 +2299,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 14036,
 "n": 211,
 "opt": 14078,
 "onetax": 14036,
@@ -2100,6 +2310,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 14248,
 "n": 212,
 "opt": 14290,
 "onetax": 14248,
@@ -2110,6 +2321,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 14327,
 "n": 213,
 "opt": 14369,
 "onetax": 14327,
@@ -2120,6 +2332,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 14541,
 "n": 214,
 "opt": 14583,
 "onetax": 14541,
@@ -2130,6 +2343,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 14633,
 "n": 215,
 "opt": 14675,
 "onetax": 14633,
@@ -2140,6 +2354,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 14741,
 "n": 216,
 "opt": 14834,
 "onetax": 14741,
@@ -2150,6 +2365,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 14813,
 "n": 217,
 "opt": 14906,
 "onetax": 14813,
@@ -2160,6 +2376,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 15031,
 "n": 218,
 "opt": 15124,
 "onetax": 15031,
@@ -2170,6 +2387,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 15108,
 "n": 219,
 "opt": 15201,
 "onetax": 15108,
@@ -2180,6 +2398,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 15180,
 "n": 220,
 "opt": 15346,
 "onetax": 15180,
@@ -2190,6 +2409,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 15258,
 "n": 221,
 "opt": 15424,
 "onetax": 15258,
@@ -2200,6 +2420,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 15480,
 "n": 222,
 "opt": 15646,
 "onetax": 15480,
@@ -2210,6 +2431,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 15492,
 "n": 223,
 "opt": 15658,
 "onetax": 15492,
@@ -2220,6 +2442,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 15604,
 "n": 224,
 "opt": 15827,
 "onetax": 15604,
@@ -2230,6 +2453,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 15714,
 "n": 225,
 "opt": 15952,
 "onetax": 15694,
@@ -2240,6 +2464,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 15940,
 "n": 226,
 "opt": 16178,
 "onetax": 15920,
@@ -2250,6 +2475,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 15944,
 "n": 227,
 "opt": 16182,
 "onetax": 15924,
@@ -2260,6 +2486,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 16058,
 "n": 228,
 "opt": 16308,
 "onetax": 16016,
@@ -2270,6 +2497,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 16060,
 "n": 229,
 "opt": 16310,
 "onetax": 16018,
@@ -2280,6 +2508,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 16290,
 "n": 230,
 "opt": 16540,
 "onetax": 16248,
@@ -2290,6 +2519,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 16521,
 "n": 231,
 "opt": 16771,
 "onetax": 16517,
@@ -2300,6 +2530,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 16633,
 "n": 232,
 "opt": 16911,
 "onetax": 16633,
@@ -2310,6 +2541,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 16637,
 "n": 233,
 "opt": 16915,
 "onetax": 16637,
@@ -2320,6 +2552,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 16723,
 "n": 234,
 "opt": 17068,
 "onetax": 16723,
@@ -2330,6 +2563,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 16829,
 "n": 235,
 "opt": 17174,
 "onetax": 16829,
@@ -2340,6 +2574,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 17065,
 "n": 236,
 "opt": 17410,
 "onetax": 17065,
@@ -2350,6 +2585,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 17156,
 "n": 237,
 "opt": 17501,
 "onetax": 17156,
@@ -2360,6 +2596,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 17394,
 "n": 238,
 "opt": 17739,
 "onetax": 17394,
@@ -2370,6 +2607,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 17400,
 "n": 239,
 "opt": 17745,
 "onetax": 17400,
@@ -2380,6 +2618,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 17520,
 "n": 240,
 "opt": 17877,
 "onetax": 17520,
@@ -2390,6 +2629,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 17522,
 "n": 241,
 "opt": 17879,
 "onetax": 17522,
@@ -2400,6 +2640,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 17764,
 "n": 242,
 "opt": 18121,
 "onetax": 17764,
@@ -2410,6 +2651,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 18147,
 "n": 243,
 "opt": 18364,
 "onetax": 18147,
@@ -2420,6 +2662,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 18391,
 "n": 244,
 "opt": 18608,
 "onetax": 18391,
@@ -2430,6 +2673,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 18696,
 "n": 245,
 "opt": 18853,
 "onetax": 18696,
@@ -2440,6 +2684,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 18942,
 "n": 246,
 "opt": 19099,
 "onetax": 18942,
@@ -2450,6 +2695,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 19002,
 "n": 247,
 "opt": 19159,
 "onetax": 19002,
@@ -2460,6 +2706,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 19126,
 "n": 248,
 "opt": 19291,
 "onetax": 19126,
@@ -2470,6 +2717,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 19217,
 "n": 249,
 "opt": 19382,
 "onetax": 19217,
@@ -2480,6 +2728,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 19341,
 "n": 250,
 "opt": 19533,
 "onetax": 19341,
@@ -2490,6 +2739,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 19351,
 "n": 251,
 "opt": 19543,
 "onetax": 19351,
@@ -2500,6 +2750,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 19603,
 "n": 252,
 "opt": 19795,
 "onetax": 19603,
@@ -2510,6 +2761,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 19723,
 "n": 253,
 "opt": 19915,
 "onetax": 19723,
@@ -2520,6 +2772,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 19977,
 "n": 254,
 "opt": 20169,
 "onetax": 19977,
@@ -2530,6 +2783,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 20280,
 "n": 255,
 "opt": 20424,
 "onetax": 20280,
@@ -2540,6 +2794,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 20408,
 "n": 256,
 "opt": 20552,
 "onetax": 20408,
@@ -2550,6 +2805,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 20414,
 "n": 257,
 "opt": 20558,
 "onetax": 20414,
@@ -2560,6 +2816,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 20672,
 "n": 258,
 "opt": 20816,
 "onetax": 20672,
@@ -2570,6 +2827,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 20776,
 "n": 259,
 "opt": 20920,
 "onetax": 20776,
@@ -2580,6 +2838,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 20928,
 "n": 260,
 "opt": 21075,
 "onetax": 20896,
@@ -2590,6 +2849,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 21189,
 "n": 261,
 "opt": 21336,
 "onetax": 21169,
@@ -2600,6 +2860,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 21451,
 "n": 262,
 "opt": 21598,
 "onetax": 21431,
@@ -2610,6 +2871,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 21457,
 "n": 263,
 "opt": 21604,
 "onetax": 21437,
@@ -2620,6 +2882,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 21685,
 "n": 264,
 "opt": 21859,
 "onetax": 21685,
@@ -2630,6 +2893,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 21809,
 "n": 265,
 "opt": 21983,
 "onetax": 21809,
@@ -2640,6 +2904,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 22075,
 "n": 266,
 "opt": 22249,
 "onetax": 22075,
@@ -2650,6 +2915,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 22176,
 "n": 267,
 "opt": 22350,
 "onetax": 22176,
@@ -2660,6 +2926,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 22444,
 "n": 268,
 "opt": 22618,
 "onetax": 22444,
@@ -2670,6 +2937,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 22450,
 "n": 269,
 "opt": 22624,
 "onetax": 22450,
@@ -2680,6 +2948,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 22744,
 "n": 270,
 "opt": 22894,
 "onetax": 22744,
@@ -2690,6 +2959,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 22746,
 "n": 271,
 "opt": 22896,
 "onetax": 22746,
@@ -2700,6 +2970,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 23018,
 "n": 272,
 "opt": 23142,
 "onetax": 23018,
@@ -2710,6 +2981,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 23195,
 "n": 273,
 "opt": 23404,
 "onetax": 23073,
@@ -2720,6 +2992,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 23469,
 "n": 274,
 "opt": 23678,
 "onetax": 23347,
@@ -2730,6 +3003,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 23895,
 "n": 275,
 "opt": 23953,
 "onetax": 23525,
@@ -2740,6 +3014,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 24039,
 "n": 276,
 "opt": 24115,
 "onetax": 23769,
@@ -2750,6 +3025,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 24045,
 "n": 277,
 "opt": 24121,
 "onetax": 23775,
@@ -2760,6 +3036,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 24323,
 "n": 278,
 "opt": 24399,
 "onetax": 24053,
@@ -2770,6 +3047,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 24610,
 "n": 279,
 "opt": 24678,
 "onetax": 24340,
@@ -2780,6 +3058,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 24890,
 "n": 280,
 "opt": 24934,
 "onetax": 24696,
@@ -2790,6 +3069,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 24894,
 "n": 281,
 "opt": 24938,
 "onetax": 24700,
@@ -2800,6 +3080,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 25176,
 "n": 282,
 "opt": 25220,
 "onetax": 24982,
@@ -2810,6 +3091,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 25178,
 "n": 283,
 "opt": 25222,
 "onetax": 24984,
@@ -2820,6 +3102,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 25462,
 "n": 284,
 "opt": 25506,
 "onetax": 25268,
@@ -2830,6 +3113,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 25613,
 "n": 285,
 "opt": 25791,
 "onetax": 25483,
@@ -2840,6 +3124,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 25899,
 "n": 286,
 "opt": 26077,
 "onetax": 25769,
@@ -2850,6 +3135,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 26001,
 "n": 287,
 "opt": 26179,
 "onetax": 25871,
@@ -2860,6 +3146,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 26111,
 "n": 288,
 "opt": 26395,
 "onetax": 26015,
@@ -2870,6 +3157,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 26231,
 "n": 289,
 "opt": 26515,
 "onetax": 26135,
@@ -2880,6 +3168,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 26521,
 "n": 290,
 "opt": 26805,
 "onetax": 26425,
@@ -2890,6 +3179,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 26634,
 "n": 291,
 "opt": 26918,
 "onetax": 26538,
@@ -2900,6 +3190,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 26926,
 "n": 292,
 "opt": 27210,
 "onetax": 26830,
@@ -2910,6 +3201,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 26936,
 "n": 293,
 "opt": 27220,
 "onetax": 26840,
@@ -2920,6 +3212,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 27330,
 "n": 294,
 "opt": 27514,
 "onetax": 27254,
@@ -2930,6 +3223,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 27466,
 "n": 295,
 "opt": 27650,
 "onetax": 27390,
@@ -2940,6 +3234,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 27614,
 "n": 296,
 "opt": 27822,
 "onetax": 27538,
@@ -2950,6 +3245,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 27979,
 "n": 297,
 "opt": 28041,
 "onetax": 27821,
@@ -2960,6 +3256,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 28277,
 "n": 298,
 "opt": 28339,
 "onetax": 28119,
@@ -2970,6 +3267,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 28367,
 "n": 299,
 "opt": 28429,
 "onetax": 28209,
@@ -2980,6 +3278,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 28499,
 "n": 300,
 "opt": 28691,
 "onetax": 28389,
@@ -2990,6 +3289,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 28595,
 "n": 301,
 "opt": 28787,
 "onetax": 28485,
@@ -3000,6 +3300,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 28897,
 "n": 302,
 "opt": 29089,
 "onetax": 28787,
@@ -3010,6 +3311,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 29006,
 "n": 303,
 "opt": 29198,
 "onetax": 28896,
@@ -3020,6 +3322,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 29296,
 "n": 304,
 "opt": 29430,
 "onetax": 29200,
@@ -3030,6 +3333,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 29424,
 "n": 305,
 "opt": 29558,
 "onetax": 29328,
@@ -3040,6 +3344,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 29758,
 "n": 306,
 "opt": 29796,
 "onetax": 29758,
@@ -3050,6 +3355,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 29772,
 "n": 307,
 "opt": 29810,
 "onetax": 29772,
@@ -3060,6 +3366,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 29916,
 "n": 308,
 "opt": 30031,
 "onetax": 29916,
@@ -3070,6 +3377,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 30023,
 "n": 309,
 "opt": 30138,
 "onetax": 30023,
@@ -3080,6 +3388,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 30333,
 "n": 310,
 "opt": 30448,
 "onetax": 30333,
@@ -3090,6 +3399,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 30337,
 "n": 311,
 "opt": 30452,
 "onetax": 30337,
@@ -3100,6 +3410,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 30681,
 "n": 312,
 "opt": 30719,
 "onetax": 30681,
@@ -3110,6 +3421,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 30683,
 "n": 313,
 "opt": 30721,
 "onetax": 30683,
@@ -3120,6 +3432,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 30997,
 "n": 314,
 "opt": 31035,
 "onetax": 30997,
@@ -3130,6 +3443,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 31089,
 "n": 315,
 "opt": 31248,
 "onetax": 31057,
@@ -3140,6 +3454,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 31405,
 "n": 316,
 "opt": 31564,
 "onetax": 31373,
@@ -3150,6 +3465,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 31409,
 "n": 317,
 "opt": 31568,
 "onetax": 31377,
@@ -3160,6 +3476,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 31727,
 "n": 318,
 "opt": 31886,
 "onetax": 31695,
@@ -3170,6 +3487,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 31885,
 "n": 319,
 "opt": 32044,
 "onetax": 31853,
@@ -3180,6 +3498,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 32125,
 "n": 320,
 "opt": 32289,
 "onetax": 32093,
@@ -3190,6 +3509,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 32240,
 "n": 321,
 "opt": 32404,
 "onetax": 32208,
@@ -3200,6 +3520,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 32562,
 "n": 322,
 "opt": 32726,
 "onetax": 32530,
@@ -3210,6 +3531,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 32664,
 "n": 323,
 "opt": 32828,
 "onetax": 32632,
@@ -3220,6 +3542,7 @@
 "hybrid_forced": 1
 },
 {
+"oracle": 32848,
 "n": 324,
 "opt": 33074,
 "onetax": 32848,
@@ -3230,6 +3553,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 33272,
 "n": 325,
 "opt": 33396,
 "onetax": 33224,
@@ -3240,6 +3564,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 33598,
 "n": 326,
 "opt": 33722,
 "onetax": 33550,
@@ -3250,6 +3575,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 33711,
 "n": 327,
 "opt": 33835,
 "onetax": 33663,
@@ -3260,6 +3586,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 33875,
 "n": 328,
 "opt": 34015,
 "onetax": 33827,
@@ -3270,6 +3597,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 33989,
 "n": 329,
 "opt": 34129,
 "onetax": 33941,
@@ -3280,6 +3608,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 34289,
 "n": 330,
 "opt": 34354,
 "onetax": 34289,
@@ -3290,6 +3619,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 34303,
 "n": 331,
 "opt": 34368,
 "onetax": 34303,
@@ -3300,6 +3630,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 34635,
 "n": 332,
 "opt": 34700,
 "onetax": 34635,
@@ -3310,6 +3641,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 34836,
 "n": 333,
 "opt": 35033,
 "onetax": 34824,
@@ -3320,6 +3652,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 35170,
 "n": 334,
 "opt": 35367,
 "onetax": 35158,
@@ -3330,6 +3663,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 35322,
 "n": 335,
 "opt": 35519,
 "onetax": 35310,
@@ -3340,6 +3674,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 35658,
 "n": 336,
 "opt": 35774,
 "onetax": 35526,
@@ -3350,6 +3685,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 35664,
 "n": 337,
 "opt": 35780,
 "onetax": 35532,
@@ -3360,6 +3696,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 36002,
 "n": 338,
 "opt": 36118,
 "onetax": 35870,
@@ -3370,6 +3707,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 36123,
 "n": 339,
 "opt": 36239,
 "onetax": 35991,
@@ -3380,6 +3718,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 36313,
 "n": 340,
 "opt": 36449,
 "onetax": 36175,
@@ -3390,6 +3729,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 36451,
 "n": 341,
 "opt": 36587,
 "onetax": 36313,
@@ -3400,6 +3740,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 36655,
 "n": 342,
 "opt": 36827,
 "onetax": 36655,
@@ -3410,6 +3751,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 37021,
 "n": 343,
 "opt": 37170,
 "onetax": 36975,
@@ -3420,6 +3762,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 37193,
 "n": 344,
 "opt": 37350,
 "onetax": 37147,
@@ -3430,6 +3773,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 37562,
 "n": 345,
 "opt": 37695,
 "onetax": 37562,
@@ -3440,6 +3784,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 37908,
 "n": 346,
 "opt": 38041,
 "onetax": 37908,
@@ -3450,6 +3795,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 37918,
 "n": 347,
 "opt": 38051,
 "onetax": 37918,
@@ -3460,6 +3806,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 38092,
 "n": 348,
 "opt": 38261,
 "onetax": 38082,
@@ -3470,6 +3817,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 38094,
 "n": 349,
 "opt": 38263,
 "onetax": 38084,
@@ -3480,6 +3828,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 38332,
 "n": 350,
 "opt": 38463,
 "onetax": 38332,
@@ -3490,6 +3839,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 38463,
 "n": 351,
 "opt": 38715,
 "onetax": 38463,
@@ -3500,6 +3850,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 38703,
 "n": 352,
 "opt": 38955,
 "onetax": 38703,
@@ -3510,6 +3861,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 38707,
 "n": 353,
 "opt": 38959,
 "onetax": 38707,
@@ -3520,6 +3872,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 39061,
 "n": 354,
 "opt": 39313,
 "onetax": 39061,
@@ -3530,6 +3883,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 39215,
 "n": 355,
 "opt": 39467,
 "onetax": 39215,
@@ -3540,6 +3894,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 39571,
 "n": 356,
 "opt": 39823,
 "onetax": 39571,
@@ -3550,6 +3905,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 39954,
 "n": 357,
 "opt": 40167,
 "onetax": 39954,
@@ -3560,6 +3916,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 40312,
 "n": 358,
 "opt": 40525,
 "onetax": 40312,
@@ -3570,6 +3927,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 40318,
 "n": 359,
 "opt": 40531,
 "onetax": 40318,
@@ -3580,6 +3938,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 40498,
 "n": 360,
 "opt": 40731,
 "onetax": 40498,
@@ -3590,6 +3949,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 40570,
 "n": 361,
 "opt": 40803,
 "onetax": 40570,
@@ -3600,6 +3960,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 40932,
 "n": 362,
 "opt": 41165,
 "onetax": 40932,
@@ -3610,6 +3971,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 41235,
 "n": 363,
 "opt": 41528,
 "onetax": 41225,
@@ -3620,6 +3982,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 41521,
 "n": 364,
 "opt": 41769,
 "onetax": 41521,
@@ -3630,6 +3993,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 41673,
 "n": 365,
 "opt": 41921,
 "onetax": 41673,
@@ -3640,6 +4004,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 42039,
 "n": 366,
 "opt": 42287,
 "onetax": 42039,
@@ -3650,6 +4015,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 42047,
 "n": 367,
 "opt": 42295,
 "onetax": 42047,
@@ -3660,6 +4026,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 42415,
 "n": 368,
 "opt": 42625,
 "onetax": 42415,
@@ -3670,6 +4037,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 42800,
 "n": 369,
 "opt": 42994,
 "onetax": 42800,
@@ -3680,6 +4048,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 43170,
 "n": 370,
 "opt": 43364,
 "onetax": 43170,
@@ -3690,6 +4059,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 43306,
 "n": 371,
 "opt": 43500,
 "onetax": 43306,
@@ -3700,6 +4070,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 43446,
 "n": 372,
 "opt": 43698,
 "onetax": 43446,
@@ -3710,6 +4081,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 43452,
 "n": 373,
 "opt": 43704,
 "onetax": 43452,
@@ -3720,6 +4092,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 43826,
 "n": 374,
 "opt": 44078,
 "onetax": 43826,
@@ -3730,6 +4103,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 44005,
 "n": 375,
 "opt": 44328,
 "onetax": 44005,
@@ -3740,6 +4114,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 44193,
 "n": 376,
 "opt": 44532,
 "onetax": 44193,
@@ -3750,6 +4125,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 44317,
 "n": 377,
 "opt": 44656,
 "onetax": 44317,
@@ -3760,6 +4136,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 44695,
 "n": 378,
 "opt": 45034,
 "onetax": 44695,
@@ -3770,6 +4147,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 44701,
 "n": 379,
 "opt": 45040,
 "onetax": 44701,
@@ -3780,6 +4158,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 44925,
 "n": 380,
 "opt": 45266,
 "onetax": 44925,
@@ -3790,6 +4169,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 45080,
 "n": 381,
 "opt": 45421,
 "onetax": 45080,
@@ -3800,6 +4180,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 45462,
 "n": 382,
 "opt": 45803,
 "onetax": 45462,
@@ -3810,6 +4191,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 45466,
 "n": 383,
 "opt": 45807,
 "onetax": 45466,
@@ -3820,6 +4202,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 45658,
 "n": 384,
 "opt": 45999,
 "onetax": 45658,
@@ -3830,6 +4213,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 46173,
 "n": 385,
 "opt": 46384,
 "onetax": 45984,
@@ -3840,6 +4224,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 46559,
 "n": 386,
 "opt": 46770,
 "onetax": 46370,
@@ -3850,6 +4235,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 46954,
 "n": 387,
 "opt": 47157,
 "onetax": 46765,
@@ -3860,6 +4246,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 47342,
 "n": 388,
 "opt": 47545,
 "onetax": 47153,
@@ -3870,6 +4257,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 47348,
 "n": 389,
 "opt": 47551,
 "onetax": 47159,
@@ -3880,6 +4268,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 47510,
 "n": 390,
 "opt": 47770,
 "onetax": 47351,
@@ -3890,6 +4279,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 47654,
 "n": 391,
 "opt": 47914,
 "onetax": 47495,
@@ -3900,6 +4290,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 48047,
 "n": 392,
 "opt": 48306,
 "onetax": 48047,
@@ -3910,6 +4301,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 48186,
 "n": 393,
 "opt": 48445,
 "onetax": 48186,
@@ -3920,6 +4312,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 48580,
 "n": 394,
 "opt": 48839,
 "onetax": 48580,
@@ -3930,6 +4323,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 48756,
 "n": 395,
 "opt": 49015,
 "onetax": 48756,
@@ -3940,6 +4334,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 49152,
 "n": 396,
 "opt": 49409,
 "onetax": 49152,
@@ -3950,6 +4345,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 49160,
 "n": 397,
 "opt": 49417,
 "onetax": 49160,
@@ -3960,6 +4356,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 49558,
 "n": 398,
 "opt": 49815,
 "onetax": 49558,
@@ -3970,6 +4367,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 49923,
 "n": 399,
 "opt": 50197,
 "onetax": 49653,
@@ -3980,6 +4378,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 50177,
 "n": 400,
 "opt": 50437,
 "onetax": 50053,
@@ -3990,6 +4389,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 50181,
 "n": 401,
 "opt": 50441,
 "onetax": 50057,
@@ -4000,6 +4400,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 50583,
 "n": 402,
 "opt": 50843,
 "onetax": 50459,
@@ -4010,6 +4411,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 50667,
 "n": 403,
 "opt": 50927,
 "onetax": 50543,
@@ -4020,6 +4422,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 51071,
 "n": 404,
 "opt": 51331,
 "onetax": 50947,
@@ -4030,6 +4433,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 51416,
 "n": 405,
 "opt": 51729,
 "onetax": 51292,
@@ -4040,6 +4444,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 51822,
 "n": 406,
 "opt": 52135,
 "onetax": 51698,
@@ -4050,6 +4455,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 52012,
 "n": 407,
 "opt": 52325,
 "onetax": 51888,
@@ -4060,6 +4466,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 52406,
 "n": 408,
 "opt": 52693,
 "onetax": 52088,
@@ -4070,6 +4477,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 52414,
 "n": 409,
 "opt": 52701,
 "onetax": 52096,
@@ -4080,6 +4488,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 52824,
 "n": 410,
 "opt": 53111,
 "onetax": 52506,
@@ -4090,6 +4499,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 52973,
 "n": 411,
 "opt": 53260,
 "onetax": 52655,
@@ -4100,6 +4510,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 53385,
 "n": 412,
 "opt": 53672,
 "onetax": 53067,
@@ -4110,6 +4521,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 53533,
 "n": 413,
 "opt": 53820,
 "onetax": 53215,
@@ -4120,6 +4532,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 53757,
 "n": 414,
 "opt": 54120,
 "onetax": 53573,
@@ -4130,6 +4543,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 53935,
 "n": 415,
 "opt": 54298,
 "onetax": 53751,
@@ -4140,6 +4554,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 54235,
 "n": 416,
 "opt": 54554,
 "onetax": 54167,
@@ -4150,6 +4565,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 54378,
 "n": 417,
 "opt": 54697,
 "onetax": 54310,
@@ -4160,6 +4576,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 54796,
 "n": 418,
 "opt": 55115,
 "onetax": 54728,
@@ -4170,6 +4587,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 54806,
 "n": 419,
 "opt": 55125,
 "onetax": 54738,
@@ -4180,6 +4598,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 55226,
 "n": 420,
 "opt": 55509,
 "onetax": 55158,
@@ -4190,6 +4609,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 55228,
 "n": 421,
 "opt": 55511,
 "onetax": 55160,
@@ -4200,6 +4620,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 55650,
 "n": 422,
 "opt": 55933,
 "onetax": 55582,
@@ -4210,6 +4631,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 56089,
 "n": 423,
 "opt": 56356,
 "onetax": 56021,
@@ -4220,6 +4642,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 56301,
 "n": 424,
 "opt": 56592,
 "onetax": 56233,
@@ -4230,6 +4653,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 56843,
 "n": 425,
 "opt": 57010,
 "onetax": 56575,
@@ -4240,6 +4664,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 57269,
 "n": 426,
 "opt": 57436,
 "onetax": 57001,
@@ -4250,6 +4675,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 57401,
 "n": 427,
 "opt": 57568,
 "onetax": 57133,
@@ -4260,6 +4686,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 57829,
 "n": 428,
 "opt": 57996,
 "onetax": 57561,
@@ -4270,6 +4697,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 58302,
 "n": 429,
 "opt": 58402,
 "onetax": 57952,
@@ -4280,6 +4708,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 58732,
 "n": 430,
 "opt": 58832,
 "onetax": 58382,
@@ -4290,6 +4719,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 58742,
 "n": 431,
 "opt": 58842,
 "onetax": 58392,
@@ -4300,6 +4730,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 59174,
 "n": 432,
 "opt": 59259,
 "onetax": 58608,
@@ -4310,6 +4741,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 59176,
 "n": 433,
 "opt": 59261,
 "onetax": 58610,
@@ -4320,6 +4752,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 59610,
 "n": 434,
 "opt": 59695,
 "onetax": 59044,
@@ -4330,6 +4763,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 60031,
 "n": 435,
 "opt": 60130,
 "onetax": 59477,
@@ -4340,6 +4774,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 60467,
 "n": 436,
 "opt": 60566,
 "onetax": 59913,
@@ -4350,6 +4785,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 60581,
 "n": 437,
 "opt": 60680,
 "onetax": 60027,
@@ -4360,6 +4796,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 61019,
 "n": 438,
 "opt": 61118,
 "onetax": 60465,
@@ -4370,6 +4807,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 61025,
 "n": 439,
 "opt": 61124,
 "onetax": 60471,
@@ -4380,6 +4818,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 61231,
 "n": 440,
 "opt": 61540,
 "onetax": 60651,
@@ -4390,6 +4829,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 61696,
 "n": 441,
 "opt": 61886,
 "onetax": 61354,
@@ -4400,6 +4840,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 62138,
 "n": 442,
 "opt": 62328,
 "onetax": 61796,
@@ -4410,6 +4851,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 62142,
 "n": 443,
 "opt": 62332,
 "onetax": 61800,
@@ -4420,6 +4862,7 @@
 "hybrid_forced": 2
 },
 {
+"oracle": 62364,
 "n": 444,
 "opt": 62590,
 "onetax": 62012,
@@ -4430,6 +4873,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 62560,
 "n": 445,
 "opt": 62786,
 "onetax": 62208,
@@ -4440,6 +4884,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 63006,
 "n": 446,
 "opt": 63232,
 "onetax": 62654,
@@ -4450,6 +4895,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 63175,
 "n": 447,
 "opt": 63401,
 "onetax": 62823,
@@ -4460,6 +4906,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 63463,
 "n": 448,
 "opt": 63837,
 "onetax": 63111,
@@ -4470,6 +4917,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 63469,
 "n": 449,
 "opt": 63843,
 "onetax": 63117,
@@ -4480,6 +4928,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 63694,
 "n": 450,
 "opt": 64214,
 "onetax": 63627,
@@ -4490,6 +4939,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 63886,
 "n": 451,
 "opt": 64406,
 "onetax": 63819,
@@ -4500,6 +4950,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 64338,
 "n": 452,
 "opt": 64858,
 "onetax": 64271,
@@ -4510,6 +4961,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 64493,
 "n": 453,
 "opt": 65013,
 "onetax": 64426,
@@ -4520,6 +4972,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 64947,
 "n": 454,
 "opt": 65467,
 "onetax": 64880,
@@ -4530,6 +4983,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 65290,
 "n": 455,
 "opt": 65757,
 "onetax": 65282,
@@ -4540,6 +4994,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 65518,
 "n": 456,
 "opt": 66025,
 "onetax": 65434,
@@ -4550,6 +5005,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 65526,
 "n": 457,
 "opt": 66033,
 "onetax": 65442,
@@ -4560,6 +5016,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 65984,
 "n": 458,
 "opt": 66491,
 "onetax": 65900,
@@ -4570,6 +5027,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 66498,
 "n": 459,
 "opt": 66922,
 "onetax": 66350,
@@ -4580,6 +5038,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 66982,
 "n": 460,
 "opt": 67344,
 "onetax": 66910,
@@ -4590,6 +5049,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 66986,
 "n": 461,
 "opt": 67348,
 "onetax": 66914,
@@ -4600,6 +5060,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 67319,
 "n": 462,
 "opt": 67760,
 "onetax": 67252,
@@ -4610,6 +5071,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 67321,
 "n": 463,
 "opt": 67762,
 "onetax": 67254,
@@ -4620,6 +5082,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 67838,
 "n": 464,
 "opt": 68122,
 "onetax": 67718,
@@ -4630,6 +5093,7 @@
 "hybrid_forced": 3
 },
 {
+"oracle": 68057,
 "n": 465,
 "opt": 68587,
 "onetax": 68057,
@@ -4640,6 +5104,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 68523,
 "n": 466,
 "opt": 69053,
 "onetax": 68523,
@@ -4650,6 +5115,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 68527,
 "n": 467,
 "opt": 69057,
 "onetax": 68527,
@@ -4660,6 +5126,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 68819,
 "n": 468,
 "opt": 69350,
 "onetax": 68819,
@@ -4670,6 +5137,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 68983,
 "n": 469,
 "opt": 69514,
 "onetax": 68983,
@@ -4680,6 +5148,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 69453,
 "n": 470,
 "opt": 69984,
 "onetax": 69453,
@@ -4690,6 +5159,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 69622,
 "n": 471,
 "opt": 70153,
 "onetax": 69622,
@@ -4700,6 +5170,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 69858,
 "n": 472,
 "opt": 70413,
 "onetax": 69858,
@@ -4710,6 +5181,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 70044,
 "n": 473,
 "opt": 70599,
 "onetax": 70044,
@@ -4720,6 +5192,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 70518,
 "n": 474,
 "opt": 71073,
 "onetax": 70518,
@@ -4730,6 +5203,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 70993,
 "n": 475,
 "opt": 71440,
 "onetax": 70993,
@@ -4740,6 +5214,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 71175,
 "n": 476,
 "opt": 71889,
 "onetax": 71175,
@@ -4750,6 +5225,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 71676,
 "n": 477,
 "opt": 72366,
 "onetax": 71676,
@@ -4760,6 +5236,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 72154,
 "n": 478,
 "opt": 72844,
 "onetax": 72154,
@@ -4770,6 +5247,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 72166,
 "n": 479,
 "opt": 72856,
 "onetax": 72166,
@@ -4780,6 +5258,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 72630,
 "n": 480,
 "opt": 73120,
 "onetax": 72406,
@@ -4790,6 +5269,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 72770,
 "n": 481,
 "opt": 73260,
 "onetax": 72546,
@@ -4800,6 +5280,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 73252,
 "n": 482,
 "opt": 73742,
 "onetax": 73028,
@@ -4810,6 +5291,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 73429,
 "n": 483,
 "opt": 74098,
 "onetax": 73237,
@@ -4820,6 +5302,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 73903,
 "n": 484,
 "opt": 74558,
 "onetax": 73903,
@@ -4830,6 +5313,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 74121,
 "n": 485,
 "opt": 74776,
 "onetax": 74121,
@@ -4840,6 +5324,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 74445,
 "n": 486,
 "opt": 75247,
 "onetax": 74445,
@@ -4850,6 +5335,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 74453,
 "n": 487,
 "opt": 75255,
 "onetax": 74453,
@@ -4860,6 +5346,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 74697,
 "n": 488,
 "opt": 75507,
 "onetax": 74697,
@@ -4870,6 +5357,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 74872,
 "n": 489,
 "opt": 75682,
 "onetax": 74872,
@@ -4880,6 +5368,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 75696,
 "n": 490,
 "opt": 76172,
 "onetax": 75562,
@@ -4890,6 +5379,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 75700,
 "n": 491,
 "opt": 76176,
 "onetax": 75566,
@@ -4900,6 +5390,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 75946,
 "n": 492,
 "opt": 76446,
 "onetax": 75762,
@@ -4910,6 +5401,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 76140,
 "n": 493,
 "opt": 76640,
 "onetax": 75956,
@@ -4920,6 +5412,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 76634,
 "n": 494,
 "opt": 77134,
 "onetax": 76450,
@@ -4930,6 +5423,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 77105,
 "n": 495,
 "opt": 77533,
 "onetax": 76916,
@@ -4940,6 +5434,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 77599,
 "n": 496,
 "opt": 77925,
 "onetax": 77412,
@@ -4950,6 +5445,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 77761,
 "n": 497,
 "opt": 78087,
 "onetax": 77574,
@@ -4960,6 +5456,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 78259,
 "n": 498,
 "opt": 78585,
 "onetax": 78072,
@@ -4970,6 +5467,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 78267,
 "n": 499,
 "opt": 78593,
 "onetax": 78080,
@@ -4980,6 +5478,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 78571,
 "n": 500,
 "opt": 78934,
 "onetax": 78284,
@@ -4990,6 +5489,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 78746,
 "n": 501,
 "opt": 79109,
 "onetax": 78459,
@@ -5000,6 +5500,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 79248,
 "n": 502,
 "opt": 79611,
 "onetax": 78961,
@@ -5010,6 +5511,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 79252,
 "n": 503,
 "opt": 79615,
 "onetax": 78965,
@@ -5020,6 +5522,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 79756,
 "n": 504,
 "opt": 80119,
 "onetax": 79301,
@@ -5030,6 +5533,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 79970,
 "n": 505,
 "opt": 80333,
 "onetax": 79515,
@@ -5040,6 +5544,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 80476,
 "n": 506,
 "opt": 80839,
 "onetax": 80021,
@@ -5050,6 +5555,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 80779,
 "n": 507,
 "opt": 81110,
 "onetax": 80779,
@@ -5060,6 +5566,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 81287,
 "n": 508,
 "opt": 81618,
 "onetax": 81287,
@@ -5070,6 +5577,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 81293,
 "n": 509,
 "opt": 81624,
 "onetax": 81293,
@@ -5080,6 +5588,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 81717,
 "n": 510,
 "opt": 82085,
 "onetax": 81543,
@@ -5090,6 +5599,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 81873,
 "n": 511,
 "opt": 82241,
 "onetax": 81699,
@@ -5100,6 +5610,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 82129,
 "n": 512,
 "opt": 82497,
 "onetax": 81955,
@@ -5110,6 +5621,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 82705,
 "n": 513,
 "opt": 82938,
 "onetax": 82039,
@@ -5120,6 +5632,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 83219,
 "n": 514,
 "opt": 83452,
 "onetax": 82553,
@@ -5130,6 +5643,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 83431,
 "n": 515,
 "opt": 83664,
 "onetax": 82765,
@@ -5140,6 +5654,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 83701,
 "n": 516,
 "opt": 83934,
 "onetax": 82953,
@@ -5150,6 +5665,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 83917,
 "n": 517,
 "opt": 84150,
 "onetax": 83169,
@@ -5160,6 +5676,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 84435,
 "n": 518,
 "opt": 84668,
 "onetax": 83687,
@@ -5170,6 +5687,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 84620,
 "n": 519,
 "opt": 84853,
 "onetax": 83872,
@@ -5180,6 +5698,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 84778,
 "n": 520,
 "opt": 85221,
 "onetax": 84392,
@@ -5190,6 +5709,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 84790,
 "n": 521,
 "opt": 85233,
 "onetax": 84404,
@@ -5200,6 +5720,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 85298,
 "n": 522,
 "opt": 85695,
 "onetax": 84926,
@@ -5210,6 +5731,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 85300,
 "n": 523,
 "opt": 85697,
 "onetax": 84928,
@@ -5220,6 +5742,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 85824,
 "n": 524,
 "opt": 86221,
 "onetax": 85452,
@@ -5230,6 +5753,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 86188,
 "n": 525,
 "opt": 86616,
 "onetax": 85932,
@@ -5240,6 +5764,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 86714,
 "n": 526,
 "opt": 87142,
 "onetax": 86458,
@@ -5250,6 +5775,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 86864,
 "n": 527,
 "opt": 87292,
 "onetax": 86608,
@@ -5260,6 +5786,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 87376,
 "n": 528,
 "opt": 87654,
 "onetax": 86968,
@@ -5270,6 +5797,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 87544,
 "n": 529,
 "opt": 87822,
 "onetax": 87136,
@@ -5280,6 +5808,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 88074,
 "n": 530,
 "opt": 88352,
 "onetax": 87666,
@@ -5290,6 +5819,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 88629,
 "n": 531,
 "opt": 88883,
 "onetax": 88221,
@@ -5300,6 +5830,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 89037,
 "n": 532,
 "opt": 89286,
 "onetax": 88821,
@@ -5310,6 +5841,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 89163,
 "n": 533,
 "opt": 89412,
 "onetax": 88947,
@@ -5320,6 +5852,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 89697,
 "n": 534,
 "opt": 89946,
 "onetax": 89481,
@@ -5330,6 +5863,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 89923,
 "n": 535,
 "opt": 90172,
 "onetax": 89707,
@@ -5340,6 +5874,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 90191,
 "n": 536,
 "opt": 90464,
 "onetax": 89975,
@@ -5350,6 +5885,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 90382,
 "n": 537,
 "opt": 90655,
 "onetax": 90166,
@@ -5360,6 +5896,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 90920,
 "n": 538,
 "opt": 91193,
 "onetax": 90704,
@@ -5370,6 +5907,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 91299,
 "n": 539,
 "opt": 91703,
 "onetax": 91083,
@@ -5380,6 +5918,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 91839,
 "n": 540,
 "opt": 92123,
 "onetax": 91623,
@@ -5390,6 +5929,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 91857,
 "n": 541,
 "opt": 92141,
 "onetax": 91641,
@@ -5400,6 +5940,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 92399,
 "n": 542,
 "opt": 92683,
 "onetax": 92183,
@@ -5410,6 +5951,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 92584,
 "n": 543,
 "opt": 92868,
 "onetax": 92368,
@@ -5420,6 +5962,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 92712,
 "n": 544,
 "opt": 93256,
 "onetax": 92704,
@@ -5430,6 +5973,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 92936,
 "n": 545,
 "opt": 93480,
 "onetax": 92928,
@@ -5440,6 +5984,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 93312,
 "n": 546,
 "opt": 93844,
 "onetax": 93312,
@@ -5450,6 +5995,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 93318,
 "n": 547,
 "opt": 93850,
 "onetax": 93318,
@@ -5460,6 +6006,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 93866,
 "n": 548,
 "opt": 94398,
 "onetax": 93866,
@@ -5470,6 +6017,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 94423,
 "n": 549,
 "opt": 94947,
 "onetax": 94423,
@@ -5480,6 +6028,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 94775,
 "n": 550,
 "opt": 95304,
 "onetax": 94775,
@@ -5490,6 +6039,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 94935,
 "n": 551,
 "opt": 95464,
 "onetax": 94935,
@@ -5500,6 +6050,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 95399,
 "n": 552,
 "opt": 95995,
 "onetax": 95183,
@@ -5510,6 +6061,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 95587,
 "n": 553,
 "opt": 96183,
 "onetax": 95371,
@@ -5520,6 +6072,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 96141,
 "n": 554,
 "opt": 96737,
 "onetax": 95925,
@@ -5530,6 +6083,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 96372,
 "n": 555,
 "opt": 97292,
 "onetax": 96246,
@@ -5540,6 +6094,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 96928,
 "n": 556,
 "opt": 97848,
 "onetax": 96802,
@@ -5550,6 +6105,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 96938,
 "n": 557,
 "opt": 97858,
 "onetax": 96812,
@@ -5560,6 +6116,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 97370,
 "n": 558,
 "opt": 98218,
 "onetax": 97370,
@@ -5570,6 +6127,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 97478,
 "n": 559,
 "opt": 98326,
 "onetax": 97478,
@@ -5580,6 +6138,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 97762,
 "n": 560,
 "opt": 98686,
 "onetax": 97758,
@@ -5590,6 +6149,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 98401,
 "n": 561,
 "opt": 99247,
 "onetax": 98357,
@@ -5600,6 +6160,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 98963,
 "n": 562,
 "opt": 99809,
 "onetax": 98919,
@@ -5610,6 +6171,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 98969,
 "n": 563,
 "opt": 99815,
 "onetax": 98925,
@@ -5620,6 +6182,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 99157,
 "n": 564,
 "opt": 100121,
 "onetax": 99145,
@@ -5630,6 +6193,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 99395,
 "n": 565,
 "opt": 100359,
 "onetax": 99383,
@@ -5640,6 +6204,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 99961,
 "n": 566,
 "opt": 100925,
 "onetax": 99949,
@@ -5650,6 +6215,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 100696,
 "n": 567,
 "opt": 101487,
 "onetax": 100696,
@@ -5660,6 +6226,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 100980,
 "n": 568,
 "opt": 101787,
 "onetax": 100980,
@@ -5670,6 +6237,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 100986,
 "n": 569,
 "opt": 101793,
 "onetax": 100986,
@@ -5680,6 +6248,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 101648,
 "n": 570,
 "opt": 102125,
 "onetax": 101216,
@@ -5690,6 +6259,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 101650,
 "n": 571,
 "opt": 102127,
 "onetax": 101218,
@@ -5700,6 +6270,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 101813,
 "n": 572,
 "opt": 102472,
 "onetax": 101575,
@@ -5710,6 +6281,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 102024,
 "n": 573,
 "opt": 102683,
 "onetax": 101786,
@@ -5720,6 +6292,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 102598,
 "n": 574,
 "opt": 103257,
 "onetax": 102360,
@@ -5730,6 +6303,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 103314,
 "n": 575,
 "opt": 103832,
 "onetax": 102976,
@@ -5740,6 +6314,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 103620,
 "n": 576,
 "opt": 104224,
 "onetax": 103360,
@@ -5750,6 +6325,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 103626,
 "n": 577,
 "opt": 104230,
 "onetax": 103366,
@@ -5760,6 +6336,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 104204,
 "n": 578,
 "opt": 104808,
 "onetax": 103944,
@@ -5770,6 +6347,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 104401,
 "n": 579,
 "opt": 105005,
 "onetax": 104141,
@@ -5780,6 +6358,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 104825,
 "n": 580,
 "opt": 105401,
 "onetax": 104749,
@@ -5790,6 +6369,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 105011,
 "n": 581,
 "opt": 105587,
 "onetax": 104935,
@@ -5800,6 +6380,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 105593,
 "n": 582,
 "opt": 106169,
 "onetax": 105517,
@@ -5810,6 +6391,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 105847,
 "n": 583,
 "opt": 106423,
 "onetax": 105771,
@@ -5820,6 +6402,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 106139,
 "n": 584,
 "opt": 106723,
 "onetax": 106063,
@@ -5830,6 +6413,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 106504,
 "n": 585,
 "opt": 107080,
 "onetax": 106428,
@@ -5840,6 +6424,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 107090,
 "n": 586,
 "opt": 107666,
 "onetax": 107014,
@@ -5850,6 +6435,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 107100,
 "n": 587,
 "opt": 107676,
 "onetax": 107024,
@@ -5860,6 +6446,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 107592,
 "n": 588,
 "opt": 108264,
 "onetax": 107516,
@@ -5870,6 +6457,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 107688,
 "n": 589,
 "opt": 108360,
 "onetax": 107612,
@@ -5880,6 +6468,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 108278,
 "n": 590,
 "opt": 108950,
 "onetax": 108202,
@@ -5890,6 +6479,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 108483,
 "n": 591,
 "opt": 109155,
 "onetax": 108407,
@@ -5900,6 +6490,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 109155,
 "n": 592,
 "opt": 109685,
 "onetax": 108999,
@@ -5910,6 +6501,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 109161,
 "n": 593,
 "opt": 109691,
 "onetax": 109005,
@@ -5920,6 +6512,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 109813,
 "n": 594,
 "opt": 110282,
 "onetax": 109813,
@@ -5930,6 +6523,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 110335,
 "n": 595,
 "opt": 110860,
 "onetax": 109939,
@@ -5940,6 +6534,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 110931,
 "n": 596,
 "opt": 111456,
 "onetax": 110535,
@@ -5950,6 +6545,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 111134,
 "n": 597,
 "opt": 111659,
 "onetax": 110738,
@@ -5960,6 +6556,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 111732,
 "n": 598,
 "opt": 112257,
 "onetax": 111336,
@@ -5970,6 +6567,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 111738,
 "n": 599,
 "opt": 112263,
 "onetax": 111342,
@@ -5980,6 +6578,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 112038,
 "n": 600,
 "opt": 112623,
 "onetax": 111642,
@@ -5990,6 +6589,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 112040,
 "n": 601,
 "opt": 112625,
 "onetax": 111644,
@@ -6000,6 +6600,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 112642,
 "n": 602,
 "opt": 113227,
 "onetax": 112246,
@@ -6010,6 +6611,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 113269,
 "n": 603,
 "opt": 113830,
 "onetax": 112873,
@@ -6020,6 +6622,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 113873,
 "n": 604,
 "opt": 114434,
 "onetax": 113477,
@@ -6030,6 +6633,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 114408,
 "n": 605,
 "opt": 115039,
 "onetax": 113938,
@@ -6040,6 +6644,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 115014,
 "n": 606,
 "opt": 115645,
 "onetax": 114544,
@@ -6050,6 +6655,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 115020,
 "n": 607,
 "opt": 115651,
 "onetax": 114550,
@@ -6060,6 +6666,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 115356,
 "n": 608,
 "opt": 115988,
 "onetax": 115006,
@@ -6070,6 +6677,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 116125,
 "n": 609,
 "opt": 116573,
 "onetax": 115373,
@@ -6080,6 +6688,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 116735,
 "n": 610,
 "opt": 117183,
 "onetax": 115983,
@@ -6090,6 +6699,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 116873,
 "n": 611,
 "opt": 117321,
 "onetax": 116121,
@@ -6100,6 +6710,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 117129,
 "n": 612,
 "opt": 117933,
 "onetax": 116733,
@@ -6110,6 +6721,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 117135,
 "n": 613,
 "opt": 117939,
 "onetax": 116739,
@@ -6120,6 +6732,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 117749,
 "n": 614,
 "opt": 118553,
 "onetax": 117353,
@@ -6130,6 +6743,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 118200,
 "n": 615,
 "opt": 119168,
 "onetax": 117794,
@@ -6140,6 +6754,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 118251,
 "n": 616,
 "opt": 119767,
 "onetax": 117934,
@@ -6150,6 +6765,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 118255,
 "n": 617,
 "opt": 119771,
 "onetax": 117938,
@@ -6160,6 +6776,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 118873,
 "n": 618,
 "opt": 120389,
 "onetax": 118556,
@@ -6170,6 +6787,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 118875,
 "n": 619,
 "opt": 120391,
 "onetax": 118558,
@@ -6180,6 +6798,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 119655,
 "n": 620,
 "opt": 120761,
 "onetax": 119130,
@@ -6190,6 +6809,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 120459,
 "n": 621,
 "opt": 121217,
 "onetax": 119933,
@@ -6200,6 +6820,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 121081,
 "n": 622,
 "opt": 121839,
 "onetax": 120555,
@@ -6210,6 +6831,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 121289,
 "n": 623,
 "opt": 122047,
 "onetax": 120763,
@@ -6220,6 +6842,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 121601,
 "n": 624,
 "opt": 122408,
 "onetax": 121123,
@@ -6230,6 +6853,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 122018,
 "n": 625,
 "opt": 122854,
 "onetax": 121908,
@@ -6240,6 +6864,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 122644,
 "n": 626,
 "opt": 123480,
 "onetax": 122534,
@@ -6250,6 +6875,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 123263,
 "n": 627,
 "opt": 124107,
 "onetax": 123263,
@@ -6260,6 +6886,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 123891,
 "n": 628,
 "opt": 124735,
 "onetax": 123891,
@@ -6270,6 +6897,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 124117,
 "n": 629,
 "opt": 124961,
 "onetax": 124117,
@@ -6280,6 +6908,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 124831,
 "n": 630,
 "opt": 125570,
 "onetax": 124831,
@@ -6290,6 +6919,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 124843,
 "n": 631,
 "opt": 125582,
 "onetax": 124843,
@@ -6300,6 +6930,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 125159,
 "n": 632,
 "opt": 125922,
 "onetax": 125159,
@@ -6310,6 +6941,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 125394,
 "n": 633,
 "opt": 126157,
 "onetax": 125394,
@@ -6320,6 +6952,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 126028,
 "n": 634,
 "opt": 126791,
 "onetax": 126028,
@@ -6330,6 +6963,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 126324,
 "n": 635,
 "opt": 127087,
 "onetax": 126324,
@@ -6340,6 +6974,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 126584,
 "n": 636,
 "opt": 127441,
 "onetax": 126584,
@@ -6350,6 +6985,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 127102,
 "n": 637,
 "opt": 128034,
 "onetax": 127102,
@@ -6360,6 +6996,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 127740,
 "n": 638,
 "opt": 128672,
 "onetax": 127740,
@@ -6370,6 +7007,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 128395,
 "n": 639,
 "opt": 129311,
 "onetax": 128395,
@@ -6380,6 +7018,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 129035,
 "n": 640,
 "opt": 129663,
 "onetax": 129035,
@@ -6390,6 +7029,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 129045,
 "n": 641,
 "opt": 129673,
 "onetax": 129045,
@@ -6400,6 +7040,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 129687,
 "n": 642,
 "opt": 130315,
 "onetax": 129687,
@@ -6410,6 +7051,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 129689,
 "n": 643,
 "opt": 130317,
 "onetax": 129689,
@@ -6420,6 +7062,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 130045,
 "n": 644,
 "opt": 130757,
 "onetax": 130045,
@@ -6430,6 +7073,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 130772,
 "n": 645,
 "opt": 131402,
 "onetax": 130772,
@@ -6440,6 +7084,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 131418,
 "n": 646,
 "opt": 132048,
 "onetax": 131418,
@@ -6450,6 +7095,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 131422,
 "n": 647,
 "opt": 132052,
 "onetax": 131422,
@@ -6460,6 +7106,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 131974,
 "n": 648,
 "opt": 132700,
 "onetax": 131974,
@@ -6470,6 +7117,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 132252,
 "n": 649,
 "opt": 132978,
 "onetax": 132252,
@@ -6480,6 +7128,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 132588,
 "n": 650,
 "opt": 133408,
 "onetax": 132557,
@@ -6490,6 +7139,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 133270,
 "n": 651,
 "opt": 134030,
 "onetax": 133270,
@@ -6500,6 +7150,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 133922,
 "n": 652,
 "opt": 134682,
 "onetax": 133922,
@@ -6510,6 +7161,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 133928,
 "n": 653,
 "opt": 134688,
 "onetax": 133928,
@@ -6520,6 +7172,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 134582,
 "n": 654,
 "opt": 135342,
 "onetax": 134582,
@@ -6530,6 +7183,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 134856,
 "n": 655,
 "opt": 135616,
 "onetax": 134856,
@@ -6540,6 +7194,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 135216,
 "n": 656,
 "opt": 136177,
 "onetax": 135216,
@@ -6550,6 +7205,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 135881,
 "n": 657,
 "opt": 136834,
 "onetax": 135881,
@@ -6560,6 +7216,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 136539,
 "n": 658,
 "opt": 137492,
 "onetax": 136539,
@@ -6570,6 +7227,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 136545,
 "n": 659,
 "opt": 137498,
 "onetax": 136545,
@@ -6580,6 +7238,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 137336,
 "n": 660,
 "opt": 138099,
 "onetax": 137289,
@@ -6590,6 +7249,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 137338,
 "n": 661,
 "opt": 138101,
 "onetax": 137291,
@@ -6600,6 +7260,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 138000,
 "n": 662,
 "opt": 138763,
 "onetax": 137953,
@@ -6610,6 +7271,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 138731,
 "n": 663,
 "opt": 139338,
 "onetax": 138278,
@@ -6620,6 +7282,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 139063,
 "n": 664,
 "opt": 139686,
 "onetax": 138610,
@@ -6630,6 +7293,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 139477,
 "n": 665,
 "opt": 140313,
 "onetax": 139020,
@@ -6640,6 +7304,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 140143,
 "n": 666,
 "opt": 140855,
 "onetax": 139686,
@@ -6650,6 +7315,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 140373,
 "n": 667,
 "opt": 141085,
 "onetax": 139916,
@@ -6660,6 +7326,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 141041,
 "n": 668,
 "opt": 141753,
 "onetax": 140584,
@@ -6670,6 +7337,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 141288,
 "n": 669,
 "opt": 142000,
 "onetax": 140831,
@@ -6680,6 +7348,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 141958,
 "n": 670,
 "opt": 142670,
 "onetax": 141501,
@@ -6690,6 +7359,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 142216,
 "n": 671,
 "opt": 142928,
 "onetax": 141759,
@@ -6700,6 +7370,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 142527,
 "n": 672,
 "opt": 143600,
 "onetax": 142527,
@@ -6710,6 +7381,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 142539,
 "n": 673,
 "opt": 143612,
 "onetax": 142539,
@@ -6720,6 +7392,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 143213,
 "n": 674,
 "opt": 144286,
 "onetax": 143213,
@@ -6730,6 +7403,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 143618,
 "n": 675,
 "opt": 144814,
 "onetax": 143618,
@@ -6740,6 +7414,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 144294,
 "n": 676,
 "opt": 145386,
 "onetax": 144294,
@@ -6750,6 +7425,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 144298,
 "n": 677,
 "opt": 145390,
 "onetax": 144298,
@@ -6760,6 +7436,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 144976,
 "n": 678,
 "opt": 146068,
 "onetax": 144976,
@@ -6770,6 +7447,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 145210,
 "n": 679,
 "opt": 146302,
 "onetax": 145210,
@@ -6780,6 +7458,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 145550,
 "n": 680,
 "opt": 146826,
 "onetax": 145550,
@@ -6790,6 +7469,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 145785,
 "n": 681,
 "opt": 147061,
 "onetax": 145785,
@@ -6800,6 +7480,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 146467,
 "n": 682,
 "opt": 147743,
 "onetax": 146467,
@@ -6810,6 +7491,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 146473,
 "n": 683,
 "opt": 147749,
 "onetax": 146473,
@@ -6820,6 +7502,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 147157,
 "n": 684,
 "opt": 148195,
 "onetax": 147157,
@@ -6830,6 +7513,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 147449,
 "n": 685,
 "opt": 148487,
 "onetax": 147449,
@@ -6840,6 +7524,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 148279,
 "n": 686,
 "opt": 149173,
 "onetax": 147939,
@@ -6850,6 +7535,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 148512,
 "n": 687,
 "opt": 149406,
 "onetax": 148172,
@@ -6860,6 +7546,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 149174,
 "n": 688,
 "opt": 149894,
 "onetax": 148860,
@@ -6870,6 +7557,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 149346,
 "n": 689,
 "opt": 150066,
 "onetax": 149032,
@@ -6880,6 +7568,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 150166,
 "n": 690,
 "opt": 150704,
 "onetax": 149342,
@@ -6890,6 +7579,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 150174,
 "n": 691,
 "opt": 150712,
 "onetax": 149350,
@@ -6900,6 +7590,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 150866,
 "n": 692,
 "opt": 151404,
 "onetax": 150042,
@@ -6910,6 +7601,7 @@
 "hybrid_forced": 4
 },
 {
+"oracle": 151027,
 "n": 693,
 "opt": 151975,
 "onetax": 150575,
@@ -6920,6 +7612,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 151721,
 "n": 694,
 "opt": 152669,
 "onetax": 151269,
@@ -6930,6 +7623,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 152005,
 "n": 695,
 "opt": 152953,
 "onetax": 151553,
@@ -6940,6 +7634,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 152483,
 "n": 696,
 "opt": 153495,
 "onetax": 151881,
@@ -6950,6 +7645,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 152699,
 "n": 697,
 "opt": 153711,
 "onetax": 152097,
@@ -6960,6 +7656,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 153397,
 "n": 698,
 "opt": 154409,
 "onetax": 152795,
@@ -6970,6 +7667,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 153638,
 "n": 699,
 "opt": 154650,
 "onetax": 153036,
@@ -6980,6 +7678,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 153998,
 "n": 700,
 "opt": 155113,
 "onetax": 153736,
@@ -6990,6 +7689,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 154008,
 "n": 701,
 "opt": 155123,
 "onetax": 153746,
@@ -7000,6 +7700,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 154804,
 "n": 702,
 "opt": 155601,
 "onetax": 154078,
@@ -7010,6 +7711,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 154980,
 "n": 703,
 "opt": 155777,
 "onetax": 154254,
@@ -7020,6 +7722,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 155366,
 "n": 704,
 "opt": 156257,
 "onetax": 154734,
@@ -7030,6 +7733,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 155781,
 "n": 705,
 "opt": 156962,
 "onetax": 155101,
@@ -7040,6 +7744,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 156487,
 "n": 706,
 "opt": 157668,
 "onetax": 155807,
@@ -7050,6 +7755,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 156709,
 "n": 707,
 "opt": 157890,
 "onetax": 156029,
@@ -7060,6 +7766,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 157025,
 "n": 708,
 "opt": 158280,
 "onetax": 156313,
@@ -7070,6 +7777,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 157033,
 "n": 709,
 "opt": 158288,
 "onetax": 156321,
@@ -7080,6 +7788,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 157743,
 "n": 710,
 "opt": 158998,
 "onetax": 157031,
@@ -7090,6 +7799,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 158478,
 "n": 711,
 "opt": 159709,
 "onetax": 157766,
@@ -7100,6 +7810,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 158834,
 "n": 712,
 "opt": 160089,
 "onetax": 158122,
@@ -7110,6 +7821,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 158996,
 "n": 713,
 "opt": 160251,
 "onetax": 158284,
@@ -7120,6 +7832,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 159832,
 "n": 714,
 "opt": 160931,
 "onetax": 158503,
@@ -7130,6 +7843,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 160262,
 "n": 715,
 "opt": 161449,
 "onetax": 159780,
@@ -7140,6 +7854,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 160978,
 "n": 716,
 "opt": 162165,
 "onetax": 160496,
@@ -7150,6 +7865,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 161229,
 "n": 717,
 "opt": 162416,
 "onetax": 160747,
@@ -7160,6 +7876,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 161947,
 "n": 718,
 "opt": 163134,
 "onetax": 161465,
@@ -7170,6 +7887,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 161957,
 "n": 719,
 "opt": 163144,
 "onetax": 161475,
@@ -7180,6 +7898,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 162357,
 "n": 720,
 "opt": 163544,
 "onetax": 161835,
@@ -7190,6 +7909,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 162573,
 "n": 721,
 "opt": 163760,
 "onetax": 162051,
@@ -7200,6 +7920,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 163295,
 "n": 722,
 "opt": 164482,
 "onetax": 162773,
@@ -7210,6 +7931,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 163540,
 "n": 723,
 "opt": 164727,
 "onetax": 163018,
@@ -7220,6 +7942,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 164264,
 "n": 724,
 "opt": 165451,
 "onetax": 163742,
@@ -7230,6 +7953,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 164181,
 "n": 725,
 "opt": 165969,
 "onetax": 163879,
@@ -7240,6 +7964,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 164995,
 "n": 726,
 "opt": 166695,
 "onetax": 164926,
@@ -7250,6 +7975,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 165003,
 "n": 727,
 "opt": 166703,
 "onetax": 164934,
@@ -7260,6 +7986,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 165367,
 "n": 728,
 "opt": 167188,
 "onetax": 165222,
@@ -7270,6 +7997,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 166276,
 "n": 729,
 "opt": 167917,
 "onetax": 166131,
@@ -7280,6 +8008,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 167006,
 "n": 730,
 "opt": 168647,
 "onetax": 166861,
@@ -7290,6 +8019,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 167204,
 "n": 731,
 "opt": 168845,
 "onetax": 167059,
@@ -7300,6 +8030,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 167464,
 "n": 732,
 "opt": 169223,
 "onetax": 167319,
@@ -7310,6 +8041,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 167470,
 "n": 733,
 "opt": 169229,
 "onetax": 167325,
@@ -7320,6 +8052,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 168204,
 "n": 734,
 "opt": 169963,
 "onetax": 168059,
@@ -7330,6 +8063,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 169181,
 "n": 735,
 "opt": 170698,
 "onetax": 169181,
@@ -7340,6 +8074,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 169613,
 "n": 736,
 "opt": 171327,
 "onetax": 169613,
@@ -7350,6 +8085,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 169923,
 "n": 737,
 "opt": 171637,
 "onetax": 169923,
@@ -7360,6 +8096,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 170661,
 "n": 738,
 "opt": 172281,
 "onetax": 170661,
@@ -7370,6 +8107,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 170667,
 "n": 739,
 "opt": 172287,
 "onetax": 170667,
@@ -7380,6 +8118,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 171011,
 "n": 740,
 "opt": 172899,
 "onetax": 171011,
@@ -7390,6 +8129,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 171334,
 "n": 741,
 "opt": 173266,
 "onetax": 171334,
@@ -7400,6 +8140,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 172076,
 "n": 742,
 "opt": 174008,
 "onetax": 172076,
@@ -7410,6 +8151,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 172080,
 "n": 743,
 "opt": 174012,
 "onetax": 172080,
@@ -7420,6 +8162,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 172872,
 "n": 744,
 "opt": 174516,
 "onetax": 172872,
@@ -7430,6 +8173,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 173200,
 "n": 745,
 "opt": 174844,
 "onetax": 173200,
@@ -7440,6 +8184,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 173946,
 "n": 746,
 "opt": 175590,
 "onetax": 173946,
@@ -7450,6 +8195,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 174709,
 "n": 747,
 "opt": 176337,
 "onetax": 174709,
@@ -7460,6 +8206,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 175457,
 "n": 748,
 "opt": 177085,
 "onetax": 175457,
@@ -7470,6 +8217,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 175691,
 "n": 749,
 "opt": 177319,
 "onetax": 175691,
@@ -7480,6 +8228,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 175840,
 "n": 750,
 "opt": 177803,
 "onetax": 175781,
@@ -7490,6 +8239,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 175848,
 "n": 751,
 "opt": 177811,
 "onetax": 175789,
@@ -7500,6 +8250,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 176608,
 "n": 752,
 "opt": 178341,
 "onetax": 176541,
@@ -7510,6 +8261,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 176879,
 "n": 753,
 "opt": 178612,
 "onetax": 176812,
@@ -7520,6 +8272,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 177633,
 "n": 754,
 "opt": 179366,
 "onetax": 177566,
@@ -7530,6 +8283,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 177941,
 "n": 755,
 "opt": 179674,
 "onetax": 177874,
@@ -7540,6 +8294,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 178697,
 "n": 756,
 "opt": 180426,
 "onetax": 178306,
@@ -7550,6 +8305,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 178703,
 "n": 757,
 "opt": 180432,
 "onetax": 178312,
@@ -7560,6 +8316,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 179461,
 "n": 758,
 "opt": 181190,
 "onetax": 179070,
@@ -7570,6 +8327,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 180296,
 "n": 759,
 "opt": 181711,
 "onetax": 179905,
@@ -7580,6 +8338,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 180744,
 "n": 760,
 "opt": 182165,
 "onetax": 180257,
@@ -7590,6 +8349,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 180748,
 "n": 761,
 "opt": 182169,
 "onetax": 180261,
@@ -7600,6 +8360,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 181510,
 "n": 762,
 "opt": 182931,
 "onetax": 181023,
@@ -7610,6 +8371,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 181738,
 "n": 763,
 "opt": 183159,
 "onetax": 181251,
@@ -7620,6 +8382,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 182502,
 "n": 764,
 "opt": 183923,
 "onetax": 182015,
@@ -7630,6 +8393,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 183267,
 "n": 765,
 "opt": 184654,
 "onetax": 182848,
@@ -7640,6 +8404,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 184033,
 "n": 766,
 "opt": 185420,
 "onetax": 183614,
@@ -7650,6 +8415,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 184217,
 "n": 767,
 "opt": 185604,
 "onetax": 183798,
@@ -7660,6 +8426,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 184601,
 "n": 768,
 "opt": 185988,
 "onetax": 184182,
@@ -7670,6 +8437,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 184609,
 "n": 769,
 "opt": 185996,
 "onetax": 184190,
@@ -7680,6 +8448,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 185410,
 "n": 770,
 "opt": 186713,
 "onetax": 185410,
@@ -7690,6 +8459,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 185679,
 "n": 771,
 "opt": 186982,
 "onetax": 185679,
@@ -7700,6 +8470,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 186451,
 "n": 772,
 "opt": 187754,
 "onetax": 186451,
@@ -7710,6 +8481,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 186455,
 "n": 773,
 "opt": 187758,
 "onetax": 186455,
@@ -7720,6 +8492,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 187229,
 "n": 774,
 "opt": 188442,
 "onetax": 187229,
@@ -7730,6 +8503,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 187739,
 "n": 775,
 "opt": 189000,
 "onetax": 187739,
@@ -7740,6 +8514,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 188127,
 "n": 776,
 "opt": 189420,
 "onetax": 188127,
@@ -7750,6 +8525,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 188558,
 "n": 777,
 "opt": 189905,
 "onetax": 188558,
@@ -7760,6 +8536,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 189336,
 "n": 778,
 "opt": 190683,
 "onetax": 189336,
@@ -7770,6 +8547,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 189486,
 "n": 779,
 "opt": 190833,
 "onetax": 189486,
@@ -7780,6 +8558,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 189867,
 "n": 780,
 "opt": 191325,
 "onetax": 189606,
@@ -7790,6 +8569,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 190179,
 "n": 781,
 "opt": 191637,
 "onetax": 189918,
@@ -7800,6 +8580,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 190961,
 "n": 782,
 "opt": 192419,
 "onetax": 190700,
@@ -7810,6 +8591,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 192251,
 "n": 783,
 "opt": 193202,
 "onetax": 192101,
@@ -7820,6 +8602,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 192971,
 "n": 784,
 "opt": 193986,
 "onetax": 192885,
@@ -7830,6 +8613,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 193303,
 "n": 785,
 "opt": 194318,
 "onetax": 193217,
@@ -7840,6 +8624,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 194089,
 "n": 786,
 "opt": 195104,
 "onetax": 194003,
@@ -7850,6 +8635,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 194103,
 "n": 787,
 "opt": 195118,
 "onetax": 194017,
@@ -7860,6 +8646,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 194891,
 "n": 788,
 "opt": 195906,
 "onetax": 194805,
@@ -7870,6 +8657,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 195166,
 "n": 789,
 "opt": 196181,
 "onetax": 195080,
@@ -7880,6 +8668,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 195956,
 "n": 790,
 "opt": 196971,
 "onetax": 195870,
@@ -7890,6 +8679,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 196202,
 "n": 791,
 "opt": 197217,
 "onetax": 196116,
@@ -7900,6 +8690,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 196860,
 "n": 792,
 "opt": 197992,
 "onetax": 196860,
@@ -7910,6 +8701,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 197004,
 "n": 793,
 "opt": 198136,
 "onetax": 197004,
@@ -7920,6 +8712,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 197798,
 "n": 794,
 "opt": 198930,
 "onetax": 197798,
@@ -7930,6 +8723,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 198343,
 "n": 795,
 "opt": 199725,
 "onetax": 198343,
@@ -7940,6 +8734,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 199139,
 "n": 796,
 "opt": 200521,
 "onetax": 199139,
@@ -7950,6 +8745,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 199149,
 "n": 797,
 "opt": 200531,
 "onetax": 199149,
@@ -7960,6 +8756,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 199807,
 "n": 798,
 "opt": 201250,
 "onetax": 199439,
@@ -7970,6 +8767,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 200047,
 "n": 799,
 "opt": 201490,
 "onetax": 199679,
@@ -7980,6 +8778,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 200575,
 "n": 800,
 "opt": 201990,
 "onetax": 200079,
@@ -7990,6 +8789,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 201400,
 "n": 801,
 "opt": 202791,
 "onetax": 200904,
@@ -8000,6 +8800,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 202202,
 "n": 802,
 "opt": 203593,
 "onetax": 201706,
@@ -8010,6 +8811,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 202508,
 "n": 803,
 "opt": 203899,
 "onetax": 202012,
@@ -8020,6 +8822,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 202776,
 "n": 804,
 "opt": 204337,
 "onetax": 202328,
@@ -8030,6 +8833,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 203494,
 "n": 805,
 "opt": 204916,
 "onetax": 203356,
@@ -8040,6 +8844,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 204300,
 "n": 806,
 "opt": 205722,
 "onetax": 204162,
@@ -8050,6 +8855,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 204581,
 "n": 807,
 "opt": 206003,
 "onetax": 204443,
@@ -8060,6 +8866,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 204985,
 "n": 808,
 "opt": 206423,
 "onetax": 204847,
@@ -8070,6 +8877,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 204997,
 "n": 809,
 "opt": 206435,
 "onetax": 204859,
@@ -8080,6 +8888,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 205903,
 "n": 810,
 "opt": 207230,
 "onetax": 205399,
@@ -8090,6 +8899,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 205905,
 "n": 811,
 "opt": 207232,
 "onetax": 205401,
@@ -8100,6 +8910,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 206652,
 "n": 812,
 "opt": 208044,
 "onetax": 205991,
@@ -8110,6 +8921,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 206927,
 "n": 813,
 "opt": 208319,
 "onetax": 206266,
@@ -8120,6 +8932,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 207741,
 "n": 814,
 "opt": 209133,
 "onetax": 207080,
@@ -8130,6 +8943,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 208085,
 "n": 815,
 "opt": 209477,
 "onetax": 207424,
@@ -8140,6 +8954,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 208957,
 "n": 816,
 "opt": 210180,
 "onetax": 207928,
@@ -8150,6 +8965,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 209077,
 "n": 817,
 "opt": 210300,
 "onetax": 208048,
@@ -8160,6 +8976,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 209895,
 "n": 818,
 "opt": 211118,
 "onetax": 208866,
@@ -8170,6 +8987,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 211067,
 "n": 819,
 "opt": 211831,
 "onetax": 209946,
@@ -8180,6 +8998,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 211555,
 "n": 820,
 "opt": 212343,
 "onetax": 210858,
@@ -8190,6 +9009,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 211565,
 "n": 821,
 "opt": 212353,
 "onetax": 210868,
@@ -8200,6 +9020,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 212387,
 "n": 822,
 "opt": 213175,
 "onetax": 211690,
@@ -8210,6 +9031,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 212389,
 "n": 823,
 "opt": 213177,
 "onetax": 211692,
@@ -8220,6 +9042,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 212801,
 "n": 824,
 "opt": 213597,
 "onetax": 212104,
@@ -8230,6 +9053,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 213490,
 "n": 825,
 "opt": 214174,
 "onetax": 212467,
@@ -8240,6 +9064,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 214316,
 "n": 826,
 "opt": 215000,
 "onetax": 213293,
@@ -8250,6 +9075,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 214320,
 "n": 827,
 "opt": 215004,
 "onetax": 213297,
@@ -8260,6 +9086,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 215282,
 "n": 828,
 "opt": 215832,
 "onetax": 213893,
@@ -8270,6 +9097,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 215284,
 "n": 829,
 "opt": 215834,
 "onetax": 213895,
@@ -8280,6 +9108,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 216114,
 "n": 830,
 "opt": 216664,
 "onetax": 214725,
@@ -8290,6 +9119,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 216403,
 "n": 831,
 "opt": 216953,
 "onetax": 215014,
@@ -8300,6 +9130,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 216607,
 "n": 832,
 "opt": 217575,
 "onetax": 215494,
@@ -8310,6 +9141,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 217181,
 "n": 833,
 "opt": 218226,
 "onetax": 215572,
@@ -8320,6 +9152,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 218015,
 "n": 834,
 "opt": 219060,
 "onetax": 216406,
@@ -8330,6 +9163,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 218361,
 "n": 835,
 "opt": 219406,
 "onetax": 216752,
@@ -8340,6 +9174,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 218999,
 "n": 836,
 "opt": 220069,
 "onetax": 217588,
@@ -8350,6 +9185,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 219282,
 "n": 837,
 "opt": 220684,
 "onetax": 218881,
@@ -8360,6 +9196,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 220120,
 "n": 838,
 "opt": 221522,
 "onetax": 219719,
@@ -8370,6 +9207,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 220130,
 "n": 839,
 "opt": 221532,
 "onetax": 219729,
@@ -8380,6 +9218,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 220930,
 "n": 840,
 "opt": 222172,
 "onetax": 220689,
@@ -8390,6 +9229,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 221242,
 "n": 841,
 "opt": 222484,
 "onetax": 221001,
@@ -8400,6 +9240,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 222084,
 "n": 842,
 "opt": 223326,
 "onetax": 221843,
@@ -8410,6 +9251,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 222373,
 "n": 843,
 "opt": 223615,
 "onetax": 222132,
@@ -8420,6 +9262,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 223217,
 "n": 844,
 "opt": 224459,
 "onetax": 222976,
@@ -8430,6 +9273,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 224359,
 "n": 845,
 "opt": 225251,
 "onetax": 224008,
@@ -8440,6 +9284,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 224854,
 "n": 846,
 "opt": 225839,
 "onetax": 224854,
@@ -8450,6 +9295,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 226140,
 "n": 847,
 "opt": 226661,
 "onetax": 225082,
@@ -8460,6 +9306,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 226966,
 "n": 848,
 "opt": 227415,
 "onetax": 225930,
@@ -8470,6 +9317,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 227253,
 "n": 849,
 "opt": 227702,
 "onetax": 226217,
@@ -8480,6 +9328,7 @@
 "hybrid_forced": 5
 },
 {
+"oracle": 227719,
 "n": 850,
 "opt": 228294,
 "onetax": 226649,
@@ -8490,6 +9339,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 227981,
 "n": 851,
 "opt": 228556,
 "onetax": 226911,
@@ -8500,6 +9350,7 @@
 "hybrid_forced": 6
 },
 {
+"oracle": 228431,
 "n": 852,
 "opt": 229006,
 "onetax": 227227,
@@ -8510,6 +9361,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 228445,
 "n": 853,
 "opt": 229020,
 "onetax": 227241,
@@ -8520,6 +9372,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 229299,
 "n": 854,
 "opt": 229874,
 "onetax": 228095,
@@ -8530,6 +9383,7 @@
 "hybrid_forced": 7
 },
 {
+"oracle": 229708,
 "n": 855,
 "opt": 230442,
 "onetax": 228950,
@@ -8540,6 +9394,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 230136,
 "n": 856,
 "opt": 230886,
 "onetax": 229378,
@@ -8550,6 +9405,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 230140,
 "n": 857,
 "opt": 230890,
 "onetax": 229382,
@@ -8560,6 +9416,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 230701,
 "n": 858,
 "opt": 231418,
 "onetax": 229778,
@@ -8570,6 +9427,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 230703,
 "n": 859,
 "opt": 231420,
 "onetax": 229780,
@@ -8580,6 +9438,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 231153,
 "n": 860,
 "opt": 231911,
 "onetax": 230148,
@@ -8590,6 +9449,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 232014,
 "n": 861,
 "opt": 232735,
 "onetax": 231091,
@@ -8600,6 +9460,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 232876,
 "n": 862,
 "opt": 233597,
 "onetax": 231953,
@@ -8610,6 +9471,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 232880,
 "n": 863,
 "opt": 233601,
 "onetax": 231957,
@@ -8620,6 +9482,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 233312,
 "n": 864,
 "opt": 234257,
 "onetax": 232389,
@@ -8630,6 +9493,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 233676,
 "n": 865,
 "opt": 234621,
 "onetax": 232753,
@@ -8640,6 +9504,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 234542,
 "n": 866,
 "opt": 235487,
 "onetax": 233619,
@@ -8650,6 +9515,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 234938,
 "n": 867,
 "opt": 236245,
 "onetax": 234044,
@@ -8660,6 +9526,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 235334,
 "n": 868,
 "opt": 236864,
 "onetax": 234528,
@@ -8670,6 +9537,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 235692,
 "n": 869,
 "opt": 237222,
 "onetax": 234886,
@@ -8680,6 +9548,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 236604,
 "n": 870,
 "opt": 237771,
 "onetax": 235798,
@@ -8690,6 +9559,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 236804,
 "n": 871,
 "opt": 237971,
 "onetax": 235998,
@@ -8700,6 +9570,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 237240,
 "n": 872,
 "opt": 238415,
 "onetax": 236434,
@@ -8710,6 +9581,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 238145,
 "n": 873,
 "opt": 239288,
 "onetax": 237339,
@@ -8720,6 +9592,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 239019,
 "n": 874,
 "opt": 240162,
 "onetax": 238213,
@@ -8730,6 +9603,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 239504,
 "n": 875,
 "opt": 240739,
 "onetax": 238736,
@@ -8740,6 +9614,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 239812,
 "n": 876,
 "opt": 241189,
 "onetax": 239044,
@@ -8750,6 +9625,7 @@
 "hybrid_forced": 14
 },
 {
+"oracle": 239826,
 "n": 877,
 "opt": 241203,
 "onetax": 239058,
@@ -8760,6 +9636,7 @@
 "hybrid_forced": 14
 },
 {
+"oracle": 240704,
 "n": 878,
 "opt": 242081,
 "onetax": 239936,
@@ -8770,6 +9647,7 @@
 "hybrid_forced": 14
 },
 {
+"oracle": 241017,
 "n": 879,
 "opt": 242394,
 "onetax": 240249,
@@ -8780,6 +9658,7 @@
 "hybrid_forced": 14
 },
 {
+"oracle": 241889,
 "n": 880,
 "opt": 242974,
 "onetax": 240897,
@@ -8790,6 +9669,7 @@
 "hybrid_forced": 15
 },
 {
+"oracle": 241893,
 "n": 881,
 "opt": 242978,
 "onetax": 240901,
@@ -8800,6 +9680,7 @@
 "hybrid_forced": 15
 },
 {
+"oracle": 242443,
 "n": 882,
 "opt": 243860,
 "onetax": 241123,
@@ -8810,6 +9691,7 @@
 "hybrid_forced": 14
 },
 {
+"oracle": 242445,
 "n": 883,
 "opt": 243862,
 "onetax": 241125,
@@ -8820,6 +9702,7 @@
 "hybrid_forced": 14
 },
 {
+"oracle": 242654,
 "n": 884,
 "opt": 244504,
 "onetax": 242009,
@@ -8830,6 +9713,7 @@
 "hybrid_forced": 15
 },
 {
+"oracle": 243687,
 "n": 885,
 "opt": 245389,
 "onetax": 242624,
@@ -8840,6 +9724,7 @@
 "hybrid_forced": 14
 },
 {
+"oracle": 244573,
 "n": 886,
 "opt": 246275,
 "onetax": 243510,
@@ -8850,6 +9735,7 @@
 "hybrid_forced": 14
 },
 {
+"oracle": 244577,
 "n": 887,
 "opt": 246279,
 "onetax": 243514,
@@ -8860,6 +9746,7 @@
 "hybrid_forced": 14
 },
 {
+"oracle": 245529,
 "n": 888,
 "opt": 247097,
 "onetax": 244078,
@@ -8870,6 +9757,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 245853,
 "n": 889,
 "opt": 247421,
 "onetax": 244402,
@@ -8880,6 +9768,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 246743,
 "n": 890,
 "opt": 248311,
 "onetax": 245292,
@@ -8890,6 +9779,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 247762,
 "n": 891,
 "opt": 249202,
 "onetax": 246399,
@@ -8900,6 +9790,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 248654,
 "n": 892,
 "opt": 250094,
 "onetax": 247291,
@@ -8910,6 +9801,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 248816,
 "n": 893,
 "opt": 250256,
 "onetax": 247453,
@@ -8920,6 +9812,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 249710,
 "n": 894,
 "opt": 251150,
 "onetax": 248347,
@@ -8930,6 +9823,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 250086,
 "n": 895,
 "opt": 251526,
 "onetax": 248723,
@@ -8940,6 +9834,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 250982,
 "n": 896,
 "opt": 252202,
 "onetax": 249299,
@@ -8950,6 +9845,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 251583,
 "n": 897,
 "opt": 252994,
 "onetax": 249690,
@@ -8960,6 +9856,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 252481,
 "n": 898,
 "opt": 253892,
 "onetax": 250588,
@@ -8970,6 +9867,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 252713,
 "n": 899,
 "opt": 254124,
 "onetax": 250820,
@@ -8980,6 +9878,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 253213,
 "n": 900,
 "opt": 254657,
 "onetax": 251840,
@@ -8990,6 +9889,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 253503,
 "n": 901,
 "opt": 254947,
 "onetax": 252130,
@@ -9000,6 +9900,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 254405,
 "n": 902,
 "opt": 255849,
 "onetax": 253032,
@@ -9010,6 +9911,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 255208,
 "n": 903,
 "opt": 256711,
 "onetax": 253239,
@@ -9020,6 +9922,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 255660,
 "n": 904,
 "opt": 257179,
 "onetax": 253691,
@@ -9030,6 +9933,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 256028,
 "n": 905,
 "opt": 257547,
 "onetax": 254059,
@@ -9040,6 +9944,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 256934,
 "n": 906,
 "opt": 258453,
 "onetax": 254965,
@@ -9050,6 +9955,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 256954,
 "n": 907,
 "opt": 258473,
 "onetax": 254985,
@@ -9060,6 +9966,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 257862,
 "n": 908,
 "opt": 259381,
 "onetax": 255893,
@@ -9070,6 +9977,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 258787,
 "n": 909,
 "opt": 260290,
 "onetax": 256818,
@@ -9080,6 +9988,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 259271,
 "n": 910,
 "opt": 260815,
 "onetax": 257758,
@@ -9090,6 +9999,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 259275,
 "n": 911,
 "opt": 260819,
 "onetax": 257762,
@@ -9100,6 +10010,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 259731,
 "n": 912,
 "opt": 261323,
 "onetax": 258266,
@@ -9110,6 +10021,7 @@
 "hybrid_forced": 14
 },
 {
+"oracle": 260091,
 "n": 913,
 "opt": 261683,
 "onetax": 258626,
@@ -9120,6 +10032,7 @@
 "hybrid_forced": 14
 },
 {
+"oracle": 261005,
 "n": 914,
 "opt": 262597,
 "onetax": 259540,
@@ -9130,6 +10043,7 @@
 "hybrid_forced": 14
 },
 {
+"oracle": 261932,
 "n": 915,
 "opt": 263512,
 "onetax": 260573,
@@ -9140,6 +10054,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 262848,
 "n": 916,
 "opt": 264428,
 "onetax": 261489,
@@ -9150,6 +10065,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 263130,
 "n": 917,
 "opt": 264710,
 "onetax": 261771,
@@ -9160,6 +10076,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 264264,
 "n": 918,
 "opt": 265628,
 "onetax": 262529,
@@ -9170,6 +10087,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 264272,
 "n": 919,
 "opt": 265636,
 "onetax": 262537,
@@ -9180,6 +10098,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 265192,
 "n": 920,
 "opt": 266544,
 "onetax": 263457,
@@ -9190,6 +10109,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 265527,
 "n": 921,
 "opt": 266879,
 "onetax": 263792,
@@ -9200,6 +10120,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 266449,
 "n": 922,
 "opt": 267801,
 "onetax": 264714,
@@ -9210,6 +10131,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 266635,
 "n": 923,
 "opt": 267987,
 "onetax": 264900,
@@ -9220,6 +10142,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 267559,
 "n": 924,
 "opt": 268911,
 "onetax": 265824,
@@ -9230,6 +10153,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 269055,
 "n": 925,
 "opt": 269807,
 "onetax": 267119,
@@ -9240,6 +10164,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 269981,
 "n": 926,
 "opt": 270733,
 "onetax": 268045,
@@ -9250,6 +10175,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 270916,
 "n": 927,
 "opt": 271660,
 "onetax": 268980,
@@ -9260,6 +10186,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 271556,
 "n": 928,
 "opt": 272220,
 "onetax": 269540,
@@ -9270,6 +10197,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 271566,
 "n": 929,
 "opt": 272230,
 "onetax": 269550,
@@ -9280,6 +10208,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 272092,
 "n": 930,
 "opt": 272754,
 "onetax": 269958,
@@ -9290,6 +10219,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 272734,
 "n": 931,
 "opt": 273566,
 "onetax": 270432,
@@ -9300,6 +10230,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 273666,
 "n": 932,
 "opt": 274498,
 "onetax": 271364,
@@ -9310,6 +10241,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 273985,
 "n": 933,
 "opt": 274817,
 "onetax": 271683,
@@ -9320,6 +10252,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 274919,
 "n": 934,
 "opt": 275751,
 "onetax": 272617,
@@ -9330,6 +10263,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 275277,
 "n": 935,
 "opt": 276679,
 "onetax": 274298,
@@ -9340,6 +10274,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 275861,
 "n": 936,
 "opt": 277300,
 "onetax": 274614,
@@ -9350,6 +10285,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 275869,
 "n": 937,
 "opt": 277308,
 "onetax": 274622,
@@ -9360,6 +10296,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 276807,
 "n": 938,
 "opt": 278246,
 "onetax": 275560,
@@ -9370,6 +10307,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 277124,
 "n": 939,
 "opt": 278563,
 "onetax": 275877,
@@ -9380,6 +10318,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 277876,
 "n": 940,
 "opt": 279137,
 "onetax": 276301,
@@ -9390,6 +10329,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 277880,
 "n": 941,
 "opt": 279141,
 "onetax": 276305,
@@ -9400,6 +10340,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 278822,
 "n": 942,
 "opt": 280083,
 "onetax": 277247,
@@ -9410,6 +10351,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 279062,
 "n": 943,
 "opt": 280323,
 "onetax": 277487,
@@ -9420,6 +10362,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 279582,
 "n": 944,
 "opt": 281129,
 "onetax": 278007,
@@ -9430,6 +10373,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 280394,
 "n": 945,
 "opt": 282024,
 "onetax": 279087,
@@ -9440,6 +10384,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 281340,
 "n": 946,
 "opt": 282970,
 "onetax": 280033,
@@ -9450,6 +10395,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 281346,
 "n": 947,
 "opt": 282976,
 "onetax": 280039,
@@ -9460,6 +10406,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 281662,
 "n": 948,
 "opt": 283486,
 "onetax": 280403,
@@ -9470,6 +10417,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 281830,
 "n": 949,
 "opt": 283654,
 "onetax": 280571,
@@ -9480,6 +10428,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 282598,
 "n": 950,
 "opt": 284306,
 "onetax": 280326,
@@ -9490,6 +10439,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 282923,
 "n": 951,
 "opt": 284631,
 "onetax": 280651,
@@ -9500,6 +10450,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 283819,
 "n": 952,
 "opt": 285583,
 "onetax": 282267,
@@ -9510,6 +10461,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 283825,
 "n": 953,
 "opt": 285589,
 "onetax": 282273,
@@ -9520,6 +10472,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 284779,
 "n": 954,
 "opt": 286318,
 "onetax": 283227,
@@ -9530,6 +10483,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 285191,
 "n": 955,
 "opt": 286730,
 "onetax": 283639,
@@ -9540,6 +10494,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 286147,
 "n": 956,
 "opt": 287686,
 "onetax": 284595,
@@ -9550,6 +10505,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 287492,
 "n": 957,
 "opt": 288636,
 "onetax": 285736,
@@ -9560,6 +10516,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 288450,
 "n": 958,
 "opt": 289594,
 "onetax": 286694,
@@ -9570,6 +10527,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 288754,
 "n": 959,
 "opt": 289898,
 "onetax": 286998,
@@ -9580,6 +10538,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 289234,
 "n": 960,
 "opt": 290426,
 "onetax": 287478,
@@ -9590,6 +10549,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 289354,
 "n": 961,
 "opt": 290546,
 "onetax": 287598,
@@ -9600,6 +10560,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 290316,
 "n": 962,
 "opt": 291508,
 "onetax": 288560,
@@ -9610,6 +10571,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 291295,
 "n": 963,
 "opt": 292471,
 "onetax": 289539,
@@ -9620,6 +10582,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 292259,
 "n": 964,
 "opt": 293435,
 "onetax": 290503,
@@ -9630,6 +10593,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 292651,
 "n": 965,
 "opt": 293827,
 "onetax": 290895,
@@ -9640,6 +10604,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 293065,
 "n": 966,
 "opt": 294534,
 "onetax": 291401,
@@ -9650,6 +10615,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 293079,
 "n": 967,
 "opt": 294548,
 "onetax": 291415,
@@ -9660,6 +10626,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 294131,
 "n": 968,
 "opt": 295510,
 "onetax": 291547,
@@ -9670,6 +10637,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 293916,
 "n": 969,
 "opt": 296226,
 "onetax": 292022,
@@ -9680,6 +10648,7 @@
 "hybrid_forced": 14
 },
 {
+"oracle": 294886,
 "n": 970,
 "opt": 297196,
 "onetax": 292992,
@@ -9690,6 +10659,7 @@
 "hybrid_forced": 14
 },
 {
+"oracle": 294890,
 "n": 971,
 "opt": 297200,
 "onetax": 292996,
@@ -9700,6 +10670,7 @@
 "hybrid_forced": 14
 },
 {
+"oracle": 295846,
 "n": 972,
 "opt": 298172,
 "onetax": 294400,
@@ -9710,6 +10681,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 296134,
 "n": 973,
 "opt": 298460,
 "onetax": 294688,
@@ -9720,6 +10692,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 297108,
 "n": 974,
 "opt": 299434,
 "onetax": 295662,
@@ -9730,6 +10703,7 @@
 "hybrid_forced": 13
 },
 {
+"oracle": 298793,
 "n": 975,
 "opt": 300205,
 "onetax": 296615,
@@ -9740,6 +10714,7 @@
 "hybrid_forced": 12
 },
 {
+"oracle": 299913,
 "n": 976,
 "opt": 300957,
 "onetax": 297591,
@@ -9750,6 +10725,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 299919,
 "n": 977,
 "opt": 300963,
 "onetax": 297597,
@@ -9760,6 +10736,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 300897,
 "n": 978,
 "opt": 301941,
 "onetax": 298575,
@@ -9770,6 +10747,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 301295,
 "n": 979,
 "opt": 302339,
 "onetax": 298973,
@@ -9780,6 +10758,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 302105,
 "n": 980,
 "opt": 303319,
 "onetax": 299805,
@@ -9790,6 +10769,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 303094,
 "n": 981,
 "opt": 304300,
 "onetax": 300794,
@@ -9800,6 +10780,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 304076,
 "n": 982,
 "opt": 305282,
 "onetax": 301776,
@@ -9810,6 +10791,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 304082,
 "n": 983,
 "opt": 305288,
 "onetax": 301782,
@@ -9820,6 +10802,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 304694,
 "n": 984,
 "opt": 306134,
 "onetax": 302394,
@@ -9830,6 +10813,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 305100,
 "n": 985,
 "opt": 306540,
 "onetax": 302800,
@@ -9840,6 +10824,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 306086,
 "n": 986,
 "opt": 307526,
 "onetax": 303786,
@@ -9850,6 +10835,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 306455,
 "n": 987,
 "opt": 308235,
 "onetax": 304155,
@@ -9860,6 +10846,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 307391,
 "n": 988,
 "opt": 308949,
 "onetax": 305143,
@@ -9870,6 +10857,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 307601,
 "n": 989,
 "opt": 309159,
 "onetax": 305353,
@@ -9880,6 +10868,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 308168,
 "n": 990,
 "opt": 310049,
 "onetax": 306475,
@@ -9890,6 +10879,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 308176,
 "n": 991,
 "opt": 310057,
 "onetax": 306483,
@@ -9900,6 +10890,7 @@
 "hybrid_forced": 9
 },
 {
+"oracle": 308704,
 "n": 992,
 "opt": 310690,
 "onetax": 307227,
@@ -9910,6 +10901,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 309063,
 "n": 993,
 "opt": 311049,
 "onetax": 307586,
@@ -9920,6 +10912,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 310057,
 "n": 994,
 "opt": 312043,
 "onetax": 308580,
@@ -9930,6 +10923,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 310461,
 "n": 995,
 "opt": 312447,
 "onetax": 308984,
@@ -9940,6 +10934,7 @@
 "hybrid_forced": 10
 },
 {
+"oracle": 310825,
 "n": 996,
 "opt": 312969,
 "onetax": 309348,
@@ -9950,6 +10945,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 310831,
 "n": 997,
 "opt": 312975,
 "onetax": 309354,
@@ -9960,6 +10956,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 311829,
 "n": 998,
 "opt": 313973,
 "onetax": 310352,
@@ -9970,6 +10967,7 @@
 "hybrid_forced": 11
 },
 {
+"oracle": 313335,
 "n": 999,
 "opt": 314764,
 "onetax": 311750,
@@ -9980,6 +10978,7 @@
 "hybrid_forced": 8
 },
 {
+"oracle": 314575,
 "n": 1000,
 "opt": 315426,
 "onetax": 312350,

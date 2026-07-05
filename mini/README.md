@@ -169,19 +169,51 @@ Two designs matter here:
   the upper half's tax demands to stay *flexible*.
 * The dynamic-feasibility version wins: **99.264%** of all optimal
   points vs OneTax's 99.065% (better in 537 games, equal in 102, worse
-  in 360), making it the strongest O(n²)-class strategy measured here.
-  For small games (N ≤ 300) plain OneTax still edges it out, and no
-  strategy dominates game-by-game: forcing the upper half shifts tax
-  pressure into the lower half, which sometimes costs more than the
-  forced upper numbers are worth.
+  in 360).  For small games (N ≤ 300) plain OneTax still edges it out,
+  and no strategy dominates game-by-game: forcing the upper half
+  shifts tax pressure into the lower half, which sometimes costs more
+  than the forced upper numbers are worth.
 
-| strategy | share of all optimal points, N=1..1000 |
-|---|---|
-| forced-upper OneTax (this project) | **99.264%** |
-| onetax (Moniot) | 99.065% |
-| greedy (this project) | 98.601% |
-| cascade (this project) | 92.520% |
-| maxturn (Carmony & Holliday) | 90.294% |
+The count of upper numbers OneTax misses predicts the winner sharply
+(`python3 portfolio.py`): when it misses 0-2, forcing nets negative;
+from 3 up, forcing is nearly a free win.  That tension is resolved by
+the fork oracle below.
+
+## The fork oracle: pricing picks, then comparing continuations
+
+`one_tax_oracle` in `approx.py` merges the two approaches.  The upper
+machinery acts as an economist rather than a dictator: it tracks the
+achievable set of upper selections (initially the provably optimal
+upper half), any pick that keeps the set solvable is free, and a pick
+that breaks it is charged the drop in achievable upper value
+(re-derived by optimize_mini) - allowed only if the pick is worth more
+than the loss, with the protected set shrinking accordingly.
+
+Per-pick pricing alone turns out to converge to the hard veto: a
+single pick is always worth less than the upper number it destroys,
+but OneTax's advantage comes from *bundles* of unconstrained picks -
+the same locality lesson as the 2-tax result, from the other side.  So
+the oracle compares continuations instead of picks: wherever the
+priced spine plays a different move than plain OneTax would, it
+snapshots the position, and afterwards plays a plain OneTax tail out
+of every snapshot.  The answer is the best of the spine and all tails,
+which by construction is at least as good as both plain OneTax and the
+forced-upper hybrid on **every single game** (asserted at runtime).
+
+| strategy | share of all optimal points, N=1..1000 | exact optima |
+|---|---|---|
+| **fork oracle (this project)** | **99.414%** | 56/999 |
+| forced-upper OneTax (this project) | 99.264% | 50/999 |
+| onetax (Moniot) | 99.065% | 42/999 |
+| greedy (this project) | 98.601% | 89/999 |
+| cascade (this project) | 92.520% | 19/999 |
+| maxturn (Carmony & Holliday) | 90.294% | 14/999 |
+
+The oracle alone beats the old max(onetax, hybrid) portfolio (99.312%)
+and makes both parents obsolete: neither is the sole best strategy in
+a single game.  The four-way portfolio with greedy - which still wins
+192 games outright, mostly via its 89 exact optima - reaches
+**99.427%**, leaving about 0.57% of optimal on the table.
 
 ## Why a 2-tax rule cannot be bolted onto OneTax
 
