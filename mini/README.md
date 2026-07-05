@@ -12,7 +12,11 @@ This is a small, clean implementation built to test a theory about the
 **The theory holds for every game from N=1 to N=1000.**
 
 Checked against the known optimal solutions in
-[`optimal.json`](../src/main/resources/optimal.json):
+[`optimal.json`](../src/main/resources/optimal.json) - which were
+themselves produced by the frame-based solver, so see
+"What is independently certified" below for how much of this is
+verified without shared assumptions (everything through n=54,
+exhaustively):
 
 ```
 games checked:        1000
@@ -91,13 +95,44 @@ sits a whisker below: the pure-matching bound overshoots in 911/999
 games, but only by ~101 points on average (257 points at N=1000, or
 0.09% of the upper sum).  N=39 is the minimal specimen: matching
 allows {22, ...} worth 486, but no claiming order delivers it, and the
-true optimum takes 21 for 485 - exactly this project's set.  So the
-answer is squeezed: a proven ceiling just above, a playable
-construction from below, and the known optima landing exactly on the
-construction in all 1000 games.  The one unproven step is that a
-full-game optimum never sacrifices upper value for lower gain; every
-prize outweighs any single coupon (prize > N/2 >= coupon), and no
-counterexample exists through N=1000.
+true optimum takes 21 for 485 - exactly this project's set.
+
+### What is independently certified, and what is not
+
+There is a circularity risk in "the known optima agree with this
+algorithm 1000/1000": optimal.json was produced by the frame/mini-game
+solver, and this project's algorithm is built on the same structural
+theory.  If the shared decomposition assumption were wrong, both could
+miss the same better solutions.  `independent.py` therefore certifies
+what it can using only arguments with no shared assumptions:
+
+* **Replay** - every recorded solution is a legal game with a matching
+  score, so every entry of optimal.json is a sound lower bound.
+* **Brute force** - an exact solver over raw pot states (no frames, no
+  matchings, no maximal factors) reproduces every optimal score for
+  **n = 1..54** and shows this project's upper-half set is the
+  **unique** optimal upper set in all 54 games.  The wall is n=55
+  (memoized state space, ~150s/game in pure Python).
+* **Matching bound** - the maximum-weight-matching upper bound,
+  recomputed here from scratch, equals the recorded score in 27 games;
+  all of them lie below the brute-force frontier, so it adds nothing
+  above n=54 (its tightness dies out as N grows).
+* **Certificate chain** - opt(n) <= n + opt(n-1) is proved with no
+  structural theory; a recorded solution achieving n + score(n-1) is
+  certified given game n-1.  332 games satisfy the identity, but they
+  are scattered in runs of at most 4, and none sits directly on the
+  frontier, so the chain currently certifies nothing further.
+
+Bottom line: games 1..54 are certified unconditionally, including the
+uniqueness of the upper-half set; for 55..1000, optimal.json is the
+best known result and the 1000/1000 agreement between it and this
+algorithm is strong consistency between two implementations of one
+theory - not an independent proof of either.  The matroid ceiling and
+the 0.09% sliver are pure mathematics and stand regardless.  The one
+unproven step remains: that a full-game optimum never sacrifices upper
+value for lower gain; every prize outweighs any single coupon
+(prize > N/2 >= coupon), and no counterexample exists anywhere in the
+certified range.
 
 ## How much of the game is in the lower half?
 
@@ -326,6 +361,7 @@ python3 -m pytest test_taxman_mini.py
 | `halves.py` | how much of the optimal score comes from selections ≤ N/2 |
 | `approx.py` | full-game approximation strategies and the Moniot comparison |
 | `upper_fidelity.py` | OneTax's upper-half fidelity and the forced-upper hybrid |
+| `independent.py` | theory-free certification of optimal.json (brute force, matching bound, certificate chain) |
 | `bench.py` | per-strategy timing, scaling exponents, and profiling |
 | `moniot_table.json` | Robert Moniot's published N≤128 results (for validation) |
 | `approx_results.json` | per-game scores of every strategy for N=1..1000 |
