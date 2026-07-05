@@ -34,6 +34,7 @@ def main(argv: List[str] | None = None) -> int:
     divs = divisor_lists(args.max_n)
     spf = smallest_prime_factors(args.max_n)
 
+    per_game: List[dict] = []
     games = wrong_upper = 0
     upper_loss_total = lower_loss_total = 0
     hybrid_wins = hybrid_ties = hybrid_losses = 0
@@ -57,9 +58,19 @@ def main(argv: List[str] | None = None) -> int:
         upper_exact, _ = solve_upper_half(n, spf)
         assert set(upper_exact) == upper_opt
 
-        hybrid_score, hybrid_seq = one_tax_forced_upper(n, divs, spf)
+        hybrid_score, hybrid_seq, forced = one_tax_forced_upper(n, divs, spf)
         assert check_sequence(n, hybrid_seq) == hybrid_score
         assert {m for m in hybrid_seq if m > n / 2} == upper_opt
+        per_game.append({
+            "n": n,
+            "opt": opt_score,
+            "onetax": onetax_score,
+            "hybrid": hybrid_score,
+            "upper_opt_sum": sum(upper_opt),
+            "upper_onetax_sum": sum(upper_onetax),
+            "onetax_missed": len(upper_opt - upper_onetax),
+            "hybrid_forced": forced,
+        })
 
         upper_loss = sum(upper_opt) - sum(upper_onetax)
         total_loss = opt_score - onetax_score
@@ -103,6 +114,10 @@ def main(argv: List[str] | None = None) -> int:
     print(f"  share of optimal: onetax "
           f"{100 * scores['onetax'] / scores['opt']:.3f}%, hybrid "
           f"{100 * scores['hybrid'] / scores['opt']:.3f}%")
+
+    out = Path(__file__).resolve().parent / "fidelity_results.json"
+    out.write_text(json.dumps(per_game, indent=0))
+    print(f"per-game results written to {out.name}")
     return 0
 
 

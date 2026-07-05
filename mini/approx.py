@@ -335,7 +335,7 @@ def one_tax(
 
 def one_tax_forced_upper(
     n: int, divs: Sequence[List[int]], spf: Sequence[int]
-) -> Tuple[int, List[int]]:
+) -> Tuple[int, List[int], int]:
     """OneTax constrained to play the provably optimal upper half.
 
     The upper-half machinery supplies the optimal selections above n/2.
@@ -348,7 +348,8 @@ def one_tax_forced_upper(
     OneTax has no legal pick, the next playable upper selection from
     solve_mini's own ordering is played instead.
 
-    Returns (score, sequence).
+    Returns (score, sequence, forced): forced counts the stalls where an
+    upper selection had to be played because OneTax had no legal pick.
     """
     from taxman_mini import (
         MiniInfeasible, optimize_mini as _opt, solve_mini as _solve,
@@ -387,6 +388,7 @@ def one_tax_forced_upper(
 
     sequence: List[int] = []
     score = 0
+    forced = 0
     while True:
         pick = 0
         for c in range(n, 1, -1):
@@ -416,6 +418,7 @@ def one_tax_forced_upper(
             pick = next((c for c in candidates if allowed(c)), 0)
             if not pick:
                 raise RuntimeError(f"game {n}: no playable upper selection")
+            forced += 1
         else:
             break
 
@@ -431,7 +434,7 @@ def one_tax_forced_upper(
 
     if remaining_upper:
         raise RuntimeError(f"game {n}: upper selections left unplayed")
-    return score, sequence
+    return score, sequence, forced
 
 
 def max_turn(n: int, divs: Sequence[List[int]]) -> int:
