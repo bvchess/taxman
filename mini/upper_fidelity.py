@@ -19,7 +19,10 @@ import sys
 from pathlib import Path
 from typing import List
 
-from approx import check_sequence, divisor_lists, one_tax, one_tax_forced_upper
+from approx import (
+    check_sequence, divisor_lists, one_tax, one_tax_forced_upper,
+    one_tax_oracle,
+)
 from taxman_mini import smallest_prime_factors, solve_upper_half
 from verify import DEFAULT_OPTIMAL
 
@@ -40,7 +43,7 @@ def main(argv: List[str] | None = None) -> int:
     hybrid_wins = hybrid_ties = hybrid_losses = 0
     onetax_optimal_wrong_upper = 0
     worst: List[tuple] = []
-    scores = {"onetax": 0, "hybrid": 0, "opt": 0}
+    scores = {"onetax": 0, "hybrid": 0, "oracle": 0, "opt": 0}
 
     for n in range(2, args.max_n + 1):
         if n not in optimal or optimal[n]["score"] == 0:
@@ -61,7 +64,13 @@ def main(argv: List[str] | None = None) -> int:
         hybrid_score, hybrid_seq, forced = one_tax_forced_upper(n, divs, spf)
         assert check_sequence(n, hybrid_seq) == hybrid_score
         assert {m for m in hybrid_seq if m > n / 2} == upper_opt
+
+        oracle_score, oracle_seq = one_tax_oracle(n, divs, spf)
+        assert check_sequence(n, oracle_seq) == oracle_score
+        assert oracle_score >= max(onetax_score, hybrid_score)
+
         per_game.append({
+            "oracle": oracle_score,
             "n": n,
             "opt": opt_score,
             "onetax": onetax_score,
@@ -85,6 +94,7 @@ def main(argv: List[str] | None = None) -> int:
 
         scores["onetax"] += onetax_score
         scores["hybrid"] += hybrid_score
+        scores["oracle"] += oracle_score
         scores["opt"] += opt_score
         if hybrid_score > onetax_score:
             hybrid_wins += 1
@@ -113,7 +123,8 @@ def main(argv: List[str] | None = None) -> int:
           f"hybrid {scores['hybrid']}, optimal {scores['opt']}")
     print(f"  share of optimal: onetax "
           f"{100 * scores['onetax'] / scores['opt']:.3f}%, hybrid "
-          f"{100 * scores['hybrid'] / scores['opt']:.3f}%")
+          f"{100 * scores['hybrid'] / scores['opt']:.3f}%, oracle "
+          f"{100 * scores['oracle'] / scores['opt']:.3f}%")
 
     out = Path(__file__).resolve().parent / "fidelity_results.json"
     out.write_text(json.dumps(per_game, indent=0))

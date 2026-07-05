@@ -36,39 +36,38 @@ def pct(a: int, b: int) -> str:
 
 
 def report_portfolio(rows: List[dict], greedy: Dict[int, int]) -> None:
-    total = {"opt": 0, "onetax": 0, "hybrid": 0, "greedy": 0,
-             "duo": 0, "trio": 0}
-    exact = {"onetax": 0, "hybrid": 0, "greedy": 0, "duo": 0, "trio": 0}
-    argmax = {"onetax": 0, "hybrid": 0, "greedy": 0, "tie": 0}
+    names = ("onetax", "hybrid", "oracle", "greedy", "duo", "quad")
+    total = {name: 0 for name in names + ("opt",)}
+    exact = {name: 0 for name in names}
+    argmax = {"onetax": 0, "hybrid": 0, "oracle": 0, "greedy": 0, "tie": 0}
+    have_oracle = "oracle" in rows[0]
     for r in rows:
         g = greedy[r["n"]]
-        duo = max(r["onetax"], r["hybrid"])
-        trio = max(duo, g)
+        o = r.get("oracle", 0)
+        scores = {"onetax": r["onetax"], "hybrid": r["hybrid"],
+                  "oracle": o, "greedy": g,
+                  "duo": max(r["onetax"], r["hybrid"]),
+                  "quad": max(r["onetax"], r["hybrid"], o, g)}
         total["opt"] += r["opt"]
-        total["onetax"] += r["onetax"]
-        total["hybrid"] += r["hybrid"]
-        total["greedy"] += g
-        total["duo"] += duo
-        total["trio"] += trio
-        for name, score in (("onetax", r["onetax"]), ("hybrid", r["hybrid"]),
-                            ("greedy", g), ("duo", duo), ("trio", trio)):
-            if score == r["opt"]:
+        for name in names:
+            total[name] += scores[name]
+            if scores[name] == r["opt"]:
                 exact[name] += 1
-        best = trio
-        winners = [name for name, score in
-                   (("onetax", r["onetax"]), ("hybrid", r["hybrid"]),
-                    ("greedy", g)) if score == best]
+        winners = [name for name in ("onetax", "hybrid", "oracle", "greedy")
+                   if scores[name] == scores["quad"]]
         argmax[winners[0] if len(winners) == 1 else "tie"] += 1
 
     print("=== 1. Portfolio baseline (per-game best) ===")
-    for name in ("onetax", "hybrid", "greedy", "duo", "trio"):
+    for name in names:
+        if name == "oracle" and not have_oracle:
+            continue
         label = {"duo": "max(onetax, hybrid)",
-                 "trio": "max(onetax, hybrid, greedy)"}.get(name, name)
+                 "quad": "max(all four)"}.get(name, name)
         print(f"  {label:<28} {pct(total[name], total['opt']):>8}   "
               f"exactly optimal in {exact[name]}/{len(rows)}")
     print(f"  sole best strategy: onetax {argmax['onetax']}, "
-          f"hybrid {argmax['hybrid']}, greedy {argmax['greedy']}, "
-          f"tie {argmax['tie']}")
+          f"hybrid {argmax['hybrid']}, oracle {argmax['oracle']}, "
+          f"greedy {argmax['greedy']}, tie {argmax['tie']}")
     print()
 
 

@@ -107,6 +107,20 @@ def test_two_tax_is_a_measured_noop():
         assert one_tax(n, divs, two_tax=True) == one_tax(n, divs)
 
 
+def test_oracle_dominates_onetax_and_hybrid():
+    from approx import (
+        check_sequence, divisor_lists, one_tax, one_tax_forced_upper,
+        one_tax_oracle,
+    )
+
+    divs = divisor_lists(200)
+    for n in (10, 21, 55, 100, 158, 200):
+        score, seq = one_tax_oracle(n, divs, SPF)
+        assert check_sequence(n, seq) == score
+        assert score >= one_tax(n, divs)
+        assert score >= one_tax_forced_upper(n, divs, SPF)[0]
+
+
 def test_approx_strategies_are_legal_and_sane():
     from approx import cascade, check_sequence, divisor_lists, greedy, one_tax
 
