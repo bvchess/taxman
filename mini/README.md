@@ -334,6 +334,37 @@ simultaneously reassigns which taxes the surrounding numbers pay.  Any
 strategy that wants them must reason about the assignment of divisors
 to selections - the matching machinery - not about individual picks.
 
+## Divergence autopsy: what exactly goes wrong (n=500-1000)
+
+`diagnose.py` traces the fate of every optimal pick that OneTax and
+greedy fail to make, for all 501 games in 500..1000 (full per-miss logs
+in `divergence_onetax.json` / `divergence_greedy.json`).  The taxonomy
+is strikingly clean:
+
+|  | OneTax | greedy |
+|---|---|---|
+| net points lost | 874,945 | 1,363,455 |
+| upper misses | 2,320 (1.03M pts) - **100% sniped** | 32 (14K pts) |
+| lower misses | 5,649 (1.74M pts) - **100% spent as tax** | 8,894 (2.72M pts) - 100% spent as tax |
+| killer is itself an optimal pick | 99.8% | 100% |
+| missed 2-tax acquisitions | 82 (28K pts) | 113 (40K pts) |
+
+Three conclusions.  (1) **Every failure is an assignment failure.**
+The strategies spend lower numbers as tax for picks that ARE in the
+optimal solution - optimal simply funds those picks with different
+divisors.  Nothing is ever double-swept or wasted; the money is spent
+on the right things through the wrong accounts.  (2) **The 2-tax /
+sacrifice residue is marginal**: under 3% of either strategy's loss
+comes from numbers optimal acquires with two taxes.  The one-for-two
+trade, dramatic as it is, is not where the points are; one-for-one
+re-routing (augmenting) addresses ~97% of the identified loss.
+(3) **Greedy's specific disease is the ordering constraint**: its
+rejection log shows precedence-cycle vetoes outnumber matching
+failures 15:1 (16,369 cycle rejections vs 1,081 no-path).  Its Kuhn
+matching is nearly perfect - only 32 upper misses in 501 games - but
+its cycle handling only retries the candidate's own coupon choices,
+never re-routing other selections to break the cycle.
+
 ## Performance
 
 Per-game wall time in pure Python (best of 3, `python3 bench.py`), with
@@ -386,6 +417,7 @@ python3 -m pytest test_taxman_mini.py
 | `independent.py` | theory-free certification of optimal.json (brute force, matching bound, certificate chain) |
 | `bound.py` | the Franklín-Moniot upper bound (max-weight matching over maximal-factor edges) |
 | `bench.py` | per-strategy timing, scaling exponents, and profiling |
+| `diagnose.py` | divergence autopsy: per-miss fate logs for OneTax and greedy |
 | `moniot_table.json` | Robert Moniot's published N≤128 results (for validation) |
 | `approx_results.json` | per-game scores of every strategy for N=1..1000 |
 | `test_taxman_mini.py` | unit tests anchored to the wiki's examples |
