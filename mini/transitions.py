@@ -41,7 +41,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Union
 
 from approx import divisor_lists
-from taxman_mini import smallest_prime_factors, solve_upper_half
+from taxman_mini import (
+    MiniInfeasible, smallest_prime_factors, solve_mini, solve_upper_half,
+)
 from verify import DEFAULT_OPTIMAL
 
 MINI_DIR = Path(__file__).resolve().parent
@@ -125,14 +127,36 @@ class SetEval:
     def playable_add(self, x: int) -> bool:
         """Try to add x to the set; return whether the set stays playable.
 
-        A direct port of approx.greedy's try_select: pop x if it currently
-        serves as someone's tax, add x (blocking it as anyone's coupon),
-        augment, and on a precedence cycle retry with each of x's divisors
-        forced in turn.  Any failure fully restores prior state.
+        Two-tier test.  The fast tier is a direct port of approx.greedy's
+        try_select (pop x if it holds someone's tax, add x, augment, retry
+        with each of x's own divisors forced on a precedence cycle); it is
+        sound but not complete -- its single-pick coupon reshuffling can
+        falsely reject a member of a genuinely playable set when breaking
+        the cycle needs OTHER picks reassigned too (empirically ~9 picks
+        per game around n=500, e.g. 230/225/220 which sit inside the
+        provably-playable optimal set).  So when the fast tier rejects, a
+        complete tier runs: solve_mini decides the bipartite selectability
+        of S + {x} exactly (raising MiniInfeasible iff no assignment covers
+        every pick) and its canonical order is confirmed acyclic under the
+        full real-game precedence.  Only a rejection by BOTH tiers is a
+        real "unplayable".  Any failure fully restores prior state.
         """
         if x in self.S:
             return True
+        if self._greedy_add(x):
+            return True
+        # Fast tier rejected: fall back to the complete solve_mini test.
+        target = self.S | {x}
+        matching = self._complete_matching(target)
+        if matching is None:
+            return False
+        self.S = target
+        self.owner = {f: c for c, f in matching.items()}
+        self.match = dict(matching)
+        return True
 
+    def _greedy_add(self, x: int) -> bool:
+        """Fast, sound-but-incomplete add: approx.greedy's try_select."""
         # A failed Kuhn search leaves the matching untouched, so only
         # successful augments need their trails rolled back.
         pre_trail: List[Tuple[int, Optional[int]]] = []
@@ -171,6 +195,53 @@ class SetEval:
         self.S.discard(x)
         self._rollback(pre_trail)
         return False
+
+    def _complete_matching(
+        self, target: Set[int]
+    ) -> Optional[Dict[int, int]]:
+        """Decide playability of `target` exactly, returning a matching.
+
+        Reduces the pick set to a bipartite Taxman Mini game (each pick to
+        its proper divisors that lie outside the set) and lets solve_mini
+        find an assignment or prove none exists.  A returned assignment is
+        confirmed acyclic under the full real-game precedence (both the
+        coupon edges and the pick-divides-pick edges) before acceptance;
+        None means no playable assignment (MiniInfeasible or a cyclic one).
+        """
+        mf = {c: {d for d in self.divs[c] if d not in target} for c in target}
+        factors: Set[int] = set().union(*mf.values()) if mf else set()
+        try:
+            _, matching = solve_mini(target, factors, mf)
+        except MiniInfeasible:
+            return None
+        if not self._matching_acyclic(target, matching):
+            return None
+        return matching
+
+    def _matching_acyclic(
+        self, target: Set[int], matching: Dict[int, int]
+    ) -> bool:
+        """Kahn's check of the precedence induced by a full matching."""
+        indeg = {c: 0 for c in target}
+        succ: Dict[int, List[int]] = {c: [] for c in target}
+        for a in target:
+            seen = set()
+            for start in (matching[a], a):
+                for b in range(2 * start, self.n + 1, start):
+                    if b in target and b != a and b not in seen:
+                        seen.add(b)
+                        succ[a].append(b)
+                        indeg[b] += 1
+        ready = [c for c in target if indeg[c] == 0]
+        done = 0
+        while ready:
+            a = ready.pop()
+            done += 1
+            for b in succ[a]:
+                indeg[b] -= 1
+                if indeg[b] == 0:
+                    ready.append(b)
+        return done == len(target)
 
     def remove(self, x: int) -> None:
         """Remove pick x.  A subset of a playable set is always playable."""
