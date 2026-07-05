@@ -144,6 +144,45 @@ mean for large N.  The cascade line quantifies what the verified
 upper-half theory achieves entirely on its own, with no promotions —
 about 93%, matching the lower-half share analysis above.
 
+## Does OneTax get the upper half right?
+
+No (`python3 upper_fidelity.py`).  Over N=2..1000 OneTax selects the
+wrong set of numbers above N/2 in **83.7%** of games, and in none of
+those does it still score optimal.  Its upper-half errors are always
+omissions, never wrong picks: OneTax only selects a number once it is
+down to a single divisor, and composite upper numbers whose divisor
+counts never drain to one (e.g. 488, 506, 513, 522... for N around
+970) simply never get picked.  The errors are self-compensating,
+though: summed over all games OneTax gives up 1,143,256 points in the
+upper half but wins 158,870 points *more* than optimal in the lower
+half, because every skipped upper number leaves its would-be tax in
+play to be farmed.
+
+`one_tax_forced_upper` in `approx.py` tests the obvious repair: run
+OneTax, but only allow a pick if the remaining optimal upper selections
+are still solvable afterwards (a solve_mini feasibility check), and
+when OneTax stalls, play the cheapest still-solvable upper selection.
+Two designs matter here:
+
+* Pinning each upper selection to a reserved factor (the maximal-factor
+  matching) fails badly — 94.9% of optimal — because optimal play needs
+  the upper half's tax demands to stay *flexible*.
+* The dynamic-feasibility version wins: **99.264%** of all optimal
+  points vs OneTax's 99.065% (better in 537 games, equal in 102, worse
+  in 360), making it the strongest O(n²)-class strategy measured here.
+  For small games (N ≤ 300) plain OneTax still edges it out, and no
+  strategy dominates game-by-game: forcing the upper half shifts tax
+  pressure into the lower half, which sometimes costs more than the
+  forced upper numbers are worth.
+
+| strategy | share of all optimal points, N=1..1000 |
+|---|---|
+| forced-upper OneTax (this project) | **99.264%** |
+| onetax (Moniot) | 99.065% |
+| greedy (this project) | 98.601% |
+| cascade (this project) | 92.520% |
+| maxturn (Carmony & Holliday) | 90.294% |
+
 ## Running it
 
 No dependencies beyond Python 3.8+ (pytest for the test suite).
@@ -153,6 +192,7 @@ python3 verify.py                  # check the upper-half theory, N=1..1000
 python3 verify.py --max-n 200 -v   # smaller range, per-game detail
 python3 halves.py                  # lower-half share of the optimal score
 python3 approx.py                  # full-game strategy comparison (~9 min)
+python3 upper_fidelity.py          # OneTax upper-half errors + forced-upper hybrid (~7 min)
 python3 -m pytest test_taxman_mini.py
 ```
 
@@ -164,6 +204,7 @@ python3 -m pytest test_taxman_mini.py
 | `verify.py` | checks the upper-half theory against `optimal.json` for N=1..1000 |
 | `halves.py` | how much of the optimal score comes from selections ≤ N/2 |
 | `approx.py` | full-game approximation strategies and the Moniot comparison |
+| `upper_fidelity.py` | OneTax's upper-half fidelity and the forced-upper hybrid |
 | `moniot_table.json` | Robert Moniot's published N≤128 results (for validation) |
 | `approx_results.json` | per-game scores of every strategy for N=1..1000 |
 | `test_taxman_mini.py` | unit tests anchored to the wiki's examples |
