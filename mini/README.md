@@ -250,6 +250,33 @@ simultaneously reassigns which taxes the surrounding numbers pay.  Any
 strategy that wants them must reason about the assignment of divisors
 to selections - the matching machinery - not about individual picks.
 
+## Performance
+
+Per-game wall time in pure Python (best of 3, `python3 bench.py`), with
+the empirical scaling exponent k in time ~ n^k:
+
+| component | n=125 | n=250 | n=500 | n=1000 | ~n^k |
+|---|---|---|---|---|---|
+| onetax | 0.2 ms | 0.6 ms | 1.9 ms | 6.1 ms | 1.6 |
+| maxturn | 0.3 ms | 1.2 ms | 4.4 ms | 19 ms | 1.9 |
+| upper half (`solve_upper_half`) | 2.7 ms | 10 ms | 38 ms | 168 ms | 2.0 |
+| cascade | 3.8 ms | 16 ms | 66 ms | 310 ms | 2.1 |
+| hybrid (forced upper) | 5.8 ms | 24 ms | 91 ms | 430 ms | 2.1 |
+| greedy | 3.8 ms | 62 ms | 377 ms | 1.2 s | 2.7 |
+| oracle (fork) | 6.1 ms | 62 ms | 215 ms | ~2 s | ~3 |
+
+OneTax is indeed nearly free.  Determining the optimal >N/2 moves is a
+clean O(n²): optimize_mini runs one O(n) feasibility check per
+candidate.  The oracle is the expensive one - profiling shows
+essentially all of its time inside `price()`: every candidate pick
+triggers a solve_mini feasibility check, and every break triggers an
+optimize_mini re-derivation (tens of thousands of solve_mini calls per
+game).  Pricing now bails out as soon as the accumulated loss reaches
+the pick's value, which saves ~1.4x; the remaining cost is dominated
+by the members that are *kept* during re-derivation, so the next real
+speedup would be an incremental feasibility structure rather than
+rebuilding the mini graph per check.
+
 ## Running it
 
 No dependencies beyond Python 3.8+ (pytest for the test suite).
@@ -272,6 +299,7 @@ python3 -m pytest test_taxman_mini.py
 | `halves.py` | how much of the optimal score comes from selections ≤ N/2 |
 | `approx.py` | full-game approximation strategies and the Moniot comparison |
 | `upper_fidelity.py` | OneTax's upper-half fidelity and the forced-upper hybrid |
+| `bench.py` | per-strategy timing, scaling exponents, and profiling |
 | `moniot_table.json` | Robert Moniot's published N≤128 results (for validation) |
 | `approx_results.json` | per-game scores of every strategy for N=1..1000 |
 | `test_taxman_mini.py` | unit tests anchored to the wiki's examples |

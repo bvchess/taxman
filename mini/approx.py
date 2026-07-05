@@ -526,7 +526,14 @@ def one_tax_oracle(
             count[m] -= 1
 
     def price(c: int) -> Tuple[int, Set[int]]:
-        """Cost of picking c now, and the protected set to keep if we do."""
+        """Cost of picking c now, and the protected set to keep if we do.
+
+        Rejection only requires knowing the loss reaches c, so the
+        optimize_mini re-derivation runs with a budget: it bails out as
+        soon as the dropped value hits c (returning loss=c, enough for
+        the caller's loss < c test to fail).  The exact keep set is only
+        completed when the pick will actually be accepted.
+        """
         gone = {d for d in divs[c] if d in pot}
         gone.add(c)
         rest = protected - {c}
@@ -536,8 +543,21 @@ def one_tax_oracle(
             _solve(rest, factors, edges)
             return 0, rest
         except MiniInfeasible:
-            keep, _ = _opt(rest, factors, edges)
-            return sum(rest) - sum(keep), keep
+            pass
+        keep: Set[int] = set()
+        used: Set[int] = set()
+        loss = 0
+        for u in sorted(rest, reverse=True):
+            try:
+                _solve(keep | {u}, used | edges[u], edges)
+            except MiniInfeasible:
+                loss += u
+                if loss >= c:
+                    return loss, rest
+                continue
+            keep.add(u)
+            used |= edges[u]
+        return loss, keep
 
     def plain_choice() -> int:
         """The move plain OneTax would make from the current position."""
