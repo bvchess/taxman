@@ -172,7 +172,11 @@ def _playable_order(
         dropped.append(loser)
 
 
-def greedy(n: int, divs: Sequence[List[int]]) -> List[int]:
+def greedy(
+    n: int,
+    divs: Sequence[List[int]],
+    rejections: Optional[List[Tuple[int, str]]] = None,
+) -> List[int]:
     """Greedy matching approximation of a full game; returns the sequence."""
     selected: Set[int] = set()
     owner: Dict[int, int] = {}  # divisor -> selection paying it
@@ -186,6 +190,8 @@ def greedy(n: int, divs: Sequence[List[int]]) -> List[int]:
             holder = owner.pop(m)
             if not _augment(holder, owner, selected, divs, {m}, pre_trail):
                 owner[m] = holder
+                if rejections is not None:
+                    rejections.append((m, "rematch"))
                 return False
             pre_trail.append((m, holder))  # a rollback restores m's owner
         selected.add(m)  # blocks m from being used as anyone's tax below
@@ -194,6 +200,8 @@ def greedy(n: int, divs: Sequence[List[int]]) -> List[int]:
         if not _augment(m, owner, selected, divs, set(), trail):
             selected.discard(m)  # no matching covers m: permanent reject
             _rollback(owner, pre_trail)
+            if rejections is not None:
+                rejections.append((m, "no-path"))
             return False
         if _is_acyclic(selected, owner, n):
             return True
@@ -212,6 +220,8 @@ def greedy(n: int, divs: Sequence[List[int]]) -> List[int]:
                 _rollback(owner, trail)
         selected.discard(m)
         _rollback(owner, pre_trail)
+        if rejections is not None:
+            rejections.append((m, "cycle"))
         return False
 
     retry_later: List[int] = []
