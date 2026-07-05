@@ -397,9 +397,14 @@ Full per-transition records in `transitions.json`.  Headlines:
 
 * **76.2% of transitions need no search at all**: pure insertion lands
   exactly on the optimal solution (gap 0 in 382/501).
-* **Locality is perfect**: all 834 changed lower numbers across all
-  transitions lie within divisor-distance 2 of the arriving n.  The
-  search neighborhood is fully characterized and small.
+* **Locality is strong but not perfect** (corrected: the first
+  measurement let paths run through the number 1, which divides
+  everything and makes distance-2 vacuous).  With 1 excluded, 80.8%
+  of the 834 changed lower numbers share a prime factor with the
+  arriving n (true divisor-distance <= 2); the remaining 19.2% are
+  coprime to n, at distance 3-4, and none are farther.  A search
+  neighborhood keyed to n's prime factors covers four-fifths of the
+  churn; the rest needs one more hop.
 * **Geodesic depth**: 0 flips in 382 games, 1-3 flips in 51 more
   (single flips and small compounds), **blocked in 68 (13.6%)** - real
   landscape valleys where every improving move is an atomic bundle of
