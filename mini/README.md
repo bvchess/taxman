@@ -382,6 +382,7 @@ python3 -m pytest test_taxman_mini.py
 | `approx.py` | full-game approximation strategies and the Moniot comparison |
 | `upper_fidelity.py` | OneTax's upper-half fidelity and the forced-upper hybrid |
 | `independent.py` | theory-free certification of optimal.json (brute force, matching bound, certificate chain) |
+| `bound.py` | the Franklín-Moniot upper bound (max-weight matching over maximal-factor edges) |
 | `bench.py` | per-strategy timing, scaling exponents, and profiling |
 | `moniot_table.json` | Robert Moniot's published N≤128 results (for validation) |
 | `approx_results.json` | per-game scores of every strategy for N=1..1000 |

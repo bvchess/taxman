@@ -137,6 +137,16 @@ def test_approx_strategies_are_legal_and_sane():
     assert check_sequence(5, greedy(5, divs)) == 9
 
 
+def test_fm_bound_matches_published_values():
+    pytest.importorskip("networkx")
+    from bound import fm_bound
+
+    assert fm_bound(21) == 145
+    assert fm_bound(50) == 811
+    assert fm_bound(100) == 3173
+    assert fm_bound(128) == 5310
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(pytest.main([__file__, "-q"]))
