@@ -46,6 +46,7 @@ from pathlib import Path
 from typing import Dict, FrozenSet, List, Optional, Set, Tuple
 
 from approx import check_sequence, divisor_lists
+from bitpot import bits, divisor_masks, mask_of, multiple_masks, popcount
 from taxman_mini import smallest_prime_factors, solve_upper_half
 from verify import DEFAULT_OPTIMAL
 
@@ -60,33 +61,34 @@ class Exact:
     def __init__(self, n: int, divs, deadline: float):
         self.n = n
         self.divs = divs
+        self.dmask = divisor_masks(n)
+        self.mmask = multiple_masks(n)
         self.deadline = deadline
-        self.memo: Dict[FrozenSet[int], int] = {}
+        self.memo: Dict[int, int] = {}
         self.calls = 0
 
-    def multiples(self, c: int, pot: FrozenSet[int]) -> bool:
-        return any(m in pot for m in range(2 * c, self.n + 1, c))
+    def multiples(self, c: int, pot: int) -> bool:
+        return self.mmask[c] & pot != 0
 
-    def normalize(self, pot: Set[int]) -> FrozenSet[int]:
+    def normalize(self, pot: int) -> int:
         """Drop inert numbers: never pickable and never usable as tax."""
         changed = True
         while changed:
             changed = False
-            for c in list(pot):
-                if not any(d in pot for d in self.divs[c]) \
-                        and not any(m in pot for m in range(2 * c, self.n + 1, c)):
-                    pot.discard(c)
+            for c in list(bits(pot)):
+                if self.dmask[c] & pot == 0 and self.mmask[c] & pot == 0:
+                    pot &= ~(1 << c)
                     changed = True
-        return frozenset(pot)
+        return pot
 
-    def bound(self, pot: FrozenSet[int]) -> int:
+    def bound(self, pot: int) -> int:
         pickable = sorted(
-            (c for c in pot if any(d in pot for d in self.divs[c])),
+            (c for c in bits(pot) if self.dmask[c] & pot),
             reverse=True,
         )
-        return sum(pickable[: min(len(pickable), len(pot) // 2)])
+        return sum(pickable[: min(len(pickable), popcount(pot) // 2)])
 
-    def best(self, pot: FrozenSet[int]) -> int:
+    def best(self, pot: int) -> int:
         cached = self.memo.get(pot)
         if cached is not None:
             return cached
@@ -95,12 +97,12 @@ class Exact:
             raise OutOfTime
         result = 0
         moves = sorted(
-            (c for c in pot if any(d in pot for d in self.divs[c])),
+            (c for c in bits(pot) if self.dmask[c] & pot),
             reverse=True,
         )
         for c in moves:
-            tax = {d for d in self.divs[c] if d in pot}
-            child = self.normalize(set(pot) - tax - {c})
+            tax = self.dmask[c] & pot
+            child = self.normalize(pot & ~tax & ~(1 << c))
             if c + self.bound(child) <= result:
                 continue
             result = max(result, c + self.best(child))
@@ -108,12 +110,12 @@ class Exact:
         return result
 
     def optimal_upper_sets(
-        self, pot: FrozenSet[int], cap: int = 64
+        self, pot: int, cap: int = 64
     ) -> Optional[Set[FrozenSet[int]]]:
         """Every set of >n/2 picks used by some optimal continuation."""
-        memo: Dict[FrozenSet[int], Optional[Set[FrozenSet[int]]]] = {}
+        memo: Dict[int, Optional[Set[FrozenSet[int]]]] = {}
 
-        def walk(state: FrozenSet[int]) -> Optional[Set[FrozenSet[int]]]:
+        def walk(state: int) -> Optional[Set[FrozenSet[int]]]:
             if state in memo:
                 return memo[state]
             target = self.best(state)
@@ -121,11 +123,11 @@ class Exact:
                 memo[state] = {frozenset()}
                 return memo[state]
             found: Set[FrozenSet[int]] = set()
-            for c in state:
-                tax = {d for d in self.divs[c] if d in state}
+            for c in bits(state):
+                tax = self.dmask[c] & state
                 if not tax:
                     continue
-                child = self.normalize(set(state) - tax - {c})
+                child = self.normalize(state & ~tax & ~(1 << c))
                 if c + self.best(child) != target:
                     continue
                 tails = walk(child)
@@ -172,7 +174,7 @@ def main(argv: List[str] | None = None) -> int:
     for n in range(1, args.brute_max + 1):
         solver = Exact(n, divs, time.monotonic() + args.budget)
         try:
-            true_opt = solver.best(frozenset(range(1, n + 1)))
+            true_opt = solver.best(mask_of(range(1, n + 1)))
         except OutOfTime:
             print(f"brute force: n={n} exceeded {args.budget:.0f}s budget, "
                   f"stopping here")
@@ -183,7 +185,7 @@ def main(argv: List[str] | None = None) -> int:
             continue
         brute_verified = n
 
-        sets = solver.optimal_upper_sets(frozenset(range(1, n + 1)))
+        sets = solver.optimal_upper_sets(mask_of(range(1, n + 1)))
         ours = frozenset(solve_upper_half(n, spf)[0])
         if sets is not None:
             if len(sets) == 1:
