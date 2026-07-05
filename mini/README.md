@@ -183,6 +183,41 @@ Two designs matter here:
 | cascade (this project) | 92.520% |
 | maxturn (Carmony & Holliday) | 90.294% |
 
+## Why a 2-tax rule cannot be bolted onto OneTax
+
+The tax census above suggested an attractive idea: optimal games make
+2-tax moves in 946 of 999 games, carrying more net value (875K points)
+than OneTax's entire gap to optimal, so teach OneTax to pay two taxes.
+It does not work, for reasons worth recording (`one_tax(two_tax=True)`
+keeps the provably-safe version of the rule; it never fires).
+
+1. **There is no endgame slack.**  A "stranded harvest" - pick a number
+   whose two remaining divisors are dead, since the taxman was getting
+   all three anyway - can never trigger: in all 999 games OneTax
+   terminates with every pot number at zero divisors.  OneTax pays
+   exactly one divisor per pick, so nothing is ever wasted; the pot is
+   always drained bone-dry.
+
+2. **Losses are sniping, not sticking.**  Tracing the upper numbers
+   OneTax misses (e.g. 494 at N=970): the number drops to its last
+   divisor (38), and next turn OneTax hands that divisor to a larger
+   claimant (646 = 17·38).  The number dies at count 0, not count 2.
+
+3. **A local 2-tax rescue is either unnecessary or unaffordable.**
+   Consider x at two divisors whose rivals are the current one-tax
+   claimants c1 and c2.  If the rivals are smaller than x, x needs no
+   rescue: when one divisor is consumed, x reaches one divisor and
+   outranks them.  If the rivals are larger, the rescue price exceeds
+   2x and can never be worth x.  Forcing the exchange whenever
+   x > c1 + c2 loses 1.75M points over N=1..1000 (it fires exactly in
+   the cases where x would have won anyway, paying double).
+
+So the 875K points that optimal games route through 2-tax moves are
+**coordination gains**: they are profitable only because optimal
+simultaneously reassigns which taxes the surrounding numbers pay.  Any
+strategy that wants them must reason about the assignment of divisors
+to selections - the matching machinery - not about individual picks.
+
 ## Running it
 
 No dependencies beyond Python 3.8+ (pytest for the test suite).

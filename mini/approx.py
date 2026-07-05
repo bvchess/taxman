@@ -283,11 +283,31 @@ def one_tax(
     refined: bool = True,
     sequence: Optional[List[int]] = None,
     forbidden: Optional[Set[int]] = None,
+    two_tax: bool = False,
 ) -> int:
     """Moniot's OneTax heuristic; returns the player's score.
 
     Picks appended to `sequence` if given; numbers in `forbidden` are
     never picked (they can still be taken as tax).
+
+    With two_tax enabled, a stranded harvest runs at every stall: pick
+    any c that has no multiples left and whose two remaining divisors
+    divide nothing else in the pot and can never be picked themselves.
+    All three numbers are already the taxman's, so picking c is pure
+    profit.  Measured across N=1..1000 this NEVER fires: OneTax always
+    drains the pot completely (every terminal number has zero divisors
+    left), so there is no endgame slack to harvest.
+
+    A mid-game two-tax exchange was also tried and removed: pick a
+    two-divisor number x when the current one-tax claimants of its
+    divisors are together worth less than x.  It loses 1.75M points
+    over N=1..1000, and the reason is structural: under largest-first
+    one-tax dynamics, x is doomed only when its rivals are LARGER than
+    x (smaller rivals lose to x once it reaches one divisor), in which
+    case paying both divisors costs more than x is worth.  A profitable
+    local two-tax move cannot exist; the two-tax moves in optimal games
+    are coordination gains, available only by reassigning other
+    numbers' taxes at the same time.
     """
     in_pot = bytearray(n + 1)
     for i in range(1, n + 1):
@@ -300,6 +320,20 @@ def one_tax(
         for m in range(2 * x, n + 1, x):
             count[m] -= 1
 
+    def dead(d: int, c: int) -> bool:
+        """d can never leave the pot except through c's pick."""
+        return count[d] == 0 and not any(
+            in_pot[m] for m in range(2 * d, n + 1, d) if m != c
+        )
+
+    def find_stranded() -> int:
+        for c in range(n, 1, -1):
+            if (in_pot[c] and count[c] == 2 and c not in banned
+                    and not any(in_pot[m] for m in range(2 * c, n + 1, c))
+                    and all(dead(d, c) for d in divs[c] if in_pot[d])):
+                return c
+        return 0
+
     score = 0
     while True:
         pick = 0
@@ -308,9 +342,12 @@ def one_tax(
                 pick = c
                 break
         if not pick:
-            break
+            if two_tax:
+                pick = find_stranded()
+            if not pick:
+                break
 
-        if refined:
+        if pick and count[pick] == 1 and refined:
             d = next(x for x in divs[pick] if in_pot[x])
             rescue = 0
             for m in range(2 * pick, n + 1, pick):
