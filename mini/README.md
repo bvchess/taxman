@@ -469,8 +469,29 @@ same way even when seeded from the true optimal n-1 - genuine
 landscape, not accumulated drift.  Cost: certified games <0.2s;
 valley games 20-70s (the complete playability tier dominates).
 
+The full self-fed run 500..1000 (seeded once from optimal(499),
+3.7h) answers the drift question with data
+(`continuation_results.json`):
+
+| band | mean gap | exact |
+|---|---|---|
+| 500-599 | 17.9 | 56/100 |
+| 600-699 | 21.6 | 50/100 |
+| 700-799 | 91.7 | 14/100 |
+| 800-899 | 66.4 | 9/100 |
+| 900-999 | 86.4 | 1/100 |
+
+Drift is real but bounded: missed valleys become standing deficits
+that accumulate (exact matches nearly vanish by the 900s), yet the
+mean gap stays ~0.03% of score and does not run away.  Point-weighted
+over the whole range the chain holds **99.969% of optimal** - about
+5x closer than fixed greedy (99.854%) - and beats greedy game-by-game
+400 to 52.  Certificates keep firing at 31% even self-fed.
+
 Open items: deeper bundles or temporary-descent moves for the ~13.6%
-valley class, and an incremental SetEval to cut valley-game cost.
+valley class (the entire residual), re-anchoring the chain from
+independent solutions when they beat it (fixed greedy wins 52 games),
+and an incremental SetEval to cut valley-game cost (mean 27s/game).
 
 ## Performance
 
