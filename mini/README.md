@@ -559,10 +559,36 @@ over the whole range the chain holds **99.969% of optimal** - about
 5x closer than greedy (99.854%) - and beats greedy game-by-game
 400 to 52.  Certificates keep firing at 31% even self-fed.
 
+**Cold start converges exactly.**  A chain started from nothing at
+n=2 (no optimal.json seed anywhere, `continuation_cold_results.json`)
+heals its own early mistakes completely: by n=500 it produces scores
+identical to the optimal-seeded chain in 501/501 games, and holds
+**99.970% of all optimal points over 2..1000** (476/999 exact) as a
+fully self-contained solver.  A perfect seed is worth nothing by
+mid-range - the certificate/insertion dynamics snap the chain back
+onto an optimal path.
+
+**The measured efficiency frontier (500..1000, one 2.8GHz core):**
+
+| configuration | share of optimal | wall time |
+|---|---|---|
+| flips only (no bundles) | 99.81% | 2 min |
+| greedy, per game | 99.85% | ~11 min |
+| bundles capped at 100 + greedy re-anchor | **99.95%** | **26 min** |
+| full bundle budget | 99.97% | 3.7 h |
+
+The capped configuration captures ~90% of the chain's advantage over
+greedy at ~12% of the full cost (mean 3.1s/game, max 12s) and is the
+recommended default; the full budget is the publication-quality
+setting.  Greedy re-anchoring fired in only 9/501 games - the chain
+rarely needs its floor - but it is what caps drift by construction.
+Also measured: with no bundle repair at all, chain drift compounds
+(mean gap 132 -> 605 across bands); in a self-fed system, valley
+repair is infrastructure, not luxury.
+
 Open items: deeper bundles or temporary-descent moves for the ~13.6%
-valley class (the entire residual), re-anchoring the chain from
-independent solutions when they beat it (greedy wins 52 games),
-and an incremental SetEval to cut valley-game cost (mean 27s/game).
+valley class (the entire residual), and an incremental SetEval to cut
+valley-game cost.
 
 ## Performance
 
