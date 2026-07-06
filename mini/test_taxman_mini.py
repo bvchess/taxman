@@ -142,12 +142,12 @@ def test_approx_strategies_are_legal_and_sane():
 
 def test_greedy_regression_floor():
     # The simplified two-tier greedy must never score below the recorded
-    # baseline in greedy_fixed_results.json (it may legitimately improve on
+    # baseline in greedy_results.json (it may legitimately improve on
     # it by shedding bogus rejections, hence a floor check rather than ==).
     from approx import check_sequence, divisor_lists, greedy
 
     stored = json.loads(
-        (Path(__file__).resolve().parent / "greedy_fixed_results.json").read_text()
+        (Path(__file__).resolve().parent / "greedy_results.json").read_text()
     )
     divs = divisor_lists(1000)  # a larger table is valid for any smaller n
     for n in (21, 100, 250, 500, 750, 1000):

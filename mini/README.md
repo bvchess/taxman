@@ -315,11 +315,11 @@ the full precedence) before rejecting.  The transformation:
 | exactly optimal | 89/999 | **214/999** |
 | share of all optimal points | 98.601% | **99.851%** |
 
-Fixed greedy is now the strongest single strategy by a wide margin
+Greedy is now the strongest single strategy by a wide margin
 (the fork oracle held 99.414%), gaining 1.32M points across the range
 with 891 games improved and 16 slightly regressed; cycle rejections
 fell ~62%, and the four-strategy portfolio (99.854%) is now
-essentially fixed greedy alone.  Earlier autopsy and rejection
+essentially greedy alone.  Earlier autopsy and rejection
 numbers for greedy in this README describe the pre-fix version.
 
 ### Greedy, final form
@@ -331,7 +331,11 @@ sets are downward-closed), the forced-coupon cycle retries (subsumed
 by the complete tier), and the end-of-game cycle repair (unreachable;
 now an invariant assert).  Deleting them changed no score in any of
 the 1000 games and made the sweep ~20% faster; worst-case complexity
-drops to O(n^2 log n).  The algorithm of record:
+drops to O(n^2 log n).  The sole rejection reason is "infeasible" - a
+theorem, every time; the schedulability conjecture (see the complete
+path below) is trusted rather than re-verified per acceptance, with
+the final ordering step as the loud detector.  The algorithm of
+record:
 
 ```
 greedy(n):
@@ -349,9 +353,10 @@ playable(T):
         peel the bipartite reduction (each pick -> its divisors
         outside T) with solve_mini;
         no full assignment  -> NO ("infeasible" - a theorem)
-        assignment found    -> verify full precedence acyclic -> YES
-        (matching-but-cyclic -> NO ("cyclic") - unproven corner,
-         never observed)
+        assignment found    -> YES  (the schedulability conjecture,
+         trusted: peeling's assignment is always orderable.  A
+         violation would surface as a loud failure at the final
+         ordering step; zero observed, ever.)
 ```
 
 Because acceptance is decided by a complete test, the output set is
@@ -496,7 +501,7 @@ a legal game in-solver.
 
 Seeded from optimal(499) and self-fed on 500..540: **25/41 games exact
 (61%), mean gap 12.1 points (~0.015% of score)** - about ten times
-closer to optimal than fixed greedy on the same slice - with 500..520
+closer to optimal than greedy on the same slice - with 500..520
 solved 21/21.  The misses begin at n=525 and are exactly the
 documented "blocked valley" class: crossing them needs atomic swaps of
 3-4 simultaneous removals (n=525: remove {116,186,189,250}, add
@@ -521,12 +526,12 @@ Drift is real but bounded: missed valleys become standing deficits
 that accumulate (exact matches nearly vanish by the 900s), yet the
 mean gap stays ~0.03% of score and does not run away.  Point-weighted
 over the whole range the chain holds **99.969% of optimal** - about
-5x closer than fixed greedy (99.854%) - and beats greedy game-by-game
+5x closer than greedy (99.854%) - and beats greedy game-by-game
 400 to 52.  Certificates keep firing at 31% even self-fed.
 
 Open items: deeper bundles or temporary-descent moves for the ~13.6%
 valley class (the entire residual), re-anchoring the chain from
-independent solutions when they beat it (fixed greedy wins 52 games),
+independent solutions when they beat it (greedy wins 52 games),
 and an incremental SetEval to cut valley-game cost (mean 27s/game).
 
 ## Performance

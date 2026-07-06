@@ -27,9 +27,14 @@ greedy
     Playability is decided two-tier: a cheap incremental augmenting search
     (Kuhn) plus acyclicity check tries to extend the matching in place,
     and on any failure the complete tier (an exact bipartite reduction via
-    solve_mini) decides accept/reject exactly.  A complete-tier rejection
-    is permanent: playable sets are downward-closed, so a set that cannot
-    be matched now can never be matched after more elements are added.
+    solve_mini) decides accept/reject exactly.  The complete tier trusts
+    the conjecture that solve_mini's returned assignment is always
+    schedulable (zero counterexamples across all runs), so any matching it
+    returns is accepted unconditionally; the sole rejection reason is now
+    "infeasible" (solve_mini found no assignment at all).  A complete-tier
+    rejection is permanent: playable sets are downward-closed, so a set
+    that cannot be matched now can never be matched after more elements
+    are added.
 
 cascade
     The pure upper-half machinery applied band by band: play the numbers
@@ -163,10 +168,13 @@ def _playable_order(
 ) -> List[int]:
     """Topologically order selections by the precedence relation.
 
-    Every acceptance into `selected` is verified acyclic before being
-    committed, so the final matching is guaranteed acyclic: a single
-    Kahn's-algorithm pass orders every element.  A leftover cycle would
-    be an invariant violation, so this raises rather than repairing it.
+    The fast path's acceptances are verified acyclic before being
+    committed; the complete tier instead trusts the conjecture that
+    solve_mini's returned assignment is always schedulable, so it accepts
+    unconditionally.  Either way the final matching is expected acyclic,
+    and a single Kahn's-algorithm pass orders every element.  A leftover
+    cycle would be a conjecture violation, so this raises rather than
+    repairing it.
     """
     succ: Dict[int, List[int]] = {c: [] for c in selected}
     indeg: Dict[int, int] = {c: 0 for c in selected}
@@ -188,7 +196,10 @@ def _playable_order(
             if indeg[b] == 0:
                 ready.append(b)
     if len(order) != len(selected):
-        raise RuntimeError("invariant violation: cyclic final matching")
+        raise RuntimeError(
+            "conjecture violated: solve_mini produced an unschedulable "
+            "assignment (see README, 'cyclic')"
+        )
     return order
 
 
@@ -235,14 +246,10 @@ def greedy(
                 rejections.append((m, "infeasible"))
             return False
         owner_candidate = {f: c for c, f in matching.items()}
-        if _is_acyclic(selected | {m}, owner_candidate, n):
-            owner.clear()
-            owner.update(owner_candidate)
-            selected.add(m)
-            return True
-        if rejections is not None:
-            rejections.append((m, "cyclic"))
-        return False
+        owner.clear()
+        owner.update(owner_candidate)
+        selected.add(m)
+        return True
 
     for m in range(n, 1, -1):
         if not divs[m]:
