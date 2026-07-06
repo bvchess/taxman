@@ -3,6 +3,9 @@
 Run with:  python3 -m pytest test_taxman_mini.py   (or just python3 test_taxman_mini.py)
 """
 
+import json
+from pathlib import Path
+
 import pytest
 
 from taxman_mini import (
@@ -135,6 +138,20 @@ def test_approx_strategies_are_legal_and_sane():
     assert check_sequence(21, greedy(21, divs)) == 144
     # ...and reproduces the N=5 example from the wiki's game introduction.
     assert check_sequence(5, greedy(5, divs)) == 9
+
+
+def test_greedy_regression_floor():
+    # The simplified two-tier greedy must never score below the recorded
+    # baseline in greedy_fixed_results.json (it may legitimately improve on
+    # it by shedding bogus rejections, hence a floor check rather than ==).
+    from approx import check_sequence, divisor_lists, greedy
+
+    stored = json.loads(
+        (Path(__file__).resolve().parent / "greedy_fixed_results.json").read_text()
+    )
+    divs = divisor_lists(1000)  # a larger table is valid for any smaller n
+    for n in (21, 100, 250, 500, 750, 1000):
+        assert check_sequence(n, greedy(n, divs)) >= stored[str(n)]
 
 
 def test_fm_bound_matches_published_values():

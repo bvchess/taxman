@@ -12,9 +12,9 @@ the strategy never makes) into a "fate":
   drained       m's divisors trickled away one at a time (or the game
                 ended before m was fully starved).
 
-For greedy, each missed m is additionally tagged with the reason(s) greedy's
-own matching search rejected it ("no-path", "cycle", "rematch", joined with
-"+" if rejected more than once across greedy's two passes).
+For greedy, each missed m is additionally tagged with the reason greedy's
+own playability test rejected it ("infeasible" or "cyclic"); greedy makes a
+single descending pass, so each m is rejected at most once.
 
 Writes two machine-readable logs, one record per diverging game, to
 divergence_onetax.json and divergence_greedy.json, and prints an aggregate
@@ -232,7 +232,7 @@ def print_summary(
 
     if is_greedy:
         print("rejection-reason histogram (atomic tokens, may overlap):")
-        for token in ("no-path", "cycle", "rematch"):
+        for token in ("infeasible", "cyclic"):
             c = reason_count.get(token, 0)
             s = reason_sum.get(token, 0)
             print(f"  {token:<10} count={c:>4} sum={s:>8}")

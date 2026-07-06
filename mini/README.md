@@ -322,6 +322,42 @@ fell ~62%, and the four-strategy portfolio (99.854%) is now
 essentially fixed greedy alone.  Earlier autopsy and rejection
 numbers for greedy in this README describe the pre-fix version.
 
+### Greedy, final form
+
+With a complete playability test, every compensating mechanism became
+dead weight and was removed - the second-chance pass (measured: zero
+rescues; provable: complete rejections are permanent since playable
+sets are downward-closed), the forced-coupon cycle retries (subsumed
+by the complete tier), and the end-of-game cycle repair (unreachable;
+now an invariant assert).  Deleting them changed no score in any of
+the 1000 games and made the sweep ~20% faster; worst-case complexity
+drops to O(n^2 log n).  The algorithm of record:
+
+```
+greedy(n):
+    S = {}
+    for m = n down to 2:
+        if playable(S + {m}):          # complete yes/no test
+            S = S + {m}
+    return a topological order of S    # guaranteed legal game
+
+playable(T):
+    FAST PATH  (optimization only): extend the running coupon matching
+        by one augmenting search for m; if it extends and the
+        precedence stays acyclic -> YES
+    COMPLETE PATH (the decider, on any fast-path failure):
+        peel the bipartite reduction (each pick -> its divisors
+        outside T) with solve_mini;
+        no full assignment  -> NO ("infeasible" - a theorem)
+        assignment found    -> verify full precedence acyclic -> YES
+        (matching-but-cyclic -> NO ("cyclic") - unproven corner,
+         never observed)
+```
+
+Because acceptance is decided by a complete test, the output set is
+canonical: a deterministic function of playability alone, independent
+of coupon preferences or augmenting-path order.
+
 ## Why a 2-tax rule cannot be bolted onto OneTax
 
 The tax census above suggested an attractive idea: optimal games make

@@ -23,12 +23,13 @@ Strategies implemented here:
 
 greedy
     The full-game generalization of "take the highest prime": consider
-    n, n-1, ..., 2 and accept each number if an augmenting path can add
-    it to the matching (if no augmenting path exists, no matching covers
-    it - a permanent, well-founded rejection).  Rare precedence cycles
-    are repaired at the end by dropping the smallest involved selection.
-    Runs in O(n) augmenting searches of O(E) each, E = sum of divisor
-    counts = O(n log n).
+    n, n-1, ..., 2 and accept each number if the pick set stays playable.
+    Playability is decided two-tier: a cheap incremental augmenting search
+    (Kuhn) plus acyclicity check tries to extend the matching in place,
+    and on any failure the complete tier (an exact bipartite reduction via
+    solve_mini) decides accept/reject exactly.  A complete-tier rejection
+    is permanent: playable sets are downward-closed, so a set that cannot
+    be matched now can never be matched after more elements are added.
 
 cascade
     The pure upper-half machinery applied band by band: play the numbers
@@ -159,39 +160,36 @@ def _is_acyclic(selected: Set[int], owner: Dict[int, int], n: int) -> bool:
 
 def _playable_order(
     selected: Set[int], match: Dict[int, int], n: int
-) -> Tuple[List[int], List[int]]:
+) -> List[int]:
     """Topologically order selections by the precedence relation.
 
-    Returns (order, dropped): if the precedence graph has cycles, the
-    smallest selection in each cycle is dropped until it is acyclic.
+    Every acceptance into `selected` is verified acyclic before being
+    committed, so the final matching is guaranteed acyclic: a single
+    Kahn's-algorithm pass orders every element.  A leftover cycle would
+    be an invariant violation, so this raises rather than repairing it.
     """
-    dropped: List[int] = []
-    while True:
-        succ: Dict[int, List[int]] = {c: [] for c in selected}
-        indeg: Dict[int, int] = {c: 0 for c in selected}
-        for a in selected:
-            seen = set()
-            for start in (match[a], a):
-                for b in range(2 * start, n + 1, start):
-                    if b in selected and b != a and b not in seen:
-                        seen.add(b)
-                        succ[a].append(b)
-                        indeg[b] += 1
-        ready = sorted(c for c in selected if indeg[c] == 0)
-        order: List[int] = []
-        while ready:
-            a = ready.pop()
-            order.append(a)
-            for b in succ[a]:
-                indeg[b] -= 1
-                if indeg[b] == 0:
-                    ready.append(b)
-        if len(order) == len(selected):
-            return order, dropped
-        loser = min(c for c in selected if indeg[c] > 0)
-        selected.discard(loser)
-        del match[loser]
-        dropped.append(loser)
+    succ: Dict[int, List[int]] = {c: [] for c in selected}
+    indeg: Dict[int, int] = {c: 0 for c in selected}
+    for a in selected:
+        seen = set()
+        for start in (match[a], a):
+            for b in range(2 * start, n + 1, start):
+                if b in selected and b != a and b not in seen:
+                    seen.add(b)
+                    succ[a].append(b)
+                    indeg[b] += 1
+    ready = sorted(c for c in selected if indeg[c] == 0)
+    order: List[int] = []
+    while ready:
+        a = ready.pop()
+        order.append(a)
+        for b in succ[a]:
+            indeg[b] -= 1
+            if indeg[b] == 0:
+                ready.append(b)
+    if len(order) != len(selected):
+        raise RuntimeError("invariant violation: cyclic final matching")
+    return order
 
 
 def greedy(
@@ -204,77 +202,55 @@ def greedy(
     owner: Dict[int, int] = {}  # divisor -> selection paying it
 
     def try_select(m: int) -> bool:
-        # A failed Kuhn search leaves the matching untouched, so only
-        # successful augments need their trails rolled back.
+        # STEP 1 -- fast path: an opportunistic incremental extension of
+        # the current matching.  Any failure here rolls back fully and
+        # falls through to the complete tier; nothing is rejected yet.
         pre_trail: List[Tuple[int, Optional[int]]] = []
         if m in owner:
-            # m currently serves as someone's tax; try to rematch them.
+            # m currently serves as someone's tax; try to re-route that
+            # holder onto a different divisor without touching m.
             holder = owner.pop(m)
-            if not _augment(holder, owner, selected, divs, {m}, pre_trail):
-                owner[m] = holder
-                if rejections is not None:
-                    rejections.append((m, "rematch"))
-                return False
-            pre_trail.append((m, holder))  # a rollback restores m's owner
-        selected.add(m)  # blocks m from being used as anyone's tax below
+            if _augment(holder, owner, selected, divs, {m}, pre_trail):
+                pre_trail.append((m, holder))  # rollback restores m's owner
+            else:
+                owner[m] = holder  # undo the pop; fall through to step 2
+                pre_trail = []
 
-        trail: List[Tuple[int, Optional[int]]] = []
-        if not _augment(m, owner, selected, divs, set(), trail):
-            selected.discard(m)  # no matching covers m: permanent reject
-            _rollback(owner, pre_trail)
-            if rejections is not None:
-                rejections.append((m, "no-path"))
-            return False
-        if _is_acyclic(selected, owner, n):
-            return True
-        _rollback(owner, trail)
-
-        # The matching creates a precedence cycle; retry with each of m's
-        # divisors forced in turn, since a different assignment for m can
-        # route the precedence differently.
-        for f in reversed(divs[m]):
-            if f in selected:
-                continue
-            trail = []
-            if _augment(m, owner, selected, divs, set(divs[m]) - {f}, trail):
+        if len(pre_trail) or m not in owner:
+            selected.add(m)  # blocks m from being used as anyone's tax
+            trail: List[Tuple[int, Optional[int]]] = []
+            if _augment(m, owner, selected, divs, set(), trail):
                 if _is_acyclic(selected, owner, n):
-                    return True
+                    return True  # fast, common-case silent success
                 _rollback(owner, trail)
+            selected.discard(m)
+            _rollback(owner, pre_trail)
 
-        # Tier 1 exhausted every retry of m's own coupon and still cycles.
-        # Tier 2: ask the trusted oracle (solve_mini) whether the whole
-        # current pick set (selected already includes m here) admits ANY
-        # acyclic assignment, not just ones reachable by reshuffling m's
-        # coupon alone.  A hit replaces the owner map wholesale; a miss
-        # falls through to the same permanent "cycle" rejection as before.
-        matching = _complete_matching(selected, divs)
-        if matching is not None:
-            owner_candidate = {f: c for c, f in matching.items()}
-            if _is_acyclic(selected, owner_candidate, n):
-                owner.clear()
-                owner.update(owner_candidate)
-                return True
-
-        selected.discard(m)
-        _rollback(owner, pre_trail)
+        # STEP 2 -- complete tier: the unconditional decider.  `selected`
+        # does not contain m here (the fast path rolled back fully), so
+        # pass a fresh `selected | {m}` without mutating shared state.
+        matching = _complete_matching(selected | {m}, divs)
+        if matching is None:
+            if rejections is not None:
+                rejections.append((m, "infeasible"))
+            return False
+        owner_candidate = {f: c for c, f in matching.items()}
+        if _is_acyclic(selected | {m}, owner_candidate, n):
+            owner.clear()
+            owner.update(owner_candidate)
+            selected.add(m)
+            return True
         if rejections is not None:
-            rejections.append((m, "cycle"))
+            rejections.append((m, "cyclic"))
         return False
 
-    retry_later: List[int] = []
     for m in range(n, 1, -1):
         if not divs[m]:
             continue
-        if not try_select(m):
-            retry_later.append(m)
-    for m in retry_later:
         try_select(m)
 
     match = {c: f for f, c in owner.items() if c in selected}
-    order, dropped = _playable_order(selected, match, n)
-    if dropped:
-        raise RuntimeError(f"unexpected precedence cycle in game {n}")
-    return order
+    return _playable_order(selected, match, n)
 
 
 # ---------------------------------------------------------------------------
