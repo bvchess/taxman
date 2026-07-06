@@ -46,7 +46,7 @@ from math import gcd
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
-from approx import check_sequence, divisor_lists
+from approx import check_sequence, divisor_lists, greedy
 from seteval import SetEval
 from taxman_mini import smallest_prime_factors, solve_upper_half
 from verify import DEFAULT_OPTIMAL
@@ -262,6 +262,7 @@ def solve_game(
     prev_set: Set[int],
     prev_score: Optional[int],
     bundle_limit: int,
+    reanchor_greedy: bool,
     optimal: Dict[int, Dict[str, Any]],
 ) -> Dict[str, Any]:
     """Solve game n warm-started from the previous solution; return a record."""
@@ -287,15 +288,25 @@ def solve_game(
     if prev_score is not None and incumbent_score == n + prev_score:
         certified = True
     else:
-        # Steps 4-5: interleave tier-1 hill climbing and tier-2 bundles.
+        # Step 4: tier-1 hill climbing always runs to quiescence first,
+        # independent of the bundle budget -- `--bundle-limit 0` must mean
+        # "flips yes, bundles no", not "no local search at all".
+        f, _failed_adds = tier1(evaluator, n)
+        flips += f
+        if f > 0:
+            tier = max(tier, 1)
+
+        # Step 5: interleave tier-2 bundles with tier-1 re-convergence,
+        # bounded by the bundle budget. bundle_limit=0 means this loop
+        # never executes.
         budget = [bundle_limit]
         while budget[0] > 0:
-            f, _failed_adds = tier1(evaluator, n)
-            flips += f
-            if f > 0:
-                tier = max(tier, 1)
             if tier2_pass(evaluator, n, budget):
                 tier = max(tier, 2)
+                f, _failed_adds = tier1(evaluator, n)
+                flips += f
+                if f > 0:
+                    tier = max(tier, 1)
             else:
                 break
 
@@ -309,8 +320,20 @@ def solve_game(
         f"score={our_score} sum={sum(evaluator.S)}"
     )
 
+    source = "chain"
+    output_set = evaluator.S
+    if reanchor_greedy:
+        greedy_seq = greedy(n, divs)
+        greedy_score = check_sequence(n, greedy_seq)  # validates greedy's own sequence
+        if greedy_score > our_score:
+            greedy_set = set(greedy_seq)
+            assert greedy_score == sum(greedy_set)
+            our_score = greedy_score
+            output_set = greedy_set
+            source = "greedy"
+
     prev_lower = {m for m in prev_set if 2 * m <= n}
-    our_lower = {m for m in evaluator.S if 2 * m <= n}
+    our_lower = {m for m in output_set if 2 * m <= n}
     churn = len(prev_lower ^ our_lower)
 
     record: Dict[str, Any] = {
@@ -320,8 +343,9 @@ def solve_game(
         "tier": tier,
         "flips": flips,
         "churn_from_prev": churn,
+        "source": source,
         "time_s": round(time.monotonic() - t0, 4),
-        "_set": sorted(evaluator.S),  # carried forward; stripped before output
+        "_set": sorted(output_set),  # carried forward; stripped before output
     }
     if n in optimal:
         opt = optimal[n]["score"]
@@ -339,6 +363,7 @@ def run(
     to_n: int,
     seed_from_optimal: bool,
     bundle_limit: int,
+    reanchor_greedy: bool,
     optimal: Dict[int, Dict[str, Any]],
     spf: Sequence[int],
     divs: Sequence[List[int]],
@@ -358,7 +383,8 @@ def run(
     records: List[Dict[str, Any]] = []
     started = time.monotonic()
     for i, n in enumerate(range(from_n, to_n + 1), 1):
-        rec = solve_game(n, spf, divs, prev_set, prev_score, bundle_limit, optimal)
+        rec = solve_game(n, spf, divs, prev_set, prev_score, bundle_limit,
+                          reanchor_greedy, optimal)
         prev_set = set(rec.pop("_set"))
         prev_score = rec["score"]
         records.append(rec)
@@ -373,12 +399,13 @@ def run(
 # ---------------------------------------------------------------------------
 
 def print_summary(
-    records: List[Dict[str, Any]], elapsed: float, seeded: bool
+    records: List[Dict[str, Any]], elapsed: float, seeded: bool, reanchor: bool
 ) -> None:
     total = len(records)
     print("=" * 64)
     print(f"CONTINUATION SOLVER: {total} games "
-          f"(seed = {'optimal.json' if seeded else 'cold/empty'})")
+          f"(seed = {'optimal.json' if seeded else 'cold/empty'}, "
+          f"reanchor-greedy = {'on' if reanchor else 'off'})")
     print("=" * 64)
     if total == 0:
         return
@@ -419,6 +446,11 @@ def print_summary(
     print(f"\nCertificate rate: {cert}/{total} "
           f"({100 * cert / total:.1f}%)")
 
+    # Greedy re-anchor adoptions.
+    adopted = sum(1 for r in records if r.get("source") == "greedy")
+    print(f"Greedy re-anchor adoptions: {adopted}/{total} "
+          f"({100 * adopted / total:.1f}%)")
+
     # Tier usage histogram.
     tiers = {0: 0, 1: 0, 2: 0}
     for r in records:
@@ -446,6 +478,10 @@ def main(argv: List[str] | None = None) -> int:
                              "solution (the standard experiment)")
     parser.add_argument("--bundle-limit", type=int, default=2000,
                         help="max tier-2 bundle evaluations per game")
+    parser.add_argument("--reanchor-greedy", action="store_true", dest="reanchor_greedy",
+                        help="after solving game n, also try the greedy strategy's "
+                             "solution and adopt it (score + pick set) if it beats "
+                             "the chain's solution")
     parser.add_argument("--optimal", type=Path, default=DEFAULT_OPTIMAL)
     parser.add_argument("--out", type=Path,
                         default=MINI_DIR / "continuation_results.json")
@@ -458,11 +494,11 @@ def main(argv: List[str] | None = None) -> int:
 
     started = time.monotonic()
     records = run(args.from_n, args.to_n, args.seed_from_optimal,
-                  args.bundle_limit, optimal, spf, divs)
+                  args.bundle_limit, args.reanchor_greedy, optimal, spf, divs)
     elapsed = time.monotonic() - started
 
     args.out.write_text(json.dumps(records, separators=(",", ":")))
-    print_summary(records, elapsed, args.seed_from_optimal)
+    print_summary(records, elapsed, args.seed_from_optimal, args.reanchor_greedy)
     print(f"\n{args.out}: {len(records)} records, "
           f"{args.out.stat().st_size} bytes")
     return 0
