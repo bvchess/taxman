@@ -329,36 +329,66 @@ dead weight and was removed - the second-chance pass (measured: zero
 rescues; provable: complete rejections are permanent since playable
 sets are downward-closed), the forced-coupon cycle retries (subsumed
 by the complete tier), and the end-of-game cycle repair (unreachable;
-now an invariant assert).  Deleting them changed no score in any of
-the 1000 games and made the sweep ~20% faster; worst-case complexity
-drops to O(n^2 log n).  The sole rejection reason is "infeasible" - a
-theorem, every time; the schedulability conjecture (see the complete
-path below) is trusted rather than re-verified per acceptance, with
-the final ordering step as the loud detector.  The algorithm of
-record:
+now a loud error).  Deleting them changed no score in any of the 1000
+games; the sole rejection reason is "infeasible" - a theorem, every
+time.  The algorithm of record, at the same level as the wiki's
+solve_mini/optimize_mini:
 
 ```
-greedy(n):
-    S = {}
-    for m = n down to 2:
-        if playable(S + {m}):          # complete yes/no test
-            S = S + {m}
-    return a topological order of S    # guaranteed legal game
+greedy(N):
+    let S be an empty set
+    for c from N down to 2:
+        if playable(S with c added):
+            add c to S
+    return ordered(S)
 
-playable(T):
-    FAST PATH  (optimization only): extend the running coupon matching
-        by one augmenting search for m; if it extends and the
-        precedence stays acyclic -> YES
-    COMPLETE PATH (the decider, on any fast-path failure):
-        peel the bipartite reduction (each pick -> its divisors
-        outside T) with solve_mini;
-        no full assignment  -> NO ("infeasible" - a theorem)
-        assignment found    -> YES  (the schedulability conjecture,
-         trusted: peeling's assignment is always orderable.  A
-         violation would surface as a loud failure at the final
-         ordering step; zero observed, ever.)
+
+playable(S):
+    treat S as a mini game in which the factors of each member
+        are its proper divisors that are NOT in S
+    if solve_mini on that game does not raise an error:
+        return true
+    else:
+        return false
+
+
+ordered(S):
+    let pay(s) be the factor assigned to each s by solve_mini
+    return any ordering of S in which s comes before t whenever
+        pay(s) divides t, or s divides t
 ```
 
+Three remarks:
+
+1. **This is optimize_mini, promoted to the whole game.**  The loop is
+   identical - descending order, keep what stays solvable - and the
+   feasibility test is the same solve_mini, unchanged.  Only the
+   meaning of "factor" generalizes: in the upper-half game a
+   selection's factors are its maximal factors; here they are all of
+   its divisors not themselves selected.  Restrict greedy(N) to the
+   numbers above N/2 and it collapses back into optimize_mini.
+
+2. **ordered needs one condition the mini game didn't.**  In a true
+   mini game nothing selected divides anything else selected, so
+   solve_mini's own output order suffices.  In the full game
+   selections can divide each other, so the ordering must also respect
+   "s before t whenever s divides t" - the smaller pick is taken
+   before the larger one sweeps it.
+
+3. **What is proved and what is trusted.**  A solve_mini error makes
+   rejection a theorem: no assignment of distinct factors exists, and
+   adding more selections only makes it harder.  A solve_mini success
+   is trusted to be orderable - the *schedulability conjecture*,
+   unbeaten in every game ever run.  If it ever fails, ordered() finds
+   no valid ordering and the program stops with an error rather than
+   playing a bad game.
+
+Implementation note: the pseudocode is the specification, not the
+code.  A literal transcription would re-solve the mini game for every
+candidate; the implementation keeps a running assignment (Kuhn
+augmenting + an acyclicity check) and only falls back to the full
+solve_mini reduction when the incremental update fails - bit-identical
+results, verified across all 1000 games, at a fraction of the cost.
 Because acceptance is decided by a complete test, the output set is
 canonical: a deterministic function of playability alone, independent
 of coupon preferences or augmenting-path order.
