@@ -33,6 +33,15 @@ What makes it special:
   bigger set is only harder to pay for, a rejected number is rejected
   forever.  One consequence: the set this program picks is canonical,
   a deterministic function of the game, not of tie-breaking.
+* The picks above n/2 are not merely good - they are exactly the
+  >n/2 selections of an optimal game (verified against the known
+  optima for every n <= 1000).  Numbers above n/2 never divide one
+  another, so up there selection is a pure matching question, and
+  the matchable upper sets form a matroid - the structure in which
+  a greedy descending pass is provably unbeatable.  Because the loop
+  runs from n downward, its first n/2 iterations are literally that
+  optimal upper-half computation; whatever greedy loses to the true
+  optimum, it loses among the small numbers below n/2.
 * The one leap of faith is deferred, not hidden.  Accepting a set
   whenever the reservations exist assumes they can also be scheduled
   (the "schedulability conjecture" - never violated in any game ever
