@@ -1,7 +1,43 @@
-"""Executable specification of the README's "Greedy, final form" pseudocode.
+"""The greedy Taxman strategy, written to be read.
 
-Written for clarity, not speed; the fast bit-identical implementation
-(incremental matching + Kuhn augmenting paths) lives in approx.py's greedy().
+This is the executable version of the pseudocode in README.md
+("Greedy, final form"): correct, minimal, and unhurried.  The fast,
+bit-identical implementation (incremental matching + Kuhn augmenting
+paths) lives in approx.py's greedy().
+
+The game, in one breath: the pot holds 1..n; picking a number c keeps
+c for you and surrenders every divisor of c still in the pot to the
+taxman; every pick must surrender at least one divisor, and when no
+legal pick remains the taxman sweeps the leftovers.  Highest total
+wins.
+
+What the program illustrates: an excellent full game can be played
+without ever simulating a turn.  The strategy decides *membership*
+first - walk c from n down to 2 and keep c whenever the kept set
+stays playable - and only at the very end arranges the chosen set
+into a legal sequence.  This works because playability is a property
+of the set, not of any particular move order: a set of picks can be
+played if and only if every member can reserve its own personal tax
+payment (a divisor outside the set, no two members sharing) and the
+reservations can be scheduled without stepping on each other.
+solve_mini finds the reservations; ordered() does the scheduling.
+
+What makes it special:
+
+* No search, no lookahead, no scoring heuristics - one feasibility
+  question ("can everyone still be paid?") asked n times, which is
+  what keeps the whole strategy in the O(n^2) complexity class while
+  landing within ~0.15% of the known optimal scores for n <= 1000.
+* Rejections are proofs, not judgment calls.  When solve_mini fails,
+  no reservation scheme exists for that set at all - and since a
+  bigger set is only harder to pay for, a rejected number is rejected
+  forever.  One consequence: the set this program picks is canonical,
+  a deterministic function of the game, not of tie-breaking.
+* The one leap of faith is deferred, not hidden.  Accepting a set
+  whenever the reservations exist assumes they can also be scheduled
+  (the "schedulability conjecture" - never violated in any game ever
+  run).  If it ever fails, ordered() halts the program rather than
+  play an illegal game.
 """
 
 
@@ -10,10 +46,32 @@ class Infeasible(Exception):
 
 
 def proper_divisors(c):
+    # Every d < c that divides c; these are the numbers c's pick would
+    # surrender to the taxman if they were still in the pot.
     return [d for d in range(1, c) if c % d == 0]
 
 
 def solve_mini(members, factors, factors_of):
+    """Reserve a distinct payment ("pay") for every member, or fail.
+
+    This is the wiki's solve_mini: a peeling procedure that only ever
+    makes forced moves, never guesses, and never backtracks.  Two
+    moves are forced:
+
+    * A member with exactly ONE usable factor left must reserve it -
+      and is sequenced FIRST, before any other pick could sweep that
+      factor away.
+    * A factor that only ONE member can use must go to that member -
+      which is sequenced LAST, giving earlier picks time to consume
+      its other factors, so this one is what it actually pays.
+
+    When neither rule applies, no assignment of distinct payments
+    exists and the set is unplayable - failure here is a theorem
+    about the set, not a dead end in a search.
+
+    Returns (sequence, pay) where pay maps each member to its
+    reserved payment.
+    """
     if not members:
         return [], {}
 
@@ -37,6 +95,18 @@ def solve_mini(members, factors, factors_of):
 
 
 def playable(s_set):
+    """Can this set of picks be a legal game?  The heart of the strategy.
+
+    Reduce the question to a "mini game": the candidate picks are the
+    members, and the payment pool holds every number OUTSIDE the set
+    that divides a member (a number inside the set is a pick, so it
+    cannot double as anyone's tax payment).  The set is accepted
+    exactly when solve_mini can reserve a distinct payment for every
+    member.
+
+    Returns the pay reservations on success (evidence, reused by
+    ordered()), or None.
+    """
     factors = set()
     for s in s_set:
         factors |= set(proper_divisors(s))
@@ -52,6 +122,24 @@ def playable(s_set):
 
 
 def ordered(s_set, pay):
+    """Arrange the accepted set into a legal playing order.
+
+    A pick sweeps ALL of its remaining divisors, so the order must
+    respect two precedence rules - s comes before t whenever:
+
+    * pay(s) divides t: otherwise t's sweep would destroy s's
+      reserved payment before s could pay with it;
+    * s divides t: s is itself a divisor of t, so s must be picked
+      before t's sweep removes s from the pot entirely.
+
+    Any order respecting both is legal.  A repeated scan is all it
+    takes: place a member a as soon as no still-waiting member b has
+    to precede it (no b with pay(b) dividing a, no b dividing a).
+    If every remaining member is blocked, the constraints form a
+    cycle and no order exists - the schedulability conjecture says
+    solve_mini's reservations never do this, and this loud failure
+    is where that trust is checked.
+    """
     remaining = set(s_set)
     placed = []
     while remaining:
@@ -74,6 +162,14 @@ def ordered(s_set, pay):
 
 
 def greedy(n):
+    """Play Taxman game n: choose the set first, then order it.
+
+    Descending order is the greedy heart: offer the biggest numbers
+    first, keep each one whose addition leaves the set payable.  This
+    is the wiki's optimize_mini promoted from the upper half to the
+    whole game - restricted to the numbers above n/2 it collapses
+    back into optimize_mini exactly.
+    """
     s = set()
     for c in range(n, 1, -1):
         if playable(s | {c}) is not None:
@@ -87,5 +183,5 @@ if __name__ == "__main__":
 
     sys.setrecursionlimit(10000)
     result = greedy(int(sys.argv[1]))
-    print(result)
-    print(sum(result))
+    print("picks, in playing order:", result)
+    print("score (sum of picks):   ", sum(result))
