@@ -25,6 +25,26 @@ verify returned work against the test suite
 (`python3 -m pytest mini/test_taxman_mini.py`) and known results
 before committing.
 
+## Checkpoint policy for long runs (set by Brian, 2026-07-07)
+
+The container can restart without warning, killing background jobs; a
+2026-07-06 restart cost an hour of continuation-chain progress because
+the run wrote its output only at completion.  From now on, every run
+expected to take more than a few minutes must checkpoint frequently:
+
+* Write accumulated results to the output file incrementally (every
+  N games / every few minutes), not just at the end.
+* Make the run resumable: on startup, load any existing checkpoint
+  and continue from where it left off, skipping finished work.  Keep
+  whatever state the resume needs (e.g. the previous game's pick set)
+  in the checkpoint, even if it is stripped from the final output.
+* When (re)launching a long job, prefer the resumable path so a
+  restart costs at most one checkpoint interval.
+
+`mini/continuation.py` (`--resume`, checkpoint every 5 games) and the
+scratchpad `ub_fill.py` pattern (merge existing results, write every
+10 completions) are the reference implementations.
+
 ## Project context
 
 The active work lives in `mini/` (see `mini/README.md`): a clean
