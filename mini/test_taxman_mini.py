@@ -182,6 +182,35 @@ def test_solvent_simple_matches_canonical():
         assert check_sequence(n, seq) == score
 
 
+def test_prime_sacrifice_identity():
+    # Wiki "Reusing a previous solution", sections "If N is prime" and
+    # "Generalizing": for prime N, opt(N) = N + opt(N-1) - p_hat, where
+    # p_hat is the largest prime below N. Pure data check against
+    # optimal.json -- no solver runs -- for every prime N in 3..1000
+    # (validated 167/167 in the original measurement).
+    from bound import DEFAULT_OPTIMAL
+
+    optimal = json.loads(DEFAULT_OPTIMAL.read_text())
+    scores = {g["n"]: g["score"] for g in optimal}
+
+    largest_prime_below = [None] * 1001
+    last_prime = None
+    for k in range(1001):
+        largest_prime_below[k] = last_prime
+        if k >= 2 and SPF[k] == k:
+            last_prime = k
+
+    checked = 0
+    for n in range(3, 1001):
+        if SPF[n] != n:
+            continue  # n not prime
+        p_hat = largest_prime_below[n]
+        assert p_hat is not None
+        assert scores[n] == n + scores[n - 1] - p_hat
+        checked += 1
+    assert checked > 0  # sanity: the loop actually exercised primes
+
+
 def test_fm_bound_matches_published_values():
     pytest.importorskip("networkx")
     from bound import fm_bound

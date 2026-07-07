@@ -624,6 +624,19 @@ single-flip ascent and bundle moves (SetEval, now shared in
 solve_mini playability tier).  Every produced solution is replayed as
 a legal game in-solver.
 
+Two optimality certificates are recognized, from the wiki's "Reusing
+a previous solution": **exact** (score = n + score(n-1), the
+no-sacrifice upper bound met) and **prime-sacrifice** - for prime n,
+opt(n) = n + opt(n-1) - p̂ with p̂ the largest prime below n, because
+1 dies with any game's first move and a prime's only payment is 1,
+so a solution holds at most one prime, played first; taking prime n
+forces dropping the previous solution's prime, and nothing cheaper
+can be forced (validated 167/167 against the known optima).  The
+prime certificate is label-only - it never cuts search short, since
+a cold chain's prev score may be suboptimal and would make the cap
+invalid.  Prime games always carry a real sacrifice, so they never
+certify "exact"; the second certificate roughly covers them.
+
 Seeded from optimal(499) and self-fed on 500..540: **25/41 games exact
 (61%), mean gap 12.1 points (~0.015% of score)** - about ten times
 closer to optimal than solvent on the same slice - with 500..520

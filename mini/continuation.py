@@ -30,6 +30,29 @@ Every produced solution is validated by deriving a real-game order from
 the matching and replaying it under the true rules (approx.check_sequence)
 to reproduce the recorded score.
 
+Certificates. Two record-level labels certify a score as provably optimal
+given the previous game's score, without re-solving game n from scratch:
+
+  * "exact" -- the incumbent (or final) score equals n + prev_score, i.e.
+    prepending n to the previous game's own solution is already optimal
+    (opt(n) <= n + opt(n-1) always; equality closes the gap).
+  * "prime" -- the "prime sacrifice" identity from the wiki page "Reusing a
+    previous solution" (https://github.com/bvchess/taxman/wiki/Reusing-a-
+    previous-solution, sections "If N is prime" and "Generalizing"),
+    validated 167/167 against optimal.json: for prime N,
+    opt(N) = N + opt(N-1) - p_hat, where p_hat is the largest prime < N.
+    Sketch: 1 divides every number, so it is consumed by any game's first
+    move; a prime's only proper divisor is 1, so any solution containing a
+    prime plays it first and contains at most one prime. Taking prime N as
+    a selection therefore forces sacrificing whatever prime the previous
+    solution played (p_hat, the largest prime below N -- largest because
+    swapping any smaller prime up to p_hat into that slot is always
+    feasible and only improves the score). Conversely, prepending N to an
+    optimal (N-1) solution with its prime removed is always legal, so the
+    bound is tight. Both certificates are label-only: they are computed
+    from the *final* settled score after all search tiers and the solvent
+    re-anchor, and never gate or skip the search itself (see solve_game).
+
 Usage:
     python3 continuation.py --from 500 --to 1000 [--seed-from-optimal]
                             [--bundle-limit K] [--out PATH] [--resume]
@@ -270,6 +293,7 @@ def solve_game(
     bundle_limit: int,
     reanchor_solvent: bool,
     optimal: Dict[int, Dict[str, Any]],
+    largest_prime_below: Sequence[Optional[int]],
 ) -> Dict[str, Any]:
     """Solve game n warm-started from the previous solution; return a record."""
     t0 = time.monotonic()
@@ -286,13 +310,15 @@ def solve_game(
         evaluator.playable_add(x)
 
     incumbent_score = evaluator.score()
-    certified = False
+    lucky_exit = False
     tier = 0
     flips = 0
 
-    # Step 3: certificate.
+    # Step 3: lucky certificate -- an early exit that skips the search
+    # entirely. This is the ONLY certificate allowed to change search
+    # behavior; see the "prime" certificate below for why it stays label-only.
     if prev_score is not None and incumbent_score == n + prev_score:
-        certified = True
+        lucky_exit = True
     else:
         # Step 4: tier-1 hill climbing always runs to quiescence first,
         # independent of the bundle budget -- `--bundle-limit 0` must mean
@@ -342,10 +368,33 @@ def solve_game(
     our_lower = {m for m in output_set if 2 * m <= n}
     churn = len(prev_lower ^ our_lower)
 
+    # Certificates, computed on the FINAL settled score (after tiers and the
+    # solvent re-anchor adoption above) -- both are label-only postmortem
+    # checks, never a search cap. In a cold chain prev_score may itself be
+    # suboptimal, so n + prev_score (- p_hat) computed from a suboptimal
+    # prev is not a valid upper bound on opt(n); cutting search on it could
+    # forfeit points. Labeling only after the fact costs nothing and can
+    # never be wrong. (lucky_exit above is the one exception: it short-
+    # circuits the search, but only on the same "score == n + prev_score"
+    # condition re-checked here, so it always ends up labeled "exact".)
+    certificate: Optional[str] = None
+    if prev_score is not None and our_score == n + prev_score:
+        certificate = "exact"
+    elif (
+        prev_score is not None
+        and n >= 2
+        and spf[n] == n  # n is prime
+        and largest_prime_below[n] is not None
+        and our_score == n + prev_score - largest_prime_below[n]
+    ):
+        certificate = "prime"
+    certified = certificate is not None
+
     record: Dict[str, Any] = {
         "n": n,
         "score": our_score,
         "certified": certified,
+        "certificate": certificate,
         "tier": tier,
         "flips": flips,
         "churn_from_prev": churn,
@@ -387,6 +436,17 @@ def run(
     record and it is extended in place -- seed_from_optimal is ignored in
     that case, since the checkpoint seed wins.
     """
+    # Prime-sacrifice certificate lookup: largest_prime_below[n] = the
+    # largest prime q < n, or None if none exists. Cheap O(range) pass over
+    # spf, computed once here where spf is already in scope.
+    limit = len(spf) - 1
+    largest_prime_below: List[Optional[int]] = [None] * (limit + 1)
+    last_prime: Optional[int] = None
+    for k in range(limit + 1):
+        largest_prime_below[k] = last_prime
+        if k >= 2 and spf[k] == k:
+            last_prime = k
+
     if initial_records:
         records: List[Dict[str, Any]] = list(initial_records)
         last = records[-1]
@@ -410,7 +470,7 @@ def run(
     started = time.monotonic()
     for i, n in enumerate(range(start_n, to_n + 1), 1):
         rec = solve_game(n, spf, mf, prev_set, prev_score, bundle_limit,
-                          reanchor_solvent, optimal)
+                          reanchor_solvent, optimal, largest_prime_below)
         prev_set = set(rec["_set"])
         prev_score = rec["score"]
         records.append(rec)
@@ -469,10 +529,13 @@ def print_summary(
     else:
         print("\n(no optimal.json coverage in this range; gaps unavailable)")
 
-    # Certificate rate.
+    # Certificate rate, broken down by certificate kind.
     cert = sum(1 for r in records if r["certified"])
+    cert_exact = sum(1 for r in records if r.get("certificate") == "exact")
+    cert_prime = sum(1 for r in records if r.get("certificate") == "prime")
     print(f"\nCertificate rate: {cert}/{total} "
-          f"({100 * cert / total:.1f}%)")
+          f"({100 * cert / total:.1f}%) -- "
+          f"exact {cert_exact}, prime-sacrifice {cert_prime}")
 
     # Solvent re-anchor adoptions.
     adopted = sum(1 for r in records if r.get("source") == "solvent")
