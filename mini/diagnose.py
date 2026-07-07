@@ -33,7 +33,9 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from approx import check_sequence, divisor_lists, solvent, one_tax
+from approx import (
+    check_sequence, divisor_lists, maximal_factor_lists, solvent, one_tax,
+)
 from verify import DEFAULT_OPTIMAL
 
 MINI_DIR = Path(__file__).resolve().parent
@@ -259,6 +261,7 @@ def main(argv: List[str] | None = None) -> int:
     optimal = {g["n"]: g for g in json.loads(args.optimal.read_text())}
     sys.setrecursionlimit(100_000)
     divs = divisor_lists(args.to_n)
+    mf = maximal_factor_lists(args.to_n)
 
     onetax_records: List[Dict[str, Any]] = []
     solvent_records: List[Dict[str, Any]] = []
@@ -284,7 +287,7 @@ def main(argv: List[str] | None = None) -> int:
             ))
 
         rejections: List[Tuple[int, str]] = []
-        gseq = solvent(n, divs, rejections=rejections)
+        gseq = solvent(n, mf, rejections=rejections)
         gscore = check_sequence(n, gseq)
         if gscore != opt_score:
             solvent_records.append(build_record(

@@ -40,7 +40,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Union
 
-from approx import divisor_lists
+from approx import divisor_lists, maximal_factor_lists
 from seteval import SetEval
 from taxman_mini import (
     MiniInfeasible, smallest_prime_factors, solve_mini, solve_upper_half,
@@ -125,7 +125,7 @@ def locality_bfs(
 def build_adapted_incumbent(
     n: int,
     spf: Sequence[int],
-    divs: Sequence[List[int]],
+    mf: Sequence[List[int]],
     prev_set: Set[int],
 ) -> Tuple[SetEval, int]:
     """Adapt game n-1's lower picks onto game n's optimal upper half.
@@ -136,7 +136,7 @@ def build_adapted_incumbent(
     returned as adapt_dropped.
     """
     upper_seq, _tax_pool = solve_upper_half(n, spf)
-    evaluator = SetEval(n, divs)
+    evaluator = SetEval(n, mf)
     for c in sorted(upper_seq, reverse=True):
         if not evaluator.playable_add(c):
             raise RuntimeError(
@@ -294,7 +294,7 @@ def sanity_reload(
     n: int,
     opt_score: int,
     opt_moves: Sequence[int],
-    divs: Sequence[List[int]],
+    mf: Sequence[List[int]],
 ) -> bool:
     """Reload a known optimal set through SetEval largest-first.
 
@@ -302,7 +302,7 @@ def sanity_reload(
     so a plain add of each move (largest first) already exercises it.
     Returns False (never raises) if any add fails or the score mismatches.
     """
-    evaluator = SetEval(n, divs)
+    evaluator = SetEval(n, mf)
     for x in sorted(opt_moves, reverse=True):
         if not evaluator.playable_add(x):
             return False
@@ -324,6 +324,7 @@ def main(argv: List[str] | None = None) -> int:
     optimal = {g["n"]: g for g in json.loads(args.optimal.read_text())}
     sys.setrecursionlimit(100_000)
     divs = divisor_lists(args.to_n)
+    mf = maximal_factor_lists(args.to_n)
     spf = smallest_prime_factors(args.to_n)
 
     transitions: List[Dict[str, Any]] = []
@@ -340,7 +341,7 @@ def main(argv: List[str] | None = None) -> int:
         opt_score_n = optimal[n]["score"]
         opt_score_prev = optimal[n - 1]["score"]
 
-        if not sanity_reload(n, opt_score_n, optimal[n]["moves"], divs):
+        if not sanity_reload(n, opt_score_n, optimal[n]["moves"], mf):
             evaluator_failures.append(n)
 
         prev_set = set(optimal[n - 1]["moves"])
@@ -351,7 +352,7 @@ def main(argv: List[str] | None = None) -> int:
         locality = locality_bfs(n, changed, divs)
 
         evaluator, adapt_dropped = build_adapted_incumbent(
-            n, spf, divs, prev_set
+            n, spf, mf, prev_set
         )
         incumbent_gap = opt_score_n - evaluator.score()
         if incumbent_gap == 0:

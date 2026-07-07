@@ -29,17 +29,25 @@ from taxman_mini import MiniInfeasible, solve_mini
 class SetEval:
     """A mutable set of Taxman picks with an incremental playability test.
 
-    Mirrors approx.solvent's matching machinery: `owner` maps each divisor
-    currently spent as tax to the pick holding it, and `match` is the
-    inverse restricted to the current picks.  `match` is not threaded
+    Mirrors approx.solvent's matching machinery over the maximal-factor
+    candidate pool (`mf`): `owner` maps each candidate factor currently
+    spent as tax to the pick holding it, and `match` is the inverse
+    restricted to the current picks.  The pool is maximal factors rather
+    than all proper divisors because the lifting lemma makes the two
+    matching-equivalent (verified bit-identical for every n in 1..1000).
+    `match` is not threaded
     through Kuhn's recursion; it is rebuilt by one dict inversion after
     every committed mutation, which keeps it immune to augmenting-path
     rollback and costs only O(|S|).
     """
 
-    def __init__(self, n: int, divs: Sequence[List[int]]) -> None:
+    def __init__(self, n: int, mf: Sequence[List[int]]) -> None:
         self.n = n
-        self.divs = divs  # shared, read-only: divs[m] = proper divisors asc.
+        # shared, read-only candidate-payment pool: mf[m] = m's maximal
+        # factors (f with m/f prime), ascending.  The lifting lemma makes
+        # this matching-equivalent to the full proper-divisor pool, so the
+        # augmenting search and solve_mini reduction below only need it.
+        self.mf = mf
         self.S: Set[int] = set()
         self.owner: Dict[int, int] = {}  # divisor -> pick paying it as tax
         self.match: Dict[int, int] = {}  # pick -> its own coupon
@@ -51,7 +59,7 @@ class SetEval:
         visited: Set[int],
         trail: List[Tuple[int, Optional[int]]],
     ) -> bool:
-        for f in reversed(self.divs[v]):
+        for f in reversed(self.mf[v]):
             if f in self.S or f in visited:
                 continue
             visited.add(f)
@@ -154,13 +162,13 @@ class SetEval:
         self._rollback(trail)
 
         # The matching creates a precedence cycle; retry with each of x's
-        # divisors forced in turn, since a different assignment for x can
-        # route the precedence differently.
-        for f in reversed(self.divs[x]):
+        # candidate factors forced in turn, since a different assignment for
+        # x can route the precedence differently.
+        for f in reversed(self.mf[x]):
             if f in self.S:
                 continue
             trail = []
-            if self._augment(x, set(self.divs[x]) - {f}, trail):
+            if self._augment(x, set(self.mf[x]) - {f}, trail):
                 if self._is_acyclic():
                     self._rebuild_match()
                     return True
@@ -181,10 +189,10 @@ class SetEval:
         coupon edges and the pick-divides-pick edges) before acceptance;
         None means no playable assignment (MiniInfeasible or a cyclic one).
         """
-        mf = {c: {d for d in self.divs[c] if d not in target} for c in target}
-        factors: Set[int] = set().union(*mf.values()) if mf else set()
+        avail = {c: {d for d in self.mf[c] if d not in target} for c in target}
+        factors: Set[int] = set().union(*avail.values()) if avail else set()
         try:
-            _, matching = solve_mini(target, factors, mf)
+            _, matching = solve_mini(target, factors, avail)
         except MiniInfeasible:
             return None
         if not self._matching_acyclic(target, matching):
@@ -237,8 +245,8 @@ class SetEval:
         self.match = dict(snap[2])
 
     def clone(self) -> "SetEval":
-        """A new evaluator sharing n/divs by reference, with copied state."""
-        other = SetEval(self.n, self.divs)
+        """A new evaluator sharing n/mf by reference, with copied state."""
+        other = SetEval(self.n, self.mf)
         other.S = set(self.S)
         other.owner = dict(self.owner)
         other.match = dict(self.match)

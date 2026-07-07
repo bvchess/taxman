@@ -21,8 +21,8 @@ import time
 from typing import Callable, List
 
 from approx import (
-    cascade, divisor_lists, solvent, max_turn, one_tax, one_tax_forced_upper,
-    one_tax_oracle,
+    cascade, divisor_lists, maximal_factor_lists, solvent, max_turn, one_tax,
+    one_tax_forced_upper, one_tax_oracle,
 )
 from taxman_mini import smallest_prime_factors, solve_upper_half
 
@@ -45,6 +45,7 @@ def main(argv: List[str] | None = None) -> int:
 
     top = max(sizes)
     divs = divisor_lists(top)
+    mf = maximal_factor_lists(top)
     spf = smallest_prime_factors(top)
 
     subjects = [
@@ -52,7 +53,7 @@ def main(argv: List[str] | None = None) -> int:
         ("maxturn", lambda n: max_turn(n, divs)),
         ("upper half (solve_upper_half)", lambda n: solve_upper_half(n, spf)),
         ("cascade", lambda n: cascade(n, divs)),
-        ("solvent", lambda n: solvent(n, divs)),
+        ("solvent", lambda n: solvent(n, mf)),
         ("hybrid (forced upper)", lambda n: one_tax_forced_upper(n, divs, spf)),
         ("oracle (fork)", lambda n: one_tax_oracle(n, divs, spf)),
     ]

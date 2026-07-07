@@ -182,15 +182,33 @@ built on a characterization of playability that generalizes the
 ordering argument above:
 
 > A set of selections can all be played, in some order, **iff** there is
-> a matching assigning each selection a distinct divisor still in the
-> game, such that the precedence relation *"a before b whenever a's
-> assigned divisor divides b, or a divides b"* is acyclic.  Any
+> a matching assigning each selection a distinct **maximal factor** not
+> in the set, such that the precedence relation *"a before b whenever
+> a's assigned factor divides b, or a divides b"* is acyclic.  Any
 > topological order of the precedence is a legal game.
+
+Only maximal factors matter.  The characterization was first proven
+with the weaker pool "any divisor still in the game"; the sharpening
+is the Franklín-Moniot lifting argument turned inward.  Whatever
+divisor d a pick c actually surrenders lifts to a maximal factor f of
+c with d | f: f must still be in the pot (anything that had removed f
+- picked, or swept as a divisor of some earlier pick - would have
+removed d with it), and f cannot itself be a selection, or c's sweep
+would now destroy an unplayed pick.  So every legal game already pays
+each pick with a distinct outside maximal factor, and restricting the
+pool loses nothing.  Tested by running solvent with both pools over
+n=1..1000: identical pick sets in 1000/1000 games, with the
+maximal-factor pool ~2x faster (a number has ~log n divisors but only
+as many maximal factors as distinct primes).  One boundary: the
+equivalence is about *feasibility*.  cascade, which plays solve_mini's
+raw sequence under real sweeps, still needs true divisors — at n=5
+the maximal-factor pool emits the order [4, 5], and playing 4 sweeps
+the 1 that 5 needed.
 
 The **solvent** strategy is then the full-game generalization of "take
 the highest prime": consider n, n-1, ..., 2 and accept each number if
 the set stays *solvent* — every selection can still pay its tax with a
-distinct divisor from outside the set.  Mechanically: accept if an
+distinct maximal factor from outside the set.  Mechanically: accept if an
 augmenting path can add the number to the matching (if no augmenting
 path exists, no matching covers it — a permanent, well-founded
 rejection) and a precedence-respecting assignment can be found.  This
@@ -348,8 +366,18 @@ class Infeasible(Exception):
     """Raised when solve_mini cannot pay every member from the factor pool."""
 
 
-def proper_divisors(c):
-    return [d for d in range(1, c) if c % d == 0]
+def maximal_factors(c):
+    primes = set()
+    r = c
+    p = 2
+    while p * p <= r:
+        while r % p == 0:
+            primes.add(p)
+            r //= p
+        p += 1
+    if r > 1:
+        primes.add(r)
+    return {c // p for p in primes}
 
 
 def solve_mini(members, factors, factors_of):
@@ -378,10 +406,10 @@ def solve_mini(members, factors, factors_of):
 def playable(s_set):
     factors = set()
     for s in s_set:
-        factors |= set(proper_divisors(s))
+        factors |= maximal_factors(s)
     factors -= s_set
 
-    factors_of = {s: set(proper_divisors(s)) & factors for s in s_set}
+    factors_of = {s: maximal_factors(s) & factors for s in s_set}
 
     try:
         _, pay = solve_mini(s_set, factors, factors_of)
@@ -424,12 +452,13 @@ def solvent(n):
 Three remarks:
 
 1. **This is optimize_mini, promoted to the whole game.**  The loop is
-   identical - descending order, keep what stays solvable - and the
-   feasibility test is the same solve_mini, unchanged.  Only the
-   meaning of "factor" generalizes: in the upper-half game a
-   selection's factors are its maximal factors; here they are all of
-   its divisors not themselves selected.  Restrict solvent(N) to the
-   numbers above N/2 and it collapses back into optimize_mini.
+   identical - descending order, keep what stays solvable - the
+   feasibility test is the same solve_mini, and the factor notion is
+   the same too: maximal factors, the only factor notion anywhere in
+   this project.  The sole adjustment is that factors already selected
+   are excluded from the pool.  Restrict solvent(N) to the numbers
+   above N/2 - where no maximal factor can be a selection - and it
+   collapses back into optimize_mini exactly.
 
 2. **ordered needs one condition the mini game didn't.**  solve_mini
    already orders what it solves - the front/back placement in its two
@@ -646,7 +675,10 @@ onto an optimal path.
 The capped configuration captures ~90% of the chain's advantage over
 solvent at ~12% of the full cost (mean 3.1s/game, max 12s) and is the
 recommended default; the full budget is the publication-quality
-setting.  Solvent re-anchoring fired in only 9/501 games - the chain
+setting.  (These timings predate the maximal-factor pool refactor,
+which speeds the continuation solver about 3.5x - the chain hammers
+SetEval's matching, which is exactly what the smaller pool
+accelerates.)  Solvent re-anchoring fired in only 9/501 games - the chain
 rarely needs its floor - but it is what caps drift by construction.
 Also measured: with no bundle repair at all, chain drift compounds
 (mean gap 132 -> 605 across bands); in a self-fed system, valley
@@ -722,7 +754,7 @@ the empirical scaling exponent k in time ~ n^k:
 | upper half (`solve_upper_half`) | 2.7 ms | 10 ms | 38 ms | 168 ms | 2.0 |
 | cascade | 3.8 ms | 16 ms | 66 ms | 310 ms | 2.1 |
 | hybrid (forced upper) | 5.8 ms | 24 ms | 91 ms | 430 ms | 2.1 |
-| solvent | 3.8 ms | 62 ms | 377 ms | 1.2 s | 2.7 |
+| solvent | 7.0 ms | 28 ms | 128 ms | 643 ms | 2.2 |
 | oracle (fork) | 6.1 ms | 62 ms | 215 ms | ~2 s | ~3 |
 
 OneTax is indeed nearly free.  Determining the optimal >N/2 moves is a

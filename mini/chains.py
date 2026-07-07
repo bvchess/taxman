@@ -36,7 +36,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Sequence, Set, Tuple, Union
 
-from approx import divisor_lists, solvent, one_tax
+from approx import divisor_lists, maximal_factor_lists, solvent, one_tax
 from diagnose import replay_tax_map
 from verify import DEFAULT_OPTIMAL
 
@@ -248,6 +248,7 @@ def analyze_onetax(
 def analyze_solvent(
     n: int,
     divs: Sequence[List[int]],
+    mf: Sequence[List[int]],
     record: Dict[str, Any],
     stats: Stats,
     chain_records: List[Dict[str, Any]],
@@ -255,8 +256,8 @@ def analyze_solvent(
     taxed = [e for e in record["missed"] if e["fate"] == "taxed"]
     if not taxed:
         return
-    seq = solvent(n, divs)
-    info = kill_info(n, seq, divs, taxed)
+    seq = solvent(n, mf)  # maximal-factor pool for the matching
+    info = kill_info(n, seq, divs, taxed)  # true divisors for real replay
 
     for entry in taxed:
         m = entry["m"]
@@ -320,6 +321,7 @@ def main(argv: List[str] | None = None) -> int:
 
     sys.setrecursionlimit(100_000)
     divs = divisor_lists(args.to_n)
+    mf = maximal_factor_lists(args.to_n)
 
     onetax_stats = Stats()
     solvent_stats = Stats()
@@ -341,7 +343,8 @@ def main(argv: List[str] | None = None) -> int:
             analyze_onetax(n, divs, onetax_log[n], opt_set, opt_tax_map,
                             onetax_stats, chain_records)
         if n in solvent_log:
-            analyze_solvent(n, divs, solvent_log[n], solvent_stats, chain_records)
+            analyze_solvent(n, divs, mf, solvent_log[n], solvent_stats,
+                            chain_records)
 
     elapsed = time.monotonic() - started
     print(f"analyzed {analyzed} games in {elapsed:.1f}s", file=sys.stderr)

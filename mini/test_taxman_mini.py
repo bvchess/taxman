@@ -125,33 +125,37 @@ def test_oracle_dominates_onetax_and_hybrid():
 
 
 def test_approx_strategies_are_legal_and_sane():
-    from approx import cascade, check_sequence, divisor_lists, solvent, one_tax
+    from approx import (
+        cascade, check_sequence, divisor_lists, maximal_factor_lists, solvent,
+        one_tax,
+    )
 
     divs = divisor_lists(128)
+    mf = maximal_factor_lists(128)
     for n in (2, 5, 10, 21, 50, 128):
-        solvent_score = check_sequence(n, solvent(n, divs))
+        solvent_score = check_sequence(n, solvent(n, mf))
         cascade_score = check_sequence(n, cascade(n, divs))
         assert solvent_score >= cascade_score
         assert one_tax(n, divs) > 0
 
     # solvent finds the known optimal for the wiki's walkthrough game...
-    assert check_sequence(21, solvent(21, divs)) == 144
+    assert check_sequence(21, solvent(21, mf)) == 144
     # ...and reproduces the N=5 example from the wiki's game introduction.
-    assert check_sequence(5, solvent(5, divs)) == 9
+    assert check_sequence(5, solvent(5, mf)) == 9
 
 
 def test_solvent_regression_floor():
     # The simplified two-tier solvent must never score below the recorded
     # baseline in solvent_results.json (it may legitimately improve on
     # it by shedding bogus rejections, hence a floor check rather than ==).
-    from approx import check_sequence, divisor_lists, solvent
+    from approx import check_sequence, maximal_factor_lists, solvent
 
     stored = json.loads(
         (Path(__file__).resolve().parent / "solvent_results.json").read_text()
     )
-    divs = divisor_lists(1000)  # a larger table is valid for any smaller n
+    mf = maximal_factor_lists(1000)  # a larger table is valid for any smaller n
     for n in (21, 100, 250, 500, 750, 1000):
-        assert check_sequence(n, solvent(n, divs)) >= stored[str(n)]
+        assert check_sequence(n, solvent(n, mf)) >= stored[str(n)]
 
 
 def test_solvent_simple_matches_canonical():
@@ -160,19 +164,21 @@ def test_solvent_simple_matches_canonical():
     # both the recorded canonical scores and the fast approx.solvent() output
     # (the README states the canonical set is a deterministic function of
     # playability alone), and produce a legal game.
-    from approx import check_sequence, divisor_lists, solvent as approx_solvent
+    from approx import (
+        check_sequence, maximal_factor_lists, solvent as approx_solvent,
+    )
 
     import solvent_simple
 
     stored = json.loads(
         (Path(__file__).resolve().parent / "solvent_results.json").read_text()
     )
-    divs = divisor_lists(60)
+    mf = maximal_factor_lists(60)
     for n in range(1, 61):
         seq = solvent_simple.solvent(n)
         score = sum(seq)
         assert score == stored[str(n)]
-        assert set(seq) == set(approx_solvent(n, divs))
+        assert set(seq) == set(approx_solvent(n, mf))
         assert check_sequence(n, seq) == score
 
 

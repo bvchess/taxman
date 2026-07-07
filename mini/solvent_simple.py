@@ -63,10 +63,21 @@ class Infeasible(Exception):
     """Raised when solve_mini cannot pay every member from the factor pool."""
 
 
-def proper_divisors(c):
-    # Every d < c that divides c; these are the numbers c's pick would
-    # surrender to the taxman if they were still in the pot.
-    return [d for d in range(1, c) if c % d == 0]
+def maximal_factors(c):
+    # The maximal factors of c: every f such that c / f is prime.  A prime's
+    # only maximal factor is 1; 1 itself has none.  Found by dividing c by
+    # each of its distinct prime factors.
+    primes = set()
+    r = c
+    p = 2
+    while p * p <= r:
+        while r % p == 0:
+            primes.add(p)
+            r //= p
+        p += 1
+    if r > 1:
+        primes.add(r)
+    return {c // p for p in primes}
 
 
 def solve_mini(members, factors, factors_of):
@@ -117,20 +128,22 @@ def playable(s_set):
 
     Reduce the question to a "mini game": the candidate picks are the
     members, and the payment pool holds every number OUTSIDE the set
-    that divides a member (a number inside the set is a pick, so it
-    cannot double as anyone's tax payment).  The set is accepted
-    exactly when solve_mini can reserve a distinct payment for every
-    member.
+    that is a MAXIMAL factor of a member (an f with member/f prime; a
+    number inside the set is a pick, so it cannot double as anyone's tax
+    payment).  Maximal factors are the right pool because any surviving
+    proper divisor lifts to a surviving maximal factor outside the set,
+    so the matching question is unchanged.  The set is accepted exactly
+    when solve_mini can reserve a distinct payment for every member.
 
     Returns the pay reservations on success (evidence, reused by
     ordered()), or None.
     """
     factors = set()
     for s in s_set:
-        factors |= set(proper_divisors(s))
+        factors |= maximal_factors(s)
     factors -= s_set
 
-    factors_of = {s: set(proper_divisors(s)) & factors for s in s_set}
+    factors_of = {s: maximal_factors(s) & factors for s in s_set}
 
     try:
         _, pay = solve_mini(s_set, factors, factors_of)

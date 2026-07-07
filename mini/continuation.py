@@ -52,7 +52,7 @@ from math import gcd
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
-from approx import check_sequence, divisor_lists, solvent
+from approx import check_sequence, maximal_factor_lists, solvent
 from seteval import SetEval
 from taxman_mini import smallest_prime_factors, solve_upper_half
 from verify import DEFAULT_OPTIMAL
@@ -126,7 +126,7 @@ def tier1(evaluator: SetEval, n: int) -> Tuple[int, List[int]]:
     """
     local = [
         x for x in range(n // 2, 1, -1)
-        if evaluator.divs[x] and gcd(x, n) > 1
+        if evaluator.mf[x] and gcd(x, n) > 1
     ]
     flips = 0
     while flips < TIER1_STEP_CAP:
@@ -186,7 +186,7 @@ def tier2_pass(
     lower_picks = sorted(p for p in evaluator.S if 2 * p <= n)
     local_blocked = sorted(
         (x for x in range(2, n // 2 + 1)
-         if x not in evaluator.S and evaluator.divs[x] and gcd(x, n) > 1),
+         if x not in evaluator.S and evaluator.mf[x] and gcd(x, n) > 1),
         reverse=True,
     )
     if not lower_picks or not local_blocked:
@@ -264,7 +264,7 @@ def tier2_pass(
 def solve_game(
     n: int,
     spf: Sequence[int],
-    divs: Sequence[List[int]],
+    mf: Sequence[List[int]],
     prev_set: Set[int],
     prev_score: Optional[int],
     bundle_limit: int,
@@ -273,7 +273,7 @@ def solve_game(
 ) -> Dict[str, Any]:
     """Solve game n warm-started from the previous solution; return a record."""
     t0 = time.monotonic()
-    evaluator = SetEval(n, divs)
+    evaluator = SetEval(n, mf)
 
     # Step 1: seed the provably-optimal, always-playable upper half.
     upper_seq, _ = solve_upper_half(n, spf)
@@ -329,7 +329,7 @@ def solve_game(
     source = "chain"
     output_set = evaluator.S
     if reanchor_solvent:
-        solvent_seq = solvent(n, divs)
+        solvent_seq = solvent(n, mf)
         solvent_score = check_sequence(n, solvent_seq)  # validates solvent's own sequence
         if solvent_score > our_score:
             solvent_set = set(solvent_seq)
@@ -372,7 +372,7 @@ def run(
     reanchor_solvent: bool,
     optimal: Dict[int, Dict[str, Any]],
     spf: Sequence[int],
-    divs: Sequence[List[int]],
+    mf: Sequence[List[int]],
     out_path: Optional[Path] = None,
     initial_records: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
@@ -409,7 +409,7 @@ def run(
 
     started = time.monotonic()
     for i, n in enumerate(range(start_n, to_n + 1), 1):
-        rec = solve_game(n, spf, divs, prev_set, prev_score, bundle_limit,
+        rec = solve_game(n, spf, mf, prev_set, prev_score, bundle_limit,
                           reanchor_solvent, optimal)
         prev_set = set(rec["_set"])
         prev_score = rec["score"]
@@ -521,7 +521,7 @@ def main(argv: List[str] | None = None) -> int:
     sys.setrecursionlimit(100_000)
     optimal = {g["n"]: g for g in json.loads(args.optimal.read_text())}
     spf = smallest_prime_factors(args.to_n)
-    divs = divisor_lists(args.to_n)
+    mf = maximal_factor_lists(args.to_n)
 
     initial_records: Optional[List[Dict[str, Any]]] = None
     if args.resume:
@@ -554,7 +554,7 @@ def main(argv: List[str] | None = None) -> int:
 
     started = time.monotonic()
     records = run(args.from_n, args.to_n, args.seed_from_optimal,
-                  args.bundle_limit, args.reanchor_solvent, optimal, spf, divs,
+                  args.bundle_limit, args.reanchor_solvent, optimal, spf, mf,
                   out_path=args.out, initial_records=initial_records)
     elapsed = time.monotonic() - started
 

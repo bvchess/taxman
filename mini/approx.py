@@ -65,7 +65,10 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
-from taxman_mini import MiniInfeasible, optimize_mini, solve_mini
+from taxman_mini import (
+    MiniInfeasible, maximal_factors, optimize_mini, smallest_prime_factors,
+    solve_mini,
+)
 from verify import DEFAULT_OPTIMAL
 
 DEFAULT_MONIOT = Path(__file__).resolve().parent / "moniot_table.json"
@@ -80,6 +83,23 @@ def divisor_lists(n: int) -> List[List[int]]:
     return divs
 
 
+def maximal_factor_lists(n: int) -> List[List[int]]:
+    """mf[m] is every maximal factor of m (f with m/f prime), ascending.
+
+    Same shape and index contract as divisor_lists (indices 0 and 1 are
+    empty).  This is the candidate-payment pool for the matching machinery:
+    the lifting lemma guarantees any surviving proper divisor of a pick
+    lifts to a surviving maximal factor outside the set, so restricting the
+    pool to maximal factors is matching-equivalent to using all proper
+    divisors (confirmed bit-identical for every n in 1..1000).
+    """
+    spf = smallest_prime_factors(n)
+    mf: List[List[int]] = [[] for _ in range(n + 1)]
+    for c in range(2, n + 1):
+        mf[c] = sorted(maximal_factors(c, spf))
+    return mf
+
+
 # ---------------------------------------------------------------------------
 # solvent: matching-based full-game approximation
 # ---------------------------------------------------------------------------
@@ -88,20 +108,21 @@ def _augment(
     v: int,
     owner: Dict[int, int],
     selected: Set[int],
-    divs: Sequence[List[int]],
+    mf: Sequence[List[int]],
     visited: Set[int],
     trail: List[Tuple[int, Optional[int]]],
 ) -> bool:
-    """Kuhn's augmenting search: find v a divisor, reassigning others.
+    """Kuhn's augmenting search: find v a candidate factor, reassigning others.
 
-    Every owner change is recorded on the trail so it can be rolled back.
+    `mf` is the candidate-payment pool (maximal factors); every owner change
+    is recorded on the trail so it can be rolled back.
     """
-    for f in reversed(divs[v]):
+    for f in reversed(mf[v]):
         if f in selected or f in visited:
             continue
         visited.add(f)
         holder = owner.get(f)
-        if holder is None or _augment(holder, owner, selected, divs, visited, trail):
+        if holder is None or _augment(holder, owner, selected, mf, visited, trail):
             trail.append((f, holder))
             owner[f] = v
             return True
@@ -117,7 +138,7 @@ def _rollback(owner: Dict[int, int], trail: List[Tuple[int, Optional[int]]]) -> 
 
 
 def _complete_matching(
-    target: Set[int], divs: Sequence[List[int]]
+    target: Set[int], mf: Sequence[List[int]]
 ) -> Optional[Dict[int, int]]:
     """Decide playability of `target` exactly via the Taxman Mini reduction.
 
@@ -125,14 +146,15 @@ def _complete_matching(
     cycle can require OTHER picks' coupons to move too, which falsely
     vetoes playable candidates (see transitions.py's SetEval, which proves
     this out).  This is the complete tier: reduce target to a bipartite
-    Taxman Mini game -- each pick maps to the set of its proper divisors
-    NOT in target -- and let solve_mini decide exactly, returning a full
-    pick -> divisor matching, or None if no assignment covers every pick.
+    Taxman Mini game -- each pick maps to the set of its candidate factors
+    (maximal factors) NOT in target -- and let solve_mini decide exactly,
+    returning a full pick -> factor matching, or None if no assignment
+    covers every pick.
     """
-    mf = {c: {d for d in divs[c] if d not in target} for c in target}
-    factors: Set[int] = set().union(*mf.values()) if mf else set()
+    avail = {c: {d for d in mf[c] if d not in target} for c in target}
+    factors: Set[int] = set().union(*avail.values()) if avail else set()
     try:
-        _, matching = solve_mini(target, factors, mf)
+        _, matching = solve_mini(target, factors, avail)
     except MiniInfeasible:
         return None
     return matching
@@ -205,12 +227,21 @@ def _playable_order(
 
 def solvent(
     n: int,
-    divs: Sequence[List[int]],
+    mf: Sequence[List[int]],
     rejections: Optional[List[Tuple[int, str]]] = None,
 ) -> List[int]:
-    """Solvent matching approximation of a full game; returns the sequence."""
+    """Solvent matching approximation of a full game; returns the sequence.
+
+    `mf` is the candidate-payment pool: each pick's maximal factors (f with
+    pick/f prime), as built by maximal_factor_lists.  This is the correct
+    pool for the matching question ("can every pick reserve a distinct
+    payment?") -- the lifting lemma proves it matching-equivalent to the
+    full proper-divisor pool, and feeding maximal factors instead of all
+    divisors was verified bit-identical (set and score) for every n in
+    1..1000.
+    """
     selected: Set[int] = set()
-    owner: Dict[int, int] = {}  # divisor -> selection paying it
+    owner: Dict[int, int] = {}  # factor -> selection paying it
 
     def try_select(m: int) -> bool:
         # STEP 1 -- fast path: an opportunistic incremental extension of
@@ -221,7 +252,7 @@ def solvent(
             # m currently serves as someone's tax; try to re-route that
             # holder onto a different divisor without touching m.
             holder = owner.pop(m)
-            if _augment(holder, owner, selected, divs, {m}, pre_trail):
+            if _augment(holder, owner, selected, mf, {m}, pre_trail):
                 pre_trail.append((m, holder))  # rollback restores m's owner
             else:
                 owner[m] = holder  # undo the pop; fall through to step 2
@@ -230,7 +261,7 @@ def solvent(
         if len(pre_trail) or m not in owner:
             selected.add(m)  # blocks m from being used as anyone's tax
             trail: List[Tuple[int, Optional[int]]] = []
-            if _augment(m, owner, selected, divs, set(), trail):
+            if _augment(m, owner, selected, mf, set(), trail):
                 if _is_acyclic(selected, owner, n):
                     return True  # fast, common-case silent success
                 _rollback(owner, trail)
@@ -240,7 +271,7 @@ def solvent(
         # STEP 2 -- complete tier: the unconditional decider.  `selected`
         # does not contain m here (the fast path rolled back fully), so
         # pass a fresh `selected | {m}` without mutating shared state.
-        matching = _complete_matching(selected | {m}, divs)
+        matching = _complete_matching(selected | {m}, mf)
         if matching is None:
             if rejections is not None:
                 rejections.append((m, "infeasible"))
@@ -252,7 +283,7 @@ def solvent(
         return True
 
     for m in range(n, 1, -1):
-        if not divs[m]:
+        if not mf[m]:
             continue
         try_select(m)
 
@@ -265,7 +296,19 @@ def solvent(
 # ---------------------------------------------------------------------------
 
 def cascade(n: int, divs: Sequence[List[int]]) -> List[int]:
-    """Approximate a full game with repeated upper-half mini games."""
+    """Approximate a full game with repeated upper-half mini games.
+
+    Unlike solvent, cascade uses TRUE proper divisors (`divs`) as its
+    per-band edge pool, NOT the maximal-factor pool.  It replays
+    solve_mini's returned ORDER directly under real-game (true-divisor)
+    sweeping, so the order must be valid against every divisor a pick
+    sweeps -- a stronger property than the matching-feasibility the lifting
+    lemma equates the two pools on.  With a maximal-factor pool solve_mini
+    can emit an order that strands a pick whose only surviving payment is a
+    non-maximal shared divisor swept early (e.g. n=5: playing 4 before 5
+    sweeps their shared divisor 1).  The sweep replay and end-of-band
+    liveness check need true divisors for the same reason.
+    """
     pot: Set[int] = set(range(1, n + 1))
     sequence: List[int] = []
     band_top = n
@@ -724,9 +767,11 @@ def check_sequence(n: int, sequence: Sequence[int]) -> int:
 STRATEGIES = ("solvent", "cascade", "onetax", "maxturn")
 
 
-def play_all(n: int, divs: Sequence[List[int]]) -> Dict[str, int]:
+def play_all(
+    n: int, divs: Sequence[List[int]], mf: Sequence[List[int]]
+) -> Dict[str, int]:
     return {
-        "solvent": check_sequence(n, solvent(n, divs)),
+        "solvent": check_sequence(n, solvent(n, mf)),
         "cascade": check_sequence(n, cascade(n, divs)),
         "onetax": one_tax(n, divs),
         "maxturn": max_turn(n, divs),
@@ -746,13 +791,14 @@ def main(argv: List[str] | None = None) -> int:
 
     started = time.monotonic()
     divs = divisor_lists(args.max_n)
+    mf = maximal_factor_lists(args.max_n)
     results: Dict[int, Dict[str, int]] = {}
 
     sys.setrecursionlimit(100_000)
     for n in range(1, args.max_n + 1):
         if n not in optimal:
             break
-        results[n] = play_all(n, divs)
+        results[n] = play_all(n, divs, mf)
         results[n]["opt"] = optimal[n]["score"]
         if n % 100 == 0:
             print(f"...through n={n} ({time.monotonic() - started:.0f}s)",
