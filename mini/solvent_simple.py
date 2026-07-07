@@ -202,7 +202,11 @@ if __name__ == "__main__":
     if len(sys.argv) != 2 or not sys.argv[1].isdigit():
         sys.exit(f"usage: python3 {sys.argv[0]} N   (the game size, e.g. 21)")
 
-    sys.setrecursionlimit(10000)
-    result = solvent(int(sys.argv[1]))
+    n = int(sys.argv[1])
+    # solve_mini peels one selection per recursive call, so the deepest
+    # recursion needs one stack frame per selection - at most n.  Grant
+    # that (plus headroom), never going below Python's default of 1000.
+    sys.setrecursionlimit(max(1000, n + 100))
+    result = solvent(n)
     print("picks, in playing order:", result)
     print("score (sum of picks):   ", sum(result))
