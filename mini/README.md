@@ -331,8 +331,8 @@ sets are downward-closed), the forced-coupon cycle retries (subsumed
 by the complete tier), and the end-of-game cycle repair (unreachable;
 now a loud error).  Deleting them changed no score in any of the 1000
 games; the sole rejection reason is "infeasible" - a theorem, every
-time.  The algorithm of record, at the same level as the wiki's
-solve_mini/optimize_mini:
+time.  The algorithm of record, with solve_mini written out in full
+(no optimizations, no shortcuts):
 
 ```
 greedy(N):
@@ -344,16 +344,26 @@ greedy(N):
 
 
 playable(S):
-    treat S as a mini game in which the factors of each member
-        are its proper divisors that are NOT in S
-    if solve_mini on that game does not raise an error:
-        return true
-    else:
-        return false
+    treat S as a mini game whose factor pool F holds every number
+        that is not in S but divides a member of S; the factors of
+        each member are its proper divisors in F
+    if solve_mini(S, F) succeeds: return true
+    else: return false
+
+
+solve_mini(C, F):
+    if C is empty:
+        return the empty sequence          # success
+    if some c in C has exactly one factor f remaining in F:
+        let pay(c) = f
+        return [c] followed by solve_mini(C - {c}, F - {f})
+    if some f in F is a factor of exactly one c in C:
+        let pay(c) = f
+        return solve_mini(C - {c}, F - {f}) followed by [c]
+    ERROR: cannot select every member of C using F
 
 
 ordered(S):
-    let pay(s) be the factor assigned to each s by solve_mini
     return any ordering of S in which s comes before t whenever
         pay(s) divides t, or s divides t
 ```
@@ -368,12 +378,14 @@ Three remarks:
    its divisors not themselves selected.  Restrict greedy(N) to the
    numbers above N/2 and it collapses back into optimize_mini.
 
-2. **ordered needs one condition the mini game didn't.**  In a true
-   mini game nothing selected divides anything else selected, so
-   solve_mini's own output order suffices.  In the full game
-   selections can divide each other, so the ordering must also respect
-   "s before t whenever s divides t" - the smaller pick is taken
-   before the larger one sweeps it.
+2. **ordered needs one condition the mini game didn't.**  solve_mini
+   already orders what it solves - the front/back placement in its two
+   rules is exactly what keeps each selection's payment available when
+   its turn comes.  In a true mini game nothing selected divides
+   anything else selected, so that order suffices.  In the full game
+   selections can divide each other, so ordered() rebuilds the order
+   from pay() with one added rule: "s before t whenever s divides t" -
+   the smaller pick is taken before the larger one sweeps it.
 
 3. **What is proved and what is trusted.**  A solve_mini error makes
    rejection a theorem: no assignment of distinct factors exists, and
