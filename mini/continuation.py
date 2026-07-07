@@ -32,7 +32,13 @@ to reproduce the recorded score.
 
 Usage:
     python3 continuation.py --from 500 --to 1000 [--seed-from-optimal]
-                            [--bundle-limit K] [--out PATH]
+                            [--bundle-limit K] [--out PATH] [--resume]
+
+--out is checkpointed every 5 games (and at the end) with each record's
+"_set" retained, so a container restart mid-run can be recovered from with
+--resume: it loads the checkpoint, verifies it holds consecutive games
+starting at --from, and continues from where it left off. The final output
+file has "_set" stripped from every record, same as a non-resumed run.
 """
 
 from __future__ import annotations
@@ -367,30 +373,52 @@ def run(
     optimal: Dict[int, Dict[str, Any]],
     spf: Sequence[int],
     divs: Sequence[List[int]],
+    out_path: Optional[Path] = None,
+    initial_records: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
-    """Solve games from_n..to_n sequentially, each fed the previous result."""
-    if seed_from_optimal:
-        if (from_n - 1) not in optimal:
-            raise SystemExit(
-                f"--seed-from-optimal needs optimal.json to cover n={from_n - 1}"
-            )
-        prev_set: Set[int] = set(optimal[from_n - 1]["moves"])
-        prev_score: Optional[int] = optimal[from_n - 1]["score"]
-    else:
-        prev_set = set()
-        prev_score = None
+    """Solve games from_n..to_n sequentially, each fed the previous result.
 
-    records: List[Dict[str, Any]] = []
+    If out_path is given, the growing records list (with each record's
+    "_set" still attached) is checkpointed to out_path every 5 games and
+    after the final game, so an interrupted run leaves a resumable file
+    behind. If initial_records is given and non-empty (a checkpoint loaded
+    by main), the loop resumes right after its last game instead of
+    starting at from_n: prev_set/prev_score are seeded from that last
+    record and it is extended in place -- seed_from_optimal is ignored in
+    that case, since the checkpoint seed wins.
+    """
+    if initial_records:
+        records: List[Dict[str, Any]] = list(initial_records)
+        last = records[-1]
+        prev_set: Set[int] = set(last["_set"])
+        prev_score: Optional[int] = last["score"]
+        start_n = last["n"] + 1
+    else:
+        records = []
+        start_n = from_n
+        if seed_from_optimal:
+            if (from_n - 1) not in optimal:
+                raise SystemExit(
+                    f"--seed-from-optimal needs optimal.json to cover n={from_n - 1}"
+                )
+            prev_set = set(optimal[from_n - 1]["moves"])
+            prev_score = optimal[from_n - 1]["score"]
+        else:
+            prev_set = set()
+            prev_score = None
+
     started = time.monotonic()
-    for i, n in enumerate(range(from_n, to_n + 1), 1):
+    for i, n in enumerate(range(start_n, to_n + 1), 1):
         rec = solve_game(n, spf, divs, prev_set, prev_score, bundle_limit,
                           reanchor_greedy, optimal)
-        prev_set = set(rec.pop("_set"))
+        prev_set = set(rec["_set"])
         prev_score = rec["score"]
         records.append(rec)
         if i % 50 == 0:
             print(f"...through n={n} ({time.monotonic() - started:.0f}s)",
                   file=sys.stderr)
+        if out_path is not None and (i % 5 == 0 or n == to_n):
+            out_path.write_text(json.dumps(records, separators=(",", ":")))
     return records
 
 
@@ -485,6 +513,9 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument("--optimal", type=Path, default=DEFAULT_OPTIMAL)
     parser.add_argument("--out", type=Path,
                         default=MINI_DIR / "continuation_results.json")
+    parser.add_argument("--resume", action="store_true",
+                        help="resume from an existing --out checkpoint left "
+                             "by an interrupted run")
     args = parser.parse_args(argv)
 
     sys.setrecursionlimit(100_000)
@@ -492,11 +523,43 @@ def main(argv: List[str] | None = None) -> int:
     spf = smallest_prime_factors(args.to_n)
     divs = divisor_lists(args.to_n)
 
+    initial_records: Optional[List[Dict[str, Any]]] = None
+    if args.resume:
+        if not args.out.exists() or args.out.stat().st_size == 0:
+            raise SystemExit(
+                f"--resume: {args.out} does not exist or is empty"
+            )
+        loaded = json.loads(args.out.read_text())
+        if loaded:
+            expected_n = args.from_n
+            for r in loaded:
+                if r["n"] != expected_n:
+                    raise SystemExit(
+                        f"--resume: {args.out} does not hold consecutive "
+                        f"games starting at --from {args.from_n} (expected "
+                        f"n={expected_n}, found n={r['n']})"
+                    )
+                expected_n += 1
+            if "_set" not in loaded[-1]:
+                raise SystemExit(
+                    f"--resume: {args.out} has no \"_set\" in its last "
+                    "record -- it looks like a finished (stripped) output "
+                    "file, not a checkpoint left by an interrupted run."
+                )
+            if loaded[-1]["n"] >= args.to_n:
+                print(f"{args.out}: already complete through "
+                      f"n={loaded[-1]['n']} >= --to {args.to_n}; nothing "
+                      "to resume.")
+            initial_records = loaded
+
     started = time.monotonic()
     records = run(args.from_n, args.to_n, args.seed_from_optimal,
-                  args.bundle_limit, args.reanchor_greedy, optimal, spf, divs)
+                  args.bundle_limit, args.reanchor_greedy, optimal, spf, divs,
+                  out_path=args.out, initial_records=initial_records)
     elapsed = time.monotonic() - started
 
+    for r in records:
+        r.pop("_set", None)
     args.out.write_text(json.dumps(records, separators=(",", ":")))
     print_summary(records, elapsed, args.seed_from_optimal, args.reanchor_greedy)
     print(f"\n{args.out}: {len(records)} records, "
