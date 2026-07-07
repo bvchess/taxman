@@ -10,9 +10,9 @@ rollback so a rejected mutation fully restores prior state.
 
 This class was extracted verbatim from transitions.py (which now imports
 it) so the continuation solver and the transition anatomy share one
-validated evaluator.  It mirrors approx.greedy's matching machinery and
+validated evaluator.  It mirrors approx.solvent's matching machinery and
 falls back to taxman_mini.solve_mini for a complete playability decision
-when the fast, incomplete greedy tier rejects an add.
+when the fast, incomplete solvent tier rejects an add.
 """
 
 from __future__ import annotations
@@ -23,13 +23,13 @@ from taxman_mini import MiniInfeasible, solve_mini
 
 
 # ---------------------------------------------------------------------------
-# SetEval: incremental playability evaluator (a stateful port of greedy)
+# SetEval: incremental playability evaluator (a stateful port of solvent)
 # ---------------------------------------------------------------------------
 
 class SetEval:
     """A mutable set of Taxman picks with an incremental playability test.
 
-    Mirrors approx.greedy's matching machinery: `owner` maps each divisor
+    Mirrors approx.solvent's matching machinery: `owner` maps each divisor
     currently spent as tax to the pick holding it, and `match` is the
     inverse restricted to the current picks.  `match` is not threaded
     through Kuhn's recursion; it is rebuilt by one dict inversion after
@@ -100,7 +100,7 @@ class SetEval:
     def playable_add(self, x: int) -> bool:
         """Try to add x to the set; return whether the set stays playable.
 
-        Two-tier test.  The fast tier is a direct port of approx.greedy's
+        Two-tier test.  The fast tier is a direct port of approx.solvent's
         try_select (pop x if it holds someone's tax, add x, augment, retry
         with each of x's own divisors forced on a precedence cycle); it is
         sound but not complete -- its single-pick coupon reshuffling can
@@ -116,7 +116,7 @@ class SetEval:
         """
         if x in self.S:
             return True
-        if self._greedy_add(x):
+        if self._solvent_add(x):
             return True
         # Fast tier rejected: fall back to the complete solve_mini test.
         target = self.S | {x}
@@ -128,8 +128,8 @@ class SetEval:
         self.match = dict(matching)
         return True
 
-    def _greedy_add(self, x: int) -> bool:
-        """Fast, sound-but-incomplete add: approx.greedy's try_select."""
+    def _solvent_add(self, x: int) -> bool:
+        """Fast, sound-but-incomplete add: approx.solvent's try_select."""
         # A failed Kuhn search leaves the matching untouched, so only
         # successful augments need their trails rolled back.
         pre_trail: List[Tuple[int, Optional[int]]] = []

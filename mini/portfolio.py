@@ -35,17 +35,17 @@ def pct(a: int, b: int) -> str:
     return f"{100 * a / b:.3f}%"
 
 
-def report_portfolio(rows: List[dict], greedy: Dict[int, int]) -> None:
-    names = ("onetax", "hybrid", "oracle", "greedy", "duo", "quad")
+def report_portfolio(rows: List[dict], solvent: Dict[int, int]) -> None:
+    names = ("onetax", "hybrid", "oracle", "solvent", "duo", "quad")
     total = {name: 0 for name in names + ("opt",)}
     exact = {name: 0 for name in names}
-    argmax = {"onetax": 0, "hybrid": 0, "oracle": 0, "greedy": 0, "tie": 0}
+    argmax = {"onetax": 0, "hybrid": 0, "oracle": 0, "solvent": 0, "tie": 0}
     have_oracle = "oracle" in rows[0]
     for r in rows:
-        g = greedy[r["n"]]
+        g = solvent[r["n"]]
         o = r.get("oracle", 0)
         scores = {"onetax": r["onetax"], "hybrid": r["hybrid"],
-                  "oracle": o, "greedy": g,
+                  "oracle": o, "solvent": g,
                   "duo": max(r["onetax"], r["hybrid"]),
                   "quad": max(r["onetax"], r["hybrid"], o, g)}
         total["opt"] += r["opt"]
@@ -53,7 +53,7 @@ def report_portfolio(rows: List[dict], greedy: Dict[int, int]) -> None:
             total[name] += scores[name]
             if scores[name] == r["opt"]:
                 exact[name] += 1
-        winners = [name for name in ("onetax", "hybrid", "oracle", "greedy")
+        winners = [name for name in ("onetax", "hybrid", "oracle", "solvent")
                    if scores[name] == scores["quad"]]
         argmax[winners[0] if len(winners) == 1 else "tie"] += 1
 
@@ -67,7 +67,7 @@ def report_portfolio(rows: List[dict], greedy: Dict[int, int]) -> None:
               f"exactly optimal in {exact[name]}/{len(rows)}")
     print(f"  sole best strategy: onetax {argmax['onetax']}, "
           f"hybrid {argmax['hybrid']}, oracle {argmax['oracle']}, "
-          f"greedy {argmax['greedy']}, tie {argmax['tie']}")
+          f"solvent {argmax['solvent']}, tie {argmax['tie']}")
     print()
 
 
@@ -177,11 +177,11 @@ def main(argv: List[str] | None = None) -> int:
 
     rows = [r for r in json.loads((HERE / "fidelity_results.json").read_text())
             if r["n"] <= args.max_n]
-    greedy = {int(n): v["greedy"] for n, v in
-              json.loads((HERE / "approx_results.json").read_text()).items()}
+    solvent = {int(n): v["solvent"] for n, v in
+               json.loads((HERE / "approx_results.json").read_text()).items()}
     optimal = json.loads(args.optimal.read_text())
 
-    report_portfolio(rows, greedy)
+    report_portfolio(rows, solvent)
     report_losing_games(rows)
     report_tax_census(optimal, args.max_n)
     return 0

@@ -2,7 +2,7 @@
 
 Adding the number n to a Taxman pot perturbs the optimal solution.  This
 module measures, for each n in a range, how local and how shallow that
-perturbation is.  It builds on the same matching theory approx.py's greedy
+perturbation is.  It builds on the same matching theory approx.py's solvent
 uses (a set of picks is playable iff a divisor-matching with an acyclic
 precedence relation exists), exposed here as an incremental evaluator
 (SetEval) so a candidate set can be mutated pick-by-pick and re-tested.

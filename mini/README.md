@@ -187,14 +187,22 @@ ordering argument above:
 > assigned divisor divides b, or a divides b"* is acyclic.  Any
 > topological order of the precedence is a legal game.
 
-The **greedy** strategy is then the full-game generalization of "take
+The **solvent** strategy is then the full-game generalization of "take
 the highest prime": consider n, n-1, ..., 2 and accept each number if
-an augmenting path can add it to the matching (if no augmenting path
-exists, no matching covers it — a permanent, well-founded rejection)
-and a precedence-respecting assignment can be found.  This is O(n)
-augmenting searches of O(n log n) each, plus one acyclicity check per
-acceptance — about O(n² log n) worst case, a few hundred milliseconds
-at n=1000 in pure Python.
+the set stays *solvent* — every selection can still pay its tax with a
+distinct divisor from outside the set.  Mechanically: accept if an
+augmenting path can add the number to the matching (if no augmenting
+path exists, no matching covers it — a permanent, well-founded
+rejection) and a precedence-respecting assignment can be found.  This
+is O(n) augmenting searches of O(n log n) each, plus one acyclicity
+check per acceptance — about O(n² log n) worst case, a few hundred
+milliseconds at n=1000 in pure Python.
+
+(A note on the name: this strategy was called "greedy" through most of
+the project's history, and it *is* greedy — over set membership, in
+the matroid sense.  But the strategy players call "greedy Taxman" is
+take-the-biggest-legal-number-each-turn — maxturn below, a far weaker
+thing.  The strategy is now named for its acceptance test instead.)
 
 Results for N=1..1000 against the known optima, alongside the pure
 band-by-band cascade of upper-half mini games (**cascade**) and two
@@ -206,14 +214,14 @@ OneTax, where at N=128 ours scores 5289 vs his 5193):
 
 | strategy | mean % of optimal | worst game | exactly optimal |
 |---|---|---|---|
-| greedy (this project) | 98.97% | 97.81% | 89/999 |
+| solvent (this project) | 98.97% | 97.81% | 89/999 |
 | onetax (Moniot) | 99.10% | 96.00% | 42/999 |
 | cascade (this project) | 93.02% | 91.10% | 19/999 |
 | maxturn (Carmony & Holliday) | 90.55% | 86.12% | 14/999 |
 
 Selected games:
 
-| n | optimal | greedy | onetax | cascade | maxturn |
+| n | optimal | solvent | onetax | cascade | maxturn |
 |---|---|---|---|---|---|
 | 21 | 144 | **144** | 144 | 135 | 135 |
 | 100 | 3164 | **3161** | 3148 | 2976 | 2904 |
@@ -221,7 +229,7 @@ Selected games:
 | 500 | 78934 | 77631 | **78284** | 72849 | 71100 |
 | 1000 | 315426 | 311260 | **312350** | 291258 | 286608 |
 
-So an O(n²)-class algorithm gets within about 1% of optimal: greedy has
+So an O(n²)-class algorithm gets within about 1% of optimal: solvent has
 the best worst case (never below 97.8%) and finds the most exact optima
 (89, including every game up to N=52); OneTax has a slightly better
 mean for large N.  The cascade line quantifies what the verified
@@ -289,40 +297,40 @@ forced-upper hybrid on **every single game** (asserted at runtime).
 | **fork oracle (this project)** | **99.414%** | 56/999 |
 | forced-upper OneTax (this project) | 99.264% | 50/999 |
 | onetax (Moniot) | 99.065% | 42/999 |
-| greedy (this project) | 98.601% | 89/999 |
+| solvent (this project) | 98.601% | 89/999 |
 | cascade (this project) | 92.520% | 19/999 |
 | maxturn (Carmony & Holliday) | 90.294% | 14/999 |
 
 The oracle alone beats the old max(onetax, hybrid) portfolio (99.312%)
 and makes both parents obsolete: neither is the sole best strategy in
-a single game.  The four-way portfolio with greedy - which still wins
+a single game.  The four-way portfolio with solvent - which still wins
 192 games outright, mostly via its 89 exact optima - reaches
 **99.427%**, leaving about 0.57% of optimal on the table.
 
-### Fixing greedy's false vetoes made it the champion
+### Fixing solvent's false vetoes made it the champion
 
-The transition diagnostic later proved greedy's acceptance test
+The transition diagnostic later proved solvent's acceptance test
 incomplete: on a precedence cycle it only retried the candidate's own
 coupons, falsely vetoing playable picks whose cycles route through
 other selections' assignments.  try_select now falls back to a
 complete tier (the solve_mini bipartite reduction, verified against
 the full precedence) before rejecting.  The transformation:
 
-| greedy | before fix | after fix |
+| solvent | before fix | after fix |
 |---|---|---|
 | mean % of optimal | 98.97% | **99.86%** |
 | worst game | 97.81% | **99.08%** |
 | exactly optimal | 89/999 | **214/999** |
 | share of all optimal points | 98.601% | **99.851%** |
 
-Greedy is now the strongest single strategy by a wide margin
+Solvent is now the strongest single strategy by a wide margin
 (the fork oracle held 99.414%), gaining 1.32M points across the range
 with 891 games improved and 16 slightly regressed; cycle rejections
 fell ~62%, and the four-strategy portfolio (99.854%) is now
-essentially greedy alone.  Earlier autopsy and rejection
-numbers for greedy in this README describe the pre-fix version.
+essentially solvent alone.  Earlier autopsy and rejection
+numbers for solvent in this README describe the pre-fix version.
 
-### Greedy, final form
+### Solvent, final form
 
 With a complete playability test, every compensating mechanism became
 dead weight and was removed - the second-chance pass (measured: zero
@@ -332,8 +340,8 @@ by the complete tier), and the end-of-game cycle repair (unreachable;
 now a loud error).  Deleting them changed no score in any of the 1000
 games; the sole rejection reason is "infeasible" - a theorem, every
 time.  The algorithm of record, as a straight-line reference
-implementation (`greedy_simple.py` - runnable, no optimizations,
-verified against the fast greedy for exact set equality):
+implementation (`solvent_simple.py` - runnable, no optimizations,
+verified against the fast implementation for exact set equality):
 
 ```python
 class Infeasible(Exception):
@@ -404,7 +412,7 @@ def ordered(s_set, pay):
     return placed
 
 
-def greedy(n):
+def solvent(n):
     s = set()
     for c in range(n, 1, -1):
         if playable(s | {c}) is not None:
@@ -420,7 +428,7 @@ Three remarks:
    feasibility test is the same solve_mini, unchanged.  Only the
    meaning of "factor" generalizes: in the upper-half game a
    selection's factors are its maximal factors; here they are all of
-   its divisors not themselves selected.  Restrict greedy(N) to the
+   its divisors not themselves selected.  Restrict solvent(N) to the
    numbers above N/2 and it collapses back into optimize_mini.
 
 2. **ordered needs one condition the mini game didn't.**  solve_mini
@@ -440,7 +448,7 @@ Three remarks:
    no valid ordering and the program stops with an error rather than
    playing a bad game.
 
-Implementation note: `greedy_simple.py` is the specification, not the
+Implementation note: `solvent_simple.py` is the specification, not the
 production code.  It re-solves the mini game from scratch for every
 candidate; the fast implementation in `approx.py` keeps a running
 assignment (Kuhn augmenting + an acyclicity check) and only falls back
@@ -489,11 +497,11 @@ to selections - the matching machinery - not about individual picks.
 ## Divergence autopsy: what exactly goes wrong (n=500-1000)
 
 `diagnose.py` traces the fate of every optimal pick that OneTax and
-greedy fail to make, for all 501 games in 500..1000 (full per-miss logs
-in `divergence_onetax.json` / `divergence_greedy.json`).  The taxonomy
+solvent fail to make, for all 501 games in 500..1000 (full per-miss logs
+in `divergence_onetax.json` / `divergence_solvent.json`).  The taxonomy
 is strikingly clean:
 
-|  | OneTax | greedy |
+|  | OneTax | solvent |
 |---|---|---|
 | net points lost | 874,945 | 1,363,455 |
 | upper misses | 2,320 (1.03M pts) - **100% sniped** | 32 (14K pts) |
@@ -510,7 +518,7 @@ sacrifice residue is marginal**: under 3% of either strategy's loss
 comes from numbers optimal acquires with two taxes.  The one-for-two
 trade, dramatic as it is, is not where the points are; one-for-one
 re-routing (augmenting) addresses ~97% of the identified loss.
-(3) **Greedy's specific disease is the ordering constraint**: its
+(3) **Solvent's specific disease is the ordering constraint**: its
 rejection log shows precedence-cycle vetoes outnumber matching
 failures 15:1 (16,369 cycle rejections vs 1,081 no-path).  Its Kuhn
 matching is nearly perfect - only 32 upper misses in 501 games - but
@@ -564,12 +572,12 @@ Full per-transition records in `transitions.json`.  Headlines:
   smaller step strictly worse).  Blind steepest-ascent reaches optimal
   in 78.4% of transitions; when it stalls, the residual averages just
   82 points (~0.04% of score).
-* Discovered en route: the greedy strategy's playability test is
+* Discovered en route: the solvent strategy's playability test is
   provably incomplete - forcing only the candidate's own coupons
   cannot break cycles running through other picks' assignments, so
   many of its 16K "cycle" rejections are false vetoes.  The two-tier
-  evaluator here (greedy test backed by a complete solve_mini oracle)
-  is the repair.
+  evaluator here (solvent's incremental test backed by a complete
+  solve_mini oracle) is the repair.
 
 Implication for a continuation solver: insertion + a depth-3 flip
 search over the distance-2 neighborhood of n reproduces the optimal
@@ -589,7 +597,7 @@ a legal game in-solver.
 
 Seeded from optimal(499) and self-fed on 500..540: **25/41 games exact
 (61%), mean gap 12.1 points (~0.015% of score)** - about ten times
-closer to optimal than greedy on the same slice - with 500..520
+closer to optimal than solvent on the same slice - with 500..520
 solved 21/21.  The misses begin at n=525 and are exactly the
 documented "blocked valley" class: crossing them needs atomic swaps of
 3-4 simultaneous removals (n=525: remove {116,186,189,250}, add
@@ -614,7 +622,7 @@ Drift is real but bounded: missed valleys become standing deficits
 that accumulate (exact matches nearly vanish by the 900s), yet the
 mean gap stays ~0.03% of score and does not run away.  Point-weighted
 over the whole range the chain holds **99.969% of optimal** - about
-5x closer than greedy (99.854%) - and beats greedy game-by-game
+5x closer than solvent (99.854%) - and beats solvent game-by-game
 400 to 52.  Certificates keep firing at 31% even self-fed.
 
 **Cold start converges exactly.**  A chain started from nothing at
@@ -631,14 +639,14 @@ onto an optimal path.
 | configuration | share of optimal | wall time |
 |---|---|---|
 | flips only (no bundles) | 99.81% | 2 min |
-| greedy, per game | 99.85% | ~11 min |
-| bundles capped at 100 + greedy re-anchor | **99.95%** | **26 min** |
+| solvent, per game | 99.85% | ~11 min |
+| bundles capped at 100 + solvent re-anchor | **99.95%** | **26 min** |
 | full bundle budget | 99.97% | 3.7 h |
 
 The capped configuration captures ~90% of the chain's advantage over
-greedy at ~12% of the full cost (mean 3.1s/game, max 12s) and is the
+solvent at ~12% of the full cost (mean 3.1s/game, max 12s) and is the
 recommended default; the full budget is the publication-quality
-setting.  Greedy re-anchoring fired in only 9/501 games - the chain
+setting.  Solvent re-anchoring fired in only 9/501 games - the chain
 rarely needs its floor - but it is what caps drift by construction.
 Also measured: with no bundle repair at all, chain drift compounds
 (mean gap 132 -> 605 across bands); in a self-fed system, valley
@@ -659,14 +667,14 @@ also lives inside.
 
 The chain (`continuation_chain_2000.json`) was seeded once from
 optimal(1000) and self-fed through 2000 in the recommended
-configuration (bundles capped at 100, greedy re-anchor), 3.3h under
+configuration (bundles capped at 100, solvent re-anchor), 3.3h under
 PyPy, every solution replayed as a legal game in-solver.  Results
 over 1001..2000, as a share of the F-M bound:
 
 | strategy | mean | worst game |
 |---|---|---|
 | continuation chain | **99.64%** | 99.40% (n=1302) |
-| greedy | 99.56% | 99.34% |
+| solvent | 99.56% | 99.34% |
 | onetax | 98.61% | 98.01% |
 
 For calibration: over 500..1000, where the truth is known, the
@@ -683,10 +691,10 @@ the same relaxation in the lower half.)
 The chain's internal signals also stay healthy in unmapped territory:
 certificates (score = n + score(n-1)) keep firing at 31.5%, mean
 lower-half churn is 1.23 numbers per game, 76.8% of games resolve at
-tier 0, and the greedy re-anchor floor was needed in only 22/1000
-games.  Game-by-game the chain beats greedy 894 times and ties 106,
+tier 0, and the solvent re-anchor floor was needed in only 22/1000
+games.  Game-by-game the chain beats solvent 894 times and ties 106,
 never losing (the re-anchor guarantees the floor); over the whole
-range it collects 579,264 more points than greedy and 7.45M more
+range it collects 579,264 more points than solvent and 7.45M more
 than OneTax, finishing within **0.352%** of the theoretical ceiling
 in aggregate - `continuation_chain_2000.json` is, as of this run,
 the best known set of solutions for these 1000 games.
@@ -699,7 +707,7 @@ The second chart is the readable one: dividing by the bound cancels
 the number-theoretic jitter shared by every series (the bound line
 itself becomes the flat 100% reference), and the strategies separate
 into clean bands - the chain hugging the altitude the true optimum
-occupied below 1000, greedy ~0.1 points lower, OneTax sagging a full
+occupied below 1000, solvent ~0.1 points lower, OneTax sagging a full
 point below that.
 
 ## Performance
@@ -714,7 +722,7 @@ the empirical scaling exponent k in time ~ n^k:
 | upper half (`solve_upper_half`) | 2.7 ms | 10 ms | 38 ms | 168 ms | 2.0 |
 | cascade | 3.8 ms | 16 ms | 66 ms | 310 ms | 2.1 |
 | hybrid (forced upper) | 5.8 ms | 24 ms | 91 ms | 430 ms | 2.1 |
-| greedy | 3.8 ms | 62 ms | 377 ms | 1.2 s | 2.7 |
+| solvent | 3.8 ms | 62 ms | 377 ms | 1.2 s | 2.7 |
 | oracle (fork) | 6.1 ms | 62 ms | 215 ms | ~2 s | ~3 |
 
 OneTax is indeed nearly free.  Determining the optimal >N/2 moves is a
@@ -754,17 +762,17 @@ python3 -m pytest test_taxman_mini.py
 | `independent.py` | theory-free certification of optimal.json (brute force, matching bound, certificate chain) |
 | `bound.py` | the Franklín-Moniot upper bound (max-weight matching over maximal-factor edges) |
 | `bench.py` | per-strategy timing, scaling exponents, and profiling |
-| `diagnose.py` | divergence autopsy: per-miss fate logs for OneTax and greedy |
+| `diagnose.py` | divergence autopsy: per-miss fate logs for OneTax and solvent |
 | `chains.py` | funding-chain depth analysis of the missed numbers |
 | `transitions.py` | search kind/depth needed to solve n from the n-1 solution |
-| `greedy_simple.py` | illustration-grade reference implementation of greedy (the README's algorithm of record, runnable) |
+| `solvent_simple.py` | illustration-grade reference implementation of solvent (the README's algorithm of record, runnable) |
 | `seteval.py` | incremental set evaluator: matching + complete playability tier |
 | `continuation.py` | the continuation solver: solve n by searching near n-1 |
 | `moniot_table.json` | Robert Moniot's published N≤128 results (for validation) |
 | `approx_results.json` | per-game scores of every strategy for N=1..1000 |
-| `greedy_results.json` | canonical greedy scores for N=1..1000 (regression baseline) |
+| `solvent_results.json` | canonical solvent scores for N=1..1000 (regression baseline) |
 | `fm_bound_2000.json` | exact Franklín-Moniot bound for every N=2..2000 |
 | `continuation_chain_2000.json` | the chain's best-known solutions for N=1001..2000 |
-| `greedy_2000.json`, `onetax_2000.json`, `maxturn_2000.json` | per-game scores extending those strategies to N=2000 |
+| `solvent_2000.json`, `onetax_2000.json`, `maxturn_2000.json` | per-game scores extending those strategies to N=2000 |
 | `pot_fraction.png`, `score_vs_bound.png` | the two summary charts (absolute pot share; share of the F-M bound) |
 | `test_taxman_mini.py` | unit tests anchored to the wiki's examples |

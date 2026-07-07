@@ -21,7 +21,7 @@ The key fact (a generalization of the ordering argument in verify.py):
 
 Strategies implemented here:
 
-greedy
+solvent
     The full-game generalization of "take the highest prime": consider
     n, n-1, ..., 2 and accept each number if the pick set stays playable.
     Playability is decided two-tier: a cheap incremental augmenting search
@@ -81,7 +81,7 @@ def divisor_lists(n: int) -> List[List[int]]:
 
 
 # ---------------------------------------------------------------------------
-# greedy: matching-based full-game approximation
+# solvent: matching-based full-game approximation
 # ---------------------------------------------------------------------------
 
 def _augment(
@@ -203,12 +203,12 @@ def _playable_order(
     return order
 
 
-def greedy(
+def solvent(
     n: int,
     divs: Sequence[List[int]],
     rejections: Optional[List[Tuple[int, str]]] = None,
 ) -> List[int]:
-    """Greedy matching approximation of a full game; returns the sequence."""
+    """Solvent matching approximation of a full game; returns the sequence."""
     selected: Set[int] = set()
     owner: Dict[int, int] = {}  # divisor -> selection paying it
 
@@ -721,12 +721,12 @@ def check_sequence(n: int, sequence: Sequence[int]) -> int:
     return score
 
 
-STRATEGIES = ("greedy", "cascade", "onetax", "maxturn")
+STRATEGIES = ("solvent", "cascade", "onetax", "maxturn")
 
 
 def play_all(n: int, divs: Sequence[List[int]]) -> Dict[str, int]:
     return {
-        "greedy": check_sequence(n, greedy(n, divs)),
+        "solvent": check_sequence(n, solvent(n, divs)),
         "cascade": check_sequence(n, cascade(n, divs)),
         "onetax": one_tax(n, divs),
         "maxturn": max_turn(n, divs),

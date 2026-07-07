@@ -1,9 +1,9 @@
-"""The greedy Taxman strategy, written to be read.
+"""The solvent Taxman strategy, written to be read.
 
 This is the executable version of the pseudocode in README.md
-("Greedy, final form"): correct, minimal, and unhurried.  The fast,
+("Solvent, final form"): correct, minimal, and unhurried.  The fast,
 bit-identical implementation (incremental matching + Kuhn augmenting
-paths) lives in approx.py's greedy().
+paths) lives in approx.py's solvent().
 
 The game, in one breath: the pot holds 1..n; picking a number c keeps
 c for you and surrenders every divisor of c still in the pot to the
@@ -40,7 +40,7 @@ What makes it special:
   the matchable upper sets form a matroid - the structure in which
   a greedy descending pass is provably unbeatable.  Because the loop
   runs from n downward, its first n/2 iterations are literally that
-  optimal upper-half computation; whatever greedy loses to the true
+  optimal upper-half computation; whatever solvent loses to the true
   optimum, it loses among the small numbers below n/2.
 * The one leap of faith is deferred, not hidden.  Accepting a set
   whenever the reservations exist assumes they can also be scheduled
@@ -50,12 +50,12 @@ What makes it special:
 
 Run it with the game size as the only argument:
 
-    $ python3 greedy_simple.py 21
+    $ python3 solvent_simple.py 21
     picks, in playing order: [19, 9, 15, 21, 14, 18, 12, 16, 20]
     score (sum of picks):    144
 
 (144 is the known optimum for n=21.)  Sizes up to a few hundred
-answer in seconds; beyond that, use approx.py's fast greedy().
+answer in seconds; beyond that, use approx.py's fast solvent().
 """
 
 
@@ -179,7 +179,7 @@ def ordered(s_set, pay):
     return placed
 
 
-def greedy(n):
+def solvent(n):
     """Play Taxman game n: choose the set first, then order it.
 
     Descending order is the greedy heart: offer the biggest numbers
@@ -203,6 +203,6 @@ if __name__ == "__main__":
         sys.exit(f"usage: python3 {sys.argv[0]} N   (the game size, e.g. 21)")
 
     sys.setrecursionlimit(10000)
-    result = greedy(int(sys.argv[1]))
+    result = solvent(int(sys.argv[1]))
     print("picks, in playing order:", result)
     print("score (sum of picks):   ", sum(result))

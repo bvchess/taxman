@@ -1,6 +1,6 @@
-"""Diagnose where OneTax and greedy diverge from optimal Taxman games.
+"""Diagnose where OneTax and solvent diverge from optimal Taxman games.
 
-For every game in a range where OneTax or greedy scores below the known
+For every game in a range where OneTax or solvent scores below the known
 optimal, this classifies each missed optimal selection m (an optimal pick
 the strategy never makes) into a "fate":
 
@@ -12,12 +12,12 @@ the strategy never makes) into a "fate":
   drained       m's divisors trickled away one at a time (or the game
                 ended before m was fully starved).
 
-For greedy, each missed m is additionally tagged with the reason greedy's
-own playability test rejected it ("infeasible"); greedy makes a single
+For solvent, each missed m is additionally tagged with the reason solvent's
+own playability test rejected it ("infeasible"); solvent makes a single
 descending pass, so each m is rejected at most once.
 
 Writes two machine-readable logs, one record per diverging game, to
-divergence_onetax.json and divergence_greedy.json, and prints an aggregate
+divergence_onetax.json and divergence_solvent.json, and prints an aggregate
 summary per strategy over the analyzed range.
 
 Usage:
@@ -33,7 +33,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from approx import check_sequence, divisor_lists, greedy, one_tax
+from approx import check_sequence, divisor_lists, solvent, one_tax
 from verify import DEFAULT_OPTIMAL
 
 MINI_DIR = Path(__file__).resolve().parent
@@ -90,7 +90,7 @@ def build_record(
     opt_tax_map: Dict[int, List[int]],
     seq: Sequence[int],
     divs: Sequence[List[int]],
-    greedy_reasons: Optional[List[Tuple[int, str]]],
+    solvent_reasons: Optional[List[Tuple[int, str]]],
 ) -> Dict[str, Any]:
     opt_set = set(opt_moves)
     strat_set = set(seq)
@@ -153,8 +153,8 @@ def build_record(
             "opt_tax_count": len(opt_tax_list),
             "opt_tax": opt_tax_list,
         }
-        if greedy_reasons is not None:
-            entry["greedy_reason"] = lookup_reason(m, greedy_reasons)
+        if solvent_reasons is not None:
+            entry["solvent_reason"] = lookup_reason(m, solvent_reasons)
         missed_entries.append(entry)
 
     return {
@@ -170,7 +170,7 @@ def print_summary(
     name: str,
     records: List[Dict[str, Any]],
     total_games: int,
-    is_greedy: bool,
+    is_solvent: bool,
 ) -> None:
     print(f"=== {name} ===")
     diverging = len(records)
@@ -211,8 +211,8 @@ def print_summary(
                 else:
                     taxed_not_in_opt += 1
 
-            if is_greedy:
-                for token in entry["greedy_reason"].split("+"):
+            if is_solvent:
+                for token in entry["solvent_reason"].split("+"):
                     reason_count[token] = reason_count.get(token, 0) + 1
                     reason_sum[token] = reason_sum.get(token, 0) + m
 
@@ -230,7 +230,7 @@ def print_summary(
     print(f"taxed fate: killer_in_opt=True: {taxed_in_opt}   "
           f"killer_in_opt=False: {taxed_not_in_opt}")
 
-    if is_greedy:
+    if is_solvent:
         print("rejection-reason histogram (atomic tokens, may overlap):")
         for token in ("infeasible",):
             c = reason_count.get(token, 0)
@@ -261,7 +261,7 @@ def main(argv: List[str] | None = None) -> int:
     divs = divisor_lists(args.to_n)
 
     onetax_records: List[Dict[str, Any]] = []
-    greedy_records: List[Dict[str, Any]] = []
+    solvent_records: List[Dict[str, Any]] = []
     total_games = 0
     started = time.monotonic()
 
@@ -284,10 +284,10 @@ def main(argv: List[str] | None = None) -> int:
             ))
 
         rejections: List[Tuple[int, str]] = []
-        gseq = greedy(n, divs, rejections=rejections)
+        gseq = solvent(n, divs, rejections=rejections)
         gscore = check_sequence(n, gseq)
         if gscore != opt_score:
-            greedy_records.append(build_record(
+            solvent_records.append(build_record(
                 n, opt_score, gscore, opt_moves, opt_tax_map, gseq, divs,
                 rejections,
             ))
@@ -296,15 +296,15 @@ def main(argv: List[str] | None = None) -> int:
     print(f"analyzed {total_games} games in {elapsed:.1f}s", file=sys.stderr)
 
     onetax_path = MINI_DIR / "divergence_onetax.json"
-    greedy_path = MINI_DIR / "divergence_greedy.json"
+    solvent_path = MINI_DIR / "divergence_solvent.json"
     onetax_path.write_text(json.dumps(onetax_records, separators=(",", ":")))
-    greedy_path.write_text(json.dumps(greedy_records, separators=(",", ":")))
+    solvent_path.write_text(json.dumps(solvent_records, separators=(",", ":")))
     print(f"{onetax_path.name}: {onetax_path.stat().st_size} bytes")
-    print(f"{greedy_path.name}: {greedy_path.stat().st_size} bytes")
+    print(f"{solvent_path.name}: {solvent_path.stat().st_size} bytes")
     print()
 
-    print_summary("OneTax", onetax_records, total_games, is_greedy=False)
-    print_summary("Greedy", greedy_records, total_games, is_greedy=True)
+    print_summary("OneTax", onetax_records, total_games, is_solvent=False)
+    print_summary("Solvent", solvent_records, total_games, is_solvent=True)
 
     return 0
 

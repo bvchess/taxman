@@ -1,4 +1,4 @@
-"""Measure how deep OneTax's and greedy's coupon re-routing chains run.
+"""Measure how deep OneTax's and solvent's coupon re-routing chains run.
 
 diagnose.py classifies each optimal selection m that a strategy misses; the
 "taxed" fate means m left the strategy's pot as tax of some other pick, the
@@ -24,7 +24,7 @@ softened into a counted, reported exception rather than a hard crash.
 
 Usage:
     python3 chains.py [--from 500] [--to 1000] [--optimal PATH]
-                       [--onetax-log PATH] [--greedy-log PATH]
+                       [--onetax-log PATH] [--solvent-log PATH]
 """
 
 from __future__ import annotations
@@ -36,13 +36,13 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Sequence, Set, Tuple, Union
 
-from approx import divisor_lists, greedy, one_tax
+from approx import divisor_lists, solvent, one_tax
 from diagnose import replay_tax_map
 from verify import DEFAULT_OPTIMAL
 
 MINI_DIR = Path(__file__).resolve().parent
 DEFAULT_ONETAX_LOG = MINI_DIR / "divergence_onetax.json"
-DEFAULT_GREEDY_LOG = MINI_DIR / "divergence_greedy.json"
+DEFAULT_SOLVENT_LOG = MINI_DIR / "divergence_solvent.json"
 
 MAX_DEPTH = 8
 
@@ -245,7 +245,7 @@ def analyze_onetax(
         })
 
 
-def analyze_greedy(
+def analyze_solvent(
     n: int,
     divs: Sequence[List[int]],
     record: Dict[str, Any],
@@ -255,7 +255,7 @@ def analyze_greedy(
     taxed = [e for e in record["missed"] if e["fate"] == "taxed"]
     if not taxed:
         return
-    seq = greedy(n, divs)
+    seq = solvent(n, divs)
     info = kill_info(n, seq, divs, taxed)
 
     for entry in taxed:
@@ -263,7 +263,7 @@ def analyze_greedy(
         kill_count, coupon_alive, fodder = info[m]
         stats.record_common(kill_count, coupon_alive, fodder)
         chain_records.append({
-            "n": n, "m": m, "strategy": "greedy",
+            "n": n, "m": m, "strategy": "solvent",
             "kill_count": kill_count, "m_coupon_alive": coupon_alive,
             "depth_or_terminal": None,
         })
@@ -311,18 +311,18 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument("--to", dest="to_n", type=int, default=1000)
     parser.add_argument("--optimal", type=Path, default=DEFAULT_OPTIMAL)
     parser.add_argument("--onetax-log", type=Path, default=DEFAULT_ONETAX_LOG)
-    parser.add_argument("--greedy-log", type=Path, default=DEFAULT_GREEDY_LOG)
+    parser.add_argument("--solvent-log", type=Path, default=DEFAULT_SOLVENT_LOG)
     args = parser.parse_args(argv)
 
     optimal = {g["n"]: g for g in json.loads(args.optimal.read_text())}
     onetax_log = {r["n"]: r for r in json.loads(args.onetax_log.read_text())}
-    greedy_log = {r["n"]: r for r in json.loads(args.greedy_log.read_text())}
+    solvent_log = {r["n"]: r for r in json.loads(args.solvent_log.read_text())}
 
     sys.setrecursionlimit(100_000)
     divs = divisor_lists(args.to_n)
 
     onetax_stats = Stats()
-    greedy_stats = Stats()
+    solvent_stats = Stats()
     chain_records: List[Dict[str, Any]] = []
 
     started = time.monotonic()
@@ -340,15 +340,15 @@ def main(argv: List[str] | None = None) -> int:
         if n in onetax_log:
             analyze_onetax(n, divs, onetax_log[n], opt_set, opt_tax_map,
                             onetax_stats, chain_records)
-        if n in greedy_log:
-            analyze_greedy(n, divs, greedy_log[n], greedy_stats, chain_records)
+        if n in solvent_log:
+            analyze_solvent(n, divs, solvent_log[n], solvent_stats, chain_records)
 
     elapsed = time.monotonic() - started
     print(f"analyzed {analyzed} games in {elapsed:.1f}s", file=sys.stderr)
     print()
 
     print_summary("OneTax", onetax_stats, is_onetax=True)
-    print_summary("Greedy", greedy_stats, is_onetax=False)
+    print_summary("Solvent", solvent_stats, is_onetax=False)
 
     out = MINI_DIR / "divergence_chains.json"
     out.write_text(json.dumps(chain_records, separators=(",", ":")))
