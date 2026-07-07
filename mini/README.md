@@ -590,6 +590,60 @@ Open items: deeper bundles or temporary-descent moves for the ~13.6%
 valley class (the entire residual), and an incremental SetEval to cut
 valley-game cost.
 
+## Beyond ground truth: best-known solutions for 1001-2000
+
+There is no optimal.json past n=1000, so the extension to n=2000
+changes what "how good is it?" can mean: every strategy is now
+measured against the Franklín-Moniot upper bound (`fm_bound_2000.json`,
+exact per-game values for 2..2000), and each game carries a
+*certified* gap - the distance to the bound, which the true optimum
+also lives inside.
+
+The chain (`continuation_chain_2000.json`) was seeded once from
+optimal(1000) and self-fed through 2000 in the recommended
+configuration (bundles capped at 100, greedy re-anchor), 3.3h under
+PyPy, every solution replayed as a legal game in-solver.  Results
+over 1001..2000, as a share of the F-M bound:
+
+| strategy | mean | worst game |
+|---|---|---|
+| continuation chain | **99.64%** | 99.40% (n=1302) |
+| greedy | 99.56% | 99.34% |
+| onetax | 98.61% | 98.01% |
+
+For calibration: over 500..1000, where the truth is known, the
+*optimal* score averages 99.71% of the bound (never below 99.57%),
+and the chain plays within 0.03% of optimal.  The chain's 99.64%
+band in 1001..2000 is therefore consistent with continued
+near-optimal play; most of the certified gap is bound looseness, not
+heuristic error.  (Decomposed at n=1000, where both are known: of the
+1168-point gap between bound and optimum, 257 points are the bound
+overpaying the upper half - it matches picks to single maximal
+factors with no sweep or ordering constraints - and 911 points are
+the same relaxation in the lower half.)
+
+The chain's internal signals also stay healthy in unmapped territory:
+certificates (score = n + score(n-1)) keep firing at 31.5%, mean
+lower-half churn is 1.23 numbers per game, 76.8% of games resolve at
+tier 0, and the greedy re-anchor floor was needed in only 22/1000
+games.  Game-by-game the chain beats greedy 894 times and ties 106,
+never losing (the re-anchor guarantees the floor); over the whole
+range it collects 579,264 more points than greedy and 7.45M more
+than OneTax, finishing within **0.352%** of the theoretical ceiling
+in aggregate - `continuation_chain_2000.json` is, as of this run,
+the best known set of solutions for these 1000 games.
+
+![player's share of the pot, by strategy](pot_fraction.png)
+
+![score as a share of the F-M bound](score_vs_bound.png)
+
+The second chart is the readable one: dividing by the bound cancels
+the number-theoretic jitter shared by every series (the bound line
+itself becomes the flat 100% reference), and the strategies separate
+into clean bands - the chain hugging the altitude the true optimum
+occupied below 1000, greedy ~0.1 points lower, OneTax sagging a full
+point below that.
+
 ## Performance
 
 Per-game wall time in pure Python (best of 3, `python3 bench.py`), with
@@ -649,4 +703,9 @@ python3 -m pytest test_taxman_mini.py
 | `continuation.py` | the continuation solver: solve n by searching near n-1 |
 | `moniot_table.json` | Robert Moniot's published N≤128 results (for validation) |
 | `approx_results.json` | per-game scores of every strategy for N=1..1000 |
+| `greedy_results.json` | canonical greedy scores for N=1..1000 (regression baseline) |
+| `fm_bound_2000.json` | exact Franklín-Moniot bound for every N=2..2000 |
+| `continuation_chain_2000.json` | the chain's best-known solutions for N=1001..2000 |
+| `greedy_2000.json`, `onetax_2000.json`, `maxturn_2000.json` | per-game scores extending those strategies to N=2000 |
+| `pot_fraction.png`, `score_vs_bound.png` | the two summary charts (absolute pot share; share of the F-M bound) |
 | `test_taxman_mini.py` | unit tests anchored to the wiki's examples |
