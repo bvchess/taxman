@@ -38,6 +38,15 @@ What makes it special:
   (the "schedulability conjecture" - never violated in any game ever
   run).  If it ever fails, ordered() halts the program rather than
   play an illegal game.
+
+Run it with the game size as the only argument:
+
+    $ python3 greedy_simple.py 21
+    picks, in playing order: [19, 9, 15, 21, 14, 18, 12, 16, 20]
+    score (sum of picks):    144
+
+(144 is the known optimum for n=21.)  Sizes up to a few hundred
+answer in seconds; beyond that, use approx.py's fast greedy().
 """
 
 
@@ -180,6 +189,9 @@ def greedy(n):
 
 if __name__ == "__main__":
     import sys
+
+    if len(sys.argv) != 2 or not sys.argv[1].isdigit():
+        sys.exit(f"usage: python3 {sys.argv[0]} N   (the game size, e.g. 21)")
 
     sys.setrecursionlimit(10000)
     result = greedy(int(sys.argv[1]))
