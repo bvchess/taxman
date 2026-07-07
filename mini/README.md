@@ -667,14 +667,21 @@ over the whole range the chain holds **99.969% of optimal** - about
 5x closer than solvent (99.854%) - and beats solvent game-by-game
 400 to 52.  Certificates keep firing at 31% even self-fed.
 
-**Cold start converges exactly.**  A chain started from nothing at
-n=2 (no optimal.json seed anywhere, `continuation_cold_results.json`)
-heals its own early mistakes completely: by n=500 it produces scores
-identical to the optimal-seeded chain in 501/501 games, and holds
-**99.970% of all optimal points over 2..1000** (476/999 exact) as a
-fully self-contained solver.  A perfect seed is worth nothing by
-mid-range - the certificate/insertion dynamics snap the chain back
-onto an optimal path.
+**Cold start converges, and the re-anchor gives it a floor.**  The
+flagship cold chain (started from nothing at n=2, solvent re-anchor
+on, `continuation_cold_results.json`) holds **99.972% of all optimal
+points over 2..1000** (502/999 exact, worst game 99.52%) as a fully
+self-contained solver, and never scores below solvent - the re-anchor
+guarantees that floor and fired 17 times.  Certificates cover 497/999
+games: 330 exact plus 167 prime-sacrifice - every prime game reaches
+its proven-optimal score.  Against the optimal-seeded chain it agrees
+in 433/501 games over 500..1000 and wins on points (+1,474 net); a
+perfect seed is worth nothing by mid-range, and with the floor the
+cold chain is strictly the better configuration.  (An earlier
+re-anchor-less cold run held 99.970% but fell below solvent in 72
+games, worst 97.13%; the floor fixed that and still gained +1,556
+points net - path dependence from re-seeding cost a few dozen points
+in three brief episodes, repaid many times over.)
 
 **The measured efficiency frontier (500..1000, one 2.8GHz core):**
 
