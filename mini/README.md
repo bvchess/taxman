@@ -331,41 +331,86 @@ sets are downward-closed), the forced-coupon cycle retries (subsumed
 by the complete tier), and the end-of-game cycle repair (unreachable;
 now a loud error).  Deleting them changed no score in any of the 1000
 games; the sole rejection reason is "infeasible" - a theorem, every
-time.  The algorithm of record, with solve_mini written out in full
-(no optimizations, no shortcuts):
+time.  The algorithm of record, as a straight-line reference
+implementation (`greedy_simple.py` - runnable, no optimizations,
+verified against the fast greedy for exact set equality):
 
-```
-greedy(N):
-    let S be an empty set
-    for c from N down to 2:
-        if playable(S with c added):
-            add c to S
-    return ordered(S)
+```python
+class Infeasible(Exception):
+    """Raised when solve_mini cannot pay every member from the factor pool."""
 
 
-playable(S):
-    treat S as a mini game whose factor pool F holds every number
-        that is not in S but divides a member of S; the factors of
-        each member are its proper divisors in F
-    if solve_mini(S, F) succeeds: return true
-    else: return false
+def proper_divisors(c):
+    return [d for d in range(1, c) if c % d == 0]
 
 
-solve_mini(C, F):
-    if C is empty:
-        return the empty sequence          # success
-    if some c in C has exactly one factor f remaining in F:
-        let pay(c) = f
-        return [c] followed by solve_mini(C - {c}, F - {f})
-    if some f in F is a factor of exactly one c in C:
-        let pay(c) = f
-        return solve_mini(C - {c}, F - {f}) followed by [c]
-    ERROR: cannot select every member of C using F
+def solve_mini(members, factors, factors_of):
+    if not members:
+        return [], {}
+
+    for c in members:
+        remaining = factors_of[c] & factors
+        if len(remaining) == 1:
+            (f,) = remaining
+            seq, pay = solve_mini(members - {c}, factors - {f}, factors_of)
+            pay[c] = f
+            return [c] + seq, pay
+
+    for f in factors:
+        payers = [c for c in members if f in factors_of[c]]
+        if len(payers) == 1:
+            c = payers[0]
+            seq, pay = solve_mini(members - {c}, factors - {f}, factors_of)
+            pay[c] = f
+            return seq + [c], pay
+
+    raise Infeasible(f"cannot select every member of {members} using {factors}")
 
 
-ordered(S):
-    return any ordering of S in which s comes before t whenever
-        pay(s) divides t, or s divides t
+def playable(s_set):
+    factors = set()
+    for s in s_set:
+        factors |= set(proper_divisors(s))
+    factors -= s_set
+
+    factors_of = {s: set(proper_divisors(s)) & factors for s in s_set}
+
+    try:
+        _, pay = solve_mini(s_set, factors, factors_of)
+    except Infeasible:
+        return None
+    return pay
+
+
+def ordered(s_set, pay):
+    remaining = set(s_set)
+    placed = []
+    while remaining:
+        for a in remaining:
+            blocked = any(
+                b != a
+                and ((pay.get(b) is not None and a % pay[b] == 0) or a % b == 0)
+                for b in remaining
+            )
+            if not blocked:
+                placed.append(a)
+                remaining.discard(a)
+                break
+        else:
+            raise RuntimeError(
+                f"schedulability conjecture violated: no valid ordering "
+                f"exists for {remaining}"
+            )
+    return placed
+
+
+def greedy(n):
+    s = set()
+    for c in range(n, 1, -1):
+        if playable(s | {c}) is not None:
+            s.add(c)
+    pay = playable(s)
+    return ordered(s, pay)
 ```
 
 Three remarks:
@@ -395,12 +440,13 @@ Three remarks:
    no valid ordering and the program stops with an error rather than
    playing a bad game.
 
-Implementation note: the pseudocode is the specification, not the
-code.  A literal transcription would re-solve the mini game for every
-candidate; the implementation keeps a running assignment (Kuhn
-augmenting + an acyclicity check) and only falls back to the full
-solve_mini reduction when the incremental update fails - bit-identical
-results, verified across all 1000 games, at a fraction of the cost.
+Implementation note: `greedy_simple.py` is the specification, not the
+production code.  It re-solves the mini game from scratch for every
+candidate; the fast implementation in `approx.py` keeps a running
+assignment (Kuhn augmenting + an acyclicity check) and only falls back
+to the full solve_mini reduction when the incremental update fails -
+bit-identical results (exact set equality checked in the test suite
+and across n=1..300), at a fraction of the cost.
 Because acceptance is decided by a complete test, the output set is
 canonical: a deterministic function of playability alone, independent
 of coupon preferences or augmenting-path order.
@@ -711,6 +757,7 @@ python3 -m pytest test_taxman_mini.py
 | `diagnose.py` | divergence autopsy: per-miss fate logs for OneTax and greedy |
 | `chains.py` | funding-chain depth analysis of the missed numbers |
 | `transitions.py` | search kind/depth needed to solve n from the n-1 solution |
+| `greedy_simple.py` | illustration-grade reference implementation of greedy (the README's algorithm of record, runnable) |
 | `seteval.py` | incremental set evaluator: matching + complete playability tier |
 | `continuation.py` | the continuation solver: solve n by searching near n-1 |
 | `moniot_table.json` | Robert Moniot's published N≤128 results (for validation) |

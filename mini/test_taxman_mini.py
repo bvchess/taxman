@@ -154,6 +154,28 @@ def test_greedy_regression_floor():
         assert check_sequence(n, greedy(n, divs)) >= stored[str(n)]
 
 
+def test_greedy_simple_matches_canonical():
+    # greedy_simple.py is a plain, from-scratch executable spec of the
+    # README's "Greedy, final form" pseudocode; it must agree exactly with
+    # both the recorded canonical scores and the fast approx.greedy() output
+    # (the README states the canonical set is a deterministic function of
+    # playability alone), and produce a legal game.
+    from approx import check_sequence, divisor_lists, greedy as approx_greedy
+
+    import greedy_simple
+
+    stored = json.loads(
+        (Path(__file__).resolve().parent / "greedy_results.json").read_text()
+    )
+    divs = divisor_lists(60)
+    for n in range(1, 61):
+        seq = greedy_simple.greedy(n)
+        score = sum(seq)
+        assert score == stored[str(n)]
+        assert set(seq) == set(approx_greedy(n, divs))
+        assert check_sequence(n, seq) == score
+
+
 def test_fm_bound_matches_published_values():
     pytest.importorskip("networkx")
     from bound import fm_bound
