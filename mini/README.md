@@ -624,18 +624,40 @@ single-flip ascent and bundle moves (SetEval, now shared in
 solve_mini playability tier).  Every produced solution is replayed as
 a legal game in-solver.
 
-Two optimality certificates are recognized, from the wiki's "Reusing
-a previous solution": **exact** (score = n + score(n-1), the
-no-sacrifice upper bound met) and **prime-sacrifice** - for prime n,
-opt(n) = n + opt(n-1) - p̂ with p̂ the largest prime below n, because
-1 dies with any game's first move and a prime's only payment is 1,
-so a solution holds at most one prime, played first; taking prime n
-forces dropping the previous solution's prime, and nothing cheaper
-can be forced (validated 167/167 against the known optima).  The
-prime certificate is label-only - it never cuts search short, since
-a cold chain's prev score may be suboptimal and would make the cap
-invalid.  Prime games always carry a real sacrifice, so they never
-certify "exact"; the second certificate roughly covers them.
+Three certificates are recognized, from the wiki's "Reusing a
+previous solution" (Generalizing):
+
+* **exact** (proven): score = n + score(n-1), the no-sacrifice upper
+  bound met.
+* **prime-sacrifice** (proven): for prime n, opt(n) = n + opt(n-1) -
+  p̂ with p̂ the largest prime below n, because 1 dies with any
+  game's first move and a prime's only payment is 1, so a solution
+  holds at most one prime, played first; taking prime n forces
+  dropping the previous solution's prime, and nothing cheaper can be
+  forced (validated 167/167 against the known optima).
+* **upper-delta** (conjecture-grade): score = score(n-1) + [U*(n) -
+  U*(n-1)], optionally + n/2 for even n when the boundary-crosser is
+  re-picked as a lower number - the exactly-computable change in the
+  certified upper-half ceiling, trusted to be the whole change.  No
+  theorem: the lower half could in principle recoup an eviction, so
+  this kind is adopted the way the schedulability conjecture is -
+  zero violations observed (no firing ever blessed a game whose gap
+  grew, across every transition at n<=1000).
+
+The general rule subsumes the proven two extensionally - exact is
+its zero-eviction case, prime is its prime-evicts-prime case - but
+the labels track proof status, and each game wears the strongest
+claim it can defend (precedence exact > prime > upper-delta).  Two
+structural facts from the validation sweep: across all 998
+transitions the optimal upper set never re-admits a previously
+evicted candidate (the only arrival is ever n itself), and no
+transition ever combines an eviction with the boundary-crossing
+exit.  Certificate coverage: **688/999 (68.9%)** of cold-chain games
+at n<=1000 and 633/1000 (63.3%) over 1001..2000 - closely matching
+the ~70% the wiki reports for these techniques.  The prime and
+upper-delta kinds are label-only - they never cut search short,
+since a cold chain's prev score may be suboptimal and would make the
+cap invalid (and upper-delta's cap is conjectural).
 
 What a certificate means depends on the anchor.  When score(n-1) is
 provably optimal, a certificate proves optimality outright.  In a
