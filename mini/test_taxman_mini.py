@@ -211,6 +211,53 @@ def test_prime_sacrifice_identity():
     assert checked > 0  # sanity: the loop actually exercised primes
 
 
+def test_upper_delta_certificate_is_benign():
+    # continuation.py's third certificate kind ("upper-delta", CONJECTURE-
+    # GRADE): let U*(k) = sum(solve_upper_half(k, spf)[0]) and
+    # d_upper(n) = U*(n) - U*(n-1). The certificate fires when
+    # score == prev_score + d_upper(n), or -- for even n -- score ==
+    # prev_score + d_upper(n) + n//2 (the boundary-crosser n/2 re-picked as
+    # a lower number). Validated data-only (scratchpad eviction_cert_check.py)
+    # as zero-harmful (gap never increases where it fires) over all 998
+    # cold-chain transitions at n<=1000. This test re-derives that check,
+    # restricted to n<=400: solve_upper_half over the full n<=1000 range
+    # takes ~70s in CPython (well over a reasonable pytest budget), while
+    # n<=400 takes ~4s and still exercises many firings.
+    from bound import DEFAULT_OPTIMAL
+
+    n_max = 400
+    spf = smallest_prime_factors(n_max)
+    u_star = {n: sum(solve_upper_half(n, spf)[0]) for n in range(0, n_max + 1)}
+
+    optimal = json.loads(DEFAULT_OPTIMAL.read_text())
+    opt_score = {g["n"]: g["score"] for g in optimal}
+
+    cold_path = Path(__file__).resolve().parent / "continuation_cold_results.json"
+    chain = json.loads(cold_path.read_text())
+    chain_by_n = {r["n"]: r for r in chain if r["n"] <= n_max}
+
+    fired = 0
+    for n in range(3, n_max + 1):
+        if n not in chain_by_n or (n - 1) not in chain_by_n:
+            continue
+        prev_score = chain_by_n[n - 1]["score"]
+        score_n = chain_by_n[n]["score"]
+        d_upper = u_star[n] - u_star[n - 1]
+        fires = (score_n == prev_score + d_upper) or (
+            n % 2 == 0 and score_n == prev_score + d_upper + n // 2
+        )
+        if not fires:
+            continue
+        fired += 1
+        gap_n = opt_score[n] - score_n
+        gap_prev = opt_score[n - 1] - prev_score
+        assert gap_n <= gap_prev, (
+            f"upper-delta certificate fired harmfully at n={n}: "
+            f"gap {gap_prev} -> {gap_n}"
+        )
+    assert fired > 0  # sanity: the rule actually exercised firings in range
+
+
 def test_fm_bound_matches_published_values():
     pytest.importorskip("networkx")
     from bound import fm_bound

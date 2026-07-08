@@ -30,8 +30,9 @@ Every produced solution is validated by deriving a real-game order from
 the matching and replaying it under the true rules (approx.check_sequence)
 to reproduce the recorded score.
 
-Certificates. Two record-level labels certify a score as provably optimal
-given the previous game's score, without re-solving game n from scratch:
+Certificates. Three record-level labels certify a score as provably (or,
+for the third, conjecturally) optimal given the previous game's score,
+without re-solving game n from scratch:
 
   * "exact" -- the incumbent (or final) score equals n + prev_score, i.e.
     prepending n to the previous game's own solution is already optimal
@@ -49,19 +50,44 @@ given the previous game's score, without re-solving game n from scratch:
     swapping any smaller prime up to p_hat into that slot is always
     feasible and only improves the score). Conversely, prepending N to an
     optimal (N-1) solution with its prime removed is always legal, so the
-    bound is tight. Both certificates are label-only: they are computed
-    from the *final* settled score after all search tiers and the solvent
-    re-anchor, and never gate or skip the search itself (see solve_game).
+    bound is tight.
+  * "upper-delta" -- CONJECTURE-GRADE, no theorem behind it. Let U*(k) be
+    the sum of solve_upper_half(k, spf)'s returned sequence (the provably
+    optimal upper half of game k) and d_upper(n) = U*(n) - U*(n-1). The
+    certificate fires when score == prev_score + d_upper(n), or -- for
+    even n -- score == prev_score + d_upper(n) + n//2, the extra term
+    covering the boundary-crosser n/2: on an even game, n/2 sits exactly on
+    the upper/lower boundary of game n-1 (excluded, since the upper half is
+    strictly greater than (n-1)/2) but can be re-picked as a *lower* number
+    of game n once n/2 <= n/2, so a legal transition may carry it across as
+    a lower pick in addition to the upper-half delta. Validated (scratchpad
+    eviction_cert_check.py) as zero-harmful over all 998 cold-chain
+    transitions at n<=1000 (gap never increases when it fires), and the
+    underlying identity holds on 70.4% of ground-truth optimal.json
+    transitions -- strong empirical support, but unlike "exact" and
+    "prime" it has no correctness proof, so it is kept as a separate,
+    lower-confidence label.
+
+  "exact" and "prime" are, empirically, special cases of the upper-delta
+  identity (zero eviction from the upper half, and prime-evicts-prime,
+  respectively) but are kept as their own labels because they are proven;
+  "upper-delta" is the catch-all for the conjectured, unproven remainder.
+  All three certificates are label-only: they are computed from the
+  *final* settled score after all search tiers and the solvent re-anchor,
+  and never gate or skip the search itself (see solve_game), with the sole
+  exception of the lucky "exact" early exit described there.
 
 Usage:
     python3 continuation.py --from 500 --to 1000 [--seed-from-optimal]
                             [--bundle-limit K] [--out PATH] [--resume]
 
 --out is checkpointed every 5 games (and at the end) with each record's
-"_set" retained, so a container restart mid-run can be recovered from with
---resume: it loads the checkpoint, verifies it holds consecutive games
-starting at --from, and continues from where it left off. The final output
-file has "_set" stripped from every record, same as a non-resumed run.
+"_set" and "_upper_sum" retained, so a container restart mid-run can be
+recovered from with --resume: it loads the checkpoint, verifies it holds
+consecutive games starting at --from, and continues from where it left
+off. The final output
+file has "_set" and "_upper_sum" stripped from every record, same as a
+non-resumed run.
 """
 
 from __future__ import annotations
@@ -290,6 +316,7 @@ def solve_game(
     mf: Sequence[List[int]],
     prev_set: Set[int],
     prev_score: Optional[int],
+    prev_upper_sum: Optional[int],
     bundle_limit: int,
     reanchor_solvent: bool,
     optimal: Dict[int, Dict[str, Any]],
@@ -299,8 +326,11 @@ def solve_game(
     t0 = time.monotonic()
     evaluator = SetEval(n, mf)
 
-    # Step 1: seed the provably-optimal, always-playable upper half.
+    # Step 1: seed the provably-optimal, always-playable upper half. Its sum
+    # is U*(n), reused below (rather than recomputed) for the "upper-delta"
+    # certificate.
     upper_seq, _ = solve_upper_half(n, spf)
+    upper_sum = sum(upper_seq)
     for c in sorted(upper_seq, reverse=True):
         if not evaluator.playable_add(c):
             raise RuntimeError(f"upper-half selection {c} failed at n={n}")
@@ -369,7 +399,7 @@ def solve_game(
     churn = len(prev_lower ^ our_lower)
 
     # Certificates, computed on the FINAL settled score (after tiers and the
-    # solvent re-anchor adoption above) -- both are label-only postmortem
+    # solvent re-anchor adoption above) -- all three are label-only postmortem
     # checks, never a search cap. In a cold chain prev_score may itself be
     # suboptimal, so n + prev_score (- p_hat) computed from a suboptimal
     # prev is not a valid upper bound on opt(n); cutting search on it could
@@ -377,6 +407,12 @@ def solve_game(
     # never be wrong. (lucky_exit above is the one exception: it short-
     # circuits the search, but only on the same "score == n + prev_score"
     # condition re-checked here, so it always ends up labeled "exact".)
+    #
+    # Precedence: "exact", else "prime", else "upper-delta" -- the first two
+    # are proven identities; "upper-delta" (see module docstring) is
+    # CONJECTURE-GRADE, validated zero-harmful over all cold-chain
+    # transitions at n<=1000 and holding on 70.4% of ground-truth
+    # optimal.json transitions, but with no correctness proof.
     certificate: Optional[str] = None
     if prev_score is not None and our_score == n + prev_score:
         certificate = "exact"
@@ -388,6 +424,12 @@ def solve_game(
         and our_score == n + prev_score - largest_prime_below[n]
     ):
         certificate = "prime"
+    elif prev_score is not None and prev_upper_sum is not None:
+        d_upper = upper_sum - prev_upper_sum
+        if our_score == prev_score + d_upper:
+            certificate = "upper-delta"
+        elif n % 2 == 0 and our_score == prev_score + d_upper + n // 2:
+            certificate = "upper-delta"
     certified = certificate is not None
 
     record: Dict[str, Any] = {
@@ -401,6 +443,7 @@ def solve_game(
         "source": source,
         "time_s": round(time.monotonic() - t0, 4),
         "_set": sorted(output_set),  # carried forward; stripped before output
+        "_upper_sum": upper_sum,  # U*(n); carried forward, stripped before output
     }
     if n in optimal:
         opt = optimal[n]["score"]
@@ -452,6 +495,13 @@ def run(
         last = records[-1]
         prev_set: Set[int] = set(last["_set"])
         prev_score: Optional[int] = last["score"]
+        # "_upper_sum" is carried in checkpoints the same way "_set" is; fall
+        # back to recomputing U*(last n) for checkpoints written before this
+        # field existed.
+        if "_upper_sum" in last:
+            prev_upper_sum: Optional[int] = last["_upper_sum"]
+        else:
+            prev_upper_sum = sum(solve_upper_half(last["n"], spf)[0])
         start_n = last["n"] + 1
     else:
         records = []
@@ -466,13 +516,20 @@ def run(
         else:
             prev_set = set()
             prev_score = None
+        # U*(from_n - 1), the upper-delta certificate's starting point.
+        # solve_upper_half handles n<=0 gracefully (empty selection, sum 0),
+        # so this naturally gives U*(1) = 0 and U*(2) = 2 with no special
+        # casing -- covers --from 2 (prev game n=1 has U*=0) for free.
+        prev_upper_sum = sum(solve_upper_half(from_n - 1, spf)[0])
 
     started = time.monotonic()
     for i, n in enumerate(range(start_n, to_n + 1), 1):
-        rec = solve_game(n, spf, mf, prev_set, prev_score, bundle_limit,
-                          reanchor_solvent, optimal, largest_prime_below)
+        rec = solve_game(n, spf, mf, prev_set, prev_score, prev_upper_sum,
+                          bundle_limit, reanchor_solvent, optimal,
+                          largest_prime_below)
         prev_set = set(rec["_set"])
         prev_score = rec["score"]
+        prev_upper_sum = rec["_upper_sum"]
         records.append(rec)
         if i % 50 == 0:
             print(f"...through n={n} ({time.monotonic() - started:.0f}s)",
@@ -533,9 +590,11 @@ def print_summary(
     cert = sum(1 for r in records if r["certified"])
     cert_exact = sum(1 for r in records if r.get("certificate") == "exact")
     cert_prime = sum(1 for r in records if r.get("certificate") == "prime")
+    cert_upper = sum(1 for r in records if r.get("certificate") == "upper-delta")
     print(f"\nCertificate rate: {cert}/{total} "
           f"({100 * cert / total:.1f}%) -- "
-          f"exact {cert_exact}, prime-sacrifice {cert_prime}")
+          f"exact {cert_exact}, prime-sacrifice {cert_prime}, "
+          f"upper-delta {cert_upper}")
 
     # Solvent re-anchor adoptions.
     adopted = sum(1 for r in records if r.get("source") == "solvent")
@@ -623,6 +682,7 @@ def main(argv: List[str] | None = None) -> int:
 
     for r in records:
         r.pop("_set", None)
+        r.pop("_upper_sum", None)
     args.out.write_text(json.dumps(records, separators=(",", ":")))
     print_summary(records, elapsed, args.seed_from_optimal, args.reanchor_solvent)
     print(f"\n{args.out}: {len(records)} records, "
