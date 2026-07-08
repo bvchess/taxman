@@ -683,6 +683,16 @@ games, worst 97.13%; the floor fixed that and still gained +1,556
 points net - path dependence from re-seeding cost a few dozen points
 in three brief episodes, repaid many times over.)
 
+**The scoreboard, n = 2..1000** (n=1 excluded: its optimal score is
+0).  Average = mean of per-game percentages; share = total points /
+total optimal points:
+
+| strategy | avg % of optimal | point share | worst game | exact |
+|---|---|---|---|---|
+| onetax | 99.105% | 99.065% | 96.00% | 42/999 |
+| solvent | 99.855% | 99.851% | 99.08% | 214/999 |
+| continuation (cold, re-anchored) | **99.978%** | **99.972%** | **99.52%** | **502/999** |
+
 **The measured efficiency frontier (500..1000, one 2.8GHz core):**
 
 | configuration | share of optimal | wall time |
