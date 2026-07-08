@@ -47,9 +47,14 @@ scratchpad `ub_fill.py` pattern (merge existing results, write every
 
 ## Project context
 
-The active work lives in `mini/` (see `mini/README.md`): a clean
-Python implementation testing the theory that the >N/2 selections of
-an optimal Taxman game are computable in polynomial time, plus
-O(n^2)-class full-game strategies measured against
-`src/main/resources/optimal.json`.  Development happens on the branch
-`claude/taxman-polynomial-time-gy59il`; commit and push there.
+The active work lives in `mini/` (see `mini/README.md`): the proven
+polynomial-time upper half (`taxman_mini.py`, `verify.py`), the
+solvent strategy (`strategies.py`, readable version
+`solvent_simple.py`), the continuation solver with its certificates
+(`continuation.py`, `seteval.py`), and the yardsticks (`bound.py`,
+`certify.py`).  Committed datasets and charts live in
+`mini/results/`; scripts write elsewhere by default and must never
+overwrite committed results.  Retired experiments (diagnostic
+campaign, fork oracle, trust-certificates) exist only in git history
+and the README's "Dead ends" section.  Development happens on the
+branch `claude/taxman-polynomial-time-gy59il`; commit and push there.
