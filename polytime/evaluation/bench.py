@@ -6,7 +6,7 @@ smallest and largest sample, and profiles the most expensive strategy to
 show where its time goes.
 
 Usage:
-    python3 bench.py [--sizes 125,250,500,1000] [--repeat 3]
+    python3 -m evaluation.bench [--sizes 125,250,500,1000] [--repeat 3]
 """
 
 from __future__ import annotations
@@ -20,10 +20,14 @@ import sys
 import time
 from typing import Callable, List
 
-from strategies import (
-    cascade, divisor_lists, maximal_factor_lists, solvent, max_turn, one_tax,
+from core import (
+    divisor_lists, maximal_factor_lists, smallest_prime_factors,
+    solve_upper_half,
 )
-from taxman_mini import smallest_prime_factors, solve_upper_half
+from strategies.cascade import cascade
+from strategies.maxturn import max_turn
+from strategies.onetax import one_tax
+from strategies.solvent import solvent
 
 
 def best_time(fn: Callable[[], object], repeat: int) -> float:

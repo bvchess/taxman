@@ -6,7 +6,7 @@ i (1-indexed: `mask >> i & 1`) means "i is in the pot".  For n=10000 that is
 just a ~10000-bit int, which Python handles natively.
 
 `divisor_masks` and `multiple_masks` mirror the multiples-sieve pattern used
-by `divisor_lists` in strategies.py (for each d, walk its multiples with a
+by `divisor_lists` in core.py (for each d, walk its multiples with a
 step of d), so both run in O(n log n) rather than the O(n sqrt n) or O(n^2)
 cost of computing divisors per number.
 """
@@ -20,7 +20,7 @@ def divisor_masks(n: int) -> List[int]:
     """masks[c] has bit d set for every proper divisor d of c, for c <= n.
 
     masks[0] = masks[1] = 0 (no proper divisors).  Built with the same
-    multiples sieve as `divisor_lists` in strategies.py: O(n log n) total.
+    multiples sieve as `divisor_lists` in core.py: O(n log n) total.
     """
     masks: List[int] = [0] * (n + 1)
     for d in range(1, n // 2 + 1):

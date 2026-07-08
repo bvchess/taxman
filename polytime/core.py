@@ -1,9 +1,11 @@
-"""Taxman Mini: polynomial-time solver for the upper half of a Taxman game.
+"""Core polynomial-time reduction for the upper half of a Taxman game.
 
-Taxman Mini is a simplified Taxman game played with a set of potential
-selections C and a set of maximal factors F, where the maximal factor graph
-is bipartite: every number is either a selection or a factor, never both.
-(See https://github.com/bvchess/taxman/wiki/Taxman-Mini)
+The reduction is played with a set of potential selections C and a set of
+maximal factors F, where the maximal factor graph is bipartite: every
+number is either a selection or a factor, never both.
+(See https://github.com/bvchess/taxman/wiki/Taxman-Mini for the wiki's
+description of this reduction, "Taxman Mini", and the solve_mini /
+optimize_mini procedures implemented below.)
 
 For a regular Taxman game N, the numbers greater than N/2 are exactly the
 source nodes of the maximal factor graph (no number in the game is a multiple
@@ -12,10 +14,10 @@ of them), and all of their maximal factors are <= N/2.  So
     C = { c : N/2 < c <= N }
     F = union of the maximal factors of the members of C
 
-forms a valid Taxman Mini game.  The theory tested by this project is that
-optimize_mini/solve_mini applied to this game yield exactly the numbers
-greater than N/2 in the optimal solution to game N, along with a valid order
-in which to select them.
+forms a valid instance of the factor game. The theory tested by this project
+is that optimize_mini/solve_mini applied to this game yield exactly the
+numbers greater than N/2 in the optimal solution to game N, along with a
+valid order in which to select them.
 """
 
 from __future__ import annotations
@@ -23,7 +25,7 @@ from __future__ import annotations
 from typing import Dict, Iterable, List, Sequence, Set, Tuple
 
 
-class MiniInfeasible(Exception):
+class Infeasible(Exception):
     """Raised by solve_mini when not all members of C can be selected."""
 
 
@@ -62,7 +64,7 @@ def solve_mini(
     factors: Iterable[int],
     mf: Dict[int, Set[int]],
 ) -> Tuple[List[int], Dict[int, int]]:
-    """Order the selections of a Taxman Mini game so every one can be taken.
+    """Order the selections of a factor game so every one can be taken.
 
     Implements the recursive procedure from the wiki iteratively:
 
@@ -75,7 +77,7 @@ def solve_mini(
             ERROR: cannot select all members of C using F
 
     Returns (sequence, matching) where matching maps each selection to the
-    factor it pays as tax.  Raises MiniInfeasible if no ordering exists.
+    factor it pays as tax.  Raises Infeasible if no ordering exists.
     """
     c_set = set(selections)
     f_set = set(factors)
@@ -110,13 +112,13 @@ def solve_mini(
             if len(facs) == 1:
                 single_factor.add(other_c)
             elif not facs:
-                raise MiniInfeasible(f"{other_c} has no remaining factor")
+                raise Infeasible(f"{other_c} has no remaining factor")
 
     while c_set:
         while single_factor:
             c = single_factor.pop()
             if not fac_of[c]:
-                raise MiniInfeasible(f"{c} has no remaining factor")
+                raise Infeasible(f"{c} has no remaining factor")
             (f,) = fac_of[c]
             front.append(c)
             matching[c] = f
@@ -132,7 +134,7 @@ def solve_mini(
             matching[c] = f
             remove_pair(c, f)
         else:
-            raise MiniInfeasible(
+            raise Infeasible(
                 f"cannot select all of {sorted(c_set)} using {sorted(f_set)}"
             )
 
@@ -158,7 +160,7 @@ def optimize_mini(
         r_f2 = r_f | (mf[c] & f_set)
         try:
             solve_mini(opt_c2, r_f2, mf)
-        except MiniInfeasible:
+        except Infeasible:
             continue
         opt_c = opt_c2
         r_f = r_f2
@@ -200,12 +202,12 @@ def order_for_real_game(matching: Dict[int, int]) -> List[int]:
         ready.sort(reverse=True)
 
     if len(order) != len(matching):
-        raise MiniInfeasible("cycle in selection ordering constraints")
+        raise Infeasible("cycle in selection ordering constraints")
     return order
 
 
 def upper_half_game(n: int, spf: Sequence[int]) -> Tuple[Set[int], Set[int], Dict[int, Set[int]]]:
-    """The Taxman Mini game formed by the upper half of Taxman game n.
+    """The factor game formed by the upper half of Taxman game n.
 
     Returns (C, F, mf) where C is every number greater than n/2, F is the
     union of their maximal factors, and mf maps each member of C to its
@@ -227,3 +229,47 @@ def solve_upper_half(n: int, spf: Sequence[int]) -> Tuple[List[int], Set[int]]:
     opt_c, r_f = optimize_mini(c_set, f_set, mf)
     _, matching = solve_mini(opt_c, r_f, mf)
     return order_for_real_game(matching), r_f
+
+
+# ---------------------------------------------------------------------------
+# whole-game helpers shared by every strategy and evaluation script
+# ---------------------------------------------------------------------------
+
+def divisor_lists(n: int) -> List[List[int]]:
+    """divs[m] is every proper divisor of m (1 <= divisor < m), for m <= n."""
+    divs: List[List[int]] = [[] for _ in range(n + 1)]
+    for d in range(1, n // 2 + 1):
+        for m in range(2 * d, n + 1, d):
+            divs[m].append(d)
+    return divs
+
+
+def maximal_factor_lists(n: int) -> List[List[int]]:
+    """mf[m] is every maximal factor of m (f with m/f prime), ascending.
+
+    Same shape and index contract as divisor_lists (indices 0 and 1 are
+    empty).  This is the candidate-payment pool for the matching machinery:
+    the lifting lemma guarantees any surviving proper divisor of a pick
+    lifts to a surviving maximal factor outside the set, so restricting the
+    pool to maximal factors is matching-equivalent to using all proper
+    divisors (confirmed bit-identical for every n in 1..1000).
+    """
+    spf = smallest_prime_factors(n)
+    mf: List[List[int]] = [[] for _ in range(n + 1)]
+    for c in range(2, n + 1):
+        mf[c] = sorted(maximal_factors(c, spf))
+    return mf
+
+
+def check_sequence(n: int, sequence: Sequence[int]) -> int:
+    """Score a sequence while verifying it is a legal game of Taxman n."""
+    pot = set(range(1, n + 1))
+    score = 0
+    for c in sequence:
+        tax = {d for d in pot if d != c and c % d == 0}
+        if c not in pot or not tax:
+            raise RuntimeError(f"illegal sequence for game {n} at {c}")
+        pot -= tax
+        pot.remove(c)
+        score += c
+    return score

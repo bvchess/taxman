@@ -1,9 +1,10 @@
 """Verify the upper-half theory against known optimal Taxman solutions.
 
 Theory: for every game N there is a polynomial-time algorithm (optimize_mini
-followed by solve_mini on the upper-half Taxman Mini game) that produces
-exactly the numbers greater than N/2 in the optimal solution, along with an
-order in which those numbers can all be selected.
+followed by solve_mini on the upper-half factor game, see
+https://github.com/bvchess/taxman/wiki/Taxman-Mini) that produces exactly
+the numbers greater than N/2 in the optimal solution, along with an order
+in which those numbers can all be selected.
 
 For each game this script checks:
 
@@ -18,7 +19,7 @@ For each game this script checks:
      Optimal orderings are not unique, so a difference is not a failure.
 
 Usage:
-    python3 verify.py [--max-n 1000] [--optimal PATH] [-v]
+    python3 -m evaluation.verify [--max-n 1000] [--optimal PATH] [-v]
 """
 
 from __future__ import annotations
@@ -30,9 +31,9 @@ import time
 from pathlib import Path
 from typing import List, Sequence, Set
 
-from taxman_mini import smallest_prime_factors, solve_upper_half
+from core import smallest_prime_factors, solve_upper_half
 
-DEFAULT_OPTIMAL = Path(__file__).resolve().parent.parent / "src/main/resources/optimal.json"
+DEFAULT_OPTIMAL = Path(__file__).resolve().parent.parent.parent / "src/main/resources/optimal.json"
 
 
 def replay(sequence: Sequence[int], pot: Set[int]) -> bool:

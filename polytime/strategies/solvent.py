@@ -1,0 +1,221 @@
+"""solvent: matching-based full-game approximation of optimal Taxman play.
+
+The full-game generalization of "take the highest prime": consider
+n, n-1, ..., 2 and accept each number if the pick set stays playable.
+Playability is decided two-tier: a cheap incremental augmenting search
+(Kuhn) plus acyclicity check tries to extend the matching in place, and on
+any failure the complete tier (an exact bipartite reduction via solve_mini)
+decides accept/reject exactly.  The complete tier trusts the conjecture
+that solve_mini's returned assignment is always schedulable (zero
+counterexamples across all runs), so any matching it returns is accepted
+unconditionally; the sole rejection reason is now "infeasible" (solve_mini
+found no assignment at all).  A complete-tier rejection is permanent:
+playable sets are downward-closed, so a set that cannot be matched now can
+never be matched after more elements are added.
+
+The key fact (a generalization of the ordering argument in evaluation.verify):
+
+    A set S of selections can all be played, in some order, if and only
+    if there is a matching that assigns each selection a distinct divisor
+    still in the game, such that the precedence relation "a before b
+    whenever a's assigned divisor divides b, or a divides b" is acyclic.
+
+    Playing any topological order works: a selection's assigned divisor
+    cannot be swept earlier (everything divisible by it comes later), and
+    a selection that is itself someone's divisor is played before being
+    swept.  Conversely, a real game induces such a matching (pick one
+    paid divisor per selection) and its play order is a linear extension.
+"""
+
+from __future__ import annotations
+
+from typing import Dict, List, Optional, Sequence, Set, Tuple
+
+from core import Infeasible, solve_mini
+
+
+def _augment(
+    v: int,
+    owner: Dict[int, int],
+    selected: Set[int],
+    mf: Sequence[List[int]],
+    visited: Set[int],
+    trail: List[Tuple[int, Optional[int]]],
+) -> bool:
+    """Kuhn's augmenting search: find v a candidate factor, reassigning others.
+
+    `mf` is the candidate-payment pool (maximal factors); every owner change
+    is recorded on the trail so it can be rolled back.
+    """
+    for f in reversed(mf[v]):
+        if f in selected or f in visited:
+            continue
+        visited.add(f)
+        holder = owner.get(f)
+        if holder is None or _augment(holder, owner, selected, mf, visited, trail):
+            trail.append((f, holder))
+            owner[f] = v
+            return True
+    return False
+
+
+def _rollback(owner: Dict[int, int], trail: List[Tuple[int, Optional[int]]]) -> None:
+    for f, previous in reversed(trail):
+        if previous is None:
+            del owner[f]
+        else:
+            owner[f] = previous
+
+
+def _complete_matching(
+    target: Set[int], mf: Sequence[List[int]]
+) -> Optional[Dict[int, int]]:
+    """Decide playability of `target` exactly via the factor-game reduction.
+
+    Tier 1's cycle retry only reshuffles the candidate's own coupon; a real
+    cycle can require OTHER picks' coupons to move too, which falsely
+    vetoes playable candidates (see strategies.seteval.SetEval, which
+    proves this out).  This is the complete tier: reduce target to a
+    bipartite factor game -- each pick maps to the set of its candidate
+    factors (maximal factors) NOT in target -- and let solve_mini decide
+    exactly, returning a full pick -> factor matching, or None if no
+    assignment covers every pick.
+    """
+    avail = {c: {d for d in mf[c] if d not in target} for c in target}
+    factors: Set[int] = set().union(*avail.values()) if avail else set()
+    try:
+        _, matching = solve_mini(target, factors, avail)
+    except Infeasible:
+        return None
+    return matching
+
+
+def _is_acyclic(selected: Set[int], owner: Dict[int, int], n: int) -> bool:
+    """Kahn's check of the precedence relation over the selected set."""
+    indeg = {c: 0 for c in selected}
+    succ: Dict[int, List[int]] = {c: [] for c in selected}
+    match = {c: f for f, c in owner.items() if c in selected}
+    for a in selected:
+        seen = set()
+        for start in (match[a], a):
+            for b in range(2 * start, n + 1, start):
+                if b in selected and b != a and b not in seen:
+                    seen.add(b)
+                    succ[a].append(b)
+                    indeg[b] += 1
+    ready = [c for c in selected if indeg[c] == 0]
+    done = 0
+    while ready:
+        a = ready.pop()
+        done += 1
+        for b in succ[a]:
+            indeg[b] -= 1
+            if indeg[b] == 0:
+                ready.append(b)
+    return done == len(selected)
+
+
+def _playable_order(
+    selected: Set[int], match: Dict[int, int], n: int
+) -> List[int]:
+    """Topologically order selections by the precedence relation.
+
+    The fast path's acceptances are verified acyclic before being
+    committed; the complete tier instead trusts the conjecture that
+    solve_mini's returned assignment is always schedulable, so it accepts
+    unconditionally.  Either way the final matching is expected acyclic,
+    and a single Kahn's-algorithm pass orders every element.  A leftover
+    cycle would be a conjecture violation, so this raises rather than
+    repairing it.
+    """
+    succ: Dict[int, List[int]] = {c: [] for c in selected}
+    indeg: Dict[int, int] = {c: 0 for c in selected}
+    for a in selected:
+        seen = set()
+        for start in (match[a], a):
+            for b in range(2 * start, n + 1, start):
+                if b in selected and b != a and b not in seen:
+                    seen.add(b)
+                    succ[a].append(b)
+                    indeg[b] += 1
+    ready = sorted(c for c in selected if indeg[c] == 0)
+    order: List[int] = []
+    while ready:
+        a = ready.pop()
+        order.append(a)
+        for b in succ[a]:
+            indeg[b] -= 1
+            if indeg[b] == 0:
+                ready.append(b)
+    if len(order) != len(selected):
+        raise RuntimeError(
+            "conjecture violated: solve_mini produced an unschedulable "
+            "assignment (see README, 'cyclic')"
+        )
+    return order
+
+
+def solvent(
+    n: int,
+    mf: Sequence[List[int]],
+    rejections: Optional[List[Tuple[int, str]]] = None,
+) -> List[int]:
+    """Solvent matching approximation of a full game; returns the sequence.
+
+    `mf` is the candidate-payment pool: each pick's maximal factors (f with
+    pick/f prime), as built by core.maximal_factor_lists.  This is the
+    correct pool for the matching question ("can every pick reserve a
+    distinct payment?") -- the lifting lemma proves it matching-equivalent
+    to the full proper-divisor pool, and feeding maximal factors instead of
+    all divisors was verified bit-identical (set and score) for every n in
+    1..1000.
+    """
+    selected: Set[int] = set()
+    owner: Dict[int, int] = {}  # factor -> selection paying it
+
+    def try_select(m: int) -> bool:
+        # STEP 1 -- fast path: an opportunistic incremental extension of
+        # the current matching.  Any failure here rolls back fully and
+        # falls through to the complete tier; nothing is rejected yet.
+        pre_trail: List[Tuple[int, Optional[int]]] = []
+        if m in owner:
+            # m currently serves as someone's tax; try to re-route that
+            # holder onto a different divisor without touching m.
+            holder = owner.pop(m)
+            if _augment(holder, owner, selected, mf, {m}, pre_trail):
+                pre_trail.append((m, holder))  # rollback restores m's owner
+            else:
+                owner[m] = holder  # undo the pop; fall through to step 2
+                pre_trail = []
+
+        if len(pre_trail) or m not in owner:
+            selected.add(m)  # blocks m from being used as anyone's tax
+            trail: List[Tuple[int, Optional[int]]] = []
+            if _augment(m, owner, selected, mf, set(), trail):
+                if _is_acyclic(selected, owner, n):
+                    return True  # fast, common-case silent success
+                _rollback(owner, trail)
+            selected.discard(m)
+            _rollback(owner, pre_trail)
+
+        # STEP 2 -- complete tier: the unconditional decider.  `selected`
+        # does not contain m here (the fast path rolled back fully), so
+        # pass a fresh `selected | {m}` without mutating shared state.
+        matching = _complete_matching(selected | {m}, mf)
+        if matching is None:
+            if rejections is not None:
+                rejections.append((m, "infeasible"))
+            return False
+        owner_candidate = {f: c for c, f in matching.items()}
+        owner.clear()
+        owner.update(owner_candidate)
+        selected.add(m)
+        return True
+
+    for m in range(n, 1, -1):
+        if not mf[m]:
+            continue
+        try_select(m)
+
+    match = {c: f for f, c in owner.items() if c in selected}
+    return _playable_order(selected, match, n)

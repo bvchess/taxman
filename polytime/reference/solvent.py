@@ -3,7 +3,7 @@
 This is the executable version of the pseudocode in README.md
 ("Solvent, final form"): correct, minimal, and unhurried.  The fast,
 bit-identical implementation (incremental matching + Kuhn augmenting
-paths) lives in strategies.py's solvent().
+paths) lives in strategies/solvent.py's solvent().
 
 The game, in one breath: the pot holds 1..n; picking a number c keeps
 c for you and surrenders every divisor of c still in the pot to the
@@ -50,12 +50,12 @@ What makes it special:
 
 Run it with the game size as the only argument:
 
-    $ python3 solvent_simple.py 21
+    $ python3 -m reference.solvent 21
     picks, in playing order: [19, 9, 15, 21, 14, 18, 12, 16, 20]
     score (sum of picks):    144
 
 (144 is the known optimum for n=21.)  Sizes up to a few hundred
-answer in seconds; beyond that, use strategies.py's fast solvent().
+answer in seconds; beyond that, use strategies/solvent.py's fast solvent().
 """
 
 
@@ -126,7 +126,7 @@ def solve_mini(members, factors, factors_of):
 def playable(s_set):
     """Can this set of picks be a legal game?  The heart of the strategy.
 
-    Reduce the question to a "mini game": the candidate picks are the
+    Reduce the question to a factor game: the candidate picks are the
     members, and the payment pool holds every number OUTSIDE the set
     that is a MAXIMAL factor of a member (an f with member/f prime; a
     number inside the set is a pick, so it cannot double as anyone's tax

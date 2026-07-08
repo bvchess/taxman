@@ -78,7 +78,7 @@ without re-solving game n from scratch:
   exception of the lucky "exact" early exit described there.
 
 Usage:
-    python3 continuation.py --from 500 --to 1000 [--seed-from-optimal]
+    python3 -m strategies.continuation --from 500 --to 1000 [--seed-from-optimal]
                             [--bundle-limit K] [--out PATH] [--resume]
 
 --out is checkpointed every 5 games (and at the end) with each record's
@@ -101,12 +101,12 @@ from math import gcd
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
-from strategies import check_sequence, maximal_factor_lists, solvent
-from seteval import SetEval
-from taxman_mini import smallest_prime_factors, solve_upper_half
-from verify import DEFAULT_OPTIMAL
+from core import check_sequence, maximal_factor_lists, smallest_prime_factors, solve_upper_half
+from evaluation.verify import DEFAULT_OPTIMAL
+from strategies.seteval import SetEval
+from strategies.solvent import solvent
 
-MINI_DIR = Path(__file__).resolve().parent
+PKG_DIR = Path(__file__).resolve().parent.parent
 
 TIER1_STEP_CAP = 80
 TIER2_REFILL_K = 30
@@ -122,7 +122,7 @@ def derive_order(n: int, S: Set[int], match: Dict[int, int]) -> List[int]:
     Topologically sorts the full playability precedence -- "a before b
     whenever a's assigned coupon divides b, OR a divides b" -- exactly the
     relation SetEval's acyclicity check verifies.  (order_for_real_game in
-    taxman_mini only encodes the coupon edges, which suffices for the
+    core.py only encodes the coupon edges, which suffices for the
     upper half where no pick divides another, but a full game also needs
     the pick-divides-pick edges so a claimed number is not swept as tax by
     a larger pick played first.)  A valid, acyclic matching always yields a
@@ -634,7 +634,7 @@ def main(argv: List[str] | None = None) -> int:
                              "the chain's solution")
     parser.add_argument("--optimal", type=Path, default=DEFAULT_OPTIMAL)
     parser.add_argument("--out", type=Path,
-                        default=MINI_DIR / "continuation_out.json")
+                        default=PKG_DIR / "continuation_out.json")
     parser.add_argument("--resume", action="store_true",
                         help="resume from an existing --out checkpoint left "
                              "by an interrupted run")

@@ -1,6 +1,6 @@
-"""Unit tests for taxman_mini, anchored to the examples in the wiki.
+"""Unit tests for core.py, anchored to the examples in the wiki.
 
-Run with:  python3 -m pytest test_taxman_mini.py   (or just python3 test_taxman_mini.py)
+Run with:  python3 -m pytest evaluation/test_taxman.py   (from polytime/)
 """
 
 import json
@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from taxman_mini import (
-    MiniInfeasible,
+from core import (
+    Infeasible,
     maximal_factors,
     optimize_mini,
     smallest_prime_factors,
@@ -17,9 +17,11 @@ from taxman_mini import (
     solve_upper_half,
     upper_half_game,
 )
-from verify import replay
+from evaluation.verify import replay
 
 SPF = smallest_prime_factors(1000)
+
+RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
 
 
 def mf_table(numbers):
@@ -46,7 +48,7 @@ def test_solve_mini_single_selection():
 def test_solve_mini_infeasible_two_primes_one_factor():
     # Two primes share the single factor 1: only one can be selected.
     mf = mf_table([5, 7])
-    with pytest.raises(MiniInfeasible):
+    with pytest.raises(Infeasible):
         solve_mini({5, 7}, {1}, mf)
 
 
@@ -55,7 +57,7 @@ def test_solve_mini_shared_core_is_infeasible():
     # in a way that forms a 2-core: 12 -> {6, 4}, 18 -> {6, 9}.  With only
     # {6} available both compete for one factor.
     mf = mf_table([12, 18])
-    with pytest.raises(MiniInfeasible):
+    with pytest.raises(Infeasible):
         solve_mini({12, 18}, {6}, mf)
 
 
@@ -101,10 +103,10 @@ def test_replay_rejects_taxless_selection():
 
 
 def test_strategies_are_legal_and_sane():
-    from strategies import (
-        cascade, check_sequence, divisor_lists, maximal_factor_lists, solvent,
-        one_tax,
-    )
+    from core import check_sequence, divisor_lists, maximal_factor_lists
+    from strategies.cascade import cascade
+    from strategies.onetax import one_tax
+    from strategies.solvent import solvent
 
     divs = divisor_lists(128)
     mf = maximal_factor_lists(128)
@@ -124,33 +126,27 @@ def test_solvent_regression_floor():
     # The simplified two-tier solvent must never score below the recorded
     # baseline in results/solvent_1000.json (it may legitimately improve on
     # it by shedding bogus rejections, hence a floor check rather than ==).
-    from strategies import check_sequence, maximal_factor_lists, solvent
+    from core import check_sequence, maximal_factor_lists
+    from strategies.solvent import solvent
 
-    stored = json.loads(
-        (Path(__file__).resolve().parent / "results" / "solvent_1000.json")
-        .read_text()
-    )
+    stored = json.loads((RESULTS_DIR / "solvent_1000.json").read_text())
     mf = maximal_factor_lists(1000)  # a larger table is valid for any smaller n
     for n in (21, 100, 250, 500, 750, 1000):
         assert check_sequence(n, solvent(n, mf)) >= stored[str(n)]
 
 
 def test_solvent_simple_matches_canonical():
-    # solvent_simple.py is a plain, from-scratch executable spec of the
+    # reference/solvent.py is a plain, from-scratch executable spec of the
     # README's "Solvent, final form" pseudocode; it must agree exactly with
     # both the recorded canonical scores and the fast strategies.solvent()
     # output (the README states the canonical set is a deterministic
     # function of playability alone), and produce a legal game.
-    from strategies import (
-        check_sequence, maximal_factor_lists, solvent as strategies_solvent,
-    )
+    from core import check_sequence, maximal_factor_lists
+    from strategies.solvent import solvent as strategies_solvent
 
-    import solvent_simple
+    import reference.solvent as solvent_simple
 
-    stored = json.loads(
-        (Path(__file__).resolve().parent / "results" / "solvent_1000.json")
-        .read_text()
-    )
+    stored = json.loads((RESULTS_DIR / "solvent_1000.json").read_text())
     mf = maximal_factor_lists(60)
     for n in range(1, 61):
         seq = solvent_simple.solvent(n)
@@ -166,7 +162,7 @@ def test_prime_sacrifice_identity():
     # p_hat is the largest prime below N. Pure data check against
     # optimal.json -- no solver runs -- for every prime N in 3..1000
     # (validated 167/167 in the original measurement).
-    from bound import DEFAULT_OPTIMAL
+    from evaluation.bound import DEFAULT_OPTIMAL
 
     optimal = json.loads(DEFAULT_OPTIMAL.read_text())
     scores = {g["n"]: g["score"] for g in optimal}
@@ -190,8 +186,8 @@ def test_prime_sacrifice_identity():
 
 
 def test_upper_delta_certificate_is_benign():
-    # continuation.py's third certificate kind ("upper-delta", CONJECTURE-
-    # GRADE): let U*(k) = sum(solve_upper_half(k, spf)[0]) and
+    # strategies.continuation's third certificate kind ("upper-delta",
+    # CONJECTURE-GRADE): let U*(k) = sum(solve_upper_half(k, spf)[0]) and
     # d_upper(n) = U*(n) - U*(n-1). The certificate fires when
     # score == prev_score + d_upper(n), or -- for even n -- score ==
     # prev_score + d_upper(n) + n//2 (the boundary-crosser n/2 re-picked as
@@ -201,7 +197,7 @@ def test_upper_delta_certificate_is_benign():
     # restricted to n<=400: solve_upper_half over the full n<=1000 range
     # takes ~70s in CPython (well over a reasonable pytest budget), while
     # n<=400 takes ~4s and still exercises many firings.
-    from bound import DEFAULT_OPTIMAL
+    from evaluation.bound import DEFAULT_OPTIMAL
 
     n_max = 400
     spf = smallest_prime_factors(n_max)
@@ -210,9 +206,7 @@ def test_upper_delta_certificate_is_benign():
     optimal = json.loads(DEFAULT_OPTIMAL.read_text())
     opt_score = {g["n"]: g["score"] for g in optimal}
 
-    cold_path = (
-        Path(__file__).resolve().parent / "results" / "chain_cold_1000.json"
-    )
+    cold_path = RESULTS_DIR / "chain_cold_1000.json"
     chain = json.loads(cold_path.read_text())
     chain_by_n = {r["n"]: r for r in chain if r["n"] <= n_max}
 
@@ -240,7 +234,7 @@ def test_upper_delta_certificate_is_benign():
 
 def test_fm_bound_matches_published_values():
     pytest.importorskip("networkx")
-    from bound import fm_bound
+    from evaluation.bound import fm_bound
 
     assert fm_bound(21) == 145
     assert fm_bound(50) == 811

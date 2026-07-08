@@ -11,15 +11,15 @@ rollback so a rejected mutation fully restores prior state.
 This class was extracted verbatim from transitions.py (which now imports
 it) so the continuation solver and the transition anatomy share one
 validated evaluator.  It mirrors strategies.solvent's matching machinery and
-falls back to taxman_mini.solve_mini for a complete playability decision
-when the fast, incomplete solvent tier rejects an add.
+falls back to core.solve_mini for a complete playability decision when the
+fast, incomplete solvent tier rejects an add.
 """
 
 from __future__ import annotations
 
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
-from taxman_mini import MiniInfeasible, solve_mini
+from core import Infeasible, solve_mini
 
 
 # ---------------------------------------------------------------------------
@@ -117,7 +117,7 @@ class SetEval:
         per game around n=500, e.g. 230/225/220 which sit inside the
         provably-playable optimal set).  So when the fast tier rejects, a
         complete tier runs: solve_mini decides the bipartite selectability
-        of S + {x} exactly (raising MiniInfeasible iff no assignment covers
+        of S + {x} exactly (raising Infeasible iff no assignment covers
         every pick) and its canonical order is confirmed acyclic under the
         full real-game precedence.  Only a rejection by BOTH tiers is a
         real "unplayable".  Any failure fully restores prior state.
@@ -182,18 +182,18 @@ class SetEval:
     ) -> Optional[Dict[int, int]]:
         """Decide playability of `target` exactly, returning a matching.
 
-        Reduces the pick set to a bipartite Taxman Mini game (each pick to
+        Reduces the pick set to a bipartite factor game (each pick to
         its proper divisors that lie outside the set) and lets solve_mini
         find an assignment or prove none exists.  A returned assignment is
         confirmed acyclic under the full real-game precedence (both the
         coupon edges and the pick-divides-pick edges) before acceptance;
-        None means no playable assignment (MiniInfeasible or a cyclic one).
+        None means no playable assignment (Infeasible or a cyclic one).
         """
         avail = {c: {d for d in self.mf[c] if d not in target} for c in target}
         factors: Set[int] = set().union(*avail.values()) if avail else set()
         try:
             _, matching = solve_mini(target, factors, avail)
-        except MiniInfeasible:
+        except Infeasible:
             return None
         if not self._matching_acyclic(target, matching):
             return None

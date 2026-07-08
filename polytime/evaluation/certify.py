@@ -1,11 +1,11 @@
 """Independent verification of optimal.json, free of the frame theory.
 
-optimal.json was produced by the frame/mini-game solver, and this
+optimal.json was produced by the frame/factor-game solver, and this
 project's upper-half algorithm is built on the same structural theory.
 Agreement between them is therefore not, by itself, evidence that
 either is correct.  This script certifies as much of optimal.json as
 possible using only arguments that share no assumptions with frames,
-mini games, or maximal-factor decompositions:
+the factor game, or maximal-factor decompositions:
 
 1. Replay: every solution in optimal.json is checked to be a legal
    game whose score matches, making every entry a sound LOWER bound.
@@ -32,7 +32,7 @@ mini games, or maximal-factor decompositions:
    is certified outright.  Requires networkx; skipped if unavailable.
 
 Usage:
-    python3 certify.py [--budget 30] [--brute-max 64]
+    python3 -m evaluation.certify [--budget 30] [--brute-max 64]
                        [--matching-max 300] [--optimal PATH]
 """
 
@@ -45,10 +45,9 @@ import time
 from pathlib import Path
 from typing import Dict, FrozenSet, List, Optional, Set, Tuple
 
-from strategies import check_sequence, divisor_lists
-from bitpot import bits, divisor_masks, mask_of, multiple_masks, popcount
-from taxman_mini import smallest_prime_factors, solve_upper_half
-from verify import DEFAULT_OPTIMAL
+from core import check_sequence, divisor_lists, smallest_prime_factors, solve_upper_half
+from evaluation.bitpot import bits, divisor_masks, mask_of, multiple_masks, popcount
+from evaluation.verify import DEFAULT_OPTIMAL
 
 
 class OutOfTime(Exception):

@@ -19,8 +19,8 @@ N <= 122 (the last tight game is N=122).  Over N=500..1000 the optimum
 averages 99.71% of the bound and never falls below 99.57%.
 
 Usage:
-    python3 bound.py 21 128 1000
-    python3 bound.py --max-n 1000 --out bounds.json
+    python3 -m evaluation.bound 21 128 1000
+    python3 -m evaluation.bound --max-n 1000 --out bounds.json
 """
 
 from __future__ import annotations
@@ -31,14 +31,14 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
-from taxman_mini import maximal_factors, smallest_prime_factors
+from core import maximal_factors, smallest_prime_factors
 
 try:
     import networkx as nx
 except ImportError:
     nx = None
 
-DEFAULT_OPTIMAL = Path(__file__).resolve().parent.parent / "src/main/resources/optimal.json"
+DEFAULT_OPTIMAL = Path(__file__).resolve().parent.parent.parent / "src/main/resources/optimal.json"
 
 
 def fm_bound(n: int, spf: Optional[Sequence[int]] = None) -> int:
