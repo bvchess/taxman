@@ -1,4 +1,4 @@
-# Taxman Mini: most of an optimal Taxman game in polynomial time
+# Most of an optimal Taxman game in polynomial time
 
 Taxman is played against a pot {1..n}: picking c keeps c and surrenders
 every divisor of c still in the pot; every pick must surrender at least
@@ -10,8 +10,8 @@ Three results, in increasing order of ambition:
 
 1. **The selections greater than n/2 of an optimal game — and a legal
    order for them — are computable in O(n²)** (the theory this project
-   set out to test, from the
-   [Taxman Mini wiki](https://github.com/bvchess/taxman/wiki/Taxman-Mini)).
+   set out to test, from
+   [the wiki](https://github.com/bvchess/taxman/wiki/Taxman-Mini)).
    Verified against known optimal solutions for every n = 1..1000.
 2. **An O(n²)-class strategy for the whole game — solvent — holds
    99.85% of all optimal points** over n = 1..1000, never dropping
@@ -99,8 +99,8 @@ membership, in the matroid sense — but the strategy players call
 below, a far weaker thing.)
 
 The algorithm of record is committed as a runnable reference
-implementation, `solvent_simple.py`, verified for exact set equality
-against the fast implementation:
+implementation, `reference/solvent.py`, verified for exact set
+equality against the fast implementation:
 
 ```python
 def solvent(n):
@@ -119,9 +119,9 @@ promoted to the whole game — restrict it to the numbers above n/2 and
 it collapses back — and its rejections are theorems (no payment
 assignment exists, and larger sets are only harder to pay), which
 makes the output set canonical: a deterministic function of
-playability alone.  The fast version in `strategies.py` (incremental
-Kuhn matching, complete solve_mini fallback tier) is bit-identical at
-a fraction of the cost.
+playability alone.  The fast version in `strategies/solvent.py`
+(incremental Kuhn matching, complete solve_mini fallback tier) is
+bit-identical at a fraction of the cost.
 
 Results over n = 2..1000 against the known optima (n=1 excluded — its
 optimal score is 0; `onetax` and `maxturn` are the two heuristics from
@@ -149,7 +149,7 @@ Transition measurements motivated the design: the optimal solution of
 game n sits a tiny, local perturbation from game n−1's (76% of
 transitions are pure insertions; mean lower-half churn ~1.2 numbers;
 13.6% are "blocked valleys" crossable only by atomic multi-flip
-bundles).  `continuation.py` solves games in sequence, each
+bundles).  `strategies/continuation.py` solves games in sequence, each
 warm-started from the previous game's own output:
 
 1. exact upper half (`solve_upper_half` — no search);
@@ -221,7 +221,7 @@ ones that must run regardless).
 
 ## The yardsticks
 
-**The Franklín–Moniot upper bound** (`bound.py`, exact values for
+**The Franklín–Moniot upper bound** (`evaluation/bound.py`, exact values for
 every n = 2..2000 in `results/fm_bound_2000.json`): the max-weight
 matching over maximal-factor edges — what optimal play would score if
 payments needed no schedule and sweeps took only the paid factor.  It
@@ -233,16 +233,16 @@ books 4 picks no legal order can deliver — and 911 in the lower half.
 The matching's upper half is *never* a tie with the real one: where
 they differ it is strictly heavier, i.e. strictly fictional.
 
-**Theory-free certification** (`certify.py`): optimal.json was
-produced by the same frame/mini-game theory this project tests, so
-`certify.py` audits it with none of that theory — exhaustive
+**Theory-free certification** (`evaluation/certify.py`): optimal.json
+was produced by the same theory this project tests, so the audit uses
+none of it — exhaustive
 bitmask search (unique optimal upper sets confirmed through n=62),
 the naive all-divisors matching bound, and opt(n) ≤ n + opt(n−1)
 chains.  No contradiction has ever been found by any audit.
 
 ## Performance
 
-Pure Python, one core, best of 3 (`bench.py`); k is the empirical
+Pure Python, one core, best of 3 (`evaluation/bench.py`); k is the empirical
 exponent in time ~ n^k:
 
 | component | n=125 | n=250 | n=500 | n=1000 | ~n^k |
@@ -261,37 +261,41 @@ default; PyPy is ~2–3x CPython on all of it.
 
 ## Running it
 
-Python 3.8+ (pytest for the suite; networkx for `bound.py`; PyPy
-recommended for long runs).  Scripts write their outputs to
-uncommitted files by default — the committed files under `results/`
-are only ever updated deliberately.
+Python 3.8+ (pytest for the suite; networkx for the bound; PyPy
+recommended for long runs).  Run everything from this directory with
+`python3 -m`.  Scripts write their outputs to uncommitted files by
+default — the committed files under `results/` are only ever updated
+deliberately.
 
 ```
-python3 verify.py                    # the upper-half theory, n=1..1000
-python3 solvent_simple.py 21         # the readable strategy, one game
-python3 strategies.py                # full strategy comparison (~10 min)
-pypy3 continuation.py --from 2 --to 1000 --reanchor-solvent   # the flagship chain (~80 min)
-python3 bound.py 21 128 1000         # F-M bound for specific games
-python3 certify.py                   # theory-free audit of optimal.json
-python3 -m pytest test_taxman_mini.py
+python3 -m evaluation.verify            # the upper-half theory, n=1..1000
+python3 -m reference.solvent 21         # the readable strategy, one game
+python3 -m evaluation.scoreboard        # full strategy comparison (~10 min)
+pypy3   -m strategies.continuation --from 2 --to 1000 --reanchor-solvent   # the flagship chain (~80 min)
+python3 -m evaluation.bound 21 128 1000 # F-M bound for specific games
+python3 -m evaluation.certify           # theory-free audit of optimal.json
+python3 -m pytest evaluation/test_taxman.py
 ```
 
-`continuation.py` checkpoints its `--out` file every 5 games and
+The continuation solver checkpoints its `--out` file every 5 games and
 resumes with `--resume` — container restarts cost at most a few games.
 
 ## Files
 
 | file | contents |
 |---|---|
-| `taxman_mini.py` | the wiki's core algorithms: `maximal_factors`, `solve_mini`, `optimize_mini`, `order_for_real_game`, `solve_upper_half` |
-| `verify.py` | checks the upper-half theory against optimal.json, n=1..1000 |
-| `solvent_simple.py` | the solvent strategy written to be read (and run) |
-| `strategies.py` | fast solvent + onetax/maxturn/cascade + `check_sequence` replay validation |
-| `seteval.py` | incremental set evaluator: Kuhn matching + complete solve_mini tier |
-| `continuation.py` | the continuation solver: certificates, flip/bundle search, solvent re-anchor |
-| `bound.py` | the Franklín–Moniot upper bound |
-| `certify.py` | theory-free certification of optimal.json (uses `bitpot.py` bitmask primitives) |
-| `bench.py` | timings and scaling exponents |
+| `core.py` | shared foundations: `maximal_factors`, the wiki's `solve_mini` / `optimize_mini`, `order_for_real_game`, `solve_upper_half`, divisor tables, `check_sequence` replay validation |
+| `strategies/solvent.py` | the fast solvent implementation (incremental matching + complete fallback tier) |
+| `strategies/onetax.py`, `strategies/maxturn.py`, `strategies/cascade.py` | the comparison strategies |
+| `strategies/continuation.py` | the continuation solver: certificates, flip/bundle search, solvent re-anchor |
+| `strategies/seteval.py` | incremental set evaluator used by the continuation search |
+| `reference/solvent.py` | the solvent strategy written to be read (and run) |
+| `evaluation/verify.py` | checks the upper-half theory against optimal.json, n=1..1000 |
+| `evaluation/scoreboard.py` | runs every strategy over a range and tabulates vs. optimal |
+| `evaluation/bound.py` | the Franklín–Moniot upper bound |
+| `evaluation/certify.py` | theory-free certification of optimal.json (uses `evaluation/bitpot.py` bitmask primitives) |
+| `evaluation/bench.py` | timings and scaling exponents |
+| `evaluation/test_taxman.py` | the test suite |
 | `results/solvent_1000.json`, `results/strategies_1000.json` | per-game scores vs. optimal, n=1..1000 |
 | `results/chain_cold_1000.json` | the flagship cold chain, with certificates |
 | `results/chain_seeded_500_1000.json` | the optimal-seeded chain (drift experiment) |
