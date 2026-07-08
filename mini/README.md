@@ -637,6 +637,16 @@ a cold chain's prev score may be suboptimal and would make the cap
 invalid.  Prime games always carry a real sacrifice, so they never
 certify "exact"; the second certificate roughly covers them.
 
+What a certificate means depends on the anchor.  When score(n-1) is
+provably optimal, a certificate proves optimality outright.  In a
+self-fed chain it proves something weaker but still useful: since
+opt(n) <= n + opt(n-1), a certified game satisfies gap(n) <=
+gap(n-1) - it added no error of its own, and any deficit it carries
+was inherited from upstream.  Certificates thus mark where chain
+error is *created* (uncertified games only), which also makes them a
+work scheduler: to improve a chain, re-search just the uncertified
+games and let gains flow downstream through the certified stretches.
+
 Seeded from optimal(499) and self-fed on 500..540: **25/41 games exact
 (61%), mean gap 12.1 points (~0.015% of score)** - about ten times
 closer to optimal than solvent on the same slice - with 500..520
