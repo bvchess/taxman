@@ -156,7 +156,9 @@ def derive_order(n: int, S: Set[int], match: Dict[int, int]) -> List[int]:
 # tier 1: steepest-ascent single flips
 # ---------------------------------------------------------------------------
 
-def tier1(evaluator: SetEval, n: int) -> Tuple[int, List[int]]:
+def tier1(
+    evaluator: SetEval, n: int, cap: Optional[int] = None
+) -> Tuple[int, List[int]]:
     """Hill-climb by the single steepest improving add until none exists.
 
     A single add of x raises the score by exactly +x; a single remove only
@@ -171,6 +173,10 @@ def tier1(evaluator: SetEval, n: int) -> Tuple[int, List[int]]:
     locality), so any free add that helps shares a prime factor with n.
     That keeps the convergence sweep (proving no add improves, the common
     and otherwise expensive case) to ~80 candidates instead of ~n/2.
+
+    If `cap` is given (--trust-certificates mode), the sweep stops as soon
+    as an accepted flip brings the score to or past it -- the certificate
+    says nothing better exists, so continuing to search is wasted work.
     Returns (flips_taken, cap_hit) with cap_hit unused by callers.
     """
     local = [
@@ -186,6 +192,8 @@ def tier1(evaluator: SetEval, n: int) -> Tuple[int, List[int]]:
             if evaluator.playable_add(x):
                 flips += 1
                 moved = True
+                if cap is not None and evaluator.score() >= cap:
+                    return flips, []
                 break
         if not moved:
             break
@@ -306,6 +314,37 @@ def tier2_pass(
     return False
 
 
+def certificate_cap(
+    n: int,
+    prev_score: Optional[int],
+    prev_upper_sum: Optional[int],
+    upper_sum: int,
+    spf: Sequence[int],
+    largest_prime_below: Sequence[Optional[int]],
+) -> Optional[int]:
+    """Max of all certificate values applicable to game n, or None.
+
+    This is the same n+prev / prime / upper-delta arithmetic used to LABEL
+    the final score (see solve_game), evaluated up front instead so it can
+    be used as a search-stopping cap. It is only a TRUE upper bound on
+    opt(n) when prev_score already equals opt(n-1) -- in a cold chain
+    prev_score can itself be suboptimal, in which case capping search on it
+    can forfeit points. That gap is exactly why --trust-certificates is
+    opt-in rather than the default.
+    """
+    if prev_score is None:
+        return None
+    candidates = [n + prev_score]
+    if spf[n] == n and largest_prime_below[n] is not None:
+        candidates.append(n + prev_score - largest_prime_below[n])
+    if prev_upper_sum is not None:
+        d_upper = upper_sum - prev_upper_sum
+        candidates.append(prev_score + d_upper)
+        if n % 2 == 0:
+            candidates.append(prev_score + d_upper + n // 2)
+    return max(candidates)
+
+
 # ---------------------------------------------------------------------------
 # per-game solve
 # ---------------------------------------------------------------------------
@@ -321,6 +360,7 @@ def solve_game(
     reanchor_solvent: bool,
     optimal: Dict[int, Dict[str, Any]],
     largest_prime_below: Sequence[Optional[int]],
+    trust_certificates: bool = False,
 ) -> Dict[str, Any]:
     """Solve game n warm-started from the previous solution; return a record."""
     t0 = time.monotonic()
@@ -344,28 +384,49 @@ def solve_game(
     tier = 0
     flips = 0
 
+    # --trust-certificates: the max of all certificate values applicable to
+    # n, used below as a search-stopping cap. None (no cap, default) unless
+    # the flag is on -- see certificate_cap's docstring for why this is
+    # opt-in: it is only a true bound when prev_score is itself optimal.
+    cap = (
+        certificate_cap(n, prev_score, prev_upper_sum, upper_sum, spf,
+                         largest_prime_below)
+        if trust_certificates else None
+    )
+
     # Step 3: lucky certificate -- an early exit that skips the search
     # entirely. This is the ONLY certificate allowed to change search
     # behavior; see the "prime" certificate below for why it stays label-only.
+    # With --trust-certificates, reaching the (possibly higher) cap right
+    # after insertion is the same kind of early exit, just for any of the
+    # three certificate identities instead of only "exact".
     if prev_score is not None and incumbent_score == n + prev_score:
+        lucky_exit = True
+    elif cap is not None and incumbent_score >= cap:
         lucky_exit = True
     else:
         # Step 4: tier-1 hill climbing always runs to quiescence first,
         # independent of the bundle budget -- `--bundle-limit 0` must mean
-        # "flips yes, bundles no", not "no local search at all".
-        f, _failed_adds = tier1(evaluator, n)
+        # "flips yes, bundles no", not "no local search at all". Passing
+        # `cap` lets it stop mid-sweep the moment an accepted flip reaches it.
+        f, _failed_adds = tier1(evaluator, n, cap)
         flips += f
         if f > 0:
             tier = max(tier, 1)
 
         # Step 5: interleave tier-2 bundles with tier-1 re-convergence,
         # bounded by the bundle budget. bundle_limit=0 means this loop
-        # never executes.
+        # never executes. The cap check in the while-condition covers "stop
+        # before another bundle pass once cap is already reached"; the one
+        # right after tier2_pass covers "stop immediately after an accepted
+        # tier-2 bundle improvement reaches cap", before re-running tier1.
         budget = [bundle_limit]
-        while budget[0] > 0:
+        while budget[0] > 0 and (cap is None or evaluator.score() < cap):
             if tier2_pass(evaluator, n, budget):
                 tier = max(tier, 2)
-                f, _failed_adds = tier1(evaluator, n)
+                if cap is not None and evaluator.score() >= cap:
+                    break
+                f, _failed_adds = tier1(evaluator, n, cap)
                 flips += f
                 if f > 0:
                     tier = max(tier, 1)
@@ -467,6 +528,7 @@ def run(
     mf: Sequence[List[int]],
     out_path: Optional[Path] = None,
     initial_records: Optional[List[Dict[str, Any]]] = None,
+    trust_certificates: bool = False,
 ) -> List[Dict[str, Any]]:
     """Solve games from_n..to_n sequentially, each fed the previous result.
 
@@ -526,7 +588,7 @@ def run(
     for i, n in enumerate(range(start_n, to_n + 1), 1):
         rec = solve_game(n, spf, mf, prev_set, prev_score, prev_upper_sum,
                           bundle_limit, reanchor_solvent, optimal,
-                          largest_prime_below)
+                          largest_prime_below, trust_certificates)
         prev_set = set(rec["_set"])
         prev_score = rec["score"]
         prev_upper_sum = rec["_upper_sum"]
@@ -638,6 +700,15 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument("--resume", action="store_true",
                         help="resume from an existing --out checkpoint left "
                              "by an interrupted run")
+    parser.add_argument("--trust-certificates", action="store_true",
+                        dest="trust_certificates", default=False,
+                        help="treat the max of the applicable certificate "
+                             "values (n+prev, prime-sacrifice, upper-delta) "
+                             "as a search-stopping cap for that game, "
+                             "instead of the label-only default. Only a "
+                             "true cap when prev's score is itself optimal "
+                             "-- see certificate_cap's docstring -- so this "
+                             "is opt-in and off by default.")
     args = parser.parse_args(argv)
 
     sys.setrecursionlimit(100_000)
@@ -677,7 +748,8 @@ def main(argv: List[str] | None = None) -> int:
     started = time.monotonic()
     records = run(args.from_n, args.to_n, args.seed_from_optimal,
                   args.bundle_limit, args.reanchor_solvent, optimal, spf, mf,
-                  out_path=args.out, initial_records=initial_records)
+                  out_path=args.out, initial_records=initial_records,
+                  trust_certificates=args.trust_certificates)
     elapsed = time.monotonic() - started
 
     for r in records:
