@@ -659,6 +659,20 @@ upper-delta kinds are label-only - they never cut search short,
 since a cold chain's prev score may be suboptimal and would make the
 cap invalid (and upper-delta's cap is conjectural).
 
+Trusting certificates as search cutoffs was tested and rejected.  A
+`--trust-certificates` mode (stop searching a game the moment its
+score reaches the strongest applicable certificate value) was run
+head-to-head against the conservative cold chain: 969/999 games
+identical, but 4 of the 8 "repair" games - games whose conservative
+score exceeds every certificate cap because the predecessor was
+suboptimal - were bitten, their climbs stopping at exactly the
+(invalid) cap value, each dragging 3-5 downstream games before the
+chain healed: 22 games degraded, -511 points net.  The speedup was
+only ~7%: games that end on a certificate are cheap tier-0 games,
+while the expensive searches are precisely the uncertified ones that
+must run in full either way.  Verdict: certificates label; they do
+not steer.  The flag remains for experiments.
+
 What a certificate means depends on the anchor.  When score(n-1) is
 provably optimal, a certificate proves optimality outright.  In a
 self-fed chain it proves something weaker but still useful: since
