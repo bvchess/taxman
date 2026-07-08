@@ -156,7 +156,7 @@ def derive_order(n: int, S: Set[int], match: Dict[int, int]) -> List[int]:
 # tier 1: steepest-ascent single flips
 # ---------------------------------------------------------------------------
 
-def tier1(evaluator: SetEval, n: int) -> Tuple[int, List[int]]:
+def tier1(evaluator: SetEval, n: int) -> int:
     """Hill-climb by the single steepest improving add until none exists.
 
     A single add of x raises the score by exactly +x; a single remove only
@@ -171,7 +171,7 @@ def tier1(evaluator: SetEval, n: int) -> Tuple[int, List[int]]:
     locality), so any free add that helps shares a prime factor with n.
     That keeps the convergence sweep (proving no add improves, the common
     and otherwise expensive case) to ~80 candidates instead of ~n/2.
-    Returns (flips_taken, cap_hit) with cap_hit unused by callers.
+    Returns the number of flips taken.
     """
     local = [
         x for x in range(n // 2, 1, -1)
@@ -189,7 +189,7 @@ def tier1(evaluator: SetEval, n: int) -> Tuple[int, List[int]]:
                 break
         if not moved:
             break
-    return flips, []
+    return flips
 
 
 # ---------------------------------------------------------------------------
@@ -353,7 +353,7 @@ def solve_game(
         # Step 4: tier-1 hill climbing always runs to quiescence first,
         # independent of the bundle budget -- `--bundle-limit 0` must mean
         # "flips yes, bundles no", not "no local search at all".
-        f, _failed_adds = tier1(evaluator, n)
+        f = tier1(evaluator, n)
         flips += f
         if f > 0:
             tier = max(tier, 1)
@@ -365,7 +365,7 @@ def solve_game(
         while budget[0] > 0:
             if tier2_pass(evaluator, n, budget):
                 tier = max(tier, 2)
-                f, _failed_adds = tier1(evaluator, n)
+                f = tier1(evaluator, n)
                 flips += f
                 if f > 0:
                     tier = max(tier, 1)
