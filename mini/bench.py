@@ -20,7 +20,7 @@ import sys
 import time
 from typing import Callable, List
 
-from approx import (
+from strategies import (
     cascade, divisor_lists, maximal_factor_lists, solvent, max_turn, one_tax,
 )
 from taxman_mini import smallest_prime_factors, solve_upper_half

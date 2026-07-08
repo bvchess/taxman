@@ -100,8 +100,8 @@ def test_replay_rejects_taxless_selection():
     assert replay([5], {1, 5})
 
 
-def test_approx_strategies_are_legal_and_sane():
-    from approx import (
+def test_strategies_are_legal_and_sane():
+    from strategies import (
         cascade, check_sequence, divisor_lists, maximal_factor_lists, solvent,
         one_tax,
     )
@@ -122,12 +122,13 @@ def test_approx_strategies_are_legal_and_sane():
 
 def test_solvent_regression_floor():
     # The simplified two-tier solvent must never score below the recorded
-    # baseline in solvent_results.json (it may legitimately improve on
+    # baseline in results/solvent_1000.json (it may legitimately improve on
     # it by shedding bogus rejections, hence a floor check rather than ==).
-    from approx import check_sequence, maximal_factor_lists, solvent
+    from strategies import check_sequence, maximal_factor_lists, solvent
 
     stored = json.loads(
-        (Path(__file__).resolve().parent / "solvent_results.json").read_text()
+        (Path(__file__).resolve().parent / "results" / "solvent_1000.json")
+        .read_text()
     )
     mf = maximal_factor_lists(1000)  # a larger table is valid for any smaller n
     for n in (21, 100, 250, 500, 750, 1000):
@@ -137,24 +138,25 @@ def test_solvent_regression_floor():
 def test_solvent_simple_matches_canonical():
     # solvent_simple.py is a plain, from-scratch executable spec of the
     # README's "Solvent, final form" pseudocode; it must agree exactly with
-    # both the recorded canonical scores and the fast approx.solvent() output
-    # (the README states the canonical set is a deterministic function of
-    # playability alone), and produce a legal game.
-    from approx import (
-        check_sequence, maximal_factor_lists, solvent as approx_solvent,
+    # both the recorded canonical scores and the fast strategies.solvent()
+    # output (the README states the canonical set is a deterministic
+    # function of playability alone), and produce a legal game.
+    from strategies import (
+        check_sequence, maximal_factor_lists, solvent as strategies_solvent,
     )
 
     import solvent_simple
 
     stored = json.loads(
-        (Path(__file__).resolve().parent / "solvent_results.json").read_text()
+        (Path(__file__).resolve().parent / "results" / "solvent_1000.json")
+        .read_text()
     )
     mf = maximal_factor_lists(60)
     for n in range(1, 61):
         seq = solvent_simple.solvent(n)
         score = sum(seq)
         assert score == stored[str(n)]
-        assert set(seq) == set(approx_solvent(n, mf))
+        assert set(seq) == set(strategies_solvent(n, mf))
         assert check_sequence(n, seq) == score
 
 
@@ -208,7 +210,9 @@ def test_upper_delta_certificate_is_benign():
     optimal = json.loads(DEFAULT_OPTIMAL.read_text())
     opt_score = {g["n"]: g["score"] for g in optimal}
 
-    cold_path = Path(__file__).resolve().parent / "continuation_cold_results.json"
+    cold_path = (
+        Path(__file__).resolve().parent / "results" / "chain_cold_1000.json"
+    )
     chain = json.loads(cold_path.read_text())
     chain_by_n = {r["n"]: r for r in chain if r["n"] <= n_max}
 

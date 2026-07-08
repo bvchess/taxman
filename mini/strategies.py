@@ -53,7 +53,7 @@ maxturn (Carmony & Holliday, 1993)
     for the turn.
 
 Usage:
-    python3 approx.py [--max-n 1000] [--optimal PATH] [--moniot PATH]
+    python3 strategies.py [--max-n 1000] [--optimal PATH] [--moniot PATH]
 """
 
 from __future__ import annotations
@@ -71,7 +71,7 @@ from taxman_mini import (
 )
 from verify import DEFAULT_OPTIMAL
 
-DEFAULT_MONIOT = Path(__file__).resolve().parent / "moniot_table.json"
+DEFAULT_MONIOT = Path(__file__).resolve().parent / "results" / "moniot_table.json"
 
 
 def divisor_lists(n: int) -> List[List[int]]:
@@ -520,7 +520,7 @@ def main(argv: List[str] | None = None) -> int:
             line += f" {r[name]:>8} {100 * r[name] / r['opt']:>6.2f}"
         print(line)
 
-    out = Path(__file__).resolve().parent / "approx_results.json"
+    out = Path(__file__).resolve().parent / "strategies_out.json"
     out.write_text(json.dumps(results, indent=0))
     print(f"\nper-game results written to {out.name} "
           f"({time.monotonic() - started:.0f}s total)")

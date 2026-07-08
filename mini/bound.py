@@ -9,7 +9,7 @@ matching of that graph (every legal game's picks pair with distinct
 paid factors, so no game can score above this).
 
 This maximal-factor-edge bound is much sharper than the naive
-all-divisors matching bound (see `independent.py`): at n=1000 the gap
+all-divisors matching bound (see `certify.py`): at n=1000 the gap
 to the true optimum is 1168 points here, versus 3038 for the
 all-divisors version.
 

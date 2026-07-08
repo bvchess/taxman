@@ -10,7 +10,7 @@ rollback so a rejected mutation fully restores prior state.
 
 This class was extracted verbatim from transitions.py (which now imports
 it) so the continuation solver and the transition anatomy share one
-validated evaluator.  It mirrors approx.solvent's matching machinery and
+validated evaluator.  It mirrors strategies.solvent's matching machinery and
 falls back to taxman_mini.solve_mini for a complete playability decision
 when the fast, incomplete solvent tier rejects an add.
 """
@@ -29,7 +29,7 @@ from taxman_mini import MiniInfeasible, solve_mini
 class SetEval:
     """A mutable set of Taxman picks with an incremental playability test.
 
-    Mirrors approx.solvent's matching machinery over the maximal-factor
+    Mirrors strategies.solvent's matching machinery over the maximal-factor
     candidate pool (`mf`): `owner` maps each candidate factor currently
     spent as tax to the pick holding it, and `match` is the inverse
     restricted to the current picks.  The pool is maximal factors rather
@@ -52,7 +52,7 @@ class SetEval:
         self.owner: Dict[int, int] = {}  # divisor -> pick paying it as tax
         self.match: Dict[int, int] = {}  # pick -> its own coupon
 
-    # -- Kuhn's augmenting search, ported from approx._augment ------------
+    # -- Kuhn's augmenting search, ported from strategies._augment ------------
     def _augment(
         self,
         v: int,
@@ -108,7 +108,7 @@ class SetEval:
     def playable_add(self, x: int) -> bool:
         """Try to add x to the set; return whether the set stays playable.
 
-        Two-tier test.  The fast tier is a direct port of approx.solvent's
+        Two-tier test.  The fast tier is a direct port of strategies.solvent's
         try_select (pop x if it holds someone's tax, add x, augment, retry
         with each of x's own divisors forced on a precedence cycle); it is
         sound but not complete -- its single-pick coupon reshuffling can
@@ -137,7 +137,7 @@ class SetEval:
         return True
 
     def _solvent_add(self, x: int) -> bool:
-        """Fast, sound-but-incomplete add: approx.solvent's try_select."""
+        """Fast, sound-but-incomplete add: strategies.solvent's try_select."""
         # A failed Kuhn search leaves the matching untouched, so only
         # successful augments need their trails rolled back.
         pre_trail: List[Tuple[int, Optional[int]]] = []

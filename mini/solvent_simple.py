@@ -3,7 +3,7 @@
 This is the executable version of the pseudocode in README.md
 ("Solvent, final form"): correct, minimal, and unhurried.  The fast,
 bit-identical implementation (incremental matching + Kuhn augmenting
-paths) lives in approx.py's solvent().
+paths) lives in strategies.py's solvent().
 
 The game, in one breath: the pot holds 1..n; picking a number c keeps
 c for you and surrenders every divisor of c still in the pot to the
@@ -55,7 +55,7 @@ Run it with the game size as the only argument:
     score (sum of picks):    144
 
 (144 is the known optimum for n=21.)  Sizes up to a few hundred
-answer in seconds; beyond that, use approx.py's fast solvent().
+answer in seconds; beyond that, use strategies.py's fast solvent().
 """
 
 

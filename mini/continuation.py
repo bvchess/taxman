@@ -27,7 +27,7 @@ Per game n (given the previous solution's pick set and score):
      {154,220}, net +6) that no single flip can cross.
 
 Every produced solution is validated by deriving a real-game order from
-the matching and replaying it under the true rules (approx.check_sequence)
+the matching and replaying it under the true rules (strategies.check_sequence)
 to reproduce the recorded score.
 
 Certificates. Three record-level labels certify a score as provably (or,
@@ -101,7 +101,7 @@ from math import gcd
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
-from approx import check_sequence, maximal_factor_lists, solvent
+from strategies import check_sequence, maximal_factor_lists, solvent
 from seteval import SetEval
 from taxman_mini import smallest_prime_factors, solve_upper_half
 from verify import DEFAULT_OPTIMAL
@@ -634,7 +634,7 @@ def main(argv: List[str] | None = None) -> int:
                              "the chain's solution")
     parser.add_argument("--optimal", type=Path, default=DEFAULT_OPTIMAL)
     parser.add_argument("--out", type=Path,
-                        default=MINI_DIR / "continuation_results.json")
+                        default=MINI_DIR / "continuation_out.json")
     parser.add_argument("--resume", action="store_true",
                         help="resume from an existing --out checkpoint left "
                              "by an interrupted run")

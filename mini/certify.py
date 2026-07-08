@@ -32,8 +32,8 @@ mini games, or maximal-factor decompositions:
    is certified outright.  Requires networkx; skipped if unavailable.
 
 Usage:
-    python3 independent.py [--budget 30] [--brute-max 64]
-                           [--matching-max 300] [--optimal PATH]
+    python3 certify.py [--budget 30] [--brute-max 64]
+                       [--matching-max 300] [--optimal PATH]
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ import time
 from pathlib import Path
 from typing import Dict, FrozenSet, List, Optional, Set, Tuple
 
-from approx import check_sequence, divisor_lists
+from strategies import check_sequence, divisor_lists
 from bitpot import bits, divisor_masks, mask_of, multiple_masks, popcount
 from taxman_mini import smallest_prime_factors, solve_upper_half
 from verify import DEFAULT_OPTIMAL
