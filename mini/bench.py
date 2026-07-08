@@ -22,7 +22,6 @@ from typing import Callable, List
 
 from approx import (
     cascade, divisor_lists, maximal_factor_lists, solvent, max_turn, one_tax,
-    one_tax_forced_upper, one_tax_oracle,
 )
 from taxman_mini import smallest_prime_factors, solve_upper_half
 
@@ -54,8 +53,6 @@ def main(argv: List[str] | None = None) -> int:
         ("upper half (solve_upper_half)", lambda n: solve_upper_half(n, spf)),
         ("cascade", lambda n: cascade(n, divs)),
         ("solvent", lambda n: solvent(n, mf)),
-        ("hybrid (forced upper)", lambda n: one_tax_forced_upper(n, divs, spf)),
-        ("oracle (fork)", lambda n: one_tax_oracle(n, divs, spf)),
     ]
 
     header = f"{'per-game seconds':<31}" + "".join(f"{f'n={s}':>10}" for s in sizes)
@@ -67,10 +64,10 @@ def main(argv: List[str] | None = None) -> int:
         row = f"{name:<31}" + "".join(f"{t:>10.4f}" for t in times)
         print(row + f"{k:>7.2f}")
 
-    print(f"\nprofile of one_tax_oracle(n={top}), top functions by cumulative time:")
+    print(f"\nprofile of solvent(n={top}), top functions by cumulative time:")
     profiler = cProfile.Profile()
     profiler.enable()
-    one_tax_oracle(top, divs, spf)
+    solvent(top, mf)
     profiler.disable()
     out = io.StringIO()
     stats = pstats.Stats(profiler, stream=out)

@@ -350,83 +350,39 @@ def cascade(n: int, divs: Sequence[List[int]]) -> List[int]:
 # Moniot's heuristics
 # ---------------------------------------------------------------------------
 
-def one_tax(
-    n: int,
-    divs: Sequence[List[int]],
-    refined: bool = True,
-    sequence: Optional[List[int]] = None,
-    forbidden: Optional[Set[int]] = None,
-    two_tax: bool = False,
-    start_pot: Optional[Set[int]] = None,
-) -> int:
+def one_tax(n: int, divs: Sequence[List[int]], refined: bool = True) -> int:
     """Moniot's OneTax heuristic; returns the player's score.
 
-    Picks appended to `sequence` if given; numbers in `forbidden` are
-    never picked (they can still be taken as tax).  `start_pot` plays
-    from a mid-game position instead of the full pot {1..n}.
-
-    With two_tax enabled, a stranded harvest runs at every stall: pick
-    any c that has no multiples left and whose two remaining divisors
-    divide nothing else in the pot and can never be picked themselves.
-    All three numbers are already the taxman's, so picking c is pure
-    profit.  Measured across N=1..1000 this NEVER fires: OneTax always
-    drains the pot completely (every terminal number has zero divisors
-    left), so there is no endgame slack to harvest.
-
-    A mid-game two-tax exchange was also tried and removed: pick a
-    two-divisor number x when the current one-tax claimants of its
-    divisors are together worth less than x.  It loses 1.75M points
-    over N=1..1000, and the reason is structural: under largest-first
-    one-tax dynamics, x is doomed only when its rivals are LARGER than
-    x (smaller rivals lose to x once it reaches one divisor), in which
-    case paying both divisors costs more than x is worth.  A profitable
-    local two-tax move cannot exist; the two-tax moves in optimal games
-    are coordination gains, available only by reassigning other
-    numbers' taxes at the same time.
+    Picks the largest number with exactly one divisor left in play, with
+    Moniot's refinement: if that pick would strand a multiple m (leaving
+    m with no divisors while m divides nothing left in play), pick m
+    instead.
     """
     in_pot = bytearray(n + 1)
-    for i in start_pot if start_pot is not None else range(1, n + 1):
+    for i in range(1, n + 1):
         in_pot[i] = 1
     count = [sum(1 for d in divs[m] if in_pot[d]) for m in range(n + 1)]
-    banned = forbidden or ()
 
     def remove(x: int) -> None:
         in_pot[x] = 0
         for m in range(2 * x, n + 1, x):
             count[m] -= 1
 
-    def dead(d: int, c: int) -> bool:
-        """d can never leave the pot except through c's pick."""
-        return count[d] == 0 and not any(
-            in_pot[m] for m in range(2 * d, n + 1, d) if m != c
-        )
-
-    def find_stranded() -> int:
-        for c in range(n, 1, -1):
-            if (in_pot[c] and count[c] == 2 and c not in banned
-                    and not any(in_pot[m] for m in range(2 * c, n + 1, c))
-                    and all(dead(d, c) for d in divs[c] if in_pot[d])):
-                return c
-        return 0
-
     score = 0
     while True:
         pick = 0
         for c in range(n, 1, -1):
-            if in_pot[c] and count[c] == 1 and c not in banned:
+            if in_pot[c] and count[c] == 1:
                 pick = c
                 break
         if not pick:
-            if two_tax:
-                pick = find_stranded()
-            if not pick:
-                break
+            break
 
         if pick and count[pick] == 1 and refined:
             d = next(x for x in divs[pick] if in_pot[x])
             rescue = 0
             for m in range(2 * pick, n + 1, pick):
-                if not in_pot[m] or m in banned:
+                if not in_pot[m]:
                     continue
                 stranded = all(x in (pick, d) for x in divs[m] if in_pot[x])
                 useless = not any(in_pot[k] for k in range(2 * m, n + 1, m))
@@ -440,278 +396,7 @@ def one_tax(
         for x in tax:
             remove(x)
         score += pick
-        if sequence is not None:
-            sequence.append(pick)
     return score
-
-
-def one_tax_forced_upper(
-    n: int, divs: Sequence[List[int]], spf: Sequence[int]
-) -> Tuple[int, List[int], int]:
-    """OneTax constrained to play the provably optimal upper half.
-
-    The upper-half machinery supplies the optimal selections above n/2.
-    OneTax then runs with one extra rule: a pick is allowed only if,
-    after removing it and the tax it sweeps, the remaining upper
-    selections are still solvable (solve_mini feasibility over their
-    maximal factors still in the pot).  No factor is pinned to any
-    selection - the upper half's tax demands stay flexible, which is
-    what lets OneTax keep farming the lower half around them.  When
-    OneTax has no legal pick, the next playable upper selection from
-    solve_mini's own ordering is played instead.
-
-    Returns (score, sequence, forced): forced counts the stalls where an
-    upper selection had to be played because OneTax had no legal pick.
-    """
-    from taxman_mini import (
-        MiniInfeasible, optimize_mini as _opt, solve_mini as _solve,
-        upper_half_game,
-    )
-
-    c_all, _, mf = upper_half_game(n, spf)
-    opt_c, _ = _opt(c_all, set().union(*mf.values()) if mf else set(), mf)
-    not_upper = c_all - opt_c
-    remaining_upper = set(opt_c)
-
-    pot = set(range(1, n + 1))
-    count = [len(divs[m]) for m in range(n + 1)]
-
-    def remove(x: int) -> None:
-        pot.discard(x)
-        for m in range(2 * x, n + 1, x):
-            count[m] -= 1
-
-    def feasible_after(pick: int, tax: Sequence[int]) -> bool:
-        gone = set(tax)
-        gone.add(pick)
-        rest = remaining_upper - {pick}
-        edges = {c: (mf[c] & pot) - gone for c in rest}
-        factors = set().union(*edges.values()) if edges else set()
-        try:
-            _solve(rest, factors, edges)
-        except MiniInfeasible:
-            return False
-        return True
-
-    def allowed(c: int) -> bool:
-        if c in not_upper:
-            return False
-        return feasible_after(c, [d for d in divs[c] if d in pot])
-
-    sequence: List[int] = []
-    score = 0
-    forced = 0
-    while True:
-        pick = 0
-        for c in range(n, 1, -1):
-            if c in pot and count[c] == 1 and allowed(c):
-                pick = c
-                break
-
-        if pick:  # Moniot's rescue refinement, within the same constraints
-            d = next(x for x in divs[pick] if x in pot)
-            rescue = 0
-            for m in range(2 * pick, n + 1, pick):
-                if m not in pot or not allowed(m):
-                    continue
-                stranded = all(x in (pick, d) for x in divs[m] if x in pot)
-                useless = not any(k in pot for k in range(2 * m, n + 1, m))
-                if stranded and useless:
-                    rescue = max(rescue, m)
-            if rescue:
-                pick = rescue
-        elif remaining_upper:
-            # OneTax stalled: of the upper selections that keep the rest
-            # solvable, play the one that sweeps the least tax.
-            candidates = sorted(
-                remaining_upper,
-                key=lambda c: (sum(d for d in divs[c] if d in pot), -c),
-            )
-            pick = next((c for c in candidates if allowed(c)), 0)
-            if not pick:
-                raise RuntimeError(f"game {n}: no playable upper selection")
-            forced += 1
-        else:
-            break
-
-        tax = [x for x in divs[pick] if x in pot]
-        if not tax:
-            raise RuntimeError(f"illegal forced move {pick} in game {n}")
-        remove(pick)
-        for x in tax:
-            remove(x)
-        score += pick
-        sequence.append(pick)
-        remaining_upper.discard(pick)
-
-    if remaining_upper:
-        raise RuntimeError(f"game {n}: upper selections left unplayed")
-    return score, sequence, forced
-
-
-def one_tax_oracle(
-    n: int, divs: Sequence[List[int]], spf: Sequence[int]
-) -> Tuple[int, List[int]]:
-    """OneTax with the upper-half machinery as an economist, not a dictator.
-
-    Plain OneTax loses points two ways: it never picks upper numbers
-    whose divisor counts stay above one (coordination failures), and the
-    forced-upper hybrid that fixes this overpays in games where OneTax
-    was already close (forcing shifts tax pressure into the lower half).
-
-    Here every candidate pick is priced instead of policed.  The oracle
-    tracks the achievable set of upper selections (initially the provably
-    optimal upper half).  A pick that keeps the whole set solvable is
-    free.  A pick that breaks solvability is charged the drop in the
-    achievable upper sum (recomputed by optimize_mini on what would
-    remain) and is allowed only if the pick is worth more than the loss;
-    the protected set then shrinks to the new achievable set.  When
-    OneTax has no affordable pick, the cheapest still-affordable upper
-    selection is played instead.
-
-    Per-pick pricing alone converges to the hard veto (a single pick is
-    always worth less than an upper number), but OneTax's advantage
-    comes from BUNDLES of unconstrained picks.  So continuations are
-    compared, not picks: at every turn where the priced spine plays a
-    different move than plain OneTax would, the position is snapshotted,
-    and afterwards a plain OneTax tail is played out from each snapshot.
-    The result is the best of the spine and all tails - by construction
-    at least as good as both plain OneTax and the forced-upper hybrid on
-    every single game.
-
-    Returns (score, sequence).
-    """
-    from taxman_mini import (
-        MiniInfeasible, optimize_mini as _opt, solve_mini as _solve,
-        upper_half_game,
-    )
-
-    c_all, f_all, mf = upper_half_game(n, spf)
-    protected, _ = _opt(c_all, f_all, mf)
-    protected = set(protected)
-
-    pot = set(range(1, n + 1))
-    count = [len(divs[m]) for m in range(n + 1)]
-
-    def remove(x: int) -> None:
-        pot.discard(x)
-        for m in range(2 * x, n + 1, x):
-            count[m] -= 1
-
-    def price(c: int) -> Tuple[int, Set[int]]:
-        """Cost of picking c now, and the protected set to keep if we do.
-
-        Rejection only requires knowing the loss reaches c, so the
-        optimize_mini re-derivation runs with a budget: it bails out as
-        soon as the dropped value hits c (returning loss=c, enough for
-        the caller's loss < c test to fail).  The exact keep set is only
-        completed when the pick will actually be accepted.
-        """
-        gone = {d for d in divs[c] if d in pot}
-        gone.add(c)
-        rest = protected - {c}
-        edges = {u: (mf[u] & pot) - gone for u in rest}
-        factors: Set[int] = set().union(*edges.values()) if edges else set()
-        try:
-            _solve(rest, factors, edges)
-            return 0, rest
-        except MiniInfeasible:
-            pass
-        keep: Set[int] = set()
-        used: Set[int] = set()
-        loss = 0
-        for u in sorted(rest, reverse=True):
-            try:
-                _solve(keep | {u}, used | edges[u], edges)
-            except MiniInfeasible:
-                loss += u
-                if loss >= c:
-                    return loss, rest
-                continue
-            keep.add(u)
-            used |= edges[u]
-        return loss, keep
-
-    def plain_choice() -> int:
-        """The move plain OneTax would make from the current position."""
-        pick = 0
-        for c in range(n, 1, -1):
-            if c in pot and count[c] == 1:
-                pick = c
-                break
-        if pick:
-            d = next(x for x in divs[pick] if x in pot)
-            for m in range(2 * pick, n + 1, pick):
-                if m not in pot:
-                    continue
-                stranded = all(x in (pick, d) for x in divs[m] if x in pot)
-                useless = not any(k in pot for k in range(2 * m, n + 1, m))
-                if stranded and useless and m > pick:
-                    pick = m
-        return pick
-
-    sequence: List[int] = []
-    score = 0
-    snapshots: List[Tuple[int, int, Set[int]]] = [(0, 0, set(pot))]
-
-    while True:
-        pick, follow_up = 0, protected
-        for c in range(n, 1, -1):
-            if c in pot and count[c] == 1:
-                loss, keep = price(c)
-                if loss < c:
-                    pick, follow_up = c, keep
-                    break
-
-        if pick:  # Moniot's rescue refinement, at the same prices
-            base = pick
-            d = next(x for x in divs[base] if x in pot)
-            for m in range(2 * base, n + 1, base):
-                if m not in pot or m <= pick:
-                    continue
-                stranded = all(x in (base, d) for x in divs[m] if x in pot)
-                useless = not any(k in pot for k in range(2 * m, n + 1, m))
-                if stranded and useless:
-                    loss, keep = price(m)
-                    if loss < m:
-                        pick, follow_up = m, keep
-        elif protected:
-            # OneTax stalled: play the upper selection that sweeps the
-            # least tax among the ones we can still afford.
-            for c in sorted(protected,
-                            key=lambda u: (sum(d for d in divs[u] if d in pot),
-                                           -u)):
-                loss, keep = price(c)
-                if loss < c:
-                    pick, follow_up = c, keep
-                    break
-            if not pick:
-                raise RuntimeError(f"game {n}: no affordable upper selection")
-        else:
-            break
-
-        if pick != plain_choice():
-            snapshots.append((score, len(sequence), set(pot)))
-
-        tax = [x for x in divs[pick] if x in pot]
-        if not tax:
-            raise RuntimeError(f"illegal move {pick} in game {n}")
-        remove(pick)
-        for x in tax:
-            remove(x)
-        score += pick
-        sequence.append(pick)
-        protected = follow_up
-
-    best_score, best_sequence = score, sequence
-    for prefix_score, prefix_len, position in snapshots:
-        tail: List[int] = []
-        tail_score = one_tax(n, divs, sequence=tail, start_pot=position)
-        if prefix_score + tail_score > best_score:
-            best_score = prefix_score + tail_score
-            best_sequence = sequence[:prefix_len] + tail
-
-    return best_score, best_sequence
 
 
 def max_turn(n: int, divs: Sequence[List[int]]) -> int:
