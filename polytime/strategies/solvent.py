@@ -150,11 +150,12 @@ def _playable_order(
     """Topologically order selections by the precedence relation.
 
     The fast path's acceptances are verified acyclic before being
-    committed; the complete tier instead trusts the conjecture that
-    solve_mini's returned assignment is always schedulable, so it accepts
-    unconditionally.  Either way the final matching is expected acyclic,
-    and a single Kahn's-algorithm pass orders every element.  A leftover
-    cycle would be a conjecture violation, so this raises rather than
+    committed; the complete tier accepts solve_mini's assignment
+    unconditionally, which is sound by the schedulability THEOREM (see
+    the README: peel-produced assignments are provably acyclic).
+    Either way the final matching is acyclic, and a single
+    Kahn's-algorithm pass orders every element.  A leftover cycle is
+    impossible unless there is a bug, so this raises rather than
     repairing it.
     """
     succ: Dict[int, List[int]] = {c: [] for c in selected}
@@ -178,8 +179,8 @@ def _playable_order(
                 ready.append(b)
     if len(order) != len(selected):
         raise RuntimeError(
-            "conjecture violated: solve_mini produced an unschedulable "
-            "assignment (see README, 'cyclic')"
+            "schedulability theorem violated - impossible unless there "
+            "is a bug (see README, 'The schedulability theorem')"
         )
     return order
 

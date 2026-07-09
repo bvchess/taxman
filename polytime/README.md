@@ -96,10 +96,53 @@ What is proven vs. trusted, precisely:
 | no *playable* upper set outweighs U\* | conjecture-conditioned (needs completeness; note U\* < M\* — by 257 points at n=1000) |
 | playability ⟺ maximal-factor matching + acyclic precedence | proven |
 | for prime n: opt(n) = n + opt(n−1) − (largest prime < n) | proven, verified 167/167 |
-| solve_mini's assignment is always schedulable | conjecture ("schedulability"), never violated, checked loudly at runtime |
+| solve_mini's assignment is always schedulable | **theorem** ("schedulability", proof below): the peel rules cannot emit a cyclic assignment.  Still asserted loudly at runtime, as defense in depth |
 | solve_mini's failure means the set is unplayable | conjecture ("completeness") — NOT reducible to "no matching exists": matchable-but-unplayable sets are real (n=21 holds a 145-sum set whose every matching is precedence-cyclic; the optimum is 144) and solve_mini correctly rejects them.  solve_mini is a playability oracle, strictly stronger than a matching oracle |
 | opt delta = U\* delta (the upper-delta certificate) | conjecture, holds on 70.4% of transitions where it applies, zero contradictions |
 | optimal.json itself | independently certified to n=62 by brute force (`certify.py`), consistent with every bound and certificate beyond |
+
+### The schedulability theorem
+
+**Theorem.** Whenever `solve_mini` succeeds on a reduction instance
+(members C, factor pool F with C ∩ F = ∅, each member's list L(c) =
+mf(c) ∩ F), its returned assignment pay(·) has an acyclic precedence
+"a before b whenever pay(a) | b, or a | b" — so a legal play order
+always exists, and the ordering step can never fail.
+
+*Proof.*  Every payment is a maximal factor of its member, so
+Ω(pay(x)) = Ω(x) − 1 exactly (Ω = prime factors with multiplicity;
+primes pay 1, Ω(1) = 0).  Follow the potential Ω(pay(aᵢ)) around a
+supposed cycle.  If an edge has a | b (whether or not pay(a) | b
+also holds), then Ω(pay(a)) = Ω(a) − 1 < Ω(b) − 1 = Ω(pay(b)),
+strictly.  Otherwise pay(a) | b properly (payments lie in F,
+disjoint from C), so Ω(pay(a)) ≤ Ω(b) − 1 = Ω(pay(b)).  A cycle
+forces equality everywhere: no member-divides-member edges, and on
+every edge Ω(pay(a)) = Ω(b) − 1, which for a divisor of b means
+b/pay(a) is prime — pay(a) is a *maximal factor of b*.  Since
+pay(a) ∈ F, it lies in L(b): every cycle lives on pool edges.  (A
+prime paying 1 has out-edges to everything, but equality forces its
+cycle successor to be prime with L = {1}, and the same collision
+below.)  Now let c be the earliest-peeled member of such a cycle and
+lean on two invariants of the implementation: a factor leaves a
+member's live list only when globally consumed as some pair's
+payment, and `comps_of[f]` holds exactly the live members listing f.
+If c was front-peeled, its live list at that step was {pay(c)}; its
+cycle predecessor a peels later, so pay(a) is unconsumed and still
+in c's live list — pay(a) = pay(c), contradicting distinct payments.
+If c was back-peeled, pay(c) was listed by no other live member; its
+cycle successor d peels later, is live, and lists pay(c) —
+contradicting that uniqueness.  ∎
+
+Two notes.  The theorem covers exactly the assignments the code can
+emit: the fast Kuhn-matching tier checks acyclicity explicitly before
+accepting, and falls back to solve_mini — whose output the theorem
+covers — whenever its matching goes cyclic.  And the proof *requires*
+maximal-factor payments (the potential argument dies with all-divisor
+pools), so the maximal-factor refactor, adopted for speed, is what
+made the conjecture provable.  The 39 → 33 → 22 → 26 cycle shows why
+peeling is structurally immune: a cycle core has no degree-1 vertex,
+so the forced-move discipline stalls and refuses rather than threads
+through it.
 
 ## Solvent: the O(n²) strategy
 

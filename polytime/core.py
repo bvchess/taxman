@@ -218,15 +218,18 @@ def order_for_real_game(matching: Dict[int, int]) -> List[int]:
     sweep it, and conversely b cannot rob a of its factor.  (This is the
     role of solving frames front-to-back in the wiki's walkthrough.)
 
-    Any topological order of that precedence works.  A cycle would require
-    two selections to share an assigned factor, which a matching forbids,
-    so this always succeeds for a valid matching.
+    Any topological order of that precedence works, and one always
+    exists: by the schedulability theorem (README, "The schedulability
+    theorem"), an assignment produced by solve_mini's peeling can never
+    have a cyclic precedence -- the prime-counting potential confines
+    any would-be cycle to pool edges, and the peel rules refuse those
+    configurations outright.
 
     Algorithmically this is Kahn's topological sort verbatim: build the
     precedence DAG, repeatedly emit a vertex with no unplayed
     predecessor.  (For the full game, where selections can divide each
     other, the precedence needs a second edge type -- see
-    strategies.solvent._playable_order.)
+    strategies.solvent._playable_order; the theorem covers both.)
     """
     order: List[int] = []
     blockers: Dict[int, int] = {c: 0 for c in matching}  # unplayed predecessors

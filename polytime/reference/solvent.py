@@ -53,11 +53,17 @@ What makes it special:
   an optimal game's upper half exactly is the verified part (every
   n <= 1000), not a theorem.  Whatever solvent loses to the true
   optimum, it loses among the small numbers below n/2.
-* The one leap of faith is deferred, not hidden.  Accepting a set
-  whenever the reservations exist assumes they can also be scheduled
-  (the "schedulability conjecture" - never violated in any game ever
-  run).  If it ever fails, ordered() halts the program rather than
-  play an illegal game.
+* The scheduling step is guaranteed, and that is a theorem, not
+  luck: solve_mini's forced-move discipline provably cannot emit an
+  assignment whose precedence is cyclic (the schedulability theorem
+  - see the README for the proof; the key is that payments are
+  maximal factors, so a potential based on counting prime factors
+  confines any would-be cycle to configurations the peel rules
+  refuse).  ordered() still checks, and halts rather than play an
+  illegal game - asserting a theorem costs little and catches bugs.
+  The leap of faith that remains lives on the rejection side: that a
+  solve_mini refusal always means the set is truly unplayable is the
+  "completeness" conjecture, unproven.
 
 Run it with the game size as the only argument:
 
@@ -182,9 +188,9 @@ def ordered(s_set, pay):
     takes: place a member a as soon as no still-waiting member b has
     to precede it (no b with pay(b) dividing a, no b dividing a).
     If every remaining member is blocked, the constraints form a
-    cycle and no order exists - the schedulability conjecture says
-    solve_mini's reservations never do this, and this loud failure
-    is where that trust is checked.
+    cycle and no order exists - the schedulability theorem says
+    solve_mini's reservations never do this, so the loud failure
+    below is an assertion of a theorem, reachable only by a bug.
     """
     remaining = set(s_set)
     placed = []
@@ -201,8 +207,8 @@ def ordered(s_set, pay):
                 break
         else:
             raise RuntimeError(
-                f"schedulability conjecture violated: no valid ordering "
-                f"exists for {remaining}"
+                f"schedulability theorem violated (impossible unless "
+                f"there is a bug): no valid ordering exists for {remaining}"
             )
     return placed
 
