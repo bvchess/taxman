@@ -56,13 +56,13 @@ What makes it special:
 * The scheduling step is guaranteed, and that is a theorem, not
   luck: solve_mini's forced-move discipline provably cannot emit an
   assignment whose precedence is cyclic (the schedulability theorem
-  - see the README for the proof; the key is that payments are
+  - see THEORY.md for the proof; the key is that payments are
   maximal factors, so a potential based on counting prime factors
   confines any would-be cycle to configurations the peel rules
   refuse).  ordered() still checks, and halts rather than play an
   illegal game - asserting a theorem costs little and catches bugs.
   The rejection side is also a theorem now ("completeness", proof in
-  the README): a solve_mini refusal always means the set is truly
+  THEORY.md): a solve_mini refusal always means the set is truly
   unplayable.  Nothing in this program's accept/reject behavior rests
   on faith - solve_mini is a proven decision procedure for
   playability, in both directions.
