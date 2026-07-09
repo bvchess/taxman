@@ -2,7 +2,7 @@
 
 The transition anatomy (transitions.py) showed that the optimal solution
 of game n sits a tiny, local perturbation away from the optimal solution
-of game n-1: keep the upper-half ceiling set, carry the previous
+of game n-1: keep the U* upper half, carry the previous
 game's lower picks, and a shallow flip/bundle search closes the rest.
 
 This module turns that measurement into a *sequential self-fed solver*.
@@ -14,10 +14,11 @@ stay pinned to the optimum, or does small per-game error accumulate?
 
 Per game n (given the previous solution's pick set and score):
 
-  1. Seed the upper half U*(n) from solve_upper_half.  What is proven:
-     no game's upper half can outscore this set, and it is always
-     playable.  That optimal games hold exactly this set is measured
-     (1000/1000), not proven.
+  1. Seed the upper half U*(n) from solve_upper_half.  It is always
+     playable, and it is capped by the proven matching ceiling M* (no
+     game's upper half can outscore the max-weight matchable set; note
+     U* < M* is possible and real -- by 257 points at n=1000).  That
+     optimal games hold exactly U* is measured (1000/1000), not proven.
   2. Carry the previous solution's lower picks (2*m <= n), largest-first,
      skipping any that no longer fit -- the "incumbent".
   3. Certificate: if the incumbent already scores n + score(n-1), it is
@@ -55,7 +56,7 @@ without re-solving game n from scratch:
     bound is tight.
   * "upper-delta" -- CONJECTURE-GRADE, no theorem behind it. Let U*(k) be
     the sum of solve_upper_half(k, spf)'s returned sequence (the
-    upper-half ceiling of game k) and d_upper(n) = U*(n) - U*(n-1). The
+    computed upper half of game k) and d_upper(n) = U*(n) - U*(n-1). The
     certificate fires when score == prev_score + d_upper(n), or -- for
     even n -- score == prev_score + d_upper(n) + n//2, the extra term
     covering the boundary-crosser n/2: on an even game, n/2 sits exactly on
@@ -80,7 +81,7 @@ without re-solving game n from scratch:
   exception of the lucky "exact" early exit described there.
 
 The design is warm-started local search.  Each game
-begins from a strong initial solution (the upper-half ceiling set
+begins from a strong initial solution (the U* upper half
 plus the previous game's lower picks), then hill-climbs -- steepest
 single flips, then compound "bundle" moves that cross the valleys
 where every single step is downhill (the classic local-optima
@@ -341,7 +342,7 @@ def solve_game(
     t0 = time.monotonic()
     evaluator = SetEval(n, mf)
 
-    # Step 1: seed the always-playable upper-half ceiling set. Its sum
+    # Step 1: seed the always-playable U* upper half. Its sum
     # is U*(n), reused below (rather than recomputed) for the "upper-delta"
     # certificate.
     upper_seq, _ = solve_upper_half(n, spf)

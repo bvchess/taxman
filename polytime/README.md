@@ -64,14 +64,24 @@ directly under real sweeps, still needs true divisors: at n=5 a
 maximal-factor pool emits [4, 5], and playing 4 sweeps the 1 that 5
 needed.)
 
-For the upper half alone the matching lives in a transversal matroid,
-where greedy-by-value is provably optimal: **no legal game's upper
-half can outscore the greedy matchable set** — and in all 1000
-verified games, the optimal game's upper half *is* exactly that set
-(`verify.py`).  The wiki's `solve_mini` (forced-move peeling, which
-both decides feasibility and assigns each pick its payment) and
-`optimize_mini` (greedy descending admission) compute it in O(n²);
-`order_for_real_game` turns the assignment into a legal order.  The
+For the upper half alone, matchable sets form a transversal matroid
+(Edmonds–Fulkerson), where descending-weight greedy is provably
+optimal.  Combined with the lifting argument (every legal game's
+upper picks consume distinct outside maximal factors), that proves a
+hard ceiling: **no legal game's upper half can outscore M\*, the
+maximum-weight matchable upper set**.  The set this project actually
+computes, U\* from `solve_upper_half`, is something subtly different:
+`optimize_mini` admits greedily with `solve_mini` — a *playability*
+test, stricter than matching — so U\* ≤ M\*, and the inequality is
+real: at n=1000, M\* ≥ 291,515 (the F–M bound's own matching
+witnesses it) while U\* = 291,258.  The 257-point difference is
+matchable-but-unplayable weight, upper-half siblings of the n=21 set.
+What is proven is that no game beats M\*; what is measured
+(`verify.py`, 1000/1000) is that optimal games' upper halves equal U\*
+exactly; that no *playable* upper set outweighs U\* inherits the
+completeness conjecture rather than the matroid theorem.
+`order_for_real_game` turns solve_mini's assignment into a legal
+order.  The
 subtlety that makes the game hard lives in the *lower* half: an
 optimal game sometimes skips a larger prize to fund two smaller ones,
 and those one-for-two trades cascade through chains of reassignments.
@@ -81,13 +91,14 @@ What is proven vs. trusted, precisely:
 | claim | status |
 |---|---|
 | opt(n) ≤ n + opt(n−1) | proven (wiki) |
-| no upper half beats the greedy matchable set | proven |
+| no upper half beats M\*, the max-weight *matchable* upper set | proven (lifting + transversal matroid) |
+| U\* (`solve_upper_half`) equals the optimal game's upper half | measured, 1000/1000 |
+| no *playable* upper set outweighs U\* | conjecture-conditioned (needs completeness; note U\* < M\* — by 257 points at n=1000) |
 | playability ⟺ maximal-factor matching + acyclic precedence | proven |
 | for prime n: opt(n) = n + opt(n−1) − (largest prime < n) | proven, verified 167/167 |
-| optimal games realize the full upper-half ceiling | measured, 1000/1000 |
 | solve_mini's assignment is always schedulable | conjecture ("schedulability"), never violated, checked loudly at runtime |
 | solve_mini's failure means the set is unplayable | conjecture ("completeness") — NOT reducible to "no matching exists": matchable-but-unplayable sets are real (n=21 holds a 145-sum set whose every matching is precedence-cyclic; the optimum is 144) and solve_mini correctly rejects them.  solve_mini is a playability oracle, strictly stronger than a matching oracle |
-| opt delta = upper-ceiling delta (the upper-delta certificate) | conjecture, holds on 70.4% of transitions where it applies, zero contradictions |
+| opt delta = U\* delta (the upper-delta certificate) | conjecture, holds on 70.4% of transitions where it applies, zero contradictions |
 | optimal.json itself | independently certified to n=62 by brute force (`certify.py`), consistent with every bound and certificate beyond |
 
 ## Solvent: the O(n²) strategy
@@ -158,9 +169,9 @@ transitions are pure insertions; mean lower-half churn ~1.2 numbers;
 bundles).  `strategies/continuation.py` solves games in sequence, each
 warm-started from the previous game's own output:
 
-1. the upper-half ceiling set (`solve_upper_half` — no search;
-   provably unbeatable in upper-half weight, and empirically the
-   optimal game's own upper half in all 1000 verified games);
+1. the U\* upper half (`solve_upper_half` — no search; capped by the
+   proven matching ceiling M\*, and empirically the optimal game's
+   own upper half in all 1000 verified games);
 2. carry the previous game's lower picks;
 3. certificate check (below) — done instantly if it fires;
 4. tier-1: steepest single flips to quiescence;
@@ -291,7 +302,7 @@ ratios, not just exponents):
   log log is invisible at these sizes (ratios ~4.2).
 * **cascade** rides the same machinery: Θ(n²)-ish, measured k≈2.1.
 * **the continuation chain** costs O(n²) per game before search (the
-  upper-half ceiling computation) plus the budgeted flip/bundle work, so a full
+  solve_upper_half computation) plus the budgeted flip/bundle work, so a full
   chain 2..N is Θ(N³)-class in aggregate — ~78 minutes to N=1000
   under PyPy.
 
@@ -382,7 +393,7 @@ ideas do real work:
 | bipartite matching, Kuhn's augmenting paths, Berge's lemma | `strategies/solvent.py` (`_augment`; failed search = conclusive rejection) |
 | Hall's theorem — and its limits | matchability is *not* playability: the n=21 set in the ledger has perfect matchings and no legal order |
 | topological sort (Kahn's algorithm), DAGs | `core.order_for_real_game`, `strategies/solvent.py` `_is_acyclic` / `_playable_order` |
-| greedy algorithms + matroids (exchange argument) | the upper half is a transversal matroid, which is *why* descending greedy provably yields the heaviest possible upper half |
+| greedy algorithms + matroids (exchange argument) | matchable upper sets form a transversal matroid, which is *why* descending greedy provably yields the heaviest *matchable* upper half (M\*) — the proven ceiling that caps every game |
 | sieve of Eratosthenes | `core.smallest_prime_factors` (storing witnesses, not booleans) |
 | amortized analysis, worklists | `core.solve_mini` — degree-1 peeling in O(V+E) via the Kahn-queue trick |
 | relaxations (as in LP relaxation), duality intuition | `evaluation/bound.py` — delete two constraints, get a poly-time upper bound |

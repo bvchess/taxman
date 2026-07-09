@@ -37,10 +37,12 @@ The key fact (sharpened by the lifting lemma to maximal factors only):
 Under the hood this is classic bipartite maximum matching, applied
 greedily.  _augment is Kuhn's algorithm (the Hungarian-style
 alternating DFS); the accept loop is the matroid greedy template --
-descending weights, keep what stays independent -- which is why the
-picks above n/2 are provably the heaviest upper half any game can hold
-(matchable upper sets form a transversal matroid; that optimal games
-hold exactly this set is verified for n <= 1000, not proven);
+descending weights, keep what stays independent.  Matchable upper
+sets form a transversal matroid, which proves a hard ceiling (no
+game's upper half can outscore the max-weight matchable set); this
+strategy's playability test is stricter than matching, so its upper
+picks sit at or below that ceiling, and that they equal the optimal
+game's upper half exactly is verified for n <= 1000, not proven.
 _is_acyclic and _playable_order are Kahn's
 topological sort doing cycle detection and schedule construction.  The
 one nonstandard ingredient is the interplay between matching and
