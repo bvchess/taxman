@@ -77,9 +77,11 @@ witnesses it) while U\* = 291,258.  The 257-point difference is
 matchable-but-unplayable weight, upper-half siblings of the n=21 set.
 What is proven is that no game beats M\*; what is measured
 (`verify.py`, 1000/1000) is that optimal games' upper halves equal U\*
-exactly; "no *playable* upper set outweighs U\*" now needs only the
-exchange property for playable sets (completeness is a theorem),
-and is exhaustively verified for every n = 2..99.
+exactly; "no *playable* upper set outweighs U\*" is proven wherever
+the frontier jam is hyperedge-free (see below), exhaustively
+verified for every n = 2..99, and open in general — both the
+exchange route (n=2873) and the single-sacrifice route (n=9170) are
+provably closed.
 `order_for_real_game` turns solve_mini's assignment into a legal
 order.  The
 subtlety that makes the game hard lives in the *lower* half: an
