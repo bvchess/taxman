@@ -86,6 +86,7 @@ What is proven vs. trusted, precisely:
 | for prime n: opt(n) = n + opt(n−1) − (largest prime < n) | proven, verified 167/167 |
 | optimal games realize the full upper-half ceiling | measured, 1000/1000 |
 | solve_mini's assignment is always schedulable | conjecture ("schedulability"), never violated, checked loudly at runtime |
+| solve_mini's failure means the set is unplayable | conjecture ("completeness") — NOT reducible to "no matching exists": matchable-but-unplayable sets are real (n=21 holds a 145-sum set whose every matching is precedence-cyclic; the optimum is 144) and solve_mini correctly rejects them.  solve_mini is a playability oracle, strictly stronger than a matching oracle |
 | opt delta = upper-ceiling delta (the upper-delta certificate) | conjecture, holds on 70.4% of transitions where it applies, zero contradictions |
 | optimal.json itself | independently certified to n=62 by brute force (`certify.py`), consistent with every bound and certificate beyond |
 
@@ -117,11 +118,15 @@ where `playable` runs the wiki's solve_mini over the outside maximal
 factors, and `ordered` topologically sorts the precedence "s before t
 whenever pay(s) divides t, or s divides t".  This is `optimize_mini`
 promoted to the whole game — restrict it to the numbers above n/2 and
-it collapses back — and its rejections are theorems (no payment
-assignment exists, and larger sets are only harder to pay), which
-makes the output set canonical: a deterministic function of
-playability alone.  The fast version in `strategies/solvent.py`
-(incremental Kuhn matching, complete solve_mini fallback tier) is
+it collapses back — and its rejections are solve_mini refusals,
+trusted (the completeness conjecture in the ledger above) to mean the
+set is unplayable; since playable sets are downward-closed, a
+rejection is permanent either way, which makes the output set
+canonical: a deterministic function of the game, not of tie-breaking.
+The fast version in `strategies/solvent.py` (incremental Kuhn
+matching; a failed augmenting search rejects outright, by Berge's
+lemma; solve_mini is consulted only when the incremental matching
+goes precedence-cyclic — where it does real playability work) is
 bit-identical at a fraction of the cost.
 
 Results over n = 2..1000 against the known optima (n=1 excluded — its
@@ -364,6 +369,16 @@ history):
   strategy and the oracle obsolete.
 * **Trusting certificates as search cutoffs** — see above: −511
   points for +7% speed.  Certificates label; they do not steer.
+* **"Acceptance is just matching-existence."**  Auditing solvent for
+  wasted safety checks found one real redundancy (the complete-tier
+  consultation after a *failed* augment — Berge's lemma already
+  decides; removing it is bit-identical and ~2x faster) and one
+  falsified one: dropping the per-acceptance acyclicity gate changes
+  answers, first at n=21, where a matchable-but-unschedulable set
+  out-sums the true optimum.  The failed half taught more than the
+  successful half: solve_mini rejects some sets that have perfect
+  payment matchings, i.e. it is a playability oracle, not a matching
+  oracle — a fact the codebase had relied on without stating.
 * **Bitsets** win for state hashing (the brute-force certifier) and
   lose for whole-scan divisor work (harmonic-sum beats n²/64 past
   n≈600); PyPy beats both concerns at once for long runs.

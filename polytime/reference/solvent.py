@@ -31,11 +31,17 @@ What makes it special:
   O(n^2 log n); this readable version re-derives each answer from
   scratch and pays roughly a factor of n for the privilege (~n^3.3
   measured) - it exists to be read, not raced.
-* Rejections are proofs, not judgment calls.  When solve_mini fails,
-  no reservation scheme exists for that set at all - and since a
-  bigger set is only harder to pay for, a rejected number is rejected
-  forever.  One consequence: the set this program picks is canonical,
-  a deterministic function of the game, not of tie-breaking.
+* Rejections are refusals by a playability oracle, not judgment
+  calls.  When solve_mini fails the set is unplayable - and that is
+  MORE than "no one can be paid": there are sets where everyone can
+  reserve a distinct payment yet no legal order exists (at n=21 the
+  145-sum set {10,12,14,15,16,18,19,20,21} out-sums the true optimum
+  144), and solve_mini's forced-move peeling refuses those too (the
+  "completeness" conjecture: its refusals coincide exactly with
+  unplayability - never violated).  Since playable sets are
+  downward-closed, a rejection is permanent, and the set this program
+  picks is canonical: a deterministic function of the game, not of
+  tie-breaking.
 * The picks above n/2 are not merely good - they are exactly the
   >n/2 selections of an optimal game (verified against the known
   optima for every n <= 1000).  Numbers above n/2 never divide one
@@ -97,9 +103,13 @@ def solve_mini(members, factors, factors_of):
       which is sequenced LAST, giving earlier picks time to consume
       its other factors, so this one is what it actually pays.
 
-    When neither rule applies, no assignment of distinct payments
-    exists and the set is unplayable - failure here is a theorem
-    about the set, not a dead end in a search.
+    When neither rule applies, the set is refused as unplayable.
+    Note what this refusal is NOT: it is not always "no assignment of
+    distinct payments exists" - some refused sets have perfect
+    payment assignments, every one of which is impossible to
+    schedule.  The forced-move discipline makes solve_mini reject
+    those too: it is a playability oracle, conjecturally exact,
+    strictly stronger than a matching test.
 
     Returns (sequence, pay) where pay maps each member to its
     reserved payment.
