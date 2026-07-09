@@ -3,7 +3,15 @@
 The pure upper-half machinery applied band by band: play the numbers
 above half the remaining maximum optimally with optimize_mini and
 solve_mini, sweep, repeat on what is left.  Shows how much of the game
-the verified theory captures on its own, with no promotions.
+the verified theory captures on its own, with no promotions (~93% of
+optimal) -- the ablation baseline that measures what solvent's and
+the chain's remaining machinery is actually buying.
+
+Note cascade plays solve_mini's raw sequence under real sweeps, so it
+needs TRUE divisor lists, not the maximal-factor pool: feasibility is
+pool-invariant (the lifting lemma) but raw play orders are not -- at
+n=5 a maximal-factor pool orders [4, 5], and playing 4 sweeps the 1
+that 5 needed.
 """
 
 from __future__ import annotations

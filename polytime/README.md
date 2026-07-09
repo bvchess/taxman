@@ -354,6 +354,39 @@ resumes with `--resume` — container restarts cost at most a few games.
 | `results/moniot_table.json` | Moniot's published n≤128 results (validation) |
 | `results/pot_fraction.png`, `results/score_vs_bound.png` | the two summary charts |
 
+## For students
+
+Taxman turns up in undergraduate projects, and this codebase is
+deliberately readable as a tour of course material meeting a real
+problem.  A suggested path: play a few games by hand (n=12 is
+instructive), read `reference/solvent.py` top to bottom, then
+`core.py`, then `strategies/solvent.py`, then skim
+`strategies/continuation.py`'s docstring.  Where the classroom
+concepts live:
+
+| concept from class | where it does real work here |
+|---|---|
+| bipartite matching, Kuhn's augmenting paths, Berge's lemma | `strategies/solvent.py` (`_augment`; failed search = conclusive rejection) |
+| Hall's theorem — and its limits | matchability is *not* playability: the n=21 set in the ledger has perfect matchings and no legal order |
+| topological sort (Kahn's algorithm), DAGs | `core.order_for_real_game`, `strategies/solvent.py` `_is_acyclic` / `_playable_order` |
+| greedy algorithms + matroids (exchange argument) | the upper half is a transversal matroid, which is *why* descending greedy is provably optimal there |
+| sieve of Eratosthenes | `core.smallest_prime_factors` (storing witnesses, not booleans) |
+| amortized analysis, worklists | `core.solve_mini` — degree-1 peeling in O(V+E) via the Kahn-queue trick |
+| relaxations (as in LP relaxation), duality intuition | `evaluation/bound.py` — delete two constraints, get a poly-time upper bound |
+| Edmonds' blossom algorithm — and when you don't need it | `evaluation/bound.py`: an Ω-parity argument shows the graph is bipartite, so blossoms never fire |
+| bitmask DP, memoization, branch-and-bound | `evaluation/certify.py` + `evaluation/bitpot.py` |
+| local search, hill climbing, escaping local optima | `strategies/continuation.py` (flips, then valley-crossing bundles) |
+| undo logs / transaction rollback | `strategies/seteval.py` |
+| NP-hardness | Franklín & Moniot's paper (cited above) — the hardness and our upper bound are two faces of the same matching structure |
+| theorems vs. conjectures vs. measurements | the ledger table above — every claim in this project is tagged with its grade of evidence |
+
+The habits this project would most like to teach are in the ledger
+and the dead-ends section: label what is proven versus conjectured
+versus measured, test the elegant hypothesis before trusting it, and
+keep the falsified ones on display — the n=21 counterexample and the
+trust-certificates experiment taught more than several of the
+successes.
+
 ## Dead ends worth remembering
 
 Rejected ideas that carry real information (full details in git

@@ -1,18 +1,26 @@
 """SetEval: an incremental playability evaluator for Taxman pick sets.
 
 A set of Taxman picks is playable iff there is a matching assigning each
-pick a distinct proper divisor still in the pot such that the precedence
-relation "a before b whenever a's assigned divisor divides b, or a divides
+pick a distinct maximal factor outside the set such that the precedence
+relation "a before b whenever a's assigned factor divides b, or a divides
 b" is acyclic (any topological order is then a legal game).  SetEval keeps
 such a matching incrementally: a candidate set can be mutated pick-by-pick
 (playable_add / remove) and re-tested cheaply, with augmenting-path
 rollback so a rejected mutation fully restores prior state.
 
-This class was extracted verbatim from transitions.py (which now imports
-it) so the continuation solver and the transition anatomy share one
-validated evaluator.  It mirrors strategies.solvent's matching machinery and
-falls back to core.solve_mini for a complete playability decision when the
-fast, incomplete solvent tier rejects an add.
+It mirrors strategies.solvent's matching machinery: a failed augmenting
+search rejects outright (Berge's lemma -- no matching covers the
+candidate), and core.solve_mini is consulted only when the incremental
+matching goes precedence-cyclic, where it decides true playability.
+
+For students: this is the "dynamic" flavor of an algorithm you know
+statically.  Local search (the continuation solver) fires thousands of
+"what if I added/removed x?" probes per game, so instead of re-solving
+the matching from scratch per probe, SetEval maintains it across
+mutations and journals every change to a trail -- the same undo-log
+idea a database uses for transaction rollback.  A rejected probe rolls
+back to exactly the prior state; snapshot/restore brackets compound
+moves.
 """
 
 from __future__ import annotations

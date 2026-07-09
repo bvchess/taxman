@@ -77,6 +77,18 @@ without re-solving game n from scratch:
   and never gate or skip the search itself (see solve_game), with the sole
   exception of the lucky "exact" early exit described there.
 
+For students: the design is warm-started local search.  Each game
+begins from a strong initial solution (the provably-optimal upper half
+plus the previous game's lower picks), then hill-climbs -- steepest
+single flips, then compound "bundle" moves that cross the valleys
+where every single step is downhill (the local-optima problem from
+your AI/optimization course, met here in the wild).  The certificates
+are optimality gap bounds in the branch-and-bound sense: reaching a
+provable upper bound ends the question.  Two measured lessons worth
+internalizing: a self-fed chain heals its own early mistakes (cold
+start converges), and bounds computed from an unproven premise must
+not steer the search (see the README's trust-certificates dead end).
+
 Usage:
     python3 -m strategies.continuation --from 500 --to 1000 [--seed-from-optimal]
                             [--bundle-limit K] [--out PATH] [--resume]

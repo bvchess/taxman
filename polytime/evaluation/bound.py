@@ -21,6 +21,22 @@ bound is tight - equal to the true optimum - in 45 games, all with
 N <= 122 (the last tight game is N=122).  Over N=500..1000 the optimum
 averages 99.71% of the bound and never falls below 99.57%.
 
+For students, three classroom connections.  (1) This is a
+*relaxation*: delete the hard constraints (turn order; the rule that a
+pick sweeps ALL its remaining divisors, not just the one it "pays"),
+and the relaxed problem both becomes solvable in polynomial time and
+upper-bounds the original -- the same move as relaxing an integer
+program to a linear one.  (2) networkx's max_weight_matching is
+Edmonds' blossom algorithm for general graphs, but blossoms never fire
+here: every edge (d, c) has c/d prime, so crossing an edge changes
+Omega(n) -- the count of prime factors with multiplicity -- by exactly
+one, every cycle is even, and the graph is bipartite (even-Omega
+vertices vs odd-Omega).  A parity argument proving bipartiteness is
+worth writing out once in your life.  (3) The same Franklin-Moniot
+paper proves NP-hardness of a Taxman variant via this matching
+connection -- the bound and the hardness are two faces of one
+structure.
+
 Usage:
     python3 -m evaluation.bound 21 128 1000
     python3 -m evaluation.bound --max-n 1000 --out bounds.json

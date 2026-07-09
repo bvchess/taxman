@@ -2,29 +2,48 @@
 
 The full-game generalization of "take the highest prime": consider
 n, n-1, ..., 2 and accept each number if the pick set stays playable.
-Playability is decided two-tier: a cheap incremental augmenting search
-(Kuhn) plus acyclicity check tries to extend the matching in place, and on
-any failure the complete tier (an exact bipartite reduction via solve_mini)
-decides accept/reject exactly.  The complete tier trusts the conjecture
-that solve_mini's returned assignment is always schedulable (zero
-counterexamples across all runs), so any matching it returns is accepted
-unconditionally; the sole rejection reason is now "infeasible" (solve_mini
-found no assignment at all).  A complete-tier rejection is permanent:
-playable sets are downward-closed, so a set that cannot be matched now can
-never be matched after more elements are added.
+Per candidate the decision has three outcomes:
 
-The key fact (a generalization of the ordering argument in evaluation.verify):
+  * the incremental augmenting search fails -> reject outright.  By
+    Berge's lemma (a matching is maximum iff no augmenting path exists
+    from a free vertex), the failure already proves no matching covers
+    the candidate; nothing can overturn it.
+  * the search succeeds and the updated matching's precedence relation
+    is acyclic -> accept.
+  * the search succeeds but the matching has gone precedence-cyclic ->
+    ask solve_mini, which decides exactly.  This path is load-bearing:
+    some sets have perfect matchings, every one of them cyclic (first
+    at n=21), and solve_mini correctly refuses those -- it is a
+    playability oracle, strictly stronger than a matching test.
+
+A rejection is permanent either way: playable sets are downward-closed,
+so a set unplayable now can never become playable by adding more.
+
+The key fact (sharpened by the lifting lemma to maximal factors only):
 
     A set S of selections can all be played, in some order, if and only
-    if there is a matching that assigns each selection a distinct divisor
-    still in the game, such that the precedence relation "a before b
-    whenever a's assigned divisor divides b, or a divides b" is acyclic.
+    if there is a matching that assigns each selection a distinct
+    maximal factor outside S, such that the precedence relation "a
+    before b whenever a's assigned factor divides b, or a divides b" is
+    acyclic.
 
-    Playing any topological order works: a selection's assigned divisor
+    Playing any topological order works: a selection's assigned factor
     cannot be swept earlier (everything divisible by it comes later), and
     a selection that is itself someone's divisor is played before being
-    swept.  Conversely, a real game induces such a matching (pick one
-    paid divisor per selection) and its play order is a linear extension.
+    swept.  Conversely, a real game induces such a matching (any paid
+    divisor lifts to a surviving maximal factor) and its play order is a
+    linear extension.
+
+For students: this file is bipartite maximum matching from your
+algorithms course, applied greedily.  _augment is Kuhn's algorithm (the
+Hungarian-style alternating DFS); the accept loop is the matroid greedy
+template -- descending weights, keep what stays independent -- which is
+why the picks above n/2 are provably optimal (matchable upper sets form
+a transversal matroid); _is_acyclic and _playable_order are Kahn's
+topological sort doing cycle detection and schedule construction.  The
+one non-classroom ingredient is the interplay between matching and
+scheduling: matchability alone is NOT playability, which is exactly why
+the cyclic path above must consult solve_mini.
 """
 
 from __future__ import annotations
@@ -44,8 +63,14 @@ def _augment(
 ) -> bool:
     """Kuhn's augmenting search: find v a candidate factor, reassigning others.
 
-    `mf` is the candidate-payment pool (maximal factors); every owner change
-    is recorded on the trail so it can be rolled back.
+    The textbook alternating-path DFS for bipartite matching: try each of
+    v's factors; a free factor ends the path, an owned one recurses on its
+    holder to re-route it.  Success extends the matching by one; failure
+    (with the full `visited` set explored) proves, via Berge's lemma, that
+    no matching covers v alongside the current picks -- callers treat that
+    as a conclusive rejection.  `mf` is the candidate-payment pool (maximal
+    factors); every owner change is recorded on the trail so a failed
+    composite operation can be rolled back exactly, undo-log style.
     """
     for f in reversed(mf[v]):
         if f in selected or f in visited:

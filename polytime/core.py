@@ -18,6 +18,24 @@ forms a valid instance of the factor game. The theory tested by this project
 is that optimize_mini/solve_mini applied to this game yield exactly the
 numbers greater than N/2 in the optimal solution to game N, along with a
 valid order in which to select them.
+
+For students: this file is three classroom ideas wearing number-theory
+clothes.  (1) *Modeling*: the game becomes a bipartite graph — picks on
+one side, candidate tax payments on the other, an edge where payment
+divides pick — so "can everything be paid?" becomes a matching
+question.  (2) *Degree-1 peeling*: solve_mini repeatedly makes only
+forced moves (a vertex with one live edge has no choice), maintained
+with worklists exactly like Kahn's topological sort keeps its
+in-degree-zero queue; each edge is touched O(1) times, so it runs in
+O(V + E) — and E is tiny, since a number has only as many maximal
+factors as distinct primes (average ln ln n ~= 2).  (3) *Topological
+order*: order_for_real_game turns the payment assignment into a legal
+play sequence by topologically sorting a precedence DAG.  One warning
+worth its own exam question: solve_mini is NOT equivalent to checking
+that a matching exists (Hall's condition).  There are sets where a
+perfect payment matching exists but every such matching is impossible
+to schedule — solve_mini's forced-move discipline rejects those too.
+The smallest example lives at n=21; see the README's ledger.
 """
 
 from __future__ import annotations
@@ -30,7 +48,13 @@ class Infeasible(Exception):
 
 
 def smallest_prime_factors(limit: int) -> List[int]:
-    """Sieve: spf[n] is the smallest prime factor of n, for 0 <= n <= limit."""
+    """Sieve: spf[n] is the smallest prime factor of n, for 0 <= n <= limit.
+
+    The Sieve of Eratosthenes, storing a witness instead of a boolean:
+    spf[n] == n exactly when n is prime, and repeatedly dividing n by
+    spf[n] factors it in O(log n) with no trial division.  Build cost is
+    the classic O(n log log n).
+    """
     spf = list(range(limit + 1))
     for p in range(2, int(limit**0.5) + 1):
         if spf[p] == p:  # p is prime
@@ -78,6 +102,22 @@ def solve_mini(
 
     Returns (sequence, matching) where matching maps each selection to the
     factor it pays as tax.  Raises Infeasible if no ordering exists.
+
+    Implementation note (why this is fast): the naive reading rescans
+    every member at every level, O(|C| * E).  Instead, `single_factor`
+    and `single_comp` are worklists of vertices whose live degree just
+    became 1 -- the same pattern as Kahn's topological sort maintaining
+    its in-degree-zero queue.  Each edge is deleted exactly once inside
+    remove_pair, doing O(1) work plus possibly enqueueing a neighbor, so
+    the whole run is O(V + E).  With E = sum of distinct-prime counts
+    (average ~2 per member), this is by far the cheapest operation in
+    the project -- linear in a very sparse graph.
+
+    Semantics note (easy to get wrong): failure here does NOT simply
+    mean "no perfect matching exists".  Some sets have perfect payment
+    matchings, every one of which is precedence-cyclic and hence
+    unplayable; the forced-move discipline rejects those too.  See the
+    README ledger ("completeness" conjecture) and the n=21 example.
     """
     c_set = set(selections)
     f_set = set(factors)
@@ -181,6 +221,12 @@ def order_for_real_game(matching: Dict[int, int]) -> List[int]:
     Any topological order of that precedence works.  A cycle would require
     two selections to share an assigned factor, which a matching forbids,
     so this always succeeds for a valid matching.
+
+    Algorithmically this is Kahn's topological sort verbatim: build the
+    precedence DAG, repeatedly emit a vertex with no unplayed
+    predecessor.  (For the full game, where selections can divide each
+    other, the precedence needs a second edge type -- see
+    strategies.solvent._playable_order.)
     """
     order: List[int] = []
     blockers: Dict[int, int] = {c: 0 for c in matching}  # unplayed predecessors
