@@ -38,8 +38,10 @@ Under the hood this is classic bipartite maximum matching, applied
 greedily.  _augment is Kuhn's algorithm (the Hungarian-style
 alternating DFS); the accept loop is the matroid greedy template --
 descending weights, keep what stays independent -- which is why the
-picks above n/2 are provably optimal (matchable upper sets form a
-transversal matroid); _is_acyclic and _playable_order are Kahn's
+picks above n/2 are provably the heaviest upper half any game can hold
+(matchable upper sets form a transversal matroid; that optimal games
+hold exactly this set is verified for n <= 1000, not proven);
+_is_acyclic and _playable_order are Kahn's
 topological sort doing cycle detection and schedule construction.  The
 one nonstandard ingredient is the interplay between matching and
 scheduling: matchability alone is NOT playability, which is exactly why

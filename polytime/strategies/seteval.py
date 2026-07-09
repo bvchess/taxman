@@ -129,10 +129,11 @@ class SetEval:
         the cycle needs OTHER picks reassigned too (empirically ~9 picks
         per game around n=500, e.g. 230/225/220 which sit inside the
         provably-playable optimal set).  So when the fast tier rejects, a
-        complete tier runs: solve_mini decides the bipartite selectability
-        of S + {x} exactly (raising Infeasible iff no assignment covers
-        every pick) and its canonical order is confirmed acyclic under the
-        full real-game precedence.  Only a rejection by BOTH tiers is a
+        complete tier runs: solve_mini decides the playability of
+        S + {x} (raising Infeasible when no playable assignment exists --
+        a refusal strictly stronger than "no matching": see the n=21
+        note in strategies.solvent) and its canonical order is confirmed
+        acyclic under the full real-game precedence.  Only a rejection by BOTH tiers is a
         real "unplayable".  Any failure fully restores prior state.
         """
         if x in self.S:

@@ -158,7 +158,9 @@ transitions are pure insertions; mean lower-half churn ~1.2 numbers;
 bundles).  `strategies/continuation.py` solves games in sequence, each
 warm-started from the previous game's own output:
 
-1. exact upper half (`solve_upper_half` — no search);
+1. the upper-half ceiling set (`solve_upper_half` — no search;
+   provably unbeatable in upper-half weight, and empirically the
+   optimal game's own upper half in all 1000 verified games);
 2. carry the previous game's lower picks;
 3. certificate check (below) — done instantly if it fires;
 4. tier-1: steepest single flips to quiescence;
@@ -289,7 +291,7 @@ ratios, not just exponents):
   log log is invisible at these sizes (ratios ~4.2).
 * **cascade** rides the same machinery: Θ(n²)-ish, measured k≈2.1.
 * **the continuation chain** costs O(n²) per game before search (the
-  exact upper half) plus the budgeted flip/bundle work, so a full
+  upper-half ceiling computation) plus the budgeted flip/bundle work, so a full
   chain 2..N is Θ(N³)-class in aggregate — ~78 minutes to N=1000
   under PyPy.
 
@@ -380,7 +382,7 @@ ideas do real work:
 | bipartite matching, Kuhn's augmenting paths, Berge's lemma | `strategies/solvent.py` (`_augment`; failed search = conclusive rejection) |
 | Hall's theorem — and its limits | matchability is *not* playability: the n=21 set in the ledger has perfect matchings and no legal order |
 | topological sort (Kahn's algorithm), DAGs | `core.order_for_real_game`, `strategies/solvent.py` `_is_acyclic` / `_playable_order` |
-| greedy algorithms + matroids (exchange argument) | the upper half is a transversal matroid, which is *why* descending greedy is provably optimal there |
+| greedy algorithms + matroids (exchange argument) | the upper half is a transversal matroid, which is *why* descending greedy provably yields the heaviest possible upper half |
 | sieve of Eratosthenes | `core.smallest_prime_factors` (storing witnesses, not booleans) |
 | amortized analysis, worklists | `core.solve_mini` — degree-1 peeling in O(V+E) via the Kahn-queue trick |
 | relaxations (as in LP relaxation), duality intuition | `evaluation/bound.py` — delete two constraints, get a poly-time upper bound |

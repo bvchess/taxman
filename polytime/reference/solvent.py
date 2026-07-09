@@ -47,10 +47,12 @@ What makes it special:
   optima for every n <= 1000).  Numbers above n/2 never divide one
   another, so up there selection is a pure matching question, and
   the matchable upper sets form a matroid - the structure in which
-  a greedy descending pass is provably unbeatable.  Because the loop
-  runs from n downward, its first n/2 iterations are literally that
-  optimal upper-half computation; whatever solvent loses to the true
-  optimum, it loses among the small numbers below n/2.
+  a greedy descending pass provably yields the heaviest possible upper
+  half.  (That optimal games hold exactly this set is the verified
+  part, not a theorem.)  Because the loop runs from n downward, its
+  first n/2 iterations are literally that ceiling computation;
+  whatever solvent loses to the true optimum, it loses among the
+  small numbers below n/2.
 * The one leap of faith is deferred, not hidden.  Accepting a set
   whenever the reservations exist assumes they can also be scheduled
   (the "schedulability conjecture" - never violated in any game ever
