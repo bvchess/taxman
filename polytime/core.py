@@ -19,7 +19,7 @@ is that optimize_mini/solve_mini applied to this game yield exactly the
 numbers greater than N/2 in the optimal solution to game N, along with a
 valid order in which to select them.
 
-For students: this file is three classroom ideas wearing number-theory
+Three well-known ideas underlie this file, wearing number-theory
 clothes.  (1) *Modeling*: the game becomes a bipartite graph — picks on
 one side, candidate tax payments on the other, an edge where payment
 divides pick — so "can everything be paid?" becomes a matching
@@ -30,8 +30,8 @@ in-degree-zero queue; each edge is touched O(1) times, so it runs in
 O(V + E) — and E is tiny, since a number has only as many maximal
 factors as distinct primes (average ln ln n ~= 2).  (3) *Topological
 order*: order_for_real_game turns the payment assignment into a legal
-play sequence by topologically sorting a precedence DAG.  One warning
-worth its own exam question: solve_mini is NOT equivalent to checking
+play sequence by topologically sorting a precedence DAG.  One warning:
+solve_mini is NOT equivalent to checking
 that a matching exists (Hall's condition).  There are sets where a
 perfect payment matching exists but every such matching is impossible
 to schedule — solve_mini's forced-move discipline rejects those too.

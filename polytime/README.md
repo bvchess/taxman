@@ -354,17 +354,28 @@ resumes with `--resume` — container restarts cost at most a few games.
 | `results/moniot_table.json` | Moniot's published n≤128 results (validation) |
 | `results/pot_fraction.png`, `results/score_vs_bound.png` | the two summary charts |
 
-## For students
+## Reading guide
 
-Taxman turns up in undergraduate projects, and this codebase is
-deliberately readable as a tour of course material meeting a real
-problem.  A suggested path: play a few games by hand (n=12 is
-instructive), read `reference/solvent.py` top to bottom, then
-`core.py`, then `strategies/solvent.py`, then skim
-`strategies/continuation.py`'s docstring.  Where the classroom
-concepts live:
+The codebase is small enough to read end to end, and it doubles as a
+tour of standard algorithmic material meeting a real problem.  A
+suggested path: play n=21 by hand, read `reference/solvent.py` top to
+bottom, then `core.py`, then `strategies/solvent.py`, then skim
+`strategies/continuation.py`'s docstring.
 
-| concept from class | where it does real work here |
+n=21 is the house example, cited wherever a concept needs a concrete
+case, because one small game happens to contain the whole story: [the
+wiki walks it through move by move](https://github.com/bvchess/taxman/wiki/Walkthrough-for-N=21);
+`python3 -m reference.solvent 21` solves it (144, the optimum);
+its optimal game opens with the highest prime and funds a
+one-for-two trade; the matchable-but-unplayable set
+{10,12,14,15,16,18,19,20,21} lives there, summing to 145 — one point
+more than any legal game can score — which makes it both the ledger's
+completeness counterexample and the reason the F–M bound reads 145
+against a true optimum of 144: the relaxation happily books exactly
+the fictional set that solve_mini refuses.  Where the well-known
+ideas do real work:
+
+| concept | where it does real work here |
 |---|---|
 | bipartite matching, Kuhn's augmenting paths, Berge's lemma | `strategies/solvent.py` (`_augment`; failed search = conclusive rejection) |
 | Hall's theorem — and its limits | matchability is *not* playability: the n=21 set in the ledger has perfect matchings and no legal order |
@@ -380,10 +391,10 @@ concepts live:
 | NP-hardness | Franklín & Moniot's paper (cited above) — the hardness and our upper bound are two faces of the same matching structure |
 | theorems vs. conjectures vs. measurements | the ledger table above — every claim in this project is tagged with its grade of evidence |
 
-The habits this project would most like to teach are in the ledger
-and the dead-ends section: label what is proven versus conjectured
-versus measured, test the elegant hypothesis before trusting it, and
-keep the falsified ones on display — the n=21 counterexample and the
+The working habits on display live in the ledger and the dead-ends
+section: label what is proven versus conjectured versus measured,
+test the elegant hypothesis before trusting it, and keep the
+falsified ones on display — the n=21 counterexample and the
 trust-certificates experiment taught more than several of the
 successes.
 

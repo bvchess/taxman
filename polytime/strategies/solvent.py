@@ -34,14 +34,14 @@ The key fact (sharpened by the lifting lemma to maximal factors only):
     divisor lifts to a surviving maximal factor) and its play order is a
     linear extension.
 
-For students: this file is bipartite maximum matching from your
-algorithms course, applied greedily.  _augment is Kuhn's algorithm (the
-Hungarian-style alternating DFS); the accept loop is the matroid greedy
-template -- descending weights, keep what stays independent -- which is
-why the picks above n/2 are provably optimal (matchable upper sets form
-a transversal matroid); _is_acyclic and _playable_order are Kahn's
+Under the hood this is classic bipartite maximum matching, applied
+greedily.  _augment is Kuhn's algorithm (the Hungarian-style
+alternating DFS); the accept loop is the matroid greedy template --
+descending weights, keep what stays independent -- which is why the
+picks above n/2 are provably optimal (matchable upper sets form a
+transversal matroid); _is_acyclic and _playable_order are Kahn's
 topological sort doing cycle detection and schedule construction.  The
-one non-classroom ingredient is the interplay between matching and
+one nonstandard ingredient is the interplay between matching and
 scheduling: matchability alone is NOT playability, which is exactly why
 the cyclic path above must consult solve_mini.
 """

@@ -31,11 +31,11 @@ the factor game, or maximal-factor decompositions:
    divisors).  Wherever that bound equals the recorded score, the game
    is certified outright.  Requires networkx; skipped if unavailable.
 
-For students: the brute-force solver is the bitmask-state exhaustive
-search you met in the TSP dynamic program -- the pot is one big int
-(bit i set = "i still in the pot", see bitpot.py), states are memoized
-in a dict keyed by the mask, and a sound admissible bound prunes
-branches that cannot beat the incumbent, which is branch-and-bound in
+The brute-force solver is the classic bitmask-state exhaustive search
+(same shape as the Held-Karp TSP dynamic program): the pot is one big
+int (bit i set = "i still in the pot", see bitpot.py), states are
+memoized in a dict keyed by the mask, and a sound admissible bound
+prunes branches that cannot beat the incumbent -- branch-and-bound in
 its simplest form.  The scientific point of this file matters as much
 as the algorithms: optimal.json and the theory being tested share
 ancestry, so agreement between them proves nothing.  Certification

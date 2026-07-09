@@ -13,8 +13,8 @@ search rejects outright (Berge's lemma -- no matching covers the
 candidate), and core.solve_mini is consulted only when the incremental
 matching goes precedence-cyclic, where it decides true playability.
 
-For students: this is the "dynamic" flavor of an algorithm you know
-statically.  Local search (the continuation solver) fires thousands of
+This is the dynamic flavor of a normally static algorithm.  Local
+search (the continuation solver) fires thousands of
 "what if I added/removed x?" probes per game, so instead of re-solving
 the matching from scratch per probe, SetEval maintains it across
 mutations and journals every change to a trail -- the same undo-log
