@@ -225,6 +225,22 @@ descending-weight greedy — an argument that must use the weights
 (a member is its own weight), since the unweighted structure
 provably cannot carry it.
 
+How load-bearing the arithmetic is was measured directly: taking the
+n=2873 gadget's incidence structure and trying all 720 weight
+orderings, **48 of them make greedy fail** — the actual member
+values land in the safe majority.  Random abstract graphic+hyperedge
+systems violate dominance readily; the number-realizable ones, never
+(zero violations across every gadget tested, n = 741..1850 dense plus
+spot ranges to 10,072).  Two exact empirical laws at the known
+multi-size gadget sharpen the target: the smaller maximal set always
+contains the component's lightest member, and the size classes are
+weight-separated (every larger base outweighs every smaller one).
+The open problem, in its final form: show that weight orderings
+realizable by actual prime arithmetic always avoid the bad
+orderings — e.g., for the six-member shape {p²q, pq², p²r, q³, pqr,
+q²r} over primes p < q < r, classify the realizable orderings and
+check each against the 48.
+
 ## Solvent: the O(n²) strategy
 
 Named for its acceptance test: a number joins only if the whole set
