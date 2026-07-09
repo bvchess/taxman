@@ -1,7 +1,7 @@
 """The Franklín & Moniot upper bound on the optimal Taxman score.
 
-Atli Fannar Franklín and Robert K. Moniot, "The difficulty of beating
-the Taxman", Discrete Applied Mathematics 339, 166-171, 2023.
+Franklín, A. F. and Moniot R. K.  The difficulty of beating the
+Taxman.  Discrete Applied Mathematics, 339, 166-171, (2023).
 Preprint: arXiv:2211.00461, https://arxiv.org/abs/2211.00461
 
 For game N,

@@ -223,10 +223,10 @@ ones that must run regardless).
 ## The yardsticks
 
 **The Franklín–Moniot upper bound** (`evaluation/bound.py`, exact values for
-every n = 2..2000 in `results/fm_bound_2000.json`): from Atli Fannar
-Franklín and Robert K. Moniot, ["The difficulty of beating the
-Taxman"](https://arxiv.org/abs/2211.00461), *Discrete Applied
-Mathematics* 339 (2023) 166–171 — the max-weight
+every n = 2..2000 in `results/fm_bound_2000.json`): from Franklín,
+A. F. and Moniot R. K.  [The difficulty of beating the
+Taxman](https://arxiv.org/abs/2211.00461).  *Discrete Applied
+Mathematics*, 339, 166–171, (2023) — the max-weight
 matching over maximal-factor edges — what optimal play would score if
 payments needed no schedule and sweeps took only the paid factor.
 The same paper proves NP-hardness of a Taxman variant via graph
