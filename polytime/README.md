@@ -94,7 +94,8 @@ What is proven vs. trusted, precisely:
 | opt(n) ≤ n + opt(n−1) | proven (wiki) |
 | no upper half beats M\*, the max-weight *matchable* upper set | proven (lifting + transversal matroid) |
 | U\* (`solve_upper_half`) equals the optimal game's upper half | measured, 1000/1000 |
-| no *playable* upper set outweighs U\* | conjecture — needs only the exchange property now (completeness is proven); exhaustively verified for every n = 2..99 (the brute-force frontier); note U\* < M\* — by 257 points at n=1000 |
+| no *playable* upper set outweighs U\* | conjecture — and the matroid route to it is **closed**: the exchange property is FALSE (counterexample at n=2873, below).  Exhaustively verified for n = 2..99; greedy beats brute force on every three-prime gadget tested to n=9000; note U\* < M\* — by 257 points at n=1000 |
+| on members with ≤ 2 distinct primes, playable = forest in the factor-value graph (a graphic matroid) | theorem (via the core characterization; verified on 89,400 random subsets) |
 | playability ⟺ maximal-factor matching + acyclic precedence | proven |
 | for prime n: opt(n) = n + opt(n−1) − (largest prime < n) | proven, verified 167/167 |
 | solve_mini's assignment is always schedulable | **theorem** ("schedulability", proof below): the peel rules cannot emit a cyclic assignment.  Still asserted loudly at runtime, as defense in depth |
@@ -184,6 +185,44 @@ Only in the maximal-factor regime do the two theorems interlock into
 the full equivalence: **solve_mini succeeds ⟺ the set is playable.**
 Acceptance in this project is not a heuristic anywhere: it is a
 decision procedure for playability, proven in both directions.
+
+### Playable sets are almost — but not — a matroid
+
+The two theorems yield a static characterization: a set is playable
+iff it contains no *self-covering core* — a nonempty subset in which
+every member's every maximal factor is also some other member's
+maximal factor (dismantle by repeatedly removing any member holding a
+factor no one else lists; the order never matters).  The n=39
+specimen {39, 33, 22, 26} is the minimal celebrity core.
+
+On members with at most two distinct primes this system is a
+**graphic matroid**: map each factor value to a vertex (plus a ground
+vertex for primes and prime powers, whose single factor makes a
+pendant edge) and each member to the edge joining its two factors —
+then a core is exactly a subgraph of minimum degree 2, so playable ⟺
+forest.  Members with three or more distinct primes are hyperedges
+glued onto that graph, and there the matroid property genuinely
+fails.  The smallest failure is at **n = 2873**, on six members built
+from {11, 13, 17}:
+
+    A = {1573, 2057, 2431, 2873}                (playable, size 4)
+    B = {1573, 1859, 2057, 2197, 2873}          (playable, size 5)
+
+Both members of B∖A jam: A+1859 and A+2197 each contain a core.  Two
+maximal playable sets of different sizes — the definitive non-matroid
+signature — so the exchange property is false and greedy optimality
+for the upper half **cannot** be proven by matroid exchange.
+
+And yet greedy survives: in every three-prime gadget for n = 700..9000
+(1,108 of them), descending-weight greedy still returns the
+maximum-weight playable set — at n=2873 it takes the heavy size-5
+base and never lands on the stuck size-4 one, because the stuck base
+is also the *light* one.  That is the precise remaining open problem
+for "the upper half is guaranteed optimal": prove that in these
+gadgets the heaviest maximal playable set is always reachable by
+descending-weight greedy — an argument that must use the weights
+(a member is its own weight), since the unweighted structure is
+provably not a matroid.
 
 ## Solvent: the O(n²) strategy
 
