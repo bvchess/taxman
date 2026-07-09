@@ -116,8 +116,10 @@ def solve_mini(
     Semantics note (easy to get wrong): failure here does NOT simply
     mean "no perfect matching exists".  Some sets have perfect payment
     matchings, every one of which is precedence-cyclic and hence
-    unplayable; the forced-move discipline rejects those too.  See the
-    README ledger ("completeness" conjecture) and the n=21 example.
+    unplayable; the forced-move discipline rejects those too.  Both
+    directions are theorems (README: "The schedulability theorem",
+    "The completeness theorem"): with maximal-factor pools, success
+    here is exactly playability.  See the n=21 example.
     """
     c_set = set(selections)
     f_set = set(factors)

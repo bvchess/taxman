@@ -36,11 +36,11 @@ What makes it special:
   MORE than "no one can be paid": there are sets where everyone can
   reserve a distinct payment yet no legal order exists (at n=21 the
   145-sum set {10,12,14,15,16,18,19,20,21} out-sums the true optimum
-  144), and solve_mini's forced-move peeling refuses those too (the
-  "completeness" conjecture: its refusals coincide exactly with
-  unplayability - never violated).  Since playable sets are
-  downward-closed, a rejection is permanent, and the set this program
-  picks is canonical: a deterministic function of the game, not of
+  144), and solve_mini's forced-move peeling provably refuses those
+  too (the "completeness" theorem - its refusals coincide exactly
+  with unplayability).  Since playable sets are downward-closed, a
+  rejection is permanent, and the set this program picks is
+  canonical: a deterministic function of playability, not of
   tie-breaking.
 * The picks above n/2 are not merely good - they are exactly the
   >n/2 selections of an optimal game (verified against the known
@@ -61,9 +61,11 @@ What makes it special:
   confines any would-be cycle to configurations the peel rules
   refuse).  ordered() still checks, and halts rather than play an
   illegal game - asserting a theorem costs little and catches bugs.
-  The leap of faith that remains lives on the rejection side: that a
-  solve_mini refusal always means the set is truly unplayable is the
-  "completeness" conjecture, unproven.
+  The rejection side is also a theorem now ("completeness", proof in
+  the README): a solve_mini refusal always means the set is truly
+  unplayable.  Nothing in this program's accept/reject behavior rests
+  on faith - solve_mini is a proven decision procedure for
+  playability, in both directions.
 
 Run it with the game size as the only argument:
 

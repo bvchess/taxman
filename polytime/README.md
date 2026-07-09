@@ -78,8 +78,9 @@ witnesses it) while U\* = 291,258.  The 257-point difference is
 matchable-but-unplayable weight, upper-half siblings of the n=21 set.
 What is proven is that no game beats M\*; what is measured
 (`verify.py`, 1000/1000) is that optimal games' upper halves equal U\*
-exactly; that no *playable* upper set outweighs U\* inherits the
-completeness conjecture rather than the matroid theorem.
+exactly; "no *playable* upper set outweighs U\*" now needs only the
+exchange property for playable sets (completeness is a theorem),
+and is exhaustively verified as far as brute force reaches.
 `order_for_real_game` turns solve_mini's assignment into a legal
 order.  The
 subtlety that makes the game hard lives in the *lower* half: an
@@ -93,11 +94,11 @@ What is proven vs. trusted, precisely:
 | opt(n) ≤ n + opt(n−1) | proven (wiki) |
 | no upper half beats M\*, the max-weight *matchable* upper set | proven (lifting + transversal matroid) |
 | U\* (`solve_upper_half`) equals the optimal game's upper half | measured, 1000/1000 |
-| no *playable* upper set outweighs U\* | conjecture-conditioned (needs completeness; note U\* < M\* — by 257 points at n=1000) |
+| no *playable* upper set outweighs U\* | conjecture — needs only the exchange property now (completeness is proven); exhaustively verified for every n the sweep reaches (93+); note U\* < M\* — by 257 points at n=1000 |
 | playability ⟺ maximal-factor matching + acyclic precedence | proven |
 | for prime n: opt(n) = n + opt(n−1) − (largest prime < n) | proven, verified 167/167 |
 | solve_mini's assignment is always schedulable | **theorem** ("schedulability", proof below): the peel rules cannot emit a cyclic assignment.  Still asserted loudly at runtime, as defense in depth |
-| solve_mini's failure means the set is unplayable | conjecture ("completeness") — NOT reducible to "no matching exists": matchable-but-unplayable sets are real (n=21 holds a 145-sum set whose every matching is precedence-cyclic; the optimum is 144) and solve_mini correctly rejects them.  solve_mini is a playability oracle, strictly stronger than a matching oracle |
+| solve_mini's failure means the set is unplayable | **theorem** ("completeness", proof below) — NOT reducible to "no matching exists": matchable-but-unplayable sets are real (n=21 holds a 145-sum set whose every matching is precedence-cyclic; the optimum is 144) and solve_mini provably rejects exactly the unplayable.  With schedulability, solve_mini is a proven playability oracle |
 | opt delta = U\* delta (the upper-delta certificate) | conjecture, holds on 70.4% of transitions where it applies, zero contradictions |
 | optimal.json itself | independently certified to n=62 by brute force (`certify.py`), consistent with every bound and certificate beyond |
 
@@ -144,6 +145,46 @@ peeling is structurally immune: a cycle core has no degree-1 vertex,
 so the forced-move discipline stalls and refuses rather than threads
 through it.
 
+### The completeness theorem
+
+**Theorem.** If a set is playable, solve_mini succeeds on it.
+(Contrapositive: every solve_mini refusal is a proof of
+unplayability.)
+
+*Proof.*  Three lemmas.  *Front moves preserve playability*: if live
+member c has exactly one live factor f, every covering matching must
+assign f to c, and removing the pair leaves an acyclic covering
+matching of the residue (restriction of acyclic is acyclic).  *Back
+moves preserve playability*: if live factor f is listed by exactly
+one live member c, take any acyclic covering matching M — nobody but
+c can be matched to f, so M minus c's own pair covers everyone else
+while avoiding f, and survives the removal of (c, f).  The invariant
+here is playability of the *residual instance*, which depends only on
+which pair was removed — not on the fact that the code pays c with f
+while M may pay it with something else (that discrepancy belongs to
+the schedulability theorem, not this one).  *A stall is unplayable*:
+if no forced move exists with members remaining, every live factor
+has zero or at least two live members.  Take any covering matching of
+the residue: each member a's payment is a live factor with at least
+one lister (a itself), hence at least two — so some other live member
+b lists pay(a), and pay(a) | b is a precedence edge a → b.  Every
+vertex has an out-edge, so the finite digraph contains a directed
+cycle; every covering matching is precedence-cyclic, and the residue
+is unplayable.  Chaining: a playable input stays playable through
+every forced move, a playable residue can never strand a member at
+zero factors, and a halt with members remaining would make the
+(playable) residue unplayable — contradiction.  ∎
+
+Note what each theorem needs: completeness holds for *any* pool of
+proper divisors — maximality unused — but the converse
+(schedulability) genuinely requires maximal factors: with lists
+{6: [1], 9: [3]} the unique matching is a perfect 2-cycle (1 | 9 and
+3 | 6), the set is unplayable, and peeling would accept it anyway.
+Only in the maximal-factor regime do the two theorems interlock into
+the full equivalence: **solve_mini succeeds ⟺ the set is playable.**
+Acceptance in this project is not a heuristic anywhere: it is a
+decision procedure for playability, proven in both directions.
+
 ## Solvent: the O(n²) strategy
 
 Named for its acceptance test: a number joins only if the whole set
@@ -172,11 +213,11 @@ where `playable` runs the wiki's solve_mini over the outside maximal
 factors, and `ordered` topologically sorts the precedence "s before t
 whenever pay(s) divides t, or s divides t".  This is `optimize_mini`
 promoted to the whole game — restrict it to the numbers above n/2 and
-it collapses back — and its rejections are solve_mini refusals,
-trusted (the completeness conjecture in the ledger above) to mean the
-set is unplayable; since playable sets are downward-closed, a
-rejection is permanent either way, which makes the output set
-canonical: a deterministic function of the game, not of tie-breaking.
+it collapses back — and its rejections are solve_mini refusals, which
+by the completeness theorem are proofs that the set is unplayable;
+since playable sets are downward-closed, a rejection is permanent,
+which makes the output set canonical: a deterministic function of
+playability, proven, not of tie-breaking.
 The fast version in `strategies/solvent.py` (incremental Kuhn
 matching; a failed augmenting search rejects outright, by Berge's
 lemma; solve_mini is consulted only when the incremental matching
