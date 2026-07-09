@@ -243,8 +243,9 @@ supposed heavier playable T at their largest disagreement d.  T
 cannot be the one holding d (T would contain greedy's own rejection
 certificate — downward closure).  So d ∈ G, T skips it, and if T is
 maximum-weight then T+d must be unplayable: every core of T+d
-contains d (T is playable) and dips below d (the part above d is
-greedy's playable prefix).  Let R be the union of those cores — the
+contains d (T is playable) and dips below d — the part of T+d at or
+above d is exactly G ∩ {≥ d}, playable *because* step one put d in G,
+so no core fits inside it.  Let R be the union of those cores — the
 2-core of T+d in hypergraph terms.  Three short lemmas are theorems
 (machine-cross-checked at every step): repairs live entirely inside
 R; a sacrifice t repairs T+d exactly when t lies in **every** minimal
@@ -261,14 +262,17 @@ n = 9170, d = 6137 = 17·19², the six members {4913, 5491, 6137,
 6647, 7429, 8303} (all built from 17, 19, 23; the hyperedge is
 7429 = 17·19·23) form an R with **two** minimal cores through d
 sharing nothing else — their below-d parts are {4913} and {5491},
-disjoint — so no single sacrifice repairs, verified directly.
+disjoint — so no single *below-d* sacrifice repairs: every single
+repair (6647, 7429, 8303, or d itself) costs at least d, verified
+directly.
 Greedy is still right there: every d-avoiding way to break both
 cores costs more than d (any single alternative victim is heavier
 than d; any two members sum past n), and the full-context optimum
 does take d — skipping it costs 1,224 points net.  But proving that
-in general is now visibly a *non-local, weighted* question: the
-would-be improver's kept members must be charged for what they lock
-out elsewhere in the component, not just at the frontier.  That is
+in general is now visibly a *non-local, weighted* question: whenever
+no single lighter sacrifice repairs the jam, the would-be improver's
+kept members must be charged for what they lock out elsewhere in the
+component, not just at the frontier.  That is
 the open problem's irreducible form, with n=9170 as the first test
 any proof must pass.
 
