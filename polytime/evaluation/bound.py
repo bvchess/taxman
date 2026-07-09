@@ -1,7 +1,10 @@
-"""The Franklin & Moniot upper bound on the optimal Taxman score.
+"""The Franklín & Moniot upper bound on the optimal Taxman score.
 
-Franklin, A. F. and Moniot, R. K., "The difficulty of beating the
-Taxman", Discrete Applied Mathematics 339, 166-171, 2023: for game N,
+Atli Fannar Franklín and Robert K. Moniot, "The difficulty of beating
+the Taxman", Discrete Applied Mathematics 339, 166-171, 2023.
+Preprint: arXiv:2211.00461, https://arxiv.org/abs/2211.00461
+
+For game N,
 build a graph on vertices 1..N with an edge (d, c) of weight c for
 every c in 2..N and every d in maximal_factors(c) - note maximal
 factors, not all divisors.  The bound is the weight of a maximum-weight

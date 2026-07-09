@@ -25,9 +25,12 @@ solve_mini finds the reservations; ordered() does the scheduling.
 What makes it special:
 
 * No search, no lookahead, no scoring heuristics - one feasibility
-  question ("can everyone still be paid?") asked n times, which is
-  what keeps the whole strategy in the O(n^2) complexity class while
-  landing within ~0.15% of the known optimal scores for n <= 1000.
+  question ("can everyone still be paid?") asked n times, landing
+  within ~0.15% of the known optimal scores for n <= 1000.  Answered
+  incrementally (strategies/solvent.py), the whole strategy runs in
+  O(n^2 log n); this readable version re-derives each answer from
+  scratch and pays roughly a factor of n for the privilege (~n^3.3
+  measured) - it exists to be read, not raced.
 * Rejections are proofs, not judgment calls.  When solve_mini fails,
   no reservation scheme exists for that set at all - and since a
   bigger set is only harder to pay for, a rejected number is rejected

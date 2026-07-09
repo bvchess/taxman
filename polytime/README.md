@@ -13,9 +13,10 @@ Three results, in increasing order of ambition:
    set out to test, from
    [the wiki](https://github.com/bvchess/taxman/wiki/Taxman-Mini)).
    Verified against known optimal solutions for every n = 1..1000.
-2. **An O(n²)-class strategy for the whole game — solvent — holds
-   99.85% of all optimal points** over n = 1..1000, never dropping
-   below 99.08% in any game, with no search and no lookahead.
+2. **A near-quadratic — O(n² log n) — strategy for the whole game,
+   solvent, holds 99.85% of all optimal points** over n = 1..1000,
+   never dropping below 99.08% in any game, with no search and no
+   lookahead.
 3. **A self-fed continuation solver holds 99.97% of all optimal
    points**, starting from nothing at n=2, and extends to the best
    known solutions for n = 1001..2000 — provably within 0.35% of the
@@ -222,9 +223,16 @@ ones that must run regardless).
 ## The yardsticks
 
 **The Franklín–Moniot upper bound** (`evaluation/bound.py`, exact values for
-every n = 2..2000 in `results/fm_bound_2000.json`): the max-weight
+every n = 2..2000 in `results/fm_bound_2000.json`): from Atli Fannar
+Franklín and Robert K. Moniot, ["The difficulty of beating the
+Taxman"](https://arxiv.org/abs/2211.00461), *Discrete Applied
+Mathematics* 339 (2023) 166–171 — the max-weight
 matching over maximal-factor edges — what optimal play would score if
-payments needed no schedule and sweeps took only the paid factor.  It
+payments needed no schedule and sweeps took only the paid factor.
+The same paper proves NP-hardness of a Taxman variant via graph
+matching, which is the theoretical backdrop for everything here:
+the bound is the matching relaxation of the game, and our claims
+past n=1000 are measured against it.  It
 is tight only through n=122; over 500..1000 the true optimum averages
 99.71% of it (never below 99.57%), so most of the bound-to-chain band
 on the charts is bound looseness, not solver error.  Decomposed at
@@ -252,6 +260,37 @@ exponent in time ~ n^k:
 | upper half (`solve_upper_half`) | 2.7 ms | 10 ms | 38 ms | 168 ms | 2.0 |
 | cascade | 3.8 ms | 16 ms | 66 ms | 310 ms | 2.1 |
 | solvent | 7.0 ms | 28 ms | 128 ms | 643 ms | 2.2 |
+
+Exact complexities, fitted against models over n = 250..4000 (doubling
+ratios, not just exponents):
+
+* **solvent is Θ(n² log n)**, and the log is real: each of the ~0.44n
+  acceptances runs an acyclicity check that enumerates multiples
+  (a harmonic sum, Θ(n log n) per check).  The measured ratio
+  t(1000)/t(125) is 91.9 — the n²·ln n model predicts 91.7, pure n²
+  predicts 64.
+* **maxturn is a textbook Θ(n²)**: every turn scans the whole pot for
+  the max (doubling ratios 3.9–4.0, no drift).
+* **onetax is worst-case O(n²) but runs ~n^1.7**: its per-turn scan
+  early-exits near the top of the pot; the guaranteed work is the
+  harmonic-sum divisor-count updates, Θ(n log n).  Doubling ratios
+  drift up (3.0 → 3.7) as the worst case slowly asserts itself.
+* **the upper half (solve_upper_half) is Θ(n² log log n)** — one
+  peeling pass per candidate over a graph with Σω(c) edges; the
+  log log is invisible at these sizes (ratios ~4.2).
+* **cascade** rides the same machinery: Θ(n²)-ish, measured k≈2.1.
+* **the continuation chain** costs O(n²) per game before search (the
+  exact upper half) plus the budgeted flip/bundle work, so a full
+  chain 2..N is Θ(N³)-class in aggregate — ~78 minutes to N=1000
+  under PyPy.
+
+The readable reference implementation is *not* in the same class as
+the fast one: `reference/solvent.py` re-derives every feasibility
+answer from scratch (a full peeling per candidate, O(n²) per
+question, n questions) and measures ~n^3.3, versus the fast
+version's incremental matching at Θ(n² log n) — the same strategy,
+one factor of n apart.  At n=500 that is 10.3 s vs 0.13 s; the
+reference exists to be read, not raced.
 
 The continuation chain runs ~4.7s/game (cold, full budget, PyPy) —
 the 2..1000 flagship takes ~78 minutes, 1001..2000 about 3.3 hours.
