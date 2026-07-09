@@ -80,7 +80,7 @@ What is proven is that no game beats M\*; what is measured
 (`verify.py`, 1000/1000) is that optimal games' upper halves equal U\*
 exactly; "no *playable* upper set outweighs U\*" now needs only the
 exchange property for playable sets (completeness is a theorem),
-and is exhaustively verified as far as brute force reaches.
+and is exhaustively verified for every n = 2..99.
 `order_for_real_game` turns solve_mini's assignment into a legal
 order.  The
 subtlety that makes the game hard lives in the *lower* half: an
@@ -94,7 +94,7 @@ What is proven vs. trusted, precisely:
 | opt(n) ≤ n + opt(n−1) | proven (wiki) |
 | no upper half beats M\*, the max-weight *matchable* upper set | proven (lifting + transversal matroid) |
 | U\* (`solve_upper_half`) equals the optimal game's upper half | measured, 1000/1000 |
-| no *playable* upper set outweighs U\* | conjecture — needs only the exchange property now (completeness is proven); exhaustively verified for every n the sweep reaches (93+); note U\* < M\* — by 257 points at n=1000 |
+| no *playable* upper set outweighs U\* | conjecture — needs only the exchange property now (completeness is proven); exhaustively verified for every n = 2..99 (the brute-force frontier); note U\* < M\* — by 257 points at n=1000 |
 | playability ⟺ maximal-factor matching + acyclic precedence | proven |
 | for prime n: opt(n) = n + opt(n−1) − (largest prime < n) | proven, verified 167/167 |
 | solve_mini's assignment is always schedulable | **theorem** ("schedulability", proof below): the peel rules cannot emit a cyclic assignment.  Still asserted loudly at runtime, as defense in depth |
