@@ -93,7 +93,8 @@ What is proven vs. trusted, precisely:
 | opt(n) ≤ n + opt(n−1) | proven (wiki) |
 | no upper half beats M\*, the max-weight *matchable* upper set | proven (lifting: every game's picks pair with distinct factors) |
 | U\* (`solve_upper_half`) equals the optimal game's upper half | measured, 1000/1000 |
-| no *playable* upper set outweighs U\* | conjecture — the exchange route to it is **closed**: greedy-extendability fails (counterexample at n=2873, below).  Exhaustively verified for n = 2..99; greedy beats brute force on every three-prime gadget tested to n=9000; note U\* < M\* — by 257 points at n=1000 |
+| no *playable* upper set outweighs U\* | conjecture — proven wherever the jam is hyperedge-free (the frontier argument below); the single-sacrifice route is **false** in general (n=9170 witness); the remaining gap is non-local and weighted.  Exhaustive n = 2..99; every gadget tested to n=9000+ |
+| greedy weight-optimality when the frontier jam has only ≤2-prime members | theorem (unique minimal core: forest + one edge; proof below) |
 | on members with ≤ 2 distinct primes, playable = forest in the factor-value graph | theorem (via the core characterization; verified on 89,400 random subsets) |
 | playability ⟺ maximal-factor matching + acyclic precedence | proven |
 | for prime n: opt(n) = n + opt(n−1) − (largest prime < n) | proven, verified 167/167 |
@@ -231,15 +232,43 @@ orderings, **48 of them make greedy fail** — the actual member
 values land in the safe majority.  Random abstract graphic+hyperedge
 systems violate dominance readily; the number-realizable ones, never
 (zero violations across every gadget tested, n = 741..1850 dense plus
-spot ranges to 10,072).  Two exact empirical laws at the known
-multi-size gadget sharpen the target: the smaller maximal set always
-contains the component's lightest member, and the size classes are
-weight-separated (every larger base outweighs every smaller one).
-The open problem, in its final form: show that weight orderings
-realizable by actual prime arithmetic always avoid the bad
-orderings — e.g., for the six-member shape {p²q, pq², p²r, q³, pqr,
-q²r} over primes p < q < r, classify the realizable orderings and
-check each against the 48.
+spot ranges to 10,072).
+
+### The frontier argument, and exactly where it stops
+
+The natural direct proof gets remarkably far.  Compare greedy G to a
+supposed heavier playable T at their largest disagreement d.  T
+cannot be the one holding d (T would contain greedy's own rejection
+certificate — downward closure).  So d ∈ G, T skips it, and if T is
+maximum-weight then T+d must be unplayable: every core of T+d
+contains d (T is playable) and dips below d (the part above d is
+greedy's playable prefix).  Let R be the union of those cores — the
+2-core of T+d in hypergraph terms.  Three short lemmas are theorems
+(machine-cross-checked at every step): repairs live entirely inside
+R; a sacrifice t repairs T+d exactly when t lies in **every** minimal
+core of R (the "victim law", 0 exceptions in 22,998 trials); and when
+every member of R has at most two distinct primes, R−d is a forest,
+R has *exactly one* minimal core (a forest plus one edge has one
+cycle), so a below-d victim always exists and the sacrifice
+T+d−t both restores playability and gains weight — contradiction.
+**Greedy is provably weight-optimal wherever the jam is
+hyperedge-free.**
+
+Beyond that regime the single-sacrifice step is **false**.  At
+n = 9170, d = 6137 = 17·19², the six members {4913, 5491, 6137,
+6647, 7429, 8303} (all built from 17, 19, 23; the hyperedge is
+7429 = 17·19·23) form an R with **two** minimal cores through d
+sharing nothing else — their below-d parts are {4913} and {5491},
+disjoint — so no single sacrifice repairs, verified directly.
+Greedy is still right there: every d-avoiding way to break both
+cores costs more than d (any single alternative victim is heavier
+than d; any two members sum past n), and the full-context optimum
+does take d — skipping it costs 1,224 points net.  But proving that
+in general is now visibly a *non-local, weighted* question: the
+would-be improver's kept members must be charged for what they lock
+out elsewhere in the component, not just at the frontier.  That is
+the open problem's irreducible form, with n=9170 as the first test
+any proof must pass.
 
 ## Solvent: the O(n²) strategy
 
