@@ -64,12 +64,11 @@ directly under real sweeps, still needs true divisors: at n=5 a
 maximal-factor pool emits [4, 5], and playing 4 sweeps the 1 that 5
 needed.)
 
-For the upper half alone, matchable sets form a transversal matroid
-(Edmonds–Fulkerson), where descending-weight greedy is provably
-optimal.  Combined with the lifting argument (every legal game's
-upper picks consume distinct outside maximal factors), that proves a
-hard ceiling: **no legal game's upper half can outscore M\*, the
-maximum-weight matchable upper set**.  The set this project actually
+For the upper half alone, the lifting argument gives a hard ceiling
+directly: every legal game's upper picks consume distinct outside
+maximal factors, so **no legal game's upper half can outscore M\*,
+the maximum-weight matchable upper set** — a pure matching quantity,
+needing no theory beyond "a maximum exists".  The set this project actually
 computes, U\* from `solve_upper_half`, is something subtly different:
 `optimize_mini` admits greedily with `solve_mini` — a *playability*
 test, stricter than matching — so U\* ≤ M\*, and the inequality is
@@ -92,10 +91,10 @@ What is proven vs. trusted, precisely:
 | claim | status |
 |---|---|
 | opt(n) ≤ n + opt(n−1) | proven (wiki) |
-| no upper half beats M\*, the max-weight *matchable* upper set | proven (lifting + transversal matroid) |
+| no upper half beats M\*, the max-weight *matchable* upper set | proven (lifting: every game's picks pair with distinct factors) |
 | U\* (`solve_upper_half`) equals the optimal game's upper half | measured, 1000/1000 |
-| no *playable* upper set outweighs U\* | conjecture — and the matroid route to it is **closed**: the exchange property is FALSE (counterexample at n=2873, below).  Exhaustively verified for n = 2..99; greedy beats brute force on every three-prime gadget tested to n=9000; note U\* < M\* — by 257 points at n=1000 |
-| on members with ≤ 2 distinct primes, playable = forest in the factor-value graph (a graphic matroid) | theorem (via the core characterization; verified on 89,400 random subsets) |
+| no *playable* upper set outweighs U\* | conjecture — the exchange route to it is **closed**: greedy-extendability fails (counterexample at n=2873, below).  Exhaustively verified for n = 2..99; greedy beats brute force on every three-prime gadget tested to n=9000; note U\* < M\* — by 257 points at n=1000 |
+| on members with ≤ 2 distinct primes, playable = forest in the factor-value graph | theorem (via the core characterization; verified on 89,400 random subsets) |
 | playability ⟺ maximal-factor matching + acyclic precedence | proven |
 | for prime n: opt(n) = n + opt(n−1) − (largest prime < n) | proven, verified 167/167 |
 | solve_mini's assignment is always schedulable | **theorem** ("schedulability", proof below): the peel rules cannot emit a cyclic assignment.  Still asserted loudly at runtime, as defense in depth |
@@ -186,7 +185,7 @@ the full equivalence: **solve_mini succeeds ⟺ the set is playable.**
 Acceptance in this project is not a heuristic anywhere: it is a
 decision procedure for playability, proven in both directions.
 
-### Playable sets are almost — but not — a matroid
+### Cores, forests, and where exchange breaks
 
 The two theorems yield a static characterization: a set is playable
 iff it contains no *self-covering core* — a nonempty subset in which
@@ -195,23 +194,25 @@ maximal factor (dismantle by repeatedly removing any member holding a
 factor no one else lists; the order never matters).  The n=39
 specimen {39, 33, 22, 26} is the minimal celebrity core.
 
-On members with at most two distinct primes this system is a
-**graphic matroid**: map each factor value to a vertex (plus a ground
+For members with at most two distinct primes the characterization
+turns geometric: map each factor value to a vertex (plus a ground
 vertex for primes and prime powers, whose single factor makes a
 pendant edge) and each member to the edge joining its two factors —
-then a core is exactly a subgraph of minimum degree 2, so playable ⟺
-forest.  Members with three or more distinct primes are hyperedges
-glued onto that graph, and there the matroid property genuinely
-fails.  The smallest failure is at **n = 2873**, on six members built
-from {11, 13, 17}:
+a core is exactly a subgraph of minimum degree 2, so **playable ⟺
+forest**.  Forests famously trade well: removing an edge and adding
+another never traps you, which is why greedy is bulletproof in that
+regime.  Members with three or more distinct primes are hyperedges
+glued onto the graph, and there the trading breaks.  The smallest
+failure is at **n = 2873**, on six members built from {11, 13, 17}:
 
     A = {1573, 2057, 2431, 2873}                (playable, size 4)
     B = {1573, 1859, 2057, 2197, 2873}          (playable, size 5)
 
 Both members of B∖A jam: A+1859 and A+2197 each contain a core.  Two
-maximal playable sets of different sizes — the definitive non-matroid
-signature — so the exchange property is false and greedy optimality
-for the upper half **cannot** be proven by matroid exchange.
+maximal playable sets of *different sizes* — so playable sets do not
+support the exchange argument that justifies greedy in the textbook
+setting, and greedy optimality for the upper half cannot be proven
+that way.
 
 And yet greedy survives: in every three-prime gadget for n = 700..9000
 (1,108 of them), descending-weight greedy still returns the
@@ -221,8 +222,8 @@ is also the *light* one.  That is the precise remaining open problem
 for "the upper half is guaranteed optimal": prove that in these
 gadgets the heaviest maximal playable set is always reachable by
 descending-weight greedy — an argument that must use the weights
-(a member is its own weight), since the unweighted structure is
-provably not a matroid.
+(a member is its own weight), since the unweighted structure
+provably cannot carry it.
 
 ## Solvent: the O(n²) strategy
 
@@ -230,7 +231,7 @@ Named for its acceptance test: a number joins only if the whole set
 stays *solvent* — every selection can still pay its tax with a
 distinct maximal factor from outside the set.  (It was called "greedy"
 through most of this project's history, and it is greedy — over set
-membership, in the matroid sense — but the strategy players call
+membership — but the strategy players call
 "greedy Taxman" is take-the-biggest-legal-number-each-turn, `maxturn`
 below, a far weaker thing.)
 
@@ -516,7 +517,7 @@ ideas do real work:
 | bipartite matching, Kuhn's augmenting paths, Berge's lemma | `strategies/solvent.py` (`_augment`; failed search = conclusive rejection) |
 | Hall's theorem — and its limits | matchability is *not* playability: the n=21 set in the ledger has perfect matchings and no legal order |
 | topological sort (Kahn's algorithm), DAGs | `core.order_for_real_game`, `strategies/solvent.py` `_is_acyclic` / `_playable_order` |
-| greedy algorithms + matroids (exchange argument) | matchable upper sets form a transversal matroid, which is *why* descending greedy provably yields the heaviest *matchable* upper half (M\*) — the proven ceiling that caps every game |
+| greedy algorithms + matroids — and their limits | the natural matroid hypothesis for playable sets is *false* (n=2873; see "Dead ends") — the survival of greedy here is a fact about Taxman's weights, not about exchange |
 | sieve of Eratosthenes | `core.smallest_prime_factors` (storing witnesses, not booleans) |
 | amortized analysis, worklists | `core.solve_mini` — degree-1 peeling in O(V+E) via the Kahn-queue trick |
 | relaxations (as in LP relaxation), duality intuition | `evaluation/bound.py` — delete two constraints, get a poly-time upper bound |
@@ -554,6 +555,17 @@ history):
   strategy and the oracle obsolete.
 * **Trusting certificates as search cutoffs** — see above: −511
   points for +7% speed.  Certificates label; they do not steer.
+* **The matroid frame.**  For most of the project, greedy's upper-half
+  optimality was explained by matroid theory: matchable sets do form
+  a transversal matroid, and on two-prime members playable sets form
+  a graphic one, so the frame kept passing tests.  It is false where
+  it matters: playable sets with three-prime members admit maximal
+  sets of different sizes (n=2873), so the exchange axiom fails and
+  no matroid argument can justify greedy over playable sets.  What
+  actually protects greedy is that Taxman's weights are the members
+  themselves — the stuck configurations are provably reachable only
+  through light members that descending greedy visits last.  Keep the
+  matroid lens for matchability; drop it for playability.
 * **"Acceptance is just matching-existence."**  Auditing solvent for
   wasted safety checks found one real redundancy (the complete-tier
   consultation after a *failed* augment — Berge's lemma already

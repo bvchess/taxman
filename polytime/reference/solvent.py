@@ -46,8 +46,8 @@ What makes it special:
   >n/2 selections of an optimal game (verified against the known
   optima for every n <= 1000).  Numbers above n/2 never divide one
   another, so up there selection is a pure matching question, and
-  the matchable upper sets form a matroid, which proves a hard
-  ceiling: no game's upper half can outscore the heaviest matchable
+  pairing every pick with a distinct outside factor caps every game:
+  no upper half can outscore the heaviest matchable
   set.  This program's playability test is stricter than matching,
   so its upper picks sit at or below that ceiling; that they equal
   an optimal game's upper half exactly is the verified part (every
