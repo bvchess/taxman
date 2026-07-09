@@ -264,16 +264,20 @@ exponent in time ~ n^k:
 | maxturn | 0.3 ms | 1.2 ms | 4.4 ms | 19 ms | 1.9 |
 | upper half (`solve_upper_half`) | 2.7 ms | 10 ms | 38 ms | 168 ms | 2.0 |
 | cascade | 3.8 ms | 16 ms | 66 ms | 310 ms | 2.1 |
-| solvent | 7.0 ms | 28 ms | 128 ms | 643 ms | 2.2 |
+| solvent | 2.6 ms | 12 ms | 56 ms | 319 ms | 2.3 |
 
 Exact complexities, fitted against models over n = 250..4000 (doubling
 ratios, not just exponents):
 
 * **solvent is Θ(n² log n)**, and the log is real: each of the ~0.44n
-  acceptances runs an acyclicity check that enumerates multiples
-  (a harmonic sum, Θ(n log n) per check).  The measured ratio
-  t(1000)/t(125) is 91.9 — the n²·ln n model predicts 91.7, pure n²
-  predicts 64.
+  acceptances runs an acyclicity check that enumerates multiples (a
+  harmonic sum, Θ(n log n) per check) — and that check is
+  decision-relevant, not a safety ritual: without it, solvent accepts
+  the matchable-but-unplayable set at n=21.  What *was* a safety
+  ritual: consulting solve_mini after a failed augmenting search
+  (Berge's lemma already decides).  Removing that halved the constant
+  (bit-identical output, verified over all 1000 games) without
+  changing the class.
 * **maxturn is a textbook Θ(n²)**: every turn scans the whole pot for
   the max (doubling ratios 3.9–4.0, no drift).
 * **onetax is worst-case O(n²) but runs ~n^1.7**: its per-turn scan
@@ -297,8 +301,9 @@ version's incremental matching at Θ(n² log n) — the same strategy,
 one factor of n apart.  At n=500 that is 10.3 s vs 0.13 s; the
 reference exists to be read, not raced.
 
-The continuation chain runs ~4.7s/game (cold, full budget, PyPy) —
-the 2..1000 flagship takes ~78 minutes, 1001..2000 about 3.3 hours.
+The continuation chain runs ~2s/game (cold, full budget, PyPy, after
+the Berge early-reject sped its evaluator ~2.4x) — call it ~35
+minutes for the 2..1000 flagship, ~1.5 hours for 1001..2000.
 A budget-capped configuration (bundles ≤ 100) reaches 99.95% of
 optimal at roughly a quarter of the cost and is the recommended
 default; PyPy is ~2–3x CPython on all of it.

@@ -51,6 +51,11 @@ class SetEval:
         self.S: Set[int] = set()
         self.owner: Dict[int, int] = {}  # divisor -> pick paying it as tax
         self.match: Dict[int, int] = {}  # pick -> its own coupon
+        # Set by _solvent_add: True when the fast tier failed on an
+        # augmenting search (Berge-conclusive -- no matching covers S | {x});
+        # False when it failed only because every matching found was cyclic
+        # (the complete tier must then decide).
+        self._fail_conclusive = False
 
     # -- Kuhn's augmenting search, ported from strategies._augment ------------
     def _augment(
@@ -126,7 +131,15 @@ class SetEval:
             return True
         if self._solvent_add(x):
             return True
-        # Fast tier rejected: fall back to the complete solve_mini test.
+        if self._fail_conclusive:
+            # Berge-conclusive fast-tier failure (a failed augmenting search
+            # from a free vertex): no matching covers S | {x}, so the
+            # complete tier's Infeasible is forced -- skip it.
+            return False
+        # Cyclic-only fast-tier failure: solve_mini here is a playability
+        # oracle (a set can be matchable yet unschedulable; see the n=21
+        # counterexample in the lean-solvent experiment), so the complete
+        # tier must decide.
         target = self.S | {x}
         matching = self._complete_matching(target)
         if matching is None:
@@ -137,9 +150,15 @@ class SetEval:
         return True
 
     def _solvent_add(self, x: int) -> bool:
-        """Fast, sound-but-incomplete add: strategies.solvent's try_select."""
+        """Fast, sound-but-incomplete add: strategies.solvent's try_select.
+
+        Sets self._fail_conclusive on failure: True when an augmenting
+        search failed (Berge-conclusive), False when only a precedence cycle
+        remained (the complete tier must decide).
+        """
         # A failed Kuhn search leaves the matching untouched, so only
         # successful augments need their trails rolled back.
+        self._fail_conclusive = False
         pre_trail: List[Tuple[int, Optional[int]]] = []
         if x in self.owner:
             # x currently serves as someone's tax; try to rematch them
@@ -147,6 +166,7 @@ class SetEval:
             holder = self.owner.pop(x)
             if not self._augment(holder, {x}, pre_trail):
                 self.owner[x] = holder
+                self._fail_conclusive = True  # Berge: re-route failure
                 return False
             pre_trail.append((x, holder))  # a rollback restores x's owner
         self.S.add(x)  # blocks x from being used as anyone's tax below
@@ -155,6 +175,7 @@ class SetEval:
         if not self._augment(x, set(), trail):
             self.S.discard(x)  # no matching covers x: permanent reject
             self._rollback(pre_trail)
+            self._fail_conclusive = True  # Berge: augment failure from x
             return False
         if self._is_acyclic():
             self._rebuild_match()
@@ -175,6 +196,7 @@ class SetEval:
                 self._rollback(trail)
         self.S.discard(x)
         self._rollback(pre_trail)
+        # cyclic-only failure: NOT conclusive (flag stays False)
         return False
 
     def _complete_matching(

@@ -174,9 +174,6 @@ def solvent(
     owner: Dict[int, int] = {}  # factor -> selection paying it
 
     def try_select(m: int) -> bool:
-        # STEP 1 -- fast path: an opportunistic incremental extension of
-        # the current matching.  Any failure here rolls back fully and
-        # falls through to the complete tier; nothing is rejected yet.
         pre_trail: List[Tuple[int, Optional[int]]] = []
         if m in owner:
             # m currently serves as someone's tax; try to re-route that
@@ -185,32 +182,51 @@ def solvent(
             if _augment(holder, owner, selected, mf, {m}, pre_trail):
                 pre_trail.append((m, holder))  # rollback restores m's owner
             else:
-                owner[m] = holder  # undo the pop; fall through to step 2
-                pre_trail = []
+                owner[m] = holder  # undo the pop
+                # Conclusive reject (Berge): a failed augmenting search from
+                # the free vertex `holder` (avoiding m) proves no matching
+                # saturates `selected` while excluding factor m, yet
+                # target = selected | {m} requires exactly that.  The
+                # complete tier's Infeasible is therefore forced -- skip it.
+                if rejections is not None:
+                    rejections.append((m, "infeasible"))
+                return False
 
-        if len(pre_trail) or m not in owner:
-            selected.add(m)  # blocks m from being used as anyone's tax
-            trail: List[Tuple[int, Optional[int]]] = []
-            if _augment(m, owner, selected, mf, set(), trail):
-                if _is_acyclic(selected, owner, n):
-                    return True  # fast, common-case silent success
-                _rollback(owner, trail)
+        selected.add(m)  # blocks m from being used as anyone's tax
+        trail: List[Tuple[int, Optional[int]]] = []
+        if _augment(m, owner, selected, mf, set(), trail):
+            if _is_acyclic(selected, owner, n):
+                return True  # fast, common-case silent success
+            # Augment succeeded but the precedence is cyclic: this is NOT
+            # conclusive, so the complete tier must decide.  Here solve_mini
+            # is a playability oracle, not a matching oracle -- a set can be
+            # matchable yet unschedulable (its every matching cyclic), and
+            # solve_mini's forced-peeling structure correctly rejects such
+            # sets.  See the n=21 counterexample in the lean-solvent
+            # experiment docstring (candidate 10 augments but yields an
+            # unplayable 145-point set).  This path is unchanged from the
+            # canonical two-tier code.
+            _rollback(owner, trail)
             selected.discard(m)
             _rollback(owner, pre_trail)
+            matching = _complete_matching(selected | {m}, mf)
+            if matching is None:
+                if rejections is not None:
+                    rejections.append((m, "infeasible"))
+                return False
+            owner_candidate = {f: c for c, f in matching.items()}
+            owner.clear()
+            owner.update(owner_candidate)
+            selected.add(m)
+            return True
 
-        # STEP 2 -- complete tier: the unconditional decider.  `selected`
-        # does not contain m here (the fast path rolled back fully), so
-        # pass a fresh `selected | {m}` without mutating shared state.
-        matching = _complete_matching(selected | {m}, mf)
-        if matching is None:
-            if rejections is not None:
-                rejections.append((m, "infeasible"))
-            return False
-        owner_candidate = {f: c for c, f in matching.items()}
-        owner.clear()
-        owner.update(owner_candidate)
-        selected.add(m)
-        return True
+        # Conclusive reject (Berge): a failed augmenting search from the free
+        # vertex m proves no matching saturates selected | {m}.
+        selected.discard(m)
+        _rollback(owner, pre_trail)
+        if rejections is not None:
+            rejections.append((m, "infeasible"))
+        return False
 
     for m in range(n, 1, -1):
         if not mf[m]:
