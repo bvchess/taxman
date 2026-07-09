@@ -107,41 +107,45 @@ def solve_mini(members, factors, factors_of):
     moves are forced:
 
     * A member with exactly ONE usable factor left must reserve it -
-      and is sequenced FIRST, before any other pick could sweep that
-      factor away.
+      no other payment can save that member, and every valid
+      assignment makes this exact reservation anyway.
     * A factor that only ONE member can use must go to that member -
-      which is sequenced LAST, giving earlier picks time to consume
-      its other factors, so this one is what it actually pays.
+      granting it takes nothing away from anyone else.
 
     When neither rule applies, the set is refused as unplayable.
     Note what this refusal is NOT: it is not always "no assignment of
     distinct payments exists" - some refused sets have perfect
     payment assignments, every one of which is impossible to
     schedule.  The forced-move discipline makes solve_mini reject
-    those too: it is a playability oracle, conjecturally exact,
+    those too: it is a playability oracle, provably exact (THEORY.md),
     strictly stronger than a matching test.
 
-    Returns (sequence, pay) where pay maps each member to its
-    reserved payment.
+    Returns pay, mapping each member to its reserved payment.  No
+    move order is returned: the peel's discovery order is meaningful
+    only in the factor game, where a move consumes exactly its
+    reserved factor.  Real sweeps take every divisor, maximal or not,
+    so a real play order must be built from the full divisibility
+    precedence - ordered()'s job, guaranteed to succeed by the
+    schedulability theorem.
     """
     if not members:
-        return [], {}
+        return {}
 
     for c in members:
         remaining = factors_of[c] & factors
         if len(remaining) == 1:
             (f,) = remaining
-            seq, pay = solve_mini(members - {c}, factors - {f}, factors_of)
+            pay = solve_mini(members - {c}, factors - {f}, factors_of)
             pay[c] = f
-            return [c] + seq, pay
+            return pay
 
     for f in factors:
         payers = [c for c in members if f in factors_of[c]]
         if len(payers) == 1:
             c = payers[0]
-            seq, pay = solve_mini(members - {c}, factors - {f}, factors_of)
+            pay = solve_mini(members - {c}, factors - {f}, factors_of)
             pay[c] = f
-            return seq + [c], pay
+            return pay
 
     raise Infeasible(f"cannot select every member of {members} using {factors}")
 
@@ -169,7 +173,7 @@ def playable(s_set):
     factors_of = {s: maximal_factors(s) & factors for s in s_set}
 
     try:
-        _, pay = solve_mini(s_set, factors, factors_of)
+        pay = solve_mini(s_set, factors, factors_of)
     except Infeasible:
         return None
     return pay
