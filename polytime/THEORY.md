@@ -153,8 +153,9 @@ that way.
 
 And yet greedy survives: in every three-prime gadget for n = 700..9000
 (1,108 of them), descending-weight greedy still returns the
-maximum-weight playable set — at n=2873 it takes the heavy size-5
-base and never lands on the stuck size-4 one, because the stuck base
+maximum-weight playable set — at n=2873 it takes a heavy size-5 set,
+{1859, 2057, 2197, 2431, 2873} (heavier even than B), and never
+lands on the stuck size-4 A, because the stuck base
 is also the *light* one.  That is the precise remaining open problem
 for "the upper half is guaranteed optimal": prove that in these
 gadgets the heaviest maximal playable set is always reachable by
