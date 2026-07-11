@@ -87,6 +87,8 @@ What is proven vs. trusted, precisely:
 | greedy weight-optimality when the frontier jam has only ≤2-prime members | theorem (unique minimal core: forest + one edge; proof in THEORY.md) |
 | on members with ≤ 2 distinct primes, playable = forest in the factor-value graph | theorem (via the core characterization; verified on 89,400 random subsets) |
 | playability ⟺ maximal-factor matching + acyclic precedence | proven |
+| playable ⟺ residual empty (no self-covering subset), for separated instances (no member is another's maximal factor — automatic above n/2) | **theorem** (THEORY.md, "The residual theorems"): the ⟸ half was previously asserted-but-unproven; now proven via the extension lemma.  Unrestricted version: 30,000 fuzz trials clean, unproven — and its confinement cousin is **false** there ({2,4,8} witness) |
+| minimal exclusion sets live inside the residual (exclusion confinement) | **theorem** (same section, same separation hypothesis) — grounds the residual-restricted exact searches of the cardinality campaigns (validated 35/35 before the proof existed) |
 | for prime n: opt(n) = n + opt(n−1) − (largest prime < n) | proven, verified 167/167 |
 | solve_mini's assignment is always schedulable | **theorem** ("schedulability", proof in THEORY.md): the peel rules cannot emit a cyclic assignment.  Still asserted loudly at runtime, as defense in depth |
 | solve_mini's failure means the set is unplayable | **theorem** ("completeness", proof in THEORY.md) — NOT reducible to "no matching exists": matchable-but-unplayable sets are real (n=21 holds a 145-sum set whose every matching is precedence-cyclic; the optimum is 144) and solve_mini provably rejects exactly the unplayable.  With schedulability, solve_mini is a proven playability oracle |

@@ -124,7 +124,8 @@ decision procedure for playability, proven in both directions.
 
 ## Cores, forests, and where exchange breaks
 
-The two theorems yield a static characterization: a set is playable
+The peel theorems suggest — and "The residual theorems" at the end
+of this file now prove — a static characterization: a set is playable
 iff it contains no *self-covering core* — a nonempty subset in which
 every member's every maximal factor is also some other member's
 maximal factor (dismantle by repeatedly removing any member holding a
@@ -311,3 +312,105 @@ every jam shape requires either a monomial inversion
 the shape's own realization forces into (n/2, n] — is the sharpest
 known form of why the integers protect greedy, and the guard's
 *sufficiency* in general is the part still resting on measurement.
+
+## The residual theorems: characterization and exclusion confinement
+
+Standing hypothesis for this section: the instance is **separated** —
+no member is a maximal factor of another member.  Every instance this
+project computes with satisfies it automatically: members of an
+upper-half or band instance all exceed n/2 (or the band floor), while
+a maximal factor of such a member is at most half of it.  Separation
+buys a decisive simplification: the pool of a subset S is the union
+of its members' maximal factors with the members subtracted, and
+under separation the subtraction never bites — every member's live
+list is its full maximal-factor set, in every subset, so
+self-covering and dismantling are intrinsic notions, stable under
+taking subsets.
+
+The hypothesis is not decorative (adversarial review found this the
+hard way, breaking an earlier draft that claimed more).  With members
+doubling as each other's factors the pool shifts as members come and
+go, and two of the theorems below become false: for K = {2, 4, 8}
+(residual {4, 8}, since 4 and 8 have empty lists there), the
+exclusion E = {2, 8} leaves the playable {4} — 2 re-enters the pool —
+yet K∖(E∩R) = {2, 4} strands 4, violating Theorem R3; and the
+extension lemma dies at S = {8, 33, 37} with x = 4, whose arrival as
+a member removes 4 from the pool and strands 8.  Fuzzing found 86
+such confinement violations in 6,507 member-divides-member instances
+— and zero in 25,615 separated ones.
+
+**Theorem R1 (survival and confluence; no separation needed).**  A
+self-covering subset survives every dismantling sequence; all
+dismantling sequences of an instance end at the same fixpoint, the
+*residual*; a nonempty residual is itself self-covering, and the
+residual equals the union of all self-covering subsets.  In
+particular the residual is empty iff no self-covering subset exists.
+
+*Proof.*  If the next deletion removes x with private factor f and x
+belonged to a self-covering C, then f — like every factor of x — is
+listed by another member of C, all of C being alive; that contradicts
+privacy, so dismantling never touches C.  A nonempty fixpoint is
+self-covering by definition of "no forced deletion remains" (a member
+with an empty list is vacuously covered and never removable).  Two
+fixpoints R₁, R₂ of different sequences: R₁ is self-covering, hence
+survives the second sequence, so R₁ ⊆ R₂, and symmetrically.  ∎
+
+**Extension lemma (separated instances).**  Let S be playable and let
+x ∉ S be a member that is not a maximal factor of any member of S,
+with some f ∈ mf(x) listed by no member of S.  Then S ∪ {x} is
+playable.
+
+*Proof.*  Adding x leaves every old member's list intact (x sits in
+no one's maximal factors; the pool only grows).  Take an acyclic
+covering assignment of S and extend it by pay(x) = f; distinctness
+holds because every payment is listed by its payer and f is listed by
+no member of S.  Suppose the extended precedence has a cycle.  The
+precedence among old members is unchanged, so the cycle passes
+through x.  Now reuse the first half of the schedulability theorem's
+proof, which is assignment-agnostic — it needs only that every
+payment is a maximal factor of its member, so Ω(pay(v)) = Ω(v) − 1
+exactly: along a member-divides-member edge the potential strictly
+increases, so a cycle contains none; along a payment edge a → b it
+increases weakly, with equality forcing pay(a) ∈ mf(b).  A cycle
+forces equality everywhere — in particular on the cycle's edge
+leaving x, which then requires f ∈ mf(z) for some z ∈ S,
+contradicting f's privacy.  ∎
+
+**Theorem R2 (core characterization, separated instances).**  A set
+is playable iff its residual is empty — equivalently, iff it contains
+no self-covering subset.
+
+*Proof.*  (⇒, no separation needed)  A self-covering C is unplayable:
+a member with an empty list can never pay, and otherwise any covering
+assignment gives each x ∈ C a payment listed by another member of C —
+an out-edge within C — so the finite digraph has a cycle and every
+covering assignment is precedence-cyclic.  Downward closure of
+playability finishes.  (⇐)  Let x₁, …, x_k be a complete dismantling
+order (empty residual) and T_j = {x_j, …, x_k}.  T_{k+1} = ∅ is
+playable; x_j has a factor private in T_j, is no member's maximal
+factor (separation), so the extension lemma lifts playability from
+T_{j+1} to T_j.  Induction ends at T₁ = M.  ∎
+
+The ⇐ direction is the new content: the project had asserted the
+characterization ("the two theorems yield…") without proving this
+half — the adversarial referee's 8,000-instance validation was, until
+now, its only support.  Without separation the statement has never
+failed (30,000 fuzzed instances, 21,000 of them member-divides-member)
+but remains unproven.
+
+**Theorem R3 (exclusion confinement, separated instances).**  Let K
+have residual R.  If K ∖ E is playable, so is K ∖ (E ∩ R).
+
+*Proof.*  Suppose K ∖ (E ∩ R) is unplayable.  By R2 it contains a
+self-covering C; by R1, C ⊆ R.  C avoids E ∩ R and lies in R, so it
+avoids E entirely: C ⊆ K ∖ E.  But K ∖ E is playable and by R2
+contains no self-covering subset.  ∎
+
+Corollaries.  Minimal exclusion sets lie inside the residual
+(otherwise E ∩ R is a smaller valid exclusion).  Every maximum-weight
+playable subset — any positive weights, cardinality included —
+contains everything outside the residual.  Exact searches restricted
+to subsets of the residual are therefore sound: the reduction the
+(★) campaigns leaned on (validated 35/35 against unrestricted search
+before this proof existed).  The frontier argument's Lemma A
+("repairs live entirely inside R") is the special case K = T + d.
