@@ -83,7 +83,7 @@ What is proven vs. trusted, precisely:
 | opt(n) ≤ n + opt(n−1) | proven (wiki) |
 | no upper half beats M\*, the max-weight *matchable* upper set | proven (lifting: every game's picks pair with distinct factors) |
 | U\* (`solve_upper_half`) equals the optimal game's upper half | measured, 1000/1000 |
-| no *playable* upper set outweighs U\* | conjecture — proven wherever the jam is hyperedge-free (THEORY.md, "The frontier argument"); the single-sacrifice route is **false** in general (n=9170 witness); the remaining gap is non-local and weighted.  Exhaustive n = 2..99; every gadget tested to n=9000+ |
+| no *playable* upper set outweighs U\* | conjecture — proven wherever the jam is hyperedge-free (THEORY.md, "The frontier argument"); the single-sacrifice route is **false** in general (n=9170 witness).  Now known **equivalent to a pure cardinality claim** — greedy is maximum-cardinality on every incidence component (THEORY.md, "The cardinality reformulation") — verified-or-certified on 99.8% of all 3,236 rejection-bearing components tested to n=4000+, zero counterexamples.  Exhaustive n = 2..99 |
 | greedy weight-optimality when the frontier jam has only ≤2-prime members | theorem (unique minimal core: forest + one edge; proof in THEORY.md) |
 | on members with ≤ 2 distinct primes, playable = forest in the factor-value graph | theorem (via the core characterization; verified on 89,400 random subsets) |
 | playability ⟺ maximal-factor matching + acyclic precedence | proven |
@@ -104,10 +104,14 @@ theorem** (a solve_mini refusal is a proof of unplayability — the two
 theorems together make acceptance a proven decision procedure for
 playability); the **core/forest characterization** (playable ⟺
 core-free; on ≤2-prime members, playable ⟺ forest) with the n=2873
-gadget where the exchange property dies; and the **frontier
+gadget where the exchange property dies; the **frontier
 argument**, which proves greedy weight-optimal wherever the jam is
-hyperedge-free and pins the remaining open problem — non-local,
-weighted — to its first hard witness at n=9170.
+hyperedge-free and pins the remaining open problem to its first hard
+witness at n=9170; and the **cardinality reformulation**, which
+strips the weights from that open problem — greedy optimality is
+exactly the claim that greedy is maximum-cardinality on every
+incidence component, verified or certified on 99.8% of every
+component ever tested.
 
 ## Solvent: the O(n²) strategy
 

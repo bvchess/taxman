@@ -210,3 +210,78 @@ kept members must be charged for what they lock out elsewhere in the
 component, not just at the frontier.  That is
 the open problem's irreducible form, with n=9170 as the first test
 any proof must pass.
+
+## The cardinality reformulation
+
+The weights can be removed from the open problem entirely.  Taxman's
+weights are the members themselves, so any weight assignment is
+consistent with the value ordering — and for order-consistent
+weights, the classic majorization fact applies: greedy's set
+outweighs a competitor for *every* consistent weighting iff it
+matches or beats the competitor's cardinality within every top
+segment of the ordering.  Since descending greedy's decisions above
+any threshold never depend on anything below it (its restriction to
+{> t} IS its run on the truncated instance), the whole conjecture
+becomes one unweighted statement:
+
+> **(★)** On every connected component of the member–factor
+> incidence graph — and every truncation of one — descending greedy
+> returns a **maximum-cardinality** playable subset.
+
+(★) implies weight-optimality by summing the truncations
+(layer-cake); by majorization it is also *necessary* if optimality
+is to hold for every order-consistent weighting, so it is the exact
+combinatorial content of the conjecture, not a strengthening.
+
+What the reformulation exposed, each fact machine-checked:
+
+* **The ordering is the protection, not the magnitudes.**  On the
+  abstract incidence structure of the n=2873 gadget (equally of the
+  n=9170 sextet), 48 of the 720 weight orderings make greedy fail —
+  and every one of the 48 is a pure *cardinality* upset: greedy is
+  steered into excluding both members of a factor-sharing pair,
+  landing on a 4-set while a playable 5-set exists.  No
+  magnitude-style axiom can block that (near-uniform weights realize
+  it), and in particular the "all members exceed n/2" axiom kills
+  none of the 48.  The real numeric order simply never lands among
+  the 48 — at n=2873 the trap needs the sharing pair ranked last,
+  and 11²·13 sits below both sharers.  A proof of (★) must therefore
+  use the arithmetic of the ordering (the window law: within the
+  star of f, f·q < f·p iff q < p), because the incidence structure
+  alone provably permits the trap.
+* **The component is the unit of proof; sub-instances lie.**  On the
+  bare n=9170 sextet, greedy's 4-of-6 is NOT maximum — dropping only
+  d leaves a playable 5-set — and it stays non-maximum with the
+  first ring of attachments added.  What restores it is 6859 = 19³,
+  farther out in the component, whose demand for the factor 361
+  tightens the contest.  Cardinality dominance genuinely fails on
+  fragments and holds on the full component.
+* **Minimal exclusion sets live inside the residual** (the
+  component's 2-core under private-factor dismantling) — Lemma A
+  generalized from one skipped pick to the whole component;
+  validated 35/35 against unrestricted search, and the workhorse
+  that made the big components decidable (n=2873's 377-member
+  component has a 70-member residual).
+* **Matching certifies most components, and its failures are the
+  n=21 phenomenon.**  Playable ⊆ matchable gives the free bound
+  |G ∩ K| ≤ max-cardinality ≤ ν(K); greedy meets ν on 86.8% of the
+  large components, certifying (★) there with no search.  Where ν
+  overshoots, every exactly-probed case found greedy still optimal —
+  the surplus was matchable-but-unplayable phantom edges, the
+  cardinality twin of the F–M bound's weight slack.
+
+Standing evidence for (★): zero counterexamples anywhere.  Across
+every game size tested (all n = 6..1500, forty samples to 4000,
+n=2873, n=9170), of 3,236 rejection-bearing components, 99.8% are
+verified (exact search: brute force, or exhaustion over the
+residual) or certified (greedy meets the matching bound), including
+the n=2873 celebrity component (greedy's 6 exclusions proven minimal
+by 12.4M playability checks over its residual).  The handful still
+undecided are single-cluster jam regions whose exact search is
+super-exponential — n=9170's component (|K| = 1,174, residual 306,
+37 greedy exclusions, any improving exclusion forced by the matching
+bound to have size 19..36) is the standing monster.  The proof
+obligation, sharpened: *within one connected jam cluster, under the
+numeric ordering, greedy's exclusion count is minimal* — with the
+window law as the engine, and n=9170's cluster as the first test any
+proof must pass.
