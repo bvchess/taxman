@@ -1,0 +1,4164 @@
+{
+  "per_episode": [
+    {
+      "n_start": 54,
+      "n_end": 54,
+      "m": 21,
+      "direction": "solvent_only",
+      "length": 1,
+      "deficit_sum": 5,
+      "onset": {
+        "n_used": 54,
+        "m": 21,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 42,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 54,
+          "m": 21,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": [
+            3
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 81,
+      "n_end": 83,
+      "m": 39,
+      "direction": "solvent_only",
+      "length": 3,
+      "deficit_sum": 30,
+      "onset": {
+        "n_used": 81,
+        "m": 39,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 78,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 81,
+          "m": 39,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": true,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": [
+            3
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 120,
+      "n_end": 120,
+      "m": 49,
+      "direction": "solvent_only",
+      "length": 1,
+      "deficit_sum": 21,
+      "onset": {
+        "n_used": 120,
+        "m": 49,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 98,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 120,
+          "m": 49,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 126,
+      "n_end": 127,
+      "m": 56,
+      "direction": "solvent_only",
+      "length": 2,
+      "deficit_sum": 2,
+      "onset": {
+        "n_used": 126,
+        "m": 56,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 112,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 126,
+          "m": 56,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 128,
+      "n_end": 139,
+      "m": 60,
+      "direction": "solvent_only",
+      "length": 12,
+      "deficit_sum": 421,
+      "onset": {
+        "n_used": 128,
+        "m": 60,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 120,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 128,
+          "m": 60,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 176,
+      "n_end": 179,
+      "m": 70,
+      "direction": "solvent_only",
+      "length": 4,
+      "deficit_sum": 4,
+      "onset": {
+        "n_used": 176,
+        "m": 70,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 140,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 176,
+          "m": 70,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 180,
+      "n_end": 191,
+      "m": 81,
+      "direction": "solvent_only",
+      "length": 12,
+      "deficit_sum": 618,
+      "onset": {
+        "n_used": 180,
+        "m": 81,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 162,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 180,
+          "m": 81,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 192,
+      "n_end": 207,
+      "m": 90,
+      "direction": "solvent_only",
+      "length": 16,
+      "deficit_sum": 1610,
+      "onset": {
+        "n_used": 192,
+        "m": 90,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 180,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 192,
+          "m": 90,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 208,
+      "n_end": 215,
+      "m": 104,
+      "direction": "solvent_only",
+      "length": 8,
+      "deficit_sum": 878,
+      "onset": {
+        "n_used": 208,
+        "m": 104,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 208,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 208,
+          "m": 104,
+          "n0_eq_2m": true,
+          "n0_in_2m_to_2m_plus_5": true,
+          "n0_multiple_of_m": true,
+          "n0_multiple_of_m_maxfactor": [
+            8,
+            52
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 216,
+      "n_end": 223,
+      "m": 100,
+      "direction": "solvent_only",
+      "length": 8,
+      "deficit_sum": 440,
+      "onset": {
+        "n_used": 216,
+        "m": 100,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 200,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 216,
+          "m": 100,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 225,
+      "n_end": 259,
+      "m": 100,
+      "direction": "solvent_only",
+      "length": 35,
+      "deficit_sum": 408,
+      "onset": {
+        "n_used": 225,
+        "m": 100,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-WEAK",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": true,
+        "patron": 200,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 225,
+          "m": 100,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 260,
+      "n_end": 287,
+      "m": 105,
+      "direction": "solvent_only",
+      "length": 28,
+      "deficit_sum": 995,
+      "onset": {
+        "n_used": 260,
+        "m": 105,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 210,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 260,
+          "m": 105,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 288,
+      "n_end": 299,
+      "m": 126,
+      "direction": "solvent_only",
+      "length": 12,
+      "deficit_sum": 1146,
+      "onset": {
+        "n_used": 288,
+        "m": 126,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 252,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 288,
+          "m": 126,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": [
+            18
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 300,
+      "n_end": 303,
+      "m": 136,
+      "direction": "solvent_only",
+      "length": 4,
+      "deficit_sum": 328,
+      "onset": {
+        "n_used": 300,
+        "m": 136,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 272,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 300,
+          "m": 136,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 304,
+      "n_end": 307,
+      "m": 152,
+      "direction": "solvent_only",
+      "length": 4,
+      "deficit_sum": 238,
+      "onset": {
+        "n_used": 304,
+        "m": 152,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 304,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 304,
+          "m": 152,
+          "n0_eq_2m": true,
+          "n0_in_2m_to_2m_plus_5": true,
+          "n0_multiple_of_m": true,
+          "n0_multiple_of_m_maxfactor": [
+            8,
+            76
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 308,
+      "n_end": 311,
+      "m": 132,
+      "direction": "solvent_only",
+      "length": 4,
+      "deficit_sum": 368,
+      "onset": {
+        "n_used": 308,
+        "m": 132,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 264,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 308,
+          "m": 132,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": [
+            44
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 312,
+      "n_end": 314,
+      "m": 152,
+      "direction": "solvent_only",
+      "length": 3,
+      "deficit_sum": 225,
+      "onset": {
+        "n_used": 312,
+        "m": 152,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 304,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 312,
+          "m": 152,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": [
+            8
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 315,
+      "n_end": 319,
+      "m": 135,
+      "direction": "solvent_only",
+      "length": 5,
+      "deficit_sum": 405,
+      "onset": {
+        "n_used": 315,
+        "m": 135,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 270,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 315,
+          "m": 135,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": [
+            45
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 320,
+      "n_end": 335,
+      "m": 150,
+      "direction": "solvent_only",
+      "length": 16,
+      "deficit_sum": 1623,
+      "onset": {
+        "n_used": 320,
+        "m": 150,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 300,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 320,
+          "m": 150,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 350,
+      "n_end": 363,
+      "m": 150,
+      "direction": "solvent_only",
+      "length": 14,
+      "deficit_sum": 326,
+      "onset": {
+        "n_used": 350,
+        "m": 150,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-WEAK",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": true,
+        "patron": 300,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 350,
+          "m": 150,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": [
+            50
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 375,
+      "n_end": 379,
+      "m": 153,
+      "direction": "solvent_only",
+      "length": 5,
+      "deficit_sum": 125,
+      "onset": {
+        "n_used": 375,
+        "m": 153,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 306,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 375,
+          "m": 153,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 380,
+      "n_end": 389,
+      "m": 154,
+      "direction": "solvent_only",
+      "length": 10,
+      "deficit_sum": 240,
+      "onset": {
+        "n_used": 380,
+        "m": 154,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 308,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 380,
+          "m": 154,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 390,
+      "n_end": 404,
+      "m": 171,
+      "direction": "solvent_only",
+      "length": 15,
+      "deficit_sum": 825,
+      "onset": {
+        "n_used": 390,
+        "m": 171,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 342,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 390,
+          "m": 171,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 405,
+      "n_end": 407,
+      "m": 150,
+      "direction": "solvent_only",
+      "length": 3,
+      "deficit_sum": 144,
+      "onset": {
+        "n_used": 405,
+        "m": 150,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 300,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 405,
+          "m": 150,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 408,
+      "n_end": 415,
+      "m": 176,
+      "direction": "solvent_only",
+      "length": 8,
+      "deficit_sum": 248,
+      "onset": {
+        "n_used": 408,
+        "m": 176,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 352,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 408,
+          "m": 176,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 416,
+      "n_end": 419,
+      "m": 150,
+      "direction": "solvent_only",
+      "length": 4,
+      "deficit_sum": 188,
+      "onset": {
+        "n_used": 416,
+        "m": 150,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 300,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 416,
+          "m": 150,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 420,
+      "n_end": 431,
+      "m": 180,
+      "direction": "solvent_only",
+      "length": 12,
+      "deficit_sum": 375,
+      "onset": {
+        "n_used": 420,
+        "m": 180,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 360,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 420,
+          "m": 180,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": [
+            60
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 432,
+      "n_end": 439,
+      "m": 189,
+      "direction": "solvent_only",
+      "length": 8,
+      "deficit_sum": 184,
+      "onset": {
+        "n_used": 432,
+        "m": 189,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 378,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 432,
+          "m": 189,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": [
+            27
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 440,
+      "n_end": 440,
+      "m": 208,
+      "direction": "solvent_only",
+      "length": 1,
+      "deficit_sum": 97,
+      "onset": {
+        "n_used": 440,
+        "m": 208,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 416,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 440,
+          "m": 208,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 441,
+      "n_end": 447,
+      "m": 200,
+      "direction": "solvent_only",
+      "length": 7,
+      "deficit_sum": 1253,
+      "onset": {
+        "n_used": 441,
+        "m": 200,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 400,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 441,
+          "m": 200,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 448,
+      "n_end": 449,
+      "m": 184,
+      "direction": "solvent_only",
+      "length": 2,
+      "deficit_sum": 334,
+      "onset": {
+        "n_used": 448,
+        "m": 184,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 368,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 448,
+          "m": 184,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": [
+            8
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 450,
+      "n_end": 459,
+      "m": 189,
+      "direction": "solvent_only",
+      "length": 10,
+      "deficit_sum": 1904,
+      "onset": {
+        "n_used": 450,
+        "m": 189,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 378,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 450,
+          "m": 189,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 460,
+      "n_end": 461,
+      "m": 195,
+      "direction": "solvent_only",
+      "length": 2,
+      "deficit_sum": 836,
+      "onset": {
+        "n_used": 460,
+        "m": 195,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 390,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 460,
+          "m": 195,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 462,
+      "n_end": 463,
+      "m": 190,
+      "direction": "solvent_only",
+      "length": 2,
+      "deficit_sum": 736,
+      "onset": {
+        "n_used": 462,
+        "m": 190,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 380,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 462,
+          "m": 190,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 464,
+      "n_end": 467,
+      "m": 232,
+      "direction": "solvent_only",
+      "length": 4,
+      "deficit_sum": 932,
+      "onset": {
+        "n_used": 464,
+        "m": 232,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 464,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 464,
+          "m": 232,
+          "n0_eq_2m": true,
+          "n0_in_2m_to_2m_plus_5": true,
+          "n0_multiple_of_m": true,
+          "n0_multiple_of_m_maxfactor": [
+            8,
+            116
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 468,
+      "n_end": 474,
+      "m": 225,
+      "direction": "solvent_only",
+      "length": 7,
+      "deficit_sum": 1386,
+      "onset": {
+        "n_used": 468,
+        "m": 225,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 450,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 468,
+          "m": 225,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 475,
+      "n_end": 475,
+      "m": 190,
+      "direction": "solvent_only",
+      "length": 1,
+      "deficit_sum": 90,
+      "onset": {
+        "n_used": 475,
+        "m": 190,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 380,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 475,
+          "m": 190,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": [
+            95
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 476,
+      "n_end": 482,
+      "m": 225,
+      "direction": "solvent_only",
+      "length": 7,
+      "deficit_sum": 441,
+      "onset": {
+        "n_used": 476,
+        "m": 225,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 450,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 476,
+          "m": 225,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 484,
+      "n_end": 485,
+      "m": 198,
+      "direction": "solvent_only",
+      "length": 2,
+      "deficit_sum": 52,
+      "onset": {
+        "n_used": 484,
+        "m": 198,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 396,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 484,
+          "m": 198,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 486,
+      "n_end": 499,
+      "m": 210,
+      "direction": "solvent_only",
+      "length": 14,
+      "deficit_sum": 1459,
+      "onset": {
+        "n_used": 486,
+        "m": 210,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 420,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 486,
+          "m": 210,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 507,
+      "n_end": 512,
+      "m": 220,
+      "direction": "solvent_only",
+      "length": 6,
+      "deficit_sum": 306,
+      "onset": {
+        "n_used": 507,
+        "m": 220,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 440,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 507,
+          "m": 220,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 513,
+      "n_end": 519,
+      "m": 240,
+      "direction": "solvent_only",
+      "length": 7,
+      "deficit_sum": 812,
+      "onset": {
+        "n_used": 513,
+        "m": 240,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 480,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 513,
+          "m": 240,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 520,
+      "n_end": 521,
+      "m": 225,
+      "direction": "solvent_only",
+      "length": 2,
+      "deficit_sum": 328,
+      "onset": {
+        "n_used": 520,
+        "m": 225,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 450,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 520,
+          "m": 225,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 522,
+      "n_end": 524,
+      "m": 248,
+      "direction": "solvent_only",
+      "length": 3,
+      "deficit_sum": 834,
+      "onset": {
+        "n_used": 522,
+        "m": 248,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 496,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 522,
+          "m": 248,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 525,
+      "n_end": 527,
+      "m": 250,
+      "direction": "solvent_only",
+      "length": 3,
+      "deficit_sum": 864,
+      "onset": {
+        "n_used": 525,
+        "m": 250,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 500,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 525,
+          "m": 250,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 528,
+      "n_end": 531,
+      "m": 225,
+      "direction": "solvent_only",
+      "length": 4,
+      "deficit_sum": 680,
+      "onset": {
+        "n_used": 528,
+        "m": 225,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 450,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 528,
+          "m": 225,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 532,
+      "n_end": 538,
+      "m": 240,
+      "direction": "solvent_only",
+      "length": 7,
+      "deficit_sum": 826,
+      "onset": {
+        "n_used": 532,
+        "m": 240,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 480,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 532,
+          "m": 240,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 539,
+      "n_end": 543,
+      "m": 250,
+      "direction": "solvent_only",
+      "length": 5,
+      "deficit_sum": 945,
+      "onset": {
+        "n_used": 539,
+        "m": 250,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 500,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 539,
+          "m": 250,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 544,
+      "n_end": 559,
+      "m": 240,
+      "direction": "solvent_only",
+      "length": 16,
+      "deficit_sum": 2988,
+      "onset": {
+        "n_used": 544,
+        "m": 240,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 480,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 544,
+          "m": 240,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 560,
+      "n_end": 566,
+      "m": 196,
+      "direction": "solvent_only",
+      "length": 7,
+      "deficit_sum": 534,
+      "onset": {
+        "n_used": 560,
+        "m": 196,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 392,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 560,
+          "m": 196,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": [
+            28
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 567,
+      "n_end": 571,
+      "m": 210,
+      "direction": "solvent_only",
+      "length": 5,
+      "deficit_sum": 273,
+      "onset": {
+        "n_used": 567,
+        "m": 210,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 420,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 567,
+          "m": 210,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 572,
+      "n_end": 575,
+      "m": 285,
+      "direction": "solvent_only",
+      "length": 4,
+      "deficit_sum": 300,
+      "onset": {
+        "n_used": 572,
+        "m": 285,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 570,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 572,
+          "m": 285,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": true,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 576,
+      "n_end": 579,
+      "m": 243,
+      "direction": "solvent_only",
+      "length": 4,
+      "deficit_sum": 332,
+      "onset": {
+        "n_used": 576,
+        "m": 243,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 486,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 576,
+          "m": 243,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 580,
+      "n_end": 584,
+      "m": 230,
+      "direction": "solvent_only",
+      "length": 5,
+      "deficit_sum": 185,
+      "onset": {
+        "n_used": 580,
+        "m": 230,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 460,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 580,
+          "m": 230,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": [
+            10
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 585,
+      "n_end": 593,
+      "m": 231,
+      "direction": "solvent_only",
+      "length": 9,
+      "deficit_sum": 396,
+      "onset": {
+        "n_used": 585,
+        "m": 231,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 462,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 585,
+          "m": 231,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 594,
+      "n_end": 594,
+      "m": 243,
+      "direction": "solvent_only",
+      "length": 1,
+      "deficit_sum": 41,
+      "onset": {
+        "n_used": 594,
+        "m": 243,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 486,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 594,
+          "m": 243,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 595,
+      "n_end": 607,
+      "m": 255,
+      "direction": "solvent_only",
+      "length": 13,
+      "deficit_sum": 423,
+      "onset": {
+        "n_used": 595,
+        "m": 255,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 510,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 595,
+          "m": 255,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": [
+            85
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 616,
+      "n_end": 619,
+      "m": 285,
+      "direction": "solvent_only",
+      "length": 4,
+      "deficit_sum": 368,
+      "onset": {
+        "n_used": 616,
+        "m": 285,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 570,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 616,
+          "m": 285,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 620,
+      "n_end": 620,
+      "m": 290,
+      "direction": "solvent_only",
+      "length": 1,
+      "deficit_sum": 103,
+      "onset": {
+        "n_used": 620,
+        "m": 290,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 580,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 620,
+          "m": 290,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": [
+            10
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 621,
+      "n_end": 623,
+      "m": 255,
+      "direction": "solvent_only",
+      "length": 3,
+      "deficit_sum": 18,
+      "onset": {
+        "n_used": 621,
+        "m": 255,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 510,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 621,
+          "m": 255,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 630,
+      "n_end": 649,
+      "m": 250,
+      "direction": "solvent_only",
+      "length": 20,
+      "deficit_sum": 452,
+      "onset": {
+        "n_used": 630,
+        "m": 250,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 500,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 630,
+          "m": 250,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 656,
+      "n_end": 659,
+      "m": 260,
+      "direction": "solvent_only",
+      "length": 4,
+      "deficit_sum": 164,
+      "onset": {
+        "n_used": 656,
+        "m": 260,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-WEAK",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": true,
+        "patron": 520,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 656,
+          "m": 260,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 665,
+      "n_end": 674,
+      "m": 266,
+      "direction": "solvent_only",
+      "length": 10,
+      "deficit_sum": 1558,
+      "onset": {
+        "n_used": 665,
+        "m": 266,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 532,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 665,
+          "m": 266,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": [
+            133
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 675,
+      "n_end": 675,
+      "m": 328,
+      "direction": "solvent_only",
+      "length": 1,
+      "deficit_sum": 80,
+      "onset": {
+        "n_used": 675,
+        "m": 328,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 656,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 675,
+          "m": 328,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 676,
+      "n_end": 679,
+      "m": 266,
+      "direction": "solvent_only",
+      "length": 4,
+      "deficit_sum": 792,
+      "onset": {
+        "n_used": 676,
+        "m": 266,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 532,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 676,
+          "m": 266,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 680,
+      "n_end": 683,
+      "m": 328,
+      "direction": "solvent_only",
+      "length": 4,
+      "deficit_sum": 416,
+      "onset": {
+        "n_used": 680,
+        "m": 328,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 656,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 680,
+          "m": 328,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": [
+            8
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 684,
+      "n_end": 685,
+      "m": 325,
+      "direction": "solvent_only",
+      "length": 2,
+      "deficit_sum": 92,
+      "onset": {
+        "n_used": 684,
+        "m": 325,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 650,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 684,
+          "m": 325,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 686,
+      "n_end": 689,
+      "m": 266,
+      "direction": "solvent_only",
+      "length": 4,
+      "deficit_sum": 232,
+      "onset": {
+        "n_used": 686,
+        "m": 266,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 532,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 686,
+          "m": 266,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": [
+            14
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 690,
+      "n_end": 699,
+      "m": 294,
+      "direction": "solvent_only",
+      "length": 10,
+      "deficit_sum": 1123,
+      "onset": {
+        "n_used": 690,
+        "m": 294,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 588,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 690,
+          "m": 294,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 700,
+      "n_end": 713,
+      "m": 315,
+      "direction": "solvent_only",
+      "length": 14,
+      "deficit_sum": 570,
+      "onset": {
+        "n_used": 700,
+        "m": 315,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 630,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 700,
+          "m": 315,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 714,
+      "n_end": 714,
+      "m": 297,
+      "direction": "solvent_only",
+      "length": 1,
+      "deficit_sum": 234,
+      "onset": {
+        "n_used": 714,
+        "m": 297,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 594,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 714,
+          "m": 297,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 715,
+      "n_end": 735,
+      "m": 315,
+      "direction": "solvent_only",
+      "length": 21,
+      "deficit_sum": 3019,
+      "onset": {
+        "n_used": 715,
+        "m": 315,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 630,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 715,
+          "m": 315,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 736,
+      "n_end": 749,
+      "m": 324,
+      "direction": "solvent_only",
+      "length": 14,
+      "deficit_sum": 4338,
+      "onset": {
+        "n_used": 736,
+        "m": 324,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 648,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 736,
+          "m": 324,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 750,
+      "n_end": 755,
+      "m": 315,
+      "direction": "solvent_only",
+      "length": 6,
+      "deficit_sum": 2228,
+      "onset": {
+        "n_used": 750,
+        "m": 315,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 630,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 750,
+          "m": 315,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 756,
+      "n_end": 764,
+      "m": 324,
+      "direction": "solvent_only",
+      "length": 9,
+      "deficit_sum": 2781,
+      "onset": {
+        "n_used": 756,
+        "m": 324,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 648,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 756,
+          "m": 324,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": [
+            108
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 765,
+      "n_end": 791,
+      "m": 340,
+      "direction": "solvent_only",
+      "length": 27,
+      "deficit_sum": 15074,
+      "onset": {
+        "n_used": 765,
+        "m": 340,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 680,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 765,
+          "m": 340,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 792,
+      "n_end": 797,
+      "m": 351,
+      "direction": "solvent_only",
+      "length": 6,
+      "deficit_sum": 3180,
+      "onset": {
+        "n_used": 792,
+        "m": 351,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 702,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 792,
+          "m": 351,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 798,
+      "n_end": 799,
+      "m": 380,
+      "direction": "solvent_only",
+      "length": 2,
+      "deficit_sum": 1148,
+      "onset": {
+        "n_used": 798,
+        "m": 380,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 760,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 798,
+          "m": 380,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 800,
+      "n_end": 804,
+      "m": 352,
+      "direction": "solvent_only",
+      "length": 5,
+      "deficit_sum": 2970,
+      "onset": {
+        "n_used": 800,
+        "m": 352,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 704,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 800,
+          "m": 352,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": [
+            32
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 805,
+      "n_end": 809,
+      "m": 351,
+      "direction": "solvent_only",
+      "length": 5,
+      "deficit_sum": 2650,
+      "onset": {
+        "n_used": 805,
+        "m": 351,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 702,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 805,
+          "m": 351,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 810,
+      "n_end": 815,
+      "m": 352,
+      "direction": "solvent_only",
+      "length": 6,
+      "deficit_sum": 3282,
+      "onset": {
+        "n_used": 810,
+        "m": 352,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 704,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 810,
+          "m": 352,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 816,
+      "n_end": 819,
+      "m": 360,
+      "direction": "solvent_only",
+      "length": 4,
+      "deficit_sum": 2317,
+      "onset": {
+        "n_used": 816,
+        "m": 360,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 720,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 816,
+          "m": 360,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 820,
+      "n_end": 831,
+      "m": 370,
+      "direction": "solvent_only",
+      "length": 12,
+      "deficit_sum": 7210,
+      "onset": {
+        "n_used": 820,
+        "m": 370,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 740,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 820,
+          "m": 370,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": [
+            10
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 832,
+      "n_end": 832,
+      "m": 400,
+      "direction": "solvent_only",
+      "length": 1,
+      "deficit_sum": 469,
+      "onset": {
+        "n_used": 832,
+        "m": 400,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 800,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 832,
+          "m": 400,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 833,
+      "n_end": 835,
+      "m": 370,
+      "direction": "solvent_only",
+      "length": 3,
+      "deficit_sum": 1563,
+      "onset": {
+        "n_used": 833,
+        "m": 370,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 740,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 833,
+          "m": 370,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 836,
+      "n_end": 866,
+      "m": 400,
+      "direction": "solvent_only",
+      "length": 31,
+      "deficit_sum": 16796,
+      "onset": {
+        "n_used": 836,
+        "m": 400,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 800,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 836,
+          "m": 400,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 867,
+      "n_end": 867,
+      "m": 410,
+      "direction": "solvent_only",
+      "length": 1,
+      "deficit_sum": 695,
+      "onset": {
+        "n_used": 867,
+        "m": 410,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 820,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 867,
+          "m": 410,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 868,
+      "n_end": 895,
+      "m": 400,
+      "direction": "solvent_only",
+      "length": 28,
+      "deficit_sum": 8808,
+      "onset": {
+        "n_used": 868,
+        "m": 400,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 800,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 868,
+          "m": 400,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 896,
+      "n_end": 896,
+      "m": 351,
+      "direction": "solvent_only",
+      "length": 1,
+      "deficit_sum": 210,
+      "onset": {
+        "n_used": 896,
+        "m": 351,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 702,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 896,
+          "m": 351,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 897,
+      "n_end": 899,
+      "m": 380,
+      "direction": "solvent_only",
+      "length": 3,
+      "deficit_sum": 141,
+      "onset": {
+        "n_used": 897,
+        "m": 380,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 760,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 897,
+          "m": 380,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 900,
+      "n_end": 909,
+      "m": 405,
+      "direction": "solvent_only",
+      "length": 10,
+      "deficit_sum": 580,
+      "onset": {
+        "n_used": 900,
+        "m": 405,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 810,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 900,
+          "m": 405,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 910,
+      "n_end": 919,
+      "m": 400,
+      "direction": "solvent_only",
+      "length": 10,
+      "deficit_sum": 230,
+      "onset": {
+        "n_used": 910,
+        "m": 400,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-WEAK",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": true,
+        "patron": 800,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 910,
+          "m": 400,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 920,
+      "n_end": 930,
+      "m": 405,
+      "direction": "solvent_only",
+      "length": 11,
+      "deficit_sum": 1911,
+      "onset": {
+        "n_used": 920,
+        "m": 405,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 810,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 920,
+          "m": 405,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 931,
+      "n_end": 939,
+      "m": 464,
+      "direction": "solvent_only",
+      "length": 9,
+      "deficit_sum": 4928,
+      "onset": {
+        "n_used": 931,
+        "m": 464,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 928,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 931,
+          "m": 464,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": true,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 940,
+      "n_end": 949,
+      "m": 430,
+      "direction": "solvent_only",
+      "length": 10,
+      "deficit_sum": 5722,
+      "onset": {
+        "n_used": 940,
+        "m": 430,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 860,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 940,
+          "m": 430,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": [
+            10
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 950,
+      "n_end": 953,
+      "m": 456,
+      "direction": "solvent_only",
+      "length": 4,
+      "deficit_sum": 1992,
+      "onset": {
+        "n_used": 950,
+        "m": 456,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 912,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 950,
+          "m": 456,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 954,
+      "n_end": 968,
+      "m": 430,
+      "direction": "solvent_only",
+      "length": 15,
+      "deficit_sum": 7736,
+      "onset": {
+        "n_used": 954,
+        "m": 430,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 860,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 954,
+          "m": 430,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 969,
+      "n_end": 974,
+      "m": 455,
+      "direction": "solvent_only",
+      "length": 6,
+      "deficit_sum": 2808,
+      "onset": {
+        "n_used": 969,
+        "m": 455,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 910,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 969,
+          "m": 455,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 975,
+      "n_end": 983,
+      "m": 430,
+      "direction": "solvent_only",
+      "length": 9,
+      "deficit_sum": 3404,
+      "onset": {
+        "n_used": 975,
+        "m": 430,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 860,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 975,
+          "m": 430,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 984,
+      "n_end": 986,
+      "m": 464,
+      "direction": "solvent_only",
+      "length": 3,
+      "deficit_sum": 2316,
+      "onset": {
+        "n_used": 984,
+        "m": 464,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 928,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 984,
+          "m": 464,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 987,
+      "n_end": 991,
+      "m": 475,
+      "direction": "solvent_only",
+      "length": 5,
+      "deficit_sum": 2859,
+      "onset": {
+        "n_used": 987,
+        "m": 475,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 950,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 987,
+          "m": 475,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 992,
+      "n_end": 998,
+      "m": 496,
+      "direction": "solvent_only",
+      "length": 7,
+      "deficit_sum": 3185,
+      "onset": {
+        "n_used": 992,
+        "m": 496,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 992,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 992,
+          "m": 496,
+          "n0_eq_2m": true,
+          "n0_in_2m_to_2m_plus_5": true,
+          "n0_multiple_of_m": true,
+          "n0_multiple_of_m_maxfactor": [
+            16,
+            248
+          ]
+        }
+      }
+    },
+    {
+      "n_start": 999,
+      "n_end": 999,
+      "m": 470,
+      "direction": "solvent_only",
+      "length": 1,
+      "deficit_sum": 521,
+      "onset": {
+        "n_used": 999,
+        "m": 470,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 940,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 999,
+          "m": 470,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 1000,
+      "n_end": 1000,
+      "m": 496,
+      "direction": "solvent_only",
+      "length": 1,
+      "deficit_sum": 207,
+      "onset": {
+        "n_used": 1000,
+        "m": 496,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 992,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 1000,
+          "m": 496,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    }
+  ],
+  "mid_episode_checks": [
+    {
+      "n_start": 225,
+      "n_end": 259,
+      "m": 100,
+      "length": 35,
+      "mid_n": 242,
+      "onset_class": "SELF-BLOCKING-WEAK",
+      "mid_class": "SELF-BLOCKING-WEAK",
+      "class_differs": false,
+      "mid_result": {
+        "n_used": 242,
+        "m": 100,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-WEAK",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": true,
+        "patron": 200,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 242,
+          "m": 100,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 836,
+      "n_end": 866,
+      "m": 400,
+      "length": 31,
+      "mid_n": 851,
+      "onset_class": "SELF-BLOCKING-STRONG",
+      "mid_class": "SELF-BLOCKING-STRONG",
+      "class_differs": false,
+      "mid_result": {
+        "n_used": 851,
+        "m": 400,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 800,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 851,
+          "m": 400,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 260,
+      "n_end": 287,
+      "m": 105,
+      "length": 28,
+      "mid_n": 274,
+      "onset_class": "SELF-BLOCKING-STRONG",
+      "mid_class": "SELF-BLOCKING-STRONG",
+      "class_differs": false,
+      "mid_result": {
+        "n_used": 274,
+        "m": 105,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 210,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 274,
+          "m": 105,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 868,
+      "n_end": 895,
+      "m": 400,
+      "length": 28,
+      "mid_n": 882,
+      "onset_class": "SELF-BLOCKING-STRONG",
+      "mid_class": "SELF-BLOCKING-STRONG",
+      "class_differs": false,
+      "mid_result": {
+        "n_used": 882,
+        "m": 400,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 800,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 882,
+          "m": 400,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 765,
+      "n_end": 791,
+      "m": 340,
+      "length": 27,
+      "mid_n": 778,
+      "onset_class": "SELF-BLOCKING-STRONG",
+      "mid_class": "SELF-BLOCKING-STRONG",
+      "class_differs": false,
+      "mid_result": {
+        "n_used": 778,
+        "m": 340,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 680,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 778,
+          "m": 340,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 715,
+      "n_end": 735,
+      "m": 315,
+      "length": 21,
+      "mid_n": 725,
+      "onset_class": "SELF-BLOCKING-STRONG",
+      "mid_class": "SELF-BLOCKING-STRONG",
+      "class_differs": false,
+      "mid_result": {
+        "n_used": 725,
+        "m": 315,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 630,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 725,
+          "m": 315,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 630,
+      "n_end": 649,
+      "m": 250,
+      "length": 20,
+      "mid_n": 640,
+      "onset_class": "SELF-BLOCKING-STRONG",
+      "mid_class": "SELF-BLOCKING-STRONG",
+      "class_differs": false,
+      "mid_result": {
+        "n_used": 640,
+        "m": 250,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 500,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 640,
+          "m": 250,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 192,
+      "n_end": 207,
+      "m": 90,
+      "length": 16,
+      "mid_n": 200,
+      "onset_class": "SELF-BLOCKING-STRONG",
+      "mid_class": "SELF-BLOCKING-STRONG",
+      "class_differs": false,
+      "mid_result": {
+        "n_used": 200,
+        "m": 90,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 180,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 200,
+          "m": 90,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 320,
+      "n_end": 335,
+      "m": 150,
+      "length": 16,
+      "mid_n": 328,
+      "onset_class": "SELF-BLOCKING-STRONG",
+      "mid_class": "SELF-BLOCKING-STRONG",
+      "class_differs": false,
+      "mid_result": {
+        "n_used": 328,
+        "m": 150,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 300,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 328,
+          "m": 150,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    },
+    {
+      "n_start": 544,
+      "n_end": 559,
+      "m": 240,
+      "length": 16,
+      "mid_n": 552,
+      "onset_class": "SELF-BLOCKING-STRONG",
+      "mid_class": "SELF-BLOCKING-STRONG",
+      "class_differs": false,
+      "mid_result": {
+        "n_used": 552,
+        "m": 240,
+        "direction": "solvent_only",
+        "class": "SELF-BLOCKING-STRONG",
+        "m_in_pool": true,
+        "m_used_in_returned_matching": true,
+        "banned_playable": false,
+        "patron": 480,
+        "patron_ratio": 2,
+        "patron_ratio_is_prime": true,
+        "patron_is_2m": true,
+        "trigger": {
+          "n0": 552,
+          "m": 240,
+          "n0_eq_2m": false,
+          "n0_in_2m_to_2m_plus_5": false,
+          "n0_multiple_of_m": false,
+          "n0_multiple_of_m_maxfactor": []
+        }
+      }
+    }
+  ],
+  "aggregate": {
+    "n_episodes": 104,
+    "total_games_check": 785,
+    "class_table": [
+      {
+        "class": "SELF-BLOCKING-STRONG",
+        "episode_count": 100,
+        "episode_count_frac": 0.9615384615384616,
+        "game_count": 722,
+        "game_count_frac": 0.9197452229299363,
+        "deficit_sum": 155359,
+        "deficit_frac_of_total": 0.9927917334986293
+      },
+      {
+        "class": "SELF-BLOCKING-WEAK",
+        "episode_count": 4,
+        "episode_count_frac": 0.038461538461538464,
+        "game_count": 63,
+        "game_count_frac": 0.08025477707006369,
+        "deficit_sum": 1128,
+        "deficit_frac_of_total": 0.007208266501370721
+      }
+    ],
+    "self_blocking_strong_plus_weak_deficit": 156487,
+    "self_blocking_strong_plus_weak_deficit_frac": 1.0,
+    "self_blocking_strong_plus_weak_episode_count": 104,
+    "self_blocking_dominates_by_deficit": true,
+    "patron_ratio_distribution": {
+      "2": 104
+    },
+    "patron_is_2m_count": 104,
+    "patron_is_2m_frac_of_self_blocking": 1.0,
+    "self_blocking_episode_count_for_trigger_tab": 104,
+    "trigger_arithmetic_tabulation": {
+      "n0_eq_2m": 4,
+      "n0_in_2m_to_2m_plus_5_not_eq": 3,
+      "n0_multiple_of_m_not_2m": 0,
+      "n0_multiple_of_m_maxfactor_only": 21,
+      "none_of_above": 76
+    },
+    "mid_episode_checks_run": 10,
+    "mid_episode_class_differs_count": 0,
+    "mid_episode_class_differs": [],
+    "patron_records": [
+      {
+        "n_start": 54,
+        "m": 21,
+        "patron": 42,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 81,
+        "m": 39,
+        "patron": 78,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 120,
+        "m": 49,
+        "patron": 98,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 126,
+        "m": 56,
+        "patron": 112,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 128,
+        "m": 60,
+        "patron": 120,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 176,
+        "m": 70,
+        "patron": 140,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 180,
+        "m": 81,
+        "patron": 162,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 192,
+        "m": 90,
+        "patron": 180,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 208,
+        "m": 104,
+        "patron": 208,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 216,
+        "m": 100,
+        "patron": 200,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 225,
+        "m": 100,
+        "patron": 200,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-WEAK"
+      },
+      {
+        "n_start": 260,
+        "m": 105,
+        "patron": 210,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 288,
+        "m": 126,
+        "patron": 252,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 300,
+        "m": 136,
+        "patron": 272,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 304,
+        "m": 152,
+        "patron": 304,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 308,
+        "m": 132,
+        "patron": 264,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 312,
+        "m": 152,
+        "patron": 304,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 315,
+        "m": 135,
+        "patron": 270,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 320,
+        "m": 150,
+        "patron": 300,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 350,
+        "m": 150,
+        "patron": 300,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-WEAK"
+      },
+      {
+        "n_start": 375,
+        "m": 153,
+        "patron": 306,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 380,
+        "m": 154,
+        "patron": 308,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 390,
+        "m": 171,
+        "patron": 342,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 405,
+        "m": 150,
+        "patron": 300,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 408,
+        "m": 176,
+        "patron": 352,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 416,
+        "m": 150,
+        "patron": 300,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 420,
+        "m": 180,
+        "patron": 360,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 432,
+        "m": 189,
+        "patron": 378,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 440,
+        "m": 208,
+        "patron": 416,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 441,
+        "m": 200,
+        "patron": 400,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 448,
+        "m": 184,
+        "patron": 368,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 450,
+        "m": 189,
+        "patron": 378,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 460,
+        "m": 195,
+        "patron": 390,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 462,
+        "m": 190,
+        "patron": 380,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 464,
+        "m": 232,
+        "patron": 464,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 468,
+        "m": 225,
+        "patron": 450,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 475,
+        "m": 190,
+        "patron": 380,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 476,
+        "m": 225,
+        "patron": 450,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 484,
+        "m": 198,
+        "patron": 396,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 486,
+        "m": 210,
+        "patron": 420,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 507,
+        "m": 220,
+        "patron": 440,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 513,
+        "m": 240,
+        "patron": 480,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 520,
+        "m": 225,
+        "patron": 450,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 522,
+        "m": 248,
+        "patron": 496,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 525,
+        "m": 250,
+        "patron": 500,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 528,
+        "m": 225,
+        "patron": 450,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 532,
+        "m": 240,
+        "patron": 480,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 539,
+        "m": 250,
+        "patron": 500,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 544,
+        "m": 240,
+        "patron": 480,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 560,
+        "m": 196,
+        "patron": 392,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 567,
+        "m": 210,
+        "patron": 420,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 572,
+        "m": 285,
+        "patron": 570,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 576,
+        "m": 243,
+        "patron": 486,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 580,
+        "m": 230,
+        "patron": 460,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 585,
+        "m": 231,
+        "patron": 462,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 594,
+        "m": 243,
+        "patron": 486,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 595,
+        "m": 255,
+        "patron": 510,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 616,
+        "m": 285,
+        "patron": 570,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 620,
+        "m": 290,
+        "patron": 580,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 621,
+        "m": 255,
+        "patron": 510,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 630,
+        "m": 250,
+        "patron": 500,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 656,
+        "m": 260,
+        "patron": 520,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-WEAK"
+      },
+      {
+        "n_start": 665,
+        "m": 266,
+        "patron": 532,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 675,
+        "m": 328,
+        "patron": 656,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 676,
+        "m": 266,
+        "patron": 532,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 680,
+        "m": 328,
+        "patron": 656,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 684,
+        "m": 325,
+        "patron": 650,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 686,
+        "m": 266,
+        "patron": 532,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 690,
+        "m": 294,
+        "patron": 588,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 700,
+        "m": 315,
+        "patron": 630,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 714,
+        "m": 297,
+        "patron": 594,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 715,
+        "m": 315,
+        "patron": 630,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 736,
+        "m": 324,
+        "patron": 648,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 750,
+        "m": 315,
+        "patron": 630,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 756,
+        "m": 324,
+        "patron": 648,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 765,
+        "m": 340,
+        "patron": 680,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 792,
+        "m": 351,
+        "patron": 702,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 798,
+        "m": 380,
+        "patron": 760,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 800,
+        "m": 352,
+        "patron": 704,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 805,
+        "m": 351,
+        "patron": 702,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 810,
+        "m": 352,
+        "patron": 704,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 816,
+        "m": 360,
+        "patron": 720,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 820,
+        "m": 370,
+        "patron": 740,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 832,
+        "m": 400,
+        "patron": 800,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 833,
+        "m": 370,
+        "patron": 740,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 836,
+        "m": 400,
+        "patron": 800,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 867,
+        "m": 410,
+        "patron": 820,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 868,
+        "m": 400,
+        "patron": 800,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 896,
+        "m": 351,
+        "patron": 702,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 897,
+        "m": 380,
+        "patron": 760,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 900,
+        "m": 405,
+        "patron": 810,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 910,
+        "m": 400,
+        "patron": 800,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-WEAK"
+      },
+      {
+        "n_start": 920,
+        "m": 405,
+        "patron": 810,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 931,
+        "m": 464,
+        "patron": 928,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 940,
+        "m": 430,
+        "patron": 860,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 950,
+        "m": 456,
+        "patron": 912,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 954,
+        "m": 430,
+        "patron": 860,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 969,
+        "m": 455,
+        "patron": 910,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 975,
+        "m": 430,
+        "patron": 860,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 984,
+        "m": 464,
+        "patron": 928,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 987,
+        "m": 475,
+        "patron": 950,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 992,
+        "m": 496,
+        "patron": 992,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 999,
+        "m": 470,
+        "patron": 940,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      },
+      {
+        "n_start": 1000,
+        "m": 496,
+        "patron": 992,
+        "ratio": 2,
+        "class": "SELF-BLOCKING-STRONG"
+      }
+    ]
+  },
+  "summary_stats_total_deficit": 156487,
+  "summary_stats_total_games": 785
+}

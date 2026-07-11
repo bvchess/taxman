@@ -167,10 +167,24 @@ promotions — what the theory achieves entirely on its own):
 | solvent | 99.855% | 99.851% | 99.08% | 214/999 |
 | continuation chain (below) | **99.978%** | **99.972%** | **99.52%** | **502/999** |
 
-Where solvent still loses, diagnostics showed every failure is an
-assignment failure: the points are spent on the right numbers through
-the wrong accounts, and re-routing them is exactly what the
-continuation solver's search does.
+Where solvent still loses, the mechanism is measured to be singular
+— "self-blocking" (`results/mistake_catalog_1000.json`,
+`results/signature_classification_1000.json`): the 785 imperfect
+games decompose into 104 persistent mistake episodes, and in every
+one of them solvent *picks* a number m that the optimal game instead
+reserves as the tax payment of 2m.  The patron is always exactly 2m,
+and that is forced: every mistake locus lies in (n/3, n/2], where 3m
+already exceeds n, so 2m is m's only possible payer.  In 100 of the
+104 episodes the reservation is provably necessary — ban m from the
+coupon pool and the optimal set becomes unplayable, typically by a
+cascade that strands a number sharing no factor with m.  The victims
+sit below m, unseen when the descending scan decides m; a one-pass
+strategy structurally cannot price them, and re-routing them by
+search is exactly what the continuation solver does.  (The band is
+where lower-half picks live at all, not where mistakes prefer to
+form: optimal games place only 1.3% of their picks below n/3 — a
+number there has two or more multiples demanding it as currency, and
+both players leave it as money.)
 
 ## The continuation solver: search near n−1
 
