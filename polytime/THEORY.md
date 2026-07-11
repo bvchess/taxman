@@ -285,3 +285,29 @@ obligation, sharpened: *within one connected jam cluster, under the
 numeric ordering, greedy's exclusion count is minimal* — with the
 window law as the engine, and n=9170's cluster as the first test any
 proof must pass.
+
+For the two known jam shapes, that obligation is now discharged at
+the ordering level (machine-classified; the fixed-comparison
+criterion is exact majorization of exponent vectors, validated
+against 300 sampled prime constellations with zero disagreements).
+Every one of the n=2873 shape's 48 trap orderings demands p²q ranked
+above pq² — impossible for every prime triple; one universal
+inequality retires the entire class.  The n=9170 shape's 48 split
+46 impossible the same way, one never realized in the searched
+constellation space, and exactly one realizable: the true numeric
+descending order itself.  Greedy's real behavior on that shape IS an
+abstract trap — standalone, it keeps 4 where 5 fit — and what
+rescues it, in every realization tested (three constellations, both
+window edges), is the sandwiched guard: q³ > pq² > n/2 and
+q³ < q²r ≤ n force q³ into the game wherever the shape exists
+(proven — two lines), its only maximal factor is the contested q²,
+and the oracle's refusal of the trap's 5-set names it verbatim
+("q³ has no remaining factor").  Deleting q³ alone springs the trap
+at the tight end of the window (load-bearing, 4/6 realizations);
+at the loose end other ambient contention over-determines the
+defense.  The general lemma this points at — every trap ordering of
+every jam shape requires either a monomial inversion
+(majorization-impossible) or the absence of a window resident that
+the shape's own realization forces into (n/2, n] — is the sharpest
+known form of why the integers protect greedy, and the guard's
+*sufficiency* in general is the part still resting on measurement.
