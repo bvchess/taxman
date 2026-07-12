@@ -2,3 +2,4 @@
 target
 bin/taxman.jar
 .DS_Store
+*.iml
