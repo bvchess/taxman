@@ -313,6 +313,29 @@ the shape's own realization forces into (n/2, n] — is the sharpest
 known form of why the integers protect greedy, and the guard's
 *sufficiency* in general is the part still resting on measurement.
 
+The census then closed the whole 3-prime zoo (degrees ≤ 5, shape
+sizes ≤ 8, paddings of ≤ 2 members; sizes ≤ 7 exhaustive over all
+orderings, size 8 sampled at 10,000 per shape).  First the minimal
+layer: 77 minimal self-covering shapes, all realizable, none with a
+single breaker — for a reason that is a one-line lemma: removing
+*any* member of an inclusion-minimal self-covering set leaves no
+self-covering subset, so every victim repairs it and greedy cannot
+choose wrong.  Trap potential lives only in *padded* jams (a core
+plus members leaning on its coupons): of 428 padded shapes, 42 carry
+breakers — 22,909 trap orderings in all, classified 22,891 monomially
+impossible, 11 never realized, 7 realizable, **0 unprotected**.  All
+7 realizable breakers were defeated in ambient context at every
+realization tested (18/18, components up to 6,186 members); every
+load-bearing guard (q³ five times, q²r twice) is sandwich-forced into
+the window by fixed comparisons among the shape's own members.  The
+census also found the exact boundary of danger, verified 428/428: a
+padded shape has breakers **iff its maximal playable subsets come in
+two (always adjacent) sizes** — trap potential is precisely the
+failure of the exchange property, the n=2873 phenomenon, now a
+characterization rather than an anecdote.  Greedy's droppable pair
+always shares a maximal factor, and breaker-bearing paddings are the
+ones welded to both members of that pair.
+
 ## The residual theorems: characterization and exclusion confinement
 
 Standing hypothesis for this section: the instance is **separated** —
