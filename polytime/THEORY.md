@@ -277,11 +277,13 @@ n=2873, n=9170), of 3,236 rejection-bearing components, 99.8% are
 verified (exact search: brute force, or exhaustion over the
 residual) or certified (greedy meets the matching bound), including
 the n=2873 celebrity component (greedy's 6 exclusions proven minimal
-by 12.4M playability checks over its residual).  The handful still
-undecided are single-cluster jam regions whose exact search is
-super-exponential — n=9170's component (|K| = 1,174, residual 306,
-37 greedy exclusions, any improving exclusion forced by the matching
-bound to have size 19..36) is the standing monster.  The proof
+by 12.4M playability checks over its residual).  Exactly five
+components remain undecided in the entire tested range — n = 3103,
+3872, 3936, 4000, and 9170 — single-cluster jam regions whose exact
+search budgets run from 2.7×10⁹ to 1.1×10⁴⁷ subsets; n=9170's
+component (|K| = 1,174, residual 306, 37 greedy exclusions, any
+improving exclusion forced by the matching bound to have size 19..36)
+is the standing monster only a theorem will settle.  The proof
 obligation, sharpened: *within one connected jam cluster, under the
 numeric ordering, greedy's exclusion count is minimal* — with the
 window law as the engine, and n=9170's cluster as the first test any
