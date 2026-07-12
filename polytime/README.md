@@ -167,6 +167,7 @@ promotions — what the theory achieves entirely on its own):
 | cascade | — | 92.52% | 91.10% | 19/999 |
 | onetax | 99.105% | 99.065% | 96.00% | 42/999 |
 | solvent | 99.855% | 99.851% | 99.08% | 214/999 |
+| solvent-b | 99.937% | 99.929% | 99.20% | 337/999 |
 | continuation chain (below) | **99.978%** | **99.972%** | **99.52%** | **502/999** |
 
 Where solvent still loses, the mechanism is measured to be singular
@@ -187,6 +188,23 @@ where lower-half picks live at all, not where mistakes prefer to
 form: optimal games place only 1.3% of their picks below n/3 — a
 number there has two or more multiples demanding it as currency, and
 both players leave it as money.)
+
+**solvent-b** (`strategies/solvent_b.py`) turns that diagnosis into a
+strategy: after the base solvent pass, audit every kept pick that is
+also a maximal factor of another kept pick — the structural dual-use
+criterion, no thresholds anywhere — by re-completing the game with
+that pick banned and adopting on strict improvement, to a fixpoint.
+The reruns price the downstream victims by literally playing them,
+which is exactly the information a single descending pass cannot
+have.  Result: 99.929% of all optimal points (337/999 exact, worst
+game 99.20%), recovering ~52% of solvent's entire loss; the residue
+is the handful of episodes needing *coordinated* multi-number moves
+(the blocked-valley phenomenon that the continuation solver's
+bundles exist for).  Cost is one factor of n over solvent —
+Θ(n³ log n), softened ~2x by prefix-reuse forking (nothing above a
+fork point is ever recomputed): measured ~9x solvent at n=500, ~59x
+at n=1000.  Every audit is a fresh feasibility question answered by
+the same proven machinery; nothing is heuristic.
 
 ## The continuation solver: search near n−1
 
@@ -377,6 +395,7 @@ resumes with `--resume` — container restarts cost at most a few games.
 | `THEORY.md` | the proofs: playability, schedulability, completeness, cores/forests, the frontier argument |
 | `core.py` | shared foundations: `maximal_factors`, the wiki's `solve_mini` / `optimize_mini`, `order_for_real_game`, `solve_upper_half`, divisor tables, `check_sequence` replay validation |
 | `strategies/solvent.py` | the fast solvent implementation (incremental matching + complete fallback tier) |
+| `strategies/solvent_b.py` | solvent-b: solvent plus the dual-use audit (recovers ~52% of solvent's loss for one factor of n in cost) |
 | `strategies/onetax.py`, `strategies/maxturn.py`, `strategies/cascade.py` | the comparison strategies |
 | `strategies/continuation.py` | the continuation solver: certificates, flip/bundle search, solvent re-anchor |
 | `strategies/seteval.py` | incremental set evaluator used by the continuation search |
