@@ -1,11 +1,9 @@
-"""The solvent Taxman strategy, written to be read.
+"""
+This is implementation of the Solvent Taxman strategy.  The code is
+written for readability rather than performance. There are many ways
+to make it run faster at the cost of making it more complicated.
 
-This is the executable version of the pseudocode in README.md
-("Solvent, final form"): correct, minimal, and unhurried.  The fast,
-bit-identical implementation (incremental matching + Kuhn augmenting
-paths) lives in strategies/solvent.py's solvent().
-
-The game, in one breath: the pot holds 1..n; picking a number c keeps
+The game: the pot holds 1..n; picking a number c keeps
 c for you and surrenders every divisor of c still in the pot to the
 taxman; every pick must surrender at least one divisor, and when no
 legal pick remains the taxman sweeps the leftovers.  Highest total
@@ -23,49 +21,20 @@ reservations can be scheduled without stepping on each other.
 solve_mini finds the reservations; ordered() does the scheduling.
 
 What makes it special:
-
 * No search, no lookahead, no scoring heuristics - one feasibility
   question ("can everyone still be paid?") asked n times, landing
   within ~0.15% of the known optimal scores for n <= 1000.  Answered
   incrementally (strategies/solvent.py), the whole strategy runs in
   O(n^2 log n); this readable version re-derives each answer from
-  scratch and pays roughly a factor of n for the privilege (~n^3.3
-  measured) - it exists to be read, not raced.
-* Rejections are refusals by a playability oracle, not judgment
-  calls.  When solve_mini fails the set is unplayable - and that is
-  MORE than "no one can be paid": there are sets where everyone can
-  reserve a distinct payment yet no legal order exists (at n=21 the
-  145-sum set {10,12,14,15,16,18,19,20,21} out-sums the true optimum
-  144), and solve_mini's forced-move peeling provably refuses those
-  too (the "completeness" theorem - its refusals coincide exactly
-  with unplayability).  Since playable sets are downward-closed, a
-  rejection is permanent, and the set this program picks is
-  canonical: a deterministic function of playability, not of
-  tie-breaking.
-* The picks above n/2 are not merely good - they are exactly the
-  >n/2 selections of an optimal game (verified against the known
-  optima for every n <= 1000).  Numbers above n/2 never divide one
-  another, so up there selection is a pure matching question, and
-  pairing every pick with a distinct outside factor caps every game:
-  no upper half can outscore the heaviest matchable
-  set.  This program's playability test is stricter than matching,
-  so its upper picks sit at or below that ceiling; that they equal
-  an optimal game's upper half exactly is the verified part (every
-  n <= 1000), not a theorem.  Whatever solvent loses to the true
-  optimum, it loses among the small numbers below n/2.
-* The scheduling step is guaranteed, and that is a theorem, not
-  luck: solve_mini's forced-move discipline provably cannot emit an
-  assignment whose precedence is cyclic (the schedulability theorem
-  - see THEORY.md for the proof; the key is that payments are
-  maximal factors, so a potential based on counting prime factors
-  confines any would-be cycle to configurations the peel rules
-  refuse).  ordered() still checks, and halts rather than play an
-  illegal game - asserting a theorem costs little and catches bugs.
-  The rejection side is also a theorem now ("completeness", proof in
-  THEORY.md): a solve_mini refusal always means the set is truly
-  unplayable.  Nothing in this program's accept/reject behavior rests
-  on faith - solve_mini is a proven decision procedure for
-  playability, in both directions.
+  scratch and pays roughly a factor of n for the privilege O(~n^3).
+* The picks above n/2 are the >n/2 selections of an optimal game,
+  at least for every n <= 1000. Whatever solvent loses to the true
+  optimum, it loses among the numbers below n/2 where some numbers
+  have the potential to be either a selection or tax.
+* The scheduling step is guaranteed: the selection proceedure cannot
+  emit an assignment whose precedence is cyclic. ordered() still
+  checks and halts rather than play an illegal game, but this is a
+  safety precaution only.
 
 Run it with the game size as the only argument:
 
@@ -74,7 +43,7 @@ Run it with the game size as the only argument:
     score (sum of picks):    144
 
 (144 is the known optimum for n=21.)  Sizes up to a few hundred
-answer in seconds; beyond that, use strategies/solvent.py's fast solvent().
+answer in seconds using the pypy implementation of python.
 """
 
 
@@ -220,13 +189,11 @@ def ordered(s_set, pay):
 
 
 def solvent(n):
-    """Play Taxman game n: choose the set first, then order it.
+    """Play Taxman game n: choose the set of picks first, then order
+    them.
 
-    Descending order is the greedy heart: offer the biggest numbers
-    first, keep each one whose addition leaves the set payable.  This
-    is the wiki's optimize_mini promoted from the upper half to the
-    whole game - restricted to the numbers above n/2 it collapses
-    back into optimize_mini exactly.
+    Select the biggest numbers first, keep each one whose addition
+    leaves the set playable.
     """
     s = set()
     for c in range(n, 1, -1):
