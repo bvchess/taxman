@@ -156,6 +156,149 @@ def test_solvent_simple_matches_canonical():
         assert check_sequence(n, seq) == score
 
 
+def test_solvent_b_matches_experiment_anchors():
+    # Anchor scores recorded by the band_audit.py structural-audit experiment
+    # (scratchpad band_audit_results.json, n_from=2 n_to=1000, cap 6 audit
+    # iterations), covering distinct behaviors: 21 and 100 untouched
+    # (already optimal, the audit never fires); 81 untouched despite a
+    # nonempty audit set (audited, but no candidate ban ever improved the
+    # score); 54 fired and fully repaired to optimal; 120 fired across two
+    # audit iterations; 208 fired but only partially closes the gap to
+    # optimal.
+    from core import check_sequence, maximal_factor_lists
+    from strategies.solvent_b import solvent_b
+
+    anchors = {21: 144, 54: 940, 81: 2095, 100: 3164, 120: 4593, 208: 13806}
+    mf = maximal_factor_lists(1000)
+    for n, expected in anchors.items():
+        assert check_sequence(n, solvent_b(n, mf)) == expected
+
+
+def test_solvent_b_never_below_solvent():
+    # Every audit adoption is a strict improvement (see solvent_b's
+    # docstring), so a fixpoint with zero adoptions must reproduce solvent's
+    # own score exactly, and any fired audit can only raise it.
+    from core import check_sequence, maximal_factor_lists
+    from strategies.solvent import solvent
+    from strategies.solvent_b import solvent_b
+
+    mf = maximal_factor_lists(300)
+    for n in (21, 54, 81, 100, 120, 150, 208, 300):
+        assert check_sequence(n, solvent_b(n, mf)) >= check_sequence(n, solvent(n, mf))
+
+
+def test_solvent_b_fork_matches_full_rerun():
+    # solvent-b's speedup is prefix-reuse forking: within one audit round, a
+    # single descending scan forks at each candidate instead of rerunning
+    # the whole scan from n per candidate.  This checks that speedup is
+    # lossless: at n=150 and n=200, every forked trial encountered while
+    # replaying solvent_b's own audit trajectory is compared against an
+    # independently-coded full rerun (a verbatim reimplementation of
+    # solvent's driving loop under one extra ban, built directly from
+    # strategies.solvent's tier-1/tier-2 primitives -- NOT solvent_b's own
+    # _finish_scan/_make_try_select) and must yield the identical pick set.
+    from core import maximal_factor_lists
+    from strategies.solvent import (
+        _augment,
+        _complete_matching,
+        _is_acyclic,
+        _playable_order,
+        _rollback,
+        solvent,
+    )
+    from strategies.solvent_b import (
+        MAX_ITERS,
+        _finish_scan,
+        _make_try_select,
+        _structural_audit_set,
+    )
+
+    def full_rerun(n, mf, banned):
+        # Independent copy of solvent's driving loop, banned-set
+        # parameterized (mirrors band_audit.py's solvent_banned; duplicated
+        # here, rather than imported, so this test's oracle does not depend
+        # on solvent_b's own forking machinery).
+        selected = set()
+        owner = {}
+
+        def try_select(m):
+            pre_trail = []
+            if m in owner:
+                holder = owner.pop(m)
+                if _augment(holder, owner, selected, mf, {m}, pre_trail):
+                    pre_trail.append((m, holder))
+                else:
+                    owner[m] = holder
+                    return False
+            selected.add(m)
+            trail = []
+            if _augment(m, owner, selected, mf, set(), trail):
+                if _is_acyclic(selected, owner, n):
+                    return True
+                _rollback(owner, trail)
+                selected.discard(m)
+                _rollback(owner, pre_trail)
+                matching = _complete_matching(selected | {m}, mf)
+                if matching is None:
+                    return False
+                owner_candidate = {f: c for c, f in matching.items()}
+                owner.clear()
+                owner.update(owner_candidate)
+                selected.add(m)
+                return True
+            selected.discard(m)
+            _rollback(owner, pre_trail)
+            return False
+
+        for m in range(n, 1, -1):
+            if not mf[m] or m in banned:
+                continue
+            try_select(m)
+        return selected
+
+    mf = maximal_factor_lists(200)
+    checks = 0
+    for n in (150, 200):
+        current_set = set(solvent(n, mf))
+        banned = set()
+        for _ in range(MAX_ITERS):
+            B = _structural_audit_set(current_set, mf)
+            if not B:
+                break
+            candidates = sorted(B, reverse=True)
+            current_score = sum(current_set)
+
+            selected, owner = set(), {}
+            try_select = _make_try_select(n, mf, selected, owner)
+            remaining = iter(candidates)
+            next_candidate = next(remaining, None)
+            adopted = None
+            for m in range(n, 1, -1):
+                if not mf[m] or m in banned:
+                    continue
+                if m == next_candidate:
+                    fork_selected = set(selected)
+                    fork_owner = dict(owner)
+                    _finish_scan(n, mf, banned | {m}, fork_selected, fork_owner, m - 1)
+
+                    oracle_selected = full_rerun(n, mf, banned | {m})
+                    assert fork_selected == oracle_selected, (n, m)
+                    checks += 1
+
+                    if adopted is None and sum(fork_selected) > current_score:
+                        adopted = (m, fork_selected)
+                    next_candidate = next(remaining, None)
+                try_select(m)
+
+            if adopted is None:
+                break
+            m, new_set = adopted
+            banned = banned | {m}
+            current_set = new_set
+
+    assert checks > 0  # sanity: the audit actually exercised fork points
+
+
 def test_prime_sacrifice_identity():
     # Wiki "Reusing a previous solution", sections "If N is prime" and
     # "Generalizing": for prime N, opt(N) = N + opt(N-1) - p_hat, where
