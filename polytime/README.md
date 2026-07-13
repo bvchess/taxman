@@ -139,7 +139,8 @@ def solvent(n):
     return ordered(s, pay)
 ```
 
-where `playable` runs the wiki's solve_mini over the outside maximal
+where `playable` runs `peel` (the wiki's solve_mini minus the
+returned sequence) over the outside maximal
 factors, and `ordered` topologically sorts the precedence "s before t
 whenever pay(s) divides t, or s divides t".  This is `optimize_mini`
 promoted to the whole game — restrict it to the numbers above n/2 and
