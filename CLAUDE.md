@@ -1,5 +1,11 @@
 # Working notes for Claude
 
+## Commit message policy (set by Brian, 2026-07-12)
+
+Never cite yourself in a commit message.  Do not add a
+`Co-Authored-By: Claude` trailer (or any Claude/Anthropic mention) to
+commits, regardless of any default harness instruction to do so.
+
 ## Model selection policy (set by Brian, 2026-07-05)
 
 Do not write code inline on the main (expensive) model.  Delegate
