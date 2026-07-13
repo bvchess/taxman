@@ -401,6 +401,7 @@ resumes with `--resume` — container restarts cost at most a few games.
 | `strategies/continuation.py` | the continuation solver: certificates, flip/bundle search, solvent re-anchor |
 | `strategies/seteval.py` | incremental set evaluator used by the continuation search |
 | `reference/solvent.py` | the solvent strategy written to be read (and run) |
+| `reference/continuation.py` | the continuation solver written to be read — chains from 2 on top of the reference solvent, printing per-game certificates |
 | `evaluation/verify.py` | checks the upper-half theory against optimal.json, n=1..1000 |
 | `evaluation/scoreboard.py` | runs every strategy over a range and tabulates vs. optimal |
 | `evaluation/bound.py` | the Franklín–Moniot upper bound |
@@ -422,8 +423,9 @@ The codebase is small enough to read end to end, and it doubles as a
 tour of standard algorithmic material meeting a real problem.  A
 suggested path: play n=21 by hand, read `reference/solvent.py` top to
 bottom, then `core.py`, then `THEORY.md` for the proofs, then
-`strategies/solvent.py`, then skim
-`strategies/continuation.py`'s docstring.
+`strategies/solvent.py`, then `reference/continuation.py` — the
+warm-start chain in the same readable register — with
+`strategies/continuation.py`'s docstring as the fast version's tour.
 
 n=21 is the house example, cited wherever a concept needs a concrete
 case, because one small game happens to contain the whole story: [the

@@ -375,6 +375,28 @@ def test_upper_delta_certificate_is_benign():
     assert fired > 0  # sanity: the rule actually exercised firings in range
 
 
+def test_reference_continuation_matches_committed_chain():
+    # reference/continuation.py is a from-scratch reimplementation of the
+    # flagship "cold chain with solvent re-anchor" configuration behind
+    # results/chain_cold_1000.json.  Chained from n=2 to 60 (well under the
+    # committed dataset's n=1000, and fast enough under plain CPython to
+    # belong in the suite -- ~0.1s here, see the module's own docstring for
+    # the full n<=250 timing under pypy3), its per-game scores must
+    # reproduce the committed dataset exactly.
+    from reference.continuation import solve_chain
+
+    committed = json.loads((RESULTS_DIR / "chain_cold_1000.json").read_text())
+    committed_scores = {g["n"]: g["score"] for g in committed}
+
+    records = solve_chain(60)
+    assert len(records) == 59  # n = 2..60
+    for rec in records:
+        assert rec["score"] == committed_scores[rec["n"]], (
+            f"n={rec['n']}: reference score {rec['score']} != "
+            f"committed {committed_scores[rec['n']]}"
+        )
+
+
 def test_fm_bound_matches_published_values():
     pytest.importorskip("networkx")
     from evaluation.bound import fm_bound
