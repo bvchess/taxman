@@ -1,10 +1,11 @@
 # Taxman
-A program to find optimal solutions to the taxman game.
+A program to find optimal solutions to the taxman game along with some heuristic
+approaches to more quickly find approximate solutions.
 
 ![game 10 move 3](img/10.3.png)
 
 See the [project wiki](https://github.com/bvchess/taxman/wiki) for more information about the game and the
-algorithm implemented by this program.
+algorithm implemented by this program. Heuristic approaches are [here](heuristics).
 
 
 ## Usage
@@ -35,8 +36,7 @@ to take advantage of multi-core CPUs.
 ## References and Links
 - The On-Line Encyclopedia of Integer Sequences documents the Taxman Sequence (the optimal player score)
 as [A019312](https://oeis.org/A019312).
-- My son built an interactive version of Taxman for N = 16.  You can play it online here: <http://xvade.com/taxman>.
-Other online implementations are <http://davidbau.com/archives/2008/12/07/taxman_game.html> and
+- Interactive online implementations of the taxman game are <http://davidbau.com/archives/2008/12/07/taxman_game.html> and
 <https://www.cryptool.org/en/cto/taxman>.
   
 ## Build
