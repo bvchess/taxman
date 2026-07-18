@@ -1,3 +1,6 @@
+# Copyright (c) Brian Chess 2026
+# SPDX-License-Identifier: MIT
+
 """onetax (Moniot): pick the largest number with exactly one divisor left.
 
 Compared against heuristics from Robert Moniot's strategy comparison

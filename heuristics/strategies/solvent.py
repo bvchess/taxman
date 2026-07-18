@@ -1,3 +1,6 @@
+# Copyright (c) Brian Chess 2026
+# SPDX-License-Identifier: MIT
+
 """solvent: matching-based full-game approximation of optimal Taxman play.
 
 The full-game generalization of "take the highest prime": consider

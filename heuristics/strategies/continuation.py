@@ -1,3 +1,6 @@
+# Copyright (c) Brian Chess 2026
+# SPDX-License-Identifier: MIT
+
 """Continuation solver: solve Taxman game n by warm-starting from n-1.
 
 The transition anatomy (transitions.py) showed that the optimal solution

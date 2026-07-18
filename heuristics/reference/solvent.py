@@ -1,3 +1,6 @@
+# Copyright (c) Brian Chess 2026
+# SPDX-License-Identifier: MIT
+
 """
 This is implementation of the Solvent Taxman strategy.  The code is
 written for readability rather than performance. There are many ways

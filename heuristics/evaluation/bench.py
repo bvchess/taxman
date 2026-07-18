@@ -1,3 +1,6 @@
+# Copyright (c) Brian Chess 2026
+# SPDX-License-Identifier: MIT
+
 """Performance measurements for every solver and strategy in this project.
 
 Times each component at a range of game sizes (best of `--repeat` runs),

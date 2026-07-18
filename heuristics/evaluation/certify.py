@@ -1,3 +1,6 @@
+# Copyright (c) Brian Chess 2026
+# SPDX-License-Identifier: MIT
+
 """Independent verification of optimal.json, free of the frame theory.
 
 optimal.json was produced by the frame/factor-game solver, and this

@@ -1,3 +1,6 @@
+# Copyright (c) Brian Chess 2026
+# SPDX-License-Identifier: MIT
+
 """The Franklín & Moniot upper bound on the optimal Taxman score.
 
 Franklín, A. F. and Moniot R. K.  The difficulty of beating the

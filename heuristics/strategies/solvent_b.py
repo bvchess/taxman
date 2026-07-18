@@ -1,3 +1,6 @@
+# Copyright (c) Brian Chess 2026
+# SPDX-License-Identifier: MIT
+
 """solvent-b: solvent, self-audited for the "self-blocking" mistake.
 
 Background (see README.md's "Solvent" section and

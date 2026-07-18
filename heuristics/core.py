@@ -1,3 +1,6 @@
+# Copyright (c) Brian Chess 2026
+# SPDX-License-Identifier: MIT
+
 """Core polynomial-time reduction for the upper half of a Taxman game.
 
 The reduction is played with a set of potential selections C and a set of

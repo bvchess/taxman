@@ -1,3 +1,6 @@
+# Copyright (c) Brian Chess 2026
+# SPDX-License-Identifier: MIT
+
 """Bitmask primitives for representing a Taxman pot as a single Python int.
 
 Today pots are Python `set[int]` objects; this module provides the pieces

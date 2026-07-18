@@ -1,6 +1,9 @@
+# Copyright (c) Brian Chess 2026
+# SPDX-License-Identifier: MIT
+
 """Unit tests for core.py, anchored to the examples in the wiki.
 
-Run with:  python3 -m pytest evaluation/test_taxman.py   (from polytime/)
+Run with:  python3 -m pytest evaluation/test_taxman.py   (from heuristics/)
 """
 
 import json

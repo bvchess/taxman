@@ -1,3 +1,6 @@
+# Copyright (c) Brian Chess 2026
+# SPDX-License-Identifier: MIT
+
 """
 This is a readable reference implementation of the continuation solver
 - the strategy that plays every game n by warm-starting from game n-1's

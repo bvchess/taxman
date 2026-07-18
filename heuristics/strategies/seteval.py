@@ -1,3 +1,6 @@
+# Copyright (c) Brian Chess 2026
+# SPDX-License-Identifier: MIT
+
 """SetEval: an incremental playability evaluator for Taxman pick sets.
 
 A set of Taxman picks is playable iff there is a matching assigning each

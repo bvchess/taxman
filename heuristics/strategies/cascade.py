@@ -1,3 +1,6 @@
+# Copyright (c) Brian Chess 2026
+# SPDX-License-Identifier: MIT
+
 """cascade: the verified upper-half theory applied band by band.
 
 The pure upper-half machinery applied band by band: play the numbers

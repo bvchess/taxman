@@ -1,3 +1,6 @@
+# Copyright (c) Brian Chess 2026
+# SPDX-License-Identifier: MIT
+
 """Comparison runner: score every strategy against known optimal solutions.
 
 Plays solvent, solvent-b, cascade, and Moniot's onetax/maxturn heuristics on

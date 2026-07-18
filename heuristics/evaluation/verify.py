@@ -1,3 +1,6 @@
+# Copyright (c) Brian Chess 2026
+# SPDX-License-Identifier: MIT
+
 """Verify the upper-half theory against known optimal Taxman solutions.
 
 Theory: for every game N there is a polynomial-time algorithm (optimize_mini

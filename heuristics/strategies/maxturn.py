@@ -1,3 +1,6 @@
+# Copyright (c) Brian Chess 2026
+# SPDX-License-Identifier: MIT
+
 """maxturn (Carmony & Holliday, 1993): maximize a single turn's net take.
 
 Pick the number maximizing the player's take minus the taxman's take for
