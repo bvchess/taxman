@@ -13,7 +13,7 @@ rollback so a rejected mutation fully restores prior state.
 
 It mirrors strategies.solvent's matching machinery: a failed augmenting
 search rejects outright (Berge's lemma -- no matching covers the
-candidate), and core.solve_mini is consulted only when the incremental
+candidate), and core.peel is consulted only when the incremental
 matching goes precedence-cyclic, where it decides true playability.
 
 This is the dynamic flavor of a normally static algorithm.  Local
@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
-from core import Infeasible, solve_mini
+from core import Infeasible, peel
 
 
 # ---------------------------------------------------------------------------
@@ -57,7 +57,7 @@ class SetEval:
         # shared, read-only candidate-payment pool: mf[m] = m's maximal
         # factors (f with m/f prime), ascending.  The lifting lemma makes
         # this matching-equivalent to the full proper-divisor pool, so the
-        # augmenting search and solve_mini reduction below only need it.
+        # augmenting search and peel reduction below only need it.
         self.mf = mf
         self.S: Set[int] = set()
         self.owner: Dict[int, int] = {}  # divisor -> pick paying it as tax
@@ -132,7 +132,7 @@ class SetEval:
         the cycle needs OTHER picks reassigned too (empirically ~9 picks
         per game around n=500, e.g. 230/225/220 which sit inside the
         provably-playable optimal set).  So when the fast tier rejects, a
-        complete tier runs: solve_mini decides the playability of
+        complete tier runs: peel decides the playability of
         S + {x} (raising Infeasible when no playable assignment exists --
         a refusal strictly stronger than "no matching": see the n=21
         note in strategies.solvent) and its canonical order is confirmed
@@ -148,7 +148,7 @@ class SetEval:
             # from a free vertex): no matching covers S | {x}, so the
             # complete tier's Infeasible is forced -- skip it.
             return False
-        # Cyclic-only fast-tier failure: solve_mini here is a playability
+        # Cyclic-only fast-tier failure: peel here is a playability
         # oracle (a set can be matchable yet unschedulable; see the n=21
         # counterexample in the lean-solvent experiment), so the complete
         # tier must decide.
@@ -217,7 +217,7 @@ class SetEval:
         """Decide playability of `target` exactly, returning a matching.
 
         Reduces the pick set to a bipartite factor game (each pick to
-        its proper divisors that lie outside the set) and lets solve_mini
+        its proper divisors that lie outside the set) and lets peel
         find an assignment or prove none exists.  A returned assignment is
         confirmed acyclic under the full real-game precedence (both the
         coupon edges and the pick-divides-pick edges) before acceptance;
@@ -226,7 +226,7 @@ class SetEval:
         avail = {c: {d for d in self.mf[c] if d not in target} for c in target}
         factors: Set[int] = set().union(*avail.values()) if avail else set()
         try:
-            _, matching = solve_mini(target, factors, avail)
+            _, matching = peel(target, factors, avail)
         except Infeasible:
             return None
         if not self._matching_acyclic(target, matching):

@@ -275,7 +275,7 @@ def tier2_pass(
         # is structurally unplayable simply fails and leaves the state
         # untouched, so the smaller genuine beneficiary later in the list
         # still finds its coupon free.  The full playable_add (with the
-        # solve_mini completeness tier) is required -- a valley beneficiary
+        # peel completeness tier) is required -- a valley beneficiary
         # such as 189 after removing {98,210} is not greedily addable, only
         # completely so.
         for x in cands:
@@ -289,7 +289,7 @@ def tier2_pass(
         # (240/192 share 48, 210/189 share 21, 198/154 share 22), whereas
         # the many always-blocked large adds share only a factor of 2 with
         # the removal and never become playable -- shortlisting by gcd drops
-        # them so the solve_mini-heavy refill runs on ~K, not ~150,
+        # them so the peel-heavy refill runs on ~K, not ~150,
         # candidates, without losing the beneficiary.
         ranked = sorted(
             pool, key=lambda x: max(gcd(x, r) for r in removed), reverse=True

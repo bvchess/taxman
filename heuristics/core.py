@@ -7,8 +7,8 @@ The reduction is played with a set of potential selections C and a set of
 maximal factors F, where the maximal factor graph is bipartite: every
 number is either a selection or a factor, never both.
 (See https://github.com/bvchess/taxman/wiki/Taxman-Mini for the wiki's
-description of this reduction, "Taxman Mini", and the solve_mini /
-optimize_mini procedures implemented below.)
+description of this reduction, "Taxman Mini", and the procedures
+implemented below.)
 
 For a regular Taxman game N, the numbers greater than N/2 are exactly the
 source nodes of the maximal factor graph (no number in the game is a multiple
@@ -18,7 +18,7 @@ of them), and all of their maximal factors are <= N/2.  So
     F = union of the maximal factors of the members of C
 
 forms a valid instance of the factor game. The theory tested by this project
-is that optimize_mini/solve_mini applied to this game yield exactly the
+is that optimize_mini/peel applied to this game yield exactly the
 numbers greater than N/2 in the optimal solution to game N, along with a
 valid order in which to select them.
 
@@ -26,7 +26,7 @@ Three well-known ideas underlie this file, wearing number-theory
 clothes.  (1) *Modeling*: the game becomes a bipartite graph — picks on
 one side, candidate tax payments on the other, an edge where payment
 divides pick — so "can everything be paid?" becomes a matching
-question.  (2) *Degree-1 peeling*: solve_mini repeatedly makes only
+question.  (2) *Degree-1 peeling*: peel repeatedly makes only
 forced moves (a vertex with one live edge has no choice), maintained
 with worklists exactly like Kahn's topological sort keeps its
 in-degree-zero queue; each edge is touched O(1) times, so it runs in
@@ -34,10 +34,10 @@ O(V + E) — and E is tiny, since a number has only as many maximal
 factors as distinct primes (average ln ln n ~= 2).  (3) *Topological
 order*: order_for_real_game turns the payment assignment into a legal
 play sequence by topologically sorting a precedence DAG.  One warning:
-solve_mini is NOT equivalent to checking
+peel is NOT equivalent to checking
 that a matching exists (Hall's condition).  There are sets where a
 perfect payment matching exists but every such matching is impossible
-to schedule — solve_mini's forced-move discipline rejects those too.
+to schedule — peel's forced-move discipline rejects those too.
 The smallest example lives at n=21; see the README's ledger.
 """
 
@@ -47,7 +47,7 @@ from typing import Dict, Iterable, List, Sequence, Set, Tuple
 
 
 class Infeasible(Exception):
-    """Raised by solve_mini when not all members of C can be selected."""
+    """Raised by peel when not all members of C can be selected."""
 
 
 def smallest_prime_factors(limit: int) -> List[int]:
@@ -86,7 +86,7 @@ def maximal_factors(n: int, spf: Sequence[int]) -> Set[int]:
     return {n // p for p in prime_factors(n, spf)}
 
 
-def solve_mini(
+def peel(
     selections: Iterable[int],
     factors: Iterable[int],
     mf: Dict[int, Set[int]],
@@ -95,12 +95,12 @@ def solve_mini(
 
     Implements the recursive procedure from the wiki iteratively:
 
-        solve_mini(C, F):
+        peel(C, F):
             if C is empty: return []
             if some c in C has only a single factor f in F:
-                return [c] + solve_mini(C - {c}, F - {f})
+                return [c] + peel(C - {c}, F - {f})
             if some f in F is a maximal factor of only one c in C:
-                return solve_mini(C - {c}, F - {f}) + [c]
+                return peel(C - {c}, F - {f}) + [c]
             ERROR: cannot select all members of C using F
 
     Returns (sequence, matching) where matching maps each selection to the
@@ -204,7 +204,7 @@ def optimize_mini(
         opt_c2 = opt_c | {c}
         r_f2 = r_f | (mf[c] & f_set)
         try:
-            solve_mini(opt_c2, r_f2, mf)
+            peel(opt_c2, r_f2, mf)
         except Infeasible:
             continue
         opt_c = opt_c2
@@ -216,7 +216,7 @@ def optimize_mini(
 def order_for_real_game(matching: Dict[int, int]) -> List[int]:
     """Order matched selections so the sequence is playable in a real game.
 
-    solve_mini's order only accounts for maximal factors, but in a real
+    peel's order only accounts for maximal factors, but in a real
     taxman game a selection sweeps ALL of its remaining divisors from the
     pot.  The order must therefore ensure that whenever a's assigned factor
     divides b, a is played before b: a consumes its factor before b would
@@ -225,7 +225,7 @@ def order_for_real_game(matching: Dict[int, int]) -> List[int]:
 
     Any topological order of that precedence works, and one always
     exists: by the schedulability theorem (THEORY.md, "The schedulability
-    theorem"), an assignment produced by solve_mini's peeling can never
+    theorem"), an assignment produced by peel can never
     have a cyclic precedence -- the prime-counting potential confines
     any would-be cycle to pool edges, and the peel rules refuse those
     configurations outright.
@@ -281,7 +281,7 @@ def solve_upper_half(n: int, spf: Sequence[int]) -> Tuple[List[int], Set[int]]:
     """
     c_set, f_set, mf = upper_half_game(n, spf)
     opt_c, r_f = optimize_mini(c_set, f_set, mf)
-    _, matching = solve_mini(opt_c, r_f, mf)
+    _, matching = peel(opt_c, r_f, mf)
     return order_for_real_game(matching), r_f
 
 

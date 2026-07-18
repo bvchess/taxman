@@ -14,9 +14,9 @@ Per candidate the decision has three outcomes:
   * the search succeeds and the updated matching's precedence relation
     is acyclic -> accept.
   * the search succeeds but the matching has gone precedence-cyclic ->
-    ask solve_mini, which decides exactly.  This path is load-bearing:
+    ask peel, which decides exactly.  This path is load-bearing:
     some sets have perfect matchings, every one of them cyclic (first
-    at n=21), and solve_mini correctly refuses those -- it is a
+    at n=21), and peel correctly refuses those -- it is a
     playability oracle, strictly stronger than a matching test.
 
 A rejection is permanent either way: playable sets are downward-closed,
@@ -50,14 +50,14 @@ _is_acyclic and _playable_order are Kahn's
 topological sort doing cycle detection and schedule construction.  The
 one nonstandard ingredient is the interplay between matching and
 scheduling: matchability alone is NOT playability, which is exactly why
-the cyclic path above must consult solve_mini.
+the cyclic path above must consult peel.
 """
 
 from __future__ import annotations
 
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
-from core import Infeasible, solve_mini
+from core import Infeasible, peel
 
 
 def _augment(
@@ -109,14 +109,14 @@ def _complete_matching(
     vetoes playable candidates (see strategies.seteval.SetEval, which
     proves this out).  This is the complete tier: reduce target to a
     bipartite factor game -- each pick maps to the set of its candidate
-    factors (maximal factors) NOT in target -- and let solve_mini decide
+    factors (maximal factors) NOT in target -- and let peel decide
     exactly, returning a full pick -> factor matching, or None if no
     assignment covers every pick.
     """
     avail = {c: {d for d in mf[c] if d not in target} for c in target}
     factors: Set[int] = set().union(*avail.values()) if avail else set()
     try:
-        _, matching = solve_mini(target, factors, avail)
+        _, matching = peel(target, factors, avail)
     except Infeasible:
         return None
     return matching
@@ -153,7 +153,7 @@ def _playable_order(
     """Topologically order selections by the precedence relation.
 
     The fast path's acceptances are verified acyclic before being
-    committed; the complete tier accepts solve_mini's assignment
+    committed; the complete tier accepts peel's assignment
     unconditionally, which is sound by the schedulability THEOREM (see
     THEORY.md: peel-produced assignments are provably acyclic).
     Either way the final matching is acyclic, and a single
@@ -231,10 +231,10 @@ def solvent(
             if _is_acyclic(selected, owner, n):
                 return True  # fast, common-case silent success
             # Augment succeeded but the precedence is cyclic: this is NOT
-            # conclusive, so the complete tier must decide.  Here solve_mini
+            # conclusive, so the complete tier must decide.  Here peel
             # is a playability oracle, not a matching oracle -- a set can be
             # matchable yet unschedulable (its every matching cyclic), and
-            # solve_mini's forced-peeling structure correctly rejects such
+            # peel's forced-peeling structure correctly rejects such
             # sets.  See the n=21 counterexample in the lean-solvent
             # experiment docstring (candidate 10 augments but yields an
             # unplayable 145-point set).  This path is unchanged from the

@@ -5,12 +5,12 @@
 
 The pure upper-half machinery applied band by band: play the numbers
 above half the remaining maximum optimally with optimize_mini and
-solve_mini, sweep, repeat on what is left.  Shows how much of the game
+peel, sweep, repeat on what is left.  Shows how much of the game
 the verified theory captures on its own, with no promotions (~93% of
 optimal) -- the ablation baseline that measures what solvent's and
 the chain's remaining machinery is actually buying.
 
-Note cascade plays solve_mini's raw sequence under real sweeps, so it
+Note cascade plays peel's raw sequence under real sweeps, so it
 needs TRUE divisor lists, not the maximal-factor pool: feasibility is
 pool-invariant (the lifting lemma) but raw play orders are not -- at
 n=5 a maximal-factor pool orders [4, 5], and playing 4 sweeps the 1
@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Sequence, Set
 
-from core import optimize_mini, solve_mini
+from core import optimize_mini, peel
 
 
 def cascade(n: int, divs: Sequence[List[int]]) -> List[int]:
@@ -29,10 +29,10 @@ def cascade(n: int, divs: Sequence[List[int]]) -> List[int]:
 
     Unlike solvent, cascade uses TRUE proper divisors (`divs`) as its
     per-band edge pool, NOT the maximal-factor pool.  It replays
-    solve_mini's returned ORDER directly under real-game (true-divisor)
+    peel's returned ORDER directly under real-game (true-divisor)
     sweeping, so the order must be valid against every divisor a pick
     sweeps -- a stronger property than the matching-feasibility the lifting
-    lemma equates the two pools on.  With a maximal-factor pool solve_mini
+    lemma equates the two pools on.  With a maximal-factor pool peel
     can emit an order that strands a pick whose only surviving payment is a
     non-maximal shared divisor swept early (e.g. n=5: playing 4 before 5
     sweeps their shared divisor 1).  The sweep replay and end-of-band
@@ -58,7 +58,7 @@ def cascade(n: int, divs: Sequence[List[int]]) -> List[int]:
         f_set: Set[int] = set().union(*edges.values())
 
         opt_c, r_f = optimize_mini(c_set, f_set, edges)
-        order, _ = solve_mini(opt_c, r_f, edges)
+        order, _ = peel(opt_c, r_f, edges)
 
         for c in order:
             tax = [d for d in divs[c] if d in pot]

@@ -188,7 +188,7 @@ def upper_half_selection(n: int) -> Set[int]:
     the game, so every one of their maximal factors is at most n/2 and
     the upper-half game is already a plain instance of the same
     membership question solvent asks of the whole game.  Both peel()
-    (here) and core.solve_mini (the fast code) are exact playability
+    (here) and core.peel (the fast code) are exact playability
     oracles over that same question, so the two approaches must
     agree - verified (evaluation/test_taxman.py) by direct comparison,
     not merely argued.

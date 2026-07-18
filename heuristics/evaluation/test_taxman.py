@@ -16,7 +16,7 @@ from core import (
     maximal_factors,
     optimize_mini,
     smallest_prime_factors,
-    solve_mini,
+    peel,
     solve_upper_half,
     upper_half_game,
 )
@@ -41,27 +41,27 @@ def test_maximal_factors():
     assert maximal_factors(20, SPF) == {10, 4}
 
 
-def test_solve_mini_single_selection():
+def test_peel_single_selection():
     mf = mf_table([7])
-    sequence, matching = solve_mini({7}, {1}, mf)
+    sequence, matching = peel({7}, {1}, mf)
     assert sequence == [7]
     assert matching == {7: 1}
 
 
-def test_solve_mini_infeasible_two_primes_one_factor():
+def test_peel_infeasible_two_primes_one_factor():
     # Two primes share the single factor 1: only one can be selected.
     mf = mf_table([5, 7])
     with pytest.raises(Infeasible):
-        solve_mini({5, 7}, {1}, mf)
+        peel({5, 7}, {1}, mf)
 
 
-def test_solve_mini_shared_core_is_infeasible():
+def test_peel_shared_core_is_infeasible():
     # 12 and 18 both have maximal factors {6, ...} restricted here to {6, 9}
     # in a way that forms a 2-core: 12 -> {6, 4}, 18 -> {6, 9}.  With only
     # {6} available both compete for one factor.
     mf = mf_table([12, 18])
     with pytest.raises(Infeasible):
-        solve_mini({12, 18}, {6}, mf)
+        peel({12, 18}, {6}, mf)
 
 
 def test_optimize_mini_takes_highest_prime():

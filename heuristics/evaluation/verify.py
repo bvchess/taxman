@@ -4,7 +4,7 @@
 """Verify the upper-half theory against known optimal Taxman solutions.
 
 Theory: for every game N there is a polynomial-time algorithm (optimize_mini
-followed by solve_mini on the upper-half factor game, see
+followed by peel on the upper-half factor game, see
 https://github.com/bvchess/taxman/wiki/Taxman-Mini) that produces exactly
 the numbers greater than N/2 in the optimal solution, along with an order
 in which those numbers can all be selected.
@@ -13,11 +13,11 @@ For each game this script checks:
 
   1. Set match: the selections chosen by optimize_mini equal the set of
      numbers greater than N/2 in the known optimal solution.
-  2. Playable: replaying solve_mini's sequence as a real taxman game over
+  2. Playable: replaying peel's sequence as a real taxman game over
      the pot optC + rF, where each selection removes every remaining divisor
      from the pot, pays at least one factor of tax per selection and selects
      every number in optC.
-  3. Order match (informational only): whether solve_mini's order equals the
+  3. Order match (informational only): whether peel's order equals the
      relative order of the >N/2 numbers in the known optimal solution.
      Optimal orderings are not unique, so a difference is not a failure.
 

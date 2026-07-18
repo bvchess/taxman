@@ -50,7 +50,7 @@ answer in seconds.
 
 
 class Infeasible(Exception):
-    """Raised when solve_mini cannot pay every member from the factor pool."""
+    """Raised when peel cannot pay every member from the factor pool."""
 
 
 # Populated once by solvent() at startup: all_maximal_factors[c] is the set of
@@ -89,8 +89,8 @@ def build_maximal_factor_table(n):
 def peel(members, available_as_tax):
     """Reserve a distinct payment ("pay") for every member, or fail.
 
-    This is similar to the wiki's solve_mini: a peeling procedure that
-    only ever makes forced moves, never guesses, and never backtracks.
+    A peeling procedure that only ever makes forced moves, never
+    guesses, and never backtracks.
     Two moves are forced:
     * A member with exactly ONE usable factor left must reserve it -
       no other payment can save that member, and every valid
@@ -102,7 +102,7 @@ def peel(members, available_as_tax):
     Note what this refusal is NOT: it is not always "no assignment of
     distinct payments exists" - some refused sets have perfect
     payment assignments, every one of which is impossible to
-    schedule.  The forced-move discipline makes solve_mini reject
+    schedule.  The forced-move discipline makes peel reject
     those too: it is a playability oracle, provably exact (THEORY.md),
     strictly stronger than a matching test.
 
