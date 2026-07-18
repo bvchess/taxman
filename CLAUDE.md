@@ -15,7 +15,7 @@ task:
 * **Haiku** - mechanical edits, boilerplate, renames, small test
   tweaks.
 * **Sonnet** - routine implementation: new scripts, strategy variants,
-  benchmark/verification code like most of `polytime/`.
+  benchmark/verification code like most of `heuristics/`.
 * **Opus/heavyweight** - only when the code embeds genuinely hard
   reasoning (e.g. the fork-oracle design, correctness-critical
   matching/rollback logic).
@@ -28,7 +28,7 @@ When delegating, write a precise spec in the subagent prompt (this
 project has subtle correctness traps: augmenting-path rollback,
 sweep-all-divisors tax semantics, name shadowing in one_tax) and
 verify returned work against the test suite
-(`python3 -m pytest polytime/evaluation/test_taxman.py`) and known results
+(`python3 -m pytest heuristics/evaluation/test_taxman.py`) and known results
 before committing.
 
 ## Checkpoint policy for long runs (set by Brian, 2026-07-07)
@@ -47,21 +47,21 @@ expected to take more than a few minutes must checkpoint frequently:
 * When (re)launching a long job, prefer the resumable path so a
   restart costs at most one checkpoint interval.
 
-`polytime/strategies/continuation.py` (`--resume`, checkpoint every 5
+`heuristics/strategies/continuation.py` (`--resume`, checkpoint every 5
 games) and the
 scratchpad `ub_fill.py` pattern (merge existing results, write every
 10 completions) are the reference implementations.
 
 ## Project context
 
-The active work lives in `polytime/` (see `polytime/README.md`),
+The active work lives in `heuristics/` (see `heuristics/README.md`),
 run from that directory with `python3 -m`: shared foundations in
 `core.py`; one file per strategy under `strategies/` (solvent,
 onetax, maxturn, cascade, continuation + its seteval engine); the
 readable reference implementation in `reference/solvent.py`; and
 verification/measurement code under `evaluation/` (verify,
 scoreboard, bound, certify, bench, test_taxman.py).  Committed
-datasets and charts live in `polytime/results/`; scripts write
+datasets and charts live in `heuristics/results/`; scripts write
 elsewhere by default and must never overwrite committed results.
 Retired experiments (diagnostic campaign, fork oracle,
 trust-certificates) exist only in git history and the README's "Dead
