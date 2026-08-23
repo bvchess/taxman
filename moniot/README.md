@@ -5,11 +5,6 @@ plays Taxman using any of seven heuristic strategies.  It was provided by
 its author for inclusion here and is redistributed under the MIT license
 (see the SPDX header in the source).
 
-The file is kept **byte-for-byte as its author sent it**.  Nothing in this
-directory edits it — the build works around it instead.  Please keep it
-that way, so it stays a faithful copy of the reference implementation
-rather than a fork of it.
-
 Moniot is a co-author of the Franklín–Moniot upper bound that this project
 measures against ([The difficulty of beating the
 Taxman](https://arxiv.org/abs/2211.00461), *Discrete Applied Mathematics*
@@ -32,7 +27,7 @@ make
 ```
 
 Requires a C++17 compiler.  There is no dependency beyond POSIX
-`getopt_long`.  The built binary is not tracked.
+`getopt_long`.
 
 The `Makefile` force-includes `<algorithm>`, `<climits>` and `<strings.h>`,
 which the source uses but does not include.  libc++ (macOS) supplies them
@@ -68,7 +63,7 @@ $ echo 1-1000 | ./playtaxman -h MaxTurn+ -s -p CSV > maxturn_plus.csv
 
 ## The strategies
 
-Run `./playtaxman -d -h NAME` for the author's own description of each.
+Run `./playtaxman -d -h NAME` for the author's description of each.
 Scores below were measured over n = 2..1000 against
 [`optimal.json`](../src/main/resources/optimal.json); "point share" is the
 strategy's total as a fraction of the optimal total, and "exact" counts
@@ -100,14 +95,9 @@ program:
 * `strategies/onetax.py` with `refined=True` **diverges** from `OneTax`,
   first at n = 128, on 313 of 1000 games.
 
-The divergence is a real difference in the refinement rule, and the two
+The divergence is a difference in the refinement rule, and the two
 sources disagree about which rule is intended: the prose description in
 `playtaxman.cpp` (lines 53–56) requires the rescued multiple to have no
 other active multiple of its own, which `strategies/onetax.py` implements
 and `takeOneTax` does not.  `takeOneTax` also takes the smallest
-qualifying multiple where the Python takes the largest.  Unresolved —
-pending a question to the author.
-
-Separately, `moniot_table.json` carries a `CycleBreak` column that has no
-counterpart among the seven heuristics here; its provenance is also an
-open question.
+qualifying multiple where the Python takes the largest.
