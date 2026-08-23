@@ -65,5 +65,11 @@ datasets and charts live in `heuristics/results/`; scripts write
 elsewhere by default and must never overwrite committed results.
 Retired experiments (diagnostic campaign, fork oracle,
 trust-certificates) exist only in git history and the README's "Dead
-ends" section.  Development happens on the branch
-`claude/taxman-polynomial-time-gy59il`; commit and push there.
+ends" section.  Development happens directly on `master`; commit and
+push there.  (Through 2026-08-23 it happened on the branch
+`claude/taxman-polynomial-time-gy59il`, which has since been merged
+into `master` and deleted.)
+
+Robert Moniot's C++ program `moniot/playtaxman.cpp` implements seven
+heuristic strategies and is essentially as its author sent it.  Keep edits
+to it minimal; prefer working around it in `moniot/Makefile`.
