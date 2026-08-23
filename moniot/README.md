@@ -1,4 +1,4 @@
-# playtaxman — Robert Moniot's heuristic strategies
+# playtaxman — a collection of heuristic strategies
 
 `playtaxman.cpp` is a standalone C++ program by **Robert K. Moniot** that
 plays Taxman using any of seven heuristic strategies.  It was provided by
@@ -28,11 +28,6 @@ make
 
 Requires a C++17 compiler.  There is no dependency beyond POSIX
 `getopt_long`.
-
-The `Makefile` force-includes `<algorithm>`, `<climits>` and `<strings.h>`,
-which the source uses but does not include.  libc++ (macOS) supplies them
-transitively; libstdc++ (most Linux) does not.  This is handled in the
-build rather than in the source to keep the copy verbatim.
 
 ## Usage
 

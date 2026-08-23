@@ -19,6 +19,9 @@
 #include <getopt.h>
 #include <sstream>
 #include <string>
+#include <algorithm>
+#include <climits>
+#include <strings.h>
 using namespace std;
 
 // Supported heuristics for playing Taxman
@@ -729,7 +732,7 @@ int main( int argc, char *argv[] ) {
   // selected heuristic and exit.
 
   if (describe_heuristic) {
-    struct Heuristic h = heuristicList.at(heuristic);
+    Heuristic h = heuristicList.at(heuristic);
     cout << "Heuristic: " << h.name << endl;
     for (int line=0; h.desc[line] != NULL; ++line) { // Go thru lines of description
       cout << h.desc[line] << endl;
