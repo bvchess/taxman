@@ -7,6 +7,9 @@ approaches to more quickly find approximate solutions.
 See the [project wiki](https://github.com/bvchess/taxman/wiki) for more information about the game and the
 algorithm implemented by this program. Heuristic approaches are [here](heuristics).
 
+Robert Moniot's C++ program implementing seven heuristic strategies is included in
+[moniot](moniot), redistributed with his permission.
+
 
 ## Usage
 `bin/taxman [options] <board size or range>`  
