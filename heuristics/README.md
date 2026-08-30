@@ -305,6 +305,25 @@ books 4 picks no legal order can deliver — and 911 in the lower half.
 The matching's upper half is *never* a tie with the real one: where
 they differ it is strictly heavier, i.e. strictly fictional.
 
+**The born-free matching** (`evaluation/bornfree.py`) is the same
+paper's constructive counterpart to that bound.  Theorem 1 there
+identifies optimal play with the max-weight matching *restricted to
+matchings free of flat alternating cycles*; dropping the restriction
+gives `bound.py`, while the born-free algorithm keeps it by building a
+matching that cannot contain such a cycle in the first place — for
+each prime p ≤ n descending, pair x with p·x whenever both are unused.
+No matching algorithm runs at all, and the pick set is always
+playable, so `core.order_for_real_game` schedules it directly.  It
+takes 90.39% of the optimal total over n=2..1000 (a shade above
+`maxturn`'s 90.29%) and
+settles at 56.89% of the pot out to n=100,000, matching the paper's
+figure.  Its interest is not strength but provability: it is the only
+strategy here with a proved guarantee, and the gap to `onetax` prices
+what refusing to search costs.  Two caveats found while implementing
+it: the paper's claim that it wins for every N > 3 fails at exactly
+N=7 and N=13, and the descending order over x, though the paper
+specifies it, has no effect on the result.
+
 **Theory-free certification** (`evaluation/certify.py`): optimal.json
 was produced by the same theory this project tests, so the audit uses
 none of it — exhaustive
@@ -381,6 +400,7 @@ python3 -m reference.solvent 21         # the readable strategy, one game
 python3 -m evaluation.scoreboard        # full strategy comparison (~10 min)
 pypy3   -m strategies.continuation --from 2 --to 1000 --reanchor-solvent   # the flagship chain (~80 min)
 python3 -m evaluation.bound 21 128 1000 # F-M bound for specific games
+python3 -m evaluation.bornfree 21 1000  # F-M born-free matching, same games
 python3 -m evaluation.certify           # theory-free audit of optimal.json
 python3 -m pytest evaluation/test_taxman.py
 ```
@@ -404,6 +424,7 @@ resumes with `--resume` — container restarts cost at most a few games.
 | `evaluation/verify.py` | checks the upper-half theory against optimal.json, n=1..1000 |
 | `evaluation/scoreboard.py` | runs every strategy over a range and tabulates vs. optimal |
 | `evaluation/bound.py` | the Franklín–Moniot upper bound |
+| `evaluation/bornfree.py` | the Franklín–Moniot born-free matching: their constructive lower bound |
 | `evaluation/certify.py` | theory-free certification of optimal.json (uses `evaluation/bitpot.py` bitmask primitives) |
 | `evaluation/bench.py` | timings and scaling exponents |
 | `evaluation/test_taxman.py` | the test suite |

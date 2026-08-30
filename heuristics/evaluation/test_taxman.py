@@ -410,6 +410,56 @@ def test_fm_bound_matches_published_values():
     assert fm_bound(128) == 5310
 
 
+def test_born_free_matches_known_scores():
+    from evaluation.bornfree import born_free, born_free_matching
+
+    assert born_free(21) == 123
+    assert born_free(100) == 2908
+    assert born_free(1000) == 286297
+
+    m = born_free_matching(21)
+    picks = sorted(m.keys())
+    taxes = sorted(m.values())
+    assert picks == [14, 15, 16, 18, 19, 20, 21]
+    assert taxes == [1, 2, 3, 4, 5, 6, 8]
+
+
+def test_born_free_game_is_legal_and_matches_score():
+    from core import check_sequence
+    from evaluation.bornfree import born_free, born_free_game
+
+    for n in (1, 2, 5, 7, 13, 21, 50, 100, 208, 400):
+        assert check_sequence(n, born_free_game(n)) == born_free(n)
+
+
+def test_born_free_theorem_4_threshold():
+    # Franklín & Moniot, Theorem 4: the p_max=5 restricted born-free matching
+    # already exceeds half the pot at N=847.
+    from evaluation.bornfree import born_free
+
+    score = born_free(847, p_max=5)
+    assert score == 183980
+    assert 2 * score > 847 * 848 // 2
+
+
+def test_born_free_beats_half_pot_except_two_small_exceptions():
+    # The paper states (opening its "A winning strategy" section, ahead of
+    # Theorem 3) that the born-free algorithm is "capable of winning the game
+    # for all N > 3".  Theorem 4 proves only the N >= 847 case.  The claim is
+    # not quite true: at N=7 (score 13 vs. a pot of 28) and N=13 (score 44
+    # vs. a pot of 91) the born-free score falls short of half the pot.
+    # Those are, empirically, the *only* two exceptions -- verified through
+    # n=2000 in scratch exploration, and re-checked here through n=500.
+    from evaluation.bornfree import born_free
+
+    shortfalls = set()
+    for n in range(4, 501):
+        pot = n * (n + 1) // 2
+        if born_free(n) <= pot / 2:
+            shortfalls.add(n)
+    assert shortfalls == {7, 13}
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(pytest.main([__file__, "-q"]))
