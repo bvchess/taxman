@@ -75,7 +75,7 @@ vector<Heuristic> heuristicList = {
   { GreedyOneTax, "GreedyOneTax", {
       "Like OneTax, pick a number that has only one divisor in play.  Differs",
       "from OneTax in that if two or more numbers have only one remaining divisor,",
-      "instead of choosing the laregest, choose the one with the largest",
+      "instead of choosing the largest, choose the one with the largest",
       "difference between the player's take and the Taxman's take, like MaxTurn.",
       "Like OneTax, also include the tweak of taking a multiple of the pick",
       "if it will become unpickable. The score is mostly the same as OneTax,",
@@ -543,18 +543,21 @@ bool takeOneTax(GameBoard& g, HeuristicID heuristic) {
 
   if (heuristic == OneTax) { 	// Skip this for PureOneTax
     // Check if this pick has only one active multiple that has no other divisors
-    // besides this pick and its single tax.  If so, take that instead, giving
-    // the Taxman the pick and its divisor.
+    // besides this pick and its single tax, and no active multiples
+    // of its own.  If so, take that instead, giving the Taxman the
+    // pick and its divisor.
     numList_t multiples = getRemainingMultiples(pick, g);
   
     for ( int m : multiples ) {
-      numList_t divisors = getRemainingDivisors(m, g);
-      if (divisors.size() == 2) {
+      numList_t mdivisors = getRemainingDivisors(m, g);
+      numList_t mmultiples = getRemainingMultiples(m, g);
+
+      if (mmultiples.size() == 0 && mdivisors.size() == 2) {
 	pick = m;
-	taxes = divisors;
-	break;
+	taxes = mdivisors;
       }
     }
+
   }
   
   // Take the pick and give Taxman its divisor(s).
@@ -592,16 +595,19 @@ bool takeGreedyOneTax(GameBoard& g) {
 
   // Now apply the tweak.
   
-  // Check if this pick has only one active multiple that has no other divisors
-  // besides this pick and its single tax.  If so, take that instead.
+    // Check if this pick has only one active multiple that has no other divisors
+    // besides this pick and its single tax, and no active multiples
+    // of its own.  If so, take that instead, giving the Taxman the
+    // pick and its divisor.
   numList_t multiples = getRemainingMultiples(pick, g);
   
   for ( int m : multiples ) {
-    numList_t divisors = getRemainingDivisors(m, g);
-    if (divisors.size() == 2) {
+    numList_t mdivisors = getRemainingDivisors(m, g);
+    numList_t mmultiples = getRemainingMultiples(m, g);
+
+    if (mmultiples.size() == 0 && mdivisors.size() == 2) {
       pick = m;
-      taxes = divisors;
-      break;
+      taxes = mdivisors;
     }
 
   }

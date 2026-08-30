@@ -1029,11 +1029,11 @@
 5310,
 5301,
 5188,
-5193,
+5289,
 4970,
 4816
 ]
 },
 "source": "https://www.dsm.fordham.edu/~moniot/taxman-strategies-comparison.html",
-"description": "Results table from Robert Moniot: Comparison of strategies for playing the Taxman game. Columns per row (indexed by N): UpperBound, Optimal, CycleBreak, OneTax, MaxTurn+, MaxTurn."
+"description": "Results table from Robert Moniot: Comparison of strategies for playing the Taxman game. Columns per row (indexed by N): UpperBound, Optimal, CycleBreak, OneTax, MaxTurn+, MaxTurn. Includes the author's 2026-08-24 correction of the N=128 OneTax entry (5193 -> 5289). CycleBreak is implementation-dependent: a maximum-weight matching need not be unique, so other implementations can report different CycleBreak scores."
 }

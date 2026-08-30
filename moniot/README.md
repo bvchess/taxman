@@ -66,8 +66,8 @@ games where it found an optimal score.
 
 | strategy | point share | avg % of optimal | worst game | exact |
 |---|---|---|---|---|
-| OneTax (default) | 98.983% | 98.917% | 96.00% | 42/999 |
-| GreedyOneTax | 98.921% | 98.849% | 95.99% | 42/999 |
+| OneTax (default) | 99.065% | 99.105% | 96.00% | 42/999 |
+| GreedyOneTax | 98.989% | 99.010% | 95.99% | 42/999 |
 | PureOneTax | 97.450% | 97.222% | 80.95% | 25/999 |
 | MaxTurn+ | 94.685% | 95.069% | 91.89% | 22/999 |
 | MaxTurn | 90.294% | 90.554% | 86.12% | 14/999 |
@@ -77,22 +77,23 @@ games where it found an optimal score.
 All seven reproduce the n ≤ 128 published table exactly on the three
 columns it shares (`OneTax`, `MaxTurn+`, `MaxTurn`).
 
+The table's fourth strategy column, `CycleBreak`, is not in this program.
+It is the heuristic of the Franklin–Moniot paper: take a maximum-weight
+matching and break its alternating cycles by removing edges (an
+approximate feedback-arc-set problem).  A maximum-weight matching need
+not be unique, so `CycleBreak` scores are implementation-dependent — the
+published column comes from a Mathematica implementation, and Moniot's
+C++/Boost implementation gives a different set of scores.
+
 ## Relationship to `heuristics/`
 
 [`heuristics/`](../heuristics) contains independent Python
 reimplementations of two of these strategies, used as comparison baselines
-for that project's own strategies.  Verified over n = 1..1000 against this
-program:
+for that project's own strategies.  Verified over n = 2..2000 against this
+program, all 1999 games each:
 
-* `strategies/maxturn.py` matches `MaxTurn` on all 1000 games.
-* `strategies/onetax.py` with `refined=False` matches `PureOneTax` on all
-  1000 games.
-* `strategies/onetax.py` with `refined=True` **diverges** from `OneTax`,
-  first at n = 128, on 313 of 1000 games.
-
-The divergence is a difference in the refinement rule, and the two
-sources disagree about which rule is intended: the prose description in
-`playtaxman.cpp` (lines 53–56) requires the rescued multiple to have no
-other active multiple of its own, which `strategies/onetax.py` implements
-and `takeOneTax` does not.  `takeOneTax` also takes the smallest
-qualifying multiple where the Python takes the largest.
+* `strategies/maxturn.py` matches `MaxTurn`
+  ([`results/maxturn_2000.json`](../heuristics/results/maxturn_2000.json)).
+* `strategies/onetax.py` with `refined=False` matches `PureOneTax`.
+* `strategies/onetax.py` with `refined=True` matches `OneTax`
+  ([`results/onetax_2000.json`](../heuristics/results/onetax_2000.json)).
