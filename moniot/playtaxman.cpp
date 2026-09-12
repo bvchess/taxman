@@ -20,9 +20,12 @@
 #include <sstream>
 #include <string>
 #include <algorithm>
+#include <cstdlib>
 #include <climits>
 #include <strings.h>
 using namespace std;
+
+#define MAX_SANE_N 40000  // prevent overflow in n(n+1) and excess alloc req
 
 // Supported heuristics for playing Taxman
 typedef enum {
@@ -236,13 +239,13 @@ void usage(char *path, int exit_status) {
   cout << "     -p | --print=FORMAT: print output in given format" << endl;
   cout << "     -s | --score: print score" << endl;
   cout << " HEURISTIC can be one of: (case insensitive)" << endl;
-  for ( int h = 0; h < heuristicList.size(); h++ ) {
+  for ( size_t h = 0; h < heuristicList.size(); h++ ) {
     cout << "   " << heuristicList.at(h).name;
     if ( h == defaultHeuristic ) cout << " (default)";
     cout << endl;
   }
   cout << " FORMAT can be one of: (case insensitive)" << endl;
-  for ( int pf = 0; pf < printFormatList.size(); pf++ ) {
+  for ( size_t pf = 0; pf < printFormatList.size(); pf++ ) {
     cout << "   " << printFormatList.at(pf).name << ": " << printFormatList.at(pf).desc;
     if ( pf == defaultPrintFormat ) cout << " (default)";
     cout << endl;
@@ -261,6 +264,16 @@ void inputError(void) {
   exit(EXIT_FAILURE);
 }
 
+
+// This routine makes sure the input value of N is valid. MAX_SANE_N should
+// ensure that the calculation n*(n=1) is < max int.  For 32-bit signed
+// ints that is about 65000.
+void validate_n(int n) {
+  if ( n < 1 || n > MAX_SANE_N ) {
+    cout << "Require 1 <= N <= " << MAX_SANE_N << endl;
+    exit(EXIT_FAILURE);
+  }
+}
 
 // Functions used by several heuristics
 
@@ -677,7 +690,7 @@ int main( int argc, char *argv[] ) {
     {NULL,0,NULL,0},
   };
 
-  char opt_char;
+  int opt_char;
 
   while ((opt_char=getopt_long(argc, argv, "?dfh:mp:s", options, NULL)) != -1) {
     bool heuristicFound = false;   // for -h option error checking
@@ -703,7 +716,7 @@ int main( int argc, char *argv[] ) {
       default_output = false;
       break;
     case 'h':
-      for ( int h = 0; h < heuristicList.size(); h++ ) {
+      for ( size_t h = 0; h < heuristicList.size(); h++ ) {
 	if (strcasecmp(optarg,heuristicList.at(h).name) == 0) {
 	  heuristicFound = true;
 	  heuristic = heuristicList.at(h).id;
@@ -716,7 +729,7 @@ int main( int argc, char *argv[] ) {
       }
       break;
     case 'p':
-      for ( int pf = 0; pf < printFormatList.size(); pf++ ) {
+      for ( size_t pf = 0; pf < printFormatList.size(); pf++ ) {
 	if (strcasecmp(optarg,printFormatList.at(pf).name) == 0) {
 	  printFormatFound = true;
 	  printFormat = printFormatList.at(pf).id;
@@ -770,11 +783,13 @@ int main( int argc, char *argv[] ) {
     inputError();
     exit(1);
   }
+  validate_n(min_n);
   nvalues.push_back(min_n);
   while ( input_ss >> sep ) {
     if( !(input_ss >> max_n) ) {
       inputError();
-    }
+    } 
+    validate_n(max_n);
     switch( sep ) {
     case '-':			// minN-maxN range
       if ( max_n < min_n ) {

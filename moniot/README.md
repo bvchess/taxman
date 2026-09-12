@@ -36,7 +36,8 @@ Requires a C++17 compiler.  There is no dependency beyond POSIX
 ```
 
 The board size is read from stdin — a single `N`, a range `minN-maxN`, a
-list `N1,N2,...`, or a combination.
+list `N1,N2,...`, or a combination.  Every value must satisfy
+1 ≤ N ≤ 40000.
 
 | option | effect |
 |---|---|
