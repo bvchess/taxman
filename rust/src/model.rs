@@ -1002,10 +1002,23 @@ impl Model {
     /// the moves of the current core: with fewer members promoted the frame has fewer moves and more factors,
     /// so a core it has is a set of moves that is stuck (each live factor shared within the set) with the
     /// current members too, and the current core contains every such set.  Of the frames that fail, the one
-    /// giving the smallest conflict is used.
+    /// giving the smallest conflict is used (the first of them, if several are as small).
     pub fn conflict_using<const W: usize>(
         &self,
         scratch: &mut Scratch<W>,
+        state: &FrameSet<W>,
+        set: &Bits<W>,
+        minimal: bool,
+    ) -> Option<Bits<W>> {
+        self.conflict_cached(scratch, None, state, set, minimal)
+    }
+
+    /// [`conflict_using`](Self::conflict_using), with the frames' answers kept in `cache` (if given) and reused
+    /// when a frame and its edits are the same as last time: the same answer, often without peeling.
+    pub fn conflict_cached<const W: usize>(
+        &self,
+        scratch: &mut Scratch<W>,
+        mut cache: Option<&mut ConflictCache<W>>,
         state: &FrameSet<W>,
         set: &Bits<W>,
         minimal: bool,
@@ -1014,9 +1027,48 @@ impl Model {
         if let Some(x) = not_a_factor {
             return Some(Bits::EMPTY.with(x));
         }
+        let mut best: Option<Bits<W>> = None;
+        for (i, frame) in state.frames().iter().enumerate() {
+            let (gained, lost) = (edits.gained[i], edits.lost[i]);
+            if gained.is_empty() && lost.is_empty() {
+                continue;
+            }
+            let key = FrameEdits { moves: frame.moves, factors: frame.factors, gained, lost, minimal };
+            let conflict = match cache.as_deref_mut() {
+                Some(cache) => match cache.entries[i].as_ref().filter(|e| e.0 == key) {
+                    Some(&(_, answer)) => answer,
+                    None => {
+                        let answer = self.frame_conflict(scratch, frame, &gained, &lost, minimal);
+                        cache.entries[i] = Some((key, answer));
+                        answer
+                    }
+                },
+                None => self.frame_conflict(scratch, frame, &gained, &lost, minimal),
+            };
+            let Some(conflict) = conflict else { continue };
+            if best.is_none_or(|b| conflict.len() < b.len()) {
+                best = Some(conflict);
+                if conflict.len() == 1 {
+                    break; // none can be smaller
+                }
+            }
+        }
+        best
+    }
+
+    /// The conflict of [`conflict_using`](Self::conflict_using) for one frame with `gained` promoted into it and
+    /// `lost` promoted out of it: `None` if it stays winnable.
+    fn frame_conflict<const W: usize>(
+        &self,
+        scratch: &mut Scratch<W>,
+        frame: &Frame<W>,
+        gained: &Bits<W>,
+        lost: &Bits<W>,
+        minimal: bool,
+    ) -> Option<Bits<W>> {
         let g = &self.graph;
-        // The factors of `frame` that the moves of `core` can pay with, live or promoted out.
-        let near = |frame: &Frame<W>, core: &Bits<W>| -> Bits<W> {
+        // The factors of the frame that the moves of `core` can pay with, live or promoted out.
+        let near = |core: &Bits<W>| -> Bits<W> {
             let mut out = Bits::EMPTY;
             for m in core.iter() {
                 for &q in g.factors(m) {
@@ -1025,40 +1077,30 @@ impl Model {
             }
             out & frame.factors
         };
-        let mut best: Option<Bits<W>> = None;
-        for (i, frame) in state.frames().iter().enumerate() {
-            let (gained, lost) = (edits.gained[i], edits.lost[i]);
-            if gained.is_empty() && lost.is_empty() {
-                continue;
-            }
-            let mut core = scratch.stuck(&(frame.moves | gained), &(frame.factors - lost), g);
-            if core.is_empty() {
-                continue;
-            }
-            let mut factors = near(frame, &core);
-            let mut conflict = (gained & core) | (lost & factors);
-            if minimal {
-                let members = conflict;
-                for x in members.iter() {
-                    if !conflict.contains(x) {
-                        continue;
-                    }
-                    let fewer = conflict.without(x);
-                    let moves = (core & frame.moves) | (fewer & gained);
-                    let left = scratch.stuck(&moves, &(factors - (fewer & lost)), g);
-                    if !left.is_empty() {
-                        core = left;
-                        factors = near(frame, &core);
-                        conflict = fewer & ((gained & core) | (lost & factors));
-                    }
+        let mut core = scratch.stuck(&(frame.moves | *gained), &(frame.factors - *lost), g);
+        if core.is_empty() {
+            return None;
+        }
+        let mut factors = near(&core);
+        let mut conflict = (*gained & core) | (*lost & factors);
+        if minimal {
+            let members = conflict;
+            for x in members.iter() {
+                if !conflict.contains(x) {
+                    continue;
+                }
+                let fewer = conflict.without(x);
+                let moves = (core & frame.moves) | (fewer & *gained);
+                let left = scratch.stuck(&moves, &(factors - (fewer & *lost)), g);
+                if !left.is_empty() {
+                    core = left;
+                    factors = near(&core);
+                    conflict = fewer & ((*gained & core) | (*lost & factors));
                 }
             }
-            debug_assert!(!conflict.is_empty(), "the frames of a state are winnable");
-            if best.is_none_or(|b| conflict.len() < b.len()) {
-                best = Some(conflict);
-            }
         }
-        best
+        debug_assert!(!conflict.is_empty(), "the frames of a state are winnable");
+        Some(conflict)
     }
 
     /// Whether every frame of `state` stays winnable with `edits` applied.
@@ -1086,6 +1128,29 @@ impl Model {
         }
         reduce_from(&mut frame.moves, &mut frame.factors, pending, g);
         frame.freedoms -= (gained.len() + lost.len()) as i32;
+    }
+}
+
+/// One frame with promotions into and out of it, and the kind of conflict asked for: the key of a
+/// [`ConflictCache`] entry.
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct FrameEdits<const W: usize> {
+    moves: Bits<W>,
+    factors: Bits<W>,
+    gained: Bits<W>,
+    lost: Bits<W>,
+    minimal: bool,
+}
+
+/// The last answer [`Model::conflict_cached`] found for each frame, to reuse when the frame and its edits are the
+/// same: along a search, consecutive heaviest matchings mostly promote the same numbers in most frames.
+pub struct ConflictCache<const W: usize> {
+    entries: [Option<(FrameEdits<W>, Option<Bits<W>>)>; MAX_FRAMES],
+}
+
+impl<const W: usize> Default for ConflictCache<W> {
+    fn default() -> Self {
+        ConflictCache { entries: [None; MAX_FRAMES] }
     }
 }
 

@@ -41,7 +41,7 @@ use crate::bits::Bits;
 use crate::bounds::{self, max_additional, Bounds, Preclusions, RunnerUp};
 use crate::engine::{self, Counters, Ctx, EngineConfig, Poll, Searcher, Start, Stats, Unit};
 use crate::matchbound::{MatchBound, MatchGraph};
-use crate::model::{FrameSet, Model, Scratch};
+use crate::model::{ConflictCache, FrameSet, Model, Scratch};
 use crate::numtheory::Tables;
 use std::io;
 use std::path::Path;
@@ -126,6 +126,9 @@ impl SearchTactics {
     }
 
     fn from_bits(bits: u16) -> Result<Self, String> {
+        if bits >> 9 != 0 {
+            return Err(format!("unknown tactics {bits:#x}"));
+        }
         let branching = match bits >> 7 & 3 {
             0 => Branching::Largest,
             1 => Branching::ConflictSmallest,
@@ -248,6 +251,7 @@ struct Refiner<'r, 'g, const W: usize> {
     need: u64,
     /// Conflicts of `state` (or of states above it).
     known: &'r mut Vec<Bits<W>>,
+    cache: &'r mut ConflictCache<W>,
     /// Matching evaluations made.
     evaluations: u64,
     /// Conflicts computed (not found in `known`).
@@ -313,7 +317,7 @@ impl<const W: usize> Refiner<'_, '_, W> {
     /// depends on how the search got to the node, which work units do not record, and a single-threaded search
     /// explores the same tree however often it is interrupted.
     fn fresh_conflict(&mut self, promoted: &Bits<W>) -> Option<Bits<W>> {
-        let k = self.model.conflict_using(self.scratch, self.state, promoted, true)?;
+        let k = self.model.conflict_cached(self.scratch, Some(self.cache), self.state, promoted, true)?;
         self.computed += 1;
         self.known.push(k);
         Some(k)
@@ -626,6 +630,8 @@ pub struct TaxSearcher<'a, const W: usize> {
     /// Conflicts known for the node being worked on (see [`Refiner`]); `levels[d].known_end` of them hold for
     /// the node at depth `d`.
     known: Vec<Bits<W>>,
+    /// The frames' last conflicts (see [`ConflictCache`]).
+    conflict_cache: ConflictCache<W>,
     payload: Vec<u8>,
     probe: Option<Probe<'a>>,
 }
@@ -642,6 +648,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             children: 0,
             counts: RefineCounts::default(),
             known: Vec::new(),
+            conflict_cache: ConflictCache::default(),
             payload: Vec::with_capacity(8 * W),
             probe: space.diagnostics.map(|shared| Probe { shared, local: Diagnostics::default() }),
         }
@@ -658,6 +665,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         space: &SearchSpace<'a, W>,
         scratch: &mut Scratch<W>,
         known: &mut Vec<Bits<W>>,
+        cache: &mut ConflictCache<W>,
         state: &FrameSet<W>,
         need: u64,
         want_conflict: bool,
@@ -675,7 +683,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             return MatchCheck::Open(None);
         }
         let exact = Bits::EMPTY;
-        let mut refiner = Refiner { m, model, scratch, state, need, known, evaluations: 0, computed: 0, exact };
+        let mut refiner = Refiner { m, model, scratch, state, need, known, cache, evaluations: 0, computed: 0, exact };
         let verdict = refiner.top(depth, want_conflict);
         counts.refinements += 1;
         counts.evaluations += refiner.evaluations;
@@ -771,6 +779,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 space,
                 scratch,
                 known,
+                &mut self.conflict_cache,
                 &node.state,
                 need,
                 branching != Branching::Largest,
@@ -844,11 +853,21 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             if let Some(m) = matching {
                 m.push(n, &cands);
             }
-            let (scratch, known) = (bounds.scratch(), &mut self.known);
+            let (scratch, known, cache) = (bounds.scratch(), &mut self.known, &mut self.conflict_cache);
             let mut found = Bits::EMPTY;
             let state = &child.state;
-            let check =
-                Self::matching_check(matching, &mut self.counts, space, scratch, known, state, need, false, &mut found);
+            let check = Self::matching_check(
+                matching,
+                &mut self.counts,
+                space,
+                scratch,
+                known,
+                cache,
+                state,
+                need,
+                false,
+                &mut found,
+            );
             if !found.is_empty() {
                 Self::offer(space, &mut self.payload, ctx, &(child.promoted | found));
             }
@@ -1406,6 +1425,7 @@ mod tests {
         for _path in 0..6 {
             let (mut state, mut promoted, mut cands) = (root, Bits::<W>::EMPTY, all);
             let mut known = Vec::new();
+            let mut cache = ConflictCache::default();
             loop {
                 let max_add = max_additional(max_total, &state, &promoted, &cands);
                 let truth = best_completion(&model, &state, &cands, max_add);
@@ -1421,6 +1441,7 @@ mod tests {
                             state: &state,
                             need,
                             known: &mut known,
+                            cache: &mut cache,
                             evaluations: 0,
                             computed: 0,
                             exact: Bits::EMPTY,
@@ -1501,6 +1522,7 @@ mod tests {
             SearchTactics { branching: Branching::Largest, match_refine: 0, ..default },
             SearchTactics { branching: Branching::ConflictSmallest, match_refine: 0, ..default },
             SearchTactics { branching: Branching::ConflictLargest, match_refine: 2, ..default },
+            SearchTactics { branching: Branching::ConflictLargest, ..default },
             SearchTactics { branching: Branching::Largest, match_refine: 3, ..default },
         ];
         variants.iter().map(|&t| (t, search_checked(&prepare_golden::<W>(g, t), 1, "tactics").sum)).collect()
