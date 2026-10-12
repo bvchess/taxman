@@ -121,8 +121,8 @@ dependencies.  Modules:
 | `matchbound` | the matching bound (see "Improvements queued after parity"): `match_bound`, a min-cost-flow reference; `MatchGraph` (the root's graph) and `MatchBound` (an optimal matching and its potentials per level of the DFS path, repaired incrementally) |
 | `engine` | problem-independent parallel depth-first branch-and-bound driver: work units, shared deque with disk spill, incumbent, yielding/splitting, checkpoint and resume, progress reporting, statistics |
 | `search` | the Taxman searcher (port of `BranchExplorer`) implementing the engine's `Searcher` trait; `prepare` (preclusions, greedy, `revise_freedoms`) and `search` (seed, cap, checkpoint and resume) |
-| `solver` | per-game pipeline: prime shortcut → reuse_prev → search setup → search → `Apiary(board, promotions)` solution → replay → compare with optimal.json → record |
-| `main.rs` | CLI |
+| `solver` | `Tactics` (every switch above, by name), `SolveOptions`, `solve_game` (the per-game pipeline below) and `solve_range` (a range of games, resumable through a results file) |
+| `main.rs`, `cli.rs`, `commands.rs` | CLI: `solve`, `regress`, `bench`, `verify-optimal`, `tables` (`taxman help` lists the options) |
 
 Width dispatch: everything that holds sets of game numbers is generic over
 `const W: usize`; the CLI picks `W ∈ {8, 16, 32, 64}` from n (n ≤ 511, 1023,
@@ -217,20 +217,36 @@ the incumbent value), `offer(value, payload) -> bool`, and a per-worker
 
 1. Board tables for n.
 2. If `prime_shortcut` and n is prime and the n−1 solution is known: replace
-   its first move with n.
-3. Else if `reuse_prev`: port of `FrameSolver.reusePrev`.
-4. Else search: hives → frames → columns → `FrameSet`; preclusions;
+   its first move with n (method `prime`).
+3. Hives → frames.  With no promotion candidates the game with no promotions
+   is the only one (method `trivial`).
+4. Else if `reuse_prev`: port of `FrameSolver.reusePrev` (method `reuse`).
+5. Else search (method `search`): columns → `FrameSet`; preclusions;
    greedy; `revise_freedoms` (which can run a nested two-frame search through
    the same engine); `max_total`; seed incumbent; run the engine.
-5. Solution = `Apiary(board, promotions)` moves in hive order; replay to check
+6. Solution = `Apiary(board, promotions)` moves in hive order; replay to check
    legality; compare the score with optimal.json when n is there (mismatch
    is a hard error).
-6. Append one JSON line to the results file: n, score, moves, promotions,
-   method (prime / reuse / search), nodes, seconds per phase, tactics.
+7. Append one JSON line to the results file: n, score, moves, promotions,
+   method, completed, nodes, search counters, seconds per phase, tactics (and
+   which unproven ones were on), whether the score matched optimal.json.
+
+Steps 2 and 4 are skipped by `force_search`, and when the game has a
+checkpoint (a search that was interrupted is resumed, never replaced by a
+derivation).  A checkpoint is `<dir>/n<NNNN>.ckpt`; resuming one made for
+another game, width or search tactics is refused rather than restarted.  A
+search stopped by a time or node limit gives an incomplete result (`completed`
+false, the best game so far) and keeps its checkpoint; a range stops there.
 
 Range runs feed each game's solution to the next and resume from the
-results file.  The n−1 solution comes from, in order: this run, the results
-file, optimal.json.
+results file (games completed in it are skipped; each result is appended and
+synced as soon as it is done).  The n−1 solution comes from, in order: this
+run, the results file, optimal.json.
+
+`taxman bench` also appends one JSON line per run to `bench/history.jsonl`
+(commit, whether the sources were modified, threads, tactics, and per game
+the nodes, seconds per phase and search counters), so that performance can be
+followed across changes.
 
 ## Improvements queued after parity
 

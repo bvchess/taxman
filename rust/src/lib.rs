@@ -12,3 +12,4 @@ pub mod matchbound;
 pub mod model;
 pub mod numtheory;
 pub mod search;
+pub mod solver;
