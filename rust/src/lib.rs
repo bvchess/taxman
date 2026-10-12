@@ -3,6 +3,7 @@
 pub mod accelerate;
 pub mod bits;
 pub mod bounds;
+pub mod brute;
 pub mod engine;
 pub mod frames;
 pub mod game;
@@ -11,5 +12,6 @@ pub mod json;
 pub mod matchbound;
 pub mod model;
 pub mod numtheory;
+pub mod sacrifice;
 pub mod search;
 pub mod solver;

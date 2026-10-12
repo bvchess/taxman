@@ -1,5 +1,5 @@
-//! Number-theory tables for a board `1..=n`: smallest prime factors, divisors, and the *maximal*
-//! factors and composites that the frame model is built on.
+//! Number-theory tables for a board `1..=n` (or one with holes, [`Tables::punctured`]): smallest prime
+//! factors, divisors, and the *maximal* factors and composites that the frame model is built on.
 //!
 //! The *maximal factors* of `c` are `c/p` for each distinct prime `p` dividing `c` (so the maximal
 //! factors of a prime are `{1}`, and `1` has none).  The *maximal composites* of `c` are `c·p ≤ n` for
@@ -18,6 +18,9 @@ pub struct Tables {
     pub max_composites: Vec<Vec<u32>>,
     /// All divisors of `k`, including 1 and `k`.
     pub divisors: Vec<Vec<u32>>,
+    /// The numbers taken off the board, ascending (see [`Tables::punctured`]); empty for the board `1..=n`.  The
+    /// lists above are arithmetic and include them.
+    pub holes: Vec<u32>,
     primes: Vec<u32>,
 }
 
@@ -73,7 +76,28 @@ impl Tables {
             }
         }
 
-        Tables { n, spf, max_factors, max_composites, divisors, primes }
+        Tables { n, spf, max_factors, max_composites, divisors, holes: Vec::new(), primes }
+    }
+
+    /// The tables of the board `1..=n` with the numbers in `holes` taken off it.  A hole is never in the pot, so
+    /// it is never a move and never pays tax.  The lists stay arithmetic (they still mention the holes): the
+    /// hives ([`crate::hives::Apiary`]) leave the holes out, and the search only ever looks at the numbers of
+    /// its frames.  A number whose maximal factor is a hole does *not* pay with the hole's factors instead, so
+    /// on a punctured board the frame model plays the maximal-factor rule (see [`crate::sacrifice`]).
+    pub fn punctured(n: u32, holes: &[u32]) -> Self {
+        let mut t = Tables::new(n);
+        let mut holes = holes.to_vec();
+        holes.sort_unstable();
+        holes.dedup();
+        assert!(holes.iter().all(|h| (1..=n).contains(h)), "holes {holes:?} are not all on the board 1..={n}");
+        t.holes = holes;
+        t
+    }
+
+    /// Whether `k` has been taken off the board.
+    #[inline]
+    pub fn is_hole(&self, k: u32) -> bool {
+        !self.holes.is_empty() && self.holes.binary_search(&k).is_ok()
     }
 
     /// Whether `k` is prime.  Requires `k <= n`.

@@ -39,6 +39,50 @@ pub fn replay(n: u32, moves: &[u32]) -> Result<u64, String> {
     Ok(score)
 }
 
+/// Plays `moves` on the board `1..=n` without `holes` under the *maximal-factor rule*, and returns the score.
+///
+/// A hole is never in the pot.  A move is legal if it is still in the pot and one of its maximal factors (`m/p`
+/// for a prime `p | m`) is still in the pot; it removes the number and all of its divisors.  On the board `1..=n`
+/// this is the same game as [`replay`]'s (a divisor in the pot lies below a maximal factor in the pot).  On a
+/// punctured board it is stricter: a move whose maximal factor is a hole may not pay with a divisor of the hole.
+/// It is the game the frame model plays on a punctured board ([`crate::sacrifice`]).  Like [`replay`], it uses
+/// only divisibility.
+pub fn replay_punctured(n: u32, holes: &[u32], moves: &[u32]) -> Result<u64, String> {
+    let mut in_pot = vec![true; n as usize + 1];
+    in_pot[0] = false;
+    for &h in holes {
+        if (1..=n).contains(&h) {
+            in_pot[h as usize] = false;
+        }
+    }
+    let mut score = 0u64;
+    for (i, &m) in moves.iter().enumerate() {
+        let turn = i + 1;
+        if m < 1 || m > n {
+            return Err(format!("move {turn} ({m}): not on the board 1..={n}"));
+        }
+        if !in_pot[m as usize] {
+            let why = if holes.contains(&m) { "a hole" } else { "already taken" };
+            return Err(format!("move {turn} ({m}): {why}"));
+        }
+        let pays_tax = (2..=m).filter(|&p| m % p == 0 && is_prime(p)).any(|p| in_pot[(m / p) as usize]);
+        if !pays_tax {
+            return Err(format!("move {turn} ({m}): no maximal factor left in the pot, so it pays no tax"));
+        }
+        for d in (1..m).filter(|d| m % d == 0) {
+            in_pot[d as usize] = false;
+        }
+        in_pot[m as usize] = false;
+        score += u64::from(m);
+    }
+    Ok(score)
+}
+
+/// Trial division.
+fn is_prime(p: u32) -> bool {
+    p >= 2 && (2..).take_while(|q| q * q <= p).all(|q| !p.is_multiple_of(q))
+}
+
 /// Sanity bound on `n` when reading a results file, so a corrupt file cannot request a huge allocation.
 const MAX_PLAUSIBLE_N: u32 = 1 << 20;
 

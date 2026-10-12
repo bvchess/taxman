@@ -87,7 +87,7 @@ and values for them.
 
 | tactic | default | status | effect |
 |---|---|---|---|
-| `prime_shortcut` | on | proven | prime n: replace the n−1 solution's first move with n |
+| `prime_shortcut` | on | proven (model-free, given an optimal n−1 game: see `sacrifice`) | prime n: replace the n−1 solution's first move with n |
 | `reuse_prev` | on | unproven (conjecture-grade "upper-delta" certificate) | `FrameSolver.reusePrev`; accepts a derived solution without search |
 | `revise_freedoms` | on | unproven ("max-sum promotion set also has max count") | `UpperBoundEstimator.reviseFreedoms`; can shrink frame 0's freedoms |
 | `preclusions` | off | sound (promotion failure is monotone: more moves or fewer factors never make a frame winnable) | depth-2 preclusion table; prunes candidates (off since 2026-10: with nogoods it no longer pays for its setup) |
@@ -122,7 +122,7 @@ dependencies.  Modules:
 | module | contents |
 |---|---|
 | `bits` | `Bits<const W: usize>`: fixed-width bitset over `[u64; W]`, `Copy`, no heap; capacity `64·W − 1`.  Set ops, popcount, sum, min/max, ascending and descending iteration, `nth_largest`, `largest(k)`, `next_below(x)`, `is_subset`, hashing. |
-| `numtheory` | smallest-prime-factor sieve; for 1..=n: maximal factors (n/p for each prime p dividing n; {1} for primes; {} for 1) and maximal composites (k·p ≤ n), as `Vec<Vec<u32>>` and as bitsets; all divisors; prime test |
+| `numtheory` | smallest-prime-factor sieve; for 1..=n: maximal factors (n/p for each prime p dividing n; {1} for primes; {} for 1) and maximal composites (k·p ≤ n), as `Vec<Vec<u32>>` and as bitsets; all divisors; prime test; optionally *holes*, numbers taken off the board (`Tables::punctured`, for the sacrifice study; the hives leave them out) |
 | `json` | minimal JSON reader/writer (enough for optimal.json, golden data, results, checkpoints' headers) |
 | `game` | `replay(n, moves) -> Result<score>`: independent legality check (each move on the board, pays ≥ 1 tax, takes all divisors still present); optimal.json loader |
 | `hives` | port of `Apiary`/`Hive`/`Namer`-free equivalent: hive formation with `treat_as_sources`, unzip, removeImpossible, finishSetup propagation, merge, promotion candidates, per-hive solution, apiary solution order |
@@ -135,6 +135,8 @@ dependencies.  Modules:
 | `search` | the Taxman searcher (port of `BranchExplorer`) implementing the engine's `Searcher` trait; `prepare` (preclusions, greedy, `revise_freedoms`) and `search` (seed, cap, checkpoint and resume); `Refiner` (conflicts of the heaviest matching: exactness, refinement, branching); the starting incumbent's `dive` and local search (`Neighbourhood`); `search_with` and `Diagnostics` for measurements |
 | `examples/ladder.rs` | the ladder harness: standalone searches of hard games from the frame builder with a time limit (see Performance) |
 | `solver` | `Tactics` (every tactic above, by name and value), `SolveOptions`, `solve_game` (the per-game pipeline below) and `solve_range` (a range of games, resumable through a results file) |
+| `brute` | exact Taxman on boards up to 127 with holes, by memoized search over pot states (no frame model), under the rules or the maximal-factor rule |
+| `sacrifice` | study, not used by the solver: the proven bound opt(n) ≤ max(opt(n−1), n + max over maximal factors f of n of opt_M({1..n−1} ∖ {f})), the punctured games it needs (frame model on a board with a hole), and what it was measured to be worth (`examples/sacrifice.rs`) |
 | `main.rs`, `cli.rs`, `commands.rs` | CLI: `solve`, `regress`, `bench`, `verify-optimal`, `tables` (`taxman help` lists the options) |
 
 Width dispatch: everything that holds sets of game numbers is generic over
