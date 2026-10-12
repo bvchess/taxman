@@ -856,9 +856,17 @@ impl<'g, const W: usize> MatchBound<'g, W> {
     /// Pushes the child of the top level made by promoting `n` (which must succeed in the search's state), with
     /// the candidates `child_cands` (a subset of the top level's).  See the type's docs.
     pub fn push(&mut self, n: u32, child_cands: &Bits<W>) {
+        self.push_all(&Bits::EMPTY.with(n), child_cands);
+    }
+
+    /// [`push`](Self::push) for the child made by promoting every member of `promoted` (each of them a candidate
+    /// of the top level, or removed from them since its last evaluation).
+    pub fn push_all(&mut self, promoted: &Bits<W>, child_cands: &Bits<W>) {
         let graph = self.graph;
         let child = self.push_copy();
-        child.promote(graph, n);
+        for n in promoted.iter() {
+            child.promote(graph, n);
+        }
         child.dropped |= child.cands - *child_cands;
     }
 
@@ -1169,13 +1177,33 @@ mod tests {
                     mb.keep_excluded();
                 }
                 if self.rng.chance(40) {
-                    if let Some(next) = self.model.promote(state, n) {
-                        let next_promoted = promoted.with(n);
+                    if let Some(mut next) = self.model.promote(state, n) {
+                        let mut next_promoted = promoted.with(n);
                         let max_next = max_additional(self.max_total, &next, &next_promoted, &cands);
-                        let child =
+                        let mut child =
                             new_candidate_list(self.model, self.preclusions, n, max_next, &next, &cands, &promoted);
+                        // Sometimes the child promotes another candidate too, as the search's forced ones.
+                        let mut added = Bits::EMPTY.with(n);
+                        if let Some(m) = child.max().filter(|_| self.rng.chance(30)) {
+                            if self.model.promote_in_place(&mut next, m) {
+                                child.remove(m);
+                                let before = next_promoted;
+                                next_promoted.insert(m);
+                                added.insert(m);
+                                let max_next = max_additional(self.max_total, &next, &next_promoted, &child);
+                                child = new_candidate_list(
+                                    self.model,
+                                    self.preclusions,
+                                    m,
+                                    max_next,
+                                    &next,
+                                    &child,
+                                    &before,
+                                );
+                            }
+                        }
                         let depth = mb.depth();
-                        mb.push(n, &child);
+                        mb.push_all(&added, &child);
                         if self.rng.chance(60) {
                             self.explore(mb, &next, next_promoted, child, visit);
                         } else {

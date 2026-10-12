@@ -94,6 +94,7 @@ and values for them.
 | `match_bound` | on | sound (matchability relaxes winnability) | node bound = min(blameGame, matching relaxation), the matching one computed only when blameGame fails to prune; a heaviest matching that can be promoted is the node's best completion (offered as incumbent, node done) |
 | `branching` | `conflict-strong` | sound (any order explores every promotion set) | which candidate a node promotes next: `largest` (the Java's order), or a member of a conflict of the heaviest matching (these need `match_bound`): the smallest (`conflict-smallest`), the largest (`conflict-largest`), or the one whose removal lowers the matching bound most (`conflict-strong`) |
 | `match_refine` | 1 | sound (see `search::Refiner`) | refine the matching bound by branching on conflicts this many levels deep, where it does not prune (0 = off, at most 7; needs `match_bound`) |
+| `fix_forced` | on | sound (every completion that beats the incumbent promotes them) | with `conflict-strong` branching, the child also promotes the conflict's *forced* members: those whose removal alone brings the matching bound below what the node needs |
 | `legacy_bound` | off | unsound (the runner-up defect) | reproduce the Java bound exactly |
 | `prev_cap` | on | proven if opt(n−1) is optimal | stop as soon as the incumbent reaches n + opt(n−1) − inTheBag (`FrameSolver.getMaxPromotionSum`) |
 | `seed_incumbent` | on | sound (any feasible promotion set is a valid incumbent) | start from the better of greedy and the n−1 solution's promotions that are still feasible |
@@ -109,7 +110,7 @@ Results record the tactics they were produced with (`tactics`: the changes
 from the defaults, such as `branching=largest,match_refine=0`;
 `tactic_switches`: every tactic's value, the booleans as booleans,
 `match_refine` as a number and `branching` as its name), and whether any
-unproven tactic was on.  A checkpoint records the six search tactics and is
+unproven tactic was on.  A checkpoint records the seven search tactics and is
 refused when they differ.
 
 ## Architecture
@@ -392,6 +393,32 @@ linearly to the 8 performance cores; the 2 efficiency cores add little.
 Left to try: making the per-node conflict work cheaper (a quarter of the
 time: peeling each frame `Q*` touches), fewer matching solves per node, and
 incumbents for games like 992 whose optimum is found late.
+
+### Forced members (2026-10, second round)
+
+Measured with the ladder on one thread (deterministic node counts) with the
+frontier's tactics (`revise_freedoms=off`), seeded from n−1 (from
+`results/strict.jsonl` past 1000, `--known`), on a fast set that each finish
+in under 25 s: 880, 936, 1050 (optimum found late), 1100, 1170, 1184 (proof
+only).  Where the time went at 1184 (`sample`): peeling for conflicts 29%
+(nearly all of it minimizing them), matching repairs for refinement 18% and
+for strong branching 16%, the candidate filter's peels 16%.
+
+The tree is mostly chains: at four nodes in five the node's loop ends right
+after its first child, because removing the member that strong branching
+chose already brings the bound below what the node needs.  That member is
+*forced*: every completion that beats the incumbent promotes it.  Strong
+branching computes the bound without each member of the conflict, and at
+1184 more than one member was forced at 54% of the nodes (two at 16%, three
+at 10%, four or more at 28%).  Before, the child promoted one of them and
+found the others again, one level each, further down.
+
+* **Forced members** (tactic `fix_forced`, sound).  The child promotes every
+  forced member of the conflict, not only the chosen one: the child's
+  completions are some of the node's, so those that beat the incumbent
+  promote them all, and if one cannot be promoted any more (or the child's
+  candidate filter dropped it) the child has no such completion at all.
+  Nodes −31% (880) to −60% (1170), time −21% to −36%.
 
 ## Testing
 

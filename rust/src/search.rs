@@ -25,8 +25,11 @@
 //! loop breaks then too.  The upper bound is `blameGame`'s and, with the `match_bound` tactic, the matching
 //! bound ([`crate::matchbound`]), possibly refined by conflicts (see [`Refiner`]).  When the heaviest matching
 //! can itself be promoted, it is the node's best completion: it is offered as the incumbent and the node is
-//! done.  The search starts from the best of the greedy set, the seed, and a rounding of the root's matching
-//! ([`dive`]), improved by a local search ([`Neighbourhood::improve`]).
+//! done.  With conflict branching the candidate `n` is a member of a conflict of the heaviest matching; with
+//! the `fix_forced` tactic the child also promotes the members of that conflict that every completion beating
+//! the incumbent must promote (see [`strongest`]).  The search starts from the best of the greedy set, the
+//! seed, and a rounding of the root's matching ([`dive`]), improved by a local search
+//! ([`Neighbourhood::improve`]).
 //!
 //! Two exact shortcuts keep the expensive bound out of the way: the bound never exceeds the sum of the
 //! `max_add` largest candidates, so when that sum already decides the comparison the bound is not computed;
@@ -72,6 +75,10 @@ pub struct SearchTactics {
     pub match_refine: u8,
     /// Which candidate a node branches on next (sound: any order explores every promotion set).
     pub branching: Branching,
+    /// With `branching = conflict-strong`: a child also promotes the node's other *forced* candidates, the
+    /// members of the conflict whose removal alone brings the matching bound below what the node needs (sound:
+    /// every completion that can beat the incumbent promotes them; see [`strongest`]).
+    pub fix_forced: bool,
 }
 
 /// Which candidate a node's loop promotes next (tactic `branching`).  The child promotes it, and the node goes on
@@ -128,6 +135,7 @@ impl Default for SearchTactics {
             match_bound: true,
             match_refine: 1,
             branching: Branching::default(),
+            fix_forced: true,
         }
     }
 }
@@ -145,6 +153,9 @@ impl SearchTactics {
         }
     }
 
+    /// The tactics as the header of a checkpoint records them.  Tactics added later are recorded by the bits of
+    /// their non-default values (`fix_forced` by bit 9 when it is off), so that a checkpoint made before they
+    /// existed reads back with their defaults: they are sound, so a search resumed with them is still correct.
     fn bits(self) -> u16 {
         let branching = match self.branching {
             Branching::Largest => 0,
@@ -158,10 +169,11 @@ impl SearchTactics {
             | u16::from(self.match_bound) << 3
             | u16::from(self.match_refine.min(Self::MAX_MATCH_REFINE)) << 4
             | branching << 7
+            | u16::from(!self.fix_forced) << 9
     }
 
     fn from_bits(bits: u16) -> Result<Self, String> {
-        if bits >> 9 != 0 {
+        if bits >> 10 != 0 {
             return Err(format!("unknown tactics {bits:#x}"));
         }
         let branching = match bits >> 7 & 3 {
@@ -177,6 +189,7 @@ impl SearchTactics {
             match_bound: bits & 8 != 0,
             match_refine: (bits >> 4 & 7) as u8,
             branching,
+            fix_forced: bits & 1 << 9 == 0,
         })
     }
 }
@@ -231,6 +244,8 @@ pub struct SearchSpace<'a, const W: usize> {
     /// How deep to refine the matching bound by conflicts (tactic `match_refine`), and how to branch.
     pub match_refine: u32,
     pub conflict_branching: Branching,
+    /// Tactic `fix_forced`.
+    pub fix_forced: bool,
     /// The cap on the number of promotions (`maxTotalPromotions`).
     pub max_total: u32,
     pub rule: RunnerUp,
@@ -414,10 +429,17 @@ impl<const W: usize> Refiner<'_, '_, W> {
 /// going on without it the likeliest to stop soon.  (The child that promotes it gains nothing to look at: the
 /// heaviest matching already promotes every member.)  `m`'s top level is the node, settled; it is left so, with
 /// the level without the chosen member kept for it (see [`MatchBound::keep_excluded`]).
-fn strongest<const W: usize>(m: &mut MatchBound<'_, W>, k: &Bits<W>) -> u32 {
+///
+/// Also returns the members whose removal brings the bound below `need`, the node's *forced* members: every
+/// completion that reaches `need` promotes them all.  The chosen member is among them unless there are none.
+fn strongest<const W: usize>(m: &mut MatchBound<'_, W>, k: &Bits<W>, need: u64) -> (u32, Bits<W>) {
     let mut best = (u64::MAX, 0);
+    let mut forced = Bits::EMPTY;
     for x in k.iter() {
         let bound = m.value_excluding(x);
+        if bound < need {
+            forced.insert(x);
+        }
         if bound <= best.0 {
             m.keep_excluded();
             best = (bound, x);
@@ -425,7 +447,7 @@ fn strongest<const W: usize>(m: &mut MatchBound<'_, W>, k: &Bits<W>) -> u32 {
             m.pop();
         }
     }
-    best.1
+    (best.1, forced)
 }
 
 /// One node on the searcher's stack.
@@ -491,8 +513,10 @@ pub mod cut {
     pub const REFINED: usize = 4;
     /// The heaviest matching can be promoted: the best completion is known (and offered as the incumbent).
     pub const EXACT: usize = 5;
-    pub const COUNT: usize = 6;
-    pub const NAMES: [&str; COUNT] = ["empty", "largest", "blame", "match", "refined", "exact"];
+    /// A forced candidate (tactic `fix_forced`) is no longer a candidate of the child or cannot be promoted.
+    pub const FORCED: usize = 6;
+    pub const COUNT: usize = 7;
+    pub const NAMES: [&str; COUNT] = ["empty", "largest", "blame", "match", "refined", "exact", "forced"];
 }
 
 /// Buckets of [`Diagnostics::gaps`]: excesses `0..GAP_BUCKETS − 1`, and the last for everything above.
@@ -884,13 +908,16 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         // The candidate to branch on: promoted in the child, and no longer a candidate of this node.
         let k = conflict.map(|k| k & node.cands).filter(|k| !k.is_empty());
         let mut kept = false; // whether the matching level without n is kept for the node
+        let mut forced = Bits::EMPTY; // members of k that every completion reaching `need` promotes
         let n = match (branching, k) {
             (Branching::ConflictSmallest, Some(k)) => k.min(),
             (Branching::ConflictLargest, Some(k)) => k.max(),
             (Branching::ConflictStrong, Some(k)) if k.len() > 1 => {
                 let m = matching.as_mut().expect("conflicts come from the matching");
                 kept = true;
-                Some(strongest(m, &k))
+                let (n, members) = strongest(m, &k, need);
+                forced = members;
+                Some(n)
             }
             (Branching::ConflictStrong, Some(k)) => k.max(),
             _ => node.cands.max(),
@@ -914,13 +941,35 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         self.promotions += 1;
         child.promoted = node.promoted.with(n);
         child.sum = node.sum + u64::from(n);
-        let max_next = max_additional(space.max_total, &child.state, &child.promoted, &node.cands);
+        let mut max_next = max_additional(space.max_total, &child.state, &child.promoted, &node.cands);
         let mut cands = bounds.new_candidate_list(n, max_next, &child.state, &node.cands, &node.promoted);
+        // Tactic `fix_forced`: the child promotes the node's other forced members too.  Every completion of the
+        // node that reaches `need` promotes them, and the child's completions are some of the node's, so the
+        // child loses nothing that matters; if one of them is no longer a candidate of the child or cannot be
+        // promoted, the child has no such completion at all.
+        if space.fix_forced {
+            for f in forced.without(n).iter_desc() {
+                let before = child.promoted;
+                if !cands.contains(f) || !space.model.promote_in_place_using(bounds.scratch(), &mut child.state, f) {
+                    if let Some(p) = probe {
+                        p.local.child_cuts[cut::FORCED] += 1;
+                    }
+                    return Some(depth);
+                }
+                self.promotions += 1;
+                cands.remove(f);
+                child.promoted.insert(f);
+                child.sum += u64::from(f);
+                max_next = max_additional(space.max_total, &child.state, &child.promoted, &cands);
+                cands = bounds.new_candidate_list(f, max_next, &child.state, &cands, &before);
+            }
+        }
+        let added = child.promoted - node.promoted;
         // A known conflict of the node (or above) that the child promotes all but one member of rules that member
         // out: the child's state is the node's with more promotions, so promoting it would promote the whole
         // conflict there.  (The heaviest matching of the node promotes n already, so without this the child's
         // matching bound would not drop at all.)
-        for k in self.known.iter().filter(|k| k.contains(n)) {
+        for k in self.known.iter().filter(|k| k.intersects(&added)) {
             let rest = *k - child.promoted;
             if rest.len() == 1 {
                 cands -= rest;
@@ -936,7 +985,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             None
         } else {
             if let Some(m) = matching {
-                m.push(n, &cands);
+                m.push_all(&added, &cands);
             }
             let (scratch, known, cache) = (bounds.scratch(), &mut self.known, &mut self.conflict_cache);
             let mut found = Bits::EMPTY;
@@ -1459,6 +1508,7 @@ pub fn search_with<const W: usize>(
         match_graph: match_graph.as_ref(),
         match_refine: u32::from(prepared.tactics.match_refine),
         conflict_branching: if prepared.tactics.match_bound { prepared.tactics.branching } else { Branching::Largest },
+        fix_forced: prepared.tactics.fix_forced,
         max_total: prepared.max_total,
         rule: prepared.tactics.rule(),
         cap,
@@ -1654,6 +1704,87 @@ mod tests {
         assert!(verdicts > 5000 && refined > 500 && exact > 500);
     }
 
+    /// Checks the forced members of strong branching (tactic `fix_forced`) along random search paths of `g`: at a
+    /// node whose heaviest matching has a conflict, every forced member is in every completion that reaches
+    /// `need` (found exhaustively), so the child that promotes all of them keeps the best completion whenever it
+    /// reaches `need`.  Returns the numbers of nodes checked and of forced members.
+    fn forced_soundness<const W: usize>(g: &Golden, rng: &mut Rng) -> [u64; 2] {
+        let (model, root) = Model::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
+        let all = Bits::<W>::from_slice(&g.candidates);
+        let max_total = root.max_promotions_among(&all).max(0) as u32;
+        let preclusions = Preclusions::build(&model, &root, &all, 2);
+        let graph = MatchGraph::new(&model, &root);
+        let mut m = MatchBound::new(&graph);
+        let mut scratch = Scratch::new();
+        let mut checks = [0; 2];
+        for _path in 0..6 {
+            let (mut state, mut promoted, mut cands) = (root, Bits::<W>::EMPTY, all);
+            loop {
+                let max_add = max_additional(max_total, &state, &promoted, &cands);
+                let truth = best_completion(&model, &state, &cands, max_add);
+                for need in [truth.saturating_sub(5), truth, truth + 1] {
+                    m.reset(&promoted, &cands);
+                    if m.value() < need {
+                        continue;
+                    }
+                    let chosen = m.chosen();
+                    let Some(k) = model.conflict_using(&mut scratch, &state, &chosen, true) else { continue };
+                    let k = k & cands;
+                    if k.len() < 2 {
+                        continue;
+                    }
+                    let (n, forced) = strongest(&mut m, &k, need);
+                    let what = format!("n={} promoted {promoted:?} cands {cands:?} need {need}", g.n);
+                    assert!(k.contains(n) && forced.is_subset(&k), "{what}: {n} {forced:?} from {k:?}");
+                    assert!(forced.is_empty() || forced.contains(n), "{what}: {n} is not among {forced:?}");
+                    for x in forced.iter() {
+                        let without = best_completion(&model, &state, &cands.without(x), max_add);
+                        assert!(without < need, "{what}: {x} is forced, but leaving it out reaches {without}");
+                    }
+                    if truth >= need && !forced.is_empty() {
+                        let next = model.promote_all_using(&mut scratch, &state, &forced);
+                        let next = next.unwrap_or_else(|| panic!("{what}: the forced {forced:?} cannot be promoted"));
+                        let rest = best_completion(&model, &next, &(cands - forced), max_add - forced.len());
+                        assert_eq!(rest + forced.sum(), truth, "{what}: promoting {forced:?} loses the best");
+                    }
+                    checks[0] += 1;
+                    checks[1] += u64::from(forced.len());
+                }
+                // Descend into a random child, as the search would (in any order).
+                let members = cands.to_vec();
+                if members.is_empty() {
+                    break;
+                }
+                let Some((n, next)) = (0..4).find_map(|_| {
+                    let n = rng.pick(&members);
+                    model.promote(&state, n).map(|s| (n, s))
+                }) else {
+                    break;
+                };
+                let rest = cands.without(n);
+                let max_next = max_additional(max_total, &next, &promoted.with(n), &rest);
+                cands = bounds::new_candidate_list(&model, Some(&preclusions), n, max_next, &next, &rest, &promoted);
+                (state, promoted) = (next, promoted.with(n));
+            }
+        }
+        checks
+    }
+
+    #[test]
+    fn forced_members_are_in_every_good_completion() {
+        let mut rng = Rng(0xF0BC_ED00_1234_5678);
+        let mut checks = [0; 2];
+        for n in golden_ns().into_iter().filter(|&n| (40..=220).contains(&n)) {
+            let more = forced_soundness::<4>(&load(n), &mut rng);
+            for (a, b) in checks.iter_mut().zip(more) {
+                *a += b;
+            }
+        }
+        let [nodes, forced] = checks;
+        eprintln!("forced members: {nodes} nodes with a conflict to branch on, {forced} forced members");
+        assert!(nodes > 500 && forced > 300);
+    }
+
     #[test]
     fn golden_games_above_400_match_the_java() {
         let games: Vec<Golden> = golden_ns().into_iter().filter(|&n| n > 400).map(load).collect();
@@ -1676,6 +1807,8 @@ mod tests {
             SearchTactics { branching: Branching::ConflictLargest, match_refine: 2, ..default },
             SearchTactics { branching: Branching::ConflictLargest, ..default },
             SearchTactics { branching: Branching::Largest, match_refine: 3, ..default },
+            SearchTactics { fix_forced: false, ..default },
+            SearchTactics { fix_forced: false, match_refine: 0, ..default },
         ];
         variants.iter().map(|&t| (t, search_checked(&prepare_golden::<W>(g, t), 1, "tactics").sum)).collect()
     }
@@ -1712,14 +1845,17 @@ mod tests {
         }
     }
 
-    fn resume_in_pieces(threads: usize) {
+    /// Searches 760 in pieces of about a sixth of its nodes each, resuming from the checkpoint, and checks the
+    /// answer.  The engine checks the node limit every 1024 nodes, so a search of fewer than 6·1024 nodes stops
+    /// less often: with one thread it must still take `min_pieces` pieces.
+    fn resume_in_pieces(threads: usize, tactics: SearchTactics, min_pieces: usize) {
         let g = load(760);
         let tables = Tables::new(g.n);
         let cands = Bits::<16>::from_slice(&g.candidates);
-        let whole = prepare::<16>(&tables, &g.columns, &cands, SearchTactics::default(), 2).unwrap();
+        let whole = prepare::<16>(&tables, &g.columns, &cands, tactics, 2).unwrap();
         let nodes = search_checked(&whole, 1, "uninterrupted").stats.nodes;
 
-        let dir = TempDir::new(&format!("resume{threads}"));
+        let dir = TempDir::new(&format!("resume{threads}-{}", tactics.bits()));
         let ckpt = dir.0.join("ckpt.bin");
         let cfg = EngineConfig {
             checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))),
@@ -1742,19 +1878,22 @@ mod tests {
         // One thread explores in depth-first order however often it is interrupted, but the conflicts a searcher
         // learns along its path are not part of a work unit, so a resumed search can prune a little differently
         // (it does not at the time of writing); several threads explore a varying number of nodes anyway.
-        assert!(pieces >= if threads == 1 { 4 } else { 2 }, "only {pieces} pieces");
+        assert!(pieces >= if threads == 1 { min_pieces } else { 2 }, "only {pieces} pieces");
         assert!(!ckpt.exists(), "a completed run deletes its checkpoint");
         assert_eq!(result.sum, golden_sum(&g));
     }
 
     #[test]
     fn checkpoint_and_resume_one_thread() {
-        resume_in_pieces(1);
+        resume_in_pieces(1, SearchTactics::default(), 3);
+        resume_in_pieces(1, SearchTactics { fix_forced: false, ..SearchTactics::default() }, 4);
     }
 
     #[test]
     fn checkpoint_and_resume_four_threads() {
-        resume_in_pieces(4);
+        // The default tactics search 760 in too few nodes for four threads to reach the node limit before the
+        // end; the Java's branching takes many more.
+        resume_in_pieces(4, SearchTactics { branching: Branching::Largest, ..SearchTactics::default() }, 2);
     }
 
     #[test]
@@ -1814,6 +1953,28 @@ mod tests {
         );
         assert!(Header::<16>::decode(&header.encode()).is_err());
         assert!(Header::<8>::decode(b"nonsense").is_err());
+
+        // Every setting of the search tactics reads back as it was written, and the default tactics of a checkpoint
+        // made before `fix_forced` existed (0x19d) read back as today's defaults.
+        let default = SearchTactics::default();
+        for refine in [0, 1, 7] {
+            for branching in Branching::ALL {
+                for (on, off) in [(true, false), (false, true)] {
+                    let t = SearchTactics {
+                        preclusions: on,
+                        legacy_bound: off,
+                        revise_freedoms: on,
+                        match_bound: off,
+                        match_refine: refine,
+                        branching,
+                        fix_forced: on,
+                    };
+                    assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
+                }
+            }
+        }
+        assert_eq!(SearchTactics::from_bits(0x19d), Ok(default));
+        assert!(SearchTactics::from_bits(1 << 10).is_err());
     }
 
     // ---- benchmark: cargo test --release bench_search -- --ignored --nocapture --test-threads=1 ----
