@@ -80,7 +80,8 @@ inside this model.
 | `prime_shortcut` | on | proven | prime n: replace the n−1 solution's first move with n |
 | `reuse_prev` | on | unproven (conjecture-grade "upper-delta" certificate) | `FrameSolver.reusePrev`; accepts a derived solution without search |
 | `revise_freedoms` | on | unproven ("max-sum promotion set also has max count") | `UpperBoundEstimator.reviseFreedoms`; can shrink frame 0's freedoms |
-| `preclusions` | on | sound given monotonicity of promotion failure | depth-2 preclusion table; prunes candidates |
+| `preclusions` | on | sound (promotion failure is monotone: more moves or fewer factors never make a frame winnable) | depth-2 preclusion table; prunes candidates |
+| `match_bound` | on | sound (matchability relaxes winnability) | node bound = min(blameGame, matching relaxation), the matching one computed only when blameGame fails to prune |
 | `legacy_bound` | off | unsound (the runner-up defect) | reproduce the Java bound exactly |
 | `prev_cap` | on | proven if opt(n−1) is optimal | stop as soon as the incumbent reaches n + opt(n−1) − inTheBag (`FrameSolver.getMaxPromotionSum`) |
 | `seed_incumbent` | on | sound (any feasible promotion set is a valid incumbent) | start from the better of greedy and the n−1 solution's promotions that are still feasible |
@@ -111,6 +112,7 @@ dependencies.  Modules:
 | `accelerate` | deriving game n from game n−1 (prime shortcut, `reusePrev`), and turning a promotion set into an ordered game |
 | `model` | the search state: `Frame`, `FrameSet` (fixed array of frames), `FactorProvider` (factor/composite lists restricted to frame numbers), `FrameMapper` (home frame of each candidate), `promote_into`, `promote_out_of`, `promote`, `can_promote`, `is_winnable` (peel), `reduce`, `narrow_candidates`, `max_promotions` |
 | `bounds` | preclusion table; `upper_bound` (blameGame + largestThatFitInFrames, sound or legacy runner-up); greedy lower bound; `revise_freedoms` |
+| `matchbound` | the matching bound (see "Improvements queued after parity"): `match_bound`, a min-cost-flow reference; `MatchGraph` (the root's graph) and `MatchBound` (an optimal matching and its potentials per level of the DFS path, repaired incrementally) |
 | `engine` | problem-independent parallel depth-first branch-and-bound driver: work units, shared deque with disk spill, incumbent, yielding/splitting, checkpoint and resume, progress reporting, statistics |
 | `search` | the Taxman searcher (port of `BranchExplorer`) implementing the engine's `Searcher` trait |
 | `solver` | per-game pipeline: prime shortcut → reuse_prev → search setup → search → `Apiary(board, promotions)` solution → replay → compare with optimal.json → record |
@@ -237,6 +239,16 @@ file, optimal.json.
   363–769.  The cardinality cap never binds.  To be used incrementally
   (re-optimized along the DFS path) and combined with the Java bound
   (take the minimum).
+  *Implemented* in module `matchbound` (not yet used by `search`): an
+  optimal matching and its dual potentials per level of the DFS path,
+  repaired by Hungarian searches after each change; 0.7–2.4 µs per
+  evaluation in a DFS at n=480–760, against 30–170 µs from scratch.  A test
+  DFS that starts with the optimum as incumbent and evaluates the matching
+  bound only where blameGame fails to prune visits 85, 34, 1.5, 2.7, 1.7,
+  32 and 35 times fewer nodes at n=480, 500, 600, 640, 660, 700 and 720
+  (taking 57, 26, 1.5, 2.5, 1.6, 24 and 28 times less time), and at n=760
+  finishes in 90k nodes where blameGame alone passes 3M.  The cap never
+  bound there either.
 * Seeding the incumbent from n−1 and stopping at n + opt(n−1) (tactics
   `seed_incumbent`, `prev_cap`).
 
