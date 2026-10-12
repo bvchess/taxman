@@ -25,7 +25,7 @@ use taxman::game::Optimal;
 use taxman::hives::Apiary;
 use taxman::json::Json;
 use taxman::numtheory::Tables;
-use taxman::search::{cut, prepare, search_with, Diagnostics, Revise, SearchTactics};
+use taxman::search::{cut, prepare, search_with, sets_of_width, Diagnostics, Revise, SearchTactics};
 use taxman::solver::Tactics;
 
 struct Options {
@@ -36,6 +36,8 @@ struct Options {
     seed: bool,
     /// Seed with the game for n itself (so that the search only has to prove it optimal).
     seed_opt: bool,
+    /// Start each game's nogood table with the nogoods of the game before it in the list.
+    carry: bool,
     /// A results file with more known games.
     known: Option<PathBuf>,
     tactics: SearchTactics,
@@ -50,6 +52,7 @@ fn parse() -> Result<Options, String> {
         cap: true,
         seed: true,
         seed_opt: false,
+        carry: false,
         known: None,
         tactics: SearchTactics::default(),
         games: Vec::new(),
@@ -64,6 +67,7 @@ fn parse() -> Result<Options, String> {
             "--no-cap" => o.cap = false,
             "--no-seed" => o.seed = false,
             "--seed-opt" => o.seed_opt = true,
+            "--carry" => o.carry = true,
             "--known" => o.known = Some(value("--known")?.into()),
             "--tactic" => {
                 // The solver's parser, so that the names and values are the same as for `taxman solve --tactic`.
@@ -99,12 +103,14 @@ fn main() {
             std::process::exit(2);
         }
     };
+    let mut nogoods = Vec::new();
     for &n in &o.games {
-        match n {
-            0..=1023 => run::<16>(n, &o, &optimal),
-            1024..=2047 => run::<32>(n, &o, &optimal),
-            _ => run::<64>(n, &o, &optimal),
-        }
+        let carried = if o.carry { std::mem::take(&mut nogoods) } else { Vec::new() };
+        nogoods = match n {
+            0..=1023 => run::<16>(n, &o, &optimal, &carried),
+            1024..=2047 => run::<32>(n, &o, &optimal, &carried),
+            _ => run::<64>(n, &o, &optimal, &carried),
+        };
     }
 }
 
@@ -130,7 +136,9 @@ fn secs(d: Duration) -> f64 {
     d.as_secs_f64()
 }
 
-fn run<const W: usize>(n: u32, o: &Options, optimal: &Optimal) {
+/// Searches game `n`, its nogood tables starting with the nogoods among `carried`, and returns the nogoods it
+/// ends with.
+fn run<const W: usize>(n: u32, o: &Options, optimal: &Optimal, carried: &[Vec<u32>]) -> Vec<Vec<u32>> {
     let t0 = Instant::now();
     let tables = Tables::new(n);
     let frames = build_frames::<W>(&tables);
@@ -148,7 +156,8 @@ fn run<const W: usize>(n: u32, o: &Options, optimal: &Optimal) {
     };
     let diag = o.diag.then(|| Mutex::new(Diagnostics::default()));
     let cap = prev_cap.filter(|_| o.cap);
-    let r = search_with(&p, &cfg, seed.as_ref(), cap, false, diag.as_ref()).expect("search");
+    let given = sets_of_width::<W>(carried);
+    let r = search_with(&p, &cfg, seed.as_ref(), cap, false, &given, diag.as_ref()).expect("search");
     let t = &p.timings;
     let revise = match p.revise {
         Revise::Searched { nodes, .. } => format!("searched {nodes} nodes"),
@@ -181,9 +190,30 @@ fn run<const W: usize>(n: u32, o: &Options, optimal: &Optimal) {
         secs(t.revise),
         p.max_total,
     );
+    if o.tactics.nogoods {
+        // When the table had learned half, 90%, 99% and all of what it learned.
+        let at = |q: f64| {
+            let i = ((q * r.learned.len() as f64).ceil() as usize).clamp(1, r.learned.len().max(1)) - 1;
+            r.learned.get(i).map_or("-".into(), |&t| format!("{:.2}", secs(t)))
+        };
+        println!(
+            "    nogoods: carried {} of {} given; learned {} (50% by {} s, 90% by {}, 99% by {}, all by {} of \
+             {:.2} s); {} at the end",
+            r.carried,
+            carried.len(),
+            r.learned.len(),
+            at(0.5),
+            at(0.9),
+            at(0.99),
+            at(1.0),
+            secs(r.time),
+            r.nogoods.len()
+        );
+    }
     if let Some(diag) = diag {
         print_diagnostics(&diag.into_inner().expect("diagnostics"), r.stats.nodes, r.found.map(|f| f.steps));
     }
+    r.nogoods.iter().map(Bits::to_vec).collect()
 }
 
 fn print_diagnostics(d: &Diagnostics, nodes: u64, found_steps: Option<u64>) {
