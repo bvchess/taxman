@@ -1,0 +1,13 @@
+{
+"n":33,
+"apiary":{"hives":[{"name":"A","sources":[31],"factors":[1],"remainingSources":[],"remainingFactors":[],"impossible":[17,19,23,29],"freeFactorCount":0,"promotionCandidates":[],"solution":[31]},{"name":"B","sources":[21,22,26,33],"factors":[2,3,7,11,13],"remainingSources":[22,33],"remainingFactors":[2,3,11],"impossible":[],"freeFactorCount":1,"promotionCandidates":[],"solution":[33,22,26,21]},{"name":"C","sources":[25],"factors":[5],"remainingSources":[],"remainingFactors":[],"impossible":[],"freeFactorCount":0,"promotionCandidates":[],"solution":[25]},{"name":"D","sources":[18,20,27,28,30],"factors":[4,6,9,10,14,15],"remainingSources":[18,20,30],"remainingFactors":[4,6,10,15],"impossible":[],"freeFactorCount":1,"promotionCandidates":[4,10,15],"solution":[27,18,20,30,28]},{"name":"E","sources":[24],"factors":[8,12],"remainingSources":[24],"remainingFactors":[8,12],"impossible":[],"freeFactorCount":1,"promotionCandidates":[8,12],"solution":[24]},{"name":"F","sources":[32],"factors":[16],"remainingSources":[],"remainingFactors":[],"impossible":[],"freeFactorCount":0,"promotionCandidates":[],"solution":[32]}],"solution":[31,33,22,26,21,25,27,18,20,30,28,24,32],"impossible":[17,19,23,29],"promotionCandidates":[4,8,10,12,15]},
+"frames":[{"name":"B","remainingFactors":[2,3,11],"remainingSources":[22,33],"freeFactorCount":1,"candidates":[4,10,15]},{"name":"D","remainingFactors":[4,6,10,15],"remainingSources":[18,20,30],"freeFactorCount":1,"candidates":[4,8,10,12,15]},{"name":"E","remainingFactors":[8,12],"remainingSources":[24],"freeFactorCount":1,"candidates":[8,12]}],
+"estimateMaxPromotions":1,
+"allCandidates":[4,8,10,12,15],
+"frameSet":[{"moves":[22,33],"factors":[2,3,11],"freedoms":1},{"moves":[20,30],"factors":[4,10,15],"freedoms":1},{"moves":[24],"factors":[8,12],"freedoms":1}],
+"maxPromotionsUnrevised":1,
+"greedy":[15],
+"searchManager":{"maxTotalPromotions":1,"revisedFrame0Freedoms":1,"initialBest":[15]},
+"solve":{"accelerated":true,"moves":[31,25,15,33,22,26,21,27,18,30,20,28,24,32],"score":352,"promotions":[15]},
+"timings":{"searchManagerMs":0,"solveMs":1}
+}

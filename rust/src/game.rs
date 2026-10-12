@@ -1,0 +1,240 @@
+//! The rules of Taxman, as an independent referee, and the known optimal games.
+//!
+//! [`replay`] deliberately shares no code with the solver's number-theory tables: it uses only divisibility
+//! and a plain "is it still in the pot" array, so a bug in a table cannot make a wrong game look legal.
+
+use crate::json::Json;
+use std::path::{Path, PathBuf};
+
+/// Plays `moves` on the board `1..=n` and returns the player's score (the sum of the moves).
+///
+/// A move is legal if it is a number on the board that is still in the pot and at least one of its proper
+/// divisors is still in the pot.  Making it removes the number and all of its divisors from the pot (the
+/// taxman takes the divisors).  The sequence need not be a complete game: legal moves may remain at the end.
+pub fn replay(n: u32, moves: &[u32]) -> Result<u64, String> {
+    let mut in_pot = vec![true; n as usize + 1];
+    in_pot[0] = false;
+    let mut score = 0u64;
+    for (i, &m) in moves.iter().enumerate() {
+        let turn = i + 1;
+        if m < 1 || m > n {
+            return Err(format!("move {turn} ({m}): not on the board 1..={n}"));
+        }
+        if !in_pot[m as usize] {
+            return Err(format!("move {turn} ({m}): already taken"));
+        }
+        // The taxman takes every proper divisor still in the pot; the move is legal only if there was one.
+        // (Clearing before the check is harmless: an illegal move ends the replay.)
+        let mut pays_tax = false;
+        for d in (1..m).filter(|d| m % d == 0) {
+            pays_tax |= in_pot[d as usize];
+            in_pot[d as usize] = false;
+        }
+        if !pays_tax {
+            return Err(format!("move {turn} ({m}): no proper divisor left in the pot, so it pays no tax"));
+        }
+        in_pot[m as usize] = false;
+        score += u64::from(m);
+    }
+    Ok(score)
+}
+
+/// Sanity bound on `n` when reading a results file, so a corrupt file cannot request a huge allocation.
+const MAX_PLAUSIBLE_N: u32 = 1 << 20;
+
+/// The known optimal games (`src/main/resources/optimal.json`): for each board size, the best score and a game
+/// that achieves it.
+pub struct Optimal {
+    /// Indexed by `n`; `None` where the file has no entry.
+    by_n: Vec<Option<(u64, Vec<u32>)>>,
+}
+
+impl Optimal {
+    /// `optimal.json` in the repository's Java resources, found relative to this crate.
+    pub fn default_path() -> PathBuf {
+        PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../src/main/resources/optimal.json"))
+    }
+
+    /// Loads [`default_path`](Self::default_path).
+    pub fn load_default() -> Result<Optimal, String> {
+        Optimal::load(Optimal::default_path())
+    }
+
+    /// Loads a file holding an array of `{"n": .., "score": .., "moves": [..]}` objects.
+    pub fn load(path: impl AsRef<Path>) -> Result<Optimal, String> {
+        Optimal::from_json(&Json::from_file(path)?)
+    }
+
+    pub fn from_json(json: &Json) -> Result<Optimal, String> {
+        let entries = json.as_arr().ok_or("expected an array of games")?;
+        let mut by_n: Vec<Option<(u64, Vec<u32>)>> = Vec::new();
+        for (i, entry) in entries.iter().enumerate() {
+            let field = |name: &str| entry.get(name).ok_or_else(|| format!("entry {i}: missing \"{name}\""));
+            let n = field("n")?.as_u32().filter(|&n| n <= MAX_PLAUSIBLE_N);
+            let n = n.ok_or_else(|| format!("entry {i}: bad \"n\""))?;
+            let score = field("score")?.as_u64().ok_or_else(|| format!("entry {i} (n={n}): bad \"score\""))?;
+            let moves = field("moves")?.as_u32_vec().ok_or_else(|| format!("entry {i} (n={n}): bad \"moves\""))?;
+            if by_n.len() <= n as usize {
+                by_n.resize(n as usize + 1, None);
+            }
+            if by_n[n as usize].replace((score, moves)).is_some() {
+                return Err(format!("entry {i}: duplicate n={n}"));
+            }
+        }
+        Ok(Optimal { by_n })
+    }
+
+    fn entry(&self, n: u32) -> Option<&(u64, Vec<u32>)> {
+        self.by_n.get(n as usize)?.as_ref()
+    }
+
+    /// The optimal score for board size `n`, if known.
+    pub fn score(&self, n: u32) -> Option<u64> {
+        self.entry(n).map(|(score, _)| *score)
+    }
+
+    /// An optimal game for board size `n`, if known.
+    pub fn moves(&self, n: u32) -> Option<&[u32]> {
+        self.entry(n).map(|(_, moves)| moves.as_slice())
+    }
+
+    /// Every entry as `(n, score, moves)`, ascending in `n`.
+    pub fn games(&self) -> impl Iterator<Item = (u32, u64, &[u32])> + '_ {
+        let present = self.by_n.iter().enumerate();
+        present.filter_map(|(n, e)| e.as_ref().map(|(score, moves)| (n as u32, *score, moves.as_slice())))
+    }
+
+    /// The board sizes that have an entry, ascending.
+    pub fn sizes(&self) -> impl Iterator<Item = u32> + '_ {
+        self.games().map(|(n, _, _)| n)
+    }
+
+    /// The largest board size with an entry (0 if there are none).
+    pub fn max_n(&self) -> u32 {
+        self.sizes().last().unwrap_or(0)
+    }
+
+    /// Replays every game and checks that it is legal and scores what the file says.  Returns the number of
+    /// games checked.
+    pub fn verify_all(&self) -> Result<usize, String> {
+        let mut checked = 0;
+        for (n, score, moves) in self.games() {
+            match replay(n, moves) {
+                Ok(replayed) if replayed == score => checked += 1,
+                Ok(replayed) => return Err(format!("n={n}: recorded score {score} but the moves score {replayed}")),
+                Err(e) => return Err(format!("n={n}: {e}")),
+            }
+        }
+        Ok(checked)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Instant;
+
+    #[test]
+    fn replay_scores_legal_games() {
+        assert_eq!(replay(0, &[]), Ok(0));
+        assert_eq!(replay(1, &[]), Ok(0));
+        assert_eq!(replay(2, &[2]), Ok(2));
+        assert_eq!(replay(4, &[3, 4]), Ok(7));
+        assert_eq!(replay(5, &[5, 4]), Ok(9));
+        assert_eq!(replay(6, &[5, 4, 6]), Ok(15));
+        // Legal, and already a complete game: 4 takes 1 and 2, and 3 can no longer be played.
+        assert_eq!(replay(4, &[4]), Ok(4));
+        // A sequence need not be complete: 6 alone is legal even though 4 and 5 are left (4 has no tax left).
+        assert_eq!(replay(6, &[6]), Ok(6));
+    }
+
+    #[test]
+    fn replay_rejects_moves_off_the_board() {
+        assert!(replay(5, &[0]).unwrap_err().contains("not on the board"));
+        assert!(replay(5, &[6]).unwrap_err().contains("not on the board"));
+        assert!(replay(0, &[1]).unwrap_err().contains("not on the board"));
+        assert!(replay(5, &[5, 4, 100]).unwrap_err().contains("move 3"));
+    }
+
+    #[test]
+    fn replay_rejects_numbers_not_in_the_pot() {
+        assert!(replay(4, &[3, 3]).unwrap_err().contains("already taken"));
+        // 6 takes 1, 2 and 3 from the pot, so 3 is gone.
+        assert!(replay(6, &[6, 3]).unwrap_err().contains("already taken"));
+        // 2 is taxed by the move 4.
+        assert!(replay(4, &[4, 2]).unwrap_err().contains("already taken"));
+    }
+
+    #[test]
+    fn replay_rejects_moves_that_pay_no_tax() {
+        // 1 never has a proper divisor.
+        assert!(replay(4, &[1]).unwrap_err().contains("pays no tax"));
+        // After 2 takes 1, 4 has no divisor left in the pot.
+        let err = replay(10, &[2, 4]).unwrap_err();
+        assert!(err.contains("move 2") && err.contains("pays no tax"), "{err}");
+        // A prime can only be played while 1 is still there.
+        assert!(replay(7, &[4, 7]).unwrap_err().contains("pays no tax"));
+        assert_eq!(replay(7, &[7, 4]), Ok(11));
+    }
+
+    #[test]
+    fn optimal_json_loads() {
+        let start = Instant::now();
+        let opt = Optimal::load_default().unwrap();
+        // The parse is ~10 ms when optimized; the generous bound only guards against something quadratic.
+        assert!(start.elapsed().as_secs_f64() < 1.0, "loading took {:?}", start.elapsed());
+        assert_eq!(opt.max_n(), 1000);
+        assert_eq!(opt.sizes().count(), 1000);
+        assert!(opt.sizes().eq(1..=1000));
+        // n = 0 and anything past the file are unknown.
+        assert_eq!((opt.score(0), opt.moves(0), opt.score(1001), opt.moves(1001)), (None, None, None, None));
+        // n = 1 has score 0 and no moves.
+        assert_eq!((opt.score(1), opt.moves(1)), (Some(0), Some(&[][..])));
+        assert_eq!((opt.score(2), opt.moves(2)), (Some(2), Some(&[2][..])));
+        assert_eq!((opt.score(4), opt.moves(4)), (Some(7), Some(&[3, 4][..])));
+        assert_eq!((opt.score(6), opt.moves(6)), (Some(15), Some(&[5, 4, 6][..])));
+    }
+
+    #[test]
+    fn every_optimal_game_replays_to_its_recorded_score() {
+        let opt = Optimal::load_default().unwrap();
+        assert_eq!(opt.verify_all(), Ok(1000));
+        // Also spot-check through replay() directly.
+        for n in [1, 2, 10, 100, 500, 1000] {
+            assert_eq!(replay(n, opt.moves(n).unwrap()), Ok(opt.score(n).unwrap()), "n={n}");
+        }
+    }
+
+    #[test]
+    fn verify_all_detects_bad_entries() {
+        let load = |text: &str| Optimal::from_json(&Json::parse(text).unwrap()).unwrap();
+        assert_eq!(load(r#"[{"n":4,"score":7,"moves":[3,4]}]"#).verify_all(), Ok(1));
+        let wrong_score = load(r#"[{"n":4,"score":8,"moves":[3,4]}]"#).verify_all().unwrap_err();
+        assert!(wrong_score.contains("n=4") && wrong_score.contains("recorded score 8"), "{wrong_score}");
+        let illegal = load(r#"[{"n":4,"score":4,"moves":[1]}]"#).verify_all().unwrap_err();
+        assert!(illegal.contains("n=4") && illegal.contains("pays no tax"), "{illegal}");
+    }
+
+    #[test]
+    fn from_json_rejects_malformed_input() {
+        let err = |text: &str| Optimal::from_json(&Json::parse(text).unwrap()).err().unwrap();
+        assert!(err("{}").contains("array"));
+        assert!(err(r#"[{"score":1,"moves":[]}]"#).contains("missing \"n\""));
+        assert!(err(r#"[{"n":-1,"score":1,"moves":[]}]"#).contains("bad \"n\""));
+        assert!(err(r#"[{"n":2,"score":"x","moves":[]}]"#).contains("bad \"score\""));
+        assert!(err(r#"[{"n":2,"score":2,"moves":[2,"a"]}]"#).contains("bad \"moves\""));
+        let dup = r#"[{"n":2,"score":2,"moves":[2]},{"n":2,"score":2,"moves":[2]}]"#;
+        assert!(err(dup).contains("duplicate n=2"));
+        assert!(Optimal::load("/nonexistent/optimal.json").is_err());
+    }
+
+    #[test]
+    fn sparse_files_are_fine() {
+        let json = Json::parse(r#"[{"n":7,"score":17,"moves":[7,4,6]},{"n":3,"score":3,"moves":[3]}]"#).unwrap();
+        let opt = Optimal::from_json(&json).unwrap();
+        assert_eq!(opt.sizes().collect::<Vec<_>>(), vec![3, 7]);
+        assert_eq!(opt.max_n(), 7);
+        assert_eq!(opt.score(5), None);
+        assert_eq!(opt.verify_all(), Ok(2));
+    }
+}

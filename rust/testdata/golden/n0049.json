@@ -1,0 +1,13 @@
+{
+"n":49,
+"apiary":{"hives":[{"name":"A","sources":[47],"factors":[1],"remainingSources":[],"remainingFactors":[],"impossible":[29,31,37,41,43],"freeFactorCount":0,"promotionCandidates":[],"solution":[47]},{"name":"B","sources":[35,49],"factors":[5,7],"remainingSources":[],"remainingFactors":[],"impossible":[25],"freeFactorCount":0,"promotionCandidates":[],"solution":[49,35]},{"name":"C","sources":[26,33,34,38,39,46],"factors":[2,3,11,13,17,19,23],"remainingSources":[26,39],"remainingFactors":[2,3,13],"impossible":[],"freeFactorCount":1,"promotionCandidates":[],"solution":[39,26,46,38,34,33]},{"name":"D","sources":[27,28,30,42,44,45],"factors":[4,6,9,10,14,15,21,22],"remainingSources":[27,28,30,42,45],"remainingFactors":[4,6,9,10,14,15,21],"impossible":[],"freeFactorCount":2,"promotionCandidates":[4,10,14,21],"solution":[27,45,28,44,42,30]},{"name":"E","sources":[36],"factors":[12,18],"remainingSources":[36],"remainingFactors":[12,18],"impossible":[],"freeFactorCount":1,"promotionCandidates":[12,18],"solution":[36]},{"name":"F","sources":[40],"factors":[8,20],"remainingSources":[40],"remainingFactors":[8,20],"impossible":[],"freeFactorCount":1,"promotionCandidates":[8,20],"solution":[40]},{"name":"G","sources":[32,48],"factors":[16,24],"remainingSources":[],"remainingFactors":[],"impossible":[],"freeFactorCount":0,"promotionCandidates":[],"solution":[32,48]}],"solution":[47,49,35,39,26,46,38,34,33,27,45,28,44,42,30,36,40,32,48],"impossible":[25,29,31,37,41,43],"promotionCandidates":[4,8,10,12,14,18,20,21]},
+"frames":[{"name":"C","remainingFactors":[2,3,13],"remainingSources":[26,39],"freeFactorCount":1,"candidates":[4,10,14,21]},{"name":"D","remainingFactors":[4,6,9,10,14,15,21],"remainingSources":[27,28,30,42,45],"freeFactorCount":2,"candidates":[4,8,10,12,14,18,20,21]},{"name":"E+F","remainingFactors":[8,12,18,20],"remainingSources":[36,40],"freeFactorCount":2,"candidates":[8,12,18,20]}],
+"estimateMaxPromotions":2,
+"allCandidates":[4,8,10,12,14,18,20,21],
+"frameSet":[{"moves":[26,39],"factors":[2,3,13],"freedoms":1},{"moves":[28,30,42],"factors":[4,6,10,14,21],"freedoms":2},{"moves":[36,40],"factors":[8,12,18,20],"freedoms":2}],
+"maxPromotionsUnrevised":2,
+"greedy":[18,21],
+"searchManager":{"maxTotalPromotions":2,"revisedFrame0Freedoms":1,"initialBest":[18,21]},
+"solve":{"accelerated":true,"moves":[47,49,21,39,26,46,38,34,33,35,27,45,18,42,28,44,30,36,40,32,48],"score":758,"promotions":[18,21]},
+"timings":{"searchManagerMs":0,"solveMs":1}
+}

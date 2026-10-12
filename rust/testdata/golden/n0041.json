@@ -1,0 +1,13 @@
+{
+"n":41,
+"apiary":{"hives":[{"name":"A","sources":[41],"factors":[1],"remainingSources":[],"remainingFactors":[],"impossible":[23,29,31,37],"freeFactorCount":0,"promotionCandidates":[],"solution":[41]},{"name":"B","sources":[21,25,26,33,34,35,38,39],"factors":[2,3,5,7,11,13,17,19],"remainingSources":[],"remainingFactors":[],"impossible":[22],"freeFactorCount":0,"promotionCandidates":[],"solution":[25,35,21,39,26,38,34,33]},{"name":"C","sources":[27],"factors":[9],"remainingSources":[],"remainingFactors":[],"impossible":[],"freeFactorCount":0,"promotionCandidates":[],"solution":[27]},{"name":"D","sources":[28],"factors":[4,14],"remainingSources":[],"remainingFactors":[4],"impossible":[],"freeFactorCount":1,"promotionCandidates":[],"solution":[28]},{"name":"E","sources":[30],"factors":[6,10,15],"remainingSources":[],"remainingFactors":[6,10],"impossible":[],"freeFactorCount":2,"promotionCandidates":[],"solution":[30]},{"name":"F","sources":[24,36,40],"factors":[8,12,18,20],"remainingSources":[24,36,40],"remainingFactors":[8,12,18,20],"impossible":[],"freeFactorCount":1,"promotionCandidates":[8,12,18,20],"solution":[24,40,36]},{"name":"G","sources":[32],"factors":[16],"remainingSources":[],"remainingFactors":[],"impossible":[],"freeFactorCount":0,"promotionCandidates":[],"solution":[32]}],"solution":[41,25,35,21,39,26,38,34,33,27,28,30,24,40,36,32],"impossible":[22,23,29,31,37],"promotionCandidates":[8,12,18,20]},
+"frames":[{"name":"D+E","remainingFactors":[4,6,10],"remainingSources":[],"freeFactorCount":3,"candidates":[8,12,18,20]},{"name":"F","remainingFactors":[8,12,18,20],"remainingSources":[24,36,40],"freeFactorCount":1,"candidates":[8,12,18,20]}],
+"estimateMaxPromotions":1,
+"allCandidates":[8,12,18,20],
+"frameSet":[{"moves":[],"factors":[4,6,10],"freedoms":3},{"moves":[24,36,40],"factors":[8,12,18,20],"freedoms":1}],
+"maxPromotionsUnrevised":1,
+"greedy":[20],
+"searchManager":{"maxTotalPromotions":1,"revisedFrame0Freedoms":3,"initialBest":[20]},
+"solve":{"accelerated":true,"moves":[41,25,35,21,27,33,39,26,20,40,24,36,30,28,38,34,32],"score":529,"promotions":[20]},
+"timings":{"searchManagerMs":0,"solveMs":0}
+}

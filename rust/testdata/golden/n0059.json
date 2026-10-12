@@ -1,0 +1,13 @@
+{
+"n":59,
+"apiary":{"hives":[{"name":"A","sources":[59],"factors":[1],"remainingSources":[],"remainingFactors":[],"impossible":[31,37,41,43,47,53],"freeFactorCount":0,"promotionCandidates":[],"solution":[59]},{"name":"B","sources":[33,35,38,39,46,49,51,55,57,58],"factors":[2,3,5,7,11,13,17,19,23,29],"remainingSources":[],"remainingFactors":[],"impossible":[34],"freeFactorCount":0,"promotionCandidates":[],"solution":[49,35,55,33,57,38,58,46,51,39]},{"name":"C","sources":[30,42,45,50],"factors":[6,9,10,14,15,21,25],"remainingSources":[30,45],"remainingFactors":[6,9,10,14,15],"impossible":[],"freeFactorCount":3,"promotionCandidates":[],"solution":[50,30,42,45]},{"name":"D","sources":[44,52],"factors":[4,22,26],"remainingSources":[],"remainingFactors":[4],"impossible":[],"freeFactorCount":1,"promotionCandidates":[],"solution":[52,44]},{"name":"E","sources":[36,54],"factors":[12,18,27],"remainingSources":[36,54],"remainingFactors":[12,18,27],"impossible":[],"freeFactorCount":1,"promotionCandidates":[12,18,27],"solution":[54,36]},{"name":"F","sources":[40,56],"factors":[8,20,28],"remainingSources":[40,56],"remainingFactors":[8,20,28],"impossible":[],"freeFactorCount":1,"promotionCandidates":[8,20,28],"solution":[56,40]},{"name":"G","sources":[32,48],"factors":[16,24],"remainingSources":[],"remainingFactors":[],"impossible":[],"freeFactorCount":0,"promotionCandidates":[],"solution":[32,48]}],"solution":[59,49,35,55,33,57,38,58,46,51,39,50,30,42,45,52,44,54,36,56,40,32,48],"impossible":[31,34,37,41,43,47,53],"promotionCandidates":[8,12,18,20,27,28]},
+"frames":[{"name":"C+D","remainingFactors":[4,6,9,10,14,15],"remainingSources":[30,45],"freeFactorCount":4,"candidates":[8,12,18,20,27,28]},{"name":"E+F","remainingFactors":[8,12,18,20,27,28],"remainingSources":[36,40,54,56],"freeFactorCount":2,"candidates":[8,12,18,20,27,28]}],
+"estimateMaxPromotions":2,
+"allCandidates":[8,12,18,20,27,28],
+"frameSet":[{"moves":[30,45],"factors":[4,6,9,10,14,15],"freedoms":4},{"moves":[36,40,54,56],"factors":[8,12,18,20,27,28],"freedoms":2}],
+"maxPromotionsUnrevised":2,
+"greedy":[27,28],
+"searchManager":{"maxTotalPromotions":2,"revisedFrame0Freedoms":4,"initialBest":[27,28]},
+"solve":{"accelerated":true,"moves":[59,49,35,55,33,39,51,57,38,27,45,28,56,32,54,36,48,30,40,52,44,42,50,58,46],"score":1104,"promotions":[27,28]},
+"timings":{"searchManagerMs":0,"solveMs":1}
+}

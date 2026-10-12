@@ -1,0 +1,27 @@
+[package]
+name = "taxman"
+version = "0.1.0"
+edition = "2021"
+description = "Exact solver for the game of Taxman"
+publish = false
+
+[lib]
+name = "taxman"
+path = "src/lib.rs"
+
+[[bin]]
+name = "taxman"
+path = "src/main.rs"
+
+[dependencies]
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+# Keep symbols so profilers (samply, Instruments) can attribute time to functions.
+debug = 1
+panic = "abort"
+
+# Tests replay real games, so give them an optimizer.
+[profile.test]
+opt-level = 2

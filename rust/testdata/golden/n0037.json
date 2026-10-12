@@ -1,0 +1,13 @@
+{
+"n":37,
+"apiary":{"hives":[{"name":"A","sources":[37],"factors":[1],"remainingSources":[],"remainingFactors":[],"impossible":[19,23,29,31],"freeFactorCount":0,"promotionCandidates":[],"solution":[37]},{"name":"B","sources":[21,22,25,26,33,34,35],"factors":[2,3,5,7,11,13,17],"remainingSources":[],"remainingFactors":[],"impossible":[],"freeFactorCount":0,"promotionCandidates":[],"solution":[25,35,21,33,22,34,26]},{"name":"C","sources":[20,28,30],"factors":[4,6,10,14,15],"remainingSources":[],"remainingFactors":[4,6],"impossible":[],"freeFactorCount":2,"promotionCandidates":[],"solution":[28,20,30]},{"name":"D","sources":[27],"factors":[9],"remainingSources":[],"remainingFactors":[],"impossible":[],"freeFactorCount":0,"promotionCandidates":[],"solution":[27]},{"name":"E","sources":[24,36],"factors":[8,12,18],"remainingSources":[24,36],"remainingFactors":[8,12,18],"impossible":[],"freeFactorCount":1,"promotionCandidates":[8,12,18],"solution":[36,24]},{"name":"F","sources":[32],"factors":[16],"remainingSources":[],"remainingFactors":[],"impossible":[],"freeFactorCount":0,"promotionCandidates":[],"solution":[32]}],"solution":[37,25,35,21,33,22,34,26,28,20,30,27,36,24,32],"impossible":[19,23,29,31],"promotionCandidates":[8,12,18]},
+"frames":[{"name":"C","remainingFactors":[4,6],"remainingSources":[],"freeFactorCount":2,"candidates":[8,12,18]},{"name":"E","remainingFactors":[8,12,18],"remainingSources":[24,36],"freeFactorCount":1,"candidates":[8,12,18]}],
+"estimateMaxPromotions":1,
+"allCandidates":[8,12,18],
+"frameSet":[{"moves":[],"factors":[4,6],"freedoms":2},{"moves":[24,36],"factors":[8,12,18],"freedoms":1}],
+"maxPromotionsUnrevised":1,
+"greedy":[18],
+"searchManager":{"maxTotalPromotions":1,"revisedFrame0Freedoms":2,"initialBest":[18]},
+"solve":{"accelerated":true,"moves":[37,25,35,21,27,33,22,18,36,24,20,30,28,34,26,32],"score":448,"promotions":[18]},
+"timings":{"searchManagerMs":0,"solveMs":0}
+}

@@ -1,0 +1,13 @@
+{
+"n":3,
+"apiary":{"hives":[{"name":"A","sources":[3],"factors":[1],"remainingSources":[],"remainingFactors":[],"impossible":[2],"freeFactorCount":0,"promotionCandidates":[],"solution":[3]}],"solution":[3],"impossible":[2],"promotionCandidates":[]},
+"frames":[],
+"estimateMaxPromotions":0,
+"allCandidates":[],
+"frameSet":[],
+"maxPromotionsUnrevised":0,
+"greedy":[],
+"searchManager":{"maxTotalPromotions":0,"revisedFrame0Freedoms":null,"initialBest":[]},
+"solve":{"accelerated":true,"moves":[3],"score":3,"promotions":[]},
+"timings":{"searchManagerMs":0,"solveMs":0}
+}
