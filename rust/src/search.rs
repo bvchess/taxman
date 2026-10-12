@@ -26,7 +26,7 @@
 //! bound ([`crate::matchbound`]), possibly refined by conflicts (see [`Refiner`]).  When the heaviest matching
 //! can itself be promoted, it is the node's best completion: it is offered as the incumbent and the node is
 //! done.  The search starts from the best of the greedy set, the seed, and a rounding of the root's matching
-//! ([`dive`]).
+//! ([`dive`]), improved by a local search ([`Neighbourhood::improve`]).
 //!
 //! Two exact shortcuts keep the expensive bound out of the way: the bound never exceeds the sum of the
 //! `max_add` largest candidates, so when that sum already decides the comparison the bound is not computed;
@@ -1274,6 +1274,63 @@ fn surviving<const W: usize>(prepared: &Prepared<W>, seed: &Bits<W>) -> Bits<W> 
     kept
 }
 
+/// Where a local search for better promotion sets works: the search's model, root and candidates.
+#[derive(Clone, Copy)]
+pub struct Neighbourhood<'a, const W: usize> {
+    pub model: &'a Model,
+    pub root: &'a FrameSet<W>,
+    pub candidates: &'a Bits<W>,
+}
+
+impl<const W: usize> Neighbourhood<'_, W> {
+    /// `base` (which must be feasible) with candidates outside `excluded` added greedily, from the largest down,
+    /// narrowing the candidates after each promotion as [`bounds::greedy`] does.
+    fn fill(&self, scratch: &mut Scratch<W>, base: &Bits<W>, excluded: &Bits<W>) -> Bits<W> {
+        let mut state = self.model.promote_all_using(scratch, self.root, base).expect("a feasible base");
+        let mut out = *base;
+        let mut open = state.narrow_candidates(&(*self.candidates - *base - *excluded));
+        let mut next = open.max();
+        while let Some(n) = next {
+            if self.model.promote_in_place_using(scratch, &mut state, n) {
+                out.insert(n);
+                open = state.narrow_candidates(&open);
+            }
+            next = open.max_below(n);
+        }
+        out
+    }
+
+    /// A promotion set at least as good as `start` (which must be feasible), by local search: fill `start`
+    /// greedily, then repeatedly take one member out (and with `pairs`, then two) and refill greedily without
+    /// them ([`fill`](Self::fill)), keeping the first change that raises the sum, until none does.  A few
+    /// milliseconds with `pairs` at n ≈ 1000, less without.
+    pub fn improve(&self, scratch: &mut Scratch<W>, start: &Bits<W>, pairs: bool) -> Bits<W> {
+        let mut best = self.fill(scratch, start, &Bits::EMPTY);
+        'search: loop {
+            for x in best.iter() {
+                let other = self.fill(scratch, &best.without(x), &Bits::EMPTY.with(x));
+                if other.sum() > best.sum() {
+                    best = other;
+                    continue 'search;
+                }
+            }
+            if pairs {
+                for x in best.iter() {
+                    for y in best.iter().filter(|&y| y < x) {
+                        let out = Bits::EMPTY.with(x).with(y);
+                        let other = self.fill(scratch, &(best - out), &out);
+                        if other.sum() > best.sum() {
+                            best = other;
+                            continue 'search;
+                        }
+                    }
+                }
+            }
+            return best;
+        }
+    }
+}
+
 /// A promotion set found by rounding the matching relaxation at `root` (a starting incumbent): while the
 /// heaviest matching's candidates cannot all be promoted, take the smallest member of one of their conflicts
 /// (see [`Refiner`]) out of the candidates and solve again.  Ends with candidates that can all be promoted.
@@ -1330,6 +1387,8 @@ pub fn search_with<const W: usize>(
             incumbent = dived;
         }
     }
+    let hood = Neighbourhood { model: &prepared.model, root: &prepared.root, candidates: &prepared.candidates };
+    incumbent = hood.improve(&mut Scratch::new(), &incumbent, true);
     if !resume && cap.is_some_and(|cap| incumbent.sum() >= cap) {
         return Ok(SearchResult {
             promotions: incumbent,
@@ -1653,20 +1712,20 @@ mod tests {
 
     #[test]
     fn a_checkpoint_of_another_game_is_refused() {
-        let (a, b) = (load(480), load(400));
+        let (a, b) = (load(760), load(720));
         let dir = TempDir::new("refuse");
         let ckpt = dir.0.join("ckpt.bin");
-        let pa = prepare_golden::<8>(&a, SearchTactics::default());
+        let pa = prepare_golden::<16>(&a, SearchTactics::default());
         let cfg = EngineConfig {
             checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))),
             node_limit: Some(50),
             ..config(1)
         };
         assert!(!search(&pa, &cfg, None, None, false).unwrap().completed);
-        let cands = Bits::<8>::from_slice(&b.candidates);
-        assert!(prepare_for_resume::<8>(&Tables::new(b.n), &b.columns, &cands, &ckpt, 1).is_err());
-        let cands = Bits::<16>::from_slice(&a.candidates);
-        assert!(prepare_for_resume::<16>(&Tables::new(a.n), &a.columns, &cands, &ckpt, 1).is_err());
+        let cands = Bits::<16>::from_slice(&b.candidates);
+        assert!(prepare_for_resume::<16>(&Tables::new(b.n), &b.columns, &cands, &ckpt, 1).is_err());
+        let cands = Bits::<32>::from_slice(&a.candidates);
+        assert!(prepare_for_resume::<32>(&Tables::new(a.n), &a.columns, &cands, &ckpt, 1).is_err());
     }
 
     #[test]
