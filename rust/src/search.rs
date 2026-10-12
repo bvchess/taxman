@@ -48,7 +48,6 @@ use crate::engine::{self, Counters, Ctx, EngineConfig, Poll, Searcher, Start, St
 use crate::matchbound::{MatchBound, MatchGraph};
 use crate::model::{ConflictCache, FrameSet, Lookup, Model, Nogoods, Scratch};
 use crate::numtheory::Tables;
-use std::collections::HashSet;
 use std::io;
 use std::path::Path;
 use std::str::FromStr;
@@ -272,32 +271,6 @@ pub struct SearchSpace<'a, const W: usize> {
     /// When the search began, and the best incumbent the searchers found (see [`Found`]).
     pub began: Instant,
     pub found: Mutex<Option<Found>>,
-    /// Nogoods of the root that every searcher's table starts with (tactic `nogoods`; see [`valid_nogoods`]).
-    pub carried: &'a [Bits<W>],
-    /// The searchers' tables when they finish, merged (see [`SearchResult::nogoods`]).
-    pub learned: Mutex<Learned<W>>,
-}
-
-/// The nogoods of a search's searchers, merged as each finishes, and when each was learned.
-#[derive(Debug, Default)]
-pub struct Learned<const W: usize> {
-    /// Without duplicates, in the order the searchers finished, each searcher's in the order it had them.
-    pub sets: Vec<Bits<W>>,
-    seen: HashSet<Bits<W>>,
-    /// When each nogood was learned (since the search began), over all searchers, ascending; not the carried
-    /// ones.
-    pub times: Vec<Duration>,
-}
-
-impl<const W: usize> Learned<W> {
-    fn merge(&mut self, sets: &[Bits<W>], times: &[Duration]) {
-        for &n in sets {
-            if self.seen.insert(n) {
-                self.sets.push(n);
-            }
-        }
-        self.times.extend_from_slice(times);
-    }
 }
 
 /// When a search found its best incumbent.
@@ -844,11 +817,8 @@ pub struct TaxSearcher<'a, const W: usize> {
     known: Vec<Bits<W>>,
     /// The frames' last conflicts (see [`ConflictCache`]).
     conflict_cache: ConflictCache<W>,
-    /// The nogoods learned (tactic `nogoods`), how many the table had after the last step, and when the searcher
-    /// learned each (since the search began).
+    /// The nogoods learned (tactic `nogoods`).
     nogoods: Option<Nogoods<W>>,
-    table_len: usize,
-    learned_at: Vec<Duration>,
     payload: Vec<u8>,
     probe: Option<Probe<'a>>,
     /// The matching solver's statistics already added to the diagnostics.
@@ -857,13 +827,6 @@ pub struct TaxSearcher<'a, const W: usize> {
 
 impl<'a, const W: usize> TaxSearcher<'a, W> {
     pub fn new(space: &'a SearchSpace<'a, W>) -> Self {
-        let nogoods = space.nogoods.then(|| {
-            let mut table = Nogoods::new(space.root_max, NOGOOD_CAPACITY);
-            for n in space.carried {
-                table.insert(*n, n);
-            }
-            table
-        });
         TaxSearcher {
             space,
             bounds: Bounds::new(space.model, space.preclusions, space.rule)
@@ -876,9 +839,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             counts: RefineCounts::default(),
             known: Vec::new(),
             conflict_cache: ConflictCache::default(),
-            table_len: nogoods.as_ref().map_or(0, Nogoods::len),
-            nogoods,
-            learned_at: Vec::new(),
+            nogoods: space.nogoods.then(|| Nogoods::new(space.root_max, NOGOOD_CAPACITY)),
             payload: Vec::with_capacity(8 * W),
             probe: space.diagnostics.map(|shared| Probe { shared, local: Diagnostics::default() }),
             match_seen: [0; 3],
@@ -1303,31 +1264,12 @@ impl<const W: usize> Searcher<TaxUnit<W>> for TaxSearcher<'_, W> {
                 break;
             }
             ctx.stats().nodes += 1;
-            let next = self.step(depth, ctx);
-            if let Some(table) = &self.nogoods {
-                if table.len() != self.table_len {
-                    let now = self.space.began.elapsed();
-                    let new = table.len().saturating_sub(self.table_len); // 0 if it was full and forgot them all
-                    self.learned_at.extend(std::iter::repeat_n(now, new));
-                    self.table_len = table.len();
-                }
-            }
-            match next {
+            match self.step(depth, ctx) {
                 Some(next) => depth = next,
                 None => break,
             }
         }
         self.flush(ctx.stats());
-    }
-}
-
-/// A searcher hands its nogoods over to the search when it is done (the engine drops it when its worker ends).
-impl<const W: usize> Drop for TaxSearcher<'_, W> {
-    fn drop(&mut self) {
-        if let Some(table) = &self.nogoods {
-            let mut learned = self.space.learned.lock().unwrap_or_else(PoisonError::into_inner);
-            learned.merge(table.sets(), &self.learned_at);
-        }
     }
 }
 
@@ -1583,13 +1525,6 @@ pub struct SearchResult<const W: usize> {
     /// The incumbent the search started from: the best of the greedy set, the seed and (with `match_bound`) the
     /// matching dive.
     pub start: Bits<W>,
-    /// The nogoods the searchers' tables held at the end (tactic `nogoods`), without duplicates: those they
-    /// started with and those they learned.  Each is a nogood of this search's root.
-    pub nogoods: Vec<Bits<W>>,
-    /// How many nogoods the searchers' tables started with (the valid ones of those given to [`search_with`]).
-    pub carried: usize,
-    /// When each nogood was learned, since the search began (over all searchers, ascending).
-    pub learned: Vec<Duration>,
 }
 
 /// The candidates of `seed` that can still be promoted, one by one from the largest down, skipping the ones
@@ -1678,33 +1613,6 @@ fn dive<const W: usize>(model: &Model, root: &FrameSet<W>, graph: &MatchGraph, c
     }
 }
 
-/// The nogoods among `sets` for the root of `prepared` (see [`Nogoods`]), whatever `sets` holds (another game's
-/// nogoods, a stale or foreign file): each set that cannot be promoted from the root, reduced to a minimal subset
-/// that still cannot ([`Model::conflict_using`]), without duplicates, in the order of `sets`.  The test is exact
-/// (frame by frame, see [`Model::winnable`]), so these are nogoods of this root by the same argument as the ones
-/// the search learns.  Sets that can be promoted are dropped, and so are those with a member that is not a
-/// candidate (no node has it among its promotions or candidates, so no lookup would use them).
-pub fn valid_nogoods<const W: usize>(prepared: &Prepared<W>, sets: &[Bits<W>]) -> Vec<Bits<W>> {
-    let mut scratch = Scratch::new();
-    let mut seen = HashSet::new();
-    let mut out = Vec::new();
-    for set in sets.iter().filter(|set| !set.is_empty() && set.is_subset(&prepared.candidates)) {
-        if let Some(n) = prepared.model.conflict_using(&mut scratch, &prepared.root, set, true) {
-            if seen.insert(n) {
-                out.push(n);
-            }
-        }
-    }
-    out
-}
-
-/// Sets of numbers given as lists (nogoods of a game of another width, or read from a file) as sets of width `W`;
-/// a list with a member that `Bits<W>` cannot hold is left out (no game of this width has it as a candidate).
-pub fn sets_of_width<const W: usize>(lists: &[Vec<u32>]) -> Vec<Bits<W>> {
-    let fits = |list: &&Vec<u32>| list.iter().all(|&x| x <= Bits::<W>::MAX_VALUE);
-    lists.iter().filter(fits).map(|list| Bits::from_slice(list)).collect()
-}
-
 /// Searches for the promotion set with the largest sum.
 ///
 /// The incumbent starts as the greedy set, or as what survives of `seed` (see [`surviving`]) if that is
@@ -1718,24 +1626,20 @@ pub fn search<const W: usize>(
     cap: Option<u64>,
     resume: bool,
 ) -> io::Result<SearchResult<W>> {
-    search_with(prepared, cfg, seed, cap, resume, &[], None)
+    search_with(prepared, cfg, seed, cap, resume, None)
 }
 
-/// [`search`], with the searchers' nogood tables (tactic `nogoods`) starting with the nogoods among `carried`
-/// (see [`valid_nogoods`]: anything may be given), and collecting [`Diagnostics`] into `diagnostics` if given.
+/// [`search`], collecting [`Diagnostics`] into `diagnostics` if given.
 pub fn search_with<const W: usize>(
     prepared: &Prepared<W>,
     cfg: &EngineConfig,
     seed: Option<&Bits<W>>,
     cap: Option<u64>,
     resume: bool,
-    carried: &[Bits<W>],
     diagnostics: Option<&Mutex<Diagnostics>>,
 ) -> io::Result<SearchResult<W>> {
     let t0 = Instant::now();
     let match_graph = prepared.tactics.match_bound.then(|| MatchGraph::new(&prepared.model, &prepared.root));
-    let nogoods = prepared.tactics.match_bound && prepared.tactics.nogoods;
-    let carried = if nogoods { valid_nogoods(prepared, carried) } else { Vec::new() };
     let mut incumbent = prepared.greedy;
     if let Some(seed) = seed {
         let kept = surviving(prepared, seed);
@@ -1762,9 +1666,6 @@ pub fn search_with<const W: usize>(
             time: t0.elapsed(),
             found: None,
             start: incumbent,
-            carried: carried.len(),
-            nogoods: carried,
-            learned: Vec::new(),
         });
     }
 
@@ -1776,7 +1677,7 @@ pub fn search_with<const W: usize>(
         match_refine: u32::from(prepared.tactics.match_refine),
         conflict_branching: if prepared.tactics.match_bound { prepared.tactics.branching } else { Branching::Largest },
         fix_forced: prepared.tactics.fix_forced,
-        nogoods,
+        nogoods: prepared.tactics.match_bound && prepared.tactics.nogoods,
         root_max: prepared.root.frames().iter().filter_map(|f| (f.moves | f.factors).max()).max().unwrap_or(0),
         max_total: prepared.max_total,
         rule: prepared.tactics.rule(),
@@ -1784,8 +1685,6 @@ pub fn search_with<const W: usize>(
         diagnostics,
         began: t0,
         found: Mutex::new(None),
-        carried: &carried,
-        learned: Mutex::new(Learned::default()),
     };
     let start = if resume {
         let Some((path, _)) = &cfg.checkpoint else {
@@ -1802,8 +1701,6 @@ pub fn search_with<const W: usize>(
     let outcome = engine::run(cfg, start, &header, |_| TaxSearcher::new(&space))?;
     let promotions = get_bits(&outcome.payload);
     assert_eq!(promotions.sum(), outcome.best, "the incumbent's payload does not match its value");
-    let mut learned = space.learned.into_inner().unwrap_or_else(PoisonError::into_inner);
-    learned.times.sort_unstable();
     Ok(SearchResult {
         promotions,
         sum: outcome.best,
@@ -1814,9 +1711,6 @@ pub fn search_with<const W: usize>(
         time: t0.elapsed(),
         found: space.found.into_inner().unwrap_or_else(PoisonError::into_inner),
         start: incumbent,
-        nogoods: learned.sets,
-        carried: carried.len(),
-        learned: learned.times,
     })
 }
 
@@ -2208,39 +2102,6 @@ mod tests {
         assert!(prepare_for_resume::<16>(&Tables::new(b.n), &b.columns, &cands, &ckpt, 1).is_err());
         let cands = Bits::<32>::from_slice(&a.candidates);
         assert!(prepare_for_resume::<32>(&Tables::new(a.n), &a.columns, &cands, &ckpt, 1).is_err());
-    }
-
-    #[test]
-    fn carried_nogoods_are_checked_and_do_not_change_answers() {
-        let (g, other) = (load(760), load(720));
-        let p = prepare_golden::<16>(&g, SearchTactics::default());
-        let plain = search_checked(&p, 1, "plain");
-        let mut scratch = Scratch::new();
-        assert!(!plain.nogoods.is_empty() && plain.carried == 0);
-        for n in &plain.nogoods {
-            assert!(!p.model.can_promote_all_using(&mut scratch, &p.root, n), "{n:?} is no nogood");
-        }
-        // What is not a nogood of this root is rejected: sets that can be promoted (the optimum and a member of
-        // it), a set with a number that is not a candidate, the empty set.
-        let top = plain.promotions.max().expect("promotions");
-        let not_a_candidate = (1..=g.n).find(|&x| !p.candidates.contains(x)).expect("a non-candidate");
-        let fake = [plain.promotions, Bits::EMPTY.with(top), Bits::EMPTY.with(top).with(not_a_candidate), Bits::EMPTY];
-        assert!(valid_nogoods(&p, &fake).is_empty());
-        // Another game's nogoods, kept only where they are nogoods here too, as are this game's own.
-        let q = prepare_golden::<16>(&other, SearchTactics::default());
-        let foreign = search_checked(&q, 1, "other game").nogoods;
-        let given: Vec<Bits<16>> = fake.iter().chain(&foreign).chain(&plain.nogoods).copied().collect();
-        let valid = valid_nogoods(&p, &given);
-        assert!(valid.len() >= plain.nogoods.len());
-        for n in &valid {
-            assert!(!p.model.can_promote_all_using(&mut scratch, &p.root, n), "{n:?} is no nogood");
-            assert!(given.iter().any(|m| n.is_subset(m)), "{n:?} is not from what was given");
-        }
-        for threads in [1, 3] {
-            let cfg = config(threads);
-            let carried = search_with(&p, &cfg, None, None, false, &given, None).unwrap();
-            assert_eq!((carried.sum, carried.carried), (plain.sum, valid.len()), "{threads} threads");
-        }
     }
 
     #[test]

@@ -94,7 +94,6 @@ fn every_tactic_gives_the_same_scores() {
             "branching=conflict-largest",
             "match_refine=0",
             "match_refine=3",
-            "carry_nogoods=on",
         ]
         .map(with),
     );

@@ -59,9 +59,6 @@ pub struct Tactics {
     pub prev_cap: bool,
     /// Start the search from the better of the greedy set and the previous game's promotions (sound).
     pub seed_incumbent: bool,
-    /// Start the search's nogood tables with the nogoods the last game searched ended with, those that are
-    /// nogoods of this game's root (sound: each is checked).
-    pub carry_nogoods: bool,
 }
 
 impl Default for Tactics {
@@ -72,7 +69,6 @@ impl Default for Tactics {
             reuse_prev: true,
             prev_cap: true,
             seed_incumbent: true,
-            carry_nogoods: false,
         }
     }
 }
@@ -83,7 +79,7 @@ impl Default for Tactics {
 const UNPROVEN: [&str; 3] = ["reuse_prev", "revise_freedoms", "legacy_bound"];
 
 /// The number of tactics in DESIGN.md's table.
-const TACTIC_COUNT: usize = 13;
+const TACTIC_COUNT: usize = 12;
 
 /// The value of a tactic: an on/off switch, or one of the two settings that are not.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -170,7 +166,6 @@ impl Tactics {
             ("legacy_bound", Slot::Switch(&mut self.search.legacy_bound)),
             ("prev_cap", Slot::Switch(&mut self.prev_cap)),
             ("seed_incumbent", Slot::Switch(&mut self.seed_incumbent)),
-            ("carry_nogoods", Slot::Switch(&mut self.carry_nogoods)),
         ]
     }
 
@@ -311,24 +306,17 @@ pub struct Prev {
     pub moves: Vec<u32>,
     pub score: u64,
     pub source: PrevSource,
-    /// Nogoods of the last game searched (tactic `carry_nogoods`), as lists of numbers.
-    pub nogoods: Vec<Vec<u32>>,
 }
 
 impl Prev {
     /// The game for board size `n` in `optimal`, if it has one.
     pub fn from_optimal(optimal: &Optimal, n: u32) -> Option<Prev> {
         let (moves, score) = (optimal.moves(n)?, optimal.score(n)?);
-        Some(Prev { moves: moves.to_vec(), score, source: PrevSource::Optimal, nogoods: Vec::new() })
-    }
-
-    fn from_stored(game: &StoredGame) -> Prev {
-        Prev { moves: game.moves.clone(), score: game.score, source: PrevSource::Results, nogoods: Vec::new() }
+        Some(Prev { moves: moves.to_vec(), score, source: PrevSource::Optimal })
     }
 
     fn from_result(result: &GameResult) -> Prev {
-        let nogoods = result.nogoods.clone();
-        Prev { moves: result.moves.clone(), score: result.score, source: PrevSource::Run, nogoods }
+        Prev { moves: result.moves.clone(), score: result.score, source: PrevSource::Run }
     }
 }
 
@@ -439,9 +427,6 @@ pub struct GameResult {
     /// Whether the score equals `optimal.json`'s; `None` if the game is incomplete or the file lacks `n`.
     pub optimal_match: Option<bool>,
     pub prev_source: Option<PrevSource>,
-    /// With the tactic `carry_nogoods`, the nogoods to pass on to the next game: the search's at its end, or for a
-    /// game that was not searched, those it was given.  Not written to the results file.
-    pub nogoods: Vec<Vec<u32>>,
 }
 
 impl GameResult {
@@ -462,7 +447,6 @@ impl GameResult {
             tactics: opts.tactics,
             optimal_match: None,
             prev_source: prev.map(|p| p.source),
-            nogoods: prev.filter(|_| opts.tactics.carry_nogoods).map_or_else(Vec::new, |p| p.nogoods.clone()),
         }
     }
 
@@ -704,8 +688,7 @@ fn search_game<const W: usize>(
         node_limit: opts.node_limit,
         label: format!("n={n}"),
     };
-    let carried = search::sets_of_width::<W>(&result.nogoods);
-    let found = search::search_with(&prepared, &cfg, seed.as_ref(), cap, resuming, &carried, None);
+    let found = search::search(&prepared, &cfg, seed.as_ref(), cap, resuming);
     if ours {
         // Only removes the directory if the engine left nothing in it.
         let _ = fs::remove_dir(&spill_dir);
@@ -716,9 +699,6 @@ fn search_game<const W: usize>(
     result.stats = found.stats;
     result.counters = found.counters;
     result.phases.search = found.time;
-    if tactics.carry_nogoods {
-        result.nogoods = found.nogoods.iter().map(Bits::to_vec).collect();
-    }
     Ok(found.promotions)
 }
 
@@ -838,7 +818,7 @@ fn previous_game(n: u32, results: Option<&ResultsFile>, optimal: Option<&Optimal
     let before = n.checked_sub(1).filter(|&before| before >= 1)?;
     let stored = results.and_then(|r| r.completed(before));
     match stored {
-        Some(game) => Some(Prev::from_stored(game)),
+        Some(game) => Some(Prev { moves: game.moves.clone(), score: game.score, source: PrevSource::Results }),
         None => optimal.and_then(|o| Prev::from_optimal(o, before)),
     }
 }
@@ -875,7 +855,7 @@ pub fn solve_range_each(
     let mut prev: Option<Prev> = None;
     for n in lo..=hi {
         if let Some(game) = results.as_ref().and_then(|r| r.completed(n)) {
-            prev = Some(Prev::from_stored(game));
+            prev = Some(Prev { moves: game.moves.clone(), score: game.score, source: PrevSource::Results });
             summary.skipped += 1;
             continue;
         }
@@ -928,12 +908,11 @@ mod tests {
                 "nogoods",
                 "legacy_bound",
                 "prev_cap",
-                "seed_incumbent",
-                "carry_nogoods"
+                "seed_incumbent"
             ]
         );
         let values: Vec<String> = t.settings().iter().map(|s| s.1.to_string()).collect();
-        let expected = ["on", "on", "on", "off", "on", "conflict-strong", "1", "on", "on", "off", "on", "on", "off"];
+        let expected = ["on", "on", "on", "off", "on", "conflict-strong", "1", "on", "on", "off", "on", "on"];
         assert_eq!(values, expected);
         // The values of the search tactics are those of `SearchTactics::default()`, not copies of them.
         let search = SearchTactics::default();
@@ -1031,7 +1010,6 @@ mod tests {
             reuse_prev: false,
             prev_cap: false,
             seed_incumbent: false,
-            carry_nogoods: true,
         });
         for tactics in all {
             let mut again = Tactics::default();
@@ -1131,8 +1109,7 @@ mod tests {
     #[test]
     fn a_previous_game_that_does_not_check_out_is_refused() {
         let opts = SolveOptions { optimal_path: None, ..SolveOptions::default() };
-        let prev =
-            |moves: &[u32], score| Prev { moves: moves.to_vec(), score, source: PrevSource::Run, nogoods: vec![] };
+        let prev = |moves: &[u32], score| Prev { moves: moves.to_vec(), score, source: PrevSource::Run };
         // [5, 4, 6] is the game for 6, scoring 15.
         assert!(solve_game(7, Some(&prev(&[5, 4, 6], 15)), &opts).is_ok());
         let err = solve_game(7, Some(&prev(&[5, 4, 6], 14)), &opts).unwrap_err();

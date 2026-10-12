@@ -373,7 +373,7 @@ fn one_game<const W: usize>(n: u32, o: &RangeOptions, games: &Games) -> Result<O
             time_limit: o.time_limit,
             ..SolveOptions::default()
         };
-        let prev = Prev { moves: prev_moves.to_vec(), score: prev_score, source: PrevSource::Optimal, nogoods: vec![] };
+        let prev = Prev { moves: prev_moves.to_vec(), score: prev_score, source: PrevSource::Optimal };
         let r = solve_game_with(n, Some(&prev), &opts, None)?;
         if r.completed && opt.is_some_and(|s| s != r.score) {
             return Err(format!("n={n}: the direct search scores {}, not {opt:?}", r.score));

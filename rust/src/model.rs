@@ -1255,11 +1255,6 @@ impl<const W: usize> Nogoods<W> {
         self.sets.is_empty()
     }
 
-    /// The nogoods, in the order they were added.
-    pub fn sets(&self) -> &[Bits<W>] {
-        &self.sets
-    }
-
     /// Adds the nogood `n` (non-empty, members up to the table's `max_number`), forgetting every other one first
     /// if the table is full.  Lookups check its members in `first` (the conflict it was made from) before the
     /// others: those are the ones a node is least likely to have, so most lookups that fail stop at once.
