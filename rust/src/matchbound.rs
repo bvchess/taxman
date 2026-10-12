@@ -751,6 +751,9 @@ pub struct MatchStats {
 pub struct MatchBound<'g, const W: usize> {
     graph: &'g MatchGraph,
     levels: Vec<Level<W>>,
+    /// `spares[d]` is a level kept for level `d` (see [`keep_excluded`](Self::keep_excluded)) when `kept[d]`.
+    spares: Vec<Level<W>>,
+    kept: Vec<bool>,
     depth: usize,
     search: Search,
     stats: MatchStats,
@@ -762,6 +765,8 @@ impl<'g, const W: usize> MatchBound<'g, W> {
         let mut out = MatchBound {
             graph,
             levels: vec![Level::new(graph.len())],
+            spares: Vec::new(),
+            kept: Vec::new(),
             depth: 0,
             search: Search::default(),
             stats: MatchStats::default(),
@@ -774,6 +779,7 @@ impl<'g, const W: usize> MatchBound<'g, W> {
     /// with the candidates `cands`.  The first [`value`](Self::value) then solves it from scratch.
     pub fn reset(&mut self, promoted: &Bits<W>, cands: &Bits<W>) {
         self.depth = 0;
+        self.kept.fill(false);
         self.levels[0].reset(self.graph, promoted, cands);
     }
 
@@ -804,13 +810,54 @@ impl<'g, const W: usize> MatchBound<'g, W> {
             upper[0].copy_from(&lower[d]);
         }
         self.depth = d + 1;
+        if let Some(kept) = self.kept.get_mut(d + 1) {
+            *kept = false;
+        }
         &mut self.levels[d + 1]
     }
 
     /// Returns to the parent of the top level.
     pub fn pop(&mut self) {
         assert!(self.depth > 0, "pop without push");
+        if let Some(kept) = self.kept.get_mut(self.depth) {
+            *kept = false;
+        }
         self.depth -= 1;
+    }
+
+    /// The matching bound of the top level with `x` no longer a candidate, on a level pushed for it: then
+    /// [`pop`](Self::pop) it, or [`keep_excluded`](Self::keep_excluded) it.
+    pub fn value_excluding(&mut self, x: u32) -> u64 {
+        self.push_excluding(&Bits::EMPTY.with(x));
+        self.value()
+    }
+
+    /// Pops the level pushed by [`value_excluding`](Self::value_excluding), keeping it (settled) for its
+    /// parent: once the parent is the top level again, with children pushed and popped meanwhile but nothing done
+    /// to the parent itself, [`take_kept`](Self::take_kept) makes the kept level the parent, which saves
+    /// repairing the parent for the same removal.  A later keep for the same parent replaces it.
+    pub fn keep_excluded(&mut self) {
+        let d = self.depth;
+        assert!(d > 0, "nothing pushed to keep");
+        if self.spares.len() < d {
+            let size = self.graph.len();
+            self.spares.resize_with(d, || Level::new(size));
+            self.kept.resize(d, false);
+        }
+        std::mem::swap(&mut self.levels[d], &mut self.spares[d - 1]);
+        self.kept[d - 1] = true;
+        self.depth = d - 1;
+    }
+
+    /// If a level is kept for the top level, makes it the top level and returns true.
+    pub fn take_kept(&mut self) -> bool {
+        let d = self.depth;
+        if self.kept.get(d) != Some(&true) {
+            return false;
+        }
+        std::mem::swap(&mut self.levels[d], &mut self.spares[d]);
+        self.kept[d] = false;
+        true
     }
 
     /// Number of levels above level 0.
@@ -858,7 +905,7 @@ impl<'g, const W: usize> MatchBound<'g, W> {
     }
 
     fn settle(&mut self) -> &Level<W> {
-        let MatchBound { graph, levels, depth, search, stats } = self;
+        let MatchBound { graph, levels, depth, search, stats, .. } = self;
         let level = &mut levels[*depth];
         stats.evaluations += 1;
         level.settle(graph, search, stats);
@@ -1011,6 +1058,12 @@ mod tests {
                         mb.value();
                     }
                 }
+                // Or the level without n is solved beforehand and kept for after the child.
+                let keep = !remove_first && self.rng.chance(40);
+                if keep {
+                    mb.value_excluding(n);
+                    mb.keep_excluded();
+                }
                 if self.rng.chance(40) {
                     if let Some(next) = self.model.promote(state, n) {
                         let next_promoted = promoted.with(n);
@@ -1028,7 +1081,9 @@ mod tests {
                         assert_eq!(mb.depth(), depth);
                     }
                 }
-                if !remove_first {
+                if keep {
+                    assert!(mb.take_kept(), "the kept level is gone");
+                } else if !remove_first {
                     mb.remove_candidate(n);
                 }
                 if self.rng.chance(5) {

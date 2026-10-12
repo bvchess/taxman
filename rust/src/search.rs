@@ -380,15 +380,17 @@ impl<const W: usize> Refiner<'_, '_, W> {
 /// The member of the conflict `k` to branch on by looking ahead (tactic `branching = conflict-strong`): the one
 /// whose removal from the candidates lowers the matching bound most (then the largest), which makes the node
 /// going on without it the likeliest to stop soon.  (The child that promotes it gains nothing to look at: the
-/// heaviest matching already promotes every member.)  `m`'s top level is the node, settled; it is left so.
+/// heaviest matching already promotes every member.)  `m`'s top level is the node, settled; it is left so, with
+/// the level without the chosen member kept for it (see [`MatchBound::keep_excluded`]).
 fn strongest<const W: usize>(m: &mut MatchBound<'_, W>, k: &Bits<W>) -> u32 {
     let mut best = (u64::MAX, 0);
     for x in k.iter() {
-        m.push_excluding(&Bits::EMPTY.with(x));
-        let bound = m.value();
-        m.pop();
+        let bound = m.value_excluding(x);
         if bound <= best.0 {
+            m.keep_excluded();
             best = (bound, x);
+        } else {
+            m.pop();
         }
     }
     best.1
@@ -769,6 +771,9 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         let (path, rest) = self.levels.split_at_mut(depth + 1);
         let (node, child) = (&mut path[depth], &mut rest[0]);
         self.known.truncate(node.known_end); // forget the conflicts of the child last considered
+        if let Some(m) = &mut self.matching {
+            m.take_kept(); // the node without the candidate it last branched on, if strong branching kept it
+        }
         let bounds = &mut self.bounds;
         let matching = &mut self.matching;
         let probe = &mut self.probe;
@@ -837,11 +842,13 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         }
         // The candidate to branch on: promoted in the child, and no longer a candidate of this node.
         let k = conflict.map(|k| k & node.cands).filter(|k| !k.is_empty());
+        let mut kept = false; // whether the matching level without n is kept for the node
         let n = match (branching, k) {
             (Branching::ConflictSmallest, Some(k)) => k.min(),
             (Branching::ConflictLargest, Some(k)) => k.max(),
             (Branching::ConflictStrong, Some(k)) if k.len() > 1 => {
                 let m = matching.as_mut().expect("conflicts come from the matching");
+                kept = true;
                 Some(strongest(m, &k))
             }
             (Branching::ConflictStrong, Some(k)) => k.max(),
@@ -850,7 +857,9 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         .expect("not empty");
         node.cands.remove(n);
         if let Some(m) = matching {
-            m.remove_candidate(n);
+            if !kept {
+                m.remove_candidate(n);
+            }
         }
 
         self.attempts += 1;
