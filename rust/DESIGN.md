@@ -361,7 +361,7 @@ the lever, not cheaper nodes.
   `can_promote` filter instead of the Java's partial one) cut nodes 25–35% but
   quadrupled the cost per node.  The preclusion table still pays on long
   searches (936: 15.7 s → 11.8 s) though it costs ~1.4 s of setup on one
-  thread.  (No longer: see "Forced members", below.)
+  thread.  (No longer: see "Forced members and nogoods", below.)
 
 Per change (search seconds and nodes; 1 thread for 760/880/936 seeded from
 n−1, 10 threads for 1000; 10-thread times vary with when the optimum is
@@ -396,13 +396,15 @@ Left to try: making the per-node conflict work cheaper (a quarter of the
 time: peeling each frame `Q*` touches), fewer matching solves per node, and
 incumbents for games like 992 whose optimum is found late.
 
-### Forced members (2026-10, second round)
+### Forced members and nogoods (2026-10, second round)
 
 Measured with the ladder on one thread (deterministic node counts) with the
 frontier's tactics (`revise_freedoms=off`), seeded from n−1 (from
 `results/strict.jsonl` past 1000, `--known`), on a fast set that each finish
 in under 25 s: 880, 936, 1050 (optimum found late), 1100, 1170, 1184 (proof
-only).  Where the time went at 1184 (`sample`): peeling for conflicts 29%
+only).  (The first rows were measured while a production run used 6 cores,
+the rest on an idle machine; the first row measured again idle came out the
+same to 1%.)  Where the time went at 1184 (`sample`): peeling for conflicts 29%
 (nearly all of it minimizing them), matching repairs for refinement 18% and
 for strong branching 16%, the candidate filter's peels 16%.
 
@@ -547,7 +549,37 @@ optimal.json, the rest from `results/strict.jsonl`):
 | 356ef92 | forced members of the whole matching | 0.46 s 31k | 0.83 s 45k | 6.45 s 241k | 1.31 s 51k | 0.92 s 35k | 2.94 s 133k |
 | fe73c1c | cheaper children | 0.29 s 30k | 0.53 s 47k | 4.68 s 264k | 0.73 s 51k | 0.40 s 35k | 1.28 s 126k |
 | 372c3f9 | nogood signatures | 0.26 s 30k | 0.49 s 47k | 4.43 s 264k | 0.68 s 51k | 0.38 s 35k | 1.21 s 126k |
-| (next) | no refinement where members are forced | 0.24 s 32k | 0.45 s 52k | 3.99 s 290k | 0.67 s 56k | 0.37 s 38k | 1.13 s 130k |
+| 49517a1 | no refinement where members are forced | 0.24 s 32k | 0.45 s 52k | 3.99 s 290k | 0.67 s 56k | 0.37 s 38k | 1.13 s 130k |
+| 8bcfd36 | no preclusion table | 0.23 s 31k | 0.50 s 57k | 3.88 s 289k | 0.63 s 55k | 0.36 s 38k | 1.34 s 159k |
+
+(Setup is left out: the preclusion table took 1.3–3.9 s of it on one thread
+for these games, now nothing.)
+
+The hard games, standalone in the ladder as above, on an idle machine (search
+seconds; with several threads the times vary from run to run with when the
+optimum is found, so two runs are shown for the last version; in
+parentheses, when the final incumbent was found):
+
+| game | 8686be0, 8 threads | 8bcfd36, 8 threads | 8bcfd36, 2 threads |
+|---|---|---|---|
+| 1215 | 195.6 s (71.4) | 12.1 s (7.4), 9.8 s (2.6) | 35.7 s (13.8) |
+| 1216 | 51.5 s (start) | 3.1 s, 3.3 s | 10.4 s |
+| 1025 | 100.1 s (76.7) | 12.5 s (4.6), 23.9 s (15.0) | 93.5 s (70.0) |
+| 992 | 71.4 s (56.8) | 11.8 s (11.4), 12.0 s (11.8) | 40.0 s (39.2) |
+| 996 | 76.4 s (start) | 10.2 s, 10.0 s | 31.5 s |
+
+`taxman solve 1001-1217 --threads 8 --tactic reuse_prev=off --tactic
+revise_freedoms=off` (no unproven tactic) reproduces every score of
+`results/strict.jsonl` in 164 s of game time; those results took 1244 s on
+10 threads.  Its slowest games: 1025 21 s (110 s before), 1215 10 s (161 s),
+1020 6 s (40 s).
+
+Left to try: the incumbents of games like 992 and 1025, whose optimum the
+search reaches late (992 on 8 threads: at 11.8 s of 12.0 s; seeded with its
+optimum it takes about 6 s); the matching repairs, still about 40% of the
+time (strong branching where nothing is forced, and refinement); and the
+multi-thread search: each thread learns its own nogoods (sharing them did
+not look worth it: a proof on 8 threads takes about as many nodes as on one).
 
 ## Testing
 
@@ -589,11 +621,15 @@ Performance:
 * Larger games (738, 750, 840; Java 56–90 s) only after the bench set is
   fast and correct.
 * The ladder, `cargo run --release --example ladder -- [--threads T]
-  [--seconds S] [--diag] [--seed-opt] [--tactic …] N…`: standalone searches
-  of hard games (default 760 800 840 880 900 960 992 1000) from the frame
-  builder, seeded from optimal.json's n−1 game and capped as the solver does,
-  each with a time limit; reports completion, nodes, time and when the final
-  incumbent was found.  `--seed-opt` seeds with the game for n itself, to
-  measure the proof alone; `--diag` prints `search::Diagnostics` (nodes by
-  depth, what pruned, bound gaps, conflict sizes, matching work).  Fast
-  progress benchmarks: 880 and 936 on one thread (seconds), 1000 on ten.
+  [--seconds S] [--diag] [--seed-opt] [--known FILE] [--tactic …] N…`:
+  standalone searches of hard games (default 760 800 840 880 900 960 992
+  1000) from the frame builder, seeded from the known n−1 game and capped as
+  the solver does, each with a time limit; reports completion, nodes, time
+  and when the final incumbent was found.  The known games are optimal.json's
+  plus, with `--known`, a results file's (`results/strict.jsonl` for games
+  past 1000).  `--seed-opt` seeds with the game for n itself, to measure the
+  proof alone; `--diag` prints `search::Diagnostics` (nodes by depth, what
+  pruned, bound gaps, conflict sizes, matching work).  Fast progress
+  benchmarks (one thread, `--tactic revise_freedoms=off`): 880, 936, 1050,
+  1100, 1170, 1184; harder ones: 992, 996, 1025, 1215, 1216 on several
+  threads.
