@@ -1,0 +1,32 @@
+{"time": "2026-10-12 12:09:11", "label": "calib start: ['1001-1231']", "idle_pct": 89.25, "top": [["WindowServer", 35.4], ["top", 10.3], ["kernel_task", 7.5], ["Claude Helper", 6.9], ["pycharm", 4.9]]}
+{"time": "2026-10-12 12:18:57", "label": "calib end", "idle_pct": 76.7, "top": [["duetexpertd", 77.6], ["ladder", 67.2], ["top", 6.9], ["pycharm", 4.7], ["kernel_task", 3.2]]}
+{"time": "2026-10-12 12:19:05", "label": "calib start: ['1001-1231']", "idle_pct": 77.35, "top": [["duetexpertd", 80.1], ["ladder", 67.9], ["top", 7.3], ["pycharm", 4.0], ["kernel_task", 3.0]]}
+{"time": "2026-10-12 12:22:34", "label": "calib end", "idle_pct": 81.36, "top": [["rustc", 65.9], ["top", 7.0], ["pycharm", 3.9], ["kernel_task", 2.7], ["Wispr Flow Helpe", 1.7]]}
+{"time": "2026-10-12 12:22:41", "label": "band start: ['band1250']", "idle_pct": 83.96, "top": [["solver-ab74ea7ed", 70.4], ["fseventsd", 12.9], ["mds_stores", 8.7], ["top", 7.1], ["mds", 5.8]]}
+{"time": "2026-10-12 12:24:14", "label": "band end", "idle_pct": 95.8, "top": [["top", 13.9], ["pycharm", 4.9], ["kernel_task", 3.1], ["Wispr Flow Helpe", 2.2], ["claude", 2.0]]}
+{"time": "2026-10-12 12:24:20", "label": "band start: ['band1300', 'band1350']", "idle_pct": 84.17, "top": [["top", 9.4], ["kernel_task", 5.6], ["dasd", 5.3], ["launchd", 5.0], ["pycharm", 4.3]]}
+{"time": "2026-10-12 12:32:38", "label": "band end", "idle_pct": 76.77, "top": [["zoom.us", 45.8], ["WindowServer", 37.1], ["kernel_task", 30.3], ["launchd", 10.7], ["coreaudiod", 9.3]]}
+{"time": "2026-10-12 12:32:51", "label": "band start: ['band1300', 'band1350']", "idle_pct": 78.98, "top": [["zoom.us", 46.4], ["WindowServer", 37.8], ["kernel_task", 29.5], ["coreaudiod", 9.0], ["aomhost", 8.8]]}
+{"time": "2026-10-12 12:42:31", "label": "band end", "idle_pct": 78.55, "top": [["zoom.us", 45.9], ["WindowServer", 36.7], ["kernel_task", 27.8], ["aomhost", 9.3], ["coreaudiod", 8.3]]}
+{"time": "2026-10-12 12:42:41", "label": "band start: ['band1300', 'band1350']", "idle_pct": 72.74, "top": [["zoom.us", 47.3], ["WindowServer", 37.2], ["kernel_task", 29.1], ["aomhost", 9.3], ["coreaudiod", 8.9]]}
+{"time": "2026-10-12 12:49:12", "label": "band end", "idle_pct": 69.73, "top": [["suggestd", 55.3], ["zoom.us", 44.9], ["WindowServer", 37.9], ["kernel_task", 31.7], ["calaccessd", 11.9]]}
+{"time": "2026-10-12 12:49:21", "label": "band start: ['band1300', 'band1350']", "idle_pct": 71.8, "top": [["suggestd", 58.4], ["zoom.us", 43.7], ["WindowServer", 36.5], ["kernel_task", 27.7], ["trustd", 17.8]]}
+{"time": "2026-10-12 12:59:06", "label": "band end", "idle_pct": 75.19, "top": [["zoom.us", 54.0], ["WindowServer", 39.7], ["kernel_task", 27.2], ["Microsoft PowerP", 12.0], ["aomhost", 9.3]]}
+{"time": "2026-10-12 12:59:13", "label": "band start: ['band1350']", "idle_pct": 77.35, "top": [["zoom.us", 53.8], ["WindowServer", 35.2], ["kernel_task", 27.4], ["coreaudiod", 9.6], ["UVCAssistant", 8.6]]}
+{"time": "2026-10-12 13:08:13", "label": "band end", "idle_pct": 78.43, "top": [["zoom.us", 48.0], ["WindowServer", 38.0], ["kernel_task", 23.8], ["coreaudiod", 8.8], ["top", 8.1]]}
+{"time": "2026-10-12 13:08:27", "label": "band start: ['1351', '1352']", "idle_pct": 77.5, "top": [["zoom.us", 53.7], ["WindowServer", 36.7], ["kernel_task", 25.3], ["coreaudiod", 9.6], ["top", 8.1]]}
+{"time": "2026-10-12 13:17:00", "label": "band end", "idle_pct": 74.6, "top": [["zoom.us", 58.1], ["WindowServer", 34.5], ["kernel_task", 27.5], ["coreaudiod", 9.7], ["aomhost", 8.8]]}
+{"time": "2026-10-12 13:17:06", "label": "band start: ['1351', '1352']", "idle_pct": 64.27, "top": [["zoom.us", 58.7], ["duetexpertd", 38.0], ["WindowServer", 37.2], ["contactsd", 27.6], ["kernel_task", 25.0]]}
+{"time": "2026-10-12 13:25:58", "label": "band end", "idle_pct": 74.28, "top": [["zoom.us", 58.9], ["WindowServer", 38.7], ["kernel_task", 26.8], ["coreaudiod", 9.1], ["aomhost", 8.8]]}
+{"time": "2026-10-12 13:26:07", "label": "seedopt start: ['1225']", "idle_pct": 72.32, "top": [["duetexpertd", 51.2], ["zoom.us", 49.2], ["WindowServer", 38.1], ["kernel_task", 24.0], ["coreaudiod", 9.0]]}
+{"time": "2026-10-12 13:28:39", "label": "seedopt end", "idle_pct": 74.55, "top": [["zoom.us", 58.2], ["WindowServer", 38.9], ["kernel_task", 25.2], ["aomhost", 8.6], ["top", 8.2]]}
+{"time": "2026-10-12 13:28:41", "label": "seedopt start: ['1225']", "idle_pct": 73.11, "top": [["zoom.us", 61.3], ["WindowServer", 37.1], ["kernel_task", 26.7], ["aomhost", 8.9], ["coreaudiod", 8.6]]}
+{"time": "2026-10-12 13:29:46", "label": "seedopt end", "idle_pct": 78.26, "top": [["zoom.us", 47.8], ["WindowServer", 38.7], ["kernel_task", 23.8], ["coreaudiod", 8.8], ["top", 8.2]]}
+{"time": "2026-10-12 13:29:48", "label": "seedopt start: ['1225']", "idle_pct": 76.51, "top": [["zoom.us", 48.0], ["WindowServer", 38.5], ["kernel_task", 23.8], ["coreaudiod", 8.7], ["top", 8.3]]}
+{"time": "2026-10-12 13:30:21", "label": "seedopt end", "idle_pct": 77.65, "top": [["zoom.us", 47.5], ["WindowServer", 37.9], ["kernel_task", 24.0], ["top", 8.4], ["coreaudiod", 8.2]]}
+{"time": "2026-10-12 13:30:23", "label": "seedopt start: ['1225']", "idle_pct": 78.62, "top": [["zoom.us", 48.3], ["WindowServer", 37.0], ["kernel_task", 24.9], ["coreaudiod", 8.2], ["top", 8.0]]}
+{"time": "2026-10-12 13:30:43", "label": "seedopt end", "idle_pct": 75.78, "top": [["zoom.us", 58.3], ["WindowServer", 40.2], ["kernel_task", 24.0], ["aomhost", 9.4], ["coreaudiod", 8.5]]}
+{"time": "2026-10-12 13:31:54", "label": "recheck start: ['1215', '1225', '1300', '1230']", "idle_pct": 71.21, "top": [["zoom.us", 55.0], ["WindowServer", 32.2], ["kernel_task", 26.9], ["calaccessd", 22.7], ["suggestd", 17.3]]}
+{"time": "2026-10-12 13:38:25", "label": "recheck end", "idle_pct": 76.9, "top": [["zoom.us", 47.2], ["WindowServer", 37.5], ["kernel_task", 26.5], ["PerfPowerService", 10.2], ["coreaudiod", 9.0]]}
+{"time": "2026-10-12 13:44:34", "label": "band start: ['1250']", "idle_pct": 76.59, "top": [["zoom.us", 49.4], ["WindowServer", 37.8], ["kernel_task", 26.4], ["coreaudiod", 9.0], ["top", 8.3]]}
+{"time": "2026-10-12 13:44:36", "label": "band end", "idle_pct": 60.35, "top": [["zoom.us", 48.8], ["WindowServer", 36.5], ["kernel_task", 29.4], ["Mail", 21.6], ["contactsd", 16.9]]}
