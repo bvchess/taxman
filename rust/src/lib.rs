@@ -2,9 +2,11 @@
 
 pub mod accelerate;
 pub mod bits;
+pub mod bounds;
 pub mod engine;
 pub mod frames;
 pub mod game;
 pub mod hives;
 pub mod json;
+pub mod model;
 pub mod numtheory;
