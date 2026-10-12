@@ -72,7 +72,8 @@
 
 use crate::bits::Bits;
 use crate::model::{FrameSet, Model};
-use std::collections::VecDeque;
+use std::cmp::Reverse;
+use std::collections::{BinaryHeap, VecDeque};
 
 // ---------------------------------------------------------------------------------------------------------
 // Reference solver
@@ -545,14 +546,17 @@ const INNER: u8 = 3;
 #[derive(Clone, Debug)]
 struct RadixHeap {
     last: u64,
-    /// Bit `i` set when bucket `i` is not empty.
-    full: u128,
+    /// The codes of the events at time `last` (bucket 0), smallest first.
+    now: BinaryHeap<Reverse<u32>>,
+    /// Bit `i` set when bucket `i ≥ 1` is not empty.
+    full: u64,
+    /// Buckets 1 to 64 (index 0 unused).
     buckets: [Vec<(u64, u32)>; 65],
 }
 
 impl Default for RadixHeap {
     fn default() -> Self {
-        RadixHeap { last: 0, full: 0, buckets: std::array::from_fn(|_| Vec::new()) }
+        RadixHeap { last: 0, now: BinaryHeap::new(), full: 0, buckets: std::array::from_fn(|_| Vec::new()) }
     }
 }
 
@@ -563,8 +567,9 @@ impl RadixHeap {
     }
 
     fn clear(&mut self) {
+        self.now.clear();
         while self.full != 0 {
-            let i = self.full.trailing_zeros() as usize;
+            let i = self.full.trailing_zeros() as usize + 1;
             self.buckets[i].clear();
             self.full &= self.full - 1;
         }
@@ -574,36 +579,32 @@ impl RadixHeap {
     #[inline]
     fn push(&mut self, time: u64, code: u32) {
         debug_assert!(time >= self.last, "time went back");
-        let i = self.bucket(time);
-        self.buckets[i].push((time, code));
-        self.full |= 1 << i;
+        match self.bucket(time) {
+            0 => self.now.push(Reverse(code)),
+            i => {
+                self.buckets[i].push((time, code));
+                self.full |= 1 << (i - 1);
+            }
+        }
     }
 
     fn pop(&mut self) -> Option<(u64, u32)> {
-        if self.full == 0 {
-            return None;
-        }
-        if self.full & 1 == 0 {
+        if self.now.is_empty() {
+            if self.full == 0 {
+                return None;
+            }
             // Advance to the smallest time and spread its bucket over the lower ones (all of it moves down).
-            let i = self.full.trailing_zeros() as usize;
+            let i = self.full.trailing_zeros() as usize + 1;
             let mut moved = std::mem::take(&mut self.buckets[i]);
-            self.full &= !(1 << i);
+            self.full &= !(1 << (i - 1));
             self.last = moved.iter().map(|e| e.0).min().expect("not empty");
             for &(time, code) in &moved {
-                let j = self.bucket(time);
-                self.buckets[j].push((time, code));
-                self.full |= 1 << j;
+                self.push(time, code);
             }
             moved.clear();
             self.buckets[i] = moved;
         }
-        let now = &mut self.buckets[0];
-        let k = (0..now.len()).min_by_key(|&k| now[k].1).expect("not empty");
-        let event = now.swap_remove(k);
-        if now.is_empty() {
-            self.full &= !1;
-        }
-        Some(event)
+        self.now.pop().map(|Reverse(code)| (self.last, code))
     }
 }
 
@@ -1065,6 +1066,40 @@ mod tests {
             }
         }
         best.unwrap_or(0)
+    }
+
+    #[test]
+    fn radix_heap_pops_like_a_binary_heap() {
+        let mut rng = Rng(0x4EA9_0000_1234_5678);
+        let mut radix = RadixHeap::default();
+        for round in 0..200 {
+            radix.clear();
+            let mut reference = BinaryHeap::new();
+            let mut now = 0u64;
+            for _ in 0..rng.below(300) {
+                // Pushes at or after the last time popped; sometimes pops.
+                for _ in 0..rng.below(4) {
+                    let time = now + [0, 0, 1, 2, 7, 100, 1 << 20][rng.below(7)] + rng.below(3) as u64;
+                    let code = rng.below(1000) as u32;
+                    radix.push(time, code);
+                    reference.push(Reverse((time, code)));
+                }
+                if rng.chance(60) {
+                    let expected = reference.pop().map(|Reverse(e)| e);
+                    assert_eq!(radix.pop(), expected, "round {round}");
+                    if let Some((time, _)) = expected {
+                        now = time;
+                    }
+                }
+            }
+            // A search stops part way and clears the rest, or drains it.
+            if rng.chance(50) {
+                while let Some(Reverse(e)) = reference.pop() {
+                    assert_eq!(radix.pop(), Some(e), "round {round}, draining");
+                }
+                assert_eq!(radix.pop(), None);
+            }
+        }
     }
 
     #[test]
