@@ -224,6 +224,22 @@ Range runs feed each game's solution to the next and resume from the
 results file.  The n−1 solution comes from, in order: this run, the results
 file, optimal.json.
 
+## Improvements queued after parity
+
+* **Matching bound** (sound).  Relax winnability (peel) to plain
+  matchability across the whole frame chain: maximize the promoted sum
+  subject to every original move and every promoted number getting a
+  distinct maximal factor in its frame, and no promoted number being used
+  as a factor.  Edges v → v/p change Ω(v) by one, so this is a max-weight
+  *bipartite* matching (min-cost flow), exactly solvable.  Measured at the
+  root of all 94 golden games that need search (scratch study): mean gap to
+  the optimum 31 vs 76 for the Java bound; on the bench games 107–292 vs
+  363–769.  The cardinality cap never binds.  To be used incrementally
+  (re-optimized along the DFS path) and combined with the Java bound
+  (take the minimum).
+* Seeding the incumbent from n−1 and stopping at n + opt(n−1) (tactics
+  `seed_incumbent`, `prev_cap`).
+
 ## Testing
 
 Correctness, all on games that finish in seconds:
