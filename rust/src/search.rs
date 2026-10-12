@@ -1275,7 +1275,9 @@ impl<const W: usize> Searcher<TaxUnit<W>> for TaxSearcher<'_, W> {
         let mut depth = 0;
         loop {
             if ctx.poll() == Poll::Yield {
-                for level in &self.levels[..=depth] {
+                // A node with no candidates left (a loop that `fix_forced` ended, say) has nothing for a unit to do:
+                // its step would end the loop at once.
+                for level in self.levels[..=depth].iter().filter(|level| !level.cands.is_empty()) {
                     ctx.push(TaxUnit { promoted: level.promoted, cands: level.cands });
                 }
                 break;
@@ -2019,6 +2021,28 @@ mod tests {
         for g in &games {
             check_against_java::<16>(g);
         }
+    }
+
+    /// Every candidate of the frame builder, for the games `range` (all with candidates, or none), can be promoted
+    /// from the root by itself.
+    fn candidates_can_be_promoted_from_the_root<const W: usize>(range: std::ops::RangeInclusive<u32>) {
+        let mut scratch = Scratch::new();
+        for n in range {
+            let tables = Tables::new(n);
+            let frames = build_frames::<W>(&tables);
+            let (model, root) = Model::build::<W>(&tables, &frames.columns()).unwrap();
+            for x in frames.candidates.iter() {
+                assert!(model.can_promote_using(&mut scratch, &root, x), "n={n}: candidate {x} cannot be promoted");
+            }
+        }
+    }
+
+    /// So a test of each candidate at the root would find nothing to drop (see DESIGN.md, "Single-member conflicts
+    /// belong to the node"), and the single-member conflicts of the search are relative to its nodes.
+    #[test]
+    fn the_frame_builders_candidates_can_all_be_promoted_from_the_root() {
+        candidates_can_be_promoted_from_the_root::<16>(2..=1023);
+        candidates_can_be_promoted_from_the_root::<32>(1024..=1230);
     }
 
     fn sums_by_tactics<const W: usize>(g: &Golden) -> Vec<(SearchTactics, u64)> {

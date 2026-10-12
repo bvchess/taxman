@@ -219,7 +219,13 @@ the incumbent value), `offer(value, payload) -> bool`, and a per-worker
   workers are left that the queued units cannot serve (a *split*), (b) a
   checkpoint is due, or (c) a stop is requested (time limit or node limit).
   With one thread the deque is a pure stack: units are explored in
-  depth-first order, unchanged by checkpoints and spilling.
+  depth-first order, unchanged by checkpoints and spilling.  The Taxman
+  searcher leaves out of its yield the nodes of its stack that have no
+  candidates left (a node whose loop `fix_forced` ended): as units they would
+  only be runs of one step that end the loop.  At 2 threads on 936, 1100 and
+  1184 (twice each, `ladder --threads 2,2`) the runs of at most one poll fell
+  from 60 and 91 of 256 and 305 to 13 and 10 of 227 and 200, the nodes and
+  times unchanged.
 * **Splits, sized for many cores** (2026-10, for a 192-core machine): the
   engine keeps one open split request per idle worker that the queued and
   held units will not serve, and any running worker can claim one (an atomic
@@ -262,7 +268,7 @@ the incumbent value), `offer(value, payload) -> bool`, and a per-worker
   split into busy (in the searcher), idle (waiting for work), parked (in
   pauses) and lock wait (for the deque's lock); the effective parallelism
   busy / (wall × threads); splits and the units they gave, steals, runs and
-  tiny runs (units with nothing left); when all workers first ran at once;
+  tiny runs (units that polled at most once); when all workers first ran at once;
   the number of pauses, the longest pause and the longest wait for the
   workers to park.
 * **Progress**: every `progress_interval` (default 60 s) one line on stderr:
@@ -355,8 +361,9 @@ the lever, not cheaper nodes.
   core moves, or promoted out of it and factors of core moves) cannot be
   promoted together.  Minimized by peeling only the core, these conflicts are
   tiny: two members at the median and p75 at n=760, p50 2 / p90 5 at 996 (a
-  quarter are single members: candidates the Java's filter leaves in that
-  cannot be promoted at all).  A subset of a promotable set is promotable, so
+  quarter are single members: a candidate that cannot be promoted from that
+  node's state, though it can from the root; see "Single-member conflicts
+  belong to the node").  A subset of a promotable set is promotable, so
   every completion leaves out some member of a conflict — the basis of all
   that follows, and of `search::Refiner`'s soundness proof.
 * **Refinement** (`match_refine`).  Bound the branches of the conflict too
@@ -741,6 +748,37 @@ fast set 880–1184 is unchanged to ±4%):
 The strict chain 1201–1231 on 4 threads (as above) takes 377 s instead of
 571 s, with every score the same (1230: 158 s instead of 275 s; 1225 33 s
 instead of 55 s; 1220 39 s instead of 62 s).
+
+### Single-member conflicts belong to the node (2026-10)
+
+Many of the conflicts the search computes have one member (`--diag`'s minimal
+conflict sizes: the 25th percentile is 1 at 936, the 10th at 1184).  They
+looked like candidates that the Java's filter lets through and that cannot be
+promoted from the root at all, which every searcher, work unit and resume
+would find again; testing each candidate once from the root and dropping the
+failures would then be free.  They are not root facts:
+
+* **The frame builder's candidates all pass that test.**  A hive's promotion
+  candidates are its factors that can leave it (the remaining sources can
+  still be matched without them) and that some hive can take on as a source,
+  which comes to what `Model::can_promote` checks at the root (the home frame
+  without the factor, the frame below with it as a move).  For every game from
+  2 to 1230 none of the candidates fails that check (a test), so a filter at
+  the root drops nothing.  A version built as a tactic (the checkpoint header
+  recording the candidates it leaves, older checkpoints refused as a different
+  candidate set) searched 936, 1100, 1184 and 1215 on one thread in exactly the
+  same nodes as without it (58,903, 56,399, 167,960 and 5,161,817), with 0 of
+  225, 273, 287 and 302 candidates dropped; it was not kept.
+* **The conflicts are relative to the node.**  A nogood of one member would be
+  a candidate that cannot be promoted from the root, so the table never holds
+  one.  A single-member conflict is a candidate that cannot be promoted once the
+  node's promotions are made (its frame may have used it up in a forced pair,
+  say); in another branch, with other promotions, it is a nogood of two or more
+  members.  Looking it up is cheap, and the node's loop then goes on without
+  the candidate.
+* **Little is left to save.**  The promotions that fail are 2,282 of 58,903
+  steps at 936 (3.9%) and 698 of 167,960 at 1184 (0.4%) (`--diag`, one thread),
+  which bounds what a search that never tried a dead candidate could gain.
 
 ## Testing
 
