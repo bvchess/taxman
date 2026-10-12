@@ -65,7 +65,9 @@ pub struct SearchTactics {
     /// the matching bound only where `blameGame` does not prune (sound).
     pub match_bound: bool,
     /// Refine the matching bound by conflicts, branching this many levels deep where it does not prune
-    /// (0: off; needs `match_bound`; sound, see [`Refiner`]).  At most 7.
+    /// (0: off; needs `match_bound`; sound, see [`Refiner`]).  At most 7.  What it prunes can depend on the
+    /// conflicts already known along the path, which work units do not record, so a single-threaded search
+    /// that is interrupted may explore a slightly different tree (with the same answer).
     pub match_refine: u8,
     /// Which candidate a node branches on next (sound: any order explores every promotion set).
     pub branching: Branching,
@@ -76,13 +78,14 @@ pub struct SearchTactics {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Branching {
     /// The largest candidate left (the Java's order).
-    #[default]
     Largest,
     /// The smallest member of a conflict of the heaviest matching (see [`Refiner`]), so that neither the child
     /// nor the node going on can repeat that matching; the largest candidate when there is none (or without
     /// `match_bound`).
     ConflictSmallest,
-    /// As `ConflictSmallest`, the largest member of the conflict.
+    /// As `ConflictSmallest`, the largest member of the conflict.  The child then follows the rounding of
+    /// [`dive`] (the smaller members are the ones left out), which finds good incumbents early.
+    #[default]
     ConflictLargest,
 }
 
@@ -94,7 +97,7 @@ impl Default for SearchTactics {
             revise_freedoms: true,
             match_bound: true,
             match_refine: 0,
-            branching: Branching::Largest,
+            branching: Branching::default(),
         }
     }
 }
@@ -288,7 +291,7 @@ impl<const W: usize> Refiner<'_, '_, W> {
             return Verdict::Open(None);
         }
         let chosen = self.m.chosen();
-        let Some(k) = self.conflict_of(&chosen) else {
+        let Some(k) = self.fresh_conflict(&chosen) else {
             return Verdict::Exact(chosen);
         };
         if depth > 0 && !self.branches(k, Bits::EMPTY, depth) {
@@ -299,9 +302,17 @@ impl<const W: usize> Refiner<'_, '_, W> {
 
     /// A conflict of `promoted` from `self.state`, known or computed; `None` if it can all be promoted.
     fn conflict_of(&mut self, promoted: &Bits<W>) -> Option<Bits<W>> {
-        if let Some(&k) = self.known.iter().rev().find(|k| k.is_subset(promoted)) {
-            return Some(k);
+        match self.known.iter().rev().find(|k| k.is_subset(promoted)) {
+            Some(&k) => Some(k),
+            None => self.fresh_conflict(promoted),
         }
+    }
+
+    /// A conflict of `promoted` from `self.state`, computed (and then known); `None` if it can all be promoted.
+    /// The search branches on the top level's conflict, so that is always computed this way: what is known
+    /// depends on how the search got to the node, which work units do not record, and a single-threaded search
+    /// explores the same tree however often it is interrupted.
+    fn fresh_conflict(&mut self, promoted: &Bits<W>) -> Option<Bits<W>> {
         let k = self.model.conflict_using(self.scratch, self.state, promoted, true)?;
         self.computed += 1;
         self.known.push(k);
@@ -1528,10 +1539,10 @@ mod tests {
     }
 
     fn resume_in_pieces(threads: usize) {
-        let g = load(480);
+        let g = load(760);
         let tables = Tables::new(g.n);
-        let cands = Bits::<8>::from_slice(&g.candidates);
-        let whole = prepare::<8>(&tables, &g.columns, &cands, SearchTactics::default(), 2).unwrap();
+        let cands = Bits::<16>::from_slice(&g.candidates);
+        let whole = prepare::<16>(&tables, &g.columns, &cands, SearchTactics::default(), 2).unwrap();
         let nodes = search_checked(&whole, 1, "uninterrupted").stats.nodes;
 
         let dir = TempDir::new(&format!("resume{threads}"));
@@ -1547,7 +1558,7 @@ mod tests {
         let mut pieces = 1;
         while !result.completed {
             assert!(ckpt.exists(), "a stopped run leaves a checkpoint");
-            let resumed = prepare_for_resume::<8>(&tables, &g.columns, &cands, &ckpt, 2).unwrap();
+            let resumed = prepare_for_resume::<16>(&tables, &g.columns, &cands, &ckpt, 2).unwrap();
             assert_eq!(resumed.revise, Revise::FromCheckpoint);
             assert_eq!(resumed.root, whole.root);
             result = search(&resumed, &cfg, None, None, true).unwrap();
