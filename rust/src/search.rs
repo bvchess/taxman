@@ -865,7 +865,17 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         child.promoted = node.promoted.with(n);
         child.sum = node.sum + u64::from(n);
         let max_next = max_additional(space.max_total, &child.state, &child.promoted, &node.cands);
-        let cands = bounds.new_candidate_list(n, max_next, &child.state, &node.cands, &node.promoted);
+        let mut cands = bounds.new_candidate_list(n, max_next, &child.state, &node.cands, &node.promoted);
+        // A known conflict of the node (or above) that the child promotes all but one member of rules that member
+        // out: the child's state is the node's with more promotions, so promoting it would promote the whole
+        // conflict there.  (The heaviest matching of the node promotes n already, so without this the child's
+        // matching bound would not drop at all.)
+        for k in self.known.iter().filter(|k| k.contains(n)) {
+            let rest = *k - child.promoted;
+            if rest.len() == 1 {
+                cands -= rest;
+            }
+        }
         let need = (best + 1).saturating_sub(child.sum); // the child is worth it if its bound is at least this
         let cut_by = if cands.sum_largest(max_next) < need {
             Some(cut::LARGEST)
