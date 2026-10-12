@@ -1056,6 +1056,39 @@ impl Model {
         best
     }
 
+    /// A nogood of `root` (see [`Nogoods`]) from the conflict `k` of the state reached from `root` by promoting
+    /// `promoted`: a minimal subset of `promoted ∪ k` that keeps a frame of `root` unwinnable, found as
+    /// [`conflict_using`](Self::conflict_using) finds one, in each frame whose edits include all of `k` (the
+    /// conflicts it makes come from one frame each, so it is one of them); the smallest.  The state's frames are
+    /// the root's with `promoted` promoted (and reduced, which does not change winnability), so such a frame is
+    /// unwinnable.  The nogood minus `promoted` is a subset of `k`: as small a conflict of the state, and in
+    /// practice `k` itself.  `None` if no such frame is unwinnable, which cannot happen for a conflict.
+    pub fn nogood<const W: usize>(
+        &self,
+        scratch: &mut Scratch<W>,
+        root: &FrameSet<W>,
+        promoted: &Bits<W>,
+        k: &Bits<W>,
+    ) -> Option<Bits<W>> {
+        let (edits, not_a_factor) = self.edits(root, &(*promoted | *k));
+        if let Some(x) = not_a_factor {
+            return Some(Bits::EMPTY.with(x));
+        }
+        let mut best: Option<Bits<W>> = None;
+        for (i, frame) in root.frames().iter().enumerate() {
+            let (gained, lost) = (&edits.gained[i], &edits.lost[i]);
+            if !k.is_subset(&(*gained | *lost)) {
+                continue;
+            }
+            if let Some(n) = self.frame_conflict(scratch, frame, gained, lost, true) {
+                if best.is_none_or(|b| n.len() < b.len()) {
+                    best = Some(n);
+                }
+            }
+        }
+        best
+    }
+
     /// The conflict of [`conflict_using`](Self::conflict_using) for one frame with `gained` promoted into it and
     /// `lost` promoted out of it: `None` if it stays winnable.
     fn frame_conflict<const W: usize>(
@@ -1152,6 +1185,201 @@ impl<const W: usize> Default for ConflictCache<W> {
     fn default() -> Self {
         ConflictCache { entries: [None; MAX_FRAMES] }
     }
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Nogoods
+
+/// Conflicts of a search's root (*nogoods*): sets of candidates that cannot all be promoted from the root,
+/// learned during the search and kept so that every node can use them.
+///
+/// A nogood holds everywhere in the search.  A node's state is the root with its promotions `P` promoted, and
+/// promoting a set `F` from it succeeds exactly when `P ∪ F` can be promoted from the root (the frame-by-frame
+/// test of [`Model::winnable`] sees only the union).  A set that cannot be promoted from the root makes every
+/// superset fail too (a subset of a promotable set is promotable), so for a nogood `N`, every node has `N − P`
+/// as a conflict: no completion of the node promotes all of it.  This depends on nothing but the root and the
+/// numbers in `N`: not on the path, the incumbent, the thread, or a checkpoint (a resumed search simply starts
+/// with none).
+///
+/// A conflict `K` found at a node is relative to its promotions `P`: [`Model::nogood`] turns it into a nogood,
+/// a minimal subset of `P ∪ K` that keeps one of the root's frames unwinnable.  The table holds at most
+/// `capacity` of them and forgets them all when it is full (a cache: losing nogoods costs only their
+/// rediscovery).
+pub struct Nogoods<const W: usize> {
+    /// The nogoods, by index.
+    sets: Vec<Bits<W>>,
+    /// The members of nogood `i`, those of the conflict it was made from first: `members[start[i]..start[i + 1]]`.
+    members: Vec<u16>,
+    start: Vec<u32>,
+    /// For each nogood, a 256-bit signature: bit `x mod 256` for each member `x`.  A nogood can be within a set
+    /// only if its signature is within the set's.
+    sigs: Vec<[u64; 4]>,
+    /// For each nogood, its largest member.
+    maxes: Vec<u16>,
+    /// For each number, the nogoods it is a member of.
+    by_member: Vec<Vec<u32>>,
+    capacity: usize,
+}
+
+/// The signature of a set of numbers (see [`Nogoods`]).
+#[inline]
+fn signature(set: impl Iterator<Item = u32>) -> [u64; 4] {
+    let mut sig = [0u64; 4];
+    for x in set {
+        let bit = x & 255;
+        sig[bit as usize >> 6] |= 1 << (bit & 63);
+    }
+    sig
+}
+
+impl<const W: usize> Nogoods<W> {
+    /// An empty table for nogoods of numbers up to `max_number`, holding at most `capacity` of them.
+    pub fn new(max_number: u32, capacity: usize) -> Self {
+        let size = max_number as usize + 1;
+        Nogoods {
+            sets: Vec::new(),
+            members: Vec::new(),
+            start: vec![0],
+            sigs: Vec::new(),
+            maxes: Vec::new(),
+            by_member: vec![Vec::new(); size],
+            capacity,
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.sets.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.sets.is_empty()
+    }
+
+    /// Adds the nogood `n` (non-empty, members up to the table's `max_number`), forgetting every other one first
+    /// if the table is full.  Lookups check its members in `first` (the conflict it was made from) before the
+    /// others: those are the ones a node is least likely to have, so most lookups that fail stop at once.
+    pub fn insert(&mut self, n: Bits<W>, first: &Bits<W>) {
+        if self.sets.len() >= self.capacity {
+            self.clear();
+        }
+        let id = self.sets.len() as u32;
+        self.sets.push(n);
+        for x in (n & *first).iter().chain((n - *first).iter()) {
+            self.members.push(x as u16);
+            self.by_member[x as usize].push(id);
+        }
+        self.start.push(self.members.len() as u32);
+        self.sigs.push(signature(n.iter()));
+        self.maxes.push(n.max().expect("a nogood is not empty") as u16);
+    }
+
+    fn clear(&mut self) {
+        for n in &self.sets {
+            for x in n.iter() {
+                self.by_member[x as usize].clear();
+            }
+        }
+        self.sets.clear();
+        self.sigs.clear();
+        self.maxes.clear();
+        self.members.clear();
+        self.start.truncate(1);
+    }
+
+    fn members_of(&self, id: u32) -> &[u16] {
+        &self.members[self.start[id as usize] as usize..self.start[id as usize + 1] as usize]
+    }
+
+    /// The smallest conflict the table knows of a node with the promotions `promoted` among the candidates
+    /// `set` (disjoint from `promoted`): the smallest `N − promoted` over the nogoods `N ⊆ promoted ∪ set`, the
+    /// one with the largest member if there are several (then the first learned); `None` if there is none.
+    pub fn conflict(&self, promoted: &Bits<W>, set: &Bits<W>) -> Option<Bits<W>> {
+        match self.lookup(promoted, set, &Bits::EMPTY) {
+            Lookup::Conflict(k) => Some(k),
+            _ => None,
+        }
+    }
+
+    /// [`conflict`](Self::conflict), unless one of the conflicts the table knows is a subset of `forced` (it then
+    /// stops there and says so): if every completion that matters promotes all of `forced`, there is none.
+    pub fn lookup(&self, promoted: &Bits<W>, set: &Bits<W>, forced: &Bits<W>) -> Lookup<W> {
+        let within = *promoted | *set;
+        let outside = signature(within.iter()).map(|word| !word);
+        // The smallest conflict, of those the one with the largest member, of those the first learned.
+        let mut best: Option<(u32, u16, u32)> = None; // (size of the conflict, largest member, nogood)
+        for (id, sig) in self.sigs.iter().enumerate() {
+            if sig.iter().zip(&outside).any(|(a, b)| a & b != 0) {
+                continue;
+            }
+            let id = id as u32;
+            {
+                let (mut size, mut unforced) = (0, false);
+                let inside = self.members_of(id).iter().all(|&y| {
+                    let y = u32::from(y);
+                    if !promoted.contains(y) {
+                        size += 1;
+                        unforced |= !forced.contains(y);
+                    }
+                    within.contains(y)
+                });
+                if !inside {
+                    continue;
+                }
+                if !unforced {
+                    return Lookup::Forced;
+                }
+                let top = self.maxes[id as usize];
+                if best.is_none_or(|(s, m, _)| size < s || (size == s && top > m)) {
+                    best = Some((size, top, id));
+                }
+            }
+        }
+        match best {
+            Some((_, _, id)) => Lookup::Conflict(self.sets[id as usize] - *promoted),
+            None => Lookup::None,
+        }
+    }
+
+    /// The candidates among `cands` that a node with the promotions `promoted` cannot promote by the nogoods
+    /// that have a member in `added` (the node's newest promotions): those `N` with `N − promoted` a single
+    /// candidate.
+    pub fn ruled_out(&self, added: &Bits<W>, promoted: &Bits<W>, cands: &Bits<W>) -> Bits<W> {
+        let mut out = Bits::EMPTY;
+        for a in added.iter() {
+            let Some(ids) = self.by_member.get(a as usize) else { continue };
+            for &id in ids {
+                let mut rest = None;
+                let mut single = true;
+                for &y in self.members_of(id) {
+                    let y = u32::from(y);
+                    if !promoted.contains(y) {
+                        if rest.is_some() {
+                            single = false;
+                            break;
+                        }
+                        rest = Some(y);
+                    }
+                }
+                if let (true, Some(y)) = (single, rest) {
+                    if cands.contains(y) {
+                        out.insert(y);
+                    }
+                }
+            }
+        }
+        out
+    }
+}
+
+/// What [`Nogoods::lookup`] found.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Lookup<const W: usize> {
+    /// No conflict.
+    None,
+    /// The smallest conflict.
+    Conflict(Bits<W>),
+    /// A conflict all of whose members are forced.
+    Forced,
 }
 
 /// A set of promotions split by frame (see [`Model::edits`]).
@@ -1830,6 +2058,86 @@ mod tests {
         }
         eprintln!("frame-by-frame set check: {tried} sets, {feasible} feasible");
         assert!(feasible > tried / 10 && feasible < tried);
+    }
+
+    /// Nogoods made from the conflicts of states along random promotion paths of `g`: each is a subset of the
+    /// state's promotions and the conflict, and cannot be promoted from the root; and
+    /// every nogood learned so far, minus the promotions of any later state, is a conflict of that state.
+    /// Returns the numbers of nogoods made and of later checks.
+    fn nogood_check<const W: usize>(g: &Golden, rng: &mut Rng) -> (u64, u64) {
+        let (model, root) = Model::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
+        let candidates = Bits::<W>::from_slice(&g.candidates);
+        let mut scratch = Scratch::new();
+        let mut table = Nogoods::<W>::new(g.n, 1 << 10);
+        let (mut made, mut later) = (0, 0);
+        for _ in 0..40 {
+            let (mut state, mut promoted) = (root, Bits::<W>::EMPTY);
+            for n in rng.subset(&candidates, 20).iter() {
+                if !model.promote_in_place(&mut state, n) {
+                    continue;
+                }
+                promoted.insert(n);
+                // Every nogood holds here.
+                for i in 0..table.len() {
+                    let rest = table.sets[i] - promoted;
+                    assert!(!rest.is_empty(), "n={}: {:?} is promoted", g.n, table.sets[i]);
+                    assert!(!model.can_promote_all_using(&mut scratch, &state, &rest), "n={}: {rest:?}", g.n);
+                    later += 1;
+                }
+                let set = rng.subset(&state.narrow_candidates(&candidates), 30) - promoted;
+                let Some(k) = model.conflict_using(&mut scratch, &state, &set, true) else { continue };
+                let nogood = model.nogood(&mut scratch, &root, &promoted, &k).expect("a conflict has a nogood");
+                let what = format!("n={}: nogood {nogood:?} of {k:?} after {promoted:?}", g.n);
+                assert!(nogood.is_subset(&(promoted | k)), "{what}");
+                assert!(!model.can_promote_all_using(&mut scratch, &root, &nogood), "{what} can be promoted");
+                // The table knows it now, as the smallest conflict there is, or one as small.
+                table.insert(nogood, &k);
+                let found = table.conflict(&promoted, &set).expect("a conflict in the table");
+                assert!(found.len() <= k.len() && found.is_subset(&set), "{what}: the table has {found:?}");
+                made += 1;
+            }
+        }
+        (made, later)
+    }
+
+    #[test]
+    fn nogoods_hold_everywhere() {
+        let mut rng = Rng(0x0DD5_EED5_1234_5678);
+        let (mut made, mut later) = (0, 0);
+        for n in golden_ns().into_iter().filter(|&n| n >= 40 && (n % 7 == 0 || n >= 480)) {
+            let g = load(n);
+            let (m, l) = if n < 512 { nogood_check::<8>(&g, &mut rng) } else { nogood_check::<16>(&g, &mut rng) };
+            made += m;
+            later += l;
+        }
+        eprintln!("nogoods: {made} made, {later} checked at later states");
+        assert!(made > 500 && later > 5000);
+    }
+
+    #[test]
+    fn nogood_table_lookups() {
+        let mut table = Nogoods::<1>::new(60, 3);
+        let set = |xs: &[u32]| Bits::<1>::from_slice(xs);
+        table.insert(set(&[10, 20, 30]), &set(&[30]));
+        table.insert(set(&[5, 40]), &set(&[]));
+        // The smallest conflict among the nogoods within the promotions and the set.
+        assert_eq!(table.conflict(&set(&[]), &set(&[5, 10, 20, 30, 40])), Some(set(&[5, 40])));
+        assert_eq!(table.conflict(&set(&[10, 20]), &set(&[5, 30, 40])), Some(set(&[30])));
+        assert_eq!(table.conflict(&set(&[10]), &set(&[20, 40])), None);
+        // Ruled out: the last member of a nogood whose others are all promoted, if a newest promotion is in it.
+        let promoted = set(&[10, 20, 5]);
+        assert_eq!(table.ruled_out(&set(&[20]), &promoted, &set(&[30, 40, 50])), set(&[30]));
+        assert_eq!(table.ruled_out(&set(&[5, 20]), &promoted, &set(&[30, 40, 50])), set(&[30, 40]));
+        assert_eq!(table.ruled_out(&set(&[5, 20]), &promoted, &set(&[50])), set(&[]));
+        assert_eq!(table.ruled_out(&set(&[10]), &set(&[10]), &set(&[20, 30])), set(&[]));
+        // A full table forgets everything before taking another.
+        table.insert(set(&[1, 2]), &set(&[1, 2]));
+        assert_eq!(table.len(), 3);
+        table.insert(set(&[3, 4]), &set(&[4]));
+        assert_eq!(table.len(), 1);
+        assert_eq!(table.conflict(&set(&[]), &set(&[5, 40, 1, 2])), None);
+        assert_eq!(table.conflict(&set(&[3]), &set(&[4])), Some(set(&[4])));
+        assert_eq!(table.ruled_out(&set(&[2]), &set(&[2]), &set(&[1])), set(&[]));
     }
 
     #[test]

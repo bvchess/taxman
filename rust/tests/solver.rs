@@ -85,7 +85,7 @@ fn every_tactic_gives_the_same_scores() {
     let variants = [default].into_iter().chain(
         [
             "match_bound=off",
-            "preclusions=off",
+            "preclusions=on",
             "revise_freedoms=off",
             "seed_incumbent=off",
             "prev_cap=off",
@@ -135,7 +135,7 @@ fn an_interrupted_game_resumes_from_its_checkpoint() {
     let opts = SolveOptions {
         checkpoint_dir: Some(dir.0.clone()),
         checkpoint_interval: Duration::from_secs(3600),
-        node_limit: Some(5_000),
+        node_limit: Some(1_000),
         queue_mem_cap: 4,
         force_search: true,
         ..options(2)
@@ -170,7 +170,7 @@ fn a_checkpoint_for_another_game_or_other_tactics_is_refused() {
     let checkpoint = dir.0.join("n0600.ckpt");
 
     // Other tactics: a switch, and the two settings that are not switches.
-    for assignment in ["preclusions=off", "branching=largest", "match_refine=0", "match_refine=2"] {
+    for assignment in ["preclusions=on", "branching=largest", "match_refine=0", "match_refine=2"] {
         let mut other = opts.clone();
         other.tactics.set(assignment).unwrap();
         let err = solver::solve_game_with(600, None, &other, Some(&optimal)).unwrap_err();
