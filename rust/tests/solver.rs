@@ -94,6 +94,7 @@ fn every_tactic_gives_the_same_scores() {
             "branching=conflict-largest",
             "match_refine=0",
             "match_refine=3",
+            "forget_nogoods=off",
         ]
         .map(with),
     );

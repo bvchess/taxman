@@ -29,9 +29,10 @@
 //! done.  With conflict branching the candidate `n` is a member of a conflict of the heaviest matching; with
 //! the `fix_forced` tactic the child also promotes the members of that conflict that every completion beating
 //! the incumbent must promote (see [`strongest`]).  With the `nogoods` tactic the conflicts found are learned
-//! as conflicts of the root ([`Nogoods`]), which every node can use.  The search starts from the best of the
-//! greedy set, the seed, and a rounding of the root's matching ([`dive`]), improved by a local search
-//! ([`Neighbourhood::improve`]).
+//! as conflicts of the root ([`Nogoods`]), which every node can use (and with `forget_nogoods`, forgotten after
+//! each [`NOGOOD_PERIOD`] steps of a searcher: old ones cost more than they help).  The search starts from the
+//! best of the greedy set, the seed, and a rounding of the root's matching ([`dive`]), improved by a local
+//! search ([`Neighbourhood::improve`]).
 //!
 //! Two exact shortcuts keep the expensive bound out of the way: the bound never exceeds the sum of the
 //! `max_add` largest candidates, so when that sum already decides the comparison the bound is not computed;
@@ -87,6 +88,9 @@ pub struct SearchTactics {
     /// everywhere).  What is learned depends on the order the search went, so with it a search's tree depends on
     /// its history (threads, interruptions), not only on the node.
     pub nogoods: bool,
+    /// With `nogoods`: each searcher forgets every nogood it knows after each [`NOGOOD_PERIOD`] steps (sound: the
+    /// table is a cache).  Old nogoods cost every lookup more than they help.
+    pub forget_nogoods: bool,
 }
 
 /// Which candidate a node's loop promotes next (tactic `branching`).  The child promotes it, and the node goes on
@@ -145,6 +149,7 @@ impl Default for SearchTactics {
             branching: Branching::default(),
             fix_forced: true,
             nogoods: true,
+            forget_nogoods: true,
         }
     }
 }
@@ -163,9 +168,9 @@ impl SearchTactics {
     }
 
     /// The tactics as the header of a checkpoint records them.  Tactics added later are recorded by the bits of
-    /// their non-default values (`fix_forced` by bit 9 and `nogoods` by bit 10 when they are off), so that a
-    /// checkpoint made before they existed reads back with their defaults: they are sound, so a search resumed
-    /// with them is still correct.
+    /// their non-default values (`fix_forced` by bit 9, `nogoods` by bit 10 and `forget_nogoods` by bit 11 when
+    /// they are off), so that a checkpoint made before they existed reads back with their defaults: they are
+    /// sound, so a search resumed with them is still correct.
     fn bits(self) -> u16 {
         let branching = match self.branching {
             Branching::Largest => 0,
@@ -181,10 +186,11 @@ impl SearchTactics {
             | branching << 7
             | u16::from(!self.fix_forced) << 9
             | u16::from(!self.nogoods) << 10
+            | u16::from(!self.forget_nogoods) << 11
     }
 
     fn from_bits(bits: u16) -> Result<Self, String> {
-        if bits >> 11 != 0 {
+        if bits >> 12 != 0 {
             return Err(format!("unknown tactics {bits:#x}"));
         }
         let branching = match bits >> 7 & 3 {
@@ -202,6 +208,7 @@ impl SearchTactics {
             branching,
             fix_forced: bits & 1 << 9 == 0,
             nogoods: bits & 1 << 10 == 0,
+            forget_nogoods: bits & 1 << 11 == 0,
         })
     }
 }
@@ -259,6 +266,9 @@ pub struct SearchSpace<'a, const W: usize> {
     /// Tactics `fix_forced` and `nogoods`.
     pub fix_forced: bool,
     pub nogoods: bool,
+    /// After how many of its steps a searcher forgets the nogoods it knows (tactic `forget_nogoods`: every
+    /// [`NOGOOD_PERIOD`]), if ever.
+    pub nogood_period: Option<u64>,
     /// The largest number in the root's frames.
     pub root_max: u32,
     /// The cap on the number of promotions (`maxTotalPromotions`).
@@ -542,8 +552,13 @@ fn strongest<const W: usize>(
 }
 
 /// Most nogoods a searcher keeps (tactic `nogoods`); it forgets them all when it has this many.  Searches near
-/// n = 1200 learn about a thousand.
+/// n = 1200 learn a few thousand in all, so with `forget_nogoods` this is never reached.
 const NOGOOD_CAPACITY: usize = 1 << 16;
+
+/// With the tactic `forget_nogoods`, a searcher forgets its nogoods after each this many steps.  Every interval
+/// from 10,000 to 100,000 steps was about as good on one thread (22–26% less time than never forgetting on hard
+/// games near n = 1200, games of fewer steps unchanged); see DESIGN.md, "Forgetting nogoods".
+pub const NOGOOD_PERIOD: u64 = 50_000;
 
 /// One node on the searcher's stack.
 #[derive(Clone, Copy)]
@@ -817,8 +832,9 @@ pub struct TaxSearcher<'a, const W: usize> {
     known: Vec<Bits<W>>,
     /// The frames' last conflicts (see [`ConflictCache`]).
     conflict_cache: ConflictCache<W>,
-    /// The nogoods learned (tactic `nogoods`).
+    /// The nogoods learned (tactic `nogoods`), and the steps taken since the table was last cleared.
     nogoods: Option<Nogoods<W>>,
+    steps_since_clear: u64,
     payload: Vec<u8>,
     probe: Option<Probe<'a>>,
     /// The matching solver's statistics already added to the diagnostics.
@@ -840,6 +856,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             known: Vec::new(),
             conflict_cache: ConflictCache::default(),
             nogoods: space.nogoods.then(|| Nogoods::new(space.root_max, NOGOOD_CAPACITY)),
+            steps_since_clear: 0,
             payload: Vec::with_capacity(8 * W),
             probe: space.diagnostics.map(|shared| Probe { shared, local: Diagnostics::default() }),
             match_seen: [0; 3],
@@ -1264,7 +1281,15 @@ impl<const W: usize> Searcher<TaxUnit<W>> for TaxSearcher<'_, W> {
                 break;
             }
             ctx.stats().nodes += 1;
-            match self.step(depth, ctx) {
+            let next = self.step(depth, ctx);
+            if let (Some(table), Some(period)) = (&mut self.nogoods, self.space.nogood_period) {
+                self.steps_since_clear += 1;
+                if self.steps_since_clear >= period {
+                    table.clear();
+                    self.steps_since_clear = 0;
+                }
+            }
+            match next {
                 Some(next) => depth = next,
                 None => break,
             }
@@ -1638,6 +1663,21 @@ pub fn search_with<const W: usize>(
     resume: bool,
     diagnostics: Option<&Mutex<Diagnostics>>,
 ) -> io::Result<SearchResult<W>> {
+    let period = prepared.tactics.forget_nogoods.then_some(NOGOOD_PERIOD);
+    search_forgetting(prepared, cfg, seed, cap, resume, diagnostics, period)
+}
+
+/// [`search_with`], the searchers forgetting their nogoods after each `period` steps (if any) whatever the tactic
+/// `forget_nogoods` says, so that tests can make them forget often.
+fn search_forgetting<const W: usize>(
+    prepared: &Prepared<W>,
+    cfg: &EngineConfig,
+    seed: Option<&Bits<W>>,
+    cap: Option<u64>,
+    resume: bool,
+    diagnostics: Option<&Mutex<Diagnostics>>,
+    nogood_period: Option<u64>,
+) -> io::Result<SearchResult<W>> {
     let t0 = Instant::now();
     let match_graph = prepared.tactics.match_bound.then(|| MatchGraph::new(&prepared.model, &prepared.root));
     let mut incumbent = prepared.greedy;
@@ -1678,6 +1718,7 @@ pub fn search_with<const W: usize>(
         conflict_branching: if prepared.tactics.match_bound { prepared.tactics.branching } else { Branching::Largest },
         fix_forced: prepared.tactics.fix_forced,
         nogoods: prepared.tactics.match_bound && prepared.tactics.nogoods,
+        nogood_period,
         root_max: prepared.root.frames().iter().filter_map(|f| (f.moves | f.factors).max()).max().unwrap_or(0),
         max_total: prepared.max_total,
         rule: prepared.tactics.rule(),
@@ -1997,6 +2038,7 @@ mod tests {
             SearchTactics { fix_forced: false, match_refine: 0, ..default },
             SearchTactics { nogoods: false, ..default },
             SearchTactics { nogoods: false, match_refine: 0, ..default },
+            SearchTactics { forget_nogoods: false, ..default },
             SearchTactics { match_refine: 0, ..default },
             SearchTactics { branching: Branching::ConflictSmallest, match_refine: 2, ..default },
         ];
@@ -2015,6 +2057,21 @@ mod tests {
             }
         }
         assert!(differences.is_empty(), "AN UNPROVEN TACTIC CHANGES ANSWERS:\n{}", differences.join("\n"));
+    }
+
+    /// The searches of these games are shorter than [`NOGOOD_PERIOD`] steps, so they never forget with it: forget
+    /// after every step, and after a few.
+    #[test]
+    fn forgetting_nogoods_often_does_not_change_answers() {
+        for g in &searched_games(400) {
+            let p = prepare_golden::<8>(g, SearchTactics::default());
+            for (period, threads) in [(1, 1), (3, 2), (40, 1)] {
+                let r = search_forgetting(&p, &config(threads), None, None, false, None, Some(period)).unwrap();
+                let what = format!("n={}, forgetting every {period} steps on {threads} threads", g.n);
+                assert!(r.completed && r.promotions.is_subset(&p.candidates), "{what}");
+                assert_eq!(r.sum, golden_sum(g), "{what}");
+            }
+        }
     }
 
     /// A fresh directory under the system temp dir, removed on drop.
@@ -2145,7 +2202,8 @@ mod tests {
         assert!(Header::<8>::decode(b"nonsense").is_err());
 
         // Every setting of the search tactics reads back as it was written, and the default tactics of a checkpoint
-        // made before `fix_forced` and `nogoods` existed (0x19d) read back with them on, as they are now.
+        // made before `fix_forced`, `nogoods` and `forget_nogoods` existed (0x19d) read back with them on, as they
+        // are now; so do those of one made before `forget_nogoods` (0x19c, the preclusions off).
         let default = SearchTactics::default();
         for refine in [0, 1, 7] {
             for branching in Branching::ALL {
@@ -2159,13 +2217,16 @@ mod tests {
                         branching,
                         fix_forced: on,
                         nogoods: off,
+                        forget_nogoods: on,
                     };
                     assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
                 }
             }
         }
         assert_eq!(SearchTactics::from_bits(0x19d), Ok(SearchTactics { preclusions: true, ..default }));
-        assert!(SearchTactics::from_bits(1 << 11).is_err());
+        assert_eq!(SearchTactics::from_bits(0x19c), Ok(default));
+        assert_eq!(SearchTactics::from_bits(0x19c | 1 << 11), Ok(SearchTactics { forget_nogoods: false, ..default }));
+        assert!(SearchTactics::from_bits(1 << 12).is_err());
     }
 
     // ---- benchmark: cargo test --release bench_search -- --ignored --nocapture --test-threads=1 ----

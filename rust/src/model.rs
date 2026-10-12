@@ -1203,8 +1203,9 @@ impl<const W: usize> Default for ConflictCache<W> {
 ///
 /// A conflict `K` found at a node is relative to its promotions `P`: [`Model::nogood`] turns it into a nogood,
 /// a minimal subset of `P ∪ K` that keeps one of the root's frames unwinnable.  The table holds at most
-/// `capacity` of them and forgets them all when it is full (a cache: losing nogoods costs only their
-/// rediscovery).
+/// `capacity` of them and forgets them all when it is full, and its owner may [`clear`](Self::clear) it at any
+/// time (a cache: losing nogoods costs only their rediscovery).  Lookups scan the whole table, so a larger one
+/// makes every node slower.
 pub struct Nogoods<const W: usize> {
     /// The nogoods, by index.
     sets: Vec<Bits<W>>,
@@ -1273,7 +1274,8 @@ impl<const W: usize> Nogoods<W> {
         self.maxes.push(n.max().expect("a nogood is not empty") as u16);
     }
 
-    fn clear(&mut self) {
+    /// Forgets every nogood.
+    pub fn clear(&mut self) {
         for n in &self.sets {
             for x in n.iter() {
                 self.by_member[x as usize].clear();

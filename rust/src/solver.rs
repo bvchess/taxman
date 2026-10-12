@@ -79,7 +79,7 @@ impl Default for Tactics {
 const UNPROVEN: [&str; 3] = ["reuse_prev", "revise_freedoms", "legacy_bound"];
 
 /// The number of tactics in DESIGN.md's table.
-const TACTIC_COUNT: usize = 12;
+const TACTIC_COUNT: usize = 13;
 
 /// The value of a tactic: an on/off switch, or one of the two settings that are not.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -163,6 +163,7 @@ impl Tactics {
             ("match_refine", Slot::MatchRefine(&mut self.search.match_refine)),
             ("fix_forced", Slot::Switch(&mut self.search.fix_forced)),
             ("nogoods", Slot::Switch(&mut self.search.nogoods)),
+            ("forget_nogoods", Slot::Switch(&mut self.search.forget_nogoods)),
             ("legacy_bound", Slot::Switch(&mut self.search.legacy_bound)),
             ("prev_cap", Slot::Switch(&mut self.prev_cap)),
             ("seed_incumbent", Slot::Switch(&mut self.seed_incumbent)),
@@ -906,13 +907,14 @@ mod tests {
                 "match_refine",
                 "fix_forced",
                 "nogoods",
+                "forget_nogoods",
                 "legacy_bound",
                 "prev_cap",
                 "seed_incumbent"
             ]
         );
         let values: Vec<String> = t.settings().iter().map(|s| s.1.to_string()).collect();
-        let expected = ["on", "on", "on", "off", "on", "conflict-strong", "1", "on", "on", "off", "on", "on"];
+        let expected = ["on", "on", "on", "off", "on", "conflict-strong", "1", "on", "on", "on", "off", "on", "on"];
         assert_eq!(values, expected);
         // The values of the search tactics are those of `SearchTactics::default()`, not copies of them.
         let search = SearchTactics::default();
