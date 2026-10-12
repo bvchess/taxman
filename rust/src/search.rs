@@ -421,7 +421,10 @@ impl<const W: usize> Refiner<'_, '_, W> {
     fn top_conflict(&mut self, promoted: &Bits<W>) -> Option<Bits<W>> {
         match self.find_conflict(promoted, Bits::EMPTY) {
             Lookup::Conflict(k) => Some(k),
-            _ => None,
+            Lookup::None => None,
+            // With nothing forced this would be a nogood inside the node's own promotions, which were promoted to
+            // build the node: a broken table, which must not pass for a promotable set.
+            Lookup::Forced => unreachable!("a nogood lies within the promotions of a node"),
         }
     }
 
@@ -1317,6 +1320,9 @@ pub enum Revise {
     Unchanged,
     /// The two-frame game was searched; frame 0 got the size of its best set.
     Searched { size: u32, nodes: u64 },
+    /// A limit or a stop signal stopped the two-frame game's search, so frame 0 could not be revised: the game
+    /// is not ready to search, and [`search`] stops at once (as if a limit had stopped it, with no checkpoint).
+    Stopped { nodes: u64 },
     /// Frame 0's freedoms were taken from a checkpoint.
     FromCheckpoint,
 }
@@ -1333,6 +1339,8 @@ pub struct PrepareTimings {
 
 /// A game set up for [`search`].
 pub struct Prepared<const W: usize> {
+    /// The board size.
+    pub n: u32,
     pub model: Arc<Model>,
     /// The starting state before revising frame 0.
     pub unrevised: FrameSet<W>,
@@ -1352,7 +1360,7 @@ pub struct Prepared<const W: usize> {
 
 /// Sets up the search for the game whose frames are `columns` (factors and moves per frame, bottom first) and
 /// whose promotion candidates are `candidates`.  `threads` is used for the preclusion table and for the
-/// two-frame search of `revise_freedoms`.
+/// two-frame search of `revise_freedoms`, which has no limits (see [`prepare_within`]).
 pub fn prepare<const W: usize>(
     tables: &Tables,
     columns: &[Vec<u32>],
@@ -1360,17 +1368,32 @@ pub fn prepare<const W: usize>(
     tactics: SearchTactics,
     threads: usize,
 ) -> Result<Prepared<W>, String> {
+    let engine = EngineConfig { threads, ..EngineConfig::default() };
+    prepare_within(tables, columns, candidates, tactics, &engine)
+}
+
+/// [`prepare`] with `engine`'s threads, whose time and node limits (and stop signals) also bound the two-frame
+/// search of `revise_freedoms`; nothing else of `engine` is used.  If they stop that search, `revise` is
+/// [`Revise::Stopped`] and the game cannot be searched in this run.
+pub fn prepare_within<const W: usize>(
+    tables: &Tables,
+    columns: &[Vec<u32>],
+    candidates: &Bits<W>,
+    tactics: SearchTactics,
+    engine: &EngineConfig,
+) -> Result<Prepared<W>, String> {
     let t0 = Instant::now();
     let (model, root) = Model::build::<W>(tables, columns)?;
     let build = t0.elapsed();
-    let mut prepared = prepare_state(Arc::new(model), root, *candidates, tactics, threads, None)?;
+    let mut prepared = prepare_state(tables.n, Arc::new(model), root, *candidates, tactics, engine, None)?;
     prepared.timings.build = build;
     Ok(prepared)
 }
 
 /// [`prepare`] for resuming the search checkpointed in `checkpoint`: frame 0's freedoms come from the
 /// checkpoint's header instead of being revised again (which can take a search of its own), and the tactics
-/// are the checkpoint's.  Fails if the checkpoint was made for a different game or width.
+/// are the checkpoint's.  Fails, saying what differs, if the checkpoint was made for another board size,
+/// width, candidates or frames, or by a build whose checkpoint headers had another format.
 pub fn prepare_for_resume<const W: usize>(
     tables: &Tables,
     columns: &[Vec<u32>],
@@ -1380,32 +1403,43 @@ pub fn prepare_for_resume<const W: usize>(
 ) -> Result<Prepared<W>, String> {
     let bytes = engine::read_checkpoint_header(checkpoint).map_err(|e| format!("{}: {e}", checkpoint.display()))?;
     let header = Header::<W>::decode(&bytes)?;
-    if header.candidates != *candidates {
-        return Err("the checkpoint is for different candidates".into());
-    }
     let t0 = Instant::now();
     let (model, root) = Model::build::<W>(tables, columns)?;
     let build = t0.elapsed();
-    let mut prepared =
-        prepare_state(Arc::new(model), root, *candidates, header.tactics, threads, Some(header.frame0_freedoms))?;
-    prepared.timings.build = build;
-    if prepared.max_total != header.max_total {
-        return Err(format!("max_total {} differs from the checkpoint's {}", prepared.max_total, header.max_total));
+    // The game itself must match before it is set up with what the checkpoint says of the search.
+    let game = Header {
+        n: tables.n,
+        candidates: Header::digest_candidates(candidates),
+        frames: Header::digest_frames(&root),
+        ..header
+    };
+    if let Some(mismatch) = header.mismatch(&game) {
+        return Err(mismatch);
     }
-    Ok(prepared)
+    let engine = EngineConfig { threads, ..EngineConfig::default() };
+    let frame0 = Some(header.frame0_freedoms);
+    let mut prepared = prepare_state(tables.n, Arc::new(model), root, *candidates, header.tactics, &engine, frame0)?;
+    prepared.timings.build = build;
+    match header.mismatch(&Header::of(&prepared)) {
+        Some(mismatch) => Err(mismatch),
+        None => Ok(prepared),
+    }
 }
 
-/// The setup after the frame set exists.  `frame0` (from a checkpoint) replaces revising.
+/// The setup after the frame set exists.  `frame0` (from a checkpoint) replaces revising; `engine` as for
+/// [`prepare_within`].
 fn prepare_state<const W: usize>(
+    n: u32,
     model: Arc<Model>,
     root: FrameSet<W>,
     candidates: Bits<W>,
     tactics: SearchTactics,
-    threads: usize,
+    engine: &EngineConfig,
     frame0: Option<Option<i32>>,
 ) -> Result<Prepared<W>, String> {
     let mut timings = PrepareTimings::default();
     let t0 = Instant::now();
+    let threads = engine.threads;
     let preclusions = tactics.preclusions.then(|| Preclusions::build(&model, &root, &candidates, threads));
     timings.preclusions = t0.elapsed();
     let t0 = Instant::now();
@@ -1415,12 +1449,13 @@ fn prepare_state<const W: usize>(
     let (revised, revise) = match frame0 {
         Some(Some(freedoms)) => (root.with_frame_zero_freedoms(freedoms), Revise::FromCheckpoint),
         Some(None) => (root, Revise::FromCheckpoint),
-        None if tactics.revise_freedoms => revise_freedoms(&model, &root, &candidates, &greedy, tactics, threads)?,
+        None if tactics.revise_freedoms => revise_freedoms(n, &model, &root, &candidates, &greedy, tactics, engine)?,
         None => (root, Revise::Off),
     };
     timings.revise = t0.elapsed();
     let max_total = revised.max_promotions_among(&candidates).max(0) as u32;
     Ok(Prepared {
+        n,
         model,
         unrevised: root,
         root: revised,
@@ -1438,14 +1473,16 @@ fn prepare_state<const W: usize>(
 /// freedoms allow and there are more than 2 frames, the promotions into frame 0 may be fewer than its freedoms
 /// suggest.  The two-frame game {frame 0, frame 1} with frame 1's candidates settles how many: by its greedy
 /// set if that reaches `min(freedoms of frames 0 and 1)`, else by searching it, but only if that could change
-/// the full game's cap on promotions.  Frame 0's freedoms become that number.
+/// the full game's cap on promotions.  Frame 0's freedoms become that number.  The search runs within
+/// `engine`'s limits; if they stop it, nothing is revised and the result says [`Revise::Stopped`].
 fn revise_freedoms<const W: usize>(
+    n: u32,
     model: &Arc<Model>,
     root: &FrameSet<W>,
     candidates: &Bits<W>,
     greedy: &Bits<W>,
     tactics: SearchTactics,
-    threads: usize,
+    engine: &EngineConfig,
 ) -> Result<(FrameSet<W>, Revise), String> {
     let full_max = root.max_promotions_among(candidates);
     if i64::from(greedy.len()) == i64::from(full_max) || root.len() <= 2 {
@@ -1454,7 +1491,7 @@ fn revise_freedoms<const W: usize>(
     let pair = root.front_pair();
     let (f0, f1) = (&pair.frames()[0], &pair.frames()[1]);
     let best_possible = f0.freedoms.min(f1.freedoms);
-    let small = prepare_state(model.clone(), pair, *candidates & f1.factors, tactics, threads, None)?;
+    let small = prepare_state(n, model.clone(), pair, *candidates & f1.factors, tactics, engine, None)?;
     let small_greedy = small.greedy.len();
     if i64::from(small_greedy) == i64::from(best_possible) {
         return Ok((root.with_frame_zero_freedoms(small_greedy as i32), Revise::GreedyIsMax(small_greedy)));
@@ -1462,70 +1499,144 @@ fn revise_freedoms<const W: usize>(
     if root.with_frame_zero_freedoms(small_greedy as i32).max_promotions_among(candidates) == full_max {
         return Ok((*root, Revise::Unchanged));
     }
-    let cfg = EngineConfig { threads, label: "revise".into(), progress: None, ..EngineConfig::default() };
+    let cfg = EngineConfig {
+        threads: engine.threads,
+        time_limit: engine.time_limit,
+        node_limit: engine.node_limit,
+        label: "revise".into(),
+        ..EngineConfig::default()
+    };
     let found = search(&small, &cfg, None, None, false).map_err(|e| format!("revise search: {e}"))?;
+    let nodes = found.stats.nodes;
+    if !found.completed {
+        return Ok((*root, Revise::Stopped { nodes }));
+    }
     let size = found.promotions.len();
-    Ok((root.with_frame_zero_freedoms(size as i32), Revise::Searched { size, nodes: found.stats.nodes }))
+    Ok((root.with_frame_zero_freedoms(size as i32), Revise::Searched { size, nodes }))
 }
 
 // ---------------------------------------------------------------------------------------------------------
 // Checkpoint header
 
 /// What a checkpoint records about the search it belongs to, so that a resumed run can check it is the same
-/// search and skip revising frame 0 again.
+/// search (the same game, frames, candidates and tactics) and skip revising frame 0 again.
+///
+/// Encoded (little-endian) as the magic `TXSH`, the format [`Header::VERSION`] (u32), the width `W` (u32),
+/// `n` (u32), the digests of the candidates and of the frames (u64 each), whether there is a frame 0 (u8) and
+/// its revised freedoms (i32), `max_total` (u32) and the tactics' bits (u16).  Version 2 (magic `TXS2`, made
+/// before 2026-10-12) recorded neither `n` nor the frames, so a checkpoint of another game with the same
+/// candidates passed for this one; it is refused.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Header<const W: usize> {
-    candidates: Bits<W>,
-    max_total: u32,
+    n: u32,
+    /// [`Header::digest_candidates`] of the root candidates.
+    candidates: u64,
+    /// [`Header::digest_frames`] of the frames as built (before revising frame 0).
+    frames: u64,
     /// Frame 0's freedoms in the search's root (`None` without frames).
     frame0_freedoms: Option<i32>,
+    max_total: u32,
     tactics: SearchTactics,
 }
 
 impl<const W: usize> Header<W> {
-    const MAGIC: &'static [u8; 4] = b"TXS2";
+    const MAGIC: &'static [u8; 4] = b"TXSH";
+    const VERSION: u32 = 3;
+    const LEN: usize = 4 + 4 + 4 + 4 + 8 + 8 + 1 + 4 + 4 + 2;
 
     fn of(prepared: &Prepared<W>) -> Self {
         Header {
-            candidates: prepared.candidates,
-            max_total: prepared.max_total,
+            n: prepared.n,
+            candidates: Self::digest_candidates(&prepared.candidates),
+            frames: Self::digest_frames(&prepared.unrevised),
             frame0_freedoms: prepared.root.frames().first().map(|f| f.freedoms),
+            max_total: prepared.max_total,
             tactics: prepared.tactics,
         }
     }
 
+    fn digest_candidates(candidates: &Bits<W>) -> u64 {
+        let mut bytes = Vec::with_capacity(8 * W);
+        put_bits(&mut bytes, candidates);
+        engine::checksum(&bytes)
+    }
+
+    /// A digest of every frame's moves, factors and freedoms, bottom first.
+    fn digest_frames(frames: &FrameSet<W>) -> u64 {
+        let mut bytes = Vec::with_capacity(frames.len() * (16 * W + 4));
+        for frame in frames.frames() {
+            put_bits(&mut bytes, &frame.moves);
+            put_bits(&mut bytes, &frame.factors);
+            bytes.extend_from_slice(&frame.freedoms.to_le_bytes());
+        }
+        engine::checksum(&bytes)
+    }
+
     fn encode(&self) -> Vec<u8> {
         let mut out = Self::MAGIC.to_vec();
-        out.extend_from_slice(&(W as u32).to_le_bytes());
-        put_bits(&mut out, &self.candidates);
-        out.extend_from_slice(&self.max_total.to_le_bytes());
+        for word in [Self::VERSION, W as u32, self.n] {
+            out.extend_from_slice(&word.to_le_bytes());
+        }
+        out.extend_from_slice(&self.candidates.to_le_bytes());
+        out.extend_from_slice(&self.frames.to_le_bytes());
         out.push(u8::from(self.frame0_freedoms.is_some()));
         out.extend_from_slice(&self.frame0_freedoms.unwrap_or(0).to_le_bytes());
+        out.extend_from_slice(&self.max_total.to_le_bytes());
         out.extend_from_slice(&self.tactics.bits().to_le_bytes());
         out
     }
 
     fn decode(bytes: &[u8]) -> Result<Self, String> {
-        let len = 4 + 4 + 8 * W + 4 + 1 + 4 + 2;
-        if bytes.len() != len || &bytes[..4] != Self::MAGIC {
+        if bytes.starts_with(b"TXS2") {
+            return Err("the checkpoint was made by an older build, whose checkpoints do not record the board size \
+                        or the frames, so it cannot be checked against this game; finish it with that build, or \
+                        delete it"
+                .into());
+        }
+        if !bytes.starts_with(Self::MAGIC) {
             return Err("not a checkpoint of a Taxman search".into());
         }
-        let u32_at = |i: usize| u32::from_le_bytes(bytes[i..i + 4].try_into().expect("4 bytes"));
-        let width = u32_at(4) as usize;
+        let u32_at = |i: usize| bytes.get(i..i + 4).map(|b| u32::from_le_bytes(b.try_into().expect("4 bytes")));
+        let version = u32_at(4).unwrap_or(0);
+        if version != Self::VERSION {
+            return Err(format!("the checkpoint's header has format version {version}, not {}", Self::VERSION));
+        }
+        if bytes.len() != Self::LEN {
+            return Err(format!("the checkpoint's header has {} bytes, not {}", bytes.len(), Self::LEN));
+        }
+        let width = u32_at(8).expect("length checked") as usize;
         if width != W {
             return Err(format!("the checkpoint was made with Bits<{width}>, not Bits<{W}>"));
         }
-        let mut at = 8 + 8 * W;
-        let candidates = get_bits(&bytes[8..at]);
-        let max_total = u32_at(at);
-        let has_frame0 = bytes[at + 4] != 0;
-        let frame0 = u32_at(at + 5) as i32;
-        at += 9;
+        let u64_at = |i: usize| u64::from_le_bytes(bytes[i..i + 8].try_into().expect("8 bytes"));
         Ok(Header {
-            candidates,
-            max_total,
-            frame0_freedoms: has_frame0.then_some(frame0),
-            tactics: SearchTactics::from_bits(u16::from_le_bytes([bytes[at], bytes[at + 1]]))?,
+            n: u32_at(12).expect("length checked"),
+            candidates: u64_at(16),
+            frames: u64_at(24),
+            frame0_freedoms: (bytes[32] != 0).then(|| u32_at(33).expect("length checked") as i32),
+            max_total: u32_at(37).expect("length checked"),
+            tactics: SearchTactics::from_bits(u16::from_le_bytes([bytes[41], bytes[42]]))?,
         })
+    }
+
+    /// What differs between a checkpoint's header (`self`) and the one the run expects, if anything.
+    fn mismatch(&self, expected: &Self) -> Option<String> {
+        let what = if self.n != expected.n {
+            format!("the game n={}, not n={}", self.n, expected.n)
+        } else if self.candidates != expected.candidates {
+            "other promotion candidates".into()
+        } else if self.frames != expected.frames {
+            "other frames (made by a build with another frame builder?)".into()
+        } else if self.frame0_freedoms != expected.frame0_freedoms {
+            format!("frame 0's freedoms {:?}, not {:?}", self.frame0_freedoms, expected.frame0_freedoms)
+        } else if self.max_total != expected.max_total {
+            format!("max_total {}, not {}", self.max_total, expected.max_total)
+        } else if self.tactics != expected.tactics {
+            format!("the search tactics {:?}, not {:?}", self.tactics, expected.tactics)
+        } else {
+            return None;
+        };
+        Some(format!("the checkpoint is of {what}"))
     }
 }
 
@@ -1643,9 +1754,15 @@ fn dive<const W: usize>(model: &Model, root: &FrameSet<W>, graph: &MatchGraph, c
 /// Searches for the promotion set with the largest sum.
 ///
 /// The incumbent starts as the greedy set, or as what survives of `seed` (see [`surviving`]) if that is
-/// better.  `cap` is a proven ceiling on the sum; reaching it ends the search.  With `resume`, the search
-/// continues from the checkpoint configured in `cfg` (the `prepared` game must have been set up by
-/// [`prepare_for_resume`] or identically); otherwise it starts fresh.
+/// better.  `cap` is a proven ceiling on the sum; reaching it ends the search, also before it starts.  With
+/// `resume`, the search continues from the checkpoint configured in `cfg` (the `prepared` game must have been
+/// set up by [`prepare_for_resume`] or identically): its header must be this game's, and its incumbent a
+/// promotable set of candidates worth what the checkpoint says.  Otherwise it starts fresh, unless `prepared`
+/// is [`Revise::Stopped`]: then it stops at once, incomplete, without a checkpoint.
+///
+/// # Errors
+///
+/// The engine's, and `InvalidData` for a checkpoint that does not belong to this game.
 pub fn search<const W: usize>(
     prepared: &Prepared<W>,
     cfg: &EngineConfig,
@@ -1697,13 +1814,32 @@ fn search_forgetting<const W: usize>(
     }
     let hood = Neighbourhood { model: &prepared.model, root: &prepared.root, candidates: &prepared.candidates };
     incumbent = hood.improve(&mut Scratch::new(), &incumbent, true);
-    if !resume && cap.is_some_and(|cap| incumbent.sum() >= cap) {
+    let checkpoint = cfg.checkpoint.as_ref().map(|(path, _)| path.as_path());
+    let resumed = if resume {
+        let path =
+            checkpoint.ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "resuming needs a checkpoint"))?;
+        Some(resume_point(prepared, path).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?)
+    } else {
+        None
+    };
+    // What the search would start from, and the totals of the runs before this one.
+    let (best, before) = match &resumed {
+        Some((kept, head)) => (if kept.sum() >= incumbent.sum() { *kept } else { incumbent }, head.stats),
+        None => (incumbent, Stats::default()),
+    };
+    let reached_cap = cap.is_some_and(|cap| best.sum() >= cap);
+    let stopped = !resume && matches!(prepared.revise, Revise::Stopped { .. });
+    if reached_cap || stopped {
+        // A resumed search that reaches the cap at once is finished like any other.
+        if let (true, Some(path)) = (reached_cap && resume && !cfg.keep_completed_checkpoint, checkpoint) {
+            engine::remove_finished_checkpoint(path);
+        }
         return Ok(SearchResult {
-            promotions: incumbent,
-            sum: incumbent.sum(),
-            completed: true,
-            reached_cap: true,
-            stats: Stats::default(),
+            promotions: best,
+            sum: best.sum(),
+            completed: reached_cap,
+            reached_cap,
+            stats: before,
             counters: Counters::default(),
             time: t0.elapsed(),
             found: None,
@@ -1729,16 +1865,14 @@ fn search_forgetting<const W: usize>(
         began: t0,
         found: Mutex::new(None),
     };
-    let start = if resume {
-        let Some((path, _)) = &cfg.checkpoint else {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "resuming needs a checkpoint file"));
-        };
-        Start::Resume(path.clone())
-    } else {
-        let mut payload = Vec::new();
-        put_bits(&mut payload, &incumbent);
-        let root = TaxUnit { promoted: Bits::EMPTY, cands: prepared.candidates };
-        Start::Fresh { units: vec![root], best: incumbent.sum(), payload }
+    let start = match checkpoint.filter(|_| resume) {
+        Some(path) => Start::Resume(path.to_path_buf()),
+        None => {
+            let mut payload = Vec::new();
+            put_bits(&mut payload, &incumbent);
+            let root = TaxUnit { promoted: Bits::EMPTY, cands: prepared.candidates };
+            Start::Fresh { units: vec![root], best: incumbent.sum(), payload }
+        }
     };
     let header = Header::of(prepared).encode();
     let outcome = engine::run(cfg, start, &header, |_| TaxSearcher::new(&space))?;
@@ -1755,6 +1889,34 @@ fn search_forgetting<const W: usize>(
         found: space.found.into_inner().unwrap_or_else(PoisonError::into_inner),
         start: incumbent,
     })
+}
+
+/// The checkpoint `path` read and checked for resuming the search of `prepared`: its whole file (checksum
+/// included), its header, and its incumbent, which must be a set of candidates that can be promoted from the
+/// root and is worth the value stored with it.  Returns that set and what else the checkpoint holds.
+fn resume_point<const W: usize>(
+    prepared: &Prepared<W>,
+    path: &Path,
+) -> Result<(Bits<W>, engine::CheckpointHead), String> {
+    let at = |e: String| format!("{}: {e}", path.display());
+    let head = engine::read_checkpoint(path).map_err(|e| at(e.to_string()))?;
+    let header = Header::<W>::decode(&head.header).map_err(at)?;
+    if let Some(mismatch) = header.mismatch(&Header::of(prepared)) {
+        return Err(at(mismatch));
+    }
+    if head.payload.len() != 8 * W {
+        return Err(at(format!("its incumbent has {} bytes, not {}", head.payload.len(), 8 * W)));
+    }
+    let kept = get_bits(&head.payload);
+    let fits = kept.is_subset(&prepared.candidates)
+        && prepared.model.promote_all_using(&mut Scratch::new(), &prepared.root, &kept).is_some();
+    if !fits {
+        return Err(at("its incumbent cannot be promoted in this game".into()));
+    }
+    if kept.sum() != head.best {
+        return Err(at(format!("its incumbent is worth {}, not the {} stored with it", kept.sum(), head.best)));
+    }
+    Ok((kept, head))
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -2217,13 +2379,37 @@ mod tests {
 
         let p = prepare_golden::<8>(&load(300), SearchTactics { legacy_bound: true, ..SearchTactics::default() });
         let header = Header::of(&p);
-        let back = Header::<8>::decode(&header.encode()).unwrap();
+        let bytes = header.encode();
+        assert_eq!(bytes.len(), Header::<8>::LEN);
+        let back = Header::<8>::decode(&bytes).unwrap();
+        assert_eq!(back, header);
         assert_eq!(
-            (back.candidates, back.max_total, back.frame0_freedoms, back.tactics),
-            (p.candidates, p.max_total, p.root.frames().first().map(|f| f.freedoms), p.tactics)
+            (back.n, back.max_total, back.frame0_freedoms, back.tactics),
+            (300, p.max_total, p.root.frames().first().map(|f| f.freedoms), p.tactics)
         );
-        assert!(Header::<16>::decode(&header.encode()).is_err());
+        assert_eq!(back.mismatch(&header), None);
+        assert!(Header::<16>::decode(&bytes).unwrap_err().contains("Bits<8>"));
         assert!(Header::<8>::decode(b"nonsense").is_err());
+        assert!(Header::<8>::decode(&bytes[..20]).is_err());
+        let mut later = bytes.clone();
+        later[4] = 4;
+        assert!(Header::<8>::decode(&later).unwrap_err().contains("format version 4"));
+        // A header of the format before version 3 is refused, saying why.
+        let mut old = b"TXS2".to_vec();
+        old.extend_from_slice(&[0; 4 + 64 + 4 + 1 + 4 + 2]);
+        assert!(Header::<8>::decode(&old).unwrap_err().contains("older build"));
+        // Every field that differs is named.
+        let other = |change: fn(&mut Header<8>)| {
+            let mut h = header;
+            change(&mut h);
+            h.mismatch(&header).unwrap()
+        };
+        assert!(other(|h| h.n = 301).contains("n=301, not n=300"));
+        assert!(other(|h| h.candidates ^= 1).contains("candidates"));
+        assert!(other(|h| h.frames ^= 1).contains("frames"));
+        assert!(other(|h| h.max_total += 1).contains("max_total"));
+        assert!(other(|h| h.frame0_freedoms = None).contains("freedoms"));
+        assert!(other(|h| h.tactics.nogoods = !h.tactics.nogoods).contains("tactics"));
 
         // Every setting of the search tactics reads back as it was written, and the default tactics of a checkpoint
         // made before `fix_forced`, `nogoods` and `forget_nogoods` existed (0x19d) read back with them on, as they

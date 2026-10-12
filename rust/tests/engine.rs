@@ -386,11 +386,13 @@ fn assert_accounting(c: &engine::Counters) {
 }
 
 // Many more workers than cores, as on a machine with 192 cores: answers, splitting, checkpoints, spill and panics
-// must work however the threads are scheduled.
+// must work however the threads are scheduled.  They keep every core busy for seconds, so they run only when
+// asked for: `cargo test --release --test engine -- --ignored many_threads`.
 
 const MANY: [usize; 2] = [64, 192];
 
 #[test]
+#[ignore = "uses every core for seconds; run with --ignored"]
 fn many_threads_are_correct() {
     let inst = instance();
     let opt = inst.dp();
@@ -411,6 +413,7 @@ fn many_threads_are_correct() {
 }
 
 #[test]
+#[ignore = "uses every core for seconds; run with --ignored"]
 fn many_threads_checkpoint_resume_and_spill() {
     let inst = instance();
     let raw = raw_search(&inst);
@@ -453,6 +456,7 @@ fn many_threads_checkpoint_resume_and_spill() {
 }
 
 #[test]
+#[ignore = "uses every core for seconds; run with --ignored"]
 fn many_threads_worker_panic_propagates() {
     let inst = big_instance();
     let raw_nodes = 200_000_000; // about the big instance's tree
@@ -769,6 +773,7 @@ fn stress() {
             time_limit: ms(pick(&[0, 0, 2, 5])),
             node_limit: (pick(&[0, 0, 1]) == 1).then_some(raw.nodes / 4 + 1),
             label: format!("stress {it}"),
+            ..EngineConfig::default()
         };
         let target = (pick(&[0, 0, 0, 1]) == 1).then_some(opt);
         let mut start = fresh();

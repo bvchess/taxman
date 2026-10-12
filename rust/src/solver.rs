@@ -30,7 +30,7 @@ use crate::game::{replay, Optimal};
 use crate::hives::Apiary;
 use crate::json::Json;
 use crate::numtheory::Tables;
-use crate::search::{self, prepare, prepare_for_resume, stat, Branching, Revise, SearchTactics};
+use crate::search::{self, prepare_for_resume, prepare_within, stat, Branching, Revise, SearchTactics};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fs::{self, File, OpenOptions};
@@ -641,14 +641,33 @@ fn search_game<const W: usize>(
                 format!("cannot resume from {}: {e} (delete the file to start the game over)", path.display())
             })?;
             if p.tactics != tactics.search {
+                let made = Tactics { search: p.tactics, ..tactics };
+                let differ: Vec<_> =
+                    made.settings().into_iter().zip(tactics.settings()).filter(|(a, b)| a != b).collect();
+                let what: Vec<String> =
+                    differ.iter().map(|((name, there), (_, here))| format!("{name} is {there}, not {here}")).collect();
+                let flags: Vec<String> =
+                    differ.iter().map(|((name, there), _)| format!("--tactic {name}={there}")).collect();
                 return Err(format!(
-                    "{} was made with different search tactics than the ones given (delete it to start over)",
-                    path.display()
+                    "{} was made with different search tactics: {}; resume it with {}, or delete it to start the game \
+                     over",
+                    path.display(),
+                    what.join(", "),
+                    flags.join(" ")
                 ));
             }
             p
         }
-        None => prepare::<W>(tables, &columns, &frames.candidates, tactics.search, opts.threads)?,
+        None => {
+            // The two-frame search of `revise_freedoms` stays within this invocation's limits too.
+            let limits = EngineConfig {
+                threads: opts.threads,
+                time_limit: opts.time_limit,
+                node_limit: opts.node_limit,
+                ..EngineConfig::default()
+            };
+            prepare_within::<W>(tables, &columns, &frames.candidates, tactics.search, &limits)?
+        }
     };
     result.phases.frames += prepared.timings.build;
     result.phases.preclusions = prepared.timings.preclusions;
@@ -688,6 +707,7 @@ fn search_game<const W: usize>(
         time_limit: opts.time_limit,
         node_limit: opts.node_limit,
         label: format!("n={n}"),
+        ..EngineConfig::default()
     };
     let found = search::search(&prepared, &cfg, seed.as_ref(), cap, resuming);
     if ours {

@@ -3,9 +3,10 @@
 mod cli;
 mod commands;
 
-use cli::{CliError, CliResult};
+use cli::{errln, outln, CliError, CliResult};
 use std::process::ExitCode;
 use std::time::Instant;
+use taxman::engine;
 use taxman::game::Optimal;
 use taxman::numtheory::Tables;
 use taxman::search::{Branching, SearchTactics};
@@ -27,6 +28,8 @@ commands:
       --progress S             seconds between progress lines on stderr (default 60, 0 for none)
       --time-limit S           stop a game's search after S seconds (keeps its checkpoint)
       --node-limit N           stop a game's search after N nodes (keeps its checkpoint)
+                               SIGINT or SIGTERM stops the search the same way (exit status 130 or 143);
+                               a second one kills the process.  One process at a time uses a checkpoint DIR.
       --mem-cap UNITS          search units kept in memory before spilling to disk
       --force-search           search even where the previous game gives the answer
       --optimal FILE           optimal.json to compare with and to take previous games from (none: no file)
@@ -53,13 +56,14 @@ fn usage() -> String {
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match run(&args) {
-        Ok(()) => ExitCode::SUCCESS,
+        // A run that a signal stopped (with its checkpoint, see `solve`) tells the shell so, as 128 + the signal.
+        Ok(()) => engine::stop_signal().map_or(ExitCode::SUCCESS, |signal| ExitCode::from(128 + signal as u8)),
         Err(CliError::Usage(message)) => {
-            eprintln!("error: {message}\n\n{}", usage());
+            errln!("error: {message}\n\n{}", usage());
             ExitCode::from(2)
         }
         Err(CliError::Failed(message)) => {
-            eprintln!("error: {message}");
+            errln!("error: {message}");
             ExitCode::FAILURE
         }
     }
@@ -71,7 +75,7 @@ fn run(args: &[String]) -> CliResult {
     };
     match command.as_str() {
         "help" | "--help" | "-h" => {
-            print!("{}", usage());
+            outln!("{}", usage().trim_end());
             Ok(())
         }
         "solve" => commands::solve(rest),
@@ -102,8 +106,8 @@ fn verify_optimal(args: &[String]) -> CliResult {
     let replay_ms = millis(start);
 
     let total_moves: usize = optimal.games().map(|(_, _, moves)| moves.len()).sum();
-    println!("verified {checked} games (n up to {}, {total_moves} moves)", optimal.max_n());
-    println!("load+parse {load_ms:.1} ms, replay {replay_ms:.1} ms");
+    outln!("verified {checked} games (n up to {}, {total_moves} moves)", optimal.max_n());
+    outln!("load+parse {load_ms:.1} ms, replay {replay_ms:.1} ms");
     Ok(())
 }
 
@@ -120,9 +124,10 @@ fn tables(args: &[String]) -> CliResult {
         if k < 1 || k > n {
             return Err(CliError::Usage(format!("K = {k} is not on the board 1..={n}")));
         }
-        println!(
+        outln!(
             "{k}: maximal factors {:?}; maximal composites {:?}",
-            tables.max_factors[k as usize], tables.max_composites[k as usize]
+            tables.max_factors[k as usize],
+            tables.max_composites[k as usize]
         );
     }
     Ok(())
