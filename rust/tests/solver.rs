@@ -120,7 +120,7 @@ fn an_interrupted_game_resumes_from_its_checkpoint() {
     let opts = SolveOptions {
         checkpoint_dir: Some(dir.0.clone()),
         checkpoint_interval: Duration::from_secs(3600),
-        node_limit: Some(15_000),
+        node_limit: Some(5_000),
         queue_mem_cap: 4,
         force_search: true,
         ..options(2)
