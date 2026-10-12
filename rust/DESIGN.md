@@ -90,7 +90,7 @@ and values for them.
 | `prime_shortcut` | on | proven | prime n: replace the n−1 solution's first move with n |
 | `reuse_prev` | on | unproven (conjecture-grade "upper-delta" certificate) | `FrameSolver.reusePrev`; accepts a derived solution without search |
 | `revise_freedoms` | on | unproven ("max-sum promotion set also has max count") | `UpperBoundEstimator.reviseFreedoms`; can shrink frame 0's freedoms |
-| `preclusions` | on | sound (promotion failure is monotone: more moves or fewer factors never make a frame winnable) | depth-2 preclusion table; prunes candidates |
+| `preclusions` | off | sound (promotion failure is monotone: more moves or fewer factors never make a frame winnable) | depth-2 preclusion table; prunes candidates (off since 2026-10: with nogoods it no longer pays for its setup) |
 | `match_bound` | on | sound (matchability relaxes winnability) | node bound = the matching relaxation instead of blameGame (which never pruned where the matching bound did not), and the children's candidate lists without the Java's promotability checks (the conflicts find those candidates); a heaviest matching that can be promoted is the node's best completion (offered as incumbent, node done) |
 | `branching` | `conflict-strong` | sound (any order explores every promotion set) | which candidate a node promotes next: `largest` (the Java's order), or a member of a conflict of the heaviest matching (these need `match_bound`): the smallest (`conflict-smallest`), the largest (`conflict-largest`), or the one whose removal lowers the matching bound most (`conflict-strong`) |
 | `match_refine` | 1 | sound (see `search::Refiner`) | refine the matching bound by branching on conflicts this many levels deep, where it does not prune (0 = off, at most 7; needs `match_bound`) |
@@ -361,7 +361,7 @@ the lever, not cheaper nodes.
   `can_promote` filter instead of the Java's partial one) cut nodes 25–35% but
   quadrupled the cost per node.  The preclusion table still pays on long
   searches (936: 15.7 s → 11.8 s) though it costs ~1.4 s of setup on one
-  thread.
+  thread.  (No longer: see "Forced members", below.)
 
 Per change (search seconds and nodes; 1 thread for 760/880/936 seeded from
 n−1, 10 threads for 1000; 10-thread times vary with when the optimum is
@@ -508,6 +508,12 @@ found the others again, one level each, further down.
   whose signature is not within the node's; the conflicts chosen are the
   same as before (the smallest, then the one with the largest member).
   −5% to −10%.
+* **No preclusion table** (`preclusions` now off by default).  With the
+  nogoods it no longer pays for its setup: the searches of 992 and 1215
+  seeded with their optimum take +5% and −4% without it (one thread), and
+  1101–1217 through `taxman solve` on 8 threads spent 53 s of its 131 s
+  building tables (0.8 s per searched game, 4.4 s on one thread at 1215) and
+  72 s searching; without them 80 s in all, the search 74 s.
 * **No refinement where members are forced.**  A node with forced members
   has a single child, which promotes them; refining the node's conflict is
   left to that child.  Nodes +3% to +11%, time −2% to −8% (992 and 1215
@@ -527,8 +533,6 @@ Tried and not kept in this round:
   search, at about the same point (one thread: 160 s instead of 170 s).
   The incumbents of 1025 and 1050 improve late because the search reaches
   the subtree that holds them late, not because a nearby set is missed.
-* `preclusions=off`: no faster now on the fast set once its setup is left
-  out, and more nodes at 1184 (154k against 126k).
 
 One thread, fast set (search seconds and nodes; 880 and 936 seeded from
 optimal.json, the rest from `results/strict.jsonl`):

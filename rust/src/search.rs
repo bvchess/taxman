@@ -137,7 +137,7 @@ impl FromStr for Branching {
 impl Default for SearchTactics {
     fn default() -> Self {
         SearchTactics {
-            preclusions: true,
+            preclusions: false,
             legacy_bound: false,
             revise_freedoms: true,
             match_bound: true,
@@ -163,8 +163,9 @@ impl SearchTactics {
     }
 
     /// The tactics as the header of a checkpoint records them.  Tactics added later are recorded by the bits of
-    /// their non-default values (`fix_forced` by bit 9 and `nogoods` by bit 10 when they are off), so that a checkpoint made before they
-    /// existed reads back with their defaults: they are sound, so a search resumed with them is still correct.
+    /// their non-default values (`fix_forced` by bit 9 and `nogoods` by bit 10 when they are off), so that a
+    /// checkpoint made before they existed reads back with their defaults: they are sound, so a search resumed
+    /// with them is still correct.
     fn bits(self) -> u16 {
         let branching = match self.branching {
             Branching::Largest => 0,
@@ -1983,7 +1984,7 @@ mod tests {
         let default = SearchTactics::default();
         let variants = [
             default,
-            SearchTactics { preclusions: false, ..default },
+            SearchTactics { preclusions: true, ..default },
             SearchTactics { legacy_bound: true, ..default },
             SearchTactics { revise_freedoms: false, ..default },
             SearchTactics { match_bound: false, ..default },
@@ -2144,7 +2145,7 @@ mod tests {
         assert!(Header::<8>::decode(b"nonsense").is_err());
 
         // Every setting of the search tactics reads back as it was written, and the default tactics of a checkpoint
-        // made before `fix_forced` and `nogoods` existed (0x19d) read back as today's defaults.
+        // made before `fix_forced` and `nogoods` existed (0x19d) read back with them on, as they are now.
         let default = SearchTactics::default();
         for refine in [0, 1, 7] {
             for branching in Branching::ALL {
@@ -2163,7 +2164,7 @@ mod tests {
                 }
             }
         }
-        assert_eq!(SearchTactics::from_bits(0x19d), Ok(default));
+        assert_eq!(SearchTactics::from_bits(0x19d), Ok(SearchTactics { preclusions: true, ..default }));
         assert!(SearchTactics::from_bits(1 << 11).is_err());
     }
 
