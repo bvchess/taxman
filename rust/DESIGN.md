@@ -96,6 +96,7 @@ and values for them.
 | `match_refine` | 1 | sound (see `search::Refiner`) | refine the matching bound by branching on conflicts this many levels deep, where it does not prune (0 = off, at most 7; needs `match_bound`) |
 | `fix_forced` | on | sound (every completion that beats the incumbent promotes them) | with `conflict-strong` branching, a node's child promotes all its *forced* candidates (those whose removal alone brings the matching bound below what the node needs): the members of the heaviest matching that the potentials show forced, else the forced members of the conflict found by strong branching; the node's loop ends after that child; a node with a known conflict all forced is done |
 | `nogoods` | on | sound (a nogood holds at every node; see `model::Nogoods`) | learn each conflict as a *nogood* of the root and use the table at every node: the smallest conflict it knows of the heaviest matching is the one to branch on and refine with (computed and learned only when it knows none), and nogoods rule candidates out of children (needs `match_bound`) |
+| `forget_nogoods` | on | sound (the table is a cache) | with `nogoods`, each searcher forgets every nogood it knows after each 50,000 of its steps (`search::NOGOOD_PERIOD`): old ones cost every lookup more than they help |
 | `legacy_bound` | off | unsound (the runner-up defect) | reproduce the Java bound exactly |
 | `prev_cap` | on | proven if opt(n−1) is optimal | stop as soon as the incumbent reaches n + opt(n−1) − inTheBag (`FrameSolver.getMaxPromotionSum`) |
 | `seed_incumbent` | on | sound (any feasible promotion set is a valid incumbent) | start from the better of greedy and the n−1 solution's promotions that are still feasible |
@@ -111,8 +112,9 @@ Results record the tactics they were produced with (`tactics`: the changes
 from the defaults, such as `branching=largest,match_refine=0`;
 `tactic_switches`: every tactic's value, the booleans as booleans,
 `match_refine` as a number and `branching` as its name), and whether any
-unproven tactic was on.  A checkpoint records the eight search tactics and is
-refused when they differ.
+unproven tactic was on.  A checkpoint records the nine search tactics and is
+refused when they differ; one made before a sound search tactic existed
+(`fix_forced`, `nogoods`, `forget_nogoods`) reads back with it at its default.
 
 ## Architecture
 
@@ -617,6 +619,128 @@ optimum it takes about 6 s); the matching repairs, still about 40% of the
 time (strong branching where nothing is forced, and refinement); and the
 multi-thread search: each thread learns its own nogoods (sharing them did
 not look worth it: a proof on 8 threads takes about as many nodes as on one).
+
+### Carrying nogoods over (2026-10): measured, not kept
+
+A nogood is a fact about the root of a game's frame model, and consecutive
+games have nearly the same model, so the nogoods a search ends with could
+start the tables of the next game's search, each checked at the new root
+first: a set that cannot be promoted from the root (an exact test, frame by
+frame) is a nogood of it whatever it came from, and `conflict_using` makes it
+minimal again.  For the same reason a checkpoint could store the tables and a
+resumed search start with them.  A prototype measured both (commit f41fff8:
+`search::valid_nogoods`, the solver's tactic `carry_nogoods`, `ladder
+--carry`, `examples/resume_carry.rs`); neither pays, and both were taken out
+again.
+
+* Nearly every nogood survives into the next game: 1374 of 1374 from 1024 at
+  1025, 482 of 494 from 1219 at 1220, 1216 of 1251 from 1229 at 1230.  But
+  game n − 1 often does not search: a prime takes the shortcut, and 1214,
+  1224 and 1226 reach the cap with their seed (no nodes), so in a range the
+  nogoods come from the last game searched (1227's from 1225, through 1226).
+* The table never stops growing, but learning costs little.  On one thread,
+  half of what a hard game learns is learned in the first 3–27% of its search,
+  90% by 18–64%, and the last nogood in its last 1–17% (1024, 1025, 1215,
+  1219, 1220, 1225, and 1230 stopped at 560 s); each is one conflict computed
+  where the table knew none, a few thousand in a search of millions of nodes.
+  So what a preloaded table could save is not the learning but the search's
+  knowing smaller conflicts sooner, which changes the tree.
+* It changes, but not for the better (one thread, strict tactics, seeded from
+  n − 1 and capped as the solver does; search seconds and nodes):
+
+  | game | tables start empty | with the nogoods of |
+  |---|---|---|
+  | 1025 | 158 s 8.50M | 1024: 136 s 6.30M |
+  | 1025, proof only (seeded with its optimum) | 99 s 5.25M | 1024: 104 s 4.97M |
+  | 1220 | 186 s 13.72M | 1219: 232 s 16.47M |
+  | 1220, proof only | 177 s 13.51M | 1219: 240 s 17.81M |
+  | 1227 | 260 s 17.42M | 1225: 267 s 15.72M |
+  | 1230 | open at 560 s (best 36570 at 118 s) | 1229: open at 560 s (36570 at 186 s) |
+  | 1025, 4 threads | 35.2 s 8.51M | 1024: 38.4 s 6.82M |
+  | 1220, 4 threads | 54.0 s 17.16M | 1219: 68.0 s 15.91M |
+
+  1227 is the ceiling: 1225–1229 have the same frames and candidates (the
+  same search, 17,417,736 nodes on one thread), so 1227 started with all that
+  1225 learned is the best a carried table can be, and it takes 10% fewer
+  nodes and 3% more time.  The chain `taxman solve 1201-1231 --threads 4
+  --tactic reuse_prev=off --tactic revise_freedoms=off` from 1200 in
+  `results/strict.jsonl` took 617 s (154.7M nodes) without and 941 s (174.7M)
+  with it, every searched game slower (1230: 305 s against 445 s); there the
+  table grows from game to game.
+* Why: a larger table costs every node.  A lookup scans every nogood's
+  signature and the nogoods of each new promotion rule candidates out, so
+  nodes are slower the more the table holds (1227: 59k nodes/s from a full
+  table against 67k/s from an empty one; on 4 threads, whose tables start
+  with the union of all threads' nogoods, 177k/s against 242k/s at 1025).
+* Keeping the tables over a resume: a search stopped every K nodes and
+  resumed from its checkpoint, with the tables as they were when it stopped
+  (in memory, what a stored table would give), reproduces the uninterrupted
+  search; resumed with empty tables it is a different tree, and faster (one
+  thread):
+
+  | game, stopped every | uninterrupted | resumed with empty tables | with the tables kept |
+  |---|---|---|---|
+  | 1024, 250k nodes | 41 s 2.28M | 34 s 2.32M | 42 s 2.26M |
+  | 1215, 500k | 66 s 5.49M | 60 s 6.22M | 69 s 5.47M |
+  | 1220, 1.5M | 186 s 13.72M | 143 s 11.91M | 191 s 13.48M |
+
+  So a resume loses nothing by starting empty, and checkpoints stay as they
+  were.  That old nogoods cost more than they help is taken up in
+  "Forgetting nogoods", below.
+
+Noticed on the way: many games of a range have exactly the frames and
+candidates of an earlier one (in 1201–1231: 1202–1203 those of 1201, 1205 of
+1204, 1207 of 1206, 1210–1211 of 1209, 1213–1214 of 1212, 1217 of 1216, 1219
+of 1218, 1222–1223 of 1221, 1226–1229 of 1225, 1231 of 1230), so the same best
+promotion set, which a search of one of them has already established.  Only
+the cap differs: where it is higher than the optimum, the search is repeated
+in full.  In the strict chain above that is 1203, 1205, 1207, 1211, 1219 and
+1227: 90 s of the 617 s.
+
+### Forgetting nogoods (2026-10)
+
+The measurements of carrying nogoods over pointed the other way: a search
+resumed with empty tables was faster than one that kept them.  So each
+searcher now clears its table after each 50,000 of its own steps (tactic
+`forget_nogoods`, `search::NOGOOD_PERIOD`; sound, since the table is a cache
+and every search starts with an empty one anyway; deterministic on one
+thread).
+
+The interval, on one thread (search time of 1024, 1025, 1215 and 1220 added
+up, against never forgetting run alongside): every 10,000 steps 22% less
+time, 25,000 22%, 50,000 26%, 100,000 25%, 250,000 21%, 1,000,000 15%.  The
+node counts move both ways (1025 +7% to +28%, 1220 −11% to −28%); what the
+interval buys is cheaper nodes, since a lookup scans the whole table (1215:
+110k steps/s forgetting every 10,000 steps, 83k/s never).  A game of fewer
+steps than the interval is unchanged.  Tried and not kept:
+
+* Forgetting by size, clearing the table whenever it holds 64, 128 or 256
+  nogoods: 15%, 22% and 17% less time on those four, but the smaller games
+  slower, since they clear while still learning (936: 0.51 s against
+  0.85/0.61/0.53 s; 1050: 3.96 s against 5.19/4.49/4.33 s).
+* Keeping the nogoods used since the last clearing (returned by a lookup, or
+  ruling a candidate out of a child): every 100,000 steps 15% less time,
+  every 500,000 6%.  The ones kept cost lookups as much as the others and help
+  no more.
+
+Never forgetting against forgetting every 50,000 steps (search seconds and
+nodes; strict tactics, seeded from n − 1 and capped as the solver does; the
+fast set 880–1184 is unchanged to ±4%):
+
+| game | one thread, never | one thread, forgetting | 4 threads, never (two runs) | 4 threads, forgetting |
+|---|---|---|---|---|
+| 992 | 73.3 s 4.00M | 52.6 s 4.20M | 19.5 s, 16.9 s | 18.0 s, 16.5 s |
+| 996 | 69.0 s 4.17M | 61.9 s 4.78M | | |
+| 1024 | 43.0 s 2.28M | 34.3 s 2.38M | | |
+| 1025 | 168.5 s 8.50M | 140.5 s 10.11M | 35.3 s, 35.3 s | 32.1 s, 32.3 s |
+| 1215 | 69.6 s 5.49M | 50.6 s 5.16M | 21.8 s, 21.0 s | 15.3 s, 16.1 s |
+| 1216 | 22.4 s 2.10M | 21.1 s 2.22M | | |
+| 1220 | 192.2 s 13.72M | 125.4 s 10.51M | 60.6 s, 55.1 s | 38.8 s, 40.5 s |
+| 1225 | 262.4 s 17.42M | 154.2 s 12.07M | 54.7 s, 55.2 s | 31.9 s, 33.4 s |
+
+The strict chain 1201–1231 on 4 threads (as above) takes 377 s instead of
+571 s, with every score the same (1230: 158 s instead of 275 s; 1225 33 s
+instead of 55 s; 1220 39 s instead of 62 s).
 
 ## Testing
 
