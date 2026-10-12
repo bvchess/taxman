@@ -18,3 +18,10 @@ promotions) are listed in DESIGN.md; the same holds for optimal.json beyond
 the brute-force-certified n ≤ 62.  Each game starts from the previous game's
 result (the first from optimal.json's n=1000), which feeds `prev_cap` and the
 derivation shortcuts.
+
+Check of optimal.json itself: `taxman solve 1-1000 --threads 10 --tactic reuse_prev=off
+--tactic revise_freedoms=off` (commit 2063771) reproduces every score in
+optimal.json with no unproven tactic on — 819 games searched, 168 prime, 13
+trivial — in 8.6 minutes in total on 10 threads (slowest: n=992, 75 s).  The
+file is not kept; it would only repeat optimal.json.
+
