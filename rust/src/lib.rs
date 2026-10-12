@@ -10,3 +10,4 @@ pub mod hives;
 pub mod json;
 pub mod model;
 pub mod numtheory;
+pub mod search;

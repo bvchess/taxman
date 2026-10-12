@@ -154,20 +154,37 @@ impl<const W: usize> Worklist<W> {
         self.summary |= 1 << i;
     }
 
+    /// Removes and returns the largest member.
     #[inline]
     fn pop(&mut self) -> Option<u32> {
         if self.summary == 0 {
             return None;
         }
         let i = 63 - self.summary.leading_zeros() as usize;
-        let word = self.words[i];
-        let bit = 63 - word.leading_zeros();
-        let rest = word & !(1u64 << bit);
+        let bit = 63 - self.words[i].leading_zeros();
+        self.take(i, bit);
+        Some(((i as u32) << 6) | bit)
+    }
+
+    /// Removes and returns the smallest member.
+    #[inline]
+    fn pop_min(&mut self) -> Option<u32> {
+        if self.summary == 0 {
+            return None;
+        }
+        let i = self.summary.trailing_zeros() as usize;
+        let bit = self.words[i].trailing_zeros();
+        self.take(i, bit);
+        Some(((i as u32) << 6) | bit)
+    }
+
+    #[inline]
+    fn take(&mut self, i: usize, bit: u32) {
+        let rest = self.words[i] & !(1u64 << bit);
         self.words[i] = rest;
         if rest == 0 {
             self.summary &= !(1u64 << i);
         }
-        Some(((i as u32) << 6) | bit)
     }
 }
 
@@ -219,68 +236,227 @@ impl<const W: usize> Scratch<W> {
 
     /// Whether the frame `moves -> factors` is winnable: drops moves with a private live factor until none is
     /// left (winnable) or none can be dropped (see the module docs).
+    #[inline]
     fn winnable(&mut self, moves: &Bits<W>, factors: &Bits<W>, g: &FactorProvider) -> bool {
-        let mut left = moves.len();
-        if left > factors.len() {
-            return false;
-        }
-        if left == 0 {
-            return true;
-        }
-        let cells = self.cells.as_flattened_mut();
-        let stack = self.stack.as_flattened_mut();
-        let mut top = 0;
-        // Count every move into the cells of its live factors, pushing each factor whose count reaches 1.
-        for m in moves.iter() {
-            let mut live = false;
-            for &q in g.factors(m) {
-                if factors.contains(u32::from(q)) {
-                    live = true;
-                    let cell = &mut cells[usize::from(q)];
-                    *cell = (*cell + ONE_MOVE) ^ m;
-                    if *cell >> 16 == 1 {
-                        stack[top] = q;
-                        top += 1;
-                    }
-                }
-            }
-            if !live {
-                Self::clear(cells, factors);
-                return false;
-            }
-        }
-        // A factor with a single live move names it; that move can be taken last, so drop it.  While a move is
-        // counted, the cells of its live factors are non-zero and those of its other factors zero.
-        while top > 0 {
-            top -= 1;
-            let cell = cells[usize::from(stack[top])];
-            if cell >> 16 != 1 {
-                continue;
-            }
-            let m = cell & 0xFFFF;
-            for &q in g.factors(m) {
-                let cell = &mut cells[usize::from(q)];
-                if *cell != 0 {
-                    *cell = (*cell - ONE_MOVE) ^ m;
-                    if *cell >> 16 == 1 {
-                        stack[top] = q;
-                        top += 1;
-                    }
-                }
-            }
-            left -= 1;
-            if left == 0 {
-                return true; // every move was counted in and out, so every cell is zero again
-            }
-        }
-        Self::clear(cells, factors);
-        false
+        let mut stack = Stack { items: self.stack.as_flattened_mut(), top: 0 };
+        peel(self.cells.as_flattened_mut(), moves, factors, g, &mut NoRecord, &mut stack)
     }
 
-    fn clear(cells: &mut [u32], factors: &Bits<W>) {
-        for q in factors.iter() {
-            cells[q as usize] = 0;
+    /// [`winnable`](Self::winnable), recording the winning order in `cert`.  The order frees the smallest
+    /// factor it can at each step, so the large factors that promoted numbers have tend to be freed late, which
+    /// keeps the peels a certificate cannot avoid short (see [`Certificate`]).
+    fn certify(&mut self, moves: &Bits<W>, factors: &Bits<W>, g: &FactorProvider, cert: &mut Certificate<W>) -> bool {
+        peel(self.cells.as_flattened_mut(), moves, factors, g, cert, &mut Worklist::<W>::new())
+    }
+}
+
+/// Factors waiting for a peel to look at them again.
+trait Pending {
+    fn push(&mut self, factor: u16);
+    fn pop(&mut self) -> Option<u16>;
+}
+
+/// Last in, first out: the fastest.
+struct Stack<'a> {
+    items: &'a mut [u16],
+    top: usize,
+}
+
+impl Pending for Stack<'_> {
+    #[inline]
+    fn push(&mut self, factor: u16) {
+        self.items[self.top] = factor;
+        self.top += 1;
+    }
+
+    #[inline]
+    fn pop(&mut self) -> Option<u16> {
+        self.top = self.top.checked_sub(1)?;
+        Some(self.items[self.top])
+    }
+}
+
+/// Smallest factor first.
+impl<const W: usize> Pending for Worklist<W> {
+    #[inline]
+    fn push(&mut self, factor: u16) {
+        self.insert(u32::from(factor));
+    }
+
+    #[inline]
+    fn pop(&mut self) -> Option<u16> {
+        self.pop_min().map(|f| f as u16)
+    }
+}
+
+/// The peel behind [`Scratch::winnable`] and [`Scratch::certify`], on a [`Scratch`]'s cells (all zero before
+/// and after).
+fn peel<const W: usize, R: Recorder<W>, P: Pending>(
+    cells: &mut [u32],
+    moves: &Bits<W>,
+    factors: &Bits<W>,
+    g: &FactorProvider,
+    record: &mut R,
+    pending: &mut P,
+) -> bool {
+    let moves_total = moves.len();
+    let mut left = moves_total;
+    if left > factors.len() {
+        return false;
+    }
+    record.begin(factors, moves_total);
+    if left == 0 {
+        return true;
+    }
+    // Count every move into the cells of its live factors, queueing each factor whose count reaches 1.
+    for m in moves.iter() {
+        let mut live = false;
+        for &q in g.factors(m) {
+            if factors.contains(u32::from(q)) {
+                live = true;
+                let cell = &mut cells[usize::from(q)];
+                *cell = (*cell + ONE_MOVE) ^ m;
+                if *cell >> 16 == 1 {
+                    pending.push(q);
+                }
+            }
         }
+        if !live {
+            clear(cells, factors);
+            return false;
+        }
+    }
+    // A factor with a single live move names it; that move can be taken last, so drop it.  While a move is
+    // counted, the cells of its live factors are non-zero and those of its other factors zero.
+    while let Some(f) = pending.pop() {
+        let cell = cells[usize::from(f)];
+        if cell >> 16 != 1 {
+            continue;
+        }
+        let m = cell & 0xFFFF;
+        let step = moves_total - left;
+        record.dropped(step, m);
+        for &q in g.factors(m) {
+            let cell = &mut cells[usize::from(q)];
+            if *cell != 0 {
+                *cell = (*cell - ONE_MOVE) ^ m;
+                if *cell >> 16 == 1 {
+                    pending.push(q);
+                } else if *cell == 0 {
+                    record.freed(q, step);
+                }
+            }
+        }
+        left -= 1;
+        if left == 0 {
+            return true; // every move was counted in and out, so every cell is zero again
+        }
+    }
+    clear(cells, factors);
+    false
+}
+
+fn clear<const W: usize>(cells: &mut [u32], factors: &Bits<W>) {
+    for q in factors.iter() {
+        cells[q as usize] = 0;
+    }
+}
+
+/// What a peel reports as it goes: the move it drops at each step and the factors that lose their last live move
+/// then (one move per step, from step 0).
+trait Recorder<const W: usize> {
+    /// The peel of a frame with these factors and this many moves begins.
+    fn begin(&mut self, factors: &Bits<W>, moves: u32);
+    fn dropped(&mut self, step: u32, m: u32);
+    fn freed(&mut self, factor: u16, step: u32);
+}
+
+/// The recorder of a plain winnability check.
+struct NoRecord;
+
+impl<const W: usize> Recorder<W> for NoRecord {
+    #[inline(always)]
+    fn begin(&mut self, _: &Bits<W>, _: u32) {}
+
+    #[inline(always)]
+    fn dropped(&mut self, _: u32, _: u32) {}
+
+    #[inline(always)]
+    fn freed(&mut self, _: u16, _: u32) {}
+}
+
+/// One winning order of a winnable frame, kept to answer "is the frame still winnable with one more move, or
+/// with one factor less?" mostly without peeling (see [`Model::certify_using`]).
+///
+/// The order drops one move per step, each with a factor no remaining move but it has.  Record, for each
+/// factor, the step at which its last live move is dropped (−1 if it has none): the factors freed at a step
+/// are exactly the ones that let its move go.  Replaying the order:
+///
+/// * with a new move `x` whose live factors are `Q`: nothing changes until step `i0 = min last(Q)`; if the
+///   move of that step has a freed factor outside `Q` it still goes, and then `x` has a factor of its own and
+///   can go too, after which the order finishes as before.  So the frame stays winnable if `i0 < 0` or step
+///   `i0` frees a factor outside `Q`.
+/// * without a factor `y`: only the step that frees `y` is affected, and its move still goes if that step
+///   frees another factor.  So the frame stays winnable if `y` has no live move or its step frees two factors.
+///
+/// When neither applies, a peel decides, but only of the moves from the affected step on: the steps before it
+/// are still valid, and peeling can always be continued from any valid partial order.
+#[derive(Clone)]
+pub struct Certificate<const W: usize> {
+    /// Per factor, the step at which it is freed (−1 if it has no live move).
+    last: [[i16; 64]; W],
+    /// Per step, how many factors it frees.
+    freed: [[u8; 64]; W],
+    /// Per step, the move it drops.
+    order: [[u16; 64]; W],
+}
+
+impl<const W: usize> Default for Certificate<W> {
+    fn default() -> Self {
+        Certificate { last: [[0; 64]; W], freed: [[0; 64]; W], order: [[0; 64]; W] }
+    }
+}
+
+impl<const W: usize> Certificate<W> {
+    #[inline]
+    fn last(&self, factor: u32) -> i16 {
+        self.last.as_flattened()[factor as usize]
+    }
+
+    #[inline]
+    fn freed_at(&self, step: i16) -> u8 {
+        self.freed.as_flattened()[step as usize]
+    }
+
+    /// `moves` without the moves the order drops before `step`.
+    #[inline]
+    fn moves_from_step(&self, moves: &Bits<W>, step: i16) -> Bits<W> {
+        let mut rest = *moves;
+        for &m in &self.order.as_flattened()[..step.max(0) as usize] {
+            rest.remove(u32::from(m));
+        }
+        rest
+    }
+}
+
+impl<const W: usize> Recorder<W> for Certificate<W> {
+    fn begin(&mut self, factors: &Bits<W>, moves: u32) {
+        let last = self.last.as_flattened_mut();
+        for f in factors.iter() {
+            last[f as usize] = -1;
+        }
+        self.freed.as_flattened_mut()[..moves as usize].fill(0);
+    }
+
+    #[inline]
+    fn dropped(&mut self, step: u32, m: u32) {
+        self.order.as_flattened_mut()[step as usize] = m as u16;
+    }
+
+    #[inline]
+    fn freed(&mut self, factor: u16, step: u32) {
+        self.last.as_flattened_mut()[usize::from(factor)] = step as i16;
+        self.freed.as_flattened_mut()[step as usize] += 1;
     }
 }
 
@@ -612,6 +788,55 @@ impl Model {
         scratch.winnable(moves, factors, &self.graph)
     }
 
+    /// Records a winning order of `frame` in `cert` (see [`Certificate`]).  False if the frame is not winnable,
+    /// and then `cert` means nothing.
+    pub fn certify_using<const W: usize>(
+        &self,
+        scratch: &mut Scratch<W>,
+        frame: &Frame<W>,
+        cert: &mut Certificate<W>,
+    ) -> bool {
+        scratch.certify(&frame.moves, &frame.factors, &self.graph, cert)
+    }
+
+    /// Whether `frame`, certified by `cert`, stays winnable with the move `x` added: from the certificate when it
+    /// can tell, else by a peel of the moves from the step it gets stuck at.
+    pub fn winnable_with_move_using<const W: usize>(
+        &self,
+        scratch: &mut Scratch<W>,
+        frame: &Frame<W>,
+        cert: &Certificate<W>,
+        x: u32,
+    ) -> bool {
+        let live = || self.graph.factors(x).iter().map(|&q| u32::from(q)).filter(|&q| frame.factors.contains(q));
+        let Some(first) = live().map(|q| cert.last(q)).min() else {
+            return false; // a move with no factor can never be taken
+        };
+        if first < 0 || usize::from(cert.freed_at(first)) > live().filter(|&q| cert.last(q) == first).count() {
+            return true;
+        }
+        scratch.winnable(&cert.moves_from_step(&frame.moves, first).with(x), &frame.factors, &self.graph)
+    }
+
+    /// Whether `frame`, certified by `cert`, stays winnable without its factor `y`: from the certificate when it
+    /// can tell, else by a peel of the moves from the step that frees `y`.
+    pub fn winnable_without_factor_using<const W: usize>(
+        &self,
+        scratch: &mut Scratch<W>,
+        frame: &Frame<W>,
+        cert: &Certificate<W>,
+        y: u32,
+    ) -> bool {
+        if !frame.factors.contains(y) {
+            return true;
+        }
+        let step = cert.last(y);
+        if step < 0 || cert.freed_at(step) >= 2 {
+            return true;
+        }
+        scratch.winnable(&cert.moves_from_step(&frame.moves, step), &frame.factors.without(y), &self.graph)
+    }
+
     /// Whether `n` can be promoted: it is a factor of its home frame `h ≥ 1`, and frames `h − 1` (gaining the
     /// move) and `h` (losing the factor) both stay winnable.
     #[inline]
@@ -661,28 +886,101 @@ impl Model {
         let Some(h) = self.promotable(scratch, state, n) else {
             return false;
         };
-        let g = &self.graph;
-        let (below, above) = state.frames.split_at_mut(h);
-        let (into, out) = (&mut below[h - 1], &mut above[0]);
-
-        // Both frames were reduced, so only n (a new move) and the moves that just lost n can be forced.
-        into.moves.insert(n);
-        let mut pending = Worklist::new();
-        pending.insert(n);
-        reduce_from(&mut into.moves, &mut into.factors, pending, g);
-        into.freedoms -= 1;
-
-        out.factors.remove(n);
-        let mut pending = Worklist::new();
-        for &c in g.composites(n) {
-            if out.moves.contains(u32::from(c)) {
-                pending.insert(u32::from(c));
-            }
-        }
-        reduce_from(&mut out.moves, &mut out.factors, pending, g);
-        out.freedoms -= 1;
+        let single = Bits::EMPTY.with(n);
+        self.apply(&mut state.frames[h - 1], &single, &Bits::EMPTY);
+        self.apply(&mut state.frames[h], &Bits::EMPTY, &single);
         true
     }
+
+    /// Splits `set` by frame, from its largest member down: per frame, the members promoted into it and out of
+    /// it.  Stops at the first member that is not a factor of a home frame `h ≥ 1` in `state` (so cannot be
+    /// promoted at all) and returns it too; the split then covers only the members above it.
+    pub fn edits<const W: usize>(&self, state: &FrameSet<W>, set: &Bits<W>) -> (Edits<W>, Option<u32>) {
+        let mut edits = Edits { gained: [Bits::EMPTY; MAX_FRAMES], lost: [Bits::EMPTY; MAX_FRAMES] };
+        for x in set.iter_desc() {
+            let h = self.home(x);
+            if h == 0 || !self.contains_factor(state, x) {
+                return (edits, Some(x));
+            }
+            edits.gained[h - 1].insert(x);
+            edits.lost[h].insert(x);
+        }
+        (edits, None)
+    }
+
+    /// The state after promoting every member of `set` (one by one in decreasing order, or in any other order:
+    /// the result is the same), or `None` if that fails.  Instead of promoting one by one, each frame is checked
+    /// and reduced once with all its promotions applied (see [`winnable`](Self::winnable)).
+    pub fn promote_all_using<const W: usize>(
+        &self,
+        scratch: &mut Scratch<W>,
+        state: &FrameSet<W>,
+        set: &Bits<W>,
+    ) -> Option<FrameSet<W>> {
+        let (edits, None) = self.edits(state, set) else {
+            return None;
+        };
+        if !self.frames_winnable(scratch, state, &edits) {
+            return None;
+        }
+        let mut out = *state;
+        for (i, frame) in out.frames[..out.len].iter_mut().enumerate() {
+            let (gained, lost) = (&edits.gained[i], &edits.lost[i]);
+            if !gained.is_empty() || !lost.is_empty() {
+                self.apply(frame, gained, lost);
+            }
+        }
+        Some(out)
+    }
+
+    /// Whether [`promote_all_using`](Self::promote_all_using) would succeed.
+    pub fn can_promote_all_using<const W: usize>(
+        &self,
+        scratch: &mut Scratch<W>,
+        state: &FrameSet<W>,
+        set: &Bits<W>,
+    ) -> bool {
+        let (edits, None) = self.edits(state, set) else {
+            return false;
+        };
+        self.frames_winnable(scratch, state, &edits)
+    }
+
+    /// Whether every frame of `state` stays winnable with `edits` applied.
+    fn frames_winnable<const W: usize>(&self, scratch: &mut Scratch<W>, state: &FrameSet<W>, edits: &Edits<W>) -> bool {
+        state.frames().iter().zip(edits.gained.iter().zip(&edits.lost)).all(|(frame, (gained, lost))| {
+            (gained.is_empty() && lost.is_empty())
+                || scratch.winnable(&(frame.moves | *gained), &(frame.factors - *lost), &self.graph)
+        })
+    }
+
+    /// Adds `gained` to the moves of a winnable frame of this model and removes `lost` from its factors, then
+    /// reduces it.  The frame was reduced, so only the new moves and the moves that lost a factor can be forced;
+    /// on a winnable frame reduction is confluent, so starting there gives what a full sweep would.
+    fn apply<const W: usize>(&self, frame: &mut Frame<W>, gained: &Bits<W>, lost: &Bits<W>) {
+        let g = &self.graph;
+        frame.moves |= *gained;
+        frame.factors -= *lost;
+        let mut pending = Worklist::of(gained);
+        for y in lost.iter() {
+            for &c in g.composites(y) {
+                if frame.moves.contains(u32::from(c)) {
+                    pending.insert(u32::from(c));
+                }
+            }
+        }
+        reduce_from(&mut frame.moves, &mut frame.factors, pending, g);
+        frame.freedoms -= (gained.len() + lost.len()) as i32;
+    }
+}
+
+/// A set of promotions split by frame (see [`Model::edits`]).
+#[derive(Clone, Copy, Debug)]
+pub struct Edits<const W: usize> {
+    /// Per frame, the numbers promoted into it (its new moves).
+    pub gained: [Bits<W>; MAX_FRAMES],
+    /// Per frame, the numbers promoted out of it (the factors it loses).
+    pub lost: [Bits<W>; MAX_FRAMES],
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -1084,6 +1382,18 @@ mod tests {
                 for (i, frame) in state.frames().iter().enumerate() {
                     let (move_universe, factor_universe) = universes[i];
                     assert!(check_frame(frame.moves, frame.factors, &model.graph, &math, stats));
+                    // Single edits answered with a certificate agree with peeling.
+                    let mut scratch = Scratch::new();
+                    let mut cert = Certificate::default();
+                    assert!(model.certify_using(&mut scratch, frame, &mut cert));
+                    for x in (move_universe - frame.moves).iter() {
+                        let with = model.winnable_with_move_using(&mut scratch, frame, &cert, x);
+                        assert_eq!(with, winnable(&frame.moves.with(x), &frame.factors, &math), "with move {x}");
+                    }
+                    for y in frame.factors.iter() {
+                        let without = model.winnable_without_factor_using(&mut scratch, frame, &cert, y);
+                        assert_eq!(without, winnable(&frame.moves, &frame.factors.without(y), &math), "without {y}");
+                    }
                     let extra: Vec<u32> = (move_universe - frame.moves).to_vec();
                     let present: Vec<u32> = frame.factors.to_vec();
                     for _ in 0..4 {
@@ -1229,6 +1539,8 @@ mod tests {
                     model.winnable(&(f.moves | gained), &(f.factors - lost))
                 });
             assert_eq!(one_by_one, at_once, "n={}: {set:?}", g.n);
+            let all = model.promote_all_using(&mut Scratch::new(), &root, &set);
+            assert_eq!(all, one_by_one.then_some(state), "n={}: promote_all of {set:?}", g.n);
             tried += 1;
             feasible += u64::from(one_by_one);
         }

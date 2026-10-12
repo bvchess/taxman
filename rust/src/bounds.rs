@@ -4,10 +4,11 @@
 //! `SearchManager.maxAdditionalPromotions`).
 //!
 //! Everything here works on a [`FrameSet`] and the [`Model`] it belongs to, and allocates nothing per call
-//! except [`Preclusions::build`].
+//! except [`Preclusions::build`].  A search thread keeps one [`Bounds`], which holds its scratch space and
+//! counts its work.
 
 use crate::bits::Bits;
-use crate::model::{FrameSet, Model, Scratch, MAX_FRAMES};
+use crate::model::{Certificate, FrameSet, Model, Scratch, MAX_FRAMES};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 // ---------------------------------------------------------------------------------------------------------
@@ -21,47 +22,158 @@ pub fn max_additional<const W: usize>(max_total: u32, state: &FrameSet<W>, promo
     max_total.saturating_sub(promoted.len()).min(by_state)
 }
 
-/// The Java's `BranchExplorer.makeNewCandidateList`: the candidates for the child made by promoting `n`.
-///
-/// `new_state` is the state after promoting `n`, `cands` the parent's remaining candidates (all below `n`),
-/// `promoted` the parent's promotions (without `n`), and `max_next` the child's [`max_additional`].  Steps:
-/// narrow to the factors of frames that can still promote; drop what `preclusions` (if given) rules out after
-/// `promoted` and `n`; then, only when `n`'s home frame is above 1, drop the candidates of `n`'s home frame and
-/// the one below that cannot be promoted, checking from the top and stopping once `max_next` have passed (as
-/// in the Java, `max_next = 0` never stops the checks).
-pub fn new_candidate_list<const W: usize>(
-    model: &Model,
-    preclusions: Option<&Preclusions<W>>,
-    n: u32,
-    max_next: u32,
-    new_state: &FrameSet<W>,
-    cands: &Bits<W>,
-    promoted: &Bits<W>,
-) -> Bits<W> {
-    let mut filtered = new_state.narrow_candidates(cands);
-    if let Some(p) = preclusions {
-        p.remove_precluded(&mut filtered, n, promoted);
-    }
-    let home_n = model.home(n);
-    if home_n > 1 {
-        let mut hits = 0;
-        let mut scratch = None;
-        let unchecked = filtered;
-        for x in unchecked.iter_desc() {
-            let home_x = model.home(x);
-            if (home_x != home_n && home_x + 1 != home_n)
-                || model.can_promote_using(scratch.get_or_insert_with(Scratch::new), new_state, x)
-            {
-                hits += 1;
-                if hits == max_next {
-                    break;
-                }
-            } else {
-                filtered.remove(x);
-            }
+/// What a [`Bounds`] has done, for the search statistics.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct BoundCounts {
+    /// Calls of [`Bounds::upper_bound`].
+    pub upper_bounds: u64,
+    /// Promotability checks made by [`Bounds::new_candidate_list`].
+    pub can_promotes: u64,
+    /// Candidates [`Bounds::new_candidate_list`] dropped because the preclusion table rules them out.
+    pub precluded: u64,
+    /// Frame certificates made for those checks.
+    pub certificates: u64,
+}
+
+/// The upper bound and the child candidate lists of one search, for one thread: the search's model,
+/// preclusion table (if that tactic is on) and runner-up rule, plus scratch space and counters.
+pub struct Bounds<'a, const W: usize> {
+    model: &'a Model,
+    preclusions: Option<&'a Preclusions<W>>,
+    rule: RunnerUp,
+    scratch: Scratch<W>,
+    /// Certificates of the frames of the state [`new_candidate_list`](Self::new_candidate_list) is checking,
+    /// made when first needed; bit `i` of `certified` says `certs[i]` is current.
+    certs: Vec<Certificate<W>>,
+    certified: u32,
+    pub counts: BoundCounts,
+}
+
+impl<'a, const W: usize> Bounds<'a, W> {
+    pub fn new(model: &'a Model, preclusions: Option<&'a Preclusions<W>>, rule: RunnerUp) -> Self {
+        Bounds {
+            model,
+            preclusions,
+            rule,
+            scratch: Scratch::new(),
+            certs: vec![Certificate::default(); MAX_FRAMES],
+            certified: 0,
+            counts: BoundCounts::default(),
         }
     }
-    filtered
+
+    /// The scratch space, for the caller's own promotions.
+    #[inline]
+    pub fn scratch(&mut self) -> &mut Scratch<W> {
+        &mut self.scratch
+    }
+
+    /// The Java's `blameGame`: an upper bound on the sum of the promotions still possible from `state` among
+    /// `cands`, at most `max_size` of them.  Bid the [`largest_that_fit`]; find the first member, from the top,
+    /// that cannot be promoted after the ones above it (or is no longer a factor); assume it is the only failure
+    /// and swap it for a replacement chosen by the [`RunnerUp`] rule.
+    pub fn upper_bound(&mut self, state: &FrameSet<W>, cands: &Bits<W>, max_size: u32) -> u64 {
+        self.counts.upper_bounds += 1;
+        let bid = largest_that_fit(self.model, state, cands, max_size);
+        let Some(fail) = first_failure(self.model, &mut self.scratch, state, &bid) else {
+            return bid.sum();
+        };
+        let mut blame = Blame::new(self.model, state, cands, &bid, self.rule);
+        let mut bound = 0;
+        for f in bid.iter_desc() {
+            bound = blame.failing_at(f);
+            if f == fail {
+                break;
+            }
+        }
+        bound
+    }
+
+    /// Whether [`upper_bound`](Self::upper_bound) would be at least `target`, found with as few frame checks as
+    /// possible.  The bound only grows as the first failure moves down the bid (from the top member down), so
+    /// it reaches `target` exactly when no member above a certain one fails: one check of that prefix, frame by
+    /// frame (see [`Model::can_promote_all_using`]), and none when the answer does not depend on it.
+    pub fn reaches(&mut self, state: &FrameSet<W>, cands: &Bits<W>, max_size: u32, target: u64) -> bool {
+        self.counts.upper_bounds += 1;
+        let bid = largest_that_fit(self.model, state, cands, max_size);
+        if bid.sum() < target {
+            return false; // the bound never exceeds the bid
+        }
+        // The largest member whose failure still leaves the bound at `target` or more.
+        let mut blame = Blame::new(self.model, state, cands, &bid, self.rule);
+        let Some(enough) = bid.iter_desc().find(|&f| blame.failing_at(f) >= target) else {
+            // Any failure brings the bound below `target`: it is reached only if the whole bid can be promoted.
+            return self.model.can_promote_all_using(&mut self.scratch, state, &bid);
+        };
+        let above = bid.intersect(&Bits::from_range(enough + 1, Bits::<W>::MAX_VALUE));
+        above.is_empty() || self.model.can_promote_all_using(&mut self.scratch, state, &above)
+    }
+
+    /// The Java's `BranchExplorer.makeNewCandidateList`: the candidates for the child made by promoting `n`.
+    ///
+    /// `new_state` is the state after promoting `n`, `cands` the parent's remaining candidates (all below `n`),
+    /// `promoted` the parent's promotions (without `n`), and `max_next` the child's [`max_additional`].  Steps:
+    /// narrow to the factors of frames that can still promote; drop what the preclusion table rules out after
+    /// `promoted` and `n`; then, only when `n`'s home frame is above 1, drop the candidates of `n`'s home frame
+    /// and the one below that cannot be promoted, checking from the top and stopping once `max_next` have passed
+    /// (as in the Java, `max_next = 0` never stops the checks).
+    pub fn new_candidate_list(
+        &mut self,
+        n: u32,
+        max_next: u32,
+        new_state: &FrameSet<W>,
+        cands: &Bits<W>,
+        promoted: &Bits<W>,
+    ) -> Bits<W> {
+        let mut filtered = new_state.narrow_candidates(cands);
+        if let Some(p) = self.preclusions {
+            let before = filtered.len();
+            p.remove_precluded(&mut filtered, n, promoted);
+            self.counts.precluded += u64::from(before - filtered.len());
+        }
+        let home_n = self.model.home(n);
+        if home_n > 1 {
+            let mut hits = 0;
+            self.certified = 0;
+            let unchecked = filtered;
+            for x in unchecked.iter_desc() {
+                let home_x = self.model.home(x);
+                let unaffected = home_x != home_n && home_x + 1 != home_n;
+                if unaffected || self.can_promote_certified(new_state, x) {
+                    hits += 1;
+                    if hits == max_next {
+                        break;
+                    }
+                } else {
+                    filtered.remove(x);
+                }
+            }
+        }
+        filtered
+    }
+
+    /// [`Model::can_promote`] with certificates of `state`'s frames, made when first needed and kept until
+    /// `certified` is reset: most checks then need no peel.
+    fn can_promote_certified(&mut self, state: &FrameSet<W>, x: u32) -> bool {
+        self.counts.can_promotes += 1;
+        let h = self.model.home(x);
+        if h == 0 || !self.model.contains_factor(state, x) {
+            return false;
+        }
+        let frames = state.frames();
+        for i in [h - 1, h] {
+            if self.certified & 1 << i == 0 {
+                let cert = &mut self.certs[i];
+                let winnable = self.model.certify_using(&mut self.scratch, &frames[i], cert);
+                debug_assert!(winnable, "the frames of a state are winnable");
+                self.certified |= 1 << i;
+                self.counts.certificates += 1;
+            }
+        }
+        let scratch = &mut self.scratch;
+        self.model.winnable_with_move_using(scratch, &frames[h - 1], &self.certs[h - 1], x)
+            && self.model.winnable_without_factor_using(scratch, &frames[h], &self.certs[h], x)
+    }
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -70,11 +182,11 @@ pub fn new_candidate_list<const W: usize>(
 /// How [`upper_bound`] replaces the first member of its bid that fails.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum RunnerUp {
-    /// The largest candidate not in the bid (0 if none).  Sound: sets within the caps of [`largest_that_fit`] form
-    /// a matroid whose heaviest set is the bid, and the heaviest such set avoiding one bid member is the bid with
-    /// that member swapped for at most one candidate outside it.  A feasible set must avoid some member at or
-    /// above the first failure, and all of those are at least as large as the failing one.  (This assumes the
-    /// caps and `max_size` hold for every feasible set, as they do for freedoms that have not been revised.)
+    /// The heaviest set within the caps of [`largest_that_fit`] that leaves out some bid member at or above the
+    /// first failure (see [`Blame`]).  Sound: a feasible set must leave out such a member.  (This
+    /// assumes the caps and `max_size` hold for every feasible set, as they do for freedoms that have not been
+    /// revised.)  The simpler "largest candidate not in the bid" is also sound but much weaker when a cap
+    /// skips candidates: it swaps in skipped candidates of a full frame for members of other frames.
     #[default]
     Sound,
     /// The Java's `getRunnerUp`: the largest candidate below the bid's smallest member (0 if none).  When
@@ -120,10 +232,7 @@ pub fn largest_that_fit<const W: usize>(model: &Model, state: &FrameSet<W>, cand
     out
 }
 
-/// The Java's `blameGame`: an upper bound on the sum of the promotions still possible from `state` among
-/// `cands`, at most `max_size` of them.  Bid the [`largest_that_fit`]; find the first member, from the top, that
-/// cannot be promoted after the ones above it (or is no longer a factor); assume it is the only failure and swap
-/// it for the [`RunnerUp`].
+/// [`Bounds::upper_bound`] as a one-off, without preclusions or a reusable scratch space.
 pub fn upper_bound<const W: usize>(
     model: &Model,
     state: &FrameSet<W>,
@@ -131,12 +240,7 @@ pub fn upper_bound<const W: usize>(
     max_size: u32,
     rule: RunnerUp,
 ) -> u64 {
-    let bid = largest_that_fit(model, state, cands, max_size);
-    let best = bid.sum();
-    match first_failure(model, state, &bid) {
-        None => best,
-        Some(fail) => best - u64::from(fail) + u64::from(runner_up(cands, &bid, rule)),
-    }
+    Bounds::new(model, None, rule).upper_bound(state, cands, max_size)
 }
 
 /// The first member of `bid`, from the top, that cannot be promoted after the ones above it.
@@ -146,61 +250,135 @@ pub fn upper_bound<const W: usize>(
 /// factor of its home frame `h ≥ 1` and every frame is winnable with all of them promoted.  A frame that is
 /// winnable with all its members promoted cannot fail; otherwise a binary search over its members finds where
 /// it starts to fail, since a frame only gets harder as members are added.
-fn first_failure<const W: usize>(model: &Model, state: &FrameSet<W>, bid: &Bits<W>) -> Option<u32> {
-    let frames = state.frames();
-    // Per frame, the members promoted into it and out of it.
-    let mut gained = [Bits::<W>::EMPTY; MAX_FRAMES];
-    let mut lost = [Bits::<W>::EMPTY; MAX_FRAMES];
+fn first_failure<const W: usize>(
+    model: &Model,
+    scratch: &mut Scratch<W>,
+    state: &FrameSet<W>,
+    bid: &Bits<W>,
+) -> Option<u32> {
     // The failure found so far (0 for none); only members above it still matter.
-    let mut fail = 0;
-    for x in bid.iter_desc() {
-        let h = model.home(x);
-        if h == 0 || !model.contains_factor(state, x) {
-            fail = x;
-            break;
-        }
-        gained[h - 1].insert(x);
-        lost[h].insert(x);
-    }
-    let mut scratch = Scratch::new();
-    for (i, frame) in frames.iter().enumerate() {
-        let edits = (gained[i] | lost[i]).intersect(&Bits::from_range(fail + 1, Bits::<W>::MAX_VALUE));
-        let Some(lowest) = edits.min() else {
+    let (edits, not_a_factor) = model.edits(state, bid);
+    let mut fail = not_a_factor.unwrap_or(0);
+    for (i, frame) in state.frames().iter().enumerate() {
+        let (gained, lost) = (&edits.gained[i], &edits.lost[i]);
+        let changes = (*gained | *lost).intersect(&Bits::from_range(fail + 1, Bits::<W>::MAX_VALUE));
+        let Some(lowest) = changes.min() else {
             continue;
         };
         // Frame i with the members down to `t` promoted.
         let mut winnable_down_to = |t: u32| {
             let above = Bits::from_range(t, Bits::<W>::MAX_VALUE);
-            let moves = frame.moves | gained[i].intersect(&above);
-            model.winnable_using(&mut scratch, &moves, &(frame.factors - lost[i].intersect(&above)))
+            let moves = frame.moves | gained.intersect(&above);
+            model.winnable_using(scratch, &moves, &(frame.factors - lost.intersect(&above)))
         };
         if winnable_down_to(lowest) {
             continue;
         }
-        // The frame fails at its lowest edit; find the first (largest) edit where it fails.
-        let (mut lo, mut hi) = (0, edits.len() - 1); // edits in descending order: winnable before lo, not at hi
+        // The frame fails at its lowest change; find the first (largest) change where it fails.
+        let (mut lo, mut hi) = (0, changes.len() - 1); // descending: winnable before lo, not at hi
         while lo < hi {
             let mid = (lo + hi) / 2;
-            if winnable_down_to(edits.nth_largest(mid).unwrap()) {
+            if winnable_down_to(changes.nth_largest(mid).unwrap()) {
                 lo = mid + 1;
             } else {
                 hi = mid;
             }
         }
-        fail = edits.nth_largest(hi).unwrap();
+        fail = changes.nth_largest(hi).unwrap();
     }
     (fail != 0).then_some(fail)
 }
 
-fn runner_up<const W: usize>(cands: &Bits<W>, bid: &Bits<W>, rule: RunnerUp) -> u32 {
-    match rule {
-        RunnerUp::Sound => cands.difference(bid).max(),
-        RunnerUp::Legacy => match bid.min() {
-            None => cands.max(),
-            Some(low) => cands.max_below(low),
-        },
+/// The bound of [`Bounds::upper_bound`] as a function of the first failure, evaluated for the bid's members from
+/// the top down; it only grows on the way down.
+///
+/// [`RunnerUp::Legacy`]: the bid's sum, minus the failing member, plus the largest candidate below the bid.
+///
+/// [`RunnerUp::Sound`]: the heaviest set within the caps of [`largest_that_fit`] that leaves out at least one bid
+/// member at or above the failure.  The sets within the caps are the independent sets of a matroid (frame 1 at
+/// most `low`, the last frame at most `high`, all at most `max_size`), and the bid is its heaviest set.  By the
+/// symmetric exchange property, the heaviest set without a member `p` is the bid with `p` swapped for the
+/// heaviest outside candidate `e` that keeps the caps (or just without `p`): an `e` from a capped frame needs
+/// that frame to have room, or `p` to be from the same frame.  Which `e` qualifies depends only on `p`'s class
+/// (frame 1, last frame, other), and within a class the smallest prefix member gives the heaviest set.  Every
+/// qualifying `e` is smaller than `p` (the bid takes the largest it can), so the bound never exceeds the bid.
+struct Blame<'m, const W: usize> {
+    model: &'m Model,
+    /// Number of frames; frame 1 and the last frame are capped only with at least 4 (as the bid is).
+    len: usize,
+    rule: RunnerUp,
+    total: u64,
+    /// Per class, the largest candidate that may replace a member of that class (Legacy: in class 0).
+    swap: [u64; 3],
+    /// Per class seen so far, the bound if the failure is at that class's smallest member seen.
+    term: [u64; 3],
+}
+
+impl<'m, const W: usize> Blame<'m, W> {
+    const OTHER: usize = 0;
+
+    fn new(model: &'m Model, state: &FrameSet<W>, cands: &Bits<W>, bid: &Bits<W>, rule: RunnerUp) -> Self {
+        let frames = state.frames();
+        let len = frames.len();
+        let mut blame = Blame { model, len, rule, total: bid.sum(), swap: [0; 3], term: [0; 3] };
+        match rule {
+            RunnerUp::Legacy => {
+                let runner_up = match bid.min() {
+                    None => cands.max(),
+                    Some(low) => cands.max_below(low),
+                };
+                blame.swap[Self::OTHER] = u64::from(runner_up.unwrap_or(0));
+            }
+            RunnerUp::Sound => {
+                let caps = if len >= 4 {
+                    let (low, high) = (frames[0].freedoms.min(frames[1].freedoms), frames[len - 2].freedoms);
+                    [i32::MAX, low, high.min(frames[len - 1].freedoms)]
+                } else {
+                    [i32::MAX; 3]
+                };
+                let mut in_bid = [0i32; 3];
+                for x in bid.iter() {
+                    in_bid[blame.class(x)] += 1;
+                }
+                // The largest candidate outside the bid in each class (0 if none).
+                let mut outside = [0u64; 3];
+                for x in cands.difference(bid).iter_desc() {
+                    let c = blame.class(x);
+                    if outside[c] == 0 {
+                        outside[c] = u64::from(x);
+                        if outside.iter().all(|&o| o != 0) {
+                            break;
+                        }
+                    }
+                }
+                for c in 0..3 {
+                    let allowed = |d: usize| d == Self::OTHER || d == c || in_bid[d] < caps[d];
+                    blame.swap[c] = (0..3).filter(|&d| allowed(d)).map(|d| outside[d]).max().unwrap_or(0);
+                }
+            }
+        }
+        blame
     }
-    .unwrap_or(0)
+
+    #[inline]
+    fn class(&self, x: u32) -> usize {
+        match self.model.home(x) {
+            1 if self.len >= 4 => 1,
+            h if self.len >= 4 && h == self.len - 1 => 2,
+            _ => Self::OTHER,
+        }
+    }
+
+    /// Takes the next bid member down and returns the bound if the first failure is at `f`.
+    #[inline]
+    fn failing_at(&mut self, f: u32) -> u64 {
+        let c = match self.rule {
+            RunnerUp::Legacy => Self::OTHER,
+            RunnerUp::Sound => self.class(f),
+        };
+        self.term[c] = self.total - u64::from(f) + self.swap[c];
+        self.term.iter().copied().max().unwrap_or(0)
+    }
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -523,14 +701,16 @@ mod tests {
         let new_state = model.promote(&root, n).unwrap();
         let below = cands.intersect(&Bits::from_range(0, n - 1));
         let narrowed = new_state.narrow_candidates(&below);
-        let full = new_candidate_list(&model, None, n, 0, &new_state, &below, &Bits::EMPTY);
+        let full =
+            Bounds::new(&model, None, RunnerUp::Sound).new_candidate_list(n, 0, &new_state, &below, &Bits::EMPTY);
         for x in narrowed.iter() {
             let checked = matches!(model.home(x), 2 | 3);
             assert_eq!(full.contains(x), !checked || model.can_promote(&new_state, x), "x={x}");
         }
         // With a limit of one, checking stops at the first candidate that passes.
         let first_pass = narrowed.iter_desc().find(|&x| full.contains(x)).unwrap();
-        let limited = new_candidate_list(&model, None, n, 1, &new_state, &below, &Bits::EMPTY);
+        let limited =
+            Bounds::new(&model, None, RunnerUp::Sound).new_candidate_list(n, 1, &new_state, &below, &Bits::EMPTY);
         assert_eq!(limited, full.union(&narrowed.intersect(&Bits::from_range(0, first_pass - 1))));
     }
 
@@ -554,8 +734,22 @@ mod tests {
                     let density = 5 + rng.below(90) as u64;
                     for bid in [largest_that_fit(&model, &state, &open, size), rng.subset(&cands, density)] {
                         let expect = first_failure_one_by_one(&model, &state, &bid);
-                        assert_eq!(first_failure(&model, &state, &bid), expect, "n={}, bid {bid:?}", g.n);
+                        assert_eq!(
+                            first_failure(&model, &mut Scratch::new(), &state, &bid),
+                            expect,
+                            "n={}, bid {bid:?}",
+                            g.n
+                        );
                         failures += u64::from(expect.is_some());
+                    }
+                    for rule in [RunnerUp::Sound, RunnerUp::Legacy] {
+                        let mut bounds = Bounds::new(&model, None, rule);
+                        let bound = bounds.upper_bound(&state, &open, size);
+                        for target in [bound.saturating_sub(1), bound, bound + 1, rng.below(bound as usize + 2) as u64]
+                        {
+                            let reached = bounds.reaches(&state, &open, size, target);
+                            assert_eq!(reached, bound >= target, "n={}: {rule:?} bound {bound}, target {target}", g.n);
+                        }
                     }
                 }
                 let members = open.to_vec();
@@ -617,6 +811,18 @@ mod tests {
         checks: u64,
         children: u64,
         legacy_low: Vec<String>,
+        /// Summed excess over the best completion: the sound bound, the simpler "largest candidate outside the
+        /// bid" bound, the legacy bound.
+        excess: [i64; 3],
+    }
+
+    /// The simpler sound bound: replace the failing member by the largest candidate outside the bid.
+    fn simple_bound<const W: usize>(model: &Model, state: &FrameSet<W>, cands: &Bits<W>, max_size: u32) -> u64 {
+        let bid = largest_that_fit(model, state, cands, max_size);
+        match first_failure(model, &mut Scratch::new(), state, &bid) {
+            None => bid.sum(),
+            Some(fail) => bid.sum() - u64::from(fail) + u64::from(cands.difference(&bid).max().unwrap_or(0)),
+        }
     }
 
     fn check_bound<const W: usize>(
@@ -629,11 +835,23 @@ mod tests {
     ) {
         let truth = best_completion(model, state, cands, max_size);
         let sound = upper_bound(model, state, cands, max_size, RunnerUp::Sound);
+        let simple = simple_bound(model, state, cands, max_size);
         let legacy = upper_bound(model, state, cands, max_size, RunnerUp::Legacy);
         assert!(sound >= truth, "{what}: sound bound {sound} < best {truth} (max_size {max_size}, cands {cands:?})");
-        assert!(sound >= legacy, "{what}: the sound bound is below the legacy one");
+        assert!(sound <= simple, "{what}: the exchange bound {sound} is weaker than the simple one {simple}");
         if legacy < truth {
             report.legacy_low.push(format!("{what}: legacy {legacy} < best {truth} <= sound {sound}"));
+        }
+        for (excess, bound) in report.excess.iter_mut().zip([sound, simple, legacy]) {
+            *excess += bound as i64 - truth as i64;
+        }
+        // The threshold test agrees with the bound.
+        for (rule, bound) in [(RunnerUp::Sound, sound), (RunnerUp::Legacy, legacy)] {
+            let mut bounds = Bounds::new(model, None, rule);
+            for target in [0, 1, truth, bound.saturating_sub(1), bound, bound + 1, bound / 2, cands.sum()] {
+                let reached = bounds.reaches(state, cands, max_size, target);
+                assert_eq!(reached, bound >= target, "{what}: {rule:?} bound {bound}, target {target}");
+            }
         }
         report.checks += 1;
     }
@@ -667,8 +885,8 @@ mod tests {
                 let current = cands.intersect(&Bits::from_range(0, n - 1));
                 let new_promoted = promoted.with(n);
                 let max_next = max_additional(max_total, &new_state, &new_promoted, &current);
-                let child =
-                    new_candidate_list(&model, Some(&preclusions), n, max_next, &new_state, &current, &promoted);
+                let child = Bounds::new(&model, Some(&preclusions), RunnerUp::Sound)
+                    .new_candidate_list(n, max_next, &new_state, &current, &promoted);
                 // Narrowing, preclusions and the promotability filter never drop a useful candidate.
                 let unfiltered = best_completion(&model, &new_state, &current, max_next);
                 assert_eq!(best_completion(&model, &new_state, &child, max_next), unfiltered, "{what}, child {n}");
@@ -690,10 +908,14 @@ mod tests {
             bound_soundness::<4>(&load(n), &mut rng, &mut report);
         }
         eprintln!(
-            "bound soundness: {} bounds checked, {} children; legacy bound below the best {} times",
+            "bound soundness: {} bounds checked, {} children; legacy bound below the best {} times; mean excess \
+             over the best: sound {:.2}, simple {:.2}, legacy {:.2}",
             report.checks,
             report.children,
-            report.legacy_low.len()
+            report.legacy_low.len(),
+            report.excess[0] as f64 / report.checks as f64,
+            report.excess[1] as f64 / report.checks as f64,
+            report.excess[2] as f64 / report.checks as f64,
         );
         for line in &report.legacy_low {
             eprintln!("  {line}");
@@ -798,16 +1020,17 @@ mod tests {
         eprintln!("  promote (copying):           {ns:8.0} ns");
 
         let prec = Preclusions::build(&model, &root, &cands, 1);
+        let mut bounds = Bounds::new(&model, Some(&prec), RunnerUp::Sound);
         let ns = time_per_call(states.len() as u64, || {
             for (i, (s, c)) in states.iter().enumerate() {
                 let promoted = best.largest(i as u32);
                 let max_add = max_additional(max_total, s, &promoted, c);
-                black_box(upper_bound(&model, black_box(s), c, max_add, RunnerUp::Sound));
+                black_box(bounds.upper_bound(black_box(s), c, max_add));
             }
         });
         eprintln!("  upper_bound (greedy path):   {ns:8.0} ns");
         let ns = time_per_call(1, || {
-            black_box(upper_bound(&model, black_box(&root), &cands, max_total, RunnerUp::Sound));
+            black_box(bounds.upper_bound(black_box(&root), &cands, max_total));
         });
         eprintln!("  upper_bound (root):          {ns:8.0} ns");
         let ns = time_per_call(states.len() as u64, || {
@@ -815,7 +1038,7 @@ mod tests {
                 let promoted = best.largest(i as u32 - 1);
                 let n = best.nth_largest(i as u32 - 1).unwrap();
                 let max_next = max_additional(max_total, s, &promoted.with(n), c);
-                black_box(new_candidate_list(&model, Some(&prec), n, max_next, s, c, &promoted));
+                black_box(bounds.new_candidate_list(n, max_next, s, c, &promoted));
             }
         });
         eprintln!("  new_candidate_list:          {ns:8.0} ns");
