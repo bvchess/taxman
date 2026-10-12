@@ -125,20 +125,30 @@ enum Home {
     /// apiary but still remembers whether it had free factors when it was merged.  This is how the Java
     /// solver behaves; it is reproduced for parity (see `Apiary::has_outside_move_using`).
     Merged { had_free_factors: bool },
+    /// None: the number is a hole of a punctured board ([`Tables::punctured`]).
+    OffBoard,
 }
 
 /// All the hives of the board `1..=n`, for a given set of promoted numbers.
+///
+/// On a punctured board ([`Tables::punctured`]) the holes belong to no hive and to no factor or composite list,
+/// so they are never moves and never tax; a number whose maximal factor is a hole simply has one factor fewer.
+/// Everything else is as on the full board: in particular the sources are still the numbers above `n/2` (a number
+/// whose only maximal composites are holes is a factor nobody needs, not a source, so the search decides whether
+/// to promote it), and the hives are put in an order in which every number comes after its divisors' hives
+/// even when the chain of maximal factors between them passes through a hole (playing a number sweeps all of its
+/// divisors, holes or not in between).
 pub struct Apiary<'t, const W: usize> {
     t: &'t Tables,
     /// In apiary order: a hive is listed after every hive downstream of it.
     hives: Vec<Hive<W>>,
     /// The hive of every number, indexed by number (entry 0 is unused).
     home: Vec<Home>,
-    /// For each number, the factors it can use as tax: its maximal factors that are not sources; nothing for
-    /// a *sink* (a number all of whose maximal factors are promoted).
+    /// For each number, the factors it can use as tax: its maximal factors that are not sources (or holes);
+    /// nothing for a *sink* (a number all of whose maximal factors are promoted or holes).
     factors_of: Vec<Bits<W>>,
-    /// For each number, the moves that could use it as tax: its maximal composites other than sinks; nothing
-    /// for a source.  The mirror image of `factors_of`.
+    /// For each number, the moves that could use it as tax: its maximal composites other than sinks (and holes);
+    /// nothing for a source.  The mirror image of `factors_of`.
     composites_of: Vec<Bits<W>>,
 }
 
@@ -149,25 +159,30 @@ impl<'t, const W: usize> Apiary<'t, W> {
         let n = t.n;
         assert!(n <= Bits::<W>::MAX_VALUE, "the board 1..={n} does not fit in Bits<{W}>");
         assert!(
-            !treat_as_sources.contains(0) && treat_as_sources.max().is_none_or(|m| m <= n),
-            "promotions {treat_as_sources:?} are not all on the board 1..={n}"
+            !treat_as_sources.contains(0)
+                && treat_as_sources.max().is_none_or(|m| m <= n)
+                && t.holes.iter().all(|&h| !treat_as_sources.contains(h)),
+            "promotions {treat_as_sources:?} are not all on the board 1..={n} without {:?}",
+            t.holes
         );
 
         let (sources, sinks) = Self::sources_and_sinks(t, treat_as_sources);
         let size = n as usize + 1;
         let mut factors_of = vec![Bits::EMPTY; size];
         let mut composites_of = vec![Bits::EMPTY; size];
-        for x in 1..=n {
+        for x in (1..=n).filter(|&x| !t.is_hole(x)) {
             let xi = x as usize;
             if !sinks.contains(x) {
-                factors_of[xi] = t.max_factors[xi].iter().copied().filter(|&f| !sources.contains(f)).collect();
+                let usable = |f: &u32| !sources.contains(*f) && !t.is_hole(*f);
+                factors_of[xi] = t.max_factors[xi].iter().copied().filter(usable).collect();
             }
             if !sources.contains(x) {
-                composites_of[xi] = t.max_composites[xi].iter().copied().filter(|&c| !sinks.contains(c)).collect();
+                let usable = |c: &u32| !sinks.contains(*c) && !t.is_hole(*c);
+                composites_of[xi] = t.max_composites[xi].iter().copied().filter(usable).collect();
             }
         }
 
-        let (hives, home) = Self::form_hives(n, sources, &factors_of);
+        let (hives, home) = Self::form_hives(t, sources, &factors_of);
         let mut apiary = Apiary { t, hives, home, factors_of, composites_of };
         let order = apiary.order_hives();
         apiary.reorder(&order);
@@ -176,15 +191,16 @@ impl<'t, const W: usize> Apiary<'t, W> {
     }
 
     /// The numbers that are moves (promoted ones, and those with no maximal composite) and the sinks (numbers
-    /// whose maximal factors are all promoted, which therefore have no factor to pay tax with).
+    /// whose maximal factors are all promoted or holes, which therefore have no factor to pay tax with).  Holes
+    /// are neither.
     fn sources_and_sinks(t: &Tables, promoted: Bits<W>) -> (Bits<W>, Bits<W>) {
         let (mut sources, mut sinks) = (promoted, Bits::EMPTY);
-        for x in 1..=t.n {
+        for x in (1..=t.n).filter(|&x| !t.is_hole(x)) {
             let xi = x as usize;
             if t.max_composites[xi].is_empty() {
                 sources.insert(x);
             }
-            if t.max_factors[xi].iter().all(|&f| promoted.contains(f)) {
+            if t.max_factors[xi].iter().all(|&f| promoted.contains(f) || t.is_hole(f)) {
                 sinks.insert(x);
             }
         }
@@ -192,10 +208,13 @@ impl<'t, const W: usize> Apiary<'t, W> {
     }
 
     /// Joins every source to its factors and returns the connected components, in creation order, with the
-    /// hive of each number.  (A number that is neither a source nor a factor of one would form a hive of its
-    /// own, without sources.  That never happens, because every `x ≤ n/2` has a prime `p` with
-    /// `n/2 < x·p ≤ n`, and `x·p` is a source of which `x` is a maximal factor; no special case is needed.)
-    fn form_hives(n: u32, sources: Bits<W>, factors_of: &[Bits<W>]) -> (Vec<Hive<W>>, Vec<Home>) {
+    /// hive of each number; holes are in none.  (A number that is neither a source nor a factor of one forms a
+    /// hive of its own, without sources.  On the board `1..=n` that never happens, because every `x ≤ n/2` has a
+    /// prime `p` with `n/2 < x·p ≤ n`, and `x·p` is a source of which `x` is a maximal factor.  On a punctured
+    /// board it can, when every such `x·p` is a hole: then `x` is a factor nobody needs, a free hive of one,
+    /// which the search may promote.)
+    fn form_hives(t: &Tables, sources: Bits<W>, factors_of: &[Bits<W>]) -> (Vec<Hive<W>>, Vec<Home>) {
+        let n = t.n;
         let size = n as usize + 1;
         let mut parent: Vec<u32> = (0..=n).collect();
         for s in sources.iter() {
@@ -207,8 +226,8 @@ impl<'t, const W: usize> Apiary<'t, W> {
 
         let mut hive_of_root = vec![u32::MAX; size];
         let mut parts: Vec<(Bits<W>, Bits<W>)> = Vec::new();
-        let mut home = vec![Home::Merged { had_free_factors: false }; size];
-        for x in 1..=n {
+        let mut home = vec![Home::OffBoard; size];
+        for x in (1..=n).filter(|&x| !t.is_hole(x)) {
             let root = find(&mut parent, x) as usize;
             if hive_of_root[root] == u32::MAX {
                 hive_of_root[root] = parts.len() as u32;
@@ -231,11 +250,12 @@ impl<'t, const W: usize> Apiary<'t, W> {
     /// other is always a legal game.  Start from the hives with nothing downstream, smallest source first;
     /// after taking a hive, queue the hives directly upstream of it whose every downstream hive is already
     /// taken, again smallest source first.  (Hives without a source sort first; among those the order is
-    /// that of formation.)
+    /// that of formation.)  Downstream here passes through holes ([`Self::neighbours_through_holes`]).
     fn order_hives(&self) -> Vec<usize> {
         let count = self.hives.len();
-        let down: Vec<Vec<usize>> = (0..count).map(|i| self.downstream_hives(i)).collect();
-        let up: Vec<Vec<usize>> = (0..count).map(|i| self.upstream_hives(i)).collect();
+        let t = self.t;
+        let down: Vec<Vec<usize>> = (0..count).map(|i| self.neighbours_through_holes(i, &t.max_factors)).collect();
+        let up: Vec<Vec<usize>> = (0..count).map(|i| self.neighbours_through_holes(i, &t.max_composites)).collect();
         let min_source = |i: usize| self.hives[i].sources.min();
 
         let mut roots: Vec<usize> = (0..count).filter(|&i| down[i].is_empty()).collect();
@@ -282,11 +302,11 @@ impl<'t, const W: usize> Apiary<'t, W> {
     }
 
     /// The position in [`hives`](Self::hives) of the hive that holds `x`, unless `x` is an impossible source
-    /// of a hive that has since been merged away.
+    /// of a hive that has since been merged away, or a hole.
     pub(crate) fn hive_index_of(&self, x: u32) -> Option<usize> {
         match self.home.get(x as usize)? {
             Home::Live(p) => Some(*p as usize),
-            Home::Merged { .. } => None,
+            Home::Merged { .. } | Home::OffBoard => None,
         }
     }
 
@@ -301,6 +321,7 @@ impl<'t, const W: usize> Apiary<'t, W> {
         self.neighbours(i, &self.t.max_composites)
     }
 
+    /// The hives (other than hive `i`) that hold a number related to one in hive `i`.  Holes are skipped.
     fn neighbours(&self, i: usize, board_relation: &[Vec<u32>]) -> Vec<usize> {
         let hive = &self.hives[i];
         let mut out = Vec::new();
@@ -312,6 +333,35 @@ impl<'t, const W: usize> Apiary<'t, W> {
                     if j as usize != i {
                         out.push(j as usize);
                     }
+                }
+            }
+        }
+        out.sort_unstable();
+        out.dedup();
+        out
+    }
+
+    /// [`neighbours`](Self::neighbours), except that a related hole is passed through: the hives holding the
+    /// numbers related to the hole are reached instead.  This keeps the relation transitive across holes, as
+    /// divisibility is (a number sweeps its divisors whether or not the chain of maximal factors between them
+    /// is on the board).  Without holes it is `neighbours`.
+    fn neighbours_through_holes(&self, i: usize, board_relation: &[Vec<u32>]) -> Vec<usize> {
+        if self.t.holes.is_empty() {
+            return self.neighbours(i, board_relation);
+        }
+        let hive = &self.hives[i];
+        let mut out = Vec::new();
+        let mut pending: Vec<u32> = (hive.sources | hive.factors).iter().collect();
+        let mut passed = Vec::new();
+        while let Some(x) = pending.pop() {
+            for &y in &board_relation[x as usize] {
+                match self.home[y as usize] {
+                    Home::Live(j) if j as usize != i => out.push(j as usize),
+                    Home::OffBoard if !passed.contains(&y) => {
+                        passed.push(y);
+                        pending.push(y);
+                    }
+                    _ => {}
                 }
             }
         }
@@ -532,6 +582,7 @@ impl<'t, const W: usize> Apiary<'t, W> {
             let c_hive_has_free_factors = match self.home[c as usize] {
                 Home::Live(p) => p as usize != f_hive && self.hives[p as usize].has_free_factors(),
                 Home::Merged { had_free_factors } => had_free_factors,
+                Home::OffBoard => unreachable!("a hole is nobody's composite"),
             };
             c_hive_has_free_factors && self.can_add_source(&self.hives[f_hive], c)
         })
@@ -597,7 +648,7 @@ impl<'t, const W: usize> Apiary<'t, W> {
                     Home::Merged { had_free_factors: had_free_factors[p as usize] }
                 }
                 Home::Live(p) => Home::Live(new_pos[p as usize]),
-                stale @ Home::Merged { .. } => stale,
+                stale @ (Home::Merged { .. } | Home::OffBoard) => stale,
             };
         }
         merged_pos
