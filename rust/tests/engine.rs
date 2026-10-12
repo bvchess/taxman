@@ -198,13 +198,13 @@ struct Knapsack<'a> {
     stack: Vec<Node>,
     /// Declare optimality on reaching this value (a known upper bound).
     target: Option<u64>,
-    /// Worker 0 panics once it has explored this many nodes (to test panic propagation).
-    panic_after: Option<u64>,
+    /// Worker 0 panics once this file exists (to test panic propagation after a checkpoint).
+    panic_when: Option<PathBuf>,
 }
 
 impl Searcher<Node> for Knapsack<'_> {
     fn run(&mut self, unit: Node, ctx: &mut Ctx<'_, Node>) {
-        if ctx.worker() == 0 && self.panic_after.is_some_and(|n| ctx.stats().nodes >= n) {
+        if ctx.worker() == 0 && self.panic_when.as_ref().is_some_and(|path| path.exists()) {
             panic!("searcher panic requested by test");
         }
         dfs(self.inst, &mut self.stack, unit, &mut EngineEnv { ctx, target: self.target });
@@ -281,9 +281,9 @@ fn solve_with(
     start: Start<Node>,
     inst: &Instance,
     target: Option<u64>,
-    panic_after: Option<u64>,
+    panic_when: Option<PathBuf>,
 ) -> Outcome {
-    let make = |_| Knapsack { inst, stack: Vec::new(), target, panic_after };
+    let make = |_| Knapsack { inst, stack: Vec::new(), target, panic_when: panic_when.clone() };
     engine::run(cfg, start, HEADER, make).expect("engine run")
 }
 
@@ -509,7 +509,6 @@ fn checkpoints_with_progress_and_spill_on_ten_threads() {
 #[test]
 fn worker_panic_propagates() {
     let inst = instance();
-    let raw = raw_search(&inst);
     let dir = TempDir::new("panic");
     let ckpt = dir.path("ckpt.bin");
     let spill = dir.path("spill");
@@ -519,8 +518,8 @@ fn worker_panic_propagates() {
         spill_dir: Some(spill.clone()),
         ..config(4)
     };
-    // Worker 0 panics a while into the run, after some checkpoints have been written.
-    let result = panic::catch_unwind(AssertUnwindSafe(|| solve_with(&cfg, fresh(), &inst, None, Some(raw.nodes / 8))));
+    // Worker 0 panics once the first checkpoint is on disk, so there is one to resume from.
+    let result = panic::catch_unwind(AssertUnwindSafe(|| solve_with(&cfg, fresh(), &inst, None, Some(ckpt.clone()))));
     assert!(result.is_err(), "the panic reached the caller");
     assert!(dir_is_empty(&spill), "spill files removed while unwinding");
     // The last checkpoint written before the panic is intact and resumes to the right answer.
@@ -541,7 +540,7 @@ fn resume_rejects_wrong_header_and_damaged_files() {
         ..config(2)
     };
     assert!(!solve(&cfg, fresh(), &inst).completed);
-    let make = |_| Knapsack { inst: &inst, stack: Vec::new(), target: None, panic_after: None };
+    let make = |_| Knapsack { inst: &inst, stack: Vec::new(), target: None, panic_when: None };
 
     let err = engine::run(&cfg, Start::Resume(ckpt.clone()), b"another problem", make).unwrap_err();
     assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
@@ -583,7 +582,7 @@ fn spill_failure_stops_without_losing_work() {
         spill_dir: Some(spill.clone()),
         ..config(4)
     };
-    let make = |_| Knapsack { inst: &inst, stack: Vec::new(), target: None, panic_after: None };
+    let make = |_| Knapsack { inst: &inst, stack: Vec::new(), target: None, panic_when: None };
     let err = engine::run(&cfg, fresh(), HEADER, make).unwrap_err();
     assert_eq!(err.kind(), std::io::ErrorKind::PermissionDenied, "{err}");
     assert!(ckpt.exists(), "final checkpoint written after the spill failure");
