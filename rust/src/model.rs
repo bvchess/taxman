@@ -1847,7 +1847,7 @@ mod tests {
         let universes = universes::<W>(&g.columns);
         let candidates = Bits::<W>::from_slice(&g.candidates);
 
-        for _walk in 0..6 {
+        for _walk in 0..2 {
             let mut state = root;
             loop {
                 for (i, frame) in state.frames().iter().enumerate() {
@@ -1933,11 +1933,15 @@ mod tests {
         }
     }
 
+    /// A sample of the golden games (every 18th board and 480, 600, 720; two walks each: 1.5 s and 32,000 checks).
+    /// The seeds are fixed, so more boards or walks would only be more of one sample: the whole set (every 9th
+    /// board and all those from 480, six walks each) is 225,000 checks and 9 s; to run it, change the filter and the
+    /// number of walks (`0..6`).
     #[test]
     fn fast_peeling_and_reduction_agree_with_reference() {
         let mut rng = Rng(0x5EED_1234_ABCD_0001);
         let mut stats = PeelStats::default();
-        for n in golden_ns().into_iter().filter(|&n| n >= 20 && (n % 9 == 0 || n >= 480)) {
+        for n in golden_ns().into_iter().filter(|&n| n >= 20 && (n % 18 == 0 || n % 120 == 0)) {
             let g = load(n);
             if n < 512 {
                 random_agreement::<8>(&g, &mut rng, &mut stats);
@@ -2065,14 +2069,15 @@ mod tests {
     /// Nogoods made from the conflicts of states along random promotion paths of `g`: each is a subset of the
     /// state's promotions and the conflict, and cannot be promoted from the root; and
     /// every nogood learned so far, minus the promotions of any later state, is a conflict of that state.
-    /// Returns the numbers of nogoods made and of later checks.
+    /// Returns the numbers of nogoods made and of later checks.  Eight paths per game (forty took 2 s and made 13,500
+    /// nogoods, checked 3.8 million times later).
     fn nogood_check<const W: usize>(g: &Golden, rng: &mut Rng) -> (u64, u64) {
         let (model, root) = Model::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
         let candidates = Bits::<W>::from_slice(&g.candidates);
         let mut scratch = Scratch::new();
         let mut table = Nogoods::<W>::new(g.n, 1 << 10);
         let (mut made, mut later) = (0, 0);
-        for _ in 0..40 {
+        for _ in 0..8 {
             let (mut state, mut promoted) = (root, Bits::<W>::EMPTY);
             for n in rng.subset(&candidates, 20).iter() {
                 if !model.promote_in_place(&mut state, n) {

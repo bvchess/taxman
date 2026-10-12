@@ -33,9 +33,10 @@ commands:
       --show                   print each game's promotions and moves
   regress [--from A] [--to N] [--threads K] [--tactic ...]
                           solve A..N (default 1..400) in memory and check every score against optimal.json
-  bench [--threads K] [--tactic ...] [N ...]
+  bench [--threads K] [--tactic ...] [--history FILE] [N ...]
                           time the benchmark games (default 480 500 600 640 660 700 720 760), each on its own
-                          with the previous game from optimal.json and no derivation; appends to bench/history.jsonl
+                          with the previous game from optimal.json and no derivation; appends to FILE (default
+                          bench/history.jsonl)
   verify-optimal [FILE]   replay every game in optimal.json (or FILE) and check its recorded score
   tables N K...           print the maximal factors and composites of each K on the board 1..=N
   help                    show this message

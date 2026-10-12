@@ -394,11 +394,14 @@ mod tests {
         assert!(plain.holes.is_empty() && !plain.is_hole(6));
     }
 
+    /// Every board `[n]` minus one number, for n up to 36 (0.3 s; up to 40 takes 1.2 s, to 44 3.4 s and to 48 8.7 s,
+    /// the brute force being exponential).  DESIGN.md's N <= 52 is `cargo run --release --example sacrifice --
+    /// validate 52`.
     #[test]
     fn small_punctured_boards_match_the_brute_force() {
         let optimal = Optimal::load_default().unwrap();
         let opts = PuncturedOptions::default();
-        for n in 1..=24u32 {
+        for n in 1..=36u32 {
             let (full, full_score) = (optimal.moves(n).unwrap(), optimal.score(n).unwrap());
             for hole in 1..=n {
                 let exact = brute::solve(n, &[hole], Rule::MaximalFactor).score;
@@ -439,11 +442,15 @@ mod tests {
         }
     }
 
+    /// The bound is an oracle for the punctured frame model beyond the brute force's reach: it is at least the
+    /// optimum for every n, and each punctured game is exact.  Up to 200 (the punctured searches of W = 8), and a
+    /// sample of boards that need W = 16 (0.5 s in all).
     #[test]
     fn the_bound_holds_and_is_tight_for_primes() {
         let optimal = Optimal::load_default().unwrap();
         let opts = PuncturedOptions::default();
-        for n in 2..=60u32 {
+        let mut tight = 0;
+        for n in (2..=200u32).chain([500, 600, 609, 611, 660, 700]) {
             let (prev, prev_score) = (optimal.moves(n - 1).unwrap(), optimal.score(n - 1).unwrap());
             let b = sacrifice_bound(n, prev, prev_score, None, &opts).unwrap();
             let opt = optimal.score(n).unwrap();
@@ -454,6 +461,8 @@ mod tests {
             // A decision proves the optimum exactly when the bound is tight.
             let decided = sacrifice_bound(n, prev, prev_score, Some(opt), &opts).unwrap();
             assert_eq!(decided.proves(opt), b.value == opt, "n={n}");
+            tight += u32::from(b.value == opt);
         }
+        assert!(tight > 100, "the bound is tight at {tight} boards");
     }
 }

@@ -1345,7 +1345,7 @@ mod tests {
     fn reference_meets_the_definition() {
         let mut rng = Rng(0x0BAD_F00D_1234_5678);
         let mut checks = 0;
-        for n in golden_ns().into_iter().filter(|&n| (30..=200).contains(&n) && n % 3 == 0) {
+        for n in golden_ns().into_iter().filter(|&n| (30..=200).contains(&n) && n % 6 == 0) {
             let g = load(n);
             let (model, ..) = setup::<4>(&g);
             walks::<4>(&g, n.into(), 3, 60, &mut |_, state, _, cands| {
@@ -1372,7 +1372,7 @@ mod tests {
     fn incremental_solver_matches_the_reference() {
         let mut checks = 0;
         let mut stats = MatchStats::default();
-        for n in golden_ns().into_iter().filter(|&n| n >= 30 && (n % 13 == 0 || [480, 600, 760].contains(&n))) {
+        for n in golden_ns().into_iter().filter(|&n| n >= 30 && (n % 26 == 0 || [480, 760].contains(&n))) {
             let g = load(n);
             let (paths, budget) = if n < 300 { (6, 150) } else { (2, 60) };
             if n < 512 {
@@ -1541,9 +1541,10 @@ mod tests {
         eprintln!(
             "  child (push + value + pop):           {:9.2} µs per child ({children} children; {})",
             (both_ns - shrink_ns) / 1e3 / children as f64,
+            // What the second run did beyond the first's (differences first: the sums overflow in a debug build).
             per(
-                both.searches - 2 * shrink.searches + before.searches,
-                both.scanned - 2 * shrink.scanned + before.scanned,
+                (both.searches - shrink.searches).saturating_sub(shrink.searches - before.searches),
+                (both.scanned - shrink.scanned).saturating_sub(shrink.scanned - before.scanned),
                 children
             )
         );

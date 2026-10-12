@@ -584,8 +584,12 @@ mod tests {
     }
 
     fn random_agreement<const W: usize>(seed: u64) {
+        random_agreement_rounds::<W>(seed, 150);
+    }
+
+    fn random_agreement_rounds<const W: usize>(seed: u64, rounds: usize) {
         let mut rng = XorShift(seed);
-        for _ in 0..150 {
+        for _ in 0..rounds {
             let (am, a) = random_set::<W>(&mut rng);
             let (bm, b) = random_set::<W>(&mut rng);
             check_unary(&am, &a);
@@ -611,6 +615,55 @@ mod tests {
     #[test]
     fn random_agreement_with_model_w8() {
         random_agreement::<8>(0xDEAD_BEEF_CAFE_F00D);
+    }
+
+    /// The widths the solver picks for boards from 512 up (16, 32 and 64 words), which no other unit test reaches:
+    /// a loop that stops at a fixed word (a `len` that sums only the first 32, say) passes everything below.
+    #[test]
+    fn random_agreement_with_model_at_the_widths_of_large_boards() {
+        random_agreement_rounds::<16>(0x0123_4567_89AB_CDEF, 60);
+        random_agreement_rounds::<32>(0xFEDC_BA98_7654_3210, 30);
+        random_agreement_rounds::<64>(0xA5A5_5A5A_C3C3_3C3C, 15);
+    }
+
+    /// Every word holds numbers, including its first and last bit: the sums, counts, extremes and neighbours across
+    /// each word boundary, at the large widths.
+    fn every_word_is_used<const W: usize>() {
+        let edge = [0u32, 1, 62, 63];
+        let all: Vec<u32> = (0..W as u32).flat_map(|word| edge.map(|bit| 64 * word + bit)).collect();
+        let bits: Bits<W> = all.iter().copied().collect();
+        assert_eq!(bits.to_vec(), all);
+        assert_eq!(bits.len() as usize, all.len());
+        assert_eq!(bits.sum(), all.iter().map(|&x| u64::from(x)).sum::<u64>());
+        assert_eq!((bits.min(), bits.max()), (Some(0), Some(64 * W as u32 - 1)));
+        assert_eq!(bits.largest(5).to_vec(), all[all.len() - 5..]);
+        assert_eq!(bits.sum_largest(7), all[all.len() - 7..].iter().map(|&x| u64::from(x)).sum::<u64>());
+        assert_eq!(bits.nth_largest(all.len() as u32 - 1), Some(0));
+        for (i, &x) in all.iter().enumerate() {
+            assert!(bits.contains(x));
+            assert_eq!(bits.max_below(x), i.checked_sub(1).map(|j| all[j]), "max_below({x})");
+            assert_eq!(bits.min_above(x), all.get(i + 1).copied(), "min_above({x})");
+        }
+        // Words that are all ones, and the intersection and difference of the odd and even words.
+        let (odd, even): (Vec<u32>, Vec<u32>) =
+            ((0..W as u32).filter(|w| w % 2 == 1).flat_map(|w| 64 * w..64 * w + 64)).partition(|x| x % 2 == 1);
+        let (a, b) = (Bits::<W>::from_slice(&odd), Bits::<W>::from_slice(&even));
+        assert_eq!(a.len() as usize, odd.len());
+        assert!(a.is_disjoint(&b) && (a | b).len() as usize == odd.len() + even.len());
+        let mut drained = bits;
+        let mut seen = 0;
+        while let Some(x) = drained.pop_max() {
+            assert_eq!(Some(x), all.get(all.len() - 1 - seen).copied());
+            seen += 1;
+        }
+        assert_eq!(seen, all.len());
+    }
+
+    #[test]
+    fn every_word_of_the_large_widths_is_used() {
+        every_word_is_used::<16>();
+        every_word_is_used::<32>();
+        every_word_is_used::<64>();
     }
 
     #[test]

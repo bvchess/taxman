@@ -154,7 +154,8 @@ const BENCH_GAMES: [(u32, f64, f64); 8] = [
 const BENCH_HISTORY: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/bench/history.jsonl");
 
 pub fn bench(args: &[String]) -> CliResult {
-    let args = Args::parse(args, &SOLVER_FLAGS, &[])?;
+    let args = Args::parse(args, &flags_with(&["--history"]), &[])?;
+    let history = args.value("--history").map_or_else(|| PathBuf::from(BENCH_HISTORY), PathBuf::from);
     let ns: Vec<u32> = if args.positional().is_empty() {
         BENCH_GAMES.iter().map(|g| g.0).collect()
     } else {
@@ -205,8 +206,8 @@ pub fn bench(args: &[String]) -> CliResult {
     println!("{:>5} {:>13} {:>59.3}", "all", nodes, total);
 
     let record = history_record(&opts, &results);
-    append_history(&record).map_err(|e| failed(format!("{BENCH_HISTORY}: {e}")))?;
-    println!("appended to {BENCH_HISTORY}");
+    append_history(&history, &record).map_err(|e| failed(format!("{}: {e}", history.display())))?;
+    println!("appended to {}", history.display());
     Ok(())
 }
 
@@ -242,8 +243,7 @@ fn history_record(opts: &SolveOptions, results: &[GameResult]) -> Json {
     ])
 }
 
-fn append_history(record: &Json) -> std::io::Result<()> {
-    let path = Path::new(BENCH_HISTORY);
+fn append_history(path: &Path, record: &Json) -> std::io::Result<()> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }

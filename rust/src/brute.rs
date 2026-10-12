@@ -207,6 +207,7 @@ impl Hasher for MixHasher {
 mod tests {
     use super::*;
     use crate::game::{replay, Optimal};
+    use std::collections::{BTreeMap, BTreeSet};
 
     #[test]
     fn small_boards_match_optimal_json() {
@@ -215,6 +216,53 @@ mod tests {
             let exact = solve(n, &[], Rule::Divisor);
             assert_eq!(Some(exact.score), optimal.score(n), "n={n}");
             assert_eq!(replay(n, &exact.moves), Ok(exact.score), "n={n}");
+        }
+    }
+
+    /// A naive solver for sparse boards, sharing nothing with [`solve`]: the pot as a sorted vector, memoized.
+    fn naive(pot: &[u32], rule: Rule, memo: &mut BTreeMap<Vec<u32>, u32>) -> u32 {
+        if let Some(&value) = memo.get(pot) {
+            return value;
+        }
+        let is_prime = |p: u32| p >= 2 && (2..p).all(|q| !p.is_multiple_of(q));
+        let mut best = 0;
+        for &c in pot {
+            let pays = pot.iter().any(|&d| d < c && c % d == 0 && (rule == Rule::Divisor || is_prime(c / d)));
+            if pays {
+                let next: Vec<u32> = pot.iter().copied().filter(|&d| d != c && c % d != 0).collect();
+                best = best.max(c + naive(&next, rule, memo));
+            }
+        }
+        memo.insert(pot.to_vec(), best);
+        best
+    }
+
+    /// The other tests stop below 65, the low half of the pot's `u128`.  Sparse boards that reach 127 (the numbers
+    /// above 64 are in bits of the upper half) are cheap, and checked against a naive solver under both rules.
+    #[test]
+    fn sparse_boards_up_to_the_top_of_the_u128_match_a_naive_solver() {
+        let mut state = 0x1234_5678_9ABC_DEF1u64;
+        let mut next = move |below: u64| {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state % below
+        };
+        for round in 0..60 {
+            let n = if round % 3 == 0 { MAX_N } else { 70 + next(58) as u32 };
+            let mut present: BTreeSet<u32> = BTreeSet::new();
+            while present.len() < 8 + next(7) as usize {
+                let x = if next(2) == 0 { 1 + next(12) as u32 } else { n - next(40) as u32 };
+                if (1..=n).contains(&x) {
+                    present.insert(x);
+                }
+            }
+            let holes: Vec<u32> = (1..=n).filter(|x| !present.contains(x)).collect();
+            let pot: Vec<u32> = present.into_iter().collect();
+            for rule in [Rule::Divisor, Rule::MaximalFactor] {
+                let expected = naive(&pot, rule, &mut BTreeMap::new());
+                assert_eq!(solve(n, &holes, rule).score, u64::from(expected), "n={n} {rule:?} {pot:?}");
+            }
         }
     }
 

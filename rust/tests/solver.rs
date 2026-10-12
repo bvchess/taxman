@@ -1,6 +1,9 @@
 //! End-to-end tests of the per-game pipeline: whole ranges against `optimal.json` and the Java's own counts,
 //! tactic invariance, checkpoint and resume through the solver, and boards beyond `optimal.json`.
 
+mod common;
+
+use common::TempDir;
 use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -10,24 +13,6 @@ use taxman::hives::Apiary;
 use taxman::json::Json;
 use taxman::numtheory::Tables;
 use taxman::solver::{self, GameResult, Method, SolveOptions};
-
-/// A fresh directory under the system temp dir, removed on drop.
-struct TempDir(PathBuf);
-
-impl TempDir {
-    fn new(name: &str) -> Self {
-        let path = std::env::temp_dir().join(format!("taxman-solver-test-{name}-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&path);
-        fs::create_dir_all(&path).expect("create temp dir");
-        TempDir(path)
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
 
 fn options(threads: usize) -> SolveOptions {
     SolveOptions { threads, ..SolveOptions::default() }
@@ -77,11 +62,11 @@ fn every_tactic_gives_the_same_scores() {
     // Each variant is a `--tactic` assignment; the soundness of the ones that are not on/off settings is argued in
     // DESIGN.md's "Conflicts of the matching bound".  `branching=largest` is the Java's order.
     let with = |assignment: &str| {
-        let mut opts = SolveOptions { force_search: true, ..options(2) };
+        let mut opts = SolveOptions { force_search: true, ..options(1) };
         opts.tactics.set(assignment).unwrap();
         (assignment.to_owned(), opts)
     };
-    let default = ("default".to_owned(), SolveOptions { force_search: true, ..options(2) });
+    let default = ("default".to_owned(), SolveOptions { force_search: true, ..options(1) });
     let variants = [default].into_iter().chain(
         [
             "match_bound=off",
@@ -94,6 +79,8 @@ fn every_tactic_gives_the_same_scores() {
             "branching=conflict-largest",
             "match_refine=0",
             "match_refine=3",
+            "fix_forced=off",
+            "nogoods=off",
             "forget_nogoods=off",
         ]
         .map(with),
@@ -170,8 +157,21 @@ fn a_checkpoint_for_another_game_or_other_tactics_is_refused() {
     assert!(!solver::solve_game_with(600, None, &opts, Some(&optimal)).unwrap().completed);
     let checkpoint = dir.0.join("n0600.ckpt");
 
-    // Other tactics: a switch, and the two settings that are not switches.
-    for assignment in ["preclusions=on", "branching=largest", "match_refine=0", "match_refine=2"] {
+    // Other tactics: each of the nine search tactics (a checkpoint records them all), the switches turned the other
+    // way and the two settings that are not switches changed.
+    let assignments = [
+        "preclusions=on",
+        "legacy_bound=on",
+        "revise_freedoms=off",
+        "match_bound=off",
+        "fix_forced=off",
+        "nogoods=off",
+        "forget_nogoods=off",
+        "branching=largest",
+        "match_refine=0",
+        "match_refine=2",
+    ];
+    for assignment in assignments {
         let mut other = opts.clone();
         other.tactics.set(assignment).unwrap();
         let err = solver::solve_game_with(600, None, &other, Some(&optimal)).unwrap_err();
@@ -231,11 +231,12 @@ fn a_range_stops_at_an_unfinished_game_and_picks_up_where_it_left_off() {
     assert_eq!(lines.len(), 5 + 1);
 }
 
+/// 1500 needs `W = 32` and 2050 `W = 64` (the first board with a number above 2047 in its frames); `tests/wide.rs`
+/// goes further into the latter.  The setup's cost is mostly the local search for a better first incumbent.
 #[test]
 fn big_boards_get_through_setup() {
-    for n in [1500, 2000] {
-        // Setup (mostly the preclusion table) is the cost here, so use every core.
-        let opts = SolveOptions { node_limit: Some(1), force_search: true, ..SolveOptions::default() };
+    for n in [1500, 2050] {
+        let opts = SolveOptions { node_limit: Some(1), force_search: true, ..options(2) };
         let r = solver::solve_game(n, None, &opts).unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(r.n, n);
         assert!(!r.completed, "n={n}: one node cannot finish the search");

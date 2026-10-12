@@ -1927,7 +1927,8 @@ mod tests {
     /// Checks the forced members of strong branching (tactic `fix_forced`) along random search paths of `g`: at a
     /// node whose heaviest matching has a conflict, every forced member is in every completion that reaches
     /// `need` (found exhaustively), so the child that promotes all of them keeps the best completion whenever it
-    /// reaches `need`.  Returns the numbers of nodes checked and of forced members.
+    /// reaches `need`.  Returns the numbers of nodes checked and of forced members.  Two paths per game (six took
+    /// 3.5 s and found 7,400 nodes and 18,000 forced members, 15 to 60 times what the test asks for).
     fn forced_soundness<const W: usize>(g: &Golden, rng: &mut Rng) -> [u64; 2] {
         let (model, root) = Model::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
         let all = Bits::<W>::from_slice(&g.candidates);
@@ -1937,7 +1938,7 @@ mod tests {
         let mut m = MatchBound::new(&graph);
         let mut scratch = Scratch::new();
         let mut checks = [0; 2];
-        for _path in 0..6 {
+        for _path in 0..2 {
             let (mut state, mut promoted, mut cands) = (root, Bits::<W>::EMPTY, all);
             loop {
                 let max_add = max_additional(max_total, &state, &promoted, &cands);
@@ -2023,11 +2024,11 @@ mod tests {
         }
     }
 
-    /// Every candidate of the frame builder, for the games `range` (all with candidates, or none), can be promoted
+    /// Every candidate of the frame builder, for the games `ns` (all with candidates, or none), can be promoted
     /// from the root by itself.
-    fn candidates_can_be_promoted_from_the_root<const W: usize>(range: std::ops::RangeInclusive<u32>) {
+    fn candidates_can_be_promoted_from_the_root<const W: usize>(ns: impl Iterator<Item = u32>) {
         let mut scratch = Scratch::new();
-        for n in range {
+        for n in ns {
             let tables = Tables::new(n);
             let frames = build_frames::<W>(&tables);
             let (model, root) = Model::build::<W>(&tables, &frames.columns()).unwrap();
@@ -2038,11 +2039,14 @@ mod tests {
     }
 
     /// So a test of each candidate at the root would find nothing to drop (see DESIGN.md, "Single-member conflicts
-    /// belong to the node"), and the single-member conflicts of the search are relative to its nodes.
+    /// belong to the node"), and the single-member conflicts of the search are relative to its nodes.  The cost is
+    /// all in building the frames (10 to 20 ms a board above 500), so every board to 511 is checked (0.2 s) and
+    /// every sixth above (1.2 s); all of 2..=1230 takes 7 s.
     #[test]
     fn the_frame_builders_candidates_can_all_be_promoted_from_the_root() {
-        candidates_can_be_promoted_from_the_root::<16>(2..=1023);
-        candidates_can_be_promoted_from_the_root::<32>(1024..=1230);
+        candidates_can_be_promoted_from_the_root::<8>(2..=511);
+        candidates_can_be_promoted_from_the_root::<16>((512..=1023).step_by(6));
+        candidates_can_be_promoted_from_the_root::<32>((1024..=1230).step_by(6));
     }
 
     fn sums_by_tactics<const W: usize>(g: &Golden) -> Vec<(SearchTactics, u64)> {
