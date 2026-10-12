@@ -384,8 +384,10 @@ impl<const W: usize> Refiner<'_, '_, W> {
             Lookup::None => return Verdict::Exact(chosen),
             Lookup::Forced => return Verdict::Below,
         };
-        // A conflict all of whose members are forced leaves no completion that reaches `need`.
-        if k.is_subset(&self.forced) || (depth > 0 && !self.branches(k, Bits::EMPTY, depth)) {
+        // A conflict all of whose members are forced leaves no completion that reaches `need`.  With some forced
+        // members the node's only child promotes them, and refining is left to it (cheaper, if a few more nodes).
+        let refine = depth > 0 && self.forced.is_empty();
+        if k.is_subset(&self.forced) || (refine && !self.branches(k, Bits::EMPTY, depth)) {
             return Verdict::Below;
         }
         Verdict::Open(Some(k))

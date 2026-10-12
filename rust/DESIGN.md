@@ -508,6 +508,27 @@ found the others again, one level each, further down.
   whose signature is not within the node's; the conflicts chosen are the
   same as before (the smallest, then the one with the largest member).
   −5% to −10%.
+* **No refinement where members are forced.**  A node with forced members
+  has a single child, which promotes them; refining the node's conflict is
+  left to that child.  Nodes +3% to +11%, time −2% to −8% (992 and 1215
+  seeded with their optimum: −3.5% and −6.5%).
+
+Tried and not kept in this round:
+
+* Rounding the heaviest matching into an incumbent at every node (drop the
+  smallest member of a conflict until the rest can be promoted, then fill
+  greedily): five times slower per node, and the optimum of 1050 was found
+  at the same step.
+* A large-neighbourhood search before the search: free a window of the
+  incumbent's members (by frame pair, or 15–40 consecutive members), keep
+  the rest promoted, and search that unit with a node limit.  At 1025 it
+  reached 25080 in 1.3 s (the search takes 11 s to), but the optimum, 7
+  members out and 8 in from there across frames 1–4, was found only by the
+  search, at about the same point (one thread: 160 s instead of 170 s).
+  The incumbents of 1025 and 1050 improve late because the search reaches
+  the subtree that holds them late, not because a nearby set is missed.
+* `preclusions=off`: no faster now on the fast set once its setup is left
+  out, and more nodes at 1184 (154k against 126k).
 
 One thread, fast set (search seconds and nodes; 880 and 936 seeded from
 optimal.json, the rest from `results/strict.jsonl`):
@@ -521,7 +542,8 @@ optimal.json, the rest from `results/strict.jsonl`):
 | 667b24d | bounds from the potentials | 0.52 s 34k | 0.85 s 50k | 8.72 s 318k | 1.65 s 75k | 0.91 s 46k | 4.87 s 276k |
 | 356ef92 | forced members of the whole matching | 0.46 s 31k | 0.83 s 45k | 6.45 s 241k | 1.31 s 51k | 0.92 s 35k | 2.94 s 133k |
 | fe73c1c | cheaper children | 0.29 s 30k | 0.53 s 47k | 4.68 s 264k | 0.73 s 51k | 0.40 s 35k | 1.28 s 126k |
-| (next) | nogood signatures | 0.26 s 30k | 0.49 s 47k | 4.43 s 264k | 0.68 s 51k | 0.38 s 35k | 1.21 s 126k |
+| 372c3f9 | nogood signatures | 0.26 s 30k | 0.49 s 47k | 4.43 s 264k | 0.68 s 51k | 0.38 s 35k | 1.21 s 126k |
+| (next) | no refinement where members are forced | 0.24 s 32k | 0.45 s 52k | 3.99 s 290k | 0.67 s 56k | 0.37 s 38k | 1.13 s 130k |
 
 ## Testing
 
