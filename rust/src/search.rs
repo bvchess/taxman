@@ -98,7 +98,7 @@ impl Default for SearchTactics {
             legacy_bound: false,
             revise_freedoms: true,
             match_bound: true,
-            match_refine: 0,
+            match_refine: 1,
             branching: Branching::default(),
         }
     }
@@ -316,9 +316,9 @@ impl<const W: usize> Refiner<'_, '_, W> {
     }
 
     /// A conflict of `promoted` from `self.state`, computed (and then known); `None` if it can all be promoted.
-    /// The search branches on the top level's conflict, so that is always computed this way: what is known
-    /// depends on how the search got to the node, which work units do not record, and a single-threaded search
-    /// explores the same tree however often it is interrupted.
+    /// The search branches on the top level's conflict, so that is always computed this way, and the branching
+    /// does not depend on what is known (which depends on how the search got to the node).  What is pruned can:
+    /// refinements and the propagation into children use what is known, which work units do not record.
     fn fresh_conflict(&mut self, promoted: &Bits<W>) -> Option<Bits<W>> {
         let k = self.model.conflict_cached(self.scratch, Some(self.cache), self.state, promoted, true)?;
         self.computed += 1;
@@ -1707,14 +1707,12 @@ mod tests {
             pieces += 1;
             assert!(pieces < 100, "no progress");
         }
-        // One thread repeats the uninterrupted run exactly; several explore a varying number of nodes.
+        // One thread explores in depth-first order however often it is interrupted, but the conflicts a searcher
+        // learns along its path are not part of a work unit, so a resumed search can prune a little differently
+        // (it does not at the time of writing); several threads explore a varying number of nodes anyway.
         assert!(pieces >= if threads == 1 { 4 } else { 2 }, "only {pieces} pieces");
         assert!(!ckpt.exists(), "a completed run deletes its checkpoint");
         assert_eq!(result.sum, golden_sum(&g));
-        if threads == 1 {
-            // One thread explores in exact depth-first order however often it is interrupted.
-            assert_eq!(result.stats.nodes, nodes);
-        }
     }
 
     #[test]

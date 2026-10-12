@@ -89,7 +89,7 @@ inside this model.
 | `preclusions` | on | sound (promotion failure is monotone: more moves or fewer factors never make a frame winnable) | depth-2 preclusion table; prunes candidates |
 | `match_bound` | on | sound (matchability relaxes winnability) | node bound = min(blameGame, matching relaxation), the matching one computed only when blameGame fails to prune; a heaviest matching that can be promoted is the node's best completion (offered as incumbent, node done) |
 | `branching` | conflict-strong | sound (any order explores every promotion set) | which candidate a node promotes next: `largest` (the Java's), or a member of a conflict of the heaviest matching (needs `match_bound`): the `conflict-smallest`, the `conflict-largest`, or (`conflict-strong`) the one whose removal lowers the matching bound most |
-| `match_refine` | 0 | sound (see `search::Refiner`) | refine the matching bound by branching on conflicts this many levels deep (0–7) |
+| `match_refine` | 1 | sound (see `search::Refiner`) | refine the matching bound by branching on conflicts this many levels deep (0–7) |
 | `legacy_bound` | off | unsound (the runner-up defect) | reproduce the Java bound exactly |
 | `prev_cap` | on | proven if opt(n−1) is optimal | stop as soon as the incumbent reaches n + opt(n−1) − inTheBag (`FrameSolver.getMaxPromotionSum`) |
 | `seed_incumbent` | on | sound (any feasible promotion set is a valid incumbent) | start from the better of greedy and the n−1 solution's promotions that are still feasible |
