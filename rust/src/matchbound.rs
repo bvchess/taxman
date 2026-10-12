@@ -910,6 +910,50 @@ impl<'g, const W: usize> MatchBound<'g, W> {
         self.value()
     }
 
+    /// An upper bound on [`value_excluding(x)`](Self::value_excluding) from the top level's potentials, without
+    /// repairing anything: at least the exact value, and found in time proportional to the degrees of `x` and
+    /// of the factor it pays with.
+    ///
+    /// The top level's potentials `y` prove its value: they are a feasible dual solution whose sum is the value.
+    /// Without `x` as a candidate, its edges as a mover go and nothing else changes, so they are still feasible
+    /// and their sum still bounds the new value from above.  If `x` is promoted in the heaviest matching, paying
+    /// with `w`, lower `y_x` and then `y_w` as far as their remaining constraints allow (never below 0, as
+    /// neither is required); the matched edge was tight, so the bound becomes `value − x + y'_x + y'_w`.  If `x`
+    /// is not promoted, the bound is the value itself.
+    pub fn bound_excluding(&mut self, x: u32) -> u64 {
+        let graph = self.graph;
+        let level = self.settle();
+        if !level.feasible {
+            return 0;
+        }
+        let Some(v) = graph.vertex_of(x).filter(|&v| level.role[v] == Role::Candidate) else {
+            return level.value;
+        };
+        let w = level.mate[v];
+        if w == NONE || usize::from(w) > v {
+            return level.value; // not promoted: it pays for a mover above, or is free
+        }
+        let w = usize::from(w);
+        // The least potential a factor `f` needs to pay for the movers above it that still count (not `x`).
+        let as_factor = |f: usize| -> i64 {
+            let movers = graph.above(f).iter().map(|&u| usize::from(u));
+            let counted = movers.filter(|&u| u != v && level.role[u] != Role::Factor);
+            counted.map(|u| level.weight(graph, u) - level.y[u]).max().unwrap_or(0).max(0)
+        };
+        let y_x = as_factor(v);
+        let mut y_w = as_factor(w);
+        if level.role[w] == Role::Candidate {
+            // It can still be promoted itself, paying with its own factors.
+            let own = level.weight(graph, w);
+            let factors = graph.below(w).iter().map(|&f| usize::from(f));
+            for f in factors.filter(|&f| level.role[f] != Role::Required) {
+                y_w = y_w.max(own - level.y[f]);
+            }
+        }
+        let bound = level.value as i64 - i64::from(x) + y_x + y_w;
+        bound.clamp(0, level.value as i64) as u64
+    }
+
     /// Pops the level pushed by [`value_excluding`](Self::value_excluding), keeping it (settled) for its
     /// parent: once the parent is the top level again, with children pushed and popped meanwhile but nothing done
     /// to the parent itself, [`take_kept`](Self::take_kept) makes the kept level the parent, which saves
@@ -936,6 +980,13 @@ impl<'g, const W: usize> MatchBound<'g, W> {
         std::mem::swap(&mut self.levels[d], &mut self.spares[d]);
         self.kept[d] = false;
         true
+    }
+
+    /// Forgets the level kept for the top level, if any.
+    pub fn drop_kept(&mut self) {
+        if let Some(kept) = self.kept.get_mut(self.depth) {
+            *kept = false;
+        }
     }
 
     /// Number of levels above level 0.
@@ -1343,6 +1394,7 @@ mod tests {
         let mut rng = Rng(u64::from(g.n) * 7919);
         let mut checks = 0;
         let mut evaluations = MatchStats::default();
+        let (mut quick_checks, mut quick_tight) = (0u64, 0u64);
         walks::<W>(g, g.n.into(), paths, budget, &mut |mb, state, promoted, cands| {
             let fast = mb.value();
             check_certificate(mb);
@@ -1354,12 +1406,25 @@ mod tests {
                 assert_eq!(fresh.value(), fast, "n={}: started afresh at {promoted:?}", g.n);
                 check_certificate(&fresh);
             }
+            // The quick bound without a candidate (often a promoted one) is at least the exact value.
+            let pool = if rng.chance(70) { mb.chosen() } else { *cands };
+            if let Some(x) = pool.nth_largest(rng.below(pool.len().max(1) as usize) as u32) {
+                let quick = mb.bound_excluding(x);
+                let exact = mb.value_excluding(x);
+                mb.pop();
+                assert!(exact <= quick && quick <= fast, "n={}: without {x}: {exact} > {quick}", g.n);
+                assert_eq!(exact, match_bound(&model, state, &cands.without(x)), "n={}: without {x}", g.n);
+                quick_tight += u64::from(quick == exact);
+                quick_checks += 1;
+            }
             evaluations = mb.stats();
             checks += 1;
         });
         stats.evaluations += evaluations.evaluations;
         stats.searches += evaluations.searches;
         stats.scanned += evaluations.scanned;
+        eprintln!("  n={}: quick bounds without a candidate exact at {quick_tight} of {quick_checks}", g.n);
+        assert!(quick_checks > checks / 2);
         checks
     }
 

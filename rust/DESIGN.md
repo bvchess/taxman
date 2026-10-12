@@ -453,6 +453,20 @@ found the others again, one level each, further down.
   completion beats the incumbent: the node is done (free once strong
   branching has computed the bounds; only matters with `match_refine=0`,
   since refinement prunes those nodes first).
+* **Bounds without a member from the potentials** (`MatchBound::bound_excluding`).
+  With the conflicts looked up, matching repairs were two thirds of the
+  time, nearly all of them for the bound without one member of a conflict
+  (strong branching, and refinement's branches).  The level's potentials are
+  a dual solution whose sum is its bound; without the member as a candidate
+  they stay feasible, and lowering the member's potential and that of the
+  factor it paid with as far as their remaining edges allow gives an upper
+  bound at once: `value − x + y′ₓ + y′_w`.  At 1184 it shows 89% of the forced
+  members forced (and is never below the exact value, which the matching
+  tests check).  Strong branching (with `fix_forced`) and refinement solve
+  only for the members it does not settle; when some member is forced, the
+  node's loop ends after the child that promotes them (it covers every
+  completion that can beat the incumbent), so no level is kept for it.  The
+  same trees, 13–28% less time.
 
 One thread, fast set (search seconds and nodes; 880 and 936 seeded from
 optimal.json, the rest from `results/strict.jsonl`):
@@ -462,7 +476,8 @@ optimal.json, the rest from `results/strict.jsonl`):
 | 8686be0 | before | 2.72 s 142k | 11.65 s 500k | 24.8 s 598k | 4.81 s 161k | 4.58 s 165k | 21.6 s 786k |
 | 53a442a | forced members | 2.14 s 98k | 8.61 s 320k | 18.2 s 342k | 3.17 s 74k | 3.09 s 66k | 14.7 s 338k |
 | 261b342 | reuse the child check | 1.97 s 98k | 8.05 s 320k | 16.8 s 340k | 2.65 s 74k | 2.35 s 66k | 11.9 s 338k |
-| 8490458 | nogoods | 0.66 s 34k | 1.09 s 50k | 11.8 s 318k | 2.12 s 75k | 1.18 s 46k | 6.41 s 276k |
+| c33c3c2 | nogoods | 0.66 s 34k | 1.09 s 50k | 11.8 s 318k | 2.12 s 75k | 1.18 s 46k | 6.41 s 276k |
+| (next) | bounds from the potentials | 0.52 s 34k | 0.85 s 50k | 8.72 s 318k | 1.65 s 75k | 0.91 s 46k | 4.87 s 276k |
 
 ## Testing
 

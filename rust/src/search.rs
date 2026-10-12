@@ -442,9 +442,14 @@ impl<const W: usize> Refiner<'_, '_, W> {
         let mut reaches = false;
         let mut pushed = 0;
         for x in free.iter() {
-            self.m.push_excluding(&Bits::EMPTY.with(x));
-            reaches = self.reaches(required, depth - 1);
-            self.m.pop();
+            // The bound without x is often below `need` by the potentials alone (see
+            // `MatchBound::bound_excluding`); else solve for it.
+            reaches = self.m.bound_excluding(x) + required.sum() >= self.need && {
+                self.m.push_excluding(&Bits::EMPTY.with(x));
+                let reaches = self.reaches(required, depth - 1);
+                self.m.pop();
+                reaches
+            };
             if reaches || Some(x) == last {
                 break;
             }
@@ -469,22 +474,42 @@ impl<const W: usize> Refiner<'_, '_, W> {
 ///
 /// Also returns the members whose removal brings the bound below `need`, the node's *forced* members: every
 /// completion that reaches `need` promotes them all.  The chosen member is among them unless there are none.
-fn strongest<const W: usize>(m: &mut MatchBound<'_, W>, k: &Bits<W>, need: u64) -> (u32, Bits<W>) {
-    let mut best = (u64::MAX, 0);
+///
+/// With `quick` (for the `fix_forced` tactic, which promotes all the forced members, so that which of them is
+/// chosen hardly matters), the members that [`MatchBound::bound_excluding`] already shows to be forced are not
+/// solved for, and when some member is forced the largest forced one is chosen and no level is kept (the
+/// node's loop has nothing left to do after that child).  Returns whether a level is kept.
+fn strongest<const W: usize>(m: &mut MatchBound<'_, W>, k: &Bits<W>, need: u64, quick: bool) -> (u32, Bits<W>, bool) {
     let mut forced = Bits::EMPTY;
-    for x in k.iter() {
+    if quick {
+        for x in k.iter() {
+            if m.bound_excluding(x) < need {
+                forced.insert(x);
+            }
+        }
+    }
+    let mut best = (u64::MAX, 0);
+    let mut kept = false;
+    for x in (*k - forced).iter() {
         let bound = m.value_excluding(x);
         if bound < need {
             forced.insert(x);
         }
         if bound <= best.0 {
             m.keep_excluded();
+            kept = true;
             best = (bound, x);
         } else {
             m.pop();
         }
     }
-    (best.1, forced)
+    match forced.max() {
+        Some(n) if quick => {
+            m.drop_kept();
+            (n, forced, false)
+        }
+        _ => (best.1, forced, kept),
+    }
 }
 
 /// Most nogoods a searcher keeps (tactic `nogoods`); it forgets them all when it has this many.  Searches near
@@ -987,9 +1012,8 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             (Branching::ConflictLargest, Some(k)) => k.max(),
             (Branching::ConflictStrong, Some(k)) if k.len() > 1 => {
                 let m = matching.as_mut().expect("conflicts come from the matching");
-                kept = true;
-                let (n, members) = strongest(m, &k, need);
-                forced = members;
+                let (n, members, keeps) = strongest(m, &k, need, space.fix_forced);
+                (forced, kept) = (members, keeps);
                 Some(n)
             }
             (Branching::ConflictStrong, Some(k)) => k.max(),
@@ -1009,7 +1033,12 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             return depth.checked_sub(1);
         }
         node.cands.remove(n);
-        if let Some(m) = matching {
+        let left = node.cands; // what the child's candidates are chosen from
+        if space.fix_forced && !forced.is_empty() {
+            // Every completion that reaches `need` promotes the forced members, so all of them are the child's (or
+            // none, if it fails): the node's loop has nothing left after it.
+            node.cands = Bits::EMPTY;
+        } else if let Some(m) = matching {
             if !kept {
                 m.remove_candidate(n);
             }
@@ -1045,7 +1074,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         }
         child.promoted = node.promoted | added;
         child.sum = node.sum + added.sum();
-        let rest = node.cands - added;
+        let rest = left - added;
         let max_next = max_additional(space.max_total, &child.state, &child.promoted, &rest);
         let mut cands = bounds.new_candidate_list_after(&added, max_next, &child.state, &rest, &node.promoted);
         // A known conflict of the node (or above) that the child promotes all but one member of rules that member
@@ -1831,7 +1860,7 @@ mod tests {
                     if k.len() < 2 {
                         continue;
                     }
-                    let (n, forced) = strongest(&mut m, &k, need);
+                    let (n, forced, _) = strongest(&mut m, &k, need, rng.chance(50));
                     let what = format!("n={} promoted {promoted:?} cands {cands:?} need {need}", g.n);
                     assert!(k.contains(n) && forced.is_subset(&k), "{what}: {n} {forced:?} from {k:?}");
                     assert!(forced.is_empty() || forced.contains(n), "{what}: {n} is not among {forced:?}");
