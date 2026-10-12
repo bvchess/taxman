@@ -437,7 +437,7 @@ found the others again, one level each, further down.
   hundred over and over.  So each searcher keeps a table of them (at most
   65536, forgotten all at once when full; about a thousand are learned near
   n = 1200), and a node's conflict is the smallest the table knows within
-  `P ∪ Q*` (indexed by each nogood's largest member); only when it knows none
+  `P ∪ Q*` (of those as small, the one with the largest member); only when it knows none
   is one computed, and then learned.  Nogoods also rule candidates out of a
   child (a nogood all of whose other members the child promotes, indexed by
   member), beyond the conflicts known along the path.  Looking conflicts up
@@ -502,6 +502,12 @@ found the others again, one level each, further down.
   zero).  And blameGame is not computed with the matching bound: it never
   pruned where the matching bound did not (diagnostics: 0 at every check).
   −30% to −59% time.
+* **Nogood signatures.**  The table's scans were then 17% of the time at
+  1215 (a few hundred nogoods, a lookup per check).  Each nogood keeps a
+  256-bit signature (bit `x mod 256` per member), and a scan skips those
+  whose signature is not within the node's; the conflicts chosen are the
+  same as before (the smallest, then the one with the largest member).
+  −5% to −10%.
 
 One thread, fast set (search seconds and nodes; 880 and 936 seeded from
 optimal.json, the rest from `results/strict.jsonl`):
@@ -514,7 +520,8 @@ optimal.json, the rest from `results/strict.jsonl`):
 | c33c3c2 | nogoods | 0.66 s 34k | 1.09 s 50k | 11.8 s 318k | 2.12 s 75k | 1.18 s 46k | 6.41 s 276k |
 | 667b24d | bounds from the potentials | 0.52 s 34k | 0.85 s 50k | 8.72 s 318k | 1.65 s 75k | 0.91 s 46k | 4.87 s 276k |
 | 356ef92 | forced members of the whole matching | 0.46 s 31k | 0.83 s 45k | 6.45 s 241k | 1.31 s 51k | 0.92 s 35k | 2.94 s 133k |
-| (next) | cheaper children | 0.29 s 30k | 0.53 s 47k | 4.68 s 264k | 0.73 s 51k | 0.40 s 35k | 1.28 s 126k |
+| fe73c1c | cheaper children | 0.29 s 30k | 0.53 s 47k | 4.68 s 264k | 0.73 s 51k | 0.40 s 35k | 1.28 s 126k |
+| (next) | nogood signatures | 0.26 s 30k | 0.49 s 47k | 4.43 s 264k | 0.68 s 51k | 0.38 s 35k | 1.21 s 126k |
 
 ## Testing
 

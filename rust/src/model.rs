@@ -1211,10 +1211,25 @@ pub struct Nogoods<const W: usize> {
     /// The members of nogood `i`, those of the conflict it was made from first: `members[start[i]..start[i + 1]]`.
     members: Vec<u16>,
     start: Vec<u32>,
-    /// For each number, the nogoods whose largest member it is, and the nogoods it is a member of.
-    by_max: Vec<Vec<u32>>,
+    /// For each nogood, a 256-bit signature: bit `x mod 256` for each member `x`.  A nogood can be within a set
+    /// only if its signature is within the set's.
+    sigs: Vec<[u64; 4]>,
+    /// For each nogood, its largest member.
+    maxes: Vec<u16>,
+    /// For each number, the nogoods it is a member of.
     by_member: Vec<Vec<u32>>,
     capacity: usize,
+}
+
+/// The signature of a set of numbers (see [`Nogoods`]).
+#[inline]
+fn signature(set: impl Iterator<Item = u32>) -> [u64; 4] {
+    let mut sig = [0u64; 4];
+    for x in set {
+        let bit = x & 255;
+        sig[bit as usize >> 6] |= 1 << (bit & 63);
+    }
+    sig
 }
 
 impl<const W: usize> Nogoods<W> {
@@ -1225,7 +1240,8 @@ impl<const W: usize> Nogoods<W> {
             sets: Vec::new(),
             members: Vec::new(),
             start: vec![0],
-            by_max: vec![Vec::new(); size],
+            sigs: Vec::new(),
+            maxes: Vec::new(),
             by_member: vec![Vec::new(); size],
             capacity,
         }
@@ -1253,7 +1269,8 @@ impl<const W: usize> Nogoods<W> {
             self.by_member[x as usize].push(id);
         }
         self.start.push(self.members.len() as u32);
-        self.by_max[n.max().expect("a nogood is not empty") as usize].push(id);
+        self.sigs.push(signature(n.iter()));
+        self.maxes.push(n.max().expect("a nogood is not empty") as u16);
     }
 
     fn clear(&mut self) {
@@ -1261,9 +1278,10 @@ impl<const W: usize> Nogoods<W> {
             for x in n.iter() {
                 self.by_member[x as usize].clear();
             }
-            self.by_max[n.max().expect("not empty") as usize].clear();
         }
         self.sets.clear();
+        self.sigs.clear();
+        self.maxes.clear();
         self.members.clear();
         self.start.truncate(1);
     }
@@ -1274,7 +1292,7 @@ impl<const W: usize> Nogoods<W> {
 
     /// The smallest conflict the table knows of a node with the promotions `promoted` among the candidates
     /// `set` (disjoint from `promoted`): the smallest `N − promoted` over the nogoods `N ⊆ promoted ∪ set`, the
-    /// first such found if there are several; `None` if there is none.
+    /// one with the largest member if there are several (then the first learned); `None` if there is none.
     pub fn conflict(&self, promoted: &Bits<W>, set: &Bits<W>) -> Option<Bits<W>> {
         match self.lookup(promoted, set, &Bits::EMPTY) {
             Lookup::Conflict(k) => Some(k),
@@ -1286,10 +1304,15 @@ impl<const W: usize> Nogoods<W> {
     /// stops there and says so): if every completion that matters promotes all of `forced`, there is none.
     pub fn lookup(&self, promoted: &Bits<W>, set: &Bits<W>, forced: &Bits<W>) -> Lookup<W> {
         let within = *promoted | *set;
-        let mut best: Option<(u32, u32)> = None; // (size of the conflict, nogood)
-        for x in within.iter_desc() {
-            let Some(ids) = self.by_max.get(x as usize) else { continue };
-            for &id in ids {
+        let outside = signature(within.iter()).map(|word| !word);
+        // The smallest conflict, of those the one with the largest member, of those the first learned.
+        let mut best: Option<(u32, u16, u32)> = None; // (size of the conflict, largest member, nogood)
+        for (id, sig) in self.sigs.iter().enumerate() {
+            if sig.iter().zip(&outside).any(|(a, b)| a & b != 0) {
+                continue;
+            }
+            let id = id as u32;
+            {
                 let (mut size, mut unforced) = (0, false);
                 let inside = self.members_of(id).iter().all(|&y| {
                     let y = u32::from(y);
@@ -1305,19 +1328,14 @@ impl<const W: usize> Nogoods<W> {
                 if !unforced {
                     return Lookup::Forced;
                 }
-                if best.is_none_or(|(s, _)| size < s) {
-                    best = Some((size, id));
-                    if size == 1 && forced.is_empty() {
-                        break; // none is smaller, and none can be all forced
-                    }
+                let top = self.maxes[id as usize];
+                if best.is_none_or(|(s, m, _)| size < s || (size == s && top > m)) {
+                    best = Some((size, top, id));
                 }
-            }
-            if best.is_some_and(|(s, _)| s == 1) && forced.is_empty() {
-                break;
             }
         }
         match best {
-            Some((_, id)) => Lookup::Conflict(self.sets[id as usize] - *promoted),
+            Some((_, _, id)) => Lookup::Conflict(self.sets[id as usize] - *promoted),
             None => Lookup::None,
         }
     }
