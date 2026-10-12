@@ -2,14 +2,14 @@
 //!
 //! [`prepare`] sets a game up the way the Java's `SearchManager.create` does: the frame set, the preclusion
 //! table, the greedy incumbent, and (tactic `revise_freedoms`) a revised frame 0 that can lower the cap on the
-//! number of promotions.  [`search`] then explores the tree of `BranchExplorer.explore`, made lazy: a node's
-//! candidates are tried from the largest down, and each child is explored depth-first as soon as it is made,
-//! on an explicit stack that is reused from node to node (no recursion, no allocation per node):
+//! number of promotions.  [`search`] then explores the tree of `BranchExplorer.explore`, made lazy: each child
+//! is explored depth-first as soon as it is made, on an explicit stack that is reused from node to node (no
+//! recursion, no allocation per node):
 //!
 //! ```text
 //! loop while cands non-empty:
-//!     n = cands.max()
-//!     if upper_bound(state, cands, max_add) + sum(promoted) < best: break
+//!     if upper_bound(state, cands, max_add) + sum(promoted) <= best: break
+//!     n = the candidate to branch on (tactic `branching`; the Java's is cands.max())
 //!     cands.remove(n)
 //!     new_state = state.promote(n) else continue
 //!     new_promoted = promoted ∪ {n}
@@ -21,23 +21,31 @@
 //!                     max_additional(new_state, new_promoted, child_cands))
 //! ```
 //!
+//! The Java breaks only when the bound is below `best`; no completion can beat `best` when it is equal, so this
+//! loop breaks then too.  The upper bound is `blameGame`'s and, with the `match_bound` tactic, the matching
+//! bound ([`crate::matchbound`]), possibly refined by conflicts (see [`Refiner`]).  When the heaviest matching
+//! can itself be promoted, it is the node's best completion: it is offered as the incumbent and the node is
+//! done.  The search starts from the best of the greedy set, the seed, and a rounding of the root's matching
+//! ([`dive`]).
+//!
 //! Two exact shortcuts keep the expensive bound out of the way: the bound never exceeds the sum of the
 //! `max_add` largest candidates, so when that sum already decides the comparison the bound is not computed;
 //! and a child with no candidates is not pushed (its loop would do nothing).
 //!
-//! A unit of work is just `(promoted, cands)`: promotions happen in decreasing order along every path, so a
-//! node's state is the root with `promoted` promoted, rebuilt in one pass (see [`Model::promote_all_using`]).
-//! A rebuilt node recomputes `max_add` from its remaining candidates, which can only tighten it.
+//! A unit of work is just `(promoted, cands)`: a node's state is the root with `promoted` promoted, rebuilt in
+//! one pass (see [`Model::promote_all_using`]; the order of promotions does not matter), and `cands` holds the
+//! candidates its loop has still to try.  A rebuilt node recomputes `max_add` from its remaining candidates,
+//! which can only tighten it.
 
 use crate::bits::Bits;
 use crate::bounds::{self, max_additional, Bounds, Preclusions, RunnerUp};
 use crate::engine::{self, Counters, Ctx, EngineConfig, Poll, Searcher, Start, Stats, Unit};
 use crate::matchbound::{MatchBound, MatchGraph};
-use crate::model::{FrameSet, Model};
+use crate::model::{FrameSet, Model, Scratch};
 use crate::numtheory::Tables;
 use std::io;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 // ---------------------------------------------------------------------------------------------------------
@@ -56,11 +64,38 @@ pub struct SearchTactics {
     /// Bound nodes by the smaller of `blameGame` and the matching relaxation ([`crate::matchbound`]), computing
     /// the matching bound only where `blameGame` does not prune (sound).
     pub match_bound: bool,
+    /// Refine the matching bound by conflicts, branching this many levels deep where it does not prune
+    /// (0: off; needs `match_bound`; sound, see [`Refiner`]).  At most 7.
+    pub match_refine: u8,
+    /// Which candidate a node branches on next (sound: any order explores every promotion set).
+    pub branching: Branching,
+}
+
+/// Which candidate a node's loop promotes next (tactic `branching`).  The child promotes it, and the node goes on
+/// without it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Branching {
+    /// The largest candidate left (the Java's order).
+    #[default]
+    Largest,
+    /// The smallest member of a conflict of the heaviest matching (see [`Refiner`]), so that neither the child
+    /// nor the node going on can repeat that matching; the largest candidate when there is none (or without
+    /// `match_bound`).
+    ConflictSmallest,
+    /// As `ConflictSmallest`, the largest member of the conflict.
+    ConflictLargest,
 }
 
 impl Default for SearchTactics {
     fn default() -> Self {
-        SearchTactics { preclusions: true, legacy_bound: false, revise_freedoms: true, match_bound: true }
+        SearchTactics {
+            preclusions: true,
+            legacy_bound: false,
+            revise_freedoms: true,
+            match_bound: true,
+            match_refine: 0,
+            branching: Branching::Largest,
+        }
     }
 }
 
@@ -73,20 +108,35 @@ impl SearchTactics {
         }
     }
 
-    fn bits(self) -> u8 {
-        u8::from(self.preclusions)
-            | u8::from(self.legacy_bound) << 1
-            | u8::from(self.revise_freedoms) << 2
-            | u8::from(self.match_bound) << 3
+    fn bits(self) -> u16 {
+        let branching = match self.branching {
+            Branching::Largest => 0,
+            Branching::ConflictSmallest => 1,
+            Branching::ConflictLargest => 2,
+        };
+        u16::from(self.preclusions)
+            | u16::from(self.legacy_bound) << 1
+            | u16::from(self.revise_freedoms) << 2
+            | u16::from(self.match_bound) << 3
+            | u16::from(self.match_refine.min(7)) << 4
+            | branching << 7
     }
 
-    fn from_bits(bits: u8) -> Self {
-        SearchTactics {
+    fn from_bits(bits: u16) -> Result<Self, String> {
+        let branching = match bits >> 7 & 3 {
+            0 => Branching::Largest,
+            1 => Branching::ConflictSmallest,
+            2 => Branching::ConflictLargest,
+            _ => return Err(format!("unknown tactics {bits:#x}")),
+        };
+        Ok(SearchTactics {
             preclusions: bits & 1 != 0,
             legacy_bound: bits & 2 != 0,
             revise_freedoms: bits & 4 != 0,
             match_bound: bits & 8 != 0,
-        }
+            match_refine: (bits >> 4 & 7) as u8,
+            branching,
+        })
     }
 }
 
@@ -137,11 +187,176 @@ pub struct SearchSpace<'a, const W: usize> {
     pub preclusions: Option<&'a Preclusions<W>>,
     /// The root's matching graph, if the `match_bound` tactic is on.
     pub match_graph: Option<&'a MatchGraph>,
+    /// How deep to refine the matching bound by conflicts (tactic `match_refine`), and how to branch.
+    pub match_refine: u32,
+    pub conflict_branching: Branching,
     /// The cap on the number of promotions (`maxTotalPromotions`).
     pub max_total: u32,
     pub rule: RunnerUp,
     /// A proven ceiling on the promotion sum (n + opt(n − 1) − inTheBag): reaching it ends the search.
     pub cap: Option<u64>,
+    /// Where to collect [`Diagnostics`], if anywhere.
+    pub diagnostics: Option<&'a Mutex<Diagnostics>>,
+    /// When the search began, and the best incumbent the searchers found (see [`Found`]).
+    pub began: Instant,
+    pub found: Mutex<Option<Found>>,
+}
+
+/// When a search found its best incumbent.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Found {
+    pub value: u64,
+    /// Since the search began.
+    pub time: Duration,
+    /// The steps (engine nodes) the worker that found it had taken in this invocation by then: all the steps of
+    /// the search with one thread.
+    pub steps: u64,
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Conflict refinement of the matching bound
+
+/// The matching bound of a node refined by conflicts (tactic `match_refine`), on top of a [`MatchBound`] whose
+/// top level is the node, with `state` and the candidates `C` of that level.
+///
+/// The heaviest matching promotes some `Q* ⊆ C`.  If `Q*` can really be promoted from `state`, the bound is the
+/// best completion's sum and stands.  Otherwise some subset `K ⊆ Q*` cannot be promoted, a *conflict*
+/// ([`Model::conflict_using`]).  A subset of a set that can be promoted can be promoted too (moves left out and
+/// factors kept only help a frame, see [`Model::winnable`]), so every completion `F ⊆ C` that can be promoted
+/// leaves out some member of `K`.  With `K`'s members `k₁ < k₂ < … < k_r`, every such `F` is in exactly one
+/// of the branches "`k₁ … k_{j−1}` in `F`, `k_j` not", and the best completion is at most the largest of the
+/// branches' matching bounds: the matching with `k_j` no longer a candidate and `k₁ … k_{j−1}` required (as
+/// if promoted), plus their sum.  Each branch is refined in the same way, one level less deep, with the members
+/// required so far counted in `Q*` (so a conflict among them alone leaves the branch without completions).  By
+/// induction on the depth, the refined bound is never below the best completion; `max_add` is not needed: the
+/// bound only grows without it.
+///
+/// A conflict of a state is a conflict of every state below it (they have more promotions, which can only
+/// make promoting `K` harder) and of every candidate set containing it, so the conflicts found are kept in
+/// `known` for the rest of the node's loop and its subtree: one that `Q*` contains needs no peeling.
+///
+/// The branches are tried from the smallest member, whose exclusion costs the matching least, so that a bound
+/// that stays at least `need` is usually seen at once.
+struct Refiner<'r, 'g, const W: usize> {
+    m: &'r mut MatchBound<'g, W>,
+    model: &'r Model,
+    scratch: &'r mut Scratch<W>,
+    state: &'r FrameSet<W>,
+    need: u64,
+    /// Conflicts of `state` (or of states above it).
+    known: &'r mut Vec<Bits<W>>,
+    /// Matching evaluations made.
+    evaluations: u64,
+    /// Conflicts computed (not found in `known`).
+    computed: u64,
+    /// The best completion found that can be promoted (the candidates of an exact branch), or none.
+    exact: Bits<W>,
+}
+
+/// What the matching bound says about a node (see `TaxSearcher::matching_check`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum MatchCheck<const W: usize> {
+    /// Prune, for this [`cut`] reason.
+    Cut(usize),
+    /// The best completion is known: these candidates.
+    Exact(Bits<W>),
+    /// Go on; the conflict to branch on, if one was asked for and found.
+    Open(Option<Bits<W>>),
+}
+
+/// What [`Refiner::top`] found out about the top level.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Verdict<const W: usize> {
+    /// The (refined) bound is below `need`.
+    Below,
+    /// The heaviest matching's candidates can all be promoted: they are the best completion, and the bound is
+    /// at least `need`.
+    Exact(Bits<W>),
+    /// The bound is at least `need`; the conflict of the heaviest matching, if one was looked for.
+    Open(Option<Bits<W>>),
+}
+
+impl<const W: usize> Refiner<'_, '_, W> {
+    /// The top level's verdict, refining `depth` levels deep.  The heaviest matching is checked (and its conflict
+    /// found) only when refining or when `conflict` asks for it.
+    fn top(&mut self, depth: u32, conflict: bool) -> Verdict<W> {
+        self.evaluations += 1;
+        if self.m.value() < self.need {
+            return Verdict::Below;
+        }
+        if depth == 0 && !conflict {
+            return Verdict::Open(None);
+        }
+        let chosen = self.m.chosen();
+        let Some(k) = self.conflict_of(&chosen) else {
+            return Verdict::Exact(chosen);
+        };
+        if depth > 0 && !self.branches(k, Bits::EMPTY, depth) {
+            return Verdict::Below;
+        }
+        Verdict::Open(Some(k))
+    }
+
+    /// A conflict of `promoted` from `self.state`, known or computed; `None` if it can all be promoted.
+    fn conflict_of(&mut self, promoted: &Bits<W>) -> Option<Bits<W>> {
+        if let Some(&k) = self.known.iter().rev().find(|k| k.is_subset(promoted)) {
+            return Some(k);
+        }
+        let k = self.model.conflict_using(self.scratch, self.state, promoted, true)?;
+        self.computed += 1;
+        self.known.push(k);
+        Some(k)
+    }
+
+    /// Whether the bound of the top level, with `required` (members of `C` required by the branches above)
+    /// promoted, refined `depth` levels deep, is at least `need`.  Leaves the solver as it found it.
+    fn reaches(&mut self, required: Bits<W>, depth: u32) -> bool {
+        self.evaluations += 1;
+        if self.m.value() + required.sum() < self.need {
+            return false;
+        }
+        if depth == 0 {
+            return true;
+        }
+        let promoted = self.m.chosen() | required;
+        match self.conflict_of(&promoted) {
+            None => {
+                // The bound is exact, and a completion that good exists.
+                if promoted.sum() > self.exact.sum() {
+                    self.exact = promoted;
+                }
+                true
+            }
+            Some(k) => self.branches(k, required, depth),
+        }
+    }
+
+    /// Whether some branch of the conflict `k`, with `required` promoted, refined `depth − 1` levels deep, is at
+    /// least `need`.
+    fn branches(&mut self, k: Bits<W>, required: Bits<W>, depth: u32) -> bool {
+        let free = k - required;
+        let last = free.max();
+        let mut required = required;
+        let mut reaches = false;
+        let mut pushed = 0;
+        for x in free.iter() {
+            self.m.push_excluding(&Bits::EMPTY.with(x));
+            reaches = self.reaches(required, depth - 1);
+            self.m.pop();
+            if reaches || Some(x) == last {
+                break;
+            }
+            // The next branches have x.
+            let cands = self.m.candidates();
+            self.m.push(x, &cands);
+            required.insert(x);
+            pushed += 1;
+        }
+        for _ in 0..pushed {
+            self.m.pop();
+        }
+        reaches
+    }
 }
 
 /// One node on the searcher's stack.
@@ -154,6 +369,20 @@ struct Level<const W: usize> {
     /// The candidates still to try.
     cands: Bits<W>,
     max_add: u32,
+    /// How many of the searcher's known conflicts hold for this node.
+    known_end: usize,
+}
+
+/// Counts of the matching bound's work in a searcher.
+#[derive(Clone, Copy, Debug, Default)]
+struct RefineCounts {
+    /// Matching bounds computed for nodes.
+    match_bounds: u64,
+    /// Refinements made (tactic `match_refine`), the matching evaluations they made, and the conflicts they
+    /// had to compute (not known yet).
+    refinements: u64,
+    evaluations: u64,
+    conflicts: u64,
 }
 
 /// Indexes into [`Stats::extra`].
@@ -176,6 +405,199 @@ pub mod stat {
     pub const MATCH_BOUNDS: usize = 7;
 }
 
+// ---------------------------------------------------------------------------------------------------------
+// Diagnostics
+
+/// Why a node's loop ended or a promoted child was not explored, for [`Diagnostics`].
+pub mod cut {
+    /// No candidates left (a child: none to explore).
+    pub const EMPTY: usize = 0;
+    /// The sum of the `max_add` largest candidates is too small.
+    pub const LARGEST: usize = 1;
+    /// The `blameGame` bound.
+    pub const BLAME: usize = 2;
+    /// The matching bound.
+    pub const MATCH: usize = 3;
+    /// The matching bound refined by conflicts.
+    pub const REFINED: usize = 4;
+    /// The heaviest matching can be promoted: the best completion is known (and offered as the incumbent).
+    pub const EXACT: usize = 5;
+    pub const COUNT: usize = 6;
+    pub const NAMES: [&str; COUNT] = ["empty", "largest", "blame", "match", "refined", "exact"];
+}
+
+/// Buckets of [`Diagnostics::gaps`]: excesses `0..GAP_BUCKETS − 1`, and the last for everything above.
+pub const GAP_BUCKETS: usize = 512;
+
+/// Measurements of one search, for tuning (see [`search_with`]).  Collecting them computes extra bounds at
+/// every node, so a search that collects them is slower and its times mean little.
+#[derive(Clone, Debug, Default)]
+pub struct Diagnostics {
+    /// Steps (engine nodes: candidates a node's loop gets to, plus the step that ends the loop), by the number
+    /// of promotions of the node taking them.
+    pub steps: Vec<u64>,
+    /// Children explored, by their number of promotions.
+    pub children: Vec<u64>,
+    /// How node loops ended, by [`cut`] reason.
+    pub loop_ends: [u64; cut::COUNT],
+    /// How promoted children were left unexplored, by [`cut`] reason.
+    pub child_cuts: [u64; cut::COUNT],
+    /// Candidates whose promotion failed.
+    pub failed_promotions: u64,
+    /// At the node-loop checks that let the loop go on: how far the bound (the smaller of `blameGame` and,
+    /// with that tactic, matching) was above what the loop needed, as a histogram (see [`GAP_BUCKETS`]).
+    pub gaps: Vec<u64>,
+    /// The same for `blameGame` alone and for the matching bound alone (only with the `match_bound` tactic).
+    pub blame_gaps: Vec<u64>,
+    pub match_gaps: Vec<u64>,
+    /// Matching bounds that did not prune, and how many of those had a heaviest matching whose candidates can
+    /// all be promoted together (with at most the node's `max_add` of them), which makes the bound exact.
+    pub match_open: u64,
+    pub match_open_feasible: u64,
+    /// At those matching bounds: histograms of the size of the conflict from the core, and of the minimal
+    /// conflict (see [`Model::conflict_using`]).
+    pub core_sizes: Vec<u64>,
+    pub conflict_sizes: Vec<u64>,
+    /// At those matching bounds: how far one level of refinement (with the minimal conflict) lowers the bound
+    /// (a histogram), and how often that is enough to prune.
+    pub refine_drops: Vec<u64>,
+    pub refine_cuts: u64,
+    /// With the `match_refine` tactic: refinements made, the matching evaluations they made, and the conflicts
+    /// they computed (not known yet).
+    pub refinements: u64,
+    pub refine_evaluations: u64,
+    pub refine_conflicts: u64,
+}
+
+fn bump(counts: &mut Vec<u64>, i: usize) {
+    if counts.len() <= i {
+        counts.resize(i + 1, 0);
+    }
+    counts[i] += 1;
+}
+
+fn add_all(into: &mut Vec<u64>, from: &[u64]) {
+    if into.len() < from.len() {
+        into.resize(from.len(), 0);
+    }
+    for (a, b) in into.iter_mut().zip(from) {
+        *a += b;
+    }
+}
+
+impl Diagnostics {
+    /// Adds `other`'s counts to these.
+    pub fn merge(&mut self, other: &Diagnostics) {
+        add_all(&mut self.steps, &other.steps);
+        add_all(&mut self.children, &other.children);
+        for (a, b) in self.loop_ends.iter_mut().zip(other.loop_ends) {
+            *a += b;
+        }
+        for (a, b) in self.child_cuts.iter_mut().zip(other.child_cuts) {
+            *a += b;
+        }
+        self.failed_promotions += other.failed_promotions;
+        add_all(&mut self.gaps, &other.gaps);
+        add_all(&mut self.blame_gaps, &other.blame_gaps);
+        add_all(&mut self.match_gaps, &other.match_gaps);
+        self.match_open += other.match_open;
+        self.match_open_feasible += other.match_open_feasible;
+        add_all(&mut self.core_sizes, &other.core_sizes);
+        add_all(&mut self.conflict_sizes, &other.conflict_sizes);
+        add_all(&mut self.refine_drops, &other.refine_drops);
+        self.refine_cuts += other.refine_cuts;
+        self.refinements += other.refinements;
+        self.refine_evaluations += other.refine_evaluations;
+        self.refine_conflicts += other.refine_conflicts;
+    }
+
+    fn gap(counts: &mut Vec<u64>, gap: u64) {
+        bump(counts, (gap as usize).min(GAP_BUCKETS - 1));
+    }
+
+    /// The `q`-quantile (0 ≤ q ≤ 1) of a histogram of [`GAP_BUCKETS`] buckets.
+    pub fn quantile(counts: &[u64], q: f64) -> Option<usize> {
+        let total: u64 = counts.iter().sum();
+        if total == 0 {
+            return None;
+        }
+        let target = (q * total as f64).ceil().max(1.0) as u64;
+        let mut seen = 0;
+        counts.iter().position(|&c| {
+            seen += c;
+            seen >= target
+        })
+    }
+}
+
+/// A searcher's own diagnostics, merged into the search's at every flush.
+struct Probe<'a> {
+    shared: &'a Mutex<Diagnostics>,
+    local: Diagnostics,
+}
+
+impl Probe<'_> {
+    /// A node-loop check that let the loop go on (bound at least `need`): records how far above it was, and
+    /// whether the matching bound is exact there.
+    fn open<const W: usize>(
+        &mut self,
+        bounds: &mut Bounds<'_, W>,
+        matching: &mut Option<MatchBound<'_, W>>,
+        model: &Model,
+        node: &Level<W>,
+        need: u64,
+    ) {
+        let blame = bounds.upper_bound(&node.state, &node.cands, node.max_add);
+        let mut bound = blame;
+        Diagnostics::gap(&mut self.local.blame_gaps, blame.saturating_sub(need));
+        if let Some(m) = matching {
+            let value = m.value();
+            Diagnostics::gap(&mut self.local.match_gaps, value.saturating_sub(need));
+            bound = bound.min(value);
+            self.matching_open(bounds, m, model, &node.state, node.max_add, need);
+        }
+        Diagnostics::gap(&mut self.local.gaps, bound.saturating_sub(need));
+    }
+
+    /// A matching bound that did not prune (it is at least `need`): is its heaviest matching a feasible
+    /// completion, and what would one level of conflict refinement do?
+    fn matching_open<const W: usize>(
+        &mut self,
+        bounds: &mut Bounds<'_, W>,
+        m: &mut MatchBound<'_, W>,
+        model: &Model,
+        state: &FrameSet<W>,
+        max_add: u32,
+        need: u64,
+    ) {
+        let chosen = m.chosen();
+        let value = m.value();
+        self.local.match_open += 1;
+        let scratch = bounds.scratch();
+        let feasible = chosen.len() <= max_add && model.can_promote_all_using(scratch, state, &chosen);
+        self.local.match_open_feasible += u64::from(feasible);
+        if let Some(core) = model.conflict_using(scratch, state, &chosen, false) {
+            bump(&mut self.local.core_sizes, core.len() as usize);
+            let conflict = model.conflict_using(scratch, state, &chosen, true).expect("a conflict");
+            bump(&mut self.local.conflict_sizes, conflict.len() as usize);
+            let mut refined = 0;
+            for k in conflict.iter() {
+                m.push_excluding(&Bits::EMPTY.with(k));
+                refined = refined.max(m.value());
+                m.pop();
+            }
+            Diagnostics::gap(&mut self.local.refine_drops, value - refined);
+            self.local.refine_cuts += u64::from(refined < need);
+        }
+    }
+
+    fn flush(&mut self) {
+        let mut shared = self.shared.lock().unwrap_or_else(PoisonError::into_inner);
+        shared.merge(&self.local);
+        self.local = Diagnostics::default();
+    }
+}
+
 /// The Taxman searcher: explores units depth-first on a reusable stack.
 pub struct TaxSearcher<'a, const W: usize> {
     space: &'a SearchSpace<'a, W>,
@@ -189,8 +611,12 @@ pub struct TaxSearcher<'a, const W: usize> {
     attempts: u64,
     promotions: u64,
     children: u64,
-    match_bounds: u64,
+    counts: RefineCounts,
+    /// Conflicts known for the node being worked on (see [`Refiner`]); `levels[d].known_end` of them hold for
+    /// the node at depth `d`.
+    known: Vec<Bits<W>>,
     payload: Vec<u8>,
+    probe: Option<Probe<'a>>,
 }
 
 impl<'a, const W: usize> TaxSearcher<'a, W> {
@@ -203,18 +629,73 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             attempts: 0,
             promotions: 0,
             children: 0,
-            match_bounds: 0,
+            counts: RefineCounts::default(),
+            known: Vec::new(),
             payload: Vec::with_capacity(8 * W),
+            probe: space.diagnostics.map(|shared| Probe { shared, local: Diagnostics::default() }),
         }
     }
 
-    /// Whether the matching bound of the node on top of the matching stack is below `need` (false without the
-    /// tactic).
-    fn matching_below(matching: &mut Option<MatchBound<'a, W>>, count: &mut u64, need: u64) -> bool {
-        matching.as_mut().is_some_and(|m| {
-            *count += 1;
-            m.value() < need
-        })
+    /// The matching bound's verdict on the node on top of the matching stack, which has `state`: below `need`
+    /// ([`cut::MATCH`]), or brought below it by refining (tactic `match_refine`, with the conflicts `known` for
+    /// `state`; [`cut::REFINED`]), or exact, or at least `need`, with the conflict to branch on if the tactic
+    /// `conflict_branching` wants one.  Open without the `match_bound` tactic.
+    #[allow(clippy::too_many_arguments)]
+    fn matching_check(
+        matching: &mut Option<MatchBound<'a, W>>,
+        counts: &mut RefineCounts,
+        space: &SearchSpace<'a, W>,
+        scratch: &mut Scratch<W>,
+        known: &mut Vec<Bits<W>>,
+        state: &FrameSet<W>,
+        need: u64,
+        want_conflict: bool,
+        found: &mut Bits<W>,
+    ) -> MatchCheck<W> {
+        let Some(m) = matching.as_mut() else {
+            return MatchCheck::Open(None);
+        };
+        counts.match_bounds += 1;
+        if m.value() < need {
+            return MatchCheck::Cut(cut::MATCH);
+        }
+        let (depth, model) = (space.match_refine, space.model);
+        if depth == 0 && !want_conflict {
+            return MatchCheck::Open(None);
+        }
+        let exact = Bits::EMPTY;
+        let mut refiner = Refiner { m, model, scratch, state, need, known, evaluations: 0, computed: 0, exact };
+        let verdict = refiner.top(depth, want_conflict);
+        counts.refinements += 1;
+        counts.evaluations += refiner.evaluations;
+        counts.conflicts += refiner.computed;
+        *found = refiner.exact;
+        match verdict {
+            Verdict::Below => MatchCheck::Cut(cut::REFINED),
+            Verdict::Exact(q) => MatchCheck::Exact(q),
+            Verdict::Open(k) => MatchCheck::Open(k),
+        }
+    }
+
+    /// Offers `set` as the incumbent if it beats it, recording when, and ends the search if it reaches the cap.
+    fn offer(space: &SearchSpace<'a, W>, payload: &mut Vec<u8>, ctx: &mut Ctx<'_, TaxUnit<W>>, set: &Bits<W>) {
+        let value = set.sum();
+        if value <= ctx.best() {
+            return;
+        }
+        payload.clear();
+        put_bits(payload, set);
+        if ctx.offer(value, payload) {
+            let found = Found { value, time: space.began.elapsed(), steps: ctx.stats().nodes };
+            let mut record = space.found.lock().unwrap_or_else(PoisonError::into_inner);
+            if record.is_none_or(|r| r.value < found.value) {
+                *record = Some(found);
+            }
+            drop(record);
+            if space.cap.is_some_and(|cap| value >= cap) {
+                ctx.declare_optimal();
+            }
+        }
     }
 
     /// Rebuilds the unit's node in slot 0.
@@ -225,7 +706,9 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             .promote_all_using(self.bounds.scratch(), space.root, &unit.promoted)
             .unwrap_or_else(|| panic!("a unit's promotions {:?} cannot be promoted from the root", unit.promoted));
         let max_add = max_additional(space.max_total, &state, &unit.promoted, &unit.cands);
-        let level = Level { state, promoted: unit.promoted, sum: unit.promoted.sum(), cands: unit.cands, max_add };
+        let sum = unit.promoted.sum();
+        let level = Level { state, promoted: unit.promoted, sum, cands: unit.cands, max_add, known_end: 0 };
+        self.known.clear();
         if self.levels.is_empty() {
             self.levels.push(level);
         } else {
@@ -246,20 +729,65 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         let space = self.space;
         let (path, rest) = self.levels.split_at_mut(depth + 1);
         let (node, child) = (&mut path[depth], &mut rest[0]);
+        self.known.truncate(node.known_end); // forget the conflicts of the child last considered
         let bounds = &mut self.bounds;
         let matching = &mut self.matching;
+        let probe = &mut self.probe;
+        if let Some(p) = probe {
+            bump(&mut p.local.steps, node.promoted.len() as usize);
+        }
 
-        // The node's loop ends when its candidates are used up or cannot reach the incumbent.  Its bound is the
+        // The node's loop ends when its candidates are used up or cannot beat the incumbent.  Its bound is the
         // smaller of blameGame's and (tactic `match_bound`) the matching bound, which is computed only when
         // blameGame's does not decide; blameGame's is at most the sum of the `max_add` largest candidates, so
         // that sum may decide first.
         let best = ctx.best();
-        let need = best.saturating_sub(node.sum); // the loop goes on while the bound is at least this
-        if node.cands.is_empty()
-            || node.cands.sum_largest(node.max_add) < need
-            || !bounds.reaches(&node.state, &node.cands, node.max_add, need)
-            || Self::matching_below(matching, &mut self.match_bounds, need)
-        {
+        let need = (best + 1).saturating_sub(node.sum); // the loop goes on while the bound is at least this
+        let branching = space.conflict_branching;
+        let mut conflict = None;
+        let mut found = Bits::EMPTY;
+        let ended = if node.cands.is_empty() {
+            Some(cut::EMPTY)
+        } else if node.cands.sum_largest(node.max_add) < need {
+            Some(cut::LARGEST)
+        } else if !bounds.reaches(&node.state, &node.cands, node.max_add, need) {
+            Some(cut::BLAME)
+        } else {
+            let (scratch, known) = (bounds.scratch(), &mut self.known);
+            let check = Self::matching_check(
+                matching,
+                &mut self.counts,
+                space,
+                scratch,
+                known,
+                &node.state,
+                need,
+                branching != Branching::Largest,
+                &mut found,
+            );
+            node.known_end = known.len();
+            if !found.is_empty() {
+                Self::offer(space, &mut self.payload, ctx, &(node.promoted | found));
+            }
+            match check {
+                MatchCheck::Cut(reason) => Some(reason),
+                MatchCheck::Exact(q) => {
+                    Self::offer(space, &mut self.payload, ctx, &(node.promoted | q));
+                    Some(cut::EXACT)
+                }
+                MatchCheck::Open(k) => {
+                    conflict = k;
+                    None
+                }
+            }
+        };
+        if let Some(p) = probe {
+            match ended {
+                Some(reason) => p.local.loop_ends[reason] += 1,
+                None => p.open(bounds, matching, space.model, node, need),
+            }
+        }
+        if ended.is_some() {
             if depth > 0 {
                 if let Some(m) = matching {
                     m.pop();
@@ -267,7 +795,15 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             }
             return depth.checked_sub(1);
         }
-        let n = node.cands.pop_max().expect("not empty");
+        // The candidate to branch on: promoted in the child, and no longer a candidate of this node.
+        let k = conflict.map(|k| k & node.cands).filter(|k| !k.is_empty());
+        let n = match (branching, k) {
+            (Branching::ConflictSmallest, Some(k)) => k.min(),
+            (Branching::ConflictLargest, Some(k)) => k.max(),
+            _ => node.cands.max(),
+        }
+        .expect("not empty");
+        node.cands.remove(n);
         if let Some(m) = matching {
             m.remove_candidate(n);
         }
@@ -275,6 +811,9 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         self.attempts += 1;
         child.state.assign(&node.state);
         if !space.model.promote_in_place_using(bounds.scratch(), &mut child.state, n) {
+            if let Some(p) = probe {
+                p.local.failed_promotions += 1;
+            }
             return Some(depth);
         }
         self.promotions += 1;
@@ -283,34 +822,67 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         let max_next = max_additional(space.max_total, &child.state, &child.promoted, &node.cands);
         let cands = bounds.new_candidate_list(n, max_next, &child.state, &node.cands, &node.promoted);
         let need = (best + 1).saturating_sub(child.sum); // the child is worth it if its bound is at least this
-        if cands.sum_largest(max_next) < need || !bounds.reaches(&child.state, &cands, max_next, need) {
-            return Some(depth);
-        }
-        // A child with no candidates has nothing to bound (both bounds are 0) and is not explored.
-        if !cands.is_empty() {
+        let cut_by = if cands.sum_largest(max_next) < need {
+            Some(cut::LARGEST)
+        } else if !bounds.reaches(&child.state, &cands, max_next, need) {
+            Some(cut::BLAME)
+        } else if cands.is_empty() {
+            // A child with no candidates has nothing to bound (both bounds are 0) and is not explored.
+            None
+        } else {
             if let Some(m) = matching {
                 m.push(n, &cands);
             }
-            if Self::matching_below(matching, &mut self.match_bounds, need) {
-                if let Some(m) = matching {
-                    m.pop();
+            let (scratch, known) = (bounds.scratch(), &mut self.known);
+            let mut found = Bits::EMPTY;
+            let state = &child.state;
+            let check =
+                Self::matching_check(matching, &mut self.counts, space, scratch, known, state, need, false, &mut found);
+            if !found.is_empty() {
+                Self::offer(space, &mut self.payload, ctx, &(child.promoted | found));
+            }
+            match check {
+                MatchCheck::Open(_) => {
+                    if let (Some(p), Some(m)) = (probe.as_mut(), matching.as_mut()) {
+                        p.matching_open(bounds, m, space.model, &child.state, max_next, need);
+                    }
+                    None
                 }
-                return Some(depth);
+                cut_or_exact => {
+                    if let Some(m) = matching {
+                        m.pop();
+                    }
+                    match cut_or_exact {
+                        MatchCheck::Exact(q) => {
+                            Self::offer(space, &mut self.payload, ctx, &(child.promoted | q));
+                            Some(cut::EXACT)
+                        }
+                        MatchCheck::Cut(reason) => Some(reason),
+                        MatchCheck::Open(_) => unreachable!(),
+                    }
+                }
             }
-        }
-        if child.sum > best {
-            self.payload.clear();
-            put_bits(&mut self.payload, &child.promoted);
-            if ctx.offer(child.sum, &self.payload) && space.cap.is_some_and(|cap| child.sum >= cap) {
-                ctx.declare_optimal();
+        };
+        if let Some(reason) = cut_by {
+            if let Some(p) = probe {
+                p.local.child_cuts[reason] += 1;
             }
+            return Some(depth);
         }
+        Self::offer(space, &mut self.payload, ctx, &child.promoted);
         if cands.is_empty() {
+            if let Some(p) = probe {
+                p.local.child_cuts[cut::EMPTY] += 1;
+            }
             return Some(depth);
         }
         child.cands = cands;
         child.max_add = max_additional(space.max_total, &child.state, &child.promoted, &cands);
+        child.known_end = self.known.len();
         self.children += 1;
+        if let Some(p) = probe {
+            bump(&mut p.local.children, child.promoted.len() as usize);
+        }
         Some(depth + 1)
     }
 
@@ -325,10 +897,17 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             (stat::CHILDREN, std::mem::take(&mut self.children)),
             (stat::PRECLUDED, b.precluded),
             (stat::CERTIFICATES, b.certificates),
-            (stat::MATCH_BOUNDS, std::mem::take(&mut self.match_bounds)),
+            (stat::MATCH_BOUNDS, std::mem::take(&mut self.counts.match_bounds)),
         ];
         for (i, count) in counts {
             stats.extra[i] += count;
+        }
+        let refine = std::mem::take(&mut self.counts);
+        if let Some(p) = &mut self.probe {
+            p.local.refinements += refine.refinements;
+            p.local.refine_evaluations += refine.evaluations;
+            p.local.refine_conflicts += refine.conflicts;
+            p.flush();
         }
     }
 }
@@ -536,7 +1115,7 @@ struct Header<const W: usize> {
 }
 
 impl<const W: usize> Header<W> {
-    const MAGIC: &'static [u8; 4] = b"TXS1";
+    const MAGIC: &'static [u8; 4] = b"TXS2";
 
     fn of(prepared: &Prepared<W>) -> Self {
         Header {
@@ -554,12 +1133,12 @@ impl<const W: usize> Header<W> {
         out.extend_from_slice(&self.max_total.to_le_bytes());
         out.push(u8::from(self.frame0_freedoms.is_some()));
         out.extend_from_slice(&self.frame0_freedoms.unwrap_or(0).to_le_bytes());
-        out.push(self.tactics.bits());
+        out.extend_from_slice(&self.tactics.bits().to_le_bytes());
         out
     }
 
     fn decode(bytes: &[u8]) -> Result<Self, String> {
-        let len = 4 + 4 + 8 * W + 4 + 1 + 4 + 1;
+        let len = 4 + 4 + 8 * W + 4 + 1 + 4 + 2;
         if bytes.len() != len || &bytes[..4] != Self::MAGIC {
             return Err("not a checkpoint of a Taxman search".into());
         }
@@ -578,7 +1157,7 @@ impl<const W: usize> Header<W> {
             candidates,
             max_total,
             frame0_freedoms: has_frame0.then_some(frame0),
-            tactics: SearchTactics::from_bits(bytes[at]),
+            tactics: SearchTactics::from_bits(u16::from_le_bytes([bytes[at], bytes[at + 1]]))?,
         })
     }
 }
@@ -601,6 +1180,11 @@ pub struct SearchResult<const W: usize> {
     pub counters: Counters,
     /// Wall time of this call.
     pub time: Duration,
+    /// When this call found its best incumbent (`None` if it found none better than the starting one).
+    pub found: Option<Found>,
+    /// The incumbent the search started from: the best of the greedy set, the seed and (with `match_bound`) the
+    /// matching dive.
+    pub start: Bits<W>,
 }
 
 /// The candidates of `seed` that can still be promoted, one by one from the largest down, skipping the ones
@@ -616,6 +1200,22 @@ fn surviving<const W: usize>(prepared: &Prepared<W>, seed: &Bits<W>) -> Bits<W> 
     kept
 }
 
+/// A promotion set found by rounding the matching relaxation at `root` (a starting incumbent): while the
+/// heaviest matching's candidates cannot all be promoted, take the smallest member of one of their conflicts
+/// (see [`Refiner`]) out of the candidates and solve again.  Ends with candidates that can all be promoted.
+fn dive<const W: usize>(model: &Model, root: &FrameSet<W>, graph: &MatchGraph, cands: &Bits<W>) -> Bits<W> {
+    let mut m = MatchBound::new(graph);
+    m.reset(&Bits::EMPTY, cands);
+    let mut scratch = Scratch::new();
+    loop {
+        let chosen = m.chosen();
+        match model.conflict_using(&mut scratch, root, &chosen, true).and_then(|k| k.min()) {
+            Some(x) => m.remove_candidate(x),
+            None => return chosen,
+        }
+    }
+}
+
 /// Searches for the promotion set with the largest sum.
 ///
 /// The incumbent starts as the greedy set, or as what survives of `seed` (see [`surviving`]) if that is
@@ -629,12 +1229,31 @@ pub fn search<const W: usize>(
     cap: Option<u64>,
     resume: bool,
 ) -> io::Result<SearchResult<W>> {
+    search_with(prepared, cfg, seed, cap, resume, None)
+}
+
+/// [`search`], collecting [`Diagnostics`] into `diagnostics` if given.
+pub fn search_with<const W: usize>(
+    prepared: &Prepared<W>,
+    cfg: &EngineConfig,
+    seed: Option<&Bits<W>>,
+    cap: Option<u64>,
+    resume: bool,
+    diagnostics: Option<&Mutex<Diagnostics>>,
+) -> io::Result<SearchResult<W>> {
     let t0 = Instant::now();
+    let match_graph = prepared.tactics.match_bound.then(|| MatchGraph::new(&prepared.model, &prepared.root));
     let mut incumbent = prepared.greedy;
     if let Some(seed) = seed {
         let kept = surviving(prepared, seed);
         if kept.sum() > incumbent.sum() {
             incumbent = kept;
+        }
+    }
+    if let Some(graph) = &match_graph {
+        let dived = dive(&prepared.model, &prepared.root, graph, &prepared.candidates);
+        if dived.sum() > incumbent.sum() {
+            incumbent = dived;
         }
     }
     if !resume && cap.is_some_and(|cap| incumbent.sum() >= cap) {
@@ -646,18 +1265,24 @@ pub fn search<const W: usize>(
             stats: Stats::default(),
             counters: Counters::default(),
             time: t0.elapsed(),
+            found: None,
+            start: incumbent,
         });
     }
 
-    let match_graph = prepared.tactics.match_bound.then(|| MatchGraph::new(&prepared.model, &prepared.root));
     let space = SearchSpace {
         model: &prepared.model,
         root: &prepared.root,
         preclusions: prepared.preclusions.as_ref(),
         match_graph: match_graph.as_ref(),
+        match_refine: u32::from(prepared.tactics.match_refine),
+        conflict_branching: if prepared.tactics.match_bound { prepared.tactics.branching } else { Branching::Largest },
         max_total: prepared.max_total,
         rule: prepared.tactics.rule(),
         cap,
+        diagnostics,
+        began: t0,
+        found: Mutex::new(None),
     };
     let start = if resume {
         let Some((path, _)) = &cfg.checkpoint else {
@@ -682,6 +1307,8 @@ pub fn search<const W: usize>(
         stats: outcome.stats,
         counters: outcome.counters,
         time: t0.elapsed(),
+        found: space.found.into_inner().unwrap_or_else(PoisonError::into_inner),
+        start: incumbent,
     })
 }
 
@@ -752,6 +1379,106 @@ mod tests {
         }
     }
 
+    /// Checks the refined matching bound along random search paths of `g`: it never prunes a node whose best
+    /// completion (found exhaustively) reaches `need`, the completions it calls exact or finds can be promoted,
+    /// and the conflicts it keeps, carried down the path, stay conflicts.  Returns the numbers of verdicts, of
+    /// prunings the plain matching bound would not make, and of exact completions.
+    fn refinement_soundness<const W: usize>(g: &Golden, rng: &mut Rng) -> [u64; 3] {
+        let (model, root) = Model::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
+        let all = Bits::<W>::from_slice(&g.candidates);
+        let max_total = root.max_promotions_among(&all).max(0) as u32;
+        let preclusions = Preclusions::build(&model, &root, &all, 2);
+        let graph = MatchGraph::new(&model, &root);
+        let mut m = MatchBound::new(&graph);
+        let mut scratch = Scratch::new();
+        let mut checks = [0; 3];
+        for _path in 0..6 {
+            let (mut state, mut promoted, mut cands) = (root, Bits::<W>::EMPTY, all);
+            let mut known = Vec::new();
+            loop {
+                let max_add = max_additional(max_total, &state, &promoted, &cands);
+                let truth = best_completion(&model, &state, &cands, max_add);
+                let what = format!("n={} promoted {promoted:?} cands {cands:?} best {truth}", g.n);
+                for depth in [0, 1, 2, 4] {
+                    for need in [truth.saturating_sub(7), truth, truth + 1, truth + 9] {
+                        m.reset(&promoted, &cands);
+                        let plain = m.value();
+                        let mut refiner = Refiner {
+                            m: &mut m,
+                            model: &model,
+                            scratch: &mut scratch,
+                            state: &state,
+                            need,
+                            known: &mut known,
+                            evaluations: 0,
+                            computed: 0,
+                            exact: Bits::EMPTY,
+                        };
+                        let verdict = refiner.top(depth, rng.chance(50));
+                        let found = refiner.exact;
+                        if need <= truth {
+                            assert_ne!(verdict, Verdict::Below, "{what}: depth {depth} prunes at need {need}");
+                        }
+                        let exact = match verdict {
+                            Verdict::Exact(q) => Some(q),
+                            _ => None,
+                        };
+                        for q in [exact, Some(found).filter(|f| !f.is_empty())].into_iter().flatten() {
+                            assert!(q.is_subset(&cands) && q.sum() >= need, "{what}: exact {q:?} at need {need}");
+                            assert!(model.can_promote_all_using(&mut scratch, &state, &q), "{what}: {q:?} fails");
+                        }
+                        checks[0] += 1;
+                        checks[1] += u64::from(verdict == Verdict::Below && plain >= need);
+                        checks[2] += u64::from(exact.is_some() || !found.is_empty());
+                    }
+                }
+                for k in &known {
+                    assert!(!model.can_promote_all_using(&mut scratch, &state, k), "{what}: {k:?} is no conflict");
+                }
+                // Descend into a random child, as the search would (in any order).
+                let members = cands.to_vec();
+                if members.is_empty() {
+                    break;
+                }
+                let Some((n, next)) = (0..4).find_map(|_| {
+                    let n = rng.pick(&members);
+                    model.promote(&state, n).map(|s| (n, s))
+                }) else {
+                    break;
+                };
+                let rest = cands.without(n);
+                let max_next = max_additional(max_total, &next, &promoted.with(n), &rest);
+                cands = bounds::new_candidate_list(&model, Some(&preclusions), n, max_next, &next, &rest, &promoted);
+                (state, promoted) = (next, promoted.with(n));
+            }
+        }
+        checks
+    }
+
+    #[test]
+    fn refined_matching_bound_is_sound() {
+        let mut rng = Rng(0x5EED_C0F1_1C75_0001);
+        let mut checks = [0; 3];
+        for n in golden_ns().into_iter().filter(|&n| (40..=220).contains(&n)) {
+            let more = refinement_soundness::<4>(&load(n), &mut rng);
+            for (a, b) in checks.iter_mut().zip(more) {
+                *a += b;
+            }
+        }
+        let [verdicts, refined, exact] = checks;
+        eprintln!("refined matching bound: {verdicts} verdicts, {refined} refined prunings, {exact} exact completions");
+        assert!(verdicts > 5000 && refined > 500 && exact > 500);
+    }
+
+    #[test]
+    fn golden_games_above_400_match_the_java() {
+        let games: Vec<Golden> = golden_ns().into_iter().filter(|&n| n > 400).map(load).collect();
+        assert_eq!(games.len(), 8);
+        for g in &games {
+            check_against_java::<16>(g);
+        }
+    }
+
     fn sums_by_tactics<const W: usize>(g: &Golden) -> Vec<(SearchTactics, u64)> {
         let default = SearchTactics::default();
         let variants = [
@@ -760,6 +1487,10 @@ mod tests {
             SearchTactics { legacy_bound: true, ..default },
             SearchTactics { revise_freedoms: false, ..default },
             SearchTactics { match_bound: false, ..default },
+            SearchTactics { branching: Branching::Largest, match_refine: 0, ..default },
+            SearchTactics { branching: Branching::ConflictSmallest, match_refine: 0, ..default },
+            SearchTactics { branching: Branching::ConflictLargest, match_refine: 2, ..default },
+            SearchTactics { branching: Branching::Largest, match_refine: 3, ..default },
         ];
         variants.iter().map(|&t| (t, search_checked(&prepare_golden::<W>(g, t), 1, "tactics").sum)).collect()
     }
@@ -981,6 +1712,55 @@ mod tests {
             p.max_total,
             r.stats.extra
         );
+    }
+
+    /// EXPERIMENT: root dive variants against the optimum (`TAXMAN_GAMES`, comma-separated).
+    #[test]
+    #[ignore]
+    fn dive_variants() {
+        let optimal = crate::game::Optimal::load_default().unwrap();
+        let games = std::env::var("TAXMAN_GAMES").unwrap_or("960,984,987,988,990,992,999,1000".into());
+        for n in games.split(',').map(|s| s.trim().parse::<u32>().unwrap()) {
+            let tables = Tables::new(n);
+            let frames = build_frames::<16>(&tables);
+            let columns: Vec<Vec<u32>> =
+                frames.frames.iter().flat_map(|f| [f.factors.to_vec(), f.moves.to_vec()]).collect();
+            let p = prepare::<16>(&tables, &columns, &frames.candidates, SearchTactics::default(), 10).unwrap();
+            let bag: u64 =
+                crate::hives::Apiary::<16>::new(&tables, Bits::EMPTY).solution().iter().map(|&x| u64::from(x)).sum();
+            let opt = optimal.score(n).unwrap() - bag;
+            let graph = MatchGraph::new(&p.model, &p.root);
+            let t0 = Instant::now();
+            let smallest = dive(&p.model, &p.root, &graph, &p.candidates);
+            let t_smallest = t0.elapsed();
+            // Lookahead: exclude the member whose exclusion keeps the matching heaviest.
+            let t0 = Instant::now();
+            let mut m = MatchBound::new(&graph);
+            m.reset(&Bits::EMPTY, &p.candidates);
+            let mut scratch = Scratch::new();
+            let lookahead = loop {
+                let chosen = m.chosen();
+                let Some(k) = p.model.conflict_using(&mut scratch, &p.root, &chosen, true) else { break chosen };
+                let mut best = (0, 0);
+                for x in k.iter() {
+                    m.push_excluding(&Bits::EMPTY.with(x));
+                    best = best.max((m.value(), x));
+                    m.pop();
+                }
+                m.remove_candidate(best.1);
+            };
+            let t_lookahead = t0.elapsed();
+            m.reset(&Bits::EMPTY, &p.candidates);
+            eprintln!(
+                "n={n}: optimum {opt}, matching {}, greedy {}, dive smallest {} ({:.1} ms), lookahead {} ({:.1} ms)",
+                m.value(),
+                p.greedy.sum(),
+                smallest.sum(),
+                t_smallest.as_secs_f64() * 1e3,
+                lookahead.sum(),
+                t_lookahead.as_secs_f64() * 1e3
+            );
+        }
     }
 
     #[test]

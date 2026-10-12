@@ -780,6 +780,21 @@ impl<'g, const W: usize> MatchBound<'g, W> {
     /// Pushes the child of the top level made by promoting `n` (which must succeed in the search's state), with
     /// the candidates `child_cands` (a subset of the top level's).  See the type's docs.
     pub fn push(&mut self, n: u32, child_cands: &Bits<W>) {
+        let graph = self.graph;
+        let child = self.push_copy();
+        child.promote(graph, n);
+        child.dropped |= child.cands - *child_cands;
+    }
+
+    /// Pushes a copy of the top level with the candidates `excluded` removed: the same state, fewer
+    /// candidates.
+    pub fn push_excluding(&mut self, excluded: &Bits<W>) {
+        let child = self.push_copy();
+        child.dropped |= *excluded;
+    }
+
+    /// Pushes a copy of the top level and returns it.
+    fn push_copy(&mut self) -> &mut Level<W> {
         let d = self.depth;
         if self.levels.len() == d + 1 {
             let copy = self.levels[d].clone();
@@ -789,9 +804,7 @@ impl<'g, const W: usize> MatchBound<'g, W> {
             upper[0].copy_from(&lower[d]);
         }
         self.depth = d + 1;
-        let child = &mut self.levels[d + 1];
-        child.promote(self.graph, n);
-        child.dropped |= child.cands - *child_cands;
+        &mut self.levels[d + 1]
     }
 
     /// Returns to the parent of the top level.

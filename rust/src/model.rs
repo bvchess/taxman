@@ -242,6 +242,47 @@ impl<const W: usize> Scratch<W> {
         peel(self.cells.as_flattened_mut(), moves, factors, g, &mut NoRecord, &mut stack)
     }
 
+    /// The moves a peel of the frame `moves -> factors` cannot drop, its *core*: empty exactly when the frame is
+    /// winnable.  Every live factor of a core move is a factor of another core move (else the peel could drop
+    /// it), so no order takes all the core moves: the last of them would need a factor that an earlier one has
+    /// already taken.  So the core keeps the frame unwinnable with other moves added and with factors added that
+    /// no core move has.  Unlike [`winnable`](Self::winnable), this always peels to the end.
+    fn stuck(&mut self, moves: &Bits<W>, factors: &Bits<W>, g: &FactorProvider) -> Bits<W> {
+        let cells = self.cells.as_flattened_mut();
+        let mut pending = Stack { items: self.stack.as_flattened_mut(), top: 0 };
+        let mut left = *moves;
+        for m in moves.iter() {
+            for &q in g.factors(m) {
+                if factors.contains(u32::from(q)) {
+                    let cell = &mut cells[usize::from(q)];
+                    *cell = (*cell + ONE_MOVE) ^ m;
+                    if *cell >> 16 == 1 {
+                        pending.push(q);
+                    }
+                }
+            }
+        }
+        while let Some(f) = pending.pop() {
+            let cell = cells[usize::from(f)];
+            if cell >> 16 != 1 {
+                continue;
+            }
+            let m = cell & 0xFFFF;
+            left.remove(m);
+            for &q in g.factors(m) {
+                let cell = &mut cells[usize::from(q)];
+                if *cell != 0 {
+                    *cell = (*cell - ONE_MOVE) ^ m;
+                    if *cell >> 16 == 1 {
+                        pending.push(q);
+                    }
+                }
+            }
+        }
+        clear(cells, factors);
+        left
+    }
+
     /// [`winnable`](Self::winnable), recording the winning order in `cert`.  The order frees the smallest
     /// factor it can at each step, so the large factors that promoted numbers have tend to be freed late, which
     /// keeps the peels a certificate cannot avoid short (see [`Certificate`]).
@@ -946,6 +987,80 @@ impl Model {
         self.frames_winnable(scratch, state, &edits)
     }
 
+    /// A *conflict* of `set` in `state`: a subset of `set` that cannot be promoted from `state`, or `None` if
+    /// all of `set` can be.  Since a subset of a set that can be promoted can be promoted too (see
+    /// [`winnable`](Self::winnable)), every set that can be promoted leaves out some member of a conflict.
+    ///
+    /// The conflict is small: a single member if one is not a factor of a home frame `h ≥ 1`; else, for a frame
+    /// that is not winnable with `set` promoted, the members that its core (see [`Scratch::stuck`]) needs: the
+    /// ones promoted into the frame that are core moves, and the ones promoted out of it that are factors of
+    /// core moves.  With only those promoted, the core is still there (its moves, and the same live factors), so
+    /// the frame is still unwinnable.
+    ///
+    /// With `minimal`, that set is then reduced to a minimal one that keeps the frame unwinnable, by trying to
+    /// leave out each member, from the smallest up (so the larger members tend to stay).  Each try peels only
+    /// the moves of the current core: with fewer members promoted the frame has fewer moves and more factors,
+    /// so a core it has is a set of moves that is stuck (each live factor shared within the set) with the
+    /// current members too, and the current core contains every such set.  Of the frames that fail, the one
+    /// giving the smallest conflict is used.
+    pub fn conflict_using<const W: usize>(
+        &self,
+        scratch: &mut Scratch<W>,
+        state: &FrameSet<W>,
+        set: &Bits<W>,
+        minimal: bool,
+    ) -> Option<Bits<W>> {
+        let (edits, not_a_factor) = self.edits(state, set);
+        if let Some(x) = not_a_factor {
+            return Some(Bits::EMPTY.with(x));
+        }
+        let g = &self.graph;
+        // The factors of `frame` that the moves of `core` can pay with, live or promoted out.
+        let near = |frame: &Frame<W>, core: &Bits<W>| -> Bits<W> {
+            let mut out = Bits::EMPTY;
+            for m in core.iter() {
+                for &q in g.factors(m) {
+                    out.insert(u32::from(q));
+                }
+            }
+            out & frame.factors
+        };
+        let mut best: Option<Bits<W>> = None;
+        for (i, frame) in state.frames().iter().enumerate() {
+            let (gained, lost) = (edits.gained[i], edits.lost[i]);
+            if gained.is_empty() && lost.is_empty() {
+                continue;
+            }
+            let mut core = scratch.stuck(&(frame.moves | gained), &(frame.factors - lost), g);
+            if core.is_empty() {
+                continue;
+            }
+            let mut factors = near(frame, &core);
+            let mut conflict = (gained & core) | (lost & factors);
+            if minimal {
+                let members = conflict;
+                for x in members.iter() {
+                    if !conflict.contains(x) {
+                        continue;
+                    }
+                    let fewer = conflict.without(x);
+                    let moves = (core & frame.moves) | (fewer & gained);
+                    let left = scratch.stuck(&moves, &(factors - (fewer & lost)), g);
+                    if !left.is_empty() {
+                        core = left;
+                        factors = near(frame, &core);
+                        conflict = fewer & ((gained & core) | (lost & factors));
+                    }
+                }
+            }
+            debug_assert!(!conflict.is_empty(), "the frames of a state are winnable");
+            if best.is_none_or(|b| conflict.len() < b.len()) {
+                best = Some(conflict);
+            }
+        }
+        best
+    }
+
     /// Whether every frame of `state` stays winnable with `edits` applied.
     fn frames_winnable<const W: usize>(&self, scratch: &mut Scratch<W>, state: &FrameSet<W>, edits: &Edits<W>) -> bool {
         state.frames().iter().zip(edits.gained.iter().zip(&edits.lost)).all(|(frame, (gained, lost))| {
@@ -1407,6 +1522,19 @@ mod tests {
             stats.exhaustive += 1;
         }
         stats.checks += 1;
+        // The core: empty exactly on winnable frames; each live factor of a core move is shared within the core,
+        // and the core alone is unwinnable.
+        let core = Scratch::new().stuck(&moves, &factors, graph);
+        assert_eq!(core.is_empty(), fast, "core {core:?} of {moves:?} -> {factors:?}");
+        for m in core.iter() {
+            for q in graph.factors(m).iter().map(|&q| u32::from(q)).filter(|&q| factors.contains(q)) {
+                let shared = core.iter().any(|o| o != m && graph.factors(o).contains(&(q as u16)));
+                assert!(shared, "core move {m} has the private factor {q} in {moves:?} -> {factors:?}");
+            }
+        }
+        if !core.is_empty() {
+            assert!(!winnable(&core, &factors, graph), "the core {core:?} alone is winnable");
+        }
         if fast {
             stats.winnable += 1;
             let (rm, rf) = ref_reduce(moves, factors, math);
@@ -1569,6 +1697,23 @@ mod tests {
         assert_eq!(failed, 0, "a feasible set failed in some other order");
     }
 
+    /// Checks [`Model::conflict_using`] on `set` in `state`: none exactly when the set can be promoted, else a
+    /// non-empty subset that cannot, the minimal one no larger than the core one.
+    fn check_conflicts<const W: usize>(model: &Model, state: &FrameSet<W>, set: &Bits<W>, feasible: bool) {
+        let mut scratch = Scratch::new();
+        let core = model.conflict_using(&mut scratch, state, set, false);
+        let minimal = model.conflict_using(&mut scratch, state, set, true);
+        assert_eq!(core.is_none(), feasible, "{set:?}: core conflict {core:?}");
+        assert_eq!(minimal.is_none(), feasible, "{set:?}: minimal conflict {minimal:?}");
+        if let (Some(core), Some(minimal)) = (core, minimal) {
+            for k in [core, minimal] {
+                assert!(!k.is_empty() && k.is_subset(set), "conflict {k:?} of {set:?}");
+                assert!(!model.can_promote_all_using(&mut scratch, state, &k), "conflict {k:?} can be promoted");
+            }
+            assert!(minimal.len() <= core.len(), "minimal {minimal:?} larger than {core:?}");
+        }
+    }
+
     /// Promoting a set one by one succeeds exactly when every frame is winnable with the whole set promoted.
     fn set_check<const W: usize>(g: &Golden, rng: &mut Rng) -> (u64, u64) {
         let (model, root) = Model::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
@@ -1577,8 +1722,21 @@ mod tests {
         for _ in 0..200 {
             let density = 3 + rng.below(30) as u64;
             let set = rng.subset(&candidates, density);
+            // Conflicts in a state with a few promotions made.
+            let mut start = root;
+            for n in rng.subset(&candidates, 5).iter_desc() {
+                model.promote_in_place(&mut start, n);
+            }
+            let later = set & start.narrow_candidates(&candidates);
+            check_conflicts(
+                &model,
+                &start,
+                &later,
+                model.promote_all_using(&mut Scratch::new(), &start, &later).is_some(),
+            );
             let mut state = root;
             let one_by_one = set.iter_desc().all(|n| model.promote_in_place(&mut state, n));
+            check_conflicts(&model, &root, &set, one_by_one);
             let frames = root.frames();
             let at_once = set.iter().all(|n| model.home(n) >= 1 && model.contains_factor(&root, n))
                 && frames.iter().enumerate().all(|(i, f)| {
