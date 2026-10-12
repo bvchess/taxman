@@ -79,7 +79,10 @@ set and switchable where unproven.
 
 Each row is a switch in `Tactics` (CLI: `--tactic name=on|off`), except the
 model assumptions, which define the search space and cannot be switched off
-inside this model.
+inside this model, and `branching` and `match_refine`, which are settings of
+`search::SearchTactics` (not on/off) that the solver's `Tactics` and CLI do not
+expose yet (`examples/ladder.rs` takes `--tactic branching=…` and
+`--tactic match_refine=N`).
 
 | tactic | default | status | effect |
 |---|---|---|---|
@@ -118,11 +121,12 @@ dependencies.  Modules:
 | `hives` | port of `Apiary`/`Hive`/`Namer`-free equivalent: hive formation with `treat_as_sources`, unzip, removeImpossible, finishSetup propagation, merge, promotion candidates, per-hive solution, apiary solution order |
 | `frames` | port of `FrameBuilder` (levels of hives) producing columns (factors, moves) per frame bottom-up, candidates, `estimateMaxPromotions` |
 | `accelerate` | deriving game n from game n−1 (prime shortcut, `reusePrev`), and turning a promotion set into an ordered game |
-| `model` | the search state: `Frame`, `FrameSet` (fixed array of frames), `FactorProvider` (factor/composite lists restricted to frame numbers), `FrameMapper` (home frame of each candidate), `promote_into`, `promote_out_of`, `promote`, `can_promote`, `is_winnable` (peel), `reduce`, `narrow_candidates`, `max_promotions`; `promote_all` (a set checked frame by frame); `Certificate` (a winning order that answers most single-edit winnability questions without a peel) |
+| `model` | the search state: `Frame`, `FrameSet` (fixed array of frames), `FactorProvider` (factor/composite lists restricted to frame numbers), `FrameMapper` (home frame of each candidate), `promote_into`, `promote_out_of`, `promote`, `can_promote`, `is_winnable` (peel), `reduce`, `narrow_candidates`, `max_promotions`; `promote_all` (a set checked frame by frame); `Certificate` (a winning order that answers most single-edit winnability questions without a peel); conflicts: the *core* of an unwinnable frame (`Scratch::stuck`, the moves a peel cannot drop) and `conflict_using`/`conflict_cached` (a small, by default minimal, subset of a promotion set that cannot be promoted), with `ConflictCache` |
 | `bounds` | preclusion table; `upper_bound` (blameGame + largestThatFitInFrames, sound or legacy runner-up) and its exact threshold test `reaches`; candidate lists; greedy lower bound |
-| `matchbound` | the matching bound (see "Improvements queued after parity"): `match_bound`, a min-cost-flow reference; `MatchGraph` (the root's graph) and `MatchBound` (an optimal matching and its potentials per level of the DFS path, repaired incrementally) |
+| `matchbound` | the matching bound (see "Improvements after parity"): `match_bound`, a min-cost-flow reference; `MatchGraph` (the root's graph) and `MatchBound` (an optimal matching and its potentials per level of the DFS path, repaired incrementally by Hungarian searches on a radix heap; levels with a candidate excluded, which can be kept for the parent) |
 | `engine` | problem-independent parallel depth-first branch-and-bound driver: work units, shared deque with disk spill, incumbent, yielding/splitting, checkpoint and resume, progress reporting, statistics |
-| `search` | the Taxman searcher (port of `BranchExplorer`) implementing the engine's `Searcher` trait; `prepare` (preclusions, greedy, `revise_freedoms`) and `search` (seed, cap, checkpoint and resume) |
+| `search` | the Taxman searcher (port of `BranchExplorer`) implementing the engine's `Searcher` trait; `prepare` (preclusions, greedy, `revise_freedoms`) and `search` (seed, cap, checkpoint and resume); `Refiner` (conflicts of the heaviest matching: exactness, refinement, branching); the starting incumbent's `dive` and local search (`Neighbourhood`); `search_with` and `Diagnostics` for measurements |
+| `examples/ladder.rs` | the ladder harness: standalone searches of hard games from the frame builder with a time limit (see Performance) |
 | `solver` | `Tactics` (every switch above, by name), `SolveOptions`, `solve_game` (the per-game pipeline below) and `solve_range` (a range of games, resumable through a results file) |
 | `main.rs`, `cli.rs`, `commands.rs` | CLI: `solve`, `regress`, `bench`, `verify-optimal`, `tables` (`taxman help` lists the options) |
 
@@ -133,11 +137,11 @@ Width dispatch: everything that holds sets of game numbers is generic over
 ### Search state and order
 
 A node is `(state: FrameSet, promoted: Bits, cands: Bits, max_add: u32)`.
-Along any path promotions happen in strictly decreasing order (children only
-receive candidates below the number just promoted), so a node's state is
-`root.promote(p₁).promote(p₂)…` for `promoted` in decreasing order.  That
-makes a *work unit* just `(promoted, cands)` — two bitsets — from which the
-state is rebuilt by replaying the promotions.
+A node's state is the root with `promoted` promoted, in any order (the result
+does not depend on it), so a *work unit* is just `(promoted, cands)` — two
+bitsets — from which the state is rebuilt in one pass.  (With the Java's
+branching, promotions happen in decreasing order along every path; with
+conflict branching they need not.)
 
 The expansion step is `BranchExplorer.explore` made lazy (children explored
 depth-first as they are generated, rather than all generated first and then
@@ -145,8 +149,8 @@ forked):
 
 ```
 loop while cands non-empty:
-    n = cands.max()
-    if upper_bound(state, cands, max_add) + sum(promoted) < best: break
+    if upper_bound(state, cands, max_add) + sum(promoted) <= best: break
+    n = the candidate to branch on (tactic branching; the Java's: cands.max())
     cands.remove(n)
     new_state = state.promote(n) else continue
     new_promoted = promoted ∪ {n}
@@ -160,13 +164,19 @@ loop while cands non-empty:
 
 with `max_additional(s, p, c) = min(max_total − |p|, s.max_promotions(c))`,
 and `new_candidate_list` = narrow → remove preclusions → `can_promote`
-filter, exactly as in `BranchExplorer.makeNewCandidateList`.  The Java
+filter, exactly as in `BranchExplorer.makeNewCandidateList`, then the
+conflicts known along the path propagated (see "Improvements after parity").
+The Java breaks only when the bound is below `best`; a bound equal to `best`
+cannot lead to a better incumbent, so this loop breaks then too.  The Java
 generates all children of a node before exploring any; depth-first is
 equivalent in answer, finds good incumbents sooner, and needs memory only
 proportional to depth.
 
 Rebuilding a partially expanded node from a unit recomputes `max_add` from
-the remaining candidates, which can only tighten it (still valid).
+the remaining candidates, which can only tighten it (still valid).  The
+conflicts a searcher has learned along its path are a cache that units do
+not record, so a rebuilt node may prune a little differently from the node it
+replaces (same answer).
 
 ### Engine
 
@@ -250,7 +260,7 @@ run, the results file, optimal.json.
 the nodes, seconds per phase and search counters), so that performance can be
 followed across changes.
 
-## Improvements queued after parity
+## Improvements after parity
 
 * **Matching bound** (sound).  Relax winnability (peel) to plain
   matchability across the whole frame chain: maximize the promoted sum
@@ -263,8 +273,8 @@ followed across changes.
   363–769.  The cardinality cap never binds.  To be used incrementally
   (re-optimized along the DFS path) and combined with the Java bound
   (take the minimum).
-  *Implemented* in module `matchbound` (not yet used by `search`): an
-  optimal matching and its dual potentials per level of the DFS path,
+  *Implemented* in module `matchbound` (used by `search`, tactic
+  `match_bound`): an optimal matching and its dual potentials per level of the DFS path,
   repaired by Hungarian searches after each change; 0.7–2.4 µs per
   evaluation in a DFS at n=480–760, against 30–170 µs from scratch.  A test
   DFS that starts with the optimum as incumbent and evaluates the matching
@@ -275,6 +285,106 @@ followed across changes.
   bound there either.
 * Seeding the incumbent from n−1 and stopping at n + opt(n−1) (tactics
   `seed_incumbent`, `prev_cap`).
+
+### Conflicts of the matching bound (2026-10)
+
+Measured with `examples/ladder.rs` (see Performance) on 1 thread for 760,
+880 and 936 and on 10 threads for 1000 and the hard games near it.  With the
+matching bound alone, n=1000 was not proven in 4 minutes on 10 threads.
+
+What the diagnostics showed first (n=760–1000, `--diag`): the matching bound
+does nearly all the pruning (blameGame almost never prunes where it does not),
+and at the nodes it fails to prune it is 25–45 above what was needed
+(median); the heaviest matching there essentially never promotes a feasible
+set; the tree peaks at 25–40 promotions deep.  Making the bound tighter was
+the lever, not cheaper nodes.
+
+* **Conflicts** (`model::conflict_using`).  When the heaviest matching's
+  candidates `Q*` cannot all be promoted, some frame is unwinnable with them;
+  the moves a peel of it cannot drop (its *core*) are stuck however the order
+  goes, and the members of `Q*` the core needs (promoted into the frame and
+  core moves, or promoted out of it and factors of core moves) cannot be
+  promoted together.  Minimized by peeling only the core, these conflicts are
+  tiny: two members at the median and p75 at n=760, p50 2 / p90 5 at 996 (a
+  quarter are single members: candidates the Java's filter leaves in that
+  cannot be promoted at all).  A subset of a promotable set is promotable, so
+  every completion leaves out some member of a conflict — the basis of all
+  that follows, and of `search::Refiner`'s soundness proof.
+* **Refinement** (`match_refine`).  Bound the branches of the conflict too
+  (`k₁` out; `k₁` in and `k₂` out; …), a few levels deep.  Alone, on the
+  Java's branching, it cut nodes 2–70x but cost more per node than it saved
+  (n=880: 4.8M → 68k nodes at depth 7, 31 s → 21 s; at depth 1–3 slower than
+  without).  Caching known conflicts along the path and branching disjointly
+  made it pay at 760; with conflict branching it is worth one level (default
+  1; 2–15% faster than 0 on the benchmarks, deeper is slower).
+* **Conflict branching** (`branching`).  Branch on a member of the conflict
+  instead of the largest candidate, so that neither the child nor the node
+  going on can reproduce the matching: the decisive change.  `conflict-strong`
+  (default) branches on the member whose removal lowers the matching bound
+  most (one matching solve per member; the level for the chosen one is kept
+  for the node, `MatchBound::keep_excluded`).  Promoting a member is not worth
+  looking at: the heaviest matching promotes them all already; and a lookahead
+  that also scores the child with the other member of a pair out did worse.
+  `conflict-smallest` gives the smallest proof trees at 880/936 but finds
+  good incumbents late; `conflict-largest` follows the dive and finds them
+  early.  Branching on the members of every failing frame's conflict instead
+  of the smallest conflict was worse (936: 754k → 1.0M nodes).
+* **Exact matchings**.  A heaviest matching that can be promoted is the
+  node's best completion: offered as incumbent, node done.
+* **Propagation**.  A known conflict of which a child promotes all but one
+  member rules that member out of the child's candidates.  Without it the
+  child's matching bound equals the node's (its matching promotes the child's
+  number already).  −17% nodes.
+* **Starting incumbent**.  `dive` rounds the root's matching (drop the
+  smallest member of a conflict until feasible) — weaker than greedy on most
+  games; a one-step lookahead in the dive was no better.  A local search
+  (`Neighbourhood::improve`: fill greedily, then drop one or two members and
+  refill) reaches the optimum at the start for 945 and 988 and gets close for
+  950/984/990 (20–40 ms).  Running it on every incumbent found during the
+  search, and dives at search nodes, gave nothing measurable.
+* **Cheaper nodes**: a per-frame cache of conflict answers (consecutive
+  matchings change few frames; −5%); a radix heap in the Hungarian search
+  (−16–19%); stopping the scan of frames at a single-member conflict.
+  Choosing the frame by the smallest *core* and minimizing only it was much
+  cheaper per node but its conflicts branch far worse (n=1000 unfinished in
+  2 min).  Checking every candidate a promotion affects (a complete
+  `can_promote` filter instead of the Java's partial one) cut nodes 25–35% but
+  quadrupled the cost per node.  The preclusion table still pays on long
+  searches (936: 15.7 s → 11.8 s) though it costs ~1.4 s of setup on one
+  thread.
+
+Per change (search seconds and nodes; 1 thread for 760/880/936 seeded from
+n−1, 10 threads for 1000; 10-thread times vary with when the optimum is
+found):
+
+| commit | change | 760 | 880 | 936 | 1000 (10 thr.) |
+|---|---|---|---|---|---|
+| f8d922d | conflicts, ladder, diagnostics (Java's branching) | 1.13 s 205k | 30.7 s 4.78M | 90.8 s 12.3M | open at 120 s |
+| 6c4e6ee | branch on conflict (largest member) | 0.13 s 10.1k | 11.2 s 909k | 31.8 s 2.62M | 27.5 s |
+| 264d1ab | cache of frames' conflicts | 0.12 s 10.1k | 10.5 s 909k | 29.5 s 2.62M | 30.7 s |
+| d1c256c | strong branching | 0.12 s 7.2k | 3.8 s 243k | 17.7 s 909k | 22.8 s |
+| 75155b4 | propagation into children | 0.12 s 6.5k | 3.6 s 202k | 16.8 s 759k | 18.7 s |
+| 5ef83ea | keep the strong-branching level | 0.11 s 6.5k | 3.25 s 202k | 15.0 s 759k | 18.7 s |
+| f6aef0f | local search on the start | 0.12 s 6.5k | 3.2 s 202k | 14.8 s 758k | 17.1 s |
+| 1e7a3de | radix heap | 0.11 s 6.5k | 2.7 s 202k | 12.0 s 758k | 12.6 s |
+| 38cf168 | refine one level | 0.09 s 4.0k | 2.6 s 142k | 11.1 s 500k | 11.1 s |
+
+The ladder (10 threads, standalone from the frame builder, seeded from n−1):
+before, 992 and 1000 were open at 100 s (992's incumbent not even optimal),
+960 took 37 s and 800 13 s, and 945, 948, 950, 969, 976, 984, 987, 988, 990,
+996, 999 were open at 20–30 s.  After, all of them complete: 760 0.03 s, 800
+0.5 s, 840 0.1 s, 880 0.3 s, 900 0.1 s, 960 1.6 s, 945–999 1.4–24 s except
+992 (62 s, of which 42 s finding the optimum) and 996 (69 s, all proof).
+The whole range 761–1000 through `taxman solve` (prime shortcut and
+`reuse_prev` on; 81 games searched) takes about 5 minutes of game time on 10
+threads, every score matching optimal.json; 1001–1100 about 6.5 minutes
+(36 searched, slowest 1025 at 100 s) and 1101–1200 about 2.5 minutes (with
+`reuse_prev` and `revise_freedoms`, as the Java's results).  Threads scale
+linearly to the 8 performance cores; the 2 efficiency cores add little.
+
+Left to try: making the per-node conflict work cheaper (a quarter of the
+time: peeling each frame `Q*` touches), fewer matching solves per node, and
+incumbents for games like 992 whose optimum is found late.
 
 ## Testing
 
@@ -292,7 +402,13 @@ Correctness, all on games that finish in seconds:
 * Tactic invariance: the regression with each unproven tactic off must give
   identical scores.
 * Bound soundness: on small frame sets, the upper bound is never below the
-  exhaustively computed best completion.
+  exhaustively computed best completion; the same for the matching bound and
+  for its refinement by conflicts (whose exact completions must be
+  promotable, and whose conflicts, carried down a path, must stay
+  conflicts).  Conflicts and cores are checked against promoting the sets.
+* Golden parity: the searched golden games (93, up to 760) give the Java's
+  promotion sums with the default tactics; the tactic variants give the same
+  answers on those up to 400.
 * Engine: a toy problem with known optimum, run with 1 and many threads,
   with a tiny `queue_mem_cap` to force spilling, and killed/resumed from
   checkpoints, must give the same answer.
@@ -308,3 +424,12 @@ Performance:
   1 thread (deterministic) and with all threads.
 * Larger games (738, 750, 840; Java 56–90 s) only after the bench set is
   fast and correct.
+* The ladder, `cargo run --release --example ladder -- [--threads T]
+  [--seconds S] [--diag] [--seed-opt] [--tactic …] N…`: standalone searches
+  of hard games (default 760 800 840 880 900 960 992 1000) from the frame
+  builder, seeded from optimal.json's n−1 game and capped as the solver does,
+  each with a time limit; reports completion, nodes, time and when the final
+  incumbent was found.  `--seed-opt` seeds with the game for n itself, to
+  measure the proof alone; `--diag` prints `search::Diagnostics` (nodes by
+  depth, what pruned, bound gaps, conflict sizes, matching work).  Fast
+  progress benchmarks: 880 and 936 on one thread (seconds), 1000 on ten.
