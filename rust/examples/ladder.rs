@@ -2,17 +2,20 @@
 //!
 //! ```text
 //! cargo run --release --example ladder -- [--threads T] [--seconds S] [--diag] [--no-cap] [--no-seed] [--seed-opt]
-//!     [--tactic NAME=VALUE]... N...
+//!     [--known FILE] [--tactic NAME=VALUE]... N...
 //! ```
 //!
 //! Each game is set up from the frame builder (no golden data) with the default search tactics, seeded with
-//! the promotions of optimal.json's game for n − 1 that are still candidates (as the `seed_incumbent` tactic
+//! the promotions of the known game for n − 1 that are still candidates (as the `seed_incumbent` tactic
 //! does; `--seed-opt`: with the game for n itself, so that the search only has to prove it) and capped at
-//! n + opt(n − 1) − inTheBag (`prev_cap`).  One line per game: whether the search
-//! completed, its time and nodes, the incumbent against optimal.json, and when the final incumbent was found.
+//! n + opt(n − 1) − inTheBag (`prev_cap`).  The known games are optimal.json's, plus the completed games of a
+//! results file given with `--known` (one JSON object per line, as `taxman solve --out` writes), which is how
+//! games past optimal.json's 1000 get their n − 1.  One line per game: whether the search completed, its time
+//! and nodes, the incumbent against the known optimum, and when the final incumbent was found.
 //! `--diag` collects [`Diagnostics`] (slower) and prints a summary.  `--tactic` sets a search tactic with the
 //! names and values of `taxman solve --tactic` (`preclusions=off`, `branching=largest`, `match_refine=0`, ...).
 
+use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use taxman::bits::Bits;
@@ -20,6 +23,7 @@ use taxman::engine::EngineConfig;
 use taxman::frames::build_frames;
 use taxman::game::Optimal;
 use taxman::hives::Apiary;
+use taxman::json::Json;
 use taxman::numtheory::Tables;
 use taxman::search::{cut, prepare, search_with, Diagnostics, Revise, SearchTactics};
 use taxman::solver::Tactics;
@@ -32,6 +36,8 @@ struct Options {
     seed: bool,
     /// Seed with the game for n itself (so that the search only has to prove it optimal).
     seed_opt: bool,
+    /// A results file with more known games.
+    known: Option<PathBuf>,
     tactics: SearchTactics,
     games: Vec<u32>,
 }
@@ -44,6 +50,7 @@ fn parse() -> Result<Options, String> {
         cap: true,
         seed: true,
         seed_opt: false,
+        known: None,
         tactics: SearchTactics::default(),
         games: Vec::new(),
     };
@@ -57,6 +64,7 @@ fn parse() -> Result<Options, String> {
             "--no-cap" => o.cap = false,
             "--no-seed" => o.seed = false,
             "--seed-opt" => o.seed_opt = true,
+            "--known" => o.known = Some(value("--known")?.into()),
             "--tactic" => {
                 // The solver's parser, so that the names and values are the same as for `taxman solve --tactic`.
                 let spec = value("--tactic")?;
@@ -84,7 +92,13 @@ fn main() {
             std::process::exit(2);
         }
     };
-    let optimal = Optimal::load_default().expect("optimal.json");
+    let optimal = match known_games(o.known.as_ref()) {
+        Ok(optimal) => optimal,
+        Err(e) => {
+            eprintln!("error: {e}");
+            std::process::exit(2);
+        }
+    };
     for &n in &o.games {
         match n {
             0..=1023 => run::<16>(n, &o, &optimal),
@@ -92,6 +106,24 @@ fn main() {
             _ => run::<64>(n, &o, &optimal),
         }
     }
+}
+
+/// optimal.json's games, plus the completed games of the results file `known` (which win where both have one).
+fn known_games(known: Option<&PathBuf>) -> Result<Optimal, String> {
+    let json = Json::from_file(Optimal::default_path())?;
+    let mut games: Vec<Json> = json.as_arr().ok_or("optimal.json: expected an array of games")?.to_vec();
+    if let Some(path) = known {
+        let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+        for (i, line) in text.lines().enumerate().filter(|(_, line)| !line.trim().is_empty()) {
+            let game = Json::parse(line).map_err(|e| format!("{}: line {}: {e}", path.display(), i + 1))?;
+            if game.get("completed").and_then(Json::as_bool) == Some(true) {
+                let n = game.get("n").and_then(Json::as_u32);
+                games.retain(|g| g.get("n").and_then(Json::as_u32) != n);
+                games.push(game);
+            }
+        }
+    }
+    Optimal::from_json(&Json::Arr(games))
 }
 
 fn secs(d: Duration) -> f64 {
