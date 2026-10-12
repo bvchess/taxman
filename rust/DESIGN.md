@@ -63,9 +63,15 @@ set and switchable where unproven.
   `largestThatFitInFrames` skips candidates because frame 1 or the last frame
   is at its cap, the Java replaces the failing number with the next candidate
   below the smallest bid member.  A skipped candidate from the failing
-  number's frame can be larger, so the Java bound can be too low.  Sound
-  version: replace with the largest candidate not in the bid.  (Re-solving
-  n=2..760 in Java with the fix changed no answers; n=740 timed out.)
+  number's frame can be larger, so the Java bound can be too low (exhaustive
+  checks find it below the best completion, e.g. at the root of n=114: 358
+  against 360).  Sound version: the heaviest set within the caps that leaves
+  out some bid member at or above the failure, which by matroid exchange is
+  the bid with one member swapped for the best outside candidate the caps
+  allow.  (Simply taking the largest candidate not in the bid is also sound
+  but swaps skipped candidates of a full frame in for members of other frames;
+  it made n=700 take over 10 minutes instead of 18 s.)  (Re-solving n=2..760
+  in Java with the simple fix changed no answers; n=740 timed out.)
 * `Memo.test` computes its value twice — moot, `Memo` is not ported.
 * `TxSet.MAX_VALUE = 1023` — gone; set width is chosen from n.
 
@@ -110,11 +116,11 @@ dependencies.  Modules:
 | `hives` | port of `Apiary`/`Hive`/`Namer`-free equivalent: hive formation with `treat_as_sources`, unzip, removeImpossible, finishSetup propagation, merge, promotion candidates, per-hive solution, apiary solution order |
 | `frames` | port of `FrameBuilder` (levels of hives) producing columns (factors, moves) per frame bottom-up, candidates, `estimateMaxPromotions` |
 | `accelerate` | deriving game n from game n−1 (prime shortcut, `reusePrev`), and turning a promotion set into an ordered game |
-| `model` | the search state: `Frame`, `FrameSet` (fixed array of frames), `FactorProvider` (factor/composite lists restricted to frame numbers), `FrameMapper` (home frame of each candidate), `promote_into`, `promote_out_of`, `promote`, `can_promote`, `is_winnable` (peel), `reduce`, `narrow_candidates`, `max_promotions` |
-| `bounds` | preclusion table; `upper_bound` (blameGame + largestThatFitInFrames, sound or legacy runner-up); greedy lower bound; `revise_freedoms` |
+| `model` | the search state: `Frame`, `FrameSet` (fixed array of frames), `FactorProvider` (factor/composite lists restricted to frame numbers), `FrameMapper` (home frame of each candidate), `promote_into`, `promote_out_of`, `promote`, `can_promote`, `is_winnable` (peel), `reduce`, `narrow_candidates`, `max_promotions`; `promote_all` (a set checked frame by frame); `Certificate` (a winning order that answers most single-edit winnability questions without a peel) |
+| `bounds` | preclusion table; `upper_bound` (blameGame + largestThatFitInFrames, sound or legacy runner-up) and its exact threshold test `reaches`; candidate lists; greedy lower bound |
 | `matchbound` | the matching bound (see "Improvements queued after parity"): `match_bound`, a min-cost-flow reference; `MatchGraph` (the root's graph) and `MatchBound` (an optimal matching and its potentials per level of the DFS path, repaired incrementally) |
 | `engine` | problem-independent parallel depth-first branch-and-bound driver: work units, shared deque with disk spill, incumbent, yielding/splitting, checkpoint and resume, progress reporting, statistics |
-| `search` | the Taxman searcher (port of `BranchExplorer`) implementing the engine's `Searcher` trait |
+| `search` | the Taxman searcher (port of `BranchExplorer`) implementing the engine's `Searcher` trait; `prepare` (preclusions, greedy, `revise_freedoms`) and `search` (seed, cap, checkpoint and resume) |
 | `solver` | per-game pipeline: prime shortcut → reuse_prev → search setup → search → `Apiary(board, promotions)` solution → replay → compare with optimal.json → record |
 | `main.rs` | CLI |
 

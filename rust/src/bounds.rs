@@ -8,7 +8,7 @@
 //! counts its work.
 
 use crate::bits::Bits;
-use crate::model::{Certificate, FrameSet, Model, Scratch, MAX_FRAMES};
+use crate::model::{Certificate, FrameSet, Model, Scratch};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 // ---------------------------------------------------------------------------------------------------------
@@ -56,7 +56,7 @@ impl<'a, const W: usize> Bounds<'a, W> {
             preclusions,
             rule,
             scratch: Scratch::new(),
-            certs: vec![Certificate::default(); MAX_FRAMES],
+            certs: Vec::new(),
             certified: 0,
             counts: BoundCounts::default(),
         }
@@ -163,6 +163,9 @@ impl<'a, const W: usize> Bounds<'a, W> {
         let frames = state.frames();
         for i in [h - 1, h] {
             if self.certified & 1 << i == 0 {
+                if self.certs.len() <= i {
+                    self.certs.resize_with(i + 1, Certificate::default);
+                }
                 let cert = &mut self.certs[i];
                 let winnable = self.model.certify_using(&mut self.scratch, &frames[i], cert);
                 debug_assert!(winnable, "the frames of a state are winnable");
@@ -241,6 +244,19 @@ pub fn upper_bound<const W: usize>(
     rule: RunnerUp,
 ) -> u64 {
     Bounds::new(model, None, rule).upper_bound(state, cands, max_size)
+}
+
+/// [`Bounds::new_candidate_list`] as a one-off, without a reusable scratch space.
+pub fn new_candidate_list<const W: usize>(
+    model: &Model,
+    preclusions: Option<&Preclusions<W>>,
+    n: u32,
+    max_next: u32,
+    new_state: &FrameSet<W>,
+    cands: &Bits<W>,
+    promoted: &Bits<W>,
+) -> Bits<W> {
+    Bounds::new(model, preclusions, RunnerUp::Sound).new_candidate_list(n, max_next, new_state, cands, promoted)
 }
 
 /// The first member of `bid`, from the top, that cannot be promoted after the ones above it.

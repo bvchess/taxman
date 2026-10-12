@@ -32,6 +32,7 @@
 use crate::bits::Bits;
 use crate::bounds::{self, max_additional, Bounds, Preclusions, RunnerUp};
 use crate::engine::{self, Counters, Ctx, EngineConfig, Poll, Searcher, Start, Stats, Unit};
+use crate::matchbound::{MatchBound, MatchGraph};
 use crate::model::{FrameSet, Model};
 use crate::numtheory::Tables;
 use std::io;
@@ -52,11 +53,14 @@ pub struct SearchTactics {
     /// Lower frame 0's freedoms after solving the two-frame game (unproven: "the max-sum promotion set also has
     /// the max count").
     pub revise_freedoms: bool,
+    /// Bound nodes by the smaller of `blameGame` and the matching relaxation ([`crate::matchbound`]), computing
+    /// the matching bound only where `blameGame` does not prune (sound).
+    pub match_bound: bool,
 }
 
 impl Default for SearchTactics {
     fn default() -> Self {
-        SearchTactics { preclusions: true, legacy_bound: false, revise_freedoms: true }
+        SearchTactics { preclusions: true, legacy_bound: false, revise_freedoms: true, match_bound: true }
     }
 }
 
@@ -70,11 +74,19 @@ impl SearchTactics {
     }
 
     fn bits(self) -> u8 {
-        u8::from(self.preclusions) | u8::from(self.legacy_bound) << 1 | u8::from(self.revise_freedoms) << 2
+        u8::from(self.preclusions)
+            | u8::from(self.legacy_bound) << 1
+            | u8::from(self.revise_freedoms) << 2
+            | u8::from(self.match_bound) << 3
     }
 
     fn from_bits(bits: u8) -> Self {
-        SearchTactics { preclusions: bits & 1 != 0, legacy_bound: bits & 2 != 0, revise_freedoms: bits & 4 != 0 }
+        SearchTactics {
+            preclusions: bits & 1 != 0,
+            legacy_bound: bits & 2 != 0,
+            revise_freedoms: bits & 4 != 0,
+            match_bound: bits & 8 != 0,
+        }
     }
 }
 
@@ -123,8 +135,8 @@ pub struct SearchSpace<'a, const W: usize> {
     pub root: &'a FrameSet<W>,
     /// The preclusion table, if that tactic is on.
     pub preclusions: Option<&'a Preclusions<W>>,
-    /// The candidates at the root.
-    pub candidates: &'a Bits<W>,
+    /// The root's matching graph, if the `match_bound` tactic is on.
+    pub match_graph: Option<&'a MatchGraph>,
     /// The cap on the number of promotions (`maxTotalPromotions`).
     pub max_total: u32,
     pub rule: RunnerUp,
@@ -160,17 +172,24 @@ pub mod stat {
     pub const PRECLUDED: usize = 5;
     /// Frame certificates made for the promotability checks.
     pub const CERTIFICATES: usize = 6;
+    /// Matching bounds computed.
+    pub const MATCH_BOUNDS: usize = 7;
 }
 
 /// The Taxman searcher: explores units depth-first on a reusable stack.
 pub struct TaxSearcher<'a, const W: usize> {
     space: &'a SearchSpace<'a, W>,
     bounds: Bounds<'a, W>,
+    /// The matching bound along the stack (tactic `match_bound`).  Its levels mirror the stack's: level 0 is the
+    /// unit's node, and a child is pushed on it while the child is being considered and for as long as it is
+    /// on the stack.
+    matching: Option<MatchBound<'a, W>>,
     /// Stack slots, reused: `levels[..=depth]` is the current path, and the next slot is where a child is made.
     levels: Vec<Level<W>>,
     attempts: u64,
     promotions: u64,
     children: u64,
+    match_bounds: u64,
     payload: Vec<u8>,
 }
 
@@ -179,12 +198,23 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         TaxSearcher {
             space,
             bounds: Bounds::new(space.model, space.preclusions, space.rule),
+            matching: space.match_graph.map(MatchBound::new),
             levels: Vec::new(),
             attempts: 0,
             promotions: 0,
             children: 0,
+            match_bounds: 0,
             payload: Vec::with_capacity(8 * W),
         }
+    }
+
+    /// Whether the matching bound of the node on top of the matching stack is below `need` (false without the
+    /// tactic).
+    fn matching_below(matching: &mut Option<MatchBound<'a, W>>, count: &mut u64, need: u64) -> bool {
+        matching.as_mut().is_some_and(|m| {
+            *count += 1;
+            m.value() < need
+        })
     }
 
     /// Rebuilds the unit's node in slot 0.
@@ -201,6 +231,9 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         } else {
             self.levels[0] = level;
         }
+        if let Some(matching) = &mut self.matching {
+            matching.reset(&unit.promoted, &unit.cands);
+        }
     }
 
     /// One step of the loop of the node at `depth`: tries its next candidate.  Returns the depth of the node to
@@ -214,18 +247,30 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         let (path, rest) = self.levels.split_at_mut(depth + 1);
         let (node, child) = (&mut path[depth], &mut rest[0]);
         let bounds = &mut self.bounds;
+        let matching = &mut self.matching;
 
-        // The node's loop ends when its candidates are used up or cannot reach the incumbent.  The bound is at
-        // most the sum of the `max_add` largest candidates, so that sum may decide without the bound.
+        // The node's loop ends when its candidates are used up or cannot reach the incumbent.  Its bound is the
+        // smaller of blameGame's and (tactic `match_bound`) the matching bound, which is computed only when
+        // blameGame's does not decide; blameGame's is at most the sum of the `max_add` largest candidates, so
+        // that sum may decide first.
         let best = ctx.best();
         let need = best.saturating_sub(node.sum); // the loop goes on while the bound is at least this
         if node.cands.is_empty()
             || node.cands.sum_largest(node.max_add) < need
             || !bounds.reaches(&node.state, &node.cands, node.max_add, need)
+            || Self::matching_below(matching, &mut self.match_bounds, need)
         {
+            if depth > 0 {
+                if let Some(m) = matching {
+                    m.pop();
+                }
+            }
             return depth.checked_sub(1);
         }
         let n = node.cands.pop_max().expect("not empty");
+        if let Some(m) = matching {
+            m.remove_candidate(n);
+        }
 
         self.attempts += 1;
         child.state.assign(&node.state);
@@ -240,6 +285,18 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         let need = (best + 1).saturating_sub(child.sum); // the child is worth it if its bound is at least this
         if cands.sum_largest(max_next) < need || !bounds.reaches(&child.state, &cands, max_next, need) {
             return Some(depth);
+        }
+        // A child with no candidates has nothing to bound (both bounds are 0) and is not explored.
+        if !cands.is_empty() {
+            if let Some(m) = matching {
+                m.push(n, &cands);
+            }
+            if Self::matching_below(matching, &mut self.match_bounds, need) {
+                if let Some(m) = matching {
+                    m.pop();
+                }
+                return Some(depth);
+            }
         }
         if child.sum > best {
             self.payload.clear();
@@ -268,6 +325,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             (stat::CHILDREN, std::mem::take(&mut self.children)),
             (stat::PRECLUDED, b.precluded),
             (stat::CERTIFICATES, b.certificates),
+            (stat::MATCH_BOUNDS, std::mem::take(&mut self.match_bounds)),
         ];
         for (i, count) in counts {
             stats.extra[i] += count;
@@ -591,11 +649,12 @@ pub fn search<const W: usize>(
         });
     }
 
+    let match_graph = prepared.tactics.match_bound.then(|| MatchGraph::new(&prepared.model, &prepared.root));
     let space = SearchSpace {
         model: &prepared.model,
         root: &prepared.root,
         preclusions: prepared.preclusions.as_ref(),
-        candidates: &prepared.candidates,
+        match_graph: match_graph.as_ref(),
         max_total: prepared.max_total,
         rule: prepared.tactics.rule(),
         cap,
@@ -700,6 +759,7 @@ mod tests {
             SearchTactics { preclusions: false, ..default },
             SearchTactics { legacy_bound: true, ..default },
             SearchTactics { revise_freedoms: false, ..default },
+            SearchTactics { match_bound: false, ..default },
         ];
         variants.iter().map(|&t| (t, search_checked(&prepare_golden::<W>(g, t), 1, "tactics").sum)).collect()
     }
@@ -763,7 +823,8 @@ mod tests {
             pieces += 1;
             assert!(pieces < 100, "no progress");
         }
-        assert!(pieces >= 4, "only {pieces} pieces");
+        // One thread repeats the uninterrupted run exactly; several explore a varying number of nodes.
+        assert!(pieces >= if threads == 1 { 4 } else { 2 }, "only {pieces} pieces");
         assert!(!ckpt.exists(), "a completed run deletes its checkpoint");
         assert_eq!(result.sum, golden_sum(&g));
         if threads == 1 {
@@ -843,34 +904,38 @@ mod tests {
 
     // ---- benchmark: cargo test --release bench_search -- --ignored --nocapture --test-threads=1 ----
 
+    /// Prepares and searches one game with each thread count and both settings of `match_bound` (`TAXMAN_BENCH_MATCH`
+    /// = `on` or `off` restricts it to one), printing one line each.
     fn bench_game<const W: usize>(n: u32, columns: &[Vec<u32>], cands: &Bits<W>, java: (f64, f64)) {
         let tables = Tables::new(n);
-        for (threads, java_secs) in [(1, java.0), (10, java.1)] {
-            let t0 = Instant::now();
-            let p = prepare::<W>(&tables, columns, cands, SearchTactics::default(), threads).unwrap();
-            let r = search(&p, &config(threads), None, None, false).unwrap();
-            let total = t0.elapsed().as_secs_f64();
-            let t = &p.timings;
-            let revise_nodes = if let Revise::Searched { nodes, .. } = p.revise { nodes } else { 0 };
-            eprintln!(
-                "n={n:4} threads={threads:2}: total {total:7.3} s (Java {java_secs:5.1} s) | build {:.3} prec {:.3} \
-                 greedy {:.4} revise {:.3} search {:.3} | nodes {} revise nodes {revise_nodes} | sum {} max_total {} \
-                 {:?} | extra {:?}",
-                t.build.as_secs_f64(),
-                t.preclusions.as_secs_f64(),
-                t.greedy.as_secs_f64(),
-                t.revise.as_secs_f64(),
-                r.time.as_secs_f64(),
-                r.stats.nodes,
-                r.sum,
-                p.max_total,
-                p.revise,
-                &r.stats.extra[..6],
-            );
+        let only = std::env::var("TAXMAN_BENCH_MATCH").ok();
+        let settings = [true, false].into_iter().filter(|&on| only.as_deref().is_none_or(|s| (s == "on") == on));
+        for match_bound in settings {
+            for (threads, java_secs) in [(1, java.0), (10, java.1)] {
+                let tactics = SearchTactics { match_bound, ..SearchTactics::default() };
+                let t0 = Instant::now();
+                let p = prepare::<W>(&tables, columns, cands, tactics, threads).unwrap();
+                let r = search(&p, &config(threads), None, None, false).unwrap();
+                let total = t0.elapsed().as_secs_f64();
+                let t = &p.timings;
+                let revise_nodes = if let Revise::Searched { nodes, .. } = p.revise { nodes } else { 0 };
+                eprintln!(
+                    "n={n:4} match={:3} threads={threads:2}: total {total:7.3} s (Java {java_secs:5.1} s) | prec {:.3} \
+                     revise {:.3} ({revise_nodes} nodes) search {:.3} | nodes {} | sum {} | extra {:?}",
+                    if match_bound { "on" } else { "off" },
+                    t.preclusions.as_secs_f64(),
+                    t.revise.as_secs_f64(),
+                    r.time.as_secs_f64(),
+                    r.stats.nodes,
+                    r.sum,
+                    r.stats.extra,
+                );
+            }
         }
     }
 
-    /// One game (`TAXMAN_BENCH_N`, default 700; `TAXMAN_BENCH_THREADS`, default 1; `TAXMAN_BENCH_LEGACY` for the
+    /// One game (`TAXMAN_BENCH_N`, default 700; `TAXMAN_BENCH_THREADS`, default 1; tactics changed by
+    /// `TAXMAN_BENCH_MATCH=off`, `TAXMAN_BENCH_NO_PRECLUSIONS`, and `TAXMAN_BENCH_LEGACY` for the
     /// legacy bound), with progress lines, for profiling.
     #[test]
     #[ignore]
@@ -878,17 +943,42 @@ mod tests {
         let n = std::env::var("TAXMAN_BENCH_N").ok().and_then(|s| s.parse().ok()).unwrap_or(700);
         let threads = std::env::var("TAXMAN_BENCH_THREADS").ok().and_then(|s| s.parse().ok()).unwrap_or(1);
         let legacy_bound = std::env::var_os("TAXMAN_BENCH_LEGACY").is_some();
-        let tactics = SearchTactics { legacy_bound, ..SearchTactics::default() };
-        let g = load(n);
-        let cands = Bits::<16>::from_slice(&g.candidates);
-        let p = prepare::<16>(&Tables::new(n), &g.columns, &cands, tactics, threads).unwrap();
-        let cfg = EngineConfig { progress: Some(Duration::from_secs(10)), ..config(threads) };
+        let match_bound = std::env::var("TAXMAN_BENCH_MATCH").map_or(true, |s| s == "on");
+        let preclusions = std::env::var_os("TAXMAN_BENCH_NO_PRECLUSIONS").is_none();
+        let tactics = SearchTactics { legacy_bound, match_bound, preclusions, ..SearchTactics::default() };
+        let seconds = std::env::var("TAXMAN_BENCH_SECONDS").ok().and_then(|s| s.parse().ok());
+        let tables = Tables::new(n);
+        // The golden columns if there are any, else the frame builder's.
+        let (columns, cands) = if golden_ns().contains(&n) {
+            let g = load(n);
+            (g.columns, Bits::<16>::from_slice(&g.candidates))
+        } else {
+            let frames = build_frames::<16>(&tables);
+            (frames.frames.iter().flat_map(|f| [f.factors.to_vec(), f.moves.to_vec()]).collect(), frames.candidates)
+        };
+        let p = prepare::<16>(&tables, &columns, &cands, tactics, threads).unwrap();
+        let cfg = EngineConfig {
+            progress: Some(Duration::from_secs(10)),
+            time_limit: seconds.map(Duration::from_secs),
+            ..config(threads)
+        };
+        // What optimal.json says the best promotion sum is, and the `prev_cap` ceiling.
+        if let Ok(optimal) = crate::game::Optimal::load_default() {
+            let in_the_bag: u64 =
+                crate::hives::Apiary::<16>::new(&tables, Bits::EMPTY).solution().iter().map(|&x| u64::from(x)).sum();
+            let best = optimal.score(n).map(|s| s - in_the_bag);
+            let cap = optimal.score(n - 1).map(|s| u64::from(n) + s - in_the_bag);
+            eprintln!("n={n}: optimal promotion sum {best:?}, prev_cap {cap:?}, greedy {}", p.greedy.sum());
+        }
         let r = search(&p, &cfg, None, None, false).unwrap();
         eprintln!(
-            "n={n}: {:?} search {:.3} s, nodes {}, extra {:?}",
+            "n={n}: {:?} search {:.3} s (completed {}), nodes {}, best {}, max_total {}, extra {:?}",
             p.timings,
             r.time.as_secs_f64(),
+            r.completed,
             r.stats.nodes,
+            r.sum,
+            p.max_total,
             r.stats.extra
         );
     }
