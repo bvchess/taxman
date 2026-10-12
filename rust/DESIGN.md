@@ -94,7 +94,8 @@ and values for them.
 | `match_bound` | on | sound (matchability relaxes winnability) | node bound = min(blameGame, matching relaxation), the matching one computed only when blameGame fails to prune; a heaviest matching that can be promoted is the node's best completion (offered as incumbent, node done) |
 | `branching` | `conflict-strong` | sound (any order explores every promotion set) | which candidate a node promotes next: `largest` (the Java's order), or a member of a conflict of the heaviest matching (these need `match_bound`): the smallest (`conflict-smallest`), the largest (`conflict-largest`), or the one whose removal lowers the matching bound most (`conflict-strong`) |
 | `match_refine` | 1 | sound (see `search::Refiner`) | refine the matching bound by branching on conflicts this many levels deep, where it does not prune (0 = off, at most 7; needs `match_bound`) |
-| `fix_forced` | on | sound (every completion that beats the incumbent promotes them) | with `conflict-strong` branching, the child also promotes the conflict's *forced* members: those whose removal alone brings the matching bound below what the node needs |
+| `fix_forced` | on | sound (every completion that beats the incumbent promotes them) | with `conflict-strong` branching, the child also promotes the conflict's *forced* members: those whose removal alone brings the matching bound below what the node needs; a node whose members are all forced is done |
+| `nogoods` | on | sound (a nogood holds at every node; see `model::Nogoods`) | learn each conflict as a *nogood* of the root and use the table at every node: the smallest conflict it knows of the heaviest matching is the one to branch on and refine with (computed and learned only when it knows none), and nogoods rule candidates out of children (needs `match_bound`) |
 | `legacy_bound` | off | unsound (the runner-up defect) | reproduce the Java bound exactly |
 | `prev_cap` | on | proven if opt(n−1) is optimal | stop as soon as the incumbent reaches n + opt(n−1) − inTheBag (`FrameSolver.getMaxPromotionSum`) |
 | `seed_incumbent` | on | sound (any feasible promotion set is a valid incumbent) | start from the better of greedy and the n−1 solution's promotions that are still feasible |
@@ -110,7 +111,7 @@ Results record the tactics they were produced with (`tactics`: the changes
 from the defaults, such as `branching=largest,match_refine=0`;
 `tactic_switches`: every tactic's value, the booleans as booleans,
 `match_refine` as a number and `branching` as its name), and whether any
-unproven tactic was on.  A checkpoint records the seven search tactics and is
+unproven tactic was on.  A checkpoint records the eight search tactics and is
 refused when they differ.
 
 ## Architecture
@@ -127,7 +128,7 @@ dependencies.  Modules:
 | `hives` | port of `Apiary`/`Hive`/`Namer`-free equivalent: hive formation with `treat_as_sources`, unzip, removeImpossible, finishSetup propagation, merge, promotion candidates, per-hive solution, apiary solution order |
 | `frames` | port of `FrameBuilder` (levels of hives) producing columns (factors, moves) per frame bottom-up, candidates, `estimateMaxPromotions` |
 | `accelerate` | deriving game n from game n−1 (prime shortcut, `reusePrev`), and turning a promotion set into an ordered game |
-| `model` | the search state: `Frame`, `FrameSet` (fixed array of frames), `FactorProvider` (factor/composite lists restricted to frame numbers), `FrameMapper` (home frame of each candidate), `promote_into`, `promote_out_of`, `promote`, `can_promote`, `is_winnable` (peel), `reduce`, `narrow_candidates`, `max_promotions`; `promote_all` (a set checked frame by frame); `Certificate` (a winning order that answers most single-edit winnability questions without a peel); conflicts: the *core* of an unwinnable frame (`Scratch::stuck`, the moves a peel cannot drop) and `conflict_using`/`conflict_cached` (a small, by default minimal, subset of a promotion set that cannot be promoted), with `ConflictCache` |
+| `model` | the search state: `Frame`, `FrameSet` (fixed array of frames), `FactorProvider` (factor/composite lists restricted to frame numbers), `FrameMapper` (home frame of each candidate), `promote_into`, `promote_out_of`, `promote`, `can_promote`, `is_winnable` (peel), `reduce`, `narrow_candidates`, `max_promotions`; `promote_all` (a set checked frame by frame); `Certificate` (a winning order that answers most single-edit winnability questions without a peel); conflicts: the *core* of an unwinnable frame (`Scratch::stuck`, the moves a peel cannot drop) and `conflict_using`/`conflict_cached` (a small, by default minimal, subset of a promotion set that cannot be promoted), with `ConflictCache`; nogoods: `nogood` (a conflict of a state made a conflict of the root) and the table `Nogoods` |
 | `bounds` | preclusion table; `upper_bound` (blameGame + largestThatFitInFrames, sound or legacy runner-up) and its exact threshold test `reaches`; candidate lists; greedy lower bound |
 | `matchbound` | the matching bound (see "Improvements after parity"): `match_bound`, a min-cost-flow reference; `MatchGraph` (the root's graph) and `MatchBound` (an optimal matching and its potentials per level of the DFS path, repaired incrementally by Hungarian searches on a radix heap; levels with a candidate excluded, which can be kept for the parent) |
 | `engine` | problem-independent parallel depth-first branch-and-bound driver: work units, shared deque with disk spill, incumbent, yielding/splitting, checkpoint and resume, progress reporting, statistics |
@@ -419,6 +420,49 @@ found the others again, one level each, further down.
   promote them all, and if one cannot be promoted any more (or the child's
   candidate filter dropped it) the child has no such completion at all.
   Nodes −31% (880) to −60% (1170), time −21% to −36%.
+* **Reusing the child check.**  A child's bound is checked (with refinement
+  and its conflict) when it is made; its loop's first step repeated that with
+  the same need for the same verdict.  It now keeps the verdict.  And a child
+  that promotes several numbers makes its candidate list once, after all of
+  them.  −3% to −23% time.
+* **Nogoods** (tactic `nogoods`, sound).  A conflict `K` found at a node with
+  promotions `P` is relative to `P`; a minimal subset of `P ∪ K` that keeps
+  a frame of the *root* unwinnable is a *nogood*: it cannot be promoted from
+  the root, so at every node anywhere in the tree (any thread, any path, and
+  after a resume) the nogood minus that node's promotions is a conflict of
+  the node (a subset of a promotable set is promotable; the proof is in
+  `model::Nogoods`).  Measured first: at 1184, 291k conflicts were computed
+  but they were only 854 distinct nogoods — the search found the same few
+  hundred over and over.  So each searcher keeps a table of them (at most
+  65536, forgotten all at once when full; about a thousand are learned near
+  n = 1200), and a node's conflict is the smallest the table knows within
+  `P ∪ Q*` (indexed by each nogood's largest member); only when it knows none
+  is one computed, and then learned.  Nogoods also rule candidates out of a
+  child (a nogood all of whose other members the child promotes, indexed by
+  member), beyond the conflicts known along the path.  Looking conflicts up
+  rather than computing them is cheaper, and also better for the tree: the
+  smallest of the many conflicts known is often smaller than the one the
+  minimization of a single frame finds, and branching on it and on the
+  child's propagation cut nodes (936: 320k → 50k).  The tree now depends on
+  what the searcher has learned, so on its history (threads, interruptions),
+  not only on the node; answers do not.  Alone, lookups gave most of it
+  (880 → 39k nodes, 936 → 57k, 1184 → 287k); propagation alone, with every
+  conflict computed and made a nogood, cut nodes less (880 → 61k) and cost
+  more than it saved.
+* **All members forced.**  When every member of the conflict is forced, no
+  completion beats the incumbent: the node is done (free once strong
+  branching has computed the bounds; only matters with `match_refine=0`,
+  since refinement prunes those nodes first).
+
+One thread, fast set (search seconds and nodes; 880 and 936 seeded from
+optimal.json, the rest from `results/strict.jsonl`):
+
+| commit | change | 880 | 936 | 1050 | 1100 | 1170 | 1184 |
+|---|---|---|---|---|---|---|---|
+| 8686be0 | before | 2.72 s 142k | 11.65 s 500k | 24.8 s 598k | 4.81 s 161k | 4.58 s 165k | 21.6 s 786k |
+| 53a442a | forced members | 2.14 s 98k | 8.61 s 320k | 18.2 s 342k | 3.17 s 74k | 3.09 s 66k | 14.7 s 338k |
+| 261b342 | reuse the child check | 1.97 s 98k | 8.05 s 320k | 16.8 s 340k | 2.65 s 74k | 2.35 s 66k | 11.9 s 338k |
+| 8490458 | nogoods | 0.66 s 34k | 1.09 s 50k | 11.8 s 318k | 2.12 s 75k | 1.18 s 46k | 6.41 s 276k |
 
 ## Testing
 

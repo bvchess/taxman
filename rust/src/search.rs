@@ -27,8 +27,9 @@
 //! can itself be promoted, it is the node's best completion: it is offered as the incumbent and the node is
 //! done.  With conflict branching the candidate `n` is a member of a conflict of the heaviest matching; with
 //! the `fix_forced` tactic the child also promotes the members of that conflict that every completion beating
-//! the incumbent must promote (see [`strongest`]).  The search starts from the best of the greedy set, the
-//! seed, and a rounding of the root's matching ([`dive`]), improved by a local search
+//! the incumbent must promote (see [`strongest`]).  With the `nogoods` tactic the conflicts found are learned
+//! as conflicts of the root ([`Nogoods`]), which every node can use.  The search starts from the best of the
+//! greedy set, the seed, and a rounding of the root's matching ([`dive`]), improved by a local search
 //! ([`Neighbourhood::improve`]).
 //!
 //! Two exact shortcuts keep the expensive bound out of the way: the bound never exceeds the sum of the
@@ -44,7 +45,7 @@ use crate::bits::Bits;
 use crate::bounds::{self, max_additional, Bounds, Preclusions, RunnerUp};
 use crate::engine::{self, Counters, Ctx, EngineConfig, Poll, Searcher, Start, Stats, Unit};
 use crate::matchbound::{MatchBound, MatchGraph};
-use crate::model::{ConflictCache, FrameSet, Model, Scratch};
+use crate::model::{ConflictCache, FrameSet, Model, Nogoods, Scratch};
 use crate::numtheory::Tables;
 use std::io;
 use std::path::Path;
@@ -79,6 +80,11 @@ pub struct SearchTactics {
     /// members of the conflict whose removal alone brings the matching bound below what the node needs (sound:
     /// every completion that can beat the incumbent promotes them; see [`strongest`]).
     pub fix_forced: bool,
+    /// Learn the conflicts found as nogoods of the root ([`Nogoods`]) and use them at every node: for the
+    /// conflict to branch on and to refine with, and to rule candidates out of children (sound: a nogood holds
+    /// everywhere).  What is learned depends on the order the search went, so with it a search's tree depends on
+    /// its history (threads, interruptions), not only on the node.
+    pub nogoods: bool,
 }
 
 /// Which candidate a node's loop promotes next (tactic `branching`).  The child promotes it, and the node goes on
@@ -136,6 +142,7 @@ impl Default for SearchTactics {
             match_refine: 1,
             branching: Branching::default(),
             fix_forced: true,
+            nogoods: true,
         }
     }
 }
@@ -154,7 +161,7 @@ impl SearchTactics {
     }
 
     /// The tactics as the header of a checkpoint records them.  Tactics added later are recorded by the bits of
-    /// their non-default values (`fix_forced` by bit 9 when it is off), so that a checkpoint made before they
+    /// their non-default values (`fix_forced` by bit 9 and `nogoods` by bit 10 when they are off), so that a checkpoint made before they
     /// existed reads back with their defaults: they are sound, so a search resumed with them is still correct.
     fn bits(self) -> u16 {
         let branching = match self.branching {
@@ -170,10 +177,11 @@ impl SearchTactics {
             | u16::from(self.match_refine.min(Self::MAX_MATCH_REFINE)) << 4
             | branching << 7
             | u16::from(!self.fix_forced) << 9
+            | u16::from(!self.nogoods) << 10
     }
 
     fn from_bits(bits: u16) -> Result<Self, String> {
-        if bits >> 10 != 0 {
+        if bits >> 11 != 0 {
             return Err(format!("unknown tactics {bits:#x}"));
         }
         let branching = match bits >> 7 & 3 {
@@ -190,6 +198,7 @@ impl SearchTactics {
             match_refine: (bits >> 4 & 7) as u8,
             branching,
             fix_forced: bits & 1 << 9 == 0,
+            nogoods: bits & 1 << 10 == 0,
         })
     }
 }
@@ -244,8 +253,11 @@ pub struct SearchSpace<'a, const W: usize> {
     /// How deep to refine the matching bound by conflicts (tactic `match_refine`), and how to branch.
     pub match_refine: u32,
     pub conflict_branching: Branching,
-    /// Tactic `fix_forced`.
+    /// Tactics `fix_forced` and `nogoods`.
     pub fix_forced: bool,
+    pub nogoods: bool,
+    /// The largest number in the root's frames.
+    pub root_max: u32,
     /// The cap on the number of promotions (`maxTotalPromotions`).
     pub max_total: u32,
     pub rule: RunnerUp,
@@ -304,10 +316,21 @@ struct Refiner<'r, 'g, const W: usize> {
     cache: &'r mut ConflictCache<W>,
     /// Matching evaluations made.
     evaluations: u64,
-    /// Conflicts computed (not found in `known`).
+    /// Conflicts computed (not found in `known` or the nogood table), and found in the table.
     computed: u64,
+    hits: u64,
     /// The best completion found that can be promoted (the candidates of an exact branch), or none.
     exact: Bits<W>,
+    /// The nogoods (tactic `nogoods`).
+    learning: Option<Learning<'r, W>>,
+}
+
+/// What a [`Refiner`] needs to use and grow the searcher's nogood table (tactic `nogoods`).
+struct Learning<'r, const W: usize> {
+    table: &'r mut Nogoods<W>,
+    /// The search's root, and the promotions of the node.
+    root: &'r FrameSet<W>,
+    promoted: Bits<W>,
 }
 
 /// What the matching bound says about a node (see `TaxSearcher::matching_check`).
@@ -345,7 +368,7 @@ impl<const W: usize> Refiner<'_, '_, W> {
             return Verdict::Open(None);
         }
         let chosen = self.m.chosen();
-        let Some(k) = self.fresh_conflict(&chosen) else {
+        let Some(k) = self.top_conflict(&chosen) else {
             return Verdict::Exact(chosen);
         };
         if depth > 0 && !self.branches(k, Bits::EMPTY, depth) {
@@ -354,21 +377,35 @@ impl<const W: usize> Refiner<'_, '_, W> {
         Verdict::Open(Some(k))
     }
 
-    /// A conflict of `promoted` from `self.state`, known or computed; `None` if it can all be promoted.
+    /// A conflict of `promoted` from `self.state`, known or found; `None` if it can all be promoted.
     fn conflict_of(&mut self, promoted: &Bits<W>) -> Option<Bits<W>> {
         match self.known.iter().rev().find(|k| k.is_subset(promoted)) {
             Some(&k) => Some(k),
-            None => self.fresh_conflict(promoted),
+            None => self.top_conflict(promoted),
         }
     }
 
-    /// A conflict of `promoted` from `self.state`, computed (and then known); `None` if it can all be promoted.
-    /// The search branches on the top level's conflict, so that is always computed this way, and the branching
-    /// does not depend on what is known (which depends on how the search got to the node).  What is pruned can:
-    /// refinements and the propagation into children use what is known, which work units do not record.
-    fn fresh_conflict(&mut self, promoted: &Bits<W>) -> Option<Bits<W>> {
+    /// A conflict of `promoted` from `self.state` (and then known), from the nogood table if it has one (the
+    /// smallest it has), else computed (and then learned); `None` if it can all be promoted.  The search branches
+    /// on the top level's conflict, which is found this way, not looked up in what is known along the path: so
+    /// without the `nogoods` tactic the branching depends only on the node; with it, on what the searcher has
+    /// learned.  Refinements and the propagation into children use what is known too, which work units do not
+    /// record.
+    fn top_conflict(&mut self, promoted: &Bits<W>) -> Option<Bits<W>> {
+        if let Some(l) = &self.learning {
+            if let Some(k) = l.table.conflict(&l.promoted, promoted) {
+                self.hits += 1;
+                self.known.push(k);
+                return Some(k);
+            }
+        }
         let k = self.model.conflict_cached(self.scratch, Some(self.cache), self.state, promoted, true)?;
         self.computed += 1;
+        if let Some(l) = &mut self.learning {
+            if let Some(n) = self.model.nogood(self.scratch, l.root, &l.promoted, &k) {
+                l.table.insert(n);
+            }
+        }
         self.known.push(k);
         Some(k)
     }
@@ -450,6 +487,10 @@ fn strongest<const W: usize>(m: &mut MatchBound<'_, W>, k: &Bits<W>, need: u64) 
     (best.1, forced)
 }
 
+/// Most nogoods a searcher keeps (tactic `nogoods`); it forgets them all when it has this many.  Searches near
+/// n = 1200 learn about a thousand.
+const NOGOOD_CAPACITY: usize = 1 << 16;
+
 /// One node on the searcher's stack.
 #[derive(Clone, Copy)]
 struct Level<const W: usize> {
@@ -477,6 +518,9 @@ struct RefineCounts {
     refinements: u64,
     evaluations: u64,
     conflicts: u64,
+    /// Conflicts found in the nogood table, and candidates its nogoods ruled out of children (tactic `nogoods`).
+    hits: u64,
+    removed: u64,
 }
 
 /// Indexes into [`Stats::extra`].
@@ -719,6 +763,8 @@ pub struct TaxSearcher<'a, const W: usize> {
     known: Vec<Bits<W>>,
     /// The frames' last conflicts (see [`ConflictCache`]).
     conflict_cache: ConflictCache<W>,
+    /// The nogoods learned (tactic `nogoods`).
+    nogoods: Option<Nogoods<W>>,
     payload: Vec<u8>,
     probe: Option<Probe<'a>>,
     /// The matching solver's statistics already added to the diagnostics.
@@ -738,6 +784,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             counts: RefineCounts::default(),
             known: Vec::new(),
             conflict_cache: ConflictCache::default(),
+            nogoods: space.nogoods.then(|| Nogoods::new(space.root_max, NOGOOD_CAPACITY)),
             payload: Vec::with_capacity(8 * W),
             probe: space.diagnostics.map(|shared| Probe { shared, local: Diagnostics::default() }),
             match_seen: [0; 3],
@@ -760,6 +807,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         need: u64,
         want_conflict: bool,
         found: &mut Bits<W>,
+        nogoods: Option<(&mut Nogoods<W>, Bits<W>)>,
     ) -> MatchCheck<W> {
         let Some(m) = matching.as_mut() else {
             return MatchCheck::Open(None);
@@ -772,12 +820,26 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         if depth == 0 && !want_conflict {
             return MatchCheck::Open(None);
         }
-        let exact = Bits::EMPTY;
-        let mut refiner = Refiner { m, model, scratch, state, need, known, cache, evaluations: 0, computed: 0, exact };
+        let learning = nogoods.map(|(table, promoted)| Learning { table, root: space.root, promoted });
+        let mut refiner = Refiner {
+            m,
+            model,
+            scratch,
+            state,
+            need,
+            known,
+            cache,
+            evaluations: 0,
+            computed: 0,
+            hits: 0,
+            exact: Bits::EMPTY,
+            learning,
+        };
         let verdict = refiner.top(depth, want_conflict);
         counts.refinements += 1;
         counts.evaluations += refiner.evaluations;
         counts.conflicts += refiner.computed;
+        counts.hits += refiner.hits;
         *found = refiner.exact;
         match verdict {
             Verdict::Below => MatchCheck::Cut(cut::REFINED),
@@ -884,6 +946,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 need,
                 branching != Branching::Largest,
                 &mut found,
+                self.nogoods.as_mut().map(|table| (table, node.promoted)),
             );
             node.known_end = known.len();
             if !found.is_empty() {
@@ -933,6 +996,18 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             _ => node.cands.max(),
         }
         .expect("not empty");
+        if k.is_some_and(|k| k.len() > 1 && forced == k) {
+            // Every completion that reaches `need` promotes the whole conflict, so there is none.
+            if let Some(p) = probe {
+                p.local.loop_ends[cut::FORCED] += 1;
+            }
+            if depth > 0 {
+                if let Some(m) = matching {
+                    m.pop();
+                }
+            }
+            return depth.checked_sub(1);
+        }
         node.cands.remove(n);
         if let Some(m) = matching {
             if !kept {
@@ -983,6 +1058,12 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 cands -= rest;
             }
         }
+        // So does a nogood (tactic `nogoods`), wherever it was learned.
+        if let Some(table) = &self.nogoods {
+            let out = table.ruled_out(&added, &child.promoted, &cands);
+            self.counts.removed += u64::from(out.len());
+            cands -= out;
+        }
         let need = (best + 1).saturating_sub(child.sum); // the child is worth it if its bound is at least this
         let cut_by = if cands.sum_largest(max_next) < need {
             Some(cut::LARGEST)
@@ -1009,6 +1090,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 need,
                 false,
                 &mut found,
+                self.nogoods.as_mut().map(|table| (table, child.promoted)),
             );
             if !found.is_empty() {
                 Self::offer(space, &mut self.payload, ctx, &(child.promoted | found));
@@ -1518,6 +1600,8 @@ pub fn search_with<const W: usize>(
         match_refine: u32::from(prepared.tactics.match_refine),
         conflict_branching: if prepared.tactics.match_bound { prepared.tactics.branching } else { Branching::Largest },
         fix_forced: prepared.tactics.fix_forced,
+        nogoods: prepared.tactics.match_bound && prepared.tactics.nogoods,
+        root_max: prepared.root.frames().iter().filter_map(|f| (f.moves | f.factors).max()).max().unwrap_or(0),
         max_total: prepared.max_total,
         rule: prepared.tactics.rule(),
         cap,
@@ -1632,6 +1716,7 @@ mod tests {
         let graph = MatchGraph::new(&model, &root);
         let mut m = MatchBound::new(&graph);
         let mut scratch = Scratch::new();
+        let mut table = Nogoods::new(g.n, 1 << 12);
         let mut checks = [0; 3];
         for _path in 0..6 {
             let (mut state, mut promoted, mut cands) = (root, Bits::<W>::EMPTY, all);
@@ -1645,6 +1730,8 @@ mod tests {
                     for need in [truth.saturating_sub(7), truth, truth + 1, truth + 9] {
                         m.reset(&promoted, &cands);
                         let plain = m.value();
+                        // Half the time with the nogoods learned so far, on this path and others.
+                        let learning = rng.chance(50).then_some(Learning { table: &mut table, root: &root, promoted });
                         let mut refiner = Refiner {
                             m: &mut m,
                             model: &model,
@@ -1655,7 +1742,9 @@ mod tests {
                             cache: &mut cache,
                             evaluations: 0,
                             computed: 0,
+                            hits: 0,
                             exact: Bits::EMPTY,
+                            learning,
                         };
                         let verdict = refiner.top(depth, rng.chance(50));
                         let found = refiner.exact;
@@ -1818,6 +1907,10 @@ mod tests {
             SearchTactics { branching: Branching::Largest, match_refine: 3, ..default },
             SearchTactics { fix_forced: false, ..default },
             SearchTactics { fix_forced: false, match_refine: 0, ..default },
+            SearchTactics { nogoods: false, ..default },
+            SearchTactics { nogoods: false, match_refine: 0, ..default },
+            SearchTactics { match_refine: 0, ..default },
+            SearchTactics { branching: Branching::ConflictSmallest, match_refine: 2, ..default },
         ];
         variants.iter().map(|&t| (t, search_checked(&prepare_golden::<W>(g, t), 1, "tactics").sum)).collect()
     }
@@ -1964,7 +2057,7 @@ mod tests {
         assert!(Header::<8>::decode(b"nonsense").is_err());
 
         // Every setting of the search tactics reads back as it was written, and the default tactics of a checkpoint
-        // made before `fix_forced` existed (0x19d) read back as today's defaults.
+        // made before `fix_forced` and `nogoods` existed (0x19d) read back as today's defaults.
         let default = SearchTactics::default();
         for refine in [0, 1, 7] {
             for branching in Branching::ALL {
@@ -1977,13 +2070,14 @@ mod tests {
                         match_refine: refine,
                         branching,
                         fix_forced: on,
+                        nogoods: off,
                     };
                     assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
                 }
             }
         }
         assert_eq!(SearchTactics::from_bits(0x19d), Ok(default));
-        assert!(SearchTactics::from_bits(1 << 10).is_err());
+        assert!(SearchTactics::from_bits(1 << 11).is_err());
     }
 
     // ---- benchmark: cargo test --release bench_search -- --ignored --nocapture --test-threads=1 ----
