@@ -41,6 +41,14 @@ pub struct FrameColumns<const W: usize> {
     pub estimate_max_promotions: u32,
 }
 
+impl<const W: usize> FrameColumns<W> {
+    /// The frames in the shape [`crate::model::Model::build`] takes: for each frame, bottom first, its factors
+    /// and then its moves.
+    pub fn columns(&self) -> Vec<Vec<u32>> {
+        self.frames.iter().flat_map(|f| [f.factors.to_vec(), f.moves.to_vec()]).collect()
+    }
+}
+
 /// Builds the frames of the board `1..=t.n` with no promotions.
 pub fn build_frames<const W: usize>(t: &Tables) -> FrameColumns<W> {
     let mut apiary = Apiary::<W>::new(t, Bits::EMPTY);

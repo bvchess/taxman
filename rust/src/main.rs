@@ -1,5 +1,9 @@
 //! Command-line front end.  Subcommands are plain functions taking the arguments after the subcommand name.
 
+mod cli;
+mod commands;
+
+use cli::{CliError, CliResult};
 use std::process::ExitCode;
 use std::time::Instant;
 use taxman::game::Optimal;
@@ -9,19 +13,29 @@ const USAGE: &str = "\
 usage: taxman <command> [args]
 
 commands:
+  solve N|A-B [options]   solve one board size or a range, each from the one before
+      --threads K              worker threads (default: all cores)
+      --tactic NAME=on|off     switch a tactic (repeatable); names: prime_shortcut, reuse_prev, revise_freedoms,
+                               preclusions, match_bound, legacy_bound, prev_cap, seed_incumbent
+      --out FILE               append each result as a JSON line; games already completed in FILE are skipped
+      --checkpoint-dir DIR     keep a resumable checkpoint nDDDD.ckpt per game in DIR
+      --checkpoint-interval S  seconds between checkpoints (default 60)
+      --progress S             seconds between progress lines on stderr (default 60, 0 for none)
+      --time-limit S           stop a game's search after S seconds (keeps its checkpoint)
+      --node-limit N           stop a game's search after N nodes (keeps its checkpoint)
+      --mem-cap UNITS          search units kept in memory before spilling to disk
+      --force-search           search even where the previous game gives the answer
+      --optimal FILE           optimal.json to compare with and to take previous games from (none: no file)
+      --show                   print each game's promotions and moves
+  regress [--from A] [--to N] [--threads K] [--tactic ...]
+                          solve A..N (default 1..400) in memory and check every score against optimal.json
+  bench [--threads K] [--tactic ...] [N ...]
+                          time the benchmark games (default 480 500 600 640 660 700 720 760), each on its own
+                          with the previous game from optimal.json and no derivation; appends to bench/history.jsonl
   verify-optimal [FILE]   replay every game in optimal.json (or FILE) and check its recorded score
   tables N K...           print the maximal factors and composites of each K on the board 1..=N
   help                    show this message
 ";
-
-enum CliError {
-    /// Bad command line: print the message and the usage, exit 2.
-    Usage(String),
-    /// The command ran and failed: print the message, exit 1.
-    Failed(String),
-}
-
-type CliResult = Result<(), CliError>;
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -47,12 +61,11 @@ fn run(args: &[String]) -> CliResult {
             print!("{USAGE}");
             Ok(())
         }
+        "solve" => commands::solve(rest),
+        "regress" => commands::regress(rest),
+        "bench" => commands::bench(rest),
         "verify-optimal" => verify_optimal(rest),
         "tables" => tables(rest),
-        // Later subcommands go here, each as a function like the ones above:
-        //   "solve"   - solve one n or a range, with checkpointing (see DESIGN.md, "Per-game pipeline")
-        //   "regress" - solve 1..N and compare every score with optimal.json
-        //   "bench"   - the fixed benchmark set
         other => Err(CliError::Usage(format!("unknown command {other:?}"))),
     }
 }
