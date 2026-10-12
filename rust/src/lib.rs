@@ -2,6 +2,7 @@
 
 pub mod accelerate;
 pub mod bits;
+pub mod engine;
 pub mod frames;
 pub mod game;
 pub mod hives;

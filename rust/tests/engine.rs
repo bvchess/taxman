@@ -1,0 +1,755 @@
+//! Engine tests on a toy problem with an independently computable optimum: 0/1 knapsack solved by
+//! depth-first branch-and-bound with a simple fractional bound, checked against dynamic programming.
+//!
+//! Benchmark (engine overhead per node): `cargo test --release --test engine -- --ignored --nocapture`.
+
+use std::fs;
+use std::panic::{self, AssertUnwindSafe};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, Instant};
+
+use taxman::engine::{self, Ctx, EngineConfig, Outcome, Poll, Searcher, Start, Unit};
+
+// ------------------------------------------------------------------------------------------------------------
+// The toy problem
+// ------------------------------------------------------------------------------------------------------------
+
+/// A knapsack instance with items sorted by value density, best first.
+struct Instance {
+    w: Vec<u64>,
+    v: Vec<u64>,
+    /// `rest[j]` = total value of items `j..`.
+    rest: Vec<u64>,
+    cap: u64,
+}
+
+impl Instance {
+    /// A strongly correlated instance (value = weight + range/10), which is hard for branch-and-bound.
+    fn new(n: usize, range: u64, seed: u64) -> Instance {
+        let mut state = seed | 1;
+        let mut items: Vec<(u64, u64)> = (0..n)
+            .map(|_| {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                let w = 1 + state % range;
+                (w, w + range / 10)
+            })
+            .collect();
+        // Density v/w descending, compared exactly by cross-multiplication.
+        items.sort_by(|a, b| (b.1 * a.0).cmp(&(a.1 * b.0)));
+        let cap = items.iter().map(|it| it.0).sum::<u64>() / 2;
+        let v: Vec<u64> = items.iter().map(|it| it.1).collect();
+        let mut rest = vec![0; n + 1];
+        for j in (0..n).rev() {
+            rest[j] = rest[j + 1] + v[j];
+        }
+        Instance { w: items.iter().map(|it| it.0).collect(), v, rest, cap }
+    }
+
+    fn n(&self) -> usize {
+        self.w.len()
+    }
+
+    /// Optimum by dynamic programming over capacities.
+    fn dp(&self) -> u64 {
+        let mut best = vec![0u64; self.cap as usize + 1];
+        for (&w, &v) in self.w.iter().zip(&self.v) {
+            for c in (w as usize..best.len()).rev() {
+                best[c] = best[c].max(best[c - w as usize] + v);
+            }
+        }
+        best[self.cap as usize]
+    }
+
+    /// Value of the item set `mask`, or None if it does not fit.
+    fn check(&self, mask: u64) -> Option<u64> {
+        let items = (0..self.n()).filter(|i| mask >> i & 1 == 1);
+        let (w, v) = items.fold((0, 0), |(w, v), i| (w + self.w[i], v + self.v[i]));
+        (w <= self.cap).then_some(v)
+    }
+
+    /// Upper bound on the best completion of `node` (whose `next` is an item): all remaining room filled at
+    /// the best remaining density, but no more than all remaining items.  Deliberately weaker than the
+    /// Dantzig bound, so that the tree is large and its size varies smoothly with `n`.
+    fn bound(&self, node: &Node) -> u64 {
+        let j = node.next as usize;
+        node.value + self.rest[j].min((self.cap - node.weight) * self.v[j] / self.w[j])
+    }
+}
+
+/// A search node: items before `next` are decided; `mask` holds the chosen ones.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Node {
+    next: u32,
+    mask: u64,
+    weight: u64,
+    value: u64,
+}
+
+impl Node {
+    const ROOT: Node = Node { next: 0, mask: 0, weight: 0, value: 0 };
+}
+
+impl Unit for Node {
+    fn encode(&self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&self.next.to_le_bytes());
+        out.extend_from_slice(&self.mask.to_le_bytes());
+        out.extend_from_slice(&self.weight.to_le_bytes());
+        out.extend_from_slice(&self.value.to_le_bytes());
+    }
+
+    fn decode(b: &[u8]) -> Self {
+        let u64_at = |i: usize| u64::from_le_bytes(b[i..i + 8].try_into().unwrap());
+        Node {
+            next: u32::from_le_bytes(b[0..4].try_into().unwrap()),
+            mask: u64_at(4),
+            weight: u64_at(12),
+            value: u64_at(20),
+        }
+    }
+}
+
+/// What the depth-first search needs from its surroundings, so the same search runs inside and outside the
+/// engine (the difference measures the engine's per-node overhead).
+trait Env {
+    fn poll(&mut self) -> Poll;
+    fn best(&self) -> u64;
+    fn improve(&mut self, value: u64, mask: u64);
+    fn count(&mut self, extra: Option<usize>);
+    fn push(&mut self, node: Node);
+}
+
+fn dfs(inst: &Instance, stack: &mut Vec<Node>, root: Node, env: &mut impl Env) {
+    stack.clear();
+    stack.push(root);
+    while let Some(node) = stack.pop() {
+        if env.poll() == Poll::Yield {
+            stack.push(node);
+            for unit in stack.drain(..) {
+                env.push(unit);
+            }
+            return;
+        }
+        env.count(None);
+        if node.value > env.best() {
+            env.improve(node.value, node.mask);
+        }
+        let i = node.next as usize;
+        if i == inst.n() {
+            env.count(Some(1));
+            continue;
+        }
+        if inst.bound(&node) <= env.best() {
+            env.count(Some(0));
+            continue;
+        }
+        stack.push(Node { next: node.next + 1, ..node });
+        if node.weight + inst.w[i] <= inst.cap {
+            stack.push(Node {
+                next: node.next + 1,
+                mask: node.mask | 1 << i,
+                weight: node.weight + inst.w[i],
+                value: node.value + inst.v[i],
+            });
+        }
+    }
+}
+
+struct EngineEnv<'c, 'a> {
+    ctx: &'c mut Ctx<'a, Node>,
+    target: Option<u64>,
+}
+
+impl Env for EngineEnv<'_, '_> {
+    #[inline]
+    fn poll(&mut self) -> Poll {
+        self.ctx.poll()
+    }
+
+    #[inline]
+    fn best(&self) -> u64 {
+        self.ctx.best()
+    }
+
+    fn improve(&mut self, value: u64, mask: u64) {
+        if self.ctx.offer(value, &mask.to_le_bytes()) && Some(value) == self.target {
+            self.ctx.declare_optimal();
+        }
+    }
+
+    #[inline]
+    fn count(&mut self, extra: Option<usize>) {
+        let stats = self.ctx.stats();
+        match extra {
+            None => stats.nodes += 1,
+            Some(k) => stats.extra[k] += 1,
+        }
+    }
+
+    fn push(&mut self, node: Node) {
+        self.ctx.push(node);
+    }
+}
+
+struct Knapsack<'a> {
+    inst: &'a Instance,
+    stack: Vec<Node>,
+    /// Declare optimality on reaching this value (a known upper bound).
+    target: Option<u64>,
+    /// Worker 0 panics once it has explored this many nodes (to test panic propagation).
+    panic_after: Option<u64>,
+}
+
+impl Searcher<Node> for Knapsack<'_> {
+    fn run(&mut self, unit: Node, ctx: &mut Ctx<'_, Node>) {
+        if ctx.worker() == 0 && self.panic_after.is_some_and(|n| ctx.stats().nodes >= n) {
+            panic!("searcher panic requested by test");
+        }
+        dfs(self.inst, &mut self.stack, unit, &mut EngineEnv { ctx, target: self.target });
+    }
+}
+
+/// The search without the engine.
+#[derive(Default)]
+struct RawEnv {
+    best: u64,
+    nodes: u64,
+    extra: [u64; 2],
+}
+
+impl Env for RawEnv {
+    #[inline]
+    fn poll(&mut self) -> Poll {
+        Poll::Continue
+    }
+
+    #[inline]
+    fn best(&self) -> u64 {
+        self.best
+    }
+
+    fn improve(&mut self, value: u64, _mask: u64) {
+        self.best = value;
+    }
+
+    #[inline]
+    fn count(&mut self, extra: Option<usize>) {
+        match extra {
+            None => self.nodes += 1,
+            Some(k) => self.extra[k] += 1,
+        }
+    }
+
+    fn push(&mut self, _node: Node) {
+        unreachable!("the raw search never yields")
+    }
+}
+
+fn raw_search(inst: &Instance) -> RawEnv {
+    let mut env = RawEnv::default();
+    dfs(inst, &mut Vec::new(), Node::ROOT, &mut env);
+    env
+}
+
+// ------------------------------------------------------------------------------------------------------------
+// Fixtures
+// ------------------------------------------------------------------------------------------------------------
+
+/// The shared test instance: about 13 million nodes, optimum known by DP.
+fn instance() -> Instance {
+    Instance::new(48, 10_000, 99)
+}
+
+const HEADER: &[u8] = b"knapsack n=48 range=10000 seed=99";
+
+fn config(threads: usize) -> EngineConfig {
+    EngineConfig { threads, ..EngineConfig::default() }
+}
+
+fn fresh() -> Start<Node> {
+    Start::Fresh { units: vec![Node::ROOT], best: 0, payload: Vec::new() }
+}
+
+fn solve(cfg: &EngineConfig, start: Start<Node>, inst: &Instance) -> Outcome {
+    solve_with(cfg, start, inst, None, None)
+}
+
+fn solve_with(
+    cfg: &EngineConfig,
+    start: Start<Node>,
+    inst: &Instance,
+    target: Option<u64>,
+    panic_after: Option<u64>,
+) -> Outcome {
+    let make = |_| Knapsack { inst, stack: Vec::new(), target, panic_after };
+    engine::run(cfg, start, HEADER, make).expect("engine run")
+}
+
+/// Check the incumbent against the DP optimum and its payload against the instance.
+fn assert_optimal(out: &Outcome, inst: &Instance, opt: u64) {
+    assert_eq!(out.best, opt, "optimum");
+    let mask = u64::from_le_bytes(out.payload.as_slice().try_into().expect("payload is a mask"));
+    assert_eq!(inst.check(mask), Some(opt), "payload is a feasible solution of value best");
+}
+
+/// A fresh directory under the system temp dir, removed on drop.
+struct TempDir(PathBuf);
+
+impl TempDir {
+    fn new(name: &str) -> TempDir {
+        static SEQ: AtomicU64 = AtomicU64::new(0);
+        let seq = SEQ.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!("txengine-{name}-{}-{seq}", std::process::id()));
+        let _ = fs::remove_dir_all(&path);
+        fs::create_dir_all(&path).expect("create temp dir");
+        TempDir(path)
+    }
+
+    fn path(&self, name: &str) -> PathBuf {
+        self.0.join(name)
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+fn dir_is_empty(dir: &Path) -> bool {
+    fs::read_dir(dir).map(|mut entries| entries.next().is_none()).unwrap_or(true)
+}
+
+// ------------------------------------------------------------------------------------------------------------
+// Tests
+// ------------------------------------------------------------------------------------------------------------
+
+#[test]
+fn instance_is_big_enough() {
+    let inst = instance();
+    let raw = raw_search(&inst);
+    assert_eq!(raw.best, inst.dp());
+    assert!(raw.nodes >= 1_000_000, "tree too small: {} nodes", raw.nodes);
+}
+
+#[test]
+fn one_thread_is_correct_and_deterministic() {
+    let inst = instance();
+    let opt = inst.dp();
+    let raw = raw_search(&inst);
+    let a = solve(&config(1), fresh(), &inst);
+    let b = solve(&config(1), fresh(), &inst);
+    assert!(a.completed && b.completed);
+    assert_optimal(&a, &inst, opt);
+    assert_eq!(a.stats, b.stats, "identical statistics across runs");
+    // One engine thread explores exactly the tree the plain depth-first search explores.
+    assert_eq!(a.stats.nodes, raw.nodes);
+    assert_eq!(a.stats.extra[..2], raw.extra);
+    assert_eq!(a.counters.splits, 0);
+}
+
+#[test]
+fn eight_threads_are_correct() {
+    let inst = instance();
+    let out = solve(&config(8), fresh(), &inst);
+    assert!(out.completed && !out.optimal_declared);
+    assert_optimal(&out, &inst, inst.dp());
+    assert!(out.counters.splits > 0, "work was split");
+}
+
+#[test]
+fn tiny_queue_cap_spills_and_cleans_up() {
+    let inst = instance();
+    let dir = TempDir::new("spill");
+    let spill = dir.path("spill");
+    let cfg = EngineConfig { queue_mem_cap: 2, spill_dir: Some(spill.clone()), ..config(4) };
+    let out = solve(&cfg, fresh(), &inst);
+    assert!(out.completed);
+    assert_optimal(&out, &inst, inst.dp());
+    assert!(out.counters.spilled_units > 0, "spilled: {:?}", out.counters);
+    assert!(out.counters.reloaded_segments > 0, "reloaded: {:?}", out.counters);
+    assert!(dir_is_empty(&spill), "spill files left behind");
+}
+
+/// Run with a node limit, resuming from the checkpoint until complete.  Returns the final outcome and the
+/// number of invocations.
+fn run_in_pieces(cfg: &EngineConfig, inst: &Instance, ckpt: &Path) -> (Outcome, usize) {
+    let mut start = fresh();
+    for invocation in 1.. {
+        let began = Instant::now();
+        let out = solve(cfg, start, inst);
+        if out.completed {
+            assert!(!ckpt.exists(), "checkpoint removed on completion");
+            return (out, invocation);
+        }
+        assert!(out.elapsed >= began.elapsed() / 2, "elapsed accumulates across resumes");
+        assert!(ckpt.exists(), "final checkpoint written on stop");
+        assert_eq!(engine::read_checkpoint_header(ckpt).unwrap(), HEADER);
+        assert!(invocation < 1000, "no progress");
+        start = Start::Resume(ckpt.to_path_buf());
+    }
+    unreachable!()
+}
+
+#[test]
+fn checkpoint_resume_one_thread_is_exact() {
+    let inst = instance();
+    let raw = raw_search(&inst);
+    let dir = TempDir::new("resume1");
+    let ckpt = dir.path("ckpt.bin");
+    let spill = dir.path("spill");
+    let cfg = EngineConfig {
+        checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))),
+        node_limit: Some(raw.nodes / 7),
+        queue_mem_cap: 3,
+        spill_dir: Some(spill.clone()),
+        ..config(1)
+    };
+    let (out, invocations) = run_in_pieces(&cfg, &inst, &ckpt);
+    assert!(invocations >= 7, "{invocations} invocations");
+    assert_optimal(&out, &inst, inst.dp());
+    // A single thread resumes in exact depth-first order, so the total work equals one uninterrupted run.
+    assert_eq!(out.stats.nodes, raw.nodes);
+    assert_eq!(out.stats.extra[..2], raw.extra);
+    assert!(dir_is_empty(&spill));
+}
+
+#[test]
+fn checkpoint_resume_many_threads() {
+    let inst = instance();
+    let raw = raw_search(&inst);
+    let dir = TempDir::new("resume4");
+    let ckpt = dir.path("ckpt.bin");
+    let spill = dir.path("spill");
+    let cfg = EngineConfig {
+        checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))),
+        node_limit: Some(raw.nodes / 5),
+        queue_mem_cap: 4,
+        spill_dir: Some(spill.clone()),
+        ..config(4)
+    };
+    let (out, invocations) = run_in_pieces(&cfg, &inst, &ckpt);
+    assert!(invocations >= 3, "{invocations} invocations");
+    assert_optimal(&out, &inst, inst.dp());
+    let ratio = out.stats.nodes as f64 / raw.nodes as f64;
+    assert!((0.5..2.0).contains(&ratio), "nodes {} vs uninterrupted {}", out.stats.nodes, raw.nodes);
+    assert!(dir_is_empty(&spill));
+}
+
+#[test]
+fn time_limit_stops_and_resumes() {
+    let inst = instance();
+    let dir = TempDir::new("time");
+    let ckpt = dir.path("ckpt.bin");
+    let cfg = EngineConfig {
+        checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))),
+        time_limit: Some(Duration::from_millis(5)),
+        ..config(4)
+    };
+    let first = solve(&cfg, fresh(), &inst);
+    assert!(!first.completed, "5 ms is not enough");
+    assert!(ckpt.exists());
+    let cfg = EngineConfig { time_limit: None, ..cfg };
+    let out = solve(&cfg, Start::Resume(ckpt.clone()), &inst);
+    assert!(out.completed);
+    assert_optimal(&out, &inst, inst.dp());
+    assert!(out.stats.nodes > first.stats.nodes);
+    assert!(!ckpt.exists());
+}
+
+#[test]
+fn declare_optimal_stops_promptly() {
+    let inst = instance();
+    let opt = inst.dp();
+    let raw = raw_search(&inst);
+    for threads in [1, 8] {
+        let out = solve_with(&config(threads), fresh(), &inst, Some(opt), None);
+        assert!(out.completed && out.optimal_declared);
+        assert_optimal(&out, &inst, opt);
+        assert!(out.stats.nodes < raw.nodes / 2, "{threads} threads: {} of {} nodes", out.stats.nodes, raw.nodes);
+    }
+}
+
+#[test]
+fn frequent_checkpoints_do_not_deadlock() {
+    let inst = instance();
+    let dir = TempDir::new("frequent");
+    let ckpt = dir.path("ckpt.bin");
+    let cfg = EngineConfig { checkpoint: Some((ckpt.clone(), Duration::from_millis(10))), ..config(4) };
+    let out = solve(&cfg, fresh(), &inst);
+    assert!(out.completed);
+    assert_optimal(&out, &inst, inst.dp());
+    assert!(out.counters.checkpoints > 0, "{:?}", out.counters);
+    assert!(!ckpt.exists(), "checkpoint removed on completion");
+}
+
+#[test]
+fn checkpoints_with_progress_and_spill_on_ten_threads() {
+    let inst = instance();
+    let dir = TempDir::new("busy");
+    let ckpt = dir.path("ckpt.bin");
+    let spill = dir.path("spill");
+    let cfg = EngineConfig {
+        checkpoint: Some((ckpt.clone(), Duration::from_millis(3))),
+        progress: Some(Duration::from_millis(20)),
+        queue_mem_cap: 8,
+        spill_dir: Some(spill.clone()),
+        label: "test".into(),
+        ..config(10)
+    };
+    let out = solve(&cfg, fresh(), &inst);
+    assert!(out.completed);
+    assert_optimal(&out, &inst, inst.dp());
+    assert!(!ckpt.exists());
+    assert!(dir_is_empty(&spill));
+}
+
+#[test]
+fn worker_panic_propagates() {
+    let inst = instance();
+    let raw = raw_search(&inst);
+    let dir = TempDir::new("panic");
+    let ckpt = dir.path("ckpt.bin");
+    let spill = dir.path("spill");
+    let cfg = EngineConfig {
+        checkpoint: Some((ckpt.clone(), Duration::from_millis(1))),
+        queue_mem_cap: 2,
+        spill_dir: Some(spill.clone()),
+        ..config(4)
+    };
+    // Worker 0 panics a while into the run, after some checkpoints have been written.
+    let result = panic::catch_unwind(AssertUnwindSafe(|| solve_with(&cfg, fresh(), &inst, None, Some(raw.nodes / 8))));
+    assert!(result.is_err(), "the panic reached the caller");
+    assert!(dir_is_empty(&spill), "spill files removed while unwinding");
+    // The last checkpoint written before the panic is intact and resumes to the right answer.
+    assert!(ckpt.exists(), "a checkpoint was written before the panic");
+    let out = solve(&cfg, Start::Resume(ckpt.clone()), &inst);
+    assert!(out.completed);
+    assert_optimal(&out, &inst, inst.dp());
+}
+
+#[test]
+fn resume_rejects_wrong_header_and_damaged_files() {
+    let inst = instance();
+    let dir = TempDir::new("reject");
+    let ckpt = dir.path("ckpt.bin");
+    let cfg = EngineConfig {
+        checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))),
+        node_limit: Some(100_000),
+        ..config(2)
+    };
+    assert!(!solve(&cfg, fresh(), &inst).completed);
+    let make = |_| Knapsack { inst: &inst, stack: Vec::new(), target: None, panic_after: None };
+
+    let err = engine::run(&cfg, Start::Resume(ckpt.clone()), b"another problem", make).unwrap_err();
+    assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+
+    let good = fs::read(&ckpt).unwrap();
+    for damage in ["flip", "truncate"] {
+        let mut bad = good.clone();
+        match damage {
+            "flip" => bad[good.len() / 2] ^= 0x10,
+            _ => bad.truncate(good.len() - 5),
+        }
+        fs::write(&ckpt, &bad).unwrap();
+        let err = engine::run(&cfg, Start::Resume(ckpt.clone()), HEADER, make).unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidData, "{damage}: {err}");
+    }
+
+    fs::write(&ckpt, &good).unwrap();
+    let cfg = EngineConfig { node_limit: None, ..cfg };
+    let out = engine::run(&cfg, Start::Resume(ckpt.clone()), HEADER, make).unwrap();
+    assert!(out.completed);
+    assert_optimal(&out, &inst, inst.dp());
+}
+
+/// A spill failure stops the run with the error, but the units stay in memory and go into the final
+/// checkpoint, so nothing is lost.
+#[cfg(unix)]
+#[test]
+fn spill_failure_stops_without_losing_work() {
+    use std::os::unix::fs::PermissionsExt;
+    let inst = instance();
+    let dir = TempDir::new("spillfail");
+    let ckpt = dir.path("ckpt.bin");
+    let spill = dir.path("spill");
+    fs::create_dir_all(&spill).unwrap();
+    fs::set_permissions(&spill, fs::Permissions::from_mode(0o555)).unwrap();
+    let cfg = EngineConfig {
+        checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))),
+        queue_mem_cap: 2,
+        spill_dir: Some(spill.clone()),
+        ..config(4)
+    };
+    let make = |_| Knapsack { inst: &inst, stack: Vec::new(), target: None, panic_after: None };
+    let err = engine::run(&cfg, fresh(), HEADER, make).unwrap_err();
+    assert_eq!(err.kind(), std::io::ErrorKind::PermissionDenied, "{err}");
+    assert!(ckpt.exists(), "final checkpoint written after the spill failure");
+    fs::set_permissions(&spill, fs::Permissions::from_mode(0o755)).unwrap();
+    let out = solve(&cfg, Start::Resume(ckpt.clone()), &inst);
+    assert!(out.completed);
+    assert_optimal(&out, &inst, inst.dp());
+    assert!(dir_is_empty(&spill));
+}
+
+#[test]
+fn empty_start_completes() {
+    let inst = instance();
+    for threads in [1, 4] {
+        let start = Start::Fresh { units: Vec::new(), best: 17, payload: b"seed".to_vec() };
+        let out = solve(&config(threads), start, &inst);
+        assert!(out.completed);
+        assert_eq!((out.best, out.payload.as_slice(), out.stats.nodes), (17, &b"seed"[..], 0));
+    }
+}
+
+/// Random engine configurations on small instances, each run to completion through any number of resumes.
+/// `TXENGINE_STRESS=<iterations> cargo test --release --test engine -- --ignored stress`
+#[test]
+#[ignore]
+fn stress() {
+    let iterations: u64 = std::env::var("TXENGINE_STRESS").ok().and_then(|s| s.parse().ok()).unwrap_or(200);
+    let mut rng = 0x9e37_79b9_7f4a_7c15u64;
+    let mut pick = |options: &[u64]| {
+        rng ^= rng << 13;
+        rng ^= rng >> 7;
+        rng ^= rng << 17;
+        options[(rng % options.len() as u64) as usize]
+    };
+    let dir = TempDir::new("stress");
+    let ckpt = dir.path("ckpt.bin");
+    let spill = dir.path("spill");
+    for it in 0..iterations {
+        let inst = Instance::new(pick(&[36, 40, 44]) as usize, 10_000, pick(&[7, 99, 0x5eed_1234]));
+        let opt = inst.dp();
+        let raw = raw_search(&inst);
+        let ms = |x: u64| (x > 0).then(|| Duration::from_millis(x));
+        let cfg = EngineConfig {
+            threads: pick(&[1, 2, 3, 4, 7, 10, 16, 32]) as usize,
+            queue_mem_cap: pick(&[1, 2, 5, 50, 1 << 20]) as usize,
+            spill_dir: Some(spill.clone()),
+            checkpoint: Some((ckpt.clone(), ms(pick(&[0, 1, 3, 20])).unwrap_or(Duration::from_secs(3600)))),
+            progress: ms(pick(&[0, 0, 0, 2])),
+            time_limit: ms(pick(&[0, 0, 2, 5])),
+            node_limit: (pick(&[0, 0, 1]) == 1).then_some(raw.nodes / 4 + 1),
+            label: format!("stress {it}"),
+        };
+        let target = (pick(&[0, 0, 0, 1]) == 1).then_some(opt);
+        let mut start = fresh();
+        let (mut nodes, mut stalled) = (0, 0);
+        loop {
+            let out = solve_with(&cfg, start, &inst, target, None);
+            stalled = if out.stats.nodes > nodes { 0 } else { stalled + 1 };
+            nodes = out.stats.nodes;
+            assert!(stalled < 20, "iteration {it}: no progress with {cfg:?}");
+            if out.completed {
+                assert_optimal(&out, &inst, opt);
+                assert_eq!(out.optimal_declared, target.is_some() && out.optimal_declared);
+                if cfg.threads == 1 && target.is_none() {
+                    assert_eq!(out.stats.nodes, raw.nodes, "iteration {it}: one thread is exact");
+                }
+                break;
+            }
+            start = Start::Resume(ckpt.clone());
+        }
+        assert!(!ckpt.exists(), "iteration {it}: checkpoint left behind");
+        assert!(dir_is_empty(&spill), "iteration {it}: spill files left behind");
+    }
+}
+
+// ------------------------------------------------------------------------------------------------------------
+// Benchmark: cargo test --release --test engine -- --ignored --nocapture bench
+// ------------------------------------------------------------------------------------------------------------
+
+/// A complete binary tree with no work per node, to isolate the engine's per-node cost.
+#[derive(Clone, Copy)]
+struct Leafy(u32);
+
+impl Unit for Leafy {
+    fn encode(&self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&self.0.to_le_bytes());
+    }
+
+    fn decode(b: &[u8]) -> Self {
+        Leafy(u32::from_le_bytes(b.try_into().unwrap()))
+    }
+}
+
+/// Walk the tree below `root` (whose children have depth `root.0 + 1`, down to `depth`).
+fn walk(stack: &mut Vec<Leafy>, root: Leafy, depth: u32, mut poll: impl FnMut() -> Poll, out: &mut Vec<Leafy>) -> u64 {
+    let mut nodes = 0;
+    stack.clear();
+    stack.push(root);
+    while let Some(node) = stack.pop() {
+        if poll() == Poll::Yield {
+            stack.push(node);
+            out.append(stack);
+            break;
+        }
+        nodes += 1;
+        if node.0 < depth {
+            stack.push(Leafy(node.0 + 1));
+            stack.push(Leafy(node.0 + 1));
+        }
+    }
+    nodes
+}
+
+struct Walker {
+    depth: u32,
+    stack: Vec<Leafy>,
+    out: Vec<Leafy>,
+}
+
+impl Searcher<Leafy> for Walker {
+    fn run(&mut self, unit: Leafy, ctx: &mut Ctx<'_, Leafy>) {
+        let nodes = walk(&mut self.stack, unit, self.depth, || ctx.poll(), &mut self.out);
+        ctx.stats().nodes += nodes;
+        for u in self.out.drain(..) {
+            ctx.push(u);
+        }
+    }
+}
+
+#[test]
+#[ignore]
+fn bench() {
+    let inst = Instance::new(56, 10_000, 99);
+    let t = Instant::now();
+    let raw = raw_search(&inst);
+    let raw_secs = t.elapsed().as_secs_f64();
+    println!("knapsack: {} nodes", raw.nodes);
+    println!("  raw dfs          {:7.3} s  {:6.1} M nodes/s", raw_secs, raw.nodes as f64 / raw_secs / 1e6);
+    for threads in [1, 10] {
+        let out = solve(&config(threads), fresh(), &inst);
+        let secs = out.elapsed.as_secs_f64();
+        println!(
+            "  engine {threads:2} threads {secs:7.3} s  {:6.1} M nodes/s  ({} nodes, {} splits)",
+            out.stats.nodes as f64 / secs / 1e6,
+            out.stats.nodes,
+            out.counters.splits
+        );
+    }
+
+    let depth = 27;
+    let t = Instant::now();
+    let nodes = walk(&mut Vec::new(), Leafy(0), depth, || Poll::Continue, &mut Vec::new());
+    let raw_secs = t.elapsed().as_secs_f64();
+    println!("empty binary tree: {nodes} nodes");
+    println!("  raw walk         {:7.3} s  {:6.2} ns/node", raw_secs, raw_secs * 1e9 / nodes as f64);
+    for threads in [1, 10] {
+        let start = Start::Fresh { units: vec![Leafy(0)], best: 0, payload: Vec::new() };
+        let make = |_| Walker { depth, stack: Vec::new(), out: Vec::new() };
+        let out = engine::run(&config(threads), start, b"", make).unwrap();
+        assert_eq!(out.stats.nodes, nodes);
+        let secs = out.elapsed.as_secs_f64();
+        println!(
+            "  engine {threads:2} threads {secs:7.3} s  {:6.2} ns/node  ({:.2} ns/node/thread, {} splits)",
+            secs * 1e9 / nodes as f64,
+            secs * 1e9 * threads as f64 / nodes as f64,
+            out.counters.splits
+        );
+    }
+}
