@@ -1865,55 +1865,6 @@ mod tests {
         );
     }
 
-    /// EXPERIMENT: root dive variants against the optimum (`TAXMAN_GAMES`, comma-separated).
-    #[test]
-    #[ignore]
-    fn dive_variants() {
-        let optimal = crate::game::Optimal::load_default().unwrap();
-        let games = std::env::var("TAXMAN_GAMES").unwrap_or("960,984,987,988,990,992,999,1000".into());
-        for n in games.split(',').map(|s| s.trim().parse::<u32>().unwrap()) {
-            let tables = Tables::new(n);
-            let frames = build_frames::<16>(&tables);
-            let columns: Vec<Vec<u32>> =
-                frames.frames.iter().flat_map(|f| [f.factors.to_vec(), f.moves.to_vec()]).collect();
-            let p = prepare::<16>(&tables, &columns, &frames.candidates, SearchTactics::default(), 10).unwrap();
-            let bag: u64 =
-                crate::hives::Apiary::<16>::new(&tables, Bits::EMPTY).solution().iter().map(|&x| u64::from(x)).sum();
-            let opt = optimal.score(n).unwrap() - bag;
-            let graph = MatchGraph::new(&p.model, &p.root);
-            let t0 = Instant::now();
-            let smallest = dive(&p.model, &p.root, &graph, &p.candidates);
-            let t_smallest = t0.elapsed();
-            // Lookahead: exclude the member whose exclusion keeps the matching heaviest.
-            let t0 = Instant::now();
-            let mut m = MatchBound::new(&graph);
-            m.reset(&Bits::EMPTY, &p.candidates);
-            let mut scratch = Scratch::new();
-            let lookahead = loop {
-                let chosen = m.chosen();
-                let Some(k) = p.model.conflict_using(&mut scratch, &p.root, &chosen, true) else { break chosen };
-                let mut best = (0, 0);
-                for x in k.iter() {
-                    m.push_excluding(&Bits::EMPTY.with(x));
-                    best = best.max((m.value(), x));
-                    m.pop();
-                }
-                m.remove_candidate(best.1);
-            };
-            let t_lookahead = t0.elapsed();
-            m.reset(&Bits::EMPTY, &p.candidates);
-            eprintln!(
-                "n={n}: optimum {opt}, matching {}, greedy {}, dive smallest {} ({:.1} ms), lookahead {} ({:.1} ms)",
-                m.value(),
-                p.greedy.sum(),
-                smallest.sum(),
-                t_smallest.as_secs_f64() * 1e3,
-                lookahead.sum(),
-                t_lookahead.as_secs_f64() * 1e3
-            );
-        }
-    }
-
     #[test]
     #[ignore]
     fn bench_search() {
