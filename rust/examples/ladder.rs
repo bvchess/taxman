@@ -216,6 +216,15 @@ fn print_diagnostics(d: &Diagnostics, nodes: u64, found_steps: Option<u64>) {
         println!("    minimal conflict sizes: {}", quantiles(&d.conflict_sizes));
         println!("    bound drop from one refinement: {}", quantiles(&d.refine_drops));
     }
+    let [evaluations, searches, scanned] = d.matching;
+    if evaluations > 0 {
+        println!(
+            "    matching: {:.2} evaluations per step, {:.2} repairs per evaluation, {:.1} vertices per repair",
+            evaluations as f64 / total.max(1) as f64,
+            searches as f64 / evaluations as f64,
+            scanned as f64 / searches.max(1) as f64
+        );
+    }
     if d.refinements > 0 {
         println!(
             "    refinements {}: {:.2} evaluations and {:.3} new conflicts each",

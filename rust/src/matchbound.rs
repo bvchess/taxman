@@ -72,8 +72,7 @@
 
 use crate::bits::Bits;
 use crate::model::{FrameSet, Model};
-use std::cmp::Reverse;
-use std::collections::{BinaryHeap, VecDeque};
+use std::collections::VecDeque;
 
 // ---------------------------------------------------------------------------------------------------------
 // Reference solver
@@ -539,6 +538,75 @@ const REACHED: u8 = 1;
 const DONE: u8 = 2;
 const INNER: u8 = 3;
 
+/// A priority queue of events `(time, code)` for a search whose times never go below the last one popped (as in
+/// Dijkstra's algorithm): a radix heap.  Bucket `i > 0` holds the times whose highest bit differing from the last
+/// popped time is bit `i − 1`, bucket 0 the times equal to it.  Pops the smallest `(time, code)`, like a binary
+/// heap of the pairs, so the search makes the same choices.
+#[derive(Clone, Debug)]
+struct RadixHeap {
+    last: u64,
+    /// Bit `i` set when bucket `i` is not empty.
+    full: u128,
+    buckets: [Vec<(u64, u32)>; 65],
+}
+
+impl Default for RadixHeap {
+    fn default() -> Self {
+        RadixHeap { last: 0, full: 0, buckets: std::array::from_fn(|_| Vec::new()) }
+    }
+}
+
+impl RadixHeap {
+    #[inline]
+    fn bucket(&self, time: u64) -> usize {
+        (u64::BITS - (time ^ self.last).leading_zeros()) as usize
+    }
+
+    fn clear(&mut self) {
+        while self.full != 0 {
+            let i = self.full.trailing_zeros() as usize;
+            self.buckets[i].clear();
+            self.full &= self.full - 1;
+        }
+        self.last = 0;
+    }
+
+    #[inline]
+    fn push(&mut self, time: u64, code: u32) {
+        debug_assert!(time >= self.last, "time went back");
+        let i = self.bucket(time);
+        self.buckets[i].push((time, code));
+        self.full |= 1 << i;
+    }
+
+    fn pop(&mut self) -> Option<(u64, u32)> {
+        if self.full == 0 {
+            return None;
+        }
+        if self.full & 1 == 0 {
+            // Advance to the smallest time and spread its bucket over the lower ones (all of it moves down).
+            let i = self.full.trailing_zeros() as usize;
+            let mut moved = std::mem::take(&mut self.buckets[i]);
+            self.full &= !(1 << i);
+            self.last = moved.iter().map(|e| e.0).min().expect("not empty");
+            for &(time, code) in &moved {
+                let j = self.bucket(time);
+                self.buckets[j].push((time, code));
+                self.full |= 1 << j;
+            }
+            moved.clear();
+            self.buckets[i] = moved;
+        }
+        let now = &mut self.buckets[0];
+        let k = (0..now.len()).min_by_key(|&k| now[k].1).expect("not empty");
+        let event = now.swap_remove(k);
+        if now.is_empty() {
+            self.full &= !1;
+        }
+        Some(event)
+    }
+}
+
 /// Scratch space for the Hungarian search, reused from one search to the next.
 #[derive(Clone, Debug, Default)]
 struct Search {
@@ -552,7 +620,7 @@ struct Search {
     /// The inner vertex an outer one is reached from.
     pred: Vec<u16>,
     /// Events by time: `2v` an outer vertex `v` reached, `2v + 1` the potential of the inner vertex `v` at zero.
-    heap: BinaryHeap<Reverse<(i64, u32)>>,
+    heap: RadixHeap,
     /// The vertices of the tree (inner, and done outer), whose potentials change at the end.
     tree: Vec<u16>,
 }
@@ -587,7 +655,8 @@ impl Search {
     fn run<const W: usize>(&mut self, g: &MatchGraph, lv: &mut Level<W>, root: usize) -> bool {
         self.begin(g.len());
         self.add_inner(g, lv, root, 0);
-        while let Some(Reverse((t, code))) = self.heap.pop() {
+        while let Some((t, code)) = self.heap.pop() {
+            let t = t as i64;
             let v = (code >> 1) as usize;
             if code & 1 == 1 {
                 self.shift(lv, t);
@@ -623,7 +692,7 @@ impl Search {
         self.tree.push(a as u16);
         let (role, ya, mate) = (lv.role[a], lv.y[a], lv.mate[a]);
         if role != Role::Required {
-            self.heap.push(Reverse((d + ya, (a as u32) << 1 | 1)));
+            self.heap.push((d + ya) as u64, (a as u32) << 1 | 1);
         }
         if role != Role::Factor {
             let base = d + ya - lv.weight(g, a);
@@ -657,7 +726,7 @@ impl Search {
         }
         self.dist[b] = nd;
         self.pred[b] = a as u16;
-        self.heap.push(Reverse((nd, (b as u32) << 1)));
+        self.heap.push(nd as u64, (b as u32) << 1);
     }
 
     /// Shifts the potentials of the tree for a search that ends at time `end`.

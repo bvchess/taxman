@@ -504,6 +504,9 @@ pub struct Diagnostics {
     pub refinements: u64,
     pub refine_evaluations: u64,
     pub refine_conflicts: u64,
+    /// The matching solvers' work: evaluations, Hungarian searches, vertices scanned (see
+    /// [`MatchStats`](crate::matchbound::MatchStats)).
+    pub matching: [u64; 3],
 }
 
 fn bump(counts: &mut Vec<u64>, i: usize) {
@@ -546,6 +549,9 @@ impl Diagnostics {
         self.refinements += other.refinements;
         self.refine_evaluations += other.refine_evaluations;
         self.refine_conflicts += other.refine_conflicts;
+        for (a, b) in self.matching.iter_mut().zip(other.matching) {
+            *a += b;
+        }
     }
 
     fn gap(counts: &mut Vec<u64>, gap: u64) {
@@ -656,6 +662,8 @@ pub struct TaxSearcher<'a, const W: usize> {
     conflict_cache: ConflictCache<W>,
     payload: Vec<u8>,
     probe: Option<Probe<'a>>,
+    /// The matching solver's statistics already added to the diagnostics.
+    match_seen: [u64; 3],
 }
 
 impl<'a, const W: usize> TaxSearcher<'a, W> {
@@ -673,6 +681,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             conflict_cache: ConflictCache::default(),
             payload: Vec::with_capacity(8 * W),
             probe: space.diagnostics.map(|shared| Probe { shared, local: Diagnostics::default() }),
+            match_seen: [0; 3],
         }
     }
 
@@ -981,6 +990,14 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             p.local.refinements += refine.refinements;
             p.local.refine_evaluations += refine.evaluations;
             p.local.refine_conflicts += refine.conflicts;
+            if let Some(m) = &self.matching {
+                let s = m.stats();
+                let now = [s.evaluations, s.searches, s.scanned];
+                for ((total, seen), now) in p.local.matching.iter_mut().zip(&mut self.match_seen).zip(now) {
+                    *total += now - *seen;
+                    *seen = now;
+                }
+            }
             p.flush();
         }
     }
