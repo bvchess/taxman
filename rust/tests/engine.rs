@@ -477,7 +477,7 @@ fn frequent_checkpoints_do_not_deadlock() {
     let inst = instance();
     let dir = TempDir::new("frequent");
     let ckpt = dir.path("ckpt.bin");
-    let cfg = EngineConfig { checkpoint: Some((ckpt.clone(), Duration::from_millis(10))), ..config(4) };
+    let cfg = EngineConfig { checkpoint: Some((ckpt.clone(), Duration::from_millis(1))), ..config(4) };
     let out = solve(&cfg, fresh(), &inst);
     assert!(out.completed);
     assert_optimal(&out, &inst, inst.dp());
