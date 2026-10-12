@@ -191,13 +191,14 @@ fn the_sacrifice_bound_proves_a_w32_result() {
 // ---------------------------------------------------------------------------------------------------------
 // Resuming at W = 32
 
-/// A checkpoint of a W = 32 game that an older build wrote (`testdata/n1133_after_1000_nodes.ckpt`: game 1133 with
-/// `reuse_prev` and `revise_freedoms` off, stopped after 1,000 nodes on one thread) still resumes and finishes with
-/// the committed score.  Every write/read test of the format uses the code's own constants, so a change of the
-/// layout that round-trips (the version, the byte order of a set, the order of the header's fields, the packing of
-/// the tactics) passes them and refuses this file.
+/// A checkpoint of a W = 32 game that an earlier build wrote (`testdata/n1133_after_1000_nodes.ckpt`: game 1133 with
+/// `reuse_prev` and `revise_freedoms` off, stopped after 1,023 nodes on one thread; search header format TXSH v3)
+/// still resumes and finishes with the committed score.  Every write/read test of the format uses the code's own
+/// constants, so a change of the layout that round-trips (the version, the byte order of a set, the order of the
+/// header's fields, the packing of the tactics) passes them and refuses this file.
 ///
-/// To make such a file again, after a change that must not be compatible:
+/// A deliberate change of the format (a new header version, say, which refuses older checkpoints) fails this test.
+/// To make the file again with the new build:
 /// `taxman solve 1133 --threads 1 --tactic reuse_prev=off --tactic revise_freedoms=off --node-limit 1000
 ///  --out R --checkpoint-dir D` with `R` holding only game 1132's line of `results/strict.jsonl`, then copy
 /// `D/n1133.ckpt` over the fixture.

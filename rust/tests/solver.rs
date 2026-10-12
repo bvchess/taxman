@@ -236,6 +236,7 @@ fn a_range_stops_at_an_unfinished_game_and_picks_up_where_it_left_off() {
 #[test]
 fn big_boards_get_through_setup() {
     for n in [1500, 2050] {
+        // Setup is the cost here, mostly the starting incumbent's local search, which runs on one thread.
         let opts = SolveOptions { node_limit: Some(1), force_search: true, ..options(2) };
         let r = solver::solve_game(n, None, &opts).unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(r.n, n);

@@ -1541,10 +1541,10 @@ mod tests {
         eprintln!(
             "  child (push + value + pop):           {:9.2} µs per child ({children} children; {})",
             (both_ns - shrink_ns) / 1e3 / children as f64,
-            // What the second run did beyond the first's (differences first: the sums overflow in a debug build).
+            // Added before subtracting: the difference of the first two alone can be negative.
             per(
-                (both.searches - shrink.searches).saturating_sub(shrink.searches - before.searches),
-                (both.scanned - shrink.scanned).saturating_sub(shrink.scanned - before.scanned),
+                both.searches + before.searches - 2 * shrink.searches,
+                both.scanned + before.scanned - 2 * shrink.scanned,
                 children
             )
         );
