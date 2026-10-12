@@ -8,5 +8,6 @@ pub mod frames;
 pub mod game;
 pub mod hives;
 pub mod json;
+pub mod matchbound;
 pub mod model;
 pub mod numtheory;

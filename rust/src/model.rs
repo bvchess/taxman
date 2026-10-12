@@ -688,12 +688,14 @@ impl Model {
 // ---------------------------------------------------------------------------------------------------------
 // Tests
 
-/// Helpers shared by the tests of this module and of `bounds`.
+/// Helpers shared by the tests of this module, `bounds` and `matchbound`.
 #[cfg(test)]
 pub(crate) mod test_support {
+    use super::{FrameSet, Model};
     use crate::bits::Bits;
     use crate::json::Json;
     use std::path::PathBuf;
+    use std::time::Instant;
 
     /// Tiny xorshift64 generator, so the tests need no crates and are reproducible.
     pub(crate) struct Rng(pub u64);
@@ -773,6 +775,52 @@ pub(crate) mod test_support {
         }
         let candidates = u32s(&json, "allCandidates");
         Golden { n, columns, candidates, json }
+    }
+
+    /// The largest sum of at most `max_size` members of `cands` that can be promoted from `state` (exhaustive,
+    /// pruned only by sums): the truth that upper bounds are checked against.
+    pub(crate) fn best_completion<const W: usize>(
+        model: &Model,
+        state: &FrameSet<W>,
+        cands: &Bits<W>,
+        max_size: u32,
+    ) -> u64 {
+        fn dfs<const W: usize>(model: &Model, state: &FrameSet<W>, list: &[u32], sum: u64, left: u32, best: &mut u64) {
+            *best = (*best).max(sum);
+            if left == 0 {
+                return;
+            }
+            for i in 0..list.len() {
+                let optimistic: u64 = sum + list[i..].iter().take(left as usize).map(|&x| u64::from(x)).sum::<u64>();
+                if optimistic <= *best {
+                    return;
+                }
+                let mut next = *state;
+                if model.promote_in_place(&mut next, list[i]) {
+                    dfs(model, &next, &list[i + 1..], sum + u64::from(list[i]), left - 1, best);
+                }
+            }
+        }
+        let list: Vec<u32> = cands.iter_desc().collect();
+        let mut best = 0;
+        dfs(model, state, &list, 0, max_size, &mut best);
+        best
+    }
+
+    /// For micro-benchmarks: nanoseconds per call of `f`, which makes `calls` calls: the best of seven trials of
+    /// about 0.15 s each, so that other load on the machine disturbs the figure less.
+    pub(crate) fn time_per_call(calls: u64, mut f: impl FnMut()) -> f64 {
+        let mut best = f64::INFINITY;
+        for _ in 0..7 {
+            let start = Instant::now();
+            let mut rounds = 0u64;
+            while start.elapsed().as_secs_f64() < 0.15 {
+                f();
+                rounds += 1;
+            }
+            best = best.min(start.elapsed().as_secs_f64() * 1e9 / (rounds * calls) as f64);
+        }
+        best
     }
 }
 
