@@ -12,6 +12,7 @@ pub mod json;
 pub mod matchbound;
 pub mod model;
 pub mod numtheory;
+pub mod results;
 pub mod sacrifice;
 pub mod search;
 pub mod solver;

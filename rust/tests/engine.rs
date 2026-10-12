@@ -765,6 +765,7 @@ fn stress() {
             queue_mem_cap: pick(&[1, 2, 5, 50, 1 << 20]) as usize,
             spill_dir: Some(spill.clone()),
             checkpoint: Some((ckpt.clone(), ms(pick(&[0, 1, 3, 20])).unwrap_or(Duration::from_secs(3600)))),
+            keep_checkpoint: false,
             progress: ms(pick(&[0, 0, 0, 2])),
             time_limit: ms(pick(&[0, 0, 2, 5])),
             node_limit: (pick(&[0, 0, 1]) == 1).then_some(raw.nodes / 4 + 1),

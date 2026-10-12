@@ -3,11 +3,13 @@
 mod cli;
 mod commands;
 
-use cli::{CliError, CliResult};
+use cli::{Args, CliError, CliResult};
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Instant;
 use taxman::game::Optimal;
 use taxman::numtheory::Tables;
+use taxman::results::verify_files;
 use taxman::search::{Branching, SearchTactics};
 use taxman::solver::Tactics;
 
@@ -29,6 +31,8 @@ commands:
       --node-limit N           stop a game's search after N nodes (keeps its checkpoint)
       --mem-cap UNITS          search units kept in memory before spilling to disk
       --force-search           search even where the previous game gives the answer
+      --allow-tainted-prev     with no unproven tactic on, still build on a previous game whose proof rests on
+                               something unproven (optimal.json's games do); the results that rest on it say so
       --optimal FILE           optimal.json to compare with and to take previous games from (none: no file)
       --show                   print each game's promotions and moves
   regress [--from A] [--to N] [--threads K] [--tactic ...]
@@ -37,6 +41,9 @@ commands:
                           time the benchmark games (default 480 500 600 640 660 700 720 760), each on its own
                           with the previous game from optimal.json and no derivation; appends to bench/history.jsonl
   verify-optimal [FILE]   replay every game in optimal.json (or FILE) and check its recorded score
+  verify-results FILE... [--optimal FILE|none]
+                          check results files without changing them: every game replayed, the chain from n-1,
+                          each line's proof and provenance, and that the files agree; counts games by proof
   tables N K...           print the maximal factors and composites of each K on the board 1..=N
   help                    show this message
 ";
@@ -78,6 +85,7 @@ fn run(args: &[String]) -> CliResult {
         "regress" => commands::regress(rest),
         "bench" => commands::bench(rest),
         "verify-optimal" => verify_optimal(rest),
+        "verify-results" => verify_results(rest),
         "tables" => tables(rest),
         other => Err(CliError::Usage(format!("unknown command {other:?}"))),
     }
@@ -104,6 +112,20 @@ fn verify_optimal(args: &[String]) -> CliResult {
     let total_moves: usize = optimal.games().map(|(_, _, moves)| moves.len()).sum();
     println!("verified {checked} games (n up to {}, {total_moves} moves)", optimal.max_n());
     println!("load+parse {load_ms:.1} ms, replay {replay_ms:.1} ms");
+    Ok(())
+}
+
+fn verify_results(args: &[String]) -> CliResult {
+    let args = Args::parse(args, &["--optimal"], &[])?;
+    if args.positional().is_empty() {
+        return Err(CliError::Usage("usage: verify-results FILE... [--optimal FILE|none]".into()));
+    }
+    let optimal = cli::solver_options(&args)?.load_optimal().map_err(CliError::Failed)?;
+    let paths: Vec<PathBuf> = args.positional().iter().map(PathBuf::from).collect();
+    let start = Instant::now();
+    let report = verify_files(&paths, optimal.as_ref()).map_err(CliError::Failed)?;
+    println!("{report}");
+    println!("checked in {:.1} ms", millis(start));
     Ok(())
 }
 

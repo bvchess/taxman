@@ -31,6 +31,7 @@ use taxman::frames::build_frames;
 use taxman::game::Optimal;
 use taxman::json::Json;
 use taxman::numtheory::Tables;
+use taxman::results::{Taint, OPTIMAL_JSON};
 use taxman::sacrifice::{bound_value, punctured, sacrifice_bound, PuncturedOptions};
 use taxman::solver::{solve_game_with, Prev, PrevSource, SolveOptions, Tactics};
 
@@ -371,9 +372,13 @@ fn one_game<const W: usize>(n: u32, o: &RangeOptions, games: &Games) -> Result<O
             force_search: true,
             optimal_path: None,
             time_limit: o.time_limit,
+            // The previous game is optimal.json's, and the answer is compared with the known optimum.
+            allow_tainted_prev: true,
             ..SolveOptions::default()
         };
-        let prev = Prev { moves: prev_moves.to_vec(), score: prev_score, source: PrevSource::Optimal };
+        let taint = Taint::from([OPTIMAL_JSON.to_owned()]);
+        let prev =
+            Prev { moves: prev_moves.to_vec(), score: prev_score, source: PrevSource::Optimal, proof: None, taint };
         let r = solve_game_with(n, Some(&prev), &opts, None)?;
         if r.completed && opt.is_some_and(|s| s != r.score) {
             return Err(format!("n={n}: the direct search scores {}, not {opt:?}", r.score));

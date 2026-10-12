@@ -12,6 +12,53 @@ use std::path::{Path, PathBuf};
 /// divisors is still in the pot.  Making it removes the number and all of its divisors from the pot (the
 /// taxman takes the divisors).  The sequence need not be a complete game: legal moves may remain at the end.
 pub fn replay(n: u32, moves: &[u32]) -> Result<u64, String> {
+    play(n, moves).map(|(score, _)| score)
+}
+
+/// The moves still legal after `moves` (which must be legal): the numbers in the pot with a proper divisor in
+/// the pot, ascending.
+pub fn legal_moves_left(n: u32, moves: &[u32]) -> Result<Vec<u32>, String> {
+    let (_, in_pot) = play(n, moves)?;
+    let mut legal = vec![false; in_pot.len()];
+    for d in (1..=n).filter(|&d| in_pot[d as usize]) {
+        for m in (2 * d..=n).step_by(d as usize) {
+            legal[m as usize] |= in_pot[m as usize];
+        }
+    }
+    Ok((1..=n).filter(|&m| legal[m as usize]).collect())
+}
+
+/// Referees `moves` as a finished game of `n` and returns its score.  Besides being legal, the game must have
+/// the two properties every optimal game has, which it can show by itself:
+///
+/// * it is over: no legal move is left (one more move would only add to the score);
+/// * for `n ≥ 2`, it opens with the largest prime `≤ n`.  A prime can be played only while 1 is in the pot, so
+///   only as the first move, and an optimal game plays the largest one (the proof is in `sacrifice.rs`, under
+///   "Prime `n`").
+pub fn replay_finished(n: u32, moves: &[u32]) -> Result<u64, String> {
+    let score = replay(n, moves)?;
+    let left = legal_moves_left(n, moves)?;
+    if !left.is_empty() {
+        let shown: Vec<String> = left.iter().take(8).map(u32::to_string).collect();
+        let more = if left.len() > shown.len() { ", ..." } else { "" };
+        return Err(format!("the game is not over: {} legal moves are left ({}{more})", left.len(), shown.join(", ")));
+    }
+    if let Some(prime) = largest_prime_at_most(n) {
+        if moves.first() != Some(&prime) {
+            let first = moves.first().map_or_else(|| "nothing".to_owned(), u32::to_string);
+            return Err(format!("the game opens with {first}, not with {prime}, the largest prime up to {n}"));
+        }
+    }
+    Ok(score)
+}
+
+/// The largest prime `≤ n` (`None` for `n < 2`).
+pub fn largest_prime_at_most(n: u32) -> Option<u32> {
+    (2..=n).rev().find(|&p| is_prime(p))
+}
+
+/// [`replay`], also returning which numbers are still in the pot (indexed by number; 0 is never in it).
+fn play(n: u32, moves: &[u32]) -> Result<(u64, Vec<bool>), String> {
     let mut in_pot = vec![true; n as usize + 1];
     in_pot[0] = false;
     let mut score = 0u64;
@@ -36,7 +83,7 @@ pub fn replay(n: u32, moves: &[u32]) -> Result<u64, String> {
         in_pot[m as usize] = false;
         score += u64::from(m);
     }
-    Ok(score)
+    Ok((score, in_pot))
 }
 
 /// Plays `moves` on the board `1..=n` without `holes` under the *maximal-factor rule*, and returns the score.
@@ -219,6 +266,35 @@ mod tests {
         // A prime can only be played while 1 is still there.
         assert!(replay(7, &[4, 7]).unwrap_err().contains("pays no tax"));
         assert_eq!(replay(7, &[7, 4]), Ok(11));
+    }
+
+    #[test]
+    fn the_moves_left_and_a_finished_game() {
+        // After 7 (takes 1), 4 (takes 2) and 6 (takes 3), only 5 is in the pot, and it has no divisor left.
+        assert_eq!(legal_moves_left(7, &[7, 4, 6]), Ok(vec![]));
+        assert_eq!(replay_finished(7, &[7, 4, 6]), Ok(17));
+        // After 7 alone, every number from 4 up still has its divisor 2 or 3 in the pot.
+        assert_eq!(legal_moves_left(7, &[7]), Ok(vec![4, 6]));
+        assert!(replay_finished(7, &[7]).unwrap_err().contains("2 legal moves are left (4, 6)"));
+        // Over, but opened with the wrong prime: 5 takes 1, so 7 can never be played.
+        assert_eq!(legal_moves_left(7, &[5, 4, 6]), Ok(vec![]));
+        assert!(replay_finished(7, &[5, 4, 6]).unwrap_err().contains("opens with 5, not with 7"));
+        // The game of 1 has no moves, and an empty game of 2 is not over.
+        assert_eq!(replay_finished(1, &[]), Ok(0));
+        assert!(replay_finished(2, &[]).unwrap_err().contains("not over"));
+        assert!(replay_finished(4, &[1]).unwrap_err().contains("pays no tax"));
+        assert_eq!(
+            (largest_prime_at_most(1), largest_prime_at_most(2), largest_prime_at_most(90)),
+            (None, Some(2), Some(89))
+        );
+    }
+
+    #[test]
+    fn every_optimal_game_is_finished() {
+        let opt = Optimal::load_default().unwrap();
+        for (n, score, moves) in opt.games() {
+            assert_eq!(replay_finished(n, moves), Ok(score), "n={n}");
+        }
     }
 
     #[test]

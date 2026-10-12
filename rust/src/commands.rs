@@ -25,12 +25,13 @@ const SOLVE_FLAGS: [&str; 7] =
 
 pub fn solve(args: &[String]) -> CliResult {
     let usage = || CliError::Usage("usage: solve N|A-B [options]".into());
-    let args = Args::parse(args, &flags_with(&SOLVE_FLAGS), &["--force-search", "--show"])?;
+    let args = Args::parse(args, &flags_with(&SOLVE_FLAGS), &["--force-search", "--show", "--allow-tainted-prev"])?;
     let [range] = args.positional() else { return Err(usage()) };
     let (lo, hi) = parse_range(range)?;
 
     let mut opts = solver_options(&args)?;
     opts.force_search = args.has("--force-search");
+    opts.allow_tainted_prev = args.has("--allow-tainted-prev");
     opts.checkpoint_dir = args.value("--checkpoint-dir").map(PathBuf::from);
     if let Some(interval) = args.seconds("--checkpoint-interval")? {
         opts.checkpoint_interval = interval;
@@ -82,8 +83,10 @@ pub fn regress(args: &[String]) -> CliResult {
     let Some(optimal) = opts.load_optimal().map_err(failed)? else {
         return Err(CliError::Usage("regress compares with optimal.json, so --optimal none makes no sense".into()));
     };
-    // Report every mismatch instead of stopping at the first.
+    // Report every mismatch instead of stopping at the first.  The comparison is with optimal.json and nothing is
+    // recorded, so a first game built on optimal.json's is fine whatever the tactics.
     opts.allow_optimal_mismatch = true;
+    opts.allow_tainted_prev = true;
 
     let start = Instant::now();
     let mut results: Vec<GameResult> = Vec::new();
@@ -162,8 +165,10 @@ pub fn bench(args: &[String]) -> CliResult {
         args.positional().iter().map(parse).collect::<Result<_, _>>()?
     };
     let mut opts = solver_options(&args)?;
-    // Every game on its own: the previous game from optimal.json, and no derivation.
+    // Every game on its own: the previous game from optimal.json (whatever the tactics: a benchmark records no
+    // result), and no derivation.
     opts.force_search = true;
+    opts.allow_tainted_prev = true;
     let Some(optimal) = opts.load_optimal().map_err(failed)? else {
         return Err(CliError::Usage(
             "bench takes the previous games from optimal.json, so --optimal none makes no sense".into(),

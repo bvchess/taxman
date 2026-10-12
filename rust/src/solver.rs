@@ -15,25 +15,41 @@
 //!    `inTheBag` is what the game with no promotions scores (`FrameSolver.getMaxPromotionSum`).
 //!
 //! Steps 1 and 3 need the previous game and are skipped by `force_search`, and when a checkpoint of the game
-//! exists (a search that was interrupted is resumed, not replaced by a derivation).  The promotions become a game
-//! through the hives; [`game::replay`] referees it (an illegal game is a hard error); a completed game is
-//! compared with `optimal.json` when that has it (a mismatch is a hard error unless the options allow it).
+//! exists (a search that was interrupted is resumed, not replaced by a derivation).
+//!
+//! The previous game is checked before anything uses it: it must replay legally to its recorded score, be over
+//! (no legal move left) and open with the largest prime, as every optimal game does.  A run with no unproven
+//! tactic on refuses a previous game whose own proof rests on something unproven (its *taint*, see
+//! [`crate::results`]) unless `allow_tainted_prev`.
+//!
+//! The promotions become a game through the hives, and the game is checked before it counts (`conclude`): it
+//! must replay legally ([`replay`]); a completed game must also be over and open with the largest prime;
+//! a game from the frame model must score `inTheBag` plus its promotions; no game may score more than
+//! `n + score(n − 1)` (or its promotions exceed the cap), which would prove the previous game was not optimal, and
+//! a completed game may not score less than the previous one; and a completed game is compared with
+//! `optimal.json` when that has it.  Each failure is a hard error (the `optimal.json` comparison unless the
+//! options allow a mismatch), and a game that fails after it was found is recorded, with its promotions, in the
+//! results file's [`rejected_path`](crate::results::rejected_path).
 //!
 //! [`solve_range`] solves a range of board sizes, each feeding the next, and appends every result to a results
-//! file (one JSON object per line) as soon as it is done, so that a restarted run skips what is finished.
+//! file (one JSON object per line) as soon as it is done, so that a restarted run skips what is finished.  The
+//! file is checked when it is opened ([`ResultsFile::open`]).  A game's checkpoint is deleted only once its
+//! result is in the file.
 
 use crate::accelerate::{prime_shortcut, reuse_prev, solution_for_promotions};
 use crate::bits::{words_for, Bits};
-use crate::engine::{Counters, EngineConfig, Stats};
+use crate::engine::{self, Counters, EngineConfig, Stats};
 use crate::frames::{build_frames, FrameColumns};
-use crate::game::{replay, Optimal};
+use crate::game::{replay, replay_finished, Optimal};
 use crate::hives::Apiary;
 use crate::json::Json;
 use crate::numtheory::Tables;
+use crate::results::{
+    build_json, moves_digest, own_taint, taint_json, taint_of, Proof, ResultsFile, Taint, OPTIMAL_JSON, SCHEMA,
+};
 use crate::search::{self, prepare, prepare_for_resume, stat, Branching, Revise, SearchTactics};
-use std::collections::BTreeMap;
 use std::fmt;
-use std::fs::{self, File, OpenOptions};
+use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -246,6 +262,9 @@ pub struct SolveOptions {
     pub optimal_path: Option<PathBuf>,
     /// Record a score that differs from `optimal.json` (as `optimal_match: false`) instead of failing.
     pub allow_optimal_mismatch: bool,
+    /// Let a run with no unproven tactic on build on a previous game whose proof rests on something unproven;
+    /// the results whose proofs rest on that game inherit its taint.
+    pub allow_tainted_prev: bool,
 }
 
 impl Default for SolveOptions {
@@ -264,6 +283,7 @@ impl Default for SolveOptions {
             force_search: false,
             optimal_path: Some(Optimal::default_path()),
             allow_optimal_mismatch: false,
+            allow_tainted_prev: false,
         }
     }
 }
@@ -307,17 +327,83 @@ pub struct Prev {
     pub moves: Vec<u32>,
     pub score: u64,
     pub source: PrevSource,
+    /// How its optimality is established; `None` if that is not known (`optimal.json` does not say).
+    pub proof: Option<Proof>,
+    /// The unproven things its optimality rests on (see [`crate::results`]).
+    pub taint: Taint,
 }
 
 impl Prev {
-    /// The game for board size `n` in `optimal`, if it has one.
+    /// The game for board size `n` in `optimal`, if it has one.  Its taint is `optimal.json`.
     pub fn from_optimal(optimal: &Optimal, n: u32) -> Option<Prev> {
         let (moves, score) = (optimal.moves(n)?, optimal.score(n)?);
-        Some(Prev { moves: moves.to_vec(), score, source: PrevSource::Optimal })
+        let taint = Taint::from([OPTIMAL_JSON.to_owned()]);
+        Some(Prev { moves: moves.to_vec(), score, source: PrevSource::Optimal, proof: None, taint })
     }
 
+    /// A completed result of this run.
     fn from_result(result: &GameResult) -> Prev {
-        Prev { moves: result.moves.clone(), score: result.score, source: PrevSource::Run }
+        Prev {
+            moves: result.moves.clone(),
+            score: result.score,
+            source: PrevSource::Run,
+            proof: result.proof,
+            taint: result.taint.clone(),
+        }
+    }
+
+    /// What a result records about the previous game it was built from.
+    fn info(&self, n: u32) -> PrevInfo {
+        PrevInfo {
+            n: n - 1,
+            score: self.score,
+            source: self.source,
+            moves_digest: moves_digest(&self.moves),
+            proof: self.proof,
+            taint: self.taint.clone(),
+        }
+    }
+
+    /// Checks that the game can be an optimal game of `n − 1`: legal, scoring what it is given as, over, and
+    /// opening with the largest prime.  (Optimal itself cannot be checked; see the tripwires in [`conclude`].)
+    fn check(&self, n: u32) -> Result<(), String> {
+        let before = n - 1;
+        let whence = self.source.as_str();
+        match replay(before, &self.moves) {
+            Ok(score) if score == self.score => {}
+            Ok(score) => {
+                return Err(format!("the previous game scores {score}, not the {} it is given as", self.score))
+            }
+            Err(e) => return Err(format!("the previous game is not a legal game of n={before}: {e}")),
+        }
+        replay_finished(before, &self.moves)
+            .map(|_| ())
+            .map_err(|e| format!("the previous game (n={before}, from {whence}) cannot be optimal: {e}"))
+    }
+}
+
+/// What a result records about the game of `n − 1` it was built from.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PrevInfo {
+    pub n: u32,
+    pub score: u64,
+    pub source: PrevSource,
+    /// [`moves_digest`] of its moves.
+    pub moves_digest: String,
+    pub proof: Option<Proof>,
+    pub taint: Taint,
+}
+
+impl PrevInfo {
+    fn to_json(&self) -> Json {
+        Json::object([
+            ("n", Json::from(self.n)),
+            ("score", Json::from(self.score)),
+            ("source", Json::from(self.source.as_str())),
+            ("moves_digest", Json::from(self.moves_digest.as_str())),
+            ("proof", self.proof.map_or(Json::Null, |p| Json::from(p.as_str()))),
+            ("taint", taint_json(&self.taint)),
+        ])
     }
 }
 
@@ -335,6 +421,8 @@ pub enum Method {
 }
 
 impl Method {
+    pub const ALL: [Method; 4] = [Method::Trivial, Method::Prime, Method::Reuse, Method::Search];
+
     pub fn as_str(self) -> &'static str {
         match self {
             Method::Trivial => "trivial",
@@ -342,6 +430,11 @@ impl Method {
             Method::Reuse => "reuse",
             Method::Search => "search",
         }
+    }
+
+    /// The method [`as_str`](Self::as_str) names.
+    pub fn parse(name: &str) -> Option<Method> {
+        Method::ALL.into_iter().find(|method| method.as_str() == name)
     }
 
     /// Everything but a search (what the Java calls an accelerated game).
@@ -361,7 +454,9 @@ pub struct Phases {
     pub revise: Duration,
     /// The branch and bound (this invocation only).
     pub search: Duration,
-    /// The whole game.
+    /// The branch and bound over every invocation of a resumed search (see `SearchResult::time_all_runs`).
+    pub search_all_runs: Duration,
+    /// The whole game (this invocation only).
     pub total: Duration,
 }
 
@@ -374,6 +469,7 @@ impl Phases {
             ("greedy", secs(self.greedy)),
             ("revise", secs(self.revise)),
             ("search", secs(self.search)),
+            ("search_all_runs", secs(self.search_all_runs)),
             ("total", secs(self.total)),
         ])
     }
@@ -407,7 +503,8 @@ const STAT_NAMES: [(&str, usize); 8] = [
 #[derive(Clone, Debug)]
 pub struct GameResult {
     pub n: u32,
-    /// The game's score; for an incomplete search, that of the best game found so far.
+    /// The game's score; for an incomplete search, that of the best game found so far (written as
+    /// `best_so_far`, with `score` null).
     pub score: u64,
     pub moves: Vec<u32>,
     /// The numbers promoted, ascending.
@@ -416,6 +513,15 @@ pub struct GameResult {
     /// False when a time or node limit stopped the search (its checkpoint is kept and `score` is only a lower
     /// bound).
     pub completed: bool,
+    /// How the game's optimality is established; `None` when incomplete.
+    pub proof: Option<Proof>,
+    /// The search stopped because its incumbent reached the `prev_cap` ceiling.
+    pub reached_cap: bool,
+    /// The unproven things the proof rests on, here or in the games of `n − 1` it rests on (see
+    /// [`crate::results`]); empty when incomplete.
+    pub taint: Taint,
+    /// What the game with no promotions scores, for the games that come from the frame model (not prime ones).
+    pub in_the_bag: Option<u64>,
     /// Search nodes, over all the runs of a resumed search.
     pub nodes: u64,
     /// The search's counters (see [`search::stat`]) and the engine's activity.
@@ -423,15 +529,37 @@ pub struct GameResult {
     pub counters: Counters,
     pub setup: Option<SearchSetup>,
     pub phases: Phases,
+    /// The invocations that ran this game's search: 1, plus those of an interrupted search it resumed (as many
+    /// as the results file records, at least 1; an invocation that was killed leaves no record, but its work up
+    /// to its last checkpoint is in `nodes` and `phases.search_all_runs`).
+    pub invocations: u32,
+    /// Of the last invocation.
     pub threads: usize,
     pub tactics: Tactics,
+    /// The limits and options of the last invocation.
+    pub time_limit: Option<Duration>,
+    pub node_limit: Option<u64>,
+    pub force_search: bool,
+    pub allow_tainted_prev: bool,
+    pub allow_optimal_mismatch: bool,
+    /// `optimal.json`, if one was used: `default` for [`Optimal::default_path`], else the path given.
+    pub optimal_file: Option<String>,
     /// Whether the score equals `optimal.json`'s; `None` if the game is incomplete or the file lacks `n`.
     pub optimal_match: Option<bool>,
     pub prev_source: Option<PrevSource>,
+    /// The game of `n − 1` this one was built from.
+    pub prev: Option<PrevInfo>,
 }
 
 impl GameResult {
     fn new(n: u32, opts: &SolveOptions, prev: Option<&Prev>) -> Self {
+        let optimal_file = opts.optimal_path.as_ref().map(|path| {
+            if *path == Optimal::default_path() {
+                "default".to_owned()
+            } else {
+                path.display().to_string()
+            }
+        });
         GameResult {
             n,
             score: 0,
@@ -439,15 +567,27 @@ impl GameResult {
             promotions: Vec::new(),
             method: Method::Search,
             completed: true,
+            proof: None,
+            reached_cap: false,
+            taint: Taint::new(),
+            in_the_bag: None,
             nodes: 0,
             stats: Stats::default(),
             counters: Counters::default(),
             setup: None,
             phases: Phases::default(),
+            invocations: 1,
             threads: opts.threads,
             tactics: opts.tactics,
+            time_limit: opts.time_limit,
+            node_limit: opts.node_limit,
+            force_search: opts.force_search,
+            allow_tainted_prev: opts.allow_tainted_prev,
+            allow_optimal_mismatch: opts.allow_optimal_mismatch,
+            optimal_file,
             optimal_match: None,
             prev_source: prev.map(|p| p.source),
+            prev: prev.map(|p| p.info(n)),
         }
     }
 
@@ -456,7 +596,7 @@ impl GameResult {
         Json::object(STAT_NAMES.map(|(name, i)| (name, Json::from(self.stats.extra[i]))))
     }
 
-    /// The result as one JSON object.
+    /// The result as one JSON object (schema [`SCHEMA`]; [`crate::results`] describes the provenance fields).
     pub fn to_json(&self) -> Json {
         let c = &self.counters;
         let engine = Json::object([
@@ -475,28 +615,56 @@ impl GameResult {
                 ("revise", Json::from(format!("{:?}", s.revise))),
             ])
         });
-        Json::object([
-            ("n", Json::from(self.n)),
-            ("score", Json::from(self.score)),
-            ("moves", Json::array(self.moves.iter().copied())),
-            ("promotions", Json::array(self.promotions.iter().copied())),
-            ("method", Json::from(self.method.as_str())),
-            ("completed", Json::Bool(self.completed)),
-            ("nodes", Json::from(self.nodes)),
-            ("stats", self.stats_json()),
-            ("engine", engine),
-            ("setup", setup),
-            ("seconds", self.phases.to_json()),
-            ("threads", Json::from(self.threads)),
-            ("tactics", Json::from(self.tactics.description())),
-            ("tactic_switches", self.tactics.to_json()),
-            ("unproven_tactics_on", Json::array(self.tactics.unproven_on())),
-            ("optimal_match", self.optimal_match.map_or(Json::Null, Json::Bool)),
-            ("prev_source", self.prev_source.map_or(Json::Null, |s| Json::from(s.as_str()))),
-        ])
+        // An incomplete game's score is only the best so far, so it does not go where a final score goes.
+        let (score, best_so_far) = if self.completed {
+            (Json::from(self.score), None)
+        } else {
+            (Json::Null, Some(("best_so_far", Json::from(self.score))))
+        };
+        let limits = Json::object([
+            ("seconds", self.time_limit.map_or(Json::Null, |d| Json::Num(d.as_secs_f64()))),
+            ("nodes", self.node_limit.map_or(Json::Null, Json::from)),
+        ]);
+        let options = Json::object([
+            ("force_search", Json::Bool(self.force_search)),
+            ("allow_tainted_prev", Json::Bool(self.allow_tainted_prev)),
+            ("allow_optimal_mismatch", Json::Bool(self.allow_optimal_mismatch)),
+            ("optimal_file", self.optimal_file.as_deref().map_or(Json::Null, Json::from)),
+        ]);
+        let fields = [("schema", Json::from(SCHEMA)), ("n", Json::from(self.n)), ("score", score)]
+            .into_iter()
+            .chain(best_so_far)
+            .chain([
+                ("moves", Json::array(self.moves.iter().copied())),
+                ("promotions", Json::array(self.promotions.iter().copied())),
+                ("method", Json::from(self.method.as_str())),
+                ("completed", Json::Bool(self.completed)),
+                ("proof", self.proof.map_or(Json::Null, |p| Json::from(p.as_str()))),
+                ("reached_cap", Json::Bool(self.reached_cap)),
+                ("taint", if self.completed { taint_json(&self.taint) } else { Json::Null }),
+                ("in_the_bag", self.in_the_bag.map_or(Json::Null, Json::from)),
+                ("prev", self.prev.as_ref().map_or(Json::Null, PrevInfo::to_json)),
+                ("nodes", Json::from(self.nodes)),
+                ("stats", self.stats_json()),
+                ("engine", engine),
+                ("setup", setup),
+                ("seconds", self.phases.to_json()),
+                ("invocations", Json::from(self.invocations)),
+                ("threads", Json::from(self.threads)),
+                ("tactics", Json::from(self.tactics.description())),
+                ("tactic_switches", self.tactics.to_json()),
+                ("unproven_tactics_on", Json::array(self.tactics.unproven_on())),
+                ("limits", limits),
+                ("options", options),
+                ("optimal_match", self.optimal_match.map_or(Json::Null, Json::Bool)),
+                ("prev_source", self.prev_source.map_or(Json::Null, |s| Json::from(s.as_str()))),
+                ("build", build_json()),
+            ]);
+        Json::object(fields)
     }
 
-    /// One line for a person: board size, score, method, nodes, time, and the comparison with `optimal.json`.
+    /// One line for a person: board size, score, method, nodes, time, the comparison with `optimal.json`, the
+    /// proof, and what it rests on that is unproven.
     pub fn summary_line(&self) -> String {
         let optimal = match (self.completed, self.optimal_match) {
             (false, _) => "incomplete",
@@ -504,8 +672,14 @@ impl GameResult {
             (true, Some(false)) => "OPTIMAL MISMATCH",
             (true, None) => "optimal unknown",
         };
+        let proof = self.proof.map_or_else(String::new, |p| format!("  proof={}", p.as_str()));
+        let taint = if self.taint.is_empty() {
+            String::new()
+        } else {
+            format!(" (rests on {})", self.taint.iter().cloned().collect::<Vec<_>>().join(", "))
+        };
         format!(
-            "n={:<5} score={:<9} {:<7} nodes={:<11} {:>9.3} s  {optimal}",
+            "n={:<5} score={:<9} {:<7} nodes={:<11} {:>9.3} s  {optimal}{proof}{taint}",
             self.n,
             self.score,
             self.method.as_str(),
@@ -518,28 +692,79 @@ impl GameResult {
 // ---------------------------------------------------------------------------------------------------------
 // One game
 
+/// Why a game could not be solved.
+enum Failure {
+    /// Before there was a game to show for it.
+    Error(String),
+    /// The game was found but failed a check: the result, with the moves and promotions found, is the evidence.
+    Rejected(Box<GameResult>, String),
+}
+
+impl Failure {
+    /// The message; a rejected game's promotions go with it, so that they are not lost.
+    fn message(self) -> String {
+        match self {
+            Failure::Error(message) => message,
+            Failure::Rejected(result, message) => format!("{message} (promotions {:?})", result.promotions),
+        }
+    }
+}
+
+impl From<String> for Failure {
+    fn from(message: String) -> Self {
+        Failure::Error(message)
+    }
+}
+
+/// A check that failed after the game was found.
+fn reject(result: GameResult, reason: String) -> Result<GameResult, Failure> {
+    Err(Failure::Rejected(Box::new(result), reason))
+}
+
 /// Solves board size `n`.  `prev` is the solution of `n − 1` if known; `opts.optimal_path` is loaded for the
 /// comparison (use [`solve_game_with`] to load it once for many games).
 pub fn solve_game(n: u32, prev: Option<&Prev>, opts: &SolveOptions) -> Result<GameResult, String> {
     solve_game_with(n, prev, opts, opts.load_optimal()?.as_ref())
 }
 
-/// [`solve_game`] with `optimal.json` already loaded (`opts.optimal_path` is not used).
+/// [`solve_game`] with `optimal.json` already loaded (`opts.optimal_path` is not used).  The checkpoint of a
+/// completed game is deleted once the game has passed its checks.
 pub fn solve_game_with(
     n: u32,
     prev: Option<&Prev>,
     opts: &SolveOptions,
     optimal: Option<&Optimal>,
 ) -> Result<GameResult, String> {
-    let result = match words_for(n) {
-        _ if n == 0 => return Err("n must be at least 1".into()),
-        1..=8 => solve_with_width::<8>(n, prev, opts, optimal),
-        9..=16 => solve_with_width::<16>(n, prev, opts, optimal),
-        17..=32 => solve_with_width::<32>(n, prev, opts, optimal),
-        33..=64 => solve_with_width::<64>(n, prev, opts, optimal),
-        _ => return Err(format!("n={n} is beyond the largest supported board, n={MAX_N}")),
+    let result = solve_one(n, prev, opts, optimal, 0).map_err(Failure::message)?;
+    if result.completed {
+        discard_checkpoint(opts, n);
+    }
+    Ok(result)
+}
+
+type SolveWithWidth = fn(u32, Option<&Prev>, &SolveOptions, Option<&Optimal>, u32) -> Result<GameResult, Failure>;
+
+/// Solves board size `n` and leaves its checkpoint, if any, to the caller.  `earlier_runs` is the number of
+/// invocations a results file records for an unfinished search of `n`.
+fn solve_one(
+    n: u32,
+    prev: Option<&Prev>,
+    opts: &SolveOptions,
+    optimal: Option<&Optimal>,
+    earlier_runs: u32,
+) -> Result<GameResult, Failure> {
+    let solve: SolveWithWidth = match words_for(n) {
+        _ if n == 0 => return Err(Failure::Error("n must be at least 1".into())),
+        1..=8 => solve_with_width::<8>,
+        9..=16 => solve_with_width::<16>,
+        17..=32 => solve_with_width::<32>,
+        33..=64 => solve_with_width::<64>,
+        _ => return Err(Failure::Error(format!("n={n} is beyond the largest supported board, n={MAX_N}"))),
     };
-    result.map_err(|e| format!("n={n}: {e}"))
+    solve(n, prev, opts, optimal, earlier_runs).map_err(|failure| match failure {
+        Failure::Error(e) => Failure::Error(format!("n={n}: {e}")),
+        Failure::Rejected(result, e) => Failure::Rejected(result, format!("n={n}: {e}")),
+    })
 }
 
 fn solve_with_width<const W: usize>(
@@ -547,90 +772,179 @@ fn solve_with_width<const W: usize>(
     prev: Option<&Prev>,
     opts: &SolveOptions,
     optimal: Option<&Optimal>,
-) -> Result<GameResult, String> {
+    earlier_runs: u32,
+) -> Result<GameResult, Failure> {
     let start = Instant::now();
     let tactics = opts.tactics;
     if let Some(prev) = prev {
         // The derivations and the cap trust the previous game, so make sure it is what it says it is.
-        match replay(n - 1, &prev.moves) {
-            Ok(score) if score == prev.score => {}
-            Ok(score) => {
-                return Err(format!("the previous game scores {score}, not the {} it is given as", prev.score))
-            }
-            Err(e) => return Err(format!("the previous game is not a legal game of n={}: {e}", n - 1)),
-        }
+        prev.check(n)?;
     }
     let tables = Tables::new(n);
     let mut result = GameResult::new(n, opts, prev);
+    if optimal.is_none() {
+        result.optimal_file = None;
+    }
+    let context = Context { prev, opts, optimal, start };
     // A search that was interrupted is resumed, whatever else could have produced the game.
     let checkpoint = opts.checkpoint_file(n).filter(|path| path.exists());
     let derive = !opts.force_search && checkpoint.is_none();
 
     if derive && tactics.prime_shortcut && tables.is_prime(n) {
         if let Some(prev) = prev {
+            trust(prev, opts)?;
             let moves = prime_shortcut(n, &prev.moves);
             let candidates = Apiary::<W>::new(&tables, Bits::EMPTY).promotion_candidates();
             let promotions = candidates & moves.iter().copied().collect::<Bits<W>>();
             result.method = Method::Prime;
-            return conclude(result, moves, promotions.to_vec(), opts, optimal, start);
+            return conclude(result, moves, promotions.to_vec(), context);
         }
     }
 
     let t0 = Instant::now();
     let frames = build_frames::<W>(&tables);
     result.phases.frames = t0.elapsed();
+    let plain = solution_for_promotions::<W>(&tables, Bits::EMPTY);
+    result.in_the_bag = Some(plain.iter().map(|&m| u64::from(m)).sum());
     if frames.candidates.is_empty() {
         result.method = Method::Trivial;
-        return conclude(result, solution_for_promotions::<W>(&tables, Bits::EMPTY), Vec::new(), opts, optimal, start);
+        return conclude(result, plain, Vec::new(), context);
     }
 
+    if let Some(prev) = prev.filter(|_| tactics.prev_cap) {
+        trust(prev, opts)?;
+    }
     if derive && tactics.reuse_prev {
         if let Some(derived) = prev.and_then(|p| reuse_prev(&tables, &frames, &p.moves)) {
             result.method = Method::Reuse;
-            return conclude(result, derived.moves, derived.promotions, opts, optimal, start);
+            return conclude(result, derived.moves, derived.promotions, context);
         }
     }
 
-    let promotions = search_game(&tables, &frames, prev, opts, checkpoint, &mut result)?;
+    let promotions = search_game(&tables, &frames, prev, opts, checkpoint, earlier_runs, &mut result)?;
     let moves = solution_for_promotions::<W>(&tables, promotions);
-    conclude(result, moves, promotions.to_vec(), opts, optimal, start)
+    conclude(result, moves, promotions.to_vec(), context)
 }
 
-/// Replays the game, compares it with `optimal.json`, and completes the result.
+/// What [`conclude`] checks a game against.
+#[derive(Clone, Copy)]
+struct Context<'a> {
+    prev: Option<&'a Prev>,
+    opts: &'a SolveOptions,
+    optimal: Option<&'a Optimal>,
+    start: Instant,
+}
+
+/// Refuses, in a run with no unproven tactic on, a previous game whose proof rests on something unproven, as
+/// the game about to be solved could rest on it; `allow_tainted_prev` lets it through (the results whose proofs
+/// rest on it then inherit its taint).
+fn trust(prev: &Prev, opts: &SolveOptions) -> Result<(), Failure> {
+    if prev.taint.is_empty() || !opts.tactics.unproven_on().is_empty() || opts.allow_tainted_prev {
+        return Ok(());
+    }
+    let taint: Vec<&str> = prev.taint.iter().map(String::as_str).collect();
+    Err(Failure::Error(format!(
+        "the previous game (from {}) rests on {}, which is not proven, and a run with no unproven tactic on does \
+         not build on it.  Start from a game that rests on nothing unproven (a run from n = 1 with these tactics \
+         does), or pass --allow-tainted-prev to go on and mark the results that rest on it",
+        prev.source.as_str(),
+        taint.join(", ")
+    )))
+}
+
+/// Checks the game (see the module documentation), compares it with `optimal.json`, and completes the result
+/// with its proof and taint.
 fn conclude(
     mut result: GameResult,
     moves: Vec<u32>,
     promotions: Vec<u32>,
-    opts: &SolveOptions,
-    optimal: Option<&Optimal>,
-    start: Instant,
-) -> Result<GameResult, String> {
+    context: Context,
+) -> Result<GameResult, Failure> {
     let n = result.n;
-    result.score = replay(n, &moves).map_err(|e| format!("the {} game is not legal: {e}", result.method.as_str()))?;
-    if result.completed {
-        if let Some(expected) = optimal.and_then(|o| o.score(n)) {
-            result.optimal_match = Some(expected == result.score);
-            if expected != result.score && !opts.allow_optimal_mismatch {
-                return Err(format!("scored {} but optimal.json says {expected}", result.score));
-            }
-        }
-    }
     result.moves = moves;
     result.promotions = promotions;
-    result.phases.total = start.elapsed();
+    result.phases.total = context.start.elapsed();
+    let method = result.method.as_str();
+    // A completed game claims to be optimal, so it must be over and open with the largest prime.
+    let refereed = if result.completed { replay_finished(n, &result.moves) } else { replay(n, &result.moves) };
+    result.score = match refereed {
+        Ok(score) => score,
+        Err(e) => return reject(result, format!("the {method} game does not stand up: {e}")),
+    };
+    let score = result.score;
+    let sum: u64 = result.promotions.iter().map(|&p| u64::from(p)).sum();
+    if let Some(bag) = result.in_the_bag {
+        if score != bag + sum {
+            let why = "the game and the frame model disagree";
+            return reject(
+                result,
+                format!("the {method} game scores {score}, not inTheBag {bag} + its promotions' {sum}: {why}"),
+            );
+        }
+    }
+    // opt(n) ≤ n + opt(n − 1), so going past the ceiling proves the previous game is not optimal.
+    if let Some(cap) = result.setup.and_then(|s| s.cap) {
+        if sum > cap {
+            return reject(
+                result,
+                format!(
+                    "the promotions' {sum} exceed the cap {cap} = n + score(n − 1) − inTheBag, which proves that the \
+                     previous game is not optimal"
+                ),
+            );
+        }
+    }
+    if let Some(prev) = context.prev {
+        let ceiling = prev.score + u64::from(n);
+        let whence = prev.source.as_str();
+        if score > ceiling {
+            return reject(
+                result,
+                format!(
+                    "the game scores {score}, more than n + score(n − 1) = {ceiling}, which proves that the previous \
+                     game (from {whence}) is not optimal"
+                ),
+            );
+        }
+        if result.completed && score < prev.score {
+            return reject(
+                result,
+                format!(
+                    "the game scores {score}, less than the previous game's {} (from {whence}); a game of n − 1 is a \
+                     game of n, so this one is not optimal",
+                    prev.score
+                ),
+            );
+        }
+    }
+    if !result.completed {
+        return Ok(result);
+    }
+    if let Some(expected) = context.optimal.and_then(|o| o.score(n)) {
+        result.optimal_match = Some(expected == score);
+        if expected != score && !context.opts.allow_optimal_mismatch {
+            return reject(result, format!("scored {score} but optimal.json says {expected}"));
+        }
+    }
+    let revise = result.setup.map(|s| format!("{:?}", s.revise));
+    let own = own_taint(result.method, revise.as_deref(), result.tactics.search.legacy_bound);
+    let proof = Proof::of(result.method, true, result.reached_cap).expect("a completed game has a proof");
+    result.proof = Some(proof);
+    result.taint = taint_of(own, proof, context.prev.map(|p| &p.taint));
     Ok(result)
 }
 
 /// The search path: prepares the game (or the checkpoint's game), searches, and fills `result` with what the
-/// search did.  Returns the best promotion set found.
+/// search did.  Returns the best promotion set found.  The checkpoint is left in place (see [`solve_one`]).
 fn search_game<const W: usize>(
     tables: &Tables,
     frames: &FrameColumns<W>,
     prev: Option<&Prev>,
     opts: &SolveOptions,
     checkpoint: Option<PathBuf>,
+    earlier_runs: u32,
     result: &mut GameResult,
-) -> Result<Bits<W>, String> {
+) -> Result<Bits<W>, Failure> {
     let n = tables.n;
     let tactics = opts.tactics;
     let columns = frames.columns();
@@ -641,10 +955,10 @@ fn search_game<const W: usize>(
                 format!("cannot resume from {}: {e} (delete the file to start the game over)", path.display())
             })?;
             if p.tactics != tactics.search {
-                return Err(format!(
+                return Err(Failure::Error(format!(
                     "{} was made with different search tactics than the ones given (delete it to start over)",
                     path.display()
-                ));
+                )));
             }
             p
         }
@@ -657,7 +971,7 @@ fn search_game<const W: usize>(
 
     let cap = match prev {
         Some(prev) if tactics.prev_cap => {
-            let in_the_bag: u64 = solution_for_promotions::<W>(tables, Bits::EMPTY).iter().map(|&m| u64::from(m)).sum();
+            let in_the_bag = result.in_the_bag.expect("the caller sets inTheBag before searching");
             (prev.score + u64::from(n)).checked_sub(in_the_bag)
         }
         _ => None,
@@ -684,6 +998,8 @@ fn search_game<const W: usize>(
         queue_mem_cap: opts.queue_mem_cap,
         spill_dir: Some(spill_dir.clone()),
         checkpoint: checkpoint.or_else(|| opts.checkpoint_file(n)).map(|path| (path, opts.checkpoint_interval)),
+        // Deleted only once the result is safe (`solve_game_with`, `solve_range_each`).
+        keep_checkpoint: true,
         progress: opts.progress,
         time_limit: opts.time_limit,
         node_limit: opts.node_limit,
@@ -696,11 +1012,27 @@ fn search_game<const W: usize>(
     }
     let found = found.map_err(|e| format!("search failed: {e}"))?;
     result.completed = found.completed;
+    result.reached_cap = found.reached_cap;
     result.nodes = found.stats.nodes;
     result.stats = found.stats;
     result.counters = found.counters;
     result.phases.search = found.time;
+    result.phases.search_all_runs = found.time_all_runs;
+    if resuming {
+        // At least one invocation made the checkpoint, even if it left no line in a results file.
+        result.invocations = earlier_runs.max(1) + 1;
+    }
     Ok(found.promotions)
+}
+
+/// Deletes game `n`'s checkpoint, if checkpointing is on.  Called only once the game's result is safe: in the
+/// results file, or (without one) handed to the caller.
+fn discard_checkpoint(opts: &SolveOptions, n: u32) {
+    if let Some(path) = opts.checkpoint_file(n) {
+        if let Err(e) = engine::remove_checkpoint(&path) {
+            let _ = writeln!(std::io::stderr(), "warning: cannot remove the checkpoint of a finished game: {e}");
+        }
+    }
 }
 
 /// Where the engine spills to, and whether this function chose the directory (and so may remove it).  A
@@ -719,88 +1051,6 @@ fn spill_dir(opts: &SolveOptions, n: u32) -> (PathBuf, bool) {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// The results file
-
-/// A completed game read back from a results file.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct StoredGame {
-    pub score: u64,
-    pub moves: Vec<u32>,
-}
-
-/// A results file: one JSON object per line, appended as games finish.  Only completed games count as done.
-pub struct ResultsFile {
-    path: PathBuf,
-    file: File,
-    done: BTreeMap<u32, StoredGame>,
-}
-
-impl ResultsFile {
-    /// Opens (creating if need be) the file and reads the completed games in it.  A torn last line, left by a
-    /// crash while writing, is dropped.
-    pub fn open(path: &Path) -> Result<ResultsFile, String> {
-        let io_error = |e: std::io::Error| format!("{}: {e}", path.display());
-        let text = match fs::read_to_string(path) {
-            Ok(text) => text,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
-            Err(e) => return Err(io_error(e)),
-        };
-        let mut done = BTreeMap::new();
-        let mut valid_len = 0;
-        let lines: Vec<&str> = text.split_inclusive('\n').collect();
-        for (i, line) in lines.iter().enumerate() {
-            if !line.trim().is_empty() {
-                match parse_stored(line) {
-                    Ok(Some((n, game))) => {
-                        done.insert(n, game);
-                    }
-                    Ok(None) => {}
-                    Err(_) if i + 1 == lines.len() && !line.ends_with('\n') => break,
-                    Err(e) => return Err(format!("{}: line {}: {e}", path.display(), i + 1)),
-                }
-            }
-            valid_len += line.len();
-        }
-        let mut file = OpenOptions::new().create(true).append(true).open(path).map_err(io_error)?;
-        if valid_len < text.len() {
-            file.set_len(valid_len as u64).map_err(io_error)?;
-        } else if !text.is_empty() && !text.ends_with('\n') {
-            file.write_all(b"\n").map_err(io_error)?;
-        }
-        Ok(ResultsFile { path: path.to_owned(), file, done })
-    }
-
-    /// The completed game for board size `n`, if the file has one.
-    pub fn completed(&self, n: u32) -> Option<&StoredGame> {
-        self.done.get(&n)
-    }
-
-    /// Appends the result and makes sure it reaches the disk.
-    pub fn append(&mut self, result: &GameResult) -> Result<(), String> {
-        let line = format!("{}\n", result.to_json());
-        let written = self.file.write_all(line.as_bytes()).and_then(|()| self.file.sync_data());
-        written.map_err(|e| format!("{}: {e}", self.path.display()))?;
-        if result.completed {
-            self.done.insert(result.n, StoredGame { score: result.score, moves: result.moves.clone() });
-        }
-        Ok(())
-    }
-}
-
-/// A line of a results file: `None` for a game that did not complete.
-fn parse_stored(line: &str) -> Result<Option<(u32, StoredGame)>, String> {
-    let json = Json::parse(line).map_err(|e| e.to_string())?;
-    let field = |name: &str| json.get(name).ok_or_else(|| format!("missing \"{name}\""));
-    let n = field("n")?.as_u32().ok_or("bad \"n\"")?;
-    if !field("completed")?.as_bool().ok_or("bad \"completed\"")? {
-        return Ok(None);
-    }
-    let score = field("score")?.as_u64().ok_or("bad \"score\"")?;
-    let moves = field("moves")?.as_u32_vec().ok_or("bad \"moves\"")?;
-    Ok(Some((n, StoredGame { score, moves })))
-}
-
-// ---------------------------------------------------------------------------------------------------------
 // Ranges
 
 /// What a range run did.
@@ -814,14 +1064,22 @@ pub struct RangeSummary {
     pub stopped_at: Option<u32>,
 }
 
+/// The completed game of `n` in the results file, as the previous game of `n + 1`.
+fn stored_prev(results: &ResultsFile, n: u32) -> Option<Prev> {
+    let game = results.completed(n)?;
+    Some(Prev {
+        moves: game.moves.clone(),
+        score: game.score,
+        source: PrevSource::Results,
+        proof: Some(game.proof),
+        taint: game.taint.clone(),
+    })
+}
+
 /// The solution of game `n − 1` from the results file, else from `optimal.json`.
 fn previous_game(n: u32, results: Option<&ResultsFile>, optimal: Option<&Optimal>) -> Option<Prev> {
     let before = n.checked_sub(1).filter(|&before| before >= 1)?;
-    let stored = results.and_then(|r| r.completed(before));
-    match stored {
-        Some(game) => Some(Prev { moves: game.moves.clone(), score: game.score, source: PrevSource::Results }),
-        None => optimal.and_then(|o| Prev::from_optimal(o, before)),
-    }
+    results.and_then(|r| stored_prev(r, before)).or_else(|| optimal.and_then(|o| Prev::from_optimal(o, before)))
 }
 
 /// [`solve_range_each`], returning the results of the games solved in this run.
@@ -837,9 +1095,12 @@ pub fn solve_range(
 }
 
 /// Solves the board sizes `lo..=hi` in order, each from the solution of the one before.  The solution of
-/// `lo − 1` comes from the results file, else from `optimal.json`.  Games already completed in the results
-/// file are skipped; every other result is appended to the file (if there is one) and then given to `on_game`.
-/// The range stops at a game whose search did not complete.
+/// `lo − 1` comes from the results file, else from `optimal.json`.  The results file is checked when it is
+/// opened ([`ResultsFile::open`]); games already completed in it are skipped (and a checkpoint left for one is
+/// deleted).  Every other result is appended to the file (if there is one), then given to `on_game`, and only
+/// then is its checkpoint deleted.  A game that fails a check after it was found goes to the file's
+/// [`rejected_path`](crate::results::rejected_path) instead, and the run fails.  The range stops at a game whose
+/// search did not complete.
 pub fn solve_range_each(
     lo: u32,
     hi: u32,
@@ -851,17 +1112,33 @@ pub fn solve_range_each(
         return Err(format!("the range {lo}..={hi} is empty or starts below 1"));
     }
     let optimal = opts.load_optimal()?;
-    let mut results = results_path.map(ResultsFile::open).transpose()?;
+    let mut results = results_path.map(|path| ResultsFile::open(path, optimal.as_ref())).transpose()?;
+    if let Some(file) = &results {
+        // Left by a crash between saving a result and deleting its checkpoint.
+        for n in (lo..=hi).filter(|&n| file.completed(n).is_some()) {
+            if opts.checkpoint_file(n).is_some_and(|path| path.exists()) {
+                discard_checkpoint(opts, n);
+            }
+        }
+    }
     let mut summary = RangeSummary::default();
     let mut prev: Option<Prev> = None;
     for n in lo..=hi {
-        if let Some(game) = results.as_ref().and_then(|r| r.completed(n)) {
-            prev = Some(Prev { moves: game.moves.clone(), score: game.score, source: PrevSource::Results });
+        if let Some(stored) = results.as_ref().and_then(|r| stored_prev(r, n)) {
+            prev = Some(stored);
             summary.skipped += 1;
             continue;
         }
         let before = if n == lo { previous_game(n, results.as_ref(), optimal.as_ref()) } else { prev.take() };
-        let result = solve_game_with(n, before.as_ref(), opts, optimal.as_ref())?;
+        let earlier_runs = results.as_ref().map_or(0, |r| r.earlier_runs(n));
+        let result = match (solve_one(n, before.as_ref(), opts, optimal.as_ref(), earlier_runs), &results) {
+            (Ok(result), _) => result,
+            (Err(Failure::Rejected(result, reason)), Some(file)) => {
+                let path = file.reject(&result, &reason)?;
+                return Err(format!("{reason}; the game is recorded in {}", path.display()));
+            }
+            (Err(failure), _) => return Err(failure.message()),
+        };
         if let Some(results) = &mut results {
             results.append(&result)?;
         }
@@ -871,6 +1148,7 @@ pub fn solve_range_each(
             summary.stopped_at = Some(n);
             break;
         }
+        discard_checkpoint(opts, n);
         prev = Some(Prev::from_result(&result));
     }
     Ok(summary)
@@ -1046,8 +1324,9 @@ mod tests {
         assert_eq!(json.get("tactics").and_then(Json::as_str), Some("default"));
         assert_eq!(json.get("prev_source"), Some(&Json::Null));
         assert_eq!(json.get("unproven_tactics_on").and_then(Json::as_arr).map(<[_]>::len), Some(2));
-        let (n, stored) = parse_stored(&json.to_string()).unwrap().unwrap();
-        assert_eq!((n, stored.score, stored.moves), (10, r.score, r.moves));
+        let contents = crate::results::read_results(&format!("{json}\n"), None).unwrap();
+        let stored = &contents.games[&10];
+        assert_eq!((stored.score, &stored.moves, stored.proof), (r.score, &r.moves, Proof::Trivial));
     }
 
     #[test]
@@ -1078,7 +1357,7 @@ mod tests {
 
         // A malformed line that is not the last is an error, not something to skip.
         fs::write(&path, format!("garbage\n{}", lines.lines().next().unwrap())).unwrap();
-        assert!(ResultsFile::open(&path).is_err());
+        assert!(ResultsFile::open(&path, None).is_err());
         fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -1111,7 +1390,13 @@ mod tests {
     #[test]
     fn a_previous_game_that_does_not_check_out_is_refused() {
         let opts = SolveOptions { optimal_path: None, ..SolveOptions::default() };
-        let prev = |moves: &[u32], score| Prev { moves: moves.to_vec(), score, source: PrevSource::Run };
+        let prev = |moves: &[u32], score| Prev {
+            moves: moves.to_vec(),
+            score,
+            source: PrevSource::Run,
+            proof: Some(Proof::Exhausted),
+            taint: Taint::new(),
+        };
         // [5, 4, 6] is the game for 6, scoring 15.
         assert!(solve_game(7, Some(&prev(&[5, 4, 6], 15)), &opts).is_ok());
         let err = solve_game(7, Some(&prev(&[5, 4, 6], 14)), &opts).unwrap_err();

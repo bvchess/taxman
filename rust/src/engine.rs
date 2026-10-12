@@ -87,7 +87,8 @@
 //! panicking worker's subtree is lost); the previous checkpoint stays valid.
 //!
 //! A run that completes deletes its checkpoint file: the file is no longer needed, and resuming from it
-//! would only repeat work.
+//! would only repeat work.  A caller that must first save the answer somewhere durable sets
+//! `EngineConfig::keep_checkpoint` and deletes the file itself with [`remove_checkpoint`].
 //!
 //! # Instrumentation
 //!
@@ -178,8 +179,11 @@ pub struct EngineConfig {
     /// Directory for spill segments; created if missing.  Without it the deque is never spilled.
     pub spill_dir: Option<PathBuf>,
     /// Checkpoint file and interval.  A final checkpoint is also written when a limit stops the run, and the
-    /// file is deleted when the run completes.
+    /// file is deleted when the run completes (unless `keep_checkpoint`).
     pub checkpoint: Option<(PathBuf, Duration)>,
+    /// Leave the checkpoint file when the run completes, for a caller that deletes it ([`remove_checkpoint`])
+    /// only once the answer is saved: a crash in between then costs one checkpoint interval, not the search.
+    pub keep_checkpoint: bool,
     /// Interval between progress lines on stderr.
     pub progress: Option<Duration>,
     /// Wall-clock limit for this invocation's search, counted from when the workers start (after a resumed
@@ -198,6 +202,7 @@ impl Default for EngineConfig {
             queue_mem_cap: 1 << 20,
             spill_dir: None,
             checkpoint: None,
+            keep_checkpoint: false,
             progress: None,
             time_limit: None,
             node_limit: None,
@@ -366,7 +371,8 @@ pub const WORKER_STACK_SIZE: usize = 64 << 20;
 ///
 /// `header` is opaque caller data stored in every checkpoint (everything the caller needs to rebuild its
 /// searchers on resume); read it back with [`read_checkpoint_header`].  Worker `i` uses `make(i)`, called on
-/// its own thread.  When the run completes, the checkpoint file (if configured) is deleted.
+/// its own thread.  When the run completes, the checkpoint file (if configured) is deleted, unless
+/// `cfg.keep_checkpoint`.
 ///
 /// # Errors
 ///
@@ -430,7 +436,26 @@ where
         }
         shared.coordinate(&plan);
     });
-    shared.outcome(plan.checkpoint.map(|(path, _)| path), Instant::now())
+    let finished_checkpoint = plan.checkpoint.filter(|_| !cfg.keep_checkpoint).map(|(path, _)| path);
+    shared.outcome(finished_checkpoint, Instant::now())
+}
+
+/// Delete a checkpoint file and any temporary file a checkpoint write left next to it.  A file that is not
+/// there is fine.
+///
+/// # Errors
+///
+/// Any other failure to delete either file.
+pub fn remove_checkpoint(path: &Path) -> io::Result<()> {
+    for p in [path.to_path_buf(), tmp_path(path)] {
+        match fs::remove_file(&p) {
+            Err(e) if e.kind() != io::ErrorKind::NotFound => {
+                return Err(io::Error::new(e.kind(), format!("{}: {e}", p.display())))
+            }
+            _ => {}
+        }
+    }
+    Ok(())
 }
 
 /// Read the caller's header from a checkpoint file (without verifying the rest of the file).
@@ -1260,12 +1285,8 @@ impl<U: Unit> Shared<U> {
         }
         if completed {
             if let Some(path) = checkpoint {
-                for p in [path.to_path_buf(), tmp_path(path)] {
-                    if let Err(e) = fs::remove_file(&p) {
-                        if e.kind() != io::ErrorKind::NotFound {
-                            eprintln!("warning: cannot remove finished checkpoint {}: {e}", p.display());
-                        }
-                    }
+                if let Err(e) = remove_checkpoint(path) {
+                    eprintln!("warning: cannot remove finished checkpoint: {e}");
                 }
             }
         }

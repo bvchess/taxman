@@ -1547,6 +1547,9 @@ pub struct SearchResult<const W: usize> {
     pub counters: Counters,
     /// Wall time of this call.
     pub time: Duration,
+    /// Wall time of the search over all its runs: the engine's time in the runs before a resume (each counted up
+    /// to its last checkpoint) plus this call's.
+    pub time_all_runs: Duration,
     /// When this call found its best incumbent (`None` if it found none better than the starting one).
     pub found: Option<Found>,
     /// The incumbent the search started from: the best of the greedy set, the seed and (with `match_bound`) the
@@ -1706,6 +1709,7 @@ fn search_forgetting<const W: usize>(
             stats: Stats::default(),
             counters: Counters::default(),
             time: t0.elapsed(),
+            time_all_runs: t0.elapsed(),
             found: None,
             start: incumbent,
         });
@@ -1741,9 +1745,13 @@ fn search_forgetting<const W: usize>(
         Start::Fresh { units: vec![root], best: incumbent.sum(), payload }
     };
     let header = Header::of(prepared).encode();
+    let engine_start = Instant::now();
     let outcome = engine::run(cfg, start, &header, |_| TaxSearcher::new(&space))?;
+    // The engine's elapsed time includes the runs before a resume; what it counts beyond this call is theirs.
+    let earlier_runs = outcome.elapsed.saturating_sub(engine_start.elapsed());
     let promotions = get_bits(&outcome.payload);
     assert_eq!(promotions.sum(), outcome.best, "the incumbent's payload does not match its value");
+    let time = t0.elapsed();
     Ok(SearchResult {
         promotions,
         sum: outcome.best,
@@ -1751,7 +1759,8 @@ fn search_forgetting<const W: usize>(
         reached_cap: outcome.optimal_declared,
         stats: outcome.stats,
         counters: outcome.counters,
-        time: t0.elapsed(),
+        time,
+        time_all_runs: time + earlier_runs,
         found: space.found.into_inner().unwrap_or_else(PoisonError::into_inner),
         start: incumbent,
     })
