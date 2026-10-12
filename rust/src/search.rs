@@ -462,6 +462,9 @@ struct Level<const W: usize> {
     max_add: u32,
     /// How many of the searcher's known conflicts hold for this node.
     known_end: usize,
+    /// What the matching bound said when the node was made, until its loop takes it: open at this `need`, with
+    /// this conflict to branch on.
+    checked: Option<(u64, Bits<W>)>,
 }
 
 /// Counts of the matching bound's work in a searcher.
@@ -813,7 +816,8 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             .unwrap_or_else(|| panic!("a unit's promotions {:?} cannot be promoted from the root", unit.promoted));
         let max_add = max_additional(space.max_total, &state, &unit.promoted, &unit.cands);
         let sum = unit.promoted.sum();
-        let level = Level { state, promoted: unit.promoted, sum, cands: unit.cands, max_add, known_end: 0 };
+        let level =
+            Level { state, promoted: unit.promoted, sum, cands: unit.cands, max_add, known_end: 0, checked: None };
         self.known.clear();
         if self.levels.is_empty() {
             self.levels.push(level);
@@ -855,12 +859,18 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         let branching = space.conflict_branching;
         let mut conflict = None;
         let mut found = Bits::EMPTY;
+        let checked = node.checked.take();
         let ended = if node.cands.is_empty() {
             Some(cut::EMPTY)
         } else if node.cands.sum_largest(node.max_add) < need {
             Some(cut::LARGEST)
         } else if !bounds.reaches(&node.state, &node.cands, node.max_add, need) {
             Some(cut::BLAME)
+        } else if let Some((_, k)) = checked.filter(|&(at, _)| at == need) {
+            // The node was checked when it was made, at the same need and with the same matching (its first
+            // step): the verdict is the same, and so is the conflict.
+            conflict = Some(k);
+            None
         } else {
             let (scratch, known) = (bounds.scratch(), &mut self.known);
             let check = Self::matching_check(
@@ -931,6 +941,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         }
 
         self.attempts += 1;
+        child.checked = None;
         child.state.assign(&node.state);
         if !space.model.promote_in_place_using(bounds.scratch(), &mut child.state, n) {
             if let Some(p) = probe {
@@ -939,32 +950,29 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             return Some(depth);
         }
         self.promotions += 1;
-        child.promoted = node.promoted.with(n);
-        child.sum = node.sum + u64::from(n);
-        let mut max_next = max_additional(space.max_total, &child.state, &child.promoted, &node.cands);
-        let mut cands = bounds.new_candidate_list(n, max_next, &child.state, &node.cands, &node.promoted);
+        let mut added = Bits::EMPTY.with(n);
         // Tactic `fix_forced`: the child promotes the node's other forced members too.  Every completion of the
         // node that reaches `need` promotes them, and the child's completions are some of the node's, so the
-        // child loses nothing that matters; if one of them is no longer a candidate of the child or cannot be
-        // promoted, the child has no such completion at all.
+        // child loses nothing that matters; if one of them can no longer be promoted (or its frames have no
+        // freedoms left for it), the child has no such completion at all.
         if space.fix_forced {
             for f in forced.without(n).iter_desc() {
-                let before = child.promoted;
-                if !cands.contains(f) || !space.model.promote_in_place_using(bounds.scratch(), &mut child.state, f) {
+                let open = !child.state.narrow_candidates(&Bits::EMPTY.with(f)).is_empty();
+                if !open || !space.model.promote_in_place_using(bounds.scratch(), &mut child.state, f) {
                     if let Some(p) = probe {
                         p.local.child_cuts[cut::FORCED] += 1;
                     }
                     return Some(depth);
                 }
                 self.promotions += 1;
-                cands.remove(f);
-                child.promoted.insert(f);
-                child.sum += u64::from(f);
-                max_next = max_additional(space.max_total, &child.state, &child.promoted, &cands);
-                cands = bounds.new_candidate_list(f, max_next, &child.state, &cands, &before);
+                added.insert(f);
             }
         }
-        let added = child.promoted - node.promoted;
+        child.promoted = node.promoted | added;
+        child.sum = node.sum + added.sum();
+        let rest = node.cands - added;
+        let max_next = max_additional(space.max_total, &child.state, &child.promoted, &rest);
+        let mut cands = bounds.new_candidate_list_after(&added, max_next, &child.state, &rest, &node.promoted);
         // A known conflict of the node (or above) that the child promotes all but one member of rules that member
         // out: the child's state is the node's with more promotions, so promoting it would promote the whole
         // conflict there.  (The heaviest matching of the node promotes n already, so without this the child's
@@ -1006,7 +1014,8 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 Self::offer(space, &mut self.payload, ctx, &(child.promoted | found));
             }
             match check {
-                MatchCheck::Open(_) => {
+                MatchCheck::Open(k) => {
+                    child.checked = k.map(|k| (need, k));
                     if let (Some(p), Some(m)) = (probe.as_mut(), matching.as_mut()) {
                         p.matching_open(bounds, m, space.model, &child.state, max_next, need);
                     }

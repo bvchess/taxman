@@ -125,20 +125,45 @@ impl<'a, const W: usize> Bounds<'a, W> {
         cands: &Bits<W>,
         promoted: &Bits<W>,
     ) -> Bits<W> {
+        self.new_candidate_list_after(&Bits::EMPTY.with(n), max_next, new_state, cands, promoted)
+    }
+
+    /// [`new_candidate_list`](Self::new_candidate_list) for the child made by promoting every member of `added`
+    /// (none of them in `cands` or `promoted`): the preclusions of each of them, after all the others, and the
+    /// promotability checks of the candidates of the home frame of each of them above frame 1 and of the frame
+    /// below that.  With a single number, exactly `new_candidate_list`.
+    pub fn new_candidate_list_after(
+        &mut self,
+        added: &Bits<W>,
+        max_next: u32,
+        new_state: &FrameSet<W>,
+        cands: &Bits<W>,
+        promoted: &Bits<W>,
+    ) -> Bits<W> {
         let mut filtered = new_state.narrow_candidates(cands);
         if let Some(p) = self.preclusions {
             let before = filtered.len();
-            p.remove_precluded(&mut filtered, n, promoted);
+            let all = *promoted | *added;
+            for n in added.iter() {
+                p.remove_precluded(&mut filtered, n, &all.without(n));
+            }
             self.counts.precluded += u64::from(before - filtered.len());
         }
-        let home_n = self.model.home(n);
-        if home_n > 1 {
+        // The home frames whose candidates are checked: those of the added numbers above frame 1, and the frames
+        // below them.
+        let mut checked = 0u32;
+        for n in added.iter() {
+            let home_n = self.model.home(n);
+            if home_n > 1 {
+                checked |= 3 << (home_n - 1);
+            }
+        }
+        if checked != 0 {
             let mut hits = 0;
             self.certified = 0;
             let unchecked = filtered;
             for x in unchecked.iter_desc() {
-                let home_x = self.model.home(x);
-                let unaffected = home_x != home_n && home_x + 1 != home_n;
+                let unaffected = checked & 1 << self.model.home(x) == 0;
                 if unaffected || self.can_promote_certified(new_state, x) {
                     hits += 1;
                     if hits == max_next {
