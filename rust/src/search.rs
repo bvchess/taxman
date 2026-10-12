@@ -85,8 +85,10 @@ pub enum Branching {
     ConflictSmallest,
     /// As `ConflictSmallest`, the largest member of the conflict.  The child then follows the rounding of
     /// [`dive`] (the smaller members are the ones left out), which finds good incumbents early.
-    #[default]
     ConflictLargest,
+    /// The member of the conflict that looks best one step ahead (see [`strongest`]).
+    #[default]
+    ConflictStrong,
 }
 
 impl Default for SearchTactics {
@@ -116,6 +118,7 @@ impl SearchTactics {
             Branching::Largest => 0,
             Branching::ConflictSmallest => 1,
             Branching::ConflictLargest => 2,
+            Branching::ConflictStrong => 3,
         };
         u16::from(self.preclusions)
             | u16::from(self.legacy_bound) << 1
@@ -133,7 +136,7 @@ impl SearchTactics {
             0 => Branching::Largest,
             1 => Branching::ConflictSmallest,
             2 => Branching::ConflictLargest,
-            _ => return Err(format!("unknown tactics {bits:#x}")),
+            _ => Branching::ConflictStrong,
         };
         Ok(SearchTactics {
             preclusions: bits & 1 != 0,
@@ -372,6 +375,23 @@ impl<const W: usize> Refiner<'_, '_, W> {
         }
         reaches
     }
+}
+
+/// The member of the conflict `k` to branch on by looking ahead (tactic `branching = conflict-strong`): the one
+/// whose removal from the candidates lowers the matching bound most (then the largest), which makes the node
+/// going on without it the likeliest to stop soon.  (The child that promotes it gains nothing to look at: the
+/// heaviest matching already promotes every member.)  `m`'s top level is the node, settled; it is left so.
+fn strongest<const W: usize>(m: &mut MatchBound<'_, W>, k: &Bits<W>) -> u32 {
+    let mut best = (u64::MAX, 0);
+    for x in k.iter() {
+        m.push_excluding(&Bits::EMPTY.with(x));
+        let bound = m.value();
+        m.pop();
+        if bound <= best.0 {
+            best = (bound, x);
+        }
+    }
+    best.1
 }
 
 /// One node on the searcher's stack.
@@ -820,6 +840,11 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         let n = match (branching, k) {
             (Branching::ConflictSmallest, Some(k)) => k.min(),
             (Branching::ConflictLargest, Some(k)) => k.max(),
+            (Branching::ConflictStrong, Some(k)) if k.len() > 1 => {
+                let m = matching.as_mut().expect("conflicts come from the matching");
+                Some(strongest(m, &k))
+            }
+            (Branching::ConflictStrong, Some(k)) => k.max(),
             _ => node.cands.max(),
         }
         .expect("not empty");

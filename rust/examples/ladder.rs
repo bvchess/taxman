@@ -68,6 +68,7 @@ fn parse() -> Result<Options, String> {
                         "largest" => Branching::Largest,
                         "conflict-smallest" => Branching::ConflictSmallest,
                         "conflict-largest" => Branching::ConflictLargest,
+                        "conflict-strong" => Branching::ConflictStrong,
                         _ => return Err(format!("--tactic {spec}: largest, conflict-smallest or conflict-largest")),
                     };
                     continue;
