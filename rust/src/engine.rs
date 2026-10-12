@@ -25,13 +25,31 @@
 //! deterministic, and unchanged by checkpoints and spilling.
 //!
 //! **Splitting.**  Running searchers are interrupted only through the `signal` word, which `poll` reads with
-//! one relaxed load.  While some worker is idle, the deque and spill are empty, nothing is paused, and some
-//! worker is running, the engine raises `SIG_SPLIT`.  A running worker answers by turning that bit into
-//! `SIG_INFLIGHT` with a compare-and-swap, so exactly one worker answers each request, and no new request is
-//! raised while one is in flight.  The answering worker clears `SIG_INFLIGHT` in the same critical section
-//! in which it hands its units over (`finish_run`); the request is then re-raised if workers are still
-//! idle.  A worker whose answer had nothing to give away ignores requests for a short cooldown, so it cannot
-//! spin.  Idle workers block on `work_cv`; a push wakes at most as many of them as there are new units.
+//! one relaxed load: its low bit is the yield signal, and the rest counts open *split requests*.  The engine
+//! keeps `requested` (requests open, plus those claimed and not yet answered) equal to the *demand*: the idle
+//! workers that the queued and held units will not serve, while nothing is paused and some worker runs
+//! (`update_split`, under the lock, after every change of those numbers; it can only withdraw open requests).
+//! A running worker claims one request by decrementing the count with a compare-and-swap, so each request has
+//! at most one claimant, and yields; it hands its units over and retires the claim (`requested -= 1`) in one
+//! critical section (`finish_run`), after which the demand is recomputed.  So as many workers split at once
+//! as there are idle workers to feed: from one unit, `threads` workers are busy after a few rounds of splits
+//! in which every running worker splits, not after one split per idle worker; and splits in flight never
+//! outnumber the idle workers.  A worker answers only after `SPLIT_MIN_POLLS` polls of its current unit:
+//! a fresh unit (stolen, or the deepest one its last split left it) first goes deep enough to have something
+//! to give, and no worker is made to restart its unit at every step however long the demand lasts.  Idle
+//! workers block on `work_cv`; a push wakes at most as many of them as there are new units, after the lock
+//! is released.
+//!
+//! **Why one deque.**  A searcher's work is on its own depth-first stack, not in the deque: units exist only
+//! after a yield, and running one costs the searcher a rebuild of its state (for Taxman a promotion pass and a
+//! matching solved from scratch, 30–170 µs already at n = 480–760, against about a microsecond in the critical
+//! section).  The lock is taken about twice per unit, and units are only made when workers are idle (splits)
+//! or paused (checkpoints): with every worker busy nobody takes it.  Per-worker deques with stealing would
+//! remove contention that is not there in steady state, at the price of an ordering argument for one-thread
+//! determinism, spill and checkpoints over `threads` deques, and a distributed termination test.  What did
+//! serialize the work distribution at many threads was answering one split request at a time, which the
+//! demand count replaced.  `Counters::lock_wait` measures what is left: if it ever becomes a noticeable share
+//! of the workers' time (many workers churning through tiny units), per-worker deques are the next step.
 //!
 //! **Yield signal.**  `SIG_YIELD` is set exactly when `pause` or `exit` is set, always under the lock.  While
 //! it is set every `poll` returns `Yield`.
@@ -51,7 +69,12 @@
 //! with the caller's header, the incumbent, the statistics and the total elapsed time to `<path>.tmp`,
 //! fsyncs, and renames it over `<path>`; a checkpoint on disk is therefore always complete, and it carries a
 //! checksum.  It then clears `pause` and each worker resumes its own held unit.  A stop (time or node limit,
-//! I/O error) is a pause whose final checkpoint is followed by `exit` instead of a release.
+//! I/O error) is a pause whose final checkpoint is followed by `exit` instead of a release.  A pause costs
+//! every worker the time until the last one parks, which is bounded by the longest stretch a searcher runs
+//! without polling (one Taxman step: about 10 µs; measured at n = 1215–1225, about one step in 10^5 takes
+//! over a millisecond and the longest 10–15 ms), plus the write and its fsync; then each unit pushed in it
+//! costs a rebuild when it runs.  [`Counters`] records the longest wait for the workers to park and the
+//! longest pause.  Progress lines are printed outside the lock, so a blocked stderr cannot stall the workers.
 //!
 //! **Termination.**  The search is complete when a worker that needs work finds the deque and spill empty,
 //! `running == 0`, no held units and no pause; that worker sets `done` and `exit`.  (While paused, the
@@ -65,12 +88,35 @@
 //!
 //! A run that completes deletes its checkpoint file: the file is no longer needed, and resuming from it
 //! would only repeat work.
+//!
+//! # Instrumentation
+//!
+//! Each worker's time is split into disjoint intervals, summed in [`Counters`]: *busy* (inside
+//! [`Searcher::run`]), *idle* (waiting for work outside pauses), *parked* (waiting in a pause) and *lock wait*
+//! (waiting for the `state` lock after a run); the rest of `wall × threads` is thread start-up and the engine's
+//! own bookkeeping.  The effective parallelism is busy time over `wall × threads`.  Also counted: splits and
+//! the units they gave, steals (units taken from the front by a worker that had waited), runs and tiny runs
+//! (at most one poll: units with nothing left), when all workers first ran at once, and the pauses.  The
+//! clocks are read only at unit boundaries and waits, never per poll.  [`Counters::summary`] is the compact
+//! form that ends every progress line.
+//!
+//! # Platforms
+//!
+//! The engine uses only `std` and behaves the same on Linux and macOS.  Checkpoints are durable on both: the
+//! file is written, `sync_all`ed (`fsync` on Linux, `F_FULLFSYNC` on macOS) and renamed over the old one,
+//! and the directory is then synced so the rename itself survives a crash (needed on Linux; on platforms
+//! that cannot sync a directory this is skipped and the rename is still atomic).  Worker stacks reserve
+//! [`WORKER_STACK_SIZE`] of address space each, committed only as touched.  `EngineConfig::default` takes
+//! `available_parallelism`, which on Linux honours the CPU affinity mask and cgroup quotas.  No signals are
+//! handled: a killed run loses at most one checkpoint interval.  Threads are not pinned; on a multi-socket
+//! (NUMA) machine each searcher allocates its own state on its own thread, so first-touch puts it on that
+//! thread's node.
 
 use std::collections::VecDeque;
 use std::fs::{self, File};
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Condvar, Mutex, MutexGuard, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -169,13 +215,22 @@ pub enum Start<U> {
     Resume(PathBuf),
 }
 
-/// Engine activity counters for one invocation (not saved in checkpoints).
+/// Engine activity counters for one invocation (not saved in checkpoints).  The times are summed over workers
+/// (see "Instrumentation" in the module docs).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Counters {
+    /// Worker threads.
+    pub threads: usize,
     /// Split requests answered.
     pub splits: u64,
     /// Units handed to the deque by split answers.
     pub split_units: u64,
+    /// Units taken from the front of the deque by workers that had waited for work (steals).
+    pub steals: u64,
+    /// Units run (calls of [`Searcher::run`]).
+    pub runs: u64,
+    /// Runs that polled at most once: units with (next to) nothing left to explore.
+    pub tiny_runs: u64,
     /// Checkpoints written (periodic and final).
     pub checkpoints: u64,
     /// Units written to spill segments.
@@ -186,6 +241,104 @@ pub struct Counters {
     pub reloaded_segments: u64,
     /// Largest in-memory deque length seen (before spilling).
     pub max_queue: u64,
+    /// From starting the workers until the last one exited.
+    pub wall: Duration,
+    /// Time workers spent in [`Searcher::run`].
+    pub busy: Duration,
+    /// Time workers spent waiting for work outside pauses.
+    pub idle: Duration,
+    /// Time workers spent parked in pauses.
+    pub parked: Duration,
+    /// Time workers spent waiting for the engine's lock after a run (contention on the shared deque).
+    pub lock_wait: Duration,
+    /// From starting the workers until every worker was running a unit at the same time (`None`: never).
+    pub full_occupancy: Option<Duration>,
+    /// Pauses (each checkpoint, and the final one of a stop).
+    pub pauses: u64,
+    /// Total and longest time from asking the workers to yield until releasing them (or exiting).
+    pub pause_total: Duration,
+    pub pause_max: Duration,
+    /// Longest time from asking the workers to yield until every one had parked.
+    pub park_max: Duration,
+}
+
+impl Counters {
+    /// Add the counters of another run with as many threads, as if it had followed this one: counts and times
+    /// add up, the maxima take the larger, and full occupancy the later (never if either run never reached it).
+    pub fn add(&mut self, other: &Counters) {
+        self.threads = self.threads.max(other.threads);
+        for (a, b) in [
+            (&mut self.splits, other.splits),
+            (&mut self.split_units, other.split_units),
+            (&mut self.steals, other.steals),
+            (&mut self.runs, other.runs),
+            (&mut self.tiny_runs, other.tiny_runs),
+            (&mut self.checkpoints, other.checkpoints),
+            (&mut self.spilled_units, other.spilled_units),
+            (&mut self.spill_segments, other.spill_segments),
+            (&mut self.reloaded_segments, other.reloaded_segments),
+            (&mut self.pauses, other.pauses),
+        ] {
+            *a += b;
+        }
+        for (a, b) in [
+            (&mut self.wall, other.wall),
+            (&mut self.busy, other.busy),
+            (&mut self.idle, other.idle),
+            (&mut self.parked, other.parked),
+            (&mut self.lock_wait, other.lock_wait),
+            (&mut self.pause_total, other.pause_total),
+        ] {
+            *a += b;
+        }
+        self.max_queue = self.max_queue.max(other.max_queue);
+        self.pause_max = self.pause_max.max(other.pause_max);
+        self.park_max = self.park_max.max(other.park_max);
+        self.full_occupancy = self.full_occupancy.zip(other.full_occupancy).map(|(a, b)| a.max(b));
+    }
+
+    /// Effective parallelism: busy time over `wall × threads`, from 0 to 1.
+    #[must_use]
+    pub fn efficiency(&self) -> f64 {
+        self.share(self.busy)
+    }
+
+    /// `time` as a fraction of `wall × threads`.
+    #[must_use]
+    pub fn share(&self, time: Duration) -> f64 {
+        let capacity = self.wall.as_secs_f64() * self.threads as f64;
+        if capacity > 0.0 {
+            time.as_secs_f64() / capacity
+        } else {
+            0.0
+        }
+    }
+
+    /// One compact line: effective parallelism, the shares of idle and lock-wait time, splits, steals, time to
+    /// full occupancy, and (if any) the pauses with the share of parked time, the longest pause and the longest
+    /// wait for the workers to park.
+    #[must_use]
+    pub fn summary(&self) -> String {
+        let full = self.full_occupancy.map_or_else(|| "never".to_owned(), fmt_short);
+        let mut line = format!(
+            "eff {:.1}% idle {:.1}% lock {:.1}% splits {} steals {} full {full}",
+            100.0 * self.efficiency(),
+            100.0 * self.share(self.idle),
+            100.0 * self.share(self.lock_wait),
+            si(self.splits as f64),
+            si(self.steals as f64),
+        );
+        if self.pauses > 0 {
+            line += &format!(
+                " pauses {} ({:.1}%) max {} park {}",
+                self.pauses,
+                100.0 * self.share(self.parked),
+                fmt_short(self.pause_max),
+                fmt_short(self.park_max)
+            );
+        }
+        line
+    }
 }
 
 /// The result of [`run`].
@@ -250,8 +403,9 @@ where
     };
     let shared = Shared::new(cfg, threads, init, t0);
     shared.load(fresh, resume.as_deref())?;
-    // Limits and schedules count from here, so a slow resume cannot use up the time limit by itself.
+    // Limits, schedules and the instrumentation count from here, so a slow resume cannot use up the time limit.
     let began = Instant::now();
+    shared.lock().began = began;
     let plan = Plan {
         checkpoint: cfg.checkpoint.as_ref().map(|(path, every)| (path.as_path(), *every)),
         progress: cfg.progress,
@@ -276,7 +430,7 @@ where
         }
         shared.coordinate(&plan);
     });
-    shared.outcome(plan.checkpoint.map(|(path, _)| path))
+    shared.outcome(plan.checkpoint.map(|(path, _)| path), Instant::now())
 }
 
 /// Read the caller's header from a checkpoint file (without verifying the rest of the file).
@@ -295,8 +449,10 @@ pub struct Ctx<'a, U: Unit> {
     worker: usize,
     /// Polls left until the next slow poll (node publishing, node limit).
     countdown: u32,
-    /// Slow polls during which split requests are ignored.
-    cooldown: u32,
+    /// Times `countdown` ran out; with it, `polls` counts every poll.
+    batches: u64,
+    /// `polls()` when the current run began.
+    run_start: u64,
     yielding: bool,
     split_claimed: bool,
     /// `stats.nodes` already added to `shared.nodes`.
@@ -311,7 +467,8 @@ impl<'a, U: Unit> Ctx<'a, U> {
             shared,
             worker,
             countdown: POLL_BATCH,
-            cooldown: 0,
+            batches: 0,
+            run_start: 0,
             yielding: false,
             split_claimed: false,
             published: 0,
@@ -325,10 +482,15 @@ impl<'a, U: Unit> Ctx<'a, U> {
     #[must_use]
     pub fn poll(&mut self) -> Poll {
         self.countdown -= 1;
-        if self.countdown == 0 || self.shared.signal.0.load(Ordering::Relaxed) & SIG_ACT != 0 {
+        if self.countdown == 0 || self.shared.signal.0.load(Ordering::Relaxed) != 0 {
             return self.poll_slow();
         }
         Poll::Continue
+    }
+
+    /// Polls made by this worker so far.
+    fn polls(&self) -> u64 {
+        self.batches * u64::from(POLL_BATCH) + u64::from(POLL_BATCH - self.countdown)
     }
 
     #[cold]
@@ -336,6 +498,7 @@ impl<'a, U: Unit> Ctx<'a, U> {
     fn poll_slow(&mut self) -> Poll {
         if self.countdown == 0 {
             self.countdown = POLL_BATCH;
+            self.batches += 1;
             let total = self.flush_nodes();
             if self.shared.node_limit.is_some_and(|limit| total >= limit) {
                 self.shared.request_stop();
@@ -345,13 +508,12 @@ impl<'a, U: Unit> Ctx<'a, U> {
             let signal = self.shared.signal.0.load(Ordering::Acquire);
             if signal & SIG_YIELD != 0 {
                 self.yielding = true;
-            } else if signal & SIG_SPLIT != 0 {
-                if self.cooldown > 0 {
-                    self.cooldown -= 1;
-                } else if self.shared.claim_split() {
-                    self.split_claimed = true;
-                    self.yielding = true;
-                }
+            } else if signal >= SIG_REQUEST
+                && self.polls() - self.run_start >= SPLIT_MIN_POLLS
+                && self.shared.claim_split()
+            {
+                self.split_claimed = true;
+                self.yielding = true;
             }
         }
         if self.yielding {
@@ -426,17 +588,13 @@ impl<'a, U: Unit> Ctx<'a, U> {
 
 /// Polls between slow polls.
 const POLL_BATCH: u32 = 1024;
-/// Slow polls a worker ignores split requests for after an answer that had nothing to give away.
-const SPLIT_COOLDOWN: u32 = 64;
+/// Polls of its current unit a worker makes before it answers split requests (see "Splitting").
+const SPLIT_MIN_POLLS: u64 = 64;
 
-/// An idle worker wants work: one running worker should yield.
-const SIG_SPLIT: u32 = 1;
 /// Every running worker must yield (`pause` or `exit` is set).
-const SIG_YIELD: u32 = 2;
-/// A split request has been claimed and its units not yet handed over.
-const SIG_INFLIGHT: u32 = 4;
-/// Bits that need `poll`'s attention.
-const SIG_ACT: u32 = SIG_SPLIT | SIG_YIELD;
+const SIG_YIELD: u64 = 1;
+/// One open split request: the signal word counts them above the yield bit.
+const SIG_REQUEST: u64 = 2;
 
 static RUN_SEQ: AtomicU64 = AtomicU64::new(0);
 
@@ -462,7 +620,8 @@ struct Plan<'p> {
 }
 
 struct Shared<U: Unit> {
-    signal: Line<AtomicU32>,
+    /// [`SIG_YIELD`] plus the number of open split requests times [`SIG_REQUEST`].
+    signal: Line<AtomicU64>,
     /// Incumbent value; changes only while `payload` is locked.
     best: Line<AtomicU64>,
     /// Nodes published by workers in this invocation.
@@ -486,12 +645,16 @@ struct State<U> {
     spill: Spill,
     /// Each worker's deepest unit while paused.
     held: Vec<Option<U>>,
+    /// Units in `held`.
+    held_units: usize,
     /// Each worker's statistics as of its last finished run.
     worker_stats: Vec<Stats>,
     /// Workers inside `Searcher::run`.
     running: usize,
     /// Workers blocked on `work_cv`.
     idle: usize,
+    /// Split requests open (counted in `signal`) or claimed and not yet answered.
+    requested: usize,
     pause: bool,
     exit: bool,
     done: bool,
@@ -500,17 +663,42 @@ struct State<U> {
     panicked: bool,
     error: Option<io::Error>,
     counters: Counters,
+    /// Each worker's time accounting.
+    clocks: Vec<Clock>,
+    /// When the workers were started.
+    began: Instant,
+    /// When the current pause was asked for.
+    pause_began: Option<Instant>,
     scratch: Vec<u8>,
 }
 
 impl<U> State<U> {
+    /// Units in the deque, in memory or spilled.
+    fn queued(&self) -> usize {
+        self.mem.len() + usize::try_from(self.spill.units).unwrap_or(usize::MAX)
+    }
+
     fn queue_empty(&self) -> bool {
         self.mem.is_empty() && self.spill.segs.is_empty()
     }
 
     fn has_work(&self) -> bool {
-        !self.queue_empty() || self.held.iter().any(Option::is_some)
+        !self.queue_empty() || self.held_units > 0
     }
+}
+
+/// Where a worker's time went (see "Instrumentation").
+#[derive(Clone, Copy, Default)]
+struct Clock {
+    busy: Duration,
+    idle: Duration,
+    parked: Duration,
+    /// Waiting for the `state` lock after a run.
+    lock_wait: Duration,
+    /// Since when the worker has been running its current unit.
+    running_since: Option<Instant>,
+    /// Since when the worker has been waiting, and whether it waits in a pause.
+    waiting_since: Option<(Instant, bool)>,
 }
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -518,7 +706,7 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 /// Atomically replace the signal word by `f(current)` unless `f` returns `None`; true if it was replaced.
-fn update_signal(signal: &AtomicU32, f: impl Fn(u32) -> Option<u32>) -> bool {
+fn update_signal(signal: &AtomicU64, f: impl Fn(u64) -> Option<u64>) -> bool {
     let mut current = signal.load(Ordering::Acquire);
     while let Some(new) = f(current) {
         match signal.compare_exchange_weak(current, new, Ordering::AcqRel, Ordering::Acquire) {
@@ -546,7 +734,7 @@ impl<U: Unit> Shared<U> {
     fn new(cfg: &EngineConfig, threads: usize, init: Init, t0: Instant) -> Self {
         let prefix = format!("txspill-{}-{}", std::process::id(), RUN_SEQ.fetch_add(1, Ordering::Relaxed));
         Shared {
-            signal: Line(AtomicU32::new(0)),
+            signal: Line(AtomicU64::new(0)),
             best: Line(AtomicU64::new(init.best)),
             nodes: Line(AtomicU64::new(0)),
             payload: Mutex::new(init.payload),
@@ -554,9 +742,11 @@ impl<U: Unit> Shared<U> {
                 mem: VecDeque::new(),
                 spill: Spill { dir: cfg.spill_dir.clone(), prefix, seq: 0, segs: Vec::new(), units: 0 },
                 held: (0..threads).map(|_| None).collect(),
+                held_units: 0,
                 worker_stats: vec![Stats::default(); threads],
                 running: 0,
                 idle: 0,
+                requested: 0,
                 pause: false,
                 exit: false,
                 done: false,
@@ -564,7 +754,10 @@ impl<U: Unit> Shared<U> {
                 stop_requested: false,
                 panicked: false,
                 error: None,
-                counters: Counters::default(),
+                counters: Counters { threads, ..Counters::default() },
+                clocks: vec![Clock::default(); threads],
+                began: t0,
+                pause_began: None,
                 scratch: Vec::new(),
             }),
             work_cv: Condvar::new(),
@@ -621,8 +814,20 @@ impl<U: Unit> Shared<U> {
     fn begin_pause(&self, st: &mut State<U>) {
         if !st.pause {
             st.pause = true;
+            st.pause_began = Some(Instant::now());
             self.signal.0.fetch_or(SIG_YIELD, Ordering::AcqRel);
             self.update_split(st);
+        }
+    }
+
+    /// Count the pause that is ending (the coordinator calls this before releasing the workers or exiting).
+    fn end_pause(st: &mut State<U>) {
+        if let Some(asked) = st.pause_began.take() {
+            let length = asked.elapsed();
+            let c = &mut st.counters;
+            c.pauses += 1;
+            c.pause_total += length;
+            c.pause_max = c.pause_max.max(length);
         }
     }
 
@@ -651,28 +856,47 @@ impl<U: Unit> Shared<U> {
         self.coord_cv.notify_all();
     }
 
-    /// Raise or clear the split request to match the state (see "Splitting").
-    fn update_split(&self, st: &State<U>) {
-        let wanted = st.idle > 0 && st.running > 0 && !st.pause && !st.exit && st.queue_empty();
+    /// Open or withdraw split requests so that `requested` matches the demand (see "Splitting").  Claims are made
+    /// outside the lock, but a claim only moves a request from open to claimed, so `requested` stays exact.
+    fn update_split(&self, st: &mut State<U>) {
+        let demand = if st.pause || st.exit || st.running == 0 {
+            0
+        } else {
+            st.idle.saturating_sub(st.queued() + st.held_units)
+        };
         let signal = &self.signal.0;
-        if wanted {
-            update_signal(signal, |s| (s & (SIG_SPLIT | SIG_INFLIGHT) == 0).then_some(s | SIG_SPLIT));
-        } else if signal.load(Ordering::Relaxed) & SIG_SPLIT != 0 {
-            signal.fetch_and(!SIG_SPLIT, Ordering::AcqRel);
+        let mut current = signal.load(Ordering::Acquire);
+        loop {
+            let open = usize::try_from(current / SIG_REQUEST).expect("request count fits");
+            let claimed = st.requested - open;
+            let wanted = demand.saturating_sub(claimed);
+            if wanted == open {
+                return;
+            }
+            let new = (current & SIG_YIELD) | (wanted as u64 * SIG_REQUEST);
+            match signal.compare_exchange_weak(current, new, Ordering::AcqRel, Ordering::Acquire) {
+                Ok(_) => {
+                    st.requested = claimed + wanted;
+                    return;
+                }
+                Err(actual) => current = actual,
+            }
         }
     }
 
-    /// Claim the pending split request; true for exactly one claimant per request.
+    /// Claim an open split request; each request has at most one claimant.
     fn claim_split(&self) -> bool {
-        update_signal(&self.signal.0, |s| (s & SIG_SPLIT != 0).then_some((s & !SIG_SPLIT) | SIG_INFLIGHT))
+        update_signal(&self.signal.0, |s| (s >= SIG_REQUEST).then(|| s - SIG_REQUEST))
     }
 
-    fn wake_idle(&self, st: &State<U>, units: usize) {
-        if st.idle == 0 {
-            return;
-        }
-        if units >= st.idle {
-            self.work_cv.notify_all();
+    /// Wake at most as many idle workers as `units` new units can serve.  Called after the lock is released: the
+    /// units were queued under it and a waiter checks the queue under it before waiting, so no wakeup is lost,
+    /// and the woken workers do not have to wait for the lock.
+    fn wake_idle(&self, idle: usize, units: usize) {
+        if units >= idle {
+            if idle > 0 {
+                self.work_cv.notify_all();
+            }
         } else {
             for _ in 0..units {
                 self.work_cv.notify_one();
@@ -721,11 +945,11 @@ impl<U: Unit> Shared<U> {
                 }
             }
         }
-        if front {
-            st.mem.pop_front()
-        } else {
-            st.mem.pop_back()
+        let unit = if front { st.mem.pop_front() } else { st.mem.pop_back() };
+        if front && unit.is_some() {
+            st.counters.steals += 1;
         }
+        unit
     }
 
     // --- workers -------------------------------------------------------------------------------------------
@@ -736,9 +960,22 @@ impl<U: Unit> Shared<U> {
         let mut ctx = Ctx::new(self, i);
         let mut next = self.acquire(self.lock(), i);
         while let Some(unit) = next {
+            ctx.run_start = ctx.polls();
             searcher.run(unit, &mut ctx);
             next = self.finish_run(&mut ctx);
         }
+    }
+
+    /// Count worker `i` as running a unit from now on.
+    fn begin_run(&self, st: &mut State<U>, i: usize) {
+        let now = Instant::now();
+        st.running += 1;
+        st.counters.runs += 1;
+        st.clocks[i].running_since = Some(now);
+        if st.running == st.clocks.len() && st.counters.full_occupancy.is_none() {
+            st.counters.full_occupancy = Some(now.saturating_duration_since(st.began));
+        }
+        self.update_split(st);
     }
 
     /// Wait for a unit to run (counting it in `running`), or return `None` when the worker must exit.
@@ -751,15 +988,17 @@ impl<U: Unit> Shared<U> {
             }
             if !st.pause {
                 let unit = match st.held[i].take() {
-                    Some(unit) => Some(unit),
+                    Some(unit) => {
+                        st.held_units -= 1;
+                        Some(unit)
+                    }
                     None => self.pop(st, starved),
                 };
                 if let Some(unit) = unit {
-                    st.running += 1;
-                    self.update_split(st);
+                    self.begin_run(st, i);
                     return Some(unit);
                 }
-                if st.running == 0 && !st.pause && !st.has_work() {
+                if st.running == 0 && !st.has_work() {
                     st.done = true;
                     self.set_exit(st);
                     return None;
@@ -768,8 +1007,14 @@ impl<U: Unit> Shared<U> {
             }
             st.idle += 1;
             self.update_split(st);
+            let (since, paused) = (Instant::now(), st.pause);
+            st.clocks[i].waiting_since = Some((since, paused));
             guard = self.wait_work(guard);
-            guard.idle -= 1;
+            let st = &mut *guard;
+            st.idle -= 1;
+            let clock = &mut st.clocks[i];
+            clock.waiting_since = None;
+            *(if paused { &mut clock.parked } else { &mut clock.idle }) += since.elapsed();
         }
     }
 
@@ -779,14 +1024,21 @@ impl<U: Unit> Shared<U> {
         ctx.yielding = false;
         let claimed = std::mem::take(&mut ctx.split_claimed);
         let i = ctx.worker;
+        let end = Instant::now();
         let mut guard = self.lock();
         let st = &mut *guard;
         st.worker_stats[i] = ctx.stats;
         st.running -= 1;
+        let clock = &mut st.clocks[i];
+        clock.lock_wait += end.elapsed();
+        if let Some(since) = clock.running_since.take() {
+            clock.busy += end.saturating_duration_since(since);
+        }
         if claimed {
-            self.signal.0.fetch_and(!SIG_INFLIGHT, Ordering::AcqRel);
+            st.requested -= 1;
             st.counters.splits += 1;
         }
+        st.counters.tiny_runs += u64::from(ctx.polls() - ctx.run_start <= 1);
         if st.exit {
             ctx.pushed.clear();
             return None;
@@ -800,23 +1052,22 @@ impl<U: Unit> Shared<U> {
             self.push_units(st, &mut ctx.pushed);
         }
         if st.pause {
+            st.held_units += usize::from(keep.is_some());
             st.held[i] = keep;
             if st.running == 0 {
                 self.coord_cv.notify_all();
             }
             return self.acquire(guard, i);
         }
-        if gave > 0 {
-            self.wake_idle(st, gave);
-        } else if claimed {
-            ctx.cooldown = SPLIT_COOLDOWN;
-        }
         match keep {
             Some(unit) => {
-                st.running += 1;
-                self.update_split(st);
+                self.begin_run(st, i);
+                let idle = st.idle;
+                drop(guard);
+                self.wake_idle(idle, gave);
                 Some(unit)
             }
+            // Nothing was pushed, so there is nobody to wake.
             None => self.acquire(guard, i),
         }
     }
@@ -845,7 +1096,11 @@ impl<U: Unit> Shared<U> {
                 if st.exit {
                     continue;
                 }
+                if let Some(asked) = st.pause_began {
+                    st.counters.park_max = st.counters.park_max.max(asked.elapsed());
+                }
                 if !st.has_work() {
+                    Self::end_pause(st);
                     st.done = true;
                     self.set_exit(st);
                     continue;
@@ -859,6 +1114,7 @@ impl<U: Unit> Shared<U> {
                         }
                     }
                 }
+                Self::end_pause(st);
                 if st.stop_requested || past(plan.deadline) {
                     self.set_exit(st);
                     continue;
@@ -871,9 +1127,14 @@ impl<U: Unit> Shared<U> {
                 if now >= due {
                     let nodes = self.nodes.0.load(Ordering::Relaxed);
                     let rate = (nodes - last_report.1) as f64 / now.duration_since(last_report.0).as_secs_f64();
-                    eprintln!("{}", self.progress_line(&guard, plan.label, &format!("{}/s", si(rate))));
+                    let line = self.progress_line(&guard, plan.label, &format!("{}/s", si(rate)));
+                    // Not under the lock: a blocked stderr (a full pipe) must not stall the workers.
+                    drop(guard);
+                    eprintln!("{line}");
                     last_report = (now, nodes);
                     next_progress = Some(now + every);
+                    guard = self.lock();
+                    continue;
                 }
             }
             let wake = [next_checkpoint, next_progress, plan.deadline].into_iter().flatten().min();
@@ -891,20 +1152,39 @@ impl<U: Unit> Shared<U> {
             } else {
                 "stopped"
             };
-            eprintln!("{}", self.progress_line(&guard, plan.label, status));
+            let line = self.progress_line(&guard, plan.label, status);
+            drop(guard);
+            eprintln!("{line}");
         }
     }
 
     fn progress_line(&self, st: &State<U>, label: &str, note: &str) -> String {
         let nodes = self.base.nodes + self.nodes.0.load(Ordering::Relaxed);
         format!(
-            "{label}{}{} nodes {nodes} ({note}) best {} queue {} spilled {}",
+            "{label}{}{} nodes {nodes} ({note}) best {} queue {} spilled {} | {}",
             if label.is_empty() { "" } else { " " },
             fmt_elapsed(self.prior + self.t0.elapsed()),
             self.best.0.load(Ordering::Relaxed),
             st.mem.len(),
             st.spill.units,
+            Self::counters_at(st, Instant::now()).summary(),
         )
+    }
+
+    /// The counters with the workers' times summed up to `now` (also for runs and waits still going on).
+    fn counters_at(st: &State<U>, now: Instant) -> Counters {
+        let mut c = st.counters;
+        c.wall = now.saturating_duration_since(st.began);
+        for clock in &st.clocks {
+            c.busy += clock.busy + clock.running_since.map_or(Duration::ZERO, |t| now.saturating_duration_since(t));
+            c.idle += clock.idle;
+            c.parked += clock.parked;
+            c.lock_wait += clock.lock_wait;
+            if let Some((t, paused)) = clock.waiting_since {
+                *(if paused { &mut c.parked } else { &mut c.idle }) += now.saturating_duration_since(t);
+            }
+        }
+        c
     }
 
     fn total_stats(&self, st: &State<U>) -> Stats {
@@ -966,9 +1246,9 @@ impl<U: Unit> Shared<U> {
         out.into_inner().map_err(io::IntoInnerError::into_error)?.sync_all()
     }
 
-    /// Build the result after all workers have exited.
-    fn outcome(&self, checkpoint: Option<&Path>) -> io::Result<Outcome> {
-        let elapsed = self.prior + self.t0.elapsed();
+    /// Build the result after all workers have exited (at `ended`).
+    fn outcome(&self, checkpoint: Option<&Path>, ended: Instant) -> io::Result<Outcome> {
+        let elapsed = self.prior + ended.saturating_duration_since(self.t0);
         let mut st = self.lock();
         let completed = st.done || st.optimal;
         if let Some(e) = st.error.take() {
@@ -996,7 +1276,7 @@ impl<U: Unit> Shared<U> {
             payload: lock(&self.payload).clone(),
             stats: self.total_stats(&st),
             elapsed,
-            counters: st.counters,
+            counters: Self::counters_at(&st, ended),
         })
     }
 }
@@ -1326,6 +1606,15 @@ fn fmt_elapsed(d: Duration) -> String {
         format!("{}m{:02}s", s / 60, s % 60)
     } else {
         format!("{}h{:02}m{:02}s", s / 3600, s / 60 % 60, s % 60)
+    }
+}
+
+/// A short duration: milliseconds below a second.
+fn fmt_short(d: Duration) -> String {
+    if d < Duration::from_secs(1) {
+        format!("{:.1}ms", d.as_secs_f64() * 1e3)
+    } else {
+        format!("{:.2}s", d.as_secs_f64())
     }
 }
 

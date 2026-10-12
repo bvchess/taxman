@@ -131,9 +131,9 @@ dependencies.  Modules:
 | `model` | the search state: `Frame`, `FrameSet` (fixed array of frames), `FactorProvider` (factor/composite lists restricted to frame numbers), `FrameMapper` (home frame of each candidate), `promote_into`, `promote_out_of`, `promote`, `can_promote`, `is_winnable` (peel), `reduce`, `narrow_candidates`, `max_promotions`; `promote_all` (a set checked frame by frame); `Certificate` (a winning order that answers most single-edit winnability questions without a peel); conflicts: the *core* of an unwinnable frame (`Scratch::stuck`, the moves a peel cannot drop) and `conflict_using`/`conflict_cached` (a small, by default minimal, subset of a promotion set that cannot be promoted), with `ConflictCache`; nogoods: `nogood` (a conflict of a state made a conflict of the root) and the table `Nogoods` |
 | `bounds` | preclusion table; `upper_bound` (blameGame + largestThatFitInFrames, sound or legacy runner-up) and its exact threshold test `reaches`; candidate lists; greedy lower bound |
 | `matchbound` | the matching bound (see "Improvements after parity"): `match_bound`, a min-cost-flow reference; `MatchGraph` (the root's graph) and `MatchBound` (an optimal matching and its potentials per level of the DFS path, repaired incrementally by Hungarian searches on a radix heap; levels with a candidate excluded, which can be kept for the parent) |
-| `engine` | problem-independent parallel depth-first branch-and-bound driver: work units, shared deque with disk spill, incumbent, yielding/splitting, checkpoint and resume, progress reporting, statistics |
+| `engine` | problem-independent parallel depth-first branch-and-bound driver: work units, shared deque with disk spill, incumbent, yielding/splitting, checkpoint and resume, progress reporting, statistics, instrumentation (`Counters`) |
 | `search` | the Taxman searcher (port of `BranchExplorer`) implementing the engine's `Searcher` trait; `prepare` (preclusions, greedy, `revise_freedoms`) and `search` (seed, cap, checkpoint and resume); `Refiner` (conflicts of the heaviest matching: exactness, refinement, branching); the starting incumbent's `dive` and local search (`Neighbourhood`); `search_with` and `Diagnostics` for measurements |
-| `examples/ladder.rs` | the ladder harness: standalone searches of hard games from the frame builder with a time limit (see Performance) |
+| `examples/ladder.rs` | the ladder harness: standalone searches of hard games from the frame builder with a time limit, at one or several thread counts (see Performance) |
 | `solver` | `Tactics` (every tactic above, by name and value), `SolveOptions`, `solve_game` (the per-game pipeline below) and `solve_range` (a range of games, resumable through a results file) |
 | `brute` | exact Taxman on boards up to 127 with holes, by memoized search over pot states (no frame model), under the rules or the maximal-factor rule |
 | `sacrifice` | study, not used by the solver: the proven bound opt(n) ≤ max(opt(n−1), n + max over maximal factors f of n of opt_M({1..n−1} ∖ {f})), the punctured games it needs (frame model on a board with a hole), and what it was measured to be worth (`examples/sacrifice.rs`) |
@@ -213,10 +213,29 @@ the incumbent value), `offer(value, payload) -> bool`, and a per-worker
 * **Work distribution**: one shared deque of units.  A worker that yields
   pushes its stack's remaining work (shallowest first) and then pops from the
   back, resuming its own deepest work; idle workers take from the front, which
-  holds the shallowest — largest — subtrees.  A worker yields when (a) some
-  worker is idle and the deque is empty (only one worker answers each such
-  request), (b) a checkpoint is due, or (c) a stop is requested (time limit or
-  node limit).  With one thread the run is deterministic (no checkpointing).
+  holds the shallowest — largest — subtrees.  A worker yields when (a) idle
+  workers are left that the queued units cannot serve (a *split*), (b) a
+  checkpoint is due, or (c) a stop is requested (time limit or node limit).
+  With one thread the deque is a pure stack: units are explored in
+  depth-first order, unchanged by checkpoints and spilling.
+* **Splits, sized for many cores** (2026-10, for a 192-core machine): the
+  engine keeps one open split request per idle worker that the queued and
+  held units will not serve, and any running worker can claim one (an atomic
+  decrement of a count in the word `poll` reads), so as many workers split at
+  once as there are idle workers to feed.  From one unit, all workers are busy
+  after a few rounds in which every running worker splits, not after one
+  split per idle worker (the first design answered one request at a time).  A
+  worker answers only after 64 polls of its current unit, so a fresh unit
+  first gets deep enough to have something to give, and no worker restarts
+  its unit at every step while the demand lasts.  The deque stays a single
+  locked one: units exist only after yields, each costs its searcher a state
+  rebuild (for Taxman a matching solved from scratch, 30–170 µs already at
+  n = 480–760, against about a microsecond under the lock), and with every
+  worker busy nobody takes the lock;
+  per-worker deques with stealing would remove contention that is not there,
+  at the price of distributed ordering, spill, checkpoint and termination
+  arguments.  The lock's wait time is measured (below) so that a many-core run
+  shows whether that ever changes.
 * **Memory bound**: the in-memory deque holds at most `queue_mem_cap` units;
   beyond that the front (oldest) units are spilled to segment files in
   `spill_dir` and reloaded when memory runs dry.  Searchers keep only their
@@ -231,9 +250,25 @@ the incumbent value), `offer(value, payload) -> bool`, and a per-worker
   continues; nothing is lost or duplicated beyond partially explored nodes.
   The caller's header stores everything the setup computed that is
   expensive or must not change on resume (n, tactics, revised freedoms,
-  max_total, root candidates).
+  max_total, root candidates).  A pause costs every worker the wait for the
+  last one to park — bounded by the longest stretch between two polls, one
+  Taxman step: about 10 µs, over a millisecond about once in 10⁵ steps, the
+  longest measured 10–15 ms at n = 1215–1225 — plus the write and fsync.
+  After the rename the directory is synced too, which Linux needs for the
+  rename to survive a crash.
+* **Instrumentation** (`engine::Counters`, per invocation): each worker's time
+  split into busy (in the searcher), idle (waiting for work), parked (in
+  pauses) and lock wait (for the deque's lock); the effective parallelism
+  busy / (wall × threads); splits and the units they gave, steals, runs and
+  tiny runs (units with nothing left); when all workers first ran at once;
+  the number of pauses, the longest pause and the longest wait for the
+  workers to park.
 * **Progress**: every `progress_interval` (default 60 s) one line on stderr:
-  elapsed, nodes, nodes/s, incumbent, deque size, spilled units.
+  elapsed, nodes, nodes/s, incumbent, deque size, spilled units, and the
+  counters in short (`eff 97.1% idle 2.3% lock 0.0% splits 1.2k steals 950
+  full 3.1ms pauses 4 (0.1%) max 21.0ms park 2.3ms`: the pauses' share of
+  the workers' time, the longest pause, the longest wait to park).  It is
+  printed outside the lock, so a blocked stderr cannot stall the workers.
 
 ### Per-game pipeline (`solver`)
 
@@ -609,7 +644,13 @@ Correctness, all on games that finish in seconds:
   answers on those up to 400.
 * Engine: a toy problem with known optimum, run with 1 and many threads,
   with a tiny `queue_mem_cap` to force spilling, and killed/resumed from
-  checkpoints, must give the same answer.
+  checkpoints, must give the same answer; also with 64 and 192 threads (far
+  more than the cores, so any scheduling happens), with checkpoints every
+  2 ms, spilling, resuming and a panicking worker.  An ignored stress test
+  draws random configurations (1 to 192 threads, caps, intervals, limits)
+  and runs each to completion through any number of resumes
+  (`TXENGINE_STRESS=5000`: 200 s, all passed); the instrumentation's
+  accounting is checked on every run.
 
 Performance:
 
@@ -622,16 +663,35 @@ Performance:
   1 thread (deterministic) and with all threads.
 * Larger games (738, 750, 840; Java 56–90 s) only after the bench set is
   fast and correct.
-* The ladder, `cargo run --release --example ladder -- [--threads T]
-  [--seconds S] [--diag] [--seed-opt] [--known FILE] [--tactic …] N…`:
-  standalone searches of hard games (default 760 800 840 880 900 960 992
+* The ladder, `cargo run --release --example ladder -- [--threads T[,T…] |
+  --scaling] [--seconds S] [--diag] [--seed-opt] [--known FILE] [--tactic …]
+  N…`: standalone searches of hard games (default 760 800 840 880 900 960 992
   1000) from the frame builder, seeded from the known n−1 game and capped as
-  the solver does, each with a time limit; reports completion, nodes, time
-  and when the final incumbent was found.  The known games are optimal.json's
-  plus, with `--known`, a results file's (`results/strict.jsonl` for games
-  past 1000).  `--seed-opt` seeds with the game for n itself, to measure the
-  proof alone; `--diag` prints `search::Diagnostics` (nodes by depth, what
-  pruned, bound gaps, conflict sizes, matching work).  Fast progress
-  benchmarks (one thread, `--tactic revise_freedoms=off`): 880, 936, 1050,
-  1100, 1170, 1184; harder ones: 992, 996, 1025, 1215, 1216 on several
-  threads.
+  the solver does, each with a time limit; reports completion, nodes, time,
+  when the final incumbent was found, and the engine's counters.  The known
+  games are optimal.json's plus, with `--known`, a results file's
+  (`results/strict.jsonl` for games past 1000).  `--seed-opt` seeds with the
+  game for n itself, to measure the proof alone; `--diag` prints
+  `search::Diagnostics` (nodes by depth, what pruned, bound gaps, conflict
+  sizes, matching work).  Fast progress benchmarks (one thread, `--tactic
+  revise_freedoms=off`): 880, 936, 1050, 1100, 1170, 1184; harder ones: 992,
+  996, 1025, 1215, 1216 on several threads.
+* Scaling: the ladder with a list of thread counts (`--threads 1,2,4,8`, or
+  `--scaling` for 1, 2, 4, … up to all cores) searches each game with each
+  count and prints a table per game and one summed over the games: search
+  time, speedup, nodes per second per thread, effective parallelism, idle
+  and lock-wait time, splits and the units they gave, steals, runs, tiny
+  runs and the time to full occupancy.  With
+  `--seed-opt` the node count barely depends on the threads, so the speedup
+  measures the parallel proof alone.  On the M1 Max (8 performance cores,
+  with another job on up to 4 of them) with the proof of 1215 (`--seed-opt
+  --known results/default.jsonl --tactic revise_freedoms=off`): 62.5 s on
+  one thread, 24.6 s on 2, 15.8 s on 4 and 12.9 s on 6, effective
+  parallelism 99.9–100%, all workers busy within 3 ms; node counts vary by
+  ±10% with the threads (what each thread's nogood table has learned).
+  Games that take minutes on one thread (1215, 1220, 1225 with `--seed-opt`:
+  about 60, 150 and 200 s) suit a many-core machine; at 192 threads a game
+  of a minute is a third of a second, mostly ramp-up and tail.  The engine's
+  own benchmark (`cargo test --release --test engine -- --ignored
+  --nocapture bench`, sizes and thread counts set by `TXENGINE_BENCH_*`)
+  measures its overhead per node with no work per node.

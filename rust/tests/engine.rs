@@ -1,7 +1,8 @@
 //! Engine tests on a toy problem with an independently computable optimum: 0/1 knapsack solved by
 //! depth-first branch-and-bound with a simple fractional bound, checked against dynamic programming.
 //!
-//! Benchmark (engine overhead per node): `cargo test --release --test engine -- --ignored --nocapture`.
+//! Benchmark (engine overhead per node): `cargo test --release --test engine -- --ignored --nocapture bench`
+//! (sizes and thread counts: see [`bench`]).  Stress test: see [`stress`].
 
 use std::fs;
 use std::panic::{self, AssertUnwindSafe};
@@ -198,13 +199,13 @@ struct Knapsack<'a> {
     stack: Vec<Node>,
     /// Declare optimality on reaching this value (a known upper bound).
     target: Option<u64>,
-    /// Worker 0 panics once this file exists (to test panic propagation after a checkpoint).
+    /// A worker that starts a unit once this file exists panics (to test panic propagation after a checkpoint).
     panic_when: Option<PathBuf>,
 }
 
 impl Searcher<Node> for Knapsack<'_> {
     fn run(&mut self, unit: Node, ctx: &mut Ctx<'_, Node>) {
-        if ctx.worker() == 0 && self.panic_when.as_ref().is_some_and(|path| path.exists()) {
+        if self.panic_when.as_ref().is_some_and(|path| path.exists()) {
             panic!("searcher panic requested by test");
         }
         dfs(self.inst, &mut self.stack, unit, &mut EngineEnv { ctx, target: self.target });
@@ -260,6 +261,15 @@ fn raw_search(inst: &Instance) -> RawEnv {
 /// The shared test instance: about 13 million nodes, optimum known by DP.
 fn instance() -> Instance {
     Instance::new(48, 10_000, 99)
+}
+
+/// Items of [`big_instance`], also the benchmark's default.
+const BIG_ITEMS: usize = 56;
+
+/// A bigger instance (about 200 million nodes, under a second on one thread), for tests that need a search to
+/// last a while on many threads.
+fn big_instance() -> Instance {
+    Instance::new(BIG_ITEMS, 10_000, 99)
 }
 
 const HEADER: &[u8] = b"knapsack n=48 range=10000 seed=99";
@@ -347,7 +357,11 @@ fn one_thread_is_correct_and_deterministic() {
     // One engine thread explores exactly the tree the plain depth-first search explores.
     assert_eq!(a.stats.nodes, raw.nodes);
     assert_eq!(a.stats.extra[..2], raw.extra);
-    assert_eq!(a.counters.splits, 0);
+    let c = &a.counters;
+    assert_eq!((c.threads, c.splits, c.steals, c.runs), (1, 0, 0, 1), "{c:?}");
+    assert_eq!((c.idle, c.parked, c.pauses), (Duration::ZERO, Duration::ZERO, 0), "a lone worker never waits");
+    assert!(c.full_occupancy.is_some());
+    assert_accounting(c);
 }
 
 #[test]
@@ -357,6 +371,115 @@ fn eight_threads_are_correct() {
     assert!(out.completed && !out.optimal_declared);
     assert_optimal(&out, &inst, inst.dp());
     assert!(out.counters.splits > 0, "work was split");
+    assert_accounting(&out.counters);
+}
+
+/// The instrumentation is consistent: each worker's busy, idle, parked and lock-wait intervals are disjoint and
+/// inside the run, so together they take at most `wall × threads`; every pause that parked the workers ended later.
+fn assert_accounting(c: &engine::Counters) {
+    let capacity = c.wall * u32::try_from(c.threads).unwrap();
+    assert!(c.busy + c.idle + c.parked + c.lock_wait <= capacity, "{c:?}");
+    assert!((0.0..=1.0).contains(&c.efficiency()), "{c:?}");
+    assert!(c.full_occupancy.is_none_or(|t| t <= c.wall), "{c:?}");
+    assert!(c.pause_max <= c.pause_total && c.park_max <= c.pause_max, "{c:?}");
+    assert!(c.runs >= c.steals, "{c:?}");
+}
+
+// Many more workers than cores, as on a machine with 192 cores: answers, splitting, checkpoints, spill and panics
+// must work however the threads are scheduled.
+
+const MANY: [usize; 2] = [64, 192];
+
+#[test]
+fn many_threads_are_correct() {
+    let inst = instance();
+    let opt = inst.dp();
+    for threads in MANY {
+        let out = solve(&config(threads), fresh(), &inst);
+        assert!(out.completed && !out.optimal_declared, "{threads} threads");
+        assert_optimal(&out, &inst, opt);
+        let c = &out.counters;
+        assert_eq!(c.threads, threads);
+        assert!(c.splits > 0 && c.steals > 0 && c.runs > c.splits, "{threads} threads: {c:?}");
+        assert!(c.busy > Duration::ZERO, "{threads} threads: {c:?}");
+        assert_accounting(c);
+        println!("{threads} threads: {}", c.summary());
+        let out = solve_with(&config(threads), fresh(), &inst, Some(opt), None);
+        assert!(out.completed && out.optimal_declared, "{threads} threads: declared optimal");
+        assert_optimal(&out, &inst, opt);
+    }
+}
+
+#[test]
+fn many_threads_checkpoint_resume_and_spill() {
+    let inst = instance();
+    let raw = raw_search(&inst);
+    for threads in MANY {
+        let dir = TempDir::new(&format!("many{threads}"));
+        let ckpt = dir.path("ckpt.bin");
+        let spill = dir.path("spill");
+        // In pieces through checkpoints (each stop is a pause that parks every worker), with a tiny in-memory
+        // queue: the stacks the workers push in the pause spill.
+        let cfg = EngineConfig {
+            checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))),
+            node_limit: Some(raw.nodes / 4),
+            queue_mem_cap: 16,
+            spill_dir: Some(spill.clone()),
+            ..config(threads)
+        };
+        let (out, runs) = run_in_pieces(&cfg, &inst, &ckpt);
+        assert!(runs.len() >= 2, "{threads} threads: {} invocations", runs.len());
+        assert_optimal(&out, &inst, inst.dp());
+        assert!(runs.iter().any(|c| c.spilled_units > 0 && c.reloaded_segments > 0), "{threads} threads: {runs:?}");
+        assert!(dir_is_empty(&spill), "{threads} threads: spill files left behind");
+        // Periodic checkpoints every 2 ms, progress lines and spilling all at once.  How many pauses happen
+        // depends on when the coordinator gets a core, so only the answer and the bookkeeping are checked.
+        let big = big_instance();
+        let cfg = EngineConfig {
+            checkpoint: Some((ckpt.clone(), Duration::from_millis(2))),
+            progress: Some(Duration::from_millis(50)),
+            queue_mem_cap: 8,
+            spill_dir: Some(spill.clone()),
+            label: format!("many {threads}"),
+            ..config(threads)
+        };
+        let out = solve(&cfg, fresh(), &big);
+        assert!(out.completed);
+        assert_optimal(&out, &big, big.dp());
+        assert_accounting(&out.counters);
+        println!("{threads} threads, checkpoints every 2 ms: {}", out.counters.summary());
+        assert!(!ckpt.exists() && dir_is_empty(&spill), "{threads} threads: files left behind");
+    }
+}
+
+#[test]
+fn many_threads_worker_panic_propagates() {
+    let inst = big_instance();
+    let raw_nodes = 200_000_000; // about the big instance's tree
+    for threads in MANY {
+        let dir = TempDir::new(&format!("panic{threads}"));
+        let ckpt = dir.path("ckpt.bin");
+        let spill = dir.path("spill");
+        let cfg = EngineConfig {
+            checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))),
+            node_limit: Some(raw_nodes / 10),
+            queue_mem_cap: 4,
+            spill_dir: Some(spill.clone()),
+            ..config(threads)
+        };
+        let first = solve(&cfg, fresh(), &inst);
+        assert!(!first.completed && ckpt.exists(), "{threads} threads: stopped with a checkpoint");
+        // Resumed, every worker panics as it starts a unit, while the others start theirs or run.
+        let cfg = EngineConfig { node_limit: None, ..cfg };
+        let resumed = || solve_with(&cfg, Start::Resume(ckpt.clone()), &inst, None, Some(ckpt.clone()));
+        let result = panic::catch_unwind(AssertUnwindSafe(resumed));
+        assert!(result.is_err(), "{threads} threads: the panic reached the caller");
+        assert!(dir_is_empty(&spill), "{threads} threads: spill files removed while unwinding");
+        assert!(ckpt.exists(), "{threads} threads: the checkpoint survives the panic");
+        let out = solve(&cfg, Start::Resume(ckpt.clone()), &inst);
+        assert!(out.completed);
+        assert_optimal(&out, &inst, inst.dp());
+    }
 }
 
 #[test]
@@ -373,19 +496,29 @@ fn tiny_queue_cap_spills_and_cleans_up() {
     assert!(dir_is_empty(&spill), "spill files left behind");
 }
 
-/// Run with a node limit, resuming from the checkpoint until complete.  Returns the final outcome and the
-/// number of invocations.
-fn run_in_pieces(cfg: &EngineConfig, inst: &Instance, ckpt: &Path) -> (Outcome, usize) {
+/// Run with a node limit, resuming from the checkpoint until complete.  Returns the final outcome and the counters
+/// of every invocation.
+fn run_in_pieces(cfg: &EngineConfig, inst: &Instance, ckpt: &Path) -> (Outcome, Vec<engine::Counters>) {
     let mut start = fresh();
+    let mut counters = Vec::new();
     for invocation in 1.. {
-        let began = Instant::now();
         let out = solve(cfg, start, inst);
+        assert_accounting(&out.counters);
+        counters.push(out.counters);
+        // The elapsed time is this invocation's plus that of the runs before it (from the checkpoint).  (Checked
+        // with the engine's own clocks: a test thread can be descheduled for long when the tests oversubscribe
+        // the cores.)
+        if invocation == 1 {
+            assert!(out.elapsed >= out.counters.wall, "elapsed includes this run: {:?}", out.counters);
+        } else {
+            assert!(out.elapsed > out.counters.wall, "elapsed accumulates across resumes: {:?}", out.counters);
+        }
         if out.completed {
             assert!(!ckpt.exists(), "checkpoint removed on completion");
-            return (out, invocation);
+            return (out, counters);
         }
-        assert!(out.elapsed >= began.elapsed() / 2, "elapsed accumulates across resumes");
         assert!(ckpt.exists(), "final checkpoint written on stop");
+        assert!(out.counters.pauses >= 1 && out.counters.checkpoints >= 1, "{:?}", out.counters);
         assert_eq!(engine::read_checkpoint_header(ckpt).unwrap(), HEADER);
         assert!(invocation < 1000, "no progress");
         start = Start::Resume(ckpt.to_path_buf());
@@ -407,8 +540,8 @@ fn checkpoint_resume_one_thread_is_exact() {
         spill_dir: Some(spill.clone()),
         ..config(1)
     };
-    let (out, invocations) = run_in_pieces(&cfg, &inst, &ckpt);
-    assert!(invocations >= 7, "{invocations} invocations");
+    let (out, runs) = run_in_pieces(&cfg, &inst, &ckpt);
+    assert!(runs.len() >= 7, "{} invocations", runs.len());
     assert_optimal(&out, &inst, inst.dp());
     // A single thread resumes in exact depth-first order, so the total work equals one uninterrupted run.
     assert_eq!(out.stats.nodes, raw.nodes);
@@ -430,8 +563,8 @@ fn checkpoint_resume_many_threads() {
         spill_dir: Some(spill.clone()),
         ..config(4)
     };
-    let (out, invocations) = run_in_pieces(&cfg, &inst, &ckpt);
-    assert!(invocations >= 3, "{invocations} invocations");
+    let (out, runs) = run_in_pieces(&cfg, &inst, &ckpt);
+    assert!(runs.len() >= 3, "{} invocations", runs.len());
     assert_optimal(&out, &inst, inst.dp());
     let ratio = out.stats.nodes as f64 / raw.nodes as f64;
     assert!((0.5..2.0).contains(&ratio), "nodes {} vs uninterrupted {}", out.stats.nodes, raw.nodes);
@@ -518,7 +651,7 @@ fn worker_panic_propagates() {
         spill_dir: Some(spill.clone()),
         ..config(4)
     };
-    // Worker 0 panics once the first checkpoint is on disk, so there is one to resume from.
+    // Workers panic once the first checkpoint is on disk, so there is one to resume from.
     let result = panic::catch_unwind(AssertUnwindSafe(|| solve_with(&cfg, fresh(), &inst, None, Some(ckpt.clone()))));
     assert!(result.is_err(), "the panic reached the caller");
     assert!(dir_is_empty(&spill), "spill files removed while unwinding");
@@ -605,12 +738,14 @@ fn empty_start_completes() {
 }
 
 /// Random engine configurations on small instances, each run to completion through any number of resumes.
-/// `TXENGINE_STRESS=<iterations> cargo test --release --test engine -- --ignored stress`
+/// `TXENGINE_STRESS=<iterations> cargo test --release --test engine -- --ignored stress`; another
+/// `TXENGINE_STRESS_SEED=<number>` draws other configurations.
 #[test]
 #[ignore]
 fn stress() {
     let iterations: u64 = std::env::var("TXENGINE_STRESS").ok().and_then(|s| s.parse().ok()).unwrap_or(200);
-    let mut rng = 0x9e37_79b9_7f4a_7c15u64;
+    let seed: u64 = std::env::var("TXENGINE_STRESS_SEED").ok().and_then(|s| s.parse().ok()).unwrap_or(0);
+    let mut rng = 0x9e37_79b9_7f4a_7c15u64 ^ seed.wrapping_mul(0xd1b5_4a32_d192_ed03);
     let mut pick = |options: &[u64]| {
         rng ^= rng << 13;
         rng ^= rng >> 7;
@@ -626,7 +761,7 @@ fn stress() {
         let raw = raw_search(&inst);
         let ms = |x: u64| (x > 0).then(|| Duration::from_millis(x));
         let cfg = EngineConfig {
-            threads: pick(&[1, 2, 3, 4, 7, 10, 16, 32]) as usize,
+            threads: pick(&[1, 2, 3, 4, 7, 10, 16, 32, 64, 128, 192]) as usize,
             queue_mem_cap: pick(&[1, 2, 5, 50, 1 << 20]) as usize,
             spill_dir: Some(spill.clone()),
             checkpoint: Some((ckpt.clone(), ms(pick(&[0, 1, 3, 20])).unwrap_or(Duration::from_secs(3600)))),
@@ -640,6 +775,7 @@ fn stress() {
         let (mut nodes, mut stalled) = (0, 0);
         loop {
             let out = solve_with(&cfg, start, &inst, target, None);
+            assert_accounting(&out.counters);
             stalled = if out.stats.nodes > nodes { 0 } else { stalled + 1 };
             nodes = out.stats.nodes;
             assert!(stalled < 20, "iteration {it}: no progress with {cfg:?}");
@@ -714,41 +850,60 @@ impl Searcher<Leafy> for Walker {
 
 #[test]
 #[ignore]
+///
+/// The environment can change the thread counts (`TXENGINE_BENCH_THREADS`, default `1,2,4,8`), the knapsack's
+/// items (`TXENGINE_BENCH_ITEMS`, default [`BIG_ITEMS`]: 0.2 G nodes; 64: 0.65 G, 72: 4.2 G, 80: 60 G) and the
+/// binary tree's depth (`TXENGINE_BENCH_DEPTH`, default 27: 0.27 G nodes, each level more doubles it).  The
+/// unthreaded runs take about 2.6 ns per knapsack node and 1.2 ns per tree node on an M1 core, so on many cores
+/// the defaults finish in milliseconds; there `TXENGINE_BENCH_ITEMS=80 TXENGINE_BENCH_DEPTH=35` measure
+/// something (and take about four minutes for the unthreaded runs).
 fn bench() {
-    let inst = Instance::new(56, 10_000, 99);
+    let threads: Vec<usize> = bench_env("TXENGINE_BENCH_THREADS", "1,2,4,8")
+        .split(',')
+        .map(|t| t.parse().expect("TXENGINE_BENCH_THREADS: a list of thread counts"))
+        .collect();
+    let items: usize =
+        bench_env("TXENGINE_BENCH_ITEMS", &BIG_ITEMS.to_string()).parse().expect("TXENGINE_BENCH_ITEMS: a number");
+    let depth: u32 = bench_env("TXENGINE_BENCH_DEPTH", "27").parse().expect("TXENGINE_BENCH_DEPTH: a number");
+
+    let inst = Instance::new(items, 10_000, 99);
     let t = Instant::now();
     let raw = raw_search(&inst);
     let raw_secs = t.elapsed().as_secs_f64();
-    println!("knapsack: {} nodes", raw.nodes);
-    println!("  raw dfs          {:7.3} s  {:6.1} M nodes/s", raw_secs, raw.nodes as f64 / raw_secs / 1e6);
-    for threads in [1, 10] {
+    println!("knapsack, {items} items: {} nodes", raw.nodes);
+    println!("  raw dfs           {:7.3} s  {:6.1} M nodes/s", raw_secs, raw.nodes as f64 / raw_secs / 1e6);
+    for &threads in &threads {
         let out = solve(&config(threads), fresh(), &inst);
         let secs = out.elapsed.as_secs_f64();
         println!(
-            "  engine {threads:2} threads {secs:7.3} s  {:6.1} M nodes/s  ({} nodes, {} splits)",
+            "  engine {threads:3} threads {secs:7.3} s  {:6.1} M nodes/s  ({} nodes) {}",
             out.stats.nodes as f64 / secs / 1e6,
             out.stats.nodes,
-            out.counters.splits
+            out.counters.summary()
         );
     }
 
-    let depth = 27;
     let t = Instant::now();
     let nodes = walk(&mut Vec::new(), Leafy(0), depth, || Poll::Continue, &mut Vec::new());
     let raw_secs = t.elapsed().as_secs_f64();
-    println!("empty binary tree: {nodes} nodes");
-    println!("  raw walk         {:7.3} s  {:6.2} ns/node", raw_secs, raw_secs * 1e9 / nodes as f64);
-    for threads in [1, 10] {
+    println!("empty binary tree, depth {depth}: {nodes} nodes");
+    println!("  raw walk          {:7.3} s  {:6.2} ns/node", raw_secs, raw_secs * 1e9 / nodes as f64);
+    for &threads in &threads {
         let start = Start::Fresh { units: vec![Leafy(0)], best: 0, payload: Vec::new() };
         let make = |_| Walker { depth, stack: Vec::new(), out: Vec::new() };
         let out = engine::run(&config(threads), start, b"", make).unwrap();
         assert_eq!(out.stats.nodes, nodes);
         let secs = out.elapsed.as_secs_f64();
         println!(
-            "  engine {threads:2} threads {secs:7.3} s  {:6.2} ns/node  ({:.2} ns/node/thread, {} splits)",
+            "  engine {threads:3} threads {secs:7.3} s  {:6.2} ns/node  ({:.2} ns/node/thread) {}",
             secs * 1e9 / nodes as f64,
             secs * 1e9 * threads as f64 / nodes as f64,
-            out.counters.splits
+            out.counters.summary()
         );
     }
+}
+
+/// The benchmark setting `name` from the environment, or `default`.
+fn bench_env(name: &str, default: &str) -> String {
+    std::env::var(name).unwrap_or_else(|_| default.to_owned())
 }
