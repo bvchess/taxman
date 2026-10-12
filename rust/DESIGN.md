@@ -94,7 +94,7 @@ and values for them.
 | `match_bound` | on | sound (matchability relaxes winnability) | node bound = min(blameGame, matching relaxation), the matching one computed only when blameGame fails to prune; a heaviest matching that can be promoted is the node's best completion (offered as incumbent, node done) |
 | `branching` | `conflict-strong` | sound (any order explores every promotion set) | which candidate a node promotes next: `largest` (the Java's order), or a member of a conflict of the heaviest matching (these need `match_bound`): the smallest (`conflict-smallest`), the largest (`conflict-largest`), or the one whose removal lowers the matching bound most (`conflict-strong`) |
 | `match_refine` | 1 | sound (see `search::Refiner`) | refine the matching bound by branching on conflicts this many levels deep, where it does not prune (0 = off, at most 7; needs `match_bound`) |
-| `fix_forced` | on | sound (every completion that beats the incumbent promotes them) | with `conflict-strong` branching, the child also promotes the conflict's *forced* members: those whose removal alone brings the matching bound below what the node needs; a node whose members are all forced is done |
+| `fix_forced` | on | sound (every completion that beats the incumbent promotes them) | with `conflict-strong` branching, a node's child promotes all its *forced* candidates (those whose removal alone brings the matching bound below what the node needs): the members of the heaviest matching that the potentials show forced, else the forced members of the conflict found by strong branching; the node's loop ends after that child; a node with a known conflict all forced is done |
 | `nogoods` | on | sound (a nogood holds at every node; see `model::Nogoods`) | learn each conflict as a *nogood* of the root and use the table at every node: the smallest conflict it knows of the heaviest matching is the one to branch on and refine with (computed and learned only when it knows none), and nogoods rule candidates out of children (needs `match_bound`) |
 | `legacy_bound` | off | unsound (the runner-up defect) | reproduce the Java bound exactly |
 | `prev_cap` | on | proven if opt(n−1) is optimal | stop as soon as the incumbent reaches n + opt(n−1) − inTheBag (`FrameSolver.getMaxPromotionSum`) |
@@ -467,6 +467,29 @@ found the others again, one level each, further down.
   node's loop ends after the child that promotes them (it covers every
   completion that can beat the incumbent), so no level is kept for it.  The
   same trees, 13–28% less time.
+* **Forced members of the whole matching.**  The bound from the potentials
+  is cheap enough to compute for every member of the heaviest matching, not
+  only for the conflict's: at each check that refines (or wants a conflict)
+  the forced members of `Q*` are found that way.  If the nogood table knows
+  a conflict all of whose members are forced, or the conflict found is, the
+  node is done (diagnostics had shown that refining by the fresh minimal
+  conflict instead of the table's would prune 16% of the nodes left open:
+  other conflicts matter).  Otherwise, if any are forced, the child promotes
+  them all and strong branching is not needed; only when none is does strong
+  branching solve for its conflict's members.  The table is scanned once
+  for both (the smallest conflict, and any conflict all forced), its
+  nogoods' members ordered with the conflict they came from first, as those
+  are the likeliest to be missing at another node.  Nodes −8% (936) to −52%
+  (1184), time −2% to −39%; 992 seeded with its optimum (the proof alone,
+  one thread): 2.89M → 2.11M nodes.
+
+  Tried and not kept: proving more members forced with the forced ones
+  required (a second pass of the bounds from the potentials on a level with
+  them promoted) pruned nothing more; skipping the exact solves of strong
+  branching when the bounds from the potentials found some member forced
+  (instead of whenever they found any candidate forced), or of the
+  refinement's branches, or choosing the member to branch on by those bounds
+  alone, each traded nodes for time at about even.
 
 One thread, fast set (search seconds and nodes; 880 and 936 seeded from
 optimal.json, the rest from `results/strict.jsonl`):
@@ -477,7 +500,8 @@ optimal.json, the rest from `results/strict.jsonl`):
 | 53a442a | forced members | 2.14 s 98k | 8.61 s 320k | 18.2 s 342k | 3.17 s 74k | 3.09 s 66k | 14.7 s 338k |
 | 261b342 | reuse the child check | 1.97 s 98k | 8.05 s 320k | 16.8 s 340k | 2.65 s 74k | 2.35 s 66k | 11.9 s 338k |
 | c33c3c2 | nogoods | 0.66 s 34k | 1.09 s 50k | 11.8 s 318k | 2.12 s 75k | 1.18 s 46k | 6.41 s 276k |
-| (next) | bounds from the potentials | 0.52 s 34k | 0.85 s 50k | 8.72 s 318k | 1.65 s 75k | 0.91 s 46k | 4.87 s 276k |
+| 667b24d | bounds from the potentials | 0.52 s 34k | 0.85 s 50k | 8.72 s 318k | 1.65 s 75k | 0.91 s 46k | 4.87 s 276k |
+| (next) | forced members of the whole matching | 0.46 s 31k | 0.83 s 45k | 6.45 s 241k | 1.31 s 51k | 0.92 s 35k | 2.94 s 133k |
 
 ## Testing
 

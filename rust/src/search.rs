@@ -45,7 +45,7 @@ use crate::bits::Bits;
 use crate::bounds::{self, max_additional, Bounds, Preclusions, RunnerUp};
 use crate::engine::{self, Counters, Ctx, EngineConfig, Poll, Searcher, Start, Stats, Unit};
 use crate::matchbound::{MatchBound, MatchGraph};
-use crate::model::{ConflictCache, FrameSet, Model, Nogoods, Scratch};
+use crate::model::{ConflictCache, FrameSet, Lookup, Model, Nogoods, Scratch};
 use crate::numtheory::Tables;
 use std::io;
 use std::path::Path;
@@ -323,6 +323,9 @@ struct Refiner<'r, 'g, const W: usize> {
     exact: Bits<W>,
     /// The nogoods (tactic `nogoods`).
     learning: Option<Learning<'r, W>>,
+    /// Whether to find the heaviest matching's forced members (tactic `fix_forced`), and those found.
+    forcing: bool,
+    forced: Bits<W>,
 }
 
 /// What a [`Refiner`] needs to use and grow the searcher's nogood table (tactic `nogoods`).
@@ -368,10 +371,19 @@ impl<const W: usize> Refiner<'_, '_, W> {
             return Verdict::Open(None);
         }
         let chosen = self.m.chosen();
-        let Some(k) = self.top_conflict(&chosen) else {
-            return Verdict::Exact(chosen);
+        if self.forcing {
+            // The members of the heaviest matching that every completion reaching `need` promotes, as far as the
+            // potentials show (see `MatchBound::bound_excluding`).
+            let need = self.need;
+            self.forced = chosen.iter().filter(|&x| self.m.bound_excluding(x) < need).collect();
+        }
+        let k = match self.find_conflict(&chosen, self.forced) {
+            Lookup::Conflict(k) => k,
+            Lookup::None => return Verdict::Exact(chosen),
+            Lookup::Forced => return Verdict::Below,
         };
-        if depth > 0 && !self.branches(k, Bits::EMPTY, depth) {
+        // A conflict all of whose members are forced leaves no completion that reaches `need`.
+        if k.is_subset(&self.forced) || (depth > 0 && !self.branches(k, Bits::EMPTY, depth)) {
             return Verdict::Below;
         }
         Verdict::Open(Some(k))
@@ -392,22 +404,37 @@ impl<const W: usize> Refiner<'_, '_, W> {
     /// learned.  Refinements and the propagation into children use what is known too, which work units do not
     /// record.
     fn top_conflict(&mut self, promoted: &Bits<W>) -> Option<Bits<W>> {
+        match self.find_conflict(promoted, Bits::EMPTY) {
+            Lookup::Conflict(k) => Some(k),
+            _ => None,
+        }
+    }
+
+    /// [`top_conflict`](Self::top_conflict), or [`Lookup::Forced`] if the table knows a conflict all of whose
+    /// members are in `forced`.
+    fn find_conflict(&mut self, promoted: &Bits<W>, forced: Bits<W>) -> Lookup<W> {
         if let Some(l) = &self.learning {
-            if let Some(k) = l.table.conflict(&l.promoted, promoted) {
-                self.hits += 1;
-                self.known.push(k);
-                return Some(k);
+            match l.table.lookup(&l.promoted, promoted, &forced) {
+                Lookup::None => {}
+                found => {
+                    self.hits += 1;
+                    if let Lookup::Conflict(k) = found {
+                        self.known.push(k);
+                    }
+                    return found;
+                }
             }
         }
-        let k = self.model.conflict_cached(self.scratch, Some(self.cache), self.state, promoted, true)?;
+        let found = self.model.conflict_cached(self.scratch, Some(self.cache), self.state, promoted, true);
+        let Some(k) = found else { return Lookup::None };
         self.computed += 1;
         if let Some(l) = &mut self.learning {
             if let Some(n) = self.model.nogood(self.scratch, l.root, &l.promoted, &k) {
-                l.table.insert(n);
+                l.table.insert(n, &k);
             }
         }
         self.known.push(k);
-        Some(k)
+        Lookup::Conflict(k)
     }
 
     /// Whether the bound of the top level, with `required` (members of `C` required by the branches above)
@@ -475,22 +502,19 @@ impl<const W: usize> Refiner<'_, '_, W> {
 /// Also returns the members whose removal brings the bound below `need`, the node's *forced* members: every
 /// completion that reaches `need` promotes them all.  The chosen member is among them unless there are none.
 ///
-/// With `quick` (for the `fix_forced` tactic, which promotes all the forced members, so that which of them is
-/// chosen hardly matters), the members that [`MatchBound::bound_excluding`] already shows to be forced are not
-/// solved for, and when some member is forced the largest forced one is chosen and no level is kept (the
-/// node's loop has nothing left to do after that child).  Returns whether a level is kept.
-fn strongest<const W: usize>(m: &mut MatchBound<'_, W>, k: &Bits<W>, need: u64, quick: bool) -> (u32, Bits<W>, bool) {
+/// With `fix_forced` (that tactic promotes all the forced members, so that which of them is chosen hardly
+/// matters), when some member is forced the largest forced one is chosen and no level is kept (the node's loop
+/// has nothing left to do after that child).  Returns whether a level is kept.
+fn strongest<const W: usize>(
+    m: &mut MatchBound<'_, W>,
+    k: &Bits<W>,
+    need: u64,
+    fix_forced: bool,
+) -> (u32, Bits<W>, bool) {
     let mut forced = Bits::EMPTY;
-    if quick {
-        for x in k.iter() {
-            if m.bound_excluding(x) < need {
-                forced.insert(x);
-            }
-        }
-    }
     let mut best = (u64::MAX, 0);
     let mut kept = false;
-    for x in (*k - forced).iter() {
+    for x in k.iter() {
         let bound = m.value_excluding(x);
         if bound < need {
             forced.insert(x);
@@ -504,7 +528,7 @@ fn strongest<const W: usize>(m: &mut MatchBound<'_, W>, k: &Bits<W>, need: u64, 
         }
     }
     match forced.max() {
-        Some(n) if quick => {
+        Some(n) if fix_forced => {
             m.drop_kept();
             (n, forced, false)
         }
@@ -529,8 +553,8 @@ struct Level<const W: usize> {
     /// How many of the searcher's known conflicts hold for this node.
     known_end: usize,
     /// What the matching bound said when the node was made, until its loop takes it: open at this `need`, with
-    /// this conflict to branch on.
-    checked: Option<(u64, Bits<W>)>,
+    /// this conflict to branch on and these forced members (see [`Refiner`]).
+    checked: Option<(u64, Bits<W>, Bits<W>)>,
 }
 
 /// Counts of the matching bound's work in a searcher.
@@ -833,6 +857,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         want_conflict: bool,
         found: &mut Bits<W>,
         nogoods: Option<(&mut Nogoods<W>, Bits<W>)>,
+        forced: &mut Bits<W>,
     ) -> MatchCheck<W> {
         let Some(m) = matching.as_mut() else {
             return MatchCheck::Open(None);
@@ -859,8 +884,11 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             hits: 0,
             exact: Bits::EMPTY,
             learning,
+            forcing: space.fix_forced && space.conflict_branching == Branching::ConflictStrong,
+            forced: Bits::EMPTY,
         };
         let verdict = refiner.top(depth, want_conflict);
+        *forced = refiner.forced;
         counts.refinements += 1;
         counts.evaluations += refiner.evaluations;
         counts.conflicts += refiner.computed;
@@ -947,16 +975,17 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         let mut conflict = None;
         let mut found = Bits::EMPTY;
         let checked = node.checked.take();
+        let mut forced = Bits::EMPTY; // candidates that every completion reaching `need` promotes
         let ended = if node.cands.is_empty() {
             Some(cut::EMPTY)
         } else if node.cands.sum_largest(node.max_add) < need {
             Some(cut::LARGEST)
         } else if !bounds.reaches(&node.state, &node.cands, node.max_add, need) {
             Some(cut::BLAME)
-        } else if let Some((_, k)) = checked.filter(|&(at, _)| at == need) {
+        } else if let Some((_, k, members)) = checked.filter(|&(at, _, _)| at == need) {
             // The node was checked when it was made, at the same need and with the same matching (its first
-            // step): the verdict is the same, and so is the conflict.
-            conflict = Some(k);
+            // step): the verdict is the same, and so are the conflict and the forced members.
+            (conflict, forced) = (Some(k), members);
             None
         } else {
             let (scratch, known) = (bounds.scratch(), &mut self.known);
@@ -972,6 +1001,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 branching != Branching::Largest,
                 &mut found,
                 self.nogoods.as_mut().map(|table| (table, node.promoted)),
+                &mut forced,
             );
             node.known_end = known.len();
             if !found.is_empty() {
@@ -1006,10 +1036,12 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         // The candidate to branch on: promoted in the child, and no longer a candidate of this node.
         let k = conflict.map(|k| k & node.cands).filter(|k| !k.is_empty());
         let mut kept = false; // whether the matching level without n is kept for the node
-        let mut forced = Bits::EMPTY; // members of k that every completion reaching `need` promotes
+        forced &= node.cands;
         let n = match (branching, k) {
             (Branching::ConflictSmallest, Some(k)) => k.min(),
             (Branching::ConflictLargest, Some(k)) => k.max(),
+            // With forced members known, the child promotes them all and the node's loop ends there.
+            (Branching::ConflictStrong, Some(_)) if !forced.is_empty() => forced.max(),
             (Branching::ConflictStrong, Some(k)) if k.len() > 1 => {
                 let m = matching.as_mut().expect("conflicts come from the matching");
                 let (n, members, keeps) = strongest(m, &k, need, space.fix_forced);
@@ -1020,7 +1052,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             _ => node.cands.max(),
         }
         .expect("not empty");
-        if k.is_some_and(|k| k.len() > 1 && forced == k) {
+        if k.is_some_and(|k| k.is_subset(&forced)) {
             // Every completion that reaches `need` promotes the whole conflict, so there is none.
             if let Some(p) = probe {
                 p.local.loop_ends[cut::FORCED] += 1;
@@ -1107,6 +1139,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             }
             let (scratch, known, cache) = (bounds.scratch(), &mut self.known, &mut self.conflict_cache);
             let mut found = Bits::EMPTY;
+            let mut forced = Bits::EMPTY;
             let state = &child.state;
             let check = Self::matching_check(
                 matching,
@@ -1120,13 +1153,14 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 false,
                 &mut found,
                 self.nogoods.as_mut().map(|table| (table, child.promoted)),
+                &mut forced,
             );
             if !found.is_empty() {
                 Self::offer(space, &mut self.payload, ctx, &(child.promoted | found));
             }
             match check {
                 MatchCheck::Open(k) => {
-                    child.checked = k.map(|k| (need, k));
+                    child.checked = k.map(|k| (need, k, forced));
                     if let (Some(p), Some(m)) = (probe.as_mut(), matching.as_mut()) {
                         p.matching_open(bounds, m, space.model, &child.state, max_next, need);
                     }
@@ -1774,6 +1808,8 @@ mod tests {
                             hits: 0,
                             exact: Bits::EMPTY,
                             learning,
+                            forcing: rng.chance(50),
+                            forced: Bits::EMPTY,
                         };
                         let verdict = refiner.top(depth, rng.chance(50));
                         let found = refiner.exact;
@@ -1860,10 +1896,19 @@ mod tests {
                     if k.len() < 2 {
                         continue;
                     }
-                    let (n, forced, _) = strongest(&mut m, &k, need, rng.chance(50));
                     let what = format!("n={} promoted {promoted:?} cands {cands:?} need {need}", g.n);
-                    assert!(k.contains(n) && forced.is_subset(&k), "{what}: {n} {forced:?} from {k:?}");
-                    assert!(forced.is_empty() || forced.contains(n), "{what}: {n} is not among {forced:?}");
+                    // The members of the heaviest matching forced by the potentials alone, or else those of the
+                    // conflict that strong branching finds.
+                    let quick: Bits<W> = chosen.iter().filter(|&x| m.bound_excluding(x) < need).collect();
+                    let forced = if quick.is_empty() || rng.chance(30) {
+                        let (n, forced, _) = strongest(&mut m, &k, need, rng.chance(50));
+                        assert!(k.contains(n) && forced.is_subset(&k), "{what}: {n} {forced:?} from {k:?}");
+                        assert!(forced.is_empty() || forced.contains(n), "{what}: {n} is not among {forced:?}");
+                        assert!((quick & k).is_subset(&forced), "{what}: {quick:?} not all in {forced:?}");
+                        forced
+                    } else {
+                        quick
+                    };
                     for x in forced.iter() {
                         let without = best_completion(&model, &state, &cands.without(x), max_add);
                         assert!(without < need, "{what}: {x} is forced, but leaving it out reaches {without}");
