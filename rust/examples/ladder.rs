@@ -2,7 +2,7 @@
 //!
 //! ```text
 //! cargo run --release --example ladder -- [--threads T] [--seconds S] [--diag] [--no-cap] [--no-seed] [--seed-opt]
-//!     [--tactic NAME=on|off]... N...
+//!     [--tactic NAME=VALUE]... N...
 //! ```
 //!
 //! Each game is set up from the frame builder (no golden data) with the default search tactics, seeded with
@@ -10,7 +10,8 @@
 //! does; `--seed-opt`: with the game for n itself, so that the search only has to prove it) and capped at
 //! n + opt(n − 1) − inTheBag (`prev_cap`).  One line per game: whether the search
 //! completed, its time and nodes, the incumbent against optimal.json, and when the final incumbent was found.
-//! `--diag` collects [`Diagnostics`] (slower) and prints a summary.
+//! `--diag` collects [`Diagnostics`] (slower) and prints a summary.  `--tactic` sets a search tactic with the
+//! names and values of `taxman solve --tactic` (`preclusions=off`, `branching=largest`, `match_refine=0`, ...).
 
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -20,7 +21,8 @@ use taxman::frames::build_frames;
 use taxman::game::Optimal;
 use taxman::hives::Apiary;
 use taxman::numtheory::Tables;
-use taxman::search::{cut, prepare, search_with, Branching, Diagnostics, Revise, SearchTactics};
+use taxman::search::{cut, prepare, search_with, Diagnostics, Revise, SearchTactics};
+use taxman::solver::Tactics;
 
 struct Options {
     threads: usize,
@@ -56,35 +58,14 @@ fn parse() -> Result<Options, String> {
             "--no-seed" => o.seed = false,
             "--seed-opt" => o.seed_opt = true,
             "--tactic" => {
+                // The solver's parser, so that the names and values are the same as for `taxman solve --tactic`.
                 let spec = value("--tactic")?;
-                let (name, setting) = spec.split_once('=').ok_or("--tactic NAME=on|off")?;
-                let t = &mut o.tactics;
-                if name == "match_refine" {
-                    t.match_refine = setting.parse().map_err(|e| format!("--tactic {spec}: {e}"))?;
-                    continue;
+                let mut tactics = Tactics { search: o.tactics, ..Tactics::default() };
+                tactics.set(&spec).map_err(|e| format!("--tactic: {e}"))?;
+                if tactics != (Tactics { search: tactics.search, ..Tactics::default() }) {
+                    return Err(format!("--tactic {spec}: the ladder only searches, so only search tactics apply"));
                 }
-                if name == "branching" {
-                    t.branching = match setting {
-                        "largest" => Branching::Largest,
-                        "conflict-smallest" => Branching::ConflictSmallest,
-                        "conflict-largest" => Branching::ConflictLargest,
-                        "conflict-strong" => Branching::ConflictStrong,
-                        _ => return Err(format!("--tactic {spec}: largest, conflict-smallest or conflict-largest")),
-                    };
-                    continue;
-                }
-                let on = match setting {
-                    "on" => true,
-                    "off" => false,
-                    _ => return Err(format!("--tactic {spec}: on or off")),
-                };
-                match name {
-                    "preclusions" => t.preclusions = on,
-                    "legacy_bound" => t.legacy_bound = on,
-                    "revise_freedoms" => t.revise_freedoms = on,
-                    "match_bound" => t.match_bound = on,
-                    _ => return Err(format!("unknown tactic {name}")),
-                }
+                o.tactics = tactics.search;
             }
             n => o.games.push(n.parse().map_err(|e| format!("{n}: {e}"))?),
         }

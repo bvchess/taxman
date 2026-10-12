@@ -8,15 +8,19 @@ use std::process::ExitCode;
 use std::time::Instant;
 use taxman::game::Optimal;
 use taxman::numtheory::Tables;
+use taxman::search::{Branching, SearchTactics};
+use taxman::solver::Tactics;
 
+/// The usage text with its `{...}` parts to fill in by [`usage`].
 const USAGE: &str = "\
 usage: taxman <command> [args]
 
 commands:
   solve N|A-B [options]   solve one board size or a range, each from the one before
       --threads K              worker threads (default: all cores)
-      --tactic NAME=on|off     switch a tactic (repeatable); names: prime_shortcut, reuse_prev, revise_freedoms,
-                               preclusions, match_bound, legacy_bound, prev_cap, seed_incumbent
+      --tactic NAME=VALUE      set a tactic (repeatable).  A switch is on or off, match_refine is 0-{max_refine},
+                               branching is {branchings}.
+                               Names: {tactics}
       --out FILE               append each result as a JSON line; games already completed in FILE are skipped
       --checkpoint-dir DIR     keep a resumable checkpoint nDDDD.ckpt per game in DIR
       --checkpoint-interval S  seconds between checkpoints (default 60)
@@ -37,12 +41,21 @@ commands:
   help                    show this message
 ";
 
+/// [`USAGE`] with the tactics' names and values, which the solver defines.
+fn usage() -> String {
+    let rows: Vec<String> = Tactics::names().chunks(4).map(|row| row.join(", ")).collect();
+    USAGE
+        .replace("{tactics}", &rows.join(&format!(",\n{:31}", "")))
+        .replace("{branchings}", &Branching::ALL.map(Branching::name).join(", "))
+        .replace("{max_refine}", &SearchTactics::MAX_MATCH_REFINE.to_string())
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match run(&args) {
         Ok(()) => ExitCode::SUCCESS,
         Err(CliError::Usage(message)) => {
-            eprintln!("error: {message}\n\n{USAGE}");
+            eprintln!("error: {message}\n\n{}", usage());
             ExitCode::from(2)
         }
         Err(CliError::Failed(message)) => {
@@ -58,7 +71,7 @@ fn run(args: &[String]) -> CliResult {
     };
     match command.as_str() {
         "help" | "--help" | "-h" => {
-            print!("{USAGE}");
+            print!("{}", usage());
             Ok(())
         }
         "solve" => commands::solve(rest),

@@ -45,6 +45,7 @@ use crate::model::{ConflictCache, FrameSet, Model, Scratch};
 use crate::numtheory::Tables;
 use std::io;
 use std::path::Path;
+use std::str::FromStr;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
@@ -65,9 +66,9 @@ pub struct SearchTactics {
     /// the matching bound only where `blameGame` does not prune (sound).
     pub match_bound: bool,
     /// Refine the matching bound by conflicts, branching this many levels deep where it does not prune
-    /// (0: off; needs `match_bound`; sound, see [`Refiner`]).  At most 7.  What it prunes can depend on the
-    /// conflicts already known along the path, which work units do not record, so a single-threaded search
-    /// that is interrupted may explore a slightly different tree (with the same answer).
+    /// (0: off; needs `match_bound`; sound, see [`Refiner`]).  At most [`Self::MAX_MATCH_REFINE`].  What it
+    /// prunes can depend on the conflicts already known along the path, which work units do not record, so a
+    /// single-threaded search that is interrupted may explore a slightly different tree (with the same answer).
     pub match_refine: u8,
     /// Which candidate a node branches on next (sound: any order explores every promotion set).
     pub branching: Branching,
@@ -91,6 +92,33 @@ pub enum Branching {
     ConflictStrong,
 }
 
+impl Branching {
+    /// Every variant.
+    pub const ALL: [Branching; 4] =
+        [Branching::Largest, Branching::ConflictSmallest, Branching::ConflictLargest, Branching::ConflictStrong];
+
+    /// The name the command line and the results use (`largest`, `conflict-smallest`, ...); [`FromStr`] reads it.
+    pub fn name(self) -> &'static str {
+        match self {
+            Branching::Largest => "largest",
+            Branching::ConflictSmallest => "conflict-smallest",
+            Branching::ConflictLargest => "conflict-largest",
+            Branching::ConflictStrong => "conflict-strong",
+        }
+    }
+}
+
+impl FromStr for Branching {
+    type Err = String;
+
+    fn from_str(text: &str) -> Result<Self, String> {
+        Branching::ALL.into_iter().find(|branching| branching.name() == text).ok_or_else(|| {
+            let names: Vec<&str> = Branching::ALL.iter().map(|branching| branching.name()).collect();
+            format!("expected one of {}, got {text:?}", names.join(", "))
+        })
+    }
+}
+
 impl Default for SearchTactics {
     fn default() -> Self {
         SearchTactics {
@@ -105,6 +133,10 @@ impl Default for SearchTactics {
 }
 
 impl SearchTactics {
+    /// The largest `match_refine`: the header of a checkpoint has room for no more, so a deeper setting could not
+    /// be told from this one on resuming.
+    pub const MAX_MATCH_REFINE: u8 = 7;
+
     fn rule(self) -> RunnerUp {
         if self.legacy_bound {
             RunnerUp::Legacy
@@ -124,7 +156,7 @@ impl SearchTactics {
             | u16::from(self.legacy_bound) << 1
             | u16::from(self.revise_freedoms) << 2
             | u16::from(self.match_bound) << 3
-            | u16::from(self.match_refine.min(7)) << 4
+            | u16::from(self.match_refine.min(Self::MAX_MATCH_REFINE)) << 4
             | branching << 7
     }
 

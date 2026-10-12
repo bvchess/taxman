@@ -77,12 +77,13 @@ set and switchable where unproven.
 
 ## Tactics
 
-Each row is a switch in `Tactics` (CLI: `--tactic name=on|off`), except the
-model assumptions, which define the search space and cannot be switched off
-inside this model, and `branching` and `match_refine`, which are settings of
-`search::SearchTactics` (not on/off) that the solver's `Tactics` and CLI do not
-expose yet (`examples/ladder.rs` takes `--tactic branching=…` and
-`--tactic match_refine=N`).
+Each row is a tactic in `solver::Tactics`, set from the CLI with
+`--tactic name=value` (`on` or `off`; `match_refine=0`…`7`;
+`branching=largest|conflict-smallest|conflict-largest|conflict-strong`), except
+the model assumptions, which define the search space and cannot be switched off
+inside this model.  The ones that act inside the search are the fields of
+`search::SearchTactics`; `examples/ladder.rs` takes the same `--tactic` names
+and values for them.
 
 | tactic | default | status | effect |
 |---|---|---|---|
@@ -91,8 +92,8 @@ expose yet (`examples/ladder.rs` takes `--tactic branching=…` and
 | `revise_freedoms` | on | unproven ("max-sum promotion set also has max count") | `UpperBoundEstimator.reviseFreedoms`; can shrink frame 0's freedoms |
 | `preclusions` | on | sound (promotion failure is monotone: more moves or fewer factors never make a frame winnable) | depth-2 preclusion table; prunes candidates |
 | `match_bound` | on | sound (matchability relaxes winnability) | node bound = min(blameGame, matching relaxation), the matching one computed only when blameGame fails to prune; a heaviest matching that can be promoted is the node's best completion (offered as incumbent, node done) |
-| `branching` | conflict-strong | sound (any order explores every promotion set) | which candidate a node promotes next: `largest` (the Java's), or a member of a conflict of the heaviest matching (needs `match_bound`): the `conflict-smallest`, the `conflict-largest`, or (`conflict-strong`) the one whose removal lowers the matching bound most |
-| `match_refine` | 1 | sound (see `search::Refiner`) | refine the matching bound by branching on conflicts this many levels deep (0–7) |
+| `branching` | `conflict-strong` | sound (any order explores every promotion set) | which candidate a node promotes next: `largest` (the Java's order), or a member of a conflict of the heaviest matching (these need `match_bound`): the smallest (`conflict-smallest`), the largest (`conflict-largest`), or the one whose removal lowers the matching bound most (`conflict-strong`) |
+| `match_refine` | 1 | sound (see `search::Refiner`) | refine the matching bound by branching on conflicts this many levels deep, where it does not prune (0 = off, at most 7; needs `match_bound`) |
 | `legacy_bound` | off | unsound (the runner-up defect) | reproduce the Java bound exactly |
 | `prev_cap` | on | proven if opt(n−1) is optimal | stop as soon as the incumbent reaches n + opt(n−1) − inTheBag (`FrameSolver.getMaxPromotionSum`) |
 | `seed_incumbent` | on | sound (any feasible promotion set is a valid incumbent) | start from the better of greedy and the n−1 solution's promotions that are still feasible |
@@ -104,8 +105,12 @@ mandatory moves (`Hive.unzip`); `freeFactorCount = factors − sources`
 (`Hive.finishSetup`); closed hives take no part in the search; a promoted
 number pays tax only from the frame directly below.
 
-Results record the tactics they were produced with, and whether any unproven
-tactic was on.
+Results record the tactics they were produced with (`tactics`: the changes
+from the defaults, such as `branching=largest,match_refine=0`;
+`tactic_switches`: every tactic's value, the booleans as booleans,
+`match_refine` as a number and `branching` as its name), and whether any
+unproven tactic was on.  A checkpoint records the six search tactics and is
+refused when they differ.
 
 ## Architecture
 
@@ -127,7 +132,7 @@ dependencies.  Modules:
 | `engine` | problem-independent parallel depth-first branch-and-bound driver: work units, shared deque with disk spill, incumbent, yielding/splitting, checkpoint and resume, progress reporting, statistics |
 | `search` | the Taxman searcher (port of `BranchExplorer`) implementing the engine's `Searcher` trait; `prepare` (preclusions, greedy, `revise_freedoms`) and `search` (seed, cap, checkpoint and resume); `Refiner` (conflicts of the heaviest matching: exactness, refinement, branching); the starting incumbent's `dive` and local search (`Neighbourhood`); `search_with` and `Diagnostics` for measurements |
 | `examples/ladder.rs` | the ladder harness: standalone searches of hard games from the frame builder with a time limit (see Performance) |
-| `solver` | `Tactics` (every switch above, by name), `SolveOptions`, `solve_game` (the per-game pipeline below) and `solve_range` (a range of games, resumable through a results file) |
+| `solver` | `Tactics` (every tactic above, by name and value), `SolveOptions`, `solve_game` (the per-game pipeline below) and `solve_range` (a range of games, resumable through a results file) |
 | `main.rs`, `cli.rs`, `commands.rs` | CLI: `solve`, `regress`, `bench`, `verify-optimal`, `tables` (`taxman help` lists the options) |
 
 Width dispatch: everything that holds sets of game numbers is generic over
@@ -235,7 +240,9 @@ the incumbent value), `offer(value, payload) -> bool`, and a per-worker
 4. Else if `reuse_prev`: port of `FrameSolver.reusePrev` (method `reuse`).
 5. Else search (method `search`): columns → `FrameSet`; preclusions;
    greedy; `revise_freedoms` (which can run a nested two-frame search through
-   the same engine); `max_total`; seed incumbent; run the engine.
+   the same engine); `max_total`; the starting incumbent (the best of greedy,
+   the seed, and the root matching's rounding improved by local search); run
+   the engine.
 6. Solution = `Apiary(board, promotions)` moves in hive order; replay to check
    legality; compare the score with optimal.json when n is there (mismatch
    is a hard error).
@@ -256,9 +263,9 @@ synced as soon as it is done).  The n−1 solution comes from, in order: this
 run, the results file, optimal.json.
 
 `taxman bench` also appends one JSON line per run to `bench/history.jsonl`
-(commit, whether the sources were modified, threads, tactics, and per game
-the nodes, seconds per phase and search counters), so that performance can be
-followed across changes.
+(commit, whether the sources were modified, threads, every tactic's value, and
+per game the nodes, seconds per phase and search counters), so that
+performance can be followed across changes.
 
 ## Improvements after parity
 
@@ -400,7 +407,8 @@ Correctness, all on games that finish in seconds:
   every score against optimal.json (the Java's own test: 146 accelerated
   games in 1..200).
 * Tactic invariance: the regression with each unproven tactic off must give
-  identical scores.
+  identical scores; so must games 1..300 forced to search with each sound
+  tactic off or changed (each `branching`, `match_refine` 0 and 3).
 * Bound soundness: on small frame sets, the upper bound is never below the
   exhaustively computed best completion; the same for the matching bound and
   for its refinement by conflicts (whose exact completions must be

@@ -74,21 +74,36 @@ fn a_range_reproduces_optimal_json_and_the_javas_counts() {
 #[test]
 fn every_tactic_gives_the_same_scores() {
     let optimal = Optimal::load_default().unwrap();
-    let off = |name: &str| {
+    // Each variant is a `--tactic` assignment; the soundness of the ones that are not on/off settings is argued in
+    // DESIGN.md's "Conflicts of the matching bound".  `branching=largest` is the Java's order.
+    let with = |assignment: &str| {
         let mut opts = SolveOptions { force_search: true, ..options(2) };
-        opts.tactics.set(&format!("{name}=off")).unwrap();
-        (name.to_owned(), opts)
+        opts.tactics.set(assignment).unwrap();
+        (assignment.to_owned(), opts)
     };
     let default = ("default".to_owned(), SolveOptions { force_search: true, ..options(2) });
-    let variants = [default]
-        .into_iter()
-        .chain(["match_bound", "preclusions", "revise_freedoms", "seed_incumbent", "prev_cap"].map(off));
+    let variants = [default].into_iter().chain(
+        [
+            "match_bound=off",
+            "preclusions=off",
+            "revise_freedoms=off",
+            "seed_incumbent=off",
+            "prev_cap=off",
+            "branching=largest",
+            "branching=conflict-smallest",
+            "branching=conflict-largest",
+            "match_refine=0",
+            "match_refine=3",
+        ]
+        .map(with),
+    );
     for (name, opts) in variants {
         for r in solve_all(1, 300, &opts) {
             assert!(r.completed, "{name}: n={}", r.n);
             assert_eq!(Some(r.score), optimal.score(r.n), "{name}: n={}", r.n);
             assert_ne!(r.method, Method::Prime, "{name}: force_search skips the shortcuts (n={})", r.n);
             assert_ne!(r.method, Method::Reuse, "{name}: force_search skips the shortcuts (n={})", r.n);
+            assert_eq!(r.tactics.description(), name, "n={}", r.n);
         }
     }
 }
@@ -154,11 +169,13 @@ fn a_checkpoint_for_another_game_or_other_tactics_is_refused() {
     assert!(!solver::solve_game_with(600, None, &opts, Some(&optimal)).unwrap().completed);
     let checkpoint = dir.0.join("n0600.ckpt");
 
-    // Other tactics.
-    let mut other = opts.clone();
-    other.tactics.set("preclusions=off").unwrap();
-    let err = solver::solve_game_with(600, None, &other, Some(&optimal)).unwrap_err();
-    assert!(err.contains("different search tactics") && err.contains("n0600.ckpt"), "{err}");
+    // Other tactics: a switch, and the two settings that are not switches.
+    for assignment in ["preclusions=off", "branching=largest", "match_refine=0", "match_refine=2"] {
+        let mut other = opts.clone();
+        other.tactics.set(assignment).unwrap();
+        let err = solver::solve_game_with(600, None, &other, Some(&optimal)).unwrap_err();
+        assert!(err.contains("different search tactics") && err.contains("n0600.ckpt"), "{assignment}: {err}");
+    }
 
     // Another game, of the same width.
     fs::copy(&checkpoint, dir.0.join("n0620.ckpt")).unwrap();

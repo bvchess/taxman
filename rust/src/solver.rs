@@ -30,11 +30,13 @@ use crate::game::{replay, Optimal};
 use crate::hives::Apiary;
 use crate::json::Json;
 use crate::numtheory::Tables;
-use crate::search::{self, prepare, prepare_for_resume, stat, Revise, SearchTactics};
+use crate::search::{self, prepare, prepare_for_resume, stat, Branching, Revise, SearchTactics};
 use std::collections::BTreeMap;
+use std::fmt;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 /// The largest board the set widths cover (`W = 64`).
@@ -72,54 +74,128 @@ impl Default for Tactics {
 }
 
 /// The tactics whose answers are not proven to equal the true optimum (`reuse_prev` and `revise_freedoms` are
-/// conjecture-grade; `legacy_bound` is known to be unsound).
+/// conjecture-grade; `legacy_bound` is known to be unsound).  Every other tactic, `branching` and `match_refine`
+/// among them, is sound or proven.
 const UNPROVEN: [&str; 3] = ["reuse_prev", "revise_freedoms", "legacy_bound"];
 
+/// The number of tactics in DESIGN.md's table.
+const TACTIC_COUNT: usize = 10;
+
+/// The value of a tactic: an on/off switch, or one of the two settings that are not.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Setting {
+    Switch(bool),
+    /// `match_refine`: 0 to [`SearchTactics::MAX_MATCH_REFINE`].
+    MatchRefine(u8),
+    /// `branching`.
+    Branching(Branching),
+}
+
+/// The value as the command line spells it (`on`, `off`, `2`, `conflict-strong`).
+impl fmt::Display for Setting {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Setting::Switch(on) => f.write_str(if *on { "on" } else { "off" }),
+            Setting::MatchRefine(depth) => write!(f, "{depth}"),
+            Setting::Branching(branching) => f.write_str(branching.name()),
+        }
+    }
+}
+
+impl Setting {
+    fn to_json(self) -> Json {
+        match self {
+            Setting::Switch(on) => Json::Bool(on),
+            Setting::MatchRefine(depth) => Json::from(u32::from(depth)),
+            Setting::Branching(branching) => Json::from(branching.name()),
+        }
+    }
+}
+
+/// Where a tactic's value is kept, so that it can be assigned from text.
+enum Slot<'a> {
+    Switch(&'a mut bool),
+    MatchRefine(&'a mut u8),
+    Branching(&'a mut Branching),
+}
+
+impl Slot<'_> {
+    fn get(&self) -> Setting {
+        match self {
+            Slot::Switch(on) => Setting::Switch(**on),
+            Slot::MatchRefine(depth) => Setting::MatchRefine(**depth),
+            Slot::Branching(branching) => Setting::Branching(**branching),
+        }
+    }
+
+    /// Reads `text` as this kind of value and takes it; leaves the value alone if `text` is not one.
+    fn assign(&mut self, text: &str) -> Result<(), String> {
+        match self {
+            Slot::Switch(on) => {
+                **on = match text {
+                    "on" => true,
+                    "off" => false,
+                    _ => return Err(format!("expected on or off, got {text:?}")),
+                }
+            }
+            Slot::MatchRefine(depth) => {
+                let max = SearchTactics::MAX_MATCH_REFINE;
+                **depth = (text.parse().ok().filter(|&depth| depth <= max))
+                    .ok_or_else(|| format!("expected a whole number from 0 to {max}, got {text:?}"))?;
+            }
+            Slot::Branching(branching) => **branching = text.parse()?,
+        }
+        Ok(())
+    }
+}
+
 impl Tactics {
-    /// The names of the switches paired with the switches themselves, in DESIGN.md's order.  The single place
+    /// The names of the tactics paired with where their values are kept, in DESIGN.md's order.  The single place
     /// that knows the names.
-    fn switches_mut(&mut self) -> [(&'static str, &mut bool); 8] {
+    fn slots_mut(&mut self) -> [(&'static str, Slot<'_>); TACTIC_COUNT] {
         [
-            ("prime_shortcut", &mut self.prime_shortcut),
-            ("reuse_prev", &mut self.reuse_prev),
-            ("revise_freedoms", &mut self.search.revise_freedoms),
-            ("preclusions", &mut self.search.preclusions),
-            ("match_bound", &mut self.search.match_bound),
-            ("legacy_bound", &mut self.search.legacy_bound),
-            ("prev_cap", &mut self.prev_cap),
-            ("seed_incumbent", &mut self.seed_incumbent),
+            ("prime_shortcut", Slot::Switch(&mut self.prime_shortcut)),
+            ("reuse_prev", Slot::Switch(&mut self.reuse_prev)),
+            ("revise_freedoms", Slot::Switch(&mut self.search.revise_freedoms)),
+            ("preclusions", Slot::Switch(&mut self.search.preclusions)),
+            ("match_bound", Slot::Switch(&mut self.search.match_bound)),
+            ("branching", Slot::Branching(&mut self.search.branching)),
+            ("match_refine", Slot::MatchRefine(&mut self.search.match_refine)),
+            ("legacy_bound", Slot::Switch(&mut self.search.legacy_bound)),
+            ("prev_cap", Slot::Switch(&mut self.prev_cap)),
+            ("seed_incumbent", Slot::Switch(&mut self.seed_incumbent)),
         ]
     }
 
-    /// Every switch with its name and whether it is on.
-    pub fn switches(&self) -> [(&'static str, bool); 8] {
+    /// Every tactic with its name and value.
+    pub fn settings(&self) -> [(&'static str, Setting); TACTIC_COUNT] {
         let mut copy = *self;
-        copy.switches_mut().map(|(name, flag)| (name, *flag))
+        copy.slots_mut().map(|(name, slot)| (name, slot.get()))
     }
 
-    /// Applies `name=on` or `name=off`.
+    /// The names of the tactics, in DESIGN.md's order.
+    pub fn names() -> [&'static str; TACTIC_COUNT] {
+        Tactics::default().settings().map(|(name, _)| name)
+    }
+
+    /// Applies `name=value`: `on` or `off` for a switch, `0` to `7` for `match_refine`, and for `branching` one of
+    /// [`Branching::name`]'s names.  Nothing changes if it is an error.
     pub fn set(&mut self, assignment: &str) -> Result<(), String> {
-        let (name, value) =
-            assignment.split_once('=').ok_or_else(|| format!("expected name=on or name=off, got {assignment:?}"))?;
-        let value = match value {
-            "on" => true,
-            "off" => false,
-            _ => return Err(format!("tactic {name}: expected on or off, got {value:?}")),
+        let (name, text) = assignment.split_once('=').ok_or_else(|| {
+            format!("expected name=value, such as match_bound=off or branching=largest, got {assignment:?}")
+        })?;
+        let Some((_, mut slot)) = self.slots_mut().into_iter().find(|(known, _)| *known == name) else {
+            return Err(format!("unknown tactic {name:?}; the tactics are {}", Tactics::names().join(", ")));
         };
-        let Some((_, flag)) = self.switches_mut().into_iter().find(|(known, _)| *known == name) else {
-            let known: Vec<&str> = Tactics::default().switches().iter().map(|&(known, _)| known).collect();
-            return Err(format!("unknown tactic {name:?}; the tactics are {}", known.join(", ")));
-        };
-        *flag = value;
-        Ok(())
+        slot.assign(text).map_err(|e| format!("tactic {name}: {e}"))
     }
 
-    /// `default`, or the switches that differ from the defaults (`match_bound=off,prev_cap=off`).
+    /// `default`, or the tactics that differ from the defaults (`match_bound=off,branching=largest`).
     pub fn description(&self) -> String {
-        let defaults = Tactics::default().switches();
-        let changed: Vec<String> = (self.switches().into_iter().zip(defaults))
-            .filter(|((_, on), (_, default))| on != default)
-            .map(|((name, on), _)| format!("{name}={}", if on { "on" } else { "off" }))
+        let defaults = Tactics::default().settings();
+        let changed: Vec<String> = (self.settings().into_iter().zip(defaults))
+            .filter(|((_, value), (_, default))| value != default)
+            .map(|((name, value), _)| format!("{name}={value}"))
             .collect();
         if changed.is_empty() {
             "default".to_owned()
@@ -130,12 +206,14 @@ impl Tactics {
 
     /// The unproven switches that are on (see DESIGN.md); `legacy_bound` is unsound, the others conjectures.
     pub fn unproven_on(&self) -> Vec<&'static str> {
-        self.switches().into_iter().filter(|(name, on)| *on && UNPROVEN.contains(name)).map(|(name, _)| name).collect()
+        let on = |name: &str, value: Setting| value == Setting::Switch(true) && UNPROVEN.contains(&name);
+        self.settings().into_iter().filter(|&(name, value)| on(name, value)).map(|(name, _)| name).collect()
     }
 
-    /// All switches, by name, as a JSON object.
+    /// All tactics, by name, as a JSON object: booleans for the switches, a number for `match_refine`, and a
+    /// string for `branching`.
     pub fn to_json(&self) -> Json {
-        Json::object(self.switches().map(|(name, on)| (name, Json::Bool(on))))
+        Json::object(self.settings().map(|(name, value)| (name, value.to_json())))
     }
 }
 
@@ -622,14 +700,18 @@ fn search_game<const W: usize>(
     Ok(found.promotions)
 }
 
-/// Where the engine spills to, and whether this function chose the directory (and so may remove it).
+/// Where the engine spills to, and whether this function chose the directory (and so may remove it).  A
+/// temporary directory is the game's own: games solved at the same time (by threads of one process) do not share
+/// one, or one's removing it would fail the other's creating it.
 fn spill_dir(opts: &SolveOptions, n: u32) -> (PathBuf, bool) {
+    static TEMP_DIRS: AtomicU64 = AtomicU64::new(0);
     if let Some(dir) = &opts.spill_dir {
         (dir.clone(), false)
     } else if let Some(dir) = &opts.checkpoint_dir {
         (dir.join("spill"), true)
     } else {
-        (std::env::temp_dir().join(format!("taxman-spill-{}-n{n}", std::process::id())), true)
+        let name = format!("taxman-spill-{}-{}-n{n}", std::process::id(), TEMP_DIRS.fetch_add(1, Ordering::Relaxed));
+        (std::env::temp_dir().join(name), true)
     }
 }
 
@@ -806,26 +888,31 @@ mod tests {
     }
 
     #[test]
-    fn tactics_defaults_and_switches() {
+    fn tactics_defaults_and_settings() {
         let t = Tactics::default();
         assert_eq!(t.description(), "default");
         assert!(t.unproven_on().eq(&["reuse_prev", "revise_freedoms"]));
-        let names: Vec<&str> = t.switches().iter().map(|s| s.0).collect();
         assert_eq!(
-            names,
+            Tactics::names(),
             [
                 "prime_shortcut",
                 "reuse_prev",
                 "revise_freedoms",
                 "preclusions",
                 "match_bound",
+                "branching",
+                "match_refine",
                 "legacy_bound",
                 "prev_cap",
                 "seed_incumbent"
             ]
         );
-        let on: Vec<bool> = t.switches().iter().map(|s| s.1).collect();
-        assert_eq!(on, [true, true, true, true, true, false, true, true]);
+        let values: Vec<String> = t.settings().iter().map(|s| s.1.to_string()).collect();
+        let expected = ["on", "on", "on", "on", "on", "conflict-strong", "1", "off", "on", "on"];
+        assert_eq!(values, expected);
+        // The values of the search tactics are those of `SearchTactics::default()`, not copies of them.
+        let search = SearchTactics::default();
+        assert_eq!((t.search.match_refine, t.search.branching), (search.match_refine, search.branching));
     }
 
     #[test]
@@ -843,10 +930,102 @@ mod tests {
         assert!(t.unproven_on().is_empty());
         assert!(t.set("matchbound=off").unwrap_err().contains("unknown tactic"));
         assert!(t.set("match_bound=maybe").unwrap_err().contains("on or off"));
-        assert!(t.set("match_bound").unwrap_err().contains("name=on"));
+        assert!(t.set("match_bound").unwrap_err().contains("name=value"));
         let json = t.to_json();
         assert_eq!(json.get("match_bound").and_then(Json::as_bool), Some(false));
         assert_eq!(json.get("seed_incumbent").and_then(Json::as_bool), Some(true));
+    }
+
+    #[test]
+    fn tactics_with_values_other_than_on_and_off() {
+        let mut t = Tactics::default();
+        t.set("branching=largest").unwrap();
+        t.set("match_refine=0").unwrap();
+        assert_eq!((t.search.branching, t.search.match_refine), (Branching::Largest, 0));
+        assert_eq!(t.description(), "branching=largest,match_refine=0");
+        // Both are sound, so neither is ever reported as unproven.
+        assert_eq!(t.unproven_on(), ["reuse_prev", "revise_freedoms"]);
+        let json = t.to_json();
+        assert_eq!(json.get("branching").and_then(Json::as_str), Some("largest"));
+        assert_eq!(json.get("match_refine").and_then(Json::as_u32), Some(0));
+        assert_eq!(json.get("prev_cap").and_then(Json::as_bool), Some(true));
+        assert_eq!(json.as_obj().map(<[_]>::len), Some(TACTIC_COUNT));
+
+        // The default value is not mentioned, and setting a tactic back to it drops it from the description.
+        t.set("branching=conflict-strong").unwrap();
+        t.set("match_refine=7").unwrap();
+        assert_eq!(t.description(), "match_refine=7");
+        t.set("match_refine=1").unwrap();
+        assert_eq!(t.description(), "default");
+
+        // Bad values are refused with a message that says what is allowed, and change nothing.
+        for (assignment, expected) in [
+            (
+                "branching=nope",
+                "tactic branching: expected one of largest, conflict-smallest, conflict-largest, conflict-strong",
+            ),
+            ("branching=on", "tactic branching: expected one of largest"),
+            ("branching=", "tactic branching: expected one of largest"),
+            ("match_refine=8", "tactic match_refine: expected a whole number from 0 to 7, got \"8\""),
+            ("match_refine=-1", "tactic match_refine: expected a whole number from 0 to 7"),
+            ("match_refine=1.5", "tactic match_refine: expected a whole number from 0 to 7"),
+            ("match_refine=on", "tactic match_refine: expected a whole number from 0 to 7"),
+            ("match_refine=", "tactic match_refine: expected a whole number from 0 to 7"),
+            ("match_bound=2", "tactic match_bound: expected on or off"),
+            ("match_bound=largest", "tactic match_bound: expected on or off"),
+        ] {
+            let err = t.set(assignment).unwrap_err();
+            assert!(err.starts_with(expected), "{assignment}: {err}");
+            assert_eq!(t, Tactics::default(), "{assignment} changed something");
+        }
+        let err = t.set("branch=largest").unwrap_err();
+        assert!(err.contains("unknown tactic") && err.contains("branching, match_refine"), "{err}");
+    }
+
+    #[test]
+    fn every_setting_reads_back_as_it_is_shown() {
+        // Setting each tactic to the value `settings` shows gives the tactics that show it, and so do the
+        // changes in the description; the JSON holds the same values.
+        let mut t = Tactics::default();
+        let mut all = vec![Tactics::default()];
+        for branching in Branching::ALL {
+            for depth in 0..=SearchTactics::MAX_MATCH_REFINE {
+                t.search = SearchTactics { branching, match_refine: depth, ..t.search };
+                all.push(t);
+            }
+        }
+        all.push(Tactics {
+            search: SearchTactics {
+                preclusions: false,
+                legacy_bound: true,
+                revise_freedoms: false,
+                match_bound: false,
+                ..SearchTactics::default()
+            },
+            prime_shortcut: false,
+            reuse_prev: false,
+            prev_cap: false,
+            seed_incumbent: false,
+        });
+        for tactics in all {
+            let mut again = Tactics::default();
+            for (name, value) in tactics.settings() {
+                again.set(&format!("{name}={value}")).unwrap();
+            }
+            assert_eq!(again, tactics, "{}", tactics.description());
+            // The description alone is enough to rebuild the tactics from the defaults.
+            let mut from_description = Tactics::default();
+            if tactics.description() != "default" {
+                for assignment in tactics.description().split(',') {
+                    from_description.set(assignment).unwrap();
+                }
+            }
+            assert_eq!(from_description, tactics, "{}", tactics.description());
+            let json = Json::parse(&tactics.to_json().to_string()).unwrap();
+            for (name, value) in tactics.settings() {
+                assert_eq!(json.get(name), Some(&value.to_json()), "{name}");
+            }
+        }
     }
 
     #[test]

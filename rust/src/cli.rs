@@ -158,6 +158,23 @@ mod tests {
     }
 
     #[test]
+    fn tactics_with_values_other_than_on_and_off() {
+        let options = |tactics: &[&str]| {
+            let given: Vec<&str> = tactics.iter().flat_map(|t| ["--tactic", t]).collect();
+            let args = Args::parse(&strings(&given), &SOLVER_FLAGS, &[]).unwrap();
+            solver_options(&args).map(|opts| opts.tactics).map_err(usage)
+        };
+        let t = options(&["branching=largest", "match_refine=0"]).unwrap();
+        assert_eq!(t.description(), "branching=largest,match_refine=0");
+        // The last assignment of a tactic wins, as for the switches.
+        assert_eq!(options(&["match_refine=3", "match_refine=1"]).unwrap().description(), "default");
+        for bad in ["branching=sideways", "match_refine=9", "match_refine=two", "match_refine=-1"] {
+            let message = options(&[bad]).unwrap_err();
+            assert!(message.starts_with(&format!("tactic {}: expected ", bad.split('=').next().unwrap())), "{message}");
+        }
+    }
+
+    #[test]
     fn bad_flags_are_usage_errors() {
         let parse =
             |items: &[&str]| Args::parse(&strings(items), &SOLVER_FLAGS, &["--show"]).map(|_| ()).map_err(usage);
