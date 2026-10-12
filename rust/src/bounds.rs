@@ -46,6 +46,8 @@ pub struct Bounds<'a, const W: usize> {
     /// made when first needed; bit `i` of `certified` says `certs[i]` is current.
     certs: Vec<Certificate<W>>,
     certified: u32,
+    /// Whether [`new_candidate_list`](Self::new_candidate_list) makes the Java's promotability checks.
+    checks: bool,
     pub counts: BoundCounts,
 }
 
@@ -58,8 +60,16 @@ impl<'a, const W: usize> Bounds<'a, W> {
             scratch: Scratch::new(),
             certs: Vec::new(),
             certified: 0,
+            checks: true,
             counts: BoundCounts::default(),
         }
+    }
+
+    /// With `checks` false, [`new_candidate_list`](Self::new_candidate_list) leaves out the Java's promotability
+    /// checks (the search does with the matching bound, whose conflicts find those candidates for less).
+    pub fn with_promotability_checks(mut self, checks: bool) -> Self {
+        self.checks = checks;
+        self
     }
 
     /// The scratch space, for the caller's own promotions.
@@ -158,7 +168,7 @@ impl<'a, const W: usize> Bounds<'a, W> {
                 checked |= 3 << (home_n - 1);
             }
         }
-        if checked != 0 {
+        if checked != 0 && self.checks {
             let mut hits = 0;
             self.certified = 0;
             let unchecked = filtered;

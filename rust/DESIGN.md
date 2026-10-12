@@ -91,7 +91,7 @@ and values for them.
 | `reuse_prev` | on | unproven (conjecture-grade "upper-delta" certificate) | `FrameSolver.reusePrev`; accepts a derived solution without search |
 | `revise_freedoms` | on | unproven ("max-sum promotion set also has max count") | `UpperBoundEstimator.reviseFreedoms`; can shrink frame 0's freedoms |
 | `preclusions` | on | sound (promotion failure is monotone: more moves or fewer factors never make a frame winnable) | depth-2 preclusion table; prunes candidates |
-| `match_bound` | on | sound (matchability relaxes winnability) | node bound = min(blameGame, matching relaxation), the matching one computed only when blameGame fails to prune; a heaviest matching that can be promoted is the node's best completion (offered as incumbent, node done) |
+| `match_bound` | on | sound (matchability relaxes winnability) | node bound = the matching relaxation instead of blameGame (which never pruned where the matching bound did not), and the children's candidate lists without the Java's promotability checks (the conflicts find those candidates); a heaviest matching that can be promoted is the node's best completion (offered as incumbent, node done) |
 | `branching` | `conflict-strong` | sound (any order explores every promotion set) | which candidate a node promotes next: `largest` (the Java's order), or a member of a conflict of the heaviest matching (these need `match_bound`): the smallest (`conflict-smallest`), the largest (`conflict-largest`), or the one whose removal lowers the matching bound most (`conflict-strong`) |
 | `match_refine` | 1 | sound (see `search::Refiner`) | refine the matching bound by branching on conflicts this many levels deep, where it does not prune (0 = off, at most 7; needs `match_bound`) |
 | `fix_forced` | on | sound (every completion that beats the incumbent promotes them) | with `conflict-strong` branching, a node's child promotes all its *forced* candidates (those whose removal alone brings the matching bound below what the node needs): the members of the heaviest matching that the potentials show forced, else the forced members of the conflict found by strong branching; the node's loop ends after that child; a node with a known conflict all forced is done |
@@ -171,8 +171,9 @@ loop while cands non-empty:
 
 with `max_additional(s, p, c) = min(max_total − |p|, s.max_promotions(c))`,
 and `new_candidate_list` = narrow → remove preclusions → `can_promote`
-filter, exactly as in `BranchExplorer.makeNewCandidateList`, then the
-conflicts known along the path propagated (see "Improvements after parity").
+filter, exactly as in `BranchExplorer.makeNewCandidateList` (the filter only
+without `match_bound`), then the conflicts known along the path propagated
+(see "Improvements after parity").
 The Java breaks only when the bound is below `best`; a bound equal to `best`
 cannot lead to a better incumbent, so this loop breaks then too.  The Java
 generates all children of a node before exploring any; depth-first is
@@ -490,6 +491,17 @@ found the others again, one level each, further down.
   (instead of whenever they found any candidate forced), or of the
   refinement's branches, or choosing the member to branch on by those bounds
   alone, each traded nodes for time at about even.
+* **Cheaper children.**  Peeling had become the largest cost (37% of the
+  time at 1215: promotions and the candidate filter's checks).  With the
+  matching bound, a child's candidate list leaves out the Java's
+  promotability checks: a candidate that cannot be promoted is found by the
+  conflicts and nogoods anyway, and nodes stayed within ±8%.  The forced
+  members are promoted together, each frame checked once
+  (`Model::promote_all_using`) instead of two frames per member (together
+  they fit the frames' freedoms exactly when no frame they touch ends below
+  zero).  And blameGame is not computed with the matching bound: it never
+  pruned where the matching bound did not (diagnostics: 0 at every check).
+  −30% to −59% time.
 
 One thread, fast set (search seconds and nodes; 880 and 936 seeded from
 optimal.json, the rest from `results/strict.jsonl`):
@@ -501,7 +513,8 @@ optimal.json, the rest from `results/strict.jsonl`):
 | 261b342 | reuse the child check | 1.97 s 98k | 8.05 s 320k | 16.8 s 340k | 2.65 s 74k | 2.35 s 66k | 11.9 s 338k |
 | c33c3c2 | nogoods | 0.66 s 34k | 1.09 s 50k | 11.8 s 318k | 2.12 s 75k | 1.18 s 46k | 6.41 s 276k |
 | 667b24d | bounds from the potentials | 0.52 s 34k | 0.85 s 50k | 8.72 s 318k | 1.65 s 75k | 0.91 s 46k | 4.87 s 276k |
-| (next) | forced members of the whole matching | 0.46 s 31k | 0.83 s 45k | 6.45 s 241k | 1.31 s 51k | 0.92 s 35k | 2.94 s 133k |
+| 356ef92 | forced members of the whole matching | 0.46 s 31k | 0.83 s 45k | 6.45 s 241k | 1.31 s 51k | 0.92 s 35k | 2.94 s 133k |
+| (next) | cheaper children | 0.29 s 30k | 0.53 s 47k | 4.68 s 264k | 0.73 s 51k | 0.40 s 35k | 1.28 s 126k |
 
 ## Testing
 

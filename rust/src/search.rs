@@ -22,8 +22,9 @@
 //! ```
 //!
 //! The Java breaks only when the bound is below `best`; no completion can beat `best` when it is equal, so this
-//! loop breaks then too.  The upper bound is `blameGame`'s and, with the `match_bound` tactic, the matching
-//! bound ([`crate::matchbound`]), possibly refined by conflicts (see [`Refiner`]).  When the heaviest matching
+//! loop breaks then too.  The upper bound is `blameGame`'s, or with the `match_bound` tactic the matching bound
+//! ([`crate::matchbound`]), possibly refined by conflicts (see [`Refiner`]); the children's candidate lists then
+//! leave out the Java's promotability checks (see [`Bounds::with_promotability_checks`]).  When the heaviest matching
 //! can itself be promoted, it is the node's best completion: it is offered as the incumbent and the node is
 //! done.  With conflict branching the candidate `n` is a member of a conflict of the heaviest matching; with
 //! the `fix_forced` tactic the child also promotes the members of that conflict that every completion beating
@@ -66,8 +67,9 @@ pub struct SearchTactics {
     /// Lower frame 0's freedoms after solving the two-frame game (unproven: "the max-sum promotion set also has
     /// the max count").
     pub revise_freedoms: bool,
-    /// Bound nodes by the smaller of `blameGame` and the matching relaxation ([`crate::matchbound`]), computing
-    /// the matching bound only where `blameGame` does not prune (sound).
+    /// Bound nodes by the matching relaxation ([`crate::matchbound`]) instead of `blameGame` (sound; `blameGame`
+    /// never pruned where the matching bound did not), and leave the Java's promotability checks out of the
+    /// children's candidate lists (its conflicts find those candidates).
     pub match_bound: bool,
     /// Refine the matching bound by conflicts, branching this many levels deep where it does not prune
     /// (0: off; needs `match_bound`; sound, see [`Refiner`]).  At most [`Self::MAX_MATCH_REFINE`].  What it
@@ -824,7 +826,8 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
     pub fn new(space: &'a SearchSpace<'a, W>) -> Self {
         TaxSearcher {
             space,
-            bounds: Bounds::new(space.model, space.preclusions, space.rule),
+            bounds: Bounds::new(space.model, space.preclusions, space.rule)
+                .with_promotability_checks(space.match_graph.is_none()),
             matching: space.match_graph.map(MatchBound::new),
             levels: Vec::new(),
             attempts: 0,
@@ -965,10 +968,9 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             bump(&mut p.local.steps, node.promoted.len() as usize);
         }
 
-        // The node's loop ends when its candidates are used up or cannot beat the incumbent.  Its bound is the
-        // smaller of blameGame's and (tactic `match_bound`) the matching bound, which is computed only when
-        // blameGame's does not decide; blameGame's is at most the sum of the `max_add` largest candidates, so
-        // that sum may decide first.
+        // The node's loop ends when its candidates are used up or cannot beat the incumbent.  Its bound is
+        // blameGame's or (tactic `match_bound`) the matching bound; both are at most the sum of the `max_add`
+        // largest candidates, so that sum may decide first.
         let best = ctx.best();
         let need = (best + 1).saturating_sub(node.sum); // the loop goes on while the bound is at least this
         let branching = space.conflict_branching;
@@ -980,7 +982,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             Some(cut::EMPTY)
         } else if node.cands.sum_largest(node.max_add) < need {
             Some(cut::LARGEST)
-        } else if !bounds.reaches(&node.state, &node.cands, node.max_add, need) {
+        } else if space.match_graph.is_none() && !bounds.reaches(&node.state, &node.cands, node.max_add, need) {
             Some(cut::BLAME)
         } else if let Some((_, k, members)) = checked.filter(|&(at, _, _)| at == need) {
             // The node was checked when it was made, at the same need and with the same matching (its first
@@ -1078,32 +1080,41 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
 
         self.attempts += 1;
         child.checked = None;
-        child.state.assign(&node.state);
-        if !space.model.promote_in_place_using(bounds.scratch(), &mut child.state, n) {
+        // Tactic `fix_forced`: the child promotes the node's other forced members too.  Every completion of the
+        // node that reaches `need` promotes them, and the child's completions are some of the node's, so the
+        // child loses nothing that matters; if they cannot all be promoted (or their frames have no freedoms
+        // left for them), the child has no such completion at all.  They are promoted together, each frame
+        // checked once (see `Model::promote_all_using`); one by one, each would take a candidate's freedom from
+        // its two frames, so together they fit exactly when no frame they touch ends with negative freedoms.
+        let added = if space.fix_forced && forced.len() > 1 { forced } else { Bits::EMPTY.with(n) };
+        let promoted = if added.len() == 1 {
+            child.state.assign(&node.state);
+            space.model.promote_in_place_using(bounds.scratch(), &mut child.state, n)
+        } else {
+            match space.model.promote_all_using(bounds.scratch(), &node.state, &added) {
+                Some(state) => {
+                    child.state.assign(&state);
+                    added.iter().all(|x| {
+                        let h = space.model.home(x);
+                        let frames = child.state.frames();
+                        frames[h].freedoms >= 0 && frames[h - 1].freedoms >= 0
+                    })
+                }
+                None => false,
+            }
+        };
+        if !promoted {
             if let Some(p) = probe {
-                p.local.failed_promotions += 1;
+                let reason = if added.len() == 1 {
+                    &mut p.local.failed_promotions
+                } else {
+                    &mut p.local.child_cuts[cut::FORCED]
+                };
+                *reason += 1;
             }
             return Some(depth);
         }
-        self.promotions += 1;
-        let mut added = Bits::EMPTY.with(n);
-        // Tactic `fix_forced`: the child promotes the node's other forced members too.  Every completion of the
-        // node that reaches `need` promotes them, and the child's completions are some of the node's, so the
-        // child loses nothing that matters; if one of them can no longer be promoted (or its frames have no
-        // freedoms left for it), the child has no such completion at all.
-        if space.fix_forced {
-            for f in forced.without(n).iter_desc() {
-                let open = !child.state.narrow_candidates(&Bits::EMPTY.with(f)).is_empty();
-                if !open || !space.model.promote_in_place_using(bounds.scratch(), &mut child.state, f) {
-                    if let Some(p) = probe {
-                        p.local.child_cuts[cut::FORCED] += 1;
-                    }
-                    return Some(depth);
-                }
-                self.promotions += 1;
-                added.insert(f);
-            }
-        }
+        self.promotions += u64::from(added.len());
         child.promoted = node.promoted | added;
         child.sum = node.sum + added.sum();
         let rest = left - added;
@@ -1128,7 +1139,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         let need = (best + 1).saturating_sub(child.sum); // the child is worth it if its bound is at least this
         let cut_by = if cands.sum_largest(max_next) < need {
             Some(cut::LARGEST)
-        } else if !bounds.reaches(&child.state, &cands, max_next, need) {
+        } else if space.match_graph.is_none() && !bounds.reaches(&child.state, &cands, max_next, need) {
             Some(cut::BLAME)
         } else if cands.is_empty() {
             // A child with no candidates has nothing to bound (both bounds are 0) and is not explored.
