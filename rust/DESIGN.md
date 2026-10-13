@@ -112,9 +112,10 @@ number pays tax only from the frame directly below.
 Results record the tactics they were produced with (`tactics`: the changes
 from the defaults, such as `branching=largest,match_refine=0`;
 `tactic_switches`: every tactic's value, the booleans as booleans,
-`match_refine` as a number and `branching` as its name), and whether any
-unproven tactic was on.  A checkpoint records the nine search tactics and is
-refused when they differ (the error names each tactic that differs and the
+`match_refine` as a number and `branching` as its name), whether any
+unproven tactic was on, and which ones the game's proof actually rests on
+(`taint`, see `results.rs`).  A checkpoint records the nine search tactics and
+is refused when they differ (the error names each tactic that differs and the
 `--tactic` flags that resume it); one made before a sound search tactic
 existed (`fix_forced`, `nogoods`, `forget_nogoods`) reads back with it at its
 default.
@@ -129,7 +130,7 @@ dependencies.  Modules:
 | `bits` | `Bits<const W: usize>`: fixed-width bitset over `[u64; W]`, `Copy`, no heap; capacity `64·W − 1`.  Set ops, popcount, sum, min/max, ascending and descending iteration, `nth_largest`, `largest(k)`, `next_below(x)`, `is_subset`, hashing. |
 | `numtheory` | smallest-prime-factor sieve; for 1..=n: maximal factors (n/p for each prime p dividing n; {1} for primes; {} for 1) and maximal composites (k·p ≤ n), as `Vec<Vec<u32>>` and as bitsets; all divisors; prime test; optionally *holes*, numbers taken off the board (`Tables::punctured`, for the sacrifice study; the hives leave them out) |
 | `json` | minimal JSON reader/writer (enough for optimal.json, golden data and results files; checkpoints are binary) |
-| `game` | `replay(n, moves) -> Result<score>`: independent legality check (each move on the board, pays ≥ 1 tax, takes all divisors still present); optimal.json loader |
+| `game` | `replay(n, moves) -> Result<score>`: independent legality check (each move on the board, pays ≥ 1 tax, takes all divisors still present); `replay_finished`: also over (no legal move left) and opening with the largest prime, as every optimal game is; optimal.json loader |
 | `hives` | port of `Apiary`/`Hive`/`Namer`-free equivalent: hive formation with `treat_as_sources`, unzip, removeImpossible, finishSetup propagation, merge, promotion candidates, per-hive solution, apiary solution order |
 | `frames` | port of `FrameBuilder` (levels of hives) producing columns (factors, moves) per frame bottom-up, candidates, `estimateMaxPromotions` |
 | `accelerate` | deriving game n from game n−1 (prime shortcut, `reusePrev`), and turning a promotion set into an ordered game |
@@ -140,9 +141,10 @@ dependencies.  Modules:
 | `search` | the Taxman searcher (port of `BranchExplorer`) implementing the engine's `Searcher` trait; `prepare` (preclusions, greedy, `revise_freedoms`) and `search` (seed, cap, checkpoint and resume); `Refiner` (conflicts of the heaviest matching: exactness, refinement, branching); the starting incumbent's `dive` and local search (`Neighbourhood`); `search_with` and `Diagnostics` for measurements |
 | `examples/ladder.rs` | the ladder harness: standalone searches of hard games from the frame builder with a time limit, at one or several thread counts (see Performance) |
 | `solver` | `Tactics` (every tactic above, by name and value), `SolveOptions`, `solve_game` (the per-game pipeline below) and `solve_range` (a range of games, resumable through a results file) |
+| `results` | what a result line records about its provenance (proof kind, taint, the n−1 game it was built from, the build), the checks a results file passes when it is opened (`read_results`), `ResultsFile`, and `verify_files` behind `taxman verify-results`; `tools/check_results.py` is an independent referee of the same files |
 | `brute` | exact Taxman on boards up to 127 with holes, by memoized search over pot states (no frame model), under the rules or the maximal-factor rule |
 | `sacrifice` | study, not used by the solver: the proven bound opt(n) ≤ max(opt(n−1), n + max over maximal factors f of n of opt_M({1..n−1} ∖ {f})), the punctured games it needs (frame model on a board with a hole), and what it was measured to be worth (`examples/sacrifice.rs`) |
-| `main.rs`, `cli.rs`, `commands.rs` | CLI: `solve`, `regress`, `bench`, `verify-optimal`, `tables` (`taxman help` lists the options) |
+| `main.rs`, `cli.rs`, `commands.rs` | CLI: `solve`, `regress`, `bench`, `verify-optimal`, `verify-results`, `tables` (`taxman help` lists the options) |
 
 Width dispatch: everything that holds sets of game numbers is generic over
 `const W: usize`; the CLI picks `W ∈ {8, 16, 32, 64}` from n (n ≤ 511, 1023,
@@ -328,24 +330,40 @@ the incumbent value), `offer(value, payload) -> bool`, and a per-worker
    run starts it again); `max_total`; the starting incumbent (the best of
    greedy, the seed, and the root matching's rounding improved by local
    search); run the engine.
-6. Solution = `Apiary(board, promotions)` moves in hive order; replay to check
-   legality; compare the score with optimal.json when n is there (mismatch
-   is a hard error).
-7. Append one JSON line to the results file: n, score, moves, promotions,
-   method, completed, nodes, search counters, seconds per phase, tactics (and
-   which unproven ones were on), whether the score matched optimal.json.
+6. Solution = `Apiary(board, promotions)` moves in hive order, then the checks
+   of `solver::conclude`: legal replay; a completed game over and opening
+   with the largest prime; a game from the frame model scoring inTheBag plus
+   its promotions; no game above n + score(n−1) and no promotions above the
+   cap (either proves the n−1 game is not optimal, since opt(n) ≤ n +
+   opt(n−1)); a completed game not below score(n−1); the score against
+   optimal.json when n is there.  Each failure is a hard error; a game that
+   fails after it was found goes to `<results>.rejected.jsonl`.
+7. Append one JSON line to the results file (`results.rs` describes the
+   format): the game, its proof kind and taint, the n−1 game it was built
+   from, nodes, search counters, seconds per phase (this invocation, and all
+   of a resumed search's), invocations, tactics, limits, the build's commit.
+
+Before anything uses the n−1 solution it is checked: legal, scoring what it
+is given as, over, and opening with the largest prime below n.  A run with no
+unproven tactic on refuses one whose proof rests on something unproven (its
+taint, such as `optimal.json` for that file's games); `--allow-tainted-prev`
+overrides, and the results that rest on it inherit the taint.
 
 Steps 2 and 4 are skipped by `force_search`, and when the game has a
 checkpoint (a search that was interrupted is resumed, never replaced by a
 derivation).  A checkpoint is `<dir>/n<NNNN>.ckpt`; resuming one made for
 another game, width or search tactics is refused rather than restarted.  A
 search stopped by a time or node limit gives an incomplete result (`completed`
-false, the best game so far) and keeps its checkpoint; a range stops there.
+false, `best_so_far` the best game so far) and keeps its checkpoint; a range
+stops there.
 
 Range runs feed each game's solution to the next and resume from the
-results file (games completed in it are skipped; each result is appended and
-synced as soon as it is done).  The n−1 solution comes from, in order: this
-run, the results file, optimal.json.
+results file, which is checked when it is opened (`results.rs`: every game
+replayed, the chain from n−1, each line's arithmetic and provenance).  Games
+completed in it are skipped; each result is appended and synced as soon as it
+is done, and only then is the game's checkpoint deleted (a checkpoint left
+for a game the file has completed is deleted when a range starts).  The n−1
+solution comes from, in order: this run, the results file, optimal.json.
 
 `taxman bench` also appends one JSON line per run to `bench/history.jsonl`
 (commit, whether the sources were modified, threads, every tactic's value, and

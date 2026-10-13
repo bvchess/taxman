@@ -24,9 +24,11 @@ def main():
 
     budget = Budget(args.budget)
     log_load(f"chain start (budget {args.budget} s)")
+    # The chain starts from optimal.json's game of 1000, which rests on unproven tactics; the games whose proofs
+    # rest on it are marked so in their lines.
     cmd = [
         str(TAXMAN), "solve", f"{args.first}-{args.last}", "--threads", str(args.threads), *SOLVE_STRICT,
-        "--out", args.out, "--checkpoint-dir", args.checkpoint_dir, "--progress", "0",
+        "--allow-tainted-prev", "--out", args.out, "--checkpoint-dir", args.checkpoint_dir, "--progress", "0",
     ]
     proc = subprocess.Popen(cmd)
     while proc.poll() is None and budget.left() > 3:
