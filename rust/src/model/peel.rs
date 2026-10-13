@@ -28,8 +28,8 @@
 //! The moves a peel cannot drop are the frame's *core* ([`Scratch::stuck`]): empty exactly when the frame is
 //! winnable.  Every live factor of a core move is shared with another core move, so no order takes all of them
 //! (the last would find its factors taken), and the frame stays unwinnable however many moves are added, factors
-//! removed, or factors added that no core move has.  Conflicts ([`Model::conflict_using`](super::Model::conflict_using))
-//! are built from it.
+//! removed, or factors added that no core move has.  Conflicts are built from it
+//! ([`Model::conflict_using`](super::Model::conflict_using)).
 //!
 //! # Reduction and forced pairs
 //!

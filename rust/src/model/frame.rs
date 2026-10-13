@@ -37,7 +37,7 @@ impl<const W: usize> Frame<W> {
         Frame { moves, factors, freedoms: factors.len() as i32 - moves.len() as i32 }
     }
 
-    /// Whether some order takes every move (the peel, see [`super::peel`]).
+    /// Whether some order takes every move (the peel of the module `peel`).
     pub fn is_winnable(&self, g: &FactorProvider) -> bool {
         winnable(&self.moves, &self.factors, g)
     }

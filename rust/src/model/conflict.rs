@@ -21,8 +21,8 @@ impl Model {
     /// [`winnable`](Self::winnable)), every set that can be promoted leaves out some member of a conflict.
     ///
     /// The conflict is small: a single member if one is not a factor of a home frame `h ≥ 1`; else, for a frame
-    /// that is not winnable with `set` promoted, the members that its core (see [`Scratch::stuck`]) needs: the
-    /// ones promoted into the frame that are core moves, and the ones promoted out of it that are factors of
+    /// that is not winnable with `set` promoted, the members that its core (the moves a peel cannot drop) needs:
+    /// the ones promoted into the frame that are core moves, and the ones promoted out of it that are factors of
     /// core moves.  With only those promoted, the core is still there (its moves, and the same live factors), so
     /// the frame is still unwinnable.
     ///
@@ -85,7 +85,7 @@ impl Model {
         best
     }
 
-    /// A nogood of `root` (see [`super::nogoods`]) from the conflict `k` of the state reached from `root` by
+    /// A nogood of `root` (see [`Nogoods`](super::Nogoods)) from the conflict `k` of the state reached from `root` by
     /// promoting `promoted`: a minimal subset of `promoted ∪ k` that keeps a frame of `root` unwinnable, found as
     /// [`conflict_using`](Self::conflict_using) finds one, in each frame whose edits include all of `k` (the
     /// conflicts it makes come from one frame each, so it is one of them); the smallest.  The state's frames are
