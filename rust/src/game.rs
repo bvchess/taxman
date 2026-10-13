@@ -162,14 +162,15 @@ pub struct Optimal {
 }
 
 impl Optimal {
-    /// `optimal.json` in the repository's Java resources.  The path is fixed when the crate is *compiled*
-    /// (relative to the crate's directory), so a binary finds the file only on the machine and checkout that built
-    /// it; `--optimal FILE` and `--optimal none` are the ways around that.
+    /// `optimal.json` in the checkout this crate was compiled from.  A helper for the tests and examples, which
+    /// run from the checkout: the path is fixed when the crate is *compiled* (relative to the crate's directory).
+    /// The `taxman` binary does not use it; it finds the file when it runs ([`crate::paths::optimal_json`]), so
+    /// that it works wherever it is copied to.
     pub fn default_path() -> PathBuf {
         PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../src/main/resources/optimal.json"))
     }
 
-    /// Loads [`default_path`](Self::default_path).
+    /// Loads [`default_path`](Self::default_path): checkout-only, like it.
     pub fn load_default() -> Result<Optimal, String> {
         Optimal::load(Optimal::default_path())
     }
