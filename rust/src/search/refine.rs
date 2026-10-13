@@ -90,8 +90,7 @@ impl<const W: usize> Refiner<'_, '_, W> {
         if self.forcing {
             // The members of the heaviest matching that every completion reaching `need` promotes, as far as the
             // potentials show (see `MatchBound::bound_excluding`).
-            let need = self.need;
-            self.forced = chosen.iter().filter(|&x| self.m.bound_excluding(x) < need).collect();
+            self.forced = self.m.forced(self.need);
         }
         let k = match self.find_conflict(&chosen, self.forced) {
             Lookup::Conflict(k) => k,

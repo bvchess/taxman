@@ -555,7 +555,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
         let rest = branch.left - added;
         let max_next = max_additional(space.max_total, &child.state, &child.promoted, &rest);
         let mut cands = self.bounds.new_candidate_list_after(&added, max_next, &child.state, &rest, &node.promoted);
-        for k in self.known.iter().filter(|k| k.intersects(&added)) {
+        // Usually the child promotes one number, and a membership test is cheaper than a set intersection.
+        let touched = |k: &Bits<W>| if added.len() == 1 { k.contains(branch.n) } else { k.intersects(&added) };
+        for k in self.known.iter().filter(|k| touched(k)) {
             let rest = *k - child.promoted;
             if rest.len() == 1 {
                 cands -= rest;

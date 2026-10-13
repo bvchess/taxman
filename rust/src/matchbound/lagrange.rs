@@ -298,8 +298,7 @@ impl<'g, const W: usize> LagrangeBound<'g, W> {
     /// and the constant stay as they are without a candidate.)
     pub fn forced(&self, target: i64) -> Bits<W> {
         let level = &self.levels[self.depth - 1];
-        let constant = level.weighing.constant;
-        level.chosen.iter().filter(|&x| level.bound_excluding(self.graph, x) as i64 + constant < target).collect()
+        level.forced(self.graph, target, level.weighing.constant)
     }
 
     /// Pushes a level for the node with `promoted` and `cands`, solved from scratch at the next settle.
