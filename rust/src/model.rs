@@ -1209,31 +1209,27 @@ impl<const W: usize> Default for ConflictCache<W> {
 /// `capacity` of them and forgets them all when it is full, and its owner may [`clear`](Self::clear) it at any
 /// time (a cache: losing nogoods costs only their rediscovery).  Lookups scan the whole table, so a larger one
 /// makes every node slower.
+///
+/// For the scans, the numbers that are members of the nogoods get compact indices, in the order they first
+/// appear (a few hundred at most: they are all candidates), and each nogood is also kept as a set of those, a
+/// few words long: a nogood is tested against a set in a few word operations, exactly.
 pub struct Nogoods<const W: usize> {
     /// The nogoods, by index.
     sets: Vec<Bits<W>>,
     /// The members of nogood `i`, those of the conflict it was made from first: `members[start[i]..start[i + 1]]`.
     members: Vec<u16>,
     start: Vec<u32>,
-    /// For each nogood, a 256-bit signature: bit `x mod 256` for each member `x`.  A nogood can be within a set
-    /// only if its signature is within the set's.
-    sigs: Vec<[u64; 4]>,
     /// For each nogood, its largest member.
     maxes: Vec<u16>,
     /// For each number, the nogoods it is a member of.
     by_member: Vec<Vec<u32>>,
     capacity: usize,
-}
-
-/// The signature of a set of numbers (see [`Nogoods`]).
-#[inline]
-fn signature(set: impl Iterator<Item = u32>) -> [u64; 4] {
-    let mut sig = [0u64; 4];
-    for x in set {
-        let bit = x & 255;
-        sig[bit as usize >> 6] |= 1 << (bit & 63);
-    }
-    sig
+    /// For each number, its compact index plus one (0: not a member of any nogood); and the members by index.
+    index: Vec<u16>,
+    numbers: Vec<u16>,
+    /// Each nogood as a set of compact indices, `stride` words each (as many as the indices need).
+    compact: Vec<u64>,
+    stride: usize,
 }
 
 impl<const W: usize> Nogoods<W> {
@@ -1244,10 +1240,45 @@ impl<const W: usize> Nogoods<W> {
             sets: Vec::new(),
             members: Vec::new(),
             start: vec![0],
-            sigs: Vec::new(),
             maxes: Vec::new(),
             by_member: vec![Vec::new(); size],
             capacity,
+            index: vec![0; size],
+            numbers: Vec::new(),
+            compact: Vec::new(),
+            stride: 1,
+        }
+    }
+
+    /// `set` over the compact indices, in its first [`stride`](Self::stride) words (members that are in no
+    /// nogood are left out).  Compact indices are fewer than the members of the nogoods, so `W` words hold them.
+    #[inline]
+    fn compact_of(&self, set: &Bits<W>) -> [u64; W] {
+        let mut out = [0u64; W];
+        for x in set.iter() {
+            let i = usize::from(self.index.get(x as usize).copied().unwrap_or(0));
+            if i != 0 {
+                out[(i - 1) >> 6] |= 1 << ((i - 1) & 63);
+            }
+        }
+        out
+    }
+
+    /// Gives `x` a compact index if it has none, making the compact sets a word longer when they need it.
+    fn index_member(&mut self, x: u32) {
+        if self.index[x as usize] != 0 {
+            return;
+        }
+        self.numbers.push(x as u16);
+        self.index[x as usize] = self.numbers.len() as u16;
+        if self.numbers.len() > 64 * self.stride {
+            let wider = self.stride + 1;
+            let mut compact = Vec::with_capacity(self.sets.len() * wider);
+            for set in self.compact.chunks_exact(self.stride) {
+                compact.extend_from_slice(set);
+                compact.push(0);
+            }
+            (self.compact, self.stride) = (compact, wider);
         }
     }
 
@@ -1273,8 +1304,12 @@ impl<const W: usize> Nogoods<W> {
             self.by_member[x as usize].push(id);
         }
         self.start.push(self.members.len() as u32);
-        self.sigs.push(signature(n.iter()));
         self.maxes.push(n.max().expect("a nogood is not empty") as u16);
+        for x in n.iter() {
+            self.index_member(x);
+        }
+        let set = self.compact_of(&n);
+        self.compact.extend_from_slice(&set[..self.stride]);
     }
 
     /// Forgets every nogood.
@@ -1284,8 +1319,13 @@ impl<const W: usize> Nogoods<W> {
                 self.by_member[x as usize].clear();
             }
         }
+        for &x in &self.numbers {
+            self.index[usize::from(x)] = 0;
+        }
+        self.numbers.clear();
+        self.compact.clear();
+        self.stride = 1;
         self.sets.clear();
-        self.sigs.clear();
         self.maxes.clear();
         self.members.clear();
         self.start.truncate(1);
@@ -1308,41 +1348,62 @@ impl<const W: usize> Nogoods<W> {
     /// [`conflict`](Self::conflict), unless one of the conflicts the table knows is a subset of `forced` (it then
     /// stops there and says so): if every completion that matters promotes all of `forced`, there is none.
     pub fn lookup(&self, promoted: &Bits<W>, set: &Bits<W>, forced: &Bits<W>) -> Lookup<W> {
-        let within = *promoted | *set;
-        let outside = signature(within.iter()).map(|word| !word);
-        // The smallest conflict, of those the one with the largest member, of those the first learned.
+        if self.sets.is_empty() {
+            return Lookup::None;
+        }
+        // The three sets over the compact indices.
+        let stride = self.stride;
+        let (p, f) = (self.compact_of(promoted), self.compact_of(forced));
+        let mut within = self.compact_of(set);
+        for (w, p) in within.iter_mut().zip(&p).take(stride) {
+            *w |= p;
+        }
+        // A scan whose stride the compiler knows is unrolled.
+        let sets = [&within, &p, &f];
+        let best = match stride {
+            1 => self.scan::<1>(sets),
+            2 => self.scan::<2>(sets),
+            3 => self.scan::<3>(sets),
+            4 => self.scan::<4>(sets),
+            5 => self.scan::<5>(sets),
+            6 => self.scan::<6>(sets),
+            _ => self.scan::<0>(sets),
+        };
+        match best {
+            Err(()) => Lookup::Forced,
+            Ok(Some(id)) => Lookup::Conflict(self.sets[id as usize] - *promoted),
+            Ok(None) => Lookup::None,
+        }
+    }
+
+    /// The scan of [`lookup`](Self::lookup) over the compact sets, whose stride is `S` (0: any): with
+    /// `[within, promoted, forced]` over the compact indices, the nogood with the smallest conflict (then the
+    /// largest member, then the first learned), or `Err` at the first nogood within whose conflict is forced.
+    #[inline]
+    fn scan<const S: usize>(&self, [within, p, f]: [&[u64; W]; 3]) -> Result<Option<u32>, ()> {
+        let stride = if S == 0 { self.stride } else { S };
+        debug_assert_eq!(stride, self.stride);
+        let (within, p, f) = (&within[..stride], &p[..stride], &f[..stride]);
         let mut best: Option<(u32, u16, u32)> = None; // (size of the conflict, largest member, nogood)
-        for (id, sig) in self.sigs.iter().enumerate() {
-            if sig.iter().zip(&outside).any(|(a, b)| a & b != 0) {
+        for (id, n) in self.compact.chunks_exact(stride).enumerate() {
+            if n.iter().zip(within).fold(0, |out, (n, w)| out | n & !w) != 0 {
                 continue;
             }
-            let id = id as u32;
-            {
-                let (mut size, mut unforced) = (0, false);
-                let inside = self.members_of(id).iter().all(|&y| {
-                    let y = u32::from(y);
-                    if !promoted.contains(y) {
-                        size += 1;
-                        unforced |= !forced.contains(y);
-                    }
-                    within.contains(y)
-                });
-                if !inside {
-                    continue;
-                }
-                if !unforced {
-                    return Lookup::Forced;
-                }
-                let top = self.maxes[id as usize];
-                if best.is_none_or(|(s, m, _)| size < s || (size == s && top > m)) {
-                    best = Some((size, top, id));
-                }
+            let (mut size, mut unforced) = (0, 0);
+            for ((n, p), f) in n.iter().zip(p).zip(f) {
+                let rest = n & !p;
+                size += rest.count_ones();
+                unforced |= rest & !f;
+            }
+            if unforced == 0 {
+                return Err(());
+            }
+            let (id, top) = (id as u32, self.maxes[id]);
+            if best.is_none_or(|(s, m, _)| size < s || (size == s && top > m)) {
+                best = Some((size, top, id));
             }
         }
-        match best {
-            Some((_, _, id)) => Lookup::Conflict(self.sets[id as usize] - *promoted),
-            None => Lookup::None,
-        }
+        Ok(best.map(|(_, _, id)| id))
     }
 
     /// The candidates among `cands` that a node with the promotions `promoted` cannot promote by the nogoods
@@ -2122,6 +2183,57 @@ mod tests {
         }
         eprintln!("nogoods: {made} made, {later} checked at later states");
         assert!(made > 500 && later > 5000);
+    }
+
+    /// The table's lookups against their definition: the smallest `N − P` over the nogoods `N ⊆ P ∪ S` (then the
+    /// one with the largest member, then the first learned), or `Forced` at the first of them within `F`.  Random
+    /// tables over up to 250 numbers, so that the compact sets grow by several words, cleared now and then.
+    #[test]
+    fn nogood_lookups_follow_their_definition() {
+        let mut rng = Rng(0x0DD5_1234_ABCD_0042);
+        let mut table = Nogoods::<4>::new(255, 1 << 12);
+        let mut learned: Vec<Bits<4>> = Vec::new();
+        let subset = |rng: &mut Rng, of: &Bits<4>, percent| of.iter().filter(|_| rng.chance(percent)).collect();
+        let (mut conflicts, mut forced) = (0, 0);
+        for _ in 0..2000 {
+            if rng.below(500) == 0 {
+                table.clear();
+                learned.clear();
+            }
+            // Most members from a crowd of 24, so that the lookups find nogoods.
+            let size = 1 + rng.below(4);
+            let n: Bits<4> =
+                (0..size).map(|_| if rng.chance(70) { rng.below(24) } else { rng.below(250) } as u32).collect();
+            table.insert(n, &subset(&mut rng, &n, 50));
+            learned.push(n);
+            for _ in 0..4 {
+                let crowd = Bits::from_range(0, 23) | (0..20).map(|_| rng.below(250) as u32).collect();
+                let promoted = subset(&mut rng, &crowd, 10);
+                let set = subset(&mut rng, &crowd, 60) - promoted;
+                let musts = subset(&mut rng, &set, 15);
+                let within = promoted | set;
+                let mut expected = Lookup::None;
+                let mut best = None;
+                for (id, n) in learned.iter().enumerate().filter(|(_, n)| n.is_subset(&within)) {
+                    let k = *n - promoted;
+                    if k.is_subset(&musts) {
+                        expected = Lookup::Forced;
+                        break;
+                    }
+                    let key = (k.len(), std::cmp::Reverse(n.max()), id);
+                    if best.is_none_or(|(b, _)| key < b) {
+                        best = Some((key, k));
+                    }
+                }
+                if expected == Lookup::None {
+                    expected = best.map_or(Lookup::None, |(_, k)| Lookup::Conflict(k));
+                }
+                assert_eq!(table.lookup(&promoted, &set, &musts), expected, "{learned:?} {promoted:?} {set:?}");
+                conflicts += u32::from(matches!(expected, Lookup::Conflict(_)));
+                forced += u32::from(expected == Lookup::Forced);
+            }
+        }
+        assert!(conflicts > 500 && forced > 200, "{conflicts} conflicts, {forced} forced");
     }
 
     #[test]
