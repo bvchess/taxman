@@ -728,33 +728,34 @@ impl RadixHeap {
     }
 }
 
-/// A set of event codes popping its smallest member: a bitset under two summary levels.
-#[derive(Clone, Debug, Default)]
+/// Words of a [`CodeSet`]: the event codes of a graph are below `2 · 65536`, since it has fewer than 65535
+/// vertices ([`NONE`] is not one).
+const CODE_WORDS: usize = 2 * 65536 / 64;
+
+/// A set of event codes popping its smallest member: a bitset under two summary levels, of fixed size, so that
+/// an insertion needs no check.
+#[derive(Clone, Debug)]
 struct CodeSet {
-    words: Vec<u64>,
-    mid: Vec<u64>,
+    words: [u64; CODE_WORDS],
+    mid: [u64; CODE_WORDS / 64],
     top: u64,
+}
+
+impl Default for CodeSet {
+    fn default() -> Self {
+        CodeSet { words: [0; CODE_WORDS], mid: [0; CODE_WORDS / 64], top: 0 }
+    }
 }
 
 impl CodeSet {
     #[inline]
     fn insert(&mut self, code: u32) {
-        let w = (code >> 6) as usize;
-        if w >= self.words.len() {
-            self.grow(w);
-        }
+        debug_assert!((code as usize) < 64 * CODE_WORDS, "code {code} out of range");
+        let w = (code >> 6) as usize % CODE_WORDS;
         debug_assert_eq!(self.words[w] >> (code & 63) & 1, 0, "code {code} pushed twice at the same time");
         self.words[w] |= 1 << (code & 63);
         self.mid[w >> 6] |= 1 << (w & 63);
         self.top |= 1 << (w >> 6);
-    }
-
-    #[cold]
-    fn grow(&mut self, w: usize) {
-        let words = (w + 1).next_power_of_two().max(64);
-        assert!(words <= 64 * 64, "too many codes");
-        self.words.resize(words, 0);
-        self.mid.resize(words / 64, 0);
     }
 
     #[inline]
@@ -883,17 +884,21 @@ impl Search {
     /// Adds the inner vertex `a` to the tree at distance `d`, and reaches its neighbours over unmatched edges.
     #[inline(always)]
     fn add_inner<const W: usize, K: Weighing>(&mut self, g: &MatchGraph, lv: &Level<W, K>, a: usize, d: i64) {
-        self.slot[a] = Slot { dist: d, stamp: self.epoch, pred: self.slot[a].pred, tag: INNER };
-        self.tree.push(a as u16);
+        // The fields taken apart, so that the compiler knows that pushing an event changes neither the slots'
+        // place nor the epoch, and keeps them in registers.
+        let Search { epoch, slot, heap, tree } = self;
+        let (epoch, slot) = (*epoch, slot.as_mut_slice());
+        slot[a] = Slot { dist: d, stamp: epoch, pred: slot[a].pred, tag: INNER };
+        tree.push(a as u16);
         let (role, ya, mate) = (lv.role[a], lv.y[a], lv.mate[a]);
         if role != Role::Required {
-            self.heap.push((d + ya) as u64, (a as u32) << 1 | 1);
+            heap.push((d + ya) as u64, (a as u32) << 1 | 1);
         }
         if role != Role::Factor {
             let base = d + ya - lv.weight(g, a);
             for &b in g.below(a) {
                 if b != mate && lv.role[usize::from(b)] != Role::Required {
-                    self.reach(usize::from(b), base + lv.y[usize::from(b)], a, d);
+                    reach(slot, heap, epoch, usize::from(b), base + lv.y[usize::from(b)], a, d);
                 }
             }
         }
@@ -902,28 +907,10 @@ impl Search {
             for &b in g.above(a) {
                 let b = usize::from(b);
                 if b as u16 != mate && lv.role[b] != Role::Factor {
-                    self.reach(b, base + lv.y[b] - lv.weight(g, b), a, d);
+                    reach(slot, heap, epoch, b, base + lv.y[b] - lv.weight(g, b), a, d);
                 }
             }
         }
-    }
-
-    /// Reaches the outer vertex `b` from the inner vertex `a` (at distance `d`) at distance `nd`.
-    #[inline(always)]
-    fn reach(&mut self, b: usize, nd: i64, a: usize, d: i64) {
-        debug_assert!(nd >= d, "negative reduced cost");
-        let epoch = self.epoch;
-        let s = &mut self.slot[b];
-        if s.stamp != epoch {
-            s.stamp = epoch;
-            s.tag = REACHED;
-        } else if s.tag != REACHED || nd >= s.dist {
-            debug_assert_ne!(s.tag, INNER, "the graph is not bipartite");
-            return;
-        }
-        s.dist = nd;
-        s.pred = a as u16;
-        self.heap.push(nd as u64, (b as u32) << 1);
     }
 
     /// Shifts the potentials of the tree for a search that ends at time `end`.
@@ -956,6 +943,24 @@ impl Search {
             b = usize::from(next);
         }
     }
+}
+
+/// Reaches the outer vertex `b` from the inner vertex `a` (at distance `d`) at distance `nd`, in the search of
+/// `epoch` (see [`Search::add_inner`]).
+#[inline(always)]
+fn reach(slot: &mut [Slot], heap: &mut RadixHeap, epoch: u32, b: usize, nd: i64, a: usize, d: i64) {
+    debug_assert!(nd >= d, "negative reduced cost");
+    let s = &mut slot[b];
+    if s.stamp != epoch {
+        s.stamp = epoch;
+        s.tag = REACHED;
+    } else if s.tag != REACHED || nd >= s.dist {
+        debug_assert_ne!(s.tag, INNER, "the graph is not bipartite");
+        return;
+    }
+    s.dist = nd;
+    s.pred = a as u16;
+    heap.push(nd as u64, (b as u32) << 1);
 }
 
 // ---------------------------------------------------------------------------------------------------------
