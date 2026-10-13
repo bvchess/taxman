@@ -413,7 +413,7 @@ fn kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> Resul
         for (x, forced) in nodes.iter().zip(&forced) {
             fp.add(match table.lookup(&x.promoted, &x.chosen, forced) {
                 Lookup::None => 0,
-                Lookup::Forced => 1,
+                Lookup::AllForced => 1,
                 Lookup::Conflict(k) => k.sum(),
             });
         }
