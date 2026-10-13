@@ -1,4 +1,4 @@
-#!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
+#!/usr/bin/env python3
 """Step 5: calibration, per-band statistics, log-linear fits and chain-cost projections from the raw JSONL files.
 
 Reads chain.jsonl (strict chain 1001-1231), calib.jsonl (standalone, same games), bands.jsonl (standalone beyond 1231),

@@ -1,4 +1,4 @@
-#!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
+#!/usr/bin/env python3
 """Independent referee for the Rust solver's results files (`taxman solve --out`, one JSON object per line).
 
 Standard library only, and it shares no code with the Rust crate: the rules, the bounds and the provenance rules

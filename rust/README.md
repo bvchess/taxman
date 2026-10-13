@@ -6,8 +6,8 @@ for speed and for many cores, and it has found optimal games for every n up to 1
 
 This page is the user guide: what the solver computes and what "optimal" means here, how to build and run it, how to
 read its output, why its answers can be trusted (and where they rest on something unproven), the project's vocabulary,
-and where to start reading the code.  The design and its measurements are in [DESIGN.md](DESIGN.md); this page links
-there instead of repeating it.
+and where to start reading the code.  The design is in [DESIGN.md](DESIGN.md) and the measurements behind it in
+[docs/EXPERIMENTS.md](docs/EXPERIMENTS.md); this page links there instead of repeating them.
 
 * [1. What it solves](#1-what-it-solves)
 * [2. Build, test, run](#2-build-test-run)
@@ -68,11 +68,11 @@ from frame 0 (the factor 4) and scores 8.  The search is over such choices: n = 
 * **Within the frame model.**  The decomposition above rests on assumptions that are validated, not proven: the greedy
   removal of impossible sources inside hives, the forced moves of `unzip`, `free factors = factors - sources`, closed
   hives (those with no free factor) taking no part in the search, and a promoted number paying tax only from the frame
-  directly below ([DESIGN.md, Tactics](DESIGN.md#tactics)).  They were validated by agreement with the Java's
+  directly below ([DESIGN.md, Tactics](DESIGN.md#5-tactics)).  They were validated by agreement with the Java's
   `optimal.json` for n <= 1000 and by exhaustive search (`src/brute.rs`, `heuristics/evaluation/certify.py`) for small
   boards; the exhaustive certification covers n <= 62 only.
 * **Given the pruning is exact.**  The default search tactics are sound: they never prune a promotion set that could
-  win ([DESIGN.md, Tactics](DESIGN.md#tactics) grades each).  Two tactics are on by default for speed but are
+  win ([DESIGN.md, Tactics](DESIGN.md#5-tactics) grades each).  Two tactics are on by default for speed but are
   *unproven*: `reuse_prev` and `revise_freedoms`.  A run with both turned off is called *strict* in this
   repository, and a strict result rests on nothing unproven but the frame model and the correctness of the code.
 * **Given the previous game is optimal.**  A game of n is built from the game of n - 1: its search starts from the
@@ -93,13 +93,17 @@ cargo build --release --examples   # also builds the ladder (a scaling and progr
 ./target/release/taxman help
 ```
 
-The binary finds `optimal.json` (the Java's table of optimal games for n <= 1000) through a path fixed at compile time,
-`../src/main/resources/optimal.json` relative to this directory, so it must run on the machine and checkout that built
-it (or be given `--optimal FILE`, or `--optimal none`).  The release profile uses fat LTO and `panic = "abort"`; the
-`test` profile is optimised (`opt-level = 2`) because the tests replay real games.  On a machine that will run only
-the binary, `RUSTFLAGS="-C target-cpu=native"` builds for that CPU (see [tools/cloud/RUNBOOK.md](tools/cloud/RUNBOOK.md)).
-`tools/pgo.sh` makes a profile-guided build in `target/pgo/release` (0-2% fewer cycles now, the same answers and
-trees; its header says how, and DESIGN.md "Performance" what it gains); `examples/perf.rs` measures the hot paths.
+The binary finds `optimal.json` (the Java's table of optimal games for n <= 1000) at run time: `$TAXMAN_OPTIMAL` if that
+is set, else `src/main/resources/optimal.json` of the repository, which it looks for above the working directory and, if
+it is not there, above the binary.  So it works from any directory of a checkout, and from a copy of the binary while
+the working directory is in one; elsewhere give `--optimal FILE` (or `--optimal none` to compare with nothing), which
+is what the error says.  `taxman bench` finds its two files in the repository the same way (below).
+
+The release profile uses fat LTO and `panic = "abort"`; the `test` profile is optimised (`opt-level = 2`) because the
+tests replay real games.  On a machine that will run only the binary, `RUSTFLAGS="-C target-cpu=native"` builds for that
+CPU (see [tools/cloud/RUNBOOK.md](tools/cloud/RUNBOOK.md)).  `tools/pgo.sh` makes a profile-guided build in
+`target/pgo/release` (0-2% fewer cycles now, the same answers and trees; its header says how, and DESIGN.md
+"Performance" what it gains); `examples/perf.rs` measures the hot paths.
 
 ```
 cargo test                         # the whole suite: about 1.5 minutes to compile, then about 30 s to run (2 test threads)
@@ -109,7 +113,7 @@ The ignored tests are for large machines and long runs: `cargo test --release --
 many_threads` (64 and 192 worker threads), `TXENGINE_STRESS=2000 cargo test --release --test engine -- --ignored
 stress` (random engine configurations through resumes), `TXENGINE_CONSERVATION=500 cargo test --release --test
 robustness conservation`, and the benchmarks under `bench` in `src/` and `tests/engine.rs`.  What the suite checks is
-listed under "Testing" in [DESIGN.md](DESIGN.md#testing); `tests/tripwires.rs` asserts exact node counts, so a change
+listed under "Testing" in [DESIGN.md](DESIGN.md#9-testing); `tests/tripwires.rs` asserts exact node counts, so a change
 that alters the search tree on purpose fails it (DESIGN.md says how to update the counts).
 
 ## 3. Commands
@@ -117,7 +121,7 @@ that alters the search tree on purpose fails it (DESIGN.md says how to update th
 `taxman help` lists everything; this section shows each command with output from this build.  Throughout, "strict"
 means `--tactic reuse_prev=off --tactic revise_freedoms=off`.  A tactic is one switchable piece of the algorithm;
 `--tactic NAME=VALUE` is repeatable, and the names, values and defaults are in `taxman help` and
-[DESIGN.md](DESIGN.md#tactics).  The other flags of `solve` are in the table at the end of this section.
+[DESIGN.md](DESIGN.md#5-tactics).  The other flags of `solve` are in the table at the end of this section.
 
 ### Solve one game
 
@@ -183,11 +187,11 @@ $ taxman solve 1-1231 --tactic reuse_prev=off --tactic revise_freedoms=off --out
       --checkpoint-dir ckpt --checkpoint-interval 60 --progress 60
 ```
 
-Starting at n = 1, no game rests on `optimal.json` (it is only compared with, up to 1000: a mismatch is a hard error), so
-every proof in the file rests on nothing unproven.  A strict run that starts from an `optimal.json` game or a result
+Starting at n = 1, no game rests on `optimal.json` (it is only compared with, up to 1000: a mismatch is a hard error),
+so every proof in the file rests on nothing unproven.  A strict run that starts from an `optimal.json` game or a result
 with an unproven taint refuses to, unless given `--allow-tainted-prev`, and then marks the results that rest on it.  The
-default tactics (both unproven ones on) are faster and good for exploring; a result made with them says so, as the
-n = 992 line in section 4 does: `(rests on revise_freedoms)`.
+default tactics (both unproven ones on) are faster and good for exploring; a result made with them says so, as the n =
+992 line in section 4 does: `(rests on revise_freedoms)`.
 
 ### Checkpoints, resuming, signals
 
@@ -263,8 +267,9 @@ $ taxman tables 85 8 45                         # the maximal factors and compos
 $ taxman bench --history /tmp/h.jsonl           # time the benchmark games 936 ... 1184 (standalone, no derivation)
 ```
 
-`bench` appends one JSON line per run to its history file; the default is the tracked `bench/history.jsonl` inside the
-checkout (a path fixed at compile time), so pass `--history` to keep the checkout clean.  The ladder is the harness for
+`bench` appends one JSON line per run to its history file, `rust/bench/history.jsonl` of the repository unless
+`--history FILE` names another (pass it to keep the checkout clean), and takes the games past `optimal.json`'s from
+`rust/results/strict.jsonl` unless `--known FILE` names another results file.  The ladder is the harness for
 hard games and for scaling over thread counts: `cargo run --release --example ladder -- --scaling --seed-opt --known
 bench/curve/chain.jsonl --tactic revise_freedoms=off --seconds 600 1215` (its flags are documented at the top of
 `examples/ladder.rs`).
@@ -352,8 +357,8 @@ cut short, the fields regrouped and comments added, so it is not valid JSON as p
 
 The committed files `results/default.jsonl`, `results/strict.jsonl` and `bench/curve/chain.jsonl` are schema 1: no
 `schema`, `proof`, `taint`, `prev`, `in_the_bag` or `build`; their provenance is derived from the fields they have, by
-the same rules ([results/README.md](results/README.md)).  A line is never rewritten: a resumed game that is stopped again adds
-another incomplete line, and the completed line comes last.
+the same rules ([results/README.md](results/README.md)).  A line is never rewritten: a resumed game that is stopped
+again adds another incomplete line, and the completed line comes last.
 
 ## 5. Why the answers can be trusted
 
@@ -389,9 +394,8 @@ one.
   each line's arithmetic and provenance, that the files agree, and a count of games by proof kind and by taint.  Opening
   a results file for `--out` runs the same checks.
 * `python3 tools/check_results.py [FILE...]` is an independent referee in Python (standard library only, no shared
-  code).  It re-derives every proof and taint, and also checks each score against the Franklín-Moniot upper bound and the
-  best-known heuristic chain in `heuristics/results`.  With no arguments it checks `results/*.jsonl`.  (Its shebang is
-  the author's `.venv`; run it with `python3`.)
+  code).  It re-derives every proof and taint, and also checks each score against the Franklín-Moniot upper bound and
+  the best-known heuristic chain in `heuristics/results`.  With no arguments it checks `results/*.jsonl`.
 
 ```
 $ taxman verify-results results/strict.jsonl bench/curve/chain.jsonl
@@ -418,18 +422,20 @@ chain, taint counts).
    |  solver::solve_range_each        n = A..B in order; the game of n-1 comes from this run, FILE or optimal.json,
    |                                  and is checked (legal, over, opens with the largest prime) before anything uses it
    v
- solver::solve_one(n) -> solve_with_width::<W>      W = 8, 16, 20, 24, 28, 32 or 64 words of 64 bits (bits::WIDTHS), by n
+ solver::solve_game(n) -> solve_with_width::<W>      W = 8, 16, 20, 24, 28, 32 or 64 words of 64 bits (bits::WIDTHS), by n
    |
    |  numtheory::Tables                maximal factors and maximal composites of 1..=n
    |
    |  [1] n prime ............ accelerate::prime_shortcut   the game of n-1 with its first move replaced by n
    |                                                         method=prime        proof=prime_formula
-   |  [2] hives::Apiary                sources (always moves) + factors -> hives; unzip, removeImpossible
-   |      frames::build_frames         free hives stacked into levels = frames (0 = bottom); candidates; in_the_bag
+   |  [2] board::Board::new            hives::Apiary: sources (always moves) + factors -> hives; unzip, removeImpossible
+   |                                   frames::build_frames: free hives stacked into levels = frames (0 = bottom);
+   |                                   candidates; in_the_bag
    |      no candidates ...... the game with no promotions   method=trivial      proof=trivial
    |  [3] reuse_prev (unproven) accelerate::reuse_prev        method=reuse        proof=reuse_prev
    |  [4] search ............. method=search                 proof=exhausted | cap
-   |        search::prepare            model::Model::build -> the root FrameSet; greedy set; revise_freedoms -> max_total
+   |        Board::prepare             search::prepare: model::Model::build -> the root FrameSet; greedy set;
+   |                                   revise_freedoms -> max_total
    |        search::search             starting incumbent = best of greedy / seed (n-1's promotions) / rounded root
    |                                   matching + local search; cap = n + score(n-1) - in_the_bag
    |          engine::run              worker threads; shared deque with disk spill; incumbent; checkpoints; signals
@@ -446,7 +452,8 @@ chain, taint counts).
                                      the game becomes the previous game of n+1
 ```
 
-[DESIGN.md](DESIGN.md#per-game-pipeline-solver) has the same steps with the Java classes each replaces.
+[DESIGN.md](DESIGN.md#7-per-game-pipeline-solver) has the same steps with the Java classes each replaces, and the module
+comment of `src/solver.rs` the checks of each.
 
 ## 7. Glossary
 
@@ -454,7 +461,8 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
 
 ### The game
 
-* **board, pot, n**: the numbers 1..=n; the pot is what is still on it during a game.
+* **board, pot, n**: the numbers 1..=n; the pot is what is still on it during a game.  In the code `board::Board` is a
+  board analysed for the search: its tables, frames, candidates and `in_the_bag`.
 * **move, tax**: a number the player takes, and the divisors the taxman takes with it.
 * **maximal factor** of m: m/p for a prime p dividing m (a divisor reached by deleting one prime).  Its inverse is the
   **maximal composite**.  A move is playable if one of its maximal factors is still in the pot (equivalent, on a board
@@ -474,11 +482,11 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
 * **impossible**: a source that cannot be played together with the sources already kept (found greedily from the
   largest).  Impossible moves are dropped from the frame's moves.
 * **free factor count**: factors minus sources of a hive: how many factors it can spare.  A **free** hive has some; a
-  **closed** hive has none and takes no part in the search.  **(overloaded)** *free* is also a hive, a factor, and a vertex
-  of the matching that is unmatched.
-* **frame, level**: free hives stacked in levels (a level is every free hive with no free hive downstream of it, then the
-  next level up, ...) and merged; each level is one frame.  Frame 0 is the bottom (downstream).  A promotion moves
-  a factor of frame h to a move of frame h - 1.  "Above", "upstream" and "top" mean larger h; "below", "downstream" and
+  **closed** hive has none and takes no part in the search.  **(overloaded)** *free* is also a hive, a factor, and a
+  vertex of the matching that is unmatched.
+* **frame, level**: free hives stacked in levels (a level is every free hive with no free hive downstream of it, then
+  the next level up, ...) and merged; each level is one frame.  Frame 0 is the bottom (downstream).  A promotion moves a
+  factor of frame h to a move of frame h - 1.  "Above", "upstream" and "top" mean larger h; "below", "downstream" and
   "bottom" mean smaller.
 * **Taxman Mini**: the game a frame plays: a set of moves and a set of factors; each move must still have one of its
   maximal factors in the frame when taken, and taking it removes all of its factors still there.
@@ -496,8 +504,8 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
   `Apiary::promotion_candidates`); (2) `cands` in a search node: the candidates the node's loop still has to try; (3) a
   vertex role in the matching graph: a number that may be matched as a promoted mover, may pay for one above it, or stay
   free.
-* **in the bag** (`in_the_bag`, the Java's `inTheBag`): what the game with no promotions scores.  The score of any game of
-  the model is `in_the_bag` plus the sum of its promotions.
+* **in the bag** (`in_the_bag`, the Java's `inTheBag`): what the game with no promotions scores.  The score of any game
+  of the model is `in_the_bag` plus the sum of its promotions.
 * **max_total** (`maxTotalPromotions`): a cap on the *number* of promotions, from the frames' freedoms.
 * **cap, prev_cap** **(overloaded)**: (1) the ceiling on the promotion *sum*: `n + score(n-1) - in_the_bag`; reaching
   it ends the search (tactic `prev_cap`, proof `cap`); (2) `max_total`, "the cap on the number of promotions"; (3) the
@@ -511,14 +519,14 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
 ### The search
 
 * **tactic**: a switchable piece of the algorithm (`--tactic`).  **sound / proven / unproven / unsound**: the grading in
-  [DESIGN.md](DESIGN.md#tactics).  **strict**: no unproven tactic on.
+  [DESIGN.md](DESIGN.md#5-tactics).  **strict**: no unproven tactic on.
 * **incumbent**: the best promotion set found so far, shared by all threads; **offer** raises it.  **greedy**: promote
   every candidate that can be, from the largest down.  **seed**: the previous game's promotions that are still
-  candidates.  **dive**: round the root's matching into a feasible set.  The starting incumbent is the best of the three,
-  improved by a local search.
+  candidates.  **dive**: round the root's matching into a feasible set.  The starting incumbent is the best of the
+  three, improved by a local search.
 * **node, step, unit** **(overloaded)**: a search node is a set of promotions made from the root plus the candidates
-  left; a **unit** is a node as the engine passes it around, `(promoted, cands)`, from which the state is rebuilt; and the
-  `nodes` that results and progress lines count are *steps*, one per candidate a node's loop tries.
+  left; a **unit** is a node as the engine passes it around, `(promoted, cands)`, from which the state is rebuilt; and
+  the `nodes` that results and progress lines count are *steps*, one per candidate a node's loop tries.
 * **upper bound**: what no completion of a node can exceed.  **blameGame** is the Java's (`bounds::upper_bound`), kept
   for parity; the default is the **matching bound**.
 * **matching bound**: relax winnability to matchability: choose promotions maximising their sum such that every move
@@ -566,9 +574,9 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
 
 * **engine**: the problem-independent parallel depth-first branch-and-bound driver (`engine.rs`); the Taxman search is a
   `Searcher` it runs.  **worker**: a thread with its own searcher.  **deque**: the shared queue of units.
-* **yield, split, steal**: a searcher gives its unexplored work back by *yielding*; a *split* is a yield answering an idle
-  worker; a *steal* takes a unit from the front of the deque (the shallowest, largest subtree).  **poll**: the searcher
-  asking whether to yield.
+* **yield, split, steal**: a searcher gives its unexplored work back by *yielding*; a *split* is a yield answering an
+  idle worker; a *steal* takes a unit from the front of the deque (the shallowest, largest subtree).  **poll**: the
+  searcher asking whether to yield.
 * **spill**: units moved from memory to segment files beyond `queue_mem_cap`.
 * **checkpoint, pause, park**: a periodic pause in which all workers yield and park, and the engine writes every unit,
   the incumbent and statistics to `nNNNN.ckpt`.  **header**: what identifies the search (n, width, digests of candidates
@@ -585,20 +593,21 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
 
 ## 8. Reading order and map of the documents
 
-The code, in the order that builds understanding (sizes in lines, tests included; each file starts with a module
-comment that is worth reading first):
+The code, in the order that builds understanding (each file starts with a module comment that is worth reading first;
+`src/lib.rs` has the module map with a line on every module):
 
-1. `src/game.rs` (360): the rules as a referee, and `optimal.json`.
-2. `src/numtheory.rs` (241): maximal factors and composites.
-3. `src/hives.rs` (1000): sources, factors, hives, unzip, impossible moves, free factor counts.
-4. `src/frames.rs` (180): hives stacked into frames; the candidates.
-5. `src/model.rs` (2200): `Frame`, `FrameSet`, `Model`: winnability, promotion, reduction, then conflicts and nogoods.
-6. `src/solver.rs` (1400): the per-game pipeline and the range driver; the tactics registry.
-7. `src/matchbound.rs` (1750): the matching bound; the module comment is the best explanation of it.
-8. `src/search.rs` (2600): the search: `Refiner` (conflicts, refinement), `strongest`, `TaxSearcher::step`, `prepare`, the
+1. `src/game.rs`: the rules as a referee, and `optimal.json`.
+2. `src/numtheory.rs`: maximal factors and composites.
+3. `src/hives.rs`: sources, factors, hives, unzip, impossible moves, free factor counts.
+4. `src/frames.rs`: hives stacked into frames; the candidates.
+5. `src/model.rs`: `Frame`, `FrameSet`, `Model`: winnability, promotion, reduction, then conflicts and nogoods.
+6. `src/board.rs`, `src/solver.rs`: a board prepared for a search, and the per-game pipeline and the range driver.
+7. `src/matchbound.rs`: the matching bound; the module comment is the best explanation of it.
+8. `src/search.rs`: the search: `Refiner` (conflicts, refinement), `strongest`, `TaxSearcher::step`, `prepare`, the
    checkpoint header.
-9. `src/engine.rs` (1900): the protocol in the module comment (conservation, splitting, checkpoint, termination).
-10. `src/results.rs` (930), `src/commands.rs`, `src/main.rs`: provenance, verification, the command line.
+9. `src/engine.rs`: the protocol in the module comment (conservation, splitting, checkpoint, termination).
+10. `src/tactics.rs`, `src/results.rs`, `src/paths.rs`, `src/commands.rs`, `src/main.rs`: the switchable tactics,
+    provenance and verification, the default files, the command line.
 
 Skip on a first read: `src/bounds.rs` (the Java's `blameGame` bound and preclusions, mostly off the default path),
 `src/sacrifice.rs` and `src/brute.rs` (studies), `search::Diagnostics`, `src/accelerate.rs` (short; read it with the
@@ -607,7 +616,8 @@ pipeline).
 | document | what it holds |
 |---|---|
 | this page | the user guide |
-| [DESIGN.md](DESIGN.md) | the design: the Java mapping, tactics and their grades, the architecture, the engine, the improvements in dated rounds with measurements, and the tests |
+| [DESIGN.md](DESIGN.md) | the design as it is now: goals, the game and the frame model, the architecture, the search, the tactics and their grades, the engine, the pipeline, the trust model, the tests, performance |
+| [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) | the lab notebook: every round of improvements with its measurements, and the ideas measured and not kept |
 | [results/README.md](results/README.md) | the committed results files and what supports their scores |
 | [bench/curve/README.md](bench/curve/README.md) | how the cost grows with n beyond the frontier, and projections for a larger machine |
 | [tools/cloud/RUNBOOK.md](tools/cloud/RUNBOOK.md) | running the solver on a many-core cloud machine |

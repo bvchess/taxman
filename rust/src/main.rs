@@ -1,18 +1,18 @@
-//! Command-line front end.  Subcommands are plain functions taking the arguments after the subcommand name.
+//! The `taxman` command: parses the subcommand and hands the rest of the command line to it.
+//!
+//! The subcommands are in `commands.rs`; the flag parser, the error type and the output macros they share are in
+//! `cli.rs`.  Every subcommand is a plain function of the arguments after its name.  A command
+//! that fails prints `error: ...` and exits with status 1; a bad command line prints the usage and exits with
+//! status 2; a run that SIGINT or SIGTERM stopped (see `solve`) exits with 128 plus the signal.
 
 mod cli;
 mod commands;
 
-use cli::{errln, outln, Args, CliError, CliResult};
-use std::path::PathBuf;
+use cli::{errln, outln, CliError, CliResult};
 use std::process::ExitCode;
-use std::time::Instant;
 use taxman::engine;
-use taxman::game::Optimal;
-use taxman::numtheory::Tables;
-use taxman::results::verify_files;
 use taxman::search::{Branching, SearchTactics};
-use taxman::solver::Tactics;
+use taxman::tactics::Tactics;
 
 /// The usage text with its `{...}` parts to fill in by [`usage`].
 const USAGE: &str = "\
@@ -36,14 +36,17 @@ commands:
       --force-search           search even where the previous game gives the answer
       --allow-tainted-prev     with no unproven tactic on, still build on a previous game whose proof rests on
                                something unproven (optimal.json's games do); the results that rest on it say so
-      --optimal FILE           optimal.json to compare with and to take previous games from (none: no file)
+      --optimal FILE           optimal.json to compare with and to take previous games from (none: no file);
+                               by default $TAXMAN_OPTIMAL, else src/main/resources/optimal.json of the repository,
+                               found from the working directory or from this program
       --show                   print each game's promotions and moves
   regress [--from A] [--to N] [--threads K] [--tactic ...]
                           solve A..N (default 1..400) in memory and check every score against optimal.json
-  bench [--threads K] [--tactic ...] [--history FILE] [N ...]
+  bench [--threads K] [--tactic ...] [--history FILE] [--known FILE] [N ...]
                           time the benchmark games (default 936 1050 1100 1133 1170 1184), each on its own
-                          with the previous game from optimal.json or past it results/strict.jsonl, and no
-                          derivation; appends to FILE (default bench/history.jsonl)
+                          with the previous game from optimal.json or past it from the results file --known
+                          (default rust/results/strict.jsonl), and no derivation; appends the run to
+                          --history (default rust/bench/history.jsonl; both in the repository)
   verify-optimal [FILE]   replay every game in optimal.json (or FILE) and check its recorded score
   verify-results FILE... [--optimal FILE|none]
                           check results files without changing them: every game replayed, the chain from n-1,
@@ -89,69 +92,9 @@ fn run(args: &[String]) -> CliResult {
         "solve" => commands::solve(rest),
         "regress" => commands::regress(rest),
         "bench" => commands::bench(rest),
-        "verify-optimal" => verify_optimal(rest),
-        "verify-results" => verify_results(rest),
-        "tables" => tables(rest),
+        "verify-optimal" => commands::verify_optimal(rest),
+        "verify-results" => commands::verify_results(rest),
+        "tables" => commands::tables(rest),
         other => Err(CliError::Usage(format!("unknown command {other:?}"))),
     }
-}
-
-fn millis(since: Instant) -> f64 {
-    since.elapsed().as_secs_f64() * 1000.0
-}
-
-fn verify_optimal(args: &[String]) -> CliResult {
-    let path = match args {
-        [] => Optimal::default_path(),
-        [file] => file.into(),
-        _ => return Err(CliError::Usage("verify-optimal takes at most one argument".into())),
-    };
-    let start = Instant::now();
-    let optimal = Optimal::load(&path).map_err(CliError::Failed)?;
-    let load_ms = millis(start);
-
-    let start = Instant::now();
-    let checked = optimal.verify_all().map_err(CliError::Failed)?;
-    let replay_ms = millis(start);
-
-    let total_moves: usize = optimal.games().map(|(_, _, moves)| moves.len()).sum();
-    outln!("verified {checked} games (n up to {}, {total_moves} moves)", optimal.max_n());
-    outln!("load+parse {load_ms:.1} ms, replay {replay_ms:.1} ms");
-    Ok(())
-}
-
-fn verify_results(args: &[String]) -> CliResult {
-    let args = Args::parse(args, &["--optimal"], &[])?;
-    if args.positional().is_empty() {
-        return Err(CliError::Usage("usage: verify-results FILE... [--optimal FILE|none]".into()));
-    }
-    let optimal = cli::solver_options(&args)?.load_optimal().map_err(CliError::Failed)?;
-    let paths: Vec<PathBuf> = args.positional().iter().map(PathBuf::from).collect();
-    let start = Instant::now();
-    let report = verify_files(&paths, optimal.as_ref()).map_err(CliError::Failed)?;
-    outln!("{report}");
-    outln!("checked in {:.1} ms", millis(start));
-    Ok(())
-}
-
-fn tables(args: &[String]) -> CliResult {
-    let usage = || CliError::Usage("usage: tables N K...".into());
-    let (n, ks) = args.split_first().ok_or_else(usage)?;
-    if ks.is_empty() {
-        return Err(usage());
-    }
-    let n: u32 = n.parse().map_err(|_| CliError::Usage(format!("N must be a non-negative integer, got {n:?}")))?;
-    let tables = Tables::new(n);
-    for k in ks {
-        let k: u32 = k.parse().map_err(|_| CliError::Usage(format!("K must be a non-negative integer, got {k:?}")))?;
-        if k < 1 || k > n {
-            return Err(CliError::Usage(format!("K = {k} is not on the board 1..={n}")));
-        }
-        outln!(
-            "{k}: maximal factors {:?}; maximal composites {:?}",
-            tables.max_factors[k as usize],
-            tables.max_composites[k as usize]
-        );
-    }
-    Ok(())
 }

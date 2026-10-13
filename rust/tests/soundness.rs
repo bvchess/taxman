@@ -9,13 +9,13 @@
 
 mod common;
 
-use common::{config, Config, Game, Rng, TempDir};
+use common::{config, random_subset, Config, Game, Rng, TempDir};
 use std::time::Duration;
 use taxman::bits::Bits;
+use taxman::board::Board;
 use taxman::engine::EngineConfig;
 use taxman::frames::build_frames;
 use taxman::game::Optimal;
-use taxman::hives::Apiary;
 use taxman::model::{FrameSet, Model, Scratch};
 use taxman::numtheory::Tables;
 use taxman::search::{prepare, Branching, SearchTactics, TaxUnit};
@@ -50,7 +50,7 @@ fn configs() -> Vec<Config> {
 
 /// `optimal.json`'s best promotion sum of game `n`: its score less what the game with no promotions scores.
 fn optimal_sum<const W: usize>(optimal: &Optimal, n: u32) -> Option<u64> {
-    let in_the_bag: u64 = Apiary::<W>::new(&Tables::new(n), Bits::EMPTY).solution().iter().map(|&m| u64::from(m)).sum();
+    let in_the_bag = Board::<W>::for_n(n).in_the_bag;
     optimal.score(n).map(|score| score - in_the_bag)
 }
 
@@ -93,7 +93,7 @@ fn resumed_over_and_over<const W: usize>(n: u32, optimal: &Optimal, dir: &TempDi
     let mut resumes = 0;
     for (i, cfg) in configs().into_iter().enumerate().filter(|(i, _)| which.contains(i)) {
         let cfg = Config { threads: 2, ..cfg };
-        let checkpoint = dir.join(&format!("n{n}-{i}.ckpt"));
+        let checkpoint = dir.join(format!("n{n}-{i}.ckpt"));
         let engine = EngineConfig {
             threads: 2,
             queue_mem_cap: 2,
@@ -303,7 +303,7 @@ fn promotion_order_conflicts_and_nogoods_on_perturbed_frame_sets() {
                     before.insert(x);
                 }
             }
-            let set = rng.subset(&(all - before), 25);
+            let set = random_subset(&mut rng, &(all - before), 25);
             let at_once = model.promote_all_using(&mut scratch, &start, &set);
             let from_root = model.promote_all_using(&mut scratch, &root, &(set | before));
             for _ in 0..3 {

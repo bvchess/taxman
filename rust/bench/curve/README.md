@@ -44,30 +44,31 @@ Regenerate the tables with `./analysis.py > analysis_output.md`.
 4. **Thread scaling.**  The proof of 1225 (`--seed-opt --known chain.jsonl`) on 1, 2, 4 and 8 threads.
 5. **Analysis.**  `analysis.py`.
 
-**Deviations from the brief** (each forced by the environment or requested during the run):
+**Where the runs departed from the plan** (each forced by the environment or decided during the run):
 
-* The search limit is **585 s, not 600 s**.  A timed-out game must fit one 10-minute Bash call together with its
-  setup, and runs are resumable only between games (the ladder has no checkpoint), so 585 s is the limit and a
-  timeout means "at least 585 s".  No game in this study reached it.
-* A game started late in an invocation gets a shortened limit (what is left of the call); if it runs out of that
-  it is discarded and searched again with a whole limit in the next call.  Two such runs were discarded: 1230
+* The search limit is **585 s, not 600 s**.  The runs were made in sessions limited to 10 minutes per command, a
+  timed-out game must fit one command together with its setup, and runs are resumable only between games (the ladder has
+  no checkpoint), so 585 s is the limit and a timeout means "at least 585 s".  No game in this study reached it.
+* A game started late in an invocation gets a shortened limit (what is left of the invocation); if it runs out of that
+  it is discarded and searched again with a whole limit in the next invocation.  Two such runs were discarded: 1230
   (114 s, calibration) and 1350 (477 s).  Only the second counts against step 3's time.
-* The thread-scaling step was cut down at the coordinator's request to one game (1225, 1-8 threads, no 10); the
-  band sampling stopped after three games of band 1350 and no further bands.  For 1215 the proof-only scaling
-  that the coordinator supplied (65.0 s on 1 thread, 28.3 s on 2, 17.7 s on 4, 11.4 s on 8, from the engine
-  work) is cited, not re-measured here; I could not find those numbers in DESIGN.md or commit 988cc85.
+* The thread-scaling step was cut down to one game (1225, 1-8 threads, no 10); the band sampling stopped after three
+  games of band 1350 and no further bands.  For 1215 the proof-only scaling from the engine work (65.0 s on 1 thread,
+  28.3 s on 2, 17.7 s on 4, 11.4 s on 8) is cited, not re-measured here.  It is a different run from the one in
+  [docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md) ("Benchmarks", 62.5, 24.6, 15.8 and 12.9 s on 1, 2, 4 and 6 threads,
+  an earlier build), and the two are not comparable thread for thread.
 * The stopping rule of step 3 ("stop after the first band where at least half time out") was **not reached**: the
   last band had no timeouts, and its games take 510-540 s, just under the limit.  Step 3 used 62 minutes of the 3
-  hours (3241 s of recorded runs, 477 s discarded).
+  hours the study was given (3241 s of recorded runs, 477 s discarded).
 
 ## Results
 
 ### Chain baseline (step 1)
 
-231 games in **318 s** on 8 threads (149 s for 1001-1217, which DESIGN.md gives as 164 s for an earlier build, and
-169 s for 1218-1231).  34 primes cost 0.43 s together, 70 non-primes reach the cap with their seed (0
-nodes; 6.9 s in all, i.e. setup), 117 small searches take 110 s, and 10 big ones (chain >= 5 s) take 200 s.  The
-slowest: 1230 (91.5 s, 29% of the whole chain), 1227 (19.7 s), 1220 (19.6 s), 1025 (18.0 s), 1225 (17.0 s).
+231 games in **318 s** on 8 threads (149 s for 1001-1217, which [docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md) gives
+as 164 s for an earlier build, and 169 s for 1218-1231).  34 primes cost 0.43 s together, 70 non-primes reach the cap
+with their seed (0 nodes; 6.9 s in all, i.e. setup), 117 small searches take 110 s, and 10 big ones (chain >= 5 s) take
+200 s.  The slowest: 1230 (91.5 s, 29% of the whole chain), 1227 (19.7 s), 1220 (19.6 s), 1025 (18.0 s), 1225 (17.0 s).
 
 ### Calibration: standalone against chained (step 2)
 
@@ -197,8 +198,8 @@ the cost of single games, by the factorization of n: 1230 = 2*3*5*41 costs 207 s
 
 The wall-time speed-up is 8.4x on 8 threads, because the tree gets smaller with more threads (12.07M to 9.30M
 nodes; each thread's nogood tables are emptied every 50,000 of its steps, so the tree depends on the threads);
-the node rate itself scales 6.5x on 8 threads (80 to 65 k nodes/s per thread, -19%).  The coordinator's
-measurement for 1215 (65.0, 28.3, 17.7, 11.4 s on 1, 2, 4, 8 threads: speed-ups 2.3, 3.7, 5.7) gives a lower
+the node rate itself scales 6.5x on 8 threads (80 to 65 k nodes/s per thread, -19%).  The earlier engine measurement
+for 1215 (65.0, 28.3, 17.7, 11.4 s on 1, 2, 4, 8 threads: speed-ups 2.3, 3.7, 5.7) gives a lower
 figure, so 5.7-8.4x on 8 threads is the range seen on this machine.  Nothing was measured above 8 threads
 (the 10-thread point, with its 2 efficiency cores, was not run), so the 10x / 19x assumptions for 192 cores
 rest on the engine design, not on data here.
@@ -251,10 +252,11 @@ still be better than this estimate.
 * **Ratio assumption.**  The chained cost is taken as 0.45 x standalone from games at 1150-1231 (10 big
   searches, 8 of them at n >= 1150); it will drift if the share of the search before the final incumbent (median
   43% in band 1200, 11% in 1250, 9% in 1300, 94% in 1350) changes with n.
-* **Hardware multiplier.**  The 19x / 10x factors are the brief's assumptions.  Measured here: 5.7-8.4x on 8
-  threads over 1 thread, and a falling node rate per thread (-19% at 8); no data above 8 threads, none for
-  Graviton5.  The ramp-up and tail of a 192-thread run are negligible for games of minutes (DESIGN.md: all
-  workers busy within milliseconds), but the cheap games of a chain, each a second or less, cannot use 192 cores.
+* **Hardware multiplier.**  The 19x / 10x factors are assumptions of the study.  Measured here: 5.7-8.4x on 8 threads
+  over 1 thread, and a falling node rate per thread (-19% at 8); no data above 8 threads, none for Graviton5.  The
+  ramp-up and tail of a 192-thread run are negligible for games of minutes (all workers are busy within 3 ms,
+  [docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md)), but the cheap games of a chain, each a second or less, cannot use
+  192 cores.
 * **Limit 585 s** instead of 600 s (see above); no run hit it, so it does not affect the data.
 * **Background load**, see above.  The timing of single multi-thread runs varies by +-10-25% from the search
   alone.

@@ -5,21 +5,23 @@
 //!
 //! `TXENGINE_CONSERVATION=<iterations>` runs more random configurations of the conservation test.
 
+mod common;
+
+use common::TempDir;
 use std::fs;
 use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, ExitStatus, Stdio};
-use std::sync::atomic::{AtomicU64, Ordering};
+
 use std::sync::mpsc;
 use std::time::Duration;
 
 use taxman::bits::Bits;
+use taxman::board::Board;
 use taxman::engine::{self, Ctx, EngineConfig, Poll, Searcher, Start, Unit};
-use taxman::frames::build_frames;
 use taxman::json::Json;
-use taxman::numtheory::Tables;
-use taxman::search::{self, prepare, prepare_for_resume, Revise, SearchTactics, TaxUnit};
-use taxman::solver::{self, SolveOptions};
+use taxman::search::{self, Revise, SearchTactics, TaxUnit};
+use taxman::solver::{self, OptimalSource, SolveOptions};
 
 // ------------------------------------------------------------------------------------------------------------
 // A tree of known size
@@ -162,30 +164,6 @@ fn run_through(cfg: &EngineConfig, tree: Tree, drop_leaves: bool) -> (engine::Ou
     panic!("no progress in 10000 invocations with {cfg:?}");
 }
 
-/// A fresh directory under the system temp dir, removed on drop.
-struct TempDir(PathBuf);
-
-impl TempDir {
-    fn new(name: &str) -> TempDir {
-        static SEQ: AtomicU64 = AtomicU64::new(0);
-        let seq = SEQ.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!("taxman-robust-{name}-{}-{seq}", std::process::id()));
-        let _ = fs::remove_dir_all(&path);
-        fs::create_dir_all(&path).expect("create temp dir");
-        TempDir(path)
-    }
-
-    fn path(&self, name: &str) -> PathBuf {
-        self.0.join(name)
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
-
 fn dir_is_empty(dir: &Path) -> bool {
     fs::read_dir(dir).map(|mut entries| entries.next().is_none()).unwrap_or(true)
 }
@@ -212,7 +190,7 @@ fn conservation_is_exact_under_random_configurations() {
         options[(rng % options.len() as u64) as usize]
     };
     let dir = TempDir::new("conservation");
-    let (ckpt, spill) = (dir.path("ckpt"), dir.path("spill"));
+    let (ckpt, spill) = (dir.join("ckpt"), dir.join("spill"));
     for it in 0..iterations {
         let tree = Tree { max_depth: pick(&[16, 20, 24]) as u32, salt: pick(&[1, 2, 3, 4, 5, 6, 7]) };
         let (size, best) = tree.walk();
@@ -256,13 +234,13 @@ fn a_checkpoint_interval_of_zero_makes_progress() {
     // One and two threads in one go, and two in pieces (stopped by a node limit and resumed) with spilling.
     for (threads, pieces) in [(1, false), (2, false), (2, true)] {
         let dir = TempDir::new("zero");
-        let ckpt = dir.path("ckpt");
+        let ckpt = dir.join("ckpt");
         let cfg = EngineConfig {
             threads,
             checkpoint: Some((ckpt.clone(), Duration::ZERO)),
             node_limit: pieces.then_some(size / 4),
             queue_mem_cap: if pieces { 2 } else { 1 << 20 },
-            spill_dir: Some(dir.path("spill")),
+            spill_dir: Some(dir.join("spill")),
             ..EngineConfig::default()
         };
         let what = format!("{threads} threads, in pieces {pieces}");
@@ -273,7 +251,7 @@ fn a_checkpoint_interval_of_zero_makes_progress() {
         // At least one checkpoint was taken while the search kept going.  (Asking for two was timing-dependent:
         // an optimized build can finish the tree before the second pause; the last piece can be too small for any.)
         assert!(pieces || out.counters.checkpoints >= 1, "{what}: {:?}", out.counters);
-        assert!(!ckpt.exists() && dir_is_empty(&dir.path("spill")), "{what}");
+        assert!(!ckpt.exists() && dir_is_empty(&dir.join("spill")), "{what}");
     }
 }
 
@@ -285,7 +263,7 @@ fn absurd_intervals_and_limits_are_never_reached() {
     let dir = TempDir::new("absurd");
     let cfg = EngineConfig {
         threads: 2,
-        checkpoint: Some((dir.path("ckpt"), Duration::MAX)),
+        checkpoint: Some((dir.join("ckpt"), Duration::MAX)),
         progress: Some(Duration::MAX),
         time_limit: Some(Duration::MAX),
         node_limit: Some(u64::MAX),
@@ -301,7 +279,7 @@ fn a_completed_run_can_keep_its_checkpoint() {
     let tree = Tree { max_depth: 20, salt: 2 };
     let (size, _) = tree.walk();
     let dir = TempDir::new("keep");
-    let ckpt = dir.path("ckpt");
+    let ckpt = dir.join("ckpt");
     let make = |_| Walker { tree, stack: Vec::new(), drop_leaves: false };
     let stop = EngineConfig {
         threads: 2,
@@ -327,7 +305,7 @@ fn a_completed_run_can_keep_its_checkpoint() {
 #[test]
 fn spill_segments_of_dead_processes_are_removed() {
     let dir = TempDir::new("orphans");
-    let spill = dir.path("spill");
+    let spill = dir.join("spill");
     fs::create_dir_all(&spill).unwrap();
     // A process that has just ended: its id is free (and not reused that soon).
     let mut child = Command::new("true").spawn().unwrap();
@@ -372,17 +350,15 @@ fn a_locked_directory_is_refused() {
 // ------------------------------------------------------------------------------------------------------------
 
 /// Game `n` from the frame builder (at width 16), prepared with the default tactics.
-fn prepared_game(n: u32) -> (Tables, Vec<Vec<u32>>, Bits<16>, search::Prepared<16>) {
-    let tables = Tables::new(n);
-    let frames = build_frames::<16>(&tables);
-    let columns = frames.columns();
-    let prepared = prepare::<16>(&tables, &columns, &frames.candidates, SearchTactics::default(), 1).unwrap();
-    (tables, columns, frames.candidates, prepared)
+fn prepared_game(n: u32) -> (Board<16>, search::Prepared<16>) {
+    let board = Board::<16>::for_n(n);
+    let prepared = board.prepare(SearchTactics::default(), 1).unwrap();
+    (board, prepared)
 }
 
 /// A search of game 600 stopped early, leaving a checkpoint at `ckpt`.
-fn stopped_search(ckpt: &Path) -> (Tables, Vec<Vec<u32>>, Bits<16>, EngineConfig) {
-    let (tables, columns, candidates, prepared) = prepared_game(600);
+fn stopped_search(ckpt: &Path) -> (Board<16>, EngineConfig) {
+    let (board, prepared) = prepared_game(600);
     let cfg = EngineConfig {
         threads: 1,
         checkpoint: Some((ckpt.to_path_buf(), Duration::from_secs(3600))),
@@ -391,18 +367,18 @@ fn stopped_search(ckpt: &Path) -> (Tables, Vec<Vec<u32>>, Bits<16>, EngineConfig
     };
     assert!(!search::search(&prepared, &cfg, None, None, false).unwrap().completed);
     assert!(ckpt.exists());
-    (tables, columns, candidates, EngineConfig { node_limit: None, ..cfg })
+    (board, EngineConfig { node_limit: None, ..cfg })
 }
 
 /// A search resumed with an incumbent that already reaches the cap is finished at once.
 #[test]
 fn a_resumed_search_already_at_its_cap_finishes_at_once() {
     let dir = TempDir::new("cap");
-    let ckpt = dir.path("n0600.ckpt");
+    let ckpt = dir.join("n0600.ckpt");
     for keep in [false, true] {
-        let (tables, columns, candidates, cfg) = stopped_search(&ckpt);
+        let (board, cfg) = stopped_search(&ckpt);
         let head = engine::read_checkpoint(&ckpt).unwrap();
-        let resumed = prepare_for_resume::<16>(&tables, &columns, &candidates, &ckpt, 1).unwrap();
+        let resumed = board.prepare_for_resume(&ckpt, 1).unwrap();
         let cfg = EngineConfig { keep_completed_checkpoint: keep, ..cfg };
         let r = search::search(&resumed, &cfg, None, Some(head.best), true).unwrap();
         assert!(r.completed && r.reached_cap && r.sum >= head.best, "keep {keep}: {r:?}");
@@ -427,13 +403,13 @@ impl Searcher<TaxUnit<16>> for Stall {
 #[test]
 fn a_checkpoint_whose_incumbent_does_not_fit_is_refused() {
     let dir = TempDir::new("payload");
-    let ckpt = dir.path("n0600.ckpt");
-    let (tables, columns, candidates, cfg) = stopped_search(&ckpt);
+    let ckpt = dir.join("n0600.ckpt");
+    let (board, cfg) = stopped_search(&ckpt);
     let header = engine::read_checkpoint_header(&ckpt).unwrap();
     let real = engine::read_checkpoint(&ckpt).unwrap();
-    let resumed = prepare_for_resume::<16>(&tables, &columns, &candidates, &ckpt, 1).unwrap();
+    let resumed = board.prepare_for_resume(&ckpt, 1).unwrap();
     let words = |set: Bits<16>| set.as_words().iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>();
-    let not_a_candidate = (1..600).find(|&x| !candidates.contains(x)).unwrap();
+    let not_a_candidate = (1..600).find(|&x| !board.candidates().contains(x)).unwrap();
     let cases = [
         (real.best + 1, real.payload.clone(), "worth"),
         (u64::from(not_a_candidate), words(Bits::EMPTY.with(not_a_candidate)), "cannot be promoted"),
@@ -441,7 +417,7 @@ fn a_checkpoint_whose_incumbent_does_not_fit_is_refused() {
     ];
     for (best, payload, complaint) in cases {
         let forged = EngineConfig { threads: 1, time_limit: Some(Duration::from_millis(1)), ..cfg.clone() };
-        let root = TaxUnit { promoted: Bits::EMPTY, cands: candidates };
+        let root = TaxUnit { promoted: Bits::EMPTY, cands: board.candidates() };
         let start = Start::Fresh { units: vec![root], best, payload };
         assert!(!engine::run(&forged, start, &header, |_| Stall).unwrap().completed);
         let err = search::search(&resumed, &cfg, None, None, true).unwrap_err();
@@ -460,13 +436,13 @@ fn options(dir: &Path) -> SolveOptions {
 #[test]
 fn a_checkpoint_renamed_to_another_game_is_refused() {
     let dir = TempDir::new("renamed");
-    let mut opts = SolveOptions { time_limit: Some(Duration::ZERO), optimal_path: None, ..options(&dir.0) };
+    let mut opts = SolveOptions { time_limit: Some(Duration::ZERO), optimal: OptimalSource::None, ..options(&dir.0) };
     opts.tactics.set("revise_freedoms=off").unwrap();
     assert!(!solver::solve_game(140, None, &opts).unwrap().completed);
-    fs::copy(dir.path("n0140.ckpt"), dir.path("n0141.ckpt")).unwrap();
+    fs::copy(dir.join("n0140.ckpt"), dir.join("n0141.ckpt")).unwrap();
     let err = solver::solve_game(141, None, &opts).unwrap_err();
     assert!(err.contains("n0141.ckpt") && err.contains("the game n=140, not n=141"), "{err}");
-    assert!(dir.path("n0141.ckpt").exists(), "a refused checkpoint is left alone");
+    assert!(dir.join("n0141.ckpt").exists(), "a refused checkpoint is left alone");
 }
 
 #[test]
@@ -488,12 +464,12 @@ fn a_checkpoint_made_with_other_tactics_names_them() {
 #[test]
 fn a_limit_also_stops_the_search_of_revise_freedoms() {
     let dir = TempDir::new("revise");
-    let opts = SolveOptions { node_limit: Some(1), optimal_path: None, ..options(&dir.0) };
+    let opts = SolveOptions { node_limit: Some(1), optimal: OptimalSource::None, ..options(&dir.0) };
     let r = solver::solve_game(1225, None, &opts).unwrap();
     assert!(!r.completed && r.score > 0);
     let setup = r.setup.expect("a searched game has a setup");
     assert!(matches!(setup.revise, Revise::Stopped { nodes } if nodes < 4000), "{setup:?}");
-    assert!(!dir.path("n1225.ckpt").exists());
+    assert!(!dir.join("n1225.ckpt").exists());
 }
 
 // ------------------------------------------------------------------------------------------------------------
@@ -545,8 +521,8 @@ fn completed(line: &Json) -> bool {
 #[test]
 fn a_closed_stdout_and_stderr_do_not_stop_a_run() {
     let dir = TempDir::new("epipe");
-    let out = dir.path("results.jsonl");
-    let ckpt = dir.path("ckpt");
+    let out = dir.join("results.jsonl");
+    let ckpt = dir.join("ckpt");
     let mut child = taxman()
         .args(["solve", "936", "--force-search", "--threads", "2", "--progress", "0.002", "--show"])
         .args(["--out".as_ref(), out.as_os_str(), "--checkpoint-dir".as_ref(), ckpt.as_os_str()])
@@ -576,8 +552,8 @@ fn a_checkpoint_directory_in_use_is_refused() {
 /// exit status and stdout.
 #[cfg(unix)]
 fn solve_944(dir: &TempDir, signal: Option<&str>) -> (ExitStatus, String) {
-    let out = dir.path("results.jsonl");
-    let ckpt = dir.path("ckpt");
+    let out = dir.join("results.jsonl");
+    let ckpt = dir.join("ckpt");
     let mut child = taxman()
         .args(["solve", "944", "--force-search", "--threads", "2", "--progress", "0.02"])
         .args(["--out".as_ref(), out.as_os_str(), "--checkpoint-dir".as_ref(), ckpt.as_os_str()])
@@ -615,14 +591,14 @@ fn solve_944(dir: &TempDir, signal: Option<&str>) -> (ExitStatus, String) {
 #[test]
 fn a_signal_stops_the_search_with_a_checkpoint_to_resume() {
     let dir = TempDir::new("signal");
-    let ckpt = dir.path("ckpt").join("n0944.ckpt");
+    let ckpt = dir.join("ckpt").join("n0944.ckpt");
     let mut nodes = 0;
     for (signal, code) in [("-INT", 130), ("-TERM", 143)] {
         let (status, stdout) = solve_944(&dir, Some(signal));
         assert_eq!(status.code(), Some(code), "{signal}: {stdout}");
         assert!(stdout.contains("stopped by a signal"), "{signal}: {stdout}");
         assert!(ckpt.exists(), "{signal}: the final checkpoint");
-        let lines = results(&dir.path("results.jsonl"));
+        let lines = results(&dir.join("results.jsonl"));
         let last = lines.last().unwrap();
         assert!(!completed(last), "{signal}");
         let so_far = last.get("nodes").and_then(Json::as_u64).unwrap();
@@ -633,7 +609,7 @@ fn a_signal_stops_the_search_with_a_checkpoint_to_resume() {
     }
     let (status, stdout) = solve_944(&dir, None);
     assert!(status.success(), "{stdout}");
-    let lines = results(&dir.path("results.jsonl"));
+    let lines = results(&dir.join("results.jsonl"));
     assert_eq!(lines.len(), 3);
     let last = lines.last().unwrap();
     assert!(completed(last) && last.get("optimal_match") == Some(&Json::Bool(true)), "{stdout}");

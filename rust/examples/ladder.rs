@@ -6,7 +6,8 @@
 //!     [--no-seed] [--seed-opt] [--known FILE] [--tactic NAME=VALUE]... N...
 //! ```
 //!
-//! Each game is set up from the frame builder (no golden data) with the default search tactics, seeded with
+//! Each game is set up from the frame builder (no golden data) as `taxman solve` sets it up (`taxman::board::Board`,
+//! at the set width `with_width!` picks for n) with the default search tactics, seeded with
 //! the promotions of the known game for n − 1 that are still candidates (as the `seed_incumbent` tactic
 //! does; `--seed-opt`: with the game for n itself, so that the search only has to prove it) and capped at
 //! n + opt(n − 1) − inTheBag (`prev_cap`).  The known games are optimal.json's, plus the completed games of a
@@ -31,14 +32,12 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use taxman::bits::Bits;
+use taxman::board::Board;
 use taxman::engine::{Counters, EngineConfig};
-use taxman::frames::build_frames;
 use taxman::game::Optimal;
-use taxman::hives::Apiary;
-use taxman::numtheory::Tables;
-use taxman::search::{cut, prepare, search_with, Diagnostics, Revise, SearchTactics};
-use taxman::solver::Tactics;
+use taxman::search::{cut, search_with, Diagnostics, Revise, SearchTactics};
+use taxman::solver::SolveOptions;
+use taxman::tactics::Tactics;
 
 struct Options {
     /// Thread counts to search each game with, in order.
@@ -117,7 +116,7 @@ fn main() {
             std::process::exit(2);
         }
     };
-    let optimal = match known_games(o.known.as_ref()) {
+    let optimal = match SolveOptions::default().known_games(o.known.as_slice()) {
         Ok(optimal) => optimal,
         Err(e) => {
             eprintln!("error: {e}");
@@ -209,15 +208,6 @@ fn print_scaling(title: &str, rows: &[Row]) {
     }
 }
 
-/// optimal.json's games, plus the completed games of the results file `known` (which win where both have one).
-fn known_games(known: Option<&PathBuf>) -> Result<Optimal, String> {
-    let optimal = Optimal::load_default()?;
-    match known {
-        Some(path) => optimal.with_results(path),
-        None => Ok(optimal),
-    }
-}
-
 fn secs(d: Duration) -> f64 {
     d.as_secs_f64()
 }
@@ -225,16 +215,13 @@ fn secs(d: Duration) -> f64 {
 /// Sets game `n` up once and searches it with each of the thread counts; one line per search.
 fn run<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Vec<Row> {
     let t0 = Instant::now();
-    let tables = Tables::new(n);
-    let frames = build_frames::<W>(&tables);
-    let columns: Vec<Vec<u32>> = frames.frames.iter().flat_map(|f| [f.factors.to_vec(), f.moves.to_vec()]).collect();
+    let board = Board::<W>::for_n(n);
     let most = o.threads.iter().copied().max().unwrap_or(1);
-    let p = prepare::<W>(&tables, &columns, &frames.candidates, o.tactics, most).expect("prepare");
-    let in_the_bag: u64 = Apiary::<W>::new(&tables, Bits::EMPTY).solution().iter().map(|&x| u64::from(x)).sum();
-    let opt = optimal.score(n).map(|s| s - in_the_bag);
-    let prev_cap = optimal.score(n - 1).map(|s| u64::from(n) + s - in_the_bag);
+    let p = board.prepare(o.tactics, most).expect("prepare");
+    let opt = optimal.score(n).map(|s| s - board.in_the_bag);
+    let prev_cap = optimal.score(n - 1).and_then(|s| board.promotion_cap(s));
     let seed_game = if o.seed_opt { optimal.moves(n) } else { optimal.moves(n - 1).filter(|_| o.seed) };
-    let seed: Option<Bits<W>> = seed_game.map(|m| m.iter().copied().collect());
+    let seed = seed_game.map(|moves| board.seed(moves));
     let cap = prev_cap.filter(|_| o.cap);
     let prep = t0.elapsed();
     let t = &p.timings;

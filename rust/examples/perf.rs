@@ -44,13 +44,13 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use taxman::bits::Bits;
+use taxman::board::Board;
 use taxman::engine::{self, Ctx, EngineConfig, Searcher, Start};
-use taxman::frames::build_frames;
 use taxman::game::Optimal;
 use taxman::matchbound::{MatchBound, MatchGraph};
 use taxman::model::{Lookup, Model, Nogoods, Scratch};
-use taxman::numtheory::Tables;
-use taxman::search::{prepare, prepare_for_resume, search, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
+use taxman::search::{search, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
+use taxman::solver::SolveOptions;
 
 /// The games whose fixtures the probe runs by default.
 const GAMES: [u32; 2] = [936, 1215];
@@ -186,9 +186,7 @@ impl Report {
 
 /// A game set up as the frontier's searches are: from the frame builder, with the strict tactics.
 fn setup<const W: usize>(n: u32) -> Prepared<W> {
-    let tables = Tables::new(n);
-    let frames = build_frames::<W>(&tables);
-    prepare::<W>(&tables, &frames.columns(), &frames.candidates, tactics(), 1).expect("prepare")
+    Board::<W>::for_n(n).prepare(tactics(), 1).expect("prepare")
 }
 
 /// The optimum's promotions that can be promoted from the root, one by one from the largest down.
@@ -455,9 +453,8 @@ fn kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> Resul
 // F3: the search window
 
 fn window<const W: usize>(n: u32, path: &Path, steps: u64, reps: u32, report: &mut Report) -> Result<(), String> {
-    let tables = Tables::new(n);
-    let frames = build_frames::<W>(&tables);
-    let p = prepare_for_resume::<W>(&tables, &frames.columns(), &frames.candidates, path, 1)
+    let p = Board::<W>::for_n(n)
+        .prepare_for_resume(path, 1)
         .map_err(|e| format!("{}: {e} (make it again with `perf make-window`)", path.display()))?;
     let graph = MatchGraph::new(&p.model, &p.root);
     let space = SearchSpace::new(&p, Some(&graph), None);
@@ -615,13 +612,7 @@ fn run() -> Result<(), String> {
             _ => numbers.push(parse(arg)?),
         }
     }
-    let optimal = || -> Result<Optimal, String> {
-        let optimal = Optimal::load_default()?;
-        match known.as_deref() {
-            Some(path) => optimal.with_results(path),
-            None => Ok(optimal),
-        }
-    };
+    let optimal = || SolveOptions::default().known_games(known.as_slice());
     match (command.as_deref(), &numbers[..]) {
         (Some("make-nodes"), &[n]) => {
             let n = n as u32;

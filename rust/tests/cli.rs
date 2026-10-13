@@ -46,7 +46,7 @@ fn help_lists_the_commands_and_every_tactic() {
         for text in ["solve N|A-B", "regress", "bench", "verify-optimal", "tables N K...", "--history FILE"] {
             assert!(run.stdout.contains(text), "{args:?}: no {text:?}");
         }
-        for name in taxman::solver::Tactics::names() {
+        for name in taxman::tactics::Tactics::names() {
             assert!(run.stdout.contains(name), "{args:?}: the help does not name the tactic {name}");
         }
     }
