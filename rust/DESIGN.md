@@ -989,6 +989,18 @@ Performance:
   About 5 s in all; `perf make-nodes` and `perf make-window` make the
   fixtures again (deterministically).  For whole searches, `/usr/bin/time
   -l` reports the same counters per process.
+* Profile-guided optimization (`tools/pgo.sh`): an instrumented build runs
+  the probe and a short search at every set width (code a profile never saw
+  is optimized as cold), and `-Cprofile-use` builds
+  `target/pgo/release/taxman` and the examples.  The same trees (node
+  counts, fingerprints); 12% fewer cycles on the proof of 1215 (151.1 →
+  132.5 G), 13% at 1184, 6% at 936, and 9–11% on games it was not trained
+  on (880, 1050, 1100, 1170).  Long runs should use it; profile the plain
+  build (in the other, the search is inlined into a few functions and
+  `sample` sees little).  On Linux, rustup's `llvm-tools` has an
+  llvm-profdata that matches rustc's LLVM, and `TAXMAN_RUSTFLAGS=
+  -Ctarget-cpu=native` builds for the machine (aarch64 Linux targets generic
+  armv8-a; on the Mac the default, apple-m1, is the machine already).
 * The ladder, `cargo run --release --example ladder -- [--threads T[,T…] |
   --scaling] [--seconds S] [--diag] [--seed-opt] [--known FILE] [--tactic …]
   N…`: standalone searches of hard games (default 760 800 840 880 900 960 992
