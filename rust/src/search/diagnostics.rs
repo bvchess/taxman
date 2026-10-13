@@ -31,8 +31,10 @@ pub mod cut {
     /// Forced members (tactic `fix_forced`): a node's loop, because they include all of its conflict; a child,
     /// because they cannot all be promoted.
     pub const FORCED: usize = 6;
-    pub const COUNT: usize = 7;
-    pub const NAMES: [&str; COUNT] = ["empty", "largest", "blame", "match", "refined", "exact", "forced"];
+    /// The Lagrangian bound over nogoods (where the matching bound and its refinement did not cut).
+    pub const LAGRANGE: usize = 7;
+    pub const COUNT: usize = 8;
+    pub const NAMES: [&str; COUNT] = ["empty", "largest", "blame", "match", "refined", "exact", "forced", "lagrange"];
 }
 
 /// Buckets of [`Diagnostics::gaps`]: excesses `0..GAP_BUCKETS − 1`, and the last for everything above.

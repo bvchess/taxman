@@ -29,8 +29,10 @@ use taxman::with_width;
 
 /// (board, tactics as `--tactic` assignments, promotion sum, nodes): the game searched from the frame builder on one
 /// thread, with the revision of frame 0's freedoms where the tactics have it on.  The 1133 rows have it off, like
-/// the committed strict results.
-const EXPECTED: [(u32, &str, u64, u64); 28] = [
+/// the committed strict results.  The Lagrangian bound (tactic `lagrange`) first fits its multipliers after 2,000
+/// steps, so the games that take fewer (480, 640) do not see it; its rows `lagrange=off` are the trees of the build
+/// before it.
+const EXPECTED: [(u32, &str, u64, u64); 33] = [
     // W = 8, the small end: every tactic's effect shows in a few hundred nodes.
     (480, "default", 5350, 393),
     (480, "nogoods=off", 5350, 417),
@@ -39,30 +41,36 @@ const EXPECTED: [(u32, &str, u64, u64); 28] = [
     (480, "match_refine=3", 5350, 254),
     (480, "preclusions=on", 5350, 391),
     // W = 16: games of a few hundred to ten thousand nodes.
-    (600, "default", 8507, 5877),
+    (600, "default", 8507, 4558),
+    (600, "lagrange=off", 8507, 5877),
     (600, "nogoods=off", 8507, 17740),
-    (600, "fix_forced=off", 8507, 8180),
-    (600, "match_refine=0", 8507, 6100),
-    (600, "match_refine=3", 8507, 4070),
-    (600, "branching=conflict-smallest", 8507, 24443),
-    (600, "branching=conflict-largest", 8507, 10099),
+    (600, "fix_forced=off", 8507, 7723),
+    (600, "match_refine=0", 8507, 4711),
+    (600, "match_refine=3", 8507, 3469),
+    (600, "branching=conflict-smallest", 8507, 23696),
+    (600, "branching=conflict-largest", 8507, 9311),
     (640, "default", 9220, 676),
     (640, "nogoods=off", 9220, 1099),
     (640, "fix_forced=off", 9220, 1569),
-    (660, "default", 10242, 10043),
+    (660, "default", 10242, 8822),
+    (660, "lagrange=off", 10242, 10043),
     (660, "nogoods=off", 10242, 14817),
-    (660, "fix_forced=off", 10242, 15685),
-    (760, "default", 14170, 2567),
+    (660, "fix_forced=off", 10242, 14657),
+    (760, "default", 14170, 2318),
+    (760, "lagrange=off", 14170, 2567),
     (760, "nogoods=off", 14170, 3361),
-    (760, "fix_forced=off", 14170, 5332),
+    (760, "fix_forced=off", 14170, 4317),
     (760, "match_refine=3", 14170, 1643),
-    // W = 16, and a search of more than 50,000 steps, which forgets its nogoods once (`forget_nogoods=off`: 56,990).
-    (936, "default", 20507, 59055),
+    // W = 16, and without the Lagrangian bound a search of more than 50,000 steps, which forgets its nogoods once
+    // (`forget_nogoods=off` as well: 56,990).
+    (936, "default", 20507, 41653),
+    (936, "lagrange=off", 20507, 59055),
     // W = 20, the frontier's width.
-    (1133, "revise_freedoms=off", 28690, 2386),
+    (1133, "revise_freedoms=off", 28690, 2122),
+    (1133, "revise_freedoms=off,lagrange=off", 28690, 2386),
     (1133, "revise_freedoms=off,nogoods=off", 28690, 5269),
-    (1133, "revise_freedoms=off,fix_forced=off", 28690, 6621),
-    (1133, "revise_freedoms=off,match_refine=0", 28690, 2472),
+    (1133, "revise_freedoms=off,fix_forced=off", 28690, 4848),
+    (1133, "revise_freedoms=off,match_refine=0", 28690, 2156),
 ];
 
 fn tactics(assignments: &str) -> SearchTactics {
@@ -128,7 +136,7 @@ fn a_search_on_one_thread_is_deterministic() {
 }
 
 /// (game, nodes forgetting the nogoods every 500 steps, nodes never forgetting) for [`forgetting_search`].
-const FORGETTING: (u32, u64, u64) = (600, 8270, 5877);
+const FORGETTING: (u32, u64, u64) = (600, 5500, 4558);
 
 /// The tree below the root of a game, searched by one searcher that forgets its nogoods every `period` steps
 /// (`None`: never), from the greedy incumbent; returns (best, nodes).  A search forgets for the first time after

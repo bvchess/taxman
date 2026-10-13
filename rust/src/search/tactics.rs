@@ -47,6 +47,12 @@ pub struct SearchTactics {
     /// [`NOGOOD_PERIOD`](super::NOGOOD_PERIOD) of its steps (sound: the table is a cache).  Old nogoods cost
     /// every lookup more than they help.
     pub forget_nogoods: bool,
+    /// With `nogoods`: where the matching bound and its refinement leave a node or a child open, bound it also by a
+    /// Lagrangian relaxation of the nogoods the searcher has learned, kept incrementally along its path, and (with
+    /// `fix_forced`) add to the forced members the members without which that bound would cut (proven: weak
+    /// duality; see [`crate::matchbound::lagrange`] and `search::lagrange`).  The multipliers are refitted as the
+    /// searcher learns, so the tree depends on its history, as with `nogoods`.
+    pub lagrange: bool,
 }
 
 /// Which candidate a node's loop promotes next (tactic `branching`).  The child promotes it, and the node goes on
@@ -107,6 +113,7 @@ impl Default for SearchTactics {
             fix_forced: true,
             nogoods: true,
             forget_nogoods: true,
+            lagrange: true,
         }
     }
 }
@@ -126,9 +133,9 @@ impl SearchTactics {
     }
 
     /// The tactics as the header of a checkpoint records them.  Tactics added later are recorded by the bits of
-    /// their non-default values (`fix_forced` by bit 9, `nogoods` by bit 10 and `forget_nogoods` by bit 11 when
-    /// they are off), so that a checkpoint made before they existed reads back with their defaults: they are
-    /// sound, so a search resumed with them is still correct.
+    /// their non-default values (`fix_forced` by bit 9, `nogoods` by bit 10, `forget_nogoods` by bit 11 and
+    /// `lagrange` by bit 12 when they are off), so that a checkpoint made before they existed reads back with their
+    /// defaults: they are sound, so a search resumed with them is still correct.
     pub(super) fn bits(self) -> u16 {
         let branching = match self.branching {
             Branching::Largest => 0,
@@ -145,11 +152,12 @@ impl SearchTactics {
             | u16::from(!self.fix_forced) << 9
             | u16::from(!self.nogoods) << 10
             | u16::from(!self.forget_nogoods) << 11
+            | u16::from(!self.lagrange) << 12
     }
 
     /// The tactics [`bits`](Self::bits) recorded.
     pub(super) fn from_bits(bits: u16) -> Result<Self, String> {
-        if bits >> 12 != 0 {
+        if bits >> 13 != 0 {
             return Err(format!("unknown tactics {bits:#x}"));
         }
         let branching = match bits >> 7 & 3 {
@@ -168,6 +176,7 @@ impl SearchTactics {
             fix_forced: bits & 1 << 9 == 0,
             nogoods: bits & 1 << 10 == 0,
             forget_nogoods: bits & 1 << 11 == 0,
+            lagrange: bits & 1 << 12 == 0,
         })
     }
 }

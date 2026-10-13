@@ -3,7 +3,7 @@
 //!
 //! ```text
 //! cargo run --release --example ladder -- [--threads T[,T...] | --scaling] [--seconds S] [--diag] [--no-cap]
-//!     [--no-seed] [--seed-opt] [--known FILE] [--tactic NAME=VALUE]... [--cores C] N...
+//!     [--no-seed] [--seed-opt] [--known FILE] [--tactic NAME=VALUE]... [--node-limit N] [--cores C] N...
 //! ```
 //!
 //! Each game is set up from the frame builder (no golden data) as `taxman solve` sets it up (`taxman::board::Board`,
@@ -17,7 +17,8 @@
 //! and the engine's activity ([`Counters::summary`]: effective parallelism, idle and lock-wait time, splits,
 //! steals, time to full occupancy).  `--diag` collects [`Diagnostics`] (slower) and prints a summary.
 //! `--tactic` sets a search tactic with the names and values of `taxman solve --tactic` (`preclusions=off`,
-//! `branching=largest`, `match_refine=0`, ...).
+//! `branching=largest`, `match_refine=0`, ...).  `--node-limit N` stops each search after N nodes (steps), for
+//! measuring a prefix of a search too long to finish.
 //!
 //! Scaling: `--threads` takes a list of thread counts, and `--scaling` is 1, 2, 4, ... up to the available
 //! parallelism (which is included).  Each game is searched with each count in turn, and a table per game (and
@@ -58,6 +59,7 @@ struct Options {
     games: Vec<u32>,
     /// At most this many threads search at once (`EngineConfig::cores`).
     cores: Option<usize>,
+    node_limit: Option<u64>,
 }
 
 fn parse() -> Result<Options, String> {
@@ -72,6 +74,7 @@ fn parse() -> Result<Options, String> {
         tactics: SearchTactics::default(),
         games: Vec::new(),
         cores: None,
+        node_limit: None,
     };
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -97,6 +100,9 @@ fn parse() -> Result<Options, String> {
             "--seed-opt" => o.seed_opt = true,
             "--cores" => o.cores = Some(value("--cores")?.parse().map_err(|e| format!("--cores: {e}"))?),
             "--known" => o.known = Some(value("--known")?.into()),
+            "--node-limit" => {
+                o.node_limit = Some(value("--node-limit")?.parse().map_err(|e| format!("--node-limit: {e}"))?)
+            }
             "--tactic" => {
                 // The solver's parser, so that the names and values are the same as for `taxman solve --tactic`.
                 let spec = value("--tactic")?;
@@ -243,6 +249,7 @@ fn run<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Vec<Row> {
             threads,
             time_limit: Some(Duration::from_secs(o.seconds)),
             cores: o.cores,
+            node_limit: o.node_limit,
             ..EngineConfig::default()
         };
         let diag = o.diag.then(|| Mutex::new(Diagnostics::default()));

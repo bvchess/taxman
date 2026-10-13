@@ -235,6 +235,9 @@ Implemented as the tactic and proof kind `same_search`
 
 ### 4.2 A Lagrangian bound over the nogoods (rank 2)
 
+Done since: kept incrementally, and with the forced members its potentials give, it is the tactic `lagrange`, on by
+default, about 3 times fewer cycles on the proofs of 1184-1300 ([EXPERIMENTS.md](EXPERIMENTS.md#a-lagrangian-bound-over-the-nogoods-2026-10)).
+
 *Mechanism.*  The matching bound knows no nogood.  Every completion `F` of a node with promotions `P` promotes at most
 `|N − P| − 1` members of each nogood `N`; dualizing these inequalities with multipliers `λ_N ≥ 0` gives, for every
 `λ`, the bound `max_M Σ_{x ∈ Q(M)} (x − Σ_{N ∋ x} λ_N) + Σ_N λ_N (|N − P| − 1)`: a matching with each

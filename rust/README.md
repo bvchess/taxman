@@ -389,8 +389,8 @@ cut short, the fields regrouped and comments added, so it is not valid JSON as p
  "tactics":"reuse_prev=off,revise_freedoms=off",
  "tactic_switches":{"prime_shortcut":true,"reuse_prev":false,"same_search":true,"revise_freedoms":false,
                     "preclusions":false,"match_bound":true,"branching":"conflict-strong","match_refine":1,
-                    "fix_forced":true,"nogoods":true,"forget_nogoods":true,"legacy_bound":false,"prev_cap":true,
-                    "seed_incumbent":true},
+                    "fix_forced":true,"nogoods":true,"forget_nogoods":true,"lagrange":true,"legacy_bound":false,
+                    "prev_cap":true,"seed_incumbent":true},
  "unproven_tactics_on":[], "limits":{"seconds":null,"nodes":null},
  "options":{"force_search":false,"allow_tainted_prev":false,"allow_optimal_mismatch":false,"optimal_file":"default"},
  "optimal_match":true, "prev_source":"run", "build":{"commit":"c6cf8abe4349...","dirty":true}}
@@ -520,7 +520,8 @@ chain, taint counts).
    |                                   matching + local search; cap = n + score(n-1) - in_the_bag
    |          engine::run              worker threads; shared deque with disk spill; incumbent; checkpoints; signals
    |            Stepper::step          per node (search/searcher.rs): check_node = matching bound (matchbound) ->
-   |                                   conflicts, forced members, nogoods (search::refine::Refiner, model::Nogoods);
+   |                                   conflicts, forced members, nogoods (search::refine::Refiner, model::Nogoods)
+   |                                   -> Lagrangian bound over the nogoods (search::lagrange);
    |                                   choose_branch (a candidate) -> make_child -> check_child
    |      promotions -> accelerate::solution_for_promotions   (Apiary with the promotions as sources) -> ordered moves
    |
@@ -626,13 +627,18 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
   levels.
 * **branching**: which candidate a node promotes next.  **strong branching** (`conflict-strong`, the default): pick
   the member of the conflict whose removal lowers the matching bound most.
-* **forced member** **(overloaded)**: in the search, a member of a conflict whose removal alone brings the bound below
-  what the node needs, so every completion that beats the incumbent promotes it (tactic `fix_forced`: the child promotes
-  all of them together).  Also: a hive's *mandatory* move (`unzip`, "forced moves" in its docs), and a *forced pair*
+* **forced member** **(overloaded)**: in the search, a member of the heaviest matching whose removal alone brings the
+  matching bound (or the Lagrangian bound) below what the node needs, so every completion that beats the incumbent
+  promotes it (tactic `fix_forced`: the child promotes all of them together).  Also: a hive's *mandatory* move (`unzip`, "forced moves" in its docs), and a *forced pair*
   in `reduce`.  Three unrelated ideas.
 * **nogood**: a conflict of the *root* learned from a conflict found at a node; valid at every node, any thread, any
   path.  Each searcher keeps a table, scanned exactly over compact member indices, and forgets it every 50,000 of its
   steps (`forget_nogoods`).
+* **Lagrangian bound** (`lagrange`): the matching bound with the searcher's nogoods folded into the weights of their
+  members by *multipliers* (Lagrangian relaxation): a bound whatever the multipliers, often well below the matching
+  bound; kept along the path the same way, and its potentials find forced members too.  A nogood is **live** at a node
+  when its members outside the node's promotions are all still candidates; a **refit** fits the multipliers again (at
+  the root, to the nogoods learned), after 2,000 steps and with each forgetting (DESIGN.md, section 4).
 * **preclusion**: a depth-2 table that rules candidates out (tactic `preclusions`, off by default).
 * **certificate** **(overloaded)**: `model::Certificate` is a winning order that answers most single-edit winnability
   questions without a peel; `results::Certificate` is a score that equals a proven ceiling; the Python heuristics'
@@ -699,11 +705,13 @@ comment that is worth reading first; section 6 above is the map of how the piece
    (`peel.rs`), promotion (`promote.rs`), then conflicts (`conflict.rs`) and nogoods (`nogoods.rs`).
 8. `src/accelerate.rs`: the shortcuts from the game of n - 1 (read the comment of `prime_shortcut` for the proof of the
    prime shortcut), and the last step from promotions to moves.
-9. `src/matchbound.rs`: the matching bound; the module comment is the best explanation of it.
+9. `src/matchbound.rs`: the matching bound; the module comment is the best explanation of it.  Its child
+   `src/matchbound/lagrange.rs` is the Lagrangian bound over the nogoods, built on the same levels and repairs.
 10. `src/search/`: `mod.rs` explains the step and says what is where: `searcher.rs` (`TaxSearcher` and `Stepper::step`,
     whose phases are `check_node`, `choose_branch`, `make_child` and `check_child`), `refine.rs` (`Refiner`: conflicts,
-    refinement; `strongest`), `setup.rs` (`prepare`), `tactics.rs`, `incumbent.rs`, and `header.rs` (the checkpoint
-    header).  The `if let Some(p) = &mut self.probe` lines in `searcher.rs` are instrumentation
+    refinement; `strongest`), `lagrange.rs` (the Lagrangian bound in the search: where, forced members, refits),
+    `setup.rs` (`prepare`), `tactics.rs`, `incumbent.rs`, and `header.rs` (the checkpoint header).  The
+    `if let Some(p) = &mut self.probe` lines in `searcher.rs` are instrumentation
     (`diagnostics.rs`), which can be skipped.
 11. `src/bounds.rs`: the Java's `blameGame` bound and preclusions, mostly off the default path.  The default step does
     use three of its functions (`max_additional`, `greedy`, `new_candidate_list_after`) and the peel scratch space its

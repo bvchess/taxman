@@ -56,7 +56,7 @@ impl Default for Tactics {
 pub const UNPROVEN: [&str; 3] = ["reuse_prev", "revise_freedoms", "legacy_bound"];
 
 /// The number of tactics.
-pub const TACTIC_COUNT: usize = 14;
+pub const TACTIC_COUNT: usize = 15;
 
 /// The value of a tactic: an on/off switch, or one of the two settings that are not.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -142,6 +142,7 @@ impl Tactics {
             ("fix_forced", Slot::Switch(&mut self.search.fix_forced)),
             ("nogoods", Slot::Switch(&mut self.search.nogoods)),
             ("forget_nogoods", Slot::Switch(&mut self.search.forget_nogoods)),
+            ("lagrange", Slot::Switch(&mut self.search.lagrange)),
             ("legacy_bound", Slot::Switch(&mut self.search.legacy_bound)),
             ("prev_cap", Slot::Switch(&mut self.prev_cap)),
             ("seed_incumbent", Slot::Switch(&mut self.seed_incumbent)),
@@ -231,6 +232,7 @@ mod tests {
                 "fix_forced",
                 "nogoods",
                 "forget_nogoods",
+                "lagrange",
                 "legacy_bound",
                 "prev_cap",
                 "seed_incumbent"
@@ -238,7 +240,7 @@ mod tests {
         );
         let values: Vec<String> = t.settings().iter().map(|s| s.1.to_string()).collect();
         let expected =
-            ["on", "on", "on", "on", "off", "on", "conflict-strong", "1", "on", "on", "on", "off", "on", "on"];
+            ["on", "on", "on", "on", "off", "on", "conflict-strong", "1", "on", "on", "on", "on", "off", "on", "on"];
         assert_eq!(values, expected);
         // The values of the search tactics are those of `SearchTactics::default()`, not copies of them.
         let search = SearchTactics::default();

@@ -27,7 +27,9 @@
 //! The matching check of a node or a child is `Stepper::check` with `refine::Refiner::top`: the matching bound
 //! ([`crate::matchbound`]), the forced members, the conflict of the heaviest matching (the smallest the nogood table
 //! knows, [`crate::model::Nogoods`], else [`Model::conflict_using`](crate::model::Model::conflict_using)), and the
-//! refinement.  The tactics that switch these pieces are the fields of [`SearchTactics`].
+//! refinement; then, where they leave it open, the Lagrangian bound over the nogoods and the forced members it
+//! finds (`lagrange::Lagrangian::check`).  The tactics that switch these pieces are the fields of
+//! [`SearchTactics`].
 //!
 //! The matching bound replaces the Java's `blameGame` ([`crate::bounds`]); the two are not combined.  With the
 //! tactic `match_bound` on (the default) `blameGame` is not computed at all: it never pruned where the matching
@@ -43,7 +45,8 @@
 //! * The matching bound: [`crate::matchbound`].  Conflicts:
 //!   [`Model::conflict_using`](crate::model::Model::conflict_using); nogoods: [`crate::model::Nogoods`];
 //!   refinement and forced members: `refine::Refiner` and `refine::strongest`; the rule-outs of children:
-//!   `Stepper::make_child`.
+//!   `Stepper::make_child`; the Lagrangian bound and its forced members: [`crate::matchbound::lagrange`] and
+//!   [`lagrange`].
 //! * What a searcher remembers (the conflicts known along the path, the nogoods, the frames' last conflicts, the
 //!   matching levels kept by strong branching, a child's verdict) are facts that hold where they are used, or
 //!   caches of them: they change which tree is searched, never the answer.  So a search's tree depends on its
@@ -57,6 +60,7 @@
 //! * `incumbent`: the starting incumbent (seed, dive, local search).
 //! * `searcher`: [`TaxSearcher`], its stack and its steps; [`SearchSpace`], [`TaxUnit`], the counters [`stat`].
 //! * `refine`: the matching check (`Refiner`) and strong branching (`strongest`).
+//! * [`lagrange`]: the Lagrangian bound in the search: where it is tried, its forced members, its refits.
 //! * `header`: the checkpoint's header.
 //! * `diagnostics`: [`Diagnostics`], for tuning.
 //! * here: [`search`], which starts or resumes the engine on a prepared game.
@@ -64,6 +68,7 @@
 mod diagnostics;
 mod header;
 mod incumbent;
+pub mod lagrange;
 mod refine;
 mod searcher;
 mod setup;
