@@ -988,3 +988,4 @@
 {"n":998,"score":313973,"fm_bound":315203,"relation":"chain","search":"skipped","segments":0,"nodes":0,"secs":0.030}
 {"n":997,"score":312975,"fm_bound":314205,"relation":"prime","search":"skipped","segments":0,"nodes":0,"secs":0.030}
 {"n":987,"score":308235,"fm_bound":309349,"relation":"none","search":"proven","segments":0,"nodes":19049854,"secs":2141.468}
+{"n":988,"score":308949,"fm_bound":310079,"relation":"none","search":"proven","segments":0,"nodes":23866662,"secs":2610.481}

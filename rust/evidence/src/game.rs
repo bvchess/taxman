@@ -170,6 +170,8 @@ pub struct MatchingBound {
     /// matching bound; see [`set_scale`](Self::set_scale)).
     n: u32,
     scale: (i64, i64),
+    /// Subtracted from the weight of each number picked (zero but in Lagrangian experiments).
+    pub penalty: Vec<i64>,
     /// The optimal dual of the last solve, and its total (the bound plus BIG per forced pick).
     dual: Vec<i64>,
     total: i64,
@@ -199,6 +201,7 @@ impl MatchingBound {
             mate: vec![NONE; size],
             n: board.n,
             scale: (1, 1),
+            penalty: vec![0; size],
             dual: vec![0; size],
             total: 0,
             offset: 0,
@@ -219,7 +222,7 @@ impl MatchingBound {
         }
         let bonus = if roles[hi as usize] == Role::Pick { BIG } else { 0 };
         let scale = if 2 * hi > self.n { self.scale.0 } else { self.scale.1 };
-        Some(i64::from(hi) * scale + bonus)
+        Some(i64::from(hi) * scale + bonus - self.penalty[hi as usize])
     }
 
     /// The bound and the matching's picks, or None if some forced pick cannot be matched.
@@ -354,9 +357,44 @@ impl MatchingBound {
         old: &[Role],
         new: &[Role],
     ) -> Option<(u64, Vec<bool>)> {
+        self.update_with(board, snapshot, old, new, None)
+    }
+
+    /// [`update`](Self::update), where the penalties also change from the current ones to `penalty` (only ever
+    /// downwards: a lower penalty raises the weights of the number's downward edges, so its dual rises by as
+    /// much, and an upward edge it was matched by is no longer tight and is freed).
+    pub fn update_with(
+        &mut self,
+        board: &Board,
+        snapshot: &(Vec<u32>, Vec<i64>),
+        old: &[Role],
+        new: &[Role],
+        penalty: Option<&[i64]>,
+    ) -> Option<(u64, Vec<bool>)> {
         self.mate.clone_from(&snapshot.0);
         self.dual.clone_from(&snapshot.1);
         let mut deficient: Vec<u32> = Vec::new();
+        if let Some(penalty) = penalty {
+            for c in 2..=board.n {
+                let delta = self.penalty[c as usize] - penalty[c as usize];
+                assert!(delta >= 0, "penalties only fall");
+                if delta == 0 {
+                    continue;
+                }
+                self.penalty[c as usize] = penalty[c as usize];
+                if old[c as usize] == Role::Barred {
+                    continue;
+                }
+                self.dual[c as usize] += delta;
+                let m = self.mate[c as usize];
+                if m != NONE && m > c {
+                    self.mate[c as usize] = NONE;
+                    self.mate[m as usize] = NONE;
+                    deficient.push(m);
+                }
+                deficient.push(c);
+            }
+        }
         for c in 2..=board.n {
             let (was, is) = (old[c as usize], new[c as usize]);
             if was == is {
@@ -566,16 +604,23 @@ pub enum Verdict {
 ///   m < n, a set beating the target T has sum(S ∩ (m, n]) >= T + 1 − V(m) for every m: a node whose
 ///   unbarred numbers above some m fall short is cut, and a number whose barring would make one fall short is
 ///   forced.  (For m = n − 1 this says S contains n.)  The answer then rests on those smaller games' bounds.
+/// * **A Lagrangian bound** (with [`enable_lagrangian`](Self::enable_lagrangian)).  Every playable set picks
+///   at most |K| − 1 members of each nogood K, so for any multipliers μ_K >= 0 the matching with each pick's
+///   weight lowered by the μ of the nogoods holding it, plus Σ μ_K (|K| − 1), bounds every set the search
+///   looks for.  The multipliers are fitted once (subgradient steps at the root, over the nogoods known then)
+///   and fixed; the second matching runs alongside the first, incrementally the same way, and cuts nodes and
+///   forces picks by the same rules.
 pub struct Prover<'a> {
     board: &'a Board,
     bound: MatchingBound,
+    lag: Option<Lag>,
     target: u64,
     /// For each m < n, the least weight S must have above m (empty: no segment cuts).
     segment_need: Vec<i64>,
     pub nogoods: Vec<Vec<u32>>,
     max_nogoods: usize,
     pub nodes: u64,
-    /// Diagnostics: [new conflicts, known conflicts, forced picks, children, cut by bound, max depth].
+    /// Diagnostics: [new conflicts, known conflicts, forced picks, children, cut by bound, cut by the Lagrangian].
     pub stats: [u64; 6],
     pause_at: Option<std::time::Instant>,
     next_check: u64,
@@ -584,11 +629,68 @@ pub struct Prover<'a> {
     budget: u64,
 }
 
+/// The Lagrangian matching: weights scaled by `scale`, picks penalized by the multipliers of their *active*
+/// nogoods (those with no barred member: a nogood with one is satisfied by every set the node allows, so its
+/// term only loosens the bound and is dropped), plus Σ μ_K (|K| − 1) over the active ones.
+struct Lag {
+    m: MatchingBound,
+    scale: i64,
+    nogoods: Vec<Vec<u32>>,
+    mu: Vec<i64>,
+}
+
+impl Lag {
+    /// The penalties and the constant under `roles`.
+    fn terms(&self, roles: &[Role]) -> (Vec<i64>, i64) {
+        let mut penalty = vec![0i64; roles.len()];
+        let mut constant = 0;
+        for (k, &u) in self.nogoods.iter().zip(&self.mu) {
+            if u == 0 || k.iter().any(|&c| roles[c as usize] == Role::Barred) {
+                continue;
+            }
+            k.iter().for_each(|&c| penalty[c as usize] += u);
+            constant += u * (k.len() as i64 - 1);
+        }
+        (penalty, constant)
+    }
+
+    /// Re-optimizes from a parent's snapshot (or solves afresh), with the penalties of `roles`; returns the
+    /// result and the constant.
+    fn solve(
+        &mut self,
+        board: &Board,
+        base: Option<(&[Role], &Snapshot)>,
+        roles: &[Role],
+    ) -> (Option<(u64, Vec<bool>)>, i64) {
+        let (penalty, constant) = self.terms(roles);
+        let result = match base {
+            Some((old, snapshot)) => {
+                self.m.penalty = self.terms(old).0;
+                self.m.update_with(board, snapshot, old, roles, Some(&penalty))
+            }
+            None => {
+                self.m.penalty = penalty;
+                self.m.solve(board, roles)
+            }
+        };
+        (result, constant)
+    }
+}
+
+/// A parent's state for its children: its roles, and the optimal matching and dual of each bound.
+type Snapshot = (Vec<u32>, Vec<i64>);
+struct Base<'b> {
+    roles: &'b [Role],
+    plain: &'b Snapshot,
+    lag: Option<&'b Snapshot>,
+}
+
 impl<'a> Prover<'a> {
     pub fn new(board: &'a Board, target: u64, budget: u64) -> Self {
         Prover {
             board,
             bound: MatchingBound::new(board),
+            lag: None,
             target,
             segment_need: Vec::new(),
             nogoods: Vec::new(),
@@ -640,6 +742,53 @@ impl<'a> Prover<'a> {
             }
         }
         true
+    }
+
+    /// Fits Lagrangian multipliers for the nogoods known now (subgradient steps at the root, keeping the best)
+    /// and turns on the second bound; returns the root's Lagrangian bound.  Without nogoods it does nothing.
+    pub fn enable_lagrangian(&mut self, iterations: usize) -> Option<f64> {
+        const SCALE: i64 = 100;
+        if self.nogoods.is_empty() {
+            return None;
+        }
+        let roles = self.root_roles();
+        let ks = self.nogoods.clone();
+        let mut m = MatchingBound::new(self.board);
+        m.set_scale(SCALE, SCALE);
+        let set = |m: &mut MatchingBound, mu: &[i64]| -> i64 {
+            m.penalty.iter_mut().for_each(|p| *p = 0);
+            let mut constant = 0;
+            for (k, &u) in ks.iter().zip(mu) {
+                k.iter().for_each(|&c| m.penalty[c as usize] += u);
+                constant += u * (k.len() as i64 - 1);
+            }
+            constant
+        };
+        let mut mu = vec![0.0f64; ks.len()];
+        let mut best = (i64::MAX, vec![0i64; ks.len()]);
+        for _ in 0..iterations {
+            let ints: Vec<i64> = mu.iter().map(|u| (u * SCALE as f64).round() as i64).collect();
+            let constant = set(&mut m, &ints);
+            let (value, picks) = m.solve(self.board, &roles).expect("nothing is forced");
+            let bound = value as i64 + constant;
+            if bound < best.0 {
+                best = (bound, ints);
+            }
+            let g: Vec<f64> = ks
+                .iter()
+                .map(|k| k.iter().filter(|&&c| picks[c as usize]).count() as f64 - (k.len() as f64 - 1.0))
+                .collect();
+            let norm: f64 = g.iter().map(|x| x * x).sum();
+            if norm == 0.0 {
+                break;
+            }
+            let step = 0.5 * ((bound as f64 / SCALE as f64) - self.target as f64).max(1.0) / norm;
+            mu.iter_mut().zip(&g).for_each(|(u, gk)| *u = (*u + step * gk).max(0.0));
+        }
+        // Keep only the nogoods with a multiplier: the others add nothing, and every node scans the kept ones.
+        let (nogoods, mu): (Vec<Vec<u32>>, Vec<i64>) = ks.into_iter().zip(best.1).filter(|(_, u)| *u > 0).unzip();
+        self.lag = Some(Lag { m, scale: SCALE, nogoods, mu });
+        Some(best.0 as f64 / SCALE as f64)
     }
 
     /// The matching bound of the whole board (the Franklín–Moniot bound).
@@ -758,9 +907,9 @@ impl<'a> Prover<'a> {
         false
     }
 
-    /// A node with these roles; `base` is the parent's roles and optimal matching, to re-optimize from (None:
+    /// A node with these roles; `base` is the parent's roles and optimal matchings, to re-optimize from (None:
     /// solve from scratch).
-    fn node(&mut self, mut roles: Vec<Role>, base: Option<(&[Role], &(Vec<u32>, Vec<i64>))>) -> Verdict {
+    fn node(&mut self, mut roles: Vec<Role>, base: Option<Base>) -> Verdict {
         self.nodes += 1;
         if self.nodes > self.budget {
             return Verdict::Budget;
@@ -772,10 +921,13 @@ impl<'a> Prover<'a> {
         if !self.board.playable(&forced) {
             return Verdict::Proven;
         }
-        let mut solved = match base {
-            Some((old, snapshot)) => self.bound.update(self.board, snapshot, old, &roles),
-            None => self.bound.solve(self.board, &roles),
+        let board = self.board;
+        let mut solved = match &base {
+            Some(b) => self.bound.update(board, b.plain, b.roles, &roles),
+            None => self.bound.solve(board, &roles),
         };
+        let mut lag_solved =
+            self.lag.as_mut().map(|l| l.solve(board, base.as_ref().and_then(|b| b.lag.map(|s| (b.roles, s))), &roles));
         let n = self.board.n;
         let (value, picks) = loop {
             let Some((value, picks)) = solved else { return Verdict::Proven };
@@ -783,15 +935,33 @@ impl<'a> Prover<'a> {
                 self.stats[4] += 1;
                 return Verdict::Proven;
             }
-            // Forced picks: barring one alone brings the bound down to the target.
-            let newly: Vec<u32> = (2..=n)
+            // Forced picks: barring one alone brings a bound down to the target.
+            let mut newly: Vec<u32> = (2..=n)
                 .filter(|&c| picks[c as usize] && roles[c as usize] == Role::Free)
                 .filter(|&c| self.bound.bound_barring(&roles, c) <= self.target as i64)
                 .collect();
+            if let (Some(l), Some((lagged, constant))) = (&self.lag, &lag_solved) {
+                let Some((lag_value, lag_picks)) = lagged else { return Verdict::Proven };
+                let lag_target = self.target as i64 * l.scale - constant;
+                if *lag_value as i64 <= lag_target {
+                    self.stats[5] += 1;
+                    return Verdict::Proven;
+                }
+                let more: Vec<u32> = (2..=n)
+                    .filter(|&c| {
+                        lag_picks[c as usize]
+                            && roles[c as usize] == Role::Free
+                            && !newly.contains(&c)
+                            && l.m.bound_barring(&roles, c) <= lag_target
+                    })
+                    .collect();
+                newly.extend(more);
+            }
             if newly.is_empty() {
                 break (value, picks);
             }
             let (old, snapshot) = (roles.clone(), self.bound.snapshot());
+            let lag_snapshot = self.lag.as_ref().map(|l| l.m.snapshot());
             self.stats[2] += newly.len() as u64;
             newly.iter().for_each(|&c| roles[c as usize] = Role::Pick);
             if !self.propagate(&mut roles) {
@@ -801,7 +971,10 @@ impl<'a> Prover<'a> {
             if !self.board.playable(&forced) {
                 return Verdict::Proven;
             }
-            solved = self.bound.update(self.board, &snapshot, &old, &roles);
+            solved = self.bound.update(board, &snapshot, &old, &roles);
+            if let (Some(l), Some(s)) = (self.lag.as_mut(), lag_snapshot.as_ref()) {
+                lag_solved = Some(l.solve(board, Some((&old, s)), &roles));
+            }
         };
         // Branch on the violated conflict with the fewest free members (measured: better than the one dearest to
         // break, which doubles the tree at n = 600).  A known one also shows the picks unplayable without a peel.
@@ -837,6 +1010,7 @@ impl<'a> Prover<'a> {
         }
         self.stats[3] += branch.len() as u64;
         let (base_roles, snapshot) = (roles.clone(), self.bound.snapshot());
+        let lag_snapshot = self.lag.as_ref().map(|l| l.m.snapshot());
         let child = |j: usize, roles: &[Role]| {
             let mut child = roles.to_vec();
             branch[..j].iter().for_each(|&d| child[d as usize] = Role::Pick);
@@ -849,7 +1023,8 @@ impl<'a> Prover<'a> {
                 (j..branch.len()).for_each(|k| self.pending.push(child(k, &base_roles)));
                 return Verdict::Paused;
             }
-            match self.node(child(j, &base_roles), Some((&base_roles, &snapshot))) {
+            let base = Base { roles: &base_roles, plain: &snapshot, lag: lag_snapshot.as_ref() };
+            match self.node(child(j, &base_roles), Some(base)) {
                 Verdict::Proven => {}
                 Verdict::Paused => {
                     (j + 1..branch.len()).for_each(|k| self.pending.push(child(k, &base_roles)));
@@ -902,9 +1077,17 @@ impl<'a> Prover<'a> {
         self
     }
 
-    /// The units left open by a pause (to checkpoint), and the nogoods learned so far.
+    /// The units left open by a pause (to checkpoint).
     pub fn open_units(&self) -> &[Vec<Role>] {
         &self.pending
+    }
+
+    /// After a pause: takes the open units, and sets a new pause deadline, to go on in the same process (for
+    /// instance after [`enable_lagrangian`](Self::enable_lagrangian)) with [`run_units`](Self::run_units).
+    pub fn take_units(&mut self, pause_at: std::time::Instant) -> Vec<Vec<Role>> {
+        self.pause_at = Some(pause_at);
+        self.paused = false;
+        std::mem::take(&mut self.pending)
     }
 }
 
@@ -936,6 +1119,55 @@ mod tests {
             }
         }
         best
+    }
+
+    /// With the target one below optimal.json's score, the search (all its pruning rules: forced picks, nogoods,
+    /// the conflict-packing cut, and optionally the segment cuts) must still reach a playable set worth the
+    /// optimum; at the score itself it must prove that nothing beats it.  Every 7th game to 420.
+    #[test]
+    fn the_search_finds_the_optimum_just_above_the_target() {
+        let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../src/main/resources/optimal.json"))
+            .expect("optimal.json");
+        let mut opt = vec![0u64; 1001];
+        for line in text.lines().filter(|l| l.contains("\"n\"")) {
+            let num = |key: &str| -> u64 {
+                let at = line.find(key).unwrap() + key.len();
+                line[at..].trim_start_matches([':', ' ']).chars().take_while(char::is_ascii_digit).collect::<String>().parse().unwrap()
+            };
+            opt[num("\"n\"") as usize] = num("\"score\"");
+        }
+        let spf = smallest_prime_factors(500);
+        for n in (21..=420u32).step_by(7) {
+            let board = Board::new(n, &spf);
+            let v = opt[n as usize];
+            for variant in 0..3 {
+                let segments = variant == 1;
+                let prover = |target| {
+                    let mut p = Prover::new(&board, target, u64::MAX);
+                    if segments {
+                        p = p.with_smaller_games(&opt[..n as usize]);
+                    }
+                    if variant == 2 {
+                        // The Lagrangian bound, fitted to the nogoods of a short first search.
+                        let mut first = Prover::new(&board, target, 300);
+                        first.run();
+                        p.nogoods = first.nogoods;
+                        p.enable_lagrangian(30);
+                    }
+                    p
+                };
+                match prover(v - 1).run() {
+                    Verdict::Beaten(picks) => {
+                        let mut pick = vec![false; n as usize + 1];
+                        picks.iter().for_each(|&c| pick[c as usize] = true);
+                        assert!(board.playable(&pick), "n={n}");
+                        assert_eq!(picks.iter().map(|&c| u64::from(c)).sum::<u64>(), v, "n={n}");
+                    }
+                    other => panic!("n={n} segments={segments}: {other:?} below the optimum"),
+                }
+                assert_eq!(prover(v).run(), Verdict::Proven, "n={n} segments={segments}");
+            }
+        }
     }
 
     /// A search paused every few hundred nodes and resumed from its open units and nogoods reaches the verdict of

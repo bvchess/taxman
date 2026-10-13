@@ -3,7 +3,7 @@
 //! `results/default.jsonl` beyond).  One line per game, resumable:
 //!
 //!     exact --from A --to B [--list ...] [--threads T] [--seconds S] [--budget NODES] [--all 1]
-//!           [--segments 1] [--checkpoints DIR] [--optimal FILE] [--results FILE] --out FILE
+//!           [--segments 1] [--lagrangian 0] [--checkpoints DIR] [--optimal FILE] [--results FILE] --out FILE
 //!
 //! Per game: the recorded game is replayed by the rules (a lower bound, opt(n) >= V(n)); the Franklín–Moniot
 //! matching bound is computed; the relations opt(n) <= n + opt(n−1) and, for a prime n, opt(n) <=
@@ -107,7 +107,7 @@ fn main() {
     let (items, flags) = parse_items(std::env::args().skip(1));
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let (mut threads, mut seconds, mut budget) = (1usize, f64::INFINITY, u64::MAX);
-    let (mut all, mut segments) = (false, false);
+    let (mut all, mut segments, mut lagrangian) = (false, false, true);
     let mut optimal = root.join("../../src/main/resources/optimal.json");
     let mut results = root.join("../results/default.jsonl");
     let mut checkpoints = root.join("work/checkpoints");
@@ -119,6 +119,7 @@ fn main() {
             "--budget" => budget = value.parse().unwrap(),
             "--all" => all = value == "1" || value == "true",
             "--segments" => segments = value == "1" || value == "true",
+            "--lagrangian" => lagrangian = value == "1" || value == "true",
             "--checkpoints" => checkpoints = value.into(),
             "--optimal" => optimal = value.into(),
             "--results" => results = value.into(),
@@ -163,15 +164,34 @@ fn main() {
         let (search, note) = if fm == *score || (relation != "none" && !all) {
             ("skipped", None)
         } else {
-            let verdict = match Checkpoint::load(&ckpt) {
+            // A search that outlasts a short plain warm-up (or resumes from a checkpoint) goes on with the
+            // Lagrangian bound fitted to the nogoods learned so far.
+            let warmup = (Instant::now() + Duration::from_secs(20)).min(pause_at);
+            let first = match Checkpoint::load(&ckpt) {
                 Some(cp) => {
                     assert_eq!(cp.target, *score, "n={n}: the checkpoint is for another target");
                     prover.nodes = cp.nodes;
                     earlier.set(cp.secs);
                     prover.nogoods = cp.nogoods;
-                    prover.run_units(cp.units)
+                    prover.take_units(pause_at);
+                    Err(cp.units)
                 }
-                None => prover.run(),
+                None => {
+                    prover.take_units(warmup);
+                    match prover.run() {
+                        Verdict::Paused => Err(prover.take_units(pause_at)),
+                        other => Ok(other),
+                    }
+                }
+            };
+            let verdict = match first {
+                Ok(verdict) => verdict,
+                Err(units) => {
+                    if lagrangian {
+                        prover.enable_lagrangian(200);
+                    }
+                    prover.run_units(units)
+                }
             };
             match verdict {
                 Verdict::Proven => ("proven", None),
