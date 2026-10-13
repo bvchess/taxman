@@ -36,13 +36,14 @@
 //! validated (the Java's table of optimal games is reproduced to n = 1000, and small boards agree with
 //! exhaustive search) but not proven; README §1 and DESIGN.md ("Tactics") list them.
 //!
-//! * **unzip** finds the hive's *mandatory* moves.  A source with a single usable factor must take it; a factor
-//!   wanted by a single source is given to that source; but in both cases only when the factor cannot be put to
-//!   better use outside the hive (promoted into a move of the hive below, or used as tax by a number promoted
-//!   from another hive).  Each such pair of a move and its *claimed* factor is settled, and leaves the hive's
-//!   *remaining* sources and factors, which are what the frame shows the search.  The assumption: a hive plays
-//!   all of its sources, so a source with one choice makes it.  (Earlier notes call these moves "forced"; this
-//!   code keeps that word out of the hives, since the search has forced members of its own that are unrelated.)
+//! * **unzip** finds the hive's *mandatory* moves, in two ways: a source with a single usable factor must take
+//!   it, and a factor wanted by a single source is given to that source.  A pair is settled only when the factor
+//!   cannot be put to better use outside the hive, as tax for a number promoted from another hive or (in the
+//!   second way) as a promoted number itself, a move of the hive below.  Each settled pair of a move and its
+//!   *claimed* factor leaves the hive's *remaining* sources and factors, which are what the frame shows the
+//!   search.  The assumption: a hive plays all of its sources, so a source with one choice makes it.  (Earlier
+//!   notes call these moves "forced"; this code keeps that word out of the hives, since the search has forced
+//!   members of its own that are unrelated.)
 //! * **removeImpossible** drops, greedily from the largest source down, every source that cannot be played
 //!   together with the sources already kept.  They are the hive's *impossible* moves, which no game of the model
 //!   plays.  The assumption: that this greedy choice keeps the heaviest playable set of sources.  It would, if the
