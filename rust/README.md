@@ -423,11 +423,11 @@ Game 249 of that run repeated the search of 248; its line has `"method":"repeat"
 | `prev_source` | as `prev.source` |
 | `build` | the commit the binary was built from, and whether its sources differed from it |
 
-The committed `results/strict.jsonl` is schema 3 (made by commit bd9bb5d, before repeats existed).
-`results/default.jsonl` and `bench/curve/chain.jsonl` are schema 1, kept as they were made (the first run past 1000,
-and the cost-curve study's chain): no `schema`, `proof`, `taint`, `prev`, `in_the_bag` or `build`; their provenance
-is derived from the fields they have, by the same rules.  [results/README.md](results/README.md) says what is known about each file.  A line is
-never rewritten: a resumed game that is stopped again adds another incomplete line, and the completed line comes last.
+The committed `results/strict.jsonl` is schema 4.  `results/default.jsonl` and `bench/curve/chain.jsonl` are schema 1,
+kept as they were made (the first run past 1000, and the cost-curve study's chain): no `schema`, `proof`, `taint`,
+`prev`, `in_the_bag` or `build`; their provenance is derived from the fields they have, by the same rules.
+[results/README.md](results/README.md) says what is known about each file.  A line is never rewritten: a resumed game
+that is stopped again adds another incomplete line, and the completed line comes last.
 
 ## 5. Why the answers can be trusted
 
@@ -478,8 +478,8 @@ with one.
 
 ```
 $ taxman verify-results results/strict.jsonl bench/curve/chain.jsonl
-results/strict.jsonl: 1300 completed games, n = 1..=1300 (0 missing), 4 incomplete lines
-  proof: trivial 13, prime_formula 211, cap 415, exhausted 661
+results/strict.jsonl: 1300 completed games, n = 1..=1300 (0 missing), 0 incomplete lines
+  proof: trivial 13, prime_formula 211, cap 115, exhausted 416, same_search 545
   taint: 1300 of 1300 games rest on nothing unproven
   scores at a proven ceiling, given the game of n-1: n + score(n-1) 424, prime formula 210
 bench/curve/chain.jsonl: 231 completed games, n = 1001..=1231 (0 missing), 0 incomplete lines

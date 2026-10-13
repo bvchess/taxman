@@ -570,10 +570,10 @@ one that ran in one piece.
 ### Same search
 
 Consecutive boards often pose exactly the same search problem with another cap: of the 1076 games of the strict chain
-1..1300 that need a search, 545 pose the problem of the game before them (or the one before that, past a prime), and
-their searches were 953 of the chain's 3359 s, 851 s of the 2866 s of 1232–1300 (EXPERIMENTS, "Same search").  The
-tactic `same_search` (proven, on by default and in a strict run) concludes such a game from the earlier one with no
-search.
+1..1300 that need a search, 545 pose the problem of the game before them (or the one before that, past a prime).  The
+chain of commit bd9bb5d, which searched them, spent 953 of its 3359 s on those, 851 s of them in 1232–1300 (EXPERIMENTS,
+"Same search").  The tactic `same_search` (proven, on by default and in a strict run) concludes such a game from the
+earlier one with no search; the committed `results/strict.jsonl` was made with it.
 
 *The problem.*  After setup (`search::prepare`) the searcher is given the model (the factor graph among the frames'
 numbers and each number's home frame), the root frame set (every frame's moves, factors and freedoms, frame 0's
@@ -625,13 +625,14 @@ the game of n − 1, and its taint is m's taint plus what n's own setup rests on
 file and of the run among the `SAME_SEARCH_WINDOW` = 8 board sizes before n, latest first, for one that set a search
 up, whose proof settles it, and that the run builds on (a strict run only on a game with an empty taint, unless
 `--allow-tainted-prev`).  A game whose recorded digest differs is passed over; for one whose digest agrees, or is not
-recorded (schema 3 and older, such as the committed `strict.jsonl`), its problem is set up again from its board size
-and `setup.revise` (milliseconds; `board::search_problem`) and compared with n's whole.  The first equal one is m.
+recorded (schema 3 and older, such as the lines of `testdata/strict_schema3_1_90.jsonl`), its problem is set up again
+from its board size and `setup.revise` (milliseconds; `board::search_problem`) and compared with n's whole.  The first
+equal one is m.
 Setting m up again with this build stands for the problem m's own build searched, which a digest recorded by that
 build ties to it (a problem with the recorded digest is that problem, but for a 64-bit collision); a line of schema 3
 or older records only the problem's size, its frames, candidates and `max_total`, and the problem set up again must
 have it.  Beyond that it rests on the frame builder and the model having posed the same problem then: no commit
-since the committed `strict.jsonl` (bd9bb5d) has changed `hives`, `frames`, `model` or `numtheory`.
+since bd9bb5d, the build of those schema 3 lines, has changed what `hives`, `frames`, `model` or `numtheory` compute.
 Every repeat of 1..1300 repeats the last game before it that set a search up (n − 1, or n − 2 past a prime), so the
 window loses nothing there, keeps the setups a range starts with to eight, and makes m a function of the window's
 games, whichever lines record digests.
@@ -720,11 +721,11 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   its docstring says).
 * **Repeats** (`tests/same_search.rs`): the games that repeat an earlier search are found from the setups alone, and
   a strict chain concludes exactly those, with the scores of a chain that searches them: from n = 1 (1..300), from
-  the committed `strict.jsonl` (schema 3, digests set up again; 515..560), and from a results file a stopped run left
-  (digests recorded); a game with a checkpoint is resumed, not repeated; a repeat takes the taint of the game it
-  repeats, and a strict run repeats only a game that rests on nothing unproven.  A unit test of `board` checks that
-  the problem set up again from a line is the one the setup posed, with `revise_freedoms` on and off, and the same at
-  two set widths.
+  lines of schema 3 (`testdata/strict_schema3_1_90.jsonl`, the first 90 games of the chain of commit bd9bb5d, whose
+  digests are set up again; 91..130), and from a results file a stopped run left (digests recorded); a game with a
+  checkpoint is resumed, not repeated; a repeat takes the taint of the game it repeats, and a strict run repeats only a
+  game that rests on nothing unproven.  A unit test of `board` checks that the problem set up again from a line is the
+  one the setup posed, with `revise_freedoms` on and off, and the same at two set widths.
 * **Large boards** (`tests/wide.rs`): the Java stopped at 1000, and the sets that hold a board are 8 to 64 words
   wide, so nothing above 1023 meets anything but the committed results and these tests.  The same game at every
   width that holds it has the same frames, candidates, greedy set, promotion cap, answer and tree; game 1133 (W = 20,
@@ -804,13 +805,13 @@ on the machine moves wall times by up to 3×.  What measures what:
 game time on 8 threads, 145 s of it for 1201–1231, at that commit; the committed `bench/curve/chain.jsonl`
 (1001–1231), made by the build before it (e710d16), records 318 s, and 207 s for 1201–1231.  The cost of a game
 grows by a factor of ten for every 55 to 70 in n past 1200 ([bench/curve/README.md](bench/curve/README.md)).  The
-committed `results/strict.jsonl` (the strict chain 1..1300 by commit bd9bb5d, on 6 threads of an M1 Max shared with
-another CPU-heavy job) records 3359 s of search, 2866 s of it for 1232–1300; its slowest game is 1232 at 439 s
-([results/README.md](results/README.md)).  The Hungarian repairs of the matching are about 46% of the time, the peels
-24%, the bounds from the potentials 7%, the node's own work 7%, level copies 4% and nogood lookups 3%.  All of this is
-without the Lagrangian bound (tactic `lagrange`, section 4), which came later: with it the proof of 1215 takes 1.1 M
-nodes and 34 G cycles instead of 5.5 M and 108 G, 1184 1.6 G cycles, and the strict chain 1201–1231 on four threads
-117 s of game time instead of 283 s (EXPERIMENTS: "A Lagrangian bound over the nogoods").
+strict chain 1..1300 of commit bd9bb5d (on 6 threads of an M1 Max shared with another CPU-heavy job; in git history,
+`results/strict.jsonl` being a later run, whose times [results/README.md](results/README.md) gives) records 3359 s of
+search, 2866 s of it for 1232–1300; its slowest game is 1232 at 439 s.  The Hungarian repairs of the matching are about
+46% of the time, the peels 24%, the bounds from the potentials 7%, the node's own work 7%, level copies 4% and nogood
+lookups 3%.  All of this is without the Lagrangian bound (tactic `lagrange`, section 4), which came later: with it the
+proof of 1215 takes 1.1 M nodes and 34 G cycles instead of 5.5 M and 108 G, 1184 1.6 G cycles, and the strict chain
+1201–1231 on four threads 117 s of game time instead of 283 s (EXPERIMENTS: "A Lagrangian bound over the nogoods").
 
 ## 11. Status and what is left
 

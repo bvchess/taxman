@@ -420,17 +420,11 @@ fn the_committed_results_pass_the_verifier() {
     let report = verify_files(&paths, Some(&optimal)).unwrap_or_else(|e| panic!("{e}"));
     println!("{report}");
     let [default, strict, chain] = &report.files[..] else { panic!("three files") };
-    // strict.jsonl is a chain from n = 1 made in resumable chunks: it holds the lines of the four searches that a
-    // chunk's time limit stopped, besides the completed game of each.
-    for (file, lo, hi, incomplete) in [(default, 1001, 1231, 0), (strict, 1, 1300, 4), (chain, 1001, 1231, 0)] {
+    // strict.jsonl is a chain from n = 1 made in one invocation: it holds no line of a stopped search.
+    for (file, lo, hi) in [(default, 1001, 1231), (strict, 1, 1300), (chain, 1001, 1231)] {
         let games = &file.contents.games;
         assert!(games.keys().copied().eq(lo..=hi), "{}: not the games {lo}..={hi}", file.path.display());
-        assert_eq!(
-            (file.contents.incomplete_lines, file.contents.torn),
-            (incomplete, false),
-            "{}",
-            file.path.display()
-        );
+        assert_eq!((file.contents.incomplete_lines, file.contents.torn), (0, false), "{}", file.path.display());
         assert!(file.contents.runs.is_empty(), "{}: a game left unfinished", file.path.display());
     }
     // Every game the files share has the same score in all of them: 1001-1231.
@@ -448,13 +442,14 @@ fn the_committed_results_pass_the_verifier() {
 
     // default.jsonl: derived by reuse_prev where it could be, which most of its games rest on.
     let counts = |f: &FileReport| {
-        [Proof::Trivial, Proof::PrimeFormula, Proof::Cap, Proof::Exhausted, Proof::ReusePrev].map(|p| proofs(f, p))
+        [Proof::Trivial, Proof::PrimeFormula, Proof::Cap, Proof::Exhausted, Proof::ReusePrev, Proof::SameSearch]
+            .map(|p| proofs(f, p))
     };
-    assert_eq!(counts(default), [0, 34, 0, 78, 119]);
+    assert_eq!(counts(default), [0, 34, 0, 78, 119, 0]);
     assert_eq!(clean(default), 19);
     // strict.jsonl and the chain: no unproven tactic, and nothing unproven anywhere below them.
-    assert_eq!(counts(strict), [13, 211, 415, 661, 0]);
-    assert_eq!(counts(chain), [0, 34, 70, 127, 0]);
+    assert_eq!(counts(strict), [13, 211, 115, 416, 0, 545]);
+    assert_eq!(counts(chain), [0, 34, 70, 127, 0, 0]);
     assert_eq!((clean(strict), clean(chain)), (1300, 231));
     // Scores at a proven ceiling given the game of n − 1 (what certifies a game whatever found it).
     let ceilings = |f: &FileReport| [Certificate::NPlusPrev, Certificate::PrimeFormula].map(|c| certificates(f, c));

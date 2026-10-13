@@ -78,10 +78,10 @@ cost up to 1300 is already paid:
 These are extrapolations from a handful of points: treat them as good to a factor of several in either direction, and
 let the first hours of the real run decide (the time per game is in the log; section 5).  One point has been measured
 since: games 1232 to 1300 took 2866 s of search on 6 threads of the M1 Max, which another CPU-heavy job was sharing
-(`results/strict.jsonl`), about 2.5 to 5 minutes at the factors above, more than the 1 to 2 minutes of the 1300 row (a
-loaded machine and 6 threads make that the pessimistic side).  The first 1300 games take minutes.  A single hard game
-near 1500 can take hours.  Choose N by money and patience; rerunning `chain.sh` with a
-larger N later continues the same file.
+(the strict chain of commit bd9bb5d, which `results/strict.jsonl` has replaced), about 2.5 to 5 minutes at the factors
+above, more than the 1 to 2 minutes of the 1300 row (a loaded machine and 6 threads make that the pessimistic side).
+The first 1300 games take minutes.  A single hard game near 1500 can take hours.  Choose N by money and patience;
+rerunning `chain.sh` with a larger N later continues the same file.
 
 ### Instance
 
@@ -359,8 +359,8 @@ optional) are documented at the top of the script: `THREADS`, `CHECKPOINT_INTERV
   ```
 
   The file is checked when `chain.sh` opens it, rests on nothing unproven (a strict run builds on it), and its lines
-  keep the build that made them (commit bd9bb5d), as the lines added will keep the cloud's.  Its four incomplete lines
-  are stopped searches that a later line finished.  The comparison of `verify.sh` with the committed file is then
+  keep the build that made them (commit 243af9b), as the lines added will keep the cloud's.  It was made in one
+  invocation and holds no incomplete line.  The comparison of `verify.sh` with the committed file is then
   trivial for 1..1300, so the games above 1300 are checked by the referees alone (each game replayed, the chain
   bounds, Franklín–Moniot, the heuristic chain); a run from n = 1 is the cross-check of the machine and the build.  On
   a replacement machine, restore the saved state instead (below), never the committed file over it.

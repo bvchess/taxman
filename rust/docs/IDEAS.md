@@ -30,7 +30,7 @@ each result says whether its effect grows with n where that could be measured.
 
 | rank | idea | borrowed from | sound? | pilot result | expected payoff | cost |
 |---|---|---|---|---|---|---|
-| 1 | Reuse the answer of a game whose search space an earlier game already searched | memoization: dynamic programming, the component cache of #SAT, transposition tables | proven, given the earlier game's proof (a new proof kind) | 29.7% of the search time of the strict chain 1232-1300 (851 of 2866 s), 16.6% of 1201-1231, is spent re-searching a space already solved | the same fraction of the chain, at once; constant factor, not slope | small: a digest per game, a proof kind, the verifiers |
+| 1 | Reuse the answer of a game whose search space an earlier game already searched | memoization: dynamic programming, the component cache of #SAT, transposition tables | proven, given the earlier game's proof (a new proof kind) | 29.7% of the search time of the strict chain 1232-1300 of commit bd9bb5d (851 of 2866 s), 16.6% of 1201-1231, is spent re-searching a space already solved | the same fraction of the chain, at once; constant factor, not slope | small: a digest per game, a proof kind, the verifiers |
 | 2 | A Lagrangian bound over the nogoods | Lagrangian relaxation (MIP), core-guided bounds (MaxSAT); already in `evidence/` | sound (weak duality) | proof nodes −19% to −67% with multipliers fitted once at the root to the nogoods of a short warm-up (1184: 168k → 55k; 1215: 5.1-5.7M → 3.9M; 1225: 9.5-10.1M → 7.6M; 1250: 3.1M → 2.1M) | up to 1.3-3× fewer nodes, if a second matching can be kept incrementally for less than that | large: weighted incremental matching with weight raises, multiplier fitting, a nogood source |
 | 3 | Knuth's estimator of a tree's size | backtrack-search estimation (Knuth 1975), cube-and-conquer's lookahead | not a pruning: nothing to prove | not piloted | a game's cost before running it (budgets for the 192-core machine); split work by estimated size | small to medium |
 | 4 | Reliability branching (pseudocosts) for strong branching | MIP branching | sound (any order explores every set) | strong branching is 28-34% of the time at the frontier (section 2) | up to a quarter of the time, if the tree does not grow | medium |
@@ -53,12 +53,13 @@ are second-order and can wait for (2), which changes the time split they would a
 
 ## 2. Where the time goes in the hardest games
 
-The three slowest games of the strict chain 1232-1300 (`results/strict.jsonl`: 1232 439 s, 1287 273 s, 1299 265 s
-on 6 threads), each run as the chain runs it (`taxman solve N --strict`, its predecessor from a copy of the strict
-results truncated before N) for 40-70 s on 4 threads and sampled every millisecond by macOS `sample`.  Each sample's
-return addresses were symbolicated with their inlined frames (`atos -i`), so that code the compiler inlined into the
-step is charged to the function it came from: the *kind* of work is the innermost function of the crate, the
-*purpose* the innermost search function above it.  Shares of busy samples (the idle coordinator thread excluded):
+The three slowest games of the strict chain 1232-1300 of commit bd9bb5d (1232 439 s, 1287 273 s, 1299 265 s on 6
+threads; `results/strict.jsonl` is a later run), each run as the chain runs it (`taxman solve N --strict`, its
+predecessor from a copy of the strict results truncated before N) for 40-70 s on 4 threads and sampled every
+millisecond by macOS `sample`.  Each sample's return addresses were symbolicated with their inlined frames (`atos -i`),
+so that code the compiler inlined into the step is charged to the function it came from: the *kind* of work is the
+innermost function of the crate, the *purpose* the innermost search function above it.  Shares of busy samples (the
+idle coordinator thread excluded):
 
 | kind of work | 1232 | 1287 | 1299 |
 |---|---|---|---|
@@ -216,8 +217,8 @@ differs, and when it is above the optimum the search runs a full proof again (EX
 The pilot computed, for every game of a range that is neither trivial nor prime, a 64-bit digest of what a strict
 search depends on: the root's frames (moves, factors and freedoms of each), the candidates and `max_total`, as
 `Board::prepare` gives them with `revise_freedoms=off`.  Games with the same digest search the same space; the first
-game with a digest is the original and the later ones repeat it.  Joined with the search seconds the committed
-`results/strict.jsonl` records for each game:
+game with a digest is the original and the later ones repeat it.  Joined with the search seconds that the strict
+chain of commit bd9bb5d recorded for each game:
 
 * 1232-1300: 29 of the 60 searched games repeat an earlier space; their searches took **851 s of the 2866 s** of the
   chain (29.7%): 1299 repeats 1296 (265 s), 1293 repeats 1292 (207 s), 1271 repeats 1269 (75 s), 1267 repeats 1265

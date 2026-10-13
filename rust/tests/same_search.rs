@@ -3,10 +3,10 @@
 //!
 //! The games that repeat an earlier search are found here from the setups alone ([`repeats_by_problem`]), and a
 //! strict chain must conclude exactly those without a search, with the scores of a chain that searches them: from
-//! n = 1, from the committed `results/strict.jsonl` (whose lines, schema 3, do not record their problems' digests),
-//! and from a results file that a run left (whose lines do).  A game with a checkpoint is resumed, never repeated, and
-//! a strict run repeats only games that rest on nothing unproven.  The forged repeats that both verifiers refuse are
-//! in `tests/results.rs`.  Small boards, one thread.
+//! n = 1, from a file of lines in the older schema 3 (`testdata/strict_schema3_1_90.jsonl`, whose lines do not
+//! record their problems' digests), and from a results file that a run left (whose lines do).  A game with a
+//! checkpoint is resumed, never repeated, and a strict run repeats only games that rest on nothing unproven.  The
+//! forged repeats that both verifiers refuse are in `tests/results.rs`.  Small boards, one thread.
 
 mod common;
 
@@ -87,12 +87,15 @@ fn compare(on: &[GameResult], off: &[GameResult], expected: &[(u32, u32)]) {
     }
 }
 
-/// The lines of the committed `results/strict.jsonl` for the board sizes below `lo`, in a file of `dir` to extend.
-fn committed_below(dir: &TempDir, name: &str, lo: u32) -> std::path::PathBuf {
-    let text = fs::read_to_string(common::results_path("strict.jsonl")).unwrap();
-    let below = |line: &&str| Json::parse(line).unwrap().get("n").and_then(Json::as_u32).unwrap() < lo;
+/// The fixture of schema 3 lines (games 1 to 90 of the strict chain as commit bd9bb5d made it, before the lines
+/// recorded their problems' digests; the first lines of `git show cd3d32f:rust/results/strict.jsonl`, the whole chain
+/// from n = 1 because a results file must hold the game each line was built from), copied to `name` in `dir` to
+/// extend.
+fn schema3_games(dir: &TempDir, name: &str) -> std::path::PathBuf {
+    let fixture = common::testdata("strict_schema3_1_90.jsonl");
+    assert!(lines(&fixture).iter().all(|line| line.get("schema").and_then(Json::as_u32) == Some(3)));
     let path = dir.join(name);
-    fs::write(&path, text.lines().filter(below).map(|line| format!("{line}\n")).collect::<String>()).unwrap();
+    fs::copy(fixture, &path).unwrap();
     path
 }
 
@@ -122,17 +125,17 @@ fn a_strict_chain_from_1_repeats_exactly_the_searches_that_repeat() {
     assert_eq!(games.values().filter(|g| g.proof == Proof::SameSearch).count(), 107);
 }
 
-/// The committed strict chain records no digests (schema 3): the games of the window before a range are set up
-/// again to find the earlier game, which can be one of the file's (515 repeats 514).
+/// Lines of schema 3 record no digests: the games of the window before a range are set up again to find the earlier
+/// game, which can be one of the file's (91 repeats 90, the last line of the fixture).
 #[test]
-fn a_chain_from_the_committed_results_repeats_their_searches() {
-    let (lo, hi) = (515, 560);
-    let dir = TempDir::new("same-search-committed");
-    let (with, without) = (committed_below(&dir, "on.jsonl", lo), committed_below(&dir, "off.jsonl", lo));
+fn a_chain_from_schema_3_lines_repeats_their_searches() {
+    let (lo, hi) = (91, 130);
+    let dir = TempDir::new("same-search-schema-3");
+    let (with, without) = (schema3_games(&dir, "on.jsonl"), schema3_games(&dir, "off.jsonl"));
     let on = solver::solve_range(lo, hi, &strict(true), Some(&with)).unwrap();
     let off = solver::solve_range(lo, hi, &strict(false), Some(&without)).unwrap();
     let expected = repeats_by_problem(lo, hi);
-    assert_eq!(expected[0], (515, 514), "the first repeats a game of the file");
+    assert_eq!(expected[0], (91, 90), "the first repeats a game of the file");
     compare(&on, &off, &expected);
     let committed = common::stored_games("strict.jsonl");
     assert!(on.iter().all(|g| g.score == committed[&g.n].0), "the committed scores");
