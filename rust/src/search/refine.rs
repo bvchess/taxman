@@ -96,7 +96,12 @@ impl<const W: usize> Refiner<'_, '_, W> {
         let k = match self.find_conflict(&chosen, self.forced) {
             Lookup::Conflict(k) => k,
             Lookup::None => return Verdict::Exact(chosen),
-            Lookup::AllForced => return Verdict::Below,
+            Lookup::AllForced => {
+                // With nothing forced, a nogood all of whose members are forced lies within the node's own
+                // promotions: a broken table (as in `top_conflict`), which must not pass for a cut.
+                debug_assert!(!self.forced.is_empty(), "a nogood lies within the promotions of a node");
+                return Verdict::Below;
+            }
         };
         // A conflict all of whose members are forced leaves no completion that reaches `need`.  With some forced
         // members the node's only child promotes them, and refining is left to it (cheaper, if a few more nodes).

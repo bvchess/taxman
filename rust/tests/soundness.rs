@@ -9,7 +9,7 @@
 
 mod common;
 
-use common::{config, random_subset, Config, Game, Rng, TempDir};
+use common::{config, random_subset, stored_games, Config, Game, Rng, TempDir};
 use std::time::Duration;
 use taxman::bits::Bits;
 use taxman::board::Board;
@@ -84,25 +84,103 @@ fn a_search_from_a_handicapped_incumbent_finds_the_optimum() {
     assert!(runs > 4000, "{runs} runs");
 }
 
-/// A search interrupted every thousand nodes or so and resumed (two threads, a checkpoint every millisecond, a tiny
-/// memory cap so that units spill to disk), from a weak incumbent, ends with the optimum for every tactic: the unit
-/// tests of resuming use one game and a few tactics.  Returns the number of resumes.
-fn resumed_over_and_over<const W: usize>(n: u32, optimal: &Optimal, dir: &TempDir, which: &[usize]) -> usize {
+/// Units of game `n` at width `W`, after up to 14 random promotions, with their candidates thinned to 6 to 23 (the
+/// largest, or at random) so that the truth can be found exhaustively, searched from an incumbent worth 1, 2, 5
+/// or 30 less under random `configs`: the search must come back with the truth.  Returns the number of searches.
+fn handicapped_units<const W: usize>(n: u32, rng: &mut Rng, units: usize, configs: &[Config]) -> usize {
+    let game = Game::<W>::of_board(n).expect("a game");
+    let (mut runs, mut made) = (0, 0);
+    while made < units {
+        let (mut state, mut promoted, mut cands) = (game.root, Bits::EMPTY, game.candidates);
+        for _ in 0..rng.below(14) {
+            let members = cands.to_vec();
+            if members.is_empty() {
+                break;
+            }
+            let x = rng.pick(&members);
+            cands.remove(x);
+            if game.model.promote_in_place(&mut state, x) {
+                promoted.insert(x);
+                cands = state.narrow_candidates(&cands);
+            }
+        }
+        let mut members = cands.to_vec();
+        if members.is_empty() {
+            continue;
+        }
+        if rng.chance(50) {
+            members.reverse();
+        } else {
+            for i in (1..members.len()).rev() {
+                members.swap(i, rng.below(i as u64 + 1) as usize);
+            }
+        }
+        members.truncate(6 + rng.below(18) as usize);
+        let thin: Bits<W> = members.iter().copied().collect();
+        let Some(rest) = game.exhaustive(&state, &thin, 3_000_000) else { continue };
+        made += 1;
+        let truth = promoted.sum() + rest;
+        for _ in 0..if rest == 0 { 0 } else { 4 } {
+            let cfg = rng.pick(configs);
+            let k = rng.pick(&[1u64, 1, 2, 5, 30]).min(rest);
+            let out = game.search(cfg, vec![TaxUnit { promoted, cands: thin }], truth - k, None, None);
+            runs += 1;
+            assert!(
+                out.completed && out.best == truth && out.real,
+                "n={n} W={W} {cfg:?} promoted {promoted:?} cands {thin:?} from {}: truth {truth}, got {out:?}",
+                truth - k
+            );
+        }
+    }
+    runs
+}
+
+/// Units of real games at W = 20 to 64, the widths of the frontier and beyond, from a handicapped incumbent under
+/// every configuration but the preclusion table's (whose setup takes minutes on boards this large): the game tests
+/// above stop at W = 8, the perturbed games below at W = 4.
+#[test]
+fn units_of_wide_games_from_a_handicapped_incumbent_find_the_optimum() {
+    let configs: Vec<Config> = configs().into_iter().filter(|c| !c.preclusions).collect();
+    let mut rng = Rng(0x3D1D_E000_0000_0077);
+    let runs = handicapped_units::<20>(1100, &mut rng, 40, &configs)
+        + handicapped_units::<20>(1250, &mut rng, 40, &configs)
+        + handicapped_units::<24>(1300, &mut rng, 40, &configs)
+        + handicapped_units::<24>(1500, &mut rng, 40, &configs)
+        + handicapped_units::<28>(1600, &mut rng, 40, &configs)
+        + handicapped_units::<28>(1700, &mut rng, 40, &configs)
+        + handicapped_units::<32>(1850, &mut rng, 40, &configs)
+        + handicapped_units::<32>(2040, &mut rng, 40, &configs)
+        + handicapped_units::<64>(2050, &mut rng, 40, &configs)
+        + handicapped_units::<64>(3100, &mut rng, 40, &configs);
+    assert!(runs > 1000, "{runs} runs");
+}
+
+/// A search interrupted every `node_limit` nodes or so and resumed (two threads, a checkpoint every millisecond, a
+/// tiny memory cap so that units spill to disk), from an incumbent `handicap` below the promotion sum `truth` of
+/// game `n`, ends with the optimum for the configurations `which` of [`configs`]: the unit tests of resuming use one
+/// game and a few tactics.  Returns the number of resumes.
+fn resumed_over_and_over<const W: usize>(
+    n: u32,
+    truth: u64,
+    handicap: u64,
+    node_limit: u64,
+    dir: &TempDir,
+    which: &[usize],
+) -> usize {
     let game = Game::<W>::of_board(n).unwrap();
-    let truth = optimal_sum::<W>(optimal, n).unwrap();
     let mut resumes = 0;
     for (i, cfg) in configs().into_iter().enumerate().filter(|(i, _)| which.contains(i)) {
         let cfg = Config { threads: 2, ..cfg };
-        let checkpoint = dir.join(format!("n{n}-{i}.ckpt"));
+        let checkpoint = dir.join(format!("n{n}-w{W}-{i}.ckpt"));
         let engine = EngineConfig {
             threads: 2,
             queue_mem_cap: 2,
             spill_dir: Some(dir.join("spill")),
             checkpoint: Some((checkpoint.clone(), Duration::from_millis(1))),
-            node_limit: Some(1500),
+            node_limit: Some(node_limit),
             ..config(2)
         };
-        let mut out = game.search(cfg, vec![game.root_unit()], truth - 30, Some(engine.clone()), None);
+        let mut out = game.search(cfg, vec![game.root_unit()], truth - handicap, Some(engine.clone()), None);
         let mut pieces = 1;
         while !out.completed {
             out = game.search(cfg, Vec::new(), 0, Some(engine.clone()), Some(checkpoint.clone()));
@@ -121,7 +199,21 @@ fn a_search_resumed_over_and_over_finds_the_optimum() {
     let dir = TempDir::new("churn");
     // Game 600 takes 7,000 to 17,000 nodes from an incumbent that far below the optimum, so a limit of 1,500 stops it
     // four to nine times: with the default tactics, and with the searchers forgetting their nogoods every two steps.
-    let resumes = resumed_over_and_over::<16>(600, &optimal, &dir, &[0, 18]);
+    let truth = optimal_sum::<16>(&optimal, 600).unwrap();
+    let resumes = resumed_over_and_over::<16>(600, truth, 30, 1500, &dir, &[0, 18]);
+    assert!(resumes > 10, "only {resumes} resumes");
+}
+
+/// The same at W = 20, 24 and 64, on game 1133 (its truth from `results/strict.jsonl`) from an incumbent 400 below
+/// it, stopped every 60 nodes or so: the default tactics, and forgetting the nogoods every two or three steps.
+#[test]
+fn a_wide_search_resumed_over_and_over_finds_the_optimum() {
+    let n = 1133;
+    let truth = stored_games("strict.jsonl")[&n].0 - Board::<20>::for_n(n).in_the_bag;
+    let dir = TempDir::new("churn-wide");
+    let resumes = resumed_over_and_over::<20>(n, truth, 400, 60, &dir, &[0, 18])
+        + resumed_over_and_over::<24>(n, truth, 400, 60, &dir, &[0])
+        + resumed_over_and_over::<64>(n, truth, 400, 60, &dir, &[2]);
     assert!(resumes > 10, "only {resumes} resumes");
 }
 

@@ -187,10 +187,21 @@ pub fn prepare_for_resume<const W: usize>(
 }
 
 /// The model and the root frame set of the game whose frames are `columns`, and the time it took to build them.
+///
+/// Every frame of the root is winnable (the frame builder makes it so), and the search relies on it: promoting a
+/// move that has a factor no move of the frame below uses takes no peel (`Model::promote`), which is exact only
+/// if that frame is winnable, as every frame of every state reached from a winnable root is.  Debug builds check
+/// it here.
 fn build_root<const W: usize>(tables: &Tables, columns: &[Vec<u32>]) -> Result<(Model, FrameSet<W>, Duration), String> {
     let t0 = Instant::now();
     let (model, root) = Model::build::<W>(tables, columns)?;
-    Ok((model, root, t0.elapsed()))
+    let build = t0.elapsed();
+    debug_assert!(
+        root.frames().iter().all(|f| model.winnable(&f.moves, &f.factors)),
+        "n={}: a frame of the root is not winnable",
+        tables.n
+    );
+    Ok((model, root, build))
 }
 
 /// The root of the search that `header`'s checkpoint holds, for the game whose root as built is `root`, and what
