@@ -72,8 +72,7 @@
 
 use crate::bits::Bits;
 use crate::model::{FrameSet, Model};
-use std::cmp::Reverse;
-use std::collections::{BinaryHeap, VecDeque};
+use std::collections::VecDeque;
 
 // ---------------------------------------------------------------------------------------------------------
 // Reference solver
@@ -359,6 +358,8 @@ struct Level<const W: usize> {
     pending: Vec<u16>,
     /// False once a required vertex was found that cannot be matched.
     feasible: bool,
+    /// Whether anything may need repairing (drops or pending vertices) since the last settle.
+    dirty: bool,
 }
 
 impl<const W: usize> Level<W> {
@@ -373,6 +374,7 @@ impl<const W: usize> Level<W> {
             dropped: Bits::EMPTY,
             pending: Vec::new(),
             feasible: true,
+            dirty: true,
         }
     }
 
@@ -388,6 +390,7 @@ impl<const W: usize> Level<W> {
         self.pending.clear();
         self.pending.extend_from_slice(&other.pending);
         self.feasible = other.feasible;
+        self.dirty = other.dirty;
     }
 
     /// The weight of the edges from the mover `u` to its factors.
@@ -434,6 +437,7 @@ impl<const W: usize> Level<W> {
         self.dropped = Bits::EMPTY;
         self.pending.clear();
         self.feasible = true;
+        self.dirty = true;
         for v in 0..g.len() {
             let x = g.num[v];
             self.role[v] = if g.root_move[v] || promoted.contains(x) {
@@ -471,6 +475,7 @@ impl<const W: usize> Level<W> {
     /// Makes `n` required (the search promotes it).
     fn promote(&mut self, g: &MatchGraph, n: u32) {
         let v = g.vertex_of(n).unwrap_or_else(|| panic!("{n} is not in the root"));
+        self.dirty = true;
         self.dropped.remove(n);
         match self.role[v] {
             Role::Required => return,
@@ -514,6 +519,10 @@ impl<const W: usize> Level<W> {
 
     /// Restores the optimality conditions.
     fn settle(&mut self, g: &MatchGraph, search: &mut Search, stats: &mut MatchStats) {
+        if !self.dirty {
+            return;
+        }
+        self.dirty = false;
         self.apply_drops(g);
         while let Some(v) = self.pending.pop() {
             let v = usize::from(v);
@@ -534,20 +543,22 @@ impl<const W: usize> Level<W> {
 // ---------------------------------------------------------------------------------------------------------
 // Hungarian search
 
-/// [`Search::tag`] values, valid for vertices stamped with the current epoch.
+/// [`Slot::tag`] values, valid for vertices stamped with the current epoch.
 const REACHED: u8 = 1;
 const DONE: u8 = 2;
 const INNER: u8 = 3;
 
 /// A priority queue of events `(time, code)` for a search whose times never go below the last one popped (as in
 /// Dijkstra's algorithm): a radix heap.  Bucket `i > 0` holds the times whose highest bit differing from the last
-/// popped time is bit `i − 1`, bucket 0 the times equal to it.  Pops the smallest `(time, code)`, like a binary
-/// heap of the pairs, so the search makes the same choices.
+/// popped time is bit `i − 1`, bucket 0 the times equal to it, as a set of codes ([`CodeSet`]).  Pops the smallest
+/// `(time, code)`, like a binary heap of the pairs, so the search makes the same choices, as long as no pair is
+/// pushed while it is waiting already: the search never does that (it pushes a vertex again only at a smaller
+/// time, and the potential event of an inner vertex once).
 #[derive(Clone, Debug)]
 struct RadixHeap {
     last: u64,
     /// The codes of the events at time `last` (bucket 0), smallest first.
-    now: BinaryHeap<Reverse<u32>>,
+    now: CodeSet,
     /// Bit `i` set when bucket `i ≥ 1` is not empty.
     full: u64,
     /// Buckets 1 to 64 (index 0 unused).
@@ -556,7 +567,7 @@ struct RadixHeap {
 
 impl Default for RadixHeap {
     fn default() -> Self {
-        RadixHeap { last: 0, now: BinaryHeap::new(), full: 0, buckets: std::array::from_fn(|_| Vec::new()) }
+        RadixHeap { last: 0, now: CodeSet::default(), full: 0, buckets: std::array::from_fn(|_| Vec::new()) }
     }
 }
 
@@ -580,7 +591,7 @@ impl RadixHeap {
     fn push(&mut self, time: u64, code: u32) {
         debug_assert!(time >= self.last, "time went back");
         match self.bucket(time) {
-            0 => self.now.push(Reverse(code)),
+            0 => self.now.insert(code),
             i => {
                 self.buckets[i].push((time, code));
                 self.full |= 1 << (i - 1);
@@ -604,22 +615,99 @@ impl RadixHeap {
             moved.clear();
             self.buckets[i] = moved;
         }
-        self.now.pop().map(|Reverse(code)| (self.last, code))
+        self.now.pop_min().map(|code| (self.last, code))
     }
+}
+
+/// A set of event codes popping its smallest member: a bitset under two summary levels.
+#[derive(Clone, Debug, Default)]
+struct CodeSet {
+    words: Vec<u64>,
+    mid: Vec<u64>,
+    top: u64,
+}
+
+impl CodeSet {
+    #[inline]
+    fn insert(&mut self, code: u32) {
+        let w = (code >> 6) as usize;
+        if w >= self.words.len() {
+            self.grow(w);
+        }
+        debug_assert_eq!(self.words[w] >> (code & 63) & 1, 0, "code {code} pushed twice at the same time");
+        self.words[w] |= 1 << (code & 63);
+        self.mid[w >> 6] |= 1 << (w & 63);
+        self.top |= 1 << (w >> 6);
+    }
+
+    #[cold]
+    fn grow(&mut self, w: usize) {
+        let words = (w + 1).next_power_of_two().max(64);
+        assert!(words <= 64 * 64, "too many codes");
+        self.words.resize(words, 0);
+        self.mid.resize(words / 64, 0);
+    }
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.top == 0
+    }
+
+    #[inline]
+    fn pop_min(&mut self) -> Option<u32> {
+        if self.top == 0 {
+            return None;
+        }
+        let m = self.top.trailing_zeros() as usize;
+        let w = (m << 6) | self.mid[m].trailing_zeros() as usize;
+        let word = self.words[w];
+        let bit = word.trailing_zeros();
+        let rest = word & (word - 1);
+        self.words[w] = rest;
+        if rest == 0 {
+            let mid = self.mid[m] & (self.mid[m] - 1);
+            self.mid[m] = mid;
+            if mid == 0 {
+                self.top &= self.top - 1;
+            }
+        }
+        Some(((w as u32) << 6) | bit)
+    }
+
+    fn clear(&mut self) {
+        while self.top != 0 {
+            let m = self.top.trailing_zeros() as usize;
+            let mut mid = self.mid[m];
+            while mid != 0 {
+                self.words[(m << 6) | mid.trailing_zeros() as usize] = 0;
+                mid &= mid - 1;
+            }
+            self.mid[m] = 0;
+            self.top &= self.top - 1;
+        }
+    }
+}
+
+/// What the Hungarian search knows of a vertex, all in one place (one cache line holds four): valid while `stamp`
+/// is the current epoch.
+#[derive(Clone, Copy, Debug, Default)]
+struct Slot {
+    /// Distance from the start: when an inner vertex joined the tree; when an outer one was or can be reached.
+    dist: i64,
+    /// The epoch in which the vertex was last touched.
+    stamp: u32,
+    /// The inner vertex an outer one is reached from.
+    pred: u16,
+    /// Reached (an outer vertex with a tentative distance), done (an outer vertex in the tree), or inner.
+    tag: u8,
 }
 
 /// Scratch space for the Hungarian search, reused from one search to the next.
 #[derive(Clone, Debug, Default)]
 struct Search {
     epoch: u32,
-    /// The epoch in which each vertex was last touched; the other arrays are valid only for the current one.
-    stamp: Vec<u32>,
-    /// Reached (an outer vertex with a tentative distance), done (an outer vertex in the tree), or inner.
-    tag: Vec<u8>,
-    /// Distance from the start: when an inner vertex joined the tree; when an outer one was or can be reached.
-    dist: Vec<i64>,
-    /// The inner vertex an outer one is reached from.
-    pred: Vec<u16>,
+    /// Per vertex: the epoch it was last touched, tag, distance and predecessor (valid for the current epoch).
+    slot: Vec<Slot>,
     /// Events by time: `2v` an outer vertex `v` reached, `2v + 1` the potential of the inner vertex `v` at zero.
     heap: RadixHeap,
     /// The vertices of the tree (inner, and done outer), whose potentials change at the end.
@@ -628,15 +716,12 @@ struct Search {
 
 impl Search {
     fn begin(&mut self, size: usize) {
-        if self.stamp.len() < size {
-            self.stamp.resize(size, 0);
-            self.tag.resize(size, 0);
-            self.dist.resize(size, 0);
-            self.pred.resize(size, NONE);
+        if self.slot.len() < size {
+            self.slot.resize(size, Slot { dist: 0, stamp: 0, pred: NONE, tag: 0 });
         }
         self.epoch = self.epoch.wrapping_add(1);
         if self.epoch == 0 {
-            self.stamp.fill(0);
+            self.slot.iter_mut().for_each(|s| s.stamp = 0);
             self.epoch = 1;
         }
         self.heap.clear();
@@ -669,10 +754,11 @@ impl Search {
                 }
                 return true;
             }
-            if self.tag[v] != REACHED || self.dist[v] != t {
+            let s = &mut self.slot[v];
+            if s.tag != REACHED || s.dist != t {
                 continue; // reached again sooner, or already in the tree
             }
-            self.tag[v] = DONE;
+            s.tag = DONE;
             self.tree.push(v as u16);
             let m = lv.mate[v];
             if m == NONE {
@@ -687,9 +773,7 @@ impl Search {
 
     /// Adds the inner vertex `a` to the tree at distance `d`, and reaches its neighbours over unmatched edges.
     fn add_inner<const W: usize>(&mut self, g: &MatchGraph, lv: &Level<W>, a: usize, d: i64) {
-        self.stamp[a] = self.epoch;
-        self.tag[a] = INNER;
-        self.dist[a] = d;
+        self.slot[a] = Slot { dist: d, stamp: self.epoch, pred: self.slot[a].pred, tag: INNER };
         self.tree.push(a as u16);
         let (role, ya, mate) = (lv.role[a], lv.y[a], lv.mate[a]);
         if role != Role::Required {
@@ -715,18 +799,20 @@ impl Search {
     }
 
     /// Reaches the outer vertex `b` from the inner vertex `a` (at distance `d`) at distance `nd`.
-    #[inline]
+    #[inline(always)]
     fn reach(&mut self, b: usize, nd: i64, a: usize, d: i64) {
         debug_assert!(nd >= d, "negative reduced cost");
-        if self.stamp[b] != self.epoch {
-            self.stamp[b] = self.epoch;
-            self.tag[b] = REACHED;
-        } else if self.tag[b] != REACHED || nd >= self.dist[b] {
-            debug_assert_ne!(self.tag[b], INNER, "the graph is not bipartite");
+        let epoch = self.epoch;
+        let s = &mut self.slot[b];
+        if s.stamp != epoch {
+            s.stamp = epoch;
+            s.tag = REACHED;
+        } else if s.tag != REACHED || nd >= s.dist {
+            debug_assert_ne!(s.tag, INNER, "the graph is not bipartite");
             return;
         }
-        self.dist[b] = nd;
-        self.pred[b] = a as u16;
+        s.dist = nd;
+        s.pred = a as u16;
         self.heap.push(nd as u64, (b as u32) << 1);
     }
 
@@ -734,10 +820,11 @@ impl Search {
     fn shift<const W: usize>(&self, lv: &mut Level<W>, end: i64) {
         for &v in &self.tree {
             let v = usize::from(v);
-            if self.tag[v] == INNER {
-                lv.y[v] -= end - self.dist[v];
+            let s = &self.slot[v];
+            if s.tag == INNER {
+                lv.y[v] -= end - s.dist;
             } else {
-                lv.y[v] += end - self.dist[v];
+                lv.y[v] += end - s.dist;
             }
         }
     }
@@ -745,7 +832,7 @@ impl Search {
     /// Flips the alternating path from `root` to the outer vertex `b`, which is free.
     fn flip<const W: usize>(&self, g: &MatchGraph, lv: &mut Level<W>, root: usize, mut b: usize) {
         loop {
-            let a = usize::from(self.pred[b]);
+            let a = usize::from(self.slot[b].pred);
             let next = lv.mate[a];
             if next != NONE {
                 lv.tally(g, a, usize::from(next), false);
@@ -868,6 +955,7 @@ impl<'g, const W: usize> MatchBound<'g, W> {
             child.promote(graph, n);
         }
         child.dropped |= child.cands - *child_cands;
+        child.dirty = true;
     }
 
     /// Pushes a copy of the top level with the candidates `excluded` removed: the same state, fewer
@@ -875,6 +963,7 @@ impl<'g, const W: usize> MatchBound<'g, W> {
     pub fn push_excluding(&mut self, excluded: &Bits<W>) {
         let child = self.push_copy();
         child.dropped |= *excluded;
+        child.dirty = true;
     }
 
     /// Pushes a copy of the top level and returns it.
@@ -998,6 +1087,7 @@ impl<'g, const W: usize> MatchBound<'g, W> {
     pub fn remove_candidate(&mut self, x: u32) {
         if x <= Bits::<W>::MAX_VALUE {
             self.levels[self.depth].dropped.insert(x);
+            self.levels[self.depth].dirty = true;
         }
     }
 
@@ -1061,7 +1151,8 @@ mod tests {
     use crate::json::Json;
     use crate::model::test_support::*;
     use crate::numtheory::Tables;
-    use std::collections::HashMap;
+    use std::cmp::Reverse;
+    use std::collections::{BinaryHeap, HashMap, HashSet};
     use std::hint::black_box;
     use std::time::{Duration, Instant};
 
@@ -1135,19 +1226,25 @@ mod tests {
             radix.clear();
             let mut reference = BinaryHeap::new();
             let mut now = 0u64;
+            // The pairs waiting: as in the search, none is pushed again while it waits (a code can wait at several
+            // times, as a vertex reached again sooner does).
+            let mut waiting = HashSet::new();
             for _ in 0..rng.below(300) {
                 // Pushes at or after the last time popped; sometimes pops.
                 for _ in 0..rng.below(4) {
                     let time = now + [0, 0, 1, 2, 7, 100, 1 << 20][rng.below(7)] + rng.below(3) as u64;
                     let code = rng.below(1000) as u32;
-                    radix.push(time, code);
-                    reference.push(Reverse((time, code)));
+                    if waiting.insert((time, code)) {
+                        radix.push(time, code);
+                        reference.push(Reverse((time, code)));
+                    }
                 }
                 if rng.chance(60) {
                     let expected = reference.pop().map(|Reverse(e)| e);
                     assert_eq!(radix.pop(), expected, "round {round}");
-                    if let Some((time, _)) = expected {
+                    if let Some((time, code)) = expected {
                         now = time;
+                        waiting.remove(&(time, code));
                     }
                 }
             }
