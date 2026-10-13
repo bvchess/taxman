@@ -1,7 +1,26 @@
-//! The rules of Taxman, as an independent referee, and the known optimal games.
+//! The rules of Taxman as an independent referee, and the Java solver's table of optimal games.
 //!
-//! [`replay`] deliberately shares no code with the solver's number-theory tables: it uses only divisibility
-//! and a plain "is it still in the pot" array, so a bug in a table cannot make a wrong game look legal.
+//! # The rules
+//!
+//! The pot holds the numbers `1..=n`.  The player takes a number `m` that still has at least one proper divisor in
+//! the pot and scores `m`; the taxman takes `m` and every one of its divisors still in the pot (the *tax*).  The
+//! game is over when no number in the pot has a divisor left in the pot, and the taxman sweeps what remains.  A
+//! game is its list of moves, its score is their sum, and an *optimal game* of `n` scores the most (`opt(n)`, the
+//! Taxman sequence).  For `n = 4` the optimal game is `3, 4` (the taxman takes 1, then 2) and scores 7.
+//!
+//! # What is here
+//!
+//! * The **referee**: [`replay`] plays a list of moves and returns the score or says which move is illegal;
+//!   [`replay_finished`] also demands what every optimal game shows, that the game is over and opens with the
+//!   largest prime.  It is the last word on any game the crate produces: every solved game is replayed before it
+//!   counts ([`crate::solver`]), and `taxman verify-optimal` and `verify-results` replay whole files.  It
+//!   deliberately shares no code with the solver's number-theory tables ([`crate::numtheory`]): it uses only
+//!   divisibility and a plain "is it still in the pot" array, so a bug in a table cannot make a wrong game look
+//!   legal.  [`replay_punctured`] is the same referee for a board with holes (study code, [`crate::sacrifice`]).
+//! * [`Optimal`]: the Java solver's table `optimal.json` (an optimal game for every `n` up to 1000).  The solver
+//!   compares its answers with it and takes the previous game from it when it solves a board up to 1001.  It is
+//!   the Java's output, not a proof: the Java made it with `reuse_prev` and `revise_freedoms` on
+//!   ([`crate::results`] calls this the taint `optimal.json`).
 
 use crate::json::Json;
 use std::path::{Path, PathBuf};
@@ -33,8 +52,8 @@ pub fn legal_moves_left(n: u32, moves: &[u32]) -> Result<Vec<u32>, String> {
 ///
 /// * it is over: no legal move is left (one more move would only add to the score);
 /// * for `n ≥ 2`, it opens with the largest prime `≤ n`.  A prime can be played only while 1 is in the pot, so
-///   only as the first move, and an optimal game plays the largest one (the proof is in `sacrifice.rs`, under
-///   "Prime `n`").
+///   only as the first move, and an optimal game plays the largest one (a short exchange argument, proved with
+///   the prime shortcut it supports in [`crate::accelerate::prime_shortcut`]).
 pub fn replay_finished(n: u32, moves: &[u32]) -> Result<u64, String> {
     let score = replay(n, moves)?;
     let left = legal_moves_left(n, moves)?;
@@ -87,13 +106,14 @@ fn play(n: u32, moves: &[u32]) -> Result<(u64, Vec<bool>), String> {
 }
 
 /// Plays `moves` on the board `1..=n` without `holes` under the *maximal-factor rule*, and returns the score.
+/// Study code: only [`crate::sacrifice`] and its tests use it.
 ///
 /// A hole is never in the pot.  A move is legal if it is still in the pot and one of its maximal factors (`m/p`
 /// for a prime `p | m`) is still in the pot; it removes the number and all of its divisors.  On the board `1..=n`
-/// this is the same game as [`replay`]'s (a divisor in the pot lies below a maximal factor in the pot).  On a
-/// punctured board it is stricter: a move whose maximal factor is a hole may not pay with a divisor of the hole.
-/// It is the game the frame model plays on a punctured board ([`crate::sacrifice`]).  Like [`replay`], it uses
-/// only divisibility.
+/// this is the same game as [`replay`]'s (a divisor in the pot lies below a maximal factor in the pot: the
+/// lifting argument of [`crate::numtheory`]).  On a punctured board it is stricter: a move whose maximal factor
+/// is a hole may not pay with a divisor of the hole.  It is the game the frame model plays on a punctured board
+/// ([`crate::sacrifice`]).  Like [`replay`], it uses only divisibility.
 pub fn replay_punctured(n: u32, holes: &[u32], moves: &[u32]) -> Result<u64, String> {
     let mut in_pot = vec![true; n as usize + 1];
     in_pot[0] = false;
@@ -130,23 +150,27 @@ fn is_prime(p: u32) -> bool {
     p >= 2 && (2..).take_while(|q| q * q <= p).all(|q| !p.is_multiple_of(q))
 }
 
-/// Sanity bound on `n` when reading a results file, so a corrupt file cannot request a huge allocation.
+/// Sanity bound on `n` when reading a file of games, so a corrupt file cannot request a huge allocation.
 const MAX_PLAUSIBLE_N: u32 = 1 << 20;
 
-/// The known optimal games (`src/main/resources/optimal.json`): for each board size, the best score and a game
-/// that achieves it.
+/// The known optimal games, by board size: the Java's `src/main/resources/optimal.json`, possibly overlaid with
+/// the completed games of results files ([`with_results`](Self::with_results)).  For each board size, the best
+/// score and a game that achieves it.
 pub struct Optimal {
     /// Indexed by `n`; `None` where the file has no entry.
     by_n: Vec<Option<(u64, Vec<u32>)>>,
 }
 
 impl Optimal {
-    /// `optimal.json` in the repository's Java resources, found relative to this crate.
+    /// `optimal.json` in the checkout this crate was compiled from.  A helper for the tests and examples, which
+    /// run from the checkout: the path is fixed when the crate is *compiled* (relative to the crate's directory).
+    /// The `taxman` binary does not use it; it finds the file when it runs ([`crate::paths::optimal_json`]), so
+    /// that it works wherever it is copied to.
     pub fn default_path() -> PathBuf {
         PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../src/main/resources/optimal.json"))
     }
 
-    /// Loads [`default_path`](Self::default_path).
+    /// Loads [`default_path`](Self::default_path): checkout-only, like it.
     pub fn load_default() -> Result<Optimal, String> {
         Optimal::load(Optimal::default_path())
     }
@@ -156,6 +180,8 @@ impl Optimal {
         Optimal::from_json(&Json::from_file(path)?)
     }
 
+    /// Reads a parsed JSON array of game objects (see [`load`](Self::load)); the error names the entry that is
+    /// malformed, or a board size that appears twice.
     pub fn from_json(json: &Json) -> Result<Optimal, String> {
         let entries = json.as_arr().ok_or("expected an array of games")?;
         let mut out = Optimal { by_n: Vec::new() };
@@ -202,6 +228,7 @@ impl Optimal {
         self.by_n[n as usize].replace((score, moves)).is_some()
     }
 
+    /// The `(score, moves)` recorded for `n`, if any.
     fn entry(&self, n: u32) -> Option<&(u64, Vec<u32>)> {
         self.by_n.get(n as usize)?.as_ref()
     }

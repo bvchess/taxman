@@ -87,8 +87,10 @@ sources).  A worked example, the board 1..=85, is in the
 * **Within the frame model.**  The decomposition rests on assumptions that are validated, not proven: the greedy
   removal of impossible sources inside hives, the forced moves of `unzip`, free factor count = factors − sources,
   closed hives (those with no free factor) taking no part in the search, and a promoted number paying tax only from
-  the frame directly below.  They are validated by agreement with the Java's optimal.json for n ≤ 1000 and by
-  exhaustive search (`brute`) for boards up to 62.  The sacrifice bound (`sacrifice`) is an upper bound on opt(n) by a
+  the frame directly below.  They are validated by agreement with the Java's optimal.json for n ≤ 1000, which an
+  independent exhaustive search (`heuristics/evaluation/certify.py`) confirms for n ≤ 62, and by the Rust exact
+  oracle `brute`, which checks frame-model games on small boards (up to 40 in the test suite, 52 in
+  `examples/sacrifice validate`).  The sacrifice bound (`sacrifice`) is an upper bound on opt(n) by a
   different route (games on punctured boards); it proves game 1133 and disagrees with nothing.
 * **Given the pruning is exact.**  The default search tactics are sound (section 5 grades each).  Two tactics are on
   by default for speed but unproven: `reuse_prev` and `revise_freedoms`.  A run with both off is *strict*.
@@ -326,7 +328,7 @@ tactics of `tactics::Tactics`, in order, with their defaults, and grades exactly
 
 | tactic | default | status | effect |
 |---|---|---|---|
-| `prime_shortcut` | on | proven (model-free, given an optimal n−1 game: see `sacrifice`) | prime n: replace the n−1 solution's first move with n |
+| `prime_shortcut` | on | proven (model-free, given an optimal n−1 game: proof at `accelerate::prime_shortcut`) | prime n: replace the n−1 solution's first move with n |
 | `reuse_prev` | on | unproven (conjecture-grade "upper-delta" certificate) | `FrameSolver.reusePrev`; keeps the previous game's promotions that are still possible and accepts the game they make, with no search, if it scores what the previous game suggests |
 | `revise_freedoms` | on | unproven ("max-sum promotion set also has max count") | `UpperBoundEstimator.reviseFreedoms`; can shrink frame 0's freedoms |
 | `preclusions` | off | sound (promotion failure is monotone: more moves or fewer factors never make a frame winnable) | depth-2 preclusion table; prunes candidates (off since 2026-10: with nogoods it no longer pays for its setup) |
@@ -445,7 +447,7 @@ Every completed game records *how its optimality is established* (its proof) and
 | `trivial` | the board has no promotion candidates | no |
 | `exhausted` | the search explored its whole tree | no |
 | `cap` | the search reached `n + score(n − 1)`, which no game of n can exceed | yes |
-| `prime_formula` | a prime n plays the game of n − 1 with its first move replaced by n (proved in `sacrifice`) | yes |
+| `prime_formula` | a prime n plays the game of n − 1 with its first move replaced by n (proved at `accelerate::prime_shortcut`) | yes |
 | `reuse_prev` | the tactic accepted a derived game: a conjecture | yes |
 
 The *taint* of a game is the set of unproven things its proof rests on: the unproven tactics it used itself, plus,

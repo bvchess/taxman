@@ -1,13 +1,30 @@
-//! Fixed-width bitsets of small non-negative integers.
+//! Fixed-width bitsets of small non-negative integers: the type of every set of game numbers in the solver.
 //!
 //! `Bits<W>` is a set of `u32` values in `0..64·W`, stored inline as `[u64; W]`: it is `Copy`, never
 //! allocates, and every operation is a short loop over the words that the optimizer can unroll and
-//! vectorize.  The search code uses it for sets of game numbers; `W` is chosen from the board size
-//! (see [`words_for`]).
+//! vectorize.  The hives, the frames, the search state and the nogood tables all hold their sets of numbers as
+//! `Bits`, which is why the whole solver is generic over the width `W`.
 //!
-//! Out-of-range values are a logic error.  `insert`, `remove` and `from_range` check with
-//! `debug_assert!` and otherwise rely on the array bounds check (so a bad `insert` can never corrupt
-//! memory).  `contains` is the exception: asking about a value the set cannot hold simply answers `false`.
+//! # Choosing the width
+//!
+//! A board `1..=n` needs `W ≥ n/64 + 1` words ([`words_for`]).  The solver does not instantiate every `W`: it
+//! has one copy of its code for each of the [`WIDTHS`], picks the narrowest that holds the board
+//! ([`width_for`]), and dispatches to it with the macros [`with_width!`](crate::with_width) and
+//! [`with_words!`](crate::with_words), which turn the run-time `n` into a compile-time constant `W`.  A set
+//! operation costs a loop over all `W` words, so a narrower set is a faster search.  The boards each width serves
+//! (`n ≤ 64·W − 1`):
+//!
+//! * `W = 8`: up to 511; `W = 16`: 512 to 1023;
+//! * `W = 20`: 1024 to 1279; `W = 24`: 1280 to 1535; `W = 28`: 1536 to 1791; `W = 32`: 1792 to 2047;
+//! * `W = 64`: 2048 to 4095, the largest board the solver supports.
+//!
+//! # Out-of-range values
+//!
+//! A value the set cannot hold is a logic error.  `insert` and `remove` check with `debug_assert!` and
+//! otherwise rely on the array bounds check (so a bad `insert` can never corrupt memory); `from_range` checks its
+//! end with `debug_assert!` and in a release build silently drops the part of the range beyond the capacity.
+//! `contains`, [`max_below`](Bits::max_below) and [`min_above`](Bits::min_above) are the exceptions: asked about a
+//! value beyond the capacity they just answer (`false`, or the nearest member).
 
 use std::fmt;
 use std::iter::FusedIterator;
@@ -20,7 +37,10 @@ pub const fn words_for(n: u32) -> usize {
 
 /// The set widths the solver is built for, ascending: each is a separate copy of the search's code, and a board
 /// gets the narrowest that holds it ([`width_for`]), since every set operation costs a loop over all its words.
-/// Steps of 4 words from 16 to 32 (n = 1024 to 2047), where the search's frontier is, and 64 beyond, to n = 4095.
+/// Widths of 8 and 16 words, then steps of 4 words from 20 to 32 (boards 1024 to 2047, where the games the
+/// solver works on today are), and 64 beyond, to board 4095.  The arms of [`with_words!`](crate::with_words)
+/// repeat these numbers, because a macro arm needs literals; the test `the_width_dispatch_follows_the_widths`
+/// fails if they drift apart.
 pub const WIDTHS: [usize; 7] = [8, 16, 20, 24, 28, 32, 64];
 
 /// The narrowest of [`WIDTHS`] with at least `words` words, if any.
@@ -53,8 +73,8 @@ macro_rules! with_width {
     };
 }
 
-/// [`with_width!`] for sets of at least `$words` words: `$w` is `width_for($words)`, and `$beyond` is evaluated
-/// when there is none.
+/// [`with_width!`](crate::with_width) for sets of at least `$words` words: `$w` is `width_for($words)`, and
+/// `$beyond` is evaluated when there is none.
 #[macro_export]
 macro_rules! with_words {
     ($words:expr, $w:ident => $body:expr, else $beyond:expr) => {
@@ -92,7 +112,8 @@ macro_rules! with_words {
     };
 }
 
-/// A set of `u32` values in `0..64·W`.
+/// A set of `u32` values in `0..64·W`: the member `x` is bit `x % 64` of word `x / 64`.  Equality and hashing are
+/// by members.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Bits<const W: usize>([u64; W]);
 
@@ -154,7 +175,8 @@ impl<const W: usize> Bits<W> {
         vals.iter().copied().collect()
     }
 
-    /// The set `{lo, lo+1, ..., hi}`; empty when `lo > hi`.
+    /// The set `{lo, lo+1, ..., hi}`; empty when `lo > hi`.  `hi` must be within the capacity (see the module
+    /// documentation).
     #[inline]
     pub fn from_range(lo: u32, hi: u32) -> Self {
         debug_assert!(lo > hi || hi < Self::CAPACITY, "range end {hi} exceeds capacity {}", Self::CAPACITY);
@@ -181,7 +203,8 @@ impl<const W: usize> Bits<W> {
         Bits(words)
     }
 
-    /// The raw words, for serialization.
+    /// The raw words, for serialization (the search's work units are written to checkpoints and spill files as
+    /// little-endian words) and for code that walks the words itself.
     #[inline]
     pub const fn as_words(&self) -> &[u64; W] {
         &self.0
@@ -238,6 +261,7 @@ impl<const W: usize> Bits<W> {
         self.0.iter().map(|w| w.count_ones()).sum()
     }
 
+    /// Whether the set has no members.
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.0.iter().all(|&w| w == 0)
@@ -558,39 +582,27 @@ word_op!(Sub, sub, SubAssign, sub_assign, |a: u64, b: u64| a & !b);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_support::Rng;
     use std::collections::{BTreeSet, HashSet};
 
-    /// Tiny xorshift64 generator, so the tests need no crates and are reproducible.
-    struct XorShift(u64);
-
-    impl XorShift {
-        fn next(&mut self) -> u64 {
-            let mut x = self.0;
-            x ^= x << 13;
-            x ^= x >> 7;
-            x ^= x << 17;
-            self.0 = x;
-            x
-        }
-
-        fn below(&mut self, n: u32) -> u32 {
-            (self.next() % u64::from(n)) as u32
-        }
+    /// A random number in `0..n`.
+    fn below(rng: &mut Rng, n: u32) -> u32 {
+        rng.below(u64::from(n)) as u32
     }
 
     /// A random set with a randomly chosen density, as both a model and a `Bits`.
-    fn random_set<const W: usize>(rng: &mut XorShift) -> (BTreeSet<u32>, Bits<W>) {
+    fn random_set<const W: usize>(rng: &mut Rng) -> (BTreeSet<u32>, Bits<W>) {
         let cap = Bits::<W>::CAPACITY;
-        let target = match rng.below(4) {
-            0 => rng.below(4),
-            1 => rng.below(cap / 8 + 1),
-            2 => rng.below(cap / 2 + 1),
-            _ => rng.below(cap + 1),
+        let target = match below(rng, 4) {
+            0 => below(rng, 4),
+            1 => below(rng, cap / 8 + 1),
+            2 => below(rng, cap / 2 + 1),
+            _ => below(rng, cap + 1),
         };
         let mut model = BTreeSet::new();
         let mut bits = Bits::<W>::EMPTY;
         for _ in 0..target {
-            let x = rng.below(cap);
+            let x = below(rng, cap);
             model.insert(x);
             bits.insert(x);
         }
@@ -662,7 +674,7 @@ mod tests {
     }
 
     fn random_agreement_rounds<const W: usize>(seed: u64, rounds: usize) {
-        let mut rng = XorShift(seed);
+        let mut rng = Rng(seed);
         for _ in 0..rounds {
             let (am, a) = random_set::<W>(&mut rng);
             let (bm, b) = random_set::<W>(&mut rng);
@@ -899,7 +911,7 @@ mod tests {
 
     #[test]
     fn pop_min_and_max_drain_in_order() {
-        let mut rng = XorShift(42);
+        let mut rng = Rng(42);
         let (model, bits) = random_set::<3>(&mut rng);
         let mut asc = bits;
         let mut desc = bits;

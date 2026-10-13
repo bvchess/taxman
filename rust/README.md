@@ -371,7 +371,7 @@ Each completed game records how its optimality is established (`proof`):
 | `trivial` | the board has no promotion candidates; the game with no promotions is the only one | no |
 | `exhausted` | the search explored its whole tree | no |
 | `cap` | the search reached `n + score(n-1)`, which no game of n can exceed (removing the move n from an optimal game of n leaves a game of n - 1) | yes |
-| `prime_formula` | a prime n plays the game of n - 1 with its first move replaced by n; optimal if the game of n - 1 is (proved in `src/sacrifice.rs`, "Prime n") | yes |
+| `prime_formula` | a prime n plays the game of n - 1 with its first move replaced by n; optimal if the game of n - 1 is (proved in `src/accelerate.rs`, at `prime_shortcut`) | yes |
 | `reuse_prev` | the tactic of that name accepted a game derived from the previous one: a conjecture | yes |
 
 ### Taint
@@ -466,7 +466,7 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
 * **move, tax**: a number the player takes, and the divisors the taxman takes with it.
 * **maximal factor** of m: m/p for a prime p dividing m (a divisor reached by deleting one prime).  Its inverse is the
   **maximal composite**.  A move is playable if one of its maximal factors is still in the pot (equivalent, on a board
-  without holes, to "some divisor is": the lifting argument in `src/sacrifice.rs`).
+  without holes, to "some divisor is": the lifting argument in `src/numtheory.rs`).
 * **score, opt(n)**: the sum of the player's moves; the best score on the board 1..=n.
 * **hole**: a number taken off the board; used only by the sacrifice study and the brute-force solver.
 
@@ -492,8 +492,9 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
   maximal factors in the frame when taken, and taking it removes all of its factors still there.
 * **winnable**: some order takes every move of a frame.
 * **peel**: the test for winnable: repeatedly drop a move that has a *private* live factor (one no other move has);
-  winnable exactly when all moves drop.  **(overloaded)** `hives::count_freedoms` uses "a peeling heuristic" for its
-  own matching test, and `heuristics/core.py` has a `peel` that is a different procedure.
+  winnable exactly when all moves drop.  **(overloaded)** `hives::count_freedoms` is the same kind of peel, which also
+  takes a move with a single live factor first, for a hive's moves; and `heuristics/core.py` has a `peel` that is a
+  different procedure.
 * **reduce**: remove forced pairs: a move left with a single live factor must be paid by it, so the pair is dropped,
   repeatedly.  **(forced pair)**
 * **freedoms**: a frame's factors minus its moves, which drops by one on each promotion into or out of it.  Frame 0's
@@ -610,8 +611,8 @@ The code, in the order that builds understanding (each file starts with a module
     provenance and verification, the default files, the command line.
 
 Skip on a first read: `src/bounds.rs` (the Java's `blameGame` bound and preclusions, mostly off the default path),
-`src/sacrifice.rs` and `src/brute.rs` (studies), `search::Diagnostics`, `src/accelerate.rs` (short; read it with the
-pipeline).
+`src/sacrifice.rs` and `src/brute.rs` (a study, and the test oracle it uses), `search::Diagnostics`.  Read the
+comment of `prime_shortcut` in `src/accelerate.rs` for the proof of the prime shortcut.
 
 | document | what it holds |
 |---|---|

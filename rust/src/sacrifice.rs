@@ -1,7 +1,22 @@
 //! The sacrifice bound: an upper bound on game `n` from games on the board `n − 1` with one number taken off.
 //!
-//! *Study code* (see `examples/sacrifice.rs` for the measurements): the bound is proven below, but the solver
-//! does not use it.
+//! # Status: a study, with a negative result
+//!
+//! **This is study code.  The solver does not use it.**  It is kept because it holds a theorem (proved below) and
+//! a measured negative result, and because the tests use it as an independent check.
+//!
+//! * *The question.*  The tactic `reuse_prev` accepts a derived game unproven.  Could an upper bound on `opt(n)`
+//!   computed from games of `n − 1` prove those games optimal, or settle other games faster than searching them?
+//! * *The answer is no.*  The bound is a theorem, and the frame model computes it correctly (checked against
+//!   exhaustive search, [`crate::brute`]), but it is tight on too few of the games that matter, and computing it
+//!   costs about as much as solving the game: it is no replacement for `reuse_prev`, and putting it into the
+//!   pipeline slowed the games it was tried on (numbers under "Findings"; `examples/sacrifice.rs` made them).
+//! * *What stays in use.*  `tests/wide.rs` uses [`sacrifice_bound`] as an upper bound that does not come from the
+//!   search under test, to prove one result at `W = 20` (game 1133), beyond what the Java can check.  The support
+//!   for punctured boards (holes) exists for this study alone: [`crate::numtheory::Tables::punctured`],
+//!   [`crate::game::replay_punctured`], and the hole cases of [`crate::hives`].
+//! * *Not here.*  The proof that the prime shortcut is optimal, which the solver does rely on, is with the shortcut
+//!   ([`crate::accelerate::prime_shortcut`]); the "Prime `n`" remark below is its case in this setting.
 //!
 //! # Notation
 //!
@@ -63,31 +78,31 @@
 //!   plays `f` and every move has a maximal factor other than `f` in the pot).  If that holds for some `f`, the
 //!   bound is the trivial `n + opt(n − 1)`.  The bound bites only when every maximal factor of `n` is
 //!   load-bearing.
-//! * Prime `n` (`mf(n) = {1}`): on `B_1` no prime can be played, and the two rules agree (the other numbers have
-//!   maximal factors above 1).  Let `P` be the largest prime below `n`.  Every optimal game of `n − 1` starts
-//!   with `P`: 1 pays only for the first move; if that were a smaller prime `q`, playing `P` instead (which
-//!   removes only 1) leaves a larger pot and scores more; if it were composite, `P` could not be played at all,
-//!   and playing `P` first (removing only 1) leaves that composite another divisor and scores more.  Dropping the
-//!   first move gives a game on `B_1`, so `opt_M(B_1) ≥ opt(n − 1) − P`; and `P` followed by any game on `B_1` is
-//!   a game on `[n − 1]` (no multiple of `P` is on the board), so `opt_M(B_1) = opt(n − 1) − P`.  The bound is
-//!   `n + opt(n − 1) − P`, which the prime shortcut reaches: it is tight for every prime, and proves the prime
-//!   shortcut with no frame-model assumption.
+//! * Prime `n` (`mf(n) = {1}`).  On `B_1` no prime can be played, and the two rules agree (the other numbers have
+//!   maximal factors above 1).  Let `P` be the largest prime below `n`.  Every optimal game of `n − 1` opens with
+//!   `P` (Lemma A of [`crate::accelerate::prime_shortcut`], where it is proved).  Dropping that first move gives
+//!   a game on `B_1`, so `opt_M(B_1) ≥ opt(n − 1) − P`; and `P` followed by any game on `B_1` is a game on
+//!   `[n − 1]` (no multiple of `P` is on the board), so `opt_M(B_1) = opt(n − 1) − P`.  The bound is
+//!   `n + opt(n − 1) − P`, which the prime shortcut reaches: it is tight for every prime.  (That the shortcut is
+//!   optimal needs no frame-model assumption.  Its proof is a direct argument that does not go through this
+//!   theorem, and it lives with the shortcut.)  [`sacrifice_bound`] uses this value for the hole 1 without any
+//!   search (`without_one`).
 //!
 //! # Computing it
 //!
 //! [`punctured`] computes `opt_M(B)` for `B = [n] ∖ {hole}` with the frame model on [`Tables::punctured`]: the
-//! hole is in no hive and no factor or composite list ([`Apiary`]), so the frame model plays exactly the
-//! maximal-factor rule.  Two things had to be right for that, both found by the brute force: the sources stay the
-//! numbers above `n/2` (a number whose only maximal composite is the hole is optional, not a forced move), and the
-//! hives are ordered through the hole (a number still sweeps divisors whose maximal-factor chain to it passes
-//! through the hole).  The frame model's own assumptions (greedy impossible sources, mandatory moves, closed
-//! hives, one-frame promotions; see DESIGN.md) apply to punctured boards as they do to `[n]`, and they are only
-//! validated, not proven: against the brute force ([`crate::brute`]) on every board `[N] ∖ {h}` with `N ≤ 52`.
-//! A bound computed this way is as sound as the frame model, no more.  Each punctured game is warm-started from an
-//! optimal game of the unpunctured board, which caps it: if that game replays on the punctured board, its score is
-//! the answer with no search.
+//! hole is in no hive and no factor or composite list ([`Apiary`](crate::hives::Apiary)), so the frame model
+//! plays exactly the maximal-factor rule.  Two things had to be right for that, both found by the brute force:
+//! the sources stay the numbers above `n/2` (a number whose only maximal composite is the hole is optional, not a
+//! forced move), and the hives are ordered through the hole (a number still sweeps divisors whose maximal-factor
+//! chain to it passes through the hole).  The frame model's own assumptions (greedy impossible sources, mandatory
+//! moves, closed hives, one-frame promotions; DESIGN.md §2 and §5, and [`crate::hives`]) apply to punctured
+//! boards as they do to `[n]`, and they are only validated, not proven: against the brute force
+//! ([`crate::brute`]) on every board `[N] ∖ {h}` with `N ≤ 52`.  A bound computed this way is as sound as the frame
+//! model, no more.  Each punctured game is warm-started from an optimal game of the unpunctured board, which caps
+//! it: if that game replays on the punctured board, its score is the answer with no search.
 //!
-//! # Findings
+//! # Findings (the negative result)
 //!
 //! Measured with `examples/sacrifice.rs` (2026-10; 2 threads, sound tactics):
 //!
@@ -104,13 +119,12 @@
 //!   prime → cap → search.  It is no sound replacement for `reuse_prev`: it proves too few of its games, and
 //!   searching proves all of them sooner.
 
-use crate::bits::Bits;
+use crate::accelerate::solution_for_promotions;
+use crate::board::Board;
 use crate::engine::EngineConfig;
-use crate::frames::build_frames;
 use crate::game::replay_punctured;
-use crate::hives::Apiary;
 use crate::numtheory::Tables;
-use crate::search::{self, prepare, SearchTactics};
+use crate::search::{self, SearchTactics};
 use std::time::{Duration, Instant};
 
 /// How [`punctured`] found its game.
@@ -209,6 +223,9 @@ fn replayed(n: u32, hole: u32, full: &[u32], full_score: u64) -> Option<Puncture
     })
 }
 
+/// [`punctured`] at the set width `W`: the board (tables, frames, `in_the_bag`) is a [`Board`] on the punctured
+/// tables, set up for the search as the solver sets up a game, but with the ceiling and seed of the unpunctured
+/// board's game instead of the previous game's.
 fn punctured_with_width<const W: usize>(
     n: u32,
     hole: u32,
@@ -217,17 +234,14 @@ fn punctured_with_width<const W: usize>(
     stop_at: Option<u64>,
     opts: &PuncturedOptions,
 ) -> Result<Punctured, String> {
-    let tables = Tables::punctured(n, &[hole]);
-    let frames = build_frames::<W>(&tables);
-    let plain = Apiary::<W>::new(&tables, Bits::EMPTY).solution();
-    let in_the_bag: u64 = plain.iter().map(|&m| u64::from(m)).sum();
+    let board = Board::<W>::new(Tables::punctured(n, &[hole]));
     let referee = |moves: &[u32]| replay_punctured(n, &[hole], moves).map_err(|e| format!("illegal game: {e}"));
-    if frames.candidates.is_empty() {
-        let score = referee(&plain)?;
+    if board.is_trivial() {
+        let score = referee(&board.plain)?;
         return Ok(Punctured {
             hole,
             score,
-            moves: plain,
+            moves: board.plain,
             how: How::Trivial,
             exact: true,
             nodes: 0,
@@ -235,11 +249,13 @@ fn punctured_with_width<const W: usize>(
         });
     }
 
-    let columns = frames.columns();
-    let prepared = prepare::<W>(&tables, &columns, &frames.candidates, opts.tactics, opts.threads)?;
+    let prepared = board.prepare(opts.tactics, opts.threads)?;
+    // The ceiling is the unpunctured board's score (or the decision's target, if lower), not `n + opt(n − 1)`, so
+    // `Board::promotion_cap` does not apply.  The seed is the game's moves that are candidates here; the hole is
+    // in no hive, so it is never one.
     let ceiling = stop_at.map_or(full_score, |s| s.min(full_score));
-    let cap = Some(ceiling.saturating_sub(in_the_bag));
-    let seed: Bits<W> = full.iter().copied().filter(|&m| m != hole).collect::<Bits<W>>() & frames.candidates;
+    let cap = Some(ceiling.saturating_sub(board.in_the_bag));
+    let seed = board.seed(full);
     let cfg = EngineConfig {
         threads: opts.threads,
         time_limit: opts.time_limit,
@@ -247,10 +263,10 @@ fn punctured_with_width<const W: usize>(
         ..EngineConfig::default()
     };
     let found = search::search(&prepared, &cfg, Some(&seed), cap, false).map_err(|e| format!("search failed: {e}"))?;
-    let moves = Apiary::<W>::new(&tables, found.promotions).solution();
+    let moves = solution_for_promotions::<W>(&board.tables, found.promotions);
     let score = referee(&moves)?;
-    if score != in_the_bag + found.sum {
-        return Err(format!("the game scores {score}, not {in_the_bag} + the promotions' {}", found.sum));
+    if score != board.in_the_bag + found.sum {
+        return Err(format!("the game scores {score}, not {} + the promotions' {}", board.in_the_bag, found.sum));
     }
     // Reaching the unpunctured optimum is proof; reaching a lower `stop_at` proves only that much.
     let exact = found.completed && (!found.reached_cap || score >= full_score);
@@ -376,8 +392,10 @@ fn without_one(m: u32, prev: &[u32], prev_score: u64) -> Result<Punctured, Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bits::Bits;
     use crate::brute::{self, Rule};
     use crate::game::{replay, Optimal};
+    use crate::hives::Apiary;
 
     #[test]
     fn the_hives_of_a_punctured_board_leave_the_hole_out() {
@@ -392,8 +410,8 @@ mod tests {
     }
 
     /// Every board `[n]` minus one number, for n up to 36 (0.3 s; up to 40 takes 1.2 s, to 44 3.4 s and to 48 8.7 s,
-    /// the brute force being exponential).  DESIGN.md's N <= 52 is `cargo run --release --example sacrifice --
-    /// validate 52`.
+    /// the brute force being exponential).  The larger run that the module documentation cites (N <= 52) is
+    /// `cargo run --release --example sacrifice -- validate 52`.
     #[test]
     fn small_punctured_boards_match_the_brute_force() {
         let optimal = Optimal::load_default().unwrap();

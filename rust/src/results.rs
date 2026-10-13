@@ -13,7 +13,7 @@
 //!   `opt(n) ≤ n + opt(n − 1)`, since deleting the move `n` from an optimal game of `n` leaves a game of `n − 1`
 //!   (`n` divides nothing else on the board, so no other move changes).
 //! * `prime_formula`: a prime `n` plays the game of `n − 1` with its first move replaced by `n`.  That is optimal
-//!   if the game of `n − 1` is (proved in `sacrifice.rs`, "Prime `n`").
+//!   if the game of `n − 1` is (proved at `accelerate::prime_shortcut`).
 //! * `reuse_prev`: the tactic of that name accepted the game; a conjecture.
 //!
 //! `cap`, `prime_formula` and `reuse_prev` rest on the game of `n − 1` ([`Proof::rests_on_prev`]).  The *taint*
@@ -219,7 +219,7 @@ pub struct StoredGame {
 pub enum Certificate {
     /// `score(n) = n + score(n − 1)`, the ceiling `opt(n) ≤ n + opt(n − 1)`.
     NPlusPrev,
-    /// A prime `n` with `score(n) = n + score(n − 1) − P`, `P` the largest prime below `n` (`sacrifice.rs`).
+    /// A prime `n` with `score(n) = n + score(n − 1) − P`, `P` the largest prime below `n` (proof at `accelerate::prime_shortcut`).
     PrimeFormula,
 }
 

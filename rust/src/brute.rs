@@ -1,10 +1,33 @@
-//! Exact Taxman on small boards, with holes, by exhaustive search over pot states: no frame model.
+//! Exact Taxman on small boards, with holes, by exhaustive search over pot states: **a test oracle**.  It makes
+//! no model assumption of any kind (no hives, no frames, no maximal-factor lifting, no greedy choices), so its
+//! answers are the ground truth that the frame model's can be checked against on boards small enough to search.
+//!
+//! *Status:* the solver never calls this module.  It is compiled into the library (so that the sacrifice study's
+//! example can use it) but it is test and study support, for boards of up to [`MAX_N`] = 127 numbers; the search
+//! is exponential, and in practice the tests here stop at 40 and `cargo run --release --example sacrifice --
+//! validate N` at about 52.
 //!
 //! A state is the pot (a `u128`, bit `i` for the number `i`), a move is any number in the pot that can pay tax,
 //! the tax is every proper divisor still in the pot, and the value of a state is the best sum of moves from it,
-//! memoized.  It is the Rust counterpart of the Python certifier (`heuristics/evaluation/certify.py`), extended
-//! to boards with holes and to the maximal-factor rule, and it shares no code with the frame model or with
-//! [`crate::numtheory`].
+//! memoized.  The search is exact: a move is skipped only when an upper bound on what follows it shows that it
+//! cannot beat the best move found so far, so what is memoized is always a true value.  It is the Rust
+//! counterpart of the Python certifier (`heuristics/evaluation/certify.py`), extended to boards with holes and to
+//! the maximal-factor rule, and it shares no code with the frame model or with [`crate::numtheory`].
+//!
+//! # How the tests use it
+//!
+//! * Here: it reproduces `optimal.json` for every board up to 40; it agrees with a naive solver on random sparse
+//!   boards all the way up to 127 (which exercises the upper half of the `u128`); the two rules agree on boards
+//!   without holes; and the hole semantics are pinned on small cases.
+//! * [`crate::sacrifice`]'s tests check the frame model on every board `1..=n` minus one number, `n ≤ 36`
+//!   (`punctured` against `solve` under the maximal-factor rule), and the sacrifice bound itself.
+//! * `examples/sacrifice.rs` (`validate`, `brute`) does the same on larger ranges.
+//!
+//! No test compares the solver's own answers with it directly.  On boards without holes the chain is: the solver
+//! reproduces `optimal.json` (to 1000), and this module reproduces `optimal.json` to 40; the Python certifier
+//! `heuristics/evaluation/certify.py` is the exhaustive check that goes further (to 62).
+//!
+//! # Boards and rules
 //!
 //! A *board* is `1..=n` minus a set of *holes*: numbers that are never in the pot, so they are never moves and
 //! never tax.  [`Rule`] says what a move needs:
@@ -207,6 +230,7 @@ impl Hasher for MixHasher {
 mod tests {
     use super::*;
     use crate::game::{replay, Optimal};
+    use crate::test_support::Rng;
     use std::collections::{BTreeMap, BTreeSet};
 
     #[test]
@@ -241,13 +265,8 @@ mod tests {
     /// above 64 are in bits of the upper half) are cheap, and checked against a naive solver under both rules.
     #[test]
     fn sparse_boards_up_to_the_top_of_the_u128_match_a_naive_solver() {
-        let mut state = 0x1234_5678_9ABC_DEF1u64;
-        let mut next = move |below: u64| {
-            state ^= state << 13;
-            state ^= state >> 7;
-            state ^= state << 17;
-            state % below
-        };
+        let mut rng = Rng(0x1234_5678_9ABC_DEF1);
+        let mut next = |below: u64| rng.below(below);
         for round in 0..60 {
             let n = if round % 3 == 0 { MAX_N } else { 70 + next(58) as u32 };
             let mut present: BTreeSet<u32> = BTreeSet::new();
