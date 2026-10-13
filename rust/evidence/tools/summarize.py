@@ -8,6 +8,7 @@
     summarize.py star FILE...     the threshold-by-threshold (★) campaign: thresholds and components by method
     summarize.py exact FILE...    the model-free exact cross-check of optimal scores
     summarize.py optsets FILE...  every optimal pick set per game (bin/optsets.rs): tables, exchanges, canonical sets
+    summarize.py moves FILE...    the longest games against the optimal ones (bin/moves.rs)
 """
 
 import gzip
@@ -340,5 +341,29 @@ def optsets(paths):
             optsets_canonical(modes[mode], sets_of)
 
 
+def moves(paths):
+    """How M(n), the most moves of a game of n, was settled, and the games whose recorded optimal game is shorter."""
+    rows = {r["n"]: r for r in lines(paths)}
+    ns = sorted(rows)
+    how = Counter(r["how"] for r in rows.values())
+    undecided = [n for n in ns if rows[n]["most"] is None]
+    print(f"games: {len(ns)} ({ns[0]}..{ns[-1]}); M(n) settled by {dict(how)}; undecided: {compact_ranges(undecided)}")
+    over = [n for n in ns if rows[n]["most"] is not None and rows[n]["nu"] > rows[n]["most"]]
+    print(f"matching number above M(n): {compact_ranges(over)}")
+    gaps = Counter(r["gap"] for r in rows.values() if r["most"] is not None)
+    print(f"M(n) minus the recorded game's moves: {dict(sorted(gaps.items()))}")
+    for n in ns:
+        r = rows[n]
+        if not r.get("gap"):
+            continue
+        heaviest = ""
+        if "heaviest_sum" in r:
+            heaviest = (f"; the heaviest longest game scores {r['heaviest_sum']} ({r['score'] - r['heaviest_sum']} "
+                        f"less): {r['heaviest_out']} out, {r['heaviest_in']} in")
+        print(f"n={n}: the recorded game has {r['recorded_moves']} moves ({r['recorded_upper']} above n/2), "
+              f"M(n) = {r['most']} ({r['how']}){heaviest}")
+
+
 if __name__ == "__main__":
-    {"span": span, "star": star, "exact": exact, "adversary": adversary, "optsets": optsets}[sys.argv[1]](sys.argv[2:])
+    {"span": span, "star": star, "exact": exact, "adversary": adversary, "optsets": optsets,
+     "moves": moves}[sys.argv[1]](sys.argv[2:])

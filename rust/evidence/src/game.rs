@@ -21,7 +21,9 @@
 //! game worth the bound; otherwise they contain an unplayable subset K (shrunk to a minimal one), every
 //! playable set leaves out some member of K, and child j bars the j-th free member of K and forces the ones
 //! before it.  With [`Prover::enumerate`] it lists every playable set with sum > V instead of stopping at the
-//! first (with V = opt(n) − 1, every optimal set).
+//! first (with V = opt(n) − 1, every optimal set).  With [`Prover::weighted`] a set's worth is the sum of other
+//! positive weights of its picks: with every weight 1, "is there a playable S with more than V picks?" (the
+//! longest games, [`crate::moves`]).
 
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
@@ -159,9 +161,10 @@ impl Board {
 
 /// The matching bound: a maximum-weight matching in the bipartite graph of the board (even Ω on the left, odd
 /// on the right), as a min-cost flow by successive shortest paths with potentials (Dijkstra on reduced costs),
-/// stopping when no augmenting path has negative cost.  Edges (c, c/p) weigh c; a forced pick's downward edges
-/// weigh BIG more and its upward ones are dropped (it may not pay); a barred number's downward edges are
-/// dropped (it may not be picked).
+/// stopping when no augmenting path has negative cost.  Edges (c, c/p) weigh the weight of picking c (c itself
+/// unless [`set_weights`](Self::set_weights) or [`set_scale`](Self::set_scale) says otherwise); a forced pick's
+/// downward edges weigh BIG more and its upward ones are dropped (it may not pay); a barred number's downward
+/// edges are dropped (it may not be picked).
 pub struct MatchingBound {
     /// Neighbours of each number (its maximal factors and maximal composites).
     adj: Vec<Vec<u32>>,
@@ -169,10 +172,8 @@ pub struct MatchingBound {
     pot: Vec<i64>,
     prev: Vec<u32>,
     mate: Vec<u32>,
-    /// The board size, and the multipliers of the weights of picks above and below n/2 (1 and 1 for the
-    /// matching bound; see [`set_scale`](Self::set_scale)).
-    n: u32,
-    scale: (i64, i64),
+    /// The weight of picking each number (positive, and well below BIG in total).
+    pick_weight: Vec<i64>,
     /// Subtracted from the weight of each number picked (zero but in Lagrangian experiments).
     pub penalty: Vec<i64>,
     /// The optimal dual of the last solve, and its total (the bound plus BIG per forced pick).
@@ -202,8 +203,7 @@ impl MatchingBound {
             pot: vec![0; size],
             prev: vec![NONE; size],
             mate: vec![NONE; size],
-            n: board.n,
-            scale: (1, 1),
+            pick_weight: (0..size as i64).collect(),
             penalty: vec![0; size],
             dual: vec![0; size],
             total: 0,
@@ -214,7 +214,17 @@ impl MatchingBound {
     /// Weighs picks above n/2 by `upper` times their value and the others by `lower` times theirs (the value of
     /// a solve is then in those units).
     pub fn set_scale(&mut self, upper: i64, lower: i64) {
-        self.scale = (upper, lower);
+        let n = self.pick_weight.len() as i64 - 1;
+        for (c, w) in self.pick_weight.iter_mut().enumerate() {
+            let c = c as i64;
+            *w = c * if 2 * c > n { upper } else { lower };
+        }
+    }
+
+    /// Weighs the pick of each number c by `weights[c]` (positive), instead of by c.
+    pub fn set_weights(&mut self, weights: &[i64]) {
+        assert_eq!(weights.len(), self.pick_weight.len(), "one weight per number 0..=n");
+        self.pick_weight.copy_from_slice(weights);
     }
 
     /// The weight of edge {u, v} (u, v adjacent), or None if the roles forbid it.
@@ -224,8 +234,7 @@ impl MatchingBound {
             return None;
         }
         let bonus = if roles[hi as usize] == Role::Pick { BIG } else { 0 };
-        let scale = if 2 * hi > self.n { self.scale.0 } else { self.scale.1 };
-        Some(i64::from(hi) * scale + bonus - self.penalty[hi as usize])
+        Some(self.pick_weight[hi as usize] + bonus - self.penalty[hi as usize])
     }
 
     /// The bound and the matching's picks, or None if some forced pick cannot be matched.
@@ -623,9 +632,11 @@ pub struct Prover<'a> {
     board: &'a Board,
     bound: MatchingBound,
     lag: Option<Lag>,
+    /// The weight of picking each number (c by default; see [`weighted`](Self::weighted)).
+    weights: Vec<i64>,
     target: u64,
-    /// For each m < n, the least weight S must have above m (empty: no segment cuts).
-    segment_need: Vec<i64>,
+    /// For each m < n, an upper bound on the weight of a playable set of the board 1..=m (empty: no segment cuts).
+    smaller: Vec<i64>,
     pub nogoods: Vec<Vec<u32>>,
     max_nogoods: usize,
     pub nodes: u64,
@@ -640,6 +651,8 @@ pub struct Prover<'a> {
     /// enumerating).
     pub found: Vec<Vec<u32>>,
     limit: usize,
+    /// Raise the target to each set found and go on (see [`optimize`](Self::optimize)).
+    optimizing: bool,
 }
 
 /// The Lagrangian matching: weights scaled by `scale`, picks penalized by the multipliers of their *active*
@@ -704,8 +717,9 @@ impl<'a> Prover<'a> {
             board,
             bound: MatchingBound::new(board),
             lag: None,
+            weights: (0..=i64::from(board.n)).collect(),
             target,
-            segment_need: Vec::new(),
+            smaller: Vec::new(),
             nogoods: Vec::new(),
             max_nogoods: 20_000,
             nodes: 0,
@@ -717,6 +731,7 @@ impl<'a> Prover<'a> {
             budget,
             found: Vec::new(),
             limit: 1,
+            optimizing: false,
         }
     }
 
@@ -724,35 +739,58 @@ impl<'a> Prover<'a> {
     /// `limit`-th (returning it as [`Verdict::Beaten`]) or returns [`Verdict::Proven`] with every one of them in
     /// [`found`](Self::found).
     pub fn enumerate(mut self, limit: usize) -> Self {
-        assert!(limit >= 1);
+        assert!(limit >= 1 && !self.optimizing);
         self.limit = limit;
         self
     }
 
-    /// Turns on the segment cuts, given upper bounds `smaller[m]` on opt(m) for m = 0..n−1.
+    /// Finds the heaviest playable set instead of stopping at the first beating the target: each one found raises
+    /// the target to its weight, and the search goes on (every rule above cuts only sets no heavier than the
+    /// target, so what was cut stays cut as the target rises).  [`Verdict::Proven`] then means that nothing beats
+    /// the final target, and the last of [`found`](Self::found), if any, is a heaviest set.
+    pub fn optimize(mut self) -> Self {
+        assert!(self.limit == 1);
+        self.optimizing = true;
+        self
+    }
+
+    /// Weighs the pick of each number c by `weights[c]` (positive, one per number 0..=n) instead of by c: the
+    /// search then decides whether some playable set's weight exceeds the target, and every rule above holds with
+    /// "weight" for "sum" (each cuts only sets no heavier than the target).  Call it before the other builders
+    /// and before running.
+    pub fn weighted(mut self, weights: Vec<i64>) -> Self {
+        assert!(weights.len() == self.board.n as usize + 1 && weights[2..].iter().all(|&w| w > 0));
+        assert!(self.lag.is_none() && self.nodes == 0, "set the weights before anything else");
+        self.bound.set_weights(&weights);
+        self.weights = weights;
+        self
+    }
+
+    /// Turns on the segment cuts, given upper bounds `smaller[m]` on opt(m) for m = 0..n−1 (under the weights:
+    /// with unit weights, on the most moves of game m).
     pub fn with_smaller_games(mut self, smaller: &[u64]) -> Self {
         let n = self.board.n as usize;
         assert!(smaller.len() >= n);
-        self.segment_need = (0..n).map(|m| self.target as i64 + 1 - smaller[m] as i64).collect();
+        self.smaller = smaller[..n].iter().map(|&w| w as i64).collect();
         self
     }
 
     /// The segment cuts: false if some segment (m, n] cannot reach its need; otherwise forces every free
     /// number whose barring would leave a segment short, setting `changed`.
     fn segments(&self, roles: &mut [Role], changed: &mut bool) -> bool {
-        if self.segment_need.is_empty() {
+        if self.smaller.is_empty() {
             return true;
         }
         let n = self.board.n as usize;
-        // slack[m] = weight of unbarred numbers in (m, n] − need[m]; a free c is forced iff c > the least slack
-        // over the segments containing it (m < c).
+        // slack[m] = weight of unbarred numbers in (m, n] − need[m]; a free c is forced iff its weight > the least
+        // slack over the segments containing it (m < c).
         let mut slack = vec![0i64; n];
         let mut avail = 0i64;
         for m in (1..n).rev() {
             if roles[m + 1] != Role::Barred {
-                avail += (m + 1) as i64;
+                avail += self.weights[m + 1];
             }
-            slack[m] = avail - self.segment_need[m];
+            slack[m] = avail - (self.target as i64 + 1 - self.smaller[m]);
             if slack[m] < 0 {
                 return false;
             }
@@ -760,7 +798,7 @@ impl<'a> Prover<'a> {
         let mut least = i64::MAX;
         for c in 2..=n {
             least = least.min(slack[c - 1]);
-            if roles[c] == Role::Free && (c as i64) > least {
+            if roles[c] == Role::Free && self.weights[c] > least {
                 roles[c] = Role::Pick;
                 *changed = true;
             }
@@ -778,7 +816,7 @@ impl<'a> Prover<'a> {
         let roles = self.root_roles();
         let ks = self.nogoods.clone();
         let mut m = MatchingBound::new(self.board);
-        m.set_scale(SCALE, SCALE);
+        m.set_weights(&self.weights.iter().map(|w| w * SCALE).collect::<Vec<_>>());
         let set = |m: &mut MatchingBound, mu: &[i64]| -> i64 {
             m.penalty.iter_mut().for_each(|p| *p = 0);
             let mut constant = 0;
@@ -1023,6 +1061,13 @@ impl<'a> Prover<'a> {
             }
             None if self.board.playable(source) => {
                 let set: Vec<u32> = (2..=n).filter(|&c| source[c as usize]).collect();
+                if self.optimizing {
+                    // The node's heaviest completion (its weight is the bound): the target rises to it, which
+                    // closes the node.
+                    self.target = value;
+                    self.found.push(set);
+                    return Verdict::Proven;
+                }
                 self.found.push(set.clone());
                 if self.found.len() >= self.limit {
                     return Verdict::Beaten(set);
@@ -1359,6 +1404,16 @@ mod tests {
         for n in 2..=20u32 {
             let board = Board::new(n, &spf);
             assert_eq!(brute(&board), known[n as usize], "n={n}");
+            // Optimizing from nothing reaches the optimum, with and without the segment cuts.
+            for segments in [false, true] {
+                let mut p = Prover::new(&board, 0, u64::MAX).optimize();
+                if segments {
+                    p = p.with_smaller_games(&known);
+                }
+                assert_eq!(p.run(), Verdict::Proven);
+                let best = p.found.last().expect("a game");
+                assert_eq!(best.iter().map(|&c| u64::from(c)).sum::<u64>(), known[n as usize], "n={n}");
+            }
             for segments in [false, true] {
                 let prover = |target| {
                     let p = Prover::new(&board, target, u64::MAX);
@@ -1375,6 +1430,48 @@ mod tests {
                         assert!(sum >= known[n as usize], "n={n}");
                     }
                     other => panic!("n={n}: the optimum beats opt − 1, got {other:?}"),
+                }
+            }
+        }
+    }
+
+    /// With unit weights the search decides the most moves of a game: against brute force for n <= 20, on both
+    /// sides of the maximum, with and without the segment cuts (given the maxima of the smaller games).
+    #[test]
+    fn unit_weights_find_the_most_moves() {
+        let spf = smallest_prime_factors(100);
+        let mut most = vec![0u64; 2];
+        for n in 2..=20u32 {
+            let board = Board::new(n, &spf);
+            let mut best = 0u64;
+            for bits in 0u64..(1 << (n - 1)) {
+                let count = u64::from(bits.count_ones());
+                if count > best {
+                    let mut pick = vec![false; n as usize + 1];
+                    (2..=n as usize).filter(|&c| bits >> (c - 2) & 1 == 1).for_each(|c| pick[c] = true);
+                    if board.playable(&pick) {
+                        best = count;
+                    }
+                }
+            }
+            most.push(best);
+            for segments in [false, true] {
+                let prover = |target| {
+                    let p = Prover::new(&board, target, u64::MAX).weighted(vec![1; n as usize + 1]);
+                    if segments {
+                        p.with_smaller_games(&most[..n as usize])
+                    } else {
+                        p
+                    }
+                };
+                assert_eq!(prover(best).run(), Verdict::Proven, "n={n}");
+                match prover(best - 1).run() {
+                    Verdict::Beaten(picks) => {
+                        let mut pick = vec![false; n as usize + 1];
+                        picks.iter().for_each(|&c| pick[c as usize] = true);
+                        assert!(board.playable(&pick) && picks.len() as u64 == best, "n={n}: {picks:?}");
+                    }
+                    other => panic!("n={n}: the longest game beats {}, got {other:?}", best - 1),
                 }
             }
         }

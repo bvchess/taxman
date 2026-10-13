@@ -473,3 +473,33 @@ fn promotion_order_conflicts_and_nogoods_on_perturbed_frame_sets() {
     }
     assert!(orders > 1500 && feasible > 50 && conflicts > 100, "{orders} orders, {feasible} feasible, {conflicts}");
 }
+
+/// The conjecture `revise_freedoms` rests on, that the promotion set with the largest sum also has the most
+/// promotions, is false for the whole frame game of n = 833, the first board whose optimal game is not a longest
+/// one (`evidence/README.md`, section 8): the optimal set promotes 48 numbers, as many as `max_total` allows less
+/// one, and a set the model accepts promotes 49, four heavy promotions of the optimal set exchanged for five
+/// light ones; both games are over, the second one move longer and 29 points lighter.  The tactic applies the
+/// conjecture only to the two-frame game of frames 0 and 1, which this does not decide.
+#[test]
+fn the_heaviest_promotion_set_of_833_is_not_the_largest() {
+    const W: usize = 16;
+    let board = Board::<W>::for_n(833);
+    let game = Game::<W>::of_board(833).expect("a game");
+    let optimal: Bits<W> = [
+        245, 250, 252, 258, 261, 273, 280, 288, 294, 297, 300, 306, 310, 315, 322, 330, 333, 336, 338, 342, 343, 345,
+        350, 357, 363, 364, 368, 369, 372, 375, 376, 378, 380, 385, 387, 390, 392, 396, 399, 400, 402, 405, 406, 408,
+        410, 412, 414, 416,
+    ]
+    .into_iter()
+    .collect();
+    let mut longer = optimal;
+    [250, 252, 294, 400].into_iter().for_each(|x| longer.remove(x));
+    [116, 180, 200, 320, 351].into_iter().for_each(|x| longer.insert(x));
+    assert_eq!((optimal.len(), longer.len(), game.max_total), (48, 49, 49));
+    assert!(game.is_real(&optimal, 16692) && game.is_real(&longer, 16663));
+    for (set, moves, score) in [(optimal, 362, 218226), (longer, 363, 218197)] {
+        let played = taxman::accelerate::solution_for_promotions(&board.tables, set);
+        let refereed = taxman::game::replay_finished(833, &played).map(|s| (played.len(), s));
+        assert_eq!(refereed, Ok((moves, score)));
+    }
+}
