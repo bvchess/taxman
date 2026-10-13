@@ -53,7 +53,8 @@ checkpoints, `taxman.lock`), `logs/`, `chain.pid`, `deadline`.  Nothing is writt
 
 ### What is being computed
 
-`chain.sh N` runs `taxman solve 1-N --tactic reuse_prev=off --tactic revise_freedoms=off` into one results file:
+`chain.sh N` runs `taxman solve 1-N --strict` (no unproven tactic: `--tactic reuse_prev=off --tactic
+revise_freedoms=off`) into one results file:
 every game from n = 1, each built from the one before, with no unproven tactic.  Nothing rests on `optimal.json` (it is
 only compared with, to n = 1000) or on the committed results; the committed files are what the run is checked against
 (`verify.sh`).  The solver is the same code as on a laptop; the machine only changes how long it takes.

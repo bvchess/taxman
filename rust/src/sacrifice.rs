@@ -94,10 +94,11 @@
 //! hole is in no hive and no factor or composite list ([`Apiary`](crate::hives::Apiary)), so the frame model
 //! plays exactly the maximal-factor rule.  Two things had to be right for that, both found by the brute force:
 //! the sources stay the numbers above `n/2` (a number whose only maximal composite is the hole is optional, not a
-//! forced move), and the hives are ordered through the hole (a number still sweeps divisors whose maximal-factor
-//! chain to it passes through the hole).  The frame model's own assumptions (greedy impossible sources, mandatory
-//! moves, closed hives, one-frame promotions; DESIGN.md §2 and §5, and [`crate::hives`]) apply to punctured
-//! boards as they do to `[n]`, and they are only validated, not proven: against the brute force
+//! source, which the model plays), and the hives are ordered through the hole (a number still sweeps divisors
+//! whose maximal-factor chain to it passes through the hole).  The frame model's own assumptions (greedy
+//! impossible sources, mandatory moves, closed hives, one-frame promotions; DESIGN.md §2 and §5, and
+//! [`crate::hives`]) apply to punctured boards as they do to `[n]`, and they are only validated, not proven: against
+//! the brute force
 //! ([`crate::brute`]) on every board `[N] ∖ {h}` with `N ≤ 52`.  A bound computed this way is as sound as the frame
 //! model, no more.  Each punctured game is warm-started from an optimal game of the unpunctured board, which caps
 //! it: if that game replays on the punctured board, its score is the answer with no search.
@@ -433,8 +434,8 @@ mod tests {
     fn punctured_boards_that_once_failed() {
         let optimal = Optimal::load_default().unwrap();
         let opts = PuncturedOptions::default();
-        // Without 16, 8 has no maximal composite; were it a source (a forced move) the frame model would play 8
-        // and miss 9: [17, 9, 15, 10, 18, 14, 12] scores 95.
+        // Without 16, 8 has no maximal composite; were it a source (a move the model always plays) the model would
+        // play 8 and miss 9: [17, 9, 15, 10, 18, 14, 12] scores 95.
         // Without 8, the hive of 32 (paid by 16) is not downstream of 4's by maximal factors, but 32 sweeps 4 and
         // 2: ordered first, it left 22 nothing to pay with.
         for (n, hole) in [(18, 16), (38, 8)] {
