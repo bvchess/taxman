@@ -475,7 +475,7 @@ impl<const W: usize> Refiner<'_, '_, W> {
         self.computed += 1;
         if let Some(l) = &mut self.learning {
             if let Some(n) = self.model.nogood(self.scratch, l.root, &l.promoted, &k) {
-                l.table.insert(n, &k);
+                l.table.insert(n);
             }
         }
         self.known.push(k);

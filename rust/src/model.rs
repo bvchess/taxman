@@ -1227,9 +1227,6 @@ impl<const W: usize> Default for ConflictCache<W> {
 pub struct Nogoods<const W: usize> {
     /// The nogoods, by index.
     sets: Vec<Bits<W>>,
-    /// The members of nogood `i`, those of the conflict it was made from first: `members[start[i]..start[i + 1]]`.
-    members: Vec<u16>,
-    start: Vec<u32>,
     /// For each nogood, its largest member.
     maxes: Vec<u16>,
     /// For each number, the nogoods it is a member of.
@@ -1249,8 +1246,6 @@ impl<const W: usize> Nogoods<W> {
         let size = max_number as usize + 1;
         Nogoods {
             sets: Vec::new(),
-            members: Vec::new(),
-            start: vec![0],
             maxes: Vec::new(),
             by_member: vec![Vec::new(); size],
             capacity,
@@ -1302,23 +1297,18 @@ impl<const W: usize> Nogoods<W> {
     }
 
     /// Adds the nogood `n` (non-empty, members up to the table's `max_number`), forgetting every other one first
-    /// if the table is full.  Lookups check its members in `first` (the conflict it was made from) before the
-    /// others: those are the ones a node is least likely to have, so most lookups that fail stop at once.
-    pub fn insert(&mut self, n: Bits<W>, first: &Bits<W>) {
+    /// if the table is full.
+    pub fn insert(&mut self, n: Bits<W>) {
         if self.sets.len() >= self.capacity {
             self.clear();
         }
         let id = self.sets.len() as u32;
         self.sets.push(n);
-        for x in (n & *first).iter().chain((n - *first).iter()) {
-            self.members.push(x as u16);
-            self.by_member[x as usize].push(id);
-        }
-        self.start.push(self.members.len() as u32);
-        self.maxes.push(n.max().expect("a nogood is not empty") as u16);
         for x in n.iter() {
+            self.by_member[x as usize].push(id);
             self.index_member(x);
         }
+        self.maxes.push(n.max().expect("a nogood is not empty") as u16);
         let set = self.compact_of(&n);
         self.compact.extend_from_slice(&set[..self.stride]);
     }
@@ -1338,12 +1328,6 @@ impl<const W: usize> Nogoods<W> {
         self.stride = 1;
         self.sets.clear();
         self.maxes.clear();
-        self.members.clear();
-        self.start.truncate(1);
-    }
-
-    fn members_of(&self, id: u32) -> &[u16] {
-        &self.members[self.start[id as usize] as usize..self.start[id as usize + 1] as usize]
     }
 
     /// The smallest conflict the table knows of a node with the promotions `promoted` among the candidates
@@ -1422,29 +1406,49 @@ impl<const W: usize> Nogoods<W> {
     /// candidate.
     pub fn ruled_out(&self, added: &Bits<W>, promoted: &Bits<W>, cands: &Bits<W>) -> Bits<W> {
         let mut out = Bits::EMPTY;
+        let has_member = |a: u32| self.by_member.get(a as usize).is_some_and(|ids| !ids.is_empty());
+        if !added.iter().any(has_member) {
+            return out;
+        }
+        let p = self.compact_of(promoted);
+        // A loop whose stride the compiler knows is unrolled.
+        match self.stride {
+            1 => self.rule_out::<1>(added, &p, cands, &mut out),
+            2 => self.rule_out::<2>(added, &p, cands, &mut out),
+            3 => self.rule_out::<3>(added, &p, cands, &mut out),
+            4 => self.rule_out::<4>(added, &p, cands, &mut out),
+            5 => self.rule_out::<5>(added, &p, cands, &mut out),
+            6 => self.rule_out::<6>(added, &p, cands, &mut out),
+            _ => self.rule_out::<0>(added, &p, cands, &mut out),
+        }
+        out
+    }
+
+    /// [`ruled_out`](Self::ruled_out) with the promotions `p` over the compact indices, whose stride is `S` (0:
+    /// any), adding to `out`.
+    #[inline]
+    fn rule_out<const S: usize>(&self, added: &Bits<W>, p: &[u64; W], cands: &Bits<W>, out: &mut Bits<W>) {
+        let stride = if S == 0 { self.stride } else { S };
+        debug_assert_eq!(stride, self.stride);
+        let p = &p[..stride];
         for a in added.iter() {
             let Some(ids) = self.by_member.get(a as usize) else { continue };
             for &id in ids {
-                let mut rest = None;
-                let mut single = true;
-                for &y in self.members_of(id) {
-                    let y = u32::from(y);
-                    if !promoted.contains(y) {
-                        if rest.is_some() {
-                            single = false;
-                            break;
-                        }
-                        rest = Some(y);
+                let n = &self.compact[id as usize * stride..][..stride];
+                // How many members are not promoted, and the last of them.
+                let (mut count, mut at) = (0, 0);
+                for (k, (n, p)) in n.iter().zip(p).enumerate() {
+                    let rest = n & !p;
+                    count += rest.count_ones();
+                    if rest != 0 {
+                        at = (k << 6) | rest.trailing_zeros() as usize;
                     }
                 }
-                if let (true, Some(y)) = (single, rest) {
-                    if cands.contains(y) {
-                        out.insert(y);
-                    }
+                if count == 1 && cands.contains(u32::from(self.numbers[at])) {
+                    out.insert(u32::from(self.numbers[at]));
                 }
             }
         }
-        out
     }
 }
 
@@ -2173,7 +2177,7 @@ mod tests {
                 assert!(nogood.is_subset(&(promoted | k)), "{what}");
                 assert!(!model.can_promote_all_using(&mut scratch, &root, &nogood), "{what} can be promoted");
                 // The table knows it now, as the smallest conflict there is, or one as small.
-                table.insert(nogood, &k);
+                table.insert(nogood);
                 let found = table.conflict(&promoted, &set).expect("a conflict in the table");
                 assert!(found.len() <= k.len() && found.is_subset(&set), "{what}: the table has {found:?}");
                 made += 1;
@@ -2197,7 +2201,8 @@ mod tests {
     }
 
     /// The table's lookups against their definition: the smallest `N − P` over the nogoods `N ⊆ P ∪ S` (then the
-    /// one with the largest member, then the first learned), or `Forced` at the first of them within `F`.  Random
+    /// one with the largest member, then the first learned), or `Forced` at the first of them within `F`; and its
+    /// rule-outs (the single member left of each nogood with a member just promoted).  Random
     /// tables over up to 250 numbers, so that the compact sets grow by several words, cleared now and then.
     #[test]
     fn nogood_lookups_follow_their_definition() {
@@ -2205,7 +2210,7 @@ mod tests {
         let mut table = Nogoods::<4>::new(255, 1 << 12);
         let mut learned: Vec<Bits<4>> = Vec::new();
         let subset = |rng: &mut Rng, of: &Bits<4>, percent| of.iter().filter(|_| rng.chance(percent)).collect();
-        let (mut conflicts, mut forced) = (0, 0);
+        let (mut conflicts, mut forced, mut ruled) = (0, 0, 0);
         for _ in 0..2000 {
             if rng.below(500) == 0 {
                 table.clear();
@@ -2215,7 +2220,7 @@ mod tests {
             let size = 1 + rng.below(4);
             let n: Bits<4> =
                 (0..size).map(|_| if rng.chance(70) { rng.below(24) } else { rng.below(250) } as u32).collect();
-            table.insert(n, &subset(&mut rng, &n, 50));
+            table.insert(n);
             learned.push(n);
             for _ in 0..4 {
                 let crowd = Bits::from_range(0, 23) | (0..20).map(|_| rng.below(250) as u32).collect();
@@ -2242,17 +2247,32 @@ mod tests {
                 assert_eq!(table.lookup(&promoted, &set, &musts), expected, "{learned:?} {promoted:?} {set:?}");
                 conflicts += u32::from(matches!(expected, Lookup::Conflict(_)));
                 forced += u32::from(expected == Lookup::Forced);
+                // Ruled out: the last member, among `set`, of a nogood with a member in `added` and all the others
+                // promoted.
+                let added = subset(&mut rng, &promoted, 40);
+                let mut out = Bits::EMPTY;
+                for n in learned.iter().filter(|n| n.intersects(&added)) {
+                    let rest = *n - promoted;
+                    if rest.len() == 1 && rest.is_subset(&set) {
+                        out |= rest;
+                    }
+                }
+                assert_eq!(table.ruled_out(&added, &promoted, &set), out, "{learned:?} {added:?} {promoted:?}");
+                ruled += out.len();
             }
         }
-        assert!(conflicts > 500 && forced > 200, "{conflicts} conflicts, {forced} forced");
+        assert!(
+            conflicts > 500 && forced > 200 && ruled > 200,
+            "{conflicts} conflicts, {forced} forced, {ruled} ruled out"
+        );
     }
 
     #[test]
     fn nogood_table_lookups() {
         let mut table = Nogoods::<1>::new(60, 3);
         let set = |xs: &[u32]| Bits::<1>::from_slice(xs);
-        table.insert(set(&[10, 20, 30]), &set(&[30]));
-        table.insert(set(&[5, 40]), &set(&[]));
+        table.insert(set(&[10, 20, 30]));
+        table.insert(set(&[5, 40]));
         // The smallest conflict among the nogoods within the promotions and the set.
         assert_eq!(table.conflict(&set(&[]), &set(&[5, 10, 20, 30, 40])), Some(set(&[5, 40])));
         assert_eq!(table.conflict(&set(&[10, 20]), &set(&[5, 30, 40])), Some(set(&[30])));
@@ -2264,9 +2284,9 @@ mod tests {
         assert_eq!(table.ruled_out(&set(&[5, 20]), &promoted, &set(&[50])), set(&[]));
         assert_eq!(table.ruled_out(&set(&[10]), &set(&[10]), &set(&[20, 30])), set(&[]));
         // A full table forgets everything before taking another.
-        table.insert(set(&[1, 2]), &set(&[1, 2]));
+        table.insert(set(&[1, 2]));
         assert_eq!(table.len(), 3);
-        table.insert(set(&[3, 4]), &set(&[4]));
+        table.insert(set(&[3, 4]));
         assert_eq!(table.len(), 1);
         assert_eq!(table.conflict(&set(&[]), &set(&[5, 40, 1, 2])), None);
         assert_eq!(table.conflict(&set(&[3]), &set(&[4])), Some(set(&[4])));

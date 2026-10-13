@@ -397,7 +397,7 @@ fn kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> Resul
     for x in &nodes {
         if let Some(k) = x.conflict {
             if let Some(ng) = model.nogood(&mut scratch, &p.root, &x.promoted, &k) {
-                table.insert(ng, &k);
+                table.insert(ng);
             }
         }
     }
