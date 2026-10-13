@@ -4,14 +4,17 @@ The solver already borrows from SAT solving (conflict analysis, nogoods, forgett
 relaxation bound, strong branching), and those borrowings paid a great deal ([EXPERIMENTS.md](EXPERIMENTS.md)).
 This page asks what else to borrow, and answers with measurements rather than opinions: every idea that looked
 promising got a cheap pilot (a counter, a fixture, a node-limited or proof-only run), and the ones that did not
-survive their pilot are recorded with the number that killed them, as in EXPERIMENTS' "Tried and not kept".
+survive their pilot are recorded with the number that killed them.  The pilots' code was discarded after the study
+(section 6), so each pilot is described here well enough to be rebuilt: what it computed, on which games and with
+which settings, and the numbers that decided it.  The register of everything tried, in
+[EXPERIMENTS.md](EXPERIMENTS.md#register-of-everything-tried), has a row for each.
 
 * [1. The recommended order](#1-the-recommended-order)
 * [2. Where the time goes in the hardest games](#2-where-the-time-goes-in-the-hardest-games)
 * [3. Nogoods with very many threads](#3-nogoods-with-very-many-threads)
 * [4. The pilots](#4-the-pilots)
 * [5. Every idea considered](#5-every-idea-considered)
-* [6. The tools, and which commit holds what](#6-the-tools-and-which-commit-holds-what)
+* [6. The tools, and what became of the pilot code](#6-the-tools-and-what-became-of-the-pilot-code)
 
 How it was measured.  The machine is the 10-core M1 Max laptop, shared with other jobs the whole time (its load
 average stayed between 4 and 8), so every pilot uses at most 4 cores at a time and reports counts (nodes, lookups,
@@ -100,12 +103,36 @@ a step 16-17 k).
 
 The question: each thread keeps its own table and clears it every 50,000 of its steps; at 192 threads is that still
 right, or should threads share nogoods, or keep the good ones?  It was measured on this laptop by *emulating* many
-workers on 4 cores: `EngineConfig::cores` (new, `ladder --cores C`) lets at most C of the T worker threads search at
+workers on 4 cores: `EngineConfig::cores` (`ladder --cores C`) lets at most C of the T worker threads search at
 once, taking turns every 1024 polls in ticket order, so that 64 or 128 workers split, steal and learn exactly as
-they would on 64 or 128 cores, in counts if not in time.  A study of the tables (`ladder --nogood-study`, off the
-solver's path; the probe's fingerprint is unchanged) counts lookups, scans, hits, rule-outs, the size and age of
-every nogood used, and, through a registry of all nogoods, how often a worker learns one that another worker holds
-at that moment.
+they would on 64 or 128 cores, in counts if not in time.
+
+The study of the tables was a tracking mode of the nogood table plus a registry shared by the searchers of one
+search, set up by the ladder for these runs only (the code is gone, section 6).  What it computed:
+
+* *Counts of use*, summed over the searchers: lookups of a table that was not empty, the nogoods each scanned, the
+  lookups that found a conflict (the smallest, or one all of whose members are forced); rule-out calls (those with
+  a newly promoted number that is a member of some nogood), the nogood entries they visited, and the candidates they
+  ruled out; the nogoods learned (a conflict computed where the table knew none), imported and dropped by clears,
+  and those dropped without ever having been used.
+* *By size*: the same, learned, lookups answered, candidates ruled out and dropped unused, by the number of members
+  of the nogood (1 to 7, and 8 or more).
+* *By age*: a nogood's age is the number of steps its own searcher has taken since the nogood entered its table.
+  Each use (a lookup it answered, a candidate it ruled out) is counted in the bucket `[2^k, 2^(k+1))` of its age at
+  that moment, and so are the steps the nogood spent in the table at each age (its life is split over the buckets it
+  passes through).  The uses per 1000 nogood-steps of a bucket are 1000 × uses ÷ steps in it.
+* *Duplication across workers*: a registry of every distinct nogood learned, with which workers hold it now and
+  which have ever learned it (updated when a worker learns, imports or clears).  When a worker learns a nogood it
+  files the event as: *first* (no worker ever learned it); *held elsewhere* (another worker holds it right now,
+  so sharing would have supplied it); *learned elsewhere before* (another worker learned it, and has since
+  forgotten it); or *again* (this worker itself forgot it and learned it again).
+* *Policies*, set per run: how often a searcher forgets (never, or every K steps; the solver's is every 50,000);
+  at a clear, keep the nogoods of at most K members; share the nogoods of at most K members, meaning that a
+  searcher puts each such nogood it learns into one common pool and, at every step, imports those the others have
+  put there since it last looked, unless its table holds them already.
+
+Every run of this section is a proof (seeded with the game's own optimum), strict, with the solver's default
+tactics otherwise.
 
 **How useful an old nogood is.**  Uses (a lookup answered or a candidate ruled out) per 1000 steps a nogood spends in
 the table, by its age, on the proof of 1215 never forgetting (one thread):
@@ -117,8 +144,13 @@ the table, by its age, on the proof of 1215 never forgetting (one thread):
 Usefulness drops by 20× in the first ten thousand steps and then flattens: an old nogood is still used now and then,
 so the question is what it costs to keep.
 
-**What a nogood costs.**  Lookups and rule-outs scan the whole table (`ideas lookup-cost`, the probe's nodes of 1215,
-cycles per call):
+**What a nogood costs.**  Lookups and rule-outs scan the whole table.  Measured on the 300 search nodes of the proof
+of 1215 in the probe's fixture (`testdata/perf/n1215.nodes`: each node's promotions `P` and candidates, and `Q*`, the
+promotions of its heaviest matching), with tables made of the first k of the 3,032 distinct nogoods that a study run
+of that proof had learned, k doubling from 50 (a `Nogoods` table filled by `insert`, 20 repetitions of the
+300 nodes).  A *lookup* asks for the smallest conflict within `P ∪ Q*` as the search does (`Nogoods::conflict`); a
+*rule-out* asks `Nogoods::ruled_out` for each of the 8 largest members of `Q*` in turn as the child's one newly
+promoted number.  Cycles per call, from the process's cycle counter (`examples/common/counters.rs`):
 
 | nogoods in the table | 100 | 200 | 400 | 800 | 1600 | 3032 |
 |---|---|---|---|---|---|---|
@@ -143,7 +175,8 @@ Nearly all of it at many workers; but learning is cheap (4-7 nogoods per 1000 st
 to 6.81 at 128 on 1225 because of the re-derivations, about 1.4% of the cycles), and the tables grow only a little
 with it (an average of 153 nogoods at a lookup at 4 workers, 228 at 128).
 
-**Policies, in nodes** (proofs; many-worker runs vary by ±10% from run to run, so repeats are given):
+**Policies, in nodes** (proofs, T workers taking turns on 4 cores; many-worker runs vary by ±10% from run to run, so
+repeats are given):
 
 | proof, workers | clear every 50k (as now) | share every nogood | share those of ≤ 3 members | keep those of ≤ 3 members at a clear |
 |---|---|---|---|---|
@@ -180,8 +213,11 @@ rebuild that forgets the conflicts known along its path.  That is idea 5.
 Many consecutive games have exactly the same search space: the same frames (moves, factors, freedoms), the same
 candidates and the same `max_total`, so the same best promotion set; only the cap `n + score(n − 1) − in_the_bag`
 differs, and when it is above the optimum the search runs a full proof again (EXPERIMENTS noticed this in 1201-1231).
-`ideas repeats A B` hashes what a strict search depends on for every searched game; joined with the committed
-`results/strict.jsonl`:
+The pilot computed, for every game of a range that is neither trivial nor prime, a 64-bit digest of what a strict
+search depends on: the root's frames (moves, factors and freedoms of each), the candidates and `max_total`, as
+`Board::prepare` gives them with `revise_freedoms=off`.  Games with the same digest search the same space; the first
+game with a digest is the original and the later ones repeat it.  Joined with the search seconds the committed
+`results/strict.jsonl` records for each game:
 
 * 1232-1300: 29 of the 60 searched games repeat an earlier space; their searches took **851 s of the 2866 s** of the
   chain (29.7%): 1299 repeats 1296 (265 s), 1293 repeats 1292 (207 s), 1271 repeats 1269 (75 s), 1267 repeats 1265
@@ -200,20 +236,19 @@ The payoff is a constant fraction of the chain, at no risk, and it multiplies wi
 *Mechanism.*  The matching bound knows no nogood.  Every completion `F` of a node with promotions `P` promotes at most
 `|N − P| − 1` members of each nogood `N`; dualizing these inequalities with multipliers `λ_N ≥ 0` gives, for every
 `λ`, the bound `max_M Σ_{x ∈ Q(M)} (x − Σ_{N ∋ x} λ_N) + Σ_N λ_N (|N − P| − 1)`: a matching with each
-candidate's weight lowered by the multipliers of its nogoods, plus a constant
-(`src/search/lagrange.rs` on the branch `ideas-pilots`).  A nogood with a member that has left the candidates cannot
-be broken any more and is left out (multiplier 0 at that node).  It is the evidence crate's second bound
-([evidence/README.md](../evidence/README.md), section 5: 3.3× fewer nodes at n = 793 for its model-free search),
-brought to the frame solver, and MaxSAT's core-guided bounds in spirit: each nogood is a core, and the multipliers
-say how much each costs.
+candidate's weight lowered by the multipliers of its nogoods, plus a constant.  A nogood with a member that has left
+the candidates cannot be broken any more and is left out (multiplier 0 at that node).  It is the evidence crate's
+second bound ([evidence/README.md](../evidence/README.md), section 3: 3.3× fewer nodes at n = 793 for its model-free
+search), brought to the frame solver, and MaxSAT's core-guided bounds in spirit: each nogood is a core, and the
+multipliers say how much each costs.
 
 *Soundness.*  Weak duality, for any `λ ≥ 0` and any set of valid inequalities; it needs no proof beyond the
 validity of the nogoods, which the search already rests on.
 
 *Pilot.*  Multipliers fitted once at the root (200 subgradient steps, Polyak's step towards `need`, in a second)
-to the nogoods of a short warm-up (a node-limited proof of the same game, `--dump-nogoods`), then the bound tried
-at every node and child where the matching bound and refinement did not cut, solved from scratch by the incremental
-solver on a reweighed copy of the graph (`MatchGraph::set_weights`, `ladder --lagrange FILE --lagrange-depth 100`):
+to the nogoods of a short warm-up (a node-limited proof of the same game, whose distinct nogoods were written out),
+then the bound tried at every node and child, of any depth, where the matching bound and refinement did not cut,
+solved from scratch by the incremental solver on a reweighed copy of the graph:
 
 | proof (seed-opt) | threads | nodes without | nodes with | change | nogoods (warm-up) | bounds computed | cuts |
 |---|---|---|---|---|---|---|---|
@@ -232,10 +267,11 @@ The nodes of the warm-up are not counted: 20 k to 500 k, 5-12% of each proof.
 What the pilot also showed:
 
 * *The multipliers of dead nogoods must go.*  Keeping every nogood's multiplier whatever happened to its members
-  (`--lagrange-static`, a bound that stays valid and whose weights never change) gives 1184 129,095 nodes (−23%)
-  instead of 54,795: most of the effect comes from dropping the nogoods a node has already broken.
-* *Refitting pays.*  On the probe's search nodes (`ideas lagrange`; units of the proofs, shallow, with a mean gap of
-  145 at 936 and 260 at 1215 between the matching bound and what they need), the root's multipliers lower the bound
+  (a bound that stays valid and whose weights never change) gives 1184 129,095 nodes (−23%) instead of 54,795: most
+  of the effect comes from dropping the nogoods a node has already broken.
+* *Refitting pays.*  On the probe's search nodes (the 300 nodes of each proof's fixture, shallow, the incumbent the
+  optimum, with a mean gap of 145 at 936 and 260 at 1215 between the matching bound and what they need; the nogoods
+  were those of a study run of the proof), the root's multipliers lower the bound
   by 66 and 69 on average and cut 34 and 21 of 300 nodes (refinement cuts 27 and 10); refitted at each node (20
   steps from the root's) they lower it by 110 and 130 and cut 81 and 33.
 * Across 1100-1250 the effect is −19% to −67% with no clear trend in n: it varies more from game to game than with
@@ -247,25 +283,38 @@ second incremental solver kept along the path next to the first: about what the 
 (14-16% of the time, section 2), plus repairs when a dead nogood's multiplier is dropped (a weight *rise* on its
 other members: raise the potential of the vertex by the same amount, and unmatch it if it was paying for a mover
 or free, so that the existing Hungarian repair restores optimality).  So: (a) build the weighted incremental solver
-(weights per vertex are in place: `MatchGraph::set_weights`; weight rises are the new part), measure cycles per
+(the pilot weighed each vertex of the graph by its own weight; weight rises are the new part), measure cycles per
 node on the proofs above, and accept if nodes × cycles drops; (b) choose the nogood source for production: the
 nogoods of game n − 1 (they survive into game n almost all, EXPERIMENTS "Carrying nogoods over") or a warm-up;
 (c) refit: at every clearing of the table (fold the nogoods about to be forgotten into the multipliers instead), or
 at unit starts.  A tactic only once (a) pays; it is sound, so it would not taint.
+
+*Status.*  The pilot's code was taken over by the follow-up experiment (section 6).
 
 ### 4.3 Reduced-cost fixing (killed)
 
 From MIP: a candidate `x` that the heaviest matching does not promote has a reduced cost read off the potentials
 (`MatchBound::bound_including`: `value − min over its factors f of (y_x + y_f − x)` bounds every matching that
 promotes it); if that is below `need`, no completion that beats the incumbent promotes `x`, here or below, and it
-can leave the candidates.  It fires a lot: 70.9 of 159 candidates outside `Q*` per node at 936 and 61.6 of 212 at
-1215 (`ideas fixing-exact`, every one checked against the matching solved with `x` promoted).  And it changes no
-tree: the fast set, the proofs of 1215 (5,485,294 nodes) and 1025 (5,570,602) came out node for node the same
-(tactic `rc_fixing` in commit 5dff240, taken out in 6967c6c).  The reason is general: the matching relaxation is
-integral, so a fixed candidate is never in the heaviest matching of a node that stays open below (if it were, that
-matching would be a matching of the node promoting `x` worth at least `need`), and removing a candidate the optimum
-does not use changes neither the bound nor the conflicts.  In MIP reduced-cost fixing helps because LP solutions are
-fractional; here the forced members (`fix_forced`) are the useful half of the same dual information.
+can leave the candidates.  The bound is read off the settled level in time proportional to the degree of `x`:
+`value − max(0, min over its factors f not required of (y_x + y_f − x))`, clamped to `[0, value]`, and the value
+itself if the heaviest matching promotes `x` already.
+
+*Measurement.*  On the 300 search nodes of the probe's fixtures of 936 and 1215 (`testdata/perf/`), with the
+incumbent set to the game's optimum, each node still open (its matching bound at least `need` = optimum + 1 −
+the sum of its promotions) was taken: of its candidates outside `Q*`, those whose reduced-cost bound is below `need`
+were counted, and each was checked exactly by promoting it in the matching bound and solving (the value plus `x` had
+to be below `need`: no check failed).  It fires a lot: 70.9 of 159 candidates outside `Q*` per open node at 936 and
+61.6 of 212 at 1215.
+
+*Pilot.*  A search tactic (off by default) removed the candidates the reduced costs rule out from the node's
+candidates, and so from its children's.  It changes no tree: the fast set (880, 936, 1050, 1100, 1170, 1184, one
+thread), the proofs of 1215 (5,485,294 nodes) and 1025 (5,570,602) came out node for node the same, and the tactic
+was taken out again.  The reason is general: the matching relaxation is integral, so a fixed candidate is never in
+the heaviest matching of a node that stays open below (if it were, that matching would be a matching of the node
+promoting `x` worth at least `need`), and removing a candidate the optimum does not use changes neither the bound
+nor the conflicts.  In MIP reduced-cost fixing helps because LP solutions are fractional; here the forced members
+(`fix_forced`) are the useful half of the same dual information.
 
 ### 4.4 Component decomposition (killed)
 
@@ -273,37 +322,57 @@ From #SAT model counting and AND/OR search: if the problem left at a node splits
 component, the best completion is the sum of the parts' best, and searching them apart turns a product into a sum.
 A frame is winnable exactly when each connected component of its move-factor graph is, and an undecided candidate
 links the component where it is a factor to the one it would pay in, so the parts are the connected components of
-that graph (`ideas components`).  At the root of 936, 1000, 1100, 1215, 1232, 1287 and 1300, and at all 600 search
-nodes of the probe's fixtures (936 and 1215), there is exactly one component holding candidates.  Nothing to split.
+that graph.  Computed with a union-find over the numbers of the state: for each frame, each mover (a move of the
+frame, or a candidate that is a factor of the frame above, which would be promoted into this one) is joined to each
+of its maximal factors that is a factor of the frame; a candidate belongs to the component of its own number.  At the
+root of 936, 1000, 1100, 1215, 1232, 1287 and 1300, and at all 600 search nodes of the probe's fixtures (936 and
+1215; each node's state rebuilt from its promotions, the candidates its own), there is exactly one component holding
+candidates.  Nothing to split.
 
 ### 4.5 Disjoint conflicts from the dual (killed)
 
 From MaxSAT's disjoint-core bounds (and the evidence crate's "conflict-packing cut"): two disjoint conflicts within
 `Q*` must each lose a member, and lowering the potentials of both excluded members (and their partners) one after
-the other keeps the dual feasible, so their drops add up.  `MatchBound::bound_excluding_all` does that; checked
-never below the exact value on 16,800 pairs (26-33 above it on average), and tried where refinement did not cut:
-the fast set took between 2.7% fewer and 0.3% more nodes, and 12% more cycles (commit e248b18, taken out in
-bc6c716).  The frame solver's bound is already tight where it matters (forced members and one level of refinement
+the other keeps the dual feasible, so their drops add up.
+
+*The bound.*  The generalization of `bound_excluding` to several excluded candidates: the excluded candidates that
+the heaviest matching promotes are taken out one after the other; each lowers its own potential, and then that of the
+factor paying for it, as far as their remaining constraints allow given the potentials lowered before it (the
+excluded candidate's edges as a mover are gone), and the bound is the matching's value less the drops.  It is checked
+never below the exact value (the matching solved with the candidates out) on 16,800 pairs, and 26-33 above it on
+average.
+
+*The cut.*  Tried at a node where refinement did not cut and no member was forced: the conflicts are the one the
+search chose and every other nogood of the table within `P ∪ Q*` (less `P`); each conflict is costed by the least
+single drop `value − bound_excluding(x)` over its members; for each pair of disjoint conflicts whose costs sum
+to more than the gap `value − need`, the node is cut if the bound with both an `x` of the first and a `y` of the
+second excluded is below `need` for every such pair `(x, y)` (every completion leaves out a member of each, so its
+value is at most the largest of them).  The fast set took between 2.7% fewer and 0.3% more nodes, and 12% more
+cycles.  The frame solver's bound is already tight where it matters (forced members and one level of refinement
 catch nearly all of what pairs of conflicts would), unlike the model-free search's, whose gap is about 1,170 at
 n = 1000.
 
 ### 4.6 Recency in the choice of conflict (killed)
 
 From CDCL's activity heuristics (VSIDS, CHB): the nogood table returns the smallest conflict within `P ∪ Q*`, then
-the one with the largest member, then the first learned.  Preferring the most recently learned among the smallest
-(`--prefer 2`, commit 80f448c, taken out in bc6c716): 880 −1.2%, 936 +3.6%, 1050 +20%, 1100 +5%, 1170 −0.3%, 1184
-+7% nodes, the proofs of 1215 +0.7% and 1025 +6.7%; keeping the largest member first and only then the most recent
-(`--prefer 1`): −2.8% to +9.4%, no direction.  Which equally small conflict to branch on moves a game's node count by
-±10% either way, and recency does not choose better than size and the largest member.
+the one with the largest member, then the first learned (`Nogoods::lookup` keeps the best nogood seen in one scan of
+the table, replacing it by a later one only if that is smaller, or as small with a larger member).  The pilot changed
+the last tie-break only: preferring the most recently learned among the smallest, ignoring the largest member (a
+replacement whenever the size is no larger): 880 −1.2%, 936 +3.6%, 1050 +20%, 1100 +5%, 1170 −0.3%, 1184 +7% nodes (the
+fast set, one thread), the proofs of 1215 +0.7% and 1025 +6.7%; keeping the largest member first and only then the
+most recent (a replacement also when the size and the largest member are equal): −2.8% to +9.4%, no direction.
+Which equally small conflict to branch on moves a game's node count by ±10% either way, and recency does not choose
+better than size and the largest member.
 
 ### 4.7 A portfolio for finding incumbents (weak)
 
 From parallel SAT portfolios: run some threads with another branching that finds good sets early
 (`conflict-largest` follows the dive).  Section 2 shows the frontier's cost is the proof, so there is little to win;
-on the games that do improve their start (4 threads, 45 s, time to the best set found): 1290 at 9.3 s against
-13.9 s, 1287 at 13.7 s against 26.6 s (the same set, 41 below the optimum), 1300 not found in 45 s against
-19.2 s, 1232 found by neither.  Not worth a mechanism; worth remembering for games like 992 and 1025 whose optimum
-the search reaches late, if they come back at the frontier.
+on the games that do improve their start (4 threads, 45 s, time to the best set found with the tactic
+`branching=conflict-largest` against the default `conflict-strong`): 1290 at 9.3 s against 13.9 s, 1287 at 13.7 s
+against 26.6 s (the same set, 41 below the optimum), 1300 not found in 45 s against 19.2 s, 1232 found by neither.
+Not worth a mechanism; worth remembering for games like 992 and 1025 whose optimum the search reaches late, if they
+come back at the frontier.
 
 ## 5. Every idea considered
 
@@ -403,43 +472,33 @@ conflict the path had known; then try handing a unit its path's known conflicts 
 for any node below), or answering split requests with deeper units.  Soundness is unaffected either way (units are
 caches).
 
-## 6. The tools, and which commit holds what
+## 6. The tools, and what became of the pilot code
 
-The pilots' code is on the branch `ideas-pilots`, not on `master`: it hooks the searcher's inner loop (the probe
-measured 0.5% more cycles with every pilot off) and is research scaffolding, not a tactic.  `master` has this page
-and `tools/profile/`, which needs only the solver.  The commits below are on that branch; a pilot that graduates
-(rank 2 first, once its incremental matching pays) comes to `master` as a tactic, rewritten for it.
+The pilots' code hooked the searcher's inner loop (the probe measured 0.5% more cycles with every pilot off) and was
+research scaffolding, not a tactic, so it was not merged: after the study it was discarded, and sections 2-4 are the
+record of what it did.  Two pieces were useful on their own and are on `master`:
 
-| commit | what |
-|---|---|
-| 5dff240 | `examples/ideas.rs` (the pilots' harness: `components`, `fixing`, `fixing-exact`), `examples/common/fixtures.rs` (shared with the probe), `MatchBound::bound_including` and `fixed_out`, and the tactic `rc_fixing` (pilot 4.3) |
-| 6967c6c | the tactic `rc_fixing` taken out again (it changes no tree); the measurement and the bound stay |
-| e248b18 | `EngineConfig::cores` (many workers on few cores; a test in `tests/engine.rs`), the nogood study (`search::NogoodStudy`, tracking in `model::Nogoods`, `ladder --nogood-study --forget --keep --share --cores --node-limit`), and the disjoint-conflicts pilot (4.5) |
-| 80f448c | the Lagrangian pilot (`search::lagrange`, `MatchGraph::set_weights`, `matchbound::match_bound_weighted`, `ladder --lagrange --lagrange-depth --lagrange-steps --lagrange-static --dump-nogoods`, `ideas lagrange`), the recency pilot (4.6), `ideas repeats`, `ideas lookup-cost`, and the cycle counters shared by the probe and the pilots (`examples/common/counters.rs`) |
-| bc6c716 | the pilots that did not pay taken out (4.5, 4.6) |
-| 7c1ff92 | `tools/profile/` (the profile of section 2), and this page |
+* `EngineConfig::cores` (with a test in `tests/engine.rs` and `ladder --cores C`), which makes a few cores take
+  turns as many workers.  It costs nothing unless set: the check is in the engine's every-1024-polls slow path, and
+  the probe's cycles and fingerprint are unchanged.
+* `examples/common/fixtures.rs` (the `.nodes` fixtures and the hex text sets are written in) and
+  `examples/common/counters.rs` (cycles and instructions of the process), which the probe used to hold and the
+  pilots shared.
 
-None of this is on the solver's default path or changes a tree: `taxman solve` and its tactics are as they were, the
-probe's fingerprint is unchanged (6197a47eae6cf8c8, and its cycles within noise), and `cargo test --release` passes.
-The pilots are search-space fields set by the ladder (`SearchSpace::nogood_keep`, `nogood_share`, `nogood_study`,
-`lagrange`), not tactics, because none of them is ready to be one; rank 2 becomes a tactic once its incremental
-solver pays (4.2).
+`tools/profile/` (the profile of section 2) needs only the solver and is on `master` too.  Every other pilot is
+described where its result is: the nogood study and the cost of a table in section 3, memoizing repeated searches,
+reduced-cost fixing, components, disjoint conflicts and recency in section 4, with what each computed, on which
+games, with which settings, and the numbers that decided it.  The Lagrangian pilot (section 4.2) was taken over by
+the experiment that follows it up.
 
-To reproduce (from `rust/`, after `cargo build --release --examples`; `K=results/strict.jsonl`):
+The register in [EXPERIMENTS.md](EXPERIMENTS.md#register-of-everything-tried) has a row for each.  A pilot that
+graduates (rank 2 first, once its incremental matching pays) comes to `master` as a tactic, rewritten for it.
+
+To reproduce what is still reproducible (from `rust/`, after `cargo build --release --examples`; `K=results/strict.jsonl`):
 
 ```
-ladder --threads 1 --seed-opt --known $K --tactic revise_freedoms=off --nogood-study [--forget 0] 1215
-ladder --threads 4,16,64 --cores 4 --seed-opt --known $K --tactic revise_freedoms=off --nogood-study [--share 64] 1215
-ladder --threads 1 --seed-opt --known $K --tactic revise_freedoms=off --nogood-study --node-limit 20000 \
-    --dump-nogoods /tmp/n1184.nogoods 1184
-ladder --threads 1 --seed-opt --known $K --tactic revise_freedoms=off --lagrange /tmp/n1184.nogoods \
-    --lagrange-depth 100 1184
-ideas repeats 1201 1300
-ideas components 936 1215 1232
-ideas fixing-exact 936 1215
-ideas lagrange --nogoods /tmp/n1215.nogoods --iterations 20 1215
-ideas lookup-cost --nogoods /tmp/n1215.nogoods 1215
+ladder --threads 16 --cores 4 --seed-opt --known $K --tactic revise_freedoms=off 1215    # 16 workers on 4 cores
+tools/profile/profile.sh 1232 40 4 /tmp/prof    # the profile of section 2
 ```
 
-The profile of section 2: `tools/profile/profile.sh 1232 40 4 /tmp/prof` (macOS only: `sample` and `atos -i`; the
-attribution is `tools/profile/attribute.py`, standard library only).
+The profile (macOS only: `sample` and `atos -i`) is attributed by `tools/profile/attribute.py`, standard library only.
