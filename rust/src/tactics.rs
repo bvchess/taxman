@@ -1,9 +1,9 @@
 //! The tactics: every piece of the algorithm that can be switched, with its name, value and default.
 //!
 //! A *tactic* is one choice the solver makes that has a measurable effect on the answers' proof or on the time
-//! they take: a shortcut (`prime_shortcut`, `reuse_prev`), a way to bound or branch the search (`match_bound`,
-//! `branching`, ...), or a safeguard kept for comparison (`legacy_bound`).  DESIGN.md's table of tactics
-//! ("Tactics") grades each as proven, sound, unproven or unsound and says what it does; this module is the one
+//! they take: a shortcut (`prime_shortcut`, `reuse_prev`, `same_search`), a way to bound or branch the search
+//! (`match_bound`, `branching`, ...), or a safeguard kept for comparison (`legacy_bound`).  DESIGN.md's table of
+//! tactics ("Tactics") grades each as proven, sound, unproven or unsound and says what it does; this module is the one
 //! place in the code that knows their names.  The ones that act inside the search are [`SearchTactics`]; the
 //! others are only used by the per-game pipeline ([`crate::solver`]).
 //!
@@ -27,6 +27,9 @@ pub struct Tactics {
     /// Accept the game made of the previous game's promotions without a search, if it scores what the previous
     /// game suggests (unproven).
     pub reuse_prev: bool,
+    /// Conclude a game whose search problem an earlier game of the chain already solved with that game's
+    /// promotions, without a search (proven, given the earlier game's proof; see `crate::solver`).
+    pub same_search: bool,
     /// Stop the search as soon as the incumbent reaches `n + opt(n − 1) − inTheBag` (proven if `opt(n − 1)` is
     /// optimal).
     pub prev_cap: bool,
@@ -40,6 +43,7 @@ impl Default for Tactics {
             search: SearchTactics::default(),
             prime_shortcut: true,
             reuse_prev: true,
+            same_search: true,
             prev_cap: true,
             seed_incumbent: true,
         }
@@ -52,7 +56,7 @@ impl Default for Tactics {
 pub const UNPROVEN: [&str; 3] = ["reuse_prev", "revise_freedoms", "legacy_bound"];
 
 /// The number of tactics.
-pub const TACTIC_COUNT: usize = 13;
+pub const TACTIC_COUNT: usize = 14;
 
 /// The value of a tactic: an on/off switch, or one of the two settings that are not.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -129,6 +133,7 @@ impl Tactics {
         [
             ("prime_shortcut", Slot::Switch(&mut self.prime_shortcut)),
             ("reuse_prev", Slot::Switch(&mut self.reuse_prev)),
+            ("same_search", Slot::Switch(&mut self.same_search)),
             ("revise_freedoms", Slot::Switch(&mut self.search.revise_freedoms)),
             ("preclusions", Slot::Switch(&mut self.search.preclusions)),
             ("match_bound", Slot::Switch(&mut self.search.match_bound)),
@@ -217,6 +222,7 @@ mod tests {
             [
                 "prime_shortcut",
                 "reuse_prev",
+                "same_search",
                 "revise_freedoms",
                 "preclusions",
                 "match_bound",
@@ -231,7 +237,8 @@ mod tests {
             ]
         );
         let values: Vec<String> = t.settings().iter().map(|s| s.1.to_string()).collect();
-        let expected = ["on", "on", "on", "off", "on", "conflict-strong", "1", "on", "on", "on", "off", "on", "on"];
+        let expected =
+            ["on", "on", "on", "on", "off", "on", "conflict-strong", "1", "on", "on", "on", "off", "on", "on"];
         assert_eq!(values, expected);
         // The values of the search tactics are those of `SearchTactics::default()`, not copies of them.
         let search = SearchTactics::default();
@@ -343,6 +350,7 @@ mod tests {
             },
             prime_shortcut: false,
             reuse_prev: false,
+            same_search: false,
             prev_cap: false,
             seed_incumbent: false,
         });

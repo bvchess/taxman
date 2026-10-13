@@ -144,7 +144,7 @@ pub fn regress(args: &[String]) -> CliResult {
         opts.tactics.description(),
         elapsed.as_secs_f64()
     );
-    let counts: Vec<String> = [Method::Trivial, Method::Prime, Method::Reuse, Method::Search]
+    let counts: Vec<String> = Method::ALL
         .iter()
         .map(|&m| format!("{} {}", m.as_str(), results.iter().filter(|r| r.method == m).count()))
         .collect();

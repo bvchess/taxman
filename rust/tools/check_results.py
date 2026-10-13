@@ -12,12 +12,14 @@ For every completed game:
   first       the first move is the largest prime <= n (every optimal game opens with it)
   promoted    the promotions are moves, in ascending order
   fields      the fields the proof and taint come from agree with each other, as the solver writes them: a searched
-              game, and only a searched one, has a setup; its setup.revise is a value of revise_freedoms (Revise in
-              rust/src/search/setup.rs, as Rust's Debug writes it), "Off" exactly when tactic_switches has
-              revise_freedoms off (but up to schema 2 also "FromCheckpoint", which builds before commit 7af9fea
+              or repeat game, and only such a game, has a setup; its setup.revise is a value of revise_freedoms
+              (Revise in rust/src/search/setup.rs, as Rust's Debug writes it), "Off" exactly when tactic_switches
+              has revise_freedoms off (but up to schema 2 also "FromCheckpoint", which builds before commit 7af9fea
               wrote for any resumed search), and "Stopped" only if the game reached its cap at once; from schema 2
               on, every game but a prime one records in_the_bag; only a search reaches a cap; a prime game's n is
-              prime; a trivial game promotes nothing
+              prime; a trivial game promotes nothing; from schema 4 on, a setup records the digest of its search
+              problem, and a repeat, and only a repeat, records the game it repeats (same_search), has no cap in its
+              setup and a setup.revise that a setup that was not resumed or stopped writes
   chain       score(n-1) <= score(n) <= n + score(n-1), with n-1 from the same file, else from optimal.json
               (both are theorems about optimal games: a game of n-1 is a game of n, and deleting the move n from
               a game of n leaves a game of n-1)
@@ -30,16 +32,28 @@ For every completed game:
   provenance  the predecessor a line names is in the file (or optimal.json) and, from schema 2 on, its record
               matches that game (score, FNV-1a digest of the moves, proof, taint); the recorded proof and taint
               are the ones the rules below give
+  repeat      a repeat (method "repeat", proof same_search, schema 4) names a game m that is a completed game of
+              the same file on an earlier line, whose proof is exhausted, cap or same_search and whose setup.revise
+              is not FromCheckpoint; the record's proof and taint are m's; the recorded digests agree (the repeat's
+              setup.digest, its record's digest and, from schema 4 on, m's setup.digest); the promotions are m's,
+              and promotion_sum is their sum; score(n) - in_the_bag(n) = score(m) - in_the_bag(m) (in_the_bag of a
+              schema 1 line is its score less its promotions)
 and across files: every board size that two files share has the same score in both.
 
-Proof kinds (rust/src/results.rs explains them): trivial, exhausted, cap, prime_formula, reuse_prev; a line without
-a "schema" field (schema 1) proves by the cap when its promotions sum to setup.cap.  The taint is what a proof rests
-on that is unproven: reuse_prev for a game it derived; revise_freedoms for a searched game whose setup.revise is
-GreedyIsMax, Searched or FromCheckpoint; legacy_bound for a searched game with it on; and, for a proof by the cap,
-the prime formula or reuse_prev, the taint of the game of n-1 ("optimal.json" for a game taken from that file).
-From schema 3 on, a proof by the cap rests on nothing the game used itself (its game replays to n + score(n-1),
-the ceiling, whatever found it), so its taint is only that of the game of n-1.  A line of a schema newer than this
-referee reads is a problem.
+What this referee cannot check, because it does not rebuild the frame model: that an exhausted search explored its
+whole tree (it trusts the line's proof kind, as the Rust verifier must too), and that a repeat's search problem is
+m's.  The digests a line records are hashes of the problems, which only the solver can compute; this referee checks
+that they agree and that the two games are consistent with sharing one problem, and `taxman verify-results` sets
+both problems up again and compares them.
+
+Proof kinds (rust/src/results.rs explains them): trivial, exhausted, cap, prime_formula, reuse_prev, same_search; a
+line without a "schema" field (schema 1) proves by the cap when its promotions sum to setup.cap.  The taint is what a
+proof rests on that is unproven: reuse_prev for a game it derived; revise_freedoms for a searched or repeat game
+whose setup.revise is GreedyIsMax, Searched or FromCheckpoint; legacy_bound for a searched game with it on; for a
+proof by the cap, the prime formula or reuse_prev, the taint of the game of n-1 ("optimal.json" for a game taken
+from that file); and for same_search, the taint of the game it repeats.  From schema 3 on, a proof by the cap rests
+on nothing the game used itself (its game replays to n + score(n-1), the ceiling, whatever found it), so its taint
+is only that of the game of n-1.  A line of a schema newer than this referee reads is a problem.
 
 The report counts games by proof kind and by taint, and the arithmetic certificates: scores equal to n + score(n-1)
 or to the prime formula, which certify a game whatever found it, given that the game of n-1 is optimal.
@@ -60,8 +74,11 @@ OPTIMAL = REPO / "src" / "main" / "resources" / "optimal.json"
 FM_BOUND = REPO / "heuristics" / "results" / "fm_bound_2000.json"
 HEURISTIC_CHAIN = REPO / "heuristics" / "results" / "chain_1001_2000.json"
 
-SCHEMA = 3  # the newest format of a result line this referee reads
+SCHEMA = 4  # the newest format of a result line this referee reads
 RESTS_ON_PREV = {"prime_formula", "cap", "reuse_prev"}
+SETTLES_SEARCH = {"exhausted", "cap", "same_search"}  # the proofs a repeat can repeat
+SETS_UP = {"search", "repeat"}  # the methods whose lines have a setup
+DIGEST = re.compile("[0-9a-f]{16}")
 # The values of setup.revise, by kind: the plain ones, and those with numbers (u32 sizes, u64 node counts) in the
 # form Rust's Debug writes them, without signs or leading zeros.  REVISED are the kinds that taint a searched game.
 PLAIN_REVISE = {"Off", "NotNeeded", "Unchanged", "FromCheckpoint", "ResumedAsBuilt"}
@@ -156,11 +173,10 @@ def own_taint(row):
     taint = set()
     if row["method"] == "reuse":
         taint.add("reuse_prev")
-    if row["method"] == "search":
-        if revise_kind((row.get("setup") or {}).get("revise")) in REVISED:
-            taint.add("revise_freedoms")
-        if row["tactic_switches"].get("legacy_bound"):
-            taint.add("legacy_bound")
+    if row["method"] in SETS_UP and revise_kind((row.get("setup") or {}).get("revise")) in REVISED:
+        taint.add("revise_freedoms")
+    if row["method"] == "search" and row["tactic_switches"].get("legacy_bound"):
+        taint.add("legacy_bound")
     return taint
 
 
@@ -170,8 +186,23 @@ def contradictions(n, row, schema, reached):
     method, setup = row["method"], row.get("setup")
     switches = row.get("tactic_switches") or {}
     found = []
-    if (method == "search") != (setup is not None):
-        found.append("a searched game without a setup" if method == "search" else f"a {method} game with a setup")
+    if (method in SETS_UP) != (setup is not None):
+        found.append(f"a {method} game without a setup" if method in SETS_UP else f"a {method} game with a setup")
+    repeat = method == "repeat"
+    if repeat and schema < 4:
+        found.append(f"a repeat game in a line of schema {schema}, which has no repeats")
+    if schema >= 4 and repeat != (row.get("same_search") is not None):
+        found.append(f"a {method} game {'without' if repeat else 'with'} a same_search record")
+    if schema >= 4 and setup is not None:
+        digest = setup.get("digest")
+        if not (isinstance(digest, str) and DIGEST.fullmatch(digest)):
+            found.append(f"setup.digest {digest!r} is not 16 hexadecimal digits")
+    if repeat and setup is not None:
+        revise = setup.get("revise")
+        if setup.get("cap") is not None:
+            found.append("a repeat game whose setup has a cap, which only a search has")
+        if revise_kind(revise) in ("Stopped", "FromCheckpoint", "ResumedAsBuilt"):
+            found.append(f"a repeat game whose setup.revise is {revise}, which only a stopped or resumed search says")
     if schema >= 2 and (row.get("in_the_bag") is None) != (method == "prime"):
         found.append(f"a {method} game {'without' if method != 'prime' else 'with'} in_the_bag")
     if reached and method != "search":
@@ -207,9 +238,46 @@ def reached_cap(row):
 
 def proof_of(row):
     method = row["method"]
-    if method in ("trivial", "prime", "reuse"):
-        return {"trivial": "trivial", "prime": "prime_formula", "reuse": "reuse_prev"}[method]
+    if method in ("trivial", "prime", "reuse", "repeat"):
+        return {"trivial": "trivial", "prime": "prime_formula", "reuse": "reuse_prev", "repeat": "same_search"}[method]
     return "cap" if reached_cap(row) else "exhausted"
+
+
+def in_the_bag(row):
+    """What the game with no promotions scores: recorded from schema 2 on, else the score less the promotions."""
+    bag = row.get("in_the_bag") if row.get("schema", 1) >= 2 else None
+    return bag if bag is not None else row["score"] - sum(row["promotions"])
+
+
+def repeat_problems(n, number, row, done):
+    """What is wrong with a repeat's line against the game m it repeats (done[m] if the file completed it), as far as
+    the lines tell: the two search problems themselves only the solver can compare."""
+    record = row["same_search"]
+    m = record.get("n")
+    if not isinstance(m, int) or m >= n or m not in done:
+        return [f"it repeats the search of game {m}, which is not a completed game of the file below it"]
+    _score, _moves, proof, taint, line, earlier = done[m]
+    if line > number:
+        return [f"it repeats the search of game {m}, whose line ({line}) comes after it"]
+    found = []
+    if proof not in SETTLES_SEARCH:
+        found.append(f"it repeats the search of game {m}, whose proof ({proof}) settles no search")
+    if revise_kind((earlier.get("setup") or {}).get("revise")) == "FromCheckpoint":
+        found.append(f"game {m}'s setup.revise is FromCheckpoint, so its search cannot be set up again")
+    if record.get("proof") != proof or set(record.get("taint") or []) != taint:
+        found.append(f"its record of game {m} does not match line {line}")
+    digests = {(row.get("setup") or {}).get("digest"), record.get("digest")}
+    if earlier.get("schema", 1) >= 4:
+        digests.add((earlier.get("setup") or {}).get("digest"))
+    if len(digests) != 1:
+        found.append(f"it and game {m} (line {line}) record different search digests")
+    if row["promotions"] != earlier["promotions"]:
+        found.append(f"its promotions are not those of game {m} (line {line})")
+    if record.get("promotion_sum") != sum(row["promotions"]):
+        found.append(f"its promotions sum to {sum(row['promotions'])}, not the promotion_sum it records")
+    if row["score"] - in_the_bag(row) != earlier["score"] - in_the_bag(earlier):
+        found.append(f"score - in_the_bag is not that of game {m} (line {line})")
+    return found
 
 
 def check_file(path, optimal, fm, heuristic, divisors, problems):
@@ -225,7 +293,7 @@ def check_file(path, optimal, fm, heuristic, divisors, problems):
             continue
         games[n] = (number, row)
 
-    done = {}  # n -> (score, moves, proof, taint, line)
+    done = {}  # n -> (score, moves, proof, taint, line, row)
     counts = Counter()
     certificates = Counter()
     taints = Counter()
@@ -326,18 +394,30 @@ def check_file(path, optimal, fm, heuristic, divisors, problems):
         if row["method"] == "prime" and prev_score is not None and score != prev_score + n - replaced:
             fail(f"a prime game must score n + score(n-1) - {replaced}")
 
+        # The game a repeat repeats.
+        repeated = None
+        if row["method"] == "repeat" and isinstance(row.get("same_search"), dict):
+            for message in repeat_problems(n, number, row, done):
+                fail(message)
+            m = row["same_search"].get("n")
+            repeated = done.get(m) if isinstance(m, int) and m < n else None
+
         # Proof and taint.
         if proof in RESTS_ON_PREV and prev is None:
             fail(f"its proof ({proof}) rests on a game of n-1 it does not name")
         own = set() if proof == "cap" and schema >= 3 else own_taint(row)
-        taint = own | (prev[3] if prev and proof in RESTS_ON_PREV else set())
+        if repeated is not None:
+            basis = repeated[3]
+        else:
+            basis = prev[3] if prev and proof in RESTS_ON_PREV else set()
+        taint = own | basis
         if schema >= 2:
             if row["proof"] != proof:
                 fail(f"records the proof {row['proof']}, but the rules give {proof}")
             if set(row["taint"]) != taint:
                 fail(f"records the taint {sorted(row['taint'])}, but the rules give {sorted(taint)}")
 
-        done[n] = (score, moves, proof, taint, number)
+        done[n] = (score, moves, proof, taint, number, row)
         counts[proof] += 1
         taints.update(taint)
         if not taint:

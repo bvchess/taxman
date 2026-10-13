@@ -91,6 +91,7 @@ fn every_tactic_gives_the_same_scores() {
             assert_eq!(Some(r.score), optimal.score(r.n), "{name}: n={}", r.n);
             assert_ne!(r.method, Method::Prime, "{name}: force_search skips the shortcuts (n={})", r.n);
             assert_ne!(r.method, Method::Reuse, "{name}: force_search skips the shortcuts (n={})", r.n);
+            assert_ne!(r.method, Method::Repeat, "{name}: force_search skips the shortcuts (n={})", r.n);
             assert_eq!(r.tactics.description(), name, "n={}", r.n);
         }
     }
@@ -106,6 +107,7 @@ fn derivations_can_be_switched_off() {
                 let mut t = taxman::tactics::Tactics::default();
                 t.set("prime_shortcut=off").unwrap();
                 t.set("reuse_prev=off").unwrap();
+                t.set("same_search=off").unwrap();
                 t
             },
             ..options(2)

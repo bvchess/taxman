@@ -1,7 +1,7 @@
 # Results of the Rust solver
 
 One JSON line per game, as `taxman solve --out` writes it (the fields are described in `src/results.rs` and in
-[../README.md](../README.md#a-results-line---out-schema-3)).  This page says what each file is, how it was made, and
+[../README.md](../README.md#a-results-line---out-schema-4)).  This page says what each file is, how it was made, and
 what supports the scores in it.  The counts in it are pinned by `tests/results.rs`, so changing a file means updating
 both together.
 
@@ -55,6 +55,7 @@ What the lines say, as `taxman verify-results` and `tools/check_results.py` repo
 | proof `cap`: the search reached n + score(n − 1) | 415 | 0 | 70 |
 | proof `prime_formula` | 211 | 34 | 34 |
 | proof `reuse_prev`: a conjecture | 0 | 119 | 0 |
+| proof `same_search`: a repeat of an earlier game's search (made before the tactic existed) | 0 | 0 | 0 |
 | rest on nothing unproven | 1300 | 19 | 231 |
 | score = n + score(n − 1) | 424 | 70 | 70 |
 | score = n + score(n − 1) − P (a prime n) | 210 | 34 | 34 |
