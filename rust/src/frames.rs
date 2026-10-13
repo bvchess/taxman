@@ -36,8 +36,8 @@
 //! candidates: 8 12 16 20 24 28 30 36 40 42
 //! ```
 //!
-//! The moves are the sources the hives found neither forced nor impossible; the factors are the ones not used
-//! up by forced moves; the *freedoms* are factors minus moves.  A promotion takes a number out of the factors of
+//! The moves are the sources the hives found neither mandatory nor impossible; the factors are the ones not used
+//! up by mandatory moves; the *freedoms* are factors minus moves.  A promotion takes a number out of the factors of
 //! its frame and adds it to the moves of the frame below, which costs one freedom in each.
 //!
 //! # The order of operations matters
@@ -57,12 +57,12 @@ use crate::numtheory::Tables;
 pub struct FrameColumn<const W: usize> {
     /// The merged hives' names joined with `+`; for diagnostics only.
     pub name: String,
-    /// The frame's factors that are not already used up by forced moves.
+    /// The frame's factors that are not already used up by mandatory moves.
     pub factors: Bits<W>,
-    /// The frame's sources that are neither forced nor impossible: the moves the search still has to place.
+    /// The frame's sources that are neither mandatory nor impossible: the moves the search still has to place.
     pub moves: Bits<W>,
     /// `|factors| − |sources|` of the merged hive, the frame's *freedoms*: how many spare factors it has.  Each
-    /// promotion into the frame or out of it uses one up.  (It equals `factors.len() − moves.len()`: the forced
+    /// promotion into the frame or out of it uses one up.  (It equals `factors.len() − moves.len()`: the mandatory
     /// moves take one factor each.)
     pub free_factor_count: i32,
 }
@@ -107,7 +107,7 @@ pub fn build_frames<const W: usize>(t: &Tables) -> FrameColumns<W> {
             apiary.merge(&positions);
         }
     }
-    // Merging forgot what the parts had found (the forced and impossible moves); find it again for the merged
+    // Merging forgot what the parts had found (the mandatory and impossible moves); find it again for the merged
     // hives.
     apiary.finish_setup();
 

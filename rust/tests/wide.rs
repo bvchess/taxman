@@ -3,14 +3,15 @@
 //! `optimal.json` and the Java stop at n = 1000, and the sets that hold the numbers of a board are 8 words wide up
 //! to n = 511, then 16, 20, 24, 28 and 32 words up to 1023, 1279, 1535, 1791 and 2047, and 64 up to 4095
 //! (`bits::WIDTHS`), so nothing above n = 1023 meets anything but these tests and the committed results
-//! (`results/strict.jsonl` and `default.jsonl`, n = 1001..1231).  What is cheap to run here: the same small game
-//! at every width that holds it (a width-dependent bug changes the tree), games of 1100 to 1250 that need a few
-//! thousand nodes against the committed results, and boards of 2048 and more through their setup.
+//! (`results/strict.jsonl`, n = 1..1300, and `default.jsonl`, n = 1001..1231).  What is cheap to run here: the same
+//! small game at every width that holds it (a width-dependent bug changes the tree), games of 1100 to 1250 that need
+//! a few thousand nodes against the committed results, and boards of 2048 and more through their setup.
 
 mod common;
 
 use common::{
-    config, prev_of, profile_at_width, stored_games, strict_options, testdata, variants, Config, Game, Profile, TempDir,
+    config, prev_of, profile_at_width, stored_games, strict_options, testdata, variants, Config, Game, Profile, Rng,
+    TempDir,
 };
 use std::time::Duration;
 use taxman::bits::Bits;
@@ -248,6 +249,53 @@ fn a_w20_search_interrupted_and_resumed_gives_the_same_answer() {
         assert!(!opts.checkpoint_file(1133).unwrap().exists(), "{name}");
         assert!(pieces >= 2, "{name}: {pieces} pieces");
     }
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Promoting on wide boards
+
+/// Promoting one number at a time (`Model::promote`, which skips the peel when the move has a factor no move of
+/// the frame below uses) leaves the same state, and fails in the same places, as promoting it with the peel of
+/// every frame (`promote_all_using` of the one number), in states reached by promoting random candidates; and those
+/// states are what promoting them all at once leaves.  The shortcut is exact only in winnable frames, which every
+/// reached state has because every root frame is (the frame builder's roots; `search::prepare` checks it in debug
+/// builds, and `Game::of_board` here): the unit tests check it on perturbed boards up to n = 250 and W = 4.  Returns
+/// the promotions tried and how many could be made.
+fn single_promotions_agree_with_the_peel<const W: usize>(n: u32, rng: &mut Rng) -> (u64, u64) {
+    let game = Game::<W>::of_board(n).expect("a game whose root frames are winnable");
+    let mut scratch = Scratch::<W>::new();
+    let (mut tried, mut made) = (0, 0);
+    for _ in 0..6 {
+        let (mut state, mut promoted) = (game.root, Bits::EMPTY);
+        let percent = rng.pick(&[2u64, 5, 10, 25]);
+        for x in game.candidates.iter_desc() {
+            if rng.chance(percent) && game.model.promote_in_place(&mut state, x) {
+                promoted.insert(x);
+            }
+        }
+        let at_once = game.model.promote_all_using(&mut scratch, &game.root, &promoted);
+        assert!(at_once == Some(state), "n={n}: {promoted:?} one by one and at once differ");
+        for x in (game.candidates - promoted).iter() {
+            let peeled = game.model.promote_all_using(&mut scratch, &state, &Bits::EMPTY.with(x));
+            assert!(game.model.promote(&state, x) == peeled, "n={n}: promoting {x} after {promoted:?}");
+            tried += 1;
+            made += u64::from(peeled.is_some());
+        }
+    }
+    (tried, made)
+}
+
+#[test]
+fn single_promotions_agree_with_the_peel_at_wide_widths() {
+    let mut rng = Rng(0x5107_C0DE_0000_0001);
+    let counts = [
+        single_promotions_agree_with_the_peel::<20>(1133, &mut rng),
+        single_promotions_agree_with_the_peel::<28>(1600, &mut rng),
+        single_promotions_agree_with_the_peel::<64>(2050, &mut rng),
+        single_promotions_agree_with_the_peel::<64>(3000, &mut rng),
+    ];
+    let (tried, made) = counts.iter().fold((0, 0), |(t, m), (a, b)| (t + a, m + b));
+    assert!(tried > 3000 && made > 500, "{tried} promotions tried, {made} made");
 }
 
 // ---------------------------------------------------------------------------------------------------------

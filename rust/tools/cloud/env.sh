@@ -12,8 +12,9 @@
 #   LOGS          the log directory               (default $TAXMAN_WORK/logs)
 #   TAXMAN_BIN    the solver binary               (default rust/target/release/taxman)
 #   LADDER_BIN    the ladder example binary       (default rust/target/release/examples/ladder)
-#   RUSTFLAGS     default "-C target-cpu=native": build for the CPU of the machine that builds.  Build on the machine
-#                 type that will run the binary.  Set it to the empty string to build generic code.
+#   RUSTFLAGS     default "-C target-cpu=native" in these scripts (a plain `cargo build` builds generic code): build
+#                 for the CPU of the machine that builds.  Build on the machine type that will run the binary.  Set it
+#                 to the empty string to build generic code.
 
 _cloud_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TAXMAN_ROOT="${TAXMAN_ROOT:-$(cd "$_cloud_dir/../../.." && pwd)}"
@@ -26,8 +27,9 @@ TAXMAN_BIN="${TAXMAN_BIN:-$CRATE/target/release/taxman}"
 LADDER_BIN="${LADDER_BIN:-$CRATE/target/release/examples/ladder}"
 CLOUD_DIR="$_cloud_dir"
 
-# The settings of the committed strict chain: no unproven tactic on.
-STRICT_ARGS=(--tactic reuse_prev=off --tactic revise_freedoms=off)
+# The settings of the committed strict chain: no unproven tactic on (--tactic reuse_prev=off --tactic
+# revise_freedoms=off, which is all --strict stands for).
+STRICT_ARGS=(--strict)
 
 # The results files committed with the code, which a production run must agree with where they overlap.
 COMMITTED_RESULTS=("$CRATE/results/default.jsonl" "$CRATE/results/strict.jsonl" "$CRATE/bench/curve/chain.jsonl")

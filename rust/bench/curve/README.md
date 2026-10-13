@@ -34,9 +34,10 @@ Regenerate the tables with `./analysis.py > analysis_output.md`.
 
 1. **Chain baseline.**  `taxman solve 1001-1231 --threads 8 --tactic reuse_prev=off --tactic revise_freedoms=off
    --checkpoint-dir ... --progress 0`: each game starts from the previous game (seed and the n + opt(n-1) cap), so
-   a game's time is its *chained* cost.  Every score equals `results/strict.jsonl` (1001-1219) and
-   `results/default.jsonl` (1001-1231).  (`strict.jsonl` ends at 1219, not 1231; the chain file written here is the
-   strict file through 1231 and is what `--known` used wherever a game past 1219 was needed.)
+   a game's time is its *chained* cost.  Every score equals `results/strict.jsonl` (1001-1219, as it was then) and
+   `results/default.jsonl` (1001-1231).  (`strict.jsonl` then ended at 1219, not 1231; the chain file written here is
+   the strict file through 1231 and is what `--known` used wherever a game past 1219 was needed.  `strict.jsonl` has
+   since been regenerated as a strict chain 1-1300, and its games 1001-1231 are this file's, move for move.)
 2. **Calibration.**  `ladder --threads 8 --no-seed --no-cap --tactic revise_freedoms=off` on every non-prime in
    1001-1231, one process per game.  Each standalone result was checked against the chain's optimum (all 197
    agree).  Compared per game with step 1.

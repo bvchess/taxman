@@ -16,21 +16,21 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends python3 procps time tmux \
     && rm -rf /var/lib/apt/lists/*
 
-# The solver finds optimal.json through the path it was built at (../src/main/resources/optimal.json from the crate),
-# so the build and the runs happen at the same place in the image.
+# The solver finds optimal.json at run time (src/paths.rs): src/main/resources/optimal.json above the working
+# directory, or above the binary.  The copy below puts it where it is in a checkout, so the image needs no flag.
 WORKDIR /taxman
 COPY rust/ rust/
 COPY src/main/resources/optimal.json src/main/resources/optimal.json
 COPY heuristics/results/ heuristics/results/
 
-# The scripts build with RUSTFLAGS="-C target-cpu=native" by default; an image is built on one machine and may run on
-# another, so it builds generic code, and the empty value tells the scripts to leave it so (env.sh).
+# Cargo builds generic code, but the scripts opt in to RUSTFLAGS="-C target-cpu=native" by default (env.sh); an image
+# is built on one machine and may run on another, so the empty value below keeps it generic and the scripts leave it so.
 ENV RUSTFLAGS="" \
     TAXMAN_ROOT=/taxman \
     TAXMAN_WORK=/work
 
 WORKDIR /taxman/rust
-RUN cargo build --release --examples \
+RUN cargo build --release --bins --examples \
     && cargo test --no-run
 
 # Results, checkpoints and logs go to /work: mount a volume there (docker run -v taxman-work:/work) to keep them.

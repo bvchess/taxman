@@ -10,14 +10,15 @@
 //!
 //! # What the crate does
 //!
-//! It finds optimal games.  Every number above `n/2` is always a move, so a game is chosen by which of the other
-//! numbers to *promote* to a move as well.  The *frame model* (a restatement of the algorithm of the Java solver
-//! in `src/main/java`) splits the board into independent groups of numbers, the *hives*, stacks the ones that
-//! have numbers to spare into *frames*, and turns an optimal game into the promotion set with the largest sum
-//! that keeps every frame winnable.  A branch-and-bound over promotion sets, bounded by a matching relaxation and
-//! run on many threads, finds that set; a game of `n` is built from the game of `n − 1`, so a chain of games from
-//! `n = 1` proves each from the one before.  `README.md` (in the crate's directory) is the user guide and has the
-//! glossary; `DESIGN.md` explains the design; `docs/EXPERIMENTS.md` is the lab notebook of how it got there.
+//! It finds optimal games.  Every number above `n/2` is never tax and is played (unless it turns out to be
+//! impossible), so a game is chosen by which of the other numbers to *promote* to a move as well.  The *frame
+//! model* (a restatement of the algorithm of the Java solver in `src/main/java`) splits the board into independent
+//! groups of numbers, the *hives*, stacks the ones that have numbers to spare into *frames*, and turns an optimal
+//! game into the promotion set with the largest sum that keeps every frame winnable.  A branch-and-bound over
+//! promotion sets, bounded by a matching relaxation and run on many threads, finds that set; a game of `n` is
+//! built from the game of `n − 1`, so a chain of games from `n = 1` proves each from the one before.  `README.md`
+//! (in the crate's directory) is the user guide and has the glossary; `DESIGN.md` explains the design;
+//! `docs/EXPERIMENTS.md` is the lab notebook of how it got there.
 //!
 //! # From a board size to a game
 //!
@@ -43,15 +44,15 @@
 //!
 //! # Module map
 //!
-//! In the order that builds understanding, each layer using the ones above it.  Each module starts with a comment
-//! that says what it is for.
+//! In the order to read them (README, "Reading order", is the same list with advice for a first read): each layer
+//! uses the ones above it.  Each module starts with a comment that says what it is for.
 //!
 //! | layer | module | what it is |
 //! |---|---|---|
-//! | foundations | [`bits`] | fixed-width bitsets `Bits<W>` for sets of game numbers; the set widths, dispatched |
+//! | foundations | [`game`] | the rules as a referee ([`game::replay`]), and the table of optimal games ([`game::Optimal`]) |
 //! | | [`numtheory`] | maximal factors and composites, primes, divisors of the numbers on a board |
+//! | | [`bits`] | fixed-width bitsets `Bits<W>` for sets of game numbers; the set widths, dispatched |
 //! | | [`json`] | a small JSON reader and writer (the table of optimal games, golden data, results lines) |
-//! | | [`game`] | the rules as a referee ([`game::replay`]), and the table of optimal games ([`game::Optimal`]) |
 //! | frame model | [`hives`] | sources, factors and hives; what a board's hives can play and spare |
 //! | | [`frames`] | hives stacked into frames, and the promotion candidates |
 //! | | [`model`] | the search state: frames, winnability, promotion, conflicts, nogoods |
@@ -59,7 +60,7 @@
 //! | search | [`matchbound`] | the matching bound: the default upper bound on a node's completions |
 //! | | [`search`] | the branch-and-bound searcher, its tactics, its setup and checkpoint header |
 //! | | [`bounds`] | the Java solver's bound (`blameGame`), preclusions, the greedy incumbent, candidate lists |
-//! | | [`engine`] | the problem-independent parallel depth-first driver: threads, spill, checkpoints |
+//! | engine | [`engine`] | the problem-independent parallel depth-first driver: threads, spill, checkpoints |
 //! | solving | [`tactics`] | the switchable pieces of the algorithm, by name and value |
 //! | | [`board`] | a board analysed and prepared for a search: tables, frames, cap and seed |
 //! | | [`solver`] | the per-game pipeline, the options, the range driver |
@@ -68,11 +69,12 @@
 //! | studies | [`brute`] | exhaustive search without the frame model, to certify small boards |
 //! | | [`sacrifice`] | the sacrifice bound and punctured games; not used by the solver |
 //!
-//! The command-line front end (`main.rs`, `cli.rs`, `commands.rs`) is the binary's, not the library's.  `bounds` is
-//! mostly the Java-parity layer (the default search uses only its greedy incumbent and candidate lists), and
-//! `sacrifice` and `brute` are studies; a first read can skip all three.  `examples/` holds the ladder (searches of
-//! hard games with time limits and thread counts), the probe of the hot paths, and the sacrifice study; `tests/` the
-//! integration tests.
+//! The command-line front end (`main.rs`, `cli.rs`, `commands.rs`) is the binary's, not the library's, and is read
+//! last.  `bounds` is mostly the Java-parity layer: the default search takes from it only `max_additional`, the
+//! greedy incumbent, the narrowing of the children's candidates and the scratch space of its peels (the module
+//! comment lists them), and `sacrifice` and `brute` are studies; a first read can skip those two and read `bounds`
+//! for that list only.  `examples/` holds the ladder (searches of hard games with time limits and thread counts), the
+//! probe of the hot paths, and the sacrifice study; `tests/` the integration tests.
 
 pub mod accelerate;
 pub mod bits;

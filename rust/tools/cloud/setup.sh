@@ -135,7 +135,7 @@ exec > >(tee -a "$LOGS/setup.log") 2>&1
 
 # --- the build ---------------------------------------------------------------------------------------------------
 say "building (RUSTFLAGS='${RUSTFLAGS:-}'): the solver and the examples (ladder, sacrifice)"
-(cd "$CRATE" && cargo build --release --examples)
+(cd "$CRATE" && cargo build --release --bins --examples)
 [ -x "$TAXMAN_BIN" ] || fail "the build did not produce $TAXMAN_BIN"
 [ -x "$LADDER_BIN" ] || fail "the build did not produce $LADDER_BIN"
 

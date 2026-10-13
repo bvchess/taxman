@@ -689,6 +689,14 @@ fn spill_failure_stops_without_losing_work() {
     let spill = dir.join("spill");
     fs::create_dir_all(&spill).unwrap();
     fs::set_permissions(&spill, fs::Permissions::from_mode(0o555)).unwrap();
+    // A privileged process (root, e.g. in a container) writes to a read-only directory anyway, so the spill cannot
+    // be made to fail this way: skip rather than report a false failure.
+    let probe = spill.join("probe");
+    if fs::write(&probe, b"").is_ok() {
+        let _ = fs::remove_file(&probe);
+        eprintln!("spill_failure_stops_without_losing_work: skipped (this process can write to read-only directories)");
+        return;
+    }
     let cfg = EngineConfig {
         checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))),
         queue_mem_cap: 2,

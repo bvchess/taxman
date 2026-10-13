@@ -12,11 +12,11 @@
 //! The frame model looks at the board `1..=n` through *maximal* factors (see [`crate::numtheory`]): a move
 //! `m` is paid for by one of its maximal factors, and a factor can pay for only one move.  A number with no
 //! maximal composite (every number above `n/2`) divides nothing, so it is never anybody's tax and the model
-//! always plays it: a *source*.  The search may also *promote* further numbers (play a factor as a move), which
-//! are then treated as sources too (`treat_as_sources`).  Everything that is not a source is a *factor*.  (A
-//! *sink* is a number all of whose maximal factors are promoted, so that nothing is left to pay for it: promoting
-//! 8 on the board `1..=20` makes 16 a sink.  It is neither a move nor tax, and a sink that is a source is
-//! found impossible.)
+//! plays it unless it is found impossible (below): a *source*.  The search may also *promote* further numbers
+//! (play a factor as a move), which are then treated as sources too (`treat_as_sources`).  Everything that is not
+//! a source is a *factor*.  (A *sink* is a number all of whose maximal factors are promoted, so that nothing is
+//! left to pay for it: promoting 8 on the board `1..=20` makes 16 a sink.  It is neither a move nor tax, and a
+//! sink that is a source is found impossible.)
 //!
 //! A **hive** is a connected component of the graph that joins every source to its factors: a set of sources
 //! together with all the factors they compete for.  Hives are independent of each other, except that a factor of
@@ -624,11 +624,11 @@ impl<'t, const W: usize> Apiary<'t, W> {
     /// Simplifies hive `i` once (`unzip`, then `removeImpossible`, then the free factor count is recomputed as
     /// `|factors| − |sources|`); whether it found anything new.
     fn finish_hive(&mut self, i: usize) -> bool {
-        let found_forced = self.unzip(i);
+        let found_mandatory = self.unzip(i);
         let found_impossible = self.remove_impossible(i);
         let hive = &mut self.hives[i];
         hive.free_factor_count = hive.factors.len() as i32 - hive.sources.len() as i32;
-        found_forced | found_impossible
+        found_mandatory | found_impossible
     }
 
     /// Finds the mandatory moves of hive `i` until there are no more, recording each with the factor it claims;

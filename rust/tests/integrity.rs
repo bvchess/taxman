@@ -14,7 +14,7 @@ use taxman::game::{legal_moves_left, replay, Optimal};
 use taxman::hives::Apiary;
 use taxman::json::Json;
 use taxman::numtheory::Tables;
-use taxman::results::{moves_digest, rejected_path, Proof, ResultsFile, Taint, OPTIMAL_JSON};
+use taxman::results::{moves_digest, rejected_path, Proof, ResultsFile, Taint, OPTIMAL_JSON, SCHEMA};
 use taxman::solver::{self, GameResult, OptimalSource, Prev, PrevSource, SolveOptions};
 
 fn options(threads: usize) -> SolveOptions {
@@ -350,7 +350,7 @@ fn result_lines_carry_their_provenance() {
     if let Some(commit) = build.get("commit").and_then(Json::as_str) {
         assert_eq!(commit.len(), 40, "{commit}");
     }
-    assert_eq!(done.get("schema").and_then(Json::as_u32), Some(2));
+    assert_eq!(done.get("schema").and_then(Json::as_u32), Some(SCHEMA));
     assert!(done.get("proof").and_then(Json::as_str).is_some_and(|p| Proof::parse(p).is_some()));
     assert!(done.get("reached_cap").and_then(Json::as_bool).is_some());
     assert!(done.get("taint").and_then(Json::as_arr).is_some());

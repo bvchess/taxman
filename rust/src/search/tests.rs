@@ -353,6 +353,14 @@ fn resume_in_pieces(threads: usize, tactics: SearchTactics, min_pieces: usize) {
     let cands = Bits::<16>::from_slice(&g.candidates);
     let whole = prepare::<16>(&tables, &g.columns, &cands, tactics, 2).unwrap();
     let nodes = search_checked(&whole, 1, "uninterrupted").stats.nodes;
+    // A checkpoint's frame 0 counts as revised only if the tactic was on and it is not the built one (760's
+    // two-frame search lowers it).
+    let from_checkpoint = match (tactics.revise_freedoms, whole.root == whole.unrevised) {
+        (false, _) => Revise::Off,
+        (true, true) => Revise::ResumedAsBuilt,
+        (true, false) => Revise::FromCheckpoint,
+    };
+    assert_eq!(from_checkpoint == Revise::Off, whole.root == whole.unrevised, "760's frame 0 is revised");
 
     let dir = TempDir::new(&format!("resume{threads}-{}", tactics.bits()));
     let ckpt = dir.0.join("ckpt.bin");
@@ -368,8 +376,7 @@ fn resume_in_pieces(threads: usize, tactics: SearchTactics, min_pieces: usize) {
     while !result.completed {
         assert!(ckpt.exists(), "a stopped run leaves a checkpoint");
         let resumed = prepare_for_resume::<16>(&tables, &g.columns, &cands, &ckpt, 2).unwrap();
-        // A checkpoint's frame 0 counts as revised only if the tactic was on.
-        assert_eq!(resumed.revise, if tactics.revise_freedoms { Revise::FromCheckpoint } else { Revise::Off });
+        assert_eq!(resumed.revise, from_checkpoint);
         assert_eq!(resumed.root, whole.root);
         result = search(&resumed, &cfg, None, None, true).unwrap();
         pieces += 1;
@@ -432,6 +439,45 @@ fn seeds_and_caps() {
     // A worse seed changes nothing.
     let worse = search(&p, &config(1), Some(&Bits::EMPTY), None, false).unwrap();
     assert_eq!(worse.sum, optimum.sum);
+}
+
+/// What revising did reads back from the form a results line records it in, and nothing else reads as a value.
+#[test]
+fn revise_values_read_back_from_their_results_form() {
+    let values = [
+        Revise::Off,
+        Revise::NotNeeded,
+        Revise::GreedyIsMax(0),
+        Revise::GreedyIsMax(u32::MAX),
+        Revise::Unchanged,
+        Revise::Searched { size: 12, nodes: 8 },
+        Revise::Searched { size: u32::MAX, nodes: u64::MAX },
+        Revise::Stopped { nodes: 4321 },
+        Revise::FromCheckpoint,
+        Revise::ResumedAsBuilt,
+    ];
+    for value in values {
+        assert_eq!(Revise::parse(&format!("{value:?}")), Some(value));
+    }
+    let taints: Vec<bool> = values.iter().map(|v| v.sets_frame_zero()).collect();
+    assert_eq!(taints, [false, false, true, true, false, true, true, false, true, false]);
+    let near_misses = [
+        "",
+        "off",
+        "Off ",
+        "GreedyIsMax(+4)",
+        "GreedyIsMax(04)",
+        "GreedyIsMax(4294967296)",
+        "GreedyIsMax()",
+        "Searched { size: 12 }",
+        "Searched { nodes: 8, size: 12 }",
+        "Searched{ size: 12, nodes: 8 }",
+        "Stopped { nodes: -1 }",
+        "FromCheckpoint(3)",
+    ];
+    for text in near_misses {
+        assert_eq!(Revise::parse(text), None, "{text:?}");
+    }
 }
 
 #[test]

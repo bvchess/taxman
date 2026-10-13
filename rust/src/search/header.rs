@@ -24,7 +24,8 @@ pub(super) struct Header<const W: usize> {
     pub(super) candidates: u64,
     /// [`Header::digest_frames`] of the frames as built (before revising frame 0).
     pub(super) frames: u64,
-    /// Frame 0's freedoms in the search's root (`None` without frames).
+    /// Frame 0's freedoms in the search's root (`None` without frames): the ones it was built with, or with
+    /// `revise_freedoms` on, revised ones.  Resuming checks them against the frames (`setup::resumed_root`).
     pub(super) frame0_freedoms: Option<i32>,
     pub(super) max_total: u32,
     pub(super) tactics: SearchTactics,

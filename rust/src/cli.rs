@@ -4,9 +4,10 @@
 //! There is no parser crate.  A command line is positional arguments and flags; a flag is `--name VALUE` or
 //! `--name=VALUE` if it takes a value and `--name` if it is a switch, each command says which of its flags are
 //! which ([`Args::parse`]), and any other `--flag` is a usage error.  The flags every solving command takes
-//! ([`SOLVER_FLAGS`]: `--threads`, `--tactic`, `--optimal`) are turned into [`SolveOptions`] by [`solver_options`];
-//! the others (`--out`, `--time-limit`, ...) are each command's own.  A usage error makes `main` print the usage and
-//! exit with status 2; a command that ran and failed exits with status 1 ([`CliError`]).
+//! ([`SOLVER_FLAGS`]: `--threads`, `--tactic`, `--optimal`; and the switch [`SOLVER_SWITCHES`]: `--strict`) are
+//! turned into [`SolveOptions`] by [`solver_options`]; the others (`--out`, `--time-limit`, ...) are each command's
+//! own.  A usage error makes `main` print the usage and exit with status 2; a command that ran and failed exits
+//! with status 1 ([`CliError`]).
 
 use std::fmt;
 use std::io::Write;
@@ -55,6 +56,11 @@ pub type CliResult = Result<(), CliError>;
 /// Flags every solving command takes (each followed by a value).
 pub const SOLVER_FLAGS: [&str; 3] = ["--threads", "--tactic", "--optimal"];
 
+/// Switches (flags with no value) that go with [`SOLVER_FLAGS`]: a command that takes those takes these too, so
+/// [`Args::parse`] accepts them without being told.  `--strict` stands for `--tactic NAME=off` for every unproven
+/// tactic ([`taxman::tactics::Tactics::strict`]); a `--tactic` given as well is applied after it.
+pub const SOLVER_SWITCHES: [&str; 1] = ["--strict"];
+
 /// The command line after the subcommand name: flags with their values, and positional arguments.
 #[derive(Debug)]
 pub struct Args {
@@ -64,8 +70,11 @@ pub struct Args {
 
 impl Args {
     /// Splits `args` into flags and positionals.  `with_value` lists the flags that take a value (`--flag VALUE`
-    /// or `--flag=VALUE`) and `switches` the ones that do not; any other `--flag` is an error.
+    /// or `--flag=VALUE`) and `switches` the ones that do not; any other `--flag` is an error.  A command whose
+    /// `with_value` holds all of [`SOLVER_FLAGS`] also takes the [`SOLVER_SWITCHES`].
     pub fn parse(args: &[String], with_value: &[&str], switches: &[&str]) -> Result<Args, CliError> {
+        let takes_solver_flags = SOLVER_FLAGS.iter().all(|flag| with_value.contains(flag));
+        let solver_switches: &[&str] = if takes_solver_flags { &SOLVER_SWITCHES } else { &[] };
         let mut parsed = Args { named: Vec::new(), positional: Vec::new() };
         let mut rest = args.iter();
         while let Some(arg) = rest.next() {
@@ -77,7 +86,7 @@ impl Args {
                 Some((name, value)) => (name, Some(value.to_owned())),
                 None => (arg.as_str(), None),
             };
-            if switches.contains(&name) {
+            if switches.contains(&name) || solver_switches.contains(&name) {
                 if inline.is_some() {
                     return Err(CliError::Usage(format!("{name} takes no value")));
                 }
@@ -139,7 +148,7 @@ impl Args {
     }
 }
 
-/// The solver options the flags of [`SOLVER_FLAGS`] describe, on top of the defaults.
+/// The solver options the flags of [`SOLVER_FLAGS`] and [`SOLVER_SWITCHES`] describe, on top of the defaults.
 pub fn solver_options(args: &Args) -> Result<SolveOptions, CliError> {
     let mut opts = SolveOptions::default();
     if let Some(threads) = args.parsed::<usize>("--threads")? {
@@ -147,6 +156,10 @@ pub fn solver_options(args: &Args) -> Result<SolveOptions, CliError> {
             return Err(CliError::Usage("--threads must be at least 1".into()));
         }
         opts.threads = threads;
+    }
+    // `--strict` first, so that a `--tactic` given as well can still change what it set.
+    if args.has("--strict") {
+        opts.tactics = opts.tactics.strict();
     }
     for assignment in args.values("--tactic") {
         opts.tactics.set(assignment).map_err(CliError::Usage)?;
@@ -199,6 +212,23 @@ mod tests {
         let opts = solver_options(&args).unwrap();
         assert_eq!(opts.threads, 4);
         assert_eq!(opts.tactics.description(), "match_bound=off,prev_cap=off");
+    }
+
+    #[test]
+    fn strict_is_the_two_tactic_flags() {
+        let options = |given: &[&str]| {
+            let args = Args::parse(&strings(given), &SOLVER_FLAGS, &[]).unwrap();
+            solver_options(&args).unwrap().tactics
+        };
+        let by_hand = options(&["--tactic", "reuse_prev=off", "--tactic", "revise_freedoms=off"]);
+        assert_eq!(options(&["--strict"]), by_hand);
+        assert_eq!(options(&["--strict"]).description(), "reuse_prev=off,revise_freedoms=off");
+        // A `--tactic` is applied after `--strict`, wherever it is on the command line.
+        assert_eq!(options(&["--tactic", "reuse_prev=on", "--strict"]).description(), "revise_freedoms=off");
+        assert_eq!(options(&["--strict", "--tactic", "branching=largest"]).unproven_on(), Vec::<&str>::new());
+        // A command that takes no solver flags does not take the switch either.
+        let args = Args::parse(&strings(&["--strict"]), &["--optimal"], &[]);
+        assert!(usage(args.unwrap_err()).contains("unknown option --strict"));
     }
 
     #[test]

@@ -23,7 +23,10 @@ use std::time::{Duration, Instant};
 /// promotion set of the two-frame game.  [`GreedyIsMax`](Revise::GreedyIsMax) does: it is `min(F₀, F₁)`, which
 /// the freedoms imply anyway, so it changes nothing that matters.  [`Searched`](Revise::Searched) takes the size
 /// of the best (max-sum) set the two-frame search returns, which bounds the sizes only by the unproven conjecture
-/// of the tactic: that the max-sum set also has the max count.
+/// of the tactic: that the max-sum set also has the max count.  Either way the number is a count of promotions
+/// into frame 0, so it is at least 0 and at most the freedoms frame 0 was built with: revising only lowers them.
+///
+/// A results line records the value in its `Debug` form (`setup.revise`), which [`Revise::parse`] reads back.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Revise {
     /// The tactic is off (also for a search resumed from the checkpoint of a game that was set up with it off).
@@ -41,9 +44,47 @@ pub enum Revise {
     /// is not ready to search, and [`search`](super::search) stops at once (as if a limit had stopped it, with no
     /// checkpoint).
     Stopped { nodes: u64 },
-    /// Frame 0's freedoms were taken from a checkpoint of a game that was set up with the tactic on (so they may
-    /// be revised ones, though the checkpoint does not say whether revising changed them).
+    /// Frame 0's freedoms were taken from a checkpoint of a game that was set up with the tactic on, and they are
+    /// fewer than the ones frame 0 was built with: revised (the checkpoint does not say how).  (Builds before
+    /// commit 7af9fea wrote this for every resumed search, whatever the tactics and the freedoms.)
     FromCheckpoint,
+    /// The search resumed a checkpoint of a game that was set up with the tactic on, and frame 0's freedoms in it
+    /// are the ones frame 0 was built with: whatever revising did then, it changed nothing the search uses.
+    ResumedAsBuilt,
+}
+
+impl Revise {
+    /// Whether frame 0's freedoms in the search come from the tactic, so that the search rests on its conjecture:
+    /// [`GreedyIsMax`](Revise::GreedyIsMax), [`Searched`](Revise::Searched) and
+    /// [`FromCheckpoint`](Revise::FromCheckpoint), even when the number is the one frame 0 was built with.
+    pub fn sets_frame_zero(self) -> bool {
+        matches!(self, Revise::GreedyIsMax(_) | Revise::Searched { .. } | Revise::FromCheckpoint)
+    }
+
+    /// The value whose `Debug` form is `text`, which is how a results line records it (`setup.revise`, say
+    /// `"Searched { size: 3, nodes: 9 }"`); `None` if `text` is not exactly that form of a value.
+    pub fn parse(text: &str) -> Option<Revise> {
+        let inside = |prefix: &str, suffix: &str| text.strip_prefix(prefix)?.strip_suffix(suffix);
+        let parsed = match text {
+            "Off" => Revise::Off,
+            "NotNeeded" => Revise::NotNeeded,
+            "Unchanged" => Revise::Unchanged,
+            "FromCheckpoint" => Revise::FromCheckpoint,
+            "ResumedAsBuilt" => Revise::ResumedAsBuilt,
+            _ => {
+                if let Some(size) = inside("GreedyIsMax(", ")") {
+                    Revise::GreedyIsMax(size.parse().ok()?)
+                } else if let Some(fields) = inside("Searched { size: ", " }") {
+                    let (size, nodes) = fields.split_once(", nodes: ")?;
+                    Revise::Searched { size: size.parse().ok()?, nodes: nodes.parse().ok()? }
+                } else {
+                    Revise::Stopped { nodes: inside("Stopped { nodes: ", " }")?.parse().ok()? }
+                }
+            }
+        };
+        // The numbers as `Debug` writes them: no sign, no leading zeros.
+        (format!("{parsed:?}") == text).then_some(parsed)
+    }
 }
 
 /// Wall times of [`prepare`]'s phases.
@@ -102,9 +143,7 @@ pub fn prepare_within<const W: usize>(
     tactics: SearchTactics,
     engine: &EngineConfig,
 ) -> Result<Prepared<W>, String> {
-    let t0 = Instant::now();
-    let (model, root) = Model::build::<W>(tables, columns)?;
-    let build = t0.elapsed();
+    let (model, root, build) = build_root::<W>(tables, columns)?;
     let mut prepared = prepare_state(tables.n, Arc::new(model), root, *candidates, tactics, engine, None)?;
     prepared.timings.build = build;
     Ok(prepared)
@@ -113,7 +152,8 @@ pub fn prepare_within<const W: usize>(
 /// [`prepare`] for resuming the search checkpointed in `checkpoint`: frame 0's freedoms come from the
 /// checkpoint's header instead of being revised again (which can take a search of its own), and the tactics
 /// are the checkpoint's.  Fails, saying what differs, if the checkpoint was made for another board size,
-/// width, candidates or frames, or by a build whose checkpoint headers had another format.
+/// width, candidates or frames, or by a build whose checkpoint headers had another format, or if its frame 0
+/// has freedoms its search cannot have had (see `resumed_root`).
 pub fn prepare_for_resume<const W: usize>(
     tables: &Tables,
     columns: &[Vec<u32>],
@@ -123,9 +163,7 @@ pub fn prepare_for_resume<const W: usize>(
 ) -> Result<Prepared<W>, String> {
     let bytes = engine::read_checkpoint_header(checkpoint).map_err(|e| format!("{}: {e}", checkpoint.display()))?;
     let header = Header::<W>::decode(&bytes)?;
-    let t0 = Instant::now();
-    let (model, root) = Model::build::<W>(tables, columns)?;
-    let build = t0.elapsed();
+    let (model, root, build) = build_root::<W>(tables, columns)?;
     // The game itself must match before it is set up with what the checkpoint says of the search.
     let game = Header {
         n: tables.n,
@@ -136,18 +174,69 @@ pub fn prepare_for_resume<const W: usize>(
     if let Some(mismatch) = header.mismatch(&game) {
         return Err(mismatch);
     }
+    let resumed = resumed_root(&header, &root)?;
     let engine = EngineConfig { threads, ..EngineConfig::default() };
-    let frame0 = Some(header.frame0_freedoms);
-    let mut prepared = prepare_state(tables.n, Arc::new(model), root, *candidates, header.tactics, &engine, frame0)?;
+    let mut prepared =
+        prepare_state(tables.n, Arc::new(model), root, *candidates, header.tactics, &engine, Some(resumed))?;
     prepared.timings.build = build;
+    // What is left to compare is max_total, which follows from frame 0's freedoms.
     match header.mismatch(&Header::of(&prepared)) {
         Some(mismatch) => Err(mismatch),
         None => Ok(prepared),
     }
 }
 
-/// The setup after the frame set exists.  `frame0` (from a checkpoint) replaces revising; `engine` as for
-/// [`prepare_within`].
+/// The model and the root frame set of the game whose frames are `columns`, and the time it took to build them.
+///
+/// Every frame of the root is winnable (the frame builder makes it so), and the search relies on it: promoting a
+/// move that has a factor no move of the frame below uses takes no peel (`Model::promote`), which is exact only
+/// if that frame is winnable, as every frame of every state reached from a winnable root is.  Debug builds check
+/// it here.
+fn build_root<const W: usize>(tables: &Tables, columns: &[Vec<u32>]) -> Result<(Model, FrameSet<W>, Duration), String> {
+    let t0 = Instant::now();
+    let (model, root) = Model::build::<W>(tables, columns)?;
+    let build = t0.elapsed();
+    debug_assert!(
+        root.frames().iter().all(|f| model.winnable(&f.moves, &f.factors)),
+        "n={}: a frame of the root is not winnable",
+        tables.n
+    );
+    Ok((model, root, build))
+}
+
+/// The root of the search that `header`'s checkpoint holds, for the game whose root as built is `root`, and what
+/// revising frame 0 did as far as the checkpoint tells.  Frame 0's freedoms are the checkpoint's: the ones frame
+/// 0 was built with (and [`Revise::Off`] or [`Revise::ResumedAsBuilt`]), or with `revise_freedoms` on, fewer
+/// ([`Revise::FromCheckpoint`]).  Any other number its search cannot have had: without the tactic nothing
+/// changes them, and revising sets them to a number of promotions into frame 0, at least 0 and at most the
+/// built freedoms; so it is refused, as a checkpoint of another search.
+fn resumed_root<const W: usize>(header: &Header<W>, root: &FrameSet<W>) -> Result<(FrameSet<W>, Revise), String> {
+    let built = root.frames().first().map(|f| f.freedoms);
+    let on = header.tactics.revise_freedoms;
+    match (header.frame0_freedoms, built) {
+        (stored, built) if stored == built => Ok((*root, if on { Revise::ResumedAsBuilt } else { Revise::Off })),
+        (Some(stored), Some(built)) if on && (0..built).contains(&stored) => {
+            Ok((root.with_frame_zero_freedoms(stored), Revise::FromCheckpoint))
+        }
+        (stored, built) => {
+            let why = if on {
+                "revising them sets them to a number of promotions, from 0 to the built ones"
+            } else {
+                "revise_freedoms is off, so nothing changes them"
+            };
+            let number = |freedoms: Option<i32>| freedoms.map_or_else(|| "none".to_owned(), |f| f.to_string());
+            Err(format!(
+                "the checkpoint is of a search whose frame 0's freedoms are {}, not the {} frame 0 was built with \
+                 ({why})",
+                number(stored),
+                number(built)
+            ))
+        }
+    }
+}
+
+/// The setup after the frame set exists.  `resumed` (the root of a checkpoint's search, and what revising did as
+/// far as it tells) replaces revising; `engine` as for [`prepare_within`].
 fn prepare_state<const W: usize>(
     n: u32,
     model: Arc<Model>,
@@ -155,7 +244,7 @@ fn prepare_state<const W: usize>(
     candidates: Bits<W>,
     tactics: SearchTactics,
     engine: &EngineConfig,
-    frame0: Option<Option<i32>>,
+    resumed: Option<(FrameSet<W>, Revise)>,
 ) -> Result<Prepared<W>, String> {
     let mut timings = PrepareTimings::default();
     let t0 = Instant::now();
@@ -166,11 +255,8 @@ fn prepare_state<const W: usize>(
     let greedy = bounds::greedy(&model, &root, &candidates);
     timings.greedy = t0.elapsed();
     let t0 = Instant::now();
-    // A checkpoint's frame 0 is a revised one only if the tactic was on (the header's tactics are this search's).
-    let from_checkpoint = if tactics.revise_freedoms { Revise::FromCheckpoint } else { Revise::Off };
-    let (revised, revise) = match frame0 {
-        Some(Some(freedoms)) => (root.with_frame_zero_freedoms(freedoms), from_checkpoint),
-        Some(None) => (root, from_checkpoint),
+    let (revised, revise) = match resumed {
+        Some(resumed) => resumed,
         None if tactics.revise_freedoms => revise_freedoms(n, &model, &root, &candidates, &greedy, tactics, engine)?,
         None => (root, Revise::Off),
     };

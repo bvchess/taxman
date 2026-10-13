@@ -43,7 +43,16 @@ fn help_lists_the_commands_and_every_tactic() {
     for args in [&["help"][..], &["--help"], &["-h"]] {
         let run = taxman(args);
         assert_eq!(run.code, Some(0));
-        for text in ["solve N|A-B", "regress", "bench", "verify-optimal", "tables N K...", "--history FILE"] {
+        for text in [
+            "solve N|A-B",
+            "regress",
+            "bench",
+            "verify-optimal",
+            "tables N K...",
+            "--history FILE",
+            "--strict",
+            "--tactic reuse_prev=off --tactic revise_freedoms=off",
+        ] {
             assert!(run.stdout.contains(text), "{args:?}: no {text:?}");
         }
         for name in taxman::tactics::Tactics::names() {
@@ -161,6 +170,24 @@ fn solve_writes_its_results_skips_what_is_done_and_resumes_what_was_stopped() {
     assert!(!ckpt.join("n0600.ckpt").exists(), "a finished game removes its checkpoint");
 }
 
+/// A results file that another process has open (here this one, appending to it as a run does) is refused by
+/// `solve`, which appends nothing; once it is closed, `solve` goes on with it.
+#[test]
+fn solve_refuses_a_results_file_another_process_has_open() {
+    let dir = TempDir::new("solve-lock");
+    let results = dir.join("results.jsonl");
+    let args = ["solve", "5-9", "--threads", "1", "--progress", "0", "--out", path(&results)];
+    let held = taxman::results::ResultsFile::open(&results, None).unwrap();
+    let run = taxman(&args);
+    assert_eq!(run.code, Some(1), "{}", run.stderr);
+    assert!(run.stderr.contains("results.jsonl is in use by another process"), "{}", run.stderr);
+    assert_eq!(fs::read_to_string(&results).unwrap(), "");
+    drop(held);
+    let run = taxman(&args);
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    assert_eq!(fs::read_to_string(&results).unwrap().lines().count(), 5);
+}
+
 #[test]
 fn regress_checks_scores_against_optimal_json() {
     let run = taxman(&["regress", "--to", "40", "--threads", "1"]);
@@ -181,6 +208,55 @@ fn regress_checks_scores_against_optimal_json() {
     assert!(run.stdout.contains("MISMATCH n=10: scored 40 but optimal.json says 41"), "{}", run.stdout);
     assert!(run.stdout.contains("11 games match optimal.json, 1 do not"), "{}", run.stdout);
     assert!(run.stderr.contains("1 scores differ from optimal.json"), "{}", run.stderr);
+}
+
+#[test]
+fn strict_stands_for_the_two_tactic_flags() {
+    let strict = ["reuse_prev=off", "revise_freedoms=off"];
+    let tactics = ["--tactic", strict[0], "--tactic", strict[1]];
+    let run = taxman(&["regress", "--from", "30", "--to", "34", "--threads", "1", "--strict"]);
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    assert!(
+        run.stdout.contains("solved 30..=34 (1 threads, tactics reuse_prev=off,revise_freedoms=off)"),
+        "{}",
+        run.stdout
+    );
+    // The same results lines as with the two flags, tactics and all.
+    let dir = TempDir::new("strict");
+    let (short, long) = (dir.join("strict.jsonl"), dir.join("flags.jsonl"));
+    let args = |out: &Path, tactics: &[&str]| {
+        let mut args = vec!["solve", "1-12", "--threads", "1", "--out", path(out)];
+        args.extend_from_slice(tactics);
+        taxman(&args)
+    };
+    assert_eq!(args(&short, &["--strict"]).code, Some(0));
+    assert_eq!(args(&long, &tactics).code, Some(0));
+    let tactics_of = |file: &Path| -> Vec<(String, String)> {
+        let text = fs::read_to_string(file).unwrap();
+        let lines = text.lines().map(|line| Json::parse(line).unwrap());
+        lines.map(|j| (j.get("tactics").unwrap().to_string(), j.get("tactic_switches").unwrap().to_string())).collect()
+    };
+    assert_eq!(tactics_of(&short), tactics_of(&long));
+    assert!(tactics_of(&short).iter().all(|(description, _)| description == "\"reuse_prev=off,revise_freedoms=off\""));
+}
+
+#[test]
+fn a_game_with_no_previous_game_says_it_is_solved_standalone() {
+    let standalone = |args: &[&str]| taxman(&[&["solve", "--threads", "1", "--progress", "0"][..], args].concat());
+    let run = standalone(&["40", "--optimal", "none"]);
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    assert!(
+        run.stderr.contains("note: no previous game for n=40") && run.stderr.contains("standalone"),
+        "{}",
+        run.stderr
+    );
+    assert!(run.stdout.contains("n=40"), "{}", run.stdout);
+    // With a previous game (optimal.json's 39), or for n = 1, which has none to have, there is nothing to say.
+    for args in [&["40"][..], &["1", "--optimal", "none"], &["1-5", "--optimal", "none"]] {
+        let run = standalone(args);
+        assert_eq!(run.code, Some(0), "{args:?}: {}", run.stderr);
+        assert_eq!(run.stderr, "", "{args:?}");
+    }
 }
 
 #[test]

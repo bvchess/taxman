@@ -578,16 +578,55 @@ fn nogoods_hold_everywhere() {
     assert!(made > 500 && later > 5000);
 }
 
-/// The table's lookups against their definition: the smallest `N − P` over the nogoods `N ⊆ P ∪ S` (then the
-/// one with the largest member, then the first learned), or `Forced` at the first of them within `F`; and its
-/// rule-outs (the single member left of each nogood with a member just promoted).  Random
-/// tables over up to 250 numbers, so that the compact sets grow by several words, cleared now and then.
+/// What [`Nogoods::lookup`] answers by definition, for the nogoods `learned` in the order they were learned: the
+/// smallest `N − P` over the nogoods `N ⊆ P ∪ S` (then the one with the largest member, then the first learned), or
+/// `AllForced` at the first of them within `P ∪ F`.
+fn lookup_by_definition<const W: usize>(
+    learned: &[Bits<W>],
+    promoted: &Bits<W>,
+    set: &Bits<W>,
+    musts: &Bits<W>,
+) -> Lookup<W> {
+    let within = *promoted | *set;
+    let mut best = None;
+    for (id, n) in learned.iter().enumerate().filter(|(_, n)| n.is_subset(&within)) {
+        let k = *n - *promoted;
+        if k.is_subset(musts) {
+            return Lookup::AllForced;
+        }
+        let key = (k.len(), std::cmp::Reverse(n.max()), id);
+        if best.is_none_or(|(b, _)| key < b) {
+            best = Some((key, k));
+        }
+    }
+    best.map_or(Lookup::None, |(_, k)| Lookup::Conflict(k))
+}
+
+/// What [`Nogoods::ruled_out`] answers by definition: the last member, among `set`, of each nogood with a member in
+/// `added` and all the others promoted.
+fn ruled_out_by_definition<const W: usize>(
+    learned: &[Bits<W>],
+    added: &Bits<W>,
+    promoted: &Bits<W>,
+    set: &Bits<W>,
+) -> Bits<W> {
+    let mut out = Bits::EMPTY;
+    for n in learned.iter().filter(|n| n.intersects(added)) {
+        let rest = *n - *promoted;
+        if rest.len() == 1 && rest.is_subset(set) {
+            out |= rest;
+        }
+    }
+    out
+}
+
+/// The table's lookups and rule-outs against their definition, on random tables over up to 250 numbers, so that
+/// the compact sets grow by several words, cleared now and then.
 #[test]
 fn nogood_lookups_follow_their_definition() {
     let mut rng = Rng(0x0DD5_1234_ABCD_0042);
     let mut table = Nogoods::<4>::new(255, 1 << 12);
     let mut learned: Vec<Bits<4>> = Vec::new();
-    let subset = |rng: &mut Rng, of: &Bits<4>, percent| of.iter().filter(|_| rng.chance(percent)).collect();
     let (mut conflicts, mut forced, mut ruled) = (0, 0, 0);
     for _ in 0..2000 {
         if rng.below(500) == 0 {
@@ -602,39 +641,15 @@ fn nogood_lookups_follow_their_definition() {
         learned.push(n);
         for _ in 0..4 {
             let crowd = Bits::from_range(0, 23) | (0..20).map(|_| rng.below(250) as u32).collect();
-            let promoted = subset(&mut rng, &crowd, 10);
-            let set = subset(&mut rng, &crowd, 60) - promoted;
-            let musts = subset(&mut rng, &set, 15);
-            let within = promoted | set;
-            let mut expected = Lookup::None;
-            let mut best = None;
-            for (id, n) in learned.iter().enumerate().filter(|(_, n)| n.is_subset(&within)) {
-                let k = *n - promoted;
-                if k.is_subset(&musts) {
-                    expected = Lookup::AllForced;
-                    break;
-                }
-                let key = (k.len(), std::cmp::Reverse(n.max()), id);
-                if best.is_none_or(|(b, _)| key < b) {
-                    best = Some((key, k));
-                }
-            }
-            if expected == Lookup::None {
-                expected = best.map_or(Lookup::None, |(_, k)| Lookup::Conflict(k));
-            }
+            let promoted = rng.subset(&crowd, 10);
+            let set = rng.subset(&crowd, 60) - promoted;
+            let musts = rng.subset(&set, 15);
+            let expected = lookup_by_definition(&learned, &promoted, &set, &musts);
             assert_eq!(table.lookup(&promoted, &set, &musts), expected, "{learned:?} {promoted:?} {set:?}");
             conflicts += u32::from(matches!(expected, Lookup::Conflict(_)));
             forced += u32::from(expected == Lookup::AllForced);
-            // Ruled out: the last member, among `set`, of a nogood with a member in `added` and all the others
-            // promoted.
-            let added = subset(&mut rng, &promoted, 40);
-            let mut out = Bits::EMPTY;
-            for n in learned.iter().filter(|n| n.intersects(&added)) {
-                let rest = *n - promoted;
-                if rest.len() == 1 && rest.is_subset(&set) {
-                    out |= rest;
-                }
-            }
+            let added = rng.subset(&promoted, 40);
+            let out = ruled_out_by_definition(&learned, &added, &promoted, &set);
             assert_eq!(table.ruled_out(&added, &promoted, &set), out, "{learned:?} {added:?} {promoted:?}");
             ruled += out.len();
         }
@@ -642,6 +657,59 @@ fn nogood_lookups_follow_their_definition() {
     assert!(
         conflicts > 500 && forced > 200 && ruled > 200,
         "{conflicts} conflicts, {forced} forced, {ruled} ruled out"
+    );
+}
+
+/// The same at the widths the large searches use: a `Nogoods<16>` over numbers up to 1023 whose nogoods come to
+/// have more than 15 · 64 members, so that the compact sets are 1 to 16 words wide, through the strides of 1 to 6
+/// (whose scans are unrolled) and on into the generic scan.  Lookups go through crowds that contain learned
+/// nogoods, so that they find some at every stride.
+#[test]
+fn nogood_lookups_follow_their_definition_at_every_stride() {
+    const MAX: u32 = 1023;
+    let mut rng = Rng(0x9A4E_0001_2345_6789);
+    let mut table = Nogoods::<16>::new(MAX, 1 << 14);
+    let mut learned: Vec<Bits<16>> = Vec::new();
+    let mut members = Bits::<16>::EMPTY;
+    let (mut most, mut conflicts, mut forced, mut ruled, mut wide) = (0, 0, 0, 0, 0);
+    for _ in 0..6000 {
+        if rng.below(2500) == 0 {
+            table.clear();
+            learned.clear();
+            members = Bits::EMPTY;
+        }
+        let size = 1 + rng.below(4);
+        let n: Bits<16> = (0..size)
+            .map(|_| if rng.chance(50) { 1 + rng.below(24) } else { 1 + rng.below(u64::from(MAX)) } as u32)
+            .collect();
+        table.insert(n);
+        learned.push(n);
+        members |= n;
+        most = most.max(members.len());
+        for _ in 0..3 {
+            let mut crowd: Bits<16> = (0..20).map(|_| 1 + rng.below(u64::from(MAX)) as u32).collect();
+            for _ in 0..4 {
+                crowd |= learned[rng.below(learned.len() as u64) as usize];
+            }
+            crowd |= Bits::from_range(1, 24);
+            let promoted = rng.subset(&crowd, 5);
+            let set = rng.subset(&crowd, 75) - promoted;
+            let musts = if rng.chance(80) { Bits::EMPTY } else { rng.subset(&set, 10) };
+            let expected = lookup_by_definition(&learned, &promoted, &set, &musts);
+            assert_eq!(table.lookup(&promoted, &set, &musts), expected, "{} members", members.len());
+            conflicts += u32::from(matches!(expected, Lookup::Conflict(_)));
+            forced += u32::from(expected == Lookup::AllForced);
+            wide += u32::from(members.len() > 7 * 64 && expected != Lookup::None);
+            let added = rng.subset(&promoted, 40);
+            let out = ruled_out_by_definition(&learned, &added, &promoted, &set);
+            assert_eq!(table.ruled_out(&added, &promoted, &set), out, "{} members", members.len());
+            ruled += out.len();
+        }
+    }
+    assert!(most > 15 * 64, "at most {most} members");
+    assert!(
+        conflicts > 1000 && forced > 200 && ruled > 200 && wide > 500,
+        "{conflicts} conflicts, {forced} forced, {ruled} ruled out, {wide} found past a stride of 7"
     );
 }
 

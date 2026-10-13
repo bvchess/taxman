@@ -26,7 +26,7 @@ measured.  Each term is defined where it first matters.
 ## 1. Goals and constraints
 
 * Find optimal games beyond n = 1000, where the Java solver's table of optimal games stops, as far as the machines
-  at hand reach: today every n to 1231 on one laptop (Apple M1 Max, 10 cores, 32 GB RAM, fast SSD), and the same
+  at hand reach: today every n to 1300 on one laptop (Apple M1 Max, 10 cores, 32 GB RAM, fast SSD), and the same
   chain on a many-core cloud machine for what is beyond (`tools/cloud/RUNBOOK.md`).
 * Be right before being fast.  Every game is replayed by an independent referee before it counts, every result
   records how its optimality is established and what that rests on that is unproven, and every unproven tactic
@@ -35,8 +35,9 @@ measured.  Each term is defined where it first matters.
   (up to a 192-core machine) without depending on many of them.
 * Never rely on everything fitting in RAM.  Memory use is bounded by configuration, independent of tree size; work
   that does not fit goes to disk.
-* Every long run checkpoints frequently and resumes after a restart, losing at most one checkpoint interval (see
-  the repository's CLAUDE.md); stopped by SIGINT or SIGTERM, it loses nothing.
+* Every long run checkpoints frequently and resumes after a restart, losing at most one checkpoint interval; stopped
+  by SIGINT or SIGTERM, it loses nothing.  (A machine can restart without warning, and a job that wrote its output
+  only when it finished then loses all of its progress.)
 * Fast iteration: correctness and performance are worked out on small and medium games that finish in seconds
   (the tests, the benchmark set, the probe).  Big runs come last.
 * Standard library only, no third-party crates; Linux and macOS.
@@ -57,15 +58,21 @@ Every number above n/2 divides nothing else on the board, so it can only be a mo
 Every other number is a *factor*: tax for a larger number, and sometimes a move itself.  A move m is paid for by one
 of its *maximal factors* m/p (p a prime dividing m); and a factor can pay for one move.
 
-Sources and the factors they compete for fall into independent groups, the *hives* (`hives`).  Simplifying a hive
-finds the moves it forces (`unzip`), the sources that cannot be played together with the larger ones
-(`removeImpossible`), and its *free factor count*, factors minus sources: how many factors it can spare.  Hives with
-factors to spare are stacked into levels and merged: each level is a *frame* (`frames`), numbered from 0 at the
-bottom.  A frame is a game of *Taxman Mini*: a set of moves and a set of factors, in which every move must still have
-one of its maximal factors in the frame when it is taken, and taking it removes all of the frame's factors it uses.
-A frame is *winnable* when some order takes every move; a frame is winnable exactly when repeatedly dropping a move
-that has a factor no other move has (a *peel*) drops them all, and `model` tests that with counters instead of
-searching orders.
+Why maximal factors are enough, although a move takes every divisor of it: the lifting argument of `numtheory` and
+[THEORY.md](../heuristics/THEORY.md) (Theorem 1), summarised in the
+[README](README.md#how-the-solver-sees-the-game-the-frame-model).
+
+Sources and the factors they compete for fall into independent groups, the *hives* (`hives`).  Hive B is
+*downstream* of hive A (and A *upstream* of B) when a number of A has a maximal factor in B, that is, A's numbers are
+multiples of B's.  Simplifying a hive finds its mandatory moves (`unzip`: a source with one usable factor must take
+it), the sources that cannot be played together with the larger ones (`removeImpossible`), and its *free factor
+count*, factors minus sources: how many factors it can spare.  Hives with factors to spare are stacked into levels
+and merged: each level is a *frame* (`frames`), numbered from 0 at the bottom, the downstream end.  A frame is a game
+of *Taxman Mini*: a set of moves and a set of factors, in which every move must still have one of its maximal factors
+in the frame when it is taken, and taking it removes all of its factors still in the frame (not only the one that
+pays for it).  A frame is *winnable* when some order takes every move; a frame is winnable exactly when repeatedly
+dropping a move that has a factor no other move has (a *peel*) drops them all, and `model` tests that with counters
+instead of searching orders.
 
 ### Promotions and the score
 
@@ -85,7 +92,7 @@ sources).  A worked example, the board 1..=85, is in the
 ### What "optimal" means
 
 * **Within the frame model.**  The decomposition rests on assumptions that are validated, not proven: the greedy
-  removal of impossible sources inside hives, the forced moves of `unzip`, free factor count = factors − sources,
+  removal of impossible sources inside hives, the mandatory moves of `unzip`, free factor count = factors − sources,
   closed hives (those with no free factor) taking no part in the search, and a promoted number paying tax only from
   the frame directly below.  They are validated by agreement with the Java's optimal.json for n ≤ 1000, which a
   model-free exact search (`evidence/`: the playability theorems, the Franklín–Moniot matching bound, the chain
@@ -95,7 +102,8 @@ sources).  A worked example, the board 1..=85, is in the
   impossible sources at the root, where it shapes the search space, is descending greedy on each upper-half
   component, which `evidence/` certifies maximum-weight (for every weighting consistent with the order) in every
   game n ≤ 100,000.  The sacrifice bound (`sacrifice`) is an upper bound on opt(n) by a different route (games on
-  punctured boards); it proves game 1133 and disagrees with nothing.  `evidence/README.md` has the details.
+  punctured boards); it proves game 1133 and disagrees with nothing.  [evidence/README.md](evidence/README.md) has the
+  details.
 * **Given the pruning is exact.**  The default search tactics are sound (section 5 grades each).  Two tactics are on
   by default for speed but unproven: `reuse_prev` and `revise_freedoms`.  A run with both off is *strict*.
 * **Given the previous game is optimal.**  The game of n is built from the game of n − 1: opt(n) ≤ n + opt(n − 1)
@@ -124,11 +132,12 @@ story](docs/EXPERIMENTS.md#the-port-and-its-first-improvements)).
 ## 3. Architecture
 
 One Cargo crate in `rust/`: a library and one binary, `taxman`, with no third-party dependencies.  `src/lib.rs` has the
-module map with a line on each module.  The layers, bottom up:
+module map with a line on each module, in the order the modules are read (README, "Reading order").  The layers, bottom
+up:
 
 | layer | modules | responsibility |
 |---|---|---|
-| foundations | `bits`, `numtheory`, `json`, `game` | fixed-width bitsets; maximal factors and composites; a small JSON reader and writer; the rules as a referee and the table of optimal games |
+| foundations | `game`, `numtheory`, `bits`, `json` | the rules as a referee and the table of optimal games; maximal factors and composites; fixed-width bitsets; a small JSON reader and writer |
 | frame model | `hives`, `frames`, `model`, `accelerate` | the board as hives and frames; the search state (frames, winnability, promotion, conflicts, nogoods); deriving a game from the previous one |
 | search | `matchbound`, `search`, `bounds` | the matching bound; the branch-and-bound searcher with its setup and checkpoint header; the Java's bound, preclusions, greedy incumbent and candidate lists |
 | engine | `engine` | the problem-independent parallel depth-first driver |
@@ -136,18 +145,19 @@ module map with a line on each module.  The layers, bottom up:
 | studies | `brute`, `sacrifice` | exhaustive search to certify small boards; the sacrifice bound and punctured games (not used by the solver) |
 | front end | `main.rs`, `cli.rs`, `commands.rs` | `solve`, `regress`, `bench`, `verify-optimal`, `verify-results`, `tables` |
 
-On the default path of a solve are all the layers but the studies and the Java-parity layer `bounds` (of which the
-default search uses only the greedy incumbent, `max_additional` and the candidate lists).  `examples/` holds the
-ladder (standalone searches of hard games with time limits, thread scaling, diagnostics), the probe `perf` (the hot
-paths from fixtures, in cycles and instructions) and the sacrifice study; `tests/` the integration tests (section 9);
-`tools/` the results referee in Python, the PGO build, the Java golden export and the cloud scripts.
+On the default path of a solve are all the layers but the studies and most of the Java-parity module `bounds` (of
+which the default search uses only the greedy incumbent, `max_additional`, the narrowing of the candidate lists and
+the peel scratch space its `Bounds` owns).  `examples/` holds the ladder (standalone searches of hard games with time
+limits, thread scaling, diagnostics), the probe `perf` (the hot paths from fixtures, in cycles and instructions) and
+the sacrifice study; `tests/` the integration tests (section 9); `tools/` the results referee in Python, the PGO build,
+the Java golden export and the cloud scripts.
 
 **Width dispatch.**  Everything that holds sets of game numbers is generic over `const W: usize`, the number of 64-bit
 words, and the macro `with_width!` (in `bits`, used by the solver, the examples and the tests) picks the narrowest
 of `bits::WIDTHS` = {8, 16, 20, 24, 28, 32, 64} that holds n (n ≤ 511, 1023, 1279, 1535, 1791, 2047, 4095).  Every
 set operation is a loop over all W words, so the steps of 4 words near the frontier pay.  Each width is a copy of
-the search's code, which costs build time (about 50 s for a release build).  A checkpoint records its width, and a
-search resumes at that width if this build has it.
+the search's code, which costs build time (a release build takes under a minute on an M1 Max; EXPERIMENTS has the
+times as widths were added).  A checkpoint records its width, and a search resumes at that width if this build has it.
 
 ## 4. The search
 
@@ -180,6 +190,12 @@ loop while cands non-empty:
     child_cands = new_candidate_list(n, ...)      # narrow, remove preclusions, can_promote filter
     if sum(promoted) + n + blame_bound(new_state, child_cands, ...) > best: push the child
 ```
+
+`blame_bound` is the Java's `blameGame` upper bound (`bounds::Bounds::upper_bound`), cheap and loose.  It bids the
+`max_add` largest candidates that fit the frames' per-frame limits (which follow from the freedoms), finds the first
+member of the bid, from the top, that cannot be promoted after the ones above it, assumes it is the only failure and
+replaces it with the best runner-up candidate; `bounds.rs` has the argument that this is an upper bound.  The matching
+bound below replaces it by default.
 
 The default search keeps this skeleton and changes what bounds a node, which candidate to branch on, and what the
 child promotes; the next sections build it up, and "The default step" below puts it together.  A bound equal to
@@ -295,7 +311,8 @@ need = best + 1 − sum(promoted)                   # the loop goes on while the
 5. remove n from cands; if F is non-empty the node has nothing left to try after this child
 6. child = the node with F (or n) promoted; if that fails, the step is over
 7. child cands = the rest, narrowed, minus the members that a known conflict or a nogood rules out
-8. cut the child if the max_next largest of its cands sum below its need, or its matching bound is below it,
+8. cut the child if the max_next largest of its cands sum below its need (max_next: how many more promotions the
+   child can make among its remaining candidates, the child's own max_add), or its matching bound is below it,
    or its heaviest matching is exact (offered as incumbent); a child that stays open keeps this verdict
    for its first step; a child with no candidates is not pushed
 9. otherwise offer the child's own promotions as incumbent, and push it
@@ -338,7 +355,7 @@ tactics of `tactics::Tactics`, in order, with their defaults, and grades exactly
 | tactic | default | status | effect |
 |---|---|---|---|
 | `prime_shortcut` | on | proven (model-free, given an optimal n−1 game: proof at `accelerate::prime_shortcut`) | prime n: replace the n−1 solution's first move with n |
-| `reuse_prev` | on | unproven (conjecture-grade "upper-delta" certificate) | `FrameSolver.reusePrev`; keeps the previous game's promotions that are still possible and accepts the game they make, with no search, if it scores what the previous game suggests |
+| `reuse_prev` | on | unproven (a conjecture: the best game of n is the previous game plus n, less the moves the new board made impossible; `accelerate::reuse_prev`) | `FrameSolver.reusePrev`; keeps the previous game's promotions that are still possible and accepts the game they make, with no search, if it scores what the previous game suggests |
 | `revise_freedoms` | on | unproven ("max-sum promotion set also has max count") | `UpperBoundEstimator.reviseFreedoms`; can shrink frame 0's freedoms |
 | `preclusions` | off | sound (promotion failure is monotone: more moves or fewer factors never make a frame winnable) | depth-2 preclusion table; prunes candidates (off since 2026-10: with nogoods it no longer pays for its setup) |
 | `match_bound` | on | sound (matchability relaxes winnability) | node bound = the matching relaxation instead of `blameGame`, and the children's candidate lists without the Java's promotability checks (the conflicts find those candidates); a heaviest matching that can be promoted is the node's best completion |
@@ -460,33 +477,42 @@ Every completed game records *how its optimality is established* (its proof) and
 | `reuse_prev` | the tactic accepted a derived game: a conjecture | yes |
 
 The *taint* of a game is the set of unproven things its proof rests on: the unproven tactics it used itself, plus,
-if its proof rests on the game of n − 1, that game's taint, and so on down the chain.  A game taken from optimal.json
-has the taint `optimal.json` (the Java made it with both unproven tactics on and records nothing about which games
-used them).  An empty taint means: proven within the frame model, given that the solver is right.  A chain from n = 1
-with the strict tactics rests on nothing unproven.
+if its proof rests on the game of n − 1, that game's taint, and so on down the chain.  A proof by the cap rests on
+nothing the game used itself (since schema 3): its game replays to `n + score(n − 1)`, the ceiling, whatever found it,
+so the tactics that shaped the search play no part.  A game taken from optimal.json has the taint `optimal.json` (the
+Java made it with both unproven tactics on and records nothing about which games used them).  An empty taint means:
+proven within the frame model, given that the solver is right.  A chain from n = 1 with the strict tactics rests on
+nothing unproven.
 
 **Checks and referees.**  Every game is replayed by `game::replay_finished` before it counts, with the arithmetic and
 the ceilings `score(n−1) ≤ score(n) ≤ n + score(n−1)`; a game that fails after it was found goes to
 `<results>.rejected.jsonl` and the run fails.  `taxman verify-results` reads results files without changing them and
 runs the same checks plus agreement between files; `tools/check_results.py` is an independent referee in Python that
 re-derives every proof and taint and compares scores with the Franklín–Moniot upper bound and the best-known
-heuristic chain.  What no check can catch is a game that is legal, finished and within the bounds but not optimal
-when the game of n − 1 is not optimal either; that is what the proof kinds and the taint track, and why a chain from
-n = 1 matters.  [results/README.md](results/README.md) says what supports each committed score.
+heuristic chain.  Both refuse a line whose fields contradict each other (say `setup.revise` `Off` with the tactic on,
+or a sum at the cap without `reached_cap`), since the proof and taint are derived from them.  What no check can catch
+is a game that is legal, finished and within the bounds but not optimal when the game of n − 1 is not optimal either;
+that is what the proof kinds and the taint track, and why a chain from n = 1 matters.
+[results/README.md](results/README.md) says what supports each committed score.
 
 **Result lines** are one JSON object per line (README, "A results line"): the game, its proof and taint, the game of
 n − 1 it was built from (score, source, digest of its moves, proof, taint), node counts and search counters, seconds per
-phase, the tactics, limits, options and the commit the binary was built from.  A line is never rewritten.  Lines
-written before provenance existed (schema 1) have their proof and taint derived from the fields they have.
+phase, the tactics, limits, options and the commit the binary was built from.  A line is never rewritten, and a run
+locks the results file it appends to.  Lines written before provenance existed (schema 1) have their proof and taint
+derived from the fields they have; lines of schema 1 and 2 count a game's own tactics in a proof by the cap, by the
+rule they were written with.
 
 **What identifies a checkpoint.**  The header the search stores: a format version, the set width, n, digests of the
 root candidates and of the frames (every frame's moves, factors and freedoms, as built), frame 0's revised freedoms,
 `max_total` and the tactics.  Resuming checks all of them and says which differs, and checks that the stored incumbent
 is a set of candidates that can be promoted from the root and is worth the stored value; so a checkpoint of another
 game, or of an older build whose frame builder differs, is refused instead of pruning with a foreign incumbent or
-failing to rebuild its units.  A resumed game takes frame 0's freedoms from the checkpoint, and its `setup.revise` is
-`FromCheckpoint` (a taint of `revise_freedoms`) only if the checkpoint's tactics have that on; a resumed strict game
-says `Off` and rests on nothing unproven, as one that ran in one piece.
+failing to rebuild its units.  A resumed game takes frame 0's freedoms from the checkpoint, after checking them
+against frame 0 as built: with `revise_freedoms` off they must be the built ones, with it on they may be fewer
+(revising sets them to a number of promotions into frame 0, from 0 to the built ones), and anything else is refused.
+Its `setup.revise` is `FromCheckpoint` (a taint of `revise_freedoms`) only if they are fewer, `ResumedAsBuilt` if the
+tactic is on and they are the built ones, and `Off` for a resumed strict game, which rests on nothing unproven, as
+one that ran in one piece.
 
 ## 9. Testing
 
@@ -521,7 +547,9 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   forgetting every step, every third, never; one thread and two); the same for 500 perturbed frame sets (numbers
   dropped, role flipped, moved a frame; half of them with frame 0's freedoms revised as `prepare` does) with the truth
   found exhaustively; promoting a set at once against one by one in random orders, conflicts and nogoods on perturbed
-  models; and searches interrupted every 1,500 nodes and resumed from a checkpoint with units spilling.  A perturbed
+  models; and searches interrupted every 1,500 nodes and resumed from a checkpoint with units spilling.  Units of real
+  boards at W = 20 to 64 (thinned so that the truth is found exhaustively) from a handicapped incumbent, and game 1133
+  resumed every 60 nodes at W = 20, 24 and 64, carry the harness past the widths of `optimal.json`.  A perturbed
   game whose revision changes the best sum is left out: the search takes the revised freedoms for a fact about the best
   set, and for a game that breaks that (one in about 1,300) may return a set that they forbid.
 * **Node-count tripwires** (`tests/tripwires.rs`): a pruning tactic that stops working changes no answer, so no
@@ -538,13 +566,15 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   through any number of resumes (`TXENGINE_STRESS=<n>`).  A tree with no pruning checks conservation exactly: under
   random configurations the nodes counted must equal the tree's size, so one unit lost or explored twice shows
   (`TXENGINE_CONSERVATION=<n>` for more).  Robustness: an interval of zero finishes; limits too large for the clock are
-  never reached; spill segments of dead processes are removed; a locked checkpoint directory is refused; a checkpoint of
-  another game, with other tactics or with an incumbent that does not fit is refused; and the binary rejects bad times,
-  survives a closed stdout and stderr, and stops on SIGINT and SIGTERM with a checkpoint it then resumes.
+  never reached; spill segments of dead processes are removed; a locked checkpoint directory or results file is refused;
+  a checkpoint of another game, with other tactics, with frame 0 freedoms its search cannot have had or with an
+  incumbent that does not fit is refused; and the binary rejects bad times, survives a closed stdout and stderr, and
+  stops on SIGINT and SIGTERM with a checkpoint it then resumes.
 * **Integrity of results** (`tests/integrity.rs`, `tests/results.rs`, `tests/solver.rs`): a previous game that is not
-  what it says is refused; taint travels down a chain; a tampered results file is refused naming the line; a torn last
-  line is dropped; the committed results pass the verifier with the counts `results/README.md` quotes; a strict game
-  stopped by a node limit and resumed reads back with an empty taint.
+  what it says is refused; taint travels down a chain; a tampered results file, or one whose line contradicts itself, is
+  refused naming the line, by both verifiers; a torn last line is dropped; the committed results pass the verifier with
+  the counts `results/README.md` quotes; a strict game stopped by a node limit and resumed reads back with an empty
+  taint, and so does a default one whose checkpoint has frame 0 as built; a proof by the cap is clean on a clean chain.
 * **Large boards** (`tests/wide.rs`): `optimal.json` and the Java stop at 1000, and the sets that hold a board are 8 to
   64 words wide, so nothing above 1023 meets anything but the committed results and these tests.  The same game at every
   width that holds it has the same frames, candidates, greedy set, promotion cap, answer and tree; game 1133 (W = 20,
@@ -552,11 +582,17 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   proves game 1133 by an independent route; a W = 64 board (2050) through frames, matching bound, conflicts, greedy set
   and a node-limited search; a committed W = 32 checkpoint of game 1133 (`testdata/n1133_after_1000_nodes.ckpt`) that
   must still resume, at its own width (a deliberate change of the checkpoint format fails it; the test says how to make
-  the file again); and the levels of a real depth-first stack of game 1215 (`testdata/n1215_deep_units.txt`): the
-  incremental matching bound and the quick bounds without a member against the min-cost-flow reference.
+  the file again); the levels of a real depth-first stack of game 1215 (`testdata/n1215_deep_units.txt`): the
+  incremental matching bound and the quick bounds without a member against the min-cost-flow reference; and promoting
+  one number at a time (with its no-peel shortcut) against the peel of every frame, in reached states of boards at
+  W = 20, 28 and 64.  (The unit tests check the nogood table's lookups against their definition at compact strides of
+  1 to 16 words, and debug builds check that every root frame is winnable, which the shortcut needs.)
 * **Command line** (`tests/cli.rs`): every subcommand's happy path and its usage errors through the real binary;
   `bench --history FILE` keeps the tracked `bench/history.jsonl` out of the tests.
-* **Documentation** (`tests/docs.rs`): the table of tactics in section 5 matches the code.
+* **Documentation** (`tests/docs.rs`): the table of tactics in section 5 matches the code; every relative link and
+  `#anchor` in the markdown files resolves; the README's table of the fields of a result line, and its example line,
+  have the keys the code writes; its reading order is the module map of `src/lib.rs`; `rust-version` is what the README
+  and `setup.sh` say; and the docs call `unzip`'s moves *mandatory*, never *forced*.
 
 A few tests sample what an exhaustive run would cover (every 18th golden board for the peeling agreement, every sixth
 board above 511 for the root promotability of the frame builder's candidates, every second line of the Java fixtures);
@@ -586,8 +622,8 @@ on the machine moves wall times by up to 3×.  What measures what:
   set width (code a profile never saw is optimized as cold), and `-Cprofile-use` builds `target/pgo/release/taxman` and
   the examples.  The same trees and fingerprints.  Since the hot loop is inlined by hand it adds 0–2% (it was 12%
   before).  Profile the plain build: with PGO the search is inlined into a few functions and a profiler sees little.
-  On Linux, rustup's `llvm-tools` has an llvm-profdata that matches rustc's LLVM, and the script keeps
-  `RUSTFLAGS="-C target-cpu=native"`.
+  On Linux, rustup's `llvm-tools` has an llvm-profdata that matches rustc's LLVM, and the script adds whatever
+  `RUSTFLAGS` it is given (for instance `-C target-cpu=native`, which a plain build does not use) to the profile flags.
 * **The ladder** (`cargo run --release --example ladder -- [--threads T[,T…] | --scaling] [--seconds S] [--diag]
   [--seed-opt] [--known FILE] [--tactic …] N…`; its flags are documented at the top of `examples/ladder.rs`): standalone
   searches of hard games from the frame builder, seeded from the known n − 1 game and capped as the solver does, each
@@ -606,18 +642,24 @@ on the machine moves wall times by up to 3×.  What measures what:
 * **The cloud** (`tools/cloud`) has the scripts for a many-core machine: the sweep to 192 threads, the cost of a
   checkpoint pause, and the production chain (RUNBOOK.md).
 
-**Where it stands** (the notebook has the tables): the proof of 1215 takes 33 s on one thread (106 G cycles), and 1184
-takes 3.2 G cycles; the strict chain 1..1231 takes 279 s of game time on 8 threads of the M1 Max, 145 s of it for
-1201–1231.  The cost of a game grows by a factor of ten for every 55 to 70 in n past 1200
-([bench/curve/README.md](bench/curve/README.md)).  The Hungarian repairs of the matching are about 46% of the time, the
-peels 24%, the bounds from the potentials 7%, the node's own work 7%, level copies 4% and nogood lookups 3%.
+**Where it stands** (the notebook has the tables; these are the build of commit 4b6ef38, on the M1 Max): the proof of
+1215 takes 33 s on one thread (106 G cycles), and 1184 takes 3.2 G cycles.  The strict chain 1..1231 took 279 s of
+game time on 8 threads, 145 s of it for 1201–1231, at that commit; the committed `bench/curve/chain.jsonl`
+(1001–1231), made by the build before it (e710d16), records 318 s, and 207 s for 1201–1231.  The cost of a game
+grows by a factor of ten for every 55 to 70 in n past 1200 ([bench/curve/README.md](bench/curve/README.md)).  The
+committed `results/strict.jsonl` (the strict chain 1..1300 by commit bd9bb5d, on 6 threads of an M1 Max shared with
+another CPU-heavy job) records 3359 s of search, 2866 s of it for 1232–1300; its slowest game is 1232 at 439 s
+([results/README.md](results/README.md)).  The Hungarian repairs of the matching are about 46% of the time, the peels
+24%, the bounds from the potentials 7%, the node's own work 7%, level copies 4% and nogood lookups 3%.
 
 ## 11. Status and what is left
 
-Every n to 1231 has a game whose proof rests on nothing unproven: n ≤ 1000 are optimal.json's, reproduced by a strict
-run from n = 1 (that output was not kept), 1001–1219 are in `results/strict.jsonl` and 1001–1231 in the cost-curve
-study's `bench/curve/chain.jsonl` (`results/README.md` says what supports each score).  1232 is unfinished.  What is
-left to try: the incumbents of games like 992 and 1025, whose optimum the search reaches late; cheaper matching repairs
-(the largest cost); a warm-started unit rebuild; and, for the many-core machine, whatever its first sweep shows that a
-laptop cannot.  Nothing about scaling beyond 8 threads or about Graviton has been measured (`tools/cloud/RUNBOOK.md`,
-section 8).
+Every n to 1300 has a game whose proof rests on nothing unproven: `results/strict.jsonl` is a strict chain from n = 1
+whose games to 1000 reproduce optimal.json's scores and whose games 1001–1300 go beyond it; the cost-curve study's
+`bench/curve/chain.jsonl` (1001–1231) agrees with it, and `results/default.jsonl` (1001–1231, the first run past 1000,
+with unproven tactics on) is kept as a historical record (`results/README.md` says what supports each score).  The
+production chain on a many-core machine can start from `strict.jsonl` (`tools/cloud/RUNBOOK.md`), and a strict chain
+from n = 1 reproduces its scores.  What is left to try: the incumbents of games like 992 and 1025, whose optimum the
+search reaches late; cheaper matching repairs (the largest cost); a warm-started unit rebuild; and, for the many-core
+machine, whatever its first sweep shows that a laptop cannot.  Nothing about scaling beyond 8 threads or about
+Graviton has been measured (`tools/cloud/RUNBOOK.md`, section 8).

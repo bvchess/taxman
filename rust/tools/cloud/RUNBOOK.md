@@ -28,8 +28,8 @@ about scaling beyond 8 threads or about Graviton5 has been measured (section 8).
    up to its 8 threads (section 3).
 3. The big instance, on-demand, for the checks: the large-machine tests, the sweep to 192 threads, the cost of a
    checkpoint pause, and a rehearsal of the whole chain to 1231 with forced interruptions (section 4).
-4. The production chain, strict from n = 1, in tmux, on spot or on-demand, with a deadline and a copy of the state
-   kept off the machine (section 5).
+4. The production chain, strict, from n = 1 or from the committed `results/strict.jsonl` (which holds it to 1300), in
+   tmux, on spot or on-demand, with a deadline and a copy of the state kept off the machine (section 5).
 5. Verify, bring the results home, shut everything down (section 6).
 
 The files in this directory:
@@ -53,15 +53,19 @@ checkpoints, `taxman.lock`), `logs/`, `chain.pid`, `deadline`.  Nothing is writt
 
 ### What is being computed
 
-`chain.sh N` runs `taxman solve 1-N --tactic reuse_prev=off --tactic revise_freedoms=off` into one results file:
+`chain.sh N` runs `taxman solve 1-N --strict` (no unproven tactic: `--tactic reuse_prev=off --tactic
+revise_freedoms=off`) into one results file:
 every game from n = 1, each built from the one before, with no unproven tactic.  Nothing rests on `optimal.json` (it is
-only compared with, to n = 1000) or on the committed results; the committed files are what the run is checked against
-(`verify.sh`).  The solver is the same code as on a laptop; the machine only changes how long it takes.
+only compared with, to n = 1000).  The committed `results/strict.jsonl` is exactly such a file for n = 1 to 1300, made
+on a laptop ([results/README.md](../../results/README.md)): a run from n = 1 reproduces its scores (the run is checked
+against it by `verify.sh`), and the production chain can instead start from it, as section 5 says, so that only the
+games above 1300 are new.  The solver is the same code as on a laptop; the machine only changes how long it takes.
 
 Cost grows by a factor of 10 for every 55 to 70 in n past 1200 ([bench/curve/README.md](../../bench/curve/README.md)).
 From that file, the cost of extending the chain from 1231 to N on a 192-core machine, taking it to be 10 to 19 times
 the 8 M1 threads of the measurements (an assumption, not a measurement), and the prices it assumes ($3.33/h spot,
-$8.35/h on-demand for the 48xlarge; check the current ones):
+$8.35/h on-demand for the 48xlarge; check the current ones).  Starting from the committed file, the part of the
+cost up to 1300 is already paid:
 
 | N | time | spot | on-demand |
 |---|---|---|---|
@@ -72,8 +76,11 @@ $8.35/h on-demand for the 48xlarge; check the current ones):
 | 1550 | 4 to 8 days | $336 to $638 | $842 to $1,600 |
 
 These are extrapolations from a handful of points: treat them as good to a factor of several in either direction, and
-let the first hours of the real run decide (the time per game is in the log; section 5).  The first 1231 games take
-minutes.  A single hard game near 1500 can take hours.  Choose N by money and patience; rerunning `chain.sh` with a
+let the first hours of the real run decide (the time per game is in the log; section 5).  One point has been measured
+since: games 1232 to 1300 took 2866 s of search on 6 threads of the M1 Max, which another CPU-heavy job was sharing
+(`results/strict.jsonl`), about 2.5 to 5 minutes at the factors above, more than the 1 to 2 minutes of the 1300 row (a
+loaded machine and 6 threads make that the pessimistic side).  The first 1300 games take minutes.  A single hard game
+near 1500 can take hours.  Choose N by money and patience; rerunning `chain.sh` with a
 larger N later continues the same file.
 
 ### Instance
@@ -93,10 +100,12 @@ larger N later continues the same file.
 * **Check `lscpu` on the big one** for the number of NUMA nodes.  The engine does not pin threads; each searcher
   allocates its own state on its own thread, so first touch keeps it local.  If there are several nodes and the sweep
   shows a step in `k/s/thr` where the thread count crosses a node, that is the cause.
-* **Build on the machine type that runs it.**  `-C target-cpu=native` (the default of `env.sh`) tunes for the CPU that
-  builds; a binary built on a newer core can fail with an illegal instruction on an older one.  `setup.sh` prints the CPU
-  that `native` resolved to (`native cpu:` line); it should be a Neoverse core name, not `generic`.  The gain of `native`
-  has not been measured on Graviton (expect 0 to 3 %).
+* **Build on the machine type that runs it.**  `-C target-cpu=native` is opt-in: a plain `cargo build` is generic code
+  (README, section 2), and these scripts add it through `RUSTFLAGS` (the default of `env.sh`; set `RUSTFLAGS=` to build
+  generic code).  It tunes for the CPU that builds; a binary built on a newer core can fail with an illegal instruction
+  on an older one.  `setup.sh` prints the CPU that `native` resolved to (`native cpu:` line); it should be a Neoverse
+  core name, not `generic`.  The gain of `native` has not been measured on Graviton (expect 0 to 3 %; on the M1 it
+  measured 0 %).
 * **Profile-guided optimization** (PGO) is optional: `rust/tools/pgo.sh` makes the build (its header says how; on the
   M1 it adds 0 to 2 % now, see [DESIGN.md](../../DESIGN.md#10-performance)).  PGO changes code
   generation only: the search and its answers are the same, a checkpoint can be resumed by either binary, and
@@ -189,7 +198,8 @@ speed; the scaling numbers of a container on a laptop mean nothing for the cloud
    ```
 
    Read section 4.3 for the tables.  What to take from this machine: the single-thread rate (`k/s/thr` at 1 thread; the
-   M1 Max did 100 to 130 thousand nodes per second per thread at n = 1184 to 1215), the speedup to 8 threads, and a
+   M1 Max did 100 to 130 thousand nodes per second per thread on single games from n = 1184 to 1215, depending on
+   the game), the speedup to 8 threads, and a
    `Maximum resident set size` in the log (GNU `time` is used if installed).
 4. Try the pieces that will matter on the big machine, on a small chain:
 
@@ -259,7 +269,7 @@ scaling, n=1184 (speedup over 1 thread(s), times 1; * = stopped by the time limi
 | `search s` | wall time of the search; `*` if the time limit stopped it | a `*` makes that row useless; raise `SECONDS_LIMIT` |
 | `speedup` | time of the first row times its threads, over this time | close to the thread count for a long game; see the next paragraph |
 | `nodes` | steps taken, all threads | compare with the 1-thread row: tens of percent either way is normal (below) |
-| `k/s/thr` | thousands of nodes per second per thread | the engine's efficiency apart from the tree size: it falls a little with more threads (M1: 80 to 65 from 1 to 8 threads, 19 %); a step down at one thread count suggests memory, frequency or NUMA |
+| `k/s/thr` | thousands of nodes per second per thread | the engine's efficiency apart from the tree size: it falls a little with more threads (M1, the proof of 1225: 80 to 65 from 1 to 8 threads, 19 %; the rate depends on the game: the 1-thread row above is 126.5 at n = 1184); a step down at one thread count suggests memory, frequency or NUMA |
 | `eff %` | busy time / (wall x threads) | 99 to 100 up to 8 threads on the M1; below ~90 at 192 only means the game is too short, if `idle %` explains it |
 | `idle %` | time workers waited for work | ramp-up and tail: they matter when the whole search takes seconds; a long game should keep it small |
 | `lock %` | time waiting for the deque's lock | should stay near 0; if it reaches a few percent on long games at high counts, the engine's one shared deque is contended and per-worker deques are the next step (`src/engine.rs`, "Why one deque") |
@@ -305,11 +315,12 @@ TAXMAN_WORK=~/rehearsal EXTRA_ARGS="--time-limit 5" rust/tools/cloud/chain.sh 12
 ```
 
 It takes minutes.  The log (`~/rehearsal/logs/chain.log`) shows each pass; at the end `verify.sh` runs both referees on
-the new file and the committed ones.  **Pass = the chain completes, "both referees agree", and the line `231 board sizes
-are in more than one file, with equal scores in all`** (the scores of 1001..1231 equal the committed strict chain's; the
-moves may differ, which is allowed).  A strict game that was stopped and resumed is no different from one that ran in
-one piece (`"taint":[]`, `setup.revise` `Off`), so the chain goes on from it.  Then the two harder interruptions, by
-hand, with `TAXMAN_WORK` exported as `~/rehearsal2` in both tmux windows:
+the new file and the committed ones.  **Pass = the chain completes, "both referees agree", and the line `1231 board
+sizes are in more than one file, with equal scores in all`** (the scores of 1..1231 equal the committed strict chain's,
+and those of 1001..1231 the other two files'; the moves may differ, which is allowed).  A strict game that was stopped
+and resumed is no different from one that ran in one piece (`"taint":[]`, `setup.revise` `Off`), so the chain goes on
+from it.  Then the two harder interruptions, by hand, with `TAXMAN_WORK` exported as `~/rehearsal2` in both tmux
+windows:
 
 ```
 rust/tools/cloud/chain.sh 1231                    # window 1
@@ -336,6 +347,23 @@ In a second window, if spot: `rust/tools/cloud/spot-watch.sh`.  `chain.sh N` is 
 into `~/taxman-work/results/strict.jsonl`, all CPUs, a checkpoint and a progress line every 60 s.  Its variables (all
 optional) are documented at the top of the script: `THREADS`, `CHECKPOINT_INTERVAL`, `PROGRESS`, `EXTRA_ARGS`,
 `DEADLINE_HOURS`, `POWEROFF`, `MAX_FAILS`, `S3_DEST`, `SAVE_EVERY`.
+
+* **Where the chain starts.**  From an empty `~/taxman-work`, `chain.sh` solves from n = 1, which reproduces the
+  committed `rust/results/strict.jsonl` (n = 1 to 1300; the scores equal, the moves may differ) in minutes on the big
+  machine, and `verify.sh` then checks the machine and the build against it.  To skip those games, copy the committed
+  file in before the first run, once:
+
+  ```
+  mkdir -p ~/taxman-work/results && cp rust/results/strict.jsonl ~/taxman-work/results/strict.jsonl
+  rust/tools/cloud/chain.sh 1400                    # skips the 1300 games it holds and solves 1301 on
+  ```
+
+  The file is checked when `chain.sh` opens it, rests on nothing unproven (a strict run builds on it), and its lines
+  keep the build that made them (commit bd9bb5d), as the lines added will keep the cloud's.  Its four incomplete lines
+  are stopped searches that a later line finished.  The comparison of `verify.sh` with the committed file is then
+  trivial for 1..1300, so the games above 1300 are checked by the referees alone (each game replayed, the chain
+  bounds, Franklín–Moniot, the heuristic chain); a run from n = 1 is the cross-check of the machine and the build.  On
+  a replacement machine, restore the saved state instead (below), never the committed file over it.
 
 * **Stop on purpose**: Ctrl-C in tmux, or `kill -TERM $(cat ~/taxman-work/chain.pid)`.  The solver writes a final
   checkpoint; `chain.sh` ends with status 143.  **Start again**: run the same command.  It skips every completed game
@@ -415,7 +443,8 @@ It runs `taxman verify-results` and `tools/check_results.py` on the file togethe
 and opening with the largest prime, the chain bounds `score(n-1) <= score(n) <= n + score(n-1)`, each line's arithmetic and
 provenance, the Franklin-Moniot bound and the best heuristic chain, and that every board size shared with a committed
 file has the same score.  For a clean strict chain from 1: the report says `taint: N of N games rest on nothing unproven`.
-Any other taint, or any problem line, means the run is not what it should be: stop and read the line.
+Any other taint, or any problem line, means the run is not what it should be: stop and read the line.  (A count of
+incomplete lines is not a problem: every search that was stopped and resumed left one.)
 
 Then decide what to keep.  The file is about 2 KB per game.  The committed `results/` must not be overwritten by
 scripts; a new file next to them (say `results/strict-1-1400.jsonl`) and an update of `results/README.md`, and the
@@ -426,12 +455,13 @@ scaling logs under `bench/` (say `bench/cloud/`), are your call.
 | symptom | cause and remedy |
 |---|---|
 | `error: ... is in use by another process (process N)` | a solver already uses that checkpoint directory (`pgrep -a taxman`); a lock is released when its process ends, however it ends |
+| `error: FILE is in use by another process (another run appending to it?): it is locked` | a solver already appends to that results file (`--out`); the same remedy |
 | `chain.sh: another chain.sh is running` | the same, one level up; `~/taxman-work/chain.pid` names it |
 | `cannot resume from ...: made with different search tactics: ...` | resume with the `--tactic` flags it prints (`EXTRA_ARGS`), or delete the checkpoint to start that game over |
 | `cannot resume from ...` for another game or build | delete the named `.ckpt` file; the game restarts from its beginning |
 | the solver exits with status 137 | the OOM killer or a spot reclaim; `chain.sh` retries; look at `dmesg` if it repeats (it should not: memory use is tiny) |
 | `rustc ... older than 1.89` / an error about `try_lock` | `rustup update stable`; `setup.sh` does this when rustup is present |
-| `optimal.json` not found | the binary was moved away from the checkout it was built in (the path is fixed at compile time): rebuild there, or pass `--optimal FILE` |
+| `optimal.json` not found | the binary looks for `src/main/resources/optimal.json` at run time, above the working directory and then above the binary (`src/paths.rs`), and neither is inside a checkout: run from inside one, or pass `--optimal FILE` or set `TAXMAN_OPTIMAL` |
 | `eff` low and `idle` high on a short game at 192 threads | expected (section 4.3); judge long games |
 | `lock` of several percent on long games | the shared deque is contended: report it; fewer threads is the immediate remedy (`THREADS=96`) |
 | `/tmp` or `$TAXMAN_WORK` is a memory filesystem | `chain.sh` refuses: set `TAXMAN_WORK` to a directory on EBS |
