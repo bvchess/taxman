@@ -12,10 +12,10 @@ mod common;
 use common::{config, random_subset, Config, Game, Rng, TempDir};
 use std::time::Duration;
 use taxman::bits::Bits;
+use taxman::board::Board;
 use taxman::engine::EngineConfig;
 use taxman::frames::build_frames;
 use taxman::game::Optimal;
-use taxman::hives::Apiary;
 use taxman::model::{FrameSet, Model, Scratch};
 use taxman::numtheory::Tables;
 use taxman::search::{prepare, Branching, SearchTactics, TaxUnit};
@@ -50,7 +50,7 @@ fn configs() -> Vec<Config> {
 
 /// `optimal.json`'s best promotion sum of game `n`: its score less what the game with no promotions scores.
 fn optimal_sum<const W: usize>(optimal: &Optimal, n: u32) -> Option<u64> {
-    let in_the_bag: u64 = Apiary::<W>::new(&Tables::new(n), Bits::EMPTY).solution().iter().map(|&m| u64::from(m)).sum();
+    let in_the_bag = Board::<W>::for_n(n).in_the_bag;
     optimal.score(n).map(|score| score - in_the_bag)
 }
 

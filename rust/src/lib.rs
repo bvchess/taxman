@@ -68,10 +68,11 @@
 //! | studies | [`brute`] | exhaustive search without the frame model, to certify small boards |
 //! | | [`sacrifice`] | the sacrifice bound and punctured games; not used by the solver |
 //!
-//! The command-line front end (`main.rs`, `cli.rs`, `commands.rs`) is the binary's, not the library's.  Modules
-//! `bounds`, `sacrifice` and `brute` are off the default path (the first is the Java-parity layer; the others are
-//! studies); a first read can skip them.  `examples/` holds the ladder (searches of hard games with time limits
-//! and thread counts), the probe of the hot paths, and the sacrifice study; `tests/` the integration tests.
+//! The command-line front end (`main.rs`, `cli.rs`, `commands.rs`) is the binary's, not the library's.  `bounds` is
+//! mostly the Java-parity layer (the default search uses only its greedy incumbent and candidate lists), and
+//! `sacrifice` and `brute` are studies; a first read can skip all three.  `examples/` holds the ladder (searches of
+//! hard games with time limits and thread counts), the probe of the hot paths, and the sacrifice study; `tests/` the
+//! integration tests.
 
 pub mod accelerate;
 pub mod bits;

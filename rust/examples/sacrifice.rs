@@ -27,8 +27,8 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use taxman::accelerate::reuse_prev;
 use taxman::bits::words_for;
+use taxman::board::Board;
 use taxman::brute::{self, Rule};
-use taxman::frames::build_frames;
 use taxman::game::Optimal;
 use taxman::json::Json;
 use taxman::numtheory::Tables;
@@ -299,18 +299,17 @@ fn one_game<const W: usize>(n: u32, o: &RangeOptions, games: &Optimal) -> Result
         _ => return Err(format!("no game for n={}", n - 1)),
     };
     let opt = games.score(n);
-    let t = Tables::new(n);
-    let prime = t.is_prime(n);
+    let prime = Tables::new(n).is_prime(n);
     let exact = opt == Some(prev_score + u64::from(n));
     if o.select != Select::All && (prime || exact) {
         return Ok(None);
     }
-    let frames = build_frames::<W>(&t);
-    let trivial = frames.candidates.is_empty();
+    let board = Board::<W>::for_n(n);
+    let trivial = board.is_trivial();
     let reuse = if trivial {
         None
     } else {
-        reuse_prev(&t, &frames, prev_moves).map(|a| a.moves.iter().map(|&m| u64::from(m)).sum::<u64>())
+        reuse_prev(&board.tables, &board.frames, prev_moves).map(|a| a.moves.iter().map(|&m| u64::from(m)).sum::<u64>())
     };
     if (o.select == Select::Reuse && reuse.is_none()) || (o.select == Select::Search && (reuse.is_some() || trivial)) {
         return Ok(None);
