@@ -1,7 +1,22 @@
 //! The sacrifice bound: an upper bound on game `n` from games on the board `n − 1` with one number taken off.
 //!
-//! *Study code* (see `examples/sacrifice.rs` for the measurements): the bound is proven below, but the solver
-//! does not use it.
+//! # Status: a study, with a negative result
+//!
+//! **This is study code.  The solver does not use it.**  It is kept because it holds a theorem (proved below) and
+//! a measured negative result, and because the tests use it as an independent check.
+//!
+//! * *The question.*  The tactic `reuse_prev` accepts a derived game unproven.  Could an upper bound on `opt(n)`
+//!   computed from games of `n − 1` prove those games optimal, or settle other games faster than searching them?
+//! * *The answer is no.*  The bound is a theorem, and the frame model computes it correctly (checked against
+//!   exhaustive search, [`crate::brute`]), but it is tight on too few of the games that matter, and computing it
+//!   costs about as much as solving the game: it is no replacement for `reuse_prev`, and putting it into the
+//!   pipeline slowed the games it was tried on (numbers under "Findings"; `examples/sacrifice.rs` made them).
+//! * *What stays in use.*  `tests/wide.rs` uses [`sacrifice_bound`] as an upper bound that does not come from the
+//!   search under test, to prove one result at `W = 20` (game 1133), beyond what the Java can check.  The support
+//!   for punctured boards (holes) exists for this study alone: [`crate::numtheory::Tables::punctured`],
+//!   [`crate::game::replay_punctured`], and the hole cases of [`crate::hives`].
+//! * *Not here.*  The proof that the prime shortcut is optimal, which the solver does rely on, is with the shortcut
+//!   ([`crate::accelerate::prime_shortcut`]); the "Prime `n`" remark below is its case in this setting.
 //!
 //! # Notation
 //!
@@ -63,15 +78,15 @@
 //!   plays `f` and every move has a maximal factor other than `f` in the pot).  If that holds for some `f`, the
 //!   bound is the trivial `n + opt(n − 1)`.  The bound bites only when every maximal factor of `n` is
 //!   load-bearing.
-//! * Prime `n` (`mf(n) = {1}`): on `B_1` no prime can be played, and the two rules agree (the other numbers have
-//!   maximal factors above 1).  Let `P` be the largest prime below `n`.  Every optimal game of `n − 1` starts
-//!   with `P`: 1 pays only for the first move; if that were a smaller prime `q`, playing `P` instead (which
-//!   removes only 1) leaves a larger pot and scores more; if it were composite, `P` could not be played at all,
-//!   and playing `P` first (removing only 1) leaves that composite another divisor and scores more.  Dropping the
-//!   first move gives a game on `B_1`, so `opt_M(B_1) ≥ opt(n − 1) − P`; and `P` followed by any game on `B_1` is
-//!   a game on `[n − 1]` (no multiple of `P` is on the board), so `opt_M(B_1) = opt(n − 1) − P`.  The bound is
-//!   `n + opt(n − 1) − P`, which the prime shortcut reaches: it is tight for every prime, and proves the prime
-//!   shortcut with no frame-model assumption.
+//! * Prime `n` (`mf(n) = {1}`).  On `B_1` no prime can be played, and the two rules agree (the other numbers have
+//!   maximal factors above 1).  Let `P` be the largest prime below `n`.  Every optimal game of `n − 1` opens with
+//!   `P` (Lemma A of [`crate::accelerate::prime_shortcut`], where it is proved).  Dropping that first move gives
+//!   a game on `B_1`, so `opt_M(B_1) ≥ opt(n − 1) − P`; and `P` followed by any game on `B_1` is a game on
+//!   `[n − 1]` (no multiple of `P` is on the board), so `opt_M(B_1) = opt(n − 1) − P`.  The bound is
+//!   `n + opt(n − 1) − P`, which the prime shortcut reaches: it is tight for every prime.  (That the shortcut is
+//!   optimal needs no frame-model assumption.  Its proof is a direct argument that does not go through this
+//!   theorem, and it lives with the shortcut.)  [`sacrifice_bound`] uses this value for the hole 1 without any
+//!   search (`without_one`).
 //!
 //! # Computing it
 //!
@@ -87,7 +102,7 @@
 //! optimal game of the unpunctured board, which caps it: if that game replays on the punctured board, its score is
 //! the answer with no search.
 //!
-//! # Findings
+//! # Findings (the negative result)
 //!
 //! Measured with `examples/sacrifice.rs` (2026-10; 2 threads, sound tactics):
 //!

@@ -1,4 +1,10 @@
-//! The sacrifice-bound study (see `taxman::sacrifice` for the bound and its proof).
+//! The sacrifice-bound study: the command-line harness behind the measurements in `taxman::sacrifice`, which
+//! has the bound, its proof, and the (negative) finding that computing it does not pay.  Study code: nothing in
+//! `taxman solve` uses any of this.
+//!
+//! The brute-force and validation modes check the frame model on small boards, with one number taken off,
+//! against exhaustive search (`taxman::brute`); the range mode computes the bound for real games with the frame
+//! model and, if asked, times the direct solve of the same game for comparison.
 //!
 //! ```text
 //! cargo run --release --example sacrifice -- brute [MAX] [--out FILE]
@@ -98,6 +104,9 @@ fn secs(d: Duration) -> f64 {
 // ---------------------------------------------------------------------------------------------------------
 // The brute-force study
 
+/// The `brute` mode: for every `n` up to `MAX`, the sacrifice theorem checked on exhaustive-search values (so with
+/// no frame model in the bound), one line per `n`, and the frame model's punctured games compared with the brute
+/// force.  A counterexample to the theorem, or a disagreement of the frame model, is reported.
 fn brute_study(args: &[String]) -> Result<(), String> {
     let mut max = 60;
     let mut out = None;
@@ -197,6 +206,9 @@ fn brute_study(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+/// The `validate` mode: the frame model against the brute force on every board `1..=N` with one number `h` taken
+/// off, under the maximal-factor rule, for every `N` up to `MAX`.  Prints any mismatch; the count at the end
+/// should be 0.
 fn validate(args: &[String]) -> Result<(), String> {
     let max: u32 = args.first().map_or(Ok(40), |a| a.parse().map_err(|e| format!("{a}: {e}")))?;
     let games = Games::load(&[])?;
@@ -252,6 +264,8 @@ struct RangeOptions {
     tactics: Tactics,
 }
 
+/// The `range` mode: parses the options, then computes one line per game `LO..=HI` ([`one_game`]) and appends it to
+/// the output file as soon as it is done, skipping the games the file already has.
 fn range(args: &[String]) -> Result<(), String> {
     let mut tactics = Tactics::default();
     tactics.set("reuse_prev=off")?;
@@ -499,6 +513,8 @@ fn pct(a: usize, b: usize) -> f64 {
     100.0 * a as f64 / b.max(1) as f64
 }
 
+/// The `summary` mode: reads range files and prints how often the bound is tight, split by kind of game (prime,
+/// exact, neither; of those trivial, derived by `reuse_prev`, or needing a search), with the time comparisons.
 fn summary(args: &[String]) -> Result<(), String> {
     let mut rows: BTreeMap<u32, Json> = BTreeMap::new();
     for path in args {
