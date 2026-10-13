@@ -902,9 +902,20 @@ impl Model {
             return None;
         }
         let (into, out) = (&state.frames[h - 1], &state.frames[h]);
-        let ok = scratch.winnable(&into.moves.with(n), &into.factors, &self.graph)
+        let ok = (self.has_unused_factor(into, n) || scratch.winnable(&into.moves.with(n), &into.factors, &self.graph))
             && scratch.winnable(&out.moves, &out.factors.without(n), &self.graph);
         ok.then_some(h)
+    }
+
+    /// Whether the move `x` has a live factor in the winnable `frame` that none of the frame's moves has: then the
+    /// frame stays winnable with `x` added, which can be taken last (nothing before it takes that factor), and no
+    /// peel is needed to know it.  The answer for a sixth of the promotions near n = 1200 (the peel decides the
+    /// others; the same test for several moves promoted at once was measured, and paid less than it cost).
+    #[inline]
+    fn has_unused_factor<const W: usize>(&self, frame: &Frame<W>, x: u32) -> bool {
+        let g = &self.graph;
+        let unused = |q: u32| g.composites(q).iter().all(|&m| !frame.moves.contains(u32::from(m)));
+        g.factors(x).iter().map(|&q| u32::from(q)).any(|q| frame.factors.contains(q) && unused(q))
     }
 
     /// The state after promoting `n`, or `None` if `n` cannot be promoted.
