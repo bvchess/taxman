@@ -705,8 +705,8 @@ use them).
 earlier game of the chain (the same frames, candidates, `max_total` and factor graph; only the cap differs), so they
 have its best promotion sum, yet the solver proves it again.  How many, what does it cost, and does concluding them
 from the earlier game hold up?  The pilot (`ideas repeats` on the branch `ideas-pilots`) hashed the root frames, the
-candidates and `max_total` with Rust's `DefaultHasher`; this round makes it a proof kind (commit f5a2af3; DESIGN.md,
-["Same search"](../DESIGN.md#same-search), has the argument).
+candidates and `max_total` with Rust's `DefaultHasher`; this round makes it a proof kind (commits f5a2af3 and
+1cc4067; DESIGN.md, ["Same search"](../DESIGN.md#same-search), has the argument).
 
 *Method.*  The problem is written out canonically (`search::Problem`, which also records the model's factor lists and
 home frames for every number of the frames) and compared whole; the digest only finds candidates.  The repeats are
