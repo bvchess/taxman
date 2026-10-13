@@ -197,11 +197,13 @@ fn resumed_over_and_over<const W: usize>(
 fn a_search_resumed_over_and_over_finds_the_optimum() {
     let optimal = Optimal::load_default().unwrap();
     let dir = TempDir::new("churn");
-    // Game 600 takes 7,000 to 17,000 nodes from an incumbent that far below the optimum, so a limit of 1,500 stops it
-    // four to nine times: with the default tactics, and with the searchers forgetting their nogoods every two steps.
+    // Game 600 takes 7,000 to 17,000 nodes from an incumbent that far below the optimum (two threads: the count
+    // depends on timing), so a limit of 1,000 stops it at least six times in each of the two configurations: the
+    // default tactics, and the searchers forgetting their nogoods every two steps.  The bound below only checks that
+    // the resuming really happened; it leaves room for the smallest trees a loaded machine produces.
     let truth = optimal_sum::<16>(&optimal, 600).unwrap();
-    let resumes = resumed_over_and_over::<16>(600, truth, 30, 1500, &dir, &[0, 18]);
-    assert!(resumes > 10, "only {resumes} resumes");
+    let resumes = resumed_over_and_over::<16>(600, truth, 30, 1000, &dir, &[0, 18]);
+    assert!(resumes >= 10, "only {resumes} resumes");
 }
 
 /// The same at W = 20, 24 and 64, on game 1133 (its truth from `results/strict.jsonl`) from an incumbent 400 below
