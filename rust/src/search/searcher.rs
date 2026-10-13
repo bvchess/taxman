@@ -686,7 +686,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
             }
             Verdict::Open(conflict) => match &mut self.lagrange {
                 None => Ok(Open { conflict, forced }),
-                Some(l) => match l.check(&promoted, cands, need, forcing) {
+                Some(l) => match l.check(&promoted, cands, need, forcing, &forced) {
                     None => Err(cut::LAGRANGE),
                     Some(more) => Ok(Open { conflict, forced: forced | more }),
                 },

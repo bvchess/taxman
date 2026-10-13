@@ -72,15 +72,25 @@ impl<'a, const W: usize> Lagrangian<'a, W> {
 
     /// The Lagrangian check of the node with the promotions `promoted` and the candidates `cands`, which needs
     /// `need` (see the module docs): `None` if no completion of it reaches `need`, else the forced members found
-    /// (with `forcing`; none without).  Before the first refit there are no multipliers, and nothing is found.
+    /// (with `forcing`; none without) beyond those `known` already.  Before the first refit there are no
+    /// multipliers, and nothing is found.
     #[inline]
-    pub(super) fn check(&mut self, promoted: &Bits<W>, cands: &Bits<W>, need: u64, forcing: bool) -> Option<Bits<W>> {
+    pub(super) fn check(
+        &mut self,
+        promoted: &Bits<W>,
+        cands: &Bits<W>,
+        need: u64,
+        forcing: bool,
+        known: &Bits<W>,
+    ) -> Option<Bits<W>> {
         if self.bound.relaxation().is_empty() {
             return Some(Bits::EMPTY);
         }
         let target = SCALE * need as i64;
         match self.bound.value(promoted, cands) {
-            Some(value) if value >= target => Some(if forcing { self.bound.forced(target) } else { Bits::EMPTY }),
+            Some(value) if value >= target => {
+                Some(if forcing { self.bound.forced(target, known) } else { Bits::EMPTY })
+            }
             _ => None,
         }
     }

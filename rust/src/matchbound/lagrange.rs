@@ -295,10 +295,10 @@ impl<'g, const W: usize> LagrangeBound<'g, W> {
     /// The candidates of the heaviest matching of the last level evaluated (settled and feasible) without which
     /// the bound, from the potentials alone, is below `target` (scaled): every completion worth `target / SCALE`
     /// promotes them.  (The live nogoods' inequalities hold for every completion of the node, so the multipliers
-    /// and the constant stay as they are without a candidate.)
-    pub fn forced(&self, target: i64) -> Bits<W> {
+    /// and the constant stay as they are without a candidate.)  Those in `known` (forced already) are left out.
+    pub fn forced(&self, target: i64, known: &Bits<W>) -> Bits<W> {
         let level = &self.levels[self.depth - 1];
-        level.forced(self.graph, target, level.weighing.constant)
+        level.forced(self.graph, target, level.weighing.constant, known)
     }
 
     /// Pushes a level for the node with `promoted` and `cands`, solved from scratch at the next settle.

@@ -620,9 +620,11 @@ impl<const W: usize, K: Weighing> Level<W, K> {
     }
 
     /// The members `x` of the heaviest matching of this level, settled and feasible, whose bound without them
-    /// ([`bound_excluding`](Self::bound_excluding)) plus `constant` is below `target`.
-    fn forced(&self, g: &MatchGraph, target: i64, constant: i64) -> Bits<W> {
-        self.chosen.iter().filter(|&x| self.bound_excluding(g, x) as i64 + constant < target).collect()
+    /// ([`bound_excluding`](Self::bound_excluding)) plus `constant` is below `target`, leaving out those in
+    /// `known` (forced already).
+    fn forced(&self, g: &MatchGraph, target: i64, constant: i64, known: &Bits<W>) -> Bits<W> {
+        let rest = self.chosen - *known;
+        rest.iter().filter(|&x| self.bound_excluding(g, x) as i64 + constant < target).collect()
     }
 
     /// Restores the optimality conditions.
@@ -1170,7 +1172,7 @@ impl<'g, const W: usize> MatchBound<'g, W> {
             // No completion at all: without any member the bound is 0.
             return if need > 0 { level.chosen } else { Bits::EMPTY };
         }
-        level.forced(graph, need as i64, 0)
+        level.forced(graph, need as i64, 0, &Bits::EMPTY)
     }
 
     /// Pops the level pushed by [`value_excluding`](Self::value_excluding), keeping it (settled) for its
