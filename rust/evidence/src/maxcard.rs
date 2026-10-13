@@ -10,9 +10,9 @@
 //! 2. *Bound.*  |K ∖ R| + the Lorea rank of R with I ∩ R forced (a matroid: the forced independent set extends
 //!    to a basis) is an upper bound ([`crate::bounds`]); below `target`, the node is cut.
 //! 3. *Exact.*  If the basis found is playable, it (with K ∖ R) is a playable set as large as the bound.
-//! 4. *Branch.*  Otherwise the basis holds a core C; every playable subset leaves out some member of C, and not
-//!    one of I's (I is playable).  With C ∩ U = {c₁, …, c_r}, child j leaves out c_j and keeps c₁ … c_{j−1}:
-//!    the children partition the answers.
+//! 4. *Branch.*  Otherwise the basis holds a core C; every playable subset leaves out some member of C, and
+//!    not one of I's (I is playable).  With C ∩ U = {c₁, …, c_r}, child j leaves out c_j and keeps
+//!    c₁ … c_{j−1}: the children partition the answers.
 //!
 //! The search is exact: a node is cut only by a valid bound, and the branching covers every playable set.
 

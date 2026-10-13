@@ -13,7 +13,7 @@ method in it is tested against brute force.
 |---|---|---|---|
 | (★): descending greedy is maximum-cardinality on every component and truncation of the upper-half instance, hence U\* is the heaviest playable upper set (the upper-half conjecture) | 3,231 of 3,236 rejection-bearing components, n ≤ 1500 and 40 samples to 4000, plus n = 2873 and 9170; 5 undecided (n = 3103, 3872, 3936, 4000, 9170); scripts not kept | **every game n = 2 .. 100,000** (602,777,907 greedy rejections) and **902 games to 2,000,000** (60,183,674 more): every rejection a GF(2) linear dependency, which certifies (★) for the whole game; the five undecided components settled; no counterexample | certified per game (a bound met), open in general |
 | greedy removal of impossible sources in hives (`removeImpossible`) | agreement with optimal.json to 1000 | at the root (where it shapes the search space) it *is* descending greedy on each upper-half component, so it is certified with (★) for every n ≤ 100,000 | certified per game |
-| the frame model as a whole: `unzip`'s mandatory moves, free factor count, closed hives inert, one-level promotions, greedy removal | brute force (model-free) to n = 62; agreement with the Java's optimal.json, made by the same model, to 1000 | **opt(n) proven equal to the recorded score, model-free, for every n = 2 .. 986** (and 989 of the games to 998) | verified (exact, model-free) |
+| the frame model as a whole: `unzip`'s mandatory moves, free factor count, closed hives inert, one-level promotions, greedy removal | brute force (model-free) to n = 62; agreement with the Java's optimal.json, made by the same model, to 1000 | **opt(n) proven equal to the recorded score, model-free, for every n = 2 .. 989**, and for n = 999 .. 1019 (19 of them past optimal.json, the Rust solver's own results) | verified (exact, model-free) |
 
 What the evidence is, in one paragraph each:
 
@@ -27,7 +27,7 @@ What the evidence is, in one paragraph each:
   Franklín–Moniot matching relaxation (re-optimized incrementally from the parent node's optimal dual),
   branching on minimal unplayable sets found by peel, with forced picks from the dual and learned nogoods; with
   the proven relations opt(n) ≤ n + opt(n−1) and the prime formula, it proves the recorded optimum for every
-  n ≤ 986, sixteen times the old brute-force reach.
+  n ≤ 989, sixteen times the old brute-force reach, and for 999–1019.
 * **An adversarial search** over Taxman-shaped synthetic instances locates what protects greedy: the window
   law, taken with respect to the same ranking of the primes that decides which products fall in the window.
 
@@ -130,28 +130,39 @@ n − 1).  It knows nothing of hives, frames, greedy, `unzip` or promotions.  Th
   which made the search 160 times faster than solving each node from scratch.
 * **Branching**: if the matching's picks are playable they are a game worth the bound; otherwise a minimal
   unplayable subset (deletion filter with peel) must lose a member, and the children partition on which.
-* **Forced picks** (from the dual: barring the pick alone already brings the bound to the target) and
-  **nogoods** (every minimal unplayable set found, propagated and reused).
+* **Forced picks** (from the dual: barring the pick alone already brings the bound to the target), the
+  **conflict-packing cut** (nogoods violated by the matching whose members are far apart in the graph must each
+  be broken, and their dual costs add), and **nogoods** (every minimal unplayable set found, propagated and
+  reused).
+* **A Lagrangian bound** over the nogoods: a playable set picks at most |K| − 1 members of each nogood K, so a
+  second matching, with each pick's weight lowered by the multipliers of the unbroken nogoods holding it (fitted
+  by subgradient steps at the search's root, then fixed), bounds the search too; it runs alongside the first,
+  repaired incrementally the same way, and cut the tree 3.3-fold at n = 793.
 * **Pausing**: a search still running at the end of a run saves its open subtrees and nogoods and resumes in the
-  next run, so a game can take any number of ten-minute runs.
+  next run (depth first), so a game can take any number of ten-minute runs.
 
 The target is the recorded optimum V(n); the search proves that no playable set beats it, and the recorded game
-replays by the rules to V(n), so opt(n) = V(n).  Results (`data/exact_2_1231.jsonl`, `tools/summarize.py
-exact`):
+replays by the rules to V(n), so opt(n) = V(n).  Every rule above is tested against brute force or against the
+optimum (the search must still reach optimal.json's score from one below it, with each rule on).  Results
+(`data/exact_2_1231.jsonl`, `tools/summarize.py exact`):
 
 | | games |
 |---|---|
 | matching bound already equals V(n) | 45 |
-| proven by the search | 474 |
-| chain relation V(n) = n + V(n−1), predecessor proven | 313 |
-| prime relation, predecessor proven | 153 |
-| **every n in 2 .. 986 proven** | **985** |
+| proven by the search | 487 |
+| chain relation V(n) = n + V(n−1), predecessor proven | 321 |
+| prime relation, predecessor proven | 156 |
+| **every n in 2 .. 989**, and 999 .. 1019 | **1009** |
 
-The searches took 3.9 hours of CPU in all; the cost is far from monotone in n (the matching bound's gap is
-400–900 points from n = 500 on, and the hardest games are those whose optimum it overrates most, such as
-798–804 at 7–12 million nodes, and 987–993).  So the frame model's answer is the true optimum for every
-n ≤ 986: sixteen times the previous model-free reach (62), and evidence for every frame-model assumption at
-once.
+The searches took 10.0 hours of CPU in all.  The cost is far from monotone in n: the matching bound's gap is
+140–430 points around n = 500–700 and 650–1200 from 800 on, and the hardest games are those whose optimum it
+overrates most: 798–804 at 7–12 million nodes, 987–989 at 19–53 million.  Games 990, 992, 993, 995 and 996 had
+taken 50–70 million nodes each, and 1020 and 1023–1027 several million, without finishing; their searches are
+saved in `data/checkpoints/exact_open_searches.tar.gz` (unpack into `work/` and rerun `exact` to continue).
+Games 991, 994, 997 and 998 meet the chain or prime relation and wait on their predecessors.  So the frame
+model's answer is the true optimum for every n ≤ 989 and for 999–1019, including 19 of the Rust solver's
+results past optimal.json: sixteen times the previous model-free reach (62), and evidence for every
+frame-model assumption at once.
 
 ## 4. Adversarial search: what protects greedy
 
@@ -203,6 +214,8 @@ cargo build --release
 ./target/release/span --from 101000 --to 1000000 --step 1000 --threads 6 --seconds 540 --out OUT.jsonl
 ./target/release/star --from 2 --to 20000 --threads 6 --seconds 540 --out OUT.jsonl
 ./target/release/exact --from 2 --to 1231 --threads 6 --seconds 540 --out OUT.jsonl    # rerun until done
+tar -xzf data/checkpoints/exact_open_searches.tar.gz -C work   # to continue the open searches into data/
+./target/release/exact --from 990 --to 1231 --threads 6 --seconds 540 --out data/exact_2_1231.jsonl
 bash tools/adversary_campaign.sh                                                          # data/adversary/
 tools/summarize.py span|star|exact|adversary FILE...
 tools/crosscheck_greedy.py data/span_2_100000.jsonl.gz --max 1000
@@ -220,9 +233,10 @@ gzipped where large (`gunzip -k` to resume into it).
   rejection of descending greedy on an upper-half instance is a GF(2) dependency of what it kept above — a
   statement about cores and closed surfaces mod 2 that the adversarial results tie to the window law with the
   real ranking of the primes.
-* The model-free cross-check stops at n = 986 for now; games 987–993 and 995–1000 need tens of millions of nodes
-  each and are being resumed; past 1000 the matching bound's looseness grows.  A stronger relaxation (the
-  matching bound misses the sweep of every divisor; the upper half's own GF(2) structure is not used) is the
-  next lever.
+* The model-free cross-check stops at n = 989 (and 999–1019): games 990, 992, 993, 995, 996 and from 1020 on
+  need more than tens of millions of nodes each (their searches are saved, to be resumed).  The matching bound's
+  looseness, about 1,170 points at n = 1000, is the obstacle; a relaxation that sees more of the game (the
+  matching misses that a pick sweeps every divisor, not one; capping the upper half at W(U\*) through a
+  Lagrangian was tried and gains only 4%) is the next lever.
 * The frame model's individual assumptions other than the greedy removal are tested only end to end (through
   the optimum), not one by one.

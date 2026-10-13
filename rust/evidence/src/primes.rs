@@ -24,7 +24,7 @@ pub fn distinct_primes(mut c: u64, spf: &[u32]) -> Vec<u64> {
     while c > 1 {
         let p = u64::from(spf[c as usize]);
         primes.push(p);
-        while c % p == 0 {
+        while c.is_multiple_of(p) {
             c /= p;
         }
     }

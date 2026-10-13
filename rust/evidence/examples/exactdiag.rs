@@ -20,7 +20,7 @@ fn main() {
         let mut first = Prover::new(&board, target, warmup);
         first.run();
         prover.nogoods = first.nogoods;
-        let lag = prover.enable_lagrangian(200);
+        let lag = prover.enable_lagrangian(args.get(5).copied().unwrap_or(200) as usize);
         println!(
             "warm-up: {} nogoods from {warmup} nodes; Lagrangian root bound {lag:?} ({:.1}s)",
             prover.nogoods.len(),

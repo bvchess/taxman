@@ -30,7 +30,8 @@ def span(paths):
     for r in rows:
         assert r["spanned"] + len(r["violations"]) == r["rejections"], r["n"]
     edges = [2, 1001, 10001, 50001, 100001, 10 ** 12]
-    print(f"{'games':>16} {'count':>7} {'rejections':>12} {'spanned':>12} {'violations':>10} {'max comp':>9} {'max s':>7}")
+    print(f"{'games':>16} {'count':>7} {'rejections':>12} {'spanned':>12} {'violations':>10} "
+          f"{'max comp':>9} {'max s':>7}")
     for lo, hi in zip(edges, edges[1:]):
         sel = [r for r in rows if lo <= r["n"] < hi]
         if not sel:
@@ -87,10 +88,15 @@ def exact(paths):
     print(f"games recorded: {len(rows)} ({done[0]}..{done[-1]}); proven: {sum(proven.values()) - 1}; "
           f"by {dict(how)}")
     print(f"every n in 2..{(first_gap or max(rows) + 1) - 1} proven; first unproven: {first_gap}")
+    if first_gap:
+        beyond = [n for n in range(first_gap, max(rows) + 1) if proven.get(n)]
+        open_ = [n for n in range(first_gap, max(rows) + 1) if not proven.get(n)]
+        print(f"beyond it, proven: {beyond}; not (yet): {open_}")
     searched = [r for r in rows.values() if r["search"] in ("proven", "budget")]
     print(f"searches: {len(searched)}, total {sum(r['secs'] for r in searched) / 3600:.1f} h, "
-          f"most nodes {max((r['nodes'], r['n']) for r in searched)}, "
-          f"FM gap at the largest searched n: {max(searched, key=lambda r: r['n'])['fm_bound'] - max(searched, key=lambda r: r['n'])['score']}")
+          f"most nodes {max((r['nodes'], r['n']) for r in searched)}")
+    last = max(searched, key=lambda r: r['n'])
+    print(f"matching-bound gap at the largest searched n ({last['n']}): {last['fm_bound'] - last['score']}")
     big = sorted(searched, key=lambda r: -r["secs"])[:5]
     print("slowest: " + ", ".join(f"n={r['n']} {r['secs']:.0f}s {r['nodes']} nodes" for r in big))
 

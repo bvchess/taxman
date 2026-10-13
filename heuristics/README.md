@@ -92,7 +92,7 @@ What is proven vs. trusted, precisely:
 | peel's assignment is always schedulable | **theorem** ("schedulability", proof in THEORY.md): the peel rules cannot emit a cyclic assignment.  Still asserted loudly at runtime, as defense in depth |
 | peel's failure means the set is unplayable | **theorem** ("completeness", proof in THEORY.md) — NOT reducible to "no matching exists": matchable-but-unplayable sets are real (n=21 holds a 145-sum set whose every matching is precedence-cyclic; the optimum is 144) and peel provably rejects exactly the unplayable.  With schedulability, peel is a proven playability oracle |
 | opt delta = U\* delta (the upper-delta certificate) | conjecture, holds on 70.4% of transitions where it applies, zero contradictions |
-| optimal.json itself | independently certified to n=62 by brute force (`certify.py`); **verified model-free for every n ≤ 986** by an exact branch and bound that uses only the playability theorems, the Franklín–Moniot matching bound and the chain and prime relations (`rust/evidence`); consistent with every bound and certificate beyond |
+| optimal.json itself | independently certified to n=62 by brute force (`certify.py`); **verified model-free for every n ≤ 989** (and 999–1000; 1001–1019 of the Rust results too) by an exact branch and bound that uses only the playability theorems, the Franklín–Moniot matching bound and the chain and prime relations (`rust/evidence`); consistent with every bound and certificate beyond |
 
 ### The proofs
 

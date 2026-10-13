@@ -108,7 +108,7 @@ impl Appender {
             if keep < text.len() {
                 OpenOptions::new().write(true).open(path)?.set_len(keep as u64)?;
             }
-            lines = BufReader::new(text[..keep].as_bytes()).lines().collect::<Result<_, _>>()?;
+            lines = BufReader::new(&text.as_bytes()[..keep]).lines().collect::<Result<_, _>>()?;
         }
         let file = OpenOptions::new().create(true).append(true).open(path)?;
         Ok((Appender { file }, lines))

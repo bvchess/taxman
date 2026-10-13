@@ -64,6 +64,7 @@ impl Board {
     }
 
     /// Plays `moves` by the rules (each move needs a proper divisor in the pot and takes all of them); the score.
+    #[allow(clippy::needless_range_loop)]
     pub fn replay(&self, moves: &[u32]) -> Result<u64, String> {
         let n = self.n as usize;
         let mut pot = vec![true; n + 1];
@@ -76,7 +77,7 @@ impl Board {
             }
             let mut taxed = false;
             for d in 1..=c / 2 {
-                if c % d == 0 && pot[d] {
+                if c.is_multiple_of(d) && pot[d] {
                     pot[d] = false;
                     taxed = true;
                 }
@@ -97,6 +98,7 @@ impl Board {
     }
 
     /// The members left by dismantling the picks (empty iff playable).
+    #[allow(clippy::needless_range_loop)]
     pub fn residual(&self, pick: &[bool]) -> Vec<bool> {
         let n = self.n as usize;
         let mut alive = pick.to_vec();
@@ -806,9 +808,8 @@ impl<'a> Prover<'a> {
 
     /// Is there a playable set of picks summing to more than the target?
     pub fn run(&mut self) -> Verdict {
-        self.next_check = self.nodes + 256;
         let roles = self.root_roles();
-        self.node(roles, None)
+        self.run_units(vec![roles])
     }
 
     /// Nogood propagation: false if some nogood is entirely forced; bars the last free member of a nogood whose
@@ -978,10 +979,12 @@ impl<'a> Prover<'a> {
         };
         // Branch on the violated conflict with the fewest free members (measured: better than the one dearest to
         // break, which doubles the tree at n = 600).  A known one also shows the picks unplayable without a peel.
+        // (Branching on the Lagrangian matching's picks instead was measured: 13% more nodes at n = 793.)
+        let source = &picks;
         let known = self
             .nogoods
             .iter()
-            .filter(|k| k.iter().all(|&c| picks[c as usize]))
+            .filter(|k| k.iter().all(|&c| source[c as usize]))
             .min_by_key(|k| k.iter().filter(|&&c| roles[c as usize] == Role::Free).count());
         let conflict = match known {
             Some(k) => {
@@ -989,11 +992,11 @@ impl<'a> Prover<'a> {
                 k.clone()
             }
             None => {
-                if self.board.playable(&picks) {
-                    return Verdict::Beaten((2..=n).filter(|&c| picks[c as usize]).collect());
+                if self.board.playable(source) {
+                    return Verdict::Beaten((2..=n).filter(|&c| source[c as usize]).collect());
                 }
                 self.stats[0] += 1;
-                let k = self.board.minimal_unplayable(&picks);
+                let k = self.board.minimal_unplayable(source);
                 if self.nogoods.len() < self.max_nogoods {
                     self.nogoods.push(k.clone());
                 }
@@ -1050,19 +1053,25 @@ impl<'a> Prover<'a> {
     }
 
     /// Runs the open units (each the roles of an unexplored subtree; the last is explored first), from a
-    /// checkpoint.  On a pause, `pending` holds every unit still open (the ones left of `units` included).
+    /// checkpoint.  On a pause, `pending` holds every unit still open (the ones left of `units` included), in
+    /// the same order: depth first, so the deepest open subtree, the one the search was in, comes back first.
     pub fn run_units(&mut self, mut units: Vec<Vec<Role>>) -> Verdict {
         self.next_check = self.nodes + 256;
         while let Some(unit) = units.pop() {
             if self.pause_due() {
                 units.push(unit);
-                self.pending.extend(units);
+                self.pending = units;
                 return Verdict::Paused;
             }
             match self.node(unit, None) {
                 Verdict::Proven => {}
                 Verdict::Paused => {
-                    self.pending.extend(units);
+                    // The pause pushed each level's open children deepest level first, in sibling order; the
+                    // deepest must come back first, and within a level the first sibling.
+                    let mut fresh = std::mem::take(&mut self.pending);
+                    fresh.reverse();
+                    units.extend(fresh);
+                    self.pending = units;
                     return Verdict::Paused;
                 }
                 other => return other,
@@ -1097,6 +1106,7 @@ pub fn prime_below(n: u64, spf: &[u32]) -> u64 {
 }
 
 #[cfg(test)]
+#[allow(clippy::needless_range_loop)]
 mod tests {
     use super::*;
     use crate::primes::smallest_prime_factors;
@@ -1126,13 +1136,20 @@ mod tests {
     /// optimum; at the score itself it must prove that nothing beats it.  Every 7th game to 420.
     #[test]
     fn the_search_finds_the_optimum_just_above_the_target() {
-        let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../src/main/resources/optimal.json"))
-            .expect("optimal.json");
+        let text =
+            std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../src/main/resources/optimal.json"))
+                .expect("optimal.json");
         let mut opt = vec![0u64; 1001];
         for line in text.lines().filter(|l| l.contains("\"n\"")) {
             let num = |key: &str| -> u64 {
                 let at = line.find(key).unwrap() + key.len();
-                line[at..].trim_start_matches([':', ' ']).chars().take_while(char::is_ascii_digit).collect::<String>().parse().unwrap()
+                line[at..]
+                    .trim_start_matches([':', ' '])
+                    .chars()
+                    .take_while(char::is_ascii_digit)
+                    .collect::<String>()
+                    .parse()
+                    .unwrap()
             };
             opt[num("\"n\"") as usize] = num("\"score\"");
         }

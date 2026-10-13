@@ -13,8 +13,10 @@
 //!
 //! A search still running at `--seconds` pauses and saves its open subtrees and nogoods to
 //! `DIR/exact_N.ckpt` (default `work/checkpoints`); the next run resumes it, so a game may take any number of
-//! runs.  `--segments 1` turns on the segment cuts, which make a game's proof rest on the smaller games' bounds
-//! (recorded as `"segments":1`); they are off by default, so that each search stands alone.
+//! runs.  A search that outlasts a 20-second plain warm-up, or resumes, goes on with the Lagrangian bound fitted
+//! to the nogoods learned so far (`--lagrangian 0` turns that off).  `--segments 1` turns on the segment cuts,
+//! which make a game's proof rest on the smaller games' bounds (recorded as `"segments":1`); they are off by
+//! default, so that each search stands alone.
 
 use std::fs;
 use std::path::{Path, PathBuf};

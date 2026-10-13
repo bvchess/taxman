@@ -89,7 +89,7 @@ sources).  A worked example, the board 1..=85, is in the
   closed hives (those with no free factor) taking no part in the search, and a promoted number paying tax only from
   the frame directly below.  They are validated by agreement with the Java's optimal.json for n ≤ 1000, which a
   model-free exact search (`evidence/`: the playability theorems, the Franklín–Moniot matching bound, the chain
-  and prime relations, and nothing of hives or frames) confirms for every n ≤ 987, and an independent brute force
+  and prime relations, and nothing of hives or frames) confirms for every n ≤ 989, and an independent brute force
   (`heuristics/evaluation/certify.py`) for n ≤ 62; and by the Rust exact oracle `brute`, which checks frame-model
   games on small boards (up to 40 in the test suite, 52 in `examples/sacrifice validate`).  The greedy removal of
   impossible sources at the root, where it shapes the search space, is descending greedy on each upper-half

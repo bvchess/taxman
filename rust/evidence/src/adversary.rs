@@ -56,7 +56,7 @@ impl Family {
 pub struct Rng(pub u64);
 
 impl Rng {
-    pub fn next(&mut self) -> u64 {
+    pub fn next_u64(&mut self) -> u64 {
         self.0 ^= self.0 >> 12;
         self.0 ^= self.0 << 25;
         self.0 ^= self.0 >> 27;
@@ -65,18 +65,18 @@ impl Rng {
 
     /// Uniform in [0, 1).
     pub fn unit(&mut self) -> f64 {
-        (self.next() >> 11) as f64 / (1u64 << 53) as f64
+        (self.next_u64() >> 11) as f64 / (1u64 << 53) as f64
     }
 
     pub fn below(&mut self, k: u64) -> u64 {
-        self.next() % k
+        self.next_u64() % k
     }
 }
 
 /// An instance of `family` with size parameter `n`, noise `eps` and `seed`.
 pub fn generate(family: Family, n: u64, eps: f64, seed: u64) -> Instance {
     let mut rng = Rng(0x9E37_79B9_7F4A_7C15 ^ seed.wrapping_mul(0xD1B5_4A32_D192_ED03) ^ n);
-    rng.next();
+    rng.next_u64();
     match family {
         Family::Real | Family::Shuffled | Family::Window(_) | Family::Noisy => {
             let spf = smallest_prime_factors(n as usize);
@@ -221,8 +221,8 @@ fn window_order_by(inst: &Instance, rng: &mut Rng, rule: Rule) -> Vec<u32> {
         let hyper = inst.factors[x as usize].len() >= 3;
         match rule {
             Rule::Lowest => (inst.value[x as usize], 0),
-            Rule::HyperFirst => (u64::from(!hyper), rng.next()),
-            Rule::HyperLast => (u64::from(hyper), rng.next()),
+            Rule::HyperFirst => (u64::from(!hyper), rng.next_u64()),
+            Rule::HyperLast => (u64::from(hyper), rng.next_u64()),
             Rule::Random | Rule::Anti | Rule::Ranked => unreachable!(),
         }
     };
@@ -251,7 +251,8 @@ fn generalized(primes: &[f64], n: f64) -> Instance {
     primes.sort_by(|a, b| a.partial_cmp(b).unwrap());
     // Every product <= n as (value, exponent vector), by depth-first search over nondecreasing prime indices.
     let mut products: Vec<(f64, Vec<(u32, u8)>)> = Vec::new();
-    let mut stack: Vec<(f64, usize, Vec<(u32, u8)>)> = vec![(1.0, 0, Vec::new())];
+    type Vector = Vec<(u32, u8)>;
+    let mut stack: Vec<(f64, usize, Vector)> = vec![(1.0, 0, Vec::new())];
     while let Some((value, from, vector)) = stack.pop() {
         if value > n / 2.0 {
             products.push((value, vector.clone()));

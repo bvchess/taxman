@@ -10,7 +10,7 @@ fn factorize(mut c: u64, spf: &[u32]) -> String {
     let mut parts = Vec::new();
     for p in distinct_primes(c, spf) {
         let mut e = 0;
-        while c % p == 0 {
+        while c.is_multiple_of(p) {
             c /= p;
             e += 1;
         }
