@@ -185,7 +185,9 @@ fn a_committed_checkpoint_of_a_w32_game_resumes() {
     let r = solver::solve_game(1133, Some(&prev_of(&games, 1133)), &opts).unwrap();
     assert!(r.completed && r.method == Method::Search);
     assert_eq!(r.score, games[&1133].0);
-    assert_eq!(r.setup.map(|s| s.revise), Some(Revise::FromCheckpoint), "the game was resumed, not started over");
+    assert_eq!(r.invocations, 2, "the game was resumed, not started over");
+    assert_eq!(r.setup.map(|s| s.revise), Some(Revise::Off), "the checkpoint was made without the tactic");
+    assert!(r.taint.is_empty(), "{:?}", r.taint);
     assert!(r.nodes > 1000, "{} nodes in all, 1,000 of them before the checkpoint", r.nodes);
     assert!(!checkpoint.exists(), "a finished game removes its checkpoint");
 }

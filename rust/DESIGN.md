@@ -118,7 +118,10 @@ unproven tactic was on, and which ones the game's proof actually rests on
 is refused when they differ (the error names each tactic that differs and the
 `--tactic` flags that resume it); one made before a sound search tactic
 existed (`fix_forced`, `nogoods`, `forget_nogoods`) reads back with it at its
-default.
+default.  A resumed game takes frame 0's freedoms from the checkpoint, and its
+`setup.revise` is `FromCheckpoint` (a taint of `revise_freedoms`) only if the
+checkpoint's tactics have that on; a resumed strict game says `Off` and rests
+on nothing unproven, as one that ran in one piece.
 
 ## Architecture
 
@@ -887,6 +890,11 @@ Correctness, all on games that finish in seconds:
   finishes at once; a limit stops `revise_freedoms`' own search; and the
   binary rejects bad times and limits, survives a closed stdout and stderr,
   and stops on SIGINT and SIGTERM with a checkpoint it then resumes.
+* Resumed games and their taint (`tests/solver.rs`): a strict game stopped by
+  a node limit and resumed reads back with `setup.revise` `Off` and an empty
+  taint, so the prime game after it is solved with no `--allow-tainted-prev`;
+  with the default tactics the resumed game is `FromCheckpoint` and rests on
+  `revise_freedoms`, and so does the game built on it.
 * Large boards (`tests/wide.rs`): `optimal.json` and the Java stop at 1000,
   and the sets that hold a board are 8, 16, 32 and 64 words wide for n up to
   511, 1023, 2047 and 4095, so nothing above 1023 meets anything but the

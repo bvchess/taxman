@@ -5,18 +5,11 @@ Graviton4 (`c8g`) and on x86_64, on Amazon Linux 2023 and Ubuntu.  What the solv
 [../../README.md](../../README.md); this page is the procedure.
 
 **Status of this procedure.**  The scripts were exercised on macOS (arm64): `chain.sh` through a complete chain, a
-SIGTERM stop, forced interruptions and resumes (with a patched solver, see below), a crash loop and a deadline;
-`scaling.sh` in all three modes (a sweep, `--engine`, `--pauses`); `setup.sh` through its build and checks; `verify.sh`.
-They have not been run on Amazon Linux, Ubuntu or EC2; `save.sh` and `spot-watch.sh` need S3 and EC2 and have not
-been run at all; the Dockerfile has not been built.  Sections 2 and 3 exist to find the problems that a macOS run cannot,
-on a machine that costs cents.  Nothing about scaling beyond 8 threads or about Graviton5 has been measured (section 8).
-
-**Before the production run, the fix for resumed strict games must be in the build.**  With the build this page was
-written against, a strict game that is stopped in the middle of its search and resumed gets the taint
-`revise_freedoms` although that tactic is off, and the next `solve` then stops with *"the previous game (from this
-run) rests on revise_freedoms"* (or "from the results file", in a later invocation).  Section 4.5 is a rehearsal that
-fails at once on a build with this defect and passes on one without it.  If you see that message, update to a build that
-has the fix; do not pass `--allow-tainted-prev`, which would mark the rest of the chain as resting on something unproven.
+SIGTERM stop, forced interruptions and resumes, a crash loop and a deadline; `scaling.sh` in all three modes (a sweep,
+`--engine`, `--pauses`); `setup.sh` through its build and checks; `verify.sh`.  They have not been run on Amazon Linux,
+Ubuntu or EC2; `save.sh` and `spot-watch.sh` need S3 and EC2 and have not been run at all; the Dockerfile has not been
+built.  Sections 2 and 3 exist to find the problems that a macOS run cannot, on a machine that costs cents.  Nothing
+about scaling beyond 8 threads or about Graviton5 has been measured (section 8).
 
 * [0. The plan](#0-the-plan)
 * [1. Decisions](#1-decisions)
@@ -206,7 +199,6 @@ speed; the scaling numbers of a container on a laptop mean nothing for the cloud
 
    Every search that takes more than 2 seconds is stopped, and the next pass resumes it from its checkpoint; the log
    shows the passes ("going on"), and the end must be "the range 1-1000 is complete", both referees agreeing.
-   (A build with the defect in the status box at the top stops with the "rests on revise_freedoms" error instead.)
 5. Copy the logs home (`scp -r HOST:taxman-work/logs .`), terminate the instance, delete its volumes.
 
 ## 4. The big instance: checks before the chain
@@ -315,9 +307,9 @@ TAXMAN_WORK=~/rehearsal EXTRA_ARGS="--time-limit 5" rust/tools/cloud/chain.sh 12
 It takes minutes.  The log (`~/rehearsal/logs/chain.log`) shows each pass; at the end `verify.sh` runs both referees on
 the new file and the committed ones.  **Pass = the chain completes, "both referees agree", and the line `231 board sizes
 are in more than one file, with equal scores in all`** (the scores of 1001..1231 equal the committed strict chain's; the
-moves may differ, which is allowed).  A build with the defect in the status box ends with the "rests on
-revise_freedoms" error at the first resumed game.  Then the two harder interruptions, by hand, with `TAXMAN_WORK`
-exported as `~/rehearsal2` in both tmux windows:
+moves may differ, which is allowed).  A strict game that was stopped and resumed is no different from one that ran in
+one piece (`"taint":[]`, `setup.revise` `Off`), so the chain goes on from it.  Then the two harder interruptions, by
+hand, with `TAXMAN_WORK` exported as `~/rehearsal2` in both tmux windows:
 
 ```
 rust/tools/cloud/chain.sh 1231                    # window 1
@@ -433,7 +425,6 @@ scaling logs under `bench/` (say `bench/cloud/`), are your call.
 
 | symptom | cause and remedy |
 |---|---|
-| `error: ... the previous game (...) rests on revise_freedoms, which is not proven` in a strict run, after a stop | the defect in the status box at the top: use a build that has the fix; do not pass `--allow-tainted-prev` |
 | `error: ... is in use by another process (process N)` | a solver already uses that checkpoint directory (`pgrep -a taxman`); a lock is released when its process ends, however it ends |
 | `chain.sh: another chain.sh is running` | the same, one level up; `~/taxman-work/chain.pid` names it |
 | `cannot resume from ...: made with different search tactics: ...` | resume with the `--tactic` flags it prints (`EXTRA_ARGS`), or delete the checkpoint to start that game over |

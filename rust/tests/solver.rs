@@ -12,6 +12,8 @@ use taxman::game::Optimal;
 use taxman::hives::Apiary;
 use taxman::json::Json;
 use taxman::numtheory::Tables;
+use taxman::results::{verify_files, Proof, Taint};
+use taxman::search::Revise;
 use taxman::solver::{self, GameResult, Method, SolveOptions};
 
 fn options(threads: usize) -> SolveOptions {
@@ -146,6 +148,73 @@ fn an_interrupted_game_resumes_from_its_checkpoint() {
     assert!(!checkpoint.exists(), "a finished game removes its checkpoint");
     let left: Vec<_> = fs::read_dir(&dir.0).unwrap().map(|e| e.unwrap().path()).collect();
     assert!(left.is_empty(), "left behind: {left:?}");
+}
+
+/// Solves 600 (a game with a search of a few thousand nodes) and 601 (the prime after it, which takes 600 as its
+/// predecessor) from `base`, with no `optimal.json` to start from: a node limit stops the search of 600, and a
+/// second run, without the limit, resumes it and goes on.  Returns the games of the second run and the lines of the
+/// results file, which the verifier accepts.
+fn run_stopped_and_resumed(name: &str, base: SolveOptions) -> (Vec<GameResult>, Vec<Json>) {
+    let dir = TempDir::new(name);
+    let results = dir.join("results.jsonl");
+    let limited =
+        SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), node_limit: Some(300), optimal_path: None, ..base };
+    assert!(!limited.allow_tainted_prev);
+    let summary = solver::solve_range_each(600, 601, &limited, Some(&results), |_| {}).unwrap();
+    assert_eq!(summary.stopped_at, Some(600), "the node limit stops the search of 600");
+    assert!(limited.checkpoint_file(600).unwrap().exists());
+
+    let unlimited = SolveOptions { node_limit: None, ..limited };
+    let games = solver::solve_range(600, 601, &unlimited, Some(&results)).unwrap_or_else(|e| panic!("{e}"));
+    assert!(games.iter().all(|g| g.completed));
+    // A later invocation finds both games in the file, which agrees with what they say of themselves.
+    let again = solver::solve_range_each(600, 601, &unlimited, Some(&results), |_| {}).unwrap();
+    assert_eq!((again.solved, again.skipped), (0, 2));
+    verify_files(std::slice::from_ref(&results), None).unwrap_or_else(|e| panic!("{e}"));
+
+    let text = fs::read_to_string(&results).unwrap();
+    (games, text.lines().map(|line| Json::parse(line).unwrap()).collect())
+}
+
+/// What a results line says of the game's taint and of how frame 0's freedoms were set.
+fn taint_and_revise(line: &Json) -> (Vec<&str>, Option<&str>) {
+    let taint = line.get("taint").and_then(Json::as_arr).expect("taint").iter().filter_map(Json::as_str).collect();
+    (taint, line.get("setup").and_then(|s| s.get("revise")).and_then(Json::as_str))
+}
+
+/// A strict run (`revise_freedoms` and `reuse_prev` off) rests on nothing unproven, whether its search ran in one
+/// piece or was stopped and resumed; so the next game builds on it with no `--allow-tainted-prev`.
+#[test]
+fn a_strict_game_resumed_from_its_checkpoint_rests_on_nothing_unproven() {
+    let (games, lines) = run_stopped_and_resumed("strict-resume", common::strict_options(1));
+    let [resumed, next] = &games[..] else { panic!("{} games", games.len()) };
+    assert_eq!((resumed.n, resumed.invocations), (600, 2), "600 was resumed, not started over");
+    assert_eq!(resumed.setup.map(|s| s.revise), Some(Revise::Off));
+    assert!(resumed.taint.is_empty(), "{:?}", resumed.taint);
+    // 601 takes 600 as its predecessor, which a run with no unproven tactic on refuses if it rests on one.
+    assert!(next.completed && next.proof == Some(Proof::PrimeFormula) && next.taint.is_empty(), "{next:?}");
+
+    let [stopped, finished, prime] = &lines[..] else { panic!("{} lines", lines.len()) };
+    assert_eq!(stopped.get("completed").and_then(Json::as_bool), Some(false));
+    assert_eq!(finished.get("invocations").and_then(Json::as_u32), Some(2));
+    assert_eq!(taint_and_revise(finished), (vec![], Some("Off")));
+    assert_eq!(taint_and_revise(prime).0, Vec::<&str>::new());
+}
+
+/// With `revise_freedoms` on, the freedoms a checkpoint holds may be revised ones, and the checkpoint does not say
+/// whether they are, so the resumed game rests on the tactic, and so does the prime game built on it.
+#[test]
+fn a_game_resumed_from_its_checkpoint_with_revise_freedoms_on_rests_on_it() {
+    let (games, lines) = run_stopped_and_resumed("default-resume", options(1));
+    let [resumed, next] = &games[..] else { panic!("{} games", games.len()) };
+    assert_eq!((resumed.n, resumed.invocations), (600, 2), "600 was resumed, not started over");
+    assert_eq!(resumed.setup.map(|s| s.revise), Some(Revise::FromCheckpoint));
+    assert_eq!(resumed.taint, Taint::from(["revise_freedoms".to_owned()]));
+    assert_eq!(next.taint, resumed.taint, "601 rests on 600");
+
+    let [_, finished, prime] = &lines[..] else { panic!("{} lines", lines.len()) };
+    assert_eq!(taint_and_revise(finished), (vec!["revise_freedoms"], Some("FromCheckpoint")));
+    assert_eq!(taint_and_revise(prime).0, ["revise_freedoms"]);
 }
 
 #[test]
