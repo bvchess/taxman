@@ -472,33 +472,42 @@ Every completed game records *how its optimality is established* (its proof) and
 | `reuse_prev` | the tactic accepted a derived game: a conjecture | yes |
 
 The *taint* of a game is the set of unproven things its proof rests on: the unproven tactics it used itself, plus,
-if its proof rests on the game of n − 1, that game's taint, and so on down the chain.  A game taken from optimal.json
-has the taint `optimal.json` (the Java made it with both unproven tactics on and records nothing about which games
-used them).  An empty taint means: proven within the frame model, given that the solver is right.  A chain from n = 1
-with the strict tactics rests on nothing unproven.
+if its proof rests on the game of n − 1, that game's taint, and so on down the chain.  A proof by the cap rests on
+nothing the game used itself (since schema 3): its game replays to `n + score(n − 1)`, the ceiling, whatever found it,
+so the tactics that shaped the search play no part.  A game taken from optimal.json has the taint `optimal.json` (the
+Java made it with both unproven tactics on and records nothing about which games used them).  An empty taint means:
+proven within the frame model, given that the solver is right.  A chain from n = 1 with the strict tactics rests on
+nothing unproven.
 
 **Checks and referees.**  Every game is replayed by `game::replay_finished` before it counts, with the arithmetic and
 the ceilings `score(n−1) ≤ score(n) ≤ n + score(n−1)`; a game that fails after it was found goes to
 `<results>.rejected.jsonl` and the run fails.  `taxman verify-results` reads results files without changing them and
 runs the same checks plus agreement between files; `tools/check_results.py` is an independent referee in Python that
 re-derives every proof and taint and compares scores with the Franklín–Moniot upper bound and the best-known
-heuristic chain.  What no check can catch is a game that is legal, finished and within the bounds but not optimal
-when the game of n − 1 is not optimal either; that is what the proof kinds and the taint track, and why a chain from
-n = 1 matters.  [results/README.md](results/README.md) says what supports each committed score.
+heuristic chain.  Both refuse a line whose fields contradict each other (say `setup.revise` `Off` with the tactic on,
+or a sum at the cap without `reached_cap`), since the proof and taint are derived from them.  What no check can catch
+is a game that is legal, finished and within the bounds but not optimal when the game of n − 1 is not optimal either;
+that is what the proof kinds and the taint track, and why a chain from n = 1 matters.
+[results/README.md](results/README.md) says what supports each committed score.
 
 **Result lines** are one JSON object per line (README, "A results line"): the game, its proof and taint, the game of
 n − 1 it was built from (score, source, digest of its moves, proof, taint), node counts and search counters, seconds per
-phase, the tactics, limits, options and the commit the binary was built from.  A line is never rewritten.  Lines
-written before provenance existed (schema 1) have their proof and taint derived from the fields they have.
+phase, the tactics, limits, options and the commit the binary was built from.  A line is never rewritten, and a run
+locks the results file it appends to.  Lines written before provenance existed (schema 1) have their proof and taint
+derived from the fields they have; lines of schema 1 and 2 count a game's own tactics in a proof by the cap, by the
+rule they were written with.
 
 **What identifies a checkpoint.**  The header the search stores: a format version, the set width, n, digests of the
 root candidates and of the frames (every frame's moves, factors and freedoms, as built), frame 0's revised freedoms,
 `max_total` and the tactics.  Resuming checks all of them and says which differs, and checks that the stored incumbent
 is a set of candidates that can be promoted from the root and is worth the stored value; so a checkpoint of another
 game, or of an older build whose frame builder differs, is refused instead of pruning with a foreign incumbent or
-failing to rebuild its units.  A resumed game takes frame 0's freedoms from the checkpoint, and its `setup.revise` is
-`FromCheckpoint` (a taint of `revise_freedoms`) only if the checkpoint's tactics have that on; a resumed strict game
-says `Off` and rests on nothing unproven, as one that ran in one piece.
+failing to rebuild its units.  A resumed game takes frame 0's freedoms from the checkpoint, after checking them
+against frame 0 as built: with `revise_freedoms` off they must be the built ones, with it on they may be fewer
+(revising sets them to a number of promotions into frame 0, from 0 to the built ones), and anything else is refused.
+Its `setup.revise` is `FromCheckpoint` (a taint of `revise_freedoms`) only if they are fewer, `ResumedAsBuilt` if the
+tactic is on and they are the built ones, and `Off` for a resumed strict game, which rests on nothing unproven, as
+one that ran in one piece.
 
 ## 9. Testing
 
@@ -533,7 +542,9 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   forgetting every step, every third, never; one thread and two); the same for 500 perturbed frame sets (numbers
   dropped, role flipped, moved a frame; half of them with frame 0's freedoms revised as `prepare` does) with the truth
   found exhaustively; promoting a set at once against one by one in random orders, conflicts and nogoods on perturbed
-  models; and searches interrupted every 1,500 nodes and resumed from a checkpoint with units spilling.  A perturbed
+  models; and searches interrupted every 1,500 nodes and resumed from a checkpoint with units spilling.  Units of real
+  boards at W = 20 to 64 (thinned so that the truth is found exhaustively) from a handicapped incumbent, and game 1133
+  resumed every 60 nodes at W = 20, 24 and 64, carry the harness past the widths of `optimal.json`.  A perturbed
   game whose revision changes the best sum is left out: the search takes the revised freedoms for a fact about the best
   set, and for a game that breaks that (one in about 1,300) may return a set that they forbid.
 * **Node-count tripwires** (`tests/tripwires.rs`): a pruning tactic that stops working changes no answer, so no
@@ -550,13 +561,15 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   through any number of resumes (`TXENGINE_STRESS=<n>`).  A tree with no pruning checks conservation exactly: under
   random configurations the nodes counted must equal the tree's size, so one unit lost or explored twice shows
   (`TXENGINE_CONSERVATION=<n>` for more).  Robustness: an interval of zero finishes; limits too large for the clock are
-  never reached; spill segments of dead processes are removed; a locked checkpoint directory is refused; a checkpoint of
-  another game, with other tactics or with an incumbent that does not fit is refused; and the binary rejects bad times,
-  survives a closed stdout and stderr, and stops on SIGINT and SIGTERM with a checkpoint it then resumes.
+  never reached; spill segments of dead processes are removed; a locked checkpoint directory or results file is refused;
+  a checkpoint of another game, with other tactics, with frame 0 freedoms its search cannot have had or with an
+  incumbent that does not fit is refused; and the binary rejects bad times, survives a closed stdout and stderr, and
+  stops on SIGINT and SIGTERM with a checkpoint it then resumes.
 * **Integrity of results** (`tests/integrity.rs`, `tests/results.rs`, `tests/solver.rs`): a previous game that is not
-  what it says is refused; taint travels down a chain; a tampered results file is refused naming the line; a torn last
-  line is dropped; the committed results pass the verifier with the counts `results/README.md` quotes; a strict game
-  stopped by a node limit and resumed reads back with an empty taint.
+  what it says is refused; taint travels down a chain; a tampered results file, or one whose line contradicts itself, is
+  refused naming the line, by both verifiers; a torn last line is dropped; the committed results pass the verifier with
+  the counts `results/README.md` quotes; a strict game stopped by a node limit and resumed reads back with an empty
+  taint, and so does a default one whose checkpoint has frame 0 as built; a proof by the cap is clean on a clean chain.
 * **Large boards** (`tests/wide.rs`): `optimal.json` and the Java stop at 1000, and the sets that hold a board are 8 to
   64 words wide, so nothing above 1023 meets anything but the committed results and these tests.  The same game at every
   width that holds it has the same frames, candidates, greedy set, promotion cap, answer and tree; game 1133 (W = 20,
@@ -564,8 +577,11 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   proves game 1133 by an independent route; a W = 64 board (2050) through frames, matching bound, conflicts, greedy set
   and a node-limited search; a committed W = 32 checkpoint of game 1133 (`testdata/n1133_after_1000_nodes.ckpt`) that
   must still resume, at its own width (a deliberate change of the checkpoint format fails it; the test says how to make
-  the file again); and the levels of a real depth-first stack of game 1215 (`testdata/n1215_deep_units.txt`): the
-  incremental matching bound and the quick bounds without a member against the min-cost-flow reference.
+  the file again); the levels of a real depth-first stack of game 1215 (`testdata/n1215_deep_units.txt`): the
+  incremental matching bound and the quick bounds without a member against the min-cost-flow reference; and promoting
+  one number at a time (with its no-peel shortcut) against the peel of every frame, in reached states of boards at
+  W = 20, 28 and 64.  (The unit tests check the nogood table's lookups against their definition at compact strides of
+  1 to 16 words, and debug builds check that every root frame is winnable, which the shortcut needs.)
 * **Command line** (`tests/cli.rs`): every subcommand's happy path and its usage errors through the real binary;
   `bench --history FILE` keeps the tracked `bench/history.jsonl` out of the tests.
 * **Documentation** (`tests/docs.rs`): the table of tactics in section 5 matches the code; every relative link and

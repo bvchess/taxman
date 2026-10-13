@@ -430,6 +430,7 @@ scaling logs under `bench/` (say `bench/cloud/`), are your call.
 | symptom | cause and remedy |
 |---|---|
 | `error: ... is in use by another process (process N)` | a solver already uses that checkpoint directory (`pgrep -a taxman`); a lock is released when its process ends, however it ends |
+| `error: FILE is in use by another process (another run appending to it?): it is locked` | a solver already appends to that results file (`--out`); the same remedy |
 | `chain.sh: another chain.sh is running` | the same, one level up; `~/taxman-work/chain.pid` names it |
 | `cannot resume from ...: made with different search tactics: ...` | resume with the `--tactic` flags it prints (`EXTRA_ARGS`), or delete the checkpoint to start that game over |
 | `cannot resume from ...` for another game or build | delete the named `.ckpt` file; the game restarts from its beginning |
