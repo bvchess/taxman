@@ -510,7 +510,7 @@ pub fn fit<const W: usize>(
 #[cfg(test)]
 mod tests {
     use super::super::match_bound_weighted;
-    use super::super::tests::{check_level, setup, walks};
+    use super::super::tests::{check_bounds_excluding, check_level, setup, walks};
     use super::*;
     use crate::model::test_support::*;
     use crate::model::{FrameSet, Model, Scratch};
@@ -593,6 +593,7 @@ mod tests {
             let what = format!("n={}, promoted {promoted:?}, cands {cands:?}", g.n);
             assert_eq!(value, reference(&model, state, promoted, cands, &nogoods, &lambda), "{what}");
             check_level(&graph, &lb.levels[lb.depth - 1]);
+            check_bounds_excluding(&graph, &lb.levels[lb.depth - 1]);
             if rng.chance(10) {
                 fresh.set_relaxation(Relaxation::new(&graph, &nogoods, &lambda));
                 assert_eq!(fresh.value(promoted, cands), value, "{what}: started afresh");

@@ -586,20 +586,33 @@ impl<const W: usize, K: Weighing> Level<W, K> {
             return self.value; // not promoted: it pays for a mover above, or is free
         }
         let w = usize::from(w);
-        // The least potential a factor `f` needs to pay for the movers above it that still count (not `x`).
+        // The least potential a factor `f` needs to pay for the movers above it that still count (not `x`).  It is
+        // never more than `f`'s potential (every such edge `u–f` has slack: `weight(u) − y_u ≤ y_f`, and `f` is
+        // not required), so the scan ends at a tight edge.  The same holds for `w`'s own factors below.
         let as_factor = |f: usize| -> i64 {
-            let movers = g.above(f).iter().map(|&u| usize::from(u));
-            let counted = movers.filter(|&u| u != v && self.role[u] != Role::Factor);
-            counted.map(|u| self.weight(g, u) - self.y[u]).max().unwrap_or(0).max(0)
+            let (most, mut least) = (self.y[f], 0);
+            for u in g.above(f).iter().map(|&u| usize::from(u)) {
+                if least == most {
+                    break;
+                }
+                if u != v && self.role[u] != Role::Factor {
+                    least = least.max(self.weight(g, u) - self.y[u]);
+                }
+            }
+            least
         };
         let y_x = as_factor(v);
         let mut y_w = as_factor(w);
         if self.role[w] == Role::Candidate {
             // It can still be promoted itself, paying with its own factors.
             let own = self.weight(g, w);
-            let factors = g.below(w).iter().map(|&f| usize::from(f));
-            for f in factors.filter(|&f| self.role[f] != Role::Required) {
-                y_w = y_w.max(own - self.y[f]);
+            for f in g.below(w).iter().map(|&f| usize::from(f)) {
+                if y_w == self.y[w] {
+                    break;
+                }
+                if self.role[f] != Role::Required {
+                    y_w = y_w.max(own - self.y[f]);
+                }
             }
         }
         let bound = self.value as i64 - self.weighing.of(g, v) + y_x + y_w;
@@ -1539,6 +1552,28 @@ mod tests {
         }
     }
 
+    /// Checks [`Level::bound_excluding`] for every member of a settled level's heaviest matching against the
+    /// formula it computes, every edge scanned (it stops at a tight one): the same value, or the forced members,
+    /// and so the trees, would change.
+    pub(super) fn check_bounds_excluding<const W: usize, K: Weighing>(g: &MatchGraph, lv: &Level<W, K>) {
+        for x in lv.chosen.iter() {
+            let v = g.vertex_of(x).expect("a vertex");
+            let w = usize::from(lv.mate[v]);
+            let as_factor = |f: usize| {
+                let counted = g.above(f).iter().map(|&u| usize::from(u)).filter(|&u| u != v);
+                let counted = counted.filter(|&u| lv.role[u] != Role::Factor);
+                counted.map(|u| lv.weight(g, u) - lv.y[u]).max().unwrap_or(0).max(0)
+            };
+            let mut y_w = as_factor(w);
+            if lv.role[w] == Role::Candidate {
+                let factors = g.below(w).iter().map(|&f| usize::from(f)).filter(|&f| lv.role[f] != Role::Required);
+                y_w = factors.map(|f| lv.weight(g, w) - lv.y[f]).fold(y_w, i64::max);
+            }
+            let bound = (lv.value as i64 - lv.weighing.of(g, v) + as_factor(v) + y_w).clamp(0, lv.value as i64);
+            assert_eq!(lv.bound_excluding(g, x), bound as u64, "the bound without {x} from the potentials");
+        }
+    }
+
     /// Asserts that two levels hold the same solution (roles, matching, potentials, and what follows from them):
     /// work kept for later must be the work it saves, or the search's trees would change.
     fn assert_same_level<const W: usize>(a: &Level<W>, b: &Level<W>, what: &str) {
@@ -1669,6 +1704,7 @@ mod tests {
             }
             // The quick bound without a candidate (often a promoted one) is at least the exact value.
             let pool = if rng.chance(70) { mb.chosen() } else { *cands };
+            check_bounds_excluding(&graph, &mb.levels[mb.depth]);
             if let Some(x) = pool.nth_largest(rng.below(u64::from(pool.len().max(1))) as u32) {
                 let quick = mb.bound_excluding(x);
                 let exact = mb.value_excluding(x);
