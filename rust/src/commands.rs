@@ -1,6 +1,8 @@
-//! The subcommands that solve games: `solve`, `regress` and `bench`.  Each reads its flags with [`Args`], builds
-//! [`SolveOptions`] from them ([`solver_options`]) and calls the library's pipeline ([`taxman::solver`]); what
-//! they add is output, and the policies of a command-line run:
+//! The subcommands: `solve`, `regress`, `bench`, `verify-optimal`, `verify-results` and `tables`.
+//!
+//! The ones that solve games read their flags with [`Args`], build [`SolveOptions`] from them ([`solver_options`])
+//! and call the library's pipeline ([`taxman::solver`]); what they add is output, and the policies of a command-line
+//! run:
 //!
 //! * `solve` stops on SIGINT and SIGTERM with a final checkpoint, locks its checkpoint directory, and prints one
 //!   summary line per game as it finishes;
@@ -9,16 +11,19 @@
 //!   performance can be followed from commit to commit.  Its files are found in the repository
 //!   ([`taxman::paths`]) unless `--history` and `--known` name them.
 //!
-//! The other subcommands (`verify-optimal`, `verify-results`, `tables`) are small and live in `main.rs`.
+//! The small ones: `verify-optimal` replays every game of the table of optimal games, `verify-results` checks results
+//! files without changing them, and `tables` prints the maximal factors and composites of numbers on a board.
 
 use crate::cli::{errln, outln, parse_range, solver_options, Args, CliError, CliResult, SOLVER_FLAGS};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use taxman::engine;
+use taxman::game::Optimal;
 use taxman::json::Json;
+use taxman::numtheory::Tables;
 use taxman::paths;
-use taxman::results::{build, Build};
+use taxman::results::{build, verify_files, Build};
 use taxman::solver::{self, GameResult, Method, OptimalSource, Prev, SolveOptions};
 
 fn failed(message: String) -> CliError {
@@ -36,6 +41,7 @@ fn flags_with(own: &[&'static str]) -> Vec<&'static str> {
 const SOLVE_FLAGS: [&str; 7] =
     ["--out", "--checkpoint-dir", "--checkpoint-interval", "--progress", "--time-limit", "--node-limit", "--mem-cap"];
 
+/// `solve N|A-B [options]`: solves one board size or a range, each from the one before (`solver::solve_range_each`).
 pub fn solve(args: &[String]) -> CliResult {
     let usage = || CliError::Usage("usage: solve N|A-B [options]".into());
     let args = Args::parse(args, &flags_with(&SOLVE_FLAGS), &["--force-search", "--show", "--allow-tainted-prev"])?;
@@ -102,6 +108,7 @@ pub fn solve(args: &[String]) -> CliResult {
 // ---------------------------------------------------------------------------------------------------------
 // regress
 
+/// `regress [--from A] [--to N]`: solves A..N in memory and checks every score against optimal.json.
 pub fn regress(args: &[String]) -> CliResult {
     let args = Args::parse(args, &flags_with(&["--to", "--from"]), &[])?;
     if !args.positional().is_empty() {
@@ -270,4 +277,72 @@ fn append_history(path: &Path, record: &Json) -> std::io::Result<()> {
     }
     let mut file = std::fs::OpenOptions::new().create(true).append(true).open(path)?;
     writeln!(file, "{record}")
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// verify-optimal, verify-results, tables
+
+fn millis(since: Instant) -> f64 {
+    since.elapsed().as_secs_f64() * 1000.0
+}
+
+/// `verify-optimal [FILE]`: replays every game of the table of optimal games (the default one if no file is given)
+/// and checks its recorded score.
+pub fn verify_optimal(args: &[String]) -> CliResult {
+    let path = match args {
+        [] => paths::optimal_json().map_err(CliError::Failed)?,
+        [file] => file.into(),
+        _ => return Err(CliError::Usage("verify-optimal takes at most one argument".into())),
+    };
+    let start = Instant::now();
+    let optimal = Optimal::load(&path).map_err(CliError::Failed)?;
+    let load_ms = millis(start);
+
+    let start = Instant::now();
+    let checked = optimal.verify_all().map_err(CliError::Failed)?;
+    let replay_ms = millis(start);
+
+    let total_moves: usize = optimal.games().map(|(_, _, moves)| moves.len()).sum();
+    outln!("verified {checked} games (n up to {}, {total_moves} moves)", optimal.max_n());
+    outln!("load+parse {load_ms:.1} ms, replay {replay_ms:.1} ms");
+    Ok(())
+}
+
+/// `verify-results FILE... [--optimal FILE|none]`: checks results files without changing them
+/// (`results::verify_files`).
+pub fn verify_results(args: &[String]) -> CliResult {
+    let args = Args::parse(args, &["--optimal"], &[])?;
+    if args.positional().is_empty() {
+        return Err(CliError::Usage("usage: verify-results FILE... [--optimal FILE|none]".into()));
+    }
+    let optimal = solver_options(&args)?.load_optimal().map_err(CliError::Failed)?;
+    let paths: Vec<PathBuf> = args.positional().iter().map(PathBuf::from).collect();
+    let start = Instant::now();
+    let report = verify_files(&paths, optimal.as_ref()).map_err(CliError::Failed)?;
+    outln!("{report}");
+    outln!("checked in {:.1} ms", millis(start));
+    Ok(())
+}
+
+/// `tables N K...`: the maximal factors and composites of each K on the board `1..=N`.
+pub fn tables(args: &[String]) -> CliResult {
+    let usage = || CliError::Usage("usage: tables N K...".into());
+    let (n, ks) = args.split_first().ok_or_else(usage)?;
+    if ks.is_empty() {
+        return Err(usage());
+    }
+    let n: u32 = n.parse().map_err(|_| CliError::Usage(format!("N must be a non-negative integer, got {n:?}")))?;
+    let tables = Tables::new(n);
+    for k in ks {
+        let k: u32 = k.parse().map_err(|_| CliError::Usage(format!("K must be a non-negative integer, got {k:?}")))?;
+        if k < 1 || k > n {
+            return Err(CliError::Usage(format!("K = {k} is not on the board 1..={n}")));
+        }
+        outln!(
+            "{k}: maximal factors {:?}; maximal composites {:?}",
+            tables.max_factors[k as usize],
+            tables.max_composites[k as usize]
+        );
+    }
+    Ok(())
 }

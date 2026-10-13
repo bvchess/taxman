@@ -1,5 +1,12 @@
 //! Command-line parsing shared by the subcommands: the error type, a small flag parser, the solver options
 //! the flags describe, and output that survives a closed stdout or stderr.
+//!
+//! There is no parser crate.  A command line is positional arguments and flags; a flag is `--name VALUE` or
+//! `--name=VALUE` if it takes a value and `--name` if it is a switch, each command says which of its flags are
+//! which ([`Args::parse`]), and any other `--flag` is a usage error.  The flags every solving command takes
+//! ([`SOLVER_FLAGS`]: `--threads`, `--tactic`, `--optimal`) are turned into [`SolveOptions`] by [`solver_options`];
+//! the others (`--out`, `--time-limit`, ...) are each command's own.  A usage error makes `main` print the usage and
+//! exit with status 2; a command that ran and failed exits with status 1 ([`CliError`]).
 
 use std::fmt;
 use std::io::Write;

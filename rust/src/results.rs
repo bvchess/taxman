@@ -50,6 +50,18 @@
 //! power loss can leave garbage in it before its newline.  The last non-blank line is therefore dropped as torn
 //! if it does not parse as JSON, whether or not it ends in a newline.  A last line that parses but is not a
 //! valid result, and any bad line before the last, is an error.
+//!
+//! # The file of a run, and checking files on their own
+//!
+//! [`ResultsFile`] is the file a run appends to.  Opening it checks it ([`read_results`]); the completed games in it
+//! count as done and are the previous games of the ones after them; each new result is appended and synced as soon as
+//! it is done (so a crash loses at most the line being written); and a game that failed a check after it was found
+//! is written to [`rejected_path`] instead, with the reason.  [`verify_files`] runs the same checks on files without
+//! changing them, and that the files agree on the games they share (`taxman verify-results`).  The Python referee
+//! `tools/check_results.py` derives the same proofs and taints from the same rules with no code in common, so a
+//! mistake in either shows as a disagreement.
+//!
+//! The fields of a line are described in README.md ("A results line"); [`SCHEMA`] is the version of the format.
 
 use crate::game::{largest_prime_at_most, replay_finished, Optimal};
 use crate::json::Json;

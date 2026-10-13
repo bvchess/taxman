@@ -23,7 +23,7 @@
 //!    and the previous game's promotions that are candidates here (`seed_incumbent`, [`Board::seed`]) and stops
 //!    as soon as it reaches `n + opt(n − 1) − in_the_bag` (`prev_cap`, [`Board::promotion_cap`]).  The promotions
 //!    become a game through the hives ([`solution_for_promotions`]).
-//! 6. [`conclude`]: the game is checked before it counts, and given its proof and taint.
+//! 6. `conclude`: the game is checked before it counts, and given its proof and taint.
 //! 7. Recording (a range only): the result is appended to the results file and synced, and only then is the
 //!    game's checkpoint deleted.
 //!
