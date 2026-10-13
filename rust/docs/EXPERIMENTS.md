@@ -77,7 +77,7 @@ those of the page the row points to; a game is named by its board size, and time
 | `i32` potentials; a warm-started unit rebuild; candidate-index sets for every search-level set; watched members for the nogoods | [faster nodes](#faster-nodes-same-trees-2026-10) | open | no bound on the potentials is proven; another optimal matching can change the tree; a large refactor; the nogood table is 3% of the time |
 | Cheaper matching repairs; incumbents for games whose optimum the search reaches late (992, 1025) | [benchmarks](#benchmarks-the-probe-pgo-and-scaling) | open | the repairs are 46-67% of the time at the frontier; 992 on 8 threads finds its optimum at 11.8 s of 12.0 s |
 | Where the time goes in the hardest games (sampling profiles of 1232, 1287, 1299, 1295) | [IDEAS 2](IDEAS.md#2-where-the-time-goes-in-the-hardest-games) | measured | matching repairs 56-67%, strong branching 28-34%, conflict computation under 1%, the engine under 0.1% |
-| Reuse the answer of a game whose search space an earlier game searched (rank 1) | [IDEAS 4.1](IDEAS.md#41-memoizing-searches-that-repeat-rank-1) | open | 29.7% of the search time of the strict chain 1232-1300 (851 of 2866 s) re-searches a space already solved |
+| Same search: conclude a game whose search problem an earlier game of the chain settled, with that game's promotions (tactic and proof `same_search`; IDEAS rank 1) | [same search](#same-search-2026-10); [IDEAS 4.1](IDEAS.md#41-memoizing-searches-that-repeat-rank-1) | kept: on by default and in strict runs; results schema 4 | 545 of the 1076 searched games of 1-1300 repeat (n − 1, or n − 2 past a prime); 953 of 3359 s (28.4%) of `strict.jsonl`'s search, 851 of 2866 s in 1232-1300; 1299 in 0.08 s instead of 265 s |
 | A Lagrangian bound over the nogoods (rank 2) | [IDEAS 4.2](IDEAS.md#42-a-lagrangian-bound-over-the-nogoods-rank-2) | open, the pilot taken over by a follow-up experiment | proof nodes −4% (880) to −67% (1184) with multipliers fitted once at the root; the from-scratch evaluation of the pilot was 7 times slower per node |
 | Reduced-cost fixing of candidates from the dual | [IDEAS 4.3](IDEAS.md#43-reduced-cost-fixing-killed) | not kept | fixes 70.9 of 159 candidates outside `Q*` per node at 936, yet changes no tree: the matching relaxation is integral |
 | Component decomposition (AND/OR search, #SAT) | [IDEAS 4.4](IDEAS.md#44-component-decomposition-killed) | not kept | exactly one component holds candidates at the root of 936-1300 and at all 600 probe nodes |
@@ -181,6 +181,7 @@ and [THEORY.md's table of evidence](../../heuristics/THEORY.md#evidence).  Entri
 | [Single-member conflicts](#single-member-conflicts-belong-to-the-node-2026-10) | are single-member conflicts root facts that can be filtered once? | no: nothing to filter | (a prototype, not kept) |
 | [Faster nodes, same trees](#faster-nodes-same-trees-2026-10) | make the inner loop cheaper without changing any tree | kept: 30% fewer cycles at the 1215 proof | e3b8ddc to 4b6ef38 |
 | [Engine](#the-engine) | scaling to many cores, and checkpoints at any interval | kept: split requests per idle worker, pauses that cannot starve the workers | 2026-10 |
+| [Same search](#same-search-2026-10) | conclude a game whose search problem an earlier game already settled? | kept (`same_search`, proven); 28.4% of the strict chain's search | f5a2af3 to 06efb4c |
 | [Benchmarks](#benchmarks-the-probe-pgo-and-scaling) | what the bench set, the probe, PGO and the thread scaling showed | numbers | e3b8ddc and after |
 
 ## The port and its first improvements
@@ -833,7 +834,7 @@ use them).
 *Question.*  Rank 1 of [IDEAS.md](IDEAS.md#1-the-recommended-order): many games pose exactly the search problem of an
 earlier game of the chain (the same frames, candidates, `max_total` and factor graph; only the cap differs), so they
 have its best promotion sum, yet the solver proves it again.  How many, what does it cost, and does concluding them
-from the earlier game hold up?  The pilot (`ideas repeats` on the branch `ideas-pilots`) hashed the root frames, the
+from the earlier game hold up?  The pilot ([IDEAS.md 4.1](IDEAS.md#41-memoizing-searches-that-repeat-rank-1)) hashed the root frames, the
 candidates and `max_total` with Rust's `DefaultHasher`; this round makes it a proof kind (commits f5a2af3 and
 1cc4067; DESIGN.md, ["Same search"](../DESIGN.md#same-search), has the argument).
 
