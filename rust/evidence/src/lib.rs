@@ -13,6 +13,7 @@
 //! * [`span`]: the span check (♦), which certifies (★) on a whole instance by GF(2) linear algebra.
 //! * [`star`]: the per-threshold check of conjecture (★) on one instance.
 //! * [`game`]: the full game, model-free: replay, peel over the whole board, and an exact branch and bound.
+//! * [`moves`]: the longest games (the most moves), against the optimal game's moves.
 //! * [`adversary`]: synthetic Taxman-shaped instances for the adversarial search.
 //! * [`jsonl`]: the resumable result files every campaign writes.
 
@@ -22,6 +23,7 @@ pub mod game;
 pub mod instance;
 pub mod jsonl;
 pub mod maxcard;
+pub mod moves;
 pub mod peel;
 pub mod plus1;
 pub mod primes;
