@@ -1,4 +1,4 @@
-#!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
+#!/usr/bin/env python3
 """Shared helpers for the cost-curve scripts: paths, JSONL files, primes, wall-clock budgets, machine load."""
 import json
 import os
@@ -17,8 +17,9 @@ LADDER = RUST / "target/release/examples/ladder"
 SOLVE_STRICT = ["--tactic", "reuse_prev=off", "--tactic", "revise_freedoms=off"]
 LADDER_STRICT = ["--tactic", "revise_freedoms=off"]
 
-# One Bash call may take 10 minutes, so a timed-out standalone game (search limit + setup) has to fit in one:
-# the search limit is 585 s rather than 600 s, and one invocation of a driver may run for 592 s at most.
+# The runs were made in sessions limited to 10 minutes per command, so a timed-out standalone game (search limit +
+# setup) has to fit in one: the search limit is 585 s rather than 600 s, and one invocation of a driver may run for
+# 592 s at most.  A timeout therefore means "at least 585 s".
 SEARCH_LIMIT = 585
 INVOCATION_BUDGET = 592
 
