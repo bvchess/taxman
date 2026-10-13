@@ -81,9 +81,9 @@ those of the page the row points to; a game is named by its board size, and time
 | A Lagrangian bound over the nogoods, kept incrementally, with forced members read off its potentials (tactic `lagrange`; IDEAS rank 2) | [Lagrangian bound](#a-lagrangian-bound-over-the-nogoods-2026-10); [IDEAS 4.2](IDEAS.md#42-a-lagrangian-bound-over-the-nogoods-rank-2) | kept: on by default | proofs 1184-1300 take 2-6 times fewer cycles (3.3 geometric mean, no trend in n); the strict chain 1201-1231 2.4 times less time; the pilot alone, incremental but without forced members, about break-even; 992 (optimum found late) +35% |
 | Variants of the Lagrangian bound: depth limits 8-32, multipliers fitted mid-path or at the deepest node, bound only at node re-checks, 20 or 100 subgradient steps, first refit at 500 steps, refits every 10,000 steps | [Lagrangian bound](#a-lagrangian-bound-over-the-nogoods-2026-10) | not kept | each within ±12% of the default or worse; the bound's cost follows the changes along the path, not how often it is asked |
 | Where the time goes with the Lagrangian bound (sampling profiles of 1254, 1272, 1288, 1290, 1300 as the chain runs them; the 1215 proof by source line) | [faster nodes with the Lagrangian bound](#faster-nodes-with-the-lagrangian-bound-same-trees-2026-10) | measured | Hungarian searches 55-60% (the matching's 33-39%, the Lagrangian levels' 16-18%), peels 17-20%, the Lagrangian levels 25-28% in all (refits 4%); the searches are large (88% of the vertices scanned in trees of 64-511 of 686) |
-| Faster nodes with the Lagrangian bound, same trees: strong branching takes the level refinement solved for its first member, the bound from the potentials stops at a tight edge, one settle for the forced members, a membership test for known conflicts, the Hungarian search's fields apart and a fixed-size code set, the Lagrangian bound's forced members only among those not forced yet | [faster nodes with the Lagrangian bound](#faster-nodes-with-the-lagrangian-bound-same-trees-2026-10) | kept | the probe's windows −10.6% and −10.2% cycles (−15.3% and −14.0% instructions), with `lagrange=off` −11.6% and −11.1%; proofs 936-1254 −5% to −10%; every node count and both fingerprints unchanged |
+| Faster nodes with the Lagrangian bound, same trees: strong branching takes the level refinement solved for its first member, the bound from the potentials stops at a tight edge, one settle for the forced members, a membership test for known conflicts, the Hungarian search's fields apart and a fixed-size code set, the Lagrangian bound's forced members only among those not forced yet | [faster nodes with the Lagrangian bound](#faster-nodes-with-the-lagrangian-bound-same-trees-2026-10) | kept | the probe's windows −10.6% and −10.2% cycles (−15.3% and −14.0% instructions), with `lagrange=off` −11.6% and −11.1%; proofs 936-1254 −5% to −10%; the strict chain 1201-1231 −8.1%; every node count and both fingerprints unchanged |
 | One key for a search slot's epoch and tag; `-C target-cpu=native`; skipping forced-member checks where `value − x ≥ need`; strong branching skipping members by the lower bound `value − x`; refinement after the Lagrangian bound | [faster nodes with the Lagrangian bound](#faster-nodes-with-the-lagrangian-bound-same-trees-2026-10) | not kept | instructions −0.02% and ±0.05%, cycles within noise; the third applies to 0.17 of 19.8 checks a step (1250); the fourth can never apply (members are solved in increasing order); the last changes trees |
-| `match_refine` = 0 with the Lagrangian bound | [faster nodes with the Lagrangian bound](#faster-nodes-with-the-lagrangian-bound-same-trees-2026-10) | measured: default kept at 1 | 19 proofs (936-1288) −3.0% geometric mean (±2.4% standard error), −5.3% in all, from −21% (1254) to +20% (1225); the strict chain 1..1000 −9.6%, 1201-1231 +0.8% |
+| `match_refine` = 0 with the Lagrangian bound | [faster nodes with the Lagrangian bound](#faster-nodes-with-the-lagrangian-bound-same-trees-2026-10) | measured: default kept at 1 | 19 proofs (936-1288) −3.0% geometric mean (±2.4% standard error), −5.3% in all, from −21% (1254) to +20% (1225); the strict chain 1..1000 −9.4%, 1201-1231 +0.4% |
 | Reduced-cost fixing of candidates from the dual | [IDEAS 4.3](IDEAS.md#43-reduced-cost-fixing-killed) | not kept | fixes 70.9 of 159 candidates outside `Q*` per node at 936, yet changes no tree: the matching relaxation is integral |
 | Component decomposition (AND/OR search, #SAT) | [IDEAS 4.4](IDEAS.md#44-component-decomposition-killed) | not kept | exactly one component holds candidates at the root of 936-1300 and at all 600 probe nodes |
 | Disjoint conflicts from the dual (MaxSAT's disjoint cores, the pair cut) | [IDEAS 4.5](IDEAS.md#45-disjoint-conflicts-from-the-dual-killed) | not kept | between 2.7% fewer and 0.3% more nodes for 12% more cycles |
@@ -1140,8 +1140,10 @@ In all, the windows −10.6% and −10.2% cycles (−15.3% and −14.0% instruct
 before and after (G cycles, nodes unchanged): 936 1.22 → 1.11 (−9.1%), 1050 2.11 → 1.97 (−6.3%), 1100 1.07 → 1.01
 (−5.4%), 1170 0.56 → 0.52 (−5.7%), 1184 1.65 → 1.51 (−8.5%), 1215 33.1 → 30.1 (−9.2%), 1250 20.6 → 18.9 (−8.0%), 1254
 146.9 → 134.0 (−8.8%); with `lagrange=off` 936 −8.3%, 1100 −6.0%, 1184 −9.5%, 1215 107.3 → 96.0 (−10.5%).  (1133,
-2,122 steps, is mostly setup: +2.3% cycles, −1.7% instructions.)  1254 as the chain runs it on two threads, profiled
-again: 21.4 s against 25.3 s.  A step of the window of 1215 now costs 22.0k cycles with the Lagrangian bound and
+2,122 steps, is mostly setup: +2.3% cycles, −1.7% instructions.)  The strict chain 1201-1231 on one thread (`taxman
+solve 1201-1231 --strict --allow-tainted-prev`, from optimal.json's 1200): 1092.0 G cycles (345 s) before, 1003.2 G
+(315 s) after, −8.1% (instructions −14.0%), every game's nodes the same; `taxman regress --to 600 --strict` −1%.
+1254 as the chain runs it on two threads, profiled again: 21.4 s against 25.3 s.  A step of the window of 1215 now costs 22.0k cycles with the Lagrangian bound and
 14.6k without.
 
 Where the time goes now (the proof of 1215, one thread, by Instruments): the matching's searches 32.6%, the
@@ -1195,12 +1197,12 @@ of cycles, 0 against 1):
 Thirteen proofs are cheaper without refinement, five dearer, one even: a geometric mean of −3.0% (the logarithms'
 standard error 2.4%), −5.3% in all (953.8 G against 903.3 G), −3.3% on the thirteen from 1196 up.  Without
 refinement nodes are cheaper and usually more; but what the tree becomes (the nogoods learned, the Lagrangian
-bound's multipliers and forced members) swings each game by up to 20% either way.  The strict chains, one thread:
-`taxman regress --to 600 --strict` 5.62 G against 5.61 G (−0.3%, three runs each); `--to 1000` 532.6 G (171.3 s)
-against 481.6 G (153.4 s), −9.6% (two threads, one run each: −3.1%); and the frontier, `taxman solve 1201-1231
---strict --allow-tainted-prev` from optimal.json's 1200, 1034.5 G (326 s) against 1043.0 G (333 s), +0.8% (1215 9.0
-→ 13.9 s, 1221 21.1 → 17.3 s, 1225 25.8 → 31.0 s, 1230 206.7 → 208.3 s).  (The last round's four proofs gave 0 to
-26% less; refinement's first branch, now shared with strong branching, narrowed that by 2 to 5 points.)
+bound's multipliers and forced members) swings each game by up to 20% either way.  The strict chains, one thread, the
+same build: `taxman regress --to 600 --strict` 5.76 G against 5.70 G (−1%, two runs each, within their spread);
+`--to 1000` 513.4 G (162.1 s) against 465.0 G (145.4 s), −9.4%; and the frontier, `taxman solve 1201-1231 --strict
+--allow-tainted-prev` from optimal.json's 1200, 1003.2 G (315 s) against 1007.3 G (317 s), +0.4% (1215 8.5 → 13.5 s,
+1221 20.2 → 16.7 s, 1225 24.8 → 29.9 s, 1230 201.0 → 197.4 s).  (The last round's four proofs gave 0 to 26% less;
+refinement's first branch, now shared with strong branching, narrowed that by 2 to 5 points.)
 
 *Decision.*  Kept: the five changes, the same trees with about 10% fewer cycles at the frontier.  `match_refine` stays
 1: refinement no longer pays on average, by a few percent, but the evidence is not clear across the range, a mean

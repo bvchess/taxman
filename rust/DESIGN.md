@@ -810,8 +810,9 @@ another CPU-heavy job) records 3359 s of search, 2866 s of it for 1232–1300; i
 4), which came later: with it the proof of 1215 takes 1.1 M nodes and 34 G cycles instead of 5.5 M and 108 G, 1184
 1.6 G cycles, and the strict chain 1201–1231 on four threads 117 s of game time instead of 283 s (EXPERIMENTS: "A
 Lagrangian bound over the nogoods").  The round after it took about a tenth off the cycles with the same trees
-(commit 31b9c95: the proof of 1215 30 G cycles, 1184 1.5 G; a step of the probe's window of 1215 22.0k cycles, 14.6k
-with `lagrange=off`; EXPERIMENTS: "Faster nodes with the Lagrangian bound, same trees").  Where the time goes now (the
+(commit 31b9c95: the proof of 1215 30 G cycles, 1184 1.5 G, the strict chain 1201–1231 on one thread 315 s instead
+of 345 s; a step of the probe's window of 1215 22.0k cycles, 14.6k with `lagrange=off`; EXPERIMENTS: "Faster nodes
+with the Lagrangian bound, same trees").  Where the time goes now (the
 proof of 1215, one thread): the Hungarian searches of the matching 33% and of the Lagrangian levels 19%, the peels
 19%, the node's own work 10%, the nogood table 4%, the refits of the multipliers 3%, the bounds from the potentials
 6%, level copies 4%; by purpose the Lagrangian bound a quarter, making children a quarter, refinement 14% and
