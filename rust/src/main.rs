@@ -19,13 +19,17 @@ const USAGE: &str = "\
 usage: taxman <command> [args]
 
 commands:
-  solve N|A-B [options]   solve one board size or a range, each from the one before
-      --threads K              worker threads (default: all cores)
+  solve N|A-B [options]   solve one board size or a range, each from the one before; the first from the game
+                          of A-1 in --out FILE or optimal.json (with neither it is solved standalone, which
+                          costs more: no seed from the game before and no ceiling)
+      --threads K             worker threads (default: all cores)
       --tactic NAME=VALUE      set a tactic (repeatable).  A switch is on or off, match_refine is 0-{max_refine},
                                branching is {branchings}.
                                Names: {tactics}
-      --out FILE               append each result as a JSON line; games already completed in FILE are skipped
-      --checkpoint-dir DIR     keep a resumable checkpoint nDDDD.ckpt per game in DIR
+      --strict                 no unproven tactic: the same as {strict}
+                               (a --tactic given as well is applied after it)
+      --out FILE              append each result as a JSON line; games already completed in FILE are skipped
+      --checkpoint-dir DIR     keep a resumable checkpoint nNNNN.ckpt per game in DIR
       --checkpoint-interval S  seconds between checkpoints (default 60)
       --progress S             seconds between progress lines on stderr (default 60, 0 for none)
       --time-limit S           stop a game's search after S seconds (keeps its checkpoint)
@@ -40,9 +44,9 @@ commands:
                                by default $TAXMAN_OPTIMAL, else src/main/resources/optimal.json of the repository,
                                found from the working directory or from this program
       --show                   print each game's promotions and moves
-  regress [--from A] [--to N] [--threads K] [--tactic ...]
+  regress [--from A] [--to N] [--threads K] [--tactic ...] [--strict]
                           solve A..N (default 1..400) in memory and check every score against optimal.json
-  bench [--threads K] [--tactic ...] [--history FILE] [--known FILE] [N ...]
+  bench [--threads K] [--tactic ...] [--strict] [--history FILE] [--known FILE] [N ...]
                           time the benchmark games (default 936 1050 1100 1133 1170 1184), each on its own
                           with the previous game from optimal.json or past it from the results file --known
                           (default rust/results/strict.jsonl), and no derivation; appends the run to
@@ -58,8 +62,11 @@ commands:
 /// [`USAGE`] with the tactics' names and values, which the solver defines.
 fn usage() -> String {
     let rows: Vec<String> = Tactics::names().chunks(4).map(|row| row.join(", ")).collect();
+    let off: Vec<String> = Tactics::default().unproven_on().iter().map(|name| format!("--tactic {name}=off")).collect();
+    let strict_flags = off.join(" ");
     USAGE
         .replace("{tactics}", &rows.join(&format!(",\n{:31}", "")))
+        .replace("{strict}", &strict_flags)
         .replace("{branchings}", &Branching::ALL.map(Branching::name).join(", "))
         .replace("{max_refine}", &SearchTactics::MAX_MATCH_REFINE.to_string())
 }

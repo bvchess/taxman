@@ -46,7 +46,7 @@
 //!
 //! [`solve_range_each`] solves the board sizes `lo..=hi` in order.  The previous game of each is the one just
 //! solved; for `lo` it is the results file's game of `lo − 1`, else `optimal.json`'s, else there is none and the
-//! game is solved *standalone*, with no seed and no cap.  Every result is appended to the results file (one JSON
+//! game is solved *standalone*, with no seed and no cap (and a note on stderr says so).  Every result is appended to the results file (one JSON
 //! object per line) as soon as it is done, so that a restarted run skips what is finished; the file is checked
 //! when it is opened ([`ResultsFile::open`]).  A game whose search a limit or a signal stopped is recorded as
 //! incomplete, keeps its checkpoint, and ends the range.
@@ -984,6 +984,18 @@ fn previous_game(n: u32, results: Option<&ResultsFile>, optimal: Option<&Optimal
     results.and_then(|r| stored_prev(r, before)).or_else(|| optimal.and_then(|o| Prev::from_optimal(o, before)))
 }
 
+/// Says on stderr that game `n` has no previous game, so that it is solved standalone: correct, but without the
+/// seed and the ceiling that the game of `n − 1` gives, so it costs more (`bench/curve/README.md` measures how
+/// much).
+fn note_standalone(n: u32) {
+    let _ = writeln!(
+        std::io::stderr(),
+        "note: no previous game for n={n} (the game of {} is in neither the results file nor optimal.json): solving \
+         it standalone, with no seed and no ceiling, which costs more; to chain, give --out with the earlier games",
+        n - 1
+    );
+}
+
 /// [`solve_range_each`], returning the results of the games solved in this run.
 pub fn solve_range(
     lo: u32,
@@ -1032,6 +1044,9 @@ pub fn solve_range_each(
             continue;
         }
         let before = if n == lo { previous_game(n, results.as_ref(), optimal.as_ref()) } else { prev.take() };
+        if n == lo && n > 1 && before.is_none() {
+            note_standalone(n);
+        }
         let earlier_runs = results.as_ref().map_or(0, |r| r.earlier_runs(n));
         let result = match (solve_one(n, before.as_ref(), opts, optimal.as_ref(), earlier_runs), &results) {
             (Ok(result), _) => result,

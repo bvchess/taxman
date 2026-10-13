@@ -180,6 +180,16 @@ impl Tactics {
         }
     }
 
+    /// These tactics with every unproven one ([`UNPROVEN`]) turned off: the tactics of a *strict* run, what
+    /// `--strict` asks for.
+    #[must_use]
+    pub fn strict(mut self) -> Self {
+        for name in UNPROVEN {
+            self.set(&format!("{name}=off")).expect("UNPROVEN names switches");
+        }
+        self
+    }
+
     /// The unproven switches that are on (see [`UNPROVEN`]); a run with none of them on is *strict*.
     pub fn unproven_on(&self) -> Vec<&'static str> {
         let on = |name: &str, value: Setting| value == Setting::Switch(true) && UNPROVEN.contains(&name);
@@ -226,6 +236,22 @@ mod tests {
         // The values of the search tactics are those of `SearchTactics::default()`, not copies of them.
         let search = SearchTactics::default();
         assert_eq!((t.search.match_refine, t.search.branching), (search.match_refine, search.branching));
+    }
+
+    #[test]
+    fn strict_turns_off_exactly_the_unproven_tactics() {
+        let strict = Tactics::default().strict();
+        assert!(strict.unproven_on().is_empty());
+        assert_eq!(strict.description(), "reuse_prev=off,revise_freedoms=off");
+        // The two flags it stands for give the same tactics, and it leaves the sound ones as they are.
+        let mut by_hand = Tactics::default();
+        by_hand.set("reuse_prev=off").unwrap();
+        by_hand.set("revise_freedoms=off").unwrap();
+        assert_eq!(strict, by_hand);
+        let mut other = Tactics::default();
+        other.set("branching=largest").unwrap();
+        other.set("legacy_bound=on").unwrap();
+        assert_eq!(other.strict().description(), "reuse_prev=off,revise_freedoms=off,branching=largest");
     }
 
     #[test]

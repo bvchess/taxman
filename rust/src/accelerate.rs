@@ -105,8 +105,11 @@ pub fn prime_shortcut(n: u32, prev_moves: &[u32]) -> Vec<u32> {
 /// The tactic bets that the best game of `n` is the previous game with `n` added and those moves dropped, and so
 /// accepts a game that reaches the target.
 ///
-/// (DESIGN.md compares this rule with the "upper-delta" certificate of the Python heuristics, a similar
-/// prediction from the previous game; that the two always coincide has not been shown.)
+/// (The "upper-delta" certificate of the Python heuristics (`heuristics/README.md`, "Certificates") is a similar
+/// prediction from the previous game, and this is the one place the Rust documentation defines the term: it
+/// expects `score(n − 1) + U*(n) − U*(n − 1)`, or that plus `n/2` for an even `n`, where `U*(k)` is the sum of the
+/// upper half of a game of `k` (its moves above `k/2`, the sources).  That the two predictions always agree has
+/// not been shown.)
 ///
 /// When none of the previous moves became impossible the target *is* the ceiling and an accepted game is
 /// optimal, given that the previous one is.  Otherwise the target is a conjecture: nothing prevents a game of

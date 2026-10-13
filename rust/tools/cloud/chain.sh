@@ -5,7 +5,7 @@
 #
 # It runs
 #
-#   taxman solve 1-N --tactic reuse_prev=off --tactic revise_freedoms=off [--threads $THREADS] \
+#   taxman solve 1-N --strict [--threads $THREADS] \
 #       --out $RESULTS --checkpoint-dir $CKPT --checkpoint-interval 60 --progress 60
 #
 # in a loop.  Strict from n = 1, so that no proof rests on anything unproven.  Safe to run again at any time, after

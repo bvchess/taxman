@@ -53,7 +53,8 @@ checkpoints, `taxman.lock`), `logs/`, `chain.pid`, `deadline`.  Nothing is writt
 
 ### What is being computed
 
-`chain.sh N` runs `taxman solve 1-N --tactic reuse_prev=off --tactic revise_freedoms=off` into one results file:
+`chain.sh N` runs `taxman solve 1-N --strict` (no unproven tactic: `--tactic reuse_prev=off --tactic
+revise_freedoms=off`) into one results file:
 every game from n = 1, each built from the one before, with no unproven tactic.  Nothing rests on `optimal.json` (it is
 only compared with, to n = 1000) or on the committed results; the committed files are what the run is checked against
 (`verify.sh`).  The solver is the same code as on a laptop; the machine only changes how long it takes.
@@ -93,10 +94,12 @@ larger N later continues the same file.
 * **Check `lscpu` on the big one** for the number of NUMA nodes.  The engine does not pin threads; each searcher
   allocates its own state on its own thread, so first touch keeps it local.  If there are several nodes and the sweep
   shows a step in `k/s/thr` where the thread count crosses a node, that is the cause.
-* **Build on the machine type that runs it.**  `-C target-cpu=native` (the default of `env.sh`) tunes for the CPU that
-  builds; a binary built on a newer core can fail with an illegal instruction on an older one.  `setup.sh` prints the CPU
-  that `native` resolved to (`native cpu:` line); it should be a Neoverse core name, not `generic`.  The gain of `native`
-  has not been measured on Graviton (expect 0 to 3 %).
+* **Build on the machine type that runs it.**  `-C target-cpu=native` is opt-in: a plain `cargo build` is generic code
+  (README, section 2), and these scripts add it through `RUSTFLAGS` (the default of `env.sh`; set `RUSTFLAGS=` to build
+  generic code).  It tunes for the CPU that builds; a binary built on a newer core can fail with an illegal instruction
+  on an older one.  `setup.sh` prints the CPU that `native` resolved to (`native cpu:` line); it should be a Neoverse
+  core name, not `generic`.  The gain of `native` has not been measured on Graviton (expect 0 to 3 %; on the M1 it
+  measured 0 %).
 * **Profile-guided optimization** (PGO) is optional: `rust/tools/pgo.sh` makes the build (its header says how; on the
   M1 it adds 0 to 2 % now, see [DESIGN.md](../../DESIGN.md#10-performance)).  PGO changes code
   generation only: the search and its answers are the same, a checkpoint can be resumed by either binary, and
@@ -189,7 +192,8 @@ speed; the scaling numbers of a container on a laptop mean nothing for the cloud
    ```
 
    Read section 4.3 for the tables.  What to take from this machine: the single-thread rate (`k/s/thr` at 1 thread; the
-   M1 Max did 100 to 130 thousand nodes per second per thread at n = 1184 to 1215), the speedup to 8 threads, and a
+   M1 Max did 100 to 130 thousand nodes per second per thread on single games from n = 1184 to 1215, depending on
+   the game), the speedup to 8 threads, and a
    `Maximum resident set size` in the log (GNU `time` is used if installed).
 4. Try the pieces that will matter on the big machine, on a small chain:
 
@@ -259,7 +263,7 @@ scaling, n=1184 (speedup over 1 thread(s), times 1; * = stopped by the time limi
 | `search s` | wall time of the search; `*` if the time limit stopped it | a `*` makes that row useless; raise `SECONDS_LIMIT` |
 | `speedup` | time of the first row times its threads, over this time | close to the thread count for a long game; see the next paragraph |
 | `nodes` | steps taken, all threads | compare with the 1-thread row: tens of percent either way is normal (below) |
-| `k/s/thr` | thousands of nodes per second per thread | the engine's efficiency apart from the tree size: it falls a little with more threads (M1: 80 to 65 from 1 to 8 threads, 19 %); a step down at one thread count suggests memory, frequency or NUMA |
+| `k/s/thr` | thousands of nodes per second per thread | the engine's efficiency apart from the tree size: it falls a little with more threads (M1, the proof of 1225: 80 to 65 from 1 to 8 threads, 19 %; the rate depends on the game: the 1-thread row above is 126.5 at n = 1184); a step down at one thread count suggests memory, frequency or NUMA |
 | `eff %` | busy time / (wall x threads) | 99 to 100 up to 8 threads on the M1; below ~90 at 192 only means the game is too short, if `idle %` explains it |
 | `idle %` | time workers waited for work | ramp-up and tail: they matter when the whole search takes seconds; a long game should keep it small |
 | `lock %` | time waiting for the deque's lock | should stay near 0; if it reaches a few percent on long games at high counts, the engine's one shared deque is contended and per-worker deques are the next step (`src/engine.rs`, "Why one deque") |
@@ -431,7 +435,7 @@ scaling logs under `bench/` (say `bench/cloud/`), are your call.
 | `cannot resume from ...` for another game or build | delete the named `.ckpt` file; the game restarts from its beginning |
 | the solver exits with status 137 | the OOM killer or a spot reclaim; `chain.sh` retries; look at `dmesg` if it repeats (it should not: memory use is tiny) |
 | `rustc ... older than 1.89` / an error about `try_lock` | `rustup update stable`; `setup.sh` does this when rustup is present |
-| `optimal.json` not found | the binary was moved away from the checkout it was built in (the path is fixed at compile time): rebuild there, or pass `--optimal FILE` |
+| `optimal.json` not found | the binary looks for `src/main/resources/optimal.json` at run time, above the working directory and then above the binary (`src/paths.rs`), and neither is inside a checkout: run from inside one, or pass `--optimal FILE` or set `TAXMAN_OPTIMAL` |
 | `eff` low and `idle` high on a short game at 192 threads | expected (section 4.3); judge long games |
 | `lock` of several percent on long games | the shared deque is contended: report it; fewer threads is the immediate remedy (`THREADS=96`) |
 | `/tmp` or `$TAXMAN_WORK` is a memory filesystem | `chain.sh` refuses: set `TAXMAN_WORK` to a directory on EBS |

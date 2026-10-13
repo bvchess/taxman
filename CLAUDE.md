@@ -70,6 +70,10 @@ push there.  (Through 2026-08-23 it happened on the branch
 `claude/taxman-polynomial-time-gy59il`, which has since been merged
 into `master` and deleted.)
 
+The exact solver in Rust is the crate in `rust/` (std only; `cd rust`, then `cargo build --release`, `cargo test`):
+`rust/README.md` is its user guide and reading order, `rust/DESIGN.md` its design, `rust/docs/EXPERIMENTS.md` the lab
+notebook.  Committed results in `rust/results/` are evidence: runs write elsewhere and must never overwrite them.
+
 Robert Moniot's C++ program `moniot/playtaxman.cpp` implements seven
 heuristic strategies and is essentially as its author sent it.  Keep edits
 to it minimal; prefer working around it in `moniot/Makefile`.

@@ -4,17 +4,24 @@ approaches to more quickly find approximate solutions.
 
 ![game 10 move 3](img/10.3.png)
 
+**The game.**  The pot holds the numbers 1 to n; each turn the player takes a number that still has a proper divisor
+in the pot and scores it, and the taxman takes every divisor of it still in the pot.  The game ends when no number in
+the pot has a divisor left in it, and an optimal game scores the most (n = 4: take 3, then 4, for 7).
+
 See the [project wiki](https://github.com/bvchess/taxman/wiki) for more information about the game and the
 algorithm implemented by this program. Heuristic approaches are [here](heuristics).
 
 Robert Moniot's C++ program implementing seven heuristic strategies is included in
 [moniot](moniot), redistributed with his permission.
 
-A Rust reimplementation of the exact algorithm, built for many cores and long resumable runs, has solved boards up to
-n = 1231 (the table of optimal games in the Java program stops at 1000); see [rust/README.md](rust/README.md) for how
-to build and run it, and [rust/tools/cloud/RUNBOOK.md](rust/tools/cloud/RUNBOOK.md) for running it on a large cloud
-machine.
+## Rust solver
 
+A Rust reimplementation of the exact algorithm, built for many cores and long resumable runs, has solved boards up to
+n = 1231 (the table of optimal games in the Java program stops at 1000).  It is a Cargo crate in [rust](rust) with its
+own build, run and test instructions: start with [rust/README.md](rust/README.md) (`cd rust && cargo build --release`),
+and see [rust/tools/cloud/RUNBOOK.md](rust/tools/cloud/RUNBOOK.md) for running it on a large cloud machine.
+
+The sections "Usage", "Implementation" and "Build" below describe the Java program.
 
 ## Usage
 `bin/taxman [options] <board size or range>`  
