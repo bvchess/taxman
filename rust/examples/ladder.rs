@@ -36,7 +36,6 @@ use taxman::engine::{Counters, EngineConfig};
 use taxman::frames::build_frames;
 use taxman::game::Optimal;
 use taxman::hives::Apiary;
-use taxman::json::Json;
 use taxman::numtheory::Tables;
 use taxman::search::{cut, prepare, search_with, Diagnostics, Revise, SearchTactics};
 use taxman::solver::Tactics;
@@ -216,20 +215,11 @@ fn print_scaling(title: &str, rows: &[Row]) {
 
 /// optimal.json's games, plus the completed games of the results file `known` (which win where both have one).
 fn known_games(known: Option<&PathBuf>) -> Result<Optimal, String> {
-    let json = Json::from_file(Optimal::default_path())?;
-    let mut games: Vec<Json> = json.as_arr().ok_or("optimal.json: expected an array of games")?.to_vec();
-    if let Some(path) = known {
-        let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
-        for (i, line) in text.lines().enumerate().filter(|(_, line)| !line.trim().is_empty()) {
-            let game = Json::parse(line).map_err(|e| format!("{}: line {}: {e}", path.display(), i + 1))?;
-            if game.get("completed").and_then(Json::as_bool) == Some(true) {
-                let n = game.get("n").and_then(Json::as_u32);
-                games.retain(|g| g.get("n").and_then(Json::as_u32) != n);
-                games.push(game);
-            }
-        }
+    let optimal = Optimal::load_default()?;
+    match known {
+        Some(path) => optimal.with_results(path),
+        None => Ok(optimal),
     }
-    Optimal::from_json(&Json::Arr(games))
 }
 
 fn secs(d: Duration) -> f64 {

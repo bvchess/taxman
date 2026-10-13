@@ -140,6 +140,7 @@ dependencies.  Modules:
 | `engine` | problem-independent parallel depth-first branch-and-bound driver: work units, shared deque with disk spill, incumbent, yielding/splitting, checkpoint and resume, stopping on SIGINT/SIGTERM, a lock on a checkpoint directory, progress reporting, statistics, instrumentation (`Counters`) |
 | `search` | the Taxman searcher (port of `BranchExplorer`) implementing the engine's `Searcher` trait; `prepare` (preclusions, greedy, `revise_freedoms`) and `search` (seed, cap, checkpoint and resume); `Refiner` (conflicts of the heaviest matching: exactness, refinement, branching); the starting incumbent's `dive` and local search (`Neighbourhood`); `search_with` and `Diagnostics` for measurements |
 | `examples/ladder.rs` | the ladder harness: standalone searches of hard games from the frame builder with a time limit, at one or several thread counts (see Performance) |
+| `examples/perf.rs` | the performance probe: the hot paths replayed from fixtures, in cycles and instructions, with fingerprints (see Performance) |
 | `solver` | `Tactics` (every tactic above, by name and value), `SolveOptions`, `solve_game` (the per-game pipeline below) and `solve_range` (a range of games, resumable through a results file) |
 | `results` | what a result line records about its provenance (proof kind, taint, the n−1 game it was built from, the build), the checks a results file passes when it is opened (`read_results`), `ResultsFile`, and `verify_files` behind `taxman verify-results`; `tools/check_results.py` is an independent referee of the same files |
 | `brute` | exact Taxman on boards up to 127 with holes, by memoized search over pot states (no frame model), under the rules or the maximal-factor rule |
@@ -963,15 +964,31 @@ Correctness, all on games that finish in seconds:
 
 Performance:
 
-* `taxman bench` runs a fixed set of games that need search and finish in
-  seconds — n = 480, 500, 600, 640, 660, 700, 720, 760 — standalone (n−1 from
-  optimal.json, acceleration off), and prints per-phase time and node counts.
-  Java reference wall times, whole game including JVM start: 10 threads
-  1.5, 1.4, 1.7, 1.6, 2.1, 4.8, 5.6, 12.4 s; one thread (ForkJoin
-  parallelism 1) 2.3, 2.1, 2.7, 2.0, 4.1, 18.0, 23.2, 65.6 s.  Compare with
-  1 thread (deterministic) and with all threads.
-* Larger games (738, 750, 840; Java 56–90 s) only after the bench set is
-  fast and correct.
+* `taxman bench` runs a fixed set of games that need search and take about a
+  second each on one thread — n = 936 (W = 16) and 1050, 1100, 1133, 1170,
+  1184 (the frontier's width) — standalone (n−1 from optimal.json, past it
+  from `results/strict.jsonl`; acceleration off), prints per-phase time and
+  node counts, and appends them to `bench/history.jsonl`.  Until 2026-10 the
+  set was 480–760 (W = 8 and 16, milliseconds per game), which no longer
+  exercised the frontier's hot paths; the Java took 2.0–65.6 s for those on
+  one thread and 1.4–12.4 s on ten.  A window of a long proof is not a game
+  the solver can run, so it is in the probe.
+* The probe (`examples/perf.rs`): replays of the hot paths at the frontier
+  from fixtures in `testdata/perf/` (0.2 MB), measured in cycles and
+  instructions retired of the process (`proc_pid_rusage`), which other load
+  on the machine barely moves, unlike wall time; each with a fingerprint of
+  what it computes, which an exact optimization must leave unchanged.  F1:
+  300 search nodes each of the proofs of 936 and 1215 (`nNNNN.nodes`), every
+  kernel over all of them: the rebuild of a node, the promotion (peel) of
+  every candidate, conflicts, the matching from scratch and warm-started,
+  bounds without each member, strong branching's exact solves, children,
+  nogood lookups and rule-outs.  F2: the frame checks of those promotions.
+  F3: a checkpoint of each proof (`nNNNN.window.ckpt`, TXSH v3; 1215 after
+  1.5M nodes) resumed on one thread for 50,000 steps, one period of
+  forgetting nogoods: the search itself, fingerprinted by its counters.
+  About 5 s in all; `perf make-nodes` and `perf make-window` make the
+  fixtures again (deterministically).  For whole searches, `/usr/bin/time
+  -l` reports the same counters per process.
 * The ladder, `cargo run --release --example ladder -- [--threads T[,T…] |
   --scaling] [--seconds S] [--diag] [--seed-opt] [--known FILE] [--tactic …]
   N…`: standalone searches of hard games (default 760 800 840 880 900 960 992

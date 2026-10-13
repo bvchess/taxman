@@ -41,9 +41,9 @@ commands:
   regress [--from A] [--to N] [--threads K] [--tactic ...]
                           solve A..N (default 1..400) in memory and check every score against optimal.json
   bench [--threads K] [--tactic ...] [--history FILE] [N ...]
-                          time the benchmark games (default 480 500 600 640 660 700 720 760), each on its own
-                          with the previous game from optimal.json and no derivation; appends to FILE (default
-                          bench/history.jsonl)
+                          time the benchmark games (default 936 1050 1100 1133 1170 1184), each on its own
+                          with the previous game from optimal.json or past it results/strict.jsonl, and no
+                          derivation; appends to FILE (default bench/history.jsonl)
   verify-optimal [FILE]   replay every game in optimal.json (or FILE) and check its recorded score
   verify-results FILE... [--optimal FILE|none]
                           check results files without changing them: every game replayed, the chain from n-1,

@@ -283,6 +283,33 @@ pub struct SearchSpace<'a, const W: usize> {
     pub found: Mutex<Option<Found>>,
 }
 
+impl<'a, const W: usize> SearchSpace<'a, W> {
+    /// The space [`search`] searches `prepared` in: its tactics, with `graph` the root's matching graph
+    /// (`MatchGraph::new(&prepared.model, &prepared.root)`, needed with the tactic `match_bound`), the ceiling
+    /// `cap`, no diagnostics, and the searchers forgetting their nogoods as the tactic `forget_nogoods` says.
+    pub fn new(prepared: &'a Prepared<W>, graph: Option<&'a MatchGraph>, cap: Option<u64>) -> Self {
+        let tactics = prepared.tactics;
+        SearchSpace {
+            model: &prepared.model,
+            root: &prepared.root,
+            preclusions: prepared.preclusions.as_ref(),
+            match_graph: graph.filter(|_| tactics.match_bound),
+            match_refine: u32::from(tactics.match_refine),
+            conflict_branching: if tactics.match_bound { tactics.branching } else { Branching::Largest },
+            fix_forced: tactics.fix_forced,
+            nogoods: tactics.match_bound && tactics.nogoods,
+            nogood_period: tactics.forget_nogoods.then_some(NOGOOD_PERIOD),
+            root_max: prepared.root.frames().iter().filter_map(|f| (f.moves | f.factors).max()).max().unwrap_or(0),
+            max_total: prepared.max_total,
+            rule: tactics.rule(),
+            cap,
+            diagnostics: None,
+            began: Instant::now(),
+            found: Mutex::new(None),
+        }
+    }
+}
+
 /// When a search found its best incumbent.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Found {
@@ -1851,24 +1878,8 @@ fn search_forgetting<const W: usize>(
         });
     }
 
-    let space = SearchSpace {
-        model: &prepared.model,
-        root: &prepared.root,
-        preclusions: prepared.preclusions.as_ref(),
-        match_graph: match_graph.as_ref(),
-        match_refine: u32::from(prepared.tactics.match_refine),
-        conflict_branching: if prepared.tactics.match_bound { prepared.tactics.branching } else { Branching::Largest },
-        fix_forced: prepared.tactics.fix_forced,
-        nogoods: prepared.tactics.match_bound && prepared.tactics.nogoods,
-        nogood_period,
-        root_max: prepared.root.frames().iter().filter_map(|f| (f.moves | f.factors).max()).max().unwrap_or(0),
-        max_total: prepared.max_total,
-        rule: prepared.tactics.rule(),
-        cap,
-        diagnostics,
-        began: t0,
-        found: Mutex::new(None),
-    };
+    let space =
+        SearchSpace { nogood_period, diagnostics, began: t0, ..SearchSpace::new(prepared, match_graph.as_ref(), cap) };
     let start = match checkpoint.filter(|_| resume) {
         Some(path) => Start::Resume(path.to_path_buf()),
         None => {

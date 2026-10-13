@@ -159,33 +159,27 @@ pub fn regress(args: &[String]) -> CliResult {
 // ---------------------------------------------------------------------------------------------------------
 // bench
 
-/// The benchmark games and the Java solver's whole-game wall times for them, with one thread and with ten
-/// (including about half a second of JVM start).
-const BENCH_GAMES: [(u32, f64, f64); 8] = [
-    (480, 2.3, 1.5),
-    (500, 2.1, 1.4),
-    (600, 2.7, 1.7),
-    (640, 2.0, 1.6),
-    (660, 4.1, 2.1),
-    (700, 18.0, 4.8),
-    (720, 23.2, 5.6),
-    (760, 65.6, 12.4),
-];
+/// The benchmark games: the last W = 16 game of the fast set and the W = 32 ones near the frontier, each a
+/// search of a second or so on one thread (DESIGN.md, "Performance").
+const BENCH_GAMES: [u32; 6] = [936, 1050, 1100, 1133, 1170, 1184];
 
 const BENCH_HISTORY: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/bench/history.jsonl");
+
+/// Where the benchmark takes the previous games (and the scores to check) past optimal.json's.
+const BENCH_RESULTS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/results/strict.jsonl");
 
 pub fn bench(args: &[String]) -> CliResult {
     let args = Args::parse(args, &flags_with(&["--history"]), &[])?;
     let history = args.value("--history").map_or_else(|| PathBuf::from(BENCH_HISTORY), PathBuf::from);
     let ns: Vec<u32> = if args.positional().is_empty() {
-        BENCH_GAMES.iter().map(|g| g.0).collect()
+        BENCH_GAMES.to_vec()
     } else {
         let parse = |text: &String| text.parse().map_err(|_| CliError::Usage(format!("not a board size: {text:?}")));
         args.positional().iter().map(parse).collect::<Result<_, _>>()?
     };
     let mut opts = solver_options(&args)?;
-    // Every game on its own: the previous game from optimal.json (whatever the tactics: a benchmark records no
-    // result), and no derivation.
+    // Every game on its own: the previous game from optimal.json or, past it, from the committed strict results
+    // (whatever the tactics: a benchmark records no result), and no derivation.
     opts.force_search = true;
     opts.allow_tainted_prev = true;
     let Some(optimal) = opts.load_optimal().map_err(failed)? else {
@@ -193,39 +187,34 @@ pub fn bench(args: &[String]) -> CliResult {
             "bench takes the previous games from optimal.json, so --optimal none makes no sense".into(),
         ));
     };
+    let known = optimal.with_results(Path::new(BENCH_RESULTS)).map_err(failed)?;
 
     outln!("{} threads, tactics {}", opts.threads, opts.tactics.description());
-    let columns = ["n", "nodes", "precl s", "greedy s", "revise s", "search s", "total s", "Java 1t", "Java 10t"];
-    let [n, nodes, precl, greedy, revise, search, total, java1, java10] = columns;
-    outln!("{n:>5} {nodes:>13} {precl:>9} {greedy:>9} {revise:>9} {search:>9} {total:>9}  | {java1:>8} {java10:>8}");
+    let [n, nodes, precl, greedy, revise, search, total] =
+        ["n", "nodes", "precl s", "greedy s", "revise s", "search s", "total s"];
+    outln!("{n:>5} {nodes:>13} {precl:>9} {greedy:>9} {revise:>9} {search:>9} {total:>9}");
     let mut results = Vec::new();
     for &n in &ns {
-        let prev = n.checked_sub(1).and_then(|before| Prev::from_optimal(&optimal, before));
-        let result = solver::solve_game_with(n, prev.as_ref(), &opts, Some(&optimal)).map_err(failed)?;
-        let java = BENCH_GAMES.iter().find(|g| g.0 == n);
-        let reference = |pick: fn(&(u32, f64, f64)) -> f64| {
-            java.map_or_else(|| format!("{:>8}", "-"), |g| format!("{:>8.1}", pick(g)))
-        };
+        let prev = n.checked_sub(1).and_then(|before| Prev::from_optimal(&known, before));
+        let result = solver::solve_game_with(n, prev.as_ref(), &opts, Some(&known)).map_err(failed)?;
         let p = &result.phases;
         let secs = |d: Duration| d.as_secs_f64();
         outln!(
-            "{:>5} {:>13} {:>9.3} {:>9.3} {:>9.3} {:>9.3} {:>9.3}  | {} {}",
+            "{:>5} {:>13} {:>9.3} {:>9.3} {:>9.3} {:>9.3} {:>9.3}",
             n,
             result.nodes,
             secs(p.preclusions),
             secs(p.greedy),
             secs(p.revise),
             secs(p.search),
-            secs(p.total),
-            reference(|g| g.1),
-            reference(|g| g.2)
+            secs(p.total)
         );
         let _ = std::io::stdout().flush();
         results.push(result);
     }
     let total: f64 = results.iter().map(|r| r.phases.total.as_secs_f64()).sum();
     let nodes: u64 = results.iter().map(|r| r.nodes).sum();
-    outln!("{:>5} {:>13} {:>59.3}", "all", nodes, total);
+    outln!("{:>5} {:>13} {:>49.3}", "all", nodes, total);
 
     let record = history_record(&opts, &results);
     append_history(&history, &record).map_err(|e| failed(format!("{}: {e}", history.display())))?;

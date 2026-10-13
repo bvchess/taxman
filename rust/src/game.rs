@@ -158,21 +158,48 @@ impl Optimal {
 
     pub fn from_json(json: &Json) -> Result<Optimal, String> {
         let entries = json.as_arr().ok_or("expected an array of games")?;
-        let mut by_n: Vec<Option<(u64, Vec<u32>)>> = Vec::new();
+        let mut out = Optimal { by_n: Vec::new() };
         for (i, entry) in entries.iter().enumerate() {
-            let field = |name: &str| entry.get(name).ok_or_else(|| format!("entry {i}: missing \"{name}\""));
-            let n = field("n")?.as_u32().filter(|&n| n <= MAX_PLAUSIBLE_N);
-            let n = n.ok_or_else(|| format!("entry {i}: bad \"n\""))?;
-            let score = field("score")?.as_u64().ok_or_else(|| format!("entry {i} (n={n}): bad \"score\""))?;
-            let moves = field("moves")?.as_u32_vec().ok_or_else(|| format!("entry {i} (n={n}): bad \"moves\""))?;
-            if by_n.len() <= n as usize {
-                by_n.resize(n as usize + 1, None);
-            }
-            if by_n[n as usize].replace((score, moves)).is_some() {
+            let (n, score, moves) = Self::parse_entry(entry).map_err(|e| format!("entry {i}{e}"))?;
+            if out.set(n, score, moves) {
                 return Err(format!("entry {i}: duplicate n={n}"));
             }
         }
-        Ok(Optimal { by_n })
+        Ok(out)
+    }
+
+    /// These games with the completed games of the results file `path` (one JSON object per line, as `taxman
+    /// solve --out` writes them), which replace the games of the same board sizes.  Lines of searches that did
+    /// not complete are skipped.
+    pub fn with_results(mut self, path: &Path) -> Result<Optimal, String> {
+        let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+        for (i, line) in text.lines().enumerate().filter(|(_, line)| !line.trim().is_empty()) {
+            let at = |e: String| format!("{}: line {}{e}", path.display(), i + 1);
+            let game = Json::parse(line).map_err(|e| at(format!(": {e}")))?;
+            if game.get("completed").and_then(Json::as_bool) == Some(true) {
+                let (n, score, moves) = Self::parse_entry(&game).map_err(at)?;
+                self.set(n, score, moves);
+            }
+        }
+        Ok(self)
+    }
+
+    /// The board size, score and moves of one game object; the error says what is wrong after a ": " (or after
+    /// " (n=…): " once the board size is known).
+    fn parse_entry(entry: &Json) -> Result<(u32, u64, Vec<u32>), String> {
+        let field = |name: &str| entry.get(name).ok_or_else(|| format!(": missing \"{name}\""));
+        let n = field("n")?.as_u32().filter(|&n| n <= MAX_PLAUSIBLE_N).ok_or(": bad \"n\"")?;
+        let score = field("score")?.as_u64().ok_or_else(|| format!(" (n={n}): bad \"score\""))?;
+        let moves = field("moves")?.as_u32_vec().ok_or_else(|| format!(" (n={n}): bad \"moves\""))?;
+        Ok((n, score, moves))
+    }
+
+    /// Records the game of board size `n`; returns whether it replaced one.
+    fn set(&mut self, n: u32, score: u64, moves: Vec<u32>) -> bool {
+        if self.by_n.len() <= n as usize {
+            self.by_n.resize(n as usize + 1, None);
+        }
+        self.by_n[n as usize].replace((score, moves)).is_some()
     }
 
     fn entry(&self, n: u32) -> Option<&(u64, Vec<u32>)> {
