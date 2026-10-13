@@ -88,8 +88,10 @@ designed for speed from scratch.  One defect of the Java was found and fixed on 
   root of all 94 golden games that need search (scratch study): mean gap to
   the optimum 31 vs 76 for the Java bound; on the bench games 107–292 vs
   363–769.  The cardinality cap never binds.  To be used incrementally
-  (re-optimized along the DFS path) and combined with the Java bound
-  (take the minimum).
+  (re-optimized along the DFS path), at first combined with the Java bound
+  by taking the minimum.  (That was dropped later: `blameGame` never pruned
+  where the matching bound did not, so the shipped bound is the matching
+  bound alone.)
   *Implemented* in module `matchbound` (used by `search`, tactic
   `match_bound`): an optimal matching and its dual potentials per level of the DFS path,
   repaired by Hungarian searches after each change; 0.7–2.4 µs per
