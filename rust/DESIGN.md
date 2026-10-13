@@ -628,7 +628,9 @@ on the machine moves wall times by up to 3×.  What measures what:
   children, nogood lookups and rule-outs).  F2: the frame checks of those promotions.  F3: a checkpoint of each proof
   resumed on one thread for 50,000 steps, one period of forgetting nogoods: the search itself, fingerprinted by its
   counters.  About 5 s in all; `perf make-nodes` and `perf make-window` make the fixtures again, deterministically.
-  For whole searches, `/usr/bin/time -l` reports the same counters per process.
+  For whole searches, `/usr/bin/time -l` reports the same counters per process.  `cargo test --release` rebuilds the
+  examples in its own configuration, with about 2% more instructions: run `cargo build --release --examples` again
+  before measuring.
 * **Profile-guided optimization** (`tools/pgo.sh`): an instrumented build runs the probe and a short search at every
   set width (code a profile never saw is optimized as cold), and `-Cprofile-use` builds `target/pgo/release/taxman` and
   the examples.  The same trees and fingerprints.  Since the hot loop is inlined by hand it adds 0–2% (it was 12%
