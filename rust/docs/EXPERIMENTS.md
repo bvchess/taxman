@@ -1,15 +1,171 @@
 # Experiments: the lab notebook of the Rust solver
 
 What was tried, in what order, and what it was worth.  [DESIGN.md](../DESIGN.md) says how the solver works now;
-this page is the record of how it got there: every round of improvements with the measurements that decided it, and
-the ideas that were measured and not kept, with their numbers.  Entries are dated by month (the whole record so far
-is from 2026-10 unless a section says otherwise) and name the commits that made each step, so `git show COMMIT`
-finds the code.  Statements are true of the code at the time of the entry; where a later entry changed the picture
-it says so, and DESIGN.md is the authority on the present.
+this page is the record of how it got there: a register of every experiment, kept or not, and every round of
+improvements with the measurements that decided it, the ideas that were measured and not kept among them, with their
+numbers.  Entries are dated by month (the whole record so far is from 2026-10 unless a section says otherwise) and
+name the commits that made each step, so `git show COMMIT` finds the code.  Statements are true of the code at the
+time of the entry; where a later entry changed the picture it says so, and DESIGN.md is the authority on the present.
 
 Terms (conflict, nogood, forced member, step, `W`, ...) are defined in the [glossary of the README](../README.md#7-glossary)
 and in DESIGN.md; the measurements were made with the ladder, the probe and `taxman bench`, which DESIGN.md
 ("Performance") describes.
+
+* [Register of everything tried](#register-of-everything-tried): one row per experiment, by subject, with where its
+  details are and what decided it.  Look here first.
+* [Index of rounds](#index-of-rounds): the rounds of improvements in the order they happened, with their commits.
+* The rounds themselves (from [the port](#the-port-and-its-first-improvements) to
+  [the benchmarks](#benchmarks-the-probe-pgo-and-scaling)), which hold the details; the pilots of ideas borrowed from
+  other fields are in [IDEAS.md](IDEAS.md).
+
+## Register of everything tried
+
+One row per experiment or idea tried on the exact solver and on the theory under it, kept or not, so that nothing is
+tried twice.  **Check it before proposing an experiment, and add a row when one finishes, failures included.**  The
+details stay where the row points: a round below, [IDEAS.md](IDEAS.md), [DESIGN.md](../DESIGN.md), the
+[evidence](../evidence/README.md), the [results](../results/README.md), or the module comment of the code of a study.
+Where an experiment's code was discarded (the pilots of IDEAS.md), the page it points to describes what was computed,
+on which games and with which settings, well enough to repeat it.  The [index of rounds](#index-of-rounds) lists the
+rounds in the order they happened, with their commits.
+
+Outcomes: **kept** (in the solver or the evidence, or the finding stands), **not kept** (tried and taken out, or
+never adopted because it did not pay or is false), **superseded** (kept for a while, replaced by something better),
+**open** (proposed, not tried or not decided), **measured** (a study whose result changed no code).  The numbers are
+those of the page the row points to; a game is named by its board size, and times are search seconds.
+
+### Search and bounds
+
+| tried | details | outcome | what decided it |
+|---|---|---|---|
+| Reimplement the Java's search and check its upper bound | [port](#the-port-and-its-first-improvements) | kept, with a fix | the Java's runner-up can be too low (root of n = 114: 358 against the best completion's 360); the sound runner-up is the default, `legacy_bound` reproduces the Java's |
+| A simpler sound runner-up: the largest candidate not in the bid | [port](#the-port-and-its-first-improvements) | not kept | n = 700 took over 10 minutes instead of 18 s |
+| Matching bound (max-weight bipartite matching, kept incrementally with dual potentials) instead of `blameGame` | [after parity](#improvements-after-parity) | kept | mean gap at the root 31 against the Java bound's 76 on the 94 golden games that need search; 1.5 to 85 times fewer nodes at n = 480-720 |
+| The minimum of `blameGame` and the matching bound | [after parity](#improvements-after-parity) | not kept | `blameGame` pruned nowhere the matching bound did not (0 at every check) |
+| Seed the incumbent from the game of n − 1 and stop at the cap n + opt(n − 1) (`seed_incumbent`, `prev_cap`) | [after parity](#improvements-after-parity) | kept | 415 of the strict chain's 1300 proofs are the cap, reached before the first node ([results](../results/README.md#what-supports-the-scores)) |
+| Branch on a member of the heaviest matching's conflict instead of the largest candidate | [conflicts](#conflicts-of-the-matching-bound-2026-10) | kept, the decisive change | 936: 90.8 s to 31.8 s (12.3M to 2.62M nodes); 1000: open at 120 s to 27.5 s (10 threads) |
+| Strong branching: the member whose removal lowers the bound most, its level kept for the node (`conflict-strong`) | [conflicts](#conflicts-of-the-matching-bound-2026-10) | kept, the default | 936: 29.5 s to 17.7 s, 2.62M to 909k nodes |
+| The other branchings, `conflict-smallest` and `conflict-largest` | [conflicts](#conflicts-of-the-matching-bound-2026-10) | kept as switches | smallest gives the smallest proof trees at 880 and 936 but finds good incumbents late; largest follows the dive and finds them early |
+| Propagate the known conflicts into the children | [conflicts](#conflicts-of-the-matching-bound-2026-10) | kept | −17% nodes |
+| Refinement (bound the branches of the conflict) on the Java's branching | [conflicts](#conflicts-of-the-matching-bound-2026-10) | not kept | nodes 2-70 times fewer but dearer: 880 from 4.8M to 68k nodes at depth 7, yet only 31 s to 21 s, and slower than none at depth 1-3 |
+| Refinement one level deep with conflict branching (`match_refine` = 1) | [conflicts](#conflicts-of-the-matching-bound-2026-10) | kept | 2-15% faster than none on the benchmarks; deeper is slower |
+| Promote a member of the conflict; a lookahead that scores the child with the other member of a pair out | [conflicts](#conflicts-of-the-matching-bound-2026-10) | not kept | the heaviest matching promotes them already; the lookahead did worse |
+| Branch on the members of every failing frame's conflict | [conflicts](#conflicts-of-the-matching-bound-2026-10) | not kept | 936: 754k to 1.0M nodes |
+| Choose the frame by the smallest core and minimize only it | [conflicts](#conflicts-of-the-matching-bound-2026-10) | not kept | much cheaper nodes, but its conflicts branch far worse (1000 unfinished in 2 minutes) |
+| A complete `can_promote` filter of the candidates (the Java's is partial) | [conflicts](#conflicts-of-the-matching-bound-2026-10) | not kept | nodes −25-35%, cost per node ×4 |
+| A per-frame cache of conflict answers; a radix heap in the Hungarian search | [conflicts](#conflicts-of-the-matching-bound-2026-10) | kept | −5%; −16-19% |
+| Local search on the starting incumbent | [conflicts](#conflicts-of-the-matching-bound-2026-10) | kept | reaches the optimum at the start for 945 and 988 in 20-40 ms |
+| Local search on every incumbent found; dives at search nodes | [conflicts](#conflicts-of-the-matching-bound-2026-10) | not kept | nothing measurable |
+| A one-step lookahead in the root dive (the dive-variants experiment) | [conflicts](#conflicts-of-the-matching-bound-2026-10) | not kept | no better than the plain dive, which is itself weaker than greedy on most games |
+| Forced members (`fix_forced`): the child promotes every forced member of the conflict | [forced members](#forced-members-and-nogoods-2026-10-second-round) | kept | nodes −31% (880) to −60% (1170), time −21% to −36% |
+| Keep the child's check as the verdict of its first step; one candidate list per child | [forced members](#forced-members-and-nogoods-2026-10-second-round) | kept | −3% to −23% time |
+| The bound without a member from the dual potentials alone, instead of an exact solve | [forced members](#forced-members-and-nogoods-2026-10-second-round) | kept | same trees, 13-28% less time; settles 89% of the forced members at 1184 |
+| The forced members of the whole heaviest matching, from the potentials | [forced members](#forced-members-and-nogoods-2026-10-second-round) | kept | nodes −8% (936) to −52% (1184), time −2% to −39% |
+| Cheaper children: no Java promotability checks with the matching bound, forced members promoted together, no `blameGame` | [forced members](#forced-members-and-nogoods-2026-10-second-round) | kept | −30% to −59% time, nodes within ±8% |
+| No refinement at a node that has forced members | [forced members](#forced-members-and-nogoods-2026-10-second-round) | kept | nodes +3% to +11%, time −2% to −8% |
+| Prove more members forced with the forced ones required (a second pass of the potentials' bounds) | [forced members](#forced-members-and-nogoods-2026-10-second-round) | not kept | pruned nothing more |
+| Skip strong branching's exact solves when the potentials found a forced member, or choose the branch by the potentials alone | [forced members](#forced-members-and-nogoods-2026-10-second-round) | not kept | each traded nodes for time at about even |
+| Round the heaviest matching into an incumbent at every node | [forced members](#forced-members-and-nogoods-2026-10-second-round) | not kept | 5 times slower per node; the optimum of 1050 was found at the same step |
+| A large-neighbourhood search before the search | [forced members](#forced-members-and-nogoods-2026-10-second-round) | not kept | 1025: 25080 in 1.3 s, but the optimum only from the search, at about the same point |
+| The Java's depth-2 preclusion table | [forced members](#forced-members-and-nogoods-2026-10-second-round) | superseded by nogoods (`preclusions` off) | without it 992 and 1215 take +5% and −4%; 1101-1217 on 8 threads spent 53 of 131 s building tables |
+| Faster nodes, same trees: bucket 0 of the radix heap a bitset, packed per-vertex slots, `MAX_FRAMES` 12 to 8, exact nogood lookups, no peel for a factor no other move uses, the heap inlined | [faster nodes](#faster-nodes-same-trees-2026-10) | kept | 30% fewer cycles at the 1215 proof (151.3 G to 106.2 G), the set widths below included |
+| An undo trail for the matching levels | [faster nodes](#faster-nodes-same-trees-2026-10) | not kept | windows +0.8% and +0.9% cycles, instructions +4% |
+| The peel in frame-local form | [faster nodes](#faster-nodes-same-trees-2026-10) | not kept | bit-parallel peel +8% and +16% on forced sets; counting peel +0.5% and +0.8% |
+| Caching frame checks | [faster nodes](#faster-nodes-same-trees-2026-10) | not kept | 14-17% of the peels repeat one exactly, but only 5% one of the last eight |
+| Unchecked indexing in the Hungarian search | [faster nodes](#faster-nodes-same-trees-2026-10) | not kept | −4% instructions, −0.7% cycles; not worth `unsafe` |
+| Five smaller changes: no peel for the several moves of a forced set, a forced set promoted straight into the child's state, stopping the potentials' bound once its first part decides, the Dijkstra horizon, one branch for `reach`'s two tests | [faster nodes](#faster-nodes-same-trees-2026-10) | not kept | each within ±0.5% or worse (the horizon: windows +0.4% and +2.5%) |
+| Profile-guided optimization (`tools/pgo.sh`) | [benchmarks](#benchmarks-the-probe-pgo-and-scaling) | kept, optional | 12% on the code before the inner-loop round, 0-2% after it |
+| `i32` potentials; a warm-started unit rebuild; candidate-index sets for every search-level set; watched members for the nogoods | [faster nodes](#faster-nodes-same-trees-2026-10) | open | no bound on the potentials is proven; another optimal matching can change the tree; a large refactor; the nogood table is 3% of the time |
+| Cheaper matching repairs; incumbents for games whose optimum the search reaches late (992, 1025) | [benchmarks](#benchmarks-the-probe-pgo-and-scaling) | open | the repairs are 46-67% of the time at the frontier; 992 on 8 threads finds its optimum at 11.8 s of 12.0 s |
+| Where the time goes in the hardest games (sampling profiles of 1232, 1287, 1299, 1295) | [IDEAS 2](IDEAS.md#2-where-the-time-goes-in-the-hardest-games) | measured | matching repairs 56-67%, strong branching 28-34%, conflict computation under 1%, the engine under 0.1% |
+| Reuse the answer of a game whose search space an earlier game searched (rank 1) | [IDEAS 4.1](IDEAS.md#41-memoizing-searches-that-repeat-rank-1) | open | 29.7% of the search time of the strict chain 1232-1300 (851 of 2866 s) re-searches a space already solved |
+| A Lagrangian bound over the nogoods (rank 2) | [IDEAS 4.2](IDEAS.md#42-a-lagrangian-bound-over-the-nogoods-rank-2) | open, the pilot taken over by a follow-up experiment | proof nodes −4% (880) to −67% (1184) with multipliers fitted once at the root; the from-scratch evaluation of the pilot was 7 times slower per node |
+| Reduced-cost fixing of candidates from the dual | [IDEAS 4.3](IDEAS.md#43-reduced-cost-fixing-killed) | not kept | fixes 70.9 of 159 candidates outside `Q*` per node at 936, yet changes no tree: the matching relaxation is integral |
+| Component decomposition (AND/OR search, #SAT) | [IDEAS 4.4](IDEAS.md#44-component-decomposition-killed) | not kept | exactly one component holds candidates at the root of 936-1300 and at all 600 probe nodes |
+| Disjoint conflicts from the dual (MaxSAT's disjoint cores, the pair cut) | [IDEAS 4.5](IDEAS.md#45-disjoint-conflicts-from-the-dual-killed) | not kept | between 2.7% fewer and 0.3% more nodes for 12% more cycles |
+| A portfolio: another branching on some threads for finding incumbents | [IDEAS 4.7](IDEAS.md#47-a-portfolio-for-finding-incumbents-weak) | not kept | the frontier's cost is the proof; 8 of the 11 slowest games of 1232-1300 start at their optimum |
+| Reliability branching (pseudocosts) in place of strong branching's exact solves | [IDEAS 5](IDEAS.md#5-every-idea-considered) | open | strong branching is 28-34% of the time; not piloted |
+| Knuth's estimate of a tree's size, to budget games and split work | [IDEAS 5](IDEAS.md#5-every-idea-considered) | open | not piloted |
+| Ideas considered and not piloted: restarts, bound nogoods and backjumping, cube-and-conquer splitting, dominance rules, symmetry breaking, best-bound node selection, cutting planes | [IDEAS 5](IDEAS.md#5-every-idea-considered) | open | each has its reason there (with the optimum known the tree is fixed by the bound; the matching LP is integral; no symmetries found; ...) |
+
+### Nogoods and conflicts
+
+| tried | details | outcome | what decided it |
+|---|---|---|---|
+| Learn each conflict as a nogood of the root and use the table everywhere (`nogoods`) | [forced members](#forced-members-and-nogoods-2026-10-second-round) | kept | 936 from 8.05 s (320k nodes) to 1.09 s (50k); only 854 distinct nogoods in 291k conflicts at 1184 |
+| Nogood propagation alone, every conflict computed and made a nogood | [forced members](#forced-members-and-nogoods-2026-10-second-round) | not kept | cut nodes less (880 to 61k against 39k with lookups) and cost more than it saved |
+| 256-bit signatures to skip nogoods in a scan | [forced members](#forced-members-and-nogoods-2026-10-second-round) | superseded by exact lookups over compact member indices | −5% to −10% from the signatures, then about −2% more from the exact form |
+| Carry the nogoods of game n − 1 into game n | [carrying](#carrying-nogoods-over-2026-10-measured-not-kept) | not kept | 1227, the ceiling: −10% nodes, +3% time; the strict chain 1201-1231 617 s to 941 s |
+| Store the nogood tables in checkpoints | [carrying](#carrying-nogoods-over-2026-10-measured-not-kept) | not kept | a resume with empty tables loses nothing and is faster (1220: 143 s against 191 s with the tables kept) |
+| Forget each searcher's nogoods every N steps (`forget_nogoods`, N = 50,000) | [forgetting](#forgetting-nogoods-2026-10) | kept | 26% less time on 1024, 1025, 1215 and 1220 together; the chain 1201-1231 on 4 threads 571 s to 377 s |
+| Forget by table size (64, 128, 256) | [forgetting](#forgetting-nogoods-2026-10) | not kept | 15-22% less time on the hard four, but the smaller games slower (936: 0.51 s against 0.85/0.61/0.53 s) |
+| Keep the nogoods used since the last clearing | [forgetting](#forgetting-nogoods-2026-10) | not kept | every 100,000 steps 15% less time, 500,000 6%: the kept ones cost lookups as much and help no more |
+| Filter out candidates that cannot be promoted from the root (`root_filter`), the single-member conflicts as root facts | [single-member](#single-member-conflicts-belong-to-the-node-2026-10) | not kept | 0 of 225, 273, 287 and 302 candidates dropped at 936, 1100, 1184 and 1215, node counts identical; the frame builder's candidates pass for every game 2-1230 |
+| How useful an old nogood is, what a table costs, and how often threads learn the same nogood (the nogood study) | [IDEAS 3](IDEAS.md#3-nogoods-with-very-many-threads) | measured | uses fall 20 times in the first 10,000 steps; a table of S nogoods costs about 450 + 2.3 S cycles of a 16-20k-cycle step; 88-89% of the nogoods learned at 64-128 workers are held by another |
+| Never forget (at one thread, 1215) | [IDEAS 3](IDEAS.md#3-nogoods-with-very-many-threads) | not kept | −0.7% nodes, +19% cycles |
+| Share every nogood between the threads | [IDEAS 3](IDEAS.md#3-nogoods-with-very-many-threads) | not kept | 1225 at 128 workers 14.38M nodes against 10.9-11.5M, the tables 3-8 times as large |
+| Share only the nogoods of at most 3 members | [IDEAS 3](IDEAS.md#3-nogoods-with-very-many-threads) | not kept | 1225: 11.56M at 32 workers and 12.89M at 128, no fewer nodes than clearing |
+| Keep the nogoods of at most 3 members at a clear (a glue-like quality) | [IDEAS 3](IDEAS.md#3-nogoods-with-very-many-threads) | not kept | no measurable change; the nogoods of the search are large (11,483 of 17,556 have 8 or more members) and the large ones answer most lookups |
+| Prefer the most recently learned of the smallest conflicts (VSIDS-like recency) | [IDEAS 4.6](IDEAS.md#46-recency-in-the-choice-of-conflict-killed) | not kept | −2.8% to +20% nodes across the fast set and two proofs, no direction |
+| A clearing period of about 30,000 steps at 192 threads | [IDEAS 3](IDEAS.md#3-nogoods-with-very-many-threads) | open | the tables learn about 1.7 times faster at 128 workers; to test on the big machine |
+
+### Engine and parallelism
+
+| tried | details | outcome | what decided it |
+|---|---|---|---|
+| A yielding searcher leaves out the nodes with nothing left to do | [engine](#the-engine) | kept | runs of at most one poll fell from 60 and 91 of 256 and 305 to 13 and 10 of 227 and 200 |
+| Splits sized for many cores: one open request per idle worker, any running worker may answer | [engine](#the-engine) | kept | the first design (one request at a time) serialized the distribution of work; all workers busy within 3-8 ms |
+| Per-worker deques with stealing instead of the one locked deque | [engine](#the-engine) | not kept, not built | units exist only after yields and a rebuild costs 30-170 µs against about a microsecond under the lock, so with every worker busy nobody takes it; revisit if a many-core run shows lock wait (`Counters::lock_wait`) |
+| Checkpoint pauses at any interval | [engine](#the-engine) | kept, a fix | an interval of 0 paused again at once and the workers never ran |
+| Set widths of 20, 24 and 28 words between 16 and 32 | [engine](#the-engine) | kept | `Bits<20>` for `Bits<32>`: 6% fewer cycles at 1184 and 1215 |
+| Set widths of 12 and 48 words | [faster nodes](#faster-nodes-same-trees-2026-10) | not kept | 3-4% at 512-767 (solved) and some at 2048-3071, for 12 s more of every build |
+| Thread scaling on the M1 Max | [benchmarks](#benchmarks-the-probe-pgo-and-scaling), [bench/curve](../bench/curve/README.md#thread-scaling-step-4-the-proof-of-1225-seeded-with-its-optimum) | measured | 1225 proof 150.9 s on 1 thread, 18.0 s on 8 (the tree also shrinks); the node rate falls 19% per thread |
+| Emulate many workers on few cores (`EngineConfig::cores`, `ladder --cores`) | [IDEAS 3](IDEAS.md#3-nogoods-with-very-many-threads) | kept | 64-128 workers split, steal and learn as they would on 64-128 cores, in counts if not in time |
+| The tree grows at many workers | [IDEAS 5](IDEAS.md#5-every-idea-considered) | open | 10-20% more nodes at 32-128 emulated workers than at 4-8 on 1225, with 10-25 times the unit starts; suspect: what a rebuilt unit forgets |
+| Anything above 8 threads, Graviton5, NUMA | [RUNBOOK 8](../tools/cloud/RUNBOOK.md#8-what-has-not-been-measured) | open | not measured; the 10x to 19x assumed for 192 cores comes from the design |
+| The cost of a game against n beyond the frontier (cost-curve study) | [bench/curve](../bench/curve/README.md#results) | measured | ×10 per 55-70 in n, jagged (×18 from 1250 to 1300); a standalone game costs 1.9 times the chained one where it matters |
+
+### Tactics and shortcuts
+
+| tried | details | outcome | what decided it |
+|---|---|---|---|
+| The prime shortcut (`prime_shortcut`) | [DESIGN 5](../DESIGN.md#5-tactics) | kept, proven | tight for every prime; the proof is with `accelerate::prime_shortcut` |
+| Reuse the previous game's promotions without a search (`reuse_prev`) | [DESIGN 5](../DESIGN.md#5-tactics) | kept, unproven; off in a strict run | with several optimal sets of n − 1 the result depends on which was recorded: the recorded game of 685 plus 686 is unplayable though opt(686) = 686 + opt(685) |
+| The sacrifice bound (games on punctured boards) as a proof for `reuse_prev` | [`src/sacrifice.rs`](../src/sacrifice.rs) | not kept | tight on 57 of the 152 `reuse_prev` games, and where it proves it costs 1.1-8.7 times the direct search; the theorem stays and `tests/wide.rs` uses it |
+| Lower frame 0's freedoms by solving the two-frame game (`revise_freedoms`) | [DESIGN 4](../DESIGN.md#revise_freedoms) | kept, unproven; off in a strict run | assumes the max-sum set also has the max count, which fails on about one perturbed game in 1,300 |
+| Re-solve 1..1000 and 1001-1300 with no unproven tactic, and the non-primes of 1001-1231 standalone | [results](../results/README.md#what-supports-the-scores) | kept | `strict.jsonl` reproduces all 1000 scores of optimal.json; the 197 standalone searches agree with the chain |
+| The Java's merged-away hive branch (the stale-hive quirk) in the frame builder | [`src/hives.rs`](../src/hives.rs) | measured | reached once (n = 114) for 2 ≤ n ≤ 2000, and forcing it off changes no frame |
+
+### Theory and evidence
+
+The model-free work of [evidence](../evidence/README.md) and the proofs of [THEORY.md](../../heuristics/THEORY.md).
+
+| tried | details | outcome | what decided it |
+|---|---|---|---|
+| Validate the frame model's assumptions against exhaustive search | [DESIGN 2](../DESIGN.md#what-optimal-means) | kept | `brute` agrees with the frame model to n = 40 in the tests (52 in `sacrifice validate`) and `certify.py` to 62; the model-free proofs below extend it to 989 |
+| A model-free exact search for opt(n): matching bound, branching on minimal unplayable sets, incremental dual repair, forced picks, the conflict-packing cut, nogoods | [evidence 3](../evidence/README.md#3-model-free-exact-cross-check-of-optn) | kept | proves optimal.json's score for every n ≤ 989 and 999-1019 in 10.0 CPU hours; the incremental repair made it 160 times faster than solving each node from scratch |
+| A Lagrangian bound over the nogoods in the model-free search | [evidence 3](../evidence/README.md#3-model-free-exact-cross-check-of-optn) | kept | 3.3 times fewer nodes at n = 793 |
+| Cap the upper half at W(U\*) through a Lagrangian in the model-free search | [evidence 7](../evidence/README.md#7-what-remains-open) | not kept | gains only 4% |
+| The model-free search past 989: games 990, 992, 993, 995, 996 and from 1020 | [evidence 7](../evidence/README.md#7-what-remains-open) | open | each needs tens of millions of nodes; the searches are saved to be resumed; the matching bound's gap is about 1,170 at n = 1000; a relaxation that sees more of the game (a pick sweeps every divisor) is the next lever |
+| The span certificate (♦) for the upper-half conjecture (★) | [evidence 2](../evidence/README.md#2-conjecture--at-scale) | kept | holds for every n = 2..100,000 (602,777,907 rejections) and 902 sampled games to 2,000,000, 0 violations |
+| The threshold-by-threshold check of (★) by the cheapest sufficient bound | [evidence 2](../evidence/README.md#2-conjecture--at-scale) | kept | n = 2..20,000: 24,058,430 thresholds, none needing search (matching bound 86.2%, Lorea 8.3%, GF(2) rank 4.3%, one exclusion 1.2%) |
+| Exact maximum-cardinality searches over the residual (`maxcard`, `plus1`) | [evidence 2](../evidence/README.md#2-conjecture--at-scale) | superseded by the bounds, kept as the fallback | n = 9170 reached only its first 16 thresholds (P = 127, g = 13); the rank bound certifies it in milliseconds |
+| The earlier (★) campaign: exact searches over the residual components | [evidence 1](../evidence/README.md#1-what-existed-before) | superseded by (♦) | 3,231 of 3,236 components, n ≤ 1500 and samples to 4000, plus 2873 and 9170; five undecided (3103, 3872, 3936, 4000, 9170), all settled by the rank bound; its scripts were never committed |
+| An adversarial search over Taxman-shaped synthetic instances | [evidence 4](../evidence/README.md#4-adversarial-search-what-protects-greedy) | measured | what protects greedy is the window law taken for the real ranking of the primes: 0 failures in 1,981 such instances, against 16-57% for uniformly random orders and for the window law with a random ranking of the primes |
+| Enumerate every optimal set of every game, model-free; the theorems on uniqueness (Theorems 8 and 9) | [evidence 5](../evidence/README.md#5-is-the-optimal-set-unique) | kept | unique for every n ≤ 424; 30 of the 954 games completely enumerated, all in 425-779, have two or three, every one with upper part U\* |
+| Does every optimal game have upper part U\*? | [evidence 7](../evidence/README.md#7-what-remains-open) | open | true of every game enumerated; Theorem 8 settles the upper half alone |
+| Prove (♦), or (★), in general | [evidence 7](../evidence/README.md#7-what-remains-open) | open | certified game by game only; the sharpest form is (♦) for multiplicatively generated instances under any order obeying the window law |
+| The exchange property (a matroid) for playable sets, to justify greedy | [THEORY: where exchange breaks](../../heuristics/THEORY.md#where-exchange-breaks) | not kept: false | n = 2873 has two maximal playable sets of different sizes; greedy survives because the stuck one is the light one |
+| The single-sacrifice repair behind the frontier argument | [THEORY: the frontier argument](../../heuristics/THEORY.md#the-frontier-argument-and-exactly-where-it-stops) | not kept: false in general | at n = 9170 two minimal cores through d share nothing below it, so no single below-d sacrifice repairs |
+| A matroid relaxation that is exact for the whole game | [evidence 5](../evidence/README.md#5-is-the-optimal-set-unique) | not kept: false | game 425 has two optimal sets, and a matroid with distinct positive weights has one heaviest independent set |
+
+### The Python heuristics project
+
+The strategies (solvent, onetax, maxturn, cascade, continuation), the certificates and the experiments that did not
+pay (a 2-tax rule for OneTax, the fork oracle, trusting certificates as cutoffs, the matroid frame, matching-existence
+as acceptance, bitsets) are in [heuristics/README.md, "Dead ends worth remembering"](../../heuristics/README.md#dead-ends-worth-remembering),
+with what is proven, conjectured and measured in [its ledger](../../heuristics/README.md#the-theory-the-upper-half-is-a-matching-problem)
+and [THEORY.md's table of evidence](../../heuristics/THEORY.md#evidence).  Entries that also bear on the Rust solver
+(the matroid frame, the single-sacrifice route) have their row above.
 
 ## Index of rounds
 
@@ -26,33 +182,6 @@ and in DESIGN.md; the measurements were made with the ladder, the probe and `tax
 | [Faster nodes, same trees](#faster-nodes-same-trees-2026-10) | make the inner loop cheaper without changing any tree | kept: 30% fewer cycles at the 1215 proof | e3b8ddc to 4b6ef38 |
 | [Engine](#the-engine) | scaling to many cores, and checkpoints at any interval | kept: split requests per idle worker, pauses that cannot starve the workers | 2026-10 |
 | [Benchmarks](#benchmarks-the-probe-pgo-and-scaling) | what the bench set, the probe, PGO and the thread scaling showed | numbers | e3b8ddc and after |
-
-## Tried and not kept
-
-Everything in this table is measured below; the number is the one that decided it.
-
-| idea | round | result |
-|---|---|---|
-| Take the minimum of `blameGame` and the matching bound | matching bound | `blameGame` pruned nowhere the matching bound did not (0 at every check), so it is not computed with the matching bound |
-| Refinement on the Java's branching | conflicts | nodes 2–70x fewer but each costs more than it saves: 880 from 4.8M to 68k nodes at depth 7 but only 31 s to 21 s, and slower than none at depth 1–3 |
-| Promote a member of the conflict (instead of looking at what its removal does) | conflicts | the heaviest matching promotes them all already; a lookahead that scores the child with the other member of a pair out did worse |
-| Branch on the members of every failing frame's conflict | conflicts | 936: 754k to 1.0M nodes |
-| Choose the frame by the smallest core and minimize only it | conflicts | much cheaper per node, but its conflicts branch far worse (1000 unfinished in 2 min) |
-| A complete `can_promote` filter of the candidates (instead of the Java's partial one) | conflicts | nodes −25–35%, cost per node ×4 |
-| Local search on every incumbent found, and dives at search nodes | conflicts | nothing measurable |
-| Prove more members forced with the forced ones required | forced members | pruned nothing more |
-| Skip the exact solves of strong branching when the potentials found some member forced, or choose by the potentials alone | forced members | each traded nodes for time at about even |
-| Round the heaviest matching into an incumbent at every node | forced members | 5x slower per node; the optimum of 1050 was found at the same step |
-| A large-neighbourhood search before the search | forced members | at 1025 25080 in 1.3 s, but the optimum only from the search, at the same point |
-| Carry the nogoods of game `n − 1` into game `n`, or store them in checkpoints | carrying nogoods | 1227 (the ceiling): −10% nodes, +3% time; the strict chain 1201–1231 617 s to 941 s |
-| Forget nogoods by table size (64, 128, 256) | forgetting | 15–22% less time on the hard four, but the smaller games slower (936: 0.51 s against 0.85/0.61/0.53 s) |
-| Keep the nogoods used since the last clearing | forgetting | every 100,000 steps 15%, 500,000 6%: the ones kept cost lookups as much and help no more |
-| A filter of candidates that cannot be promoted from the root | single-member conflicts | dropped 0 of 225, 273, 287 and 302 candidates; identical node counts |
-| An undo trail for the matching levels | faster nodes | windows +0.8% and +0.9% cycles, instructions +4% |
-| The peel in frame-local form | faster nodes | bit-parallel peel +8% and +16% on forced sets; counting peel +0.5% and +0.8% |
-| Caching frame checks | faster nodes | 14–17% of peels repeat one exactly, but only 5% one of the last eight |
-| Unchecked indexing in the Hungarian search | faster nodes | −4% instructions, −0.7% cycles; not worth `unsafe` |
-| Set widths of 12 and 48 words | faster nodes | 3–4% at 512–767 (solved) and some at 2048–3071, for 12 s more of every build |
 
 ## The port and its first improvements
 

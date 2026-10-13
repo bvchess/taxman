@@ -6,9 +6,9 @@ cores, the per-game pipeline, how results are recorded and trusted, how it is te
 measured.  Each term is defined where it first matters.
 
 * The [README](README.md) is the user guide (how to build, run and read the output) and has the glossary.
-* [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) is the lab notebook: every round of improvements with its measurements,
-  and the ideas that were measured and not kept.  This page states what the solver does and why; the notebook says
-  what it was worth and what was tried instead.
+* [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) is the lab notebook and the register of everything tried, kept or not:
+  every round of improvements with its measurements, and the ideas that were measured and not kept.  This page states
+  what the solver does and why; the notebook says what it was worth and what was tried instead.
 * Each module starts with a comment that says what it is for; [`src/lib.rs`](src/lib.rs) has the module map.
 
 * [1. Goals and constraints](#1-goals-and-constraints)
