@@ -26,7 +26,7 @@ measured.  Each term is defined where it first matters.
 ## 1. Goals and constraints
 
 * Find optimal games beyond n = 1000, where the Java solver's table of optimal games stops, as far as the machines
-  at hand reach: today every n to 1231 on one laptop (Apple M1 Max, 10 cores, 32 GB RAM, fast SSD), and the same
+  at hand reach: today every n to 1300 on one laptop (Apple M1 Max, 10 cores, 32 GB RAM, fast SSD), and the same
   chain on a many-core cloud machine for what is beyond (`tools/cloud/RUNBOOK.md`).
 * Be right before being fast.  Every game is replayed by an independent referee before it counts, every result
   records how its optimality is established and what that rests on that is unproven, and every unproven tactic
@@ -642,15 +642,19 @@ on the machine moves wall times by up to 3×.  What measures what:
 game time on 8 threads, 145 s of it for 1201–1231, at that commit; the committed `bench/curve/chain.jsonl`
 (1001–1231), made by the build before it (e710d16), records 318 s, and 207 s for 1201–1231.  The cost of a game
 grows by a factor of ten for every 55 to 70 in n past 1200 ([bench/curve/README.md](bench/curve/README.md)).  The
-Hungarian repairs of the matching are about 46% of the time, the peels 24%, the bounds from the potentials 7%, the
-node's own work 7%, level copies 4% and nogood lookups 3%.
+committed `results/strict.jsonl` (the strict chain 1..1300 by commit bd9bb5d, on 6 threads of an M1 Max shared with
+another CPU-heavy job) records 3359 s of search, 2866 s of it for 1232–1300; its slowest game is 1232 at 439 s
+([results/README.md](results/README.md)).  The Hungarian repairs of the matching are about 46% of the time, the peels
+24%, the bounds from the potentials 7%, the node's own work 7%, level copies 4% and nogood lookups 3%.
 
 ## 11. Status and what is left
 
-Every n to 1231 has a game whose proof rests on nothing unproven: n ≤ 1000 are optimal.json's, reproduced by a strict
-run from n = 1 (that output was not kept), 1001–1219 are in `results/strict.jsonl` and 1001–1231 in the cost-curve
-study's `bench/curve/chain.jsonl` (`results/README.md` says what supports each score).  1232 is unfinished.  What is
-left to try: the incumbents of games like 992 and 1025, whose optimum the search reaches late; cheaper matching repairs
-(the largest cost); a warm-started unit rebuild; and, for the many-core machine, whatever its first sweep shows that a
-laptop cannot.  Nothing about scaling beyond 8 threads or about Graviton has been measured (`tools/cloud/RUNBOOK.md`,
-section 8).
+Every n to 1300 has a game whose proof rests on nothing unproven: `results/strict.jsonl` is a strict chain from n = 1
+whose games to 1000 reproduce optimal.json's scores and whose games 1001–1300 go beyond it; the cost-curve study's
+`bench/curve/chain.jsonl` (1001–1231) agrees with it, and `results/default.jsonl` (1001–1231, the first run past 1000,
+with unproven tactics on) is kept as a historical record (`results/README.md` says what supports each score).  The
+production chain on a many-core machine can start from `strict.jsonl` (`tools/cloud/RUNBOOK.md`), and a strict chain
+from n = 1 reproduces its scores.  What is left to try: the incumbents of games like 992 and 1025, whose optimum the
+search reaches late; cheaper matching repairs (the largest cost); a warm-started unit rebuild; and, for the many-core
+machine, whatever its first sweep shows that a laptop cannot.  Nothing about scaling beyond 8 threads or about
+Graviton has been measured (`tools/cloud/RUNBOOK.md`, section 8).

@@ -92,8 +92,7 @@ pub fn prev_of(games: &StoredGames, n: u32) -> Prev {
     Prev { moves: moves.clone(), score: *score, source: PrevSource::Results, proof: None, taint: Taint::new() }
 }
 
-/// The options `results/strict.jsonl` was made with (neither unproven tactic that existed then): `reuse_prev` and
-/// `revise_freedoms` off.
+/// The options `results/strict.jsonl` was made with (no unproven tactic): `reuse_prev` and `revise_freedoms` off.
 pub fn strict_options(threads: usize) -> SolveOptions {
     let mut opts = SolveOptions { threads, ..SolveOptions::default() };
     opts.tactics.set("reuse_prev=off").unwrap();

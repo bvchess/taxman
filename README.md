@@ -17,7 +17,7 @@ Robert Moniot's C++ program implementing seven heuristic strategies is included 
 ## Rust solver
 
 A Rust reimplementation of the exact algorithm, built for many cores and long resumable runs, has solved boards up to
-n = 1231 (the table of optimal games in the Java program stops at 1000).  It is a Cargo crate in [rust](rust) with its
+n = 1300 (the table of optimal games in the Java program stops at 1000).  It is a Cargo crate in [rust](rust) with its
 own build, run and test instructions: start with [rust/README.md](rust/README.md) (`cd rust && cargo build --release`),
 and see [rust/tools/cloud/RUNBOOK.md](rust/tools/cloud/RUNBOOK.md) for running it on a large cloud machine.
 

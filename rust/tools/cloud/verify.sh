@@ -4,7 +4,8 @@
 #   rust/tools/cloud/verify.sh [FILE...]        default: the production file ($RESULTS)
 #
 # 1. `taxman verify-results`: every game replayed, the chain from n-1, each line's proof and provenance, and that
-#    the files agree wherever they share a board size (the committed files cover 1001-1231).
+#    the files agree wherever they share a board size (the committed strict.jsonl covers 1-1300, the other two
+#    1001-1231).
 # 2. tools/check_results.py: the same, written independently in Python, plus the Franklin-Moniot bound and the best
 #    heuristic chain (heuristics/results, to n = 2000).
 #

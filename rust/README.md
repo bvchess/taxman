@@ -2,7 +2,7 @@
 
 `rust/` is a Cargo crate (a library and one binary, `taxman`; no third-party dependencies) that finds optimal games of
 Taxman.  It reimplements the algorithm of the Java solver in the repository root (`src/main/java`) with a search built
-for speed and for many cores, and it has found optimal games for every n up to 1231 (the Java's table stops at 1000).
+for speed and for many cores, and it has found optimal games for every n up to 1300 (the Java's table stops at 1000).
 
 This page is the user guide: what the solver computes and what "optimal" means here, how to build and run it, how to
 read its output, why its answers can be trusted (and where they rest on something unproven), the project's vocabulary,
@@ -29,8 +29,8 @@ scores the most.  The best score for each n is the Taxman sequence ([OEIS A01931
 n = 4 the optimal game is 3, 4 (the taxman takes 1, then 2) and scores 7.
 
 Finding an optimal game is a search over an enormous tree.  The solver's results are the optimal games, as sequences of
-moves with their scores, for every n from 1 to 1231: 1 to 1000 are the Java's table, which a strict run (section 3)
-reproduced, and 1001 to 1231 are the committed results (`results/`, `bench/curve/chain.jsonl`).  The code can attempt
+moves with their scores, for every n from 1 to 1300: `results/strict.jsonl` is a strict chain (section 3) from n = 1,
+whose games 1 to 1000 reproduce the Java's table and whose games 1001 to 1300 go beyond it.  The code can attempt
 any larger n up to 4095, the largest board the set widths cover.  The cost of a game grows by a factor of ten for every
 55 to 70 in n past 1200, so what can be reached is a question of machine time
 ([bench/curve/README.md](bench/curve/README.md)).
@@ -186,21 +186,23 @@ skipped 300 games already done in mine.jsonl
 ### Past n = 1000
 
 `optimal.json` stops at 1000.  A game above 1000 needs its predecessor in the results file, so copy one that has it and
-extend it; the committed files are `results/strict.jsonl` (1001-1219, strict) and `bench/curve/chain.jsonl` (1001-1231,
+extend it; the committed files are `results/strict.jsonl` (1-1300, strict) and `bench/curve/chain.jsonl` (1001-1231,
 strict).  The copy matters: `--out` appends to the file and `results/` must not be overwritten.
 
 ```
 $ cp results/strict.jsonl mine.jsonl
-$ taxman solve 1215-1220 --threads 2 --strict \
+$ taxman solve 1297-1302 --threads 2 --strict \
       --out mine.jsonl --checkpoint-dir ckpt --time-limit 8 --progress 4
-n=1220 4.0s nodes 659453 (164.6k/s) best 35959 queue 3 spilled 0 | eff 100.0% idle 0.0% lock 0.0% splits 1 steals 1 full 3.2ms
-n=1220 8.0s nodes 1375952 (stopped) best 35959 queue 57 spilled 0 | eff 99.8% idle 0.0% lock 0.0% ... pauses 1 (0.1%) ...
-n=1220  score=468662    search  nodes=1375952         8.209 s  incomplete
-skipped 5 games already done in mine.jsonl
-stopped: the search for n=1220 hit a limit before it finished; run the same command to resume it
+n=1301  score=532272    prime   nodes=0               0.015 s  optimal unknown  proof=prime_formula
+n=1302 4.0s nodes 914429 (228.4k/s) best 41423 queue 8 spilled 0 | eff 100.0% idle 0.0% lock 0.0% splits 1 steals 1 full 3.1ms
+n=1302 8.0s nodes 1814893 (stopped) best 41423 queue 52 spilled 0 | eff 99.9% idle 0.0% lock 0.0% ... pauses 1 (0.1%) ...
+n=1302  score=533546    search  nodes=1814893         8.164 s  incomplete
+skipped 4 games already done in mine.jsonl
+stopped: the search for n=1302 hit a limit before it finished; run the same command to resume it
 ```
 
-Games 1215-1219 were skipped, game 1220 started from 1219, and the time limit stopped it with its checkpoint.  A game
+Games 1297-1300 were skipped, game 1301 (a prime) took the prime formula, game 1302 started from 1301, and the time
+limit stopped it with its checkpoint.  A game
 whose predecessor is in neither the results file nor `optimal.json` (for example `taxman solve 1100` without `--out`)
 runs *standalone*, with no seed and no ceiling; `solve` says so on stderr (`note: no previous game for n=...`) and the
 result line has `"prev": null`.  That is still correct, but costs about twice as much on the hard games, and many times
@@ -209,14 +211,16 @@ more on games that a chain settles at once by reaching the ceiling ([bench/curve
 ### Strict mode, from n = 1
 
 ```
-$ taxman solve 1-1231 --strict --out strict.jsonl --checkpoint-dir ckpt --checkpoint-interval 60 --progress 60
+$ taxman solve 1-1300 --strict --out strict.jsonl --checkpoint-dir ckpt --checkpoint-interval 60 --progress 60
 ```
 
 Starting at n = 1, no game rests on `optimal.json` (it is only compared with, up to 1000: a mismatch is a hard error),
-so every proof in the file rests on nothing unproven.  A strict run that starts from an `optimal.json` game or a result
-with an unproven taint refuses to, unless given `--allow-tainted-prev`, and then marks the results that rest on it.  The
-default tactics (both unproven ones on) are faster and good for exploring; a result made with them says so, as the n =
-992 line in section 4 does: `(rests on revise_freedoms)`.
+so every proof in the file rests on nothing unproven.  The committed `results/strict.jsonl` is such a run
+([results/README.md](results/README.md) has the details of it), and this command reproduces its scores.  A strict run
+that starts from an `optimal.json` game or a result with an unproven taint refuses to, unless given
+`--allow-tainted-prev`, and then marks the results that rest on it.  The default tactics (both unproven ones on) are
+faster and good for exploring; a result made with them says so, as the n = 992 line in section 4 does: `(rests on
+revise_freedoms)`.
 
 ### Checkpoints, resuming, signals
 
@@ -252,7 +256,7 @@ counts them.
 * **The result is recorded before the checkpoint is deleted**, so a crash never loses a finished game; at worst the
   checkpoint of a finished game is left over, and the next run deletes it.
 * **Memory.**  Searcher state is bounded; the shared queue of work units spills to `DIR/spill` beyond `--mem-cap` units
-  (default 1048576).  The committed runs never got near it: their queue peaked at 348 units.
+  (default 1048576).  The committed runs never got near it: their queue peaked at 313 units.
 
 ### All flags of `solve`
 
@@ -383,11 +387,11 @@ cut short, the fields regrouped and comments added, so it is not valid JSON as p
 | `prev_source` | as `prev.source` |
 | `build` | the commit the binary was built from, and whether its sources differed from it |
 
-The committed files `results/default.jsonl`, `results/strict.jsonl` and `bench/curve/chain.jsonl` are schema 1: no
-`schema`, `proof`, `taint`, `prev`, `in_the_bag` or `build`; their provenance is derived from the fields they have, by
-the same rules.  They will be regenerated by the final build, as schema 3; [results/README.md](results/README.md) says
-what is known about them until then.  A line is never rewritten: a resumed game that is stopped again adds another
-incomplete line, and the completed line comes last.
+The committed `results/strict.jsonl` is schema 3, made by commit bd9bb5d.  `results/default.jsonl` and
+`bench/curve/chain.jsonl` are schema 1, kept as they were made (the first run past 1000, and the cost-curve study's
+chain): no `schema`, `proof`, `taint`, `prev`, `in_the_bag` or `build`; their provenance is derived from the fields
+they have, by the same rules.  [results/README.md](results/README.md) says what is known about each file.  A line is
+never rewritten: a resumed game that is stopped again adds another incomplete line, and the completed line comes last.
 
 ## 5. Why the answers can be trusted
 
@@ -431,15 +435,15 @@ one.
 
 ```
 $ taxman verify-results results/strict.jsonl bench/curve/chain.jsonl
-results/strict.jsonl: 219 completed games, n = 1001..=1219 (0 missing), 0 incomplete lines
-  proof: prime_formula 31, cap 66, exhausted 122
-  taint: 219 of 219 games rest on nothing unproven
-  scores at a proven ceiling, given the game of n-1: n + score(n-1) 66, prime formula 31
+results/strict.jsonl: 1300 completed games, n = 1..=1300 (0 missing), 4 incomplete lines
+  proof: trivial 13, prime_formula 211, cap 415, exhausted 661
+  taint: 1300 of 1300 games rest on nothing unproven
+  scores at a proven ceiling, given the game of n-1: n + score(n-1) 424, prime formula 210
 bench/curve/chain.jsonl: 231 completed games, n = 1001..=1231 (0 missing), 0 incomplete lines
   proof: prime_formula 34, cap 70, exhausted 127
   taint: 231 of 231 games rest on nothing unproven
   scores at a proven ceiling, given the game of n-1: n + score(n-1) 70, prime formula 34
-219 board sizes are in more than one file, with equal scores in all
+231 board sizes are in more than one file, with equal scores in all
 ```
 
 What the checks cannot catch is a game that is legal, finished and within the chain bounds but not optimal when the game
@@ -623,7 +627,7 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
 * **W, `Bits<W>`**: the width in 64-bit words of the bitsets that hold game numbers; chosen from n.
 * **standalone vs chained**: a game solved alone (no predecessor: no seed, no cap) or as part of a chain from n - 1
   ([bench/curve/README.md](bench/curve/README.md)).
-* **frontier** **(overloaded)**: the largest n solved contiguously (1231).  Unrelated to the "frontier" argument of
+* **frontier** **(overloaded)**: the largest n solved contiguously (1300).  Unrelated to the "frontier" argument of
   `heuristics/THEORY.md`.
 * **ladder**: a harness (`examples/ladder.rs`) that searches hard games standalone, with time limits, at several thread
   counts.  **Java**: the original solver in `src/main/java`; **optimal.json**: its table of optimal games, n <= 1000.

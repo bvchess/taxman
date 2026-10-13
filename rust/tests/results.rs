@@ -197,26 +197,39 @@ fn the_committed_results_pass_the_verifier() {
     let report = verify_files(&paths, Some(&optimal)).unwrap_or_else(|e| panic!("{e}"));
     println!("{report}");
     let [default, strict, chain] = &report.files[..] else { panic!("three files") };
-    for (file, lo, hi) in [(default, 1001, 1231), (strict, 1001, 1219), (chain, 1001, 1231)] {
+    // strict.jsonl is a chain from n = 1 made in resumable chunks: it holds the lines of the four searches that a
+    // chunk's time limit stopped, besides the completed game of each.
+    for (file, lo, hi, incomplete) in [(default, 1001, 1231, 0), (strict, 1, 1300, 4), (chain, 1001, 1231, 0)] {
         let games = &file.contents.games;
         assert!(games.keys().copied().eq(lo..=hi), "{}: not the games {lo}..={hi}", file.path.display());
-        assert_eq!((file.contents.incomplete_lines, file.contents.torn), (0, false), "{}", file.path.display());
+        assert_eq!(
+            (file.contents.incomplete_lines, file.contents.torn),
+            (incomplete, false),
+            "{}",
+            file.path.display()
+        );
+        assert!(file.contents.runs.is_empty(), "{}: a game left unfinished", file.path.display());
     }
-    // Every game the files share has the same score in all of them.
+    // Every game the files share has the same score in all of them: 1001-1231.
     assert_eq!(report.shared, 231);
+    // The strict chain from n = 1 reproduces optimal.json: its scores to 1000 are the Java's.
+    for n in 1..=1000 {
+        assert_eq!(Some(strict.contents.games[&n].score), optimal.score(n), "n={n}");
+    }
 
     // default.jsonl: derived by reuse_prev where it could be, which most of its games rest on.
-    let counts =
-        |f: &FileReport| [Proof::PrimeFormula, Proof::Cap, Proof::Exhausted, Proof::ReusePrev].map(|p| proofs(f, p));
-    assert_eq!(counts(default), [34, 0, 78, 119]);
+    let counts = |f: &FileReport| {
+        [Proof::Trivial, Proof::PrimeFormula, Proof::Cap, Proof::Exhausted, Proof::ReusePrev].map(|p| proofs(f, p))
+    };
+    assert_eq!(counts(default), [0, 34, 0, 78, 119]);
     assert_eq!(clean(default), 19);
     // strict.jsonl and the chain: no unproven tactic, and nothing unproven anywhere below them.
-    assert_eq!(counts(strict), [31, 66, 122, 0]);
-    assert_eq!(counts(chain), [34, 70, 127, 0]);
-    assert_eq!((clean(strict), clean(chain)), (219, 231));
+    assert_eq!(counts(strict), [13, 211, 415, 661, 0]);
+    assert_eq!(counts(chain), [0, 34, 70, 127, 0]);
+    assert_eq!((clean(strict), clean(chain)), (1300, 231));
     // Scores at a proven ceiling given the game of n − 1 (what certifies a game whatever found it).
     let ceilings = |f: &FileReport| [Certificate::NPlusPrev, Certificate::PrimeFormula].map(|c| certificates(f, c));
     assert_eq!(ceilings(default), [70, 34]);
-    assert_eq!(ceilings(strict), [66, 31]);
+    assert_eq!(ceilings(strict), [424, 210]);
     assert_eq!(ceilings(chain), [70, 34]);
 }
