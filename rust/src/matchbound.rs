@@ -165,20 +165,20 @@ struct Network {
     /// The node each arc enters.
     head: Vec<usize>,
     /// Residual capacity of each arc.
-    cap: Vec<i32>,
+    residual: Vec<i32>,
     cost: Vec<i64>,
 }
 
 impl Network {
     fn new(nodes: usize) -> Self {
-        Network { out: vec![Vec::new(); nodes], head: Vec::new(), cap: Vec::new(), cost: Vec::new() }
+        Network { out: vec![Vec::new(); nodes], head: Vec::new(), residual: Vec::new(), cost: Vec::new() }
     }
 
     /// Adds an arc of capacity 1 and its reverse; returns the arc.
     fn add(&mut self, from: usize, to: usize, cost: i64) -> usize {
         let e = self.head.len();
         self.head.extend([to, from]);
-        self.cap.extend([1, 0]);
+        self.residual.extend([1, 0]);
         self.cost.extend([cost, -cost]);
         self.out[from].push(e);
         self.out[to].push(e + 1);
@@ -187,7 +187,7 @@ impl Network {
 
     /// Whether the arc `e` (not a reverse arc) carries flow.
     fn carries(&self, e: usize) -> bool {
-        self.cap[e] == 0
+        self.residual[e] == 0
     }
 
     /// Successive shortest paths: while some source–sink path of negative cost is left, sends one unit along a
@@ -207,7 +207,7 @@ impl Network {
                 queued[u] = false;
                 for &e in &self.out[u] {
                     let v = self.head[e];
-                    if self.cap[e] > 0 && dist[u] + self.cost[e] < dist[v] {
+                    if self.residual[e] > 0 && dist[u] + self.cost[e] < dist[v] {
                         dist[v] = dist[u] + self.cost[e];
                         via[v] = e;
                         if !queued[v] {
@@ -223,8 +223,8 @@ impl Network {
             let mut v = SINK;
             while v != SOURCE {
                 let e = via[v];
-                self.cap[e] -= 1;
-                self.cap[e ^ 1] += 1;
+                self.residual[e] -= 1;
+                self.residual[e ^ 1] += 1;
                 v = self.head[e ^ 1];
             }
         }
@@ -1129,11 +1129,6 @@ impl<'g, const W: usize> MatchBound<'g, W> {
         level.cands - level.dropped
     }
 
-    /// Whether the top level's moves can all be matched (true for every state the search reaches).
-    pub fn is_feasible(&mut self) -> bool {
-        self.settle().feasible
-    }
-
     pub fn stats(&self) -> MatchStats {
         self.stats
     }
@@ -1549,9 +1544,9 @@ mod tests {
             walks::<4>(&g, u64::from(n) << 8, 6, 80, &mut |mb, state, promoted, cands| {
                 let bound = mb.value();
                 // No feasible completion exceeds the count the freedoms allow (they are not revised here), and
-                // the cap makes the exhaustive search much faster.
-                let cap = state.max_promotions_among(cands).max(0) as u32;
-                let best = best_completion(&model, state, cands, cap);
+                // the limit makes the exhaustive search much faster.
+                let most = state.max_promotions_among(cands).max(0) as u32;
+                let best = best_completion(&model, state, cands, most);
                 assert!(bound >= best, "n={n}: bound {bound} < best {best} after {promoted:?} with {cands:?}");
                 assert!(bound <= cands.sum());
                 if best == cands.sum() {

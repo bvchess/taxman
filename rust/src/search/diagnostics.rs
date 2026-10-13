@@ -3,7 +3,9 @@
 //!
 //! A searcher collects them only when its [`SearchSpace`](super::SearchSpace) has somewhere to put them; then it
 //! computes extra bounds at every step, so a search that collects them is slower and its times mean little.
-//! Without them each probe site of a step is a test of an `Option` that is always `None`.
+//! Without them each probe site of a step is a test of an `Option` that is always `None`, which costs nothing
+//! measurable: a build with the sites removed runs the probe's search windows (`examples/perf.rs`) in the same
+//! cycles and instructions (2026-10).
 
 use super::searcher::{Counts, Node};
 use crate::bits::Bits;
