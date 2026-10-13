@@ -1,4 +1,10 @@
-//! Command-line front end.  Subcommands are plain functions taking the arguments after the subcommand name.
+//! The `taxman` command: parses the subcommand and hands the rest of the command line to it.
+//!
+//! The subcommands that solve games (`solve`, `regress`, `bench`) are in `commands.rs`; the flag parser, the
+//! error type and the output macros they share are in `cli.rs`; `verify-optimal`, `verify-results` and `tables`
+//! are small and are here.  Every subcommand is a plain function of the arguments after its name.  A command
+//! that fails prints `error: ...` and exits with status 1; a bad command line prints the usage and exits with
+//! status 2; a run that SIGINT or SIGTERM stopped (see `solve`) exits with 128 plus the signal.
 
 mod cli;
 mod commands;
@@ -10,9 +16,10 @@ use std::time::Instant;
 use taxman::engine;
 use taxman::game::Optimal;
 use taxman::numtheory::Tables;
+use taxman::paths;
 use taxman::results::verify_files;
 use taxman::search::{Branching, SearchTactics};
-use taxman::solver::Tactics;
+use taxman::tactics::Tactics;
 
 /// The usage text with its `{...}` parts to fill in by [`usage`].
 const USAGE: &str = "\
@@ -36,14 +43,17 @@ commands:
       --force-search           search even where the previous game gives the answer
       --allow-tainted-prev     with no unproven tactic on, still build on a previous game whose proof rests on
                                something unproven (optimal.json's games do); the results that rest on it say so
-      --optimal FILE           optimal.json to compare with and to take previous games from (none: no file)
+      --optimal FILE           optimal.json to compare with and to take previous games from (none: no file);
+                               by default $TAXMAN_OPTIMAL, else src/main/resources/optimal.json of the repository,
+                               found from the working directory or from this program
       --show                   print each game's promotions and moves
   regress [--from A] [--to N] [--threads K] [--tactic ...]
                           solve A..N (default 1..400) in memory and check every score against optimal.json
-  bench [--threads K] [--tactic ...] [--history FILE] [N ...]
+  bench [--threads K] [--tactic ...] [--history FILE] [--known FILE] [N ...]
                           time the benchmark games (default 936 1050 1100 1133 1170 1184), each on its own
-                          with the previous game from optimal.json or past it results/strict.jsonl, and no
-                          derivation; appends to FILE (default bench/history.jsonl)
+                          with the previous game from optimal.json or past it from the results file --known
+                          (default rust/results/strict.jsonl), and no derivation; appends the run to
+                          --history (default rust/bench/history.jsonl; both in the repository)
   verify-optimal [FILE]   replay every game in optimal.json (or FILE) and check its recorded score
   verify-results FILE... [--optimal FILE|none]
                           check results files without changing them: every game replayed, the chain from n-1,
@@ -102,7 +112,7 @@ fn millis(since: Instant) -> f64 {
 
 fn verify_optimal(args: &[String]) -> CliResult {
     let path = match args {
-        [] => Optimal::default_path(),
+        [] => paths::optimal_json().map_err(CliError::Failed)?,
         [file] => file.into(),
         _ => return Err(CliError::Usage("verify-optimal takes at most one argument".into())),
     };

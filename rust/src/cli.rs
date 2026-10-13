@@ -6,7 +6,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
-use taxman::solver::SolveOptions;
+use taxman::solver::{OptimalSource, SolveOptions};
 
 /// Write one line, ignoring write errors: a closed pipe (EPIPE, say a `head` or a `tee` that has exited) must
 /// not kill a run whose results and checkpoints are safe on disk.  (`println!` panics on it, and release
@@ -145,7 +145,7 @@ pub fn solver_options(args: &Args) -> Result<SolveOptions, CliError> {
         opts.tactics.set(assignment).map_err(CliError::Usage)?;
     }
     if let Some(path) = args.value("--optimal") {
-        opts.optimal_path = (path != "none").then(|| PathBuf::from(path));
+        opts.optimal = if path == "none" { OptimalSource::None } else { OptimalSource::File(PathBuf::from(path)) };
     }
     Ok(opts)
 }
@@ -237,8 +237,13 @@ mod tests {
             .unwrap()
             .seconds("--progress")
             .is_err());
-        let args = Args::parse(&strings(&["--optimal", "none"]), &SOLVER_FLAGS, &[]).unwrap();
-        assert!(solver_options(&args).unwrap().optimal_path.is_none());
+        let optimal = |given: &[&str]| {
+            let args = Args::parse(&strings(given), &SOLVER_FLAGS, &[]).unwrap();
+            solver_options(&args).unwrap().optimal
+        };
+        assert_eq!(optimal(&[]), OptimalSource::Repository);
+        assert_eq!(optimal(&["--optimal", "none"]), OptimalSource::None);
+        assert_eq!(optimal(&["--optimal", "t.json"]), OptimalSource::File(PathBuf::from("t.json")));
     }
 
     #[test]

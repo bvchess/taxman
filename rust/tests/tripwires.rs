@@ -23,7 +23,7 @@ mod common;
 use common::{search_at_width, Config, Game};
 use taxman::bounds::greedy;
 use taxman::search::SearchTactics;
-use taxman::solver::Tactics;
+use taxman::tactics::Tactics;
 use taxman::with_width;
 
 /// (board, tactics as `--tactic` assignments, promotion sum, nodes): the game searched from the frame builder on one

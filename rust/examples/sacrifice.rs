@@ -23,6 +23,7 @@
 use std::collections::BTreeMap;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use taxman::accelerate::reuse_prev;
 use taxman::bits::words_for;
@@ -33,7 +34,8 @@ use taxman::json::Json;
 use taxman::numtheory::Tables;
 use taxman::results::{Taint, OPTIMAL_JSON};
 use taxman::sacrifice::{bound_value, punctured, sacrifice_bound, PuncturedOptions};
-use taxman::solver::{solve_game_with, Prev, PrevSource, SolveOptions, Tactics};
+use taxman::solver::{solve_game_with, OptimalSource, Prev, PrevSource, SolveOptions};
+use taxman::tactics::Tactics;
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -53,42 +55,10 @@ fn main() {
 // ---------------------------------------------------------------------------------------------------------
 // Games
 
-/// Known optimal games by n: optimal.json plus results files.
-struct Games(BTreeMap<u32, (u64, Vec<u32>)>);
-
-impl Games {
-    fn load(extra: &[String]) -> Result<Games, String> {
-        let optimal = Optimal::load_default()?;
-        let mut by_n: BTreeMap<u32, (u64, Vec<u32>)> =
-            optimal.games().map(|(n, score, moves)| (n, (score, moves.to_vec()))).collect();
-        for path in extra {
-            let text = fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;
-            for line in text.lines().filter(|l| !l.trim().is_empty()) {
-                let json = Json::parse(line).map_err(|e| format!("{path}: {e}"))?;
-                if json.get("completed").and_then(Json::as_bool) != Some(true) {
-                    continue;
-                }
-                let n = json.get("n").and_then(Json::as_u32).ok_or("bad n")?;
-                let score = json.get("score").and_then(Json::as_u64).ok_or("bad score")?;
-                let moves = json.get("moves").and_then(Json::as_u32_vec).ok_or("bad moves")?;
-                if let Some((known, _)) = by_n.get(&n) {
-                    if *known != score {
-                        return Err(format!("{path}: n={n} scores {score}, but {known} is known"));
-                    }
-                }
-                by_n.entry(n).or_insert((score, moves));
-            }
-        }
-        Ok(Games(by_n))
-    }
-
-    fn score(&self, n: u32) -> Option<u64> {
-        self.0.get(&n).map(|g| g.0)
-    }
-
-    fn moves(&self, n: u32) -> Option<&[u32]> {
-        self.0.get(&n).map(|g| g.1.as_slice())
-    }
+/// The known optimal games by n: optimal.json plus the completed games of the results files `extra`.
+fn load_games(extra: &[String]) -> Result<Optimal, String> {
+    let paths: Vec<PathBuf> = extra.iter().map(PathBuf::from).collect();
+    SolveOptions::default().known_games(&paths)
 }
 
 fn secs(d: Duration) -> f64 {
@@ -108,7 +78,7 @@ fn brute_study(args: &[String]) -> Result<(), String> {
             v => max = v.parse().map_err(|e| format!("{v}: {e}"))?,
         }
     }
-    let games = Games::load(&[])?;
+    let games = load_games(&[])?;
     let popts = PuncturedOptions::default();
     let mut lines = Vec::new();
     let (mut tight_m, mut tight_d, mut model_ok, mut holes_seen, mut composite, mut composite_tight) =
@@ -199,7 +169,7 @@ fn brute_study(args: &[String]) -> Result<(), String> {
 
 fn validate(args: &[String]) -> Result<(), String> {
     let max: u32 = args.first().map_or(Ok(40), |a| a.parse().map_err(|e| format!("{a}: {e}")))?;
-    let games = Games::load(&[])?;
+    let games = load_games(&[])?;
     let popts = PuncturedOptions::default();
     let (mut boards, mut mismatches) = (0, 0);
     for n in 1..=max {
@@ -300,7 +270,7 @@ fn range(args: &[String]) -> Result<(), String> {
     if o.out.is_empty() {
         return Err("range needs --out FILE".into());
     }
-    let games = Games::load(&o.games)?;
+    let games = load_games(&o.games)?;
     let done: Vec<u32> = match fs::read_to_string(&o.out) {
         Ok(text) => text.lines().filter_map(|l| Json::parse(l).ok()?.get("n")?.as_u32()).collect(),
         Err(_) => Vec::new(),
@@ -323,7 +293,7 @@ fn range(args: &[String]) -> Result<(), String> {
 }
 
 /// One game's line, or `None` if the game is not selected.
-fn one_game<const W: usize>(n: u32, o: &RangeOptions, games: &Games) -> Result<Option<Json>, String> {
+fn one_game<const W: usize>(n: u32, o: &RangeOptions, games: &Optimal) -> Result<Option<Json>, String> {
     let (prev_moves, prev_score) = match (games.moves(n - 1), games.score(n - 1)) {
         (Some(m), Some(s)) => (m, s),
         _ => return Err(format!("no game for n={}", n - 1)),
@@ -370,7 +340,7 @@ fn one_game<const W: usize>(n: u32, o: &RangeOptions, games: &Games) -> Result<O
             tactics: o.tactics,
             threads: o.threads,
             force_search: true,
-            optimal_path: None,
+            optimal: OptimalSource::None,
             time_limit: o.time_limit,
             // The previous game is optimal.json's, and the answer is compared with the known optimum.
             allow_tainted_prev: true,

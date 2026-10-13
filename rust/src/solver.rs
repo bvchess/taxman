@@ -1,54 +1,70 @@
-//! The per-game pipeline: derive the game from the previous one if possible, else search for the promotion set
-//! with the largest sum, then turn it into a game, replay it, and compare it with `optimal.json`.
+//! The per-game pipeline and the range driver: what `taxman solve` runs.
 //!
-//! [`solve_game`] solves one board size.  It picks the set width `W` from `n` and runs, in order:
+//! [`solve_game`] solves one board size and [`solve_range`] a range of them, each built on the one before.  They
+//! produce [`GameResult`]s: the game, its score, how it was found ([`Method`]) and how its optimality is
+//! established (a [`Proof`] and a *taint*, see [`crate::results`]).  Around them are the options ([`SolveOptions`])
+//! and the previous game ([`Prev`]).  The tactics are in [`crate::tactics`], the analysis of a board that every
+//! search starts from in [`crate::board`], the search in [`crate::search`] and the files in [`crate::results`].
 //!
-//! 1. the *prime shortcut* (tactic `prime_shortcut`): a prime `n` plays the game of `n − 1` with its first
-//!    move replaced by `n`;
-//! 2. the frames of the board; with no promotion candidates the game with no promotions is the only one
-//!    (method `trivial`);
-//! 3. `reuse_prev` (tactic of that name): keep the previous game's promotions that are still possible and accept
-//!    the game they make if it scores what the previous game suggests;
-//! 4. otherwise [`search::prepare`] and [`search::search`] for the best promotion set.  The search starts from
-//!    the better of the greedy set and the previous game's promotions that are still possible
-//!    (`seed_incumbent`), and stops as soon as it reaches `n + opt(n − 1) − inTheBag` (`prev_cap`), where
-//!    `inTheBag` is what the game with no promotions scores (`FrameSolver.getMaxPromotionSum`).
+//! # One game
 //!
-//! Steps 1 and 3 need the previous game and are skipped by `force_search`, and when a checkpoint of the game
-//! exists (a search that was interrupted is resumed, not replaced by a derivation).
+//! The steps, in order (DESIGN.md, "Per-game pipeline", has the same steps with the Java classes they replace):
+//!
+//! 1. The tables of the board `1..=n`, and the set width `W` for it (`with_width!`, widened to the width of the
+//!    game's checkpoint if there is one).
+//! 2. The *prime shortcut* (tactic `prime_shortcut`): a prime `n` plays the game of `n − 1` with its first move
+//!    replaced by `n` (method `prime`).
+//! 3. The board's frames ([`Board`]).  With no promotion candidates the game with no promotions is the only one
+//!    (method `trivial`).
+//! 4. `reuse_prev` (an unproven tactic): keep the previous game's promotions that are still possible and accept
+//!    the game they make if it scores what the previous game suggests (method `reuse`).
+//! 5. Otherwise the search (method `search`): [`Board::prepare`] (or [`Board::prepare_for_resume`]), then
+//!    [`search::search`] for the promotion set with the largest sum.  It starts from the better of the greedy set
+//!    and the previous game's promotions that are candidates here (`seed_incumbent`, [`Board::seed`]) and stops
+//!    as soon as it reaches `n + opt(n − 1) − in_the_bag` (`prev_cap`, [`Board::promotion_cap`]).  The promotions
+//!    become a game through the hives ([`solution_for_promotions`]).
+//! 6. [`conclude`]: the game is checked before it counts, and given its proof and taint.
+//! 7. Recording (a range only): the result is appended to the results file and synced, and only then is the
+//!    game's checkpoint deleted.
+//!
+//! Steps 2 and 4 need the previous game and are skipped by `force_search`, and when a checkpoint of the game
+//! exists: a search that was interrupted is resumed, never replaced by a derivation.
 //!
 //! The previous game is checked before anything uses it: it must replay legally to its recorded score, be over
 //! (no legal move left) and open with the largest prime, as every optimal game does.  A run with no unproven
-//! tactic on refuses a previous game whose own proof rests on something unproven (its *taint*, see
-//! [`crate::results`]) unless `allow_tainted_prev`.
+//! tactic on refuses a previous game whose own proof rests on something unproven unless `allow_tainted_prev`.
 //!
-//! The promotions become a game through the hives, and the game is checked before it counts (`conclude`): it
-//! must replay legally ([`replay`]); a completed game must also be over and open with the largest prime;
-//! a game from the frame model must score `inTheBag` plus its promotions; no game may score more than
-//! `n + score(n − 1)` (or its promotions exceed the cap), which would prove the previous game was not optimal, and
-//! a completed game may not score less than the previous one; and a completed game is compared with
-//! `optimal.json` when that has it.  Each failure is a hard error (the `optimal.json` comparison unless the
-//! options allow a mismatch), and a game that fails after it was found is recorded, with its promotions, in the
-//! results file's [`rejected_path`](crate::results::rejected_path).
+//! `conclude` checks that the game replays legally ([`replay`]); that a completed game is also over and opens with
+//! the largest prime; that a game from the frame model scores `in_the_bag` plus its promotions; that no game
+//! scores more than `n + score(n − 1)` (nor its promotions exceed the cap), which would prove the previous game
+//! was not optimal, and that a completed game does not score less than the previous one; and, for a completed
+//! game, the comparison with `optimal.json` when that has the game.  Each failure is a hard error (the
+//! `optimal.json` comparison unless the options allow a mismatch), and a game that fails after it was found is
+//! recorded, with its promotions, in the results file's [`rejected_path`](crate::results::rejected_path).
 //!
-//! [`solve_range`] solves a range of board sizes, each feeding the next, and appends every result to a results
-//! file (one JSON object per line) as soon as it is done, so that a restarted run skips what is finished.  The
-//! file is checked when it is opened ([`ResultsFile::open`]).  A game's checkpoint is deleted only once its
-//! result is in the file.
+//! # A range
+//!
+//! [`solve_range_each`] solves the board sizes `lo..=hi` in order.  The previous game of each is the one just
+//! solved; for `lo` it is the results file's game of `lo − 1`, else `optimal.json`'s, else there is none and the
+//! game is solved *standalone*, with no seed and no cap.  Every result is appended to the results file (one JSON
+//! object per line) as soon as it is done, so that a restarted run skips what is finished; the file is checked
+//! when it is opened ([`ResultsFile::open`]).  A game whose search a limit or a signal stopped is recorded as
+//! incomplete, keeps its checkpoint, and ends the range.
 
 use crate::accelerate::{prime_shortcut, reuse_prev, solution_for_promotions};
 use crate::bits::{width_for, words_for, Bits};
+use crate::board::Board;
 use crate::engine::{self, Counters, EngineConfig, Stats};
-use crate::frames::{build_frames, FrameColumns};
 use crate::game::{replay, replay_finished, Optimal};
 use crate::hives::Apiary;
 use crate::json::Json;
 use crate::numtheory::Tables;
+use crate::paths;
 use crate::results::{
     build_json, moves_digest, own_taint, taint_json, taint_of, Proof, ResultsFile, Taint, OPTIMAL_JSON, SCHEMA,
 };
-use crate::search::{self, prepare_for_resume, prepare_within, stat, Branching, Revise, SearchTactics};
-use std::fmt;
+use crate::search::{self, stat, Revise, SearchTactics};
+use crate::tactics::Tactics;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -59,185 +75,20 @@ use std::time::{Duration, Instant};
 pub const MAX_N: u32 = 64 * 64 - 1;
 
 // ---------------------------------------------------------------------------------------------------------
-// Tactics
-
-/// Every switch of DESIGN.md's table of tactics.  The ones that act inside the search are [`SearchTactics`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Tactics {
-    pub search: SearchTactics,
-    /// A prime `n` plays the game of `n − 1` with its first move replaced by `n` (proven).
-    pub prime_shortcut: bool,
-    /// Accept the game made of the previous game's promotions without a search, if it scores what the previous
-    /// game suggests (unproven).
-    pub reuse_prev: bool,
-    /// Stop the search as soon as the incumbent reaches `n + opt(n − 1) − inTheBag` (proven if `opt(n − 1)` is
-    /// optimal).
-    pub prev_cap: bool,
-    /// Start the search from the better of the greedy set and the previous game's promotions (sound).
-    pub seed_incumbent: bool,
-}
-
-impl Default for Tactics {
-    fn default() -> Self {
-        Tactics {
-            search: SearchTactics::default(),
-            prime_shortcut: true,
-            reuse_prev: true,
-            prev_cap: true,
-            seed_incumbent: true,
-        }
-    }
-}
-
-/// The tactics whose answers are not proven to equal the true optimum (`reuse_prev` and `revise_freedoms` are
-/// conjecture-grade; `legacy_bound` is known to be unsound).  Every other tactic, `branching` and `match_refine`
-/// among them, is sound or proven.
-const UNPROVEN: [&str; 3] = ["reuse_prev", "revise_freedoms", "legacy_bound"];
-
-/// The number of tactics in DESIGN.md's table.
-const TACTIC_COUNT: usize = 13;
-
-/// The value of a tactic: an on/off switch, or one of the two settings that are not.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Setting {
-    Switch(bool),
-    /// `match_refine`: 0 to [`SearchTactics::MAX_MATCH_REFINE`].
-    MatchRefine(u8),
-    /// `branching`.
-    Branching(Branching),
-}
-
-/// The value as the command line spells it (`on`, `off`, `2`, `conflict-strong`).
-impl fmt::Display for Setting {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Setting::Switch(on) => f.write_str(if *on { "on" } else { "off" }),
-            Setting::MatchRefine(depth) => write!(f, "{depth}"),
-            Setting::Branching(branching) => f.write_str(branching.name()),
-        }
-    }
-}
-
-impl Setting {
-    fn to_json(self) -> Json {
-        match self {
-            Setting::Switch(on) => Json::Bool(on),
-            Setting::MatchRefine(depth) => Json::from(u32::from(depth)),
-            Setting::Branching(branching) => Json::from(branching.name()),
-        }
-    }
-}
-
-/// Where a tactic's value is kept, so that it can be assigned from text.
-enum Slot<'a> {
-    Switch(&'a mut bool),
-    MatchRefine(&'a mut u8),
-    Branching(&'a mut Branching),
-}
-
-impl Slot<'_> {
-    fn get(&self) -> Setting {
-        match self {
-            Slot::Switch(on) => Setting::Switch(**on),
-            Slot::MatchRefine(depth) => Setting::MatchRefine(**depth),
-            Slot::Branching(branching) => Setting::Branching(**branching),
-        }
-    }
-
-    /// Reads `text` as this kind of value and takes it; leaves the value alone if `text` is not one.
-    fn assign(&mut self, text: &str) -> Result<(), String> {
-        match self {
-            Slot::Switch(on) => {
-                **on = match text {
-                    "on" => true,
-                    "off" => false,
-                    _ => return Err(format!("expected on or off, got {text:?}")),
-                }
-            }
-            Slot::MatchRefine(depth) => {
-                let max = SearchTactics::MAX_MATCH_REFINE;
-                **depth = (text.parse().ok().filter(|&depth| depth <= max))
-                    .ok_or_else(|| format!("expected a whole number from 0 to {max}, got {text:?}"))?;
-            }
-            Slot::Branching(branching) => **branching = text.parse()?,
-        }
-        Ok(())
-    }
-}
-
-impl Tactics {
-    /// The names of the tactics paired with where their values are kept, in DESIGN.md's order.  The single place
-    /// that knows the names.
-    fn slots_mut(&mut self) -> [(&'static str, Slot<'_>); TACTIC_COUNT] {
-        [
-            ("prime_shortcut", Slot::Switch(&mut self.prime_shortcut)),
-            ("reuse_prev", Slot::Switch(&mut self.reuse_prev)),
-            ("revise_freedoms", Slot::Switch(&mut self.search.revise_freedoms)),
-            ("preclusions", Slot::Switch(&mut self.search.preclusions)),
-            ("match_bound", Slot::Switch(&mut self.search.match_bound)),
-            ("branching", Slot::Branching(&mut self.search.branching)),
-            ("match_refine", Slot::MatchRefine(&mut self.search.match_refine)),
-            ("fix_forced", Slot::Switch(&mut self.search.fix_forced)),
-            ("nogoods", Slot::Switch(&mut self.search.nogoods)),
-            ("forget_nogoods", Slot::Switch(&mut self.search.forget_nogoods)),
-            ("legacy_bound", Slot::Switch(&mut self.search.legacy_bound)),
-            ("prev_cap", Slot::Switch(&mut self.prev_cap)),
-            ("seed_incumbent", Slot::Switch(&mut self.seed_incumbent)),
-        ]
-    }
-
-    /// Every tactic with its name and value.
-    pub fn settings(&self) -> [(&'static str, Setting); TACTIC_COUNT] {
-        let mut copy = *self;
-        copy.slots_mut().map(|(name, slot)| (name, slot.get()))
-    }
-
-    /// The names of the tactics, in DESIGN.md's order.
-    pub fn names() -> [&'static str; TACTIC_COUNT] {
-        Tactics::default().settings().map(|(name, _)| name)
-    }
-
-    /// Applies `name=value`: `on` or `off` for a switch, `0` to `7` for `match_refine`, and for `branching` one of
-    /// [`Branching::name`]'s names.  Nothing changes if it is an error.
-    pub fn set(&mut self, assignment: &str) -> Result<(), String> {
-        let (name, text) = assignment.split_once('=').ok_or_else(|| {
-            format!("expected name=value, such as match_bound=off or branching=largest, got {assignment:?}")
-        })?;
-        let Some((_, mut slot)) = self.slots_mut().into_iter().find(|(known, _)| *known == name) else {
-            return Err(format!("unknown tactic {name:?}; the tactics are {}", Tactics::names().join(", ")));
-        };
-        slot.assign(text).map_err(|e| format!("tactic {name}: {e}"))
-    }
-
-    /// `default`, or the tactics that differ from the defaults (`match_bound=off,branching=largest`).
-    pub fn description(&self) -> String {
-        let defaults = Tactics::default().settings();
-        let changed: Vec<String> = (self.settings().into_iter().zip(defaults))
-            .filter(|((_, value), (_, default))| value != default)
-            .map(|((name, value), _)| format!("{name}={value}"))
-            .collect();
-        if changed.is_empty() {
-            "default".to_owned()
-        } else {
-            changed.join(",")
-        }
-    }
-
-    /// The unproven switches that are on (see DESIGN.md); `legacy_bound` is unsound, the others conjectures.
-    pub fn unproven_on(&self) -> Vec<&'static str> {
-        let on = |name: &str, value: Setting| value == Setting::Switch(true) && UNPROVEN.contains(&name);
-        self.settings().into_iter().filter(|&(name, value)| on(name, value)).map(|(name, _)| name).collect()
-    }
-
-    /// All tactics, by name, as a JSON object: booleans for the switches, a number for `match_refine`, and a
-    /// string for `branching`.
-    pub fn to_json(&self) -> Json {
-        Json::object(self.settings().map(|(name, value)| (name, value.to_json())))
-    }
-}
-
-// ---------------------------------------------------------------------------------------------------------
 // Options and results
+
+/// Which table of optimal games a run compares its scores with and takes previous games from.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum OptimalSource {
+    /// The Java solver's table in the repository, found when the run starts ([`paths::optimal_json`]).
+    #[default]
+    Repository,
+    /// This file (`--optimal FILE`).
+    File(PathBuf),
+    /// No table (`--optimal none`): scores are not compared, and a range that starts after 1 has no previous game
+    /// to start from unless its results file has one.
+    None,
+}
 
 /// How to solve.
 #[derive(Clone, Debug)]
@@ -258,8 +109,8 @@ pub struct SolveOptions {
     pub spill_dir: Option<PathBuf>,
     /// Search even where the previous game would give the answer (skips `prime_shortcut` and `reuse_prev`).
     pub force_search: bool,
-    /// The file to compare scores with and to take previous games from; `None` for no comparison.
-    pub optimal_path: Option<PathBuf>,
+    /// The table to compare scores with and to take previous games from.
+    pub optimal: OptimalSource,
     /// Record a score that differs from `optimal.json` (as `optimal_match: false`) instead of failing.
     pub allow_optimal_mismatch: bool,
     /// Let a run with no unproven tactic on build on a previous game whose proof rests on something unproven;
@@ -281,7 +132,7 @@ impl Default for SolveOptions {
             queue_mem_cap: engine.queue_mem_cap,
             spill_dir: None,
             force_search: false,
-            optimal_path: Some(Optimal::default_path()),
+            optimal: OptimalSource::default(),
             allow_optimal_mismatch: false,
             allow_tainted_prev: false,
         }
@@ -289,9 +140,42 @@ impl Default for SolveOptions {
 }
 
 impl SolveOptions {
-    /// Loads `optimal_path`, if there is one.
+    /// Loads the table of optimal games, if there is one.
+    ///
+    /// # Errors
+    ///
+    /// If the table is the repository's and the repository cannot be found (see [`paths`]), or the file cannot be
+    /// read.
     pub fn load_optimal(&self) -> Result<Option<Optimal>, String> {
-        self.optimal_path.as_ref().map(Optimal::load).transpose()
+        match &self.optimal {
+            OptimalSource::Repository => Optimal::load(paths::optimal_json()?).map(Some),
+            OptimalSource::File(path) => Optimal::load(path).map(Some),
+            OptimalSource::None => Ok(None),
+        }
+    }
+
+    /// The known games: the table of optimal games with the completed games of the results files `results` added
+    /// (they replace the table's moves for the same board sizes; an unfinished search's line is skipped).  This is
+    /// how a search past the table's last board size gets the previous game it is seeded and capped from.
+    ///
+    /// # Errors
+    ///
+    /// As [`load_optimal`](Self::load_optimal), if a results file cannot be read, and if a game of a results file
+    /// scores differently from one the table already has.
+    pub fn known_games(&self, results: &[PathBuf]) -> Result<Optimal, String> {
+        let mut known = match self.load_optimal()? {
+            Some(optimal) => optimal,
+            None => Optimal::from_json(&Json::Arr(Vec::new()))?,
+        };
+        for path in results {
+            let before: Vec<(u32, u64)> = known.games().map(|(n, score, _)| (n, score)).collect();
+            known = known.with_results(path)?;
+            if let Some(&(n, score)) = before.iter().find(|&&(n, score)| known.score(n) != Some(score)) {
+                let now = known.score(n).map_or_else(|| "none".to_owned(), |s| s.to_string());
+                return Err(format!("{}: n={n} scores {now}, but the known games have {score}", path.display()));
+            }
+        }
+        Ok(known)
     }
 
     /// The checkpoint file of game `n`, if checkpointing is on.
@@ -552,7 +436,8 @@ pub struct GameResult {
     pub force_search: bool,
     pub allow_tainted_prev: bool,
     pub allow_optimal_mismatch: bool,
-    /// `optimal.json`, if one was used: `default` for [`Optimal::default_path`], else the path given.
+    /// The table of optimal games, if one was used: `default` for the repository's ([`OptimalSource::Repository`]),
+    /// else the path given.
     pub optimal_file: Option<String>,
     /// Whether the score equals `optimal.json`'s; `None` if the game is incomplete or the file lacks `n`.
     pub optimal_match: Option<bool>,
@@ -563,13 +448,11 @@ pub struct GameResult {
 
 impl GameResult {
     fn new(n: u32, opts: &SolveOptions, prev: Option<&Prev>) -> Self {
-        let optimal_file = opts.optimal_path.as_ref().map(|path| {
-            if *path == Optimal::default_path() {
-                "default".to_owned()
-            } else {
-                path.display().to_string()
-            }
-        });
+        let optimal_file = match &opts.optimal {
+            OptimalSource::Repository => Some("default".to_owned()),
+            OptimalSource::File(path) => Some(path.display().to_string()),
+            OptimalSource::None => None,
+        };
         GameResult {
             n,
             score: 0,
@@ -731,13 +614,13 @@ fn reject(result: GameResult, reason: String) -> Result<GameResult, Failure> {
     Err(Failure::Rejected(Box::new(result), reason))
 }
 
-/// Solves board size `n`.  `prev` is the solution of `n − 1` if known; `opts.optimal_path` is loaded for the
+/// Solves board size `n`.  `prev` is the solution of `n − 1` if known; `opts.optimal` is loaded for the
 /// comparison (use [`solve_game_with`] to load it once for many games).
 pub fn solve_game(n: u32, prev: Option<&Prev>, opts: &SolveOptions) -> Result<GameResult, String> {
     solve_game_with(n, prev, opts, opts.load_optimal()?.as_ref())
 }
 
-/// [`solve_game`] with `optimal.json` already loaded (`opts.optimal_path` is not used).  The checkpoint of a
+/// [`solve_game`] with `optimal.json` already loaded (`opts.optimal` is not used).  The checkpoint of a
 /// completed game is deleted once the game has passed its checks.
 pub fn solve_game_with(
     n: u32,
@@ -814,28 +697,26 @@ fn solve_with_width<const W: usize>(
         }
     }
 
-    let t0 = Instant::now();
-    let frames = build_frames::<W>(&tables);
-    result.phases.frames = t0.elapsed();
-    let plain = solution_for_promotions::<W>(&tables, Bits::EMPTY);
-    result.in_the_bag = Some(plain.iter().map(|&m| u64::from(m)).sum());
-    if frames.candidates.is_empty() {
+    let board = Board::<W>::new(tables);
+    result.phases.frames = board.frames_time;
+    result.in_the_bag = Some(board.in_the_bag);
+    if board.is_trivial() {
         result.method = Method::Trivial;
-        return conclude(result, plain, Vec::new(), context);
+        return conclude(result, board.plain, Vec::new(), context);
     }
 
     if let Some(prev) = prev.filter(|_| tactics.prev_cap) {
         trust(prev, opts)?;
     }
     if derive && tactics.reuse_prev {
-        if let Some(derived) = prev.and_then(|p| reuse_prev(&tables, &frames, &p.moves)) {
+        if let Some(derived) = prev.and_then(|p| reuse_prev(&board.tables, &board.frames, &p.moves)) {
             result.method = Method::Reuse;
             return conclude(result, derived.moves, derived.promotions, context);
         }
     }
 
-    let promotions = search_game(&tables, &frames, prev, opts, checkpoint, earlier_runs, &mut result)?;
-    let moves = solution_for_promotions::<W>(&tables, promotions);
+    let promotions = search_game(&board, prev, opts, checkpoint, earlier_runs, &mut result)?;
+    let moves = solution_for_promotions::<W>(&board.tables, promotions);
     conclude(result, moves, promotions.to_vec(), context)
 }
 
@@ -950,38 +831,23 @@ fn conclude(
 /// The search path: prepares the game (or the checkpoint's game), searches, and fills `result` with what the
 /// search did.  Returns the best promotion set found.  The checkpoint is left in place (see [`solve_one`]).
 fn search_game<const W: usize>(
-    tables: &Tables,
-    frames: &FrameColumns<W>,
+    board: &Board<W>,
     prev: Option<&Prev>,
     opts: &SolveOptions,
     checkpoint: Option<PathBuf>,
     earlier_runs: u32,
     result: &mut GameResult,
 ) -> Result<Bits<W>, Failure> {
-    let n = tables.n;
+    let n = board.n();
     let tactics = opts.tactics;
-    let columns = frames.columns();
     let resuming = checkpoint.is_some();
     let prepared = match &checkpoint {
         Some(path) => {
-            let p = prepare_for_resume::<W>(tables, &columns, &frames.candidates, path, opts.threads).map_err(|e| {
+            let p = board.prepare_for_resume(path, opts.threads).map_err(|e| {
                 format!("cannot resume from {}: {e} (delete the file to start the game over)", path.display())
             })?;
             if p.tactics != tactics.search {
-                let made = Tactics { search: p.tactics, ..tactics };
-                let differ: Vec<_> =
-                    made.settings().into_iter().zip(tactics.settings()).filter(|(a, b)| a != b).collect();
-                let what: Vec<String> =
-                    differ.iter().map(|((name, there), (_, here))| format!("{name} is {there}, not {here}")).collect();
-                let flags: Vec<String> =
-                    differ.iter().map(|((name, there), _)| format!("--tactic {name}={there}")).collect();
-                return Err(Failure::Error(format!(
-                    "{} was made with different search tactics: {}; resume it with {}, or delete it to start the game \
-                     over",
-                    path.display(),
-                    what.join(", "),
-                    flags.join(" ")
-                )));
+                return Err(Failure::Error(different_tactics(path, p.tactics, tactics)));
             }
             p
         }
@@ -993,7 +859,7 @@ fn search_game<const W: usize>(
                 node_limit: opts.node_limit,
                 ..EngineConfig::default()
             };
-            prepare_within::<W>(tables, &columns, &frames.candidates, tactics.search, &limits)?
+            board.prepare_within(tactics.search, &limits)?
         }
     };
     result.phases.frames += prepared.timings.build;
@@ -1001,23 +867,12 @@ fn search_game<const W: usize>(
     result.phases.greedy = prepared.timings.greedy;
     result.phases.revise = prepared.timings.revise;
 
-    let cap = match prev {
-        Some(prev) if tactics.prev_cap => {
-            let in_the_bag = result.in_the_bag.expect("the caller sets inTheBag before searching");
-            (prev.score + u64::from(n)).checked_sub(in_the_bag)
-        }
-        _ => None,
-    };
+    let cap = prev.filter(|_| tactics.prev_cap).and_then(|prev| board.promotion_cap(prev.score));
     // A resumed search has its incumbent in the checkpoint.
-    let seed = match prev {
-        Some(prev) if tactics.seed_incumbent && !resuming => {
-            Some(prev.moves.iter().copied().collect::<Bits<W>>() & frames.candidates)
-        }
-        _ => None,
-    };
+    let seed = prev.filter(|_| tactics.seed_incumbent && !resuming).map(|prev| board.seed(&prev.moves));
     result.setup = Some(SearchSetup {
-        frames: frames.frames.len(),
-        candidates: frames.candidates.len(),
+        frames: board.frames.frames.len(),
+        candidates: board.candidates().len(),
         max_total: prepared.max_total,
         greedy_sum: prepared.greedy.sum(),
         cap,
@@ -1055,6 +910,22 @@ fn search_game<const W: usize>(
         result.invocations = earlier_runs.max(1) + 1;
     }
     Ok(found.promotions)
+}
+
+/// The error for a checkpoint made with other search tactics than this run's: what differs, and the flags that
+/// resume it.
+fn different_tactics(checkpoint: &Path, made: SearchTactics, now: Tactics) -> String {
+    let then = Tactics { search: made, ..now };
+    let differ: Vec<_> = then.settings().into_iter().zip(now.settings()).filter(|(a, b)| a != b).collect();
+    let what: Vec<String> =
+        differ.iter().map(|((name, there), (_, here))| format!("{name} is {there}, not {here}")).collect();
+    let flags: Vec<String> = differ.iter().map(|((name, there), _)| format!("--tactic {name}={there}")).collect();
+    format!(
+        "{} was made with different search tactics: {}; resume it with {}, or delete it to start the game over",
+        checkpoint.display(),
+        what.join(", "),
+        flags.join(" ")
+    )
 }
 
 /// Deletes game `n`'s checkpoint, if checkpointing is on.  Called only once the game's result is safe: in the
@@ -1192,156 +1063,11 @@ pub fn solve_range_each(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_support::TempDir;
 
-    fn temp_dir(name: &str) -> PathBuf {
-        let path = std::env::temp_dir().join(format!("taxman-solver-{name}-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&path);
-        fs::create_dir_all(&path).expect("create temp dir");
-        path
-    }
-
-    #[test]
-    fn tactics_defaults_and_settings() {
-        let t = Tactics::default();
-        assert_eq!(t.description(), "default");
-        assert!(t.unproven_on().eq(&["reuse_prev", "revise_freedoms"]));
-        assert_eq!(
-            Tactics::names(),
-            [
-                "prime_shortcut",
-                "reuse_prev",
-                "revise_freedoms",
-                "preclusions",
-                "match_bound",
-                "branching",
-                "match_refine",
-                "fix_forced",
-                "nogoods",
-                "forget_nogoods",
-                "legacy_bound",
-                "prev_cap",
-                "seed_incumbent"
-            ]
-        );
-        let values: Vec<String> = t.settings().iter().map(|s| s.1.to_string()).collect();
-        let expected = ["on", "on", "on", "off", "on", "conflict-strong", "1", "on", "on", "on", "off", "on", "on"];
-        assert_eq!(values, expected);
-        // The values of the search tactics are those of `SearchTactics::default()`, not copies of them.
-        let search = SearchTactics::default();
-        assert_eq!((t.search.match_refine, t.search.branching), (search.match_refine, search.branching));
-    }
-
-    #[test]
-    fn tactics_set_by_name() {
-        let mut t = Tactics::default();
-        t.set("match_bound=off").unwrap();
-        t.set("legacy_bound=on").unwrap();
-        t.set("prev_cap=off").unwrap();
-        assert!(!t.search.match_bound && t.search.legacy_bound && !t.prev_cap);
-        assert_eq!(t.description(), "match_bound=off,legacy_bound=on,prev_cap=off");
-        assert!(t.unproven_on().contains(&"legacy_bound"));
-        t.set("reuse_prev=off").unwrap();
-        t.set("revise_freedoms=off").unwrap();
-        t.set("legacy_bound=off").unwrap();
-        assert!(t.unproven_on().is_empty());
-        assert!(t.set("matchbound=off").unwrap_err().contains("unknown tactic"));
-        assert!(t.set("match_bound=maybe").unwrap_err().contains("on or off"));
-        assert!(t.set("match_bound").unwrap_err().contains("name=value"));
-        let json = t.to_json();
-        assert_eq!(json.get("match_bound").and_then(Json::as_bool), Some(false));
-        assert_eq!(json.get("seed_incumbent").and_then(Json::as_bool), Some(true));
-    }
-
-    #[test]
-    fn tactics_with_values_other_than_on_and_off() {
-        let mut t = Tactics::default();
-        t.set("branching=largest").unwrap();
-        t.set("match_refine=0").unwrap();
-        assert_eq!((t.search.branching, t.search.match_refine), (Branching::Largest, 0));
-        assert_eq!(t.description(), "branching=largest,match_refine=0");
-        // Both are sound, so neither is ever reported as unproven.
-        assert_eq!(t.unproven_on(), ["reuse_prev", "revise_freedoms"]);
-        let json = t.to_json();
-        assert_eq!(json.get("branching").and_then(Json::as_str), Some("largest"));
-        assert_eq!(json.get("match_refine").and_then(Json::as_u32), Some(0));
-        assert_eq!(json.get("prev_cap").and_then(Json::as_bool), Some(true));
-        assert_eq!(json.as_obj().map(<[_]>::len), Some(TACTIC_COUNT));
-
-        // The default value is not mentioned, and setting a tactic back to it drops it from the description.
-        t.set("branching=conflict-strong").unwrap();
-        t.set("match_refine=7").unwrap();
-        assert_eq!(t.description(), "match_refine=7");
-        t.set("match_refine=1").unwrap();
-        assert_eq!(t.description(), "default");
-
-        // Bad values are refused with a message that says what is allowed, and change nothing.
-        for (assignment, expected) in [
-            (
-                "branching=nope",
-                "tactic branching: expected one of largest, conflict-smallest, conflict-largest, conflict-strong",
-            ),
-            ("branching=on", "tactic branching: expected one of largest"),
-            ("branching=", "tactic branching: expected one of largest"),
-            ("match_refine=8", "tactic match_refine: expected a whole number from 0 to 7, got \"8\""),
-            ("match_refine=-1", "tactic match_refine: expected a whole number from 0 to 7"),
-            ("match_refine=1.5", "tactic match_refine: expected a whole number from 0 to 7"),
-            ("match_refine=on", "tactic match_refine: expected a whole number from 0 to 7"),
-            ("match_refine=", "tactic match_refine: expected a whole number from 0 to 7"),
-            ("match_bound=2", "tactic match_bound: expected on or off"),
-            ("match_bound=largest", "tactic match_bound: expected on or off"),
-        ] {
-            let err = t.set(assignment).unwrap_err();
-            assert!(err.starts_with(expected), "{assignment}: {err}");
-            assert_eq!(t, Tactics::default(), "{assignment} changed something");
-        }
-        let err = t.set("branch=largest").unwrap_err();
-        assert!(err.contains("unknown tactic") && err.contains("branching, match_refine"), "{err}");
-    }
-
-    #[test]
-    fn every_setting_reads_back_as_it_is_shown() {
-        // Setting each tactic to the value `settings` shows gives the tactics that show it, and so do the
-        // changes in the description; the JSON holds the same values.
-        let mut t = Tactics::default();
-        let mut all = vec![Tactics::default()];
-        for branching in Branching::ALL {
-            for depth in 0..=SearchTactics::MAX_MATCH_REFINE {
-                t.search = SearchTactics { branching, match_refine: depth, ..t.search };
-                all.push(t);
-            }
-        }
-        all.push(Tactics {
-            search: SearchTactics {
-                preclusions: false,
-                legacy_bound: true,
-                revise_freedoms: false,
-                match_bound: false,
-                ..SearchTactics::default()
-            },
-            prime_shortcut: false,
-            reuse_prev: false,
-            prev_cap: false,
-            seed_incumbent: false,
-        });
-        for tactics in all {
-            let mut again = Tactics::default();
-            for (name, value) in tactics.settings() {
-                again.set(&format!("{name}={value}")).unwrap();
-            }
-            assert_eq!(again, tactics, "{}", tactics.description());
-            // The description alone is enough to rebuild the tactics from the defaults.
-            let mut from_description = Tactics::default();
-            if tactics.description() != "default" {
-                for assignment in tactics.description().split(',') {
-                    from_description.set(assignment).unwrap();
-                }
-            }
-            assert_eq!(from_description, tactics, "{}", tactics.description());
-            let json = Json::parse(&tactics.to_json().to_string()).unwrap();
-            for (name, value) in tactics.settings() {
-                assert_eq!(json.get(name), Some(&value.to_json()), "{name}");
-            }
-        }
+    /// The options of a test: one thread, and no table of optimal games.
+    fn without_optimal() -> SolveOptions {
+        SolveOptions { optimal: OptimalSource::None, ..SolveOptions::default() }
     }
 
     #[test]
@@ -1363,7 +1089,7 @@ mod tests {
 
     #[test]
     fn the_results_file_skips_what_is_done_and_survives_a_torn_line() {
-        let dir = temp_dir("results");
+        let dir = TempDir::new("results");
         let path = dir.join("results.jsonl");
         let opts = SolveOptions { threads: 1, ..SolveOptions::default() };
         let first = solve_range(1, 12, &opts, Some(&path)).unwrap();
@@ -1390,7 +1116,6 @@ mod tests {
         // A malformed line that is not the last is an error, not something to skip.
         fs::write(&path, format!("garbage\n{}", lines.lines().next().unwrap())).unwrap();
         assert!(ResultsFile::open(&path, None).is_err());
-        fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
@@ -1405,23 +1130,55 @@ mod tests {
 
     #[test]
     fn a_wrong_optimal_file_is_a_hard_error_unless_allowed() {
-        let dir = temp_dir("mismatch");
+        let dir = TempDir::new("mismatch");
         let path = dir.join("optimal.json");
         fs::write(&path, r#"[{"n":4,"score":8,"moves":[4,3]}]"#).unwrap();
-        let mut opts = SolveOptions { threads: 1, optimal_path: Some(path), ..SolveOptions::default() };
+        let mut opts =
+            SolveOptions { threads: 1, optimal: OptimalSource::File(path.clone()), ..SolveOptions::default() };
         let err = solve_game(4, None, &opts).unwrap_err();
         assert!(err.contains("scored 7") && err.contains("says 8"), "{err}");
         opts.allow_optimal_mismatch = true;
         let r = solve_game(4, None, &opts).unwrap();
         assert_eq!((r.score, r.optimal_match), (7, Some(false)));
-        opts.optimal_path = None;
-        assert_eq!(solve_game(4, None, &opts).unwrap().optimal_match, None);
-        fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(r.optimal_file, Some(path.display().to_string()));
+        opts.optimal = OptimalSource::None;
+        let r = solve_game(4, None, &opts).unwrap();
+        assert_eq!((r.optimal_match, r.optimal_file), (None, None));
+    }
+
+    #[test]
+    fn the_known_games_are_the_table_with_the_results_files_added() {
+        let dir = TempDir::new("known");
+        let table = dir.join("optimal.json");
+        fs::write(&table, r#"[{"n":4,"score":7,"moves":[3,4]}]"#).unwrap();
+        let line = |n: u32, score: u64, moves: &str| {
+            format!("{{\"n\":{n},\"score\":{score},\"moves\":{moves},\"completed\":true}}\n")
+        };
+        let results = dir.join("results.jsonl");
+        fs::write(&results, line(4, 7, "[2,3,4]") + &line(5, 12, "[5,4,3]")).unwrap();
+        let opts = SolveOptions { optimal: OptimalSource::File(table.clone()), ..SolveOptions::default() };
+
+        let known = opts.known_games(std::slice::from_ref(&results)).unwrap();
+        // The results file's game replaces the table's, and adds a board size the table lacks.
+        assert_eq!((known.score(4), known.moves(4)), (Some(7), Some(&[2, 3, 4][..])));
+        assert_eq!(known.score(5), Some(12));
+        assert_eq!(opts.known_games(&[]).unwrap().score(5), None);
+
+        // A score that disagrees with the table's is an error, which names the file.
+        fs::write(&results, line(4, 9, "[2,3,4]")).unwrap();
+        let err = opts.known_games(std::slice::from_ref(&results)).err().expect("a disagreement");
+        assert!(err.contains("results.jsonl") && err.contains("n=4 scores 9"), "{err}");
+
+        // With no table, the results files are all there is.
+        fs::write(&results, line(5, 12, "[5,4,3]")).unwrap();
+        let known = without_optimal().known_games(&[results]).unwrap();
+        assert_eq!((known.score(4), known.score(5)), (None, Some(12)));
+        assert!(without_optimal().load_optimal().unwrap().is_none());
     }
 
     #[test]
     fn a_previous_game_that_does_not_check_out_is_refused() {
-        let opts = SolveOptions { optimal_path: None, ..SolveOptions::default() };
+        let opts = without_optimal();
         let prev = |moves: &[u32], score| Prev {
             moves: moves.to_vec(),
             score,
@@ -1439,7 +1196,7 @@ mod tests {
 
     #[test]
     fn bad_board_sizes_are_errors() {
-        let opts = SolveOptions { optimal_path: None, ..SolveOptions::default() };
+        let opts = without_optimal();
         assert!(solve_game(0, None, &opts).is_err());
         assert!(solve_game(MAX_N + 1, None, &opts).unwrap_err().contains("beyond"));
         assert!(solve_range(5, 4, &opts, None).is_err());

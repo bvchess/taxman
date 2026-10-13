@@ -3,6 +3,9 @@
 //! opened, what survives a failure after a search, and the provenance every line carries.  Small boards, one or
 //! two threads.
 
+mod common;
+
+use common::TempDir;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -12,29 +15,7 @@ use taxman::hives::Apiary;
 use taxman::json::Json;
 use taxman::numtheory::Tables;
 use taxman::results::{moves_digest, rejected_path, Proof, ResultsFile, Taint, OPTIMAL_JSON};
-use taxman::solver::{self, GameResult, Prev, PrevSource, SolveOptions};
-
-/// A fresh directory under the system temp dir, removed on drop.
-struct TempDir(PathBuf);
-
-impl TempDir {
-    fn new(name: &str) -> Self {
-        let path = std::env::temp_dir().join(format!("taxman-integrity-{name}-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&path);
-        fs::create_dir_all(&path).expect("create temp dir");
-        TempDir(path)
-    }
-
-    fn path(&self, name: &str) -> PathBuf {
-        self.0.join(name)
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
+use taxman::solver::{self, GameResult, OptimalSource, Prev, PrevSource, SolveOptions};
 
 fn options(threads: usize) -> SolveOptions {
     SolveOptions { threads, ..SolveOptions::default() }
@@ -90,7 +71,7 @@ fn finished_but_worse_game_of_80() -> (Vec<u32>, u64) {
 
 #[test]
 fn a_previous_game_that_cannot_be_optimal_is_refused() {
-    let opts = SolveOptions { optimal_path: None, ..strict(1) };
+    let opts = SolveOptions { optimal: OptimalSource::None, ..strict(1) };
     let optimal = Optimal::load_default().unwrap();
     // Not over: optimal.json's game of 80 without its last move.
     let mut moves = optimal.moves(80).unwrap().to_vec();
@@ -120,7 +101,7 @@ fn a_previous_game_that_cannot_be_optimal_is_refused() {
 #[test]
 fn a_previous_game_that_is_not_optimal_trips_the_ceiling() {
     let (moves, score) = finished_but_worse_game_of_80();
-    let opts = SolveOptions { optimal_path: None, ..strict(1) };
+    let opts = SolveOptions { optimal: OptimalSource::None, ..strict(1) };
     let err = solver::solve_game(81, Some(&prev(moves, score)), &opts).unwrap_err();
     assert!(err.contains("exceed the cap") && err.contains("not optimal"), "{err}");
     // The error keeps the promotions that were found.
@@ -130,7 +111,7 @@ fn a_previous_game_that_is_not_optimal_trips_the_ceiling() {
 #[test]
 fn a_ceiling_tripped_in_a_range_is_recorded_as_rejected() {
     let dir = TempDir::new("tripped");
-    let results = dir.path("r.jsonl");
+    let results = dir.join("r.jsonl");
     let (moves, score) = finished_but_worse_game_of_80();
     // The bad game as optimal.json's game of 80, so that the range builds on it.
     let fake = Json::array([Json::object([
@@ -138,9 +119,9 @@ fn a_ceiling_tripped_in_a_range_is_recorded_as_rejected() {
         ("score", Json::from(score)),
         ("moves", Json::array(moves.iter().copied())),
     ])]);
-    let optimal = dir.path("optimal.json");
+    let optimal = dir.join("optimal.json");
     fs::write(&optimal, fake.to_string()).unwrap();
-    let opts = SolveOptions { optimal_path: Some(optimal), allow_tainted_prev: true, ..strict(1) };
+    let opts = SolveOptions { optimal: OptimalSource::File(optimal), allow_tainted_prev: true, ..strict(1) };
     let err = solver::solve_range(81, 82, &opts, Some(&results)).unwrap_err();
     assert!(err.contains("not optimal") && err.contains("r.rejected.jsonl"), "{err}");
     assert!(lines(&results).is_empty(), "nothing is recorded as a result");
@@ -157,7 +138,7 @@ fn a_ceiling_tripped_in_a_range_is_recorded_as_rejected() {
 #[test]
 fn a_strict_run_does_not_build_on_a_tainted_game_unless_told_to() {
     let dir = TempDir::new("taint");
-    let results = dir.path("r.jsonl");
+    let results = dir.join("r.jsonl");
     // With the default tactics, 22 is derived by reuse_prev, and 23 (a prime) rests on it.
     solver::solve_range(1, 22, &options(1), Some(&results)).unwrap();
     let line = completed_line(&results, 22);
@@ -192,7 +173,7 @@ fn a_strict_run_does_not_build_on_a_tainted_game_unless_told_to() {
 #[test]
 fn a_game_made_with_unproven_tactics_on_but_not_used_is_clean() {
     let dir = TempDir::new("clean");
-    let results = dir.path("r.jsonl");
+    let results = dir.join("r.jsonl");
     // 30 is searched to exhaustion with the default tactics, and revise_freedoms does nothing there.
     solver::solve_range(1, 30, &options(1), Some(&results)).unwrap();
     let line = completed_line(&results, 30);
@@ -223,7 +204,7 @@ fn a_strict_run_from_optimal_json_needs_the_override() {
 
 /// A results file holding games 1..=12, and its lines as text.
 fn twelve_games(dir: &TempDir) -> (PathBuf, Vec<String>) {
-    let results = dir.path("r.jsonl");
+    let results = dir.join("r.jsonl");
     solver::solve_range(1, 12, &options(1), Some(&results)).unwrap();
     let text = fs::read_to_string(&results).unwrap();
     (results, text.lines().map(str::to_owned).collect())
@@ -281,7 +262,7 @@ fn a_torn_last_line_is_cut_off_and_a_bad_one_is_an_error() {
 fn a_stale_checkpoint_of_a_completed_game_is_removed() {
     let dir = TempDir::new("stale");
     let (results, _) = twelve_games(&dir);
-    let checkpoints = dir.path("ckpt");
+    let checkpoints = dir.join("ckpt");
     fs::create_dir_all(&checkpoints).unwrap();
     // As a crash between saving game 10's result and deleting its checkpoint would leave it.
     for name in ["n0010.ckpt", "n0010.ckpt.tmp", "n0013.ckpt"] {
@@ -301,18 +282,18 @@ fn a_stale_checkpoint_of_a_completed_game_is_removed() {
 #[test]
 fn a_failure_after_the_search_keeps_the_checkpoint_and_records_the_game() {
     let dir = TempDir::new("durable");
-    let results = dir.path("r.jsonl");
-    let checkpoints = dir.path("ckpt");
+    let results = dir.join("r.jsonl");
+    let checkpoints = dir.join("ckpt");
     let checkpoint = checkpoints.join("n0600.ckpt");
     let truth = Optimal::load_default().unwrap().score(600).unwrap();
     // An optimal.json that is wrong about 600 (and has no 599, so the search starts from nothing).
-    let wrong = dir.path("wrong.json");
+    let wrong = dir.join("wrong.json");
     fs::write(&wrong, format!(r#"[{{"n":600,"score":{},"moves":[]}}]"#, truth + 1)).unwrap();
     let opts = SolveOptions {
         checkpoint_dir: Some(checkpoints.clone()),
         checkpoint_interval: Duration::from_secs(3600),
         node_limit: Some(1_000),
-        optimal_path: Some(wrong),
+        optimal: OptimalSource::File(wrong),
         ..options(2)
     };
     // A limit stops the search: a checkpoint and an incomplete line.
@@ -339,7 +320,7 @@ fn a_failure_after_the_search_keeps_the_checkpoint_and_records_the_game() {
 
     // With the right file the search resumes from the checkpoint and the result is saved before the
     // checkpoint goes.
-    let right = SolveOptions { optimal_path: Some(Optimal::default_path()), ..unlimited };
+    let right = SolveOptions { optimal: OptimalSource::Repository, ..unlimited };
     let games = solver::solve_range(600, 600, &right, Some(&results)).unwrap();
     assert_eq!((games[0].score, games[0].completed, games[0].invocations), (truth, true, 2));
     assert!(games[0].phases.search_all_runs >= games[0].phases.search);
@@ -355,7 +336,7 @@ fn result_lines_carry_their_provenance() {
     let dir = TempDir::new("provenance");
     let (results, _) = twelve_games(&dir);
     // Game 600, stopped by a limit, in the same file.
-    let checkpoints = dir.path("ckpt");
+    let checkpoints = dir.join("ckpt");
     let opts =
         SolveOptions { checkpoint_dir: Some(checkpoints), node_limit: Some(200), force_search: true, ..options(1) };
     let mut seen: Vec<GameResult> = Vec::new();
@@ -408,9 +389,9 @@ fn result_lines_carry_their_provenance() {
 #[test]
 fn a_resumed_game_counts_its_invocations_and_its_time() {
     let dir = TempDir::new("invocations");
-    let results = dir.path("r.jsonl");
+    let results = dir.join("r.jsonl");
     let opts = SolveOptions {
-        checkpoint_dir: Some(dir.path("ckpt")),
+        checkpoint_dir: Some(dir.join("ckpt")),
         checkpoint_interval: Duration::from_secs(3600),
         node_limit: Some(1_000),
         force_search: true,
@@ -437,7 +418,7 @@ fn a_resumed_game_counts_its_invocations_and_its_time() {
 /// The reviewers' invariant, now a check the solver makes on every game from the frame model.
 #[test]
 fn every_game_from_the_frame_model_scores_in_the_bag_plus_its_promotions() {
-    let opts = SolveOptions { threads: 1, optimal_path: None, force_search: true, ..SolveOptions::default() };
+    let opts = SolveOptions { threads: 1, optimal: OptimalSource::None, force_search: true, ..SolveOptions::default() };
     for r in solver::solve_range(2, 160, &opts, None).unwrap() {
         let tables = Tables::new(r.n);
         let bag: u64 = Apiary::<8>::new(&tables, Bits::EMPTY).solution().iter().map(|&m| u64::from(m)).sum();

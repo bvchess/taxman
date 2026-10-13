@@ -12,10 +12,9 @@
 
 mod common;
 
-use common::{fnv1a64, stored_games, testdata};
+use common::{fnv1a64, golden_files, stored_games, testdata};
 use std::collections::BTreeMap;
 use std::fmt::Debug;
-use std::path::PathBuf;
 use std::time::Instant;
 use taxman::accelerate::{prime_shortcut, reuse_prev, solution_for_promotions};
 use taxman::bits::Bits;
@@ -44,22 +43,7 @@ impl Golden {
 
 /// Every `n*.json` under `testdata/<dir>`, by n.
 fn load_dir(dir: &str) -> Vec<Golden> {
-    let dir = testdata(dir);
-    let mut paths: Vec<PathBuf> = std::fs::read_dir(&dir)
-        .unwrap_or_else(|e| panic!("{}: {e}", dir.display()))
-        .map(|entry| entry.unwrap().path())
-        .filter(|p| p.extension().is_some_and(|e| e == "json"))
-        .collect();
-    paths.sort();
-    paths
-        .iter()
-        .map(|path| {
-            let json = Json::from_file(path).unwrap();
-            let n = json.get("n").and_then(Json::as_u32).expect("n");
-            assert!(json.get("error").is_none(), "n={n}: the Java export reported {:?}", json.get("error"));
-            Golden { n, json }
-        })
-        .collect()
+    golden_files(dir).into_iter().map(|(n, json)| Golden { n, json }).collect()
 }
 
 fn load_golden() -> Vec<Golden> {

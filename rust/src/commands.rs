@@ -1,13 +1,25 @@
-//! The solving subcommands: `solve`, `regress` and `bench`.
+//! The subcommands that solve games: `solve`, `regress` and `bench`.  Each reads its flags with [`Args`], builds
+//! [`SolveOptions`] from them ([`solver_options`]) and calls the library's pipeline ([`taxman::solver`]); what
+//! they add is output, and the policies of a command-line run:
+//!
+//! * `solve` stops on SIGINT and SIGTERM with a final checkpoint, locks its checkpoint directory, and prints one
+//!   summary line per game as it finishes;
+//! * `regress` solves in memory and compares every score with `optimal.json`;
+//! * `bench` solves a fixed set of hard games standalone and appends the run to a history file, so that
+//!   performance can be followed from commit to commit.  Its files are found in the repository
+//!   ([`taxman::paths`]) unless `--history` and `--known` name them.
+//!
+//! The other subcommands (`verify-optimal`, `verify-results`, `tables`) are small and live in `main.rs`.
 
 use crate::cli::{errln, outln, parse_range, solver_options, Args, CliError, CliResult, SOLVER_FLAGS};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use taxman::engine;
 use taxman::json::Json;
-use taxman::solver::{self, GameResult, Method, Prev, SolveOptions};
+use taxman::paths;
+use taxman::results::{build, Build};
+use taxman::solver::{self, GameResult, Method, OptimalSource, Prev, SolveOptions};
 
 fn failed(message: String) -> CliError {
     CliError::Failed(message)
@@ -163,14 +175,17 @@ pub fn regress(args: &[String]) -> CliResult {
 /// search of a second or so on one thread (DESIGN.md, "Performance").
 const BENCH_GAMES: [u32; 6] = [936, 1050, 1100, 1133, 1170, 1184];
 
-const BENCH_HISTORY: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/bench/history.jsonl");
-
-/// Where the benchmark takes the previous games (and the scores to check) past optimal.json's.
-const BENCH_RESULTS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/results/strict.jsonl");
-
+/// Times the benchmark games (or the board sizes given), each standalone, and appends the run to the history.
 pub fn bench(args: &[String]) -> CliResult {
-    let args = Args::parse(args, &flags_with(&["--history"]), &[])?;
-    let history = args.value("--history").map_or_else(|| PathBuf::from(BENCH_HISTORY), PathBuf::from);
+    let args = Args::parse(args, &flags_with(&["--history", "--known"]), &[])?;
+    // Where the run is recorded, and where the previous games past optimal.json's come from: in the repository
+    // unless a flag names a file.
+    let file = |flag: &str, in_repository: &str| match args.value(flag) {
+        Some(path) => Ok(PathBuf::from(path)),
+        None => paths::in_repository(in_repository, &format!("{flag} FILE")).map_err(failed),
+    };
+    let history = file("--history", paths::BENCH_HISTORY_IN_REPOSITORY)?;
+    let results = file("--known", paths::STRICT_RESULTS_IN_REPOSITORY)?;
     let ns: Vec<u32> = if args.positional().is_empty() {
         BENCH_GAMES.to_vec()
     } else {
@@ -178,16 +193,16 @@ pub fn bench(args: &[String]) -> CliResult {
         args.positional().iter().map(parse).collect::<Result<_, _>>()?
     };
     let mut opts = solver_options(&args)?;
+    if opts.optimal == OptimalSource::None {
+        return Err(CliError::Usage(
+            "bench takes the previous games from optimal.json, so --optimal none makes no sense".into(),
+        ));
+    }
     // Every game on its own: the previous game from optimal.json or, past it, from the committed strict results
     // (whatever the tactics: a benchmark records no result), and no derivation.
     opts.force_search = true;
     opts.allow_tainted_prev = true;
-    let Some(optimal) = opts.load_optimal().map_err(failed)? else {
-        return Err(CliError::Usage(
-            "bench takes the previous games from optimal.json, so --optimal none makes no sense".into(),
-        ));
-    };
-    let known = optimal.with_results(Path::new(BENCH_RESULTS)).map_err(failed)?;
+    let known = opts.known_games(&[results]).map_err(failed)?;
 
     outln!("{} threads, tactics {}", opts.threads, opts.tactics.description());
     let [n, nodes, precl, greedy, revise, search, total] =
@@ -222,13 +237,8 @@ pub fn bench(args: &[String]) -> CliResult {
     Ok(())
 }
 
-/// Output of `git` in this crate's directory, if it runs and succeeds.
-fn git(args: &[&str]) -> Option<String> {
-    let output = Command::new("git").arg("-C").arg(env!("CARGO_MANIFEST_DIR")).args(args).output().ok()?;
-    output.status.success().then(|| String::from_utf8_lossy(&output.stdout).trim().to_owned())
-}
-
-/// One line of the benchmark history: when, which code, how it was run, and what each game cost.
+/// One line of the benchmark history: when, which code, how it was run, and what each game cost.  The code is the
+/// commit this binary was built from (`results::build`), and whether its sources differed from it.
 fn history_record(opts: &SolveOptions, results: &[GameResult]) -> Json {
     let games = results.iter().map(|r| {
         Json::object([
@@ -241,11 +251,11 @@ fn history_record(opts: &SolveOptions, results: &[GameResult]) -> Json {
         ])
     });
     let unix_time = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
-    // The history file itself changes with every run, so it does not make the code dirty.
-    let dirty = git(&["status", "--porcelain", "--", ".", ":(exclude)bench"]).map(|status| !status.is_empty());
+    let Build { commit, dirty } = build();
+    let short = commit.map(|commit| &commit[..commit.len().min(7)]);
     Json::object([
         ("unix_time", Json::from(unix_time)),
-        ("git", git(&["rev-parse", "--short", "HEAD"]).map_or(Json::Null, Json::from)),
+        ("git", short.map_or(Json::Null, Json::from)),
         ("dirty", dirty.map_or(Json::Null, Json::Bool)),
         ("threads", Json::from(opts.threads)),
         ("tactics", Json::from(opts.tactics.description())),

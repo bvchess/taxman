@@ -5,7 +5,6 @@ mod common;
 
 use common::TempDir;
 use std::fs;
-use std::path::PathBuf;
 use std::time::Duration;
 use taxman::bits::Bits;
 use taxman::game::Optimal;
@@ -14,7 +13,7 @@ use taxman::json::Json;
 use taxman::numtheory::Tables;
 use taxman::results::{verify_files, Proof, Taint};
 use taxman::search::Revise;
-use taxman::solver::{self, GameResult, Method, SolveOptions};
+use taxman::solver::{self, GameResult, Method, OptimalSource, SolveOptions};
 
 fn options(threads: usize) -> SolveOptions {
     SolveOptions { threads, ..SolveOptions::default() }
@@ -22,8 +21,7 @@ fn options(threads: usize) -> SolveOptions {
 
 /// Whether the Java derived game `n` without a search (`solve.accelerated` in the golden data).
 fn java_accelerated(n: u32) -> bool {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/golden").join(format!("n{n:04}.json"));
-    let json = Json::from_file(path).expect("golden file");
+    let json = common::golden(n);
     json.get("solve").and_then(|s| s.get("accelerated")).and_then(Json::as_bool).expect("solve.accelerated")
 }
 
@@ -105,7 +103,7 @@ fn derivations_can_be_switched_off() {
         120,
         &SolveOptions {
             tactics: {
-                let mut t = solver::Tactics::default();
+                let mut t = taxman::tactics::Tactics::default();
                 t.set("prime_shortcut=off").unwrap();
                 t.set("reuse_prev=off").unwrap();
                 t
@@ -157,8 +155,12 @@ fn an_interrupted_game_resumes_from_its_checkpoint() {
 fn run_stopped_and_resumed(name: &str, base: SolveOptions) -> (Vec<GameResult>, Vec<Json>) {
     let dir = TempDir::new(name);
     let results = dir.join("results.jsonl");
-    let limited =
-        SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), node_limit: Some(300), optimal_path: None, ..base };
+    let limited = SolveOptions {
+        checkpoint_dir: Some(dir.join("ckpt")),
+        node_limit: Some(300),
+        optimal: OptimalSource::None,
+        ..base
+    };
     assert!(!limited.allow_tainted_prev);
     let summary = solver::solve_range_each(600, 601, &limited, Some(&results), |_| {}).unwrap();
     assert_eq!(summary.stopped_at, Some(600), "the node limit stops the search of 600");

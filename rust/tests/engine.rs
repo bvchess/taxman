@@ -4,10 +4,13 @@
 //! Benchmark (engine overhead per node): `cargo test --release --test engine -- --ignored --nocapture bench`
 //! (sizes and thread counts: see [`bench`]).  Stress test: see [`stress`].
 
+mod common;
+
+use common::{Rng, TempDir};
 use std::fs;
 use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+
 use std::time::{Duration, Instant};
 
 use taxman::engine::{self, Ctx, EngineConfig, Outcome, Poll, Searcher, Start, Unit};
@@ -28,13 +31,10 @@ struct Instance {
 impl Instance {
     /// A strongly correlated instance (value = weight + range/10), which is hard for branch-and-bound.
     fn new(n: usize, range: u64, seed: u64) -> Instance {
-        let mut state = seed | 1;
+        let mut rng = Rng(seed | 1);
         let mut items: Vec<(u64, u64)> = (0..n)
             .map(|_| {
-                state ^= state << 13;
-                state ^= state >> 7;
-                state ^= state << 17;
-                let w = 1 + state % range;
+                let w = 1 + rng.next() % range;
                 (w, w + range / 10)
             })
             .collect();
@@ -304,30 +304,6 @@ fn assert_optimal(out: &Outcome, inst: &Instance, opt: u64) {
     assert_eq!(inst.check(mask), Some(opt), "payload is a feasible solution of value best");
 }
 
-/// A fresh directory under the system temp dir, removed on drop.
-struct TempDir(PathBuf);
-
-impl TempDir {
-    fn new(name: &str) -> TempDir {
-        static SEQ: AtomicU64 = AtomicU64::new(0);
-        let seq = SEQ.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!("txengine-{name}-{}-{seq}", std::process::id()));
-        let _ = fs::remove_dir_all(&path);
-        fs::create_dir_all(&path).expect("create temp dir");
-        TempDir(path)
-    }
-
-    fn path(&self, name: &str) -> PathBuf {
-        self.0.join(name)
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
-
 fn dir_is_empty(dir: &Path) -> bool {
     fs::read_dir(dir).map(|mut entries| entries.next().is_none()).unwrap_or(true)
 }
@@ -419,8 +395,8 @@ fn many_threads_checkpoint_resume_and_spill() {
     let raw = raw_search(&inst);
     for threads in MANY {
         let dir = TempDir::new(&format!("many{threads}"));
-        let ckpt = dir.path("ckpt.bin");
-        let spill = dir.path("spill");
+        let ckpt = dir.join("ckpt.bin");
+        let spill = dir.join("spill");
         // In pieces through checkpoints (each stop is a pause that parks every worker), with a tiny in-memory
         // queue: the stacks the workers push in the pause spill.
         let cfg = EngineConfig {
@@ -462,8 +438,8 @@ fn many_threads_worker_panic_propagates() {
     let raw_nodes = 200_000_000; // about the big instance's tree
     for threads in MANY {
         let dir = TempDir::new(&format!("panic{threads}"));
-        let ckpt = dir.path("ckpt.bin");
-        let spill = dir.path("spill");
+        let ckpt = dir.join("ckpt.bin");
+        let spill = dir.join("spill");
         let cfg = EngineConfig {
             checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))),
             node_limit: Some(raw_nodes / 10),
@@ -490,7 +466,7 @@ fn many_threads_worker_panic_propagates() {
 fn tiny_queue_cap_spills_and_cleans_up() {
     let inst = instance();
     let dir = TempDir::new("spill");
-    let spill = dir.path("spill");
+    let spill = dir.join("spill");
     let cfg = EngineConfig { queue_mem_cap: 2, spill_dir: Some(spill.clone()), ..config(4) };
     let out = solve(&cfg, fresh(), &inst);
     assert!(out.completed);
@@ -535,8 +511,8 @@ fn checkpoint_resume_one_thread_is_exact() {
     let inst = instance();
     let raw = raw_search(&inst);
     let dir = TempDir::new("resume1");
-    let ckpt = dir.path("ckpt.bin");
-    let spill = dir.path("spill");
+    let ckpt = dir.join("ckpt.bin");
+    let spill = dir.join("spill");
     let cfg = EngineConfig {
         checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))),
         node_limit: Some(raw.nodes / 7),
@@ -558,8 +534,8 @@ fn checkpoint_resume_many_threads() {
     let inst = instance();
     let raw = raw_search(&inst);
     let dir = TempDir::new("resume4");
-    let ckpt = dir.path("ckpt.bin");
-    let spill = dir.path("spill");
+    let ckpt = dir.join("ckpt.bin");
+    let spill = dir.join("spill");
     let cfg = EngineConfig {
         checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))),
         node_limit: Some(raw.nodes / 5),
@@ -579,7 +555,7 @@ fn checkpoint_resume_many_threads() {
 fn time_limit_stops_and_resumes() {
     let inst = instance();
     let dir = TempDir::new("time");
-    let ckpt = dir.path("ckpt.bin");
+    let ckpt = dir.join("ckpt.bin");
     let cfg = EngineConfig {
         checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))),
         time_limit: Some(Duration::from_millis(5)),
@@ -613,7 +589,7 @@ fn declare_optimal_stops_promptly() {
 fn frequent_checkpoints_do_not_deadlock() {
     let inst = instance();
     let dir = TempDir::new("frequent");
-    let ckpt = dir.path("ckpt.bin");
+    let ckpt = dir.join("ckpt.bin");
     let cfg = EngineConfig { checkpoint: Some((ckpt.clone(), Duration::from_millis(1))), ..config(4) };
     let out = solve(&cfg, fresh(), &inst);
     assert!(out.completed);
@@ -626,8 +602,8 @@ fn frequent_checkpoints_do_not_deadlock() {
 fn checkpoints_with_progress_and_spill_on_ten_threads() {
     let inst = instance();
     let dir = TempDir::new("busy");
-    let ckpt = dir.path("ckpt.bin");
-    let spill = dir.path("spill");
+    let ckpt = dir.join("ckpt.bin");
+    let spill = dir.join("spill");
     let cfg = EngineConfig {
         checkpoint: Some((ckpt.clone(), Duration::from_millis(3))),
         progress: Some(Duration::from_millis(20)),
@@ -647,8 +623,8 @@ fn checkpoints_with_progress_and_spill_on_ten_threads() {
 fn worker_panic_propagates() {
     let inst = instance();
     let dir = TempDir::new("panic");
-    let ckpt = dir.path("ckpt.bin");
-    let spill = dir.path("spill");
+    let ckpt = dir.join("ckpt.bin");
+    let spill = dir.join("spill");
     let cfg = EngineConfig {
         checkpoint: Some((ckpt.clone(), Duration::from_millis(1))),
         queue_mem_cap: 2,
@@ -670,7 +646,7 @@ fn worker_panic_propagates() {
 fn resume_rejects_wrong_header_and_damaged_files() {
     let inst = instance();
     let dir = TempDir::new("reject");
-    let ckpt = dir.path("ckpt.bin");
+    let ckpt = dir.join("ckpt.bin");
     let cfg = EngineConfig {
         checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))),
         node_limit: Some(100_000),
@@ -709,8 +685,8 @@ fn spill_failure_stops_without_losing_work() {
     use std::os::unix::fs::PermissionsExt;
     let inst = instance();
     let dir = TempDir::new("spillfail");
-    let ckpt = dir.path("ckpt.bin");
-    let spill = dir.path("spill");
+    let ckpt = dir.join("ckpt.bin");
+    let spill = dir.join("spill");
     fs::create_dir_all(&spill).unwrap();
     fs::set_permissions(&spill, fs::Permissions::from_mode(0o555)).unwrap();
     let cfg = EngineConfig {
@@ -749,16 +725,11 @@ fn empty_start_completes() {
 fn stress() {
     let iterations: u64 = std::env::var("TXENGINE_STRESS").ok().and_then(|s| s.parse().ok()).unwrap_or(200);
     let seed: u64 = std::env::var("TXENGINE_STRESS_SEED").ok().and_then(|s| s.parse().ok()).unwrap_or(0);
-    let mut rng = 0x9e37_79b9_7f4a_7c15u64 ^ seed.wrapping_mul(0xd1b5_4a32_d192_ed03);
-    let mut pick = |options: &[u64]| {
-        rng ^= rng << 13;
-        rng ^= rng >> 7;
-        rng ^= rng << 17;
-        options[(rng % options.len() as u64) as usize]
-    };
+    let mut rng = Rng(0x9e37_79b9_7f4a_7c15u64 ^ seed.wrapping_mul(0xd1b5_4a32_d192_ed03));
+    let mut pick = |options: &[u64]| rng.pick(options);
     let dir = TempDir::new("stress");
-    let ckpt = dir.path("ckpt.bin");
-    let spill = dir.path("spill");
+    let ckpt = dir.join("ckpt.bin");
+    let spill = dir.join("spill");
     for it in 0..iterations {
         let inst = Instance::new(pick(&[36, 40, 44]) as usize, 10_000, pick(&[7, 99, 0x5eed_1234]));
         let opt = inst.dp();

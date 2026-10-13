@@ -156,16 +156,32 @@ pub fn moves_digest(moves: &[u32]) -> String {
     format!("{hash:016x}")
 }
 
-/// The build this binary comes from (set by `build.rs`): `{"commit": hash, "dirty": bool}`, with `null` for
-/// what is not known (no git checkout).  `dirty` means the sources differed from the commit.
-pub fn build_json() -> Json {
+/// The build this binary comes from, as `build.rs` recorded it when the crate was compiled; `None` for what was
+/// not known then (not a git checkout, or no `git`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Build {
+    /// The hash of `HEAD`.
+    pub commit: Option<&'static str>,
+    /// Whether the sources differed from that commit.
+    pub dirty: Option<bool>,
+}
+
+/// The build this binary comes from.
+pub fn build() -> Build {
     let commit = env!("TAXMAN_GIT_COMMIT");
     let dirty = match env!("TAXMAN_GIT_DIRTY") {
-        "true" => Json::Bool(true),
-        "false" => Json::Bool(false),
-        _ => Json::Null,
+        "true" => Some(true),
+        "false" => Some(false),
+        _ => None,
     };
-    Json::object([("commit", if commit.is_empty() { Json::Null } else { Json::from(commit) }), ("dirty", dirty)])
+    Build { commit: (!commit.is_empty()).then_some(commit), dirty }
+}
+
+/// [`build`] as the `build` field of a result line: `{"commit": hash, "dirty": bool}`, with `null` for what is not
+/// known.
+pub fn build_json() -> Json {
+    let Build { commit, dirty } = build();
+    Json::object([("commit", commit.map_or(Json::Null, Json::from)), ("dirty", dirty.map_or(Json::Null, Json::Bool))])
 }
 
 // ---------------------------------------------------------------------------------------------------------
