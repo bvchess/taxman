@@ -102,6 +102,11 @@ impl<const W: usize> Nogoods<W> {
         self.sets.is_empty()
     }
 
+    /// The nogoods, in the order they were learned.
+    pub fn sets(&self) -> &[Bits<W>] {
+        &self.sets
+    }
+
     /// Adds the nogood `n` (non-empty, members up to the table's `max_number`), forgetting every other one first
     /// if the table is full.
     pub fn insert(&mut self, n: Bits<W>) {

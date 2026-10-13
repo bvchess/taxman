@@ -34,7 +34,7 @@
 //!        ▼
 //!       search::search ───────────────► engine::run: threads, shared deque with disk spill, checkpoints
 //!        │                               └ Stepper::step per node: matchbound → conflicts, forced
-//!        │                                 members, nogoods → branch → child
+//!        │                                 members, nogoods → Lagrangian bound → branch → child
 //!        ▼
 //!       promotions ──► hives::Apiary ──► the moves ──► game::replay ──► score, results line
 //! ```
@@ -57,7 +57,7 @@
 //! | | [`frames`] | hives stacked into frames, and the promotion candidates |
 //! | | [`model`] | the search state: frames, winnability, promotion, conflicts, nogoods |
 //! | | [`accelerate`] | deriving the game of `n` from the game of `n − 1` without a search; promotions → moves |
-//! | search | [`matchbound`] | the matching bound: the default upper bound on a node's completions |
+//! | search | [`matchbound`] | the matching bound, the default upper bound on a node's completions; the Lagrangian bound |
 //! | | [`search`] | the branch-and-bound searcher, its tactics, its setup and checkpoint header |
 //! | | [`bounds`] | the Java solver's bound (`blameGame`), preclusions, the greedy incumbent, candidate lists |
 //! | engine | [`engine`] | the problem-independent parallel depth-first driver: threads, spill, checkpoints |

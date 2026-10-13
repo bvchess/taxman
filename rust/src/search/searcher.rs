@@ -14,6 +14,7 @@
 //! both checks compare with that value, even after one of them has offered a better incumbent.
 
 use super::diagnostics::{cut, Probe};
+use super::lagrange::{Lagrangian, Refits};
 use super::refine::{strongest, Learning, Refiner, Verdict};
 use super::setup::Prepared;
 use super::tactics::Branching;
@@ -88,6 +89,11 @@ pub struct SearchSpace<'a, const W: usize> {
     /// After how many of its steps a searcher forgets the nogoods it knows (tactic `forget_nogoods`: every
     /// [`NOGOOD_PERIOD`]), if ever.
     pub nogood_period: Option<u64>,
+    /// With the Lagrangian bound over the nogoods (tactic `lagrange`, with `match_bound` and `nogoods`), when each
+    /// searcher refits its multipliers ([`Refits::SEARCH`]).
+    pub lagrange: Option<Refits>,
+    /// The root's candidates (where the Lagrangian bound's multipliers are fitted).
+    pub candidates: Bits<W>,
     /// The largest number in the root's frames.
     pub root_max: u32,
     /// The most promotions a promotion set can have (`maxTotalPromotions`; see [`Prepared::max_total`]).
@@ -122,6 +128,8 @@ impl<'a, const W: usize> SearchSpace<'a, W> {
             fix_forced: tactics.fix_forced,
             nogoods: tactics.match_bound && tactics.nogoods,
             nogood_period: tactics.forget_nogoods.then_some(NOGOOD_PERIOD),
+            lagrange: (tactics.match_bound && tactics.nogoods && tactics.lagrange).then_some(Refits::SEARCH),
+            candidates: prepared.candidates,
             root_max: prepared.root.frames().iter().filter_map(|f| (f.moves | f.factors).max()).max().unwrap_or(0),
             max_total: prepared.max_total,
             rule: tactics.rule(),
@@ -278,6 +286,8 @@ struct Stepper<'a, const W: usize> {
     /// The nogoods learned (tactic `nogoods`), and the steps taken since the table was last cleared.
     nogoods: Option<Nogoods<W>>,
     steps_since_clear: u64,
+    /// The Lagrangian bound over the nogoods along the path (tactic `lagrange`).
+    lagrange: Option<Lagrangian<'a, W>>,
     counts: Counts,
     /// The incumbents offered, encoded.
     payload: Vec<u8>,
@@ -297,6 +307,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 conflict_cache: ConflictCache::default(),
                 nogoods: space.nogoods.then(|| Nogoods::new(space.root_max, NOGOOD_CAPACITY)),
                 steps_since_clear: 0,
+                lagrange: space.lagrange.zip(space.match_graph).map(|(refits, graph)| Lagrangian::new(graph, refits)),
                 counts: Counts::default(),
                 payload: Vec::with_capacity(8 * W),
                 probe: space.diagnostics.map(Probe::new),
@@ -323,6 +334,9 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         }
         if let Some(matching) = &mut self.stepper.matching {
             matching.reset(&unit.promoted, &unit.cands);
+        }
+        if let Some(lagrange) = &mut self.stepper.lagrange {
+            lagrange.start();
         }
     }
 
@@ -352,7 +366,7 @@ impl<const W: usize> Searcher<TaxUnit<W>> for TaxSearcher<'_, W> {
             }
             ctx.stats().nodes += 1; // the engine's "nodes" are steps
             let next = self.step(depth, ctx);
-            self.stepper.forget_nogoods_when_due();
+            self.stepper.forget_nogoods_when_due(ctx);
             match next {
                 Next::Child => depth += 1,
                 Next::Same => {}
@@ -384,13 +398,13 @@ impl<'a, const W: usize> Stepper<'a, W> {
 
         let open = match self.check_node(node, need, ctx) {
             Ok(open) => open,
-            Err(reason) => return self.end_loop(reason, pushed),
+            Err(reason) => return self.end_loop(reason, &node.promoted, pushed),
         };
         if let Some(p) = &mut self.probe {
             p.open(&mut self.bounds, &mut self.matching, self.space.model, node, need);
         }
         let Some(branch) = self.choose_branch(node, open, need) else {
-            return self.end_loop(cut::FORCED, pushed);
+            return self.end_loop(cut::FORCED, &node.promoted, pushed);
         };
         let Some(max_next) = self.make_child(node, child, &branch) else {
             if let Some(p) = &mut self.probe {
@@ -445,7 +459,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
             return Ok(Open { conflict: Some(checked.conflict), forced: checked.forced });
         }
         let wants_conflict = self.space.conflict_branching != Branching::Largest;
-        let open = self.check(&node.state, node.promoted, need, wants_conflict, ctx);
+        let open = self.check(&node.state, &node.promoted, &node.cands, need, wants_conflict, ctx);
         node.known_end = self.known.len(); // the conflicts the check found hold for the node and its subtree
         open
     }
@@ -585,7 +599,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
         if let Some(m) = &mut self.matching {
             m.push_all(added, &cands);
         }
-        match self.check(&child.state, child.promoted, need, false, ctx) {
+        match self.check(&child.state, &child.promoted, &cands, need, false, ctx) {
             Ok(open) => {
                 child.checked = open.conflict.map(|conflict| Checked { need, conflict, forced: open.forced });
                 if let (Some(p), Some(m)) = (&mut self.probe, &mut self.matching) {
@@ -597,21 +611,27 @@ impl<'a, const W: usize> Stepper<'a, W> {
                 if let Some(m) = &mut self.matching {
                     m.pop();
                 }
+                if let Some(l) = &mut self.lagrange {
+                    l.leave(&child.promoted);
+                }
                 Err(reason)
             }
         }
     }
 
-    /// The matching check of the node on top of the matching stack, whose state is `state` and promotions
-    /// `promoted`, at `need` (see [`Refiner`]).  `Err(reason)`: its matching bound is below `need` ([`cut::MATCH`]),
-    /// or brought below it by refining or by forced members ([`cut::REFINED`]), or its heaviest matching can be
-    /// promoted ([`cut::EXACT`], the best completion, offered).  Else the conflict to branch on (when
-    /// `wants_conflict`, or found by refining) and the forced members.  A promotable completion that refining
-    /// finds is offered too.  Without the `match_bound` tactic the node goes on (`blameGame` has decided).
+    /// The matching check of the node on top of the matching stack, whose state is `state`, promotions `promoted`
+    /// and candidates `cands`, at `need` (see [`Refiner`]).  `Err(reason)`: its matching bound is below `need`
+    /// ([`cut::MATCH`]), or brought below it by refining or by forced members ([`cut::REFINED`]), or its heaviest
+    /// matching can be promoted ([`cut::EXACT`], the best completion, offered), or with the tactic `lagrange` the
+    /// Lagrangian bound is below `need` ([`cut::LAGRANGE`]).  Else the conflict to branch on (when
+    /// `wants_conflict`, or found by refining) and the forced members (of the matching and of the Lagrangian
+    /// bound).  A promotable completion that refining finds is offered too.  Without the `match_bound` tactic the
+    /// node goes on (`blameGame` has decided).
     fn check(
         &mut self,
         state: &FrameSet<W>,
-        promoted: Bits<W>,
+        promoted: &Bits<W>,
+        cands: &Bits<W>,
         need: u64,
         wants_conflict: bool,
         ctx: &mut Ctx<'_, TaxUnit<W>>,
@@ -626,9 +646,13 @@ impl<'a, const W: usize> Stepper<'a, W> {
         }
         let depth = space.match_refine;
         if depth == 0 && !wants_conflict {
+            // A child's check without refinement (`match_refine` 0) goes no further, the Lagrangian bound included:
+            // the child's first step checks it again, looking for its conflict.
             return Ok(Open::NONE);
         }
+        let promoted = *promoted;
         let learning = self.nogoods.as_mut().map(|table| Learning { table, root: space.root, promoted });
+        let forcing = space.fix_forced && space.conflict_branching == Branching::ConflictStrong;
         let mut refiner = Refiner {
             m,
             model: space.model,
@@ -641,7 +665,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
             computed: 0,
             exact: Bits::EMPTY,
             learning,
-            forcing: space.fix_forced && space.conflict_branching == Branching::ConflictStrong,
+            forcing,
             forced: Bits::EMPTY,
         };
         let verdict = refiner.top(depth, wants_conflict);
@@ -658,14 +682,20 @@ impl<'a, const W: usize> Stepper<'a, W> {
                 self.offer(ctx, &(promoted | q));
                 Err(cut::EXACT)
             }
-            Verdict::Open(conflict) => Ok(Open { conflict, forced }),
+            Verdict::Open(conflict) => match &mut self.lagrange {
+                None => Ok(Open { conflict, forced }),
+                Some(l) => match l.check(&promoted, cands, need, forcing) {
+                    None => Err(cut::LAGRANGE),
+                    Some(more) => Ok(Open { conflict, forced: forced | more }),
+                },
+            },
         }
     }
 
-    /// Ends the node's loop for `reason`: the search goes back to the parent, whose matching level is then on top
-    /// again (`pushed`: the node had one of its own).
+    /// Ends the loop of the node with the promotions `promoted` for `reason`: the search goes back to the parent,
+    /// whose matching level is then on top again (`pushed`: the node had one of its own).
     #[inline]
-    fn end_loop(&mut self, reason: usize, pushed: bool) -> Next {
+    fn end_loop(&mut self, reason: usize, promoted: &Bits<W>, pushed: bool) -> Next {
         if let Some(p) = &mut self.probe {
             p.loop_end(reason);
         }
@@ -673,6 +703,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
             if let Some(m) = &mut self.matching {
                 m.pop();
             }
+        }
+        if let Some(l) = &mut self.lagrange {
+            l.leave(promoted);
         }
         Next::Parent
     }
@@ -699,9 +732,13 @@ impl<'a, const W: usize> Stepper<'a, W> {
         }
     }
 
-    /// With the tactic `forget_nogoods`, forgets the nogoods every [`SearchSpace::nogood_period`] steps.
+    /// With the tactic `forget_nogoods`, forgets the nogoods every [`SearchSpace::nogood_period`] steps; with the
+    /// tactic `lagrange`, refits the Lagrangian bound's multipliers when due, first.
     #[inline]
-    fn forget_nogoods_when_due(&mut self) {
+    fn forget_nogoods_when_due(&mut self, ctx: &Ctx<'_, TaxUnit<W>>) {
+        if let (Some(l), Some(table)) = (&mut self.lagrange, &self.nogoods) {
+            l.step(table, &self.space.candidates, ctx.best());
+        }
         if let (Some(table), Some(period)) = (&mut self.nogoods, self.space.nogood_period) {
             self.steps_since_clear += 1;
             if self.steps_since_clear >= period {

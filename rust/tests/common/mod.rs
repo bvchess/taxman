@@ -25,6 +25,7 @@ use taxman::matchbound::MatchGraph;
 use taxman::model::{FrameSet, Model, Scratch};
 use taxman::numtheory::Tables;
 use taxman::results::Taint;
+use taxman::search::lagrange::Refits;
 use taxman::search::{search, Branching, SearchSpace, SearchTactics, TaxSearcher, TaxUnit, NOGOOD_PERIOD};
 use taxman::solver::{Prev, PrevSource, SolveOptions};
 
@@ -202,6 +203,8 @@ pub struct Config {
     pub nogoods: bool,
     /// After how many of its steps a searcher forgets its nogoods; `None` for never.
     pub period: Option<u64>,
+    /// When a searcher refits the multipliers of its Lagrangian bound; `None` without that bound.
+    pub refits: Option<Refits>,
     pub preclusions: bool,
     pub threads: usize,
 }
@@ -220,6 +223,7 @@ impl Config {
             fix_forced: t.fix_forced,
             nogoods: t.nogoods,
             period: t.forget_nogoods.then_some(NOGOOD_PERIOD),
+            refits: (t.match_bound && t.nogoods && t.lagrange).then_some(Refits::SEARCH),
             preclusions: t.preclusions,
             threads: 1,
         }
@@ -309,6 +313,8 @@ impl<const W: usize> Game<W> {
             fix_forced: cfg.fix_forced,
             nogoods: cfg.nogoods && cfg.matching,
             nogood_period: cfg.period,
+            lagrange: cfg.refits.filter(|_| cfg.nogoods && cfg.matching),
+            candidates: self.candidates,
             root_max: self.root.frames().iter().filter_map(|f| (f.moves | f.factors).max()).max().unwrap_or(0),
             max_total: self.max_total,
             rule: RunnerUp::Sound,

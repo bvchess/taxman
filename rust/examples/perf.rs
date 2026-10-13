@@ -4,7 +4,8 @@
 //! fingerprint unchanged; one that changes the tree on purpose changes the window's.
 //!
 //! ```text
-//! cargo run --release --example perf -- [--reps R] [--steps K] [--brief] [--fixtures DIR] [GAME...]
+//! cargo run --release --example perf -- [--reps R] [--steps K] [--brief] [--fixtures DIR] [--tactic NAME=VALUE]...
+//!     [GAME...]
 //! cargo run --release --example perf -- make-nodes N [--known FILE] [--every K] [--keep M] [--fixtures DIR]
 //! cargo run --release --example perf -- make-window N AT [--known FILE] [--fixtures DIR]
 //! ```
@@ -25,7 +26,9 @@
 //!   some nodes, resumed on one thread for `--steps` steps (default 50,000, one period of forgetting nogoods).  A
 //!   resumed search starts with empty nogood tables, so the window is the same tree every time, and its
 //!   fingerprint is the search's counters (steps, promotions, children, matching bounds, ...).  The checkpoint
-//!   is read-only.
+//!   is read-only.  The window searches with the tactics the checkpoint records, which `--tactic` changes (the
+//!   search tactics only, as for the ladder): the fixtures predate the tactic `lagrange`, so they read back with
+//!   it on, its default, and `--tactic lagrange=off` gives the tree of the build before it.
 //!
 //! Each kernel runs `--reps` times (default 3; the window 2) and the fastest by cycles is reported, per
 //! operation and in all; the fingerprints of all runs must agree.  The incremental matching kernels (marked `+`)
@@ -51,6 +54,7 @@ use taxman::matchbound::{MatchBound, MatchGraph};
 use taxman::model::{Lookup, Model, Nogoods, Scratch};
 use taxman::search::{search, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
 use taxman::solver::SolveOptions;
+use taxman::tactics::Tactics;
 
 /// The games whose fixtures the probe runs by default.
 const GAMES: [u32; 2] = [936, 1215];
@@ -452,10 +456,27 @@ fn kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> Resul
 // ---------------------------------------------------------------------------------------------------------
 // F3: the search window
 
-fn window<const W: usize>(n: u32, path: &Path, steps: u64, reps: u32, report: &mut Report) -> Result<(), String> {
-    let p = Board::<W>::for_n(n)
+/// The window of the checkpoint `path` of game `n`: `steps` steps, with the tactics the checkpoint records changed
+/// by `changes` (`name=value`, search tactics only).
+fn window<const W: usize>(
+    n: u32,
+    path: &Path,
+    steps: u64,
+    changes: &[String],
+    reps: u32,
+    report: &mut Report,
+) -> Result<(), String> {
+    let mut p = Board::<W>::for_n(n)
         .prepare_for_resume(path, 1)
         .map_err(|e| format!("{}: {e} (make it again with `perf make-window`)", path.display()))?;
+    let mut tactics = Tactics { search: p.tactics, ..Tactics::default() };
+    for change in changes {
+        tactics.set(change).map_err(|e| format!("--tactic: {e}"))?;
+    }
+    if tactics != (Tactics { search: tactics.search, ..Tactics::default() }) {
+        return Err("--tactic: the window only searches, so only search tactics apply".into());
+    }
+    p.tactics = tactics.search;
     let graph = MatchGraph::new(&p.model, &p.root);
     let space = SearchSpace::new(&p, Some(&graph), None);
     let header = engine::read_checkpoint_header(path).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -596,6 +617,7 @@ fn run() -> Result<(), String> {
         _ => None,
     };
     let (mut reps, mut steps, mut brief, mut known, mut every, mut keep) = (3, 50_000, false, None, 100_000, 300);
+    let mut changes = Vec::new();
     let mut dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("testdata/perf");
     let mut numbers = Vec::new();
     while let Some(arg) = args.next() {
@@ -609,6 +631,7 @@ fn run() -> Result<(), String> {
             "--every" => every = parse(value("--every")?)?,
             "--keep" => keep = parse(value("--keep")?)? as usize,
             "--fixtures" => dir = PathBuf::from(value("--fixtures")?),
+            "--tactic" => changes.push(value("--tactic")?),
             _ => numbers.push(parse(arg)?),
         }
     }
@@ -630,7 +653,7 @@ fn run() -> Result<(), String> {
             for n in games {
                 taxman::with_width!(n, W => {
                     kernels::<W>(&fixture(&dir, n, "nodes"), reps, &mut report)?;
-                    window::<W>(n, &fixture(&dir, n, "window.ckpt"), steps, reps, &mut report)?;
+                    window::<W>(n, &fixture(&dir, n, "window.ckpt"), steps, &changes, reps, &mut report)?;
                 });
             }
             let g = |x: u64| x as f64 / 1e9;

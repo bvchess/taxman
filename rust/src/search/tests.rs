@@ -523,8 +523,9 @@ fn units_and_headers_round_trip() {
     assert!(other(|h| h.tactics.nogoods = !h.tactics.nogoods).contains("tactics"));
 
     // Every setting of the search tactics reads back as it was written, and the default tactics of a checkpoint
-    // made before `fix_forced`, `nogoods` and `forget_nogoods` existed (0x19d) read back with them on, as they
-    // are now; so do those of one made before `forget_nogoods` (0x19c, the preclusions off).
+    // made before `fix_forced`, `nogoods`, `forget_nogoods` and `lagrange` existed (0x19d) read back with them on,
+    // as they are now; so do those of one made before `forget_nogoods` (0x19c, the preclusions off).  Bit 11 is
+    // `forget_nogoods` off, bit 12 `lagrange` off, and no higher bit is used.
     let default = SearchTactics::default();
     for refine in [0, 1, 7] {
         for branching in Branching::ALL {
@@ -539,6 +540,7 @@ fn units_and_headers_round_trip() {
                     fix_forced: on,
                     nogoods: off,
                     forget_nogoods: on,
+                    lagrange: off,
                 };
                 assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
             }
@@ -547,7 +549,8 @@ fn units_and_headers_round_trip() {
     assert_eq!(SearchTactics::from_bits(0x19d), Ok(SearchTactics { preclusions: true, ..default }));
     assert_eq!(SearchTactics::from_bits(0x19c), Ok(default));
     assert_eq!(SearchTactics::from_bits(0x19c | 1 << 11), Ok(SearchTactics { forget_nogoods: false, ..default }));
-    assert!(SearchTactics::from_bits(1 << 12).is_err());
+    assert_eq!(SearchTactics::from_bits(0x19c | 1 << 12), Ok(SearchTactics { lagrange: false, ..default }));
+    assert!(SearchTactics::from_bits(1 << 13).is_err());
 }
 
 // ---- benchmark: cargo test --release bench_search -- --ignored --nocapture --test-threads=1 ----

@@ -82,6 +82,7 @@ fn every_tactic_gives_the_same_scores() {
             "fix_forced=off",
             "nogoods=off",
             "forget_nogoods=off",
+            "lagrange=off",
         ]
         .map(with),
     );
@@ -245,7 +246,7 @@ fn a_checkpoint_for_another_game_or_other_tactics_is_refused() {
     assert!(!solver::solve_game_with(600, None, &opts, Some(&optimal)).unwrap().completed);
     let checkpoint = dir.0.join("n0600.ckpt");
 
-    // Other tactics: each of the nine search tactics (a checkpoint records them all), the switches turned the other
+    // Other tactics: each of the ten search tactics (a checkpoint records them all), the switches turned the other
     // way and the two settings that are not switches changed.
     let assignments = [
         "preclusions=on",
@@ -255,6 +256,7 @@ fn a_checkpoint_for_another_game_or_other_tactics_is_refused() {
         "fix_forced=off",
         "nogoods=off",
         "forget_nogoods=off",
+        "lagrange=off",
         "branching=largest",
         "match_refine=0",
         "match_refine=2",

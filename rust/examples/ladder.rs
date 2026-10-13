@@ -3,7 +3,7 @@
 //!
 //! ```text
 //! cargo run --release --example ladder -- [--threads T[,T...] | --scaling] [--seconds S] [--diag] [--no-cap]
-//!     [--no-seed] [--seed-opt] [--known FILE] [--tactic NAME=VALUE]... N...
+//!     [--no-seed] [--seed-opt] [--known FILE] [--tactic NAME=VALUE]... [--node-limit N] N...
 //! ```
 //!
 //! Each game is set up from the frame builder (no golden data) as `taxman solve` sets it up (`taxman::board::Board`,
@@ -17,7 +17,8 @@
 //! and the engine's activity ([`Counters::summary`]: effective parallelism, idle and lock-wait time, splits,
 //! steals, time to full occupancy).  `--diag` collects [`Diagnostics`] (slower) and prints a summary.
 //! `--tactic` sets a search tactic with the names and values of `taxman solve --tactic` (`preclusions=off`,
-//! `branching=largest`, `match_refine=0`, ...).
+//! `branching=largest`, `match_refine=0`, ...).  `--node-limit N` stops each search after N nodes (steps), for
+//! measuring a prefix of a search too long to finish.
 //!
 //! Scaling: `--threads` takes a list of thread counts, and `--scaling` is 1, 2, 4, ... up to the available
 //! parallelism (which is included).  Each game is searched with each count in turn, and a table per game (and
@@ -52,6 +53,7 @@ struct Options {
     known: Option<PathBuf>,
     tactics: SearchTactics,
     games: Vec<u32>,
+    node_limit: Option<u64>,
 }
 
 fn parse() -> Result<Options, String> {
@@ -65,6 +67,7 @@ fn parse() -> Result<Options, String> {
         known: None,
         tactics: SearchTactics::default(),
         games: Vec::new(),
+        node_limit: None,
     };
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -89,6 +92,9 @@ fn parse() -> Result<Options, String> {
             "--no-seed" => o.seed = false,
             "--seed-opt" => o.seed_opt = true,
             "--known" => o.known = Some(value("--known")?.into()),
+            "--node-limit" => {
+                o.node_limit = Some(value("--node-limit")?.parse().map_err(|e| format!("--node-limit: {e}"))?)
+            }
             "--tactic" => {
                 // The solver's parser, so that the names and values are the same as for `taxman solve --tactic`.
                 let spec = value("--tactic")?;
@@ -231,7 +237,12 @@ fn run<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Vec<Row> {
     };
     let mut rows = Vec::new();
     for &threads in &o.threads {
-        let cfg = EngineConfig { threads, time_limit: Some(Duration::from_secs(o.seconds)), ..EngineConfig::default() };
+        let cfg = EngineConfig {
+            threads,
+            time_limit: Some(Duration::from_secs(o.seconds)),
+            node_limit: o.node_limit,
+            ..EngineConfig::default()
+        };
         let diag = o.diag.then(|| Mutex::new(Diagnostics::default()));
         let r = search_with(&p, &cfg, seed.as_ref(), cap, false, diag.as_ref()).expect("search");
         let found = match r.found {

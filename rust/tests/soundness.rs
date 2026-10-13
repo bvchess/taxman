@@ -18,10 +18,14 @@ use taxman::frames::build_frames;
 use taxman::game::Optimal;
 use taxman::model::{FrameSet, Model, Scratch};
 use taxman::numtheory::Tables;
+use taxman::search::lagrange::Refits;
 use taxman::search::{prepare, Branching, SearchTactics, TaxUnit};
 
 /// Every tactic that acts inside the search, alone and in the combinations that matter, with the forgetting of
-/// nogoods at the production period, every step, every third, and never; on one thread and two.
+/// nogoods at the production period, every step, every third, and never; on one thread and two.  The Lagrangian
+/// bound (tactic `lagrange`) refits its multipliers only after 2,000 steps, which most of these searches never
+/// take, so the last configurations refit them after the first few steps and every few steps after that (with and
+/// without forgetting at the same time, refinement, and a second thread), and one turns it off.
 fn configs() -> Vec<Config> {
     let base = Config::standard();
     vec![
@@ -45,6 +49,11 @@ fn configs() -> Vec<Config> {
         Config { threads: 2, ..base },
         Config { threads: 2, period: Some(2), ..base },
         Config { threads: 2, refine: 0, ..base },
+        Config { refits: Some(Refits { first: 1, every: 4 }), ..base },
+        Config { refits: Some(Refits { first: 3, every: 9 }), period: Some(9), ..base },
+        Config { refits: Some(Refits { first: 1, every: 4 }), refine: 0, ..base },
+        Config { refits: Some(Refits { first: 2, every: 5 }), threads: 2, ..base },
+        Config { refits: None, ..base },
     ]
 }
 
@@ -82,6 +91,43 @@ fn a_search_from_a_handicapped_incumbent_finds_the_optimum() {
         }
     }
     assert!(runs > 4000, "{runs} runs");
+}
+
+/// Games 301 to 600 (every tenth), whose searches take a few hundred to a few thousand steps, from an incumbent
+/// worth 1 or 5 less than `optimal.json`'s promotion sum, with the Lagrangian bound refitted early and often (with
+/// the nogoods forgotten at the same time, and on two threads): in the games above, few searches are long enough
+/// for its multipliers to have much to fit.
+#[test]
+fn a_search_with_the_lagrangian_bound_from_a_handicapped_incumbent_finds_the_optimum() {
+    let optimal = Optimal::load_default().unwrap();
+    let base = Config::standard();
+    let configs = [
+        Config { refits: Some(Refits { first: 10, every: 60 }), ..base },
+        Config { refits: Some(Refits { first: 25, every: 100 }), period: Some(100), ..base },
+        Config { refits: Some(Refits { first: 10, every: 60 }), threads: 2, ..base },
+    ];
+    let runs =
+        lagrangian_runs::<8>(&optimal, 301..=511, &configs) + lagrangian_runs::<16>(&optimal, 512..=600, &configs);
+    assert!(runs > 150, "{runs} runs");
+}
+
+/// The searches of [`a_search_with_the_lagrangian_bound_from_a_handicapped_incumbent_finds_the_optimum`] of the
+/// games `ns` (every tenth of them) at width `W`.
+fn lagrangian_runs<const W: usize>(optimal: &Optimal, ns: std::ops::RangeInclusive<u32>, configs: &[Config]) -> usize {
+    let mut runs = 0;
+    for n in ns.filter(|n| n % 10 == 1) {
+        let Some(game) = Game::<W>::of_board(n) else { continue };
+        let truth = optimal_sum::<W>(optimal, n).unwrap();
+        for cfg in configs {
+            for k in [1, 5] {
+                let out = game.search(*cfg, vec![game.root_unit()], truth - k, None, None);
+                runs += 1;
+                assert!(out.completed, "n={n} {cfg:?} from {}: not completed", truth - k);
+                assert!(out.best == truth && out.real, "n={n} {cfg:?} from {}: truth {truth}, got {out:?}", truth - k);
+            }
+        }
+    }
+    runs
 }
 
 /// Units of game `n` at width `W`, after up to 14 random promotions, with their candidates thinned to 6 to 23 (the
@@ -198,22 +244,24 @@ fn a_search_resumed_over_and_over_finds_the_optimum() {
     let optimal = Optimal::load_default().unwrap();
     let dir = TempDir::new("churn");
     // Game 600 takes 7,000 to 17,000 nodes from an incumbent that far below the optimum (two threads: the count
-    // depends on timing), so a limit of 1,000 stops it at least six times in each of the two configurations: the
-    // default tactics, and the searchers forgetting their nogoods every two steps.  The bound below only checks that
-    // the resuming really happened; it leaves room for the smallest trees a loaded machine produces.
+    // depends on timing), so a limit of 1,000 stops it at least six times in each of the three configurations: the
+    // default tactics, the searchers forgetting their nogoods every two steps, and their Lagrangian bounds refitted
+    // every four.  The bound below only checks that the resuming really happened; it leaves room for the smallest
+    // trees a loaded machine produces.
     let truth = optimal_sum::<16>(&optimal, 600).unwrap();
-    let resumes = resumed_over_and_over::<16>(600, truth, 30, 1000, &dir, &[0, 18]);
+    let resumes = resumed_over_and_over::<16>(600, truth, 30, 1000, &dir, &[0, 18, 20]);
     assert!(resumes >= 10, "only {resumes} resumes");
 }
 
 /// The same at W = 20, 24 and 64, on game 1133 (its truth from `results/strict.jsonl`) from an incumbent 400 below
-/// it, stopped every 60 nodes or so: the default tactics, and forgetting the nogoods every two or three steps.
+/// it, stopped every 60 nodes or so: the default tactics, forgetting the nogoods every two or three steps, and
+/// refitting the Lagrangian bound every four.
 #[test]
 fn a_wide_search_resumed_over_and_over_finds_the_optimum() {
     let n = 1133;
     let truth = stored_games("strict.jsonl")[&n].0 - Board::<20>::for_n(n).in_the_bag;
     let dir = TempDir::new("churn-wide");
-    let resumes = resumed_over_and_over::<20>(n, truth, 400, 60, &dir, &[0, 18])
+    let resumes = resumed_over_and_over::<20>(n, truth, 400, 60, &dir, &[0, 18, 20])
         + resumed_over_and_over::<24>(n, truth, 400, 60, &dir, &[0])
         + resumed_over_and_over::<64>(n, truth, 400, 60, &dir, &[2]);
     assert!(resumes > 10, "only {resumes} resumes");

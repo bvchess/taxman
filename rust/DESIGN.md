@@ -144,7 +144,7 @@ up:
 |---|---|---|
 | foundations | `game`, `numtheory`, `bits`, `json` | the rules as a referee and the table of optimal games; maximal factors and composites; fixed-width bitsets; a small JSON reader and writer |
 | frame model | `hives`, `frames`, `model`, `accelerate` | the board as hives and frames; the search state (frames, winnability, promotion, conflicts, nogoods); deriving a game from the previous one |
-| search | `matchbound`, `search`, `bounds` | the matching bound; the branch-and-bound searcher with its setup and checkpoint header; the Java's bound, preclusions, greedy incumbent and candidate lists |
+| search | `matchbound`, `search`, `bounds` | the matching bound, and the Lagrangian bound over nogoods built on it; the branch-and-bound searcher with its setup and checkpoint header; the Java's bound, preclusions, greedy incumbent and candidate lists |
 | engine | `engine` | the problem-independent parallel depth-first driver |
 | solving | `tactics`, `board`, `solver`, `results`, `paths` | the switchable tactics; a board prepared for a search; the per-game pipeline and the range driver; what a result records and the checks of a results file; the default files |
 | studies | `brute`, `sacrifice` | exhaustive search to certify small boards; the sacrifice bound and punctured games (not used by the solver) |
@@ -293,6 +293,39 @@ is *forced*: every completion that beats the incumbent promotes it.
   pair, say), which in another branch is a nogood of two or more members.  The promotions that fail are under 4%
   of steps, so little is left to save.
 
+### The Lagrangian bound over the nogoods
+
+The matching bound knows no nogood, and its heaviest matching often promotes all of one.  The *Lagrangian bound*
+(tactic `lagrange`) takes them in.  At a node with promotions `P` and candidates `C`, a nogood `N` is *live* when its
+members outside `P` are all still candidates; every completion then leaves out one of them, `|F ∩ N| ≤ |N − P| − 1`.
+Moving these inequalities into the objective with multipliers `λ_N ≥ 0`, as Lagrangian relaxation does in integer
+programming, gives a bound for any multipliers (weak duality): the heaviest matching with each candidate weighed by
+its number less the multipliers of the live nogoods it is in, plus `Σ λ_N (|N − P| − 1)`.  It is computed in integers
+(weights in 64ths, nothing rounded); the module comment of `matchbound::lagrange` has the argument.
+
+* **Incremental.**  A second stack of matching levels, with weights of their own (`matchbound::lagrange`; the
+  levels and the Hungarian repairs are the matching bound's, generic over how a level weighs its candidates).  A
+  level is made for a node when the bound is asked for there, from the nearest level on its path: what the node
+  promoted is promoted, the candidates it no longer has are dropped, and the live nogoods they were in die, so the
+  weights of their other members *rise*, which needs a repair only where a member's potential must rise past a tight
+  edge.  Weights fall only when the multipliers change, and then the levels are dropped and solved afresh.  A level
+  costs about what a matching level does.
+* **Where, and what for.**  At every check of a node or a child that the matching bound and refinement leave open:
+  below `need` it cuts (cut reason `lagrange`); otherwise the members of its heaviest matching without which the
+  bound, read off its potentials as `bound_excluding` reads the matching's, would be below `need` are forced members
+  too (every completion that beats the incumbent promotes them), and with `fix_forced` the node's child promotes
+  them with the matching's.  The forced members are most of the gain.
+* **The multipliers.**  Each searcher fits its own, at the root, to the nogoods it has learned: after 2,000 of its
+  steps and then just before each forgetting of its table (every 50,000), 50 subgradient steps (Polyak's rule towards
+  what the root needs) over the table's nogoods and those of the multipliers it had, keeping the nogoods whose
+  multipliers are positive (`search::lagrange`).  Any multipliers give a bound, so the schedule decides speed only;
+  like the nogoods, the multipliers are a cache that units and checkpoints do not record, and the tree depends on
+  the searcher's history.  A search of fewer than 2,000 steps is unchanged.
+* **What it is worth.**  Proofs at the frontier (1184 to 1300) take 2 to 6 times fewer cycles on one thread, about 3
+  times on average, with no trend in n; the strict chain 1201–1231 on four threads 2.4 times less game time.  Each
+  step costs about half as much again, so a search whose time goes into finding the optimum late, as 992's does, is
+  slower (EXPERIMENTS: "A Lagrangian bound over the nogoods").
+
 ### The default step
 
 One step of a node's loop (`Stepper::step` in `src/search/searcher.rs`; the module comment of `src/search/mod.rs` says
@@ -311,6 +344,8 @@ need = best + 1 − sum(promoted)                   # the loop goes on while the
                 and if F is empty, refine it: bound the branches of K, match_refine levels deep
        refined branches all < need                 -> end the loop (cut)
      (with forced members the node's only child promotes them, and refining is left to it)
+     the Lagrangian bound over the nogoods < need  -> end the loop (cut)
+     F += the members of its heaviest matching without which it would be below need
 3. if K ⊆ F: end the loop (every completion beating the incumbent promotes all of K, which cannot be)
 4. n = a member of F if there are forced members, else the member of K whose removal lowers the bound most
 5. remove n from cands; if F is non-empty the node has nothing left to try after this child
@@ -318,16 +353,18 @@ need = best + 1 − sum(promoted)                   # the loop goes on while the
 7. child cands = the rest, narrowed, minus the members that a known conflict or a nogood rules out
 8. cut the child if the max_next largest of its cands sum below its need (max_next: how many more promotions the
    child can make among its remaining candidates, the child's own max_add), or its matching bound is below it,
-   or its heaviest matching is exact (offered as incumbent); a child that stays open keeps this verdict
-   for its first step; a child with no candidates is not pushed
+   or its heaviest matching is exact (offered as incumbent), or its Lagrangian bound is below it; a child that
+   stays open keeps this verdict, with its forced members, for its first step; a child with no candidates is not
+   pushed
 9. otherwise offer the child's own promotions as incumbent, and push it
 ```
 
-Exactness rests on four facts: the matching bound with refinement is an upper bound (above); every feasible completion
-leaves out a member of a conflict, so branching on a member and then going on without it explores every feasible set;
-forced members are promoted by every completion that can beat the incumbent; and nogoods and known conflicts hold at
-every node they are applied to (subset closure).  A node is cut only when its bound is below `need` (a completion that
-merely ties the incumbent is of no use), and a unit rebuilt from a checkpoint is a node whose bound can only be tighter.
+Exactness rests on four facts: the matching bound with refinement is an upper bound (above), and so is the Lagrangian
+bound, for any multipliers; every feasible completion leaves out a member of a conflict, so branching on a member and
+then going on without it explores every feasible set; forced members (the matching's and the Lagrangian bound's) are
+promoted by every completion that can beat the incumbent; and nogoods and known conflicts hold at every node they are
+applied to (subset closure).  A node is cut only when its bound is below `need` (a completion that merely ties the
+incumbent is of no use), and a unit rebuilt from a checkpoint is a node whose bound can only be tighter.
 `tests/soundness.rs` attacks each of these (section 9).
 
 ### The starting incumbent, the cap and the seed
@@ -369,6 +406,7 @@ tactics of `tactics::Tactics`, in order, with their defaults, and grades exactly
 | `fix_forced` | on | sound (every completion that beats the incumbent promotes them) | with `conflict-strong` branching, a node's child promotes all its forced candidates; the node's loop ends after that child |
 | `nogoods` | on | sound (a nogood holds at every node; see `model::Nogoods`) | learn each conflict as a nogood of the root and use the table at every node, for the conflict to branch on and refine with and to rule candidates out of children (needs `match_bound`) |
 | `forget_nogoods` | on | sound (the table is a cache) | with `nogoods`, each searcher forgets every nogood it knows after each 50,000 of its steps |
+| `lagrange` | on | proven (weak duality, for any multipliers over valid nogoods; `matchbound::lagrange`) | with `nogoods`, where the matching bound and refinement leave a node open, bound it also by a Lagrangian relaxation of the searcher's nogoods kept along its path, and (with `fix_forced`) force the members without which that bound would cut; the multipliers are refitted at the root as the searcher learns (section 4) |
 | `legacy_bound` | off | unsound (the runner-up defect) | reproduce the Java bound exactly |
 | `prev_cap` | on | proven if opt(n−1) is optimal | stop as soon as the incumbent reaches n + opt(n−1) − in_the_bag (`FrameSolver.getMaxPromotionSum`) |
 | `seed_incumbent` | on | sound (any feasible promotion set is a valid incumbent) | start from the better of greedy and the n−1 solution's promotions that are still feasible |
@@ -386,9 +424,9 @@ below.  They define the search space and cannot be switched off inside this mode
 **Where tactics are recorded.**  A result line records the tactics it was produced with (`tactics`: the changes from
 the defaults, such as `branching=largest,match_refine=0`; `tactic_switches`: every tactic's value), whether any
 unproven tactic was on, and which ones the game's proof actually rests on (`taint`, section 8).  A checkpoint
-records the nine search tactics and is refused when they differ (the error names each tactic that differs and the
+records the ten search tactics and is refused when they differ (the error names each tactic that differs and the
 `--tactic` flags that resume it); one made before a sound search tactic existed (`fix_forced`, `nogoods`,
-`forget_nogoods`) reads back with it at its default.
+`forget_nogoods`, `lagrange`) reads back with it at its default.
 
 ## 6. Engine
 
@@ -545,19 +583,25 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
 * **Regression**: `taxman regress --to N` solves 1..N as one range and checks every score against optimal.json (the
   Java's own test: 146 accelerated games in 1..200).
 * **Tactic invariance**: the regression with each unproven tactic off must give identical scores; so must games 1..300
-  forced to search with each sound tactic off or changed, and a checkpoint is refused when any of the nine search
+  forced to search with each sound tactic off or changed, and a checkpoint is refused when any of the ten search
   tactics differs.
 * **Bound soundness**: on small frame sets, the upper bound is never below the exhaustively computed best completion;
   the same for the matching bound and its refinement by conflicts (whose exact completions must be promotable, and
-  whose conflicts, carried down a path, must stay conflicts).  Conflicts and cores are checked against promoting the
-  sets.
+  whose conflicts, carried down a path, must stay conflicts), and for the Lagrangian bound over nogoods of the root
+  with fitted and random multipliers.  The incremental solvers agree with the reference min-cost flow (with the
+  Lagrangian weights, live nogoods and constant worked out afresh, under random relaxations changed mid-walk) and
+  with a solver started afresh, and their levels pass the optimality certificate.  Conflicts and cores are checked
+  against promoting the sets.
 * **Soundness harness** (`tests/soundness.rs`): the search is started with an incumbent worth 1 or 5 less than the
   optimum and an empty payload, so that any pruning that loses every best completion leaves the fake incumbent in place
-  (this tests the `<` and `<=` boundaries too): every game 2..=300 under each of 20 configurations (every tactic,
-  forgetting every step, every third, never; one thread and two); the same for 500 perturbed frame sets (numbers
+  (this tests the `<` and `<=` boundaries too): every game 2..=300 under each of 25 configurations (every tactic,
+  forgetting every step, every third, never; the Lagrangian bound refitted every few steps; one thread and two), and
+  games 301..=600 (every tenth, searches of hundreds to thousands of steps) with the Lagrangian bound refitted early
+  and often, where it cuts and forces thousands of times; the same for 500 perturbed frame sets (numbers
   dropped, role flipped, moved a frame; half of them with frame 0's freedoms revised as `prepare` does) with the truth
   found exhaustively; promoting a set at once against one by one in random orders, conflicts and nogoods on perturbed
-  models; and searches interrupted every 1,500 nodes and resumed from a checkpoint with units spilling.  Units of real
+  models; and searches interrupted every 1,000 nodes and resumed from a checkpoint with units spilling, one of them
+  with the Lagrangian bound refitted every four steps.  Units of real
   boards at W = 20 to 64 (thinned so that the truth is found exhaustively) from a handicapped incumbent, and game 1133
   resumed every 60 nodes at W = 20, 24 and 64, carry the harness past the widths of the Java's table (n ≤ 1000).  A
   perturbed game whose revision changes the best sum is left out: the search takes the revised freedoms for a fact about
@@ -566,7 +610,7 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   assertion on answers sees it (a mutant that ignored the result of `Nogoods::ruled_out` costs 27 to 67 % more nodes).
   With one thread the tree is deterministic, so the exact node count of a fixed game under fixed tactics (n = 480 to
   1133, every tactic off or changed in turn) is asserted, and the tree of game 600 with the searchers forgetting their
-  nogoods every 500 steps.  **A change that alters the tree on purpose fails them.**  Run `cargo test --test tripwires
+  nogoods every 500 steps; the rows with `lagrange=off` are the trees of the build before that tactic.  **A change that alters the tree on purpose fails them.**  Run `cargo test --test tripwires
   -- --nocapture`: it prints the rows as observed, in the layout of the table at the top of the file; check that the
   promotion sums (the answers) have not moved, paste the rows in, and update any node counts quoted in the docs.
 * **Engine** (`tests/engine.rs`, `tests/robustness.rs`, `tests/stop_signal.rs`): a toy problem with a known optimum
@@ -627,7 +671,10 @@ on the machine moves wall times by up to 3×.  What measures what:
   conflicts, the matching from scratch and warm-started, bounds without each member, strong branching's exact solves,
   children, nogood lookups and rule-outs).  F2: the frame checks of those promotions.  F3: a checkpoint of each proof
   resumed on one thread for 50,000 steps, one period of forgetting nogoods: the search itself, fingerprinted by its
-  counters.  About 5 s in all; `perf make-nodes` and `perf make-window` make the fixtures again, deterministically.
+  counters, with the tactics its checkpoint records (`--tactic` changes them).  The fixtures predate the tactic
+  `lagrange`, so they read back with it on; `--tactic lagrange=off` gives the windows of the build before it, and the
+  fingerprint 6197a47eae6cf8c8 of that build, and with it on the fingerprint is 36981d0eaeeae319.  About 5 s in all;
+  `perf make-nodes` and `perf make-window` make the fixtures again, deterministically.
   For whole searches, `/usr/bin/time -l` reports the same counters per process.
 * **Profile-guided optimization** (`tools/pgo.sh`): an instrumented build runs the probe and a short search at every
   set width (code a profile never saw is optimized as cold), and `-Cprofile-use` builds `target/pgo/release/taxman` and
@@ -636,7 +683,8 @@ on the machine moves wall times by up to 3×.  What measures what:
   On Linux, rustup's `llvm-tools` has an llvm-profdata that matches rustc's LLVM, and the script adds whatever
   `RUSTFLAGS` it is given (for instance `-C target-cpu=native`, which a plain build does not use) to the profile flags.
 * **The ladder** (`cargo run --release --example ladder -- [--threads T[,T…] | --scaling] [--seconds S] [--diag]
-  [--seed-opt] [--known FILE] [--tactic …] N…`; its flags are documented at the top of `examples/ladder.rs`): standalone
+  [--seed-opt] [--known FILE] [--tactic …] [--node-limit N] N…`; its flags are documented at the top of
+  `examples/ladder.rs`): standalone
   searches of hard games from the frame builder, seeded from the known n − 1 game and capped as the solver does, each
   with a time limit; it reports completion, nodes, time, when the final incumbent was found, and the engine's counters.
   `--seed-opt` seeds with the game for n itself, to measure the proof alone; `--diag` prints `search::Diagnostics`
@@ -661,7 +709,10 @@ grows by a factor of ten for every 55 to 70 in n past 1200 ([bench/curve/README.
 committed `results/strict.jsonl` (the strict chain 1..1300 by commit bd9bb5d, on 6 threads of an M1 Max shared with
 another CPU-heavy job) records 3359 s of search, 2866 s of it for 1232–1300; its slowest game is 1232 at 439 s
 ([results/README.md](results/README.md)).  The Hungarian repairs of the matching are about 46% of the time, the peels
-24%, the bounds from the potentials 7%, the node's own work 7%, level copies 4% and nogood lookups 3%.
+24%, the bounds from the potentials 7%, the node's own work 7%, level copies 4% and nogood lookups 3%.  All of this is
+without the Lagrangian bound (tactic `lagrange`, section 4), which came later: with it the proof of 1215 takes 1.1 M
+nodes and 34 G cycles instead of 5.5 M and 108 G, 1184 1.6 G cycles, and the strict chain 1201–1231 on four threads
+117 s of game time instead of 283 s (EXPERIMENTS: "A Lagrangian bound over the nogoods").
 
 ## 11. Status and what is left
 
@@ -672,6 +723,8 @@ optimal.json too, by `taxman extend-optimal`); the cost-curve study's
 with unproven tactics on) is kept as a historical record (`results/README.md` says what supports each score).  The
 production chain on a many-core machine can start from `strict.jsonl` (`tools/cloud/RUNBOOK.md`), and a strict chain
 from n = 1 reproduces its scores.  What is left to try: the incumbents of games like 992 and 1025, whose optimum the
-search reaches late; cheaper matching repairs (the largest cost); a warm-started unit rebuild; and, for the many-core
-machine, whatever its first sweep shows that a laptop cannot.  Nothing about scaling beyond 8 threads or about
-Graviton has been measured (`tools/cloud/RUNBOOK.md`, section 8).
+search reaches late (the Lagrangian bound makes 992 slower); cheaper matching repairs (the largest cost); whether
+refinement still pays with the Lagrangian bound (four proofs took 0 to 26% fewer cycles without it); refits of the
+Lagrangian multipliers that keep the levels instead of solving them afresh; a warm-started unit rebuild; and, for the
+many-core machine, whatever its first sweep shows that a laptop cannot.  Nothing about scaling beyond 8 threads or
+about Graviton has been measured (`tools/cloud/RUNBOOK.md`, section 8).
