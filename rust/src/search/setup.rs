@@ -25,6 +25,8 @@ use std::time::{Duration, Instant};
 /// of the best (max-sum) set the two-frame search returns, which bounds the sizes only by the unproven conjecture
 /// of the tactic: that the max-sum set also has the max count.  Either way the number is a count of promotions
 /// into frame 0, so it is at least 0 and at most the freedoms frame 0 was built with: revising only lowers them.
+///
+/// A results line records the value in its `Debug` form (`setup.revise`), which [`Revise::parse`] reads back.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Revise {
     /// The tactic is off (also for a search resumed from the checkpoint of a game that was set up with it off).
@@ -49,6 +51,40 @@ pub enum Revise {
     /// The search resumed a checkpoint of a game that was set up with the tactic on, and frame 0's freedoms in it
     /// are the ones frame 0 was built with: whatever revising did then, it changed nothing the search uses.
     ResumedAsBuilt,
+}
+
+impl Revise {
+    /// Whether frame 0's freedoms in the search come from the tactic, so that the search rests on its conjecture:
+    /// [`GreedyIsMax`](Revise::GreedyIsMax), [`Searched`](Revise::Searched) and
+    /// [`FromCheckpoint`](Revise::FromCheckpoint), even when the number is the one frame 0 was built with.
+    pub fn sets_frame_zero(self) -> bool {
+        matches!(self, Revise::GreedyIsMax(_) | Revise::Searched { .. } | Revise::FromCheckpoint)
+    }
+
+    /// The value whose `Debug` form is `text`, which is how a results line records it (`setup.revise`, say
+    /// `"Searched { size: 3, nodes: 9 }"`); `None` if `text` is not exactly that form of a value.
+    pub fn parse(text: &str) -> Option<Revise> {
+        let inside = |prefix: &str, suffix: &str| text.strip_prefix(prefix)?.strip_suffix(suffix);
+        let parsed = match text {
+            "Off" => Revise::Off,
+            "NotNeeded" => Revise::NotNeeded,
+            "Unchanged" => Revise::Unchanged,
+            "FromCheckpoint" => Revise::FromCheckpoint,
+            "ResumedAsBuilt" => Revise::ResumedAsBuilt,
+            _ => {
+                if let Some(size) = inside("GreedyIsMax(", ")") {
+                    Revise::GreedyIsMax(size.parse().ok()?)
+                } else if let Some(fields) = inside("Searched { size: ", " }") {
+                    let (size, nodes) = fields.split_once(", nodes: ")?;
+                    Revise::Searched { size: size.parse().ok()?, nodes: nodes.parse().ok()? }
+                } else {
+                    Revise::Stopped { nodes: inside("Stopped { nodes: ", " }")?.parse().ok()? }
+                }
+            }
+        };
+        // The numbers as `Debug` writes them: no sign, no leading zeros.
+        (format!("{parsed:?}") == text).then_some(parsed)
+    }
 }
 
 /// Wall times of [`prepare`]'s phases.

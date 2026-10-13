@@ -441,6 +441,45 @@ fn seeds_and_caps() {
     assert_eq!(worse.sum, optimum.sum);
 }
 
+/// What revising did reads back from the form a results line records it in, and nothing else reads as a value.
+#[test]
+fn revise_values_read_back_from_their_results_form() {
+    let values = [
+        Revise::Off,
+        Revise::NotNeeded,
+        Revise::GreedyIsMax(0),
+        Revise::GreedyIsMax(u32::MAX),
+        Revise::Unchanged,
+        Revise::Searched { size: 12, nodes: 8 },
+        Revise::Searched { size: u32::MAX, nodes: u64::MAX },
+        Revise::Stopped { nodes: 4321 },
+        Revise::FromCheckpoint,
+        Revise::ResumedAsBuilt,
+    ];
+    for value in values {
+        assert_eq!(Revise::parse(&format!("{value:?}")), Some(value));
+    }
+    let taints: Vec<bool> = values.iter().map(|v| v.sets_frame_zero()).collect();
+    assert_eq!(taints, [false, false, true, true, false, true, true, false, true, false]);
+    let near_misses = [
+        "",
+        "off",
+        "Off ",
+        "GreedyIsMax(+4)",
+        "GreedyIsMax(04)",
+        "GreedyIsMax(4294967296)",
+        "GreedyIsMax()",
+        "Searched { size: 12 }",
+        "Searched { nodes: 8, size: 12 }",
+        "Searched{ size: 12, nodes: 8 }",
+        "Stopped { nodes: -1 }",
+        "FromCheckpoint(3)",
+    ];
+    for text in near_misses {
+        assert_eq!(Revise::parse(text), None, "{text:?}");
+    }
+}
+
 #[test]
 fn units_and_headers_round_trip() {
     let unit = TaxUnit::<3> { promoted: Bits::from_slice(&[1, 64, 190]), cands: Bits::from_slice(&[0, 63, 127]) };

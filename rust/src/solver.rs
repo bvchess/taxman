@@ -820,8 +820,7 @@ fn conclude(
             return reject(result, format!("scored {score} but optimal.json says {expected}"));
         }
     }
-    let revise = result.setup.map(|s| format!("{:?}", s.revise));
-    let own = own_taint(result.method, revise.as_deref(), result.tactics.search.legacy_bound);
+    let own = own_taint(result.method, result.setup.map(|s| s.revise), result.tactics.search.legacy_bound);
     let proof = Proof::of(result.method, true, result.reached_cap).expect("a completed game has a proof");
     result.proof = Some(proof);
     result.taint = taint_of(own, proof, context.prev.map(|p| &p.taint));
