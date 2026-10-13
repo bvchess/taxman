@@ -91,6 +91,14 @@ pub fn field_str<'a>(line: &'a str, key: &str) -> Option<&'a str> {
     Some(&line[at..at + end])
 }
 
+/// The values of an integer-array field `"key":[a,b,...]` in a line written by [`Obj`], if any.
+pub fn field_nums(line: &str, key: &str) -> Option<Vec<u64>> {
+    let pat = format!("\"{key}\":[");
+    let at = line.find(&pat)? + pat.len();
+    let end = line[at..].find(']')?;
+    line[at..at + end].split(',').filter(|s| !s.is_empty()).map(|s| s.parse().ok()).collect()
+}
+
 /// An append-only results file.  Opening drops a torn last line (one without its newline).
 pub struct Appender {
     file: File,
@@ -180,6 +188,35 @@ where
         }
         eprintln!("{name}: {count} written in {:.0}s", started.elapsed().as_secs_f64());
     });
+}
+
+/// The recorded game of each n, (score, moves), from files in optimal.json's or the solver's results format
+/// (the first "n", "score" and "moves" of each line holding an "n"); an earlier file wins over a later one.
+pub fn recorded_games(paths: &[&Path]) -> std::collections::BTreeMap<u64, (u64, Vec<u32>)> {
+    fn after<'a>(line: &'a str, key: &str) -> Option<&'a str> {
+        let at = line.find(&format!("\"{key}\""))? + key.len() + 2;
+        Some(line[at..].trim_start().strip_prefix(':')?.trim_start())
+    }
+    let number = |s: &str| s.chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse::<u64>().ok();
+    let mut known = std::collections::BTreeMap::new();
+    for path in paths {
+        let text = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        for line in text.lines() {
+            let game = || {
+                let n = number(after(line, "n")?)?;
+                let score = number(after(line, "score")?)?;
+                let moves = after(line, "moves")?.strip_prefix('[')?;
+                let moves = &moves[..moves.find(']')?];
+                let moves: Vec<u32> =
+                    moves.split(',').filter(|s| !s.trim().is_empty()).map(|s| s.trim().parse().unwrap()).collect();
+                Some((n, score, moves))
+            };
+            if let Some((n, score, moves)) = game() {
+                known.entry(n).or_insert((score, moves));
+            }
+        }
+    }
+    known
 }
 
 /// Parses `--from A --to B [--step S] [--list a,b,...]` into the items, and returns the other flags as pairs.

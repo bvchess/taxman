@@ -82,6 +82,10 @@ What is proven vs. trusted, precisely:
 | opt(n) ≤ n + opt(n−1) | proven (wiki) |
 | no upper half beats M\*, the max-weight *matchable* upper set | proven (lifting: every game's picks pair with distinct factors) |
 | U\* (`solve_upper_half`) equals the optimal game's upper half | measured, 1000/1000 |
+| U\* is the *unique* heaviest playable upper set (every other playable upper set is termwise below it) | theorem given (★) (THEORY.md, "Uniqueness of the optimal set", Theorem 8), so certified for every n ≤ 100,000 |
+| *every* optimal game, not just the recorded one, has upper part U\* | measured: every optimal set enumerated model-free (`rust/evidence`, section 5) in every completely enumerated game; open in general |
+| the optimal set (not just its upper half) is unique | measured for every n ≤ 424; **false** from 425 on, where some games have two or three optimal sets, differing by equal-sum exchanges below n/2 |
+| optimal sets of n from those of n−1: T ∪ {n} at a chain game, T − p + n (a bijection) at a prime | theorem (THEORY.md, Theorem 9) |
 | no *playable* upper set outweighs U\* | conjecture — proven wherever the jam is hyperedge-free (THEORY.md, "The frontier argument"); the single-sacrifice route is **false** in general (n=9170 witness).  Now known **equivalent to a pure cardinality claim** — descending greedy is maximum-cardinality on every component of the upper-half instance's incidence graph (THEORY.md, "The cardinality reformulation") — and **implied by a linear-algebra one**, (♦): every greedy rejection is a GF(2) dependency of the members kept above it (THEORY.md, "The span certificate").  **Certified for every game n = 2..100,000** and 902 sampled games to 2,000,000 by checking (♦) exactly (`rust/evidence`), zero counterexamples; the five components the earlier campaign left undecided are settled.  The full 3-prime padded-jam census (428 shapes, 22,909 trap orderings) closes with **zero unprotected traps**: every trap dies by monomial inversion or a window-forced guard (THEORY.md) |
 | greedy weight-optimality when the frontier jam has only ≤2-prime members | theorem (unique minimal core: forest + one edge; proof in THEORY.md) |
 | on members with ≤ 2 distinct primes, playable = forest in the factor-value graph | theorem (via the core characterization; verified on 89,400 random subsets) |
@@ -330,7 +334,11 @@ specifies it, has no effect on the result.
 **Theory-free certification** (`evaluation/certify.py`): optimal.json
 was produced by the same theory this project tests, so the audit uses
 none of it — exhaustive
-bitmask search (unique optimal upper sets confirmed through n=62),
+bitmask search (unique optimal upper sets confirmed through n=62;
+it enumerates the whole optimal pick sets too, which
+`rust/evidence/tools/crosscheck_optsets.py` compares with the
+model-free enumeration of every optimal set: they agree, one set
+each, for every n ≤ 57),
 the naive all-divisors matching bound, and opt(n) ≤ n + opt(n−1)
 chains.  No contradiction has ever been found by any audit.
 

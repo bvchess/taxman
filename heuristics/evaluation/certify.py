@@ -19,7 +19,9 @@ the factor game, or maximal-factor decompositions:
    pruning (a pick consumes a distinct extra number, so at most
    floor(|pot|/2) picks, each from the currently-pickable set).  For
    every game it completes, the true optimum is known unconditionally,
-   and every optimal solution's set of picks above N/2 is enumerated.
+   and every optimal solution's set of picks above N/2 is enumerated,
+   as are the whole pick sets (optimal_pick_sets), so the uniqueness of
+   the optimal pick set is checked without any theory too.
 
 3. Certificate chain: opt(N) <= N + opt(N-1), proved in one paragraph
    with no structural theory (N can never be tax, so an N-game that
@@ -58,11 +60,15 @@ import json
 import sys
 import time
 from pathlib import Path
-from typing import Dict, FrozenSet, List, Optional, Set, Tuple
+from typing import Callable, Dict, FrozenSet, List, Optional, Set, Tuple
 
 from core import check_sequence, divisor_lists, smallest_prime_factors, solve_upper_half
 from evaluation.bitpot import bits, divisor_masks, mask_of, multiple_masks, popcount
 from evaluation.verify import DEFAULT_OPTIMAL
+
+
+# Cap on distinct optimal whole pick sets enumerated per game (beyond it the game counts as non-unique).
+WHOLE_SET_CAP = 10_000
 
 
 class OutOfTime(Exception):
@@ -123,10 +129,11 @@ class Exact:
         self.memo[pot] = result
         return result
 
-    def optimal_upper_sets(
-        self, pot: int, cap: int = 64
+    def optimal_pick_sets(
+        self, pot: int, cap: int = 64, keep: Optional[Callable[[int], bool]] = None
     ) -> Optional[Set[FrozenSet[int]]]:
-        """Every set of >n/2 picks used by some optimal continuation."""
+        """Every set of picks c with keep(c) (all picks if keep is None) over all optimal
+        continuations from `pot`; None if more than `cap` distinct sets turn up at any state."""
         memo: Dict[int, Optional[Set[FrozenSet[int]]]] = {}
 
         def walk(state: int) -> Optional[Set[FrozenSet[int]]]:
@@ -149,7 +156,7 @@ class Exact:
                     memo[state] = None
                     return None
                 for tail in tails:
-                    found.add(tail | {c} if 2 * c > self.n else tail)
+                    found.add(tail | {c} if keep is None or keep(c) else tail)
                     if len(found) > cap:
                         memo[state] = None
                         return None
@@ -157,6 +164,12 @@ class Exact:
             return found
 
         return walk(pot)
+
+    def optimal_upper_sets(
+        self, pot: int, cap: int = 64
+    ) -> Optional[Set[FrozenSet[int]]]:
+        """Every set of >n/2 picks used by some optimal continuation."""
+        return self.optimal_pick_sets(pot, cap, lambda c: 2 * c > self.n)
 
 
 def main(argv: List[str] | None = None) -> int:
@@ -185,6 +198,7 @@ def main(argv: List[str] | None = None) -> int:
     brute_verified = 0
     upper_confirmed = 0
     upper_unique = 0
+    whole_unique = 0
     for n in range(1, args.brute_max + 1):
         solver = Exact(n, divs, time.monotonic() + args.budget)
         try:
@@ -199,7 +213,12 @@ def main(argv: List[str] | None = None) -> int:
             continue
         brute_verified = n
 
-        sets = solver.optimal_upper_sets(mask_of(range(1, n + 1)))
+        full_pot = mask_of(range(1, n + 1))
+        whole = solver.optimal_pick_sets(full_pot, cap=WHOLE_SET_CAP)
+        if whole is not None and len(whole) == 1:
+            whole_unique += 1
+
+        sets = solver.optimal_upper_sets(full_pot)
         ours = frozenset(solve_upper_half(n, spf)[0])
         if sets is not None:
             if len(sets) == 1:
@@ -214,7 +233,8 @@ def main(argv: List[str] | None = None) -> int:
           f"n=1..{brute_verified} (no theory assumed)")
     print(f"  our upper-half set appears in an optimal solution in "
           f"{upper_confirmed}/{brute_verified}; unique optimal upper set in "
-          f"{upper_unique}/{brute_verified}")
+          f"{upper_unique}/{brute_verified}; unique optimal set in "
+          f"{whole_unique}/{brute_verified}")
 
     # --- 3. matching upper bound (certifies games outright) ---------------
     matching_tight: Set[int] = set()

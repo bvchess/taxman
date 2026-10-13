@@ -7,12 +7,14 @@ Run with:  python3 -m pytest evaluation/test_taxman.py   (from heuristics/)
 """
 
 import json
+import time
 from pathlib import Path
 
 import pytest
 
 from core import (
     Infeasible,
+    divisor_lists,
     maximal_factors,
     optimize_mini,
     smallest_prime_factors,
@@ -20,7 +22,9 @@ from core import (
     solve_upper_half,
     upper_half_game,
 )
-from evaluation.verify import replay
+from evaluation.bitpot import mask_of
+from evaluation.certify import Exact
+from evaluation.verify import DEFAULT_OPTIMAL, replay
 
 SPF = smallest_prime_factors(1000)
 
@@ -398,6 +402,19 @@ def test_reference_continuation_matches_committed_chain():
             f"n={rec['n']}: reference score {rec['score']} != "
             f"committed {committed_scores[rec['n']]}"
         )
+
+
+def test_optimal_pick_set_is_unique_for_small_n():
+    # Theory-free: certify.Exact walks every optimal continuation over raw pot states, so the whole optimal pick
+    # set (not just its upper half) is enumerated.  For every n in 2..22 it is unique and equals the moves of
+    # optimal.json's game.
+    n_max = 22
+    optimal = {g["n"]: g for g in json.loads(DEFAULT_OPTIMAL.read_text())}
+    divs = divisor_lists(n_max)
+    for n in range(2, n_max + 1):
+        solver = Exact(n, divs, time.monotonic() + 60)
+        sets = solver.optimal_pick_sets(mask_of(range(1, n + 1)), cap=10_000)
+        assert sets == {frozenset(optimal[n]["moves"])}, f"n={n}: {sets}"
 
 
 def test_fm_bound_matches_published_values():

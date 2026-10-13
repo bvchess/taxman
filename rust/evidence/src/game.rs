@@ -20,7 +20,8 @@
 //! picks matched downward and the barred ones only as payments; if the matching's picks are playable they are a
 //! game worth the bound; otherwise they contain an unplayable subset K (shrunk to a minimal one), every
 //! playable set leaves out some member of K, and child j bars the j-th free member of K and forces the ones
-//! before it.
+//! before it.  With [`Prover::enumerate`] it lists every playable set with sum > V instead of stopping at the
+//! first (with V = opt(n) − 1, every optimal set).
 
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
@@ -581,9 +582,10 @@ impl MatchingBound {
 /// What the branch and bound concluded.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Verdict {
-    /// No playable set beats the target: opt(n) <= target.
+    /// No playable set beats the target: opt(n) <= target.  (Enumerating: every one that does is in
+    /// [`Prover::found`].)
     Proven,
-    /// A playable set with a larger sum (its picks).
+    /// A playable set with a larger sum (its picks).  (Enumerating: the one that reached the limit.)
     Beaten(Vec<u32>),
     /// The node budget ran out.
     Budget,
@@ -612,6 +614,11 @@ pub enum Verdict {
 ///   looks for.  The multipliers are fitted once (subgradient steps at the root, over the nogoods known then)
 ///   and fixed; the second matching runs alongside the first, incrementally the same way, and cuts nodes and
 ///   forces picks by the same rules.
+/// * **Enumeration** (with [`enumerate`](Self::enumerate)).  Every rule above cuts only sets with sum <= target,
+///   so the search can go on past a playable set P it finds: P is recorded, and the node's other sets are
+///   partitioned by the first free number on which they disagree with P, taking the numbers outside P first
+///   (child j forces the j-th of them and bars those before it), then P's own (all outside P barred, child j bars
+///   the j-th member of P and forces those before it: subsets of P, so lighter than P).
 pub struct Prover<'a> {
     board: &'a Board,
     bound: MatchingBound,
@@ -629,6 +636,10 @@ pub struct Prover<'a> {
     paused: bool,
     pending: Vec<Vec<Role>>,
     budget: u64,
+    /// The playable sets beating the target found so far, and how many to find before stopping (1 unless
+    /// enumerating).
+    pub found: Vec<Vec<u32>>,
+    limit: usize,
 }
 
 /// The Lagrangian matching: weights scaled by `scale`, picks penalized by the multipliers of their *active*
@@ -704,7 +715,18 @@ impl<'a> Prover<'a> {
             paused: false,
             pending: Vec::new(),
             budget,
+            found: Vec::new(),
+            limit: 1,
         }
+    }
+
+    /// Lists the playable sets beating the target instead of stopping at the first: the search stops at the
+    /// `limit`-th (returning it as [`Verdict::Beaten`]) or returns [`Verdict::Proven`] with every one of them in
+    /// [`found`](Self::found).
+    pub fn enumerate(mut self, limit: usize) -> Self {
+        assert!(limit >= 1);
+        self.limit = limit;
+        self
     }
 
     /// Turns on the segment cuts, given upper bounds `smaller[m]` on opt(m) for m = 0..n−1.
@@ -799,7 +821,8 @@ impl<'a> Prover<'a> {
         self.bound.solve(self.board, &roles).expect("nothing is forced").0
     }
 
-    fn root_roles(&self) -> Vec<Role> {
+    /// The roles at the root: every number free (0 and 1 barred, as they cannot be picked).
+    pub fn root_roles(&self) -> Vec<Role> {
         let mut roles = vec![Role::Free; self.board.n as usize + 1];
         roles[0] = Role::Barred;
         roles[1] = Role::Barred;
@@ -980,46 +1003,67 @@ impl<'a> Prover<'a> {
         // Branch on the violated conflict with the fewest free members (measured: better than the one dearest to
         // break, which doubles the tree at n = 600).  A known one also shows the picks unplayable without a peel.
         // (Branching on the Lagrangian matching's picks instead was measured: 13% more nodes at n = 793.)
+        //
+        // The children are given by a list of decisions (number, role): child j gives the numbers of the first j
+        // their roles and the j-th the other role (forced and barred swapped).  For a conflict every decision is
+        // "picked", so child j forces the conflict's first j free members and bars the next.
         let source = &picks;
+        let free_of = |k: &[u32]| -> Vec<(u32, Role)> {
+            k.iter().filter(|&&c| roles[c as usize] == Role::Free).map(|&c| (c, Role::Pick)).collect()
+        };
         let known = self
             .nogoods
             .iter()
             .filter(|k| k.iter().all(|&c| source[c as usize]))
             .min_by_key(|k| k.iter().filter(|&&c| roles[c as usize] == Role::Free).count());
-        let conflict = match known {
+        let decisions = match known {
             Some(k) => {
                 self.stats[1] += 1;
-                k.clone()
+                free_of(k)
+            }
+            None if self.board.playable(source) => {
+                let set: Vec<u32> = (2..=n).filter(|&c| source[c as usize]).collect();
+                self.found.push(set.clone());
+                if self.found.len() >= self.limit {
+                    return Verdict::Beaten(set);
+                }
+                // Enumerating: every other set of this node disagrees with the picks on a free number; the
+                // numbers outside the picks first, largest first, then the picks, largest first.
+                let free = || (2..=n).rev().filter(|&c| roles[c as usize] == Role::Free);
+                free()
+                    .filter(|&c| !source[c as usize])
+                    .map(|c| (c, Role::Barred))
+                    .chain(free().filter(|&c| source[c as usize]).map(|c| (c, Role::Pick)))
+                    .collect()
             }
             None => {
-                if self.board.playable(source) {
-                    return Verdict::Beaten((2..=n).filter(|&c| source[c as usize]).collect());
-                }
                 self.stats[0] += 1;
                 let k = self.board.minimal_unplayable(source);
+                let decisions = free_of(&k);
                 if self.nogoods.len() < self.max_nogoods {
-                    self.nogoods.push(k.clone());
+                    self.nogoods.push(k);
                 }
-                k
+                decisions
             }
         };
-        let branch: Vec<u32> = conflict.iter().copied().filter(|&c| roles[c as usize] == Role::Free).collect();
-        if branch.is_empty() {
+        if decisions.is_empty() {
             return Verdict::Proven;
         }
         if self.packing_cut(&roles, &picks, value) {
             self.stats[4] += 1;
             return Verdict::Proven;
         }
-        self.stats[3] += branch.len() as u64;
+        self.stats[3] += decisions.len() as u64;
         let (base_roles, snapshot) = (roles.clone(), self.bound.snapshot());
         let lag_snapshot = self.lag.as_ref().map(|l| l.m.snapshot());
         let child = |j: usize, roles: &[Role]| {
             let mut child = roles.to_vec();
-            branch[..j].iter().for_each(|&d| child[d as usize] = Role::Pick);
-            child[branch[j] as usize] = Role::Barred;
+            decisions[..j].iter().for_each(|&(d, role)| child[d as usize] = role);
+            let (d, role) = decisions[j];
+            child[d as usize] = if role == Role::Pick { Role::Barred } else { Role::Pick };
             child
         };
+        let branch = &decisions;
         for j in 0..branch.len() {
             if self.pause_due() {
                 // Leave this child and the rest as open units.
@@ -1103,6 +1147,88 @@ impl<'a> Prover<'a> {
 /// The largest prime below `n` (n >= 3).
 pub fn prime_below(n: u64, spf: &[u32]) -> u64 {
     (2..n).rev().find(|&p| is_prime(p, spf)).expect("n > 2")
+}
+
+/// How a recorded optimum V(n) meets the proven upper bounds from V(n − 1).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Relation {
+    /// V(n) = n + V(n − 1).
+    Chain,
+    /// n is prime and V(n) = n + V(n − 1) − p, p the largest prime below n.
+    Prime,
+    /// Neither.
+    None,
+}
+
+impl Relation {
+    pub fn name(self) -> &'static str {
+        match self {
+            Relation::Chain => "chain",
+            Relation::Prime => "prime",
+            Relation::None => "none",
+        }
+    }
+}
+
+/// Which relation V(n) = `score` meets, given V(n − 1) = `prev`.
+pub fn relation(n: u64, score: u64, prev: u64, spf: &[u32]) -> Relation {
+    if score == n + prev {
+        Relation::Chain
+    } else if n > 2 && is_prime(n, spf) && score == n + prev - prime_below(n, spf) {
+        Relation::Prime
+    } else {
+        Relation::None
+    }
+}
+
+/// Every optimal set of a game n >= 2 contains q, the largest prime <= n, and no other prime.  (Primes pay only
+/// with 1, so a playable set holds at most one.  q > n/2 divides no other number of the board, so it is no one's
+/// maximal factor; for a playable S without q, S minus its prime (if any) plus q is playable — the remaining
+/// members list 1 nowhere, so q pays with 1 — and heavier, since every other prime is below q.)  Returns q.
+pub fn the_prime_of_every_optimal_set(set: &[u32], n: u32, spf: &[u32]) -> Result<u32, String> {
+    let primes: Vec<u32> = set.iter().copied().filter(|&c| is_prime(u64::from(c), spf)).collect();
+    let q = (2..=n).rev().find(|&p| is_prime(u64::from(p), spf)).expect("n >= 2");
+    if primes == [q] {
+        Ok(q)
+    } else {
+        Err(format!("n={n}: the optimal set's primes are {primes:?}, not [{q}]"))
+    }
+}
+
+/// The optimal sets of game n from all those of game n − 1, when V(n) meets a relation and V(n − 1) = opt(n − 1):
+///
+/// * **Chain** (opt(n) = n + opt(n − 1)): a playable S without n is a game of n − 1, worth at most opt(n − 1),
+///   so every optimal S holds n, and S − n (playable: a subset; n is no one's factor) is worth opt(n − 1), an
+///   optimal set of n − 1.  So the optimal sets of n are the T + n, T optimal for n − 1, that are playable.
+/// * **Prime** (n prime, opt(n) = n + opt(n − 1) − p): every optimal S holds n (as for a chain, since n > p),
+///   so no other prime; S − n + p is playable (p > (n − 1)/2 is no one's maximal factor on either board, and
+///   pays with 1 as n did) and worth opt(n − 1).  Conversely every optimal T of n − 1 holds p (it holds the
+///   largest prime <= n − 1, [`the_prime_of_every_optimal_set`]) and T − p + n is playable and worth opt(n).
+///   So T ↦ T − p + n is a bijection: n has exactly as many optimal sets as n − 1.
+///
+/// `board` is game n's; `prev` must be every optimal set of n − 1 (for n = 2, the empty set).
+pub fn derive_optimal_sets(board: &Board, relation: Relation, prev: &[Vec<u32>], spf: &[u32]) -> Vec<Vec<u32>> {
+    let n = board.n;
+    let mut sets = Vec::new();
+    for t in prev {
+        let set: Vec<u32> = match relation {
+            Relation::Chain => t.iter().copied().chain([n]).collect(),
+            Relation::Prime => {
+                let p = prime_below(u64::from(n), spf) as u32;
+                assert!(t.contains(&p), "n={n}: an optimal set of n − 1 without {p}");
+                t.iter().copied().filter(|&c| c != p).chain([n]).collect()
+            }
+            Relation::None => panic!("n={n}: no relation to derive from"),
+        };
+        let mut pick = vec![false; n as usize + 1];
+        set.iter().for_each(|&c| pick[c as usize] = true);
+        let playable = board.playable(&pick);
+        assert!(playable || relation == Relation::Chain, "n={n}: a prime swap is always playable");
+        if playable {
+            sets.push(set);
+        }
+    }
+    sets
 }
 
 #[cfg(test)]
@@ -1252,6 +1378,112 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// Enumeration lists exactly the playable sets beating the target, each once, against brute force: at
+    /// opt − 1 (the optimal sets) and well below (where sets containing a found one also beat the target).
+    #[test]
+    fn enumeration_lists_every_set_beating_the_target() {
+        let spf = smallest_prime_factors(100);
+        for n in 2..=19u32 {
+            let board = Board::new(n, &spf);
+            let opt = brute(&board);
+            for below in [1u64, 4, 12] {
+                let Some(target) = opt.checked_sub(below) else { continue };
+                let mut want: Vec<Vec<u32>> = Vec::new();
+                for bits in 0u64..(1 << (n - 1)) {
+                    let set: Vec<u32> = (2..=n).filter(|&c| bits >> (c - 2) & 1 == 1).collect();
+                    if set.iter().map(|&c| u64::from(c)).sum::<u64>() > target {
+                        let mut pick = vec![false; n as usize + 1];
+                        set.iter().for_each(|&c| pick[c as usize] = true);
+                        if board.playable(&pick) {
+                            want.push(set);
+                        }
+                    }
+                }
+                let mut prover = Prover::new(&board, target, u64::MAX).enumerate(usize::MAX);
+                assert_eq!(prover.run(), Verdict::Proven, "n={n}");
+                let mut got = prover.found.clone();
+                got.sort();
+                want.sort();
+                assert_eq!(got, want, "n={n} target={target}");
+                // With a limit the search stops at the limit-th set.
+                if want.len() >= 2 {
+                    let mut limited = Prover::new(&board, target, u64::MAX).enumerate(2);
+                    assert!(matches!(limited.run(), Verdict::Beaten(_)), "n={n}");
+                    assert_eq!(limited.found.len(), 2);
+                }
+            }
+        }
+    }
+
+    /// Where V(n) meets the chain or prime relation, the optimal sets derived from those of n − 1 are the ones
+    /// enumerated directly; and every optimal set holds the largest prime <= n and no other.  Every game to 260
+    /// (optimal.json's values; the optimal set is unique in all of them but 2..260 still exercises both rules).
+    #[test]
+    fn derived_optimal_sets_are_the_enumerated_ones() {
+        let path = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../src/main/resources/optimal.json"));
+        let known = crate::jsonl::recorded_games(&[path]);
+        let spf = smallest_prime_factors(300);
+        let all = |n: u64| -> Vec<Vec<u32>> {
+            if n < 2 {
+                return vec![Vec::new()];
+            }
+            let board = Board::new(n as u32, &spf);
+            let mut prover = Prover::new(&board, known[&n].0 - 1, u64::MAX).enumerate(usize::MAX);
+            assert_eq!(prover.run(), Verdict::Proven);
+            let mut sets = prover.found;
+            sets.iter_mut().for_each(|s| s.sort_unstable());
+            sets.sort();
+            sets
+        };
+        let (mut derived, mut by_prime) = (0, 0);
+        let mut prev = all(1);
+        for n in 2..=260u64 {
+            let sets = all(n);
+            for s in &sets {
+                the_prime_of_every_optimal_set(s, n as u32, &spf).unwrap();
+            }
+            let rel = relation(n, known[&n].0, known.get(&(n - 1)).map_or(0, |g| g.0), &spf);
+            if rel != Relation::None {
+                let board = Board::new(n as u32, &spf);
+                let mut got = derive_optimal_sets(&board, rel, &prev, &spf);
+                got.iter_mut().for_each(|s| s.sort_unstable());
+                got.sort();
+                assert_eq!(got, sets, "n={n} {rel:?}");
+                derived += 1;
+                by_prime += usize::from(rel == Relation::Prime);
+            }
+            prev = sets;
+        }
+        assert!(derived > 100 && by_prime > 40, "{derived} {by_prime}");
+    }
+
+    /// The first game with two optimal sets: 424 has one, 425 has two (optimal.json's, and the one with
+    /// {110, 132, 168} exchanged for {98, 150, 162}), with the same upper part.
+    #[test]
+    fn game_425_has_two_optimal_sets() {
+        let path = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../src/main/resources/optimal.json"));
+        let known = crate::jsonl::recorded_games(&[path]);
+        let spf = smallest_prime_factors(500);
+        let sets = |n: u64| {
+            let board = Board::new(n as u32, &spf);
+            let mut prover = Prover::new(&board, known[&n].0 - 1, u64::MAX).enumerate(usize::MAX);
+            assert_eq!(prover.run(), Verdict::Proven);
+            prover.found
+        };
+        assert_eq!(sets(424).len(), 1);
+        let found = sets(425);
+        assert_eq!(found.len(), 2);
+        let recorded: Vec<u32> = {
+            let mut m = known[&425].1.clone();
+            m.sort_unstable();
+            m
+        };
+        let other: Vec<u32> = found.into_iter().find(|s| *s != recorded).expect("a second set");
+        let gone: Vec<u32> = recorded.iter().copied().filter(|c| !other.contains(c)).collect();
+        let new: Vec<u32> = other.iter().copied().filter(|c| !recorded.contains(c)).collect();
+        assert_eq!((gone, new), (vec![110, 132, 168], vec![98, 150, 162]));
     }
 
     /// Re-optimizing from a snapshot gives the same value as solving from scratch, along random chains of role
