@@ -80,7 +80,7 @@ pub const MAX_N: u32 = 64 * 64 - 1;
 /// Which table of optimal games a run compares its scores with and takes previous games from.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum OptimalSource {
-    /// The Java solver's table in the repository, found when the run starts ([`paths::optimal_json`]).
+    /// The table of optimal games in the repository, found when the run starts ([`paths::optimal_json`]).
     #[default]
     Repository,
     /// This file (`--optimal FILE`).

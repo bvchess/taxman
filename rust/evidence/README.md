@@ -13,7 +13,7 @@ method in it is tested against brute force.
 |---|---|---|---|
 | (★): descending greedy is maximum-cardinality on every component and truncation of the upper-half instance, hence U\* is the heaviest playable upper set (the upper-half conjecture) | 3,231 of 3,236 rejection-bearing components, n ≤ 1500 and 40 samples to 4000, plus n = 2873 and 9170; 5 undecided (n = 3103, 3872, 3936, 4000, 9170); scripts not kept | **every game n = 2 .. 100,000** (602,777,907 greedy rejections) and **902 games to 2,000,000** (60,183,674 more): every rejection a GF(2) linear dependency, which certifies (★) for the whole game; the five undecided components settled; no counterexample | certified per game (a bound met), open in general |
 | greedy removal of impossible sources in hives (`removeImpossible`) | agreement with optimal.json to 1000 | at the root (where it shapes the search space) it *is* descending greedy on each upper-half component, so it is certified with (★) for every n ≤ 100,000 | certified per game |
-| the frame model as a whole: `unzip`'s mandatory moves, free factor count, closed hives inert, one-level promotions, greedy removal | brute force (model-free) to n = 62; agreement with the Java's optimal.json, made by the same model, to 1000 | **opt(n) proven equal to the recorded score, model-free, for every n = 2 .. 989**, and for n = 999 .. 1019 (19 of them past optimal.json, the Rust solver's own results) | verified (exact, model-free) |
+| the frame model as a whole: `unzip`'s mandatory moves, free factor count, closed hives inert, one-level promotions, greedy removal | brute force (model-free) to n = 62; agreement with the Java's optimal.json, made by the same model, to 1000 | **opt(n) proven equal to the recorded score, model-free, for every n = 2 .. 989**, and for n = 999 .. 1019 (19 of them past the Java's 1000, the Rust solver's own results) | verified (exact, model-free) |
 
 What the evidence is, in one paragraph each:
 
@@ -161,7 +161,7 @@ taken 50–70 million nodes each, and 1020 and 1023–1027 several million, with
 saved in `data/checkpoints/exact_open_searches.tar.gz` (unpack into `work/` and rerun `exact` to continue).
 Games 991, 994, 997 and 998 meet the chain or prime relation and wait on their predecessors.  So the frame
 model's answer is the true optimum for every n ≤ 989 and for 999–1019, including 19 of the Rust solver's
-results past optimal.json: sixteen times the previous model-free reach (62), and evidence for every
+results past the Java's 1000: sixteen times the previous model-free reach (62), and evidence for every
 frame-model assumption at once.
 
 ## 4. Adversarial search: what protects greedy

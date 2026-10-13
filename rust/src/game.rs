@@ -1,4 +1,4 @@
-//! The rules of Taxman as an independent referee, and the Java solver's table of optimal games.
+//! The rules of Taxman as an independent referee, and the table of optimal games.
 //!
 //! # The rules
 //!
@@ -17,12 +17,16 @@
 //!   deliberately shares no code with the solver's number-theory tables ([`crate::numtheory`]): it uses only
 //!   divisibility and a plain "is it still in the pot" array, so a bug in a table cannot make a wrong game look
 //!   legal.  [`replay_punctured`] is the same referee for a board with holes (study code, [`crate::sacrifice`]).
-//! * [`Optimal`]: the Java solver's table `optimal.json` (an optimal game for every `n` up to 1000).  The solver
-//!   compares its answers with it and takes the previous game from it when it solves a board up to 1001.  It is
-//!   the Java's output, not a proof: the Java made it with `reuse_prev` and `revise_freedoms` on
+//! * [`Optimal`]: the table of optimal games `optimal.json` (an optimal game for every `n` it reaches: the Java
+//!   solver's for 1 to 1000, then the games of the strict chain `results/strict.jsonl`, which `taxman
+//!   extend-optimal` appends).  The solver compares its answers with it and takes the previous game from it when
+//!   it solves the board just past a game the table has.  It is a table, not a proof: the Java made its part with
+//!   `reuse_prev` and `revise_freedoms` on, and the file does not say which games are whose
 //!   ([`crate::results`] calls this the taint `optimal.json`).
 
 use crate::json::Json;
+use std::fs::{self, File};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 /// Plays `moves` on the board `1..=n` and returns the player's score (the sum of the moves).
@@ -153,7 +157,7 @@ fn is_prime(p: u32) -> bool {
 /// Sanity bound on `n` when reading a file of games, so a corrupt file cannot request a huge allocation.
 const MAX_PLAUSIBLE_N: u32 = 1 << 20;
 
-/// The known optimal games, by board size: the Java's `src/main/resources/optimal.json`, possibly overlaid with
+/// The known optimal games, by board size: the table `src/main/resources/optimal.json`, possibly overlaid with
 /// the completed games of results files ([`with_results`](Self::with_results)).  For each board size, the best
 /// score and a game that achieves it.
 pub struct Optimal {
@@ -226,6 +230,60 @@ impl Optimal {
             self.by_n.resize(n as usize + 1, None);
         }
         self.by_n[n as usize].replace((score, moves)).is_some()
+    }
+
+    /// Appends the game of board size `n`, which must be past every board size the table has: a table is extended
+    /// past its end, and its games are never replaced.
+    pub fn push(&mut self, n: u32, score: u64, moves: Vec<u32>) -> Result<(), String> {
+        if n <= self.max_n() {
+            return Err(format!("n={n} is not past the largest board size of the table, {}", self.max_n()));
+        }
+        if n > MAX_PLAUSIBLE_N {
+            return Err(format!("n={n} is more than the {MAX_PLAUSIBLE_N} that a table of games may hold"));
+        }
+        self.set(n, score, moves);
+        Ok(())
+    }
+
+    /// The table as the file `optimal.json` is written: an array with one game per line, `  { "n": 4, "score": 7,
+    /// "moves": [3, 4] }`, a comma after every line but the last, and no newline after the closing bracket.
+    /// [`Optimal::from_json`] reads the text back, and the text of the loaded `optimal.json` is that file byte
+    /// for byte.
+    pub fn to_file_text(&self) -> String {
+        let lines: Vec<String> = self
+            .games()
+            .map(|(n, score, moves)| {
+                let moves: Vec<String> = moves.iter().map(u32::to_string).collect();
+                format!("  {{ \"n\": {n}, \"score\": {score}, \"moves\": [{}] }}", moves.join(", "))
+            })
+            .collect();
+        if lines.is_empty() {
+            "[\n]".to_owned()
+        } else {
+            format!("[\n{}\n]", lines.join(",\n"))
+        }
+    }
+
+    /// Writes [`to_file_text`](Self::to_file_text) to `path` all or nothing: the text goes to `<path>.tmp`, which
+    /// is synced and renamed over `path` (as the engine writes a checkpoint), so a write that fails or is
+    /// interrupted leaves the old file as it was.
+    pub fn save(&self, path: &Path) -> Result<(), String> {
+        let mut tmp = path.as_os_str().to_owned();
+        tmp.push(".tmp");
+        let tmp = PathBuf::from(tmp);
+        let written = File::create(&tmp)
+            .and_then(|mut file| file.write_all(self.to_file_text().as_bytes()).and_then(|()| file.sync_all()))
+            .and_then(|()| fs::rename(&tmp, path));
+        if let Err(e) = written {
+            let _ = fs::remove_file(&tmp);
+            return Err(format!("{}: {e}", path.display()));
+        }
+        // Make the rename durable; not every platform can sync a directory, so this is best effort.
+        let dir = path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
+        if let Ok(dir) = File::open(dir) {
+            let _ = dir.sync_all();
+        }
+        Ok(())
     }
 
     /// The `(score, moves)` recorded for `n`, if any.
@@ -357,11 +415,13 @@ mod tests {
         let opt = Optimal::load_default().unwrap();
         // The parse is ~10 ms when optimized; the generous bound only guards against something quadratic.
         assert!(start.elapsed().as_secs_f64() < 1.0, "loading took {:?}", start.elapsed());
-        assert_eq!(opt.max_n(), 1000);
-        assert_eq!(opt.sizes().count(), 1000);
-        assert!(opt.sizes().eq(1..=1000));
+        // Every board size from 1 to the end of the table (the Java's 1000, and what has been appended since).
+        let top = opt.max_n();
+        assert!(top >= 1000);
+        assert_eq!(opt.sizes().count(), top as usize);
+        assert!(opt.sizes().eq(1..=top));
         // n = 0 and anything past the file are unknown.
-        assert_eq!((opt.score(0), opt.moves(0), opt.score(1001), opt.moves(1001)), (None, None, None, None));
+        assert_eq!((opt.score(0), opt.moves(0), opt.score(top + 1), opt.moves(top + 1)), (None, None, None, None));
         // n = 1 has score 0 and no moves.
         assert_eq!((opt.score(1), opt.moves(1)), (Some(0), Some(&[][..])));
         assert_eq!((opt.score(2), opt.moves(2)), (Some(2), Some(&[2][..])));
@@ -372,11 +432,61 @@ mod tests {
     #[test]
     fn every_optimal_game_replays_to_its_recorded_score() {
         let opt = Optimal::load_default().unwrap();
-        assert_eq!(opt.verify_all(), Ok(1000));
+        assert_eq!(opt.verify_all(), Ok(opt.max_n() as usize));
         // Also spot-check through replay() directly.
-        for n in [1, 2, 10, 100, 500, 1000] {
+        for n in [1, 2, 10, 100, 500, 1000, opt.max_n()] {
             assert_eq!(replay(n, opt.moves(n).unwrap()), Ok(opt.score(n).unwrap()), "n={n}");
         }
+    }
+
+    /// The text of a table is its file: `optimal.json` is read and written back byte for byte, and the shapes the
+    /// format has to get right (no games, one game, a game with no moves) read back.
+    #[test]
+    fn a_table_writes_the_file_it_was_read_from() {
+        let text = fs::read_to_string(Optimal::default_path()).unwrap();
+        assert_eq!(Optimal::load_default().unwrap().to_file_text(), text);
+        assert!(text.starts_with("[\n  { \"n\": 1, \"score\": 0, \"moves\": [] },\n  { \"n\": 2, \"score\": 2,"));
+        assert!(text.ends_with("] }\n]"), "the last game has no comma, and the closing bracket no newline");
+
+        let load = |text: &str| Optimal::from_json(&Json::parse(text).unwrap()).unwrap();
+        assert_eq!(load("[]").to_file_text(), "[\n]");
+        let one = "[\n  { \"n\": 4, \"score\": 7, \"moves\": [3, 4] }\n]";
+        assert_eq!(load(one).to_file_text(), one);
+        let sparse =
+            "[\n  { \"n\": 3, \"score\": 3, \"moves\": [3] },\n  { \"n\": 7, \"score\": 17, \"moves\": [7, 4, 6] }\n]";
+        assert_eq!(load(sparse).to_file_text(), sparse);
+        // The order of the text is that of the board sizes, whatever the order of the file it was read from.
+        let shuffled = r#"[{"n":7,"score":17,"moves":[7,4,6]},{"n":3,"score":3,"moves":[3]}]"#;
+        assert_eq!(load(shuffled).to_file_text(), sparse);
+    }
+
+    #[test]
+    fn a_table_is_extended_past_its_end_only() {
+        let mut opt = Optimal::from_json(&Json::parse(r#"[{"n":4,"score":7,"moves":[3,4]}]"#).unwrap()).unwrap();
+        for n in [0, 3, 4] {
+            let err = opt.push(n, 0, vec![]).unwrap_err();
+            assert!(err.contains(&format!("n={n} is not past")) && err.contains("4"), "{err}");
+        }
+        assert!(opt.push(MAX_PLAUSIBLE_N + 1, 0, vec![]).unwrap_err().contains("more than"));
+        assert_eq!(opt.sizes().collect::<Vec<_>>(), [4]);
+        // A gap is allowed: a table may be sparse.
+        opt.push(6, 15, vec![5, 4, 6]).unwrap();
+        assert_eq!((opt.sizes().collect::<Vec<_>>(), opt.max_n(), opt.verify_all()), (vec![4, 6], 6, Ok(2)));
+    }
+
+    #[test]
+    fn a_table_is_saved_whole_and_leaves_no_temporary_file() {
+        let dir = crate::test_support::TempDir::new("save-table");
+        let path = dir.join("table.json");
+        let opt = Optimal::load_default().unwrap();
+        fs::write(&path, "old contents").unwrap();
+        opt.save(&path).unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), opt.to_file_text());
+        let names: Vec<_> = fs::read_dir(&*dir).unwrap().map(|e| e.unwrap().file_name()).collect();
+        assert_eq!(names, ["table.json"], "the temporary file is renamed away");
+        // A directory that is not there is an error naming the file, and nothing is left behind.
+        let err = opt.save(&dir.join("missing").join("table.json")).unwrap_err();
+        assert!(err.contains("missing") && err.contains("table.json"), "{err}");
     }
 
     #[test]

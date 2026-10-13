@@ -25,7 +25,7 @@ measured.  Each term is defined where it first matters.
 
 ## 1. Goals and constraints
 
-* Find optimal games beyond n = 1000, where the Java solver's table of optimal games stops, as far as the machines
+* Find optimal games beyond n = 1000, where the Java solver's table of optimal games stopped, as far as the machines
   at hand reach: today every n to 1300 on one laptop (Apple M1 Max, 10 cores, 32 GB RAM, fast SSD), and the same
   chain on a many-core cloud machine for what is beyond (`tools/cloud/RUNBOOK.md`).
 * Be right before being fast.  Every game is replayed by an independent referee before it counts, every result
@@ -143,7 +143,7 @@ up:
 | engine | `engine` | the problem-independent parallel depth-first driver |
 | solving | `tactics`, `board`, `solver`, `results`, `paths` | the switchable tactics; a board prepared for a search; the per-game pipeline and the range driver; what a result records and the checks of a results file; the default files |
 | studies | `brute`, `sacrifice` | exhaustive search to certify small boards; the sacrifice bound and punctured games (not used by the solver) |
-| front end | `main.rs`, `cli.rs`, `commands.rs` | `solve`, `regress`, `bench`, `verify-optimal`, `verify-results`, `tables` |
+| front end | `main.rs`, `cli.rs`, `commands.rs` | `solve`, `regress`, `bench`, `verify-optimal`, `verify-results`, `extend-optimal`, `tables` |
 
 On the default path of a solve are all the layers but the studies and most of the Java-parity module `bounds` (of
 which the default search uses only the greedy incumbent, `max_additional`, the narrowing of the candidate lists and
@@ -479,10 +479,13 @@ Every completed game records *how its optimality is established* (its proof) and
 The *taint* of a game is the set of unproven things its proof rests on: the unproven tactics it used itself, plus,
 if its proof rests on the game of n − 1, that game's taint, and so on down the chain.  A proof by the cap rests on
 nothing the game used itself (since schema 3): its game replays to `n + score(n − 1)`, the ceiling, whatever found it,
-so the tactics that shaped the search play no part.  A game taken from optimal.json has the taint `optimal.json` (the
-Java made it with both unproven tactics on and records nothing about which games used them).  An empty taint means:
-proven within the frame model, given that the solver is right.  A chain from n = 1 with the strict tactics rests on
-nothing unproven.
+so the tactics that shaped the search play no part.  A game taken from optimal.json has the taint `optimal.json`,
+whichever game it is: the file records nothing about where a game came from.  Its games 1 to 1000 are the Java's, made
+with both unproven tactics on and with no record of which games used them; the games above 1000 were copied from the
+strict chain (`taxman extend-optimal` takes only games with an empty taint) and are as proven as it is, but a table
+entry cannot show that, so the taint is for the whole file, the conservative reading.  An empty taint means: proven
+within the frame model, given that the solver is right.  A chain from n = 1 with the strict tactics rests on nothing
+unproven.
 
 **Checks and referees.**  Every game is replayed by `game::replay_finished` before it counts, with the arithmetic and
 the ceilings `score(n−1) ≤ score(n) ≤ n + score(n−1)`; a game that fails after it was found goes to
@@ -549,9 +552,9 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   found exhaustively; promoting a set at once against one by one in random orders, conflicts and nogoods on perturbed
   models; and searches interrupted every 1,500 nodes and resumed from a checkpoint with units spilling.  Units of real
   boards at W = 20 to 64 (thinned so that the truth is found exhaustively) from a handicapped incumbent, and game 1133
-  resumed every 60 nodes at W = 20, 24 and 64, carry the harness past the widths of `optimal.json`.  A perturbed
-  game whose revision changes the best sum is left out: the search takes the revised freedoms for a fact about the best
-  set, and for a game that breaks that (one in about 1,300) may return a set that they forbid.
+  resumed every 60 nodes at W = 20, 24 and 64, carry the harness past the widths of the Java's table (n ≤ 1000).  A
+  perturbed game whose revision changes the best sum is left out: the search takes the revised freedoms for a fact about
+  the best set, and for a game that breaks that (one in about 1,300) may return a set that they forbid.
 * **Node-count tripwires** (`tests/tripwires.rs`): a pruning tactic that stops working changes no answer, so no
   assertion on answers sees it (a mutant that ignored the result of `Nogoods::ruled_out` costs 27 to 67 % more nodes).
   With one thread the tree is deterministic, so the exact node count of a fixed game under fixed tactics (n = 480 to
@@ -575,8 +578,8 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   refused naming the line, by both verifiers; a torn last line is dropped; the committed results pass the verifier with
   the counts `results/README.md` quotes; a strict game stopped by a node limit and resumed reads back with an empty
   taint, and so does a default one whose checkpoint has frame 0 as built; a proof by the cap is clean on a clean chain.
-* **Large boards** (`tests/wide.rs`): `optimal.json` and the Java stop at 1000, and the sets that hold a board are 8 to
-  64 words wide, so nothing above 1023 meets anything but the committed results and these tests.  The same game at every
+* **Large boards** (`tests/wide.rs`): the Java stopped at 1000, and the sets that hold a board are 8 to 64 words
+  wide, so nothing above 1023 meets anything but the committed results and these tests.  The same game at every
   width that holds it has the same frames, candidates, greedy set, promotion cap, answer and tree; game 1133 (W = 20,
   about 2,400 nodes) under every sound tactic against `strict.jsonl`; a slice of the strict chain; the sacrifice bound
   proves game 1133 by an independent route; a W = 64 board (2050) through frames, matching bound, conflicts, greedy set
@@ -655,7 +658,8 @@ another CPU-heavy job) records 3359 s of search, 2866 s of it for 1232–1300; i
 ## 11. Status and what is left
 
 Every n to 1300 has a game whose proof rests on nothing unproven: `results/strict.jsonl` is a strict chain from n = 1
-whose games to 1000 reproduce optimal.json's scores and whose games 1001–1300 go beyond it; the cost-curve study's
+whose games to 1000 reproduce optimal.json's scores and whose games 1001–1300 go beyond it (and are now appended to
+optimal.json too, by `taxman extend-optimal`); the cost-curve study's
 `bench/curve/chain.jsonl` (1001–1231) agrees with it, and `results/default.jsonl` (1001–1231, the first run past 1000,
 with unproven tactics on) is kept as a historical record (`results/README.md` says what supports each score).  The
 production chain on a many-core machine can start from `strict.jsonl` (`tools/cloud/RUNBOOK.md`), and a strict chain

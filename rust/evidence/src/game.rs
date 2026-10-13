@@ -1139,19 +1139,26 @@ mod tests {
         let text =
             std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../src/main/resources/optimal.json"))
                 .expect("optimal.json");
-        let mut opt = vec![0u64; 1001];
-        for line in text.lines().filter(|l| l.contains("\"n\"")) {
-            let num = |key: &str| -> u64 {
-                let at = line.find(key).unwrap() + key.len();
-                line[at..]
-                    .trim_start_matches([':', ' '])
-                    .chars()
-                    .take_while(char::is_ascii_digit)
-                    .collect::<String>()
-                    .parse()
-                    .unwrap()
-            };
-            opt[num("\"n\"") as usize] = num("\"score\"");
+        let scores: Vec<(usize, u64)> = text
+            .lines()
+            .filter(|l| l.contains("\"n\""))
+            .map(|line| {
+                let num = |key: &str| -> u64 {
+                    let at = line.find(key).unwrap() + key.len();
+                    line[at..]
+                        .trim_start_matches([':', ' '])
+                        .chars()
+                        .take_while(char::is_ascii_digit)
+                        .collect::<String>()
+                        .parse()
+                        .unwrap()
+                };
+                (num("\"n\"") as usize, num("\"score\""))
+            })
+            .collect();
+        let mut opt = vec![0u64; scores.iter().map(|&(n, _)| n).max().expect("optimal.json has games") + 1];
+        for (n, score) in scores {
+            opt[n] = score;
         }
         let spf = smallest_prime_factors(500);
         for n in (21..=420u32).step_by(7) {

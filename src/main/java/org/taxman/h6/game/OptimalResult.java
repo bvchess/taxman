@@ -34,6 +34,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 // Optimal scores up to 519 taken from https://oeis.org/A019312/b019312.txt
+// The games for n = 1001 to 1300 are the Rust solver's (rust/results/strict.jsonl, added with `taxman extend-optimal`).
 
 public class OptimalResult {  // would make a nice record, but Moshi doesn't know how to deal with records
 

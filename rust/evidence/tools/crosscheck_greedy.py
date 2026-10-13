@@ -6,8 +6,8 @@
 
 For each game in the span file whose n is selected, U* is recomputed with heuristics/core.py's optimize_mini
 (peel-based descending greedy, sharing no code with the Rust crate) and its size and sum are compared with the
-file's `kept` and `kept_sum`.  For n <= 1000 the sum is also compared with the upper half of the optimal game in
-optimal.json.
+file's `kept` and `kept_sum`.  For every n that optimal.json has the sum is also compared with the upper half of the
+optimal game in it.
 
     crosscheck_greedy.py SPAN_FILE [--max N] [--every K]
 """

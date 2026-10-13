@@ -216,6 +216,12 @@ fn the_committed_results_pass_the_verifier() {
     for n in 1..=1000 {
         assert_eq!(Some(strict.contents.games[&n].score), optimal.score(n), "n={n}");
     }
+    // The games the table holds past 1000 were copied from it (`taxman extend-optimal`), move for move.
+    for (n, score, moves) in optimal.games().filter(|&(n, _, _)| n > 1000) {
+        let game =
+            strict.contents.games.get(&n).unwrap_or_else(|| panic!("optimal.json has a game of {n}, strict.jsonl not"));
+        assert_eq!((score, moves, game.taint.is_empty()), (game.score, &game.moves[..], true), "n={n}");
+    }
 
     // default.jsonl: derived by reuse_prev where it could be, which most of its games rest on.
     let counts = |f: &FileReport| {

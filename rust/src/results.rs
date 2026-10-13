@@ -22,8 +22,11 @@
 //! taint, and so on down the chain.  A proof by the cap rests on nothing the game used itself: the game replays
 //! legally to `n + score(n − 1)` (the line's arithmetic says so), which is the ceiling whatever found the game, so
 //! the tactics that shaped the search, frame 0's revised freedoms among them, play no part in it.  A game taken
-//! from `optimal.json` has the taint [`OPTIMAL_JSON`]: the Java made that file with `reuse_prev` and
-//! `revise_freedoms` on and records nothing about which games used them.  An empty taint means proven within the
+//! from `optimal.json` has the taint [`OPTIMAL_JSON`], whichever game it is: the file records nothing about where
+//! a game came from.  Its games 1 to 1000 are the Java's, made with `reuse_prev` and `revise_freedoms` on, with no
+//! record of which games used them; the later ones were copied from a strict chain, and are as proven as that
+//! chain was ([`extend_optimal`] takes only games with an empty taint), but a table entry cannot show it.  The
+//! taint is for the file as a whole, which is the conservative reading.  An empty taint means proven within the
 //! frame model, given that the solver is right.
 //!
 //! Lines without a `schema` field were written before there was provenance (schema 1).  Their proof and taint
@@ -74,6 +77,13 @@
 //! changing them, and that the files agree on the games they share (`taxman verify-results`).  The Python referee
 //! `tools/check_results.py` derives the same proofs and taints from the same rules with no code in common, so a
 //! mistake in either shows as a disagreement.
+//!
+//! # Extending the table of optimal games
+//!
+//! [`extend_optimal`] appends to the table `optimal.json` the games of a checked results file that continue it:
+//! from the board size after the table's last, every game that is completed and has an empty taint, up to the
+//! first board size that is not (`taxman extend-optimal`).  Its scores must agree with the table's wherever the
+//! two overlap, so a results file of another game cannot be mistaken for the table's continuation.
 //!
 //! The fields of a line are described in README.md ("A results line"); [`SCHEMA`] is the version of the format.
 
@@ -522,6 +532,12 @@ pub fn read_results(text: &str, optimal: Option<&Optimal>) -> Result<Contents, S
     Ok(contents)
 }
 
+/// [`read_results`] on the file at `path`, without changing it.  Errors name the file.
+pub fn read_results_file(path: &Path, optimal: Option<&Optimal>) -> Result<Contents, String> {
+    let text = fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    read_results(&text, optimal).map_err(|e| format!("{}: {e}", path.display()))
+}
+
 /// The game of `n − 1` that a line was built from, as far as it is known.  For a game of `optimal.json` when that
 /// file is not at hand, the line's own record (if any) stands in for its score, and its moves are not known.
 struct Pred<'a> {
@@ -849,9 +865,7 @@ pub struct Report {
 pub fn verify_files(paths: &[PathBuf], optimal: Option<&Optimal>) -> Result<Report, String> {
     let mut files = Vec::new();
     for path in paths {
-        let text = fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
-        let contents = read_results(&text, optimal).map_err(|e| format!("{}: {e}", path.display()))?;
-        files.push(FileReport { path: path.clone(), contents });
+        files.push(FileReport { path: path.clone(), contents: read_results_file(path, optimal)? });
     }
     let mut seen: BTreeMap<u32, (&Path, &StoredGame)> = BTreeMap::new();
     let mut shared = BTreeSet::new();
@@ -927,12 +941,88 @@ impl fmt::Display for Report {
 }
 
 // ---------------------------------------------------------------------------------------------------------
+// Extending the table of optimal games
+
+/// Why [`extend_optimal`] stopped.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum StopReason {
+    /// The results end before the board size; `last` is the board size of their last completed game (0: none).
+    ResultsEnd { last: u32 },
+    /// The results hold games past the board size (up to `last`) but none completed for it.
+    Gap { last: u32 },
+    /// The results hold only searches of the board size that a limit stopped.
+    Incomplete,
+    /// The game is completed, but its proof rests on something unproven.
+    Tainted(Taint),
+}
+
+impl fmt::Display for StopReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StopReason::ResultsEnd { last: 0 } => write!(f, "the results have no completed game"),
+            StopReason::ResultsEnd { last } => write!(f, "the results end at n = {last}"),
+            StopReason::Gap { last } => write!(f, "the results have no completed game of it, but go on to n = {last}"),
+            StopReason::Incomplete => write!(f, "the results have only a search of it that a limit stopped"),
+            StopReason::Tainted(taint) => {
+                let names: Vec<&str> = taint.iter().map(String::as_str).collect();
+                write!(f, "its proof rests on something unproven ({})", names.join(", "))
+            }
+        }
+    }
+}
+
+/// What [`extend_optimal`] did.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Extension {
+    /// The board sizes of the games it appended to the table (an empty range if none).
+    pub added: std::ops::RangeInclusive<u32>,
+    /// The first board size it did not append.
+    pub stopped_at: u32,
+    /// Why it did not.
+    pub reason: StopReason,
+}
+
+/// Appends to `optimal` the games of a checked results file that continue it: from the board size after the table's
+/// last, each game that `contents` ([`read_results`]) holds completed and with an empty taint, which is a proven
+/// game, up to the first board size that has none.  A search that a limit stopped and a completed game of the same
+/// board size may both be in the file (a run and its resume): the completed game is the game.
+///
+/// # Errors
+///
+/// If the results and the table score differently for a board size that both have, naming it: they are not
+/// results for the same game, or one of them is wrong.  The scores are compared before anything is appended.
+pub fn extend_optimal(optimal: &mut Optimal, contents: &Contents) -> Result<Extension, String> {
+    for (&n, game) in &contents.games {
+        if let Some(recorded) = optimal.score(n).filter(|&recorded| recorded != game.score) {
+            return Err(format!(
+                "n={n}: the results (line {}) score {}, but the table has {recorded}",
+                game.line, game.score
+            ));
+        }
+    }
+    let last = contents.games.keys().next_back().copied().unwrap_or(0);
+    let first = optimal.max_n() + 1;
+    let mut n = first;
+    let reason = loop {
+        match contents.games.get(&n) {
+            Some(game) if game.taint.is_empty() => optimal.push(n, game.score, game.moves.clone())?,
+            Some(game) => break StopReason::Tainted(game.taint.clone()),
+            None if contents.runs.contains_key(&n) => break StopReason::Incomplete,
+            None if last > n => break StopReason::Gap { last },
+            None => break StopReason::ResultsEnd { last },
+        }
+        n += 1;
+    };
+    Ok(Extension { added: first..=n - 1, stopped_at: n, reason })
+}
+
+// ---------------------------------------------------------------------------------------------------------
 // Tests
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::solver::{solve_range, SolveOptions};
+    use crate::solver::{solve_game, solve_range, SolveOptions};
 
     /// The lines `taxman solve 1-12` writes, as JSON objects.
     fn lines_1_to_12() -> Vec<Json> {
@@ -1074,5 +1164,115 @@ mod tests {
         // Without a game of 11 the line cannot stand: it names one from this file.
         let err = read_results(&line, None).unwrap_err();
         assert!(err.contains("which the file does not hold"), "{err}");
+    }
+
+    /// The lines of a strict solve of 1..=12, as JSON objects: every game has an empty taint.
+    fn strict_lines_1_to_12() -> Vec<Json> {
+        let mut opts = SolveOptions { threads: 1, ..SolveOptions::default() };
+        opts.tactics = opts.tactics.strict();
+        solve_range(1, 12, &opts, None).unwrap().iter().map(GameResult::to_json).collect()
+    }
+
+    /// The table of the first `count` games of `contents`.
+    fn table_of(contents: &Contents, count: u32) -> Optimal {
+        let games = (1..=count).map(|n| {
+            let game = &contents.games[&n];
+            let moves = Json::array(game.moves.iter().copied());
+            Json::object([("n", Json::from(n)), ("score", Json::from(game.score)), ("moves", moves)])
+        });
+        Optimal::from_json(&Json::array(games)).unwrap()
+    }
+
+    /// The line a run stopped by a limit writes for a search of `n` that did not finish.
+    fn incomplete_line(n: u32) -> Json {
+        Json::object([
+            ("schema", Json::from(SCHEMA)),
+            ("n", Json::from(n)),
+            ("completed", Json::Bool(false)),
+            ("invocations", Json::from(1u32)),
+        ])
+    }
+
+    #[test]
+    fn the_table_is_extended_by_the_proven_games_that_follow_it() {
+        let contents = read_results(&text(&strict_lines_1_to_12()), None).unwrap();
+        assert!(contents.games.values().all(|game| game.taint.is_empty()));
+        let mut table = table_of(&contents, 5);
+        let extension = extend_optimal(&mut table, &contents).unwrap();
+        assert_eq!(extension, Extension { added: 6..=12, stopped_at: 13, reason: StopReason::ResultsEnd { last: 12 } });
+        assert!(table.sizes().eq(1..=12));
+        for (n, score, moves) in table.games() {
+            assert_eq!((score, moves), (contents.games[&n].score, &contents.games[&n].moves[..]), "n={n}");
+        }
+
+        // Nothing to add is fine, and changes nothing.
+        let before = table.to_file_text();
+        let extension = extend_optimal(&mut table, &contents).unwrap();
+        assert!(extension.added.is_empty() && extension.stopped_at == 13, "{extension:?}");
+        assert_eq!(table.to_file_text(), before);
+    }
+
+    #[test]
+    fn the_extension_stops_at_a_game_that_rests_on_something_unproven() {
+        // Default tactics derive games with reuse_prev, which taints them and every game that rests on them.
+        let opts = SolveOptions { threads: 1, ..SolveOptions::default() };
+        let lines: Vec<Json> = solve_range(1, 20, &opts, None).unwrap().iter().map(GameResult::to_json).collect();
+        let contents = read_results(&text(&lines), None).unwrap();
+        let first = contents.games.values().find(|game| !game.taint.is_empty()).expect("a tainted game").n;
+        assert!(first > 2, "the table below must have a game to extend");
+        let mut table = table_of(&contents, 2);
+        let extension = extend_optimal(&mut table, &contents).unwrap();
+        let taint = contents.games[&first].taint.clone();
+        assert_eq!(extension.added, 3..=first - 1);
+        assert_eq!((extension.stopped_at, extension.reason.clone()), (first, StopReason::Tainted(taint)));
+        assert!(table.sizes().eq(1..=first - 1));
+        assert!(extension.reason.to_string().contains("rests on something unproven"));
+    }
+
+    #[test]
+    fn the_extension_stops_at_an_unfinished_search_or_a_gap() {
+        let lines = strict_lines_1_to_12();
+        let extend = |lines: &[Json]| {
+            let mut table = table_of(&read_results(&text(&lines[..7]), None).unwrap(), 7);
+            extend_optimal(&mut table, &read_results(&text(lines), None).unwrap()).unwrap()
+        };
+
+        // The file ends with a search of 10 that a limit stopped.
+        let mut unfinished = lines[..9].to_vec();
+        unfinished.push(incomplete_line(10));
+        let extension = extend(&unfinished);
+        assert_eq!((extension.added, extension.stopped_at, extension.reason), (8..=9, 10, StopReason::Incomplete));
+
+        // A run and its resume: the incomplete line comes first and the completed one is the game.
+        let mut resumed = lines[..9].to_vec();
+        resumed.push(incomplete_line(10));
+        resumed.extend_from_slice(&lines[9..]);
+        let extension = extend(&resumed);
+        assert_eq!((extension.added, extension.stopped_at), (8..=12, 13));
+
+        // A game of 12 solved on its own, with no 10 or 11 in the file.
+        let opts = SolveOptions { threads: 1, ..SolveOptions::default() };
+        let mut alone = lines[..9].to_vec();
+        alone.push(solve_game(12, None, &opts).unwrap().to_json());
+        let extension = extend(&alone);
+        assert_eq!(
+            (extension.added, extension.stopped_at, extension.reason),
+            (8..=9, 10, StopReason::Gap { last: 12 })
+        );
+
+        // Games that are all in the table already: nothing is added, and the results' end is the reason.
+        let extension = extend(&lines[..7]);
+        let reason = StopReason::ResultsEnd { last: 7 };
+        assert_eq!((extension.added.is_empty(), extension.stopped_at, extension.reason), (true, 8, reason));
+    }
+
+    #[test]
+    fn the_extension_refuses_results_that_score_differently_from_the_table() {
+        let contents = read_results(&text(&strict_lines_1_to_12()), None).unwrap();
+        let wrong = r#"[{"n":3,"score":4,"moves":[3]}]"#;
+        let mut table = Optimal::from_json(&Json::parse(wrong).unwrap()).unwrap();
+        let err = extend_optimal(&mut table, &contents).unwrap_err();
+        assert!(err.starts_with("n=3: the results (line 3) score 3, but the table has 4"), "{err}");
+        assert_eq!(table.max_n(), 3, "nothing was appended");
     }
 }

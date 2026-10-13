@@ -2,7 +2,7 @@
 //!
 //! Nothing here is a path fixed at compile time, so a binary works wherever it is as long as it can find the
 //! repository: the nearest directory above the working directory, and failing that above the directory of the
-//! executable, that holds the Java solver's table of optimal games, `src/main/resources/optimal.json`.  The
+//! executable, that holds the table of optimal games, `src/main/resources/optimal.json`.  The
 //! defaults are relative to that directory:
 //!
 //! | file | default | flag, then variable |

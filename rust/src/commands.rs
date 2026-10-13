@@ -1,4 +1,4 @@
-//! The subcommands: `solve`, `regress`, `bench`, `verify-optimal`, `verify-results` and `tables`.
+//! The subcommands: `solve`, `regress`, `bench`, `verify-optimal`, `verify-results`, `extend-optimal` and `tables`.
 //!
 //! The ones that solve games read their flags with [`Args`], build [`SolveOptions`] from them ([`solver_options`])
 //! and call the library's pipeline ([`taxman::solver`]); what they add is output, and the policies of a command-line
@@ -12,7 +12,8 @@
 //!   ([`taxman::paths`]) unless `--history` and `--known` name them.
 //!
 //! The small ones: `verify-optimal` replays every game of the table of optimal games, `verify-results` checks results
-//! files without changing them, and `tables` prints the maximal factors and composites of numbers on a board.
+//! files without changing them, `extend-optimal` writes the table with the proven games of a results file appended
+//! to it, and `tables` prints the maximal factors and composites of numbers on a board.
 
 use crate::cli::{errln, outln, parse_range, solver_options, Args, CliError, CliResult, SOLVER_FLAGS};
 use std::io::Write;
@@ -281,7 +282,7 @@ fn append_history(path: &Path, record: &Json) -> std::io::Result<()> {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// verify-optimal, verify-results, tables
+// verify-optimal, verify-results, extend-optimal, tables
 
 fn millis(since: Instant) -> f64 {
     since.elapsed().as_secs_f64() * 1000.0
@@ -322,6 +323,49 @@ pub fn verify_results(args: &[String]) -> CliResult {
     let report = verify_files(&paths, optimal.as_ref()).map_err(CliError::Failed)?;
     outln!("{report}");
     outln!("checked in {:.1} ms", millis(start));
+    Ok(())
+}
+
+/// `extend-optimal RESULTS --out FILE [--optimal FILE]`: writes the table of optimal games to `FILE` with the games of
+/// the results file `RESULTS` that continue it appended (`results::extend_optimal`).  The table is read from
+/// `--optimal` as for the other commands; it is written to `FILE` only, which the command line must name.
+pub fn extend_optimal(args: &[String]) -> CliResult {
+    let usage = || CliError::Usage("usage: extend-optimal RESULTS --out FILE [--optimal FILE]".into());
+    let args = Args::parse(args, &["--out", "--optimal"], &[])?;
+    let [results] = args.positional() else { return Err(usage()) };
+    let Some(out) = args.value("--out") else {
+        return Err(CliError::Usage(
+            "extend-optimal needs --out FILE: it never writes over the table (or anything else) unasked".into(),
+        ));
+    };
+    let (results, out) = (Path::new(results), Path::new(out));
+    // The results are the evidence the table is made from: a mistyped --out must not replace them.
+    if std::fs::canonicalize(results).ok().is_some_and(|results| std::fs::canonicalize(out).ok() == Some(results)) {
+        return Err(CliError::Usage(format!(
+            "--out is the results file {}, which would be overwritten",
+            out.display()
+        )));
+    }
+    let Some(mut optimal) = solver_options(&args)?.load_optimal().map_err(failed)? else {
+        return Err(CliError::Usage("extend-optimal extends optimal.json, so --optimal none makes no sense".into()));
+    };
+
+    let contents = taxman::results::read_results_file(results, Some(&optimal)).map_err(failed)?;
+    if contents.torn {
+        errln!("note: the last line of {} is torn and was ignored", results.display());
+    }
+    let extension = taxman::results::extend_optimal(&mut optimal, &contents).map_err(failed)?;
+    optimal.save(out).map_err(failed)?;
+
+    let (count, total) = (extension.added.clone().count(), optimal.sizes().count());
+    let added = if count == 0 {
+        "added no games".to_owned()
+    } else {
+        let games = if count == 1 { "game" } else { "games" };
+        format!("added {count} {games} (n = {}..={})", extension.added.start(), extension.added.end())
+    };
+    outln!("{added}; the table has {total} games, n up to {}; wrote {}", optimal.max_n(), out.display());
+    outln!("stopped at n = {}: {}", extension.stopped_at, extension.reason);
     Ok(())
 }
 

@@ -1,6 +1,7 @@
 //! The model-free cross-check of optimal scores: for every game in a range, an upper bound on opt(n) proven
-//! without the frame model, compared with the recorded optimum V(n) (optimal.json to 1000, the solver's
-//! `results/default.jsonl` beyond).  One line per game, resumable:
+//! without the frame model, compared with the recorded optimum V(n) (optimal.json, which reaches 1300, and for a
+//! board size it lacks the game of `--results`, by default the solver's `results/default.jsonl`).  One line per
+//! game, resumable:
 //!
 //!     exact --from A --to B [--list ...] [--threads T] [--seconds S] [--budget NODES] [--all 1]
 //!           [--segments 1] [--lagrangian 0] [--checkpoints DIR] [--optimal FILE] [--results FILE] --out FILE

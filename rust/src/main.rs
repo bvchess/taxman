@@ -55,6 +55,10 @@ commands:
   verify-results FILE... [--optimal FILE|none]
                           check results files without changing them: every game replayed, the chain from n-1,
                           each line's proof and provenance, and that the files agree; counts games by proof
+  extend-optimal RESULTS --out FILE [--optimal FILE]
+                          write optimal.json (or --optimal FILE) to FILE with the games of the results file RESULTS
+                          appended: from the board size after the table's last, each game that RESULTS has
+                          completed and that rests on nothing unproven, up to the first that it lacks
   tables N K...           print the maximal factors and composites of each K on the board 1..=N
   help                    show this message
 ";
@@ -101,6 +105,7 @@ fn run(args: &[String]) -> CliResult {
         "bench" => commands::bench(rest),
         "verify-optimal" => commands::verify_optimal(rest),
         "verify-results" => commands::verify_results(rest),
+        "extend-optimal" => commands::extend_optimal(rest),
         "tables" => commands::tables(rest),
         other => Err(CliError::Usage(format!("unknown command {other:?}"))),
     }

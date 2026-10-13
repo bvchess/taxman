@@ -68,8 +68,8 @@ decided before the search explored a node (0 nodes).
 
 Written before result lines carried their provenance: schema 1, with n, score, moves, promotions, method, completed,
 nodes, search counters, seconds, threads, `tactics` and `tactic_switches`, `unproven_tactics_on` (the unproven
-tactics that were on, used or not), `optimal_match` (null past n = 1000) and `prev_source`.  Its proofs and taints
-are derived from those fields by the rules of `src/results.rs`.
+tactics that were on, used or not), `optimal_match` (null past n = 1000, where the table then stopped) and
+`prev_source`.  Its proofs and taints are derived from those fields by the rules of `src/results.rs`.
 
 * Threads: 10 for 1001–1200 and 6 for 1201–1231.  At least 5 invocations, starting at 1001, 1201, 1218, 1221 and
   1230; 1218, 1221 and 1230 resumed a checkpoint (`setup.revise: "FromCheckpoint"`).  The runs on 6 threads were made
@@ -126,6 +126,9 @@ What that evidence amounts to:
 4. **Agreement between builds and files.**
    * n ≤ 1000: `strict.jsonl`'s scores are optimal.json's, all 1000 (each line's `optimal_match` is true;
      `tests/results.rs` checks it), and 798 of the games are optimal.json's move for move.
+   * n = 1001–1300: optimal.json now holds `strict.jsonl`'s games, copied move for move by `taxman extend-optimal` (as
+     `tests/results.rs` checks).  Their lines say `optimal_match` null, because the table stopped at 1000 when they were
+     made.
    * 1001–1231: the scores of `strict.jsonl` (commit bd9bb5d, 6 threads), `bench/curve/chain.jsonl` (commit e710d16,
      8 threads, a strict chain) and `default.jsonl` (the earlier solver, with unproven tactics on) are equal in all
      231 games.  `strict.jsonl`'s games are `chain.jsonl`'s move for move, and `default.jsonl`'s in all but 1221–1224
@@ -143,9 +146,10 @@ standalone re-solves (3) matter.
 
 ## optimal.json
 
-optimal.json was made by the Java with `reuse_prev` and `revise_freedoms` on, and records no proofs, so a game taken
-from it counts as resting on something unproven (taint `optimal.json`).  A strict run that starts from it needs
-`--allow-tainted-prev`, and its results that rest on it say so; a strict chain that rests on nothing unproven starts at
-n = 1.  `strict.jsonl` is such a chain, and its games 1–1000 reproduce optimal.json with no unproven tactic on: 819
-searched (496 exhausted, 323 by the cap), 168 prime, 13 trivial, 83 s of search in all on 6 threads, the slowest n = 992
-at 12 s.
+optimal.json's games 1–1000 were made by the Java with `reuse_prev` and `revise_freedoms` on, and 1001–1300 are
+`strict.jsonl`'s, added by `taxman extend-optimal`.  The file records no proofs and no provenance, so a game taken from
+it counts as resting on something unproven (taint `optimal.json`), whichever game it is.  A strict run that starts from
+it needs `--allow-tainted-prev`, and its results that rest on it say so; a strict chain that rests on nothing unproven
+starts at n = 1.  `strict.jsonl` is such a chain, and its games 1–1000 reproduce optimal.json with no unproven tactic
+on: 819 searched (496 exhausted, 323 by the cap), 168 prime, 13 trivial, 83 s of search in all on 6 threads, the
+slowest n = 992 at 12 s.

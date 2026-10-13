@@ -17,9 +17,10 @@ Robert Moniot's C++ program implementing seven heuristic strategies is included 
 ## Rust solver
 
 A Rust reimplementation of the exact algorithm, built for many cores and long resumable runs, has solved boards up to
-n = 1300 (the table of optimal games in the Java program stops at 1000).  It is a Cargo crate in [rust](rust) with its
-own build, run and test instructions: start with [rust/README.md](rust/README.md) (`cd rust && cargo build --release`),
-and see [rust/tools/cloud/RUNBOOK.md](rust/tools/cloud/RUNBOOK.md) for running it on a large cloud machine.
+n = 1300 (the Java program got to 1000; the table of optimal games below has the Rust solver's games for 1001 to 1300).
+It is a Cargo crate in [rust](rust) with its own build, run and test instructions: start with
+[rust/README.md](rust/README.md) (`cd rust && cargo build --release`), and see
+[rust/tools/cloud/RUNBOOK.md](rust/tools/cloud/RUNBOOK.md) for running it on a large cloud machine.
 
 The sections "Usage", "Implementation" and "Build" below describe the Java program.
 
@@ -38,9 +39,10 @@ This command will show debugging output as it searches for an optimal solution f
 
 
 ## Implementation
-The program includes pre-computed solutions to games from 1 to 1000 so that it can make use of the solution to N-1
+The program includes pre-computed solutions to games from 1 to 1300 so that it can make use of the solution to N-1
 without having to compute it on every run.  These pre-computed solutions are available in JSON format
-[here](src/main/resources/optimal.json).
+[here](src/main/resources/optimal.json).  Games 1 to 1000 are this program's; games 1001 to 1300 come from the Rust
+solver's strict chain ([rust/results/strict.jsonl](rust/results/strict.jsonl)), which rests on no unproven tactic.
 
 I use the Java [BitSet](https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/BitSet.html) class for
 fast operations on sets of small integers.  I use

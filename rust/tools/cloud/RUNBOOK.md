@@ -56,7 +56,7 @@ checkpoints, `taxman.lock`), `logs/`, `chain.pid`, `deadline`.  Nothing is writt
 `chain.sh N` runs `taxman solve 1-N --strict` (no unproven tactic: `--tactic reuse_prev=off --tactic
 revise_freedoms=off`) into one results file:
 every game from n = 1, each built from the one before, with no unproven tactic.  Nothing rests on `optimal.json` (it is
-only compared with, to n = 1000).  The committed `results/strict.jsonl` is exactly such a file for n = 1 to 1300, made
+only compared with, to n = 1300).  The committed `results/strict.jsonl` is exactly such a file for n = 1 to 1300, made
 on a laptop ([results/README.md](../../results/README.md)): a run from n = 1 reproduces its scores (the run is checked
 against it by `verify.sh`), and the production chain can instead start from it, as section 5 says, so that only the
 games above 1300 are new.  The solver is the same code as on a laptop; the machine only changes how long it takes.
@@ -449,6 +449,11 @@ incomplete lines is not a problem: every search that was stopped and resumed lef
 Then decide what to keep.  The file is about 2 KB per game.  The committed `results/` must not be overwritten by
 scripts; a new file next to them (say `results/strict-1-1400.jsonl`) and an update of `results/README.md`, and the
 scaling logs under `bench/` (say `bench/cloud/`), are your call.
+
+To put the new games into the table of optimal games, run `taxman extend-optimal` on the verified file from a checkout:
+`taxman extend-optimal results-from-cloud/strict.jsonl --out /tmp/optimal.json`.  It appends the games past the table's
+end that the file completed with an empty taint, and says where it stopped; check the result with `taxman
+verify-optimal /tmp/optimal.json` and `diff`, then copy it over `src/main/resources/optimal.json`.
 
 ## 7. When something goes wrong
 

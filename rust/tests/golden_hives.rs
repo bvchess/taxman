@@ -291,8 +291,9 @@ fn fixture_lines(name: &str, separator: &str) -> Vec<Vec<String>> {
 }
 
 /// The same decision for the boards past the golden data (761..1228, every fifth): `testdata/accel_java.txt` holds
-/// what the Java's acceleration did with the previous game (optimal.json's to n = 1000, `results/default.jsonl`'s
-/// above, as fingerprinted in the file).  A game it accepts must be the same game, to the move.
+/// what the Java's acceleration did with the previous game (optimal.json's to n = 1000, and `results/default.jsonl`'s
+/// above, as fingerprinted in the file; the games optimal.json has past 1000 are the strict chain's, not those).  A
+/// game it accepts must be the same game, to the move.
 #[test]
 fn acceleration_matches_the_java_beyond_the_golden_data() {
     let optimal = Optimal::load_default().unwrap();

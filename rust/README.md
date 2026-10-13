@@ -2,7 +2,7 @@
 
 `rust/` is a Cargo crate (a library and one binary, `taxman`; no third-party dependencies) that finds optimal games of
 Taxman.  It reimplements the algorithm of the Java solver in the repository root (`src/main/java`) with a search built
-for speed and for many cores, and it has found optimal games for every n up to 1300 (the Java's table stops at 1000).
+for speed and for many cores, and it has found optimal games for every n up to 1300 (the Java solver got to 1000).
 
 This page is the user guide: what the solver computes and what "optimal" means here, how to build and run it, how to
 read its output, why its answers can be trusted (and where they rest on something unproven), the project's vocabulary,
@@ -30,7 +30,8 @@ n = 4 the optimal game is 3, 4 (the taxman takes 1, then 2) and scores 7.
 
 Finding an optimal game is a search over an enormous tree.  The solver's results are the optimal games, as sequences of
 moves with their scores, for every n from 1 to 1300: `results/strict.jsonl` is a strict chain (section 3) from n = 1,
-whose games 1 to 1000 reproduce the Java's table and whose games 1001 to 1300 go beyond it.  The code can attempt
+whose games 1 to 1000 reproduce the Java's table and whose games 1001 to 1300 go beyond it (the table `optimal.json`
+has them now too, see `extend-optimal` in section 3).  The code can attempt
 any larger n up to 4095, the largest board the set widths cover.  The cost of a game grows by a factor of ten for every
 55 to 70 in n past 1200, so what can be reached is a question of machine time
 ([bench/curve/README.md](bench/curve/README.md)).
@@ -111,7 +112,8 @@ cargo build --release --examples   # also the ladder (scaling and progress harne
 The build is long for a program of this size because the search is compiled once for every set width
 ([DESIGN.md](DESIGN.md#3-architecture), "Width dispatch").
 
-The binary finds `optimal.json` (the Java's table of optimal games for n <= 1000) at run time: `$TAXMAN_OPTIMAL` if that
+The binary finds `optimal.json` (the table of optimal games, n <= 1300: the Java's games to 1000, then the strict
+chain's) at run time: `$TAXMAN_OPTIMAL` if that
 is set, else `src/main/resources/optimal.json` of the repository, which it looks for above the working directory and, if
 it is not there, above the binary.  So it works from any directory of a checkout, and from a copy of the binary while
 the working directory is in one; elsewhere give `--optimal FILE` (or `--optimal none` to compare with nothing), which
@@ -158,9 +160,9 @@ n=480   score=73120     search  nodes=385             0.010 s  optimal ok  proof
   moves: [479, 361, 437, 299, 403, 341, 473, 301, 469, 335, 445, 267, 471, 314, 478, 466, 458, 454, 446, ...]
 ```
 
-A single game takes its predecessor from `optimal.json` (n - 1 <= 1000), which seeds and caps the search.  The node
-count of a multi-threaded search varies a little from run to run.  "optimal ok" means the score equals the Java's
-table, not that it is proven (section 5).
+A single game takes its predecessor from `optimal.json` (n - 1 <= 1300), which seeds and caps the search.  The node
+count of a multi-threaded search varies a little from run to run.  "optimal ok" means the score equals the table's,
+not that it is proven (section 5).
 
 ### Solve a range
 
@@ -184,9 +186,9 @@ $ taxman solve 1-300 --out mine.jsonl
 skipped 300 games already done in mine.jsonl
 ```
 
-### Past n = 1000
+### Past n = 1300
 
-`optimal.json` stops at 1000.  A game above 1000 needs its predecessor in the results file, so copy one that has it and
+`optimal.json` stops at 1300.  A game above 1300 needs its predecessor in the results file, so copy one that has it and
 extend it; the committed files are `results/strict.jsonl` (1-1300, strict) and `bench/curve/chain.jsonl` (1001-1231,
 strict).  The copy matters: `--out` appends to the file and `results/` must not be overwritten.
 
@@ -204,7 +206,7 @@ stopped: the search for n=1302 hit a limit before it finished; run the same comm
 
 Games 1297-1300 were skipped, game 1301 (a prime) took the prime formula, game 1302 started from 1301, and the time
 limit stopped it with its checkpoint.  A game
-whose predecessor is in neither the results file nor `optimal.json` (for example `taxman solve 1100` without `--out`)
+whose predecessor is in neither the results file nor `optimal.json` (for example `taxman solve 1400` without `--out`)
 runs *standalone*, with no seed and no ceiling; `solve` says so on stderr (`note: no previous game for n=...`) and the
 result line has `"prev": null`.  That is still correct, but costs about twice as much on the hard games, and many times
 more on games that a chain settles at once by reaching the ceiling ([bench/curve/README.md](bench/curve/README.md)).
@@ -215,7 +217,7 @@ more on games that a chain settles at once by reaching the ceiling ([bench/curve
 $ taxman solve 1-1300 --strict --out strict.jsonl --checkpoint-dir ckpt --checkpoint-interval 60 --progress 60
 ```
 
-Starting at n = 1, no game rests on `optimal.json` (it is only compared with, up to 1000: a mismatch is a hard error),
+Starting at n = 1, no game rests on `optimal.json` (it is only compared with, up to 1300: a mismatch is a hard error),
 so every proof in the file rests on nothing unproven.  The committed `results/strict.jsonl` is such a run
 ([results/README.md](results/README.md) has the details of it), and this command reproduces its scores.  A strict run
 that starts from an `optimal.json` game or a result with an unproven taint refuses to, unless given
@@ -290,9 +292,10 @@ games 1..=200 derived without search: 146
 gives the Java's answers.
 
 ```
-$ taxman verify-optimal                         # replay every game of optimal.json (1000 games, ~75 ms)
-verified 1000 games (n up to 1000, 217199 moves)
+$ taxman verify-optimal                         # replay every game of optimal.json (1300 games, ~170 ms)
+verified 1300 games (n up to 1300, 367449 moves)
 $ taxman verify-results results/strict.jsonl bench/curve/chain.jsonl     # see section 5
+$ taxman extend-optimal results/strict.jsonl --out /tmp/optimal.json     # the table plus the games it lacks
 $ taxman tables 85 8 45                         # the maximal factors and composites of 8 and 45 on the board 1..=85
 8: maximal factors [4]; maximal composites [16, 24, 40, 56]
 45: maximal factors [9, 15]; maximal composites []
@@ -306,6 +309,22 @@ hard games and for scaling over thread counts: `cargo run --release --example la
 bench/curve/chain.jsonl --tactic revise_freedoms=off --seconds 600 1215` (its flags are documented at the top of
 `examples/ladder.rs`).
 
+`extend-optimal RESULTS --out FILE` writes the table of optimal games (`--optimal FILE` names another, as for the other
+commands) to FILE with the games of the results file RESULTS appended.  It reads RESULTS with the checks of
+`verify-results` and refuses it if a score differs from the table's for any n they share.  Then, from the board size
+after the table's last, it takes each game that RESULTS completed and that rests on nothing unproven (an empty taint),
+up to the first that is missing, only an unfinished search, or tainted, and says which and why.  The old games are
+written back byte for byte, FILE is written whole or not at all, and RESULTS can never be FILE.  This is how games 1001
+to 1300 were added to the Java's 1000 (the table now reaches 1300, so the same command now adds nothing):
+
+```
+$ taxman extend-optimal results/strict.jsonl --out /tmp/optimal.json
+added 300 games (n = 1001..=1300); the table has 1300 games, n up to 1300; wrote /tmp/optimal.json
+stopped at n = 1301: the results end at n = 1300
+```
+
+Check the new file with `taxman verify-optimal /tmp/optimal.json` before it replaces `src/main/resources/optimal.json`.
+
 ## 4. Reading the output
 
 ### The summary line (stdout, one per game)
@@ -314,12 +333,12 @@ bench/curve/chain.jsonl --tactic revise_freedoms=off --seconds 600 1215` (its fl
 n=250   score=19533     search  nodes=34   0.003 s  optimal ok  proof=exhausted
 n=992   score=310690    search  nodes=6175330   30.925 s  optimal ok  proof=exhausted (rests on revise_freedoms)
 n=1220  score=468662    search  nodes=1375952   8.209 s  incomplete
-n=1100  score=381834    search  nodes=56664   0.420 s  optimal unknown  proof=exhausted
+n=1301  score=532272    prime   nodes=0               0.015 s  optimal unknown  proof=prime_formula
 ```
 
 Board size; score (for an incomplete game, the best found so far); the method (`trivial`, `prime`, `reuse`, `search`);
 search nodes (steps, see the glossary); seconds for the game in this invocation; how it compares with `optimal.json`
-(`optimal ok`: equal; `OPTIMAL MISMATCH`: a hard error; `optimal unknown`: n above 1000 or `--optimal none`;
+(`optimal ok`: equal; `OPTIMAL MISMATCH`: a hard error; `optimal unknown`: n above 1300 or `--optimal none`;
 `incomplete`); the proof kind; and, if the proof rests on something unproven, which.
 
 ### The progress line (stderr, every `--progress` seconds and at the end)
@@ -384,7 +403,7 @@ cut short, the fields regrouped and comments added, so it is not valid JSON as p
 | `seconds` | per phase, this invocation (`search_all_runs`: the search over every invocation of a resumed game) |
 | `invocations` | how many invocations ran the search (a resumed game has more than one) |
 | `threads`, `tactics`, `tactic_switches`, `unproven_tactics_on`, `limits`, `options` | what the last invocation ran with; `tactics` is `default` or the changes from the defaults |
-| `optimal_match` | the score equals `optimal.json`'s (null above 1000) |
+| `optimal_match` | the score equals `optimal.json`'s (null if the table has no game of n) |
 | `prev_source` | as `prev.source` |
 | `build` | the commit the binary was built from, and whether its sources differed from it |
 
@@ -414,11 +433,13 @@ The *taint* of a game is the set of unproven things its proof rests on: the unpr
 (`reuse_prev` if it derived the game; `revise_freedoms` if frame 0's freedoms came from it; `legacy_bound`, which is
 known to be unsound), plus, if its proof rests on the game of n - 1, that game's taint, and so on down the chain.  A
 proof by the cap rests on nothing the game used itself: the game replays to `n + score(n-1)`, the ceiling, whatever
-found it, so its taint is only that of the game of n - 1 (schema 2 lines counted its own tactics too).  A
-game taken from `optimal.json` has the taint `optimal.json` (the Java made that file with both unproven tactics on and
-records nothing about which games used them).  An empty taint means: proven within the frame model, given that the
-solver is right.  `taxman solve` prints the taint in the summary line, and a strict run refuses a predecessor with
-one.
+found it, so its taint is only that of the game of n - 1 (schema 2 lines counted its own tactics too).  A game taken
+from `optimal.json` has the taint `optimal.json`, whichever game it is: the file records nothing about where a game
+came from, and the Java made its games 1 to 1000 with both unproven tactics on, without recording which games used
+them.  (The games above 1000 were copied from the strict chain and are as proven as it is, but a table entry cannot
+show that, so the taint stays: the conservative reading.)  An empty taint means: proven within the frame model, given
+that the solver is right.  `taxman solve` prints the taint in the summary line, and a strict run refuses a predecessor
+with one.
 
 ### The verifiers
 
@@ -605,8 +626,8 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
   no search to prove.
 * **taint**: the unproven things a proof rests on, inherited down the chain of games (section 5).  **strict / default**:
   a run with no unproven tactic on, and a run with the defaults (both unproven tactics on).
-* **optimal ok / optimal match**: the score equals `optimal.json`'s.  It compares with the Java's table; it is not a
-  proof, and does not exist above 1000.
+* **optimal ok / optimal match**: the score equals `optimal.json`'s.  It compares with the table of optimal games; it is
+  not a proof, and does not exist above the table's last game.
 * **referee**: code that checks a game or a results file independently of the code that made it: `game::replay`,
   `taxman verify-results`, `tools/check_results.py`.  **rejected**: a game that failed a check after it was found,
   written to `<results>.rejected.jsonl`.
@@ -631,7 +652,8 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
 * **frontier** **(overloaded)**: the largest n solved contiguously (1300).  Unrelated to the "frontier" argument of
   `heuristics/THEORY.md`.
 * **ladder**: a harness (`examples/ladder.rs`) that searches hard games standalone, with time limits, at several thread
-  counts.  **Java**: the original solver in `src/main/java`; **optimal.json**: its table of optimal games, n <= 1000.
+  counts.  **Java**: the original solver in `src/main/java`; **optimal.json**: the table of optimal games, n <= 1300
+  (the Java's games 1 to 1000, then the strict chain's, appended by `taxman extend-optimal`).
 
 ## 8. Reading order and map of the documents
 
