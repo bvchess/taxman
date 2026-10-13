@@ -87,11 +87,15 @@ sources).  A worked example, the board 1..=85, is in the
 * **Within the frame model.**  The decomposition rests on assumptions that are validated, not proven: the greedy
   removal of impossible sources inside hives, the forced moves of `unzip`, free factor count = factors − sources,
   closed hives (those with no free factor) taking no part in the search, and a promoted number paying tax only from
-  the frame directly below.  They are validated by agreement with the Java's optimal.json for n ≤ 1000, which an
-  independent exhaustive search (`heuristics/evaluation/certify.py`) confirms for n ≤ 62, and by the Rust exact
-  oracle `brute`, which checks frame-model games on small boards (up to 40 in the test suite, 52 in
-  `examples/sacrifice validate`).  The sacrifice bound (`sacrifice`) is an upper bound on opt(n) by a
-  different route (games on punctured boards); it proves game 1133 and disagrees with nothing.
+  the frame directly below.  They are validated by agreement with the Java's optimal.json for n ≤ 1000, which a
+  model-free exact search (`evidence/`: the playability theorems, the Franklín–Moniot matching bound, the chain
+  and prime relations, and nothing of hives or frames) confirms for every n ≤ 987, and an independent brute force
+  (`heuristics/evaluation/certify.py`) for n ≤ 62; and by the Rust exact oracle `brute`, which checks frame-model
+  games on small boards (up to 40 in the test suite, 52 in `examples/sacrifice validate`).  The greedy removal of
+  impossible sources at the root, where it shapes the search space, is descending greedy on each upper-half
+  component, which `evidence/` certifies maximum-weight (for every weighting consistent with the order) in every
+  game n ≤ 100,000.  The sacrifice bound (`sacrifice`) is an upper bound on opt(n) by a different route (games on
+  punctured boards); it proves game 1133 and disagrees with nothing.  `evidence/README.md` has the details.
 * **Given the pruning is exact.**  The default search tactics are sound (section 5 grades each).  Two tactics are on
   by default for speed but unproven: `reuse_prev` and `revise_freedoms`.  A run with both off is *strict*.
 * **Given the previous game is optimal.**  The game of n is built from the game of n − 1: opt(n) ≤ n + opt(n − 1)

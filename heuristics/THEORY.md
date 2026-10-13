@@ -15,7 +15,8 @@ Everything below supports two headline facts:
   greedy selects (the set the README calls U\*).  "The open problem"
   below states it precisely, gives its weight-free working form —
   conjecture (★) — and maps the exact boundary between what is
-  proven and what remains.
+  proven and what remains.  A linear-algebra certificate, (♦),
+  settles it game by game: every game to 100,000 is certified.
 
 Empirical support for each claim is collected in the evidence table
 at the end.
@@ -404,26 +405,89 @@ numeric ordering makes greedy's exclusion count minimal* — with the
 window law as the engine, and n=9170's component as the first test
 any proof must pass.
 
+### The span certificate (♦)
+
+Linear algebra over GF(2) gives a far stronger bound than matching.
+Give each member its incidence vector: a 1 at each of its maximal
+factors.
+
+**Lemma (playable sets are independent).**  The incidence vectors of
+a playable set are linearly independent over GF(2) (indeed over any
+field).
+
+*Proof.*  A playable set dismantles completely (Theorems 4 and 5): in
+some order x₁, x₂, … each xᵢ has a factor that no later member lists.
+In a vanishing sum over a nonempty set of members, the coordinate of
+the earliest member's private factor is 1.  ∎
+
+So no playable subset of a set K is larger than the GF(2) rank of K.
+On members with at most two distinct primes this is the graphic
+matroid's rank, exact there; on three-prime members, whose factors
+pq, pr, qr are the edges of a triangle on the primes, a dependency is
+a closed surface mod 2 — every factor an even number of times, so a
+minimal dependent set is a core.
+
+**Theorem 7 ((♦) implies (★)).**  Suppose that whenever descending
+greedy rejects a member x, x's vector is a sum of vectors of members
+it kept above x.  Then greedy is maximum-cardinality on every
+truncation {≥ t} of every component, and its set outweighs every
+playable set for every weighting consistent with the order.
+
+*Proof.*  Greedy's kept members above t are playable, hence
+independent, and span every member above t (the kept ones trivially,
+the rejected ones by hypothesis): they are a basis of K_{≥t}, so
+greedy keeps rank(K_{≥t}) members, which bounds every playable
+subset.  The weighted claim is greedy optimality on the linear
+matroid, whose bases greedy's sets are.  ∎
+
+(♦) is stronger than (★): a rejection forced only by an *odd* core
+(self-covering, with no subset listing every factor an even number of
+times) would break it without breaking (★).  Odd cores exist in
+Taxman — the exchange failure at n = 2873 needs one, since
+GF(2)-independent sets do satisfy exchange — but descending greedy has
+never rejected because of one.  Checking (♦) is greedy itself plus
+Gaussian elimination, a few seconds per game at n = 500,000, and it
+held in every game checked (Evidence, below).  The open problem
+becomes: **prove (♦)**.  The adversarial experiments in
+`rust/evidence` locate what it needs: it holds under every order of
+the real incidence structure that obeys the window law, even
+adversarially chosen ones, and under the window law reversed, but
+fails as often as a uniformly random order under the window law for a
+random ranking of the primes, or for the primes perturbed by more
+than a few percent — while generalized primes perturbed by 50%, with
+the members and factors rebuilt from them, never fail.  The
+protection is the window law *for the ranking of the primes that also
+decides which products lie in the window*.
+
 ## Evidence
 
-Standing status for (★): zero counterexamples anywhere.  Across
-every game size tested (all n = 6..1500, forty samples to 4000,
-n=2873, n=9170), 3,231 of 3,236 rejection-bearing components —
-those where greedy excludes at least one member, the only place (★)
-could fail — are verified (exact search over the residual, or brute
-force) or certified (greedy meets the matching bound).  The five
-undecided — n = 3103, 3872, 3936, 4000, and 9170 — have exact
-search budgets of 2.7×10⁹ to 1.1×10⁴⁷ subsets; the n=9170 component
-(1,174 members, residual 306, 37 greedy exclusions, any improving
-exclusion forced by the matching bound to have size 19..36) will be
-settled only by a theorem.
+Standing status for (★): zero counterexamples anywhere, and certified
+in every game checked.  The span certificate (♦) holds — every one
+of greedy's rejections is a GF(2) dependency, which certifies (★) for
+every component and truncation and the upper-half conjecture for the
+game (Theorem 7) — in every game n = 2..100,000 (602,777,907
+rejections) and in 902 sampled games to 2,000,000 (60,183,674 more).
+Threshold by threshold, every game n = 2..20,000 (24,058,430
+rejection thresholds in 58,306 rejection-bearing components) is
+certified by bounds alone: one exclusion is always needed, the
+matching bound, Lorea's hypergraphic-matroid bound, or the GF(2) rank
+bound — no search.  The earlier campaign (all n = 6..1500, forty
+samples to 4000, n=2873, n=9170: 3,231 of 3,236 rejection-bearing
+components verified or certified) had left five components undecided,
+n = 3103, 3872, 3936, 4000 and 9170; the rank bound settles all five,
+n=9170's (residual jam of 304 members, greedy's 37 exclusions, the
+matching bound proving only 19) in milliseconds.  Data, programs and
+the adversarial experiments: `rust/evidence/README.md`.
 
 | Claim | Evidence | Status |
 | --- | --- | --- |
 | Maximal-factor pool reproduces solvent's picks (and runs ~2x faster) | identical pick sets, 1000/1000 games | proven (Thm 1) and measured |
 | Victim law: a single sacrifice repairs iff it lies in every minimal core | 22,998 trials, 0 exceptions | machine-cross-checked lemma |
 | Greedy weight-optimal where the jam is hyperedge-free | — | proven (frontier argument) |
-| (★) on rejection-bearing components | 3,231 of 3,236 verified or certified; 5 undecided | open |
+| Playable sets are GF(2)-independent; (♦) implies (★) and the upper-half conjecture | — | proven (span certificate, Thm 7) |
+| (♦): every greedy rejection is a GF(2) dependency of the kept members above it | every game n = 2..100,000 and 902 samples to 2,000,000; 0 violations | certified per game; open in general |
+| (★) on rejection-bearing components | every threshold of every game n = 2..20,000 certified by bounds; the earlier 5 undecided settled | certified per game; open in general |
+| (♦) and (★) under orders obeying the window law, adversarial or random, or its reverse | 1,981 instances, n = 2000..20,000, 0 failures (uniformly random orders: 16–50% fail; window law for a random prime ranking: 26–57%) | measured |
 | n=2873 component: greedy's 6 exclusions minimal | 12.4M playability checks over the 70-member residual | verified |
 | Exclusion sets confined to the residual | validated 35/35 vs. unrestricted search | proven (Thm 6) |
 | Core characterization without separation | 30,000 fuzzed instances, 0 failures | unproven |

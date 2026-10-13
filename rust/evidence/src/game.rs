@@ -173,6 +173,8 @@ pub struct MatchingBound {
     /// The optimal dual of the last solve, and its total (the bound plus BIG per forced pick).
     dual: Vec<i64>,
     total: i64,
+    /// BIG times the number of forced picks at the last solve.
+    offset: i64,
 }
 
 const NONE: u32 = u32::MAX;
@@ -199,6 +201,7 @@ impl MatchingBound {
             scale: (1, 1),
             dual: vec![0; size],
             total: 0,
+            offset: 0,
         }
     }
 
@@ -509,7 +512,8 @@ impl MatchingBound {
             return None;
         }
         let forced = roles.iter().filter(|&&r| r == Role::Pick).count() as i64;
-        Some(((value - forced * BIG) as u64, picks))
+        self.offset = forced * BIG;
+        Some(((value - self.offset) as u64, picks))
     }
 
     /// After [`solve`](Self::solve): an upper bound on the bound with the pick `c` barred, from the optimal dual
@@ -530,8 +534,7 @@ impl MatchingBound {
         if m != NONE && m < c {
             drop += self.dual[m as usize] - lowest(m, c, roles);
         }
-        let forced = roles.iter().filter(|&&r| r == Role::Pick).count() as i64;
-        self.total - drop - forced * BIG
+        self.total - drop - self.offset
     }
 }
 
@@ -800,11 +803,8 @@ impl<'a> Prover<'a> {
             }
             solved = self.bound.update(self.board, &snapshot, &old, &roles);
         };
-        if self.board.playable(&picks) {
-            return Verdict::Beaten((2..=n).filter(|&c| picks[c as usize]).collect());
-        }
         // Branch on the violated conflict with the fewest free members (measured: better than the one dearest to
-        // break, which doubles the tree at n = 600).
+        // break, which doubles the tree at n = 600).  A known one also shows the picks unplayable without a peel.
         let known = self
             .nogoods
             .iter()
@@ -816,6 +816,9 @@ impl<'a> Prover<'a> {
                 k.clone()
             }
             None => {
+                if self.board.playable(&picks) {
+                    return Verdict::Beaten((2..=n).filter(|&c| picks[c as usize]).collect());
+                }
                 self.stats[0] += 1;
                 let k = self.board.minimal_unplayable(&picks);
                 if self.nogoods.len() < self.max_nogoods {

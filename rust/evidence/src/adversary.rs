@@ -6,7 +6,8 @@
 //! * [`Family::Shuffled`]: the real incidence structure of game n, in a uniformly random order.
 //! * [`Family::Window`]: the real incidence structure, in a random order obeying the *window law* (members
 //!   f·p sharing a factor f come in the order of their cofactor primes, as in the real order), and nothing
-//!   else: a random topological order of those constraints.
+//!   else: a topological order of those constraints, chosen at random, or adversarially ([`Rule`]: always the
+//!   smallest member allowed, or the three-factor members first or last).
 //! * [`Family::Noisy`]: the real incidence structure, ordered by value × (1 + ε·u) with u uniform in [−1, 1]:
 //!   the real order with its close calls scrambled.
 //! * [`Family::Perturbed`]: *generalized primes* (Beurling): every prime p <= N replaced by p·(1 + ε·u) (and kept
@@ -26,7 +27,7 @@ use std::collections::HashMap;
 pub enum Family {
     Real,
     Shuffled,
-    Window,
+    Window(Rule),
     Noisy,
     Perturbed,
     Cramer,
@@ -37,7 +38,12 @@ impl Family {
         match s {
             "real" => Family::Real,
             "shuffled" => Family::Shuffled,
-            "window" => Family::Window,
+            "window" => Family::Window(Rule::Random),
+            "window-low" => Family::Window(Rule::Lowest),
+            "window-hyperfirst" => Family::Window(Rule::HyperFirst),
+            "window-hyperlast" => Family::Window(Rule::HyperLast),
+            "antiwindow" => Family::Window(Rule::Anti),
+            "rankedwindow" => Family::Window(Rule::Ranked),
             "noisy" => Family::Noisy,
             "perturbed" => Family::Perturbed,
             "cramer" => Family::Cramer,
@@ -72,7 +78,7 @@ pub fn generate(family: Family, n: u64, eps: f64, seed: u64) -> Instance {
     let mut rng = Rng(0x9E37_79B9_7F4A_7C15 ^ seed.wrapping_mul(0xD1B5_4A32_D192_ED03) ^ n);
     rng.next();
     match family {
-        Family::Real | Family::Shuffled | Family::Window | Family::Noisy => {
+        Family::Real | Family::Shuffled | Family::Window(_) | Family::Noisy => {
             let spf = smallest_prime_factors(n as usize);
             let real = Instance::upper_half(n, &spf);
             let order = match family {
@@ -84,7 +90,7 @@ pub fn generate(family: Family, n: u64, eps: f64, seed: u64) -> Instance {
                     }
                     o
                 }
-                Family::Window => window_order(&real, &mut rng),
+                Family::Window(rule) => window_order(&real, &mut rng, rule, eps),
                 Family::Noisy => {
                     let mut keyed: Vec<(f64, u32)> = (0..real.len() as u32)
                         .map(|m| (real.value[m as usize] as f64 * (1.0 + eps * (2.0 * rng.unit() - 1.0)), m))
@@ -123,17 +129,57 @@ fn reorder(inst: &Instance, order: &[u32]) -> Instance {
     Instance::from_ids(value, factors, inst.factor_value.clone())
 }
 
-/// A random order of the upper half obeying the window law: for every factor f, the members f·p listing it
-/// come in decreasing order of p.  (A random topological sort: repeatedly take a random member all of whose
-/// predecessors are placed.)
-fn window_order(inst: &Instance, rng: &mut Rng) -> Vec<u32> {
+/// How a window-law order chooses among the members whose predecessors are all placed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Rule {
+    /// Uniformly at random.
+    Random,
+    /// The smallest: the order least like the real one that the window law allows.
+    Lowest,
+    /// Members with three or more factors (the hyperedges, where exchange fails) first, at random.
+    HyperFirst,
+    /// Members with three or more factors last, at random.
+    HyperLast,
+    /// At random, but obeying the reversed window law (members sharing a factor in increasing order of their
+    /// cofactors): a control, as consistent as the window law but backwards.
+    Anti,
+    /// At random, obeying the window law for another ranking of the primes (cofactors compared by rank): a
+    /// random permutation (eps = 0), or the primes by value × (1 + eps·u) (local disorder).
+    Ranked,
+}
+
+/// An order of the upper half obeying the window law: for every factor f, the members f·p listing it come in
+/// decreasing order of p.  (A topological sort of those constraints, choosing by `rule`.)
+fn window_order(inst: &Instance, rng: &mut Rng, rule: Rule, eps: f64) -> Vec<u32> {
+    if !matches!(rule, Rule::Random | Rule::Anti | Rule::Ranked) {
+        return window_order_by(inst, rng, rule);
+    }
+    // For Ranked: another ranking of the primes, by which the cofactors are compared instead.
+    let mut rank: Vec<u64> = (0..=inst.value.iter().copied().max().unwrap_or(1)).collect();
+    if rule == Rule::Ranked && eps == 0.0 {
+        for i in (1..rank.len()).rev() {
+            rank.swap(i, rng.below(i as u64 + 1) as usize);
+        }
+    } else if rule == Rule::Ranked {
+        let keys: Vec<f64> = (0..rank.len()).map(|p| p as f64 * (1.0 + eps * (2.0 * rng.unit() - 1.0))).collect();
+        let mut by: Vec<usize> = (0..rank.len()).collect();
+        by.sort_by(|&a, &b| keys[a].partial_cmp(&keys[b]).unwrap());
+        by.iter().enumerate().for_each(|(r, &p)| rank[p] = r as u64);
+    }
     let m = inst.len();
     let mut succ: Vec<Vec<u32>> = vec![Vec::new(); m];
     let mut indegree = vec![0u32; m];
-    for list in &inst.listers {
+    for (f, list) in inst.listers.iter().enumerate() {
         // Members listing f, by value descending: that is cofactor-prime descending (all are f·p).
         let mut ms = list.clone();
         ms.sort_by_key(|&x| std::cmp::Reverse(inst.value[x as usize]));
+        if rule == Rule::Anti {
+            ms.reverse();
+        }
+        if rule == Rule::Ranked {
+            let cofactor = |x: u32| inst.value[x as usize] / inst.factor_value[f];
+            ms.sort_by_key(|&x| std::cmp::Reverse(rank[cofactor(x) as usize]));
+        }
         for w in ms.windows(2) {
             succ[w[0] as usize].push(w[1]);
             indegree[w[1] as usize] += 1;
@@ -149,6 +195,48 @@ fn window_order(inst: &Instance, rng: &mut Rng) -> Vec<u32> {
             indegree[y as usize] -= 1;
             if indegree[y as usize] == 0 {
                 ready.push(y);
+            }
+        }
+    }
+    assert_eq!(order.len(), m, "the window law is acyclic");
+    order
+}
+
+fn window_order_by(inst: &Instance, rng: &mut Rng, rule: Rule) -> Vec<u32> {
+    use std::cmp::Reverse;
+    use std::collections::BinaryHeap;
+    let m = inst.len();
+    let mut succ: Vec<Vec<u32>> = vec![Vec::new(); m];
+    let mut indegree = vec![0u32; m];
+    for list in &inst.listers {
+        let mut ms = list.clone();
+        ms.sort_by_key(|&x| Reverse(inst.value[x as usize]));
+        for w in ms.windows(2) {
+            succ[w[0] as usize].push(w[1]);
+            indegree[w[1] as usize] += 1;
+        }
+    }
+    // Priority: smaller key first; ties broken at random.
+    let key = |x: u32, rng: &mut Rng| -> (u64, u64) {
+        let hyper = inst.factors[x as usize].len() >= 3;
+        match rule {
+            Rule::Lowest => (inst.value[x as usize], 0),
+            Rule::HyperFirst => (u64::from(!hyper), rng.next()),
+            Rule::HyperLast => (u64::from(hyper), rng.next()),
+            Rule::Random | Rule::Anti | Rule::Ranked => unreachable!(),
+        }
+    };
+    let mut ready: BinaryHeap<Reverse<((u64, u64), u32)>> = BinaryHeap::new();
+    for x in (0..m as u32).filter(|&x| indegree[x as usize] == 0) {
+        ready.push(Reverse((key(x, rng), x)));
+    }
+    let mut order = Vec::with_capacity(m);
+    while let Some(Reverse((_, x))) = ready.pop() {
+        order.push(x);
+        for &y in &succ[x as usize] {
+            indegree[y as usize] -= 1;
+            if indegree[y as usize] == 0 {
+                ready.push(Reverse((key(y, rng), y)));
             }
         }
     }
@@ -231,7 +319,7 @@ mod tests {
 
     #[test]
     fn window_orders_obey_the_window_law() {
-        let inst = generate(Family::Window, 800, 0.0, 3);
+        let inst = generate(Family::Window(Rule::Lowest), 800, 0.0, 3);
         let mut pos = vec![0usize; 801];
         for (i, &v) in inst.value.iter().enumerate() {
             pos[v as usize] = i;

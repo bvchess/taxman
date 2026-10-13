@@ -69,8 +69,8 @@ from frame 0 (the factor 4) and scores 8.  The search is over such choices: n = 
   removal of impossible sources inside hives, the forced moves of `unzip`, `free factors = factors - sources`, closed
   hives (those with no free factor) taking no part in the search, and a promoted number paying tax only from the frame
   directly below ([DESIGN.md, Tactics](DESIGN.md#5-tactics)).  They were validated by agreement with the Java's
-  `optimal.json` for n <= 1000 and by exhaustive search (`src/brute.rs`, `heuristics/evaluation/certify.py`) for small
-  boards; the exhaustive certification covers n <= 62 only.
+  `optimal.json` for n <= 1000, by exhaustive search (`src/brute.rs`, `heuristics/evaluation/certify.py`) for small
+  boards (n <= 62), and by a model-free exact search (`evidence/`) that confirms the optimum for every n <= 987.
 * **Given the pruning is exact.**  The default search tactics are sound: they never prune a promotion set that could
   win ([DESIGN.md, Tactics](DESIGN.md#5-tactics) grades each).  Two tactics are on by default for speed but are
   *unproven*: `reuse_prev` and `revise_freedoms`.  A run with both turned off is called *strict* in this

@@ -64,8 +64,9 @@ matchable-but-unplayable weight, upper-half siblings of the n=21 set.
 What is proven is that no game beats M\*; what is measured
 (`verify.py`, 1000/1000) is that optimal games' upper halves equal U\*
 exactly; "no *playable* upper set outweighs U\*" is proven wherever
-the frontier jam is hyperedge-free (THEORY.md), exhaustively
-verified for every n = 2..99, and open in general — both the
+the frontier jam is hyperedge-free (THEORY.md), certified game by
+game for every n = 2..100,000 by a GF(2) linear-algebra certificate
+(THEORY.md, "The span certificate"), and open in general — both the
 exchange route (n=2873) and the single-sacrifice route (n=9170) are
 provably closed.
 `order_for_real_game` turns peel's assignment into a legal
@@ -81,7 +82,7 @@ What is proven vs. trusted, precisely:
 | opt(n) ≤ n + opt(n−1) | proven (wiki) |
 | no upper half beats M\*, the max-weight *matchable* upper set | proven (lifting: every game's picks pair with distinct factors) |
 | U\* (`solve_upper_half`) equals the optimal game's upper half | measured, 1000/1000 |
-| no *playable* upper set outweighs U\* | conjecture — proven wherever the jam is hyperedge-free (THEORY.md, "The frontier argument"); the single-sacrifice route is **false** in general (n=9170 witness).  Now known **equivalent to a pure cardinality claim** — descending greedy is maximum-cardinality on every component of the upper-half instance's incidence graph (THEORY.md, "The cardinality reformulation") — verified-or-certified on 99.8% of all 3,236 rejection-bearing components tested to n=4000+, zero counterexamples.  Exhaustive n = 2..99.  The full 3-prime padded-jam census (428 shapes, 22,909 trap orderings) closes with **zero unprotected traps**: every trap dies by monomial inversion or a window-forced guard (THEORY.md) |
+| no *playable* upper set outweighs U\* | conjecture — proven wherever the jam is hyperedge-free (THEORY.md, "The frontier argument"); the single-sacrifice route is **false** in general (n=9170 witness).  Now known **equivalent to a pure cardinality claim** — descending greedy is maximum-cardinality on every component of the upper-half instance's incidence graph (THEORY.md, "The cardinality reformulation") — and **implied by a linear-algebra one**, (♦): every greedy rejection is a GF(2) dependency of the members kept above it (THEORY.md, "The span certificate").  **Certified for every game n = 2..100,000** and 902 sampled games to 2,000,000 by checking (♦) exactly (`rust/evidence`), zero counterexamples; the five components the earlier campaign left undecided are settled.  The full 3-prime padded-jam census (428 shapes, 22,909 trap orderings) closes with **zero unprotected traps**: every trap dies by monomial inversion or a window-forced guard (THEORY.md) |
 | greedy weight-optimality when the frontier jam has only ≤2-prime members | theorem (unique minimal core: forest + one edge; proof in THEORY.md) |
 | on members with ≤ 2 distinct primes, playable = forest in the factor-value graph | theorem (via the core characterization; verified on 89,400 random subsets) |
 | playability ⟺ maximal-factor matching + acyclic precedence | proven |
@@ -91,7 +92,7 @@ What is proven vs. trusted, precisely:
 | peel's assignment is always schedulable | **theorem** ("schedulability", proof in THEORY.md): the peel rules cannot emit a cyclic assignment.  Still asserted loudly at runtime, as defense in depth |
 | peel's failure means the set is unplayable | **theorem** ("completeness", proof in THEORY.md) — NOT reducible to "no matching exists": matchable-but-unplayable sets are real (n=21 holds a 145-sum set whose every matching is precedence-cyclic; the optimum is 144) and peel provably rejects exactly the unplayable.  With schedulability, peel is a proven playability oracle |
 | opt delta = U\* delta (the upper-delta certificate) | conjecture, holds on 70.4% of transitions where it applies, zero contradictions |
-| optimal.json itself | independently certified to n=62 by brute force (`certify.py`), consistent with every bound and certificate beyond |
+| optimal.json itself | independently certified to n=62 by brute force (`certify.py`); **verified model-free for every n ≤ 986** by an exact branch and bound that uses only the playability theorems, the Franklín–Moniot matching bound and the chain and prime relations (`rust/evidence`); consistent with every bound and certificate beyond |
 
 ### The proofs
 
@@ -107,11 +108,13 @@ core-free; on ≤2-prime members, playable ⟺ forest) with the n=2873
 gadget where the exchange property dies; the **frontier
 argument**, which proves greedy weight-optimal wherever the jam is
 hyperedge-free and pins the remaining open problem to its first hard
-witness at n=9170; and the **cardinality reformulation**, which
+witness at n=9170; the **cardinality reformulation**, which
 strips the weights from that open problem — greedy optimality is
 exactly the claim that descending greedy is maximum-cardinality on
-every component of the upper-half instance's incidence graph,
-verified or certified on 99.8% of every component ever tested.
+every component of the upper-half instance's incidence graph; and
+the **span certificate**, which bounds playable sets by a GF(2) rank
+and reduces the open problem to one linear-algebra statement,
+certified in every game to n = 100,000.
 
 ## Solvent: the O(n²) strategy
 

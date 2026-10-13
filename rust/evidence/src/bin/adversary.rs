@@ -1,8 +1,10 @@
 //! The adversarial campaign: synthetic Taxman-shaped instances (`adversary.rs`), each checked for (♦) and,
 //! where (♦) fails, for (★) threshold by threshold.  One line per seed, resumable ("n" is the seed):
 //!
-//!     adversary --family real|shuffled|window|noisy|perturbed|cramer --size N [--eps E]
+//!     adversary --family real|shuffled|window[-low|-hyperfirst|-hyperlast]|noisy|perturbed|cramer --size N [--eps E]
 //!               --from A --to B [--threads T] [--seconds S] [--budget NODES] --out FILE
+//!
+//! With `--size 0` the items are sizes instead of seeds (seed 0), and "n" is the size.
 
 use std::path::PathBuf;
 use std::time::Instant;
@@ -30,11 +32,13 @@ fn main() {
     assert!(!out.as_os_str().is_empty(), "--out is required");
     campaign("adversary", &seeds, threads, seconds, &out, |seed| {
         let started = Instant::now();
-        let inst = generate(family, size, eps, seed);
+        // With --size 0 the items are sizes (seed 0), for sweeping the deterministic families.
+        let (n_size, rng_seed) = if size == 0 { (seed, 0) } else { (size, seed) };
+        let inst = generate(family, n_size, eps, rng_seed);
         let span = span_check(&inst);
         let mut line = Obj::new()
             .num("n", seed)
-            .num("size", size)
+            .num("size", n_size)
             .float("eps", eps)
             .num("members", inst.len())
             .num("residual", span.residual)
