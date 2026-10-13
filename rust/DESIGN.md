@@ -647,9 +647,10 @@ on the machine moves wall times by up to 3×.  What measures what:
   cores) searches each game with each count and prints a table per game and one summed over the games: search time,
   speedup, nodes per second per thread, effective parallelism, idle and lock-wait time, splits and the units they gave,
   steals, runs, tiny runs and the time to full occupancy.  With `--seed-opt` the node count barely depends on the
-  threads, so the speedup measures the parallel proof alone.  The engine's own benchmark (`cargo test --release --test
-  engine -- --ignored --nocapture bench`, sizes and thread counts set by `TXENGINE_BENCH_*`) measures its overhead per
-  node with no work per node.
+  threads, so the speedup measures the parallel proof alone.  `--cores C` lets only C of the threads search at once
+  (`EngineConfig::cores`), to measure in counts, not time, what many more workers than cores would do.  The engine's
+  own benchmark (`cargo test --release --test engine -- --ignored --nocapture bench`, sizes and thread counts set by
+  `TXENGINE_BENCH_*`) measures its overhead per node with no work per node.
 * **The cloud** (`tools/cloud`) has the scripts for a many-core machine: the sweep to 192 threads, the cost of a
   checkpoint pause, and the production chain (RUNBOOK.md).
 
