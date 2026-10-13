@@ -915,10 +915,12 @@ Correctness, all on games that finish in seconds:
   for 94 boards of 763..1228 (with the fingerprint of the previous game the
   decision was made with); `games_java.txt` its apiary game, move for move,
   for 171 sets of promotions at 762..2049 that are not only the optimal ones.
-  The Java was run without `-ea` (its limit of 1023 is an `assert`) with
-  `tools/golden/org/.../AccelProbe.java` and `GameProbe.java`; the files say
-  how the lines are made.  Every second line of the two text files is checked
-  (`FIXTURE_STRIDE`).
+  The Java was run without `-ea` (its limit of 1023 is an `assert`, and
+  `tools/golden/export.sh` runs with `-ea`, so for n > 1023 take its last line
+  without the flag) with `GoldenExport --structure-only`, and with
+  `tools/golden/org/.../AccelProbe.java` and `GameProbe.java` for the text
+  files, which say how their lines are made.  Every second line of the two
+  text files is checked (`FIXTURE_STRIDE`).
 * Node-count tripwires (`tests/tripwires.rs`): a pruning tactic that stops
   working changes no answer, so no assertion on answers sees it (a mutant
   that ignored the result of `Nogoods::ruled_out` costs 27 to 67 % more
@@ -952,7 +954,8 @@ Correctness, all on games that finish in seconds:
   errors through the real binary; `bench --history FILE` keeps the tracked
   `bench/history.jsonl` out of the tests.
 * Cost: the whole suite takes about 28 s with two test threads in the test
-  profile (`opt-level = 2`), 25 s in release.  A few tests sample what an
+  profile (`opt-level = 2`), 24 s in release (before the tests of the
+  last four bullets and the trimming: 30 s and 26 s).  A few tests sample what an
   exhaustive run would cover (every 18th golden board for the peeling
   agreement, every sixth board above 511 for the root promotability of the
   frame builder's candidates, every second line of the Java fixtures); the
