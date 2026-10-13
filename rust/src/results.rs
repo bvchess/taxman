@@ -828,6 +828,14 @@ impl ResultsFile {
     }
 }
 
+/// Dropping releases the lock at once, by unlocking rather than only closing the file, as `engine::DirLock`
+/// does (see there for why).
+impl Drop for ResultsFile {
+    fn drop(&mut self) {
+        let _ = self.file.unlock();
+    }
+}
+
 /// Where the games that failed a check go: `<results>.rejected.jsonl`, with a `.jsonl` ending of the results
 /// file dropped (`default.jsonl` → `default.rejected.jsonl`).
 pub fn rejected_path(results: &Path) -> PathBuf {
@@ -1147,6 +1155,20 @@ mod tests {
         assert!(err.contains("r.jsonl is in use by another process"), "{err}");
         drop(held);
         assert!(ResultsFile::open(&path, None).is_ok());
+    }
+
+    /// A closed results file is free at once, though a copy of its descriptor lives on, as in a child process
+    /// between `fork` and `exec` (see `engine::DirLock`).
+    #[test]
+    fn a_closed_results_file_is_free_while_a_copy_of_its_descriptor_lives() {
+        let dir = crate::test_support::TempDir::new("results-lock-copy");
+        let path = dir.join("r.jsonl");
+        let held = ResultsFile::open(&path, None).unwrap();
+        let copy = held.file.try_clone().unwrap();
+        drop(held);
+        let again = ResultsFile::open(&path, None).err();
+        assert!(again.is_none(), "{again:?}");
+        drop(copy);
     }
 
     #[test]

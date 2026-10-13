@@ -558,7 +558,17 @@ pub fn checksum(bytes: &[u8]) -> u64 {
 /// An exclusive lock on a directory, held until dropped (see [`lock_dir`]).
 #[derive(Debug)]
 pub struct DirLock {
-    _file: File,
+    file: File,
+}
+
+/// Dropping releases the lock at once, by unlocking rather than only closing.  An `flock` belongs to the open
+/// file description, which a process spawned meanwhile by another thread shares until its `exec` closes the
+/// copy of the descriptor it inherited; closing ours would leave the directory locked for that long (a
+/// millisecond or two), and a [`lock_dir`] right after the drop would be refused.  `unlock` frees every copy.
+impl Drop for DirLock {
+    fn drop(&mut self) {
+        let _ = self.file.unlock();
+    }
 }
 
 /// The name of the lock file [`lock_dir`] uses.
@@ -579,7 +589,7 @@ pub fn lock_dir(dir: &Path) -> io::Result<DirLock> {
         Ok(()) => {
             file.set_len(0)?;
             writeln!(file, "{}", std::process::id())?;
-            Ok(DirLock { _file: file })
+            Ok(DirLock { file })
         }
         Err(TryLockError::WouldBlock) => {
             let mut holder = String::new();
@@ -1937,6 +1947,20 @@ mod tests {
         let mut shorter = Hash64::new();
         shorter.update(&data[..999]);
         assert_ne!(shorter.finish(), whole.finish());
+    }
+
+    /// A dropped lock is free at once, though a copy of its descriptor lives on, as in a child process between
+    /// `fork` and `exec` (found as a rare failure of `a_locked_directory_is_refused` while other tests spawned
+    /// processes).
+    #[test]
+    fn a_dropped_dir_lock_is_free_while_a_copy_of_its_descriptor_lives() {
+        let dir = crate::test_support::TempDir::new("dir-lock-copy");
+        let held = lock_dir(&dir).unwrap();
+        let copy = held.file.try_clone().unwrap();
+        drop(held);
+        let again = lock_dir(&dir);
+        assert!(again.is_ok(), "{again:?}");
+        drop(copy);
     }
 
     #[test]
