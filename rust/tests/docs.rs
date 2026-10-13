@@ -183,6 +183,12 @@ fn link_targets(line: &str) -> Vec<&str> {
 
 #[test]
 fn every_relative_link_and_anchor_in_the_markdown_files_resolves() {
+    // The links reach across the whole repository, so they can only be checked in a full checkout; the Linux dry-run
+    // image (tools/cloud/Dockerfile) copies just the crate and the data it needs.
+    if !crate_dir().join("../README.md").exists() {
+        eprintln!("links not checked: this is not a full checkout of the repository (no ../README.md)");
+        return;
+    }
     let mut anchors_of: BTreeMap<PathBuf, BTreeSet<String>> = BTreeMap::new();
     let mut broken = Vec::new();
     let mut checked = 0;
