@@ -270,8 +270,9 @@ fn a_checkpoint_interval_of_zero_makes_progress() {
         assert!(out.completed, "{what}");
         assert_eq!(out.stats.nodes, size, "{what}");
         assert!(invocations >= if pieces { 3 } else { 1 }, "{what}: {invocations} invocations");
-        // (The last piece can be too small for one.)
-        assert!(pieces || out.counters.checkpoints >= 2, "{what}: {:?}", out.counters);
+        // At least one checkpoint was taken while the search kept going.  (Asking for two was timing-dependent:
+        // an optimized build can finish the tree before the second pause; the last piece can be too small for any.)
+        assert!(pieces || out.counters.checkpoints >= 1, "{what}: {:?}", out.counters);
         assert!(!ckpt.exists() && dir_is_empty(&dir.path("spill")), "{what}");
     }
 }
