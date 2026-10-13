@@ -74,8 +74,8 @@ struct Enumerator {
     segments: bool,
     /// "all", "fixed" or "other" (see the top).
     upper: String,
-    /// Complete lists of optimal sets, by game.
-    cache: Mutex<HashMap<u64, Vec<Vec<u32>>>>,
+    /// The complete list of optimal sets of each game worked out so far, or None if it could not be had.
+    cache: Mutex<HashMap<u64, Option<Vec<Vec<u32>>>>>,
 }
 
 impl Enumerator {
@@ -95,7 +95,7 @@ impl Enumerator {
             return Some(vec![Vec::new()]);
         }
         if let Some(sets) = self.cache.lock().unwrap().get(&m) {
-            return Some(sets.clone());
+            return sets.clone();
         }
         let outcome = self.solve(m);
         (outcome.ended == "complete").then_some(outcome.sets)
@@ -160,18 +160,21 @@ impl Enumerator {
             the_prime_of_every_optimal_set(s, n as u32, &self.spf).unwrap();
         }
         outcome.sets.sort_unstable_by(|a, b| b.cmp(a));
-        if outcome.ended == "complete" {
-            self.cache.lock().unwrap().insert(n, outcome.sets.clone());
-        }
+        let complete = (outcome.ended == "complete").then(|| outcome.sets.clone());
+        self.cache.lock().unwrap().insert(n, complete);
         outcome
     }
 
-    /// The complete lists of optimal sets recorded in earlier lines of the output (those with every set written).
+    /// The lists of optimal sets recorded in earlier lines of the output: complete (with every set written), or
+    /// known not to be.
     fn prefill(&self, lines: &[String]) {
         for line in lines {
             let (Some(n), Some(count)) = (field_u64(line, "n"), field_u64(line, "sets")) else { continue };
-            let whole = field_str(line, "upper").is_none_or(|u| u == "all");
-            if !whole || field_str(line, "ended") != Some("complete") || count as usize > WRITTEN + 1 {
+            if field_str(line, "upper").is_some_and(|u| u != "all") {
+                continue;
+            }
+            if field_str(line, "ended") != Some("complete") || count as usize > WRITTEN + 1 {
+                self.cache.lock().unwrap().insert(n, None);
                 continue;
             }
             let Some((_, moves)) = self.known.get(&n) else { continue };
@@ -189,7 +192,7 @@ impl Enumerator {
                 sets.push(descending(&set));
             }
             assert_eq!(sets.len() as u64, count, "n={n}: the line's sets do not add up");
-            self.cache.lock().unwrap().insert(n, sets);
+            self.cache.lock().unwrap().insert(n, Some(sets));
         }
     }
 }
