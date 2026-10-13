@@ -1336,7 +1336,7 @@ impl<const W: usize> Searcher<TaxUnit<W>> for TaxSearcher<'_, W> {
 /// What revising frame 0's freedoms did (`UpperBoundEstimator.reviseFreedoms`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Revise {
-    /// The tactic is off.
+    /// The tactic is off (also for a search resumed from the checkpoint of a game that was set up with it off).
     Off,
     /// Nothing to revise: the greedy incumbent already has `max_total` promotions, or there are at most 2
     /// frames.
@@ -1350,7 +1350,8 @@ pub enum Revise {
     /// A limit or a stop signal stopped the two-frame game's search, so frame 0 could not be revised: the game
     /// is not ready to search, and [`search`] stops at once (as if a limit had stopped it, with no checkpoint).
     Stopped { nodes: u64 },
-    /// Frame 0's freedoms were taken from a checkpoint.
+    /// Frame 0's freedoms were taken from a checkpoint of a game that was set up with the tactic on (so they may
+    /// be revised ones, though the checkpoint does not say whether revising changed them).
     FromCheckpoint,
 }
 
@@ -1473,9 +1474,11 @@ fn prepare_state<const W: usize>(
     let greedy = bounds::greedy(&model, &root, &candidates);
     timings.greedy = t0.elapsed();
     let t0 = Instant::now();
+    // A checkpoint's frame 0 is a revised one only if the tactic was on (the header's tactics are this search's).
+    let from_checkpoint = if tactics.revise_freedoms { Revise::FromCheckpoint } else { Revise::Off };
     let (revised, revise) = match frame0 {
-        Some(Some(freedoms)) => (root.with_frame_zero_freedoms(freedoms), Revise::FromCheckpoint),
-        Some(None) => (root, Revise::FromCheckpoint),
+        Some(Some(freedoms)) => (root.with_frame_zero_freedoms(freedoms), from_checkpoint),
+        Some(None) => (root, from_checkpoint),
         None if tactics.revise_freedoms => revise_freedoms(n, &model, &root, &candidates, &greedy, tactics, engine)?,
         None => (root, Revise::Off),
     };
@@ -2335,7 +2338,8 @@ mod tests {
         while !result.completed {
             assert!(ckpt.exists(), "a stopped run leaves a checkpoint");
             let resumed = prepare_for_resume::<16>(&tables, &g.columns, &cands, &ckpt, 2).unwrap();
-            assert_eq!(resumed.revise, Revise::FromCheckpoint);
+            // A checkpoint's frame 0 counts as revised only if the tactic was on.
+            assert_eq!(resumed.revise, if tactics.revise_freedoms { Revise::FromCheckpoint } else { Revise::Off });
             assert_eq!(resumed.root, whole.root);
             result = search(&resumed, &cfg, None, None, true).unwrap();
             pieces += 1;
@@ -2353,6 +2357,7 @@ mod tests {
     fn checkpoint_and_resume_one_thread() {
         resume_in_pieces(1, SearchTactics::default(), 3);
         resume_in_pieces(1, SearchTactics { fix_forced: false, ..SearchTactics::default() }, 4);
+        resume_in_pieces(1, SearchTactics { revise_freedoms: false, ..SearchTactics::default() }, 3);
     }
 
     #[test]
