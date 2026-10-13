@@ -1,7 +1,34 @@
-//! Bounds and candidate filters for the branch-and-bound search over promotions: the preclusion table, the
-//! `blameGame` upper bound, the greedy incumbent, and the per-node helpers of the search (the Java's
-//! `UpperBoundEstimator`, `LowerBoundEstimator.greedy`, `BranchExplorer.makeNewCandidateList` and
-//! `SearchManager.maxAdditionalPromotions`).
+//! The Java's bounds and candidate filters for the search over promotions (`UpperBoundEstimator`,
+//! `LowerBoundEstimator.greedy`, `BranchExplorer.makeNewCandidateList`, `SearchManager.maxAdditionalPromotions`):
+//! the `blameGame` upper bound, the children's candidate lists, the greedy incumbent, and the preclusion table.
+//!
+//! # The Java-parity path
+//!
+//! Most of this module is the search of the Java, kept for parity and used only with the tactic `match_bound`
+//! off: the `blameGame` bound of every node and child ([`Bounds::upper_bound`], [`Bounds::reaches`]), with its
+//! runner-up rule (tactic `legacy_bound`), and the promotability checks of the children's candidate lists
+//! ([`Bounds::new_candidate_list`]).  With `match_bound` on (the default), the matching bound
+//! ([`crate::matchbound`]) replaces `blameGame`, which is then not computed at all (it never pruned where the
+//! matching bound did not), and the promotability checks are left out (conflicts find those candidates).  What
+//! the default search still takes from here:
+//!
+//! * [`max_additional`]: how many more promotions a node can make;
+//! * [`greedy`]: its first incumbent;
+//! * the narrowing of the children's candidates ([`Bounds::new_candidate_list_after`]), with the
+//!   [`Preclusions`] table if that tactic is on (it is off by default);
+//! * the scratch space of its peels, which its [`Bounds`] holds.
+//!
+//! # `blameGame`
+//!
+//! Bid the largest candidates within the per-frame limits of [`largest_that_fit`] and the node's `max_add`;
+//! find the first member of the bid, from the top, that cannot be promoted after the ones above it; assume it is
+//! the only failure, and replace it with a runner-up ([`RunnerUp`]).  It is an upper bound (with
+//! [`RunnerUp::Sound`]) because every promotion set keeps within those limits, which follow from the freedoms
+//! (see [`crate::model::FrameSet`]); the bid is the heaviest set that does (the limits make a matroid, whose
+//! greedy basis is the heaviest); and when the bid's members down to the failure `f` cannot all be promoted,
+//! every promotion set leaves out one of them, `p`, and the heaviest set within the limits without `p` is the
+//! bid with `p` swapped for the best outside candidate the limits allow (matroid exchange).  The bound is the
+//! largest of those over `p ≥ f`.
 //!
 //! Everything here works on a [`FrameSet`] and the [`Model`] it belongs to, and allocates nothing per call
 //! except [`Preclusions::build`].  A search thread keeps one [`Bounds`], which holds its scratch space and
@@ -12,15 +39,38 @@ use crate::model::{Certificate, FrameSet, Model, Scratch};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 // ---------------------------------------------------------------------------------------------------------
-// Per-node helpers
+// Used by every search
 
 /// The Java's `SearchManager.maxAdditionalPromotions`: how many more promotions a node can make, given the
-/// overall limit `max_total`, the promotions made so far, and the candidates left; never negative.
+/// overall limit `max_total`, the promotions made so far, and the candidates left; never negative.  (A count:
+/// the bound on the number of further promotions that the freedoms give, see [`FrameSet::max_promotions`].)
 #[inline]
 pub fn max_additional<const W: usize>(max_total: u32, state: &FrameSet<W>, promoted: &Bits<W>, cands: &Bits<W>) -> u32 {
     let by_state = state.max_promotions_among(cands).max(0) as u32;
     max_total.saturating_sub(promoted.len()).min(by_state)
 }
+
+/// The Java's `LowerBoundEstimator.greedy` (`findGreedySolutionWithSkips` with no skips): from the top, promote
+/// every candidate that can be; after each success, narrow the candidates in the new state and go on with the
+/// next one below in the narrowed set.  Returns the promotions made: the search's first incumbent.
+pub fn greedy<const W: usize>(model: &Model, root: &FrameSet<W>, cands: &Bits<W>) -> Bits<W> {
+    let mut scratch = Scratch::new();
+    let mut state = *root;
+    let mut cands = *cands;
+    let mut promoted = Bits::EMPTY;
+    let mut next = cands.max();
+    while let Some(n) = next {
+        if model.promote_in_place_using(&mut scratch, &mut state, n) {
+            cands = state.narrow_candidates(&cands);
+            promoted.insert(n);
+        }
+        next = cands.max_below(n);
+    }
+    promoted
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// The bound and the candidate lists of one searcher
 
 /// What a [`Bounds`] has done, for the search statistics.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -36,7 +86,8 @@ pub struct BoundCounts {
 }
 
 /// The upper bound and the child candidate lists of one search, for one thread: the search's model,
-/// preclusion table (if that tactic is on) and runner-up rule, plus scratch space and counters.
+/// preclusion table (if that tactic is on) and runner-up rule, plus scratch space and counters.  With the matching
+/// bound, a searcher uses it only for the narrowing of its children's candidates and for its scratch space.
 pub struct Bounds<'a, const W: usize> {
     model: &'a Model,
     preclusions: Option<&'a Preclusions<W>>,
@@ -141,7 +192,8 @@ impl<'a, const W: usize> Bounds<'a, W> {
     /// [`new_candidate_list`](Self::new_candidate_list) for the child made by promoting every member of `added`
     /// (none of them in `cands` or `promoted`): the preclusions of each of them, after all the others, and the
     /// promotability checks of the candidates of the home frame of each of them above frame 1 and of the frame
-    /// below that.  With a single number, exactly `new_candidate_list`.
+    /// below that (only [`with_promotability_checks`](Self::with_promotability_checks), as without the matching
+    /// bound).  With a single number, exactly `new_candidate_list`.
     pub fn new_candidate_list_after(
         &mut self,
         added: &Bits<W>,
@@ -215,28 +267,29 @@ impl<'a, const W: usize> Bounds<'a, W> {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// Upper bound
+// blameGame (the Java-parity path)
 
 /// How [`upper_bound`] replaces the first member of its bid that fails.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum RunnerUp {
-    /// The heaviest set within the caps of [`largest_that_fit`] that leaves out some bid member at or above the
-    /// first failure (see [`Blame`]).  Sound: a feasible set must leave out such a member.  (This
-    /// assumes the caps and `max_size` hold for every feasible set, as they do for freedoms that have not been
-    /// revised.)  The simpler "largest candidate not in the bid" is also sound but much weaker when a cap
+    /// The heaviest set within the per-frame limits of [`largest_that_fit`] that leaves out some bid member at or
+    /// above the first failure (see the module docs).  Sound: a feasible set must leave out such a member.
+    /// (This assumes the limits and `max_size` hold for every feasible set, as they do for freedoms that have not
+    /// been revised.)  The simpler "largest candidate not in the bid" is also sound but much weaker when a limit
     /// skips candidates: it swaps in skipped candidates of a full frame for members of other frames.
     #[default]
     Sound,
     /// The Java's `getRunnerUp`: the largest candidate below the bid's smallest member (0 if none).  When
-    /// [`largest_that_fit`] skips candidates because frame 1 or the last frame is at its cap, a skipped
+    /// [`largest_that_fit`] skips candidates because frame 1 or the last frame is at its limit, a skipped
     /// candidate can be larger than that and be exactly what replaces a failing number of its own frame, so this
-    /// bound can be too low.  Kept to reproduce the Java.
+    /// bound can be too low.  Kept to reproduce the Java (tactic `legacy_bound`, unsound).
     Legacy,
 }
 
 /// The Java's `largestThatFitInFrames`: the largest candidates, at most `max_size` of them, taking from frame 1
 /// at most `min(freedoms of frames 0, 1)` and from the last frame at most `min(freedoms of the last two
-/// frames)`.  With fewer than 4 frames, simply the `max_size` largest.
+/// frames)` (the Java's per-frame caps; every promotion set keeps within them, see the module docs).  With fewer
+/// than 4 frames, simply the `max_size` largest.
 pub fn largest_that_fit<const W: usize>(model: &Model, state: &FrameSet<W>, cands: &Bits<W>, max_size: u32) -> Bits<W> {
     let frames = state.frames();
     let len = frames.len();
@@ -252,7 +305,7 @@ pub fn largest_that_fit<const W: usize>(model: &Model, state: &FrameSet<W>, cand
             break;
         }
         let home = model.home(x);
-        let cap = if home == 1 {
+        let room = if home == 1 {
             &mut low
         } else if home == len - 1 {
             &mut high
@@ -261,8 +314,8 @@ pub fn largest_that_fit<const W: usize>(model: &Model, state: &FrameSet<W>, cand
             taken += 1;
             continue;
         };
-        if *cap > 0 {
-            *cap -= 1;
+        if *room > 0 {
+            *room -= 1;
             out.insert(x);
             taken += 1;
         }
@@ -345,17 +398,17 @@ fn first_failure<const W: usize>(
 ///
 /// [`RunnerUp::Legacy`]: the bid's sum, minus the failing member, plus the largest candidate below the bid.
 ///
-/// [`RunnerUp::Sound`]: the heaviest set within the caps of [`largest_that_fit`] that leaves out at least one bid
-/// member at or above the failure.  The sets within the caps are the independent sets of a matroid (frame 1 at
+/// [`RunnerUp::Sound`]: the heaviest set within the limits of [`largest_that_fit`] that leaves out at least one bid
+/// member at or above the failure.  The sets within the limits are the independent sets of a matroid (frame 1 at
 /// most `low`, the last frame at most `high`, all at most `max_size`), and the bid is its heaviest set.  By the
 /// symmetric exchange property, the heaviest set without a member `p` is the bid with `p` swapped for the
-/// heaviest outside candidate `e` that keeps the caps (or just without `p`): an `e` from a capped frame needs
+/// heaviest outside candidate `e` that keeps the limits (or just without `p`): an `e` from a limited frame needs
 /// that frame to have room, or `p` to be from the same frame.  Which `e` qualifies depends only on `p`'s class
 /// (frame 1, last frame, other), and within a class the smallest prefix member gives the heaviest set.  Every
 /// qualifying `e` is smaller than `p` (the bid takes the largest it can), so the bound never exceeds the bid.
 struct Blame<'m, const W: usize> {
     model: &'m Model,
-    /// Number of frames; frame 1 and the last frame are capped only with at least 4 (as the bid is).
+    /// Number of frames; frame 1 and the last frame are limited only with at least 4 (as the bid is).
     len: usize,
     rule: RunnerUp,
     total: u64,
@@ -381,7 +434,7 @@ impl<'m, const W: usize> Blame<'m, W> {
                 blame.swap[Self::OTHER] = u64::from(runner_up.unwrap_or(0));
             }
             RunnerUp::Sound => {
-                let caps = if len >= 4 {
+                let limits = if len >= 4 {
                     let (low, high) = (frames[0].freedoms.min(frames[1].freedoms), frames[len - 2].freedoms);
                     [i32::MAX, low, high.min(frames[len - 1].freedoms)]
                 } else {
@@ -403,7 +456,7 @@ impl<'m, const W: usize> Blame<'m, W> {
                     }
                 }
                 for c in 0..3 {
-                    let allowed = |d: usize| d == Self::OTHER || d == c || in_bid[d] < caps[d];
+                    let allowed = |d: usize| d == Self::OTHER || d == c || in_bid[d] < limits[d];
                     blame.swap[c] = (0..3).filter(|&d| allowed(d)).map(|d| outside[d]).max().unwrap_or(0);
                 }
             }
@@ -430,28 +483,6 @@ impl<'m, const W: usize> Blame<'m, W> {
         self.term[c] = self.total - u64::from(f) + self.swap[c];
         self.term.iter().copied().max().unwrap_or(0)
     }
-}
-
-// ---------------------------------------------------------------------------------------------------------
-// Greedy lower bound
-
-/// The Java's `LowerBoundEstimator.greedy` (`findGreedySolutionWithSkips` with no skips): from the top, promote
-/// every candidate that can be; after each success, narrow the candidates in the new state and go on with the
-/// next one below in the narrowed set.  Returns the promotions made.
-pub fn greedy<const W: usize>(model: &Model, root: &FrameSet<W>, cands: &Bits<W>) -> Bits<W> {
-    let mut scratch = Scratch::new();
-    let mut state = *root;
-    let mut cands = *cands;
-    let mut promoted = Bits::EMPTY;
-    let mut next = cands.max();
-    while let Some(n) = next {
-        if model.promote_in_place_using(&mut scratch, &mut state, n) {
-            cands = state.narrow_candidates(&cands);
-            promoted.insert(n);
-        }
-        next = cands.max_below(n);
-    }
-    promoted
 }
 
 // ---------------------------------------------------------------------------------------------------------

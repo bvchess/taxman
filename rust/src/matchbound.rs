@@ -1,5 +1,6 @@
 //! The matching bound: an upper bound on the sum of the promotions a search state can still make, from relaxing
-//! winnability to matchability.
+//! winnability to matchability.  With the tactic `match_bound` (on by default) it is the bound of every node of
+//! the search ([`crate::search`]).
 //!
 //! # The relaxation
 //!
@@ -23,9 +24,12 @@
 //! one, so the graph is bipartite, and the bound is a maximum-weight bipartite matching in which every move must
 //! be matched and an edge whose mover is a candidate weighs that candidate.
 //!
-//! The bound ignores frame freedoms (frame 0's can be revised to fewer than matching allows) and any cap on the
-//! number of promotions.  Both only remove completions, so it remains an upper bound.  The `blameGame` bound
-//! ([`crate::bounds::upper_bound`]) does respect them, and the smaller of the two is a bound too.
+//! The bound ignores the frames' freedoms (frame 0's can be revised to fewer than matching allows) and the limit
+//! on the number of promotions (`max_total`, a node's `max_add`).  Both only remove completions, so it remains
+//! an upper bound.  The Java's `blameGame` bound ([`crate::bounds::upper_bound`]) does respect them, and the
+//! smaller of the two would be a bound too; the search does not take it.  With `match_bound` on, the matching
+//! bound replaces `blameGame`, which is then not computed at all (it never pruned where the matching bound did
+//! not); with it off, the search uses `blameGame` alone.
 //!
 //! # Two solvers
 //!
@@ -33,6 +37,11 @@
 //! simply and slowly.  [`MatchBound`] is the solver for the search: it keeps an optimal matching and an optimal
 //! dual solution for every node on the search's path and repairs them after each change, which is cheap
 //! because the changes along a depth-first path are small.
+//!
+//! Besides the bound, the search asks the solver for the candidates its heaviest matching promotes, `Q*`
+//! ([`MatchBound::chosen`]: if they can all be promoted they are the best completion, else their conflicts are
+//! what the search branches on), and for the bound with one candidate left out, solved exactly
+//! ([`MatchBound::value_excluding`]) or bounded from the potentials alone ([`MatchBound::bound_excluding`]).
 //!
 //! [`MatchGraph`] is the graph of the search's root, with every move and factor of the root as a vertex; its
 //! edges never change.  Every state of the search is the root with some candidates promoted, and its matching
@@ -875,35 +884,38 @@ pub struct MatchStats {
 ///
 /// # Driving it from a depth-first search
 ///
-/// ```text
-/// let graph = MatchGraph::new(&model, &root);       // once per game, shared by the threads
-/// let mut mb = MatchBound::new(&graph);              // once per thread
-/// mb.reset(&promoted, &cands);                       // the node a work unit starts from
+/// As the searcher does ([`crate::search`]; `P` the node's promotions, `need = best + 1 − sum(P)`):
 ///
-/// // The expansion loop of a node, with that node on top of mb:
-/// while let Some(n) = cands.max() {
-///     if sum(promoted) + blame_bound(state, cands) <= best { break }
-///     if sum(promoted) + mb.value() <= best { break }                 // only when blame did not prune
-///     cands.remove(n);
-///     mb.remove_candidate(n);                        // recorded, not applied: free before push(n, ...)
-///     let Some(new_state) = model.promote(&state, n) else { continue };
-///     let child_cands = new_candidate_list(n, ..., &new_state, &cands, &promoted);
-///     if sum(promoted) + n + blame_bound(new_state, child_cands) > best {
-///         mb.push(n, &child_cands);
-///         if sum(promoted) + n + mb.value() > best {
-///             // explore the child: its expansion loop runs with the child on top of mb
-///         }
-///         mb.pop();
-///     }
-/// }
+/// ```text
+/// let graph = MatchGraph::new(&model, &root);      // once per search, shared by the threads
+/// let mut mb = MatchBound::new(&graph);             // once per thread
+/// mb.reset(&promoted, &cands);                      // level 0: the node a work unit starts from
+///
+/// // A step of the node on top of mb:
+/// mb.take_kept();                                   // its level without its last branch, if one was kept
+/// if mb.value() < need { mb.pop(); return; }        // the node's loop ends (no pop for level 0)
+/// let q = mb.chosen();                              // the heaviest matching's candidates
+/// mb.bound_excluding(x);                            // the bound without x ∈ q, from the potentials alone
+/// // strong branching, for each member x of a conflict K ⊆ q:
+/// mb.value_excluding(x);                            // pushes a level without x and solves it; then
+/// mb.pop();                                         //   drops it, or
+/// mb.keep_excluded();                               //   keeps it for the node, which takes it next step
+/// mb.remove_candidate(n);                           // the node goes on without n (unless that was kept)
+/// mb.push_all(&added, &child_cands);                // the child that promotes `added` (n among them)
+/// if mb.value() < need_of_child { mb.pop(); }       // pruned; else the child's steps run on top of it
 /// ```
 ///
-/// The rules: `push(n, child_cands)` makes the child obtained by promoting `n` from the top level, where `n` is
-/// one of the top level's candidates (or was removed from them since its last evaluation) and `child_cands` is
-/// a subset of the top level's candidates; `pop` goes back once the child is done.  Neither touches the parent,
-/// so the parent's loop continues where it was.  `remove_candidate(n)` before `push(n, ...)` is free as long as
-/// no evaluation of the parent comes between them; after one, the child has to repair what the removal did.
-/// The bound covers the state's own moves and promotions only: the search adds `sum(promoted)` itself.
+/// The rules: `push_all(added, child_cands)` makes the child obtained by promoting `added` from the top level,
+/// where each member of `added` is one of the top level's candidates (or was removed from them since its last
+/// evaluation) and `child_cands` is a subset of the top level's candidates; `pop` goes back once the child is
+/// done.  Neither touches the parent, so the parent's loop continues where it was.  `remove_candidate(n)`
+/// before pushing `n` is free as long as no evaluation of the parent comes between them; after one, the child
+/// has to repair what the removal did.  A level kept by [`keep_excluded`](Self::keep_excluded) waits for its
+/// parent to be the top level again ([`take_kept`](Self::take_kept)); children may come and go meanwhile, but
+/// nothing may be done to the parent itself.  The refinement of the bound by conflicts pushes levels in the
+/// same way ([`push_excluding`](Self::push_excluding), [`push`](Self::push) with
+/// [`candidates`](Self::candidates)) and pops them all.  The bound covers the state's own moves and promotions
+/// only: the search adds `sum(P)` itself.
 ///
 /// For a single state with no search, [`match_bound_once`] does all of this in one call.
 #[derive(Clone, Debug)]
@@ -1009,8 +1021,9 @@ impl<'g, const W: usize> MatchBound<'g, W> {
     /// Without `x` as a candidate, its edges as a mover go and nothing else changes, so they are still feasible
     /// and their sum still bounds the new value from above.  If `x` is promoted in the heaviest matching, paying
     /// with `w`, lower `y_x` and then `y_w` as far as their remaining constraints allow (never below 0, as
-    /// neither is required); the matched edge was tight, so the bound becomes `value − x + y'_x + y'_w`.  If `x`
-    /// is not promoted, the bound is the value itself.
+    /// neither is required): they share no remaining edge (the one between them was `x`'s as a mover), so each
+    /// can go as low as its own edges allow.  The matched edge was tight (`y_x + y_w = x`), so the bound becomes
+    /// `value − x + y'_x + y'_w`.  If `x` is not promoted, the bound is the value itself.
     pub fn bound_excluding(&mut self, x: u32) -> u64 {
         let graph = self.graph;
         let level = self.settle();
@@ -1663,8 +1676,9 @@ mod tests {
 
     // ---- how much the matching bound prunes: cargo test --release matchbound_pruning -- --ignored --nocapture ----
 
-    /// A depth-first branch and bound over promotions, with the loop of DESIGN.md ("Search state and order"),
-    /// started with the optimum as its incumbent, so that it visits exactly the nodes its bound cannot rule out.
+    /// A depth-first branch and bound over promotions, with the Java's loop (the `match_bound=off` baseline in the
+    /// module docs of [`crate::search`]), started with the optimum as its incumbent, so that it visits exactly the
+    /// nodes its bound cannot rule out.
     /// The bound is the `blameGame` bound alone, or with the matching bound evaluated wherever the first fails
     /// to prune.  A node is pruned when its bound cannot beat the incumbent.
     struct Dfs<'a, const W: usize> {
