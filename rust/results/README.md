@@ -81,7 +81,7 @@ What that evidence amounts to:
 
 1. **Arithmetic certificates.**  A score equal to n + score(n − 1) (the
    ceiling opt(n) ≤ n + opt(n − 1)), or for a prime n to n + score(n − 1) − P
-   with P the largest prime below n (proven in `src/sacrifice.rs`), is
+   with P the largest prime below n (proven in `src/accelerate.rs`), is
    optimal whenever the game of n − 1 is, whatever found it: 97 of
    `strict.jsonl`'s games and 104 of `default.jsonl`'s.
 2. **Exhaustive searches.**  `strict.jsonl`'s other 122 games are proven by a
