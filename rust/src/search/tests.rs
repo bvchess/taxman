@@ -9,7 +9,7 @@ use crate::matchbound::MatchBound;
 use crate::model::test_support::*;
 use crate::model::{ConflictCache, Model, Nogoods, Scratch};
 use crate::numtheory::Tables;
-use std::path::PathBuf;
+use crate::test_support::TempDir;
 
 fn config(threads: usize) -> EngineConfig {
     EngineConfig { threads, progress: None, ..EngineConfig::default() }
@@ -341,24 +341,6 @@ fn forgetting_nogoods_often_does_not_change_answers() {
             assert!(r.completed && r.promotions.is_subset(&p.candidates), "{what}");
             assert_eq!(r.sum, golden_sum(g), "{what}");
         }
-    }
-}
-
-/// A fresh directory under the system temp dir, removed on drop.
-struct TempDir(PathBuf);
-
-impl TempDir {
-    fn new(name: &str) -> Self {
-        let path = std::env::temp_dir().join(format!("taxman-search-{name}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&path);
-        std::fs::create_dir_all(&path).expect("create temp dir");
-        TempDir(path)
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
     }
 }
 

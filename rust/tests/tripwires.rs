@@ -134,7 +134,7 @@ const FORGETTING: (u32, u64, u64) = (600, 8270, 5877);
 /// (`None`: never), from the greedy incumbent; returns (best, nodes).  A search forgets for the first time after
 /// 50,000 steps (`NOGOOD_PERIOD`), so the games that finish sooner never meet what a long search meets all the
 /// time: conflicts that the table no longer holds, that only the propagation of the node's known conflicts into its
-/// children (search.rs, "A known conflict of the node ...") still rules out.  Measured with a mutant that switched
+/// children (`Stepper::make_child` in src/search/searcher.rs) still rules out.  Measured with a mutant that switched
 /// that propagation off: no count changes below 50,000 steps (600, 760, 936, 1133, 1140, 1150), but forgetting
 /// every 500 steps costs it 0.9 % at n = 600, and n = 992 (4.2M nodes) 22 %.
 fn forgetting_search(game: &Game<16>, period: Option<u64>) -> (u64, u64) {

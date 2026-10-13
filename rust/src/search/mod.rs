@@ -1,102 +1,49 @@
 //! The branch-and-bound search for the promotion set with the largest sum, run on the parallel [`engine`].
 //!
-//! # What it searches
+//! `DESIGN.md`, section 4 ("The search"), explains the algorithm: nodes, steps and units, the matching bound,
+//! conflicts, forced members and nogoods, the pseudocode of "The default step", and why the search is exact.  The
+//! docs here say where each piece of it is, and carry the arguments next to the code they justify.
 //!
-//! A game's frames and promotion candidates come from the frame builder ([`crate::frames`]); the frame set they
-//! make is the search's *root*.  The search finds the set of candidates with the largest sum that can be promoted
-//! together from the root (see [`crate::model`]), with at most `max_total` members.  The game's score is
-//! `in_the_bag` (what the game with no promotions scores) plus that sum.
+//! The words the code uses: a *node* is a set `P` of promotions, with the state they reach (the root with `P`
+//! promoted, in any order) and the candidates `C` its loop has still to try; a *completion* of the node is a set
+//! `F ⊆ C` that can be promoted from its state; `need = best + 1 − sum(P)` is what a completion must add to beat
+//! the incumbent (worth `best`).  A *step* is one turn of a node's loop: it makes one child, or ends the loop.  The
+//! "nodes" that the engine, the results and the progress lines count are steps.  A *unit* ([`TaxUnit`]) is a node
+//! as the engine passes it between threads and to checkpoints: `P` and `C` only, the state rebuilt in one pass.
 //!
-//! A search *node* is a set `P` of promotions, the state they reach (the root with `P` promoted, in any order),
-//! and the candidates `C` the node's loop has still to try.  A *completion* of the node is a set `F ⊆ C` that can
-//! be promoted from its state.  The *incumbent* is the best promotion set found so far, worth `best`; a node is
-//! worth exploring only while some completion could add `need = best + 1 − sum(P)`.
+//! # The default step in the code
 //!
-//! The search is depth-first, on the engine's worker threads.  Each takes a *unit* of work ([`TaxUnit`], just
-//! `P` and `C`: the state is rebuilt from `P` in one pass) and runs a loop of *steps* on its own stack of nodes
-//! ([`TaxSearcher`]).  A step is one turn of a node's loop: it makes one child, or ends the loop.  The "nodes"
-//! that the engine, the results and the progress lines count are steps.
+//! [`TaxSearcher`] runs each unit as a loop of steps on its own stack of nodes.  A step (`searcher::Stepper::step`)
+//! has four phases, which take the steps of DESIGN.md's "The default step" in order:
 //!
-//! # A step, with the default tactics
+//! * `check_node` (steps 1 and 2): does the node's loop go on?  The sum of its `max_add` largest candidates, then
+//!   the matching check, or the verdict the node's check left when it was made as a child, if `need` is the same.
+//! * `choose_branch` (steps 3 to 5): the member of the conflict to branch on (with strong branching,
+//!   `refine::strongest`), or with `fix_forced` the forced members, which the child promotes together.
+//! * `make_child` (steps 6 and 7): the child's state and candidates, without the last member of a conflict known
+//!   along the path or of a nogood.
+//! * `check_child` (steps 8 and 9): the child's own check; then it is offered as the incumbent and pushed.
 //!
-//! ```text
-//! step of the node (P, C) on top of the stack (its matching bound on top of the matching stack):
-//!   need = best + 1 − sum(P)                      (`best` is read once, for the whole step)
+//! The matching check of a node or a child is `Stepper::check` with `refine::Refiner::top`: the matching bound
+//! ([`crate::matchbound`]), the forced members, the conflict of the heaviest matching (the smallest the nogood table
+//! knows, [`crate::model::Nogoods`], else [`Model::conflict_using`](crate::model::Model::conflict_using)), and the
+//! refinement.  The tactics that switch these pieces are the fields of [`SearchTactics`].
 //!
-//!   1. check the node: does its loop go on?                                         (Stepper::check_node)
-//!        C = ∅, or the max_add largest members of C sum to less than need         → end the loop
-//!        the node's first step, at the need its check was made with               → that check's K and F
-//!        else the matching check of (P, C) at need (below)                         → end the loop, or K and F
-//!   2. choose the branch n                                                       (Stepper::choose_branch)
-//!        forced members F found:   n = max F, and the child promotes all of F; the loop ends after it
-//!        else, K of 2 or more:     strong branching: the matching bound without each member x of K, solved;
-//!                                  members that bring it below need are forced (as above; all of K forced
-//!                                  → end the loop); else n = the member that lowers it most
-//!        else:                     n = the member of K (the largest candidate if there is no K)
-//!        C ← C − n
-//!   3. make the child (P ∪ A, C′), A = {n} or F                                    (Stepper::make_child)
-//!        promote A from the node's state                                          → fails: next step
-//!        max_next = the most promotions the child can add among C − A
-//!        C′ = C − A narrowed to the frames with freedoms left, minus every candidate that would complete a
-//!             conflict known along the path, or a nogood
-//!   4. check the child at need′ = best + 1 − sum(P ∪ A)                          (Stepper::check_child)
-//!        the max_next largest members of C′ sum to less than need′, or the matching check of the child
-//!        (pushed on the matching stack) at need′ prunes it                       → next step
-//!        offer P ∪ A as the incumbent; unless C′ = ∅, push the child, keeping its check's verdict for its
-//!        first step
+//! The matching bound replaces the Java's `blameGame` ([`crate::bounds`]); the two are not combined.  With the
+//! tactic `match_bound` on (the default) `blameGame` is not computed at all: it never pruned where the matching
+//! bound did not.  With it off, the steps are the Java's loop (DESIGN.md, "Search state and order"): `blameGame`
+//! bounds every node and child, the children's candidate lists keep the Java's promotability checks, and a node
+//! branches on its largest candidate.
 //!
-//! the matching check of (P, C) at need                                    (Stepper::check, Refiner::top)
-//!   the matching bound: the heaviest matching promotes Q* ⊆ C; sum(Q*) < need        → prune
-//!   F = the members x of Q* whose bound without x (from the potentials) is below need
-//!   K = a conflict of Q*: the smallest the nogood table knows within P ∪ Q*, else one found in a frame that
-//!       fails with Q* promoted (and learned as a nogood); one the table knows inside F          → prune
-//!   no conflict: Q* can be promoted, so it is the best completion          → offer P ∪ Q*, and prune
-//!   K ⊆ F                                                                                        → prune
-//!   F = ∅: refine one level: every branch of K (k₁ out; k₁ in and k₂ out; …) below need          → prune
-//! ```
+//! # Where the arguments are
 //!
-//! The checks share what the searcher has learned: the conflicts found along the path (`known`), and its table
-//! of nogoods (conflicts of the root), which it forgets every [`NOGOOD_PERIOD`] of its steps.  The tactics that
-//! switch these pieces are the fields of [`SearchTactics`].
-//!
-//! # The Java's loop (`match_bound` off)
-//!
-//! Without the matching bound the search is the Java's `BranchExplorer.explore`, made lazy (each child is explored
-//! as soon as it is made): `blameGame` ([`crate::bounds`]) bounds the node and each child, the children's
-//! candidate lists keep the Java's promotability checks, and a node branches on its largest candidate.  The
-//! default search does not compute `blameGame` at all: the matching bound replaces it (it never pruned where the
-//! matching bound did not), it is not combined with it.
-//!
-//! ```text
-//! loop while C ≠ ∅:
-//!     if sum(P) + blameGame(S, C, max_add) < best + 1: break
-//!     n = max C;  C ← C − n
-//!     S′ = S with n promoted, else continue
-//!     C′ = new_candidate_list(n, S′, C, P)                 narrowed, preclusions, promotability checks
-//!     if sum(P) + n + blameGame(S′, C′, max_next) ≥ best + 1:
-//!         offer P + n;  explore (P + n, C′) if C′ ≠ ∅
-//! ```
-//!
-//! (The Java breaks only when the bound is below `best`; no completion can beat `best` when it is equal.)
-//!
-//! # Why the default search is exact
-//!
-//! Every pruning drops only completions that cannot beat the incumbent:
-//!
-//! * The sum of the `max_add` largest candidates bounds every completion: none has more than `max_add`
-//!   promotions (counted from the freedoms, see [`crate::model::FrameSet`]), nor larger ones.  It is a bound of
-//!   its own, tried first because it is cheap; with frame 0's freedoms revised, the count rests on
-//!   `revise_freedoms`.
-//! * The matching bound is a relaxation of promotability ([`crate::matchbound`]).
-//! * Every completion leaves out a member of every conflict of the node ([`crate::model`], `conflict`), which
-//!   conflict branching, refinement (`refine::Refiner`) and the rule-outs of children rest on; a nogood minus a
-//!   node's promotions is a conflict of the node ([`crate::model::Nogoods`]).
-//! * Forced members are in every completion that reaches `need` (`refine::Refiner`, `refine::strongest`), so the
-//!   child that promotes all of them keeps every such completion of the node, and a conflict all of whose
-//!   members are forced leaves none.
-//! * A heaviest matching that can be promoted is the best completion; it is offered before the node is dropped.
-//! * Every check compares with `need = best + 1 − sum(P)`, so a node is dropped only when nothing in it beats the
-//!   incumbent.
+//! * The sum of the `max_add` largest candidates bounds every completion by itself, not as a shortcut for the
+//!   matching bound: no completion has more promotions than the freedoms allow (see [`crate::model::FrameSet`]),
+//!   nor larger ones.  With frame 0's freedoms revised, that count rests on `revise_freedoms`.
+//! * The matching bound: [`crate::matchbound`].  Conflicts:
+//!   [`Model::conflict_using`](crate::model::Model::conflict_using); nogoods: [`crate::model::Nogoods`];
+//!   refinement and forced members: `refine::Refiner` and `refine::strongest`; the rule-outs of children:
+//!   `Stepper::make_child`.
 //! * What a searcher remembers (the conflicts known along the path, the nogoods, the frames' last conflicts, the
 //!   matching levels kept by strong branching, a child's verdict) are facts that hold where they are used, or
 //!   caches of them: they change which tree is searched, never the answer.  So a search's tree depends on its
@@ -142,7 +89,7 @@ use std::time::{Duration, Instant};
 
 /// With the tactic `forget_nogoods`, a searcher forgets its nogoods after each this many steps.  Every interval
 /// from 10,000 to 100,000 steps was about as good on one thread (22–26% less time than never forgetting on hard
-/// games near n = 1200, games of fewer steps unchanged); see DESIGN.md, "Forgetting nogoods".
+/// games near n = 1200, games of fewer steps unchanged); see docs/EXPERIMENTS.md, "Forgetting nogoods".
 pub const NOGOOD_PERIOD: u64 = 50_000;
 
 /// The outcome of [`search`].

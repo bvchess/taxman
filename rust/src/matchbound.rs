@@ -1247,7 +1247,7 @@ mod tests {
             for _ in 0..rng.below(300) {
                 // Pushes at or after the last time popped; sometimes pops.
                 for _ in 0..rng.below(4) {
-                    let time = now + [0, 0, 1, 2, 7, 100, 1 << 20][rng.below(7)] + rng.below(3) as u64;
+                    let time = now + [0, 0, 1, 2, 7, 100, 1 << 20][rng.below(7) as usize] + rng.below(3);
                     let code = rng.below(1000) as u32;
                     if waiting.insert((time, code)) {
                         radix.push(time, code);
@@ -1520,7 +1520,7 @@ mod tests {
             }
             // The quick bound without a candidate (often a promoted one) is at least the exact value.
             let pool = if rng.chance(70) { mb.chosen() } else { *cands };
-            if let Some(x) = pool.nth_largest(rng.below(pool.len().max(1) as usize) as u32) {
+            if let Some(x) = pool.nth_largest(rng.below(u64::from(pool.len().max(1))) as u32) {
                 let quick = mb.bound_excluding(x);
                 let exact = mb.value_excluding(x);
                 mb.pop();

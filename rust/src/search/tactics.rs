@@ -1,12 +1,13 @@
 //! The tactics that act inside the search ([`SearchTactics`]), and how a checkpoint records them.
 //!
-//! `solver::Tactics` holds every tactic of the solver by name; these are the ones a search and its checkpoints
-//! depend on.  Each is graded in `DESIGN.md` (Tactics); the field docs say what each does and why it is sound.
+//! [`crate::tactics::Tactics`] holds every tactic of the solver by name; these are the ones a search and its
+//! checkpoints depend on.  Each is graded in `DESIGN.md`, section 5 (Tactics); the field docs say what each does
+//! and why it is sound.
 
 use crate::bounds::RunnerUp;
 use std::str::FromStr;
 
-/// The tactics of DESIGN.md that act inside the search.
+/// The tactics of DESIGN.md, section 5, that act inside the search.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SearchTactics {
     /// Rule candidates out of children with the depth-2 preclusion table (sound: a promotion that fails keeps

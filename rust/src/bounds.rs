@@ -812,8 +812,8 @@ mod tests {
             let mut open = cands;
             loop {
                 for _ in 0..5 {
-                    let size = rng.below(open.len() as usize + 2) as u32;
-                    let density = 5 + rng.below(90) as u64;
+                    let size = rng.below(u64::from(open.len()) + 2) as u32;
+                    let density = 5 + rng.below(90);
                     for bid in [largest_that_fit(&model, &state, &open, size), rng.subset(&cands, density)] {
                         let expect = first_failure_one_by_one(&model, &state, &bid);
                         assert_eq!(
@@ -827,8 +827,7 @@ mod tests {
                     for rule in [RunnerUp::Sound, RunnerUp::Legacy] {
                         let mut bounds = Bounds::new(&model, None, rule);
                         let bound = bounds.upper_bound(&state, &open, size);
-                        for target in [bound.saturating_sub(1), bound, bound + 1, rng.below(bound as usize + 2) as u64]
-                        {
+                        for target in [bound.saturating_sub(1), bound, bound + 1, rng.below(bound + 2)] {
                             let reached = bounds.reaches(&state, &open, size, target);
                             assert_eq!(reached, bound >= target, "n={}: {rule:?} bound {bound}, target {target}", g.n);
                         }

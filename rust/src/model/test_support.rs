@@ -4,40 +4,24 @@ use crate::json::Json;
 use std::path::PathBuf;
 use std::time::Instant;
 
-/// Tiny xorshift64 generator, so the tests need no crates and are reproducible.
-pub(crate) struct Rng(pub u64);
+pub(crate) use crate::test_support::Rng;
 
-impl Rng {
-    pub(crate) fn next(&mut self) -> u64 {
-        let mut x = self.0;
-        x ^= x << 13;
-        x ^= x >> 7;
-        x ^= x << 17;
-        self.0 = x;
-        x
-    }
+/// What the tests of the frame model draw at random besides what [`Rng`] draws.
+pub(crate) trait Draws {
+    /// Puts `items` in a random order.
+    fn shuffle<T>(&mut self, items: &mut [T]);
+    /// A random subset of `set`, each member kept with probability `percent`/100.
+    fn subset<const W: usize>(&mut self, set: &Bits<W>, percent: u64) -> Bits<W>;
+}
 
-    pub(crate) fn below(&mut self, n: usize) -> usize {
-        (self.next() % n as u64) as usize
-    }
-
-    /// True with probability `percent`/100.
-    pub(crate) fn chance(&mut self, percent: u64) -> bool {
-        self.next() % 100 < percent
-    }
-
-    pub(crate) fn pick<T: Copy>(&mut self, items: &[T]) -> T {
-        items[self.below(items.len())]
-    }
-
-    pub(crate) fn shuffle<T>(&mut self, items: &mut [T]) {
+impl Draws for Rng {
+    fn shuffle<T>(&mut self, items: &mut [T]) {
         for i in (1..items.len()).rev() {
-            items.swap(i, self.below(i + 1));
+            items.swap(i, self.below(i as u64 + 1) as usize);
         }
     }
 
-    /// A random subset of `set`, each member kept with probability `percent`/100.
-    pub(crate) fn subset<const W: usize>(&mut self, set: &Bits<W>, percent: u64) -> Bits<W> {
+    fn subset<const W: usize>(&mut self, set: &Bits<W>, percent: u64) -> Bits<W> {
         set.iter().filter(|_| self.chance(percent)).collect()
     }
 }

@@ -354,14 +354,14 @@ fn random_agreement<const W: usize>(g: &Golden, rng: &mut Rng, stats: &mut PeelS
                     }
                     // Arbitrary frames over the same numbers, reachable or not: one of any size, and one
                     // small enough for the exhaustive check.
-                    let density = 20 + rng.below(70) as u64;
+                    let density = 20 + rng.below(70);
                     let moves = rng.subset(&move_universe, density);
                     let factors = rng.subset(&factor_universe, (density + 15).min(100));
                     check_frame(moves, factors, &model.graph, &math, stats);
                     let pool = move_universe.to_vec();
-                    let count = if pool.is_empty() { 0 } else { rng.below(BRUTE_MOVES + 1) };
+                    let count = if pool.is_empty() { 0 } else { rng.below(BRUTE_MOVES as u64 + 1) as usize };
                     let moves: Bits<W> = (0..count).map(|_| rng.pick(&pool)).collect();
-                    let density = 40 + rng.below(61) as u64;
+                    let density = 40 + rng.below(61);
                     let factors = rng.subset(&factor_universe, density);
                     check_frame(moves, factors, &model.graph, &math, stats);
                 }
@@ -481,7 +481,7 @@ fn set_check<const W: usize>(g: &Golden, rng: &mut Rng) -> (u64, u64) {
     let candidates = Bits::<W>::from_slice(&g.candidates);
     let (mut feasible, mut tried) = (0, 0);
     for _ in 0..200 {
-        let density = 3 + rng.below(30) as u64;
+        let density = 3 + rng.below(30);
         let set = rng.subset(&candidates, density);
         // Conflicts in a state with a few promotions made.
         let mut start = root;
