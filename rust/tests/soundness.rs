@@ -225,23 +225,33 @@ fn path<const W: usize>(rng: &mut Rng, game: &Game<W>) -> Vec<(Bits<W>, Bits<W>,
 
 /// Perturbed games, their roots and some units below them, with the truth found exhaustively, under random
 /// tactics, from an incumbent worth `k` less.  Half of the games are set up as `prepare` does, with frame 0's
-/// freedoms revised (where that changes them): then the frame set binds where the frame builder's never does, which
-/// is where the forced children's check of the freedoms (`fix_forced`) matters.
+/// freedoms revised (where that changes them), so that the frame set binds where the frame builder's never does.
+/// The search treats the revised freedoms as what they are in a real game, a fact about the best set (the
+/// conjecture of `revise_freedoms`: the set with the largest sum also has the largest count out of frame 1), and
+/// is exact only where that holds.  A perturbed game does not have to be a real game, so those whose revision
+/// changes the best sum are left out: the search of such a game (once in about 1,300) may return a set that the
+/// revised freedoms forbid and is worth more.
 #[test]
 fn perturbed_frame_sets_are_searched_exactly() {
     let mut rng = Rng(0x5EED_0001_C0DE_F00D);
     let configs = configs();
-    let (mut games, mut runs, mut revised) = (0, 0, 0);
+    let (mut games, mut runs, mut revised, mut conjecture_fails) = (0, 0, 0, 0);
     while games < 500 {
         let n = 30 + rng.below(220) as u32;
         let (frames, density) = (2 + rng.below(6), 94 + rng.below(7));
         let Some(model) = perturbed(&mut rng, n, frames, density) else { continue };
-        let unrevised = model.game.root;
+        let (unrevised, unrevised_truth) =
+            (model.game.root, model.game.exhaustive(&model.game.root, &model.game.candidates, 2_000_000));
         let game = if rng.chance(50) { model.revised() } else { model.game };
-        revised += usize::from(game.root != unrevised);
-        if game.exhaustive(&game.root, &game.candidates, 2_000_000).is_none_or(|truth| truth == 0) {
+        let truth = game.exhaustive(&game.root, &game.candidates, 2_000_000);
+        if truth != unrevised_truth {
+            conjecture_fails += 1;
             continue;
         }
+        if truth.is_none_or(|truth| truth == 0) {
+            continue;
+        }
+        revised += usize::from(game.root != unrevised);
         games += 1;
         for (promoted, cands, state) in path(&mut rng, &game) {
             let Some(rest) = game.exhaustive(&state, &cands, 2_000_000) else { continue };
@@ -265,6 +275,7 @@ fn perturbed_frame_sets_are_searched_exactly() {
         }
     }
     assert!(runs > 8000 && revised > 25, "{runs} runs, {revised} games with revised freedoms");
+    assert!(conjecture_fails < 5, "{conjecture_fails} perturbed games break the conjecture of revise_freedoms");
 }
 
 /// On perturbed games: promoting a set at once is promoting it one by one in any order (success and the state it
