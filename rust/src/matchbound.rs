@@ -1541,9 +1541,10 @@ mod tests {
         eprintln!(
             "  child (push + value + pop):           {:9.2} µs per child ({children} children; {})",
             (both_ns - shrink_ns) / 1e3 / children as f64,
+            // Added before subtracting: the difference of the first two alone can be negative.
             per(
-                both.searches - 2 * shrink.searches + before.searches,
-                both.scanned - 2 * shrink.scanned + before.scanned,
+                both.searches + before.searches - 2 * shrink.searches,
+                both.scanned + before.scanned - 2 * shrink.scanned,
                 children
             )
         );

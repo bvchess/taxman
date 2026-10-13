@@ -47,7 +47,7 @@ use crate::numtheory::Tables;
 use crate::results::{
     build_json, moves_digest, own_taint, taint_json, taint_of, Proof, ResultsFile, Taint, OPTIMAL_JSON, SCHEMA,
 };
-use crate::search::{self, prepare, prepare_for_resume, stat, Branching, Revise, SearchTactics};
+use crate::search::{self, prepare_for_resume, prepare_within, stat, Branching, Revise, SearchTactics};
 use std::fmt;
 use std::fs;
 use std::io::Write;
@@ -312,11 +312,21 @@ pub enum PrevSource {
 }
 
 impl PrevSource {
+    /// The name in result lines.
     pub fn as_str(self) -> &'static str {
         match self {
             PrevSource::Run => "run",
             PrevSource::Results => "results",
             PrevSource::Optimal => "optimal",
+        }
+    }
+
+    /// Where it came from, for a message: "this run", "the results file" or "optimal.json".
+    pub fn whence(self) -> &'static str {
+        match self {
+            PrevSource::Run => "this run",
+            PrevSource::Results => "the results file",
+            PrevSource::Optimal => OPTIMAL_JSON,
         }
     }
 }
@@ -368,7 +378,7 @@ impl Prev {
     /// opening with the largest prime.  (Optimal itself cannot be checked; see the tripwires in [`conclude`].)
     fn check(&self, n: u32) -> Result<(), String> {
         let before = n - 1;
-        let whence = self.source.as_str();
+        let whence = self.source.whence();
         match replay(before, &self.moves) {
             Ok(score) if score == self.score => {}
             Ok(score) => {
@@ -847,7 +857,7 @@ fn trust(prev: &Prev, opts: &SolveOptions) -> Result<(), Failure> {
         "the previous game (from {}) rests on {}, which is not proven, and a run with no unproven tactic on does \
          not build on it.  Start from a game that rests on nothing unproven (a run from n = 1 with these tactics \
          does), or pass --allow-tainted-prev to go on and mark the results that rest on it",
-        prev.source.as_str(),
+        prev.source.whence(),
         taint.join(", ")
     )))
 }
@@ -896,7 +906,7 @@ fn conclude(
     }
     if let Some(prev) = context.prev {
         let ceiling = prev.score + u64::from(n);
-        let whence = prev.source.as_str();
+        let whence = prev.source.whence();
         if score > ceiling {
             return reject(
                 result,
@@ -955,14 +965,33 @@ fn search_game<const W: usize>(
                 format!("cannot resume from {}: {e} (delete the file to start the game over)", path.display())
             })?;
             if p.tactics != tactics.search {
+                let made = Tactics { search: p.tactics, ..tactics };
+                let differ: Vec<_> =
+                    made.settings().into_iter().zip(tactics.settings()).filter(|(a, b)| a != b).collect();
+                let what: Vec<String> =
+                    differ.iter().map(|((name, there), (_, here))| format!("{name} is {there}, not {here}")).collect();
+                let flags: Vec<String> =
+                    differ.iter().map(|((name, there), _)| format!("--tactic {name}={there}")).collect();
                 return Err(Failure::Error(format!(
-                    "{} was made with different search tactics than the ones given (delete it to start over)",
-                    path.display()
+                    "{} was made with different search tactics: {}; resume it with {}, or delete it to start the game \
+                     over",
+                    path.display(),
+                    what.join(", "),
+                    flags.join(" ")
                 )));
             }
             p
         }
-        None => prepare::<W>(tables, &columns, &frames.candidates, tactics.search, opts.threads)?,
+        None => {
+            // The two-frame search of `revise_freedoms` stays within this invocation's limits too.
+            let limits = EngineConfig {
+                threads: opts.threads,
+                time_limit: opts.time_limit,
+                node_limit: opts.node_limit,
+                ..EngineConfig::default()
+            };
+            prepare_within::<W>(tables, &columns, &frames.candidates, tactics.search, &limits)?
+        }
     };
     result.phases.frames += prepared.timings.build;
     result.phases.preclusions = prepared.timings.preclusions;
@@ -999,7 +1028,7 @@ fn search_game<const W: usize>(
         spill_dir: Some(spill_dir.clone()),
         checkpoint: checkpoint.or_else(|| opts.checkpoint_file(n)).map(|path| (path, opts.checkpoint_interval)),
         // Deleted only once the result is safe (`solve_game_with`, `solve_range_each`).
-        keep_checkpoint: true,
+        keep_completed_checkpoint: true,
         progress: opts.progress,
         time_limit: opts.time_limit,
         node_limit: opts.node_limit,

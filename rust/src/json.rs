@@ -1,5 +1,5 @@
-//! A minimal JSON reader and writer: enough for `optimal.json`, golden test data, results files and
-//! checkpoint headers.
+//! A minimal JSON reader and writer: enough for `optimal.json`, golden test data and results files.
+//! (Checkpoints are binary: see [`crate::engine`] and the search's header.)
 //!
 //! Integers (numbers with no fraction or exponent that fit in an `i64`) parse to [`Json::Int`], everything
 //! else numeric to [`Json::Num`].  Objects keep their keys in source order; if a key is repeated, [`Json::get`]

@@ -1,10 +1,39 @@
-//! Command-line parsing shared by the subcommands: the error type, a small flag parser, and the solver options
-//! the flags describe.
+//! Command-line parsing shared by the subcommands: the error type, a small flag parser, the solver options
+//! the flags describe, and output that survives a closed stdout or stderr.
 
+use std::fmt;
+use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
 use taxman::solver::SolveOptions;
+
+/// Write one line, ignoring write errors: a closed pipe (EPIPE, say a `head` or a `tee` that has exited) must
+/// not kill a run whose results and checkpoints are safe on disk.  (`println!` panics on it, and release
+/// builds abort on a panic.)  Use it through [`outln!`] and [`errln!`].
+pub fn write_line(mut to: impl Write, line: fmt::Arguments<'_>) {
+    let _ = to.write_fmt(format_args!("{line}\n"));
+}
+
+/// `println!`, through [`write_line`].
+macro_rules! outln {
+    ($($arg:tt)*) => {
+        $crate::cli::write_line(std::io::stdout().lock(), format_args!($($arg)*))
+    };
+}
+
+/// `eprintln!`, through [`write_line`].
+macro_rules! errln {
+    ($($arg:tt)*) => {
+        $crate::cli::write_line(std::io::stderr().lock(), format_args!($($arg)*))
+    };
+}
+
+pub(crate) use {errln, outln};
+
+/// The most seconds a flag takes (about 31 years): more is surely a mistake, and much more would not fit a
+/// `Duration` or the clock.
+const MAX_SECONDS: f64 = 1e9;
 
 #[derive(Debug)]
 pub enum CliError {
@@ -85,13 +114,21 @@ impl Args {
             .transpose()
     }
 
-    /// The flag's value as a number of seconds (fractions allowed).
+    /// The flag's value as a number of seconds (fractions allowed), from 0 to [`MAX_SECONDS`].
     pub fn seconds(&self, name: &str) -> Result<Option<Duration>, CliError> {
         let Some(secs) = self.parsed::<f64>(name)? else { return Ok(None) };
-        if !secs.is_finite() || secs < 0.0 {
-            return Err(CliError::Usage(format!("{name}: {secs} is not a number of seconds")));
+        if !(0.0..=MAX_SECONDS).contains(&secs) {
+            return Err(CliError::Usage(format!("{name}: {secs} is not a number of seconds from 0 to {MAX_SECONDS}")));
         }
         Ok(Some(Duration::from_secs_f64(secs)))
+    }
+
+    /// [`seconds`](Self::seconds) that must be more than 0 (as it comes out in nanoseconds).
+    pub fn positive_seconds(&self, name: &str) -> Result<Option<Duration>, CliError> {
+        match self.seconds(name)? {
+            Some(time) if time.is_zero() => Err(CliError::Usage(format!("{name} must be more than 0 seconds"))),
+            time => Ok(time),
+        }
     }
 }
 
@@ -202,6 +239,21 @@ mod tests {
             .is_err());
         let args = Args::parse(&strings(&["--optimal", "none"]), &SOLVER_FLAGS, &[]).unwrap();
         assert!(solver_options(&args).unwrap().optimal_path.is_none());
+    }
+
+    #[test]
+    fn seconds_are_bounded_and_intervals_positive() {
+        let given = |value: &str| Args::parse(&strings(&["--every", value]), &["--every"], &[]).unwrap();
+        for bad in ["1e300", "1e10", "-0.5", "inf", "-inf", "nan", "NaN", "soon"] {
+            assert!(usage(given(bad).seconds("--every").unwrap_err()).contains("--every"), "{bad}");
+        }
+        assert_eq!(given("1e9").seconds("--every").unwrap(), Some(Duration::from_secs(1_000_000_000)));
+        assert_eq!(given("0").seconds("--every").unwrap(), Some(Duration::ZERO));
+        for zero in ["0", "0.0", "1e-12"] {
+            assert!(usage(given(zero).positive_seconds("--every").unwrap_err()).contains("more than 0"), "{zero}");
+        }
+        assert_eq!(given("0.001").positive_seconds("--every").unwrap(), Some(Duration::from_millis(1)));
+        assert_eq!(given("1").positive_seconds("--other").unwrap(), None);
     }
 
     #[test]

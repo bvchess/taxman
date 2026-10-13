@@ -10,7 +10,8 @@
   configuration, independent of tree size; work that does not fit goes to
   disk.
 * Every long run checkpoints frequently and resumes after a restart, losing
-  at most one checkpoint interval (see the repo's CLAUDE.md).
+  at most one checkpoint interval (see the repo's CLAUDE.md); stopped by
+  SIGINT or SIGTERM, it loses nothing.
 * Every unproven tactic can be switched on and off, so its effect on both
   answers and speed can be measured.
 * Fast iteration: correctness and performance are worked out on small and
@@ -113,9 +114,11 @@ from the defaults, such as `branching=largest,match_refine=0`;
 `tactic_switches`: every tactic's value, the booleans as booleans,
 `match_refine` as a number and `branching` as its name), whether any
 unproven tactic was on, and which ones the game's proof actually rests on
-(`taint`, see `results.rs`).  A checkpoint records the nine search tactics and is
-refused when they differ; one made before a sound search tactic existed
-(`fix_forced`, `nogoods`, `forget_nogoods`) reads back with it at its default.
+(`taint`, see `results.rs`).  A checkpoint records the nine search tactics and
+is refused when they differ (the error names each tactic that differs and the
+`--tactic` flags that resume it); one made before a sound search tactic
+existed (`fix_forced`, `nogoods`, `forget_nogoods`) reads back with it at its
+default.
 
 ## Architecture
 
@@ -126,7 +129,7 @@ dependencies.  Modules:
 |---|---|
 | `bits` | `Bits<const W: usize>`: fixed-width bitset over `[u64; W]`, `Copy`, no heap; capacity `64·W − 1`.  Set ops, popcount, sum, min/max, ascending and descending iteration, `nth_largest`, `largest(k)`, `next_below(x)`, `is_subset`, hashing. |
 | `numtheory` | smallest-prime-factor sieve; for 1..=n: maximal factors (n/p for each prime p dividing n; {1} for primes; {} for 1) and maximal composites (k·p ≤ n), as `Vec<Vec<u32>>` and as bitsets; all divisors; prime test; optionally *holes*, numbers taken off the board (`Tables::punctured`, for the sacrifice study; the hives leave them out) |
-| `json` | minimal JSON reader/writer (enough for optimal.json, golden data, results, checkpoints' headers) |
+| `json` | minimal JSON reader/writer (enough for optimal.json, golden data and results files; checkpoints are binary) |
 | `game` | `replay(n, moves) -> Result<score>`: independent legality check (each move on the board, pays ≥ 1 tax, takes all divisors still present); `replay_finished`: also over (no legal move left) and opening with the largest prime, as every optimal game is; optimal.json loader |
 | `hives` | port of `Apiary`/`Hive`/`Namer`-free equivalent: hive formation with `treat_as_sources`, unzip, removeImpossible, finishSetup propagation, merge, promotion candidates, per-hive solution, apiary solution order |
 | `frames` | port of `FrameBuilder` (levels of hives) producing columns (factors, moves) per frame bottom-up, candidates, `estimateMaxPromotions` |
@@ -134,7 +137,7 @@ dependencies.  Modules:
 | `model` | the search state: `Frame`, `FrameSet` (fixed array of frames), `FactorProvider` (factor/composite lists restricted to frame numbers), `FrameMapper` (home frame of each candidate), `promote_into`, `promote_out_of`, `promote`, `can_promote`, `is_winnable` (peel), `reduce`, `narrow_candidates`, `max_promotions`; `promote_all` (a set checked frame by frame); `Certificate` (a winning order that answers most single-edit winnability questions without a peel); conflicts: the *core* of an unwinnable frame (`Scratch::stuck`, the moves a peel cannot drop) and `conflict_using`/`conflict_cached` (a small, by default minimal, subset of a promotion set that cannot be promoted), with `ConflictCache`; nogoods: `nogood` (a conflict of a state made a conflict of the root) and the table `Nogoods` |
 | `bounds` | preclusion table; `upper_bound` (blameGame + largestThatFitInFrames, sound or legacy runner-up) and its exact threshold test `reaches`; candidate lists; greedy lower bound |
 | `matchbound` | the matching bound (see "Improvements after parity"): `match_bound`, a min-cost-flow reference; `MatchGraph` (the root's graph) and `MatchBound` (an optimal matching and its potentials per level of the DFS path, repaired incrementally by Hungarian searches on a radix heap; levels with a candidate excluded, which can be kept for the parent) |
-| `engine` | problem-independent parallel depth-first branch-and-bound driver: work units, shared deque with disk spill, incumbent, yielding/splitting, checkpoint and resume, progress reporting, statistics, instrumentation (`Counters`) |
+| `engine` | problem-independent parallel depth-first branch-and-bound driver: work units, shared deque with disk spill, incumbent, yielding/splitting, checkpoint and resume, stopping on SIGINT/SIGTERM, a lock on a checkpoint directory, progress reporting, statistics, instrumentation (`Counters`) |
 | `search` | the Taxman searcher (port of `BranchExplorer`) implementing the engine's `Searcher` trait; `prepare` (preclusions, greedy, `revise_freedoms`) and `search` (seed, cap, checkpoint and resume); `Refiner` (conflicts of the heaviest matching: exactness, refinement, branching); the starting incumbent's `dive` and local search (`Neighbourhood`); `search_with` and `Diagnostics` for measurements |
 | `examples/ladder.rs` | the ladder harness: standalone searches of hard games from the frame builder with a time limit, at one or several thread counts (see Performance) |
 | `solver` | `Tactics` (every tactic above, by name and value), `SolveOptions`, `solve_game` (the per-game pipeline below) and `solve_range` (a range of games, resumable through a results file) |
@@ -258,14 +261,46 @@ the incumbent value), `offer(value, payload) -> bool`, and a per-worker
   (memory and spilled) to `checkpoint.tmp`, fsyncs, renames over
   `checkpoint`, and releases the workers.  Resume loads the file and
   continues; nothing is lost or duplicated beyond partially explored nodes.
-  The caller's header stores everything the setup computed that is
-  expensive or must not change on resume (n, tactics, revised freedoms,
-  max_total, root candidates).  A pause costs every worker the wait for the
+  The caller's header stores what identifies the search and what the setup
+  computed that is expensive or must not change on resume: a format
+  version, the width, n, digests of the root candidates and of the frames
+  (every frame's moves, factors and freedoms, as built), frame 0's revised
+  freedoms, max_total and the tactics.  Resuming checks all of them and says
+  which differs, and checks that the stored incumbent is a set of
+  candidates that can be promoted from the root and is worth the stored
+  value, so a checkpoint of another game, or of an older build whose frame
+  builder differs, is refused instead of pruning with a foreign incumbent or
+  failing to rebuild its units.  Headers of the format before version 3
+  (magic `TXS2`, made before 2026-10-12) recorded neither n nor the frames:
+  a checkpoint of 140 passed for one of 141 (same candidates, same frame 0,
+  other frames).  They are refused with that reason rather than accepted
+  unchecked; finish such a game with the build that made it, or delete the
+  file.  A resumed search whose incumbent already reaches the cap finishes
+  at once.  A pause costs every worker the wait for the
   last one to park — bounded by the longest stretch between two polls, one
   Taxman step: about 10 µs, over a millisecond about once in 10⁵ steps, the
   longest measured 10–15 ms at n = 1215–1225 — plus the write and fsync.
   After the rename the directory is synced too, which Linux needs for the
-  rename to survive a crash.
+  rename to survive a crash.  Any interval works, zero included: a periodic
+  pause begins only once the workers released from the last one all run
+  again, and no sooner than the last pause lasted; and a worker answers it
+  (as a split request) only after 64 polls of its current unit, so every
+  pause is followed by work.  (Before, an interval of 0 paused again at once
+  without letting go of the lock, and the workers never ran again.)  Times
+  too large to add to the clock count as never.  A run that completes
+  deletes its checkpoint, unless the caller asks to keep it
+  (`keep_completed_checkpoint`) and deletes it itself once the result is
+  recorded.
+* **Stopping and sharing**: `taxman solve` turns SIGINT and SIGTERM into a
+  stop like a time limit's (the handler sets an atomic flag that the
+  coordinator polls every 50 ms; a final checkpoint, an incomplete result,
+  exit status 128 + the signal); a second signal kills the process at once.
+  It takes an exclusive `flock` on `taxman.lock` in its checkpoint
+  directory, so a second process there fails at once instead of writing the
+  same `.tmp` files.  Spill segments carry their process id: a run deletes
+  those of processes that no longer exist from its spill directory.
+  Progress lines and the results' lines on stdout ignore write errors, so a
+  closed pipe (a dead `tee`, `| head`) cannot kill a run.
 * **Instrumentation** (`engine::Counters`, per invocation): each worker's time
   split into busy (in the searcher), idle (waiting for work), parked (in
   pauses) and lock wait (for the deque's lock); the effective parallelism
@@ -290,9 +325,11 @@ the incumbent value), `offer(value, payload) -> bool`, and a per-worker
 4. Else if `reuse_prev`: port of `FrameSolver.reusePrev` (method `reuse`).
 5. Else search (method `search`): columns → `FrameSet`; preclusions;
    greedy; `revise_freedoms` (which can run a nested two-frame search through
-   the same engine); `max_total`; the starting incumbent (the best of greedy,
-   the seed, and the root matching's rounding improved by local search); run
-   the engine.
+   the same engine, within the run's time and node limits: if they stop it,
+   the game stops there too, incomplete and with no checkpoint, and the next
+   run starts it again); `max_total`; the starting incumbent (the best of
+   greedy, the seed, and the root matching's rounding improved by local
+   search); run the engine.
 6. Solution = `Apiary(board, promotions)` moves in hive order, then the checks
    of `solver::conclude`: legal replay; a completed game over and opening
    with the largest prime; a game from the frame model scoring inTheBag plus
@@ -826,11 +863,28 @@ Correctness, all on games that finish in seconds:
   with a tiny `queue_mem_cap` to force spilling, and killed/resumed from
   checkpoints, must give the same answer; also with 64 and 192 threads (far
   more than the cores, so any scheduling happens), with checkpoints every
-  2 ms, spilling, resuming and a panicking worker.  An ignored stress test
+  2 ms, spilling, resuming and a panicking worker (these use every core for
+  seconds, so they are ignored by default: `cargo test --release --test
+  engine -- --ignored many_threads`).  An ignored stress test
   draws random configurations (1 to 192 threads, caps, intervals, limits)
   and runs each to completion through any number of resumes
   (`TXENGINE_STRESS=5000`: 200 s, all passed); the instrumentation's
-  accounting is checked on every run.
+  accounting is checked on every run.  A tree with no pruning
+  (`tests/robustness.rs`) checks conservation exactly: under 40 random
+  configurations (1 to 16 threads, caps, intervals, limits, searchers that
+  leave childless nodes out of their yields; `TXENGINE_CONSERVATION=<n>`
+  for more) the nodes counted must equal the tree's size, so one unit lost
+  or explored twice shows, which an optimum alone does not.
+* Robustness (`tests/robustness.rs`): a checkpoint interval of zero
+  finishes; intervals and limits too large for the clock are never reached;
+  a completed run can keep its checkpoint; spill segments of dead processes
+  are removed; a locked checkpoint directory is refused; game 140's
+  checkpoint renamed to 141's, one with other tactics (named in the error),
+  and one whose incumbent is not a promotion set of the game or not worth
+  its stored value are refused; a resumed search already at its cap
+  finishes at once; a limit stops `revise_freedoms`' own search; and the
+  binary rejects bad times and limits, survives a closed stdout and stderr,
+  and stops on SIGINT and SIGTERM with a checkpoint it then resumes.
 
 Performance:
 

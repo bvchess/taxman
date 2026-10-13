@@ -1,10 +1,11 @@
 //! The solving subcommands: `solve`, `regress` and `bench`.
 
-use crate::cli::{parse_range, solver_options, Args, CliError, CliResult, SOLVER_FLAGS};
+use crate::cli::{errln, outln, parse_range, solver_options, Args, CliError, CliResult, SOLVER_FLAGS};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use taxman::engine;
 use taxman::json::Json;
 use taxman::solver::{self, GameResult, Method, Prev, SolveOptions};
 
@@ -33,25 +34,41 @@ pub fn solve(args: &[String]) -> CliResult {
     opts.force_search = args.has("--force-search");
     opts.allow_tainted_prev = args.has("--allow-tainted-prev");
     opts.checkpoint_dir = args.value("--checkpoint-dir").map(PathBuf::from);
-    if let Some(interval) = args.seconds("--checkpoint-interval")? {
+    if let Some(interval) = args.positive_seconds("--checkpoint-interval")? {
         opts.checkpoint_interval = interval;
     }
     // A progress line a minute unless asked otherwise; 0 turns them off.
     let progress = args.seconds("--progress")?.unwrap_or(Duration::from_secs(60));
     opts.progress = (!progress.is_zero()).then_some(progress);
-    opts.time_limit = args.seconds("--time-limit")?;
+    opts.time_limit = args.positive_seconds("--time-limit")?;
     opts.node_limit = args.parsed("--node-limit")?;
+    if opts.node_limit == Some(0) {
+        return Err(CliError::Usage("--node-limit must be at least 1".into()));
+    }
     if let Some(cap) = args.parsed::<usize>("--mem-cap")? {
         opts.queue_mem_cap = cap;
     }
     let out = args.value("--out").map(Path::new);
     let show = args.has("--show");
 
+    // Two processes in one checkpoint directory would overwrite each other's checkpoints.
+    let _lock = match &opts.checkpoint_dir {
+        Some(dir) => {
+            std::fs::create_dir_all(dir).map_err(|e| failed(format!("{}: {e}", dir.display())))?;
+            Some(engine::lock_dir(dir).map_err(|e| failed(e.to_string()))?)
+        }
+        None => None,
+    };
+    // A signal stops the search with a final checkpoint and the best game so far, instead of killing it.
+    if let Err(e) = engine::stop_on_signals() {
+        errln!("warning: SIGINT and SIGTERM will kill the run instead of stopping it: {e}");
+    }
+
     let summary = solver::solve_range_each(lo, hi, &opts, out, |result| {
-        println!("{}", result.summary_line());
+        outln!("{}", result.summary_line());
         if show {
-            println!("  promotions: {:?}", result.promotions);
-            println!("  moves: {:?}", result.moves);
+            outln!("  promotions: {:?}", result.promotions);
+            outln!("  moves: {:?}", result.moves);
         }
         // Games print as they finish, also when the output is a pipe or a file.
         let _ = std::io::stdout().flush();
@@ -59,12 +76,13 @@ pub fn solve(args: &[String]) -> CliResult {
     .map_err(failed)?;
     if summary.skipped > 0 {
         let file = out.map_or_else(String::new, |p| format!(" in {}", p.display()));
-        println!("skipped {} games already done{file}", summary.skipped);
+        outln!("skipped {} games already done{file}", summary.skipped);
     }
     if let Some(n) = summary.stopped_at {
         let resume =
             if opts.checkpoint_dir.is_some() { "run the same command to resume it" } else { "it was not checkpointed" };
-        println!("stopped: the search for n={n} hit a limit before it finished; {resume}");
+        let why = if engine::stop_signal().is_some() { "was stopped by a signal" } else { "hit a limit" };
+        outln!("stopped: the search for n={n} {why} before it finished; {resume}");
     }
     Ok(())
 }
@@ -92,14 +110,14 @@ pub fn regress(args: &[String]) -> CliResult {
     let mut results: Vec<GameResult> = Vec::new();
     solver::solve_range_each(from, to, &opts, None, |result| {
         if result.n % 100 == 0 {
-            eprintln!("  through n={} after {:.1} s", result.n, start.elapsed().as_secs_f64());
+            errln!("  through n={} after {:.1} s", result.n, start.elapsed().as_secs_f64());
         }
         results.push(result.clone());
     })
     .map_err(failed)?;
     let elapsed = start.elapsed();
 
-    println!(
+    outln!(
         "solved {from}..={to} ({} threads, tactics {}) in {:.1} s",
         opts.threads,
         opts.tactics.description(),
@@ -109,24 +127,24 @@ pub fn regress(args: &[String]) -> CliResult {
         .iter()
         .map(|&m| format!("{} {}", m.as_str(), results.iter().filter(|r| r.method == m).count()))
         .collect();
-    println!("by method: {}", counts.join(", "));
+    outln!("by method: {}", counts.join(", "));
     // The Java's own test counts the games it derives without search in 1..200.
     if from <= 1 && to >= 200 {
         let derived = results.iter().filter(|r| r.n <= 200 && r.method.is_derived()).count();
-        println!("games 1..=200 derived without search: {derived}");
+        outln!("games 1..=200 derived without search: {derived}");
     }
     let unchecked = results.iter().filter(|r| r.optimal_match.is_none()).count();
     let mismatches: Vec<&GameResult> = results.iter().filter(|r| r.optimal_match == Some(false)).collect();
     for r in &mismatches {
         let expected = optimal.score(r.n).map_or_else(|| "?".to_owned(), |s| s.to_string());
-        println!(
+        outln!(
             "MISMATCH n={}: scored {} but optimal.json says {expected} (method {})",
             r.n,
             r.score,
             r.method.as_str()
         );
     }
-    println!(
+    outln!(
         "{} games match optimal.json, {} do not, {unchecked} are not in it",
         results.len() - mismatches.len() - unchecked,
         mismatches.len()
@@ -175,11 +193,10 @@ pub fn bench(args: &[String]) -> CliResult {
         ));
     };
 
-    println!("{} threads, tactics {}", opts.threads, opts.tactics.description());
-    println!(
-        "{:>5} {:>13} {:>9} {:>9} {:>9} {:>9} {:>9}  | {:>8} {:>8}",
-        "n", "nodes", "precl s", "greedy s", "revise s", "search s", "total s", "Java 1t", "Java 10t"
-    );
+    outln!("{} threads, tactics {}", opts.threads, opts.tactics.description());
+    let columns = ["n", "nodes", "precl s", "greedy s", "revise s", "search s", "total s", "Java 1t", "Java 10t"];
+    let [n, nodes, precl, greedy, revise, search, total, java1, java10] = columns;
+    outln!("{n:>5} {nodes:>13} {precl:>9} {greedy:>9} {revise:>9} {search:>9} {total:>9}  | {java1:>8} {java10:>8}");
     let mut results = Vec::new();
     for &n in &ns {
         let prev = n.checked_sub(1).and_then(|before| Prev::from_optimal(&optimal, before));
@@ -190,7 +207,7 @@ pub fn bench(args: &[String]) -> CliResult {
         };
         let p = &result.phases;
         let secs = |d: Duration| d.as_secs_f64();
-        println!(
+        outln!(
             "{:>5} {:>13} {:>9.3} {:>9.3} {:>9.3} {:>9.3} {:>9.3}  | {} {}",
             n,
             result.nodes,
@@ -207,11 +224,11 @@ pub fn bench(args: &[String]) -> CliResult {
     }
     let total: f64 = results.iter().map(|r| r.phases.total.as_secs_f64()).sum();
     let nodes: u64 = results.iter().map(|r| r.nodes).sum();
-    println!("{:>5} {:>13} {:>59.3}", "all", nodes, total);
+    outln!("{:>5} {:>13} {:>59.3}", "all", nodes, total);
 
     let record = history_record(&opts, &results);
     append_history(&record).map_err(|e| failed(format!("{BENCH_HISTORY}: {e}")))?;
-    println!("appended to {BENCH_HISTORY}");
+    outln!("appended to {BENCH_HISTORY}");
     Ok(())
 }
 

@@ -34,11 +34,10 @@
 //! critical section (`finish_run`), after which the demand is recomputed.  So as many workers split at once
 //! as there are idle workers to feed: from one unit, `threads` workers are busy after a few rounds of splits
 //! in which every running worker splits, not after one split per idle worker; and splits in flight never
-//! outnumber the idle workers.  A worker answers only after `SPLIT_MIN_POLLS` polls of its current unit:
-//! a fresh unit (stolen, or the deepest one its last split left it) first goes deep enough to have something
-//! to give, and no worker is made to restart its unit at every step however long the demand lasts.  Idle
-//! workers block on `work_cv`; a push wakes at most as many of them as there are new units, after the lock
-//! is released.
+//! outnumber the idle workers.  A worker answers only after `MIN_POLLS` polls of its current unit: a fresh
+//! unit (stolen, or the deepest one its last split left it) first goes deep enough to have something to give,
+//! and no worker is made to restart its unit at every step however long the demand lasts.  Idle workers block
+//! on `work_cv`; a push wakes at most as many of them as there are new units, after the lock is released.
 //!
 //! **Why one deque.**  A searcher's work is on its own depth-first stack, not in the deque: units exist only
 //! after a yield, and running one costs the searcher a rebuild of its state (for Taxman a promotion pass and a
@@ -51,16 +50,20 @@
 //! demand count replaced.  `Counters::lock_wait` measures what is left: if it ever becomes a noticeable share
 //! of the workers' time (many workers churning through tiny units), per-worker deques are the next step.
 //!
-//! **Yield signal.**  `SIG_YIELD` is set exactly when `pause` or `exit` is set, always under the lock.  While
-//! it is set every `poll` returns `Yield`.
+//! **Yield signal.**  `SIG_YIELD` is set exactly when `exit` is set or a stop has been asked for, and
+//! `SIG_PAUSE` when a periodic checkpoint's pause is, always under the lock (`pause` is set with either).
+//! While `SIG_YIELD` is set every `poll` returns `Yield`; while `SIG_PAUSE` is, a `poll` returns `Yield` once
+//! the worker has made `MIN_POLLS` polls of its current unit, so that a worker released from one pause gets
+//! work done before the next however short the checkpoint interval.
 //!
 //! **Spill.**  Whenever the in-memory deque holds more than `queue_mem_cap` units, blocks of `cap/2` units
 //! move from its front to a new segment file.  Segments form a stack whose top is logically just in front of
 //! the in-memory deque; only when the in-memory deque is empty is the top segment read back and its file
 //! deleted.  A failed write leaves the units in memory and a failed read leaves the segment in place; either
-//! stops the run with the error.  Leftover segment files are deleted when the run ends, also on panic.
-//! Segment files (`txspill-<pid>-<run>-<seq>.seg`) left by a killed process are never read again, because
-//! a checkpoint holds copies of every unit; they can be deleted.
+//! stops the run with the error.  Leftover segment files are deleted when the run ends, also when a panic
+//! unwinds.  Segment files (`txspill-<pid>-<run>-<seq>.seg`) left by a process that died (killed, or a panic
+//! in a release build, which aborts) are never read again, because a checkpoint holds copies of every unit:
+//! a run deletes those of processes that no longer exist from its spill directory when it starts.
 //!
 //! **Checkpoint.**  The coordinator (the calling thread) sets `pause`.  Every running worker yields, pushes
 //! all but its deepest unit to the deque, keeps the deepest in its `held` slot, and parks.  When `running`
@@ -69,12 +72,21 @@
 //! with the caller's header, the incumbent, the statistics and the total elapsed time to `<path>.tmp`,
 //! fsyncs, and renames it over `<path>`; a checkpoint on disk is therefore always complete, and it carries a
 //! checksum.  It then clears `pause` and each worker resumes its own held unit.  A stop (time or node limit,
-//! I/O error) is a pause whose final checkpoint is followed by `exit` instead of a release.  A pause costs
-//! every worker the time until the last one parks, which is bounded by the longest stretch a searcher runs
-//! without polling (one Taxman step: about 10 µs; measured at n = 1215–1225, about one step in 10^5 takes
-//! over a millisecond and the longest 10–15 ms), plus the write and its fsync; then each unit pushed in it
-//! costs a rebuild when it runs.  [`Counters`] records the longest wait for the workers to park and the
-//! longest pause.  Progress lines are printed outside the lock, so a blocked stderr cannot stall the workers.
+//! a stop signal, an I/O error) is a pause whose final checkpoint is followed by `exit` instead of a release.
+//! A pause costs every worker the time until the last one parks, which is bounded by the longest stretch a
+//! searcher runs without polling (one Taxman step: about 10 µs; measured at n = 1215–1225, about one step in
+//! 10^5 takes over a millisecond and the longest 10–15 ms) plus, for a periodic checkpoint, up to `MIN_POLLS`
+//! polls of a unit just begun; then the write and its fsync; then each unit pushed in it costs a rebuild when
+//! it runs.  [`Counters`] records the longest wait for the workers to park and the longest pause.
+//!
+//! The next periodic checkpoint is due one interval after a pause ends, but never sooner than that pause
+//! lasted, and its pause begins only once the released workers are all running again (`resuming` is clear:
+//! no held unit is left, and the deque is empty or every worker runs).  The coordinator waits for that
+//! without the lock, so with any interval, zero included, the workers make progress and pauses take at most
+//! about half of their time.
+//!
+//! **Output.**  Progress lines and warnings go to stderr outside the lock, so a blocked stderr cannot stall
+//! the workers, and write errors are ignored, so a closed one (a dead `tee`, EPIPE) cannot kill them either.
 //!
 //! **Termination.**  The search is complete when a worker that needs work finds the deque and spill empty,
 //! `running == 0`, no held units and no pause; that worker sets `done` and `exit`.  (While paused, the
@@ -82,13 +94,21 @@
 //! all remaining work is discarded.  Every state change that can satisfy a waiter's condition is made under
 //! the mutex and followed by a notify, so no wakeup is lost.
 //!
-//! **Panics.**  A guard in every worker and in the coordinator sets `exit` when its thread unwinds, so nobody
-//! waits forever and `std::thread::scope` re-raises the panic.  No checkpoint is written after a panic (the
-//! panicking worker's subtree is lost); the previous checkpoint stays valid.
+//! **Panics.**  In a build that unwinds (tests), a guard in every worker and in the coordinator sets `exit`
+//! when its thread unwinds, so nobody waits forever and `std::thread::scope` re-raises the panic; no
+//! checkpoint is written after a panic (the panicking worker's subtree is lost).  Release builds abort on a
+//! panic (`panic = "abort"`), so the process ends at once.  Either way the previous checkpoint stays valid.
 //!
 //! A run that completes deletes its checkpoint file: the file is no longer needed, and resuming from it
-//! would only repeat work.  A caller that must first save the answer somewhere durable sets
-//! `EngineConfig::keep_checkpoint` and deletes the file itself with [`remove_checkpoint`].
+//! would only repeat work.  A caller that must first record the result durably sets
+//! `EngineConfig::keep_completed_checkpoint` and deletes the file itself afterwards ([`remove_checkpoint`]),
+//! so that a crash in between loses nothing.
+//!
+//! **Stopping.**  Besides the time and node limits, a run stops (with its final checkpoint) when the process
+//! receives SIGINT or SIGTERM after [`stop_on_signals`]: the handler only sets an atomic flag, which the
+//! coordinator polls at least every `SIGNAL_POLL`.  A second such signal ends the process at once.
+//! [`lock_dir`] keeps a second process out of a checkpoint directory, so that two runs never write the same
+//! checkpoint file.
 //!
 //! # Instrumentation
 //!
@@ -103,21 +123,24 @@
 //!
 //! # Platforms
 //!
-//! The engine uses only `std` and behaves the same on Linux and macOS.  Checkpoints are durable on both: the
-//! file is written, `sync_all`ed (`fsync` on Linux, `F_FULLFSYNC` on macOS) and renamed over the old one,
-//! and the directory is then synced so the rename itself survives a crash (needed on Linux; on platforms
-//! that cannot sync a directory this is skipped and the rename is still atomic).  Worker stacks reserve
-//! [`WORKER_STACK_SIZE`] of address space each, committed only as touched.  `EngineConfig::default` takes
-//! `available_parallelism`, which on Linux honours the CPU affinity mask and cgroup quotas.  No signals are
-//! handled: a killed run loses at most one checkpoint interval.  Threads are not pinned; on a multi-socket
-//! (NUMA) machine each searcher allocates its own state on its own thread, so first-touch puts it on that
-//! thread's node.
+//! The engine uses only `std` (plus the POSIX `signal`, `kill` and `_exit`, declared in `sys`) and behaves
+//! the same on Linux and macOS.  Checkpoints are durable on both: the file is written, `sync_all`ed (`fsync`
+//! on Linux, `F_FULLFSYNC` on macOS) and renamed over the old one, and the directory is then synced so the
+//! rename itself survives a crash (needed on Linux; on platforms that cannot sync a directory this is skipped
+//! and the rename is still atomic).  Worker stacks reserve [`WORKER_STACK_SIZE`] of address space each,
+//! committed only as touched.  `EngineConfig::default` takes `available_parallelism`, which on Linux honours
+//! the CPU affinity mask and cgroup quotas.  A run stopped by SIGINT or SIGTERM (after [`stop_on_signals`])
+//! loses nothing; one killed otherwise loses at most one checkpoint interval.  Telling whether the owner of a
+//! spill segment is alive uses process ids, so processes in different PID namespaces (containers) must not
+//! share a spill directory.  Threads are not pinned; on a multi-socket (NUMA) machine each searcher allocates
+//! its own state on its own thread, so first-touch puts it on that thread's node.
 
 use std::collections::VecDeque;
-use std::fs::{self, File};
+use std::ffi::c_int;
+use std::fs::{self, File, OpenOptions, TryLockError};
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
 use std::sync::{Condvar, Mutex, MutexGuard, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -178,16 +201,18 @@ pub struct EngineConfig {
     pub queue_mem_cap: usize,
     /// Directory for spill segments; created if missing.  Without it the deque is never spilled.
     pub spill_dir: Option<PathBuf>,
-    /// Checkpoint file and interval.  A final checkpoint is also written when a limit stops the run, and the
-    /// file is deleted when the run completes (unless `keep_checkpoint`).
+    /// Checkpoint file and interval.  A final checkpoint is also written when a limit or a stop signal stops
+    /// the run, and the file is deleted when the run completes (unless `keep_completed_checkpoint`).  Any
+    /// interval works, zero included: see "Checkpoint" in the module docs.
     pub checkpoint: Option<(PathBuf, Duration)>,
-    /// Leave the checkpoint file when the run completes, for a caller that deletes it ([`remove_checkpoint`])
-    /// only once the answer is saved: a crash in between then costs one checkpoint interval, not the search.
-    pub keep_checkpoint: bool,
+    /// Leave the checkpoint file in place when the run completes, for a caller that deletes it
+    /// ([`remove_checkpoint`]) only once it has recorded the result durably.  Off by default.
+    pub keep_completed_checkpoint: bool,
     /// Interval between progress lines on stderr.
     pub progress: Option<Duration>,
     /// Wall-clock limit for this invocation's search, counted from when the workers start (after a resumed
-    /// checkpoint has been loaded); earlier runs of a resumed search do not count.
+    /// checkpoint has been loaded); earlier runs of a resumed search do not count.  Too large to add to the
+    /// clock means none.
     pub time_limit: Option<Duration>,
     /// Node limit for this invocation (not counting earlier runs of a resumed search).
     pub node_limit: Option<u64>,
@@ -202,7 +227,7 @@ impl Default for EngineConfig {
             queue_mem_cap: 1 << 20,
             spill_dir: None,
             checkpoint: None,
-            keep_checkpoint: false,
+            keep_completed_checkpoint: false,
             progress: None,
             time_limit: None,
             node_limit: None,
@@ -349,8 +374,8 @@ impl Counters {
 /// The result of [`run`].
 #[derive(Clone, Debug)]
 pub struct Outcome {
-    /// The whole tree was explored, or a searcher declared the incumbent optimal.  False when a limit
-    /// stopped the run (a final checkpoint was written if configured).
+    /// The whole tree was explored, or a searcher declared the incumbent optimal.  False when a limit or a
+    /// stop signal stopped the run (a final checkpoint was written if configured).
     pub completed: bool,
     /// A searcher called [`Ctx::declare_optimal`].
     pub optimal_declared: bool,
@@ -364,15 +389,17 @@ pub struct Outcome {
     pub counters: Counters,
 }
 
-/// Stack size of worker threads; searchers may recurse deeply.
+/// Stack size of worker threads: room for searchers that recurse (the Taxman searcher does not).  It is only
+/// reserved address space, committed as touched.
 pub const WORKER_STACK_SIZE: usize = 64 << 20;
 
-/// Run a search to completion, to a limit, or until a searcher declares the incumbent optimal.
+/// Run a search to completion, to a limit, until a stop signal (see [`stop_on_signals`]), or until a searcher
+/// declares the incumbent optimal.
 ///
 /// `header` is opaque caller data stored in every checkpoint (everything the caller needs to rebuild its
-/// searchers on resume); read it back with [`read_checkpoint_header`].  Worker `i` uses `make(i)`, called on
-/// its own thread.  When the run completes, the checkpoint file (if configured) is deleted, unless
-/// `cfg.keep_checkpoint`.
+/// searchers on resume); read it back with [`read_checkpoint_header`] or [`read_checkpoint`].  Worker `i` uses
+/// `make(i)`, called on its own thread.  When the run completes, the checkpoint file (if configured) is
+/// deleted unless `cfg.keep_completed_checkpoint`.
 ///
 /// # Errors
 ///
@@ -381,7 +408,8 @@ pub const WORKER_STACK_SIZE: usize = 64 << 20;
 ///
 /// # Panics
 ///
-/// A panic in a searcher (or in `make`) stops all workers and propagates to the caller.
+/// A panic in a searcher (or in `make`) stops all workers and propagates to the caller (in a build that
+/// unwinds; release builds abort).
 pub fn run<U, S, F>(cfg: &EngineConfig, start: Start<U>, header: &[u8], make: F) -> io::Result<Outcome>
 where
     U: Unit,
@@ -392,6 +420,7 @@ where
     let threads = cfg.threads.max(1);
     if let Some(dir) = &cfg.spill_dir {
         fs::create_dir_all(dir)?;
+        remove_orphaned_segments(dir);
     }
     let (init, fresh, resume) = match start {
         Start::Fresh { units, best, payload } => {
@@ -399,7 +428,7 @@ where
         }
         Start::Resume(path) => {
             // Verify the whole file before decoding anything from it.
-            let head = scan_checkpoint(&path, |_| Ok(()))?;
+            let head = read_checkpoint(&path)?;
             if head.header != header {
                 return Err(io::Error::new(io::ErrorKind::InvalidInput, "checkpoint header does not match this run"));
             }
@@ -416,7 +445,7 @@ where
         checkpoint: cfg.checkpoint.as_ref().map(|(path, every)| (path.as_path(), *every)),
         progress: cfg.progress,
         began,
-        deadline: cfg.time_limit.map(|limit| began + limit),
+        deadline: cfg.time_limit.and_then(|limit| began.checked_add(limit)),
         label: &cfg.label,
         header,
     };
@@ -436,26 +465,8 @@ where
         }
         shared.coordinate(&plan);
     });
-    let finished_checkpoint = plan.checkpoint.filter(|_| !cfg.keep_checkpoint).map(|(path, _)| path);
-    shared.outcome(finished_checkpoint, Instant::now())
-}
-
-/// Delete a checkpoint file and any temporary file a checkpoint write left next to it.  A file that is not
-/// there is fine.
-///
-/// # Errors
-///
-/// Any other failure to delete either file.
-pub fn remove_checkpoint(path: &Path) -> io::Result<()> {
-    for p in [path.to_path_buf(), tmp_path(path)] {
-        match fs::remove_file(&p) {
-            Err(e) if e.kind() != io::ErrorKind::NotFound => {
-                return Err(io::Error::new(e.kind(), format!("{}: {e}", p.display())))
-            }
-            _ => {}
-        }
-    }
-    Ok(())
+    let finished = plan.checkpoint.map(|(path, _)| path).filter(|_| !cfg.keep_completed_checkpoint);
+    shared.outcome(finished, Instant::now())
 }
 
 /// Read the caller's header from a checkpoint file (without verifying the rest of the file).
@@ -466,6 +477,126 @@ pub fn remove_checkpoint(path: &Path) -> io::Result<()> {
 pub fn read_checkpoint_header(path: &Path) -> io::Result<Vec<u8>> {
     let mut r = BufReader::new(File::open(path)?);
     get_prefix(&mut r).map_err(truncation)
+}
+
+/// Everything a checkpoint holds but its units.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CheckpointHead {
+    /// The caller's header.
+    pub header: Vec<u8>,
+    /// The incumbent's value and payload.
+    pub best: u64,
+    pub payload: Vec<u8>,
+    /// Totals of the runs so far.
+    pub stats: Stats,
+    pub elapsed: Duration,
+}
+
+/// Read a checkpoint file, verifying all of it (its checksum included), and return everything but its units.
+///
+/// # Errors
+///
+/// I/O failures, and `InvalidData` if the file is not a checkpoint of this format version or is damaged.
+pub fn read_checkpoint(path: &Path) -> io::Result<CheckpointHead> {
+    scan_checkpoint(path, |_| Ok(()))
+}
+
+/// Delete a checkpoint file and any temporary file of it left by a failed write; files that do not exist are
+/// fine.  For a caller that ran with `keep_completed_checkpoint`.
+///
+/// # Errors
+///
+/// The first failure to delete one of them.
+pub fn remove_checkpoint(path: &Path) -> io::Result<()> {
+    let mut result = Ok(());
+    for p in [path.to_path_buf(), tmp_path(path)] {
+        if let Err(e) = fs::remove_file(&p) {
+            if e.kind() != io::ErrorKind::NotFound && result.is_ok() {
+                result = Err(io::Error::new(e.kind(), format!("cannot remove {}: {e}", p.display())));
+            }
+        }
+    }
+    result
+}
+
+/// [`remove_checkpoint`] for a search that completed, with a warning on stderr if a file stays (resuming it
+/// would only repeat work).
+pub fn remove_finished_checkpoint(path: &Path) {
+    if let Err(e) = remove_checkpoint(path) {
+        report(&format!("warning: the search completed, but its checkpoint stays: {e}"));
+    }
+}
+
+/// A checksum of `bytes`, the one checkpoints carry (see [`Hash64`]): for callers that want to record a digest
+/// of something in their header.
+#[must_use]
+pub fn checksum(bytes: &[u8]) -> u64 {
+    let mut hash = Hash64::new();
+    hash.update(bytes);
+    hash.finish()
+}
+
+/// An exclusive lock on a directory, held until dropped (see [`lock_dir`]).
+#[derive(Debug)]
+pub struct DirLock {
+    _file: File,
+}
+
+/// The name of the lock file [`lock_dir`] uses.
+pub const LOCK_FILE: &str = "taxman.lock";
+
+/// Lock `dir` (which must exist) against every other process, by an advisory lock (`flock`) on the file
+/// [`LOCK_FILE`] in it, which records the holder's process id.  The operating system releases the lock when
+/// the process ends, however it ends, so a lock is never left behind.  Two handles in one process exclude
+/// each other too.
+///
+/// # Errors
+///
+/// `WouldBlock`, naming the holder, if another process holds the lock; I/O failures.
+pub fn lock_dir(dir: &Path) -> io::Result<DirLock> {
+    let path = dir.join(LOCK_FILE);
+    let mut file = OpenOptions::new().read(true).write(true).create(true).truncate(false).open(&path)?;
+    match file.try_lock() {
+        Ok(()) => {
+            file.set_len(0)?;
+            writeln!(file, "{}", std::process::id())?;
+            Ok(DirLock { _file: file })
+        }
+        Err(TryLockError::WouldBlock) => {
+            let mut holder = String::new();
+            let _ = file.read_to_string(&mut holder);
+            let holder = holder.trim();
+            let who = if holder.is_empty() { String::new() } else { format!(" (process {holder})") };
+            let message = format!("{} is in use by another process{who}: {} is locked", dir.display(), path.display());
+            Err(io::Error::new(io::ErrorKind::WouldBlock, message))
+        }
+        Err(TryLockError::Error(e)) => Err(e),
+    }
+}
+
+/// Make SIGINT and SIGTERM stop every run of this process the way a time limit does (with a final checkpoint,
+/// `completed == false`), now and later: the first signal sets a flag that every run's coordinator polls at
+/// least every `SIGNAL_POLL`, and a run that starts after it stops at once.  A second signal ends the process
+/// at once with status 128 + the signal (the last checkpoint stays valid).
+///
+/// # Errors
+///
+/// The operating system's, if it refuses a handler; `Unsupported` where there are no POSIX signals.
+pub fn stop_on_signals() -> io::Result<()> {
+    for signal in [sys::SIGINT, sys::SIGTERM] {
+        sys::install(signal, on_stop_signal)?;
+    }
+    STOP_HANDLERS.store(true, Ordering::Relaxed);
+    Ok(())
+}
+
+/// The signal that asked this process to stop (see [`stop_on_signals`]), if one has.
+#[must_use]
+pub fn stop_signal() -> Option<i32> {
+    match STOP_SIGNAL.load(Ordering::Relaxed) {
+        0 => None,
+        signal => Some(signal),
+    }
 }
 
 /// A worker's handle to the engine, passed to [`Searcher::run`].
@@ -531,12 +662,10 @@ impl<'a, U: Unit> Ctx<'a, U> {
         }
         if !self.yielding {
             let signal = self.shared.signal.0.load(Ordering::Acquire);
-            if signal & SIG_YIELD != 0 {
+            let settled = self.polls() - self.run_start >= MIN_POLLS;
+            if signal & SIG_YIELD != 0 || (signal & SIG_PAUSE != 0 && settled) {
                 self.yielding = true;
-            } else if signal >= SIG_REQUEST
-                && self.polls() - self.run_start >= SPLIT_MIN_POLLS
-                && self.shared.claim_split()
-            {
+            } else if signal >= SIG_REQUEST && settled && self.shared.claim_split() {
                 self.split_claimed = true;
                 self.yielding = true;
             }
@@ -613,15 +742,24 @@ impl<'a, U: Unit> Ctx<'a, U> {
 
 /// Polls between slow polls.
 const POLL_BATCH: u32 = 1024;
-/// Polls of its current unit a worker makes before it answers split requests (see "Splitting").
-const SPLIT_MIN_POLLS: u64 = 64;
+/// Polls of its current unit a worker makes before it answers a split request or a periodic checkpoint's pause
+/// (see "Splitting" and "Yield signal").
+const MIN_POLLS: u64 = 64;
 
-/// Every running worker must yield (`pause` or `exit` is set).
+/// Every running worker must yield now (`exit` is set, or a stop is under way).
 const SIG_YIELD: u64 = 1;
-/// One open split request: the signal word counts them above the yield bit.
-const SIG_REQUEST: u64 = 2;
+/// Every running worker must yield once it has made `MIN_POLLS` polls of its unit (a periodic checkpoint).
+const SIG_PAUSE: u64 = 2;
+/// One open split request: the signal word counts them above the two flags.
+const SIG_REQUEST: u64 = 4;
+/// How long a coordinator waits at most before it looks for a stop signal again (after [`stop_on_signals`]).
+const SIGNAL_POLL: Duration = Duration::from_millis(50);
 
 static RUN_SEQ: AtomicU64 = AtomicU64::new(0);
+/// The first stop signal received, 0 if none (see [`stop_on_signals`]).
+static STOP_SIGNAL: AtomicI32 = AtomicI32::new(0);
+/// Whether [`stop_on_signals`] has installed its handlers, so that coordinators must poll `STOP_SIGNAL`.
+static STOP_HANDLERS: AtomicBool = AtomicBool::new(false);
 
 /// Keeps a hot atomic on its own cache line (128 bytes covers Apple silicon and adjacent-line prefetch).
 #[repr(align(128))]
@@ -681,6 +819,9 @@ struct State<U> {
     /// Split requests open (counted in `signal`) or claimed and not yet answered.
     requested: usize,
     pause: bool,
+    /// Since the start or the last release from a pause, until the workers all run again: no held unit left,
+    /// and the deque empty or every worker running.  No periodic checkpoint begins meanwhile.
+    resuming: bool,
     exit: bool,
     done: bool,
     optimal: bool,
@@ -773,6 +914,7 @@ impl<U: Unit> Shared<U> {
                 idle: 0,
                 requested: 0,
                 pause: false,
+                resuming: true,
                 exit: false,
                 done: false,
                 optimal: false,
@@ -836,29 +978,33 @@ impl<U: Unit> Shared<U> {
         self.coord_cv.notify_all();
     }
 
-    fn begin_pause(&self, st: &mut State<U>) {
+    /// Pause the workers: for a stop (`urgent`) at their next poll, for a periodic checkpoint after `MIN_POLLS`
+    /// polls of their units.  A stop asked for during a checkpoint's pause makes it urgent.
+    fn begin_pause(&self, st: &mut State<U>, urgent: bool) {
         if !st.pause {
             st.pause = true;
             st.pause_began = Some(Instant::now());
-            self.signal.0.fetch_or(SIG_YIELD, Ordering::AcqRel);
             self.update_split(st);
         }
+        self.signal.0.fetch_or(if urgent { SIG_YIELD } else { SIG_PAUSE }, Ordering::AcqRel);
     }
 
-    /// Count the pause that is ending (the coordinator calls this before releasing the workers or exiting).
-    fn end_pause(st: &mut State<U>) {
-        if let Some(asked) = st.pause_began.take() {
-            let length = asked.elapsed();
-            let c = &mut st.counters;
-            c.pauses += 1;
-            c.pause_total += length;
-            c.pause_max = c.pause_max.max(length);
-        }
+    /// Count the pause that is ending (the coordinator calls this before releasing the workers or exiting);
+    /// returns its length.
+    fn end_pause(st: &mut State<U>) -> Duration {
+        let Some(asked) = st.pause_began.take() else { return Duration::ZERO };
+        let length = asked.elapsed();
+        let c = &mut st.counters;
+        c.pauses += 1;
+        c.pause_total += length;
+        c.pause_max = c.pause_max.max(length);
+        length
     }
 
     fn release(&self, st: &mut State<U>) {
         st.pause = false;
-        self.signal.0.fetch_and(!SIG_YIELD, Ordering::AcqRel);
+        st.resuming = true;
+        self.signal.0.fetch_and(!(SIG_YIELD | SIG_PAUSE), Ordering::AcqRel);
         self.update_split(st);
         self.work_cv.notify_all();
     }
@@ -868,7 +1014,7 @@ impl<U: Unit> Shared<U> {
         let mut st = self.lock();
         if !st.stop_requested && !st.exit {
             st.stop_requested = true;
-            self.begin_pause(&mut st);
+            self.begin_pause(&mut st, true);
             self.coord_cv.notify_all();
         }
     }
@@ -877,7 +1023,7 @@ impl<U: Unit> Shared<U> {
     fn fail(&self, st: &mut State<U>, e: io::Error) {
         st.error.get_or_insert(e);
         st.stop_requested = true;
-        self.begin_pause(st);
+        self.begin_pause(st, true);
         self.coord_cv.notify_all();
     }
 
@@ -898,7 +1044,7 @@ impl<U: Unit> Shared<U> {
             if wanted == open {
                 return;
             }
-            let new = (current & SIG_YIELD) | (wanted as u64 * SIG_REQUEST);
+            let new = (current & (SIG_YIELD | SIG_PAUSE)) | (wanted as u64 * SIG_REQUEST);
             match signal.compare_exchange_weak(current, new, Ordering::AcqRel, Ordering::Acquire) {
                 Ok(_) => {
                     st.requested = claimed + wanted;
@@ -1000,6 +1146,10 @@ impl<U: Unit> Shared<U> {
         if st.running == st.clocks.len() && st.counters.full_occupancy.is_none() {
             st.counters.full_occupancy = Some(now.saturating_duration_since(st.began));
         }
+        if st.resuming && st.held_units == 0 && (st.queue_empty() || st.running == st.clocks.len()) {
+            st.resuming = false;
+            self.coord_cv.notify_all();
+        }
         self.update_split(st);
     }
 
@@ -1099,21 +1249,24 @@ impl<U: Unit> Shared<U> {
 
     // --- coordinator ---------------------------------------------------------------------------------------
 
-    /// Runs on the calling thread: checkpoints, limits, progress lines.  Returns once `exit` is set.
+    /// Runs on the calling thread: checkpoints, limits, stop signals, progress lines.  Returns once `exit` is
+    /// set.  Times too far ahead to represent (absurd intervals or limits) are never reached.
     fn coordinate(&self, plan: &Plan<'_>) {
         let _guard = PanicGuard(self);
-        let mut next_checkpoint = plan.checkpoint.map(|(_, every)| plan.began + every);
-        let mut next_progress = plan.progress.map(|every| plan.began + every);
+        let mut next_checkpoint = plan.checkpoint.and_then(|(_, every)| plan.began.checked_add(every));
+        let mut next_progress = plan.progress.and_then(|every| plan.began.checked_add(every));
         let mut last_report = (plan.began, 0);
+        let past = |t: Option<Instant>| t.is_some_and(|t| Instant::now() >= t);
+        let stopping = |st: &State<U>| st.stop_requested || stop_signal().is_some() || past(plan.deadline);
         let mut guard = self.lock();
         loop {
             if guard.exit {
                 break;
             }
             let now = Instant::now();
-            let past = |t: Option<Instant>| t.is_some_and(|t| Instant::now() >= t);
-            if guard.stop_requested || past(plan.deadline) || past(next_checkpoint) {
-                self.begin_pause(&mut guard);
+            let stop = stopping(&guard);
+            if stop || (past(next_checkpoint) && !guard.resuming) {
+                self.begin_pause(&mut guard, stop);
                 while guard.running > 0 && !guard.exit {
                     guard = self.wait_coord(guard, None);
                 }
@@ -1139,13 +1292,14 @@ impl<U: Unit> Shared<U> {
                         }
                     }
                 }
-                Self::end_pause(st);
-                if st.stop_requested || past(plan.deadline) {
+                let pause = Self::end_pause(st);
+                if stopping(st) {
                     self.set_exit(st);
                     continue;
                 }
                 self.release(st);
-                next_checkpoint = plan.checkpoint.map(|(_, every)| Instant::now() + every);
+                // See "Checkpoint": never sooner than the pause took, and not before the workers run again.
+                next_checkpoint = plan.checkpoint.and_then(|(_, every)| Instant::now().checked_add(every.max(pause)));
                 continue;
             }
             if let (Some(due), Some(every)) = (next_progress, plan.progress) {
@@ -1155,14 +1309,17 @@ impl<U: Unit> Shared<U> {
                     let line = self.progress_line(&guard, plan.label, &format!("{}/s", si(rate)));
                     // Not under the lock: a blocked stderr (a full pipe) must not stall the workers.
                     drop(guard);
-                    eprintln!("{line}");
+                    report(&line);
                     last_report = (now, nodes);
-                    next_progress = Some(now + every);
+                    next_progress = now.checked_add(every);
                     guard = self.lock();
                     continue;
                 }
             }
-            let wake = [next_checkpoint, next_progress, plan.deadline].into_iter().flatten().min();
+            // While the workers resume, the checkpoint that is due waits for `begin_run` to say they have.
+            let checkpoint = next_checkpoint.filter(|_| !guard.resuming);
+            let signals = STOP_HANDLERS.load(Ordering::Relaxed).then(|| now + SIGNAL_POLL);
+            let wake = [checkpoint, next_progress, plan.deadline, signals].into_iter().flatten().min();
             guard = self.wait_coord(guard, wake.map(|t| t.saturating_duration_since(now)));
         }
         if plan.progress.is_some() {
@@ -1179,7 +1336,7 @@ impl<U: Unit> Shared<U> {
             };
             let line = self.progress_line(&guard, plan.label, status);
             drop(guard);
-            eprintln!("{line}");
+            report(&line);
         }
     }
 
@@ -1271,8 +1428,8 @@ impl<U: Unit> Shared<U> {
         out.into_inner().map_err(io::IntoInnerError::into_error)?.sync_all()
     }
 
-    /// Build the result after all workers have exited (at `ended`).
-    fn outcome(&self, checkpoint: Option<&Path>, ended: Instant) -> io::Result<Outcome> {
+    /// Build the result after all workers have exited (at `ended`); a completed run deletes `finished`.
+    fn outcome(&self, finished: Option<&Path>, ended: Instant) -> io::Result<Outcome> {
         let elapsed = self.prior + ended.saturating_duration_since(self.t0);
         let mut st = self.lock();
         let completed = st.done || st.optimal;
@@ -1281,14 +1438,10 @@ impl<U: Unit> Shared<U> {
             if !completed {
                 return Err(e);
             }
-            eprintln!("warning: the search completed despite an I/O error: {e}");
+            report(&format!("warning: the search completed despite an I/O error: {e}"));
         }
-        if completed {
-            if let Some(path) = checkpoint {
-                if let Err(e) = remove_checkpoint(path) {
-                    eprintln!("warning: cannot remove finished checkpoint: {e}");
-                }
-            }
+        if let (true, Some(path)) = (completed, finished) {
+            remove_finished_checkpoint(path);
         }
         Ok(Outcome {
             completed,
@@ -1383,6 +1536,98 @@ impl Drop for Spill {
     }
 }
 
+/// Delete the spill segments in `dir` of processes that no longer exist (see "Spill"), as best it can.
+fn remove_orphaned_segments(dir: &Path) {
+    let Ok(entries) = fs::read_dir(dir) else { return };
+    let me = std::process::id();
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let owner = name.to_str().and_then(|name| name.strip_prefix("txspill-")?.split('-').next()?.parse().ok());
+        if owner.is_some_and(|pid| pid != me && !sys::process_exists(pid)) {
+            let _ = fs::remove_file(entry.path());
+        }
+    }
+}
+
+// ------------------------------------------------------------------------------------------------------------
+// Signals and processes: the few POSIX functions `std` does not wrap
+// ------------------------------------------------------------------------------------------------------------
+
+/// Sets [`STOP_SIGNAL`]; at a second signal, ends the process (see [`stop_on_signals`]).  Async-signal-safe:
+/// a lock-free atomic and `_exit`.
+extern "C" fn on_stop_signal(signal: c_int) {
+    if STOP_SIGNAL.swap(signal, Ordering::SeqCst) != 0 {
+        sys::exit_now(128 + signal);
+    }
+}
+
+#[cfg(unix)]
+mod sys {
+    use std::ffi::c_int;
+    use std::io;
+
+    /// The same numbers on Linux and macOS.
+    pub const SIGINT: c_int = 2;
+    pub const SIGTERM: c_int = 15;
+    /// "No such process", the same number on Linux and macOS.
+    const ESRCH: i32 = 3;
+    /// What `signal` returns when it fails (`SIG_ERR`, that is `(void (*)(int)) -1`).
+    const SIG_ERR: usize = usize::MAX;
+
+    extern "C" {
+        /// The previous handler is returned as an address, since it can be `SIG_DFL` (0) or `SIG_IGN` (1).
+        fn signal(signum: c_int, handler: extern "C" fn(c_int)) -> usize;
+        fn kill(pid: c_int, signum: c_int) -> c_int;
+        fn _exit(status: c_int) -> !;
+    }
+
+    /// Install `handler` for `signum` (BSD semantics on Linux and macOS: it stays installed, and interrupted
+    /// system calls restart).
+    pub fn install(signum: c_int, handler: extern "C" fn(c_int)) -> io::Result<()> {
+        // SAFETY: `signal` has no preconditions; the handlers given are async-signal-safe.
+        if unsafe { signal(signum, handler) } == SIG_ERR {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Whether process `pid` exists (when in doubt, it does).
+    pub fn process_exists(pid: u32) -> bool {
+        let Ok(pid) = c_int::try_from(pid) else { return true };
+        // SAFETY: signal 0 sends nothing; it only checks that the process exists.
+        let found = unsafe { kill(pid, 0) } == 0;
+        found || io::Error::last_os_error().raw_os_error() != Some(ESRCH)
+    }
+
+    /// End the process at once, without unwinding or running destructors (async-signal-safe).
+    pub fn exit_now(status: c_int) -> ! {
+        // SAFETY: `_exit` has no preconditions.
+        unsafe { _exit(status) }
+    }
+}
+
+#[cfg(not(unix))]
+mod sys {
+    use std::ffi::c_int;
+    use std::io;
+
+    pub const SIGINT: c_int = 2;
+    pub const SIGTERM: c_int = 15;
+
+    pub fn install(_signum: c_int, _handler: extern "C" fn(c_int)) -> io::Result<()> {
+        Err(io::ErrorKind::Unsupported.into())
+    }
+
+    pub fn process_exists(_pid: u32) -> bool {
+        true
+    }
+
+    pub fn exit_now(status: c_int) -> ! {
+        std::process::exit(status)
+    }
+}
+
 // ------------------------------------------------------------------------------------------------------------
 // Checkpoint file format (little-endian):
 //   "TXCKPT01", version u32, header (u64 len + bytes), best u64, payload (u64 len + bytes),
@@ -1396,18 +1641,10 @@ const VERSION: u32 = 1;
 /// Largest header or payload accepted when reading (guards against allocating for garbage lengths).
 const MAX_BLOB: u64 = 1 << 32;
 
-struct Head {
-    header: Vec<u8>,
-    best: u64,
-    payload: Vec<u8>,
-    stats: Stats,
-    elapsed: Duration,
-}
-
 /// Read and verify a whole checkpoint, passing each unit's bytes to `unit` in order.
-fn scan_checkpoint(path: &Path, mut unit: impl FnMut(&[u8]) -> io::Result<()>) -> io::Result<Head> {
+fn scan_checkpoint(path: &Path, mut unit: impl FnMut(&[u8]) -> io::Result<()>) -> io::Result<CheckpointHead> {
     let mut r = HashReader { inner: BufReader::with_capacity(1 << 20, File::open(path)?), hash: Hash64::new() };
-    let mut scan = || -> io::Result<Head> {
+    let mut scan = || -> io::Result<CheckpointHead> {
         let header = get_prefix(&mut r)?;
         let best = get_u64(&mut r)?;
         let payload = get_blob(&mut r, "payload")?;
@@ -1435,7 +1672,7 @@ fn scan_checkpoint(path: &Path, mut unit: impl FnMut(&[u8]) -> io::Result<()>) -
         if end != END_MAGIC || checksum != expected || r.inner.read(&mut [0])? != 0 {
             return Err(invalid_data("checkpoint is corrupt (checksum mismatch)"));
         }
-        Ok(Head { header, best, payload, stats, elapsed })
+        Ok(CheckpointHead { header, best, payload, stats, elapsed })
     };
     scan().map_err(truncation)
 }
@@ -1618,6 +1855,12 @@ impl<R: Read> Read for HashReader<R> {
 // ------------------------------------------------------------------------------------------------------------
 // Formatting
 // ------------------------------------------------------------------------------------------------------------
+
+/// Write a line to stderr in one write, ignoring errors (see "Output"; `eprintln!` would panic on a closed
+/// stderr, and release builds abort on a panic).
+fn report(line: &str) {
+    let _ = io::stderr().write_all(format!("{line}\n").as_bytes());
+}
 
 fn fmt_elapsed(d: Duration) -> String {
     let s = d.as_secs();
