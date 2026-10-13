@@ -123,7 +123,14 @@ fn lines_whose_fields_contradict_each_other_are_refused_by_both_verifiers() {
 
     let s = |text: &str| Json::from(text);
     let none = Json::array(Vec::<&str>::new());
-    let some_setup = Json::object([("cap", Json::Null), ("revise", s("Off")), ("digest", s("0123456789abcdef"))]);
+    let some_setup = Json::object([
+        ("frames", Json::from(1u32)),
+        ("candidates", Json::from(1u32)),
+        ("max_total", Json::from(1u32)),
+        ("cap", Json::Null),
+        ("revise", s("Off")),
+        ("digest", s("0123456789abcdef")),
+    ]);
     let smallest_move = Json::array([*games[trivial].moves.iter().min().unwrap()]);
     // Builds before 7af9fea wrote FromCheckpoint for a resumed search with the tactic off (and tainted it), up to
     // schema 2.
@@ -299,6 +306,23 @@ fn forged_repeats_are_refused_by_both_verifiers() {
     let mut complete = lines[..i].to_vec();
     complete.push(built_on_optimal);
     cases.push((complete, Verdict::Accepted));
+    // The game repeated says its problem has one more promotion to spare than it has (as a line of a build whose
+    // frame builder posed another problem would): the problem set up again is not the one its line records.
+    let max_total = m.setup.unwrap().max_total;
+    let mut resized = lines[..=i].to_vec();
+    resized[i - 1] = with(&lines[i - 1], "setup.max_total", &Json::from(max_total + 1));
+    cases.push((resized, Verdict::Refused { line: 65, n: 65, expected: "not the ProblemSize" }));
+    // 65 said to repeat a game that promotes what 64 does (so what 65 does), with its digests made that game's: the
+    // problem set up again does not have the digest recorded (and the Python referee sees the setups' sizes differ).
+    let twin_edits = [
+        ("same_search.n", Json::from(twin.n)),
+        ("same_search.proof", s(proof(twin))),
+        ("same_search.digest", digest(twin)),
+        ("setup.digest", digest(twin)),
+    ];
+    let twinned = twin_edits.iter().fold(lines[i].clone(), |line, (path, value)| with(&line, path, value));
+    let twinned: Vec<Json> = lines[..i].iter().cloned().chain([twinned]).collect();
+    cases.push((twinned, Verdict::Refused { line: 65, n: 65, expected: "its search problem's digest is" }));
     // A repeat inherits the taint of the game it repeats: 34 repeats 33, which built on optimal.json's 32 reaches its
     // cap and so rests on optimal.json.
     let allowed = SolveOptions { allow_tainted_prev: true, ..common::strict_options(1) };
@@ -315,17 +339,11 @@ fn forged_repeats_are_refused_by_both_verifiers() {
     }
     verifiers_agree(&TempDir::new("forged-repeats-files"), &cases);
 
-    // What only the Rust verifier can check, since it sets the two search problems up again: 65 said to repeat a game
-    // that promotes what 64 does (so what 65 does) but poses another problem, with its digests made that game's; and
-    // 64's frame 0 said to be revised, with 64's taint and 65's records of it made to fit.  The Python referee
-    // accepts both: it can only see that the lines agree with each other.
-    let twin_edits = [
-        ("same_search.n", Json::from(twin.n)),
-        ("same_search.proof", s(proof(twin))),
-        ("same_search.digest", digest(twin)),
-        ("setup.digest", digest(twin)),
-    ];
-    let twinned = twin_edits.iter().fold(lines[i].clone(), |line, (path, value)| with(&line, path, value));
+    // What only the Rust verifier can check, since it sets the two search problems up again.  64's frame 0 said to
+    // be revised, with 64's taint and 65's records of it made to fit: 64's problem set up again is smaller than its
+    // line says.  And a repeat said to repeat an earlier game that promotes what it does and whose setup is as large
+    // as its own, but poses another problem, with that game's recorded digest made the repeat's: the problems differ.
+    // The Python referee accepts both: it can only see that the lines agree with each other.
     let taint = if m.proof == Some(Proof::Cap) { none } else { Json::array(["revise_freedoms"]) };
     let revised = [
         ("tactic_switches.revise_freedoms", Json::Bool(true)),
@@ -334,18 +352,37 @@ fn forged_repeats_are_refused_by_both_verifiers() {
     ];
     let revised = revised.iter().fold(lines[i - 1].clone(), |line, (path, value)| with(&line, path, value));
     let fitted = ["same_search.taint", "taint", "prev.taint"].iter().fold(lines[i].clone(), |l, p| with(&l, p, &taint));
+    let revised: Vec<Json> = lines[..i - 1].iter().cloned().chain([revised, fitted]).collect();
+
+    let (k, impostor) = games
+        .iter()
+        .enumerate()
+        .find_map(|(k, r)| {
+            let (same, setup) = (r.same_search.as_ref()?, r.setup?);
+            let alike = |g: &&GameResult| {
+                g.n != same.n
+                    && g.proof.is_some_and(Proof::settles_search)
+                    && g.promotions == r.promotions
+                    && g.setup.is_some_and(|s| s.size() == setup.size() && s.digest != setup.digest)
+            };
+            Some((k, games[..k].iter().rev().find(alike)?))
+        })
+        .expect("a repeat and an earlier game alike in all but the problem");
+    let mut posing = lines[..=k].to_vec();
+    let (repeat_digest, at) = (digest(&games[k]), impostor.n as usize - 1);
+    posing[at] = with(&lines[at], "setup.digest", &repeat_digest);
+    let named = [("same_search.n", Json::from(impostor.n)), ("same_search.proof", s(proof(impostor)))];
+    posing[k] = named.iter().fold(lines[k].clone(), |line, (path, value)| with(&line, path, value));
+    let posed = format!("its search problem is not the one game {} (line {}) posed", impostor.n, impostor.n);
+
     let dir = TempDir::new("forged-repeats-rust-only");
     let mut paths = Vec::new();
-    let only_rust = [
-        (lines[i - 1].clone(), twinned, "its search problem's digest is"),
-        (revised, fitted, "its search problem is not the one game 64 (line 64) posed"),
-    ];
-    for (k, (earlier, repeat, expected)) in only_rust.into_iter().enumerate() {
-        let path = dir.join(format!("rust-only-{k}.jsonl"));
-        let text: String = lines[..i - 1].iter().chain([&earlier, &repeat]).map(|line| format!("{line}\n")).collect();
-        fs::write(&path, text).unwrap();
+    let only_rust = [(revised, 65, "not the ProblemSize".to_owned()), (posing, games[k].n, posed)];
+    for (case, (file, n, expected)) in only_rust.into_iter().enumerate() {
+        let path = dir.join(format!("rust-only-{case}.jsonl"));
+        fs::write(&path, file.iter().map(|line| format!("{line}\n")).collect::<String>()).unwrap();
         let err = verify_files(std::slice::from_ref(&path), Some(&optimal)).unwrap_err();
-        assert!(err.contains("line 65 (n=65): ") && err.contains(expected), "{k}: {err}");
+        assert!(err.contains(&format!("line {n} (n={n}): ")) && err.contains(&expected), "{case}: {err}");
         paths.push(path);
     }
     let run = Command::new("python3").arg("-I").arg(crate_path("tools/check_results.py")).args(&paths).output();

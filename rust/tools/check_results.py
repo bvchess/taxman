@@ -35,9 +35,10 @@ For every completed game:
   repeat      a repeat (method "repeat", proof same_search, schema 4) names a game m that is a completed game of
               the same file on an earlier line, whose proof is exhausted, cap or same_search and whose setup.revise
               is not FromCheckpoint; the record's proof and taint are m's; the recorded digests agree (the repeat's
-              setup.digest, its record's digest and, from schema 4 on, m's setup.digest); the promotions are m's,
-              and promotion_sum is their sum; score(n) - in_the_bag(n) = score(m) - in_the_bag(m) (in_the_bag of a
-              schema 1 line is its score less its promotions)
+              setup.digest, its record's digest and, from schema 4 on, m's setup.digest), and so do the two setups'
+              frames, candidates and max_total; the promotions are m's, and promotion_sum is their sum; score(n) -
+              in_the_bag(n) = score(m) - in_the_bag(m) (in_the_bag of a schema 1 line is its score less its
+              promotions)
 and across files: every board size that two files share has the same score in both.
 
 What this referee cannot check, because it does not rebuild the frame model: that an exhausted search explored its
@@ -271,6 +272,9 @@ def repeat_problems(n, number, row, done):
         digests.add((earlier.get("setup") or {}).get("digest"))
     if len(digests) != 1:
         found.append(f"it and game {m} (line {line}) record different search digests")
+    size = [(r.get("setup") or {}).get(key) for r in (row, earlier) for key in ("frames", "candidates", "max_total")]
+    if size[:3] != size[3:]:
+        found.append(f"its setup's frames, candidates and max_total are not those of game {m} (line {line})")
     if row["promotions"] != earlier["promotions"]:
         found.append(f"its promotions are not those of game {m} (line {line})")
     if record.get("promotion_sum") != sum(row["promotions"]):

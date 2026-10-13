@@ -200,6 +200,30 @@ impl Problem {
         let bytes: Vec<u8> = self.0.iter().flat_map(|word| word.to_le_bytes()).collect();
         engine::checksum(&bytes)
     }
+
+    /// How large the problem is: what a results line's `setup` records of it in every schema, so that a problem set
+    /// up again from an older line can be checked against the line as far as it goes.
+    pub fn size(&self) -> ProblemSize {
+        let words = &self.0;
+        // The frames: freedoms, then the moves and the factors, each a length and that many numbers.
+        let mut at = 1;
+        for _ in 0..words[0] {
+            at += 1;
+            at += 1 + words[at] as usize;
+            at += 1 + words[at] as usize;
+        }
+        let candidates = words[at];
+        ProblemSize { frames: words[0], candidates, max_total: words[at + 1 + candidates as usize] }
+    }
+}
+
+/// How large a search problem is ([`Problem::size`]): its number of frames, its number of candidates, and
+/// `max_total`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ProblemSize {
+    pub frames: u32,
+    pub candidates: u32,
+    pub max_total: u32,
 }
 
 /// The most promotions a promotion set of the root `root` can have among `candidates` (`maxTotalPromotions`).

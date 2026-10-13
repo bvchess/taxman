@@ -73,7 +73,9 @@ pub use diagnostics::{cut, Diagnostics, GAP_BUCKETS};
 pub use header::checkpoint_width;
 pub use incumbent::Neighbourhood;
 pub use searcher::{stat, Found, SearchSpace, TaxSearcher, TaxUnit};
-pub use setup::{prepare, prepare_for_resume, prepare_within, problem_of, PrepareTimings, Prepared, Problem, Revise};
+pub use setup::{
+    prepare, prepare_for_resume, prepare_within, problem_of, PrepareTimings, Prepared, Problem, ProblemSize, Revise,
+};
 pub use tactics::{Branching, SearchTactics};
 
 use crate::bits::Bits;

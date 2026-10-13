@@ -147,6 +147,7 @@ pub fn search_problem(n: u32, revise: Revise) -> Result<(Problem, u64), String> 
 mod tests {
     use super::*;
     use crate::game::{replay, Optimal};
+    use crate::search::ProblemSize;
 
     #[test]
     fn a_board_knows_its_frames_and_what_the_game_with_no_promotions_scores() {
@@ -190,7 +191,11 @@ mod tests {
             }
             for tactics in [SearchTactics::default(), SearchTactics { revise_freedoms: false, ..Default::default() }] {
                 let prepared = board.prepare(tactics, 1).unwrap();
-                assert_eq!(board.problem(prepared.revise).unwrap(), prepared.problem(), "n={n}");
+                let problem = prepared.problem();
+                assert_eq!(board.problem(prepared.revise).unwrap(), problem, "n={n}");
+                let frames = board.frames.frames.len() as u32;
+                let size = ProblemSize { frames, candidates: board.candidates().len(), max_total: prepared.max_total };
+                assert_eq!(problem.size(), size, "n={n}");
                 revised += usize::from(prepared.revise.sets_frame_zero());
             }
             let (narrow, wide) =

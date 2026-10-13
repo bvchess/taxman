@@ -589,6 +589,11 @@ up, whose proof settles it, and that the run builds on (a strict run only on a g
 `--allow-tainted-prev`).  A game whose recorded digest differs is passed over; for one whose digest agrees, or is not
 recorded (schema 3 and older, such as the committed `strict.jsonl`), its problem is set up again from its board size
 and `setup.revise` (milliseconds; `board::search_problem`) and compared with n's whole.  The first equal one is m.
+Setting m up again with this build stands for the problem m's own build searched, which a digest recorded by that
+build ties to it (a problem with the recorded digest is that problem, but for a 64-bit collision); a line of schema 3
+or older records only the problem's size, its frames, candidates and `max_total`, and the problem set up again must
+have it.  Beyond that it rests on the frame builder and the model having posed the same problem then: no commit
+since the committed `strict.jsonl` (bd9bb5d) has changed `hives`, `frames`, `model` or `numtheory`.
 Every repeat of 1..1300 repeats the last game before it that set a search up (n − 1, or n − 2 past a prime), so the
 window loses nothing there, keeps the setups a range starts with to eight, and makes m a function of the window's
 games, whichever lines record digests.
@@ -596,12 +601,12 @@ games, whichever lines record digests.
 *The verifiers.*  `taxman verify-results` checks a repeat's line against m's: m is a completed game of the same file
 on an earlier line, its proof settles its search, the line's record of m (proof, taint, digest) is m's, the
 promotions are m's and sum to the recorded promotion sum; then it sets both problems up again from the two board
-sizes and `setup.revise`, checks that their digest is the recorded one and that they are equal, and that both games
-score their board's in_the_bag plus that sum; and it derives the proof and the taint (n's own plus m's) as for any
-line.  `tools/check_results.py` shares no code with the solver and cannot build the model: it checks the same
-structure from the lines (m earlier, completed, settling its search and not resumed with revised freedoms; the
-recorded digests equal; the promotions equal; score − in_the_bag equal; the taint inherited), and says that it takes
-the problems' equality, like an exhausted search, on trust.
+sizes and `setup.revise`, checks that each is as large as its line records, that their digest is the recorded one
+and that they are equal, and that both games score their board's in_the_bag plus that sum; and it derives the proof
+and the taint (n's own plus m's) as for any line.  `tools/check_results.py` shares no code with the solver and
+cannot build the model: it checks the same structure from the lines (m earlier, completed, settling its search and
+not resumed with revised freedoms; the recorded digests and sizes equal; the promotions equal; score − in_the_bag
+equal; the taint inherited), and says that it takes the problems' equality, like an exhausted search, on trust.
 
 ## 9. Testing
 

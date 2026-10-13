@@ -67,9 +67,10 @@
 //!   same moves (by digest, [`moves_digest`]), same proof and taint;
 //! * a repeat: the game `m` it names is a completed game of the file, on an earlier line, whose proof settles its
 //!   search ([`Proof::settles_search`]) and whose proof and taint the record gives; the search problems of both
-//!   games, set up again from their board sizes and `setup.revise` ([`search_problem`]), are equal, and their
-//!   digest is the one both lines record; the promotions are `m`'s, and both games score their own `in_the_bag`
-//!   (from the boards set up again) plus the recorded promotion sum;
+//!   games, set up again from their board sizes and `setup.revise` ([`search_problem`]), are as large as their lines
+//!   record (frames, candidates, `max_total`), are equal, and have the digest both lines record; the promotions are
+//!   `m`'s, and both games score their own `in_the_bag` (from the boards set up again) plus the recorded promotion
+//!   sum;
 //! * the recorded proof and taint are the ones derived from the line and the game its proof rests on;
 //! * no board size has two completed lines.
 //!
@@ -107,7 +108,7 @@
 use crate::board::search_problem;
 use crate::game::{largest_prime_at_most, replay_finished, Optimal};
 use crate::json::Json;
-use crate::search::{Problem, Revise};
+use crate::search::{Problem, ProblemSize, Revise};
 use crate::solver::{parse_digest, GameResult, Method, PrevSource, SameSearch, MAX_N};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -284,6 +285,9 @@ pub struct StoredGame {
     /// For a game that set a search up (searched or repeat), what revising frame 0 did (`setup.revise`), from which
     /// its search problem can be set up again ([`search_problem`]).
     pub revise: Option<Revise>,
+    /// For such a game, the size of its search problem as the line records it (`setup.frames`, `setup.candidates`,
+    /// `setup.max_total`, in every schema).
+    pub size: Option<ProblemSize>,
     /// The digest of its search problem, if the line records it (`setup.digest`, schema 4).
     pub digest: Option<u64>,
 }
@@ -361,6 +365,8 @@ struct PrevRecord {
 struct Setup {
     cap: Option<u64>,
     revise: Revise,
+    /// Its frames, candidates and `max_total`.
+    size: ProblemSize,
     /// From schema 4 on.
     digest: Option<u64>,
 }
@@ -503,7 +509,12 @@ fn parse_line(json: &Json, line: usize) -> Result<Line, String> {
             let revise = Revise::parse(revise).ok_or_else(|| format!("bad \"setup.revise\": {revise:?}"))?;
             let digest =
                 if schema >= 4 { Some(s.digest("digest").map_err(|e| format!("{e} in \"setup\""))?) } else { None };
-            Some(Setup { cap: s.opt_u64("cap")?, revise, digest })
+            let size = ProblemSize {
+                frames: s.u32("frames")?,
+                candidates: s.u32("candidates")?,
+                max_total: s.u32("max_total")?,
+            };
+            Some(Setup { cap: s.opt_u64("cap")?, revise, size, digest })
         }
     };
     let same_search = match (schema >= 4).then(|| f.get("same_search")).transpose()? {
@@ -726,15 +737,23 @@ fn check_repeat<'a>(
         return Err(format!("its promotions sum to {sum}, not the promotion_sum {} it records", record.promotion_sum));
     }
 
-    // The two search problems, set up again from the board sizes and what revising did.
-    let Some((revise, theirs)) = e.setup.map(|s| s.revise).zip(earlier.revise) else {
+    // The two search problems, set up again from the board sizes and what revising did, and as large as the lines
+    // say (the frame builder of the build that wrote a line posed the same problem as this build's, as far as the
+    // line tells).
+    let Some((setup, (revise, size))) = e.setup.zip(earlier.revise.zip(earlier.size)) else {
         return Err(format!("it or game {m} has no setup to set its search up from"));
     };
-    for (k, revise) in [(e.n, revise), (m, theirs)] {
+    for (k, revise, size) in [(e.n, setup.revise, setup.size), (m, revise, size)] {
         if let std::collections::btree_map::Entry::Vacant(slot) = problems.entry(k) {
             let set_up =
                 search_problem(k, revise).map_err(|e| format!("the search of game {k} cannot be set up: {e}"))?;
             slot.insert(set_up);
+        }
+        if problems[&k].0.size() != size {
+            return Err(format!(
+                "the search problem of game {k} set up again is {:?}, not the {size:?} its line records",
+                problems[&k].0.size()
+            ));
         }
     }
     let ((mine, bag), (their_problem, their_bag)) = (&problems[&e.n], &problems[&m]);
@@ -918,6 +937,7 @@ fn check_entry(
         taint,
         certificate,
         revise: e.setup.map(|s| s.revise),
+        size: e.setup.map(|s| s.size),
         digest: e.setup.and_then(|s| s.digest),
     })
 }
@@ -999,6 +1019,7 @@ impl ResultsFile {
                     taint: result.taint.clone(),
                     certificate: result.prev.as_ref().and_then(|p| Certificate::of(result.n, result.score, p.score)),
                     revise: result.setup.map(|s| s.revise),
+                    size: result.setup.map(|s| s.size()),
                     digest: result.setup.map(|s| s.digest),
                 };
                 self.contents.games.insert(result.n, game);

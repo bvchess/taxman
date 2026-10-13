@@ -77,7 +77,7 @@ use crate::paths;
 use crate::results::{
     build_json, moves_digest, own_taint, taint_json, taint_of, Proof, ResultsFile, Taint, OPTIMAL_JSON, SCHEMA,
 };
-use crate::search::{self, stat, Problem, Revise, SearchTactics};
+use crate::search::{self, stat, Problem, ProblemSize, Revise, SearchTactics};
 use crate::tactics::Tactics;
 use std::collections::BTreeMap;
 use std::fs;
@@ -446,6 +446,13 @@ pub struct SearchSetup {
     pub revise: Revise,
     /// [`Problem::digest`](crate::search::Problem::digest) of the search problem the setup poses.
     pub digest: u64,
+}
+
+impl SearchSetup {
+    /// The size of the search problem the setup poses, as [`Problem::size`] gives it.
+    pub fn size(&self) -> ProblemSize {
+        ProblemSize { frames: self.frames as u32, candidates: self.candidates, max_total: self.max_total }
+    }
 }
 
 /// The names of [`Stats::extra`], by the index [`search::stat`] gives each.
@@ -1076,6 +1083,8 @@ pub const SAME_SEARCH_WINDOW: u32 = 8;
 struct Searched {
     /// What revising frame 0 did in its setup (its line's `setup.revise`), from which its problem is set up again.
     revise: Revise,
+    /// The size of its problem as its setup recorded it, which the problem set up again must have.
+    size: ProblemSize,
     /// The digest of its search problem: recorded by its line or by this run, else found when first needed.
     digest: Option<u64>,
     promotions: Vec<u32>,
@@ -1094,32 +1103,24 @@ impl Earlier {
     /// The games of the results file.
     fn of_file(file: &ResultsFile) -> Earlier {
         let mut earlier = Earlier::default();
-        for game in file.games() {
-            earlier.add(game.n, game.revise, game.digest, &game.promotions, game.proof, &game.taint);
+        for game in file.games().filter(|game| game.proof.settles_search()) {
+            if let Some((revise, size)) = game.revise.zip(game.size) {
+                let (promotions, proof, taint) = (game.promotions.clone(), game.proof, game.taint.clone());
+                let searched = Searched { revise, size, digest: game.digest, promotions, proof, taint };
+                earlier.games.insert(game.n, searched);
+            }
         }
         earlier
     }
 
     /// Adds a game solved in this run.
     fn add_result(&mut self, result: &GameResult) {
-        if let (true, Some(proof)) = (result.completed, result.proof) {
-            let (revise, digest) = (result.setup.map(|s| s.revise), result.setup.map(|s| s.digest));
-            self.add(result.n, revise, digest, &result.promotions, proof, &result.taint);
-        }
-    }
-
-    fn add(
-        &mut self,
-        n: u32,
-        revise: Option<Revise>,
-        digest: Option<u64>,
-        promotions: &[u32],
-        proof: Proof,
-        taint: &Taint,
-    ) {
-        if let (Some(revise), true) = (revise, proof.settles_search()) {
-            let promotions = promotions.to_vec();
-            self.games.insert(n, Searched { revise, digest, promotions, proof, taint: taint.clone() });
+        if let (true, Some(proof), Some(setup)) = (result.completed, result.proof, result.setup) {
+            if proof.settles_search() {
+                let (promotions, taint) = (result.promotions.clone(), result.taint.clone());
+                let (revise, size, digest) = (setup.revise, setup.size(), Some(setup.digest));
+                self.games.insert(result.n, Searched { revise, size, digest, promotions, proof, taint });
+            }
         }
     }
 
@@ -1129,7 +1130,8 @@ impl Earlier {
     /// promotions.  A game whose digest is not `problem`'s is passed over; for one whose digest is, or is not known,
     /// the problem is set up again from its board size and `setup.revise` ([`search_problem`]) and compared with
     /// `problem` itself, so that the answer never rests on two digests alone.  A game whose problem cannot be set up
-    /// again (its frame 0 came from a checkpoint) is dropped: a verifier could not set it up either.
+    /// again (its frame 0 came from a checkpoint), or is not as large as its line says (a line made by a build whose
+    /// frame builder posed another problem), is dropped: a verifier would refuse it too.
     fn find(&mut self, n: u32, problem: &Problem, opts: &SolveOptions) -> Option<(SameSearch, Vec<u32>)> {
         let digest = problem.digest();
         for m in (n.saturating_sub(SAME_SEARCH_WINDOW)..n).rev() {
@@ -1137,7 +1139,8 @@ impl Earlier {
             if !builds_on(&game.taint, opts) || game.digest.is_some_and(|theirs| theirs != digest) {
                 continue;
             }
-            let Ok((theirs, _)) = search_problem(m, game.revise) else {
+            let theirs = search_problem(m, game.revise).ok().filter(|(theirs, _)| theirs.size() == game.size);
+            let Some((theirs, _)) = theirs else {
                 self.games.remove(&m);
                 continue;
             };
