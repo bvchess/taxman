@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# Settings and helpers shared by the scripts in this directory.  Source it; do not run it.
+#
+# Every value can be overridden from the environment before the script starts:
+#
+#   TAXMAN_ROOT   the checkout (default: the one this file is in)
+#   TAXMAN_WORK   where results, checkpoints and logs live (default $HOME/taxman-work).  It must be on a disk that
+#                 survives a stop or a reboot: an EBS volume, not tmpfs (/tmp is tmpfs on Amazon Linux 2023) and
+#                 not instance-store NVMe.
+#   RESULTS       the production results file     (default $TAXMAN_WORK/results/strict.jsonl)
+#   CKPT          the checkpoint directory        (default $TAXMAN_WORK/ckpt)
+#   LOGS          the log directory               (default $TAXMAN_WORK/logs)
+#   TAXMAN_BIN    the solver binary               (default rust/target/release/taxman)
+#   LADDER_BIN    the ladder example binary       (default rust/target/release/examples/ladder)
+#   RUSTFLAGS     default "-C target-cpu=native": build for the CPU of the machine that builds.  Build on the machine
+#                 type that will run the binary.  Set it to the empty string to build generic code.
+
+_cloud_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TAXMAN_ROOT="${TAXMAN_ROOT:-$(cd "$_cloud_dir/../../.." && pwd)}"
+CRATE="$TAXMAN_ROOT/rust"
+TAXMAN_WORK="${TAXMAN_WORK:-$HOME/taxman-work}"
+RESULTS="${RESULTS:-$TAXMAN_WORK/results/strict.jsonl}"
+CKPT="${CKPT:-$TAXMAN_WORK/ckpt}"
+LOGS="${LOGS:-$TAXMAN_WORK/logs}"
+TAXMAN_BIN="${TAXMAN_BIN:-$CRATE/target/release/taxman}"
+LADDER_BIN="${LADDER_BIN:-$CRATE/target/release/examples/ladder}"
+CLOUD_DIR="$_cloud_dir"
+
+# The settings of the committed strict chain: no unproven tactic on.
+STRICT_ARGS=(--tactic reuse_prev=off --tactic revise_freedoms=off)
+
+# The results files committed with the code, which a production run must agree with where they overlap.
+COMMITTED_RESULTS=("$CRATE/results/default.jsonl" "$CRATE/results/strict.jsonl" "$CRATE/bench/curve/chain.jsonl")
+
+: "${RUSTFLAGS=-C target-cpu=native}"
+export RUSTFLAGS
+
+# Cargo and rustc, if rustup put them in the usual place and the shell has not been told.
+if ! command -v cargo >/dev/null 2>&1 && [ -r "$HOME/.cargo/env" ]; then
+    # shellcheck disable=SC1091
+    . "$HOME/.cargo/env"
+fi
+
+log() {
+    printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >&2
+}
+
+die() {
+    log "error: $*"
+    exit 1
+}
+
+# The number of CPUs the OS offers (what `taxman solve` uses when given no --threads).
+ncpu() {
+    nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1
+}
+
+# What a log of a measurement needs to say about the machine and the build.
+env_report() {
+    echo "date:       $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "host:       $(hostname) $(uname -sr) $(uname -m)"
+    echo "cpus:       $(ncpu)"
+    if command -v lscpu >/dev/null 2>&1; then
+        lscpu | grep -E '^(Architecture|Model name|CPU\(s\)|Thread\(s\) per core|Core\(s\) per socket|Socket\(s\)|NUMA node\(s\))' |
+            sed 's/^/            /'
+    fi
+    if [ -r /proc/meminfo ]; then
+        echo "memory:     $(awk '/MemTotal/ {printf "%.0f GiB", $2 / 1048576}' /proc/meminfo)"
+    fi
+    if command -v rustc >/dev/null 2>&1; then
+        echo "rustc:      $(rustc --version)"
+        echo "native cpu: $(rustc --print target-cpus 2>/dev/null | sed -n '2p' | sed 's/^ *//')"
+    fi
+    echo "RUSTFLAGS:  ${RUSTFLAGS:-}"
+    if command -v git >/dev/null 2>&1 && git -C "$TAXMAN_ROOT" rev-parse HEAD >/dev/null 2>&1; then
+        local dirty=""
+        [ -n "$(git -C "$TAXMAN_ROOT" status --porcelain -- rust/src rust/Cargo.toml rust/Cargo.lock rust/build.rs 2>/dev/null)" ] &&
+            dirty=" (sources modified)"
+        echo "commit:     $(git -C "$TAXMAN_ROOT" rev-parse HEAD)$dirty"
+    else
+        echo "commit:     unknown (not a git checkout)"
+    fi
+    echo "work dir:   $TAXMAN_WORK ($(df -h "$TAXMAN_WORK" 2>/dev/null | awk 'NR == 2 {print $4 " free on " $1}'))"
+}

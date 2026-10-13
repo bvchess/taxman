@@ -10,6 +10,11 @@ algorithm implemented by this program. Heuristic approaches are [here](heuristic
 Robert Moniot's C++ program implementing seven heuristic strategies is included in
 [moniot](moniot), redistributed with his permission.
 
+A Rust reimplementation of the exact algorithm, built for many cores and long resumable runs, has solved boards up to
+n = 1231 (the table of optimal games in the Java program stops at 1000); see [rust/README.md](rust/README.md) for how
+to build and run it, and [rust/tools/cloud/RUNBOOK.md](rust/tools/cloud/RUNBOOK.md) for running it on a large cloud
+machine.
+
 
 ## Usage
 `bin/taxman [options] <board size or range>`  
