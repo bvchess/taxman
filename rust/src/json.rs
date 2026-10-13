@@ -1,9 +1,21 @@
-//! A minimal JSON reader and writer: enough for `optimal.json`, golden test data and results files.
-//! (Checkpoints are binary: see [`crate::engine`] and the search's header.)
+//! A minimal JSON reader and writer, so that the crate needs no dependencies.  It is enough for what the solver
+//! reads and writes as JSON: the Java's table of optimal games `optimal.json` ([`crate::game::Optimal`]), the
+//! results files, one object per line ([`crate::results`]), and the golden test data.  (Checkpoints are
+//! binary, not JSON: see [`crate::engine`] and the search's header.)
 //!
-//! Integers (numbers with no fraction or exponent that fit in an `i64`) parse to [`Json::Int`], everything
-//! else numeric to [`Json::Num`].  Objects keep their keys in source order; if a key is repeated, [`Json::get`]
-//! returns the first occurrence.  The writer is compact (no whitespace).
+//! [`Json::parse`] reads one document (RFC 8259: strict about commas, leading zeros and control characters
+//! in strings) into a [`Json`] tree; [`Json::write_to`] and `Display` write the compact form.  The accessors
+//! (`get`, `as_u32`, `as_arr`, ...) return `None` rather than panicking when the shape is not what the caller
+//! expects, so a corrupt file becomes an error message and not a crash.
+//!
+//! * Integers (numbers with no fraction or exponent that fit in an `i64`) parse to [`Json::Int`], everything
+//!   else numeric to [`Json::Num`]; an integral `Num` such as `1e3` still reads as an integer through
+//!   [`Json::as_i64`].
+//! * Objects keep their keys in source order; if a key is repeated, [`Json::get`] returns the first
+//!   occurrence.
+//! * Nesting deeper than 256 is refused, so hostile input cannot overflow the stack.
+//! * The writer emits no whitespace.  Floats are written in the shortest form that reads back as the same
+//!   float; `NaN` and infinities, which JSON cannot express, become `null`.
 
 use std::fmt;
 use std::path::Path;
@@ -11,6 +23,8 @@ use std::path::Path;
 /// Nesting limit for the parser, so hostile input cannot overflow the stack.
 const MAX_DEPTH: usize = 256;
 
+/// A JSON value.  Numbers come in two kinds so that scores and moves survive exactly: `Int` for what fits an
+/// `i64`, `Num` (an `f64`) for the rest.  An object is a list of pairs, in source order.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Json {
     Null,
@@ -72,10 +86,12 @@ impl Json {
         self.as_arr()?.get(i)
     }
 
+    /// Whether this is `null`.
     pub fn is_null(&self) -> bool {
         matches!(self, Json::Null)
     }
 
+    /// The value of a `true` or `false`.
     pub fn as_bool(&self) -> Option<bool> {
         match self {
             Json::Bool(b) => Some(*b),
@@ -92,10 +108,12 @@ impl Json {
         }
     }
 
+    /// A non-negative integer (see [`as_i64`](Self::as_i64)).
     pub fn as_u64(&self) -> Option<u64> {
         u64::try_from(self.as_i64()?).ok()
     }
 
+    /// An integer in `0..=u32::MAX`.
     pub fn as_u32(&self) -> Option<u32> {
         u32::try_from(self.as_i64()?).ok()
     }
@@ -109,6 +127,7 @@ impl Json {
         }
     }
 
+    /// The text of a string.
     pub fn as_str(&self) -> Option<&str> {
         match self {
             Json::Str(s) => Some(s),
@@ -116,6 +135,7 @@ impl Json {
         }
     }
 
+    /// The elements of an array.
     pub fn as_arr(&self) -> Option<&[Json]> {
         match self {
             Json::Arr(items) => Some(items),
@@ -123,6 +143,7 @@ impl Json {
         }
     }
 
+    /// The `(key, value)` pairs of an object, in source order.
     pub fn as_obj(&self) -> Option<&[(String, Json)]> {
         match self {
             Json::Obj(pairs) => Some(pairs),
@@ -189,6 +210,8 @@ impl fmt::Display for Json {
     }
 }
 
+/// Writes `s` as a JSON string literal: quotes and backslashes escaped, control characters as `\n`, `\t`, ... or
+/// `\u00XX`; everything else (non-ASCII included) as it is.
 fn write_string<W: fmt::Write + ?Sized>(out: &mut W, s: &str) -> fmt::Result {
     out.write_char('"')?;
     for c in s.chars() {

@@ -1,20 +1,39 @@
-//! Number-theory tables for a board `1..=n` (or one with holes, [`Tables::punctured`]): smallest prime
-//! factors, divisors, and the *maximal* factors and composites that the frame model is built on.
+//! Number-theory tables for the board `1..=n`: the *maximal* factors and composites that the frame model is
+//! built on, plus the sieve and divisor lists they come from.
 //!
-//! The *maximal factors* of `c` are `c/p` for each distinct prime `p` dividing `c` (so the maximal
-//! factors of a prime are `{1}`, and `1` has none).  The *maximal composites* of `c` are `c·p ≤ n` for
-//! primes `p` (so those of `1` are the primes).  The two are inverse relations: `f` is a maximal
-//! factor of `m` exactly when `m` is a maximal composite of `f`.  (The Java code calls these
-//! "abbreviated" factors and composites.)
+//! Where this fits: the first step of every game.  `solver` builds one [`Tables`] for the board size; the hives
+//! ([`crate::hives`]) read the maximal-factor and maximal-composite lists to decide which number can pay for
+//! which move, and the search's factor provider ([`crate::model`]) is built from the same lists.
+//!
+//! # Maximal factors and composites
+//!
+//! The *maximal factors* of `c` are `c/p` for each distinct prime `p` dividing `c`: the divisors reached by
+//! deleting one prime from `c` (`12 → 6, 4`; a prime has the single maximal factor `1`; `1` has none).  The
+//! *maximal composites* of `c` are the numbers `c·p ≤ n` for primes `p` (those of `1` are the primes; a number
+//! above `n/2` has none).  The two are inverse relations: `f` is a maximal factor of `m` exactly when `m` is a
+//! maximal composite of `f`.  (The Java code calls them "abbreviated" factors and composites.)
+//!
+//! They are all the frame model needs of the divisibility order, because of the *lifting* argument: if some
+//! proper divisor `d` of a move `c` is still in the pot, so is every number `f` with `d | f | c`, `f ≠ c` (whatever
+//! removed `f` earlier, playing `f` or a multiple of it, would have removed its divisor `d` too), and one of those
+//! is a maximal factor of `c`.  So `c` can be played exactly when one of its maximal factors is in the pot, and
+//! the model treats each maximal factor as able to pay for one move.  (`heuristics/THEORY.md`, Theorem 1, has the
+//! full argument.  It needs every number between `d` and `c` to be on the board, so it fails on a board with
+//! holes: see [`Tables::punctured`].)
 
 /// Precomputed tables for the board `1..=n`.  Every list is ascending; index 0 is unused (and empty).
+///
+/// `max_factors` and `max_composites` are what the solver uses.  `spf` is the sieve they are built from and the
+/// source of [`is_prime`](Tables::is_prime); `divisors` is not read by the solver at all (it is the Java
+/// `FactorTable`'s list, kept for the tests that check the other lists against the definition).
 pub struct Tables {
+    /// The board size: the numbers are `1..=n`.
     pub n: u32,
     /// Smallest prime factor of each `k >= 2`; `spf[0] = spf[1] = 0`.
     pub spf: Vec<u32>,
-    /// `c/p` for each distinct prime `p | c`.
+    /// The maximal factors `c/p` for each distinct prime `p | c`.
     pub max_factors: Vec<Vec<u32>>,
-    /// `c·p ≤ n` for each prime `p`.
+    /// The maximal composites `c·p ≤ n` for each prime `p`.
     pub max_composites: Vec<Vec<u32>>,
     /// All divisors of `k`, including 1 and `k`.
     pub divisors: Vec<Vec<u32>>,
@@ -79,11 +98,15 @@ impl Tables {
         Tables { n, spf, max_factors, max_composites, divisors, holes: Vec::new(), primes }
     }
 
-    /// The tables of the board `1..=n` with the numbers in `holes` taken off it.  A hole is never in the pot, so
-    /// it is never a move and never pays tax.  The lists stay arithmetic (they still mention the holes): the
-    /// hives ([`crate::hives::Apiary`]) leave the holes out, and the search only ever looks at the numbers of
-    /// its frames.  A number whose maximal factor is a hole does *not* pay with the hole's factors instead, so
-    /// on a punctured board the frame model plays the maximal-factor rule (see [`crate::sacrifice`]).
+    /// The tables of the board `1..=n` with the numbers in `holes` taken off it.  Only the sacrifice study
+    /// ([`crate::sacrifice`]) builds punctured boards; the solver never does.
+    ///
+    /// A hole is never in the pot, so it is never a move and never pays tax.  The lists stay arithmetic (they
+    /// still mention the holes): the hives ([`crate::hives::Apiary`]) leave the holes out, and the search only
+    /// ever looks at the numbers of its frames.  A number whose maximal factor is a hole does *not* pay with the
+    /// hole's own divisors instead (the lifting argument above fails), so on a punctured board the frame model
+    /// plays the *maximal-factor rule*, which is stricter than the rules of the game there
+    /// ([`crate::game::replay_punctured`], [`crate::brute::Rule`]).
     pub fn punctured(n: u32, holes: &[u32]) -> Self {
         let mut t = Tables::new(n);
         let mut holes = holes.to_vec();
