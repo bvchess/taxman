@@ -16,13 +16,14 @@ use std::time::{Duration, Instant};
 
 /// What revising frame 0's freedoms did (`UpperBoundEstimator.reviseFreedoms`).
 ///
-/// Frame 0's freedoms only ever limit the promotions out of frame 1 (into frame 0).  The revision lowers them to
-/// how many the two-frame game of frames 0 and 1 can make, which every promotion set of the whole game
-/// respects if that number is a bound on the *count* of the two-frame game's promotion sets (frame 1 without the
-/// promotions from frame 2 is only easier).  [`GreedyIsMax`](Revise::GreedyIsMax) is such a bound
-/// (`min(F₀, F₁)`, which the freedoms imply anyway, so it changes nothing that matters);
-/// [`Searched`](Revise::Searched) takes the size of the best set the two-frame search returns, which is a bound
-/// only by the unproven conjecture that the max-sum set also has the max count.
+/// Frame 0's freedoms only ever limit the promotions out of frame 1 (into frame 0).  The revision sets them to
+/// a number of promotions the two-frame game of frames 0 and 1 is taken to allow.  The promotions out of frame 1
+/// of any promotion set of the whole game are a promotion set of that two-frame game (frame 1 without the
+/// promotions from frame 2 is only easier), so the revision is sound when the number bounds the *size* of every
+/// promotion set of the two-frame game.  [`GreedyIsMax`](Revise::GreedyIsMax) does: it is `min(F₀, F₁)`, which
+/// the freedoms imply anyway, so it changes nothing that matters.  [`Searched`](Revise::Searched) takes the size
+/// of the best (max-sum) set the two-frame search returns, which bounds the sizes only by the unproven conjecture
+/// of the tactic: that the max-sum set also has the max count.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Revise {
     /// The tactic is off (also for a search resumed from the checkpoint of a game that was set up with it off).
