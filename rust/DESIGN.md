@@ -689,10 +689,11 @@ revise_freedoms=off` (no unproven tactic) reproduces every score of
 
 Left to try: the incumbents of games like 992 and 1025, whose optimum the
 search reaches late (992 on 8 threads: at 11.8 s of 12.0 s; seeded with its
-optimum it takes about 6 s); the matching repairs, still about 40% of the
-time (strong branching where nothing is forced, and refinement); and the
-multi-thread search: each thread learns its own nogoods (sharing them did
-not look worth it: a proof on 8 threads takes about as many nodes as on one).
+optimum it takes about 6 s); the matching repairs, then about 40% of the
+time (strong branching where nothing is forced, and refinement; see "Faster
+nodes, same trees" for later); and the multi-thread search: each thread
+learns its own nogoods (sharing them did not look worth it: a proof on 8
+threads takes about as many nodes as on one).
 
 ### Carrying nogoods over (2026-10): measured, not kept
 
@@ -847,6 +848,64 @@ failures would then be free.  They are not root facts:
   steps at 936 (3.9%) and 698 of 167,960 at 1184 (0.4%) (`--diag`, one thread),
   which bounds what a search that never tried a dead candidate could gain.
 
+### Faster nodes, same trees (2026-10)
+
+The inner loop, made faster without changing any answer or tree: every
+change keeps the node counts of every game and the fingerprints of the
+probe (`examples/perf.rs`, see Performance), and was measured in cycles and
+instructions retired of the process (other load moves wall times by up to
+3×), on one thread, plain release build.  Before, at the 1215 proof: the
+Hungarian repairs about 50% of the time, the peels 19%, the bounds from the
+potentials 5%, the nogood table 8%, level copies 4%.
+
+| commit | change | 1215 window k cycles/step | 936 G cycles | 1184 | 1215 proof |
+|---|---|---|---|---|---|
+| e3b8ddc | before | 22.1 | 1.59 | 4.33 | 151.3 |
+| b4cb2b6 | set widths of 20, 24 and 28 words (see Width dispatch) | 20.4 | 1.59 | 4.05 | 142.3 |
+| ab76772 | radix heap's bucket 0 a bitset, the search's per-vertex fields in one slot, a level settled only when something changed | 18.8 | 1.47 | 3.65 | 129.3 |
+| 130e4ec | `MAX_FRAMES` 12 → 8 (every board up to 4095 has at most 8) | 18.7 | 1.46 | 3.58 | 125.9 |
+| 9bfb4d6 | nogood lookups exact over compact member indices, not signatures and member loops | 18.2 | 1.43 | 3.52 | 123.2 |
+| 319753b | no peel for a promotion whose new move has a factor no other move uses (a sixth of them) | 18.0 | 1.41 | 3.53 | 122.5 |
+| ad1237c | nogood rule-outs over the compact sets too | 17.8 | 1.35 | 3.49 | 118.9 |
+| 4b6ef38 | the radix heap's push and pop and `add_inner` inlined (they were calls, 300 a step) | 16.1 | 1.23 | 3.16 | 106.2 |
+
+In all 30% fewer cycles (1.42×) and 28% fewer instructions on the proof of
+1215 (33 s instead of 47 s), 27% at 1184, 23% at 936; the probe's windows
+27% (1215) and 26% (936).  Profile-guided optimization, 12% on the code
+before, now adds 0–2% (see Performance).  The strict chain 1..1231 on 8
+threads takes 279 s of game time (1201–1231: 145 s), every score as
+committed.  Where the time goes now (1215): the Hungarian repairs 46%, the
+peels 24%, the bounds from the potentials 7%, the node's own work 7%,
+level copies 4%, nogood lookups 3%.
+
+Measured and not kept (cycles, one thread):
+
+* An undo trail for the matching levels instead of a copy per push: pushes
+  cost little, but logging every change of a repair costs more (windows
+  +0.8% and +0.9%, instructions +4%).
+* The peel in frame-local form (each frame's movers and factors numbered
+  within it, kept in the frame set): with the bit-parallel peel in rounds the
+  checks of single promotions were 17–26% cheaper, but the frames of forced
+  sets need many rounds (windows +8% and +16%); with the counting peel on
+  local indices, +0.5% and +0.8%.
+* Caching frame checks: 14–17% of the peels in a window repeat an earlier
+  one exactly, but only 5% one of the last eight.
+* The no-peel test above for the several moves of a forced set; promoting a
+  forced set straight into the child's state; stopping the bound from the
+  potentials once its first part decides; the Dijkstra horizon (no events
+  later than a known settling one: windows +0.4% and +2.5%, as in an earlier
+  measurement); one branch for `reach`'s two tests: each within ±0.5% or
+  worse.
+* Unchecked indexing in the Hungarian search: −4% instructions but −0.7%
+  cycles, not worth `unsafe`.
+* Widths of 12 and 48 words: 3–4% at 512–767 (solved) and some at 2048–3071,
+  for 12 s more of every build.
+* Not done: `i32` potentials (no bound on the potentials is proven, so not
+  exact by construction); a warm-started unit rebuild (another optimal
+  matching can change the tree after a split or a resume); candidate-index
+  sets for every search-level set (a large refactor); watched members for
+  the nogoods (now 3% of the time).
+
 ## Testing
 
 Correctness, all on games that finish in seconds:
@@ -924,7 +983,8 @@ Correctness, all on games that finish in seconds:
   promotions deep): the incremental matching bound and the quick bounds
   without a member against the min-cost-flow reference, and the subtrees of
   the deep levels under every tactic.  The Bits unit tests cover W = 16, 32
-  and 64, every word included, and the dispatch every width's edges.
+  and 64, every word included, and the dispatch every width's edges; the
+  boards where the number of frames steps up, and 4095, fit `MAX_FRAMES`.
 * Java fixtures past 760 (`tests/golden_hives.rs`): `testdata/golden_wide/`
   holds the Java's structure (hives, frames, candidates, reduced frame set,
   greedy incumbent) for n = 511, 512, 1000, 1001, 1023, 1024, 1025, 1100,
@@ -1010,15 +1070,17 @@ Performance:
   the probe and a short search at every set width (code a profile never saw
   is optimized as cold), and `-Cprofile-use` builds
   `target/pgo/release/taxman` and the examples.  The same trees (node
-  counts, fingerprints); 12% fewer cycles on the proof of 1215 (151.1 →
-  132.5 G), 13% at 1184, 6% at 936, and 9–11% on games it was not trained
-  on (880, 1050, 1100, 1170).  Long runs should use it; profile the plain
-  build (in the other, the search is inlined into a few functions and
-  `sample` sees little).  On Linux, rustup's `llvm-tools` has an
-  llvm-profdata that matches rustc's LLVM, and the script keeps
-  `RUSTFLAGS="-C target-cpu=native"` (as `tools/cloud` sets it), which
-  builds for the machine (aarch64 Linux targets generic armv8-a; on the
-  Mac the default, apple-m1, is the machine already).
+  counts, fingerprints).  On the code before "Faster nodes, same trees" it
+  took 12% off the cycles of the proof of 1215 (151.1 → 132.5 G), 13% at
+  1184, 6% at 936 and 9–11% on games it was not trained on (880, 1050, 1100,
+  1170), mostly, it turned out, by inlining the Hungarian search's heap; with
+  that inlined by hand it adds 0–2% (1215: 106.0 → 105.1–106.4 G, 1184:
+  3.16 → 3.10 G).  Profile the plain build (with PGO the search is inlined
+  into a few functions and `sample` sees little).  On Linux, rustup's
+  `llvm-tools` has an llvm-profdata that matches rustc's LLVM, and the
+  script keeps `RUSTFLAGS="-C target-cpu=native"` (as `tools/cloud` sets
+  it), which builds for the machine (aarch64 Linux targets generic armv8-a;
+  on the Mac the default, apple-m1, is the machine already).
 * The ladder, `cargo run --release --example ladder -- [--threads T[,T…] |
   --scaling] [--seconds S] [--diag] [--seed-opt] [--known FILE] [--tactic …]
   N…`: standalone searches of hard games (default 760 800 840 880 900 960 992

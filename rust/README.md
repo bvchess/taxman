@@ -98,7 +98,7 @@ The binary finds `optimal.json` (the Java's table of optimal games for n <= 1000
 it (or be given `--optimal FILE`, or `--optimal none`).  The release profile uses fat LTO and `panic = "abort"`; the
 `test` profile is optimised (`opt-level = 2`) because the tests replay real games.  On a machine that will run only
 the binary, `RUSTFLAGS="-C target-cpu=native"` builds for that CPU (see [tools/cloud/RUNBOOK.md](tools/cloud/RUNBOOK.md)).
-`tools/pgo.sh` makes a profile-guided build in `target/pgo/release` (about 10% fewer cycles, the same answers and
+`tools/pgo.sh` makes a profile-guided build in `target/pgo/release` (0-2% fewer cycles now, the same answers and
 trees; its header says how, and DESIGN.md "Performance" what it gains); `examples/perf.rs` measures the hot paths.
 
 ```
