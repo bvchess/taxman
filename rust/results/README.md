@@ -47,12 +47,15 @@ and what supports them.
 ## What supports the scores
 
 "Optimal" here means optimal within the frame model, whose assumptions are
-listed in DESIGN.md (the same holds for optimal.json beyond the brute-force
-certified n ≤ 62), and given that the solver is right.  Two checkers, each
+listed in [DESIGN.md](../DESIGN.md#what-optimal-means) (the same holds for
+optimal.json beyond the brute-force certified n ≤ 62), and given that the solver is right.  Two checkers, each
 under a second:
 
     taxman verify-results results/default.jsonl results/strict.jsonl bench/curve/chain.jsonl
-    tools/check_results.py results/default.jsonl results/strict.jsonl bench/curve/chain.jsonl
+    python3 tools/check_results.py results/default.jsonl results/strict.jsonl bench/curve/chain.jsonl
+
+(from the `rust` directory; the proof kinds and the taint are defined in
+[DESIGN.md](../DESIGN.md#8-results-and-the-trust-model))
 
 The first is the solver's own (also run on any results file `solve --out`
 opens, and by `tests/results.rs`).  The second is an independent referee in

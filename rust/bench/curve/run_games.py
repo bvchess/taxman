@@ -1,10 +1,10 @@
-#!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
+#!/usr/bin/env python3
 """Standalone ladder searches (steps 2-4), one process per game, resumable.
 
 Appends one JSON line per finished game to --out and skips the games already in it (same n, threads and tag).
-One invocation stops before it would exceed one Bash call: a game is started with the full search limit when the
-budget allows it and otherwise with what is left; a game that runs out of that shortened limit is not recorded
-(it is searched again, with a whole limit, by the next invocation).
+One invocation stops before it would exceed `INVOCATION_BUDGET` seconds (see common.py): a game is started with
+the full search limit when the budget allows it and otherwise with what is left; a game that runs out of that
+shortened limit is not recorded (it is searched again, with a whole limit, by the next invocation).
 
 Games: numbers, ranges A-B (with --non-primes, only the non-primes), and bandA = the first --band-size non-primes
 >= A.  Examples:

@@ -6,6 +6,24 @@
 //! to disk, checkpoints periodically, and resumes exactly from a checkpoint.  It knows nothing about the
 //! problem; the searcher explores a unit depth-first and gives work back only when asked to.
 //!
+//! # Using the engine
+//!
+//! A problem implements two traits and calls [`run`]:
+//!
+//! * [`Unit`]: a unit of work, the root of an unexplored subtree, that can be written to bytes and read back.  (The
+//!   Taxman search's is two bitsets, `search::TaxUnit`.)
+//! * [`Searcher`]: explores one unit depth-first in [`Searcher::run`], calling [`Ctx::poll`] often, at least every
+//!   ~1000 nodes.  When the poll says [`Poll::Yield`] it pushes ALL its remaining unexplored work with [`Ctx::push`],
+//!   shallowest first, and returns.  Through the [`Ctx`] it also reads the incumbent ([`Ctx::best`]), offers a better
+//!   one ([`Ctx::offer`]), declares the incumbent optimal ([`Ctx::declare_optimal`]) and counts its nodes
+//!   ([`Ctx::stats`]).
+//!
+//! [`run`] takes an [`EngineConfig`] (threads, memory cap and spill directory, checkpoint file and interval, limits,
+//! progress), a [`Start`] (new units with an initial incumbent, or a checkpoint to resume), an opaque `header` that
+//! identifies the search (stored in every checkpoint and compared on resume), and a closure that makes one searcher per
+//! worker thread.  It returns an [`Outcome`]: whether the search completed, the best value and payload, the statistics,
+//! the time and the [`Counters`].  `tests/engine.rs` runs a toy problem (knapsack) through every feature.
+//!
 //! # Protocol
 //!
 //! These are the engine's invariants.  Breaking any of them loses work (wrong answers) or deadlocks.
@@ -41,14 +59,15 @@
 //!
 //! **Why one deque.**  A searcher's work is on its own depth-first stack, not in the deque: units exist only
 //! after a yield, and running one costs the searcher a rebuild of its state (for Taxman a promotion pass and a
-//! matching solved from scratch, 30–170 µs already at n = 480–760, against about a microsecond in the critical
-//! section).  The lock is taken about twice per unit, and units are only made when workers are idle (splits)
-//! or paused (checkpoints): with every worker busy nobody takes it.  Per-worker deques with stealing would
-//! remove contention that is not there in steady state, at the price of an ordering argument for one-thread
-//! determinism, spill and checkpoints over `threads` deques, and a distributed termination test.  What did
-//! serialize the work distribution at many threads was answering one split request at a time, which the
-//! demand count replaced.  `Counters::lock_wait` measures what is left: if it ever becomes a noticeable share
-//! of the workers' time (many workers churning through tiny units), per-worker deques are the next step.
+//! matching solved from scratch, tens to hundreds of microseconds, against about a microsecond in the critical
+//! section; docs/EXPERIMENTS.md, "The engine", has the numbers).  The lock is taken about twice per unit, and units
+//! are only made when workers are idle (splits) or paused (checkpoints): with every worker busy nobody takes it.
+//! Per-worker deques with stealing would remove contention that is not there in steady state, at the price of an
+//! ordering argument for one-thread determinism, spill and checkpoints over `threads` deques, and a distributed
+//! termination test.  What did serialize the work distribution at many threads was answering one split request at a
+//! time, which the demand count replaced.  `Counters::lock_wait` measures what is left: if it ever becomes a
+//! noticeable share of the workers' time (many workers churning through tiny units), per-worker deques are the next
+//! step.
 //!
 //! **Yield signal.**  `SIG_YIELD` is set exactly when `exit` is set or a stop has been asked for, and
 //! `SIG_PAUSE` when a periodic checkpoint's pause is, always under the lock (`pause` is set with either).
@@ -74,10 +93,10 @@
 //! checksum.  It then clears `pause` and each worker resumes its own held unit.  A stop (time or node limit,
 //! a stop signal, an I/O error) is a pause whose final checkpoint is followed by `exit` instead of a release.
 //! A pause costs every worker the time until the last one parks, which is bounded by the longest stretch a
-//! searcher runs without polling (one Taxman step: about 10 µs; measured at n = 1215–1225, about one step in
-//! 10^5 takes over a millisecond and the longest 10–15 ms) plus, for a periodic checkpoint, up to `MIN_POLLS`
-//! polls of a unit just begun; then the write and its fsync; then each unit pushed in it costs a rebuild when
-//! it runs.  [`Counters`] records the longest wait for the workers to park and the longest pause.
+//! searcher runs without polling (one Taxman step takes microseconds, with a tail of milliseconds: docs/EXPERIMENTS.md,
+//! "The engine") plus, for a periodic checkpoint, up to `MIN_POLLS` polls of a unit just begun; then the write and
+//! its fsync; then each unit pushed in it costs a rebuild when it runs.  [`Counters`] records the longest wait for the
+//! workers to park and the longest pause.
 //!
 //! The next periodic checkpoint is due one interval after a pause ends, but never sooner than that pause
 //! lasted, and its pause begins only once the released workers are all running again (`resuming` is clear:
@@ -527,7 +546,7 @@ pub fn remove_finished_checkpoint(path: &Path) {
     }
 }
 
-/// A checksum of `bytes`, the one checkpoints carry (see [`Hash64`]): for callers that want to record a digest
+/// A checksum of `bytes`, the one checkpoints carry (a 64-bit hash, `Hash64`): for callers that want to record a digest
 /// of something in their header.
 #[must_use]
 pub fn checksum(bytes: &[u8]) -> u64 {

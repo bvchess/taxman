@@ -16,14 +16,15 @@
 //!
 //! which prints, on failure, the rows of the failing boards as observed, in the layout of [`EXPECTED`].  Check that
 //! the changes are the intended ones (the promotion sum, which is the answer, never moves), paste the rows in, and
-//! change the node counts quoted in DESIGN.md if they are affected.  The same goes for [`FORGETTING`].
+//! change the node counts quoted in DESIGN.md and docs/EXPERIMENTS.md if they are affected.  The same goes for
+//! [`FORGETTING`].
 
 mod common;
 
 use common::{search_at_width, Config, Game};
 use taxman::bounds::greedy;
 use taxman::search::SearchTactics;
-use taxman::solver::Tactics;
+use taxman::tactics::Tactics;
 use taxman::with_width;
 
 /// (board, tactics as `--tactic` assignments, promotion sum, nodes): the game searched from the frame builder on one
@@ -118,7 +119,8 @@ fn every_board_of_the_table_is_checked() {
     assert_eq!(boards, covered, "the boards of EXPECTED and of GROUPS");
 }
 
-/// DESIGN.md: "deterministic on one thread" (nogoods, forgetting and all); nothing else asserts it for the search.
+/// DESIGN.md (section 4): deterministic on one thread (nogoods, forgetting and all); nothing else asserts it for the
+/// search.
 #[test]
 fn a_search_on_one_thread_is_deterministic() {
     let d = SearchTactics::default();

@@ -1,8 +1,14 @@
-//! Helpers shared by the integration tests: temporary directories, the committed results files as oracles beyond
-//! `optimal.json`, one-thread searches at a chosen set width, and a few small utilities.
+//! Helpers shared by the integration tests: temporary directories and a random number generator (`support.rs`, which
+//! the unit tests share), the Java's golden data and the committed results files as oracles beyond `optimal.json`,
+//! one-thread searches at a chosen set width, and a few small utilities.
 //!
 //! Each test binary compiles this module for itself and uses only part of it.
 #![allow(dead_code)]
+
+mod support;
+
+#[allow(unused_imports)]
+pub use support::{Rng, TempDir};
 
 use std::cell::OnceCell;
 use std::collections::BTreeMap;
@@ -11,42 +17,46 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Instant;
 use taxman::bits::Bits;
+use taxman::board::Board;
 use taxman::bounds::{Preclusions, RunnerUp};
 use taxman::engine::{self, EngineConfig, Start};
-use taxman::frames::build_frames;
 use taxman::json::Json;
 use taxman::matchbound::MatchGraph;
 use taxman::model::{FrameSet, Model, Scratch};
 use taxman::numtheory::Tables;
 use taxman::results::Taint;
-use taxman::search::{prepare, search, Branching, SearchSpace, SearchTactics, TaxSearcher, TaxUnit, NOGOOD_PERIOD};
+use taxman::search::{search, Branching, SearchSpace, SearchTactics, TaxSearcher, TaxUnit, NOGOOD_PERIOD};
 use taxman::solver::{Prev, PrevSource, SolveOptions};
-
-/// A fresh directory under the system temp dir, removed on drop.
-pub struct TempDir(pub PathBuf);
-
-impl TempDir {
-    pub fn new(name: &str) -> Self {
-        let path = std::env::temp_dir().join(format!("taxman-test-{name}-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&path);
-        fs::create_dir_all(&path).expect("create temp dir");
-        TempDir(path)
-    }
-
-    pub fn join(&self, name: &str) -> PathBuf {
-        self.0.join(name)
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
 
 /// A committed file under `testdata/`.
 pub fn testdata(path: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("testdata").join(path)
+}
+
+/// The Java's golden data for game `n`: `testdata/golden/n<NNNN>.json` (made by `tools/golden/export.sh`).
+pub fn golden(n: u32) -> Json {
+    Json::from_file(testdata(&format!("golden/n{n:04}.json"))).unwrap_or_else(|e| panic!("n={n}: {e}"))
+}
+
+/// Every `n*.json` under `testdata/<dir>` (`golden`, or `golden_wide`, which holds the structure only), as `(n,
+/// data)` by n.  A file in which the Java export reported an error fails the test.
+pub fn golden_files(dir: &str) -> Vec<(u32, Json)> {
+    let dir = testdata(dir);
+    let mut paths: Vec<PathBuf> = fs::read_dir(&dir)
+        .unwrap_or_else(|e| panic!("{}: {e}", dir.display()))
+        .map(|entry| entry.unwrap().path())
+        .filter(|p| p.extension().is_some_and(|e| e == "json"))
+        .collect();
+    paths.sort();
+    paths
+        .iter()
+        .map(|path| {
+            let json = Json::from_file(path).unwrap();
+            let n = json.get("n").and_then(Json::as_u32).expect("n");
+            assert!(json.get("error").is_none(), "n={n}: the Java export reported {:?}", json.get("error"));
+            (n, json)
+        })
+        .collect()
 }
 
 /// A committed results file under `results/`.
@@ -135,14 +145,13 @@ pub struct Profile {
 /// The game `n`'s [`Profile`] instantiated at width `W`, which may be wider than `n` needs.  With `node_limit` the
 /// search may stop early (and the profile then says `completed: false`).
 pub fn profile_at_width<const W: usize>(n: u32, tactics: SearchTactics, node_limit: Option<u64>) -> Profile {
-    let tables = Tables::new(n);
-    let frames = build_frames::<W>(&tables);
-    let p = prepare::<W>(&tables, &frames.columns(), &frames.candidates, tactics, 1).unwrap();
+    let board = Board::<W>::for_n(n);
+    let p = board.prepare(tactics, 1).unwrap();
     let cfg = EngineConfig { node_limit, ..config(1) };
     let r = search(&p, &cfg, None, None, false).unwrap();
     Profile {
-        columns: frames.columns(),
-        candidates: frames.candidates.to_vec(),
+        columns: board.frames.columns(),
+        candidates: board.candidates().to_vec(),
         greedy: p.greedy.to_vec(),
         max_total: p.max_total,
         frame_zero_freedoms: p.root.frames().first().map_or(0, |f| f.freedoms),
@@ -156,45 +165,15 @@ pub fn profile_at_width<const W: usize>(n: u32, tactics: SearchTactics, node_lim
 
 /// (promotion sum, nodes) of the whole search of game `n` from the frame builder at width `W`, on one thread.
 pub fn search_at_width<const W: usize>(n: u32, tactics: SearchTactics) -> (u64, u64) {
-    let tables = Tables::new(n);
-    let frames = build_frames::<W>(&tables);
-    let p = prepare::<W>(&tables, &frames.columns(), &frames.candidates, tactics, 1).unwrap();
+    let p = Board::<W>::for_n(n).prepare(tactics, 1).unwrap();
     let r = search(&p, &config(1), None, None, false).unwrap();
     assert!(r.completed);
     (r.sum, r.stats.nodes)
 }
 
-/// Tiny xorshift64 generator, so the tests need no crates and are reproducible.
-pub struct Rng(pub u64);
-
-impl Rng {
-    pub fn next(&mut self) -> u64 {
-        let mut x = self.0;
-        x ^= x << 13;
-        x ^= x >> 7;
-        x ^= x << 17;
-        self.0 = x;
-        x
-    }
-
-    /// A number in `0..n`.
-    pub fn below(&mut self, n: u64) -> u64 {
-        self.next() % n
-    }
-
-    /// True with probability `percent`/100.
-    pub fn chance(&mut self, percent: u64) -> bool {
-        self.below(100) < percent
-    }
-
-    pub fn pick<T: Copy>(&mut self, items: &[T]) -> T {
-        items[self.below(items.len() as u64) as usize]
-    }
-
-    /// A random subset of `set`, each member kept with probability `percent`/100.
-    pub fn subset<const W: usize>(&mut self, set: &Bits<W>, percent: u64) -> Bits<W> {
-        set.iter().filter(|_| self.chance(percent)).collect()
-    }
+/// A random subset of `set`, each member kept with probability `percent`/100.
+pub fn random_subset<const W: usize>(rng: &mut Rng, set: &Bits<W>, percent: u64) -> Bits<W> {
+    set.iter().filter(|_| rng.chance(percent)).collect()
 }
 
 /// FNV-1a over the decimal text of the moves, each followed by a comma: the fingerprint of a game that the Java
@@ -290,12 +269,11 @@ impl<const W: usize> Game<W> {
 
     /// Game `n` from the frame builder, with the frame builder's candidates (none: `None`).
     pub fn of_board(n: u32) -> Option<Self> {
-        let tables = Tables::new(n);
-        let frames = build_frames::<W>(&tables);
-        if frames.candidates.is_empty() {
+        let board = Board::<W>::for_n(n);
+        if board.is_trivial() {
             return None;
         }
-        Game::from_columns(&tables, &frames.columns(), frames.candidates)
+        Game::from_columns(&board.tables, &board.frames.columns(), board.candidates())
     }
 
     /// The same game with frame 0's freedoms set to `freedoms`, as `revise_freedoms` does (and the promotion cap

@@ -1,9 +1,11 @@
-#!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
+#!/usr/bin/env python3
 """Step 1: the chain baseline, `taxman solve 1001-1231` with strict tactics, resumable.
 
-Each invocation runs the solver for at most one Bash call's worth of wall time and then stops it; the results file
-and the per-game checkpoints let the next invocation continue (finished games are skipped, a game in progress
-resumes from its checkpoint).  Usage: run_chain.py [--first 1001] [--last 1231] [--threads 8] [--out FILE]
+Each invocation runs the solver for at most `INVOCATION_BUDGET` seconds of wall time (see common.py) and then
+stops it; the results file and the per-game checkpoints let the next invocation continue (finished games are
+skipped, a game in progress resumes from its checkpoint).
+
+Usage: run_chain.py [--first 1001] [--last 1231] [--threads 8] [--out FILE]
 """
 import argparse
 import subprocess

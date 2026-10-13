@@ -50,6 +50,18 @@
 //! power loss can leave garbage in it before its newline.  The last non-blank line is therefore dropped as torn
 //! if it does not parse as JSON, whether or not it ends in a newline.  A last line that parses but is not a
 //! valid result, and any bad line before the last, is an error.
+//!
+//! # The file of a run, and checking files on their own
+//!
+//! [`ResultsFile`] is the file a run appends to.  Opening it checks it ([`read_results`]); the completed games in it
+//! count as done and are the previous games of the ones after them; each new result is appended and synced as soon as
+//! it is done (so a crash loses at most the line being written); and a game that failed a check after it was found
+//! is written to [`rejected_path`] instead, with the reason.  [`verify_files`] runs the same checks on files without
+//! changing them, and that the files agree on the games they share (`taxman verify-results`).  The Python referee
+//! `tools/check_results.py` derives the same proofs and taints from the same rules with no code in common, so a
+//! mistake in either shows as a disagreement.
+//!
+//! The fields of a line are described in README.md ("A results line"); [`SCHEMA`] is the version of the format.
 
 use crate::game::{largest_prime_at_most, replay_finished, Optimal};
 use crate::json::Json;
@@ -156,16 +168,32 @@ pub fn moves_digest(moves: &[u32]) -> String {
     format!("{hash:016x}")
 }
 
-/// The build this binary comes from (set by `build.rs`): `{"commit": hash, "dirty": bool}`, with `null` for
-/// what is not known (no git checkout).  `dirty` means the sources differed from the commit.
-pub fn build_json() -> Json {
+/// The build this binary comes from, as `build.rs` recorded it when the crate was compiled; `None` for what was
+/// not known then (not a git checkout, or no `git`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Build {
+    /// The hash of `HEAD`.
+    pub commit: Option<&'static str>,
+    /// Whether the sources differed from that commit.
+    pub dirty: Option<bool>,
+}
+
+/// The build this binary comes from.
+pub fn build() -> Build {
     let commit = env!("TAXMAN_GIT_COMMIT");
     let dirty = match env!("TAXMAN_GIT_DIRTY") {
-        "true" => Json::Bool(true),
-        "false" => Json::Bool(false),
-        _ => Json::Null,
+        "true" => Some(true),
+        "false" => Some(false),
+        _ => None,
     };
-    Json::object([("commit", if commit.is_empty() { Json::Null } else { Json::from(commit) }), ("dirty", dirty)])
+    Build { commit: (!commit.is_empty()).then_some(commit), dirty }
+}
+
+/// [`build`] as the `build` field of a result line: `{"commit": hash, "dirty": bool}`, with `null` for what is not
+/// known.
+pub fn build_json() -> Json {
+    let Build { commit, dirty } = build();
+    Json::object([("commit", commit.map_or(Json::Null, Json::from)), ("dirty", dirty.map_or(Json::Null, Json::Bool))])
 }
 
 // ---------------------------------------------------------------------------------------------------------
