@@ -6,9 +6,9 @@ cores, the per-game pipeline, how results are recorded and trusted, how it is te
 measured.  Each term is defined where it first matters.
 
 * The [README](README.md) is the user guide (how to build, run and read the output) and has the glossary.
-* [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) is the lab notebook: every round of improvements with its measurements,
-  and the ideas that were measured and not kept.  This page states what the solver does and why; the notebook says
-  what it was worth and what was tried instead.
+* [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) is the lab notebook and the register of everything tried, kept or not:
+  every round of improvements with its measurements, and the ideas that were measured and not kept.  This page states
+  what the solver does and why; the notebook says what it was worth and what was tried instead.
 * Each module starts with a comment that says what it is for; [`src/lib.rs`](src/lib.rs) has the module map.
 
 * [1. Goals and constraints](#1-goals-and-constraints)
@@ -628,7 +628,9 @@ on the machine moves wall times by up to 3×.  What measures what:
   children, nogood lookups and rule-outs).  F2: the frame checks of those promotions.  F3: a checkpoint of each proof
   resumed on one thread for 50,000 steps, one period of forgetting nogoods: the search itself, fingerprinted by its
   counters.  About 5 s in all; `perf make-nodes` and `perf make-window` make the fixtures again, deterministically.
-  For whole searches, `/usr/bin/time -l` reports the same counters per process.
+  For whole searches, `/usr/bin/time -l` reports the same counters per process.  `cargo test --release` rebuilds the
+  examples in its own configuration, with about 2% more instructions: run `cargo build --release --examples` again
+  before measuring.
 * **Profile-guided optimization** (`tools/pgo.sh`): an instrumented build runs the probe and a short search at every
   set width (code a profile never saw is optimized as cold), and `-Cprofile-use` builds `target/pgo/release/taxman` and
   the examples.  The same trees and fingerprints.  Since the hot loop is inlined by hand it adds 0–2% (it was 12%
@@ -647,9 +649,10 @@ on the machine moves wall times by up to 3×.  What measures what:
   cores) searches each game with each count and prints a table per game and one summed over the games: search time,
   speedup, nodes per second per thread, effective parallelism, idle and lock-wait time, splits and the units they gave,
   steals, runs, tiny runs and the time to full occupancy.  With `--seed-opt` the node count barely depends on the
-  threads, so the speedup measures the parallel proof alone.  The engine's own benchmark (`cargo test --release --test
-  engine -- --ignored --nocapture bench`, sizes and thread counts set by `TXENGINE_BENCH_*`) measures its overhead per
-  node with no work per node.
+  threads, so the speedup measures the parallel proof alone.  `--cores C` lets only C of the threads search at once
+  (`EngineConfig::cores`), to measure in counts, not time, what many more workers than cores would do.  The engine's
+  own benchmark (`cargo test --release --test engine -- --ignored --nocapture bench`, sizes and thread counts set by
+  `TXENGINE_BENCH_*`) measures its overhead per node with no work per node.
 * **The cloud** (`tools/cloud`) has the scripts for a many-core machine: the sweep to 192 threads, the cost of a
   checkpoint pause, and the production chain (RUNBOOK.md).
 

@@ -350,6 +350,21 @@ fn eight_threads_are_correct() {
     assert_accounting(&out.counters);
 }
 
+/// Many workers taking turns on a few cores (`EngineConfig::cores`, the emulation of a larger machine) give the
+/// same answer, split the work among all of them, and stop at a node limit.
+#[test]
+fn many_workers_on_few_cores_are_correct() {
+    let inst = instance();
+    let cfg = EngineConfig { cores: Some(2), ..config(16) };
+    let out = solve(&cfg, fresh(), &inst);
+    assert!(out.completed && !out.optimal_declared);
+    assert_optimal(&out, &inst, inst.dp());
+    assert!(out.counters.splits > 0, "work was split");
+    let limited = EngineConfig { node_limit: Some(2_000), ..cfg };
+    let out = solve(&limited, fresh(), &inst);
+    assert!(!out.completed, "the node limit stops it");
+}
+
 /// The instrumentation is consistent: each worker's busy, idle, parked and lock-wait intervals are disjoint and
 /// inside the run, so together they take at most `wall × threads`; every pause that parked the workers ended later.
 fn assert_accounting(c: &engine::Counters) {
@@ -621,6 +636,16 @@ fn checkpoints_with_progress_and_spill_on_ten_threads() {
 
 #[test]
 fn worker_panic_propagates() {
+    worker_panic_propagates_with(None);
+}
+
+/// A worker's panic gives its turn on the emulated cores up, so that the workers waiting for one do not wait forever.
+#[test]
+fn worker_panic_propagates_on_one_core() {
+    worker_panic_propagates_with(Some(1));
+}
+
+fn worker_panic_propagates_with(cores: Option<usize>) {
     let inst = instance();
     let dir = TempDir::new("panic");
     let ckpt = dir.join("ckpt.bin");
@@ -629,6 +654,7 @@ fn worker_panic_propagates() {
         checkpoint: Some((ckpt.clone(), Duration::from_millis(1))),
         queue_mem_cap: 2,
         spill_dir: Some(spill.clone()),
+        cores,
         ..config(4)
     };
     // Workers panic once the first checkpoint is on disk, so there is one to resume from.

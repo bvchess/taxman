@@ -254,6 +254,12 @@ pub struct EngineConfig {
     pub node_limit: Option<u64>,
     /// Prefix for progress lines.
     pub label: String,
+    /// Emulation of many workers on few cores, for measuring what a larger machine would do in counts (nodes,
+    /// lookups), not time: at most this many of the `threads` workers search at once, taking turns every
+    /// `POLL_BATCH` polls in the order they ask (a panic in a worker gives its turn up).  `None`: no limit, and
+    /// the check costs nothing but one test every `POLL_BATCH` polls.  The workers' busy time includes their
+    /// waits for a turn, so the [`Counters`] times mean nothing with it.
+    pub cores: Option<usize>,
 }
 
 impl Default for EngineConfig {
@@ -268,6 +274,7 @@ impl Default for EngineConfig {
             time_limit: None,
             node_limit: None,
             label: String::new(),
+            cores: None,
         }
     }
 }
@@ -710,6 +717,9 @@ impl<'a, U: Unit> Ctx<'a, U> {
         if self.countdown == 0 {
             self.countdown = POLL_BATCH;
             self.batches += 1;
+            if let Some(gate) = &self.shared.gate {
+                gate.pass();
+            }
             let total = self.flush_nodes();
             if self.shared.node_limit.is_some_and(|limit| total >= limit) {
                 self.shared.request_stop();
@@ -870,6 +880,56 @@ struct Shared<U: Unit> {
     base: Stats,
     prior: Duration,
     t0: Instant,
+    /// With [`EngineConfig::cores`], the turns of the workers.
+    gate: Option<Gate>,
+}
+
+/// Lets at most `slots` workers search at once, in the order they ask: a ticket may go once fewer than `slots`
+/// tickets issued before it are still inside (for [`EngineConfig::cores`]).
+struct Gate {
+    slots: u64,
+    /// Tickets issued, and tickets that have left.
+    turns: Mutex<(u64, u64)>,
+    cv: Condvar,
+}
+
+impl Gate {
+    fn new(slots: usize) -> Self {
+        Gate { slots: slots.max(1) as u64, turns: Mutex::new((0, 0)), cv: Condvar::new() }
+    }
+
+    /// Wait for a turn, which lasts until the returned guard is dropped.
+    fn turn(&self) -> Turn<'_> {
+        self.wait_for_ticket(lock(&self.turns));
+        Turn(self)
+    }
+
+    /// The worker in a turn gives it up and takes its place at the back of the line, in one step.
+    fn pass(&self) {
+        let mut turns = lock(&self.turns);
+        turns.1 += 1;
+        self.cv.notify_all();
+        self.wait_for_ticket(turns);
+    }
+
+    /// Take the next ticket and wait until fewer than `slots` earlier ones are inside.
+    fn wait_for_ticket(&self, mut turns: MutexGuard<'_, (u64, u64)>) {
+        let ticket = turns.0;
+        turns.0 += 1;
+        while ticket >= turns.1 + self.slots {
+            turns = self.cv.wait(turns).unwrap_or_else(PoisonError::into_inner);
+        }
+    }
+}
+
+/// A turn of a [`Gate`], given back when dropped, a panic unwinding included, so that nobody waits for it forever.
+struct Turn<'a>(&'a Gate);
+
+impl Drop for Turn<'_> {
+    fn drop(&mut self) {
+        lock(&self.0.turns).1 += 1;
+        self.0.cv.notify_all();
+    }
 }
 
 struct State<U> {
@@ -1003,6 +1063,7 @@ impl<U: Unit> Shared<U> {
             base: init.base,
             prior: init.prior,
             t0,
+            gate: cfg.cores.map(Gate::new),
         }
     }
 
@@ -1201,7 +1262,9 @@ impl<U: Unit> Shared<U> {
         let mut next = self.acquire(self.lock(), i);
         while let Some(unit) = next {
             ctx.run_start = ctx.polls();
+            let turn = self.gate.as_ref().map(Gate::turn);
             searcher.run(unit, &mut ctx);
+            drop(turn);
             next = self.finish_run(&mut ctx);
         }
     }

@@ -3,7 +3,7 @@
 //!
 //! ```text
 //! cargo run --release --example ladder -- [--threads T[,T...] | --scaling] [--seconds S] [--diag] [--no-cap]
-//!     [--no-seed] [--seed-opt] [--known FILE] [--tactic NAME=VALUE]... N...
+//!     [--no-seed] [--seed-opt] [--known FILE] [--tactic NAME=VALUE]... [--cores C] N...
 //! ```
 //!
 //! Each game is set up from the frame builder (no golden data) as `taxman solve` sets it up (`taxman::board::Board`,
@@ -28,6 +28,10 @@
 //! `--seed-opt` the search only proves the optimum, so its node count barely depends on the threads and the
 //! speedup measures the parallel search alone; seeded from n − 1 it also depends on when each run happens to
 //! find the optimum.
+//!
+//! Many workers on few cores: `--cores C` lets at most C of the threads search at once, taking turns
+//! (`EngineConfig::cores`), so that `--threads 64 --cores 4` measures in counts (nodes, lookups, splits) what 64
+//! workers would do, though not in time, which the turns inflate.
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -52,6 +56,8 @@ struct Options {
     known: Option<PathBuf>,
     tactics: SearchTactics,
     games: Vec<u32>,
+    /// At most this many threads search at once (`EngineConfig::cores`).
+    cores: Option<usize>,
 }
 
 fn parse() -> Result<Options, String> {
@@ -65,6 +71,7 @@ fn parse() -> Result<Options, String> {
         known: None,
         tactics: SearchTactics::default(),
         games: Vec::new(),
+        cores: None,
     };
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -88,6 +95,7 @@ fn parse() -> Result<Options, String> {
             "--no-cap" => o.cap = false,
             "--no-seed" => o.seed = false,
             "--seed-opt" => o.seed_opt = true,
+            "--cores" => o.cores = Some(value("--cores")?.parse().map_err(|e| format!("--cores: {e}"))?),
             "--known" => o.known = Some(value("--known")?.into()),
             "--tactic" => {
                 // The solver's parser, so that the names and values are the same as for `taxman solve --tactic`.
@@ -231,7 +239,12 @@ fn run<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Vec<Row> {
     };
     let mut rows = Vec::new();
     for &threads in &o.threads {
-        let cfg = EngineConfig { threads, time_limit: Some(Duration::from_secs(o.seconds)), ..EngineConfig::default() };
+        let cfg = EngineConfig {
+            threads,
+            time_limit: Some(Duration::from_secs(o.seconds)),
+            cores: o.cores,
+            ..EngineConfig::default()
+        };
         let diag = o.diag.then(|| Mutex::new(Diagnostics::default()));
         let r = search_with(&p, &cfg, seed.as_ref(), cap, false, diag.as_ref()).expect("search");
         let found = match r.found {

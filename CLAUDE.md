@@ -73,6 +73,8 @@ into `master` and deleted.)
 The exact solver in Rust is the crate in `rust/` (std only; `cd rust`, then `cargo build --release`, `cargo test`):
 `rust/README.md` is its user guide and reading order, `rust/DESIGN.md` its design, `rust/docs/EXPERIMENTS.md` the lab
 notebook.  Committed results in `rust/results/` are evidence: runs write elsewhere and must never overwrite them.
+The register of everything tried at the top of `rust/docs/EXPERIMENTS.md` must be checked before an experiment is
+proposed and updated when one finishes, failures included.
 
 Robert Moniot's C++ program `moniot/playtaxman.cpp` implements seven
 heuristic strategies and is essentially as its author sent it.  Keep edits
