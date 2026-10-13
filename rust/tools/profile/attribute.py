@@ -99,11 +99,15 @@ def short(line):
             if w in ('core', 'std', 'alloc', 'taxman'):
                 break
             rest.append(w)
-        return 'taxman:' + '::'.join(rest[:4])
+        # Enough words for a generic function's type arguments and its name (`Level::lagrange::Penalized::copy_from`).
+        return 'taxman:' + '::'.join(rest[:6])
     return 'std:' + '::'.join([w for w in idents(sym) if len(w) > 1][-2:])
 
 
 PURPOSES = [
+    ('refit', 'refits of the Lagrangian multipliers'),
+    ('fit', 'refits of the Lagrangian multipliers'),
+    ('Lagrangian::check', 'the Lagrangian bound of a node or child (and its forced members)'),
     ('strongest', 'strong branching (exact bounds without each member)'),
     ('branches', 'refinement (bounds of the conflict\'s branches)'),
     ('reaches', 'refinement (bounds of the conflict\'s branches)'),
@@ -124,20 +128,46 @@ def purpose(chains_up):
         for f in chain:
             name = f.split('::')[-1]
             for key, label in PURPOSES:
-                if name == key:
+                if name == key or f.endswith('::' + key):
                     return label
     return '-'
 
 
-def kind(chain, frame):
+def lagrangian(name):
+    """Whether the crate's function `name` works on the Lagrangian bound's levels (its module, or the generic
+    matching code instantiated with its weighing)."""
+    return '::lagrange' in name or 'Penalized' in name
+
+
+def kind(chain, frame, up):
+    """The kind of work of a sample: `chain` is the leaf's inline chain, `frame` its text, `up` the inline chains
+    of its callers, innermost first."""
     if any(w in frame for w in ('psynch', '__ulock', 'semwait', 'kevent', 'nanosleep')):
         return 'idle (waiting)'
+    if any(f.endswith('lagrange::fit') for c in [chain] + up for f in c):
+        return 'Lagrangian: refits (fitting the multipliers, levels solved afresh)'
     if 'memmove' in frame or 'memcpy' in frame or 'memset' in frame:
-        return 'copies (memmove/memset)'
+        # Charged to the nearest function of the crate that called it.
+        caller = next((f for c in up for f in c if f.startswith('taxman:')), '')
+        if lagrangian(caller):
+            return 'Lagrangian: level copies'
+        if caller.startswith('taxman:matchbound'):
+            return 'matching level copies'
+        return 'copies (frame sets, nodes)'
     ours = [f for f in chain if f.startswith('taxman:')]
     if not ours:
         return 'other'
     name = ours[0]
+    if any(lagrangian(f) for f in ours):
+        if 'bound_excluding' in name or 'forced' in name:
+            return 'Lagrangian: forced members (from the potentials)'
+        if 'copy_from' in name or 'push_copy' in name:
+            return 'Lagrangian: level copies'
+        if any(w in name for w in ('derive', 'raise', 'fix_up', 'promote', 'apply_drops', 'kill', 'is_live')):
+            return 'Lagrangian: applying changes (promotions, candidates gone, nogoods dead)'
+        if 'reset' in name:
+            return 'Lagrangian: levels solved afresh'
+        return 'Lagrangian: repairs (Hungarian)'
     if 'bound_excluding' in name or 'bound_including' in name or 'fixed_out' in name:
         return 'bounds from the potentials'
     if 'copy_from' in name or 'push_copy' in name:
@@ -171,12 +201,12 @@ for path in sys.argv[2:]:
     for count, stack in nodes:
         leaf = stack[-1]
         leaf_chain = chains.get(address(leaf), [])
-        k = kind(leaf_chain, leaf)
+        callers = [chains.get(address(f), []) for f in reversed(stack[:-1])]
+        k = kind(leaf_chain, leaf, callers)
         by_kind[k] += count
         if k == 'idle (waiting)':
             continue
-        up = [leaf_chain] + [chains.get(address(f), []) for f in reversed(stack[:-1])]
-        p = purpose(up)
+        p = purpose([leaf_chain] + callers)
         by_purpose[p] += count
         by_both[(k, p)] += count
         by_leaf[next((f for f in leaf_chain if f.startswith("taxman:")), None) or leaf.split('  (in')[0][:60]] += count
