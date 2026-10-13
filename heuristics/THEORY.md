@@ -459,6 +459,126 @@ the members and factors rebuilt from them, never fail.  The
 protection is the window law *for the ranking of the primes that also
 decides which products lie in the window*.
 
+## Uniqueness of the optimal set
+
+Many move orders play the same set; the question here is whether
+different *sets* can be optimal.  Two statements must be kept apart:
+the upper-half instance on its own, where the theory above settles
+it, and the whole game, where only measurement does.
+
+**Theorem 8 (the heaviest playable upper set is unique).**  Suppose
+(★) holds in game n, as it does wherever (♦) holds (Theorem 7), so in
+every game n ≤ 100,000.  Then every playable subset S of the
+upper-half instance satisfies |S ∩ {≥ t}| ≤ |U\* ∩ {≥ t}| for every
+t: listed in decreasing order, the i-th member of S is at most the
+i-th member of U\*.  Consequently, for every strictly increasing
+positive weighting w (the values themselves among them),
+w(S) < w(U\*) unless S = U\*.
+
+*Proof.*  Playability splits over the components of the incidence
+graph: a member's factors are listed only by members of its own
+component, so the part of a self-covering set in each component is
+self-covering, and by Theorem 5 a set is playable iff its part in
+every component is.  So descending greedy restricted to a component
+K is descending greedy run on K, and U\* ∩ K ∩ {≥ t} is its set on
+the truncation K_{≥t}.  S ∩ K ∩ {≥ t} is playable (a subset of S),
+so (★) bounds its size by that set's; summing over the components
+gives the count inequality.  (If S's i-th member s_i exceeded U\*'s
+i-th, the threshold t = s_i would hold i members of S and at most
+i − 1 of U\*.)  Now index the values of the members c₁ > c₂ > … > c_m
+and put w(c_{m+1}) = 0.  Layer by layer,
+
+    w(S) = Σ_j (w(c_j) − w(c_{j+1})) · |S ∩ {≥ c_j}|,
+
+with every coefficient positive, so term by term w(S) ≤ w(U\*), and
+equality needs |S ∩ {≥ c_j}| = |U\* ∩ {≥ c_j}| for every j.  The jump
+of that count at c_j says whether c_j is a member, so then S = U\*.  ∎
+
+This is the textbook fact that distinct weights give a matroid a
+single heaviest basis, transplanted.  The playable sets are not a
+matroid (n = 2873, above), but under (♦) they lie inside the GF(2)
+linear matroid of Theorem 7, of which U\* is the greedy basis; the
+count form needs only (★).  So the optimal upper set is unique in
+every game to 100,000, where the brute force of
+`evaluation/certify.py` had reached 62.
+
+What Theorem 8 does not say is that every optimal *game* has upper
+part U\*.  An optimal game's upper part is a playable upper set (a
+subset of a playable set is playable), so it is either U\* or
+strictly lighter above n/2; a game with a lighter upper part would
+have to win the difference back below n/2, where the upper picks'
+payments compete with the lower picks.  Whether that ever happens is
+the strong form of what `evaluation/verify.py` measures, and it is
+open; the enumerations below never find it.
+
+Two elementary facts tie a game's optimal sets to its predecessor's.
+
+**Lemma (the prime of every optimal set).**  Every optimal set of a
+game n ≥ 2 contains q, the largest prime ≤ n, and no other prime.
+
+*Proof.*  A prime's only maximal factor is 1, so a playable set holds
+at most one prime (Theorem 1: distinct payments).  q > n/2 (Bertrand)
+divides no other number of the board, so it is nobody's maximal
+factor.  Let S be playable without q, and S′ = S minus its prime, if
+any.  S′ is playable and none of its members lists 1, so S′ ∪ {q} is
+playable (q pays with 1; adding a number that is nobody's factor
+removes nothing from anyone's list) and outweighs S, since any prime
+in S is below q.  ∎
+
+**Theorem 9 (optimal sets from the game before).**  Let p be the
+largest prime below n.
+
+* (Chain.)  If opt(n) = n + opt(n−1), the optimal sets of n are
+  exactly the playable sets T ∪ {n} with T an optimal set of n−1.  In
+  particular opt(n) = n + opt(n−1) iff some optimal set of n−1 stays
+  playable with n added.
+* (Prime.)  If n is prime, opt(n) = n + opt(n−1) − p, and
+  T ↦ T − p + n is a bijection from the optimal sets of n−1 onto
+  those of n.
+
+*Proof.*  A playable set of n without n is a playable set of n−1 (n
+is nobody's factor), worth at most opt(n−1).  Chain: an optimal S of
+n is worth more than opt(n−1), so it holds n, and S − n, playable as
+a subset, is worth opt(n−1): an optimal set of n−1.  Conversely a
+playable T ∪ {n} with T optimal for n−1 is worth opt(n).  Prime: let
+T be optimal for n−1; by the lemma it holds p and no other prime.  p
+and n are nobody's maximal factor on either board (2p > n − 1, and
+2p ≠ n), and both pay only with 1, so swapping one for the other
+preserves playability: T − p + n is playable, and opt(n) ≥
+opt(n−1) − p + n.  Conversely an optimal S of n holds n (it is worth
+more than opt(n−1), as n > p), hence no other prime, and S − n + p is
+a playable set of n−1, so opt(n) − n + p ≤ opt(n−1).  Equality holds
+throughout, both maps are well defined between optimal sets, and they
+are inverse to each other.  ∎
+
+So the number of optimal sets is the same at a prime n as at n−1, can
+only fall at a chain n, and can grow only at a composite n meeting
+neither relation.  For a solver this is reuse made exact: when the
+optimal set of n−1 is unique, one peel of T ∪ {n} decides whether n
+meets the chain bound (if not, opt(n) < n + opt(n−1)), and when it
+does, the optimal set of n is known with no search.
+
+**Remark (no exact matroid relaxation of the whole game).**  Game
+425 has two optimal sets (they differ by {110, 132, 168} ↔
+{98, 150, 162}; both replay by the rules).  So no matroid on
+{2, …, n} in which every playable set is independent can have the
+optimum as its heaviest independent set, values as weights: both
+optimal sets would be heaviest independent sets, and distinct
+positive weights allow only one (Theorem 8's layer-cake argument,
+for any matroid).  The certificate that settles the upper half has
+no analogue that is exact for the whole game.
+
+What is measured (`rust/evidence`, "Is the optimal set unique?"):
+every optimal set is enumerated, model-free, in 954 of the games
+2..989 (the other 34, the most expensive, with the upper half fixed).
+The optimal set is unique in every game n ≤ 424; 30 games between 425
+and 779 have two or three, always with the same upper part, U\*, and
+the same number of members, differing by an exchange of equally many
+lower-half numbers of equal sum, each a maximal factor of a member of
+U\*.  At 686, a chain game, the recorded optimal game of 685 cannot
+take 686, while another optimal set of 685 can: a chain step needs
+all the optimal sets of n−1, not one.
+
 ## Evidence
 
 Standing status for (★): zero counterexamples anywhere, and certified
@@ -486,6 +606,10 @@ the adversarial experiments: `rust/evidence/README.md`.
 | Greedy weight-optimal where the jam is hyperedge-free | — | proven (frontier argument) |
 | Playable sets are GF(2)-independent; (♦) implies (★) and the upper-half conjecture | — | proven (span certificate, Thm 7) |
 | (♦): every greedy rejection is a GF(2) dependency of the kept members above it | every game n = 2..100,000 and 902 samples to 2,000,000; 0 violations | certified per game; open in general |
+| U\* is the unique heaviest playable upper set, every playable upper set termwise below it | follows from (★); brute force (`certify.py`) to 62 | proven given (★) (Thm 8), so certified per game to 100,000 |
+| Optimal sets of n from those of n−1 (chain: T ∪ {n}; prime: T − p + n, a bijection); every optimal set holds the largest prime and no other | derivation = direct enumeration on every chain and prime game to 700 | proven (Thm 9, lemma) |
+| The optimal set is unique | all optimal sets enumerated model-free: every n ≤ 424; two at 425 | measured; false in general |
+| Every optimal game's upper part is U\*; a game's optimal sets have equal sizes and differ by equal-sum exchanges below n/2 | every completely enumerated game (`rust/evidence`, section 5) | measured; open |
 | (★) on rejection-bearing components | every threshold of every game n = 2..20,000 certified by bounds; the earlier 5 undecided settled | certified per game; open in general |
 | (♦) and (★) under orders obeying the window law, adversarial or random, or its reverse | 1,981 instances, n = 2000..20,000, 0 failures (uniformly random orders: 16–50% fail; window law for a random prime ranking: 26–57%) | measured |
 | n=2873 component: greedy's 6 exclusions minimal | 12.4M playability checks over the 70-member residual | verified |

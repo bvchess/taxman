@@ -109,6 +109,11 @@ sources).  A worked example, the board 1..=85, is in the
 * **Given the previous game is optimal.**  The game of n is built from the game of n − 1: opt(n) ≤ n + opt(n − 1)
   (deleting the move n from an optimal game leaves a game of n − 1), and a prime n plays the game of n − 1 with
   its first move replaced by n.  A chain of games from n = 1 is therefore proven game by game (section 8).
+  Optimal games need not be unique, though, which matters to any step that reuses the game of n − 1: from
+  n = 425 some games have two or three optimal sets (all with upper part U\*, differing below n/2), and the
+  recorded game of 685 plus 686 is unplayable although opt(686) = 686 + opt(685), through another optimal set of
+  685.  A chain step is decided by the complete list of n − 1's optimal sets, not by one of them
+  ([evidence/README.md §5](evidence/README.md)).
 
 ### The Java solver and this one
 
@@ -355,7 +360,7 @@ tactics of `tactics::Tactics`, in order, with their defaults, and grades exactly
 | tactic | default | status | effect |
 |---|---|---|---|
 | `prime_shortcut` | on | proven (model-free, given an optimal n−1 game: proof at `accelerate::prime_shortcut`) | prime n: replace the n−1 solution's first move with n |
-| `reuse_prev` | on | unproven (a conjecture: the best game of n is the previous game plus n, less the moves the new board made impossible; `accelerate::reuse_prev`) | `FrameSolver.reusePrev`; keeps the previous game's promotions that are still possible and accepts the game they make, with no search, if it scores what the previous game suggests |
+| `reuse_prev` | on | unproven (a conjecture: the best game of n is the previous game plus n, less the moves the new board made impossible; `accelerate::reuse_prev`; with several optimal games of n − 1 it depends on which one was recorded, section 2) | `FrameSolver.reusePrev`; keeps the previous game's promotions that are still possible and accepts the game they make, with no search, if it scores what the previous game suggests |
 | `revise_freedoms` | on | unproven ("max-sum promotion set also has max count") | `UpperBoundEstimator.reviseFreedoms`; can shrink frame 0's freedoms |
 | `preclusions` | off | sound (promotion failure is monotone: more moves or fewer factors never make a frame winnable) | depth-2 preclusion table; prunes candidates (off since 2026-10: with nogoods it no longer pays for its setup) |
 | `match_bound` | on | sound (matchability relaxes winnability) | node bound = the matching relaxation instead of `blameGame`, and the children's candidate lists without the Java's promotability checks (the conflicts find those candidates); a heaviest matching that can be promoted is the node's best completion |

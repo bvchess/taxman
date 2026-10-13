@@ -14,6 +14,7 @@ method in it is tested against brute force.
 | (★): descending greedy is maximum-cardinality on every component and truncation of the upper-half instance, hence U\* is the heaviest playable upper set (the upper-half conjecture) | 3,231 of 3,236 rejection-bearing components, n ≤ 1500 and 40 samples to 4000, plus n = 2873 and 9170; 5 undecided (n = 3103, 3872, 3936, 4000, 9170); scripts not kept | **every game n = 2 .. 100,000** (602,777,907 greedy rejections) and **902 games to 2,000,000** (60,183,674 more): every rejection a GF(2) linear dependency, which certifies (★) for the whole game; the five undecided components settled; no counterexample | certified per game (a bound met), open in general |
 | greedy removal of impossible sources in hives (`removeImpossible`) | agreement with optimal.json to 1000 | at the root (where it shapes the search space) it *is* descending greedy on each upper-half component, so it is certified with (★) for every n ≤ 100,000 | certified per game |
 | the frame model as a whole: `unzip`'s mandatory moves, free factor count, closed hives inert, one-level promotions, greedy removal | brute force (model-free) to n = 62; agreement with the Java's optimal.json, made by the same model, to 1000 | **opt(n) proven equal to the recorded score, model-free, for every n = 2 .. 989**, and for n = 999 .. 1019 (19 of them past optimal.json, the Rust solver's own results) | verified (exact, model-free) |
+| uniqueness: one optimal set per game, and every optimal game's upper part U\* | the unique heaviest upper set by brute force to n = 62; one optimal game recorded per n | **U\* is the unique heaviest playable upper set wherever (★) holds** (Theorem 8), so to 100,000; every optimal set enumerated, model-free, in 954 of the games 2..989 (the other 34 with the upper half fixed): **the optimal set is unique for every n ≤ 424, not at 425**; 30 games have two or three; every optimal set found has upper part U\* | proven (upper half, given (★)); measured (whole game) |
 
 What the evidence is, in one paragraph each:
 
@@ -28,6 +29,10 @@ What the evidence is, in one paragraph each:
   branching on minimal unplayable sets found by peel, with forced picks from the dual and learned nogoods; with
   the proven relations opt(n) ≤ n + opt(n−1) and the prime formula, it proves the recorded optimum for every
   n ≤ 989, sixteen times the old brute-force reach, and for 999–1019.
+* **Every optimal set.**  The same search, run in an enumeration mode one below the optimum, lists every optimal
+  set of a game for about the cost of proving the optimum.  The optimal set is unique for every n ≤ 424; from 425
+  some games have two or three, always with the same upper part, U\*, and differing by an exchange of lower-half
+  numbers of equal sum.  The upper half's uniqueness is a theorem wherever (★) holds; the whole game's is not.
 * **An adversarial search** over Taxman-shaped synthetic instances locates what protects greedy: the window
   law, taken with respect to the same ranking of the primes that decides which products fall in the window.
 
@@ -203,7 +208,134 @@ magnitudes":
 * So the open problem can be sharpened to a statement without magnitudes beyond the window: **(♦) for
   multiplicatively generated instances under any order obeying their window law.**
 
-## 5. Reproducing
+## 5. Is the optimal set unique?
+
+Many move orders play the same set of picks; the question is whether different *sets* can be optimal.  If the
+optimal set were unique, or unique up to a well-described exchange, a solver could lean on it: to reuse the game
+of n − 1 when solving n, to justify shortcuts, to break symmetry.
+
+### What is proven
+
+THEORY.md, ["Uniqueness of the optimal set"](../../heuristics/THEORY.md#uniqueness-of-the-optimal-set):
+
+* **Theorem 8: the heaviest playable upper set is unique wherever (★) holds**, so in every game n ≤ 100,000
+  (section 2).  More precisely, every playable upper set S is dominated termwise by U\*: the i-th largest member
+  of S is at most the i-th largest of U\*, so S weighs strictly less unless S = U\*.  (The playable sets are not a
+  matroid, but under (♦) they lie inside the GF(2) matroid of which U\* is the greedy basis, and a matroid with
+  distinct weights has one heaviest basis.)  This is about the upper-half instance alone.  It does *not* say that
+  every optimal game's upper part is U\*: a game with a lighter upper part could in principle win the difference
+  back below n/2.
+* **The prime of every optimal set**: every optimal set of n holds the largest prime q ≤ n and no other prime.
+* **Theorem 9: optimal sets from the game before.**  If opt(n) = n + opt(n − 1) (a *chain* game), the optimal
+  sets of n are exactly the playable T ∪ {n}, T optimal for n − 1.  If n is prime, T ↦ T − p + n (p the largest
+  prime below n) is a bijection from the optimal sets of n − 1 onto those of n.  So a game has as many optimal
+  sets as its predecessor at a prime, no more at a chain game, and only a composite game meeting neither relation
+  can have more.
+* **No matroid relaxation is exact for the whole game**: game 425 has two optimal sets (below), and a matroid
+  with distinct positive weights has one heaviest independent set.
+
+### Method
+
+`src/bin/optsets.rs` lists every optimal set of a game, model-free, with the branch and bound of section 3 in an
+enumeration mode (`Prover::enumerate`): every pruning rule of the search cuts only sets worth at most its target,
+so after a playable set P is found the search goes on, partitioning the rest of P's node by the first number on
+which a set disagrees with P.  With target V(n) − 1, the recorded optimum minus one, it lists every playable set
+worth at least V(n), so every optimal set (and would stop on one worth more, refuting V(n)).  Games meeting the
+chain or prime relation take their sets from the predecessor's by Theorem 9 (`derive_optimal_sets`).  Optionally
+(`--upper fixed` / `other`) the question splits in two: the optimal sets whose upper part is U\* (a search with
+the upper half fixed, which is cheap), and those whose upper part is not (a search whose root is split on the
+largest upper number where the set and U\* disagree, which costs as much as a proof of optimality).
+
+Checks: the enumeration equals brute force on every n ≤ 19 at the optimum and below it (where sets containing a
+found one also qualify); the derivations equal direct enumeration on every chain and prime game to 700 (and to 260
+in the test suite); `tools/crosscheck_optsets.py` compares the lists with `heuristics/evaluation/certify.py`'s
+theory-free brute force over raw pot states, which agrees on every n ≤ 57; both optimal sets of 425 replay by the
+rules (`heuristics/core.py`'s ordering and `check_sequence`); every optimal set found holds the largest prime and
+no other.
+
+Enumerating at V(n) − 1 costs about what the proof at V(n) costs: over 68 games whose proof took at least 10,000
+nodes, the ratio runs from 0.94 to 1.20, 4% more in total.  So a model-free proof of opt(n) can return the complete
+list of optimal sets almost for free.
+
+### Results
+
+`data/optsets_2_989.jsonl` (every game 2..989; `tools/summarize.py optsets`):
+
+| n | games | enumerated completely | 1 optimal set | 2 sets | 3 sets | upper half fixed only |
+|---|---|---|---|---|---|---|
+| 2..424 | 423 | 423 | 423 | | | |
+| 425..500 | 76 | 76 | 64 | 12 | | |
+| 501..600 | 100 | 100 | 99 | | 1 | |
+| 601..700 | 100 | 100 | 92 | 6 | 2 | |
+| 701..800 | 100 | 97 | 88 | 9 | | 3 |
+| 801..900 | 100 | 96 | 96 | | | 4 |
+| 901..989 | 89 | 62 | 62 | | | 27 |
+| **total** | **988** | **954** | **924** | **27** | **3** | **34** |
+
+Searches with a budget of 4 million nodes (each under about seven minutes) covered every game whose optimality
+proof had taken fewer than 3.6 million; the chain and prime games were derived.  The 34 others are the most
+expensive proofs of section 3 (798–804, 945–954, 969–983, 987–989) and the chain and prime games that follow
+them; their lines record the budget each was given (4 million nodes for 798–800 and 803–804, a short 300,000
+for the others, which were not attempted in full).  For them `data/optsets_fixed_798_1019.jsonl` lists the optimal sets whose upper part is U\* (the upper
+half fixed: 10 seconds to 2 minutes each), and so it does for 990–1019.  Each of those 34 games, and 990, 991
+and 999–1019, has exactly one optimal set with upper part U\* (57 games); for 992–998, whose optima the frame
+model's search also reaches late, the fixed-upper search spent its 2.5 or 4 million nodes without reaching even
+the recorded set.
+
+The games with more than one optimal set fall in six clusters, each started by an exchange new at its first game
+and carried by the chain and prime relations (and by some games meeting neither):
+
+| games | sets | exchange (canonical set's numbers ↔ the other set's) | sum | size |
+|---|---|---|---|---|
+| 425–428 | 2 | {110, 132, 168} ↔ {98, 150, 162} | 410 | 3 ↔ 3 |
+| 432–439 | 2 | {132, 147, 180, 208} ↔ {156, 160, 162, 189} | 667 | 4 ↔ 4 |
+| 539 | 3 | {128, 168, 240} ↔ {120, 192, 224}; {120, 154, 189, 220, 234} ↔ {147, 180, 182, 198, 210}; the two non-canonical sets are 7 ↔ 7 apart | 536, 917, 1333 | 3, 5, 7 |
+| 684–687 | 3, 3, 2, 2 | {44, 198, 238, 325} ↔ {68, 196, 266, 275}; {44, 238, 252, 260, 294} ↔ {68, 234, 250, 266, 270}; {198, 234, 250, 270, 325} ↔ {196, 252, 260, 275, 294} | 805, 1088, 1277 | 4, 5, 5 |
+| 696–699 | 2 | {198, 234, 250, 270, 325} ↔ {196, 252, 260, 275, 294} (one of 684's) | 1277 | 5 ↔ 5 |
+| 770–773, 775–779 | 2 | {228, 231, 252, 260, 280, 320, 325} ↔ {189, 250, 270, 273, 275, 315, 324} | 1896 | 7 ↔ 7 |
+
+(At 684–685 the third exchange is between the two non-canonical sets; 774 has one optimal set, and 775 brings
+770's exchange back.)  No completely enumerated game from 780 to 989 has more than one optimal set.
+
+What the data shows (observed, not proven):
+
+* **The optimal set is unique for every n ≤ 424.**  Game 425 is the first with two.  Of the 954 games enumerated
+  completely, 30 have several optimal sets (at most three), all between 425 and 779.
+* **Every optimal set of every completely enumerated game has upper part U\***, the strong form of
+  `heuristics/evaluation/verify.py`'s measurement: no optimal game ever trades upper weight for lower weight.
+* **All optimal sets of a game have the same number of members, and differ by an exchange of equally many
+  lower-half numbers of equal sum** (3 ↔ 3 up to 7 ↔ 7), every exchanged number in (n/5, 0.49 n) but 44 and 68
+  at 684–687.  Every exchanged number is a maximal factor of a member of U\*, so an exchange trades which of those
+  factors are picked and which are free to pay for their upper multiples.  At 425, with peel's payments: in one
+  set 110, 132 and 168 are picked and 98, 150 and 162 pay for 196, 300 and 324; in the other, 98, 150 and 162 are
+  picked and 110, 132 and 168 pay for 330, 396 and 336.
+* **The canonical set (the largest in decreasing lexicographic order) survives every chain and prime step**
+  observed from a game with several sets: canonical(n) = canonical(n − 1) + n (chain), or − p + n (prime; this
+  part is a theorem, the lexicographic order being preserved by the bijection): 13 of 13 such steps.  optimal.json
+  records the canonical set in 23 of the 30 games with several sets; not at 684 and 685 (it records the third of
+  three) or at 775–779 (the second of two).
+* **The recorded game of n − 1 is not always extendable.**  At 686, a chain game, the recorded optimal game of 685
+  plus 686 is unplayable; opt(686) = 686 + opt(685) holds through another optimal set of 685 (the canonical one).
+
+### What it buys a solver
+
+* **The upper half.**  Fixing the upper half to U\*, as the frame model does, gives up nothing that ties: U\* is
+  the unique heaviest playable upper set (proven given (★), so to 100,000), and every optimal game observed has
+  upper part U\*.  The second statement is the one still open in general.
+* **Reuse of n − 1 (Theorem 9).**  The prime step is exact: the optimal sets of a prime n are those of n − 1 with
+  p swapped for n.  The chain step is decidable from the complete list of n − 1's optimal sets: n meets the bound
+  n + opt(n − 1) iff one of them stays playable with n added, and then the optimal sets of n are known without
+  search.  With only one recorded set the test is not decisive (685 → 686).  The lists are short (1–3 sets so
+  far), and the part with upper part U\* is cheap to get with the upper half fixed: seconds to two minutes per
+  game to 1019, except 990–998 (six and seven minutes for 990 and 991, out of budget for 992–998).  That part is
+  the whole list wherever every optimal set has upper part U\*, which is observed but not proven.
+* **Symmetry breaking.**  A proof of optimality (target V, a set worth more than V) already cuts every tie, so a
+  canonical-set rule prunes nothing there.  It matters where ties are accepted: a search for a game reaching a
+  cap, or a step reusing the previous game, such as the solver's `reuse_prev`.  There, carrying the canonical set
+  (rather than whichever optimal set a search happened to return) is consistent with every chain and prime step
+  observed, and well defined.
+
+## 6. Reproducing
 
 Rust (std only; `cargo` from this directory), Python 3 standard library for the tools.
 
@@ -217,7 +349,12 @@ cargo build --release
 tar -xzf data/checkpoints/exact_open_searches.tar.gz -C work   # to continue the open searches into data/
 ./target/release/exact --from 990 --to 1231 --threads 6 --seconds 540 --out data/exact_2_1231.jsonl
 bash tools/adversary_campaign.sh                                                          # data/adversary/
-tools/summarize.py span|star|exact|adversary FILE...
+./target/release/optsets --from 2 --to 989 --searched-only 1 --threads 3 --seconds 540 --budget 4000000 \
+    --out OUT.jsonl                                     # the games that need a search; rerun until done
+./target/release/optsets --from 2 --to 989 --out OUT.jsonl     # then the chain and prime games, derived
+./target/release/optsets --list 798,799,800 --upper fixed --threads 1 --seconds 540 --out FIXED.jsonl
+tools/summarize.py span|star|exact|adversary|optsets FILE...
+tools/crosscheck_optsets.py data/optsets_2_989.jsonl --max 57 --budget 120     # theory-free, about 8 minutes
 tools/crosscheck_greedy.py data/span_2_100000.jsonl.gz --max 1000
 cargo run --release --example inspect 9170 4611     # a jam, its factorizations and bounds
 cargo run --release --example exactdiag 600 112623  # the model-free search's counters
@@ -227,7 +364,7 @@ Every campaign appends one JSON line per game and skips games already in its out
 by running it again; `exact` also checkpoints searches in progress (`work/checkpoints`).  The committed data is
 gzipped where large (`gunzip -k` to resume into it).
 
-## 6. What remains open
+## 7. What remains open
 
 * (★) and (♦) are certified game by game, not proven.  The sharpest form found: **prove (♦)**, that every
   rejection of descending greedy on an upper-half instance is a GF(2) dependency of what it kept above — a
@@ -240,3 +377,12 @@ gzipped where large (`gunzip -k` to resume into it).
   Lagrangian was tried and gains only 4%) is the next lever.
 * The frame model's individual assumptions other than the greedy removal are tested only end to end (through
   the optimum), not one by one.
+* Whether every optimal game's upper part is U\*.  Theorem 8 settles the upper half alone; for the whole game, a
+  frontier argument would start from an optimal S whose upper part S_U is not U\*: termwise domination puts the
+  largest disagreement d in U\* ∖ S_U, and S + d is unplayable, so the question is whether some repair costs less
+  than d.  Lower picks are all below d, and every exchange observed between optimal sets turns on lower numbers
+  that are maximal factors of members of U\*, which is where to look.  Also observed but unexplained: a game's
+  optimal sets all have the same size.  The cheapest next evidence is the other half for the 34 games enumerated
+  only with the upper half fixed: their enumeration costs about what their proofs did (5 to 60 minutes each,
+  some 6 CPU-hours in all), so it wants `exact`'s pausing and Lagrangian bound with the target lowered by one
+  and the enumeration mode on, which would let `exact` return every optimal set with each proof.
