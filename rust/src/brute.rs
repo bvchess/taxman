@@ -230,6 +230,7 @@ impl Hasher for MixHasher {
 mod tests {
     use super::*;
     use crate::game::{replay, Optimal};
+    use crate::test_support::Rng;
     use std::collections::{BTreeMap, BTreeSet};
 
     #[test]
@@ -264,13 +265,8 @@ mod tests {
     /// above 64 are in bits of the upper half) are cheap, and checked against a naive solver under both rules.
     #[test]
     fn sparse_boards_up_to_the_top_of_the_u128_match_a_naive_solver() {
-        let mut state = 0x1234_5678_9ABC_DEF1u64;
-        let mut next = move |below: u64| {
-            state ^= state << 13;
-            state ^= state >> 7;
-            state ^= state << 17;
-            state % below
-        };
+        let mut rng = Rng(0x1234_5678_9ABC_DEF1);
+        let mut next = |below: u64| rng.below(below);
         for round in 0..60 {
             let n = if round % 3 == 0 { MAX_N } else { 70 + next(58) as u32 };
             let mut present: BTreeSet<u32> = BTreeSet::new();

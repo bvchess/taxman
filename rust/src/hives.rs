@@ -34,7 +34,8 @@
 //! After the hives are formed, [`Apiary::new`] simplifies each one until nothing changes (`finish_setup`).
 //! Three things are decided hive by hive.  All three are part of the **frame model's assumptions**: they are
 //! validated (the Java's table of optimal games is reproduced to n = 1000, and small boards agree with
-//! exhaustive search) but not proven; README §1 and DESIGN.md ("Tactics") list them.
+//! exhaustive search) but not proven; README §1 and DESIGN.md (§2, "What optimal means", and §5, "Tactics") list
+//! them.
 //!
 //! * **unzip** finds the hive's *mandatory* moves, in two ways: a source with a single usable factor must take
 //!   it, and a factor wanted by a single source is given to that source.  A pair is settled only when the factor
@@ -931,6 +932,7 @@ fn column_name(i: usize) -> String {
 mod tests {
     use super::*;
     use crate::game::replay;
+    use crate::test_support::Rng;
 
     /// The Java `countFreedoms`, verbatim: a scan per step, as the doc of `Apiary::count_freedoms` describes the
     /// peel.  The reference for `Apiary::count_freedoms`.
@@ -958,44 +960,32 @@ mod tests {
         None
     }
 
-    /// Tiny xorshift64 generator, so the tests need no crates and are reproducible.
-    struct XorShift(u64);
+    /// A random percentage in `lo..=hi`.
+    fn percent(rng: &mut Rng, lo: u64, hi: u64) -> u64 {
+        lo + rng.below(hi - lo + 1)
+    }
 
-    impl XorShift {
-        fn next(&mut self) -> u64 {
-            self.0 ^= self.0 << 13;
-            self.0 ^= self.0 >> 7;
-            self.0 ^= self.0 << 17;
-            self.0
-        }
-
-        /// A random percentage in `lo..=hi`.
-        fn percent(&mut self, lo: u64, hi: u64) -> u64 {
-            lo + self.next() % (hi - lo + 1)
-        }
-
-        /// A random subset of `set` in which each member is kept with probability `percent`%.
-        fn subset<const W: usize>(&mut self, set: Bits<W>, percent: u64) -> Bits<W> {
-            set.iter().filter(|_| self.next() % 100 < percent).collect()
-        }
+    /// A random subset of `set` in which each member is kept with probability `percent`%.
+    fn subset<const W: usize>(rng: &mut Rng, set: Bits<W>, percent: u64) -> Bits<W> {
+        set.iter().filter(|_| rng.chance(percent)).collect()
     }
 
     /// Hives of ascending size, plus a union of several hives' sources against all factors, as the places
     /// where the matching is asked about.
-    fn check_count_freedoms<const W: usize>(a: &Apiary<W>, rng: &mut XorShift) {
+    fn check_count_freedoms<const W: usize>(a: &Apiary<W>, rng: &mut Rng) {
         let all_factors = a.hives.iter().fold(Bits::<W>::EMPTY, |acc, h| acc | h.factors);
         let all_sources = a.hives.iter().fold(Bits::<W>::EMPTY, |acc, h| acc | h.sources | h.impossible);
         for hive in &a.hives {
             for _ in 0..40 {
-                let percent = rng.percent(20, 100);
-                let moves = rng.subset(hive.sources | hive.impossible, percent);
-                let factors = match rng.next() % 3 {
+                let keep = percent(rng, 20, 100);
+                let moves = subset(rng, hive.sources | hive.impossible, keep);
+                let factors = match rng.below(3) {
                     0 => hive.factors,
                     1 => {
-                        let percent = rng.percent(70, 100);
-                        rng.subset(hive.factors, percent)
+                        let keep = percent(rng, 70, 100);
+                        subset(rng, hive.factors, keep)
                     }
-                    _ => rng.subset(all_factors, 30),
+                    _ => subset(rng, all_factors, 30),
                 };
                 assert_eq!(
                     a.count_freedoms(moves, factors),
@@ -1005,17 +995,17 @@ mod tests {
             }
         }
         for _ in 0..40 {
-            let percent = rng.percent(5, 25);
-            let moves = rng.subset(all_sources, percent);
-            let percent = rng.percent(50, 100);
-            let factors = rng.subset(all_factors, percent);
+            let keep = percent(rng, 5, 25);
+            let moves = subset(rng, all_sources, keep);
+            let keep = percent(rng, 50, 100);
+            let factors = subset(rng, all_factors, keep);
             assert_eq!(a.count_freedoms(moves, factors), naive_count_freedoms(a, moves, factors));
         }
     }
 
     #[test]
     fn count_freedoms_matches_the_plain_scan() {
-        let mut rng = XorShift(0x9E37_79B9_7F4A_7C15);
+        let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
         for n in [10u32, 30, 85, 120, 200, 301] {
             let t = Tables::new(n);
             let plain = Apiary::<5>::new(&t, Bits::EMPTY);
@@ -1023,7 +1013,7 @@ mod tests {
             // With promotions the sources, sinks and tables change shape.
             for _ in 0..4 {
                 let promotable = plain.promotion_candidates();
-                let promoted = rng.subset(promotable, 50);
+                let promoted = subset(&mut rng, promotable, 50);
                 check_count_freedoms(&Apiary::<5>::new(&t, promoted), &mut rng);
             }
         }

@@ -582,39 +582,27 @@ word_op!(Sub, sub, SubAssign, sub_assign, |a: u64, b: u64| a & !b);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_support::Rng;
     use std::collections::{BTreeSet, HashSet};
 
-    /// Tiny xorshift64 generator, so the tests need no crates and are reproducible.
-    struct XorShift(u64);
-
-    impl XorShift {
-        fn next(&mut self) -> u64 {
-            let mut x = self.0;
-            x ^= x << 13;
-            x ^= x >> 7;
-            x ^= x << 17;
-            self.0 = x;
-            x
-        }
-
-        fn below(&mut self, n: u32) -> u32 {
-            (self.next() % u64::from(n)) as u32
-        }
+    /// A random number in `0..n`.
+    fn below(rng: &mut Rng, n: u32) -> u32 {
+        rng.below(u64::from(n)) as u32
     }
 
     /// A random set with a randomly chosen density, as both a model and a `Bits`.
-    fn random_set<const W: usize>(rng: &mut XorShift) -> (BTreeSet<u32>, Bits<W>) {
+    fn random_set<const W: usize>(rng: &mut Rng) -> (BTreeSet<u32>, Bits<W>) {
         let cap = Bits::<W>::CAPACITY;
-        let target = match rng.below(4) {
-            0 => rng.below(4),
-            1 => rng.below(cap / 8 + 1),
-            2 => rng.below(cap / 2 + 1),
-            _ => rng.below(cap + 1),
+        let target = match below(rng, 4) {
+            0 => below(rng, 4),
+            1 => below(rng, cap / 8 + 1),
+            2 => below(rng, cap / 2 + 1),
+            _ => below(rng, cap + 1),
         };
         let mut model = BTreeSet::new();
         let mut bits = Bits::<W>::EMPTY;
         for _ in 0..target {
-            let x = rng.below(cap);
+            let x = below(rng, cap);
             model.insert(x);
             bits.insert(x);
         }
@@ -686,7 +674,7 @@ mod tests {
     }
 
     fn random_agreement_rounds<const W: usize>(seed: u64, rounds: usize) {
-        let mut rng = XorShift(seed);
+        let mut rng = Rng(seed);
         for _ in 0..rounds {
             let (am, a) = random_set::<W>(&mut rng);
             let (bm, b) = random_set::<W>(&mut rng);
@@ -923,7 +911,7 @@ mod tests {
 
     #[test]
     fn pop_min_and_max_drain_in_order() {
-        let mut rng = XorShift(42);
+        let mut rng = Rng(42);
         let (model, bits) = random_set::<3>(&mut rng);
         let mut asc = bits;
         let mut desc = bits;
