@@ -37,7 +37,7 @@ commands:
                                SIGINT or SIGTERM stops the search the same way (exit status 130 or 143);
                                a second one kills the process.  One process at a time uses a checkpoint DIR.
       --mem-cap UNITS          search units kept in memory before spilling to disk
-      --force-search           search even where the previous game gives the answer
+      --force-search           search even where the previous game or an earlier search gives the answer
       --allow-tainted-prev     with no unproven tactic on, still build on a previous game whose proof rests on
                                something unproven (optimal.json's games do); the results that rest on it say so
       --optimal FILE           optimal.json to compare with and to take previous games from (none: no file);

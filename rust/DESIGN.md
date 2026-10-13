@@ -153,9 +153,10 @@ up:
 On the default path of a solve are all the layers but the studies and most of the Java-parity module `bounds` (of
 which the default search uses only the greedy incumbent, `max_additional`, the narrowing of the candidate lists and
 the peel scratch space its `Bounds` owns).  `examples/` holds the ladder (standalone searches of hard games with time
-limits, thread scaling, diagnostics), the probe `perf` (the hot paths from fixtures, in cycles and instructions) and
-the sacrifice study; `tests/` the integration tests (section 9); `tools/` the results referee in Python, the PGO build,
-the Java golden export and the cloud scripts.
+limits, thread scaling, diagnostics), the probe `perf` (the hot paths from fixtures, in cycles and instructions),
+the sacrifice study and `repeats` (the games whose search repeats an earlier game's, from the setups alone, and what
+a results file spent on them); `tests/` the integration tests (section 9); `tools/` the results referee in Python,
+the PGO build, the Java golden export and the cloud scripts.
 
 **Width dispatch.**  Everything that holds sets of game numbers is generic over `const W: usize`, the number of 64-bit
 words, and the macro `with_width!` (in `bits`, used by the solver, the examples and the tests) picks the narrowest
@@ -361,6 +362,7 @@ tactics of `tactics::Tactics`, in order, with their defaults, and grades exactly
 |---|---|---|---|
 | `prime_shortcut` | on | proven (model-free, given an optimal n−1 game: proof at `accelerate::prime_shortcut`) | prime n: replace the n−1 solution's first move with n |
 | `reuse_prev` | on | unproven (a conjecture: the best game of n is the previous game plus n, less the moves the new board made impossible; `accelerate::reuse_prev`; with several optimal games of n − 1 it depends on which one was recorded, section 2) | `FrameSolver.reusePrev`; keeps the previous game's promotions that are still possible and accepts the game they make, with no search, if it scores what the previous game suggests |
+| `same_search` | on | proven (given the proof of the earlier game: section 8, "Same search") | a game whose search problem an earlier game of the chain posed and settled is that game's promotions on this board, with no search (method `repeat`, proof `same_search`); new in the Rust |
 | `revise_freedoms` | on | unproven ("max-sum promotion set also has max count") | `UpperBoundEstimator.reviseFreedoms`; can shrink frame 0's freedoms |
 | `preclusions` | off | sound (promotion failure is monotone: more moves or fewer factors never make a frame winnable) | depth-2 preclusion table; prunes candidates (off since 2026-10: with nogoods it no longer pays for its setup) |
 | `match_bound` | on | sound (matchability relaxes winnability) | node bound = the matching relaxation instead of `blameGame`, and the children's candidate lists without the Java's promotability checks (the conflicts find those candidates); a heaviest matching that can be promoted is the node's best completion |
@@ -446,12 +448,12 @@ comment of `src/solver.rs`.  Each step, with the Java class it reimplements:
 | 2 | prime shortcut: a prime n plays the game of n − 1 with its first move replaced by n (method `prime`) | `FrameSolver.solutionForPrime` |
 | 3 | hives → frames; with no candidates the game with no promotions is the only one (method `trivial`) | `bombus.Apiary`, `Hive`, `frame.FrameBuilder`, `WorkingFrame` |
 | 4 | `reuse_prev`: accept a game derived from the previous one, with no search (method `reuse`) | `FrameSolver.reusePrev` |
-| 5 | the search (method `search`): the frame set, bounds and greedy incumbent (`search::prepare`); the starting incumbent, cap and seed; the engine; promotions → moves | `search.SearchManager.create`, `Frame`, `FrameSet`, `UpperBoundEstimator`, `LowerBoundEstimator.greedy`, `BranchExplorer`; `Apiary(board, promotions).getSolution()` |
+| 5 | the search (method `search`): the frame set, bounds and greedy incumbent (`search::prepare`); a repeat of an earlier game's search (method `repeat`, tactic `same_search`, section 8); the starting incumbent, cap and seed; the engine; promotions → moves | `search.SearchManager.create`, `Frame`, `FrameSet`, `UpperBoundEstimator`, `LowerBoundEstimator.greedy`, `BranchExplorer`; `Apiary(board, promotions).getSolution()` |
 | 6 | `conclude`: replay and check the game, compare with optimal.json, assign its proof and taint | `game.Solution.verify` |
 | 7 | record the result (a range) | |
 
-Steps 2 and 4 need the previous game and are skipped by `force_search` and when the game has a checkpoint (a search that
-was interrupted is resumed, never replaced by a derivation).
+Steps 2 and 4 need the previous game, and the repeat of step 5 an earlier one; all three are skipped by `force_search`
+and when the game has a checkpoint (a search that was interrupted is resumed, never replaced by a derivation).
 
 The previous game is checked before anything uses it: it must replay legally to its recorded score, be over, and open
 with the largest prime.  A run with no unproven tactic on refuses one whose proof rests on something unproven (its
@@ -482,9 +484,11 @@ Every completed game records *how its optimality is established* (its proof) and
 | `cap` | the search reached `n + score(n − 1)`, which no game of n can exceed | yes |
 | `prime_formula` | a prime n plays the game of n − 1 with its first move replaced by n (proved at `accelerate::prime_shortcut`) | yes |
 | `reuse_prev` | the tactic accepted a derived game: a conjecture | yes |
+| `same_search` | an earlier game m posed the same search problem and settled it; the game is m's promotions ("Same search", below) | no: on the game m |
 
 The *taint* of a game is the set of unproven things its proof rests on: the unproven tactics it used itself, plus,
-if its proof rests on the game of n − 1, that game's taint, and so on down the chain.  A proof by the cap rests on
+if its proof rests on the game of n − 1, that game's taint, and so on down the chain (a repeat rests on the game it
+repeats instead, and takes its taint).  A proof by the cap rests on
 nothing the game used itself (since schema 3): its game replays to `n + score(n − 1)`, the ceiling, whatever found it,
 so the tactics that shaped the search play no part.  A game taken from optimal.json has the taint `optimal.json`,
 whichever game it is: the file records nothing about where a game came from.  Its games 1 to 1000 are the Java's, made
@@ -507,10 +511,11 @@ that is what the proof kinds and the taint track, and why a chain from n = 1 mat
 
 **Result lines** are one JSON object per line (README, "A results line"): the game, its proof and taint, the game of
 n − 1 it was built from (score, source, digest of its moves, proof, taint), node counts and search counters, seconds per
-phase, the tactics, limits, options and the commit the binary was built from.  A line is never rewritten, and a run
+phase, the tactics, limits, options and the commit the binary was built from; from schema 4 on, the digest of the
+search problem a setup poses and a repeat's record of the game it repeats.  A line is never rewritten, and a run
 locks the results file it appends to.  Lines written before provenance existed (schema 1) have their proof and taint
 derived from the fields they have; lines of schema 1 and 2 count a game's own tactics in a proof by the cap, by the
-rule they were written with.
+rule they were written with; lines of schema 3 and older record no digest, and are set up again when one is needed.
 
 **What identifies a checkpoint.**  The header the search stores: a format version, the set width, n, digests of the
 root candidates and of the frames (every frame's moves, factors and freedoms, as built), frame 0's revised freedoms,
@@ -523,6 +528,85 @@ against frame 0 as built: with `revise_freedoms` off they must be the built ones
 Its `setup.revise` is `FromCheckpoint` (a taint of `revise_freedoms`) only if they are fewer, `ResumedAsBuilt` if the
 tactic is on and they are the built ones, and `Off` for a resumed strict game, which rests on nothing unproven, as
 one that ran in one piece.
+
+### Same search
+
+Consecutive boards often pose exactly the same search problem with another cap: of the 1076 games of the strict chain
+1..1300 that need a search, 545 pose the problem of the game before them (or the one before that, past a prime), and
+their searches were 953 of the chain's 3359 s, 851 s of the 2866 s of 1232–1300 (EXPERIMENTS, "Same search").  The
+tactic `same_search` (proven, on by default and in a strict run) concludes such a game from the earlier one with no
+search.
+
+*The problem.*  After setup (`search::prepare`) the searcher is given the model (the factor graph among the frames'
+numbers and each number's home frame), the root frame set (every frame's moves, factors and freedoms, frame 0's
+revised by `revise_freedoms` if it was on), the candidates and `max_total`, besides the tactics, the cap and the seed;
+the greedy set, the preclusion table and the matching graph are functions of those.  Call Π = (model, root,
+candidates, `max_total`) the game's *search problem*, and P\*(Π) the largest sum of a *feasible* set of Π: a set of
+candidates that can be promoted from the root, keeping every frame winnable and its freedoms at least 0, with at
+most `max_total` members.  Which sets are feasible depends on the frames and on the graph's edges among their
+numbers, and on nothing else: promotion and reduction see only the numbers in the frames, and an edge is the
+maximal-factor relation (y = x/p, p prime), a property of the two numbers that does not depend on n.
+`search::Problem` writes Π out canonically, as numbers (so independently of the set width): the frames bottom first,
+each its freedoms, moves and factors; the candidates; `max_total`; and for every number of the frames its home frame
+and the lists of maximal factors and maximal composites the model's graph keeps for it, which name some numbers
+that reduction removed and the search never sees, erring on the side of telling problems apart.  Equal forms are
+equal problems, with the same feasible sets and the same P\*.  The tactics, the cap and the seed are not in it: a
+sound tactic, the cap and the seed change how the search runs, not what it finds (section 4); `legacy_bound` and
+`revise_freedoms` are accounted for in the taint, the latter through frame 0's freedoms, which are in Π.  A results
+line records the form's 64-bit digest (`setup.digest`); nothing rests on the digest alone (below).
+
+*Which proofs settle P\*.*  A game m whose proof is
+* `exhausted`: the search explored the whole tree of Π_m, so the sum of its promotions is P\*(Π_m), given that the
+  pruning is exact, which every exhausted proof rests on;
+* `cap`: its promotions S are feasible and sum to cap(m) = m + score(m − 1) − in_the_bag(m), so P\*(Π_m) ≥ cap(m).
+  And every feasible set T of Π_m is a legal game of m scoring in_the_bag(m) + sum(T): this is the direction of the
+  frame model that every search relies on each time it offers an incumbent, and the referee replays every game built
+  from one (none has ever failed).  So in_the_bag(m) + P\*(Π_m) ≤ opt(m) ≤ m + opt(m − 1) = m + score(m − 1), given
+  that the game of m − 1 is optimal (which the proof by the cap rests on, and m's taint records), and P\*(Π_m) =
+  cap(m), the sum of m's promotions, whatever tactics shaped the search;
+* `same_search`: by induction, m repeats a game k with Π_k = Π_m whose proof settles P\*(Π_k), and m's promotions are
+  k's.
+
+A trivial game has no candidates and sets no search up, a prime one is the prime formula's and sets none up either,
+and a `reuse_prev` game is a conjecture about the best game, not a statement about a problem: none of them is ever
+repeated, and the verifiers refuse a repeat that names one.  Neither is a game whose frame 0's freedoms came from a
+checkpoint (`setup.revise` `FromCheckpoint`): it settles its problem, but its line does not say what the problem was,
+so no one can set it up again to compare.  An unfinished search settles nothing.
+
+*The repeat.*  If game n poses Π_n = Π_m and m's proof settles it, then P\*(Π_n) = P\*(Π_m) = P, the sum of m's
+promotions S, and S is feasible in Π_n.  The game of n is S played on the board of n (`solution_for_promotions`), and
+it goes through `conclude` like any game: it must replay legally, be over and open with the largest prime, score
+in_the_bag(n) + P, stay within `score(n − 1) ≤ score(n) ≤ n + score(n − 1)`, and match optimal.json where that has n.
+It is optimal on the premise of an exhausted proof of n, the frame model's (the best game of n scores in_the_bag(n) +
+P\*(Π_n)), with P\*(Π_n) established by m's proof instead of a search.  Its proof `same_search` rests on m, not on
+the game of n − 1, and its taint is m's taint plus what n's own setup rests on: `revise_freedoms` if it revised frame
+0, since Π_n then has the revised freedoms (n searched nothing, so no search tactic of its own counts).
+
+*Finding m.*  Before n's search (and only for a search that is not resumed from a checkpoint, without
+`force_search`, and when revising frame 0 was not stopped), the solver looks at the completed games of the results
+file and of the run among the `SAME_SEARCH_WINDOW` = 8 board sizes before n, latest first, for one that set a search
+up, whose proof settles it, and that the run builds on (a strict run only on a game with an empty taint, unless
+`--allow-tainted-prev`).  A game whose recorded digest differs is passed over; for one whose digest agrees, or is not
+recorded (schema 3 and older, such as the committed `strict.jsonl`), its problem is set up again from its board size
+and `setup.revise` (milliseconds; `board::search_problem`) and compared with n's whole.  The first equal one is m.
+Setting m up again with this build stands for the problem m's own build searched, which a digest recorded by that
+build ties to it (a problem with the recorded digest is that problem, but for a 64-bit collision); a line of schema 3
+or older records only the problem's size, its frames, candidates and `max_total`, and the problem set up again must
+have it.  Beyond that it rests on the frame builder and the model having posed the same problem then: no commit
+since the committed `strict.jsonl` (bd9bb5d) has changed `hives`, `frames`, `model` or `numtheory`.
+Every repeat of 1..1300 repeats the last game before it that set a search up (n − 1, or n − 2 past a prime), so the
+window loses nothing there, keeps the setups a range starts with to eight, and makes m a function of the window's
+games, whichever lines record digests.
+
+*The verifiers.*  `taxman verify-results` checks a repeat's line against m's: m is a completed game of the same file
+on an earlier line, its proof settles its search, the line's record of m (proof, taint, digest) is m's, the
+promotions are m's and sum to the recorded promotion sum; then it sets both problems up again from the two board
+sizes and `setup.revise`, checks that each is as large as its line records, that their digest is the recorded one
+and that they are equal, and that both games score their board's in_the_bag plus that sum; and it derives the proof
+and the taint (n's own plus m's) as for any line.  `tools/check_results.py` shares no code with the solver and
+cannot build the model: it checks the same structure from the lines (m earlier, completed, settling its search and
+not resumed with revised freedoms; the recorded digests and sizes equal; the promotions equal; score − in_the_bag
+equal; the taint inherited), and says that it takes the problems' equality, like an exhausted search, on trust.
 
 ## 9. Testing
 
@@ -586,6 +670,17 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   refused naming the line, by both verifiers; a torn last line is dropped; the committed results pass the verifier with
   the counts `results/README.md` quotes; a strict game stopped by a node limit and resumed reads back with an empty
   taint, and so does a default one whose checkpoint has frame 0 as built; a proof by the cap is clean on a clean chain.
+  Forged repeats (another game named, digests or promotions or the promotion sum changed, the game repeated
+  unfinished, after the repeat, settling no search, or its taint dropped) are refused by both verifiers, and two that
+  only setting the problems up again can catch are refused by `verify-results` (the Python referee accepts them, as
+  its docstring says).
+* **Repeats** (`tests/same_search.rs`): the games that repeat an earlier search are found from the setups alone, and
+  a strict chain concludes exactly those, with the scores of a chain that searches them: from n = 1 (1..300), from
+  the committed `strict.jsonl` (schema 3, digests set up again; 515..560), and from a results file a stopped run left
+  (digests recorded); a game with a checkpoint is resumed, not repeated; a repeat takes the taint of the game it
+  repeats, and a strict run repeats only a game that rests on nothing unproven.  A unit test of `board` checks that
+  the problem set up again from a line is the one the setup posed, with `revise_freedoms` on and off, and the same at
+  two set widths.
 * **Large boards** (`tests/wide.rs`): the Java stopped at 1000, and the sets that hold a board are 8 to 64 words
   wide, so nothing above 1023 meets anything but the committed results and these tests.  The same game at every
   width that holds it has the same frames, candidates, greedy set, promotion cap, answer and tree; game 1133 (W = 20,

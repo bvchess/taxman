@@ -24,7 +24,7 @@ use crate::bits::Bits;
 use crate::engine::EngineConfig;
 use crate::frames::{build_frames, FrameColumns};
 use crate::numtheory::Tables;
-use crate::search::{self, Prepared, SearchTactics};
+use crate::search::{self, Prepared, Problem, Revise, SearchTactics};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
@@ -116,12 +116,38 @@ impl<const W: usize> Board<W> {
     pub fn seed(&self, moves: &[u32]) -> Bits<W> {
         moves.iter().copied().collect::<Bits<W>>() & self.frames.candidates
     }
+
+    /// The search problem that [`prepare`](Self::prepare) poses when revising frame 0 did what `revise` says, built
+    /// again without a search, see [`search::problem_of`].
+    ///
+    /// # Errors
+    ///
+    /// As [`search::problem_of`].
+    pub fn problem(&self, revise: Revise) -> Result<Problem, String> {
+        search::problem_of(&self.tables, &self.frames.columns(), &self.frames.candidates, revise)
+    }
+}
+
+/// The search problem of game `n` set up as `revise` (a results line's `setup.revise`) says ([`Board::problem`], at
+/// the set width `with_width!` picks for `n`), and the board's `in_the_bag`: what `taxman verify-results` and the
+/// solver compare when a game repeats an earlier game's search.
+///
+/// # Errors
+///
+/// As [`search::problem_of`], and if `n` is beyond the widest set.
+pub fn search_problem(n: u32, revise: Revise) -> Result<(Problem, u64), String> {
+    let beyond = || Err(format!("n={n} is beyond the largest supported board"));
+    crate::with_width!(n, W => {
+        let board = Board::<W>::for_n(n);
+        board.problem(revise).map(|problem| (problem, board.in_the_bag))
+    }, else beyond())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::game::{replay, Optimal};
+    use crate::search::ProblemSize;
 
     #[test]
     fn a_board_knows_its_frames_and_what_the_game_with_no_promotions_scores() {
@@ -151,6 +177,37 @@ mod tests {
         assert_eq!(board.promotion_cap(0), (85u64).checked_sub(board.in_the_bag));
         let seed = board.seed(prev_moves);
         assert!(seed.is_subset(&board.candidates()) && seed.iter().all(|x| prev_moves.contains(&x)));
+    }
+
+    /// What `taxman verify-results` and `same_search` set up again from a results line (the board size and what
+    /// revising did) is the problem the setup posed, with `revise_freedoms` on or off, at any set width.
+    #[test]
+    fn the_problem_set_up_again_is_the_one_the_setup_posed() {
+        let mut revised = 0;
+        for n in 2..=120 {
+            let board = Board::<8>::for_n(n);
+            if board.is_trivial() {
+                continue;
+            }
+            for tactics in [SearchTactics::default(), SearchTactics { revise_freedoms: false, ..Default::default() }] {
+                let prepared = board.prepare(tactics, 1).unwrap();
+                let problem = prepared.problem();
+                assert_eq!(board.problem(prepared.revise).unwrap(), problem, "n={n}");
+                let frames = board.frames.frames.len() as u32;
+                let size = ProblemSize { frames, candidates: board.candidates().len(), max_total: prepared.max_total };
+                assert_eq!(problem.size(), size, "n={n}");
+                revised += usize::from(prepared.revise.sets_frame_zero());
+            }
+            let (narrow, wide) =
+                (board.problem(Revise::Off).unwrap(), Board::<16>::for_n(n).problem(Revise::Off).unwrap());
+            assert_eq!((narrow.digest(), &narrow), (wide.digest(), &wide), "n={n}");
+        }
+        assert!(revised > 0, "no board with frame 0 revised");
+        // A checkpoint's freedoms are not recorded, and revising never raises them.
+        let board = Board::<8>::for_n(85);
+        assert!(board.problem(Revise::FromCheckpoint).unwrap_err().contains("checkpoint"));
+        assert!(board.problem(Revise::GreedyIsMax(1000)).unwrap_err().contains("built with"));
+        assert_eq!(search_problem(85, Revise::Off).unwrap(), (board.problem(Revise::Off).unwrap(), board.in_the_bag));
     }
 
     #[test]

@@ -1,7 +1,7 @@
 # Results of the Rust solver
 
 One JSON line per game, as `taxman solve --out` writes it (the fields are described in `src/results.rs` and in
-[../README.md](../README.md#a-results-line---out-schema-3)).  This page says what each file is, how it was made, and
+[../README.md](../README.md#a-results-line---out-schema-4)).  This page says what each file is, how it was made, and
 what supports the scores in it.  The counts in it are pinned by `tests/results.rs`, so changing a file means updating
 both together.
 
@@ -55,6 +55,7 @@ What the lines say, as `taxman verify-results` and `tools/check_results.py` repo
 | proof `cap`: the search reached n + score(n − 1) | 415 | 0 | 70 |
 | proof `prime_formula` | 211 | 34 | 34 |
 | proof `reuse_prev`: a conjecture | 0 | 119 | 0 |
+| proof `same_search`: a repeat of an earlier game's search (made before the tactic existed) | 0 | 0 | 0 |
 | rest on nothing unproven | 1300 | 19 | 231 |
 | score = n + score(n − 1) | 424 | 70 | 70 |
 | score = n + score(n − 1) − P (a prime n) | 210 | 34 | 34 |
@@ -62,7 +63,9 @@ What the lines say, as `taxman verify-results` and `tools/check_results.py` repo
 By range, the proofs in `strict.jsonl` are: 1–1000, 496 exhausted, 323 cap, 168 prime and 13 trivial; 1001–1231, 127
 exhausted, 70 cap and 34 prime; 1232–1300, 38 exhausted, 22 cap and 9 prime (the 69 games of 1232–1300 are 60
 searches and the primes 1237, 1249, 1259, 1277, 1279, 1283, 1289, 1291 and 1297).  The proofs by the cap were all
-decided before the search explored a node (0 nodes).
+decided before the search explored a node (0 nodes).  A chain made today would conclude 545 of the 1076 searched games
+as repeats of an earlier game's search (`same_search`), with the same scores: the searches of those games took 953 s
+of the file's 3359 s, 851 s of them in 1232–1300 ([docs/EXPERIMENTS.md](../docs/EXPERIMENTS.md#same-search-2026-10)).
 
 ## default.jsonl
 

@@ -2,6 +2,9 @@
 //! frame set, the preclusion table (tactic `preclusions`), the greedy incumbent, and (tactic `revise_freedoms`)
 //! frame 0's revised freedoms, which can lower `max_total`.  [`prepare_for_resume`] does the same for a search
 //! that a checkpoint will resume, taking frame 0's freedoms from it.
+//!
+//! The search problem a setup poses, in a canonical form that two games can be compared by, is a [`Problem`]
+//! ([`Prepared::problem`]); [`problem_of`] rebuilds it from what a results line records, without preparing a search.
 
 use super::header::Header;
 use super::tactics::SearchTactics;
@@ -61,6 +64,22 @@ impl Revise {
         matches!(self, Revise::GreedyIsMax(_) | Revise::Searched { .. } | Revise::FromCheckpoint)
     }
 
+    /// Frame 0's freedoms in the search's root, as far as this value tells: `Ok(None)` for the ones frame 0 was
+    /// built with, `Ok(Some(k))` for the `k` that revising set, and an error for
+    /// [`FromCheckpoint`](Revise::FromCheckpoint), which does not record the number.  (A
+    /// [`Stopped`](Revise::Stopped) revision changed nothing, so its root is the one built.)
+    pub fn frame_zero(self) -> Result<Option<u32>, String> {
+        match self {
+            Revise::Off | Revise::NotNeeded | Revise::Unchanged | Revise::Stopped { .. } | Revise::ResumedAsBuilt => {
+                Ok(None)
+            }
+            Revise::GreedyIsMax(size) | Revise::Searched { size, .. } => Ok(Some(size)),
+            Revise::FromCheckpoint => Err("frame 0's freedoms came from a checkpoint, which does not say what they \
+                                           were, so the search cannot be set up again from the line"
+                .into()),
+        }
+    }
+
     /// The value whose `Debug` form is `text`, which is how a results line records it (`setup.revise`, say
     /// `"Searched { size: 3, nodes: 9 }"`); `None` if `text` is not exactly that form of a value.
     pub fn parse(text: &str) -> Option<Revise> {
@@ -117,6 +136,127 @@ pub struct Prepared<const W: usize> {
     pub max_total: u32,
     pub revise: Revise,
     pub timings: PrepareTimings,
+}
+
+impl<const W: usize> Prepared<W> {
+    /// The search problem this setup poses (see [`Problem`]).
+    pub fn problem(&self) -> Problem {
+        Problem::of(&self.model, &self.root, &self.candidates, self.max_total)
+    }
+}
+
+/// The search problem a game's setup poses, in a canonical form: everything the search is given that its answer
+/// can depend on, so that two games with equal problems have the same feasible promotion sets and the same best
+/// promotion sum (DESIGN.md, "Same search").
+///
+/// The search is given the model (the factor graph and each number's home frame), the root frame set, the
+/// candidates and `max_total`, besides the tactics, the cap and the seed; the matching graph, the greedy set and
+/// the preclusion table are functions of those.  The feasible promotion sets are the sets of candidates that can be
+/// promoted from the root, keeping every frame's freedoms, with at most `max_total` members; which they are depends
+/// on the frames and on the graph's edges among their numbers, not on `n`.  So the form records, as a list of
+/// `u32`: the number of frames; for each frame, bottom first, its freedoms (as the bits of an `i32`) and its moves
+/// and its factors (each list as its length and then its numbers, ascending); the candidates; `max_total`; and for
+/// each number of the frames (their moves and factors), ascending, the number, its home frame, the maximal factors
+/// that can pay for it and the maximal composites it can pay for, as the model's graph lists them.  The graph's
+/// lists for a number can name numbers no longer in a frame (reducing the frames drops some), which the search never
+/// sees; recording them anyway errs on the side of telling more problems apart.  The numbers are game numbers, so
+/// the form does not depend on the set width.  The tactics, the cap and the seed are not in it: the sound tactics,
+/// the cap and the seed change how the search runs, not its answer, and the unproven ones are in a game's taint.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Problem(Vec<u32>);
+
+impl Problem {
+    /// The problem of a search of the model `model` from `root` over `candidates`, with at most `max_total`
+    /// promotions.
+    pub fn of<const W: usize>(model: &Model, root: &FrameSet<W>, candidates: &Bits<W>, max_total: u32) -> Problem {
+        fn list(words: &mut Vec<u32>, items: impl ExactSizeIterator<Item = u32>) {
+            words.push(items.len() as u32);
+            words.extend(items);
+        }
+        let mut words = vec![root.len() as u32];
+        let mut numbers = Bits::<W>::EMPTY;
+        for frame in root.frames() {
+            words.push(frame.freedoms as u32);
+            list(&mut words, frame.moves.to_vec().into_iter());
+            list(&mut words, frame.factors.to_vec().into_iter());
+            numbers |= frame.moves | frame.factors;
+        }
+        list(&mut words, candidates.to_vec().into_iter());
+        words.push(max_total);
+        let graph = model.graph();
+        for x in numbers.iter() {
+            words.extend([x, model.home(x) as u32]);
+            list(&mut words, graph.factors(x).iter().map(|&y| u32::from(y)));
+            list(&mut words, graph.composites(x).iter().map(|&y| u32::from(y)));
+        }
+        Problem(words)
+    }
+
+    /// A digest of the problem: the engine's 64-bit checksum ([`engine::checksum`], the one checkpoints carry) of
+    /// the form's numbers, each as four bytes, little-endian.  Two equal problems have the same digest, and two
+    /// different ones the same with a chance of about 2^-64; the solver and `taxman verify-results` compare the
+    /// problems themselves before they rely on two being the same.
+    pub fn digest(&self) -> u64 {
+        let bytes: Vec<u8> = self.0.iter().flat_map(|word| word.to_le_bytes()).collect();
+        engine::checksum(&bytes)
+    }
+
+    /// How large the problem is: what a results line's `setup` records of it in every schema, so that a problem set
+    /// up again from an older line can be checked against the line as far as it goes.
+    pub fn size(&self) -> ProblemSize {
+        let words = &self.0;
+        // The frames: freedoms, then the moves and the factors, each a length and that many numbers.
+        let mut at = 1;
+        for _ in 0..words[0] {
+            at += 1;
+            at += 1 + words[at] as usize;
+            at += 1 + words[at] as usize;
+        }
+        let candidates = words[at];
+        ProblemSize { frames: words[0], candidates, max_total: words[at + 1 + candidates as usize] }
+    }
+}
+
+/// How large a search problem is ([`Problem::size`]): its number of frames, its number of candidates, and
+/// `max_total`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ProblemSize {
+    pub frames: u32,
+    pub candidates: u32,
+    pub max_total: u32,
+}
+
+/// The most promotions a promotion set of the root `root` can have among `candidates` (`maxTotalPromotions`).
+fn max_total<const W: usize>(root: &FrameSet<W>, candidates: &Bits<W>) -> u32 {
+    root.max_promotions_among(candidates).max(0) as u32
+}
+
+/// The search problem ([`Problem`]) that [`prepare`] poses for the game whose frames are `columns`, when revising
+/// frame 0 did what `revise` (a results line's `setup.revise`) says: the model and the root are built again, frame
+/// 0's freedoms set as `revise` says ([`Revise::frame_zero`]), and `max_total` follows; nothing is searched (no
+/// greedy set, no preclusions, no revising).
+///
+/// # Errors
+///
+/// If `revise` does not say what frame 0's freedoms were, or says more than frame 0 was built with (revising only
+/// lowers them), or the frames cannot be built into a model.
+pub fn problem_of<const W: usize>(
+    tables: &Tables,
+    columns: &[Vec<u32>],
+    candidates: &Bits<W>,
+    revise: Revise,
+) -> Result<Problem, String> {
+    let frame_zero = revise.frame_zero()?;
+    let (model, root, _) = build_root::<W>(tables, columns)?;
+    let root = match (frame_zero, root.frames().first()) {
+        (None, _) => root,
+        (Some(k), Some(frame)) if i64::from(k) <= i64::from(frame.freedoms) => root.with_frame_zero_freedoms(k as i32),
+        (Some(k), frame) => {
+            let built = frame.map_or_else(|| "no frame 0".to_owned(), |f| format!("{} freedoms", f.freedoms));
+            return Err(format!("revising gave frame 0 {k} freedoms, but it was built with {built}"));
+        }
+    };
+    Ok(Problem::of(&model, &root, candidates, max_total(&root, candidates)))
 }
 
 /// Sets up the search for the game whose frames are `columns` (factors and moves per frame, bottom first) and
@@ -261,7 +401,7 @@ fn prepare_state<const W: usize>(
         None => (root, Revise::Off),
     };
     timings.revise = t0.elapsed();
-    let max_total = revised.max_promotions_among(&candidates).max(0) as u32;
+    let max_total = max_total(&revised, &candidates);
     Ok(Prepared {
         n,
         model,

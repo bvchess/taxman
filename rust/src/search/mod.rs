@@ -52,7 +52,8 @@
 //! # What is where
 //!
 //! * `tactics`: [`SearchTactics`] and [`Branching`], and how a checkpoint records them.
-//! * `setup`: [`prepare`]: the root, the greedy incumbent, `revise_freedoms`, `max_total`.
+//! * `setup`: [`prepare`]: the root, the greedy incumbent, `revise_freedoms`, `max_total`; the [`Problem`] a setup
+//!   poses.
 //! * `incumbent`: the starting incumbent (seed, dive, local search).
 //! * `searcher`: [`TaxSearcher`], its stack and its steps; [`SearchSpace`], [`TaxUnit`], the counters [`stat`].
 //! * `refine`: the matching check (`Refiner`) and strong branching (`strongest`).
@@ -72,7 +73,9 @@ pub use diagnostics::{cut, Diagnostics, GAP_BUCKETS};
 pub use header::checkpoint_width;
 pub use incumbent::Neighbourhood;
 pub use searcher::{stat, Found, SearchSpace, TaxSearcher, TaxUnit};
-pub use setup::{prepare, prepare_for_resume, prepare_within, PrepareTimings, Prepared, Revise};
+pub use setup::{
+    prepare, prepare_for_resume, prepare_within, problem_of, PrepareTimings, Prepared, Problem, ProblemSize, Revise,
+};
 pub use tactics::{Branching, SearchTactics};
 
 use crate::bits::Bits;

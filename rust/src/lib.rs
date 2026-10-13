@@ -39,8 +39,9 @@
 //!       promotions ──► hives::Apiary ──► the moves ──► game::replay ──► score, results line
 //! ```
 //!
-//! [`solver`] runs this for a game, with the shortcuts that can skip the search (`accelerate`), and for a range
-//! of games; [`results`] checks and keeps what it finds.
+//! [`solver`] runs this for a game, with the shortcuts that can skip the search (`accelerate`, and the repeat of an
+//! earlier game's search, which the setup's [`search::Problem`] finds), and for a range of games; [`results`] checks
+//! and keeps what it finds.
 //!
 //! # Module map
 //!
@@ -74,7 +75,8 @@
 //! greedy incumbent, the narrowing of the children's candidates and the scratch space of its peels (the module
 //! comment lists them), and `sacrifice` and `brute` are studies; a first read can skip those two and read `bounds`
 //! for that list only.  `examples/` holds the ladder (searches of hard games with time limits and thread counts), the
-//! probe of the hot paths, and the sacrifice study; `tests/` the integration tests.
+//! probe of the hot paths, the sacrifice study, and the list of games whose search repeats an earlier game's;
+//! `tests/` the integration tests.
 
 pub mod accelerate;
 pub mod bits;
