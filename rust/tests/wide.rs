@@ -17,11 +17,12 @@ use taxman::bits::Bits;
 use taxman::engine::EngineConfig;
 use taxman::frames::build_frames;
 use taxman::matchbound::{match_bound, MatchBound, MatchGraph};
-use taxman::model::{Model, Scratch};
+use taxman::model::{Model, Scratch, MAX_FRAMES};
 use taxman::numtheory::Tables;
 use taxman::sacrifice::{sacrifice_bound, PuncturedOptions};
 use taxman::search::{Revise, SearchTactics, TaxUnit};
 use taxman::solver::{self, Method, Prev, PrevSource, SolveOptions};
+use taxman::with_width;
 
 // ---------------------------------------------------------------------------------------------------------
 // The width does not matter
@@ -124,6 +125,18 @@ fn a_slice_of_the_strict_chain_reproduces_the_results() {
 
 // ---------------------------------------------------------------------------------------------------------
 // Boards that need W = 64
+
+/// A frame set holds `MAX_FRAMES` = 8 frames, which the largest boards have (every board up to 4095, the largest
+/// supported, was checked when it came down from 12: 6 frames from n = 512, 7 from 1024, 8 from 2048).  The boards
+/// at the steps, and the largest.
+#[test]
+fn the_largest_boards_fit_in_a_frame_set() {
+    assert_eq!(MAX_FRAMES, 8);
+    for (n, frames) in [(511, 5), (512, 6), (1023, 6), (1024, 7), (2047, 7), (2048, 8), (4095, 8)] {
+        let built = with_width!(n, W => build_frames::<W>(&Tables::new(n)).frames.len());
+        assert_eq!(built, frames, "n={n}");
+    }
+}
 
 /// The first board with a number above 2047 is n = 2048 (W = 64 by dispatch only until a frame holds one); n = 2050
 /// has such numbers in its frames.  Its frames, model, matching bound, conflicts, greedy set, setup and a short

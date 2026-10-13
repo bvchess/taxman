@@ -34,8 +34,11 @@ use crate::numtheory::Tables;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 
-/// Most frames a [`FrameSet`] can hold.  Boards up to 760 have at most 6.
-pub const MAX_FRAMES: usize = 12;
+/// Most frames a [`FrameSet`] can hold.  The frame builder gives every board up to 4095, the largest supported,
+/// at most 8 frames (all of them were checked in 2026-10: 6 frames from n = 512, 7 from 1024, 8 from 2048), and
+/// frame sets and per-frame arrays are copied whole, so they have no room to spare.  [`Model::build`] refuses
+/// more (`tests/wide.rs` builds the largest board).
+pub const MAX_FRAMES: usize = 8;
 
 // ---------------------------------------------------------------------------------------------------------
 // Factor provider
