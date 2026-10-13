@@ -353,6 +353,14 @@ fn resume_in_pieces(threads: usize, tactics: SearchTactics, min_pieces: usize) {
     let cands = Bits::<16>::from_slice(&g.candidates);
     let whole = prepare::<16>(&tables, &g.columns, &cands, tactics, 2).unwrap();
     let nodes = search_checked(&whole, 1, "uninterrupted").stats.nodes;
+    // A checkpoint's frame 0 counts as revised only if the tactic was on and it is not the built one (760's
+    // two-frame search lowers it).
+    let from_checkpoint = match (tactics.revise_freedoms, whole.root == whole.unrevised) {
+        (false, _) => Revise::Off,
+        (true, true) => Revise::ResumedAsBuilt,
+        (true, false) => Revise::FromCheckpoint,
+    };
+    assert_eq!(from_checkpoint == Revise::Off, whole.root == whole.unrevised, "760's frame 0 is revised");
 
     let dir = TempDir::new(&format!("resume{threads}-{}", tactics.bits()));
     let ckpt = dir.0.join("ckpt.bin");
@@ -368,8 +376,7 @@ fn resume_in_pieces(threads: usize, tactics: SearchTactics, min_pieces: usize) {
     while !result.completed {
         assert!(ckpt.exists(), "a stopped run leaves a checkpoint");
         let resumed = prepare_for_resume::<16>(&tables, &g.columns, &cands, &ckpt, 2).unwrap();
-        // A checkpoint's frame 0 counts as revised only if the tactic was on.
-        assert_eq!(resumed.revise, if tactics.revise_freedoms { Revise::FromCheckpoint } else { Revise::Off });
+        assert_eq!(resumed.revise, from_checkpoint);
         assert_eq!(resumed.root, whole.root);
         result = search(&resumed, &cfg, None, None, true).unwrap();
         pieces += 1;

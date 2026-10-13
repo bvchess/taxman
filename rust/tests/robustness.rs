@@ -445,6 +445,55 @@ fn a_checkpoint_renamed_to_another_game_is_refused() {
     assert!(dir.join("n0141.ckpt").exists(), "a refused checkpoint is left alone");
 }
 
+/// Rewrites the search's header in the checkpoint `path` to say that frame 0 has `freedoms` and the search
+/// `max_total` promotions at most, and the file's checksum to match: a forgery that only the check of frame 0
+/// against the frames can see.
+fn forge_frame_zero(path: &Path, freedoms: i32, max_total: u32) {
+    let mut bytes = fs::read(path).unwrap();
+    let len = bytes.len();
+    // The engine's file ends with a marker and the checksum of everything before it.
+    assert_eq!(&bytes[len - 16..len - 8], b"TXCKEND1");
+    let checksum = |bytes: &[u8]| engine::checksum(&bytes[..len - 16]).to_le_bytes();
+    assert_eq!(bytes[len - 8..], checksum(&bytes), "the checksum is of what precedes the marker");
+    // The search's header follows the engine's 20 bytes: frame 0's freedoms at 33, after a byte that says there is
+    // a frame 0, and max_total at 37 (`search::header`).
+    let at = 20;
+    assert_eq!((&bytes[at..at + 4], bytes[at + 32]), (&b"TXSH"[..], 1));
+    bytes[at + 33..at + 37].copy_from_slice(&freedoms.to_le_bytes());
+    bytes[at + 37..at + 41].copy_from_slice(&max_total.to_le_bytes());
+    let sum = checksum(&bytes);
+    bytes[len - 8..].copy_from_slice(&sum);
+    fs::write(path, bytes).unwrap();
+}
+
+/// A checkpoint whose frame 0 has freedoms its search cannot have had is refused, naming frame 0: other than the
+/// built ones with `revise_freedoms` off, since nothing else changes them; more than the built ones, or fewer than
+/// 0, with it on, since revising sets them to a number of promotions into frame 0.  (Resuming with forged ones
+/// once finished a strict game as exhausted, clean, and with a score below the optimum.)
+#[test]
+fn a_checkpoint_whose_frame_zero_its_search_cannot_have_had_is_refused() {
+    let n = 300;
+    let board = Board::<8>::for_n(n);
+    let dir = TempDir::new("frame0");
+    let default = SolveOptions { time_limit: Some(Duration::ZERO), optimal: OptimalSource::None, ..options(&dir.0) };
+    let mut strict = default.clone();
+    strict.tactics.set("revise_freedoms=off").unwrap();
+    let checkpoint = dir.join("n0300.ckpt");
+    for opts in [&strict, &default] {
+        let built = board.prepare(opts.tactics.search, 1).unwrap().unrevised;
+        let f0 = built.frames()[0].freedoms;
+        let forgeries = if opts.tactics.search.revise_freedoms { [f0 + 1, f0 + 1000, -1] } else { [f0 - 1, f0 + 1, 0] };
+        for forged in forgeries {
+            assert!(!solver::solve_game(n, None, opts).unwrap().completed);
+            let max_total = built.with_frame_zero_freedoms(forged).max_promotions_among(&board.candidates());
+            forge_frame_zero(&checkpoint, forged, max_total.max(0) as u32);
+            let err = solver::solve_game(n, None, opts).unwrap_err();
+            assert!(err.contains(&format!("frame 0's freedoms are {forged}, not the {f0} ")), "{err}");
+            fs::remove_file(&checkpoint).unwrap();
+        }
+    }
+}
+
 #[test]
 fn a_checkpoint_made_with_other_tactics_names_them() {
     let dir = TempDir::new("tactics");

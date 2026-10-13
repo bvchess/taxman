@@ -148,11 +148,11 @@ fn an_interrupted_game_resumes_from_its_checkpoint() {
     assert!(left.is_empty(), "left behind: {left:?}");
 }
 
-/// Solves 600 (a game with a search of a few thousand nodes) and 601 (the prime after it, which takes 600 as its
-/// predecessor) from `base`, with no `optimal.json` to start from: a node limit stops the search of 600, and a
-/// second run, without the limit, resumes it and goes on.  Returns the games of the second run and the lines of the
-/// results file, which the verifier accepts.
-fn run_stopped_and_resumed(name: &str, base: SolveOptions) -> (Vec<GameResult>, Vec<Json>) {
+/// Solves `n` (600 or 760, games with a search of a few thousand nodes) and `n + 1` (the prime after it, which takes
+/// `n` as its predecessor) from `base`, with no `optimal.json` to start from: a node limit stops the search of `n`,
+/// and a second run, without the limit, resumes it and goes on.  Returns the games of the second run and the lines
+/// of the results file, which the verifier accepts.
+fn run_stopped_and_resumed(name: &str, base: SolveOptions, n: u32) -> (Vec<GameResult>, Vec<Json>) {
     let dir = TempDir::new(name);
     let results = dir.join("results.jsonl");
     let limited = SolveOptions {
@@ -162,15 +162,15 @@ fn run_stopped_and_resumed(name: &str, base: SolveOptions) -> (Vec<GameResult>, 
         ..base
     };
     assert!(!limited.allow_tainted_prev);
-    let summary = solver::solve_range_each(600, 601, &limited, Some(&results), |_| {}).unwrap();
-    assert_eq!(summary.stopped_at, Some(600), "the node limit stops the search of 600");
-    assert!(limited.checkpoint_file(600).unwrap().exists());
+    let summary = solver::solve_range_each(n, n + 1, &limited, Some(&results), |_| {}).unwrap();
+    assert_eq!(summary.stopped_at, Some(n), "the node limit stops the search of {n}");
+    assert!(limited.checkpoint_file(n).unwrap().exists());
 
     let unlimited = SolveOptions { node_limit: None, ..limited };
-    let games = solver::solve_range(600, 601, &unlimited, Some(&results)).unwrap_or_else(|e| panic!("{e}"));
+    let games = solver::solve_range(n, n + 1, &unlimited, Some(&results)).unwrap_or_else(|e| panic!("{e}"));
     assert!(games.iter().all(|g| g.completed));
     // A later invocation finds both games in the file, which agrees with what they say of themselves.
-    let again = solver::solve_range_each(600, 601, &unlimited, Some(&results), |_| {}).unwrap();
+    let again = solver::solve_range_each(n, n + 1, &unlimited, Some(&results), |_| {}).unwrap();
     assert_eq!((again.solved, again.skipped), (0, 2));
     verify_files(std::slice::from_ref(&results), None).unwrap_or_else(|e| panic!("{e}"));
 
@@ -188,7 +188,7 @@ fn taint_and_revise(line: &Json) -> (Vec<&str>, Option<&str>) {
 /// piece or was stopped and resumed; so the next game builds on it with no `--allow-tainted-prev`.
 #[test]
 fn a_strict_game_resumed_from_its_checkpoint_rests_on_nothing_unproven() {
-    let (games, lines) = run_stopped_and_resumed("strict-resume", common::strict_options(1));
+    let (games, lines) = run_stopped_and_resumed("strict-resume", common::strict_options(1), 600);
     let [resumed, next] = &games[..] else { panic!("{} games", games.len()) };
     assert_eq!((resumed.n, resumed.invocations), (600, 2), "600 was resumed, not started over");
     assert_eq!(resumed.setup.map(|s| s.revise), Some(Revise::Off));
@@ -203,20 +203,37 @@ fn a_strict_game_resumed_from_its_checkpoint_rests_on_nothing_unproven() {
     assert_eq!(taint_and_revise(prime).0, Vec::<&str>::new());
 }
 
-/// With `revise_freedoms` on, the freedoms a checkpoint holds may be revised ones, and the checkpoint does not say
-/// whether they are, so the resumed game rests on the tactic, and so does the prime game built on it.
+/// With `revise_freedoms` on, a checkpoint's frame 0 may have revised freedoms, fewer than the built ones, and the
+/// checkpoint does not say how revising set them: 760's two-frame search lowers them, so the resumed game rests on
+/// the tactic, and so does the prime game built on it.
 #[test]
-fn a_game_resumed_from_its_checkpoint_with_revise_freedoms_on_rests_on_it() {
-    let (games, lines) = run_stopped_and_resumed("default-resume", options(1));
+fn a_game_resumed_with_revised_freedoms_rests_on_revise_freedoms() {
+    let (games, lines) = run_stopped_and_resumed("default-resume-revised", options(1), 760);
     let [resumed, next] = &games[..] else { panic!("{} games", games.len()) };
-    assert_eq!((resumed.n, resumed.invocations), (600, 2), "600 was resumed, not started over");
+    assert_eq!((resumed.n, resumed.invocations), (760, 2), "760 was resumed, not started over");
     assert_eq!(resumed.setup.map(|s| s.revise), Some(Revise::FromCheckpoint));
     assert_eq!(resumed.taint, Taint::from(["revise_freedoms".to_owned()]));
-    assert_eq!(next.taint, resumed.taint, "601 rests on 600");
+    assert_eq!(next.taint, resumed.taint, "761 rests on 760");
 
     let [_, finished, prime] = &lines[..] else { panic!("{} lines", lines.len()) };
     assert_eq!(taint_and_revise(finished), (vec!["revise_freedoms"], Some("FromCheckpoint")));
     assert_eq!(taint_and_revise(prime).0, ["revise_freedoms"]);
+}
+
+/// With `revise_freedoms` on, a checkpoint whose frame 0 has the freedoms it was built with (600's revision changes
+/// nothing) holds a search that does not rest on the tactic, whatever revising did: the resumed game rests on
+/// nothing unproven, as one that ran in one piece.
+#[test]
+fn a_game_resumed_with_the_built_freedoms_rests_on_nothing_unproven() {
+    let (games, lines) = run_stopped_and_resumed("default-resume-built", options(1), 600);
+    let [resumed, next] = &games[..] else { panic!("{} games", games.len()) };
+    assert_eq!((resumed.n, resumed.invocations), (600, 2), "600 was resumed, not started over");
+    assert_eq!(resumed.setup.map(|s| s.revise), Some(Revise::ResumedAsBuilt));
+    assert!(resumed.taint.is_empty() && next.taint.is_empty(), "{:?} {:?}", resumed.taint, next.taint);
+
+    let [_, finished, prime] = &lines[..] else { panic!("{} lines", lines.len()) };
+    assert_eq!(taint_and_revise(finished), (vec![], Some("ResumedAsBuilt")));
+    assert_eq!(taint_and_revise(prime).0, Vec::<&str>::new());
 }
 
 #[test]
