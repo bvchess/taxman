@@ -244,7 +244,8 @@ pub(super) struct Strong<const W: usize> {
 ///
 /// Each member's bound is solved exactly ([`MatchBound::value_excluding`]), so this also finds the members whose
 /// removal brings the bound below `need`, the node's *forced* members: every completion that reaches `need`
-/// promotes them all.
+/// promotes them all.  The smallest member's level is usually solved already: it is refinement's first branch,
+/// which [`Refiner`] keeps for this ([`MatchBound::keep_solved`]).
 ///
 /// With `fix_forced` (that tactic promotes all the forced members, so that which of them is chosen hardly
 /// matters), when some member is forced the largest forced one is chosen and no level is kept (the node's loop

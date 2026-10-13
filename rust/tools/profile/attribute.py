@@ -5,8 +5,14 @@ usage: attribute.py BINARY sample.txt [sample.txt ...]   (run by profile.sh, wit
 Each frame's return address is symbolicated with its inlined frames (`atos -i`), so that code the compiler inlined
 into the step is charged to the function it came from.  The kind of work is the innermost function of the crate in
 the leaf's inline chain (matching repairs, bounds from the potentials, peels, conflicts, nogood table, the node's
-own work, copies); the purpose is the innermost search function (strong branching, refinement, the child's check,
-...) found walking up from the leaf through the inline chains.  Standard library only; macOS only (`atos`).
+own work, copies, and the Lagrangian bound's levels: their repairs, copies, changes, forced members and refits);
+the purpose is the innermost search function (strong branching, refinement, the child's check, the Lagrangian
+check, ...) found walking up from the leaf through the inline chains.  Standard library only; macOS only (`atos`).
+
+`sample` lists the addresses of a leaf on one line, and only the first is symbolicated, so a line's samples all go
+to its inline chain: right to the function, coarse below it.  For a picture by source line, Instruments' Time
+Profiler (`xcrun xctrace record --template 'Time Profiler' --launch -- ...`, then `xctrace export`) records every
+sample's own address.
 """
 import collections
 import re
