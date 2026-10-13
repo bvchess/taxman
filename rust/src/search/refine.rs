@@ -187,6 +187,9 @@ impl<const W: usize> Refiner<'_, '_, W> {
 
     /// Whether some branch of the conflict `k`, with `required` promoted, refined `depth − 1` levels deep, is at
     /// least `need`.
+    ///
+    /// The first branch with nothing required is the level without the smallest member, which strong branching
+    /// solves first too: it is kept for it ([`MatchBound::keep_solved`]).
     fn branches(&mut self, k: Bits<W>, required: Bits<W>, depth: u32) -> bool {
         let free = k - required;
         let last = free.max();
@@ -199,7 +202,11 @@ impl<const W: usize> Refiner<'_, '_, W> {
             reaches = self.m.bound_excluding(x) + required.sum() >= self.need && {
                 self.m.push_excluding(&Bits::EMPTY.with(x));
                 let reaches = self.reaches(required, depth - 1);
-                self.m.pop();
+                if required.is_empty() {
+                    self.m.keep_solved(x);
+                } else {
+                    self.m.pop();
+                }
                 reaches
             };
             if reaches || Some(x) == last {
