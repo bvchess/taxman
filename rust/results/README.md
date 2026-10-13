@@ -63,7 +63,9 @@ What the lines say, as `taxman verify-results` and `tools/check_results.py` repo
 By range, the proofs in `strict.jsonl` are: 1–1000, 496 exhausted, 323 cap, 168 prime and 13 trivial; 1001–1231, 127
 exhausted, 70 cap and 34 prime; 1232–1300, 38 exhausted, 22 cap and 9 prime (the 69 games of 1232–1300 are 60
 searches and the primes 1237, 1249, 1259, 1277, 1279, 1283, 1289, 1291 and 1297).  The proofs by the cap were all
-decided before the search explored a node (0 nodes).
+decided before the search explored a node (0 nodes).  A chain made today would conclude 545 of the 1076 searched games
+as repeats of an earlier game's search (`same_search`), with the same scores: the searches of those games took 953 s
+of the file's 3359 s, 851 s of them in 1232–1300 ([docs/EXPERIMENTS.md](../docs/EXPERIMENTS.md#same-search-2026-10)).
 
 ## default.jsonl
 

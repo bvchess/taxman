@@ -194,6 +194,8 @@ earlier game's proof (exhausted, or the cap) establishes that sum, and the later
 `in_the_bag` plus it, replayed by the referee as always.  It needs a proof kind ("same search as game m", resting
 on m's proof and taint), the digest in the result line or recomputed when the range starts, and the two verifiers.
 The payoff is a constant fraction of the chain, at no risk, and it multiplies with everything else here.
+Implemented as the tactic and proof kind `same_search`
+([EXPERIMENTS, "Same search"](EXPERIMENTS.md#same-search-2026-10)).
 
 ### 4.2 A Lagrangian bound over the nogoods (rank 2)
 
