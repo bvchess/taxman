@@ -1911,6 +1911,15 @@ fn search_forgetting<const W: usize>(
     })
 }
 
+/// The set width `W` a checkpoint of a search was made with, if `path` holds one whose header this build can read
+/// (an older build may have chosen another width for the game than this one does).
+pub fn checkpoint_width(path: &Path) -> Option<usize> {
+    let bytes = engine::read_checkpoint_header(path).ok()?;
+    let u32_at = |i: usize| bytes.get(i..i + 4).map(|b| u32::from_le_bytes(b.try_into().expect("4 bytes")));
+    let ours = bytes.starts_with(Header::<1>::MAGIC) && u32_at(4) == Some(Header::<1>::VERSION);
+    ours.then(|| u32_at(8)).flatten().map(|width| width as usize)
+}
+
 /// The checkpoint `path` read and checked for resuming the search of `prepared`: its whole file (checksum
 /// included), its header, and its incumbent, which must be a set of candidates that can be promoted from the
 /// root and is worth the value stored with it.  Returns that set and what else the checkpoint holds.

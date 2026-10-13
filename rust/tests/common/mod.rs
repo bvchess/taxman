@@ -44,33 +44,6 @@ impl Drop for TempDir {
     }
 }
 
-/// Runs `$body` with the const generic `$w` set to the width the board `$n` needs (as `solver::solve_game` picks it):
-/// `W = 8` up to n = 511, 16 up to 1023, 32 up to 2047, 64 up to 4095.
-#[macro_export]
-macro_rules! with_width {
-    ($n:expr, $w:ident => $body:expr) => {
-        match taxman::bits::words_for($n) {
-            1..=8 => {
-                const $w: usize = 8;
-                $body
-            }
-            9..=16 => {
-                const $w: usize = 16;
-                $body
-            }
-            17..=32 => {
-                const $w: usize = 32;
-                $body
-            }
-            33..=64 => {
-                const $w: usize = 64;
-                $body
-            }
-            _ => panic!("n={} is beyond the widest set", $n),
-        }
-    };
-}
-
 /// A committed file under `testdata/`.
 pub fn testdata(path: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("testdata").join(path)

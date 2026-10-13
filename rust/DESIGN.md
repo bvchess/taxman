@@ -148,8 +148,16 @@ dependencies.  Modules:
 | `main.rs`, `cli.rs`, `commands.rs` | CLI: `solve`, `regress`, `bench`, `verify-optimal`, `verify-results`, `tables` (`taxman help` lists the options) |
 
 Width dispatch: everything that holds sets of game numbers is generic over
-`const W: usize`; the CLI picks `W ∈ {8, 16, 32, 64}` from n (n ≤ 511, 1023,
-2047, 4095).
+`const W: usize`, and the macro `with_width!` (in `bits`, used by the solver,
+the examples and the tests) picks the narrowest of `bits::WIDTHS` = {8, 16,
+20, 24, 28, 32, 64} that holds n (n ≤ 511, 1023, 1279, 1535, 1791, 2047,
+4095).  Every set operation is a loop over all W words, so the steps of 4
+words near the frontier pay: `Bits<20>` instead of `Bits<32>` takes 6% fewer
+cycles at 1184 and 1215 (2026-10).  Each width is a copy of the search's
+code: the release build took 25 s with four widths, 50 s with these seven
+(62 s with 12 and 48 too, which were left out: 512–767 is solved, and
+2048–3071 far off).  A checkpoint records its width, and a search resumes
+at that width if this build has it (an older build chose 32 for 1024–2047).
 
 ### Search state and order
 
@@ -889,29 +897,30 @@ Correctness, all on games that finish in seconds:
   binary rejects bad times and limits, survives a closed stdout and stderr,
   and stops on SIGINT and SIGTERM with a checkpoint it then resumes.
 * Large boards (`tests/wide.rs`): `optimal.json` and the Java stop at 1000,
-  and the sets that hold a board are 8, 16, 32 and 64 words wide for n up to
-  511, 1023, 2047 and 4095, so nothing above 1023 meets anything but the
-  committed results (`results/strict.jsonl`, `default.jsonl`) and these
-  tests.  The same game at every width that holds it has the same frames,
-  candidates, greedy set, promotion cap, answer and tree (nodes counted); the
-  last board of each width (511, 1023, 2047) at the width and at the next;
-  game 1133 (W = 32, about 2,400 nodes) under every sound tactic against
-  `strict.jsonl`, on one thread and two; a slice of the strict chain
-  1127..1134; the sacrifice bound proves game 1133 by an independent route;
-  a W = 64 board (2050) through frames, matching bound, conflicts, greedy set
-  and a node-limited search; a W = 32 search interrupted and resumed under
-  several tactics, and a committed checkpoint of game 1133
-  (`testdata/n1133_after_1000_nodes.ckpt`) that must still resume (a
-  deliberate change of the checkpoint format fails it; the test says how to
-  make the file again); and the levels of a real depth-first stack of game
-  1215 (`testdata/n1215_deep_units.txt`, 0 to 34 promotions deep): the
-  incremental matching bound and the quick bounds without a member against the
-  min-cost-flow reference, and the subtrees of the deep levels under every
-  tactic.  The Bits unit tests cover W = 16, 32 and 64, every word included.
+  and the sets that hold a board are 8, 16, 20, 24, 28, 32 and 64 words wide
+  for n up to 511, 1023, 1279, 1535, 1791, 2047 and 4095, so nothing above
+  1023 meets anything but the committed results (`results/strict.jsonl`,
+  `default.jsonl`) and these tests.  The same game at every width that holds
+  it has the same frames, candidates, greedy set, promotion cap, answer and
+  tree (nodes counted); the last board of each width at the width and at
+  the next; game 1133 (W = 20, about 2,400 nodes) under every sound tactic
+  against `strict.jsonl`, on one thread and two; a slice of the strict
+  chain 1127..1134; the sacrifice bound proves game 1133 by an independent
+  route; a W = 64 board (2050) through frames, matching bound, conflicts,
+  greedy set and a node-limited search; a W = 20 search interrupted and
+  resumed under several tactics, and a committed W = 32 checkpoint of game
+  1133 (`testdata/n1133_after_1000_nodes.ckpt`) that must still resume, at
+  its own width (a deliberate change of the checkpoint format fails it; the
+  test says how to make the file again); and the levels of a real
+  depth-first stack of game 1215 (`testdata/n1215_deep_units.txt`, 0 to 34
+  promotions deep): the incremental matching bound and the quick bounds
+  without a member against the min-cost-flow reference, and the subtrees of
+  the deep levels under every tactic.  The Bits unit tests cover W = 16, 32
+  and 64, every word included, and the dispatch every width's edges.
 * Java fixtures past 760 (`tests/golden_hives.rs`): `testdata/golden_wide/`
   holds the Java's structure (hives, frames, candidates, reduced frame set,
   greedy incumbent) for n = 511, 512, 1000, 1001, 1023, 1024, 1025, 1100,
-  1231, 2047 and 2048, checked at the width `words_for(n)` picks;
+  1231, 2047 and 2048, checked at the width `with_width!` picks;
   `accel_java.txt` the Java's acceptance of the previous game's promotions
   for 94 boards of 763..1228 (with the fingerprint of the previous game the
   decision was made with); `games_java.txt` its apiary game, move for move,

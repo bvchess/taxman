@@ -104,7 +104,7 @@
 //!   prime → cap → search.  It is no sound replacement for `reuse_prev`: it proves too few of its games, and
 //!   searching proves all of them sooner.
 
-use crate::bits::{words_for, Bits};
+use crate::bits::Bits;
 use crate::engine::EngineConfig;
 use crate::frames::build_frames;
 use crate::game::replay_punctured;
@@ -184,14 +184,11 @@ pub fn punctured(
         return Ok(free);
     }
     let start = Instant::now();
-    let result = match words_for(n) {
-        _ if n == 0 => return Err("n must be at least 1".into()),
-        1..=8 => punctured_with_width::<8>(n, hole, full, full_score, stop_at, opts),
-        9..=16 => punctured_with_width::<16>(n, hole, full, full_score, stop_at, opts),
-        17..=32 => punctured_with_width::<32>(n, hole, full, full_score, stop_at, opts),
-        33..=64 => punctured_with_width::<64>(n, hole, full, full_score, stop_at, opts),
-        _ => return Err(format!("n={n} is too large")),
-    };
+    if n == 0 {
+        return Err("n must be at least 1".into());
+    }
+    let result = crate::with_width!(n, W => punctured_with_width::<W>(n, hole, full, full_score, stop_at, opts),
+        else return Err(format!("n={n} is too large")));
     let mut result = result.map_err(|e| format!("n={n} without {hole}: {e}"))?;
     result.time = start.elapsed();
     Ok(result)

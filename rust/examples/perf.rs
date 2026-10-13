@@ -43,7 +43,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use taxman::bits::{words_for, Bits};
+use taxman::bits::Bits;
 use taxman::engine::{self, Ctx, EngineConfig, Searcher, Start};
 use taxman::frames::build_frames;
 use taxman::game::Optimal;
@@ -63,30 +63,6 @@ fn fixture(dir: &Path, n: u32, kind: &str) -> PathBuf {
 /// The strict tactics (`revise_freedoms` off), which the frontier's results are made with.
 fn tactics() -> SearchTactics {
     SearchTactics { revise_freedoms: false, ..SearchTactics::default() }
-}
-
-/// Runs `$body` with `$w` the set width the solver picks for the board `$n`.
-macro_rules! at_width {
-    ($n:expr, $w:ident => $body:expr) => {
-        match words_for($n) {
-            1..=8 => {
-                const $w: usize = 8;
-                $body
-            }
-            9..=16 => {
-                const $w: usize = 16;
-                $body
-            }
-            17..=32 => {
-                const $w: usize = 32;
-                $body
-            }
-            _ => {
-                const $w: usize = 64;
-                $body
-            }
-        }
-    };
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -649,11 +625,11 @@ fn run() -> Result<(), String> {
     match (command.as_deref(), &numbers[..]) {
         (Some("make-nodes"), &[n]) => {
             let n = n as u32;
-            at_width!(n, W => make_nodes::<W>(&dir, n, &optimal()?, every, keep))
+            taxman::with_width!(n, W => make_nodes::<W>(&dir, n, &optimal()?, every, keep))
         }
         (Some("make-window"), &[n, at]) => {
             let n = n as u32;
-            at_width!(n, W => make_window::<W>(&dir, n, &optimal()?, at))
+            taxman::with_width!(n, W => make_window::<W>(&dir, n, &optimal()?, at))
         }
         (Some(command), _) => Err(format!("{command}: wrong arguments (see the top of examples/perf.rs)")),
         (None, games) => {
@@ -661,7 +637,7 @@ fn run() -> Result<(), String> {
                 if games.is_empty() { GAMES.to_vec() } else { games.iter().map(|&n| n as u32).collect() };
             let mut report = Report { brief, ..Report::default() };
             for n in games {
-                at_width!(n, W => {
+                taxman::with_width!(n, W => {
                     kernels::<W>(&fixture(&dir, n, "nodes"), reps, &mut report)?;
                     window::<W>(n, &fixture(&dir, n, "window.ckpt"), steps, reps, &mut report)?;
                 });

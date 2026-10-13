@@ -1,13 +1,12 @@
 //! Large boards without large searches.
 //!
 //! `optimal.json` and the Java stop at n = 1000, and the sets that hold the numbers of a board are 8 words wide up
-//! to n = 511, 16 up to 1023, 32 up to 2047 and 64 up to 4095, so nothing above n = 1023 meets anything but these
-//! tests and the committed results (`results/strict.jsonl` and `default.jsonl`, n = 1001..1231).  What is cheap
-//! to run here: the same small game at every width that holds it (a width-dependent bug changes the tree), games
-//! of 1100 to 1250 that need a few thousand nodes against the committed results, and boards of 2048 and more
-//! through their setup.
+//! to n = 511, then 16, 20, 24, 28 and 32 words up to 1023, 1279, 1535, 1791 and 2047, and 64 up to 4095
+//! (`bits::WIDTHS`), so nothing above n = 1023 meets anything but these tests and the committed results
+//! (`results/strict.jsonl` and `default.jsonl`, n = 1001..1231).  What is cheap to run here: the same small game
+//! at every width that holds it (a width-dependent bug changes the tree), games of 1100 to 1250 that need a few
+//! thousand nodes against the committed results, and boards of 2048 and more through their setup.
 
-#[macro_use]
 mod common;
 
 use common::{
@@ -29,52 +28,67 @@ use taxman::solver::{self, Method, Prev, PrevSource, SolveOptions};
 
 /// The same game, built at every width that holds it, has the same frames, candidates, greedy set, promotion cap,
 /// search and tree (nodes counted).  A bug that depends on the width (a loop over fewer words than the set has, a
-/// mask that is wrong at the top) shows as a different tree: W = 64 is otherwise reached by no test.
+/// mask that is wrong at the top, a width that is not a power of two) shows as a different tree: the widths above
+/// the ones the boards below need are otherwise reached by no test.
 #[test]
 fn the_search_does_not_depend_on_the_width() {
     let default = SearchTactics::default();
-    // Boards that W = 8 holds, then ones that need 16 and 32.
+    // Boards that W = 8 holds, at every width.
     for n in [300, 400] {
         let at8 = profile_at_width::<8>(n, default, None);
         assert!(at8.completed && at8.sum > 0, "n={n}");
-        assert_eq!(profile_at_width::<16>(n, default, None), at8, "n={n} at W=16");
-        assert_eq!(profile_at_width::<32>(n, default, None), at8, "n={n} at W=32");
-        assert_eq!(profile_at_width::<64>(n, default, None), at8, "n={n} at W=64");
+        let others = [
+            (16, profile_at_width::<16>(n, default, None)),
+            (20, profile_at_width::<20>(n, default, None)),
+            (24, profile_at_width::<24>(n, default, None)),
+            (28, profile_at_width::<28>(n, default, None)),
+            (32, profile_at_width::<32>(n, default, None)),
+            (64, profile_at_width::<64>(n, default, None)),
+        ];
+        for (w, profile) in others {
+            assert_eq!(profile, at8, "n={n} at W={w}");
+        }
     }
     let at16 = profile_at_width::<16>(760, default, None);
     assert!(at16.completed && at16.nodes > 1000, "{} nodes", at16.nodes);
     assert_eq!(profile_at_width::<32>(760, default, None), at16, "n=760 at W=32");
     assert_eq!(profile_at_width::<64>(760, default, None), at16, "n=760 at W=64");
 
-    // A board that needs W = 32, under two of the tactic settings.
+    // A board that needs W = 20, under two of the tactic settings.
     for (name, tactics) in variants().into_iter().take(2) {
-        let at32 = profile_at_width::<32>(1133, tactics, None);
-        assert!(at32.completed && at32.nodes > 500, "{name}: {} nodes", at32.nodes);
-        assert_eq!(profile_at_width::<64>(1133, tactics, None), at32, "{name}: n=1133 at W=32 and W=64");
+        let at20 = profile_at_width::<20>(1133, tactics, None);
+        assert!(at20.completed && at20.nodes > 500, "{name}: {} nodes", at20.nodes);
+        assert_eq!(profile_at_width::<24>(1133, tactics, None), at20, "{name}: n=1133 at W=24");
+        assert_eq!(profile_at_width::<32>(1133, tactics, None), at20, "{name}: n=1133 at W=32");
+        assert_eq!(profile_at_width::<64>(1133, tactics, None), at20, "{name}: n=1133 at W=64");
     }
 }
 
-/// The last board a width holds (511, 1023, 2047) fills the top bit of its set: the start of every search (frames,
-/// candidates, greedy set, promotion cap, the first nodes) is the same at the width the board needs and at the next
-/// one.  (The boards just above, 512, 1024 and 2048, are in `testdata/golden_wide` at their own widths.)
+/// The last board a width holds (511, 1023, 1279, 1535, 1791, 2047) fills the top bit of its set: the start of every
+/// search (frames, candidates, greedy set, promotion cap, the first nodes) is the same at the width the board
+/// dispatches to and at the next one.  (The boards just above 511, 1023 and 2047 are in `testdata/golden_wide` at
+/// their own widths.)
 #[test]
 fn the_edges_of_the_widths_hold() {
     let default = SearchTactics::default();
     let limit = Some(1);
     let check = |profiles: [Profile; 2], n: u32| assert_eq!(profiles[0], profiles[1], "n={n}");
     check([profile_at_width::<8>(511, default, limit), profile_at_width::<16>(511, default, limit)], 511);
-    check([profile_at_width::<16>(1023, default, limit), profile_at_width::<32>(1023, default, limit)], 1023);
+    check([profile_at_width::<16>(1023, default, limit), profile_at_width::<20>(1023, default, limit)], 1023);
+    check([profile_at_width::<20>(1279, default, limit), profile_at_width::<24>(1279, default, limit)], 1279);
+    check([profile_at_width::<24>(1535, default, limit), profile_at_width::<28>(1535, default, limit)], 1535);
+    check([profile_at_width::<28>(1791, default, limit), profile_at_width::<32>(1791, default, limit)], 1791);
     check([profile_at_width::<32>(2047, default, limit), profile_at_width::<64>(2047, default, limit)], 2047);
 }
 
 // ---------------------------------------------------------------------------------------------------------
 // Games of 1100 and more, against the committed results
 
-/// Game 1133 (W = 32) searches in a few thousand nodes: every sound tactic must give the score of
-/// `results/strict.jsonl`, on one thread, and the default also on two.  Nothing else searches at W = 32 and checks
-/// the answer.
+/// Game 1133 (W = 20, the frontier's width) searches in a few thousand nodes: every sound tactic must give the score
+/// of `results/strict.jsonl`, on one thread, and the default also on two.  Nothing else searches at a width of 20 or
+/// more and checks the answer.
 #[test]
-fn every_tactic_gives_the_recorded_score_at_w32() {
+fn every_tactic_gives_the_recorded_score_at_w20() {
     let games = stored_games("strict.jsonl");
     let prev = prev_of(&games, 1133);
     for (name, tactics) in variants() {
@@ -144,12 +158,12 @@ fn a_board_that_needs_w64_builds_bounds_and_searches() {
     assert!(out.best == greedy.sum() || out.real, "{out:?}");
 }
 
-/// At W = 32 the sacrifice bound (a search of punctured boards, which is the theorem that the optimum of `n` is at
+/// At W = 20 the sacrifice bound (a search of punctured boards, which is the theorem that the optimum of `n` is at
 /// most the best of them plus a known term) is the only upper bound that does not come from the search being tested
 /// (the Java stops at 1023): it must be at least the recorded score, and where it is tight it proves it, as it does
 /// for game 1133 (not for game 1131, whose bound is larger).
 #[test]
-fn the_sacrifice_bound_proves_a_w32_result() {
+fn the_sacrifice_bound_proves_a_w20_result() {
     let games = stored_games("strict.jsonl");
     let n = 1133;
     let (prev_score, prev) = &games[&(n - 1)];
@@ -160,13 +174,14 @@ fn the_sacrifice_bound_proves_a_w32_result() {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// Resuming at W = 32
+// Resuming
 
-/// A checkpoint of a W = 32 game that an earlier build wrote (`testdata/n1133_after_1000_nodes.ckpt`: game 1133 with
+/// A checkpoint that an earlier build wrote (`testdata/n1133_after_1000_nodes.ckpt`: game 1133 at W = 32 with
 /// `reuse_prev` and `revise_freedoms` off, stopped after 1,023 nodes on one thread; search header format TXSH v3)
 /// still resumes and finishes with the committed score.  Every write/read test of the format uses the code's own
 /// constants, so a change of the layout that round-trips (the version, the byte order of a set, the order of the
-/// header's fields, the packing of the tactics) passes them and refuses this file.
+/// header's fields, the packing of the tactics) passes them and refuses this file.  This build gives game 1133
+/// W = 20, so the search also resumes at the width it was made with rather than the one a new search would get.
 ///
 /// A deliberate change of the format (a new header version, say, which refuses older checkpoints) fails this test.
 /// To make the file again with the new build:
@@ -190,11 +205,11 @@ fn a_committed_checkpoint_of_a_w32_game_resumes() {
     assert!(!checkpoint.exists(), "a finished game removes its checkpoint");
 }
 
-/// A W = 32 search interrupted every few hundred nodes and resumed from its checkpoint, under several sets of
+/// A W = 20 search interrupted every few hundred nodes and resumed from its checkpoint, under several sets of
 /// tactics (the tactics are part of the checkpoint's header and must read back as written).  The unit tests resume
 /// only at W = 16.
 #[test]
-fn a_w32_search_interrupted_and_resumed_gives_the_same_answer() {
+fn a_w20_search_interrupted_and_resumed_gives_the_same_answer() {
     let games = stored_games("strict.jsonl");
     let prev = prev_of(&games, 1133);
     for (name, tactics) in variants().into_iter().take(2) {

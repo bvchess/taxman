@@ -5,12 +5,11 @@
 //! reimplement.  Every comparison is exact, including list orders.  Mismatches are collected over all the
 //! files and reported together, so one bad board does not hide the rest.
 //!
-//! `testdata/golden` (n <= 760, and so `W = 16`) is what the Java solved with its own assertions on.  Beyond its
+//! `testdata/golden` (n <= 760, and so `W <= 16`) is what the Java solved with its own assertions on.  Beyond its
 //! limit of 1023 the Java was run without them (`java` without `-ea`: its limit is an `assert`, and nothing else
 //! depends on it); `testdata/golden_wide` holds the structure of the boards at the edges of the set widths and
-//! beyond, checked at the width `words_for(n)` picks, which no file of `testdata/golden` reaches.
+//! beyond, checked at the width `with_width!` picks for them, which no file of `testdata/golden` reaches.
 
-#[macro_use]
 mod common;
 
 use common::{fnv1a64, stored_games, testdata};
@@ -27,6 +26,7 @@ use taxman::hives::Apiary;
 use taxman::json::Json;
 use taxman::model::Model;
 use taxman::numtheory::Tables;
+use taxman::with_width;
 
 /// Wide enough for every file of `testdata/golden` (n <= 1023).
 const W: usize = 16;
@@ -68,8 +68,8 @@ fn load_golden() -> Vec<Golden> {
     golden
 }
 
-/// The boards at the edges of the set widths and beyond: the last and first n of `W = 8` / 16 (511, 512; 1023,
-/// 1024), of `W = 32` / 64 (2047, 2048), the Java's former limit and the games past it.
+/// The boards at the edges of the set widths and beyond: the last and first n of `W = 8` / 16 (511, 512), 16 / 20
+/// (1023, 1024) and 32 / 64 (2047, 2048), the Java's former limit and the games past it.
 const WIDE: [u32; 11] = [511, 512, 1000, 1001, 1023, 1024, 1025, 1100, 1231, 2047, 2048];
 
 fn load_wide() -> Vec<Golden> {
@@ -236,13 +236,13 @@ fn frames_match_java() {
 }
 
 /// The Java's structure for the boards at the edges of the set widths and beyond its former limit of 1023, at the
-/// width the board needs: no other test checks `W = 32` or `W = 64` against anything the Java made.
+/// width the board dispatches to: no other test checks `W` of 20 or more against anything the Java made.
 #[test]
 fn wide_boards_match_the_java() {
     let mut bad = Mismatches::default();
     let golden = load_wide();
     let widths: Vec<usize> = golden.iter().map(|g| with_width!(g.n, W => W)).collect();
-    assert_eq!(widths, [8, 16, 16, 16, 16, 32, 32, 32, 32, 32, 64], "the set width each board dispatches to");
+    assert_eq!(widths, [8, 16, 16, 16, 16, 20, 20, 20, 20, 32, 64], "the set width each board dispatches to");
     for g in &golden {
         with_width!(g.n, W => {
             check_apiary::<W>(g, &mut bad);

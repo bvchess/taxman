@@ -18,6 +18,80 @@ pub const fn words_for(n: u32) -> usize {
     (n >> 6) as usize + 1
 }
 
+/// The set widths the solver is built for, ascending: each is a separate copy of the search's code, and a board
+/// gets the narrowest that holds it ([`width_for`]), since every set operation costs a loop over all its words.
+/// Steps of 4 words from 16 to 32 (n = 1024 to 2047), where the search's frontier is, and 64 beyond, to n = 4095.
+pub const WIDTHS: [usize; 7] = [8, 16, 20, 24, 28, 32, 64];
+
+/// The narrowest of [`WIDTHS`] with at least `words` words, if any.
+pub const fn width_for(words: usize) -> Option<usize> {
+    let mut i = 0;
+    while i < WIDTHS.len() {
+        if WIDTHS[i] >= words {
+            return Some(WIDTHS[i]);
+        }
+        i += 1;
+    }
+    None
+}
+
+/// Runs `$body` with the const `$w` set to the set width for the board `1..=$n`, `width_for(words_for($n))`, and
+/// panics for a board no width holds; with `else $beyond`, evaluates that instead.
+///
+/// ```
+/// let words = taxman::with_width!(1215, W => W);
+/// assert_eq!(words, 20);
+/// ```
+#[macro_export]
+macro_rules! with_width {
+    ($n:expr, $w:ident => $body:expr) => {{
+        let n: u32 = $n;
+        $crate::with_words!($crate::bits::words_for(n), $w => $body, else panic!("n={n} is beyond the widest set"))
+    }};
+    ($n:expr, $w:ident => $body:expr, else $beyond:expr) => {
+        $crate::with_words!($crate::bits::words_for($n), $w => $body, else $beyond)
+    };
+}
+
+/// [`with_width!`] for sets of at least `$words` words: `$w` is `width_for($words)`, and `$beyond` is evaluated
+/// when there is none.
+#[macro_export]
+macro_rules! with_words {
+    ($words:expr, $w:ident => $body:expr, else $beyond:expr) => {
+        match $words {
+            0..=8 => {
+                const $w: usize = 8;
+                $body
+            }
+            9..=16 => {
+                const $w: usize = 16;
+                $body
+            }
+            17..=20 => {
+                const $w: usize = 20;
+                $body
+            }
+            21..=24 => {
+                const $w: usize = 24;
+                $body
+            }
+            25..=28 => {
+                const $w: usize = 28;
+                $body
+            }
+            29..=32 => {
+                const $w: usize = 32;
+                $body
+            }
+            33..=64 => {
+                const $w: usize = 64;
+                $body
+            }
+            _ => $beyond,
+        }
+    };
+}
+
 /// A set of `u32` values in `0..64·W`.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Bits<const W: usize>([u64; W]);
@@ -701,6 +775,24 @@ mod tests {
         for n in [0u32, 1, 62, 63, 64, 65, 127, 128, 511, 512, 1000, 4095] {
             assert!(n < 64 * words_for(n) as u32);
         }
+    }
+
+    #[test]
+    fn the_width_dispatch_follows_the_widths() {
+        assert!(WIDTHS.is_sorted() && WIDTHS[WIDTHS.len() - 1] == 64);
+        for words in 0..=70 {
+            let picked = crate::with_words!(words, W => Some(W), else None);
+            assert_eq!(picked, width_for(words), "{words} words");
+            assert!(picked.is_none_or(|w| w >= words && WIDTHS.contains(&w)), "{words} words");
+        }
+        // The last board of each width, and the first of the next.
+        let edges = [(1, 8), (511, 8), (512, 16), (1023, 16), (1024, 20), (1279, 20), (1280, 24), (1535, 24)];
+        let more = [(1536, 28), (1791, 28), (1792, 32), (2047, 32), (2048, 64), (4095, 64)];
+        for (n, width) in edges.into_iter().chain(more) {
+            assert_eq!(crate::with_width!(n, W => W), width, "n={n}");
+            assert_eq!(width_for(words_for(n)), Some(width), "n={n}");
+        }
+        assert_eq!(crate::with_width!(4096, W => Some(W), else None), None);
     }
 
     #[test]

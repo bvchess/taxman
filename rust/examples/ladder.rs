@@ -126,11 +126,7 @@ fn main() {
     };
     let mut all = Vec::new();
     for &n in &o.games {
-        let rows = match n {
-            0..=1023 => run::<16>(n, &o, &optimal),
-            1024..=2047 => run::<32>(n, &o, &optimal),
-            _ => run::<64>(n, &o, &optimal),
-        };
+        let rows = taxman::with_width!(n, W => run::<W>(n, &o, &optimal));
         if rows.len() > 1 {
             print_scaling(&format!("n={n}"), &rows);
         }

@@ -18,13 +18,13 @@
 //! the changes are the intended ones (the promotion sum, which is the answer, never moves), paste the rows in, and
 //! change the node counts quoted in DESIGN.md if they are affected.  The same goes for [`FORGETTING`].
 
-#[macro_use]
 mod common;
 
 use common::{search_at_width, Config, Game};
 use taxman::bounds::greedy;
 use taxman::search::SearchTactics;
 use taxman::solver::Tactics;
+use taxman::with_width;
 
 /// (board, tactics as `--tactic` assignments, promotion sum, nodes): the game searched from the frame builder on one
 /// thread, with the revision of frame 0's freedoms where the tactics have it on.  The 1133 rows have it off, like
@@ -55,9 +55,9 @@ const EXPECTED: [(u32, &str, u64, u64); 28] = [
     (760, "nogoods=off", 14170, 3361),
     (760, "fix_forced=off", 14170, 5332),
     (760, "match_refine=3", 14170, 1643),
-    // A search of more than 50,000 steps forgets its nogoods once (`forget_nogoods`: 56,990 nodes without).
+    // W = 16, and a search of more than 50,000 steps, which forgets its nogoods once (`forget_nogoods=off`: 56,990).
     (936, "default", 20507, 59055),
-    // W = 32.
+    // W = 20, the frontier's width.
     (1133, "revise_freedoms=off", 28690, 2386),
     (1133, "revise_freedoms=off,nogoods=off", 28690, 5269),
     (1133, "revise_freedoms=off,fix_forced=off", 28690, 6621),

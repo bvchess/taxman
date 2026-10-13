@@ -231,7 +231,7 @@ fn a_range_stops_at_an_unfinished_game_and_picks_up_where_it_left_off() {
     assert_eq!(lines.len(), 5 + 1);
 }
 
-/// 1500 needs `W = 32` and 2050 `W = 64` (the first board with a number above 2047 in its frames); `tests/wide.rs`
+/// 1500 gets `W = 24` and 2050 `W = 64` (the first board with a number above 2047 in its frames); `tests/wide.rs`
 /// goes further into the latter.  The setup's cost is mostly the local search for a better first incumbent.
 #[test]
 fn big_boards_get_through_setup() {
