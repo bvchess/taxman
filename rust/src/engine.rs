@@ -129,6 +129,20 @@
 //! [`lock_dir`] keeps a second process out of a checkpoint directory, so that two runs never write the same
 //! checkpoint file.
 //!
+//! **Starting stopped.**  The coordinator is the only one who checks the deadline and the stop signal, and the
+//! workers run until it does, so a stop that begins while a run is under way takes effect when the coordinator
+//! next looks, and a search shorter than that completes first.  A stop that already holds when the run starts
+//! must not depend on that race: a deadline already past (a time limit of zero) or a stop signal already received
+//! does no search work, however the threads are scheduled.  [`run`] makes that check (`Plan::stop_due`, the very
+//! test the coordinator makes) before it starts a worker; if it holds, it asks for the stop (`request_stop`)
+//! and starts none, and the coordinator stops the run at its first check like any stop.  No unit was ever handed
+//! out, so the final checkpoint holds all of them (the starting units, or the checkpoint's), the incumbent and
+//! statistics are the ones the run started with, `completed` is false and `Counters::runs` is 0; a run resumed
+//! from that checkpoint while the stop still holds stops the same way and writes the same units again.  (A
+//! search with no units at all is complete, and says so.)  The node limit is not a stop of this kind: workers
+//! enforce it when they publish their node counts, every `POLL_BATCH` polls, so a search shorter than that
+//! completes whatever the limit.
+//!
 //! # Instrumentation
 //!
 //! Each worker's time is split into disjoint intervals, summed in [`Counters`]: *busy* (inside
@@ -221,8 +235,8 @@ pub struct EngineConfig {
     /// Directory for spill segments; created if missing.  Without it the deque is never spilled.
     pub spill_dir: Option<PathBuf>,
     /// Checkpoint file and interval.  A final checkpoint is also written when a limit or a stop signal stops
-    /// the run, and the file is deleted when the run completes (unless `keep_completed_checkpoint`).  Any
-    /// interval works, zero included: see "Checkpoint" in the module docs.
+    /// the run (also one that holds from the start), and the file is deleted when the run completes (unless
+    /// `keep_completed_checkpoint`).  Any interval works, zero included: see "Checkpoint" in the module docs.
     pub checkpoint: Option<(PathBuf, Duration)>,
     /// Leave the checkpoint file in place when the run completes, for a caller that deletes it
     /// ([`remove_checkpoint`]) only once it has recorded the result durably.  Off by default.
@@ -231,9 +245,12 @@ pub struct EngineConfig {
     pub progress: Option<Duration>,
     /// Wall-clock limit for this invocation's search, counted from when the workers start (after a resumed
     /// checkpoint has been loaded); earlier runs of a resumed search do not count.  Too large to add to the
-    /// clock means none.
+    /// clock means none.  A limit that has run out before the first worker would start, zero above all, stops
+    /// the run before any search work, with its final checkpoint ("Starting stopped" in the module docs); one
+    /// that runs out later stops the run when the coordinator next looks.
     pub time_limit: Option<Duration>,
-    /// Node limit for this invocation (not counting earlier runs of a resumed search).
+    /// Node limit for this invocation (not counting earlier runs of a resumed search).  The workers enforce it
+    /// when they publish their node counts, every 1024 polls, so a search shorter than that completes.
     pub node_limit: Option<u64>,
     /// Prefix for progress lines.
     pub label: String,
@@ -468,8 +485,16 @@ where
         label: &cfg.label,
         header,
     };
+    // See "Starting stopped": a stop that already holds is made before any worker exists to take a unit, and the
+    // coordinator carries it out as it does every stop.
+    let workers = if plan.stop_due() {
+        shared.request_stop();
+        0
+    } else {
+        threads
+    };
     thread::scope(|scope| {
-        for i in 0..threads {
+        for i in 0..workers {
             let (shared, make) = (&shared, &make);
             let spawned = thread::Builder::new()
                 .name(format!("engine-{i}"))
@@ -605,8 +630,9 @@ pub fn lock_dir(dir: &Path) -> io::Result<DirLock> {
 
 /// Make SIGINT and SIGTERM stop every run of this process the way a time limit does (with a final checkpoint,
 /// `completed == false`), now and later: the first signal sets a flag that every run's coordinator polls at
-/// least every `SIGNAL_POLL`, and a run that starts after it stops at once.  A second signal ends the process
-/// at once with status 128 + the signal (the last checkpoint stays valid).
+/// least every `SIGNAL_POLL`, and a run that starts after it stops at once, before any search work ("Starting
+/// stopped" in the module docs).  A second signal ends the process at once with status 128 + the signal (the
+/// last checkpoint stays valid).
 ///
 /// # Errors
 ///
@@ -809,6 +835,20 @@ struct Plan<'p> {
     deadline: Option<Instant>,
     label: &'p str,
     header: &'p [u8],
+}
+
+impl Plan<'_> {
+    /// Whether the clock or the process asks the run to stop now: the deadline has passed, or a stop signal
+    /// has been received (see [`stop_on_signals`]).  The one test of both: the coordinator makes it at every
+    /// look, and [`run`] before it starts a worker ("Starting stopped").  Once true it stays true.
+    fn stop_due(&self) -> bool {
+        stop_signal().is_some() || past(self.deadline)
+    }
+}
+
+/// Whether `t`, if there is one, is not in the future.
+fn past(t: Option<Instant>) -> bool {
+    t.is_some_and(|t| Instant::now() >= t)
 }
 
 struct Shared<U: Unit> {
@@ -1285,8 +1325,7 @@ impl<U: Unit> Shared<U> {
         let mut next_checkpoint = plan.checkpoint.and_then(|(_, every)| plan.began.checked_add(every));
         let mut next_progress = plan.progress.and_then(|every| plan.began.checked_add(every));
         let mut last_report = (plan.began, 0);
-        let past = |t: Option<Instant>| t.is_some_and(|t| Instant::now() >= t);
-        let stopping = |st: &State<U>| st.stop_requested || stop_signal().is_some() || past(plan.deadline);
+        let stopping = |st: &State<U>| st.stop_requested || plan.stop_due();
         let mut guard = self.lock();
         loop {
             if guard.exit {

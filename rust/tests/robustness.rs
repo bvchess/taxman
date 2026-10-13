@@ -255,6 +255,60 @@ fn a_checkpoint_interval_of_zero_makes_progress() {
     }
 }
 
+/// A run whose deadline has already passed when it starts, which is what a time limit of zero is, does no search
+/// work however the threads are scheduled.  Only the coordinator looked at the deadline, so the workers, started
+/// first, could finish a small search before its first look, and the run completed instead of stopping with its
+/// checkpoint (with one worker about one run in a thousand on a loaded machine; with many nearly every run, since
+/// the first has the start-up of the others to itself).  Now no worker is started: the run stops with every unit
+/// in its checkpoint, however often it is resumed under the same deadline, and a run resumed without it finds
+/// nothing lost.  (A stop signal that was received before the run starts is the same stop: `tests/stop_signal.rs`.)
+#[test]
+fn a_deadline_that_has_passed_stops_the_run_before_any_search() {
+    // Many runs of a search small enough to finish within a start-up, with many workers and no checkpoint file.
+    let small = Tree { max_depth: 5, salt: 1 };
+    let expired = EngineConfig { threads: 16, time_limit: Some(Duration::ZERO), ..EngineConfig::default() };
+    for run in 0..300 {
+        let make = |_| Walker { tree: small, stack: Vec::new(), drop_leaves: false };
+        let out = engine::run(&expired, fresh(), HEADER, make).unwrap();
+        let nothing = (out.completed, out.stats.nodes, out.counters.runs, out.counters.checkpoints);
+        assert_eq!(nothing, (false, 0, 0, 0), "run {run}: {:?}", out.counters);
+    }
+
+    // A search stopped part-way, with spilling, resumed under a deadline that has passed, then without it.
+    let tree = Tree { max_depth: 20, salt: 2 };
+    let (size, best) = tree.walk();
+    let dir = TempDir::new("expired");
+    let (ckpt, spill) = (dir.join("ckpt"), dir.join("spill"));
+    let make = |_| Walker { tree, stack: Vec::new(), drop_leaves: false };
+    let cfg = EngineConfig {
+        threads: 4,
+        checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))),
+        queue_mem_cap: 2,
+        spill_dir: Some(spill.clone()),
+        node_limit: Some(size / 3),
+        ..EngineConfig::default()
+    };
+    assert!(!engine::run(&cfg, fresh(), HEADER, make).unwrap().completed);
+    let head = engine::read_checkpoint(&ckpt).unwrap();
+    let expired = EngineConfig { node_limit: None, time_limit: Some(Duration::ZERO), ..cfg.clone() };
+    for resume in 0..5 {
+        let out = engine::run(&expired, Start::Resume(ckpt.clone()), HEADER, make).unwrap();
+        assert!(
+            !out.completed && out.counters.runs == 0 && out.counters.checkpoints == 1,
+            "{resume}: {:?}",
+            out.counters
+        );
+        assert_eq!((out.stats, out.best), (head.stats, head.best), "resume {resume}: no node explored");
+        let again = engine::read_checkpoint(&ckpt).unwrap();
+        assert_eq!((again.stats, again.best, &again.payload), (head.stats, head.best, &head.payload), "{resume}");
+        assert!(dir_is_empty(&spill), "resume {resume}: spill segments left behind");
+    }
+    let rest = EngineConfig { node_limit: None, time_limit: None, ..cfg };
+    let out = engine::run(&rest, Start::Resume(ckpt.clone()), HEADER, make).unwrap();
+    assert!(out.completed && (out.stats.nodes, out.best) == (size, best), "every unit was kept: {:?}", out.counters);
+    assert!(!ckpt.exists() && dir_is_empty(&spill));
+}
+
 /// Intervals and limits too long to add to the clock are never reached (they used to overflow `Instant`).
 #[test]
 fn absurd_intervals_and_limits_are_never_reached() {

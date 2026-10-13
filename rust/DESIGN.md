@@ -418,7 +418,9 @@ design in outline.
   search (section 8: it is what makes a checkpoint of another game, width, build or tactics refuse to resume).  A run
   that completes deletes its checkpoint unless the caller asks to keep it until it has recorded the result.
 * **Stopping and sharing.**  Time and node limits, and SIGINT and SIGTERM (after `stop_on_signals`), stop a run with a
-  final checkpoint; a second signal kills the process.  `taxman solve` takes an exclusive `flock` on `taxman.lock` in
+  final checkpoint; a second signal kills the process.  A stop that already holds when a run starts (a time limit of
+  zero, a signal received before) does no search work, however the threads are scheduled: the run checks before it
+  starts a worker (engine docs, "Starting stopped").  `taxman solve` takes an exclusive `flock` on `taxman.lock` in
   its checkpoint directory, so a second process there fails at once.  Spill segments carry their process id, and a run
   deletes those of processes that no longer exist.  Progress lines and results on stdout ignore write errors, so a
   closed pipe cannot kill a run.  A panic in a release build aborts (`panic = "abort"`); the previous checkpoint stays
@@ -562,17 +564,18 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   nogoods every 500 steps.  **A change that alters the tree on purpose fails them.**  Run `cargo test --test tripwires
   -- --nocapture`: it prints the rows as observed, in the layout of the table at the top of the file; check that the
   promotion sums (the answers) have not moved, paste the rows in, and update any node counts quoted in the docs.
-* **Engine** (`tests/engine.rs`, `tests/robustness.rs`): a toy problem with a known optimum (knapsack against dynamic
-  programming), run with 1 and many threads, with a tiny `queue_mem_cap` to force spilling, and killed and resumed from
-  checkpoints, must give the same answer; ignored tests do the same with 64 and 192 threads, checkpoints every 2 ms, and
-  a panicking worker (`cargo test --release --test engine -- --ignored many_threads`), and draw random configurations
-  through any number of resumes (`TXENGINE_STRESS=<n>`).  A tree with no pruning checks conservation exactly: under
-  random configurations the nodes counted must equal the tree's size, so one unit lost or explored twice shows
-  (`TXENGINE_CONSERVATION=<n>` for more).  Robustness: an interval of zero finishes; limits too large for the clock are
-  never reached; spill segments of dead processes are removed; a locked checkpoint directory or results file is refused;
-  a checkpoint of another game, with other tactics, with frame 0 freedoms its search cannot have had or with an
-  incumbent that does not fit is refused; and the binary rejects bad times, survives a closed stdout and stderr, and
-  stops on SIGINT and SIGTERM with a checkpoint it then resumes.
+* **Engine** (`tests/engine.rs`, `tests/robustness.rs`, `tests/stop_signal.rs`): a toy problem with a known optimum
+  (knapsack against dynamic programming), run with 1 and many threads, with a tiny `queue_mem_cap` to force spilling,
+  and killed and resumed from checkpoints, must give the same answer; ignored tests do the same with 64 and 192 threads,
+  checkpoints every 2 ms, and a panicking worker (`cargo test --release --test engine -- --ignored many_threads`), and
+  draw random configurations through any number of resumes (`TXENGINE_STRESS=<n>`).  A tree with no pruning checks
+  conservation exactly: under random configurations the nodes counted must equal the tree's size, so one unit lost or
+  explored twice shows (`TXENGINE_CONSERVATION=<n>` for more).  Robustness: an interval of zero finishes; limits too
+  large for the clock are never reached; a deadline that has passed, or a stop signal received, before a run starts
+  stops it before any search, with every unit in its checkpoint; spill segments of dead processes are removed; a locked
+  checkpoint directory or results file is refused; a checkpoint of another game, with other tactics, with frame 0
+  freedoms its search cannot have had or with an incumbent that does not fit is refused; and the binary rejects bad
+  times, survives a closed stdout and stderr, and stops on SIGINT and SIGTERM with a checkpoint it then resumes.
 * **Integrity of results** (`tests/integrity.rs`, `tests/results.rs`, `tests/solver.rs`): a previous game that is not
   what it says is refused; taint travels down a chain; a tampered results file, or one whose line contradicts itself, is
   refused naming the line, by both verifiers; a torn last line is dropped; the committed results pass the verifier with

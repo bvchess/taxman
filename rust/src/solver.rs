@@ -100,7 +100,8 @@ pub struct SolveOptions {
     pub checkpoint_interval: Duration,
     /// Interval between progress lines on stderr.
     pub progress: Option<Duration>,
-    /// Per game and invocation; an unfinished search keeps its checkpoint.
+    /// Per game and invocation; an unfinished search keeps its checkpoint.  A limit that has run out before a
+    /// search starts, zero above all, stops it before it does any work ([`EngineConfig::time_limit`]).
     pub time_limit: Option<Duration>,
     pub node_limit: Option<u64>,
     /// Most queued search units kept in memory; the rest spill to disk.
