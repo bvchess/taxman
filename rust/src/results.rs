@@ -66,10 +66,11 @@
 //!
 //! # The file of a run, and checking files on their own
 //!
-//! [`ResultsFile`] is the file a run appends to.  Opening it checks it ([`read_results`]); the completed games in it
-//! count as done and are the previous games of the ones after them; each new result is appended and synced as soon as
-//! it is done (so a crash loses at most the line being written); and a game that failed a check after it was found
-//! is written to [`rejected_path`] instead, with the reason.  [`verify_files`] runs the same checks on files without
+//! [`ResultsFile`] is the file a run appends to.  Opening it locks it against other processes (two runs appending to
+//! one file would leave two lines for a game) and checks it ([`read_results`]); the completed games in it count as
+//! done and are the previous games of the ones after them; each new result is appended and synced as soon as it is
+//! done (so a crash loses at most the line being written); and a game that failed a check after it was found is
+//! written to [`rejected_path`] instead, with the reason.  [`verify_files`] runs the same checks on files without
 //! changing them, and that the files agree on the games they share (`taxman verify-results`).  The Python referee
 //! `tools/check_results.py` derives the same proofs and taints from the same rules with no code in common, so a
 //! mistake in either shows as a disagreement.
@@ -82,8 +83,8 @@ use crate::search::Revise;
 use crate::solver::{GameResult, Method, PrevSource, MAX_N};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
-use std::fs::{self, File, OpenOptions};
-use std::io::Write;
+use std::fs::{self, File, OpenOptions, TryLockError};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 /// The version of the result-line format.  1 (no `schema` field) is the format before provenance; 2 counted a
@@ -719,25 +720,39 @@ fn check_entry(e: Entry, games: &BTreeMap<u32, StoredGame>, optimal: Option<&Opt
 // The results file of a run
 
 /// A results file being appended to: one JSON object per line, as games finish.  Only completed games count as
-/// done.  Opening it checks it ([`read_results`]).
+/// done.  Opening it locks it and checks it ([`read_results`]).
 pub struct ResultsFile {
     path: PathBuf,
+    /// Locked (`flock`) for as long as it is open.
     file: File,
     contents: Contents,
 }
 
 impl ResultsFile {
-    /// Opens (creating if need be) the file and checks it, with `optimal` for the games of `n − 1` that came
-    /// from it.  A torn last line is cut off.
+    /// Opens (creating if need be) the file, locks it against every other process (the lock goes when the file is
+    /// dropped or the process ends, however it ends), and checks it, with `optimal` for the games of `n − 1` that
+    /// came from it.  A torn last line is cut off.
+    ///
+    /// Two runs appending to one file would both solve the games it lacks and both append them, leaving two lines
+    /// for a game, which no later run opens; so a file another process has open is refused, as `taxman solve`
+    /// refuses a checkpoint directory in use (`engine::lock_dir`).  Two handles in one process exclude each other
+    /// too.
     pub fn open(path: &Path, optimal: Option<&Optimal>) -> Result<ResultsFile, String> {
         let io_error = |e: std::io::Error| format!("{}: {e}", path.display());
-        let text = match fs::read_to_string(path) {
-            Ok(text) => text,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
-            Err(e) => return Err(io_error(e)),
-        };
+        let mut file = OpenOptions::new().create(true).read(true).append(true).open(path).map_err(io_error)?;
+        match file.try_lock() {
+            Ok(()) => {}
+            Err(TryLockError::WouldBlock) => {
+                return Err(format!(
+                    "{} is in use by another process (another run appending to it?): it is locked",
+                    path.display()
+                ))
+            }
+            Err(TryLockError::Error(e)) => return Err(io_error(e)),
+        }
+        let mut text = String::new();
+        file.read_to_string(&mut text).map_err(io_error)?;
         let contents = read_results(&text, optimal).map_err(|e| format!("{}: {e}", path.display()))?;
-        let mut file = OpenOptions::new().create(true).append(true).open(path).map_err(io_error)?;
         if contents.torn {
             file.set_len(contents.valid_len as u64).map_err(io_error)?;
         }
@@ -1029,6 +1044,19 @@ mod tests {
         let mut twice = lines.clone();
         twice.push(lines[4].clone());
         assert!(read_results(&text(&twice), None).unwrap_err().contains("lines 5 and 13 both hold"));
+    }
+
+    /// An open results file is locked: opening it again (from this process or another) is refused until it is
+    /// closed.
+    #[test]
+    fn a_results_file_is_locked_while_it_is_open() {
+        let dir = crate::test_support::TempDir::new("results-lock");
+        let path = dir.join("r.jsonl");
+        let held = ResultsFile::open(&path, None).unwrap();
+        let err = ResultsFile::open(&path, None).err().expect("a second handle is refused");
+        assert!(err.contains("r.jsonl is in use by another process"), "{err}");
+        drop(held);
+        assert!(ResultsFile::open(&path, None).is_ok());
     }
 
     #[test]

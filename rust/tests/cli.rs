@@ -170,6 +170,24 @@ fn solve_writes_its_results_skips_what_is_done_and_resumes_what_was_stopped() {
     assert!(!ckpt.join("n0600.ckpt").exists(), "a finished game removes its checkpoint");
 }
 
+/// A results file that another process has open (here this one, appending to it as a run does) is refused by
+/// `solve`, which appends nothing; once it is closed, `solve` goes on with it.
+#[test]
+fn solve_refuses_a_results_file_another_process_has_open() {
+    let dir = TempDir::new("solve-lock");
+    let results = dir.join("results.jsonl");
+    let args = ["solve", "5-9", "--threads", "1", "--progress", "0", "--out", path(&results)];
+    let held = taxman::results::ResultsFile::open(&results, None).unwrap();
+    let run = taxman(&args);
+    assert_eq!(run.code, Some(1), "{}", run.stderr);
+    assert!(run.stderr.contains("results.jsonl is in use by another process"), "{}", run.stderr);
+    assert_eq!(fs::read_to_string(&results).unwrap(), "");
+    drop(held);
+    let run = taxman(&args);
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    assert_eq!(fs::read_to_string(&results).unwrap().lines().count(), 5);
+}
+
 #[test]
 fn regress_checks_scores_against_optimal_json() {
     let run = taxman(&["regress", "--to", "40", "--threads", "1"]);

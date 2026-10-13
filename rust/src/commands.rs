@@ -4,8 +4,8 @@
 //! and call the library's pipeline ([`taxman::solver`]); what they add is output, and the policies of a command-line
 //! run:
 //!
-//! * `solve` stops on SIGINT and SIGTERM with a final checkpoint, locks its checkpoint directory, and prints one
-//!   summary line per game as it finishes;
+//! * `solve` stops on SIGINT and SIGTERM with a final checkpoint, locks its checkpoint directory and (when it opens
+//!   it, `results::ResultsFile`) its results file, and prints one summary line per game as it finishes;
 //! * `regress` solves in memory and compares every score with `optimal.json`;
 //! * `bench` solves a fixed set of hard games standalone and appends the run to a history file, so that
 //!   performance can be followed from commit to commit.  Its files are found in the repository
@@ -69,7 +69,8 @@ pub fn solve(args: &[String]) -> CliResult {
     let out = args.value("--out").map(Path::new);
     let show = args.has("--show");
 
-    // Two processes in one checkpoint directory would overwrite each other's checkpoints.
+    // Two processes in one checkpoint directory would overwrite each other's checkpoints.  (Opening the results
+    // file locks it too, against a second run appending to it.)
     let _lock = match &opts.checkpoint_dir {
         Some(dir) => {
             std::fs::create_dir_all(dir).map_err(|e| failed(format!("{}: {e}", dir.display())))?;
