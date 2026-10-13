@@ -201,7 +201,7 @@ The payoff is a constant fraction of the chain, at no risk, and it multiplies wi
 `|N − P| − 1` members of each nogood `N`; dualizing these inequalities with multipliers `λ_N ≥ 0` gives, for every
 `λ`, the bound `max_M Σ_{x ∈ Q(M)} (x − Σ_{N ∋ x} λ_N) + Σ_N λ_N (|N − P| − 1)`: a matching with each
 candidate's weight lowered by the multipliers of its nogoods, plus a constant
-([`src/search/lagrange.rs`](../src/search/lagrange.rs)).  A nogood with a member that has left the candidates cannot
+(`src/search/lagrange.rs` on the branch `ideas-pilots`).  A nogood with a member that has left the candidates cannot
 be broken any more and is left out (multiplier 0 at that node).  It is the evidence crate's second bound
 ([evidence/README.md](../evidence/README.md), section 5: 3.3× fewer nodes at n = 793 for its model-free search),
 brought to the frame solver, and MaxSAT's core-guided bounds in spirit: each nogood is a core, and the multipliers
