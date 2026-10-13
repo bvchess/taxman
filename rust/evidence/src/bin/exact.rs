@@ -1,0 +1,210 @@
+//! The model-free cross-check of optimal scores: for every game in a range, an upper bound on opt(n) proven
+//! without the frame model, compared with the recorded optimum V(n) (optimal.json to 1000, the solver's
+//! `results/default.jsonl` beyond).  One line per game, resumable:
+//!
+//!     exact --from A --to B [--list ...] [--threads T] [--seconds S] [--budget NODES] [--all 1]
+//!           [--segments 1] [--checkpoints DIR] [--optimal FILE] [--results FILE] --out FILE
+//!
+//! Per game: the recorded game is replayed by the rules (a lower bound, opt(n) >= V(n)); the Franklín–Moniot
+//! matching bound is computed; the relations opt(n) <= n + opt(n−1) and, for a prime n, opt(n) <=
+//! n + opt(n−1) − p are noted; and unless one of them already gives V(n) (or `--all`), the branch and bound of
+//! `game.rs` decides whether any playable set beats V(n).  Which games end up proven, given their predecessors,
+//! is worked out by `tools/summarize.py exact` from the file.
+//!
+//! A search still running at `--seconds` pauses and saves its open subtrees and nogoods to
+//! `DIR/exact_N.ckpt` (default `work/checkpoints`); the next run resumes it, so a game may take any number of
+//! runs.  `--segments 1` turns on the segment cuts, which make a game's proof rest on the smaller games' bounds
+//! (recorded as `"segments":1`); they are off by default, so that each search stands alone.
+
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
+use taxman_evidence::game::{prime_below, Board, Prover, Role, Verdict};
+use taxman_evidence::jsonl::{campaign, parse_items, Obj};
+use taxman_evidence::primes::{is_prime, smallest_prime_factors};
+
+/// (n, score, moves) of every game in a file of optimal.json's or the solver's results format: the first "n",
+/// "score" and "moves" of each line holding an "n".
+fn games(text: &str) -> Vec<(u64, u64, Vec<u32>)> {
+    fn after<'a>(line: &'a str, key: &str) -> Option<&'a str> {
+        let at = line.find(&format!("\"{key}\""))? + key.len() + 2;
+        Some(line[at..].trim_start().strip_prefix(':')?.trim_start())
+    }
+    let number = |s: &str| s.chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse::<u64>().ok();
+    text.lines()
+        .filter_map(|line| {
+            let n = number(after(line, "n")?)?;
+            let score = number(after(line, "score")?)?;
+            let moves = after(line, "moves")?.strip_prefix('[')?;
+            let moves = &moves[..moves.find(']')?];
+            let moves = moves.split(',').filter(|s| !s.trim().is_empty()).map(|s| s.trim().parse().unwrap()).collect();
+            Some((n, score, moves))
+        })
+        .collect()
+}
+
+/// A paused search: its target, nodes so far, nogoods and open units (roles as letters F, P, B).
+struct Checkpoint {
+    target: u64,
+    nodes: u64,
+    /// Seconds spent in earlier runs.
+    secs: f64,
+    nogoods: Vec<Vec<u32>>,
+    units: Vec<Vec<Role>>,
+}
+
+impl Checkpoint {
+    fn save(&self, path: &Path) {
+        let mut text = format!("target {}\nnodes {}\nsecs {}\n", self.target, self.nodes, self.secs);
+        for k in &self.nogoods {
+            text += &format!("nogood {}\n", k.iter().map(|c| c.to_string()).collect::<Vec<_>>().join(" "));
+        }
+        for u in &self.units {
+            let letters: String = u
+                .iter()
+                .map(|r| match r {
+                    Role::Free => 'F',
+                    Role::Pick => 'P',
+                    Role::Barred => 'B',
+                })
+                .collect();
+            text += &format!("unit {letters}\n");
+        }
+        let tmp = path.with_extension("tmp");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&tmp, text).unwrap();
+        fs::File::open(&tmp).unwrap().sync_all().unwrap();
+        fs::rename(&tmp, path).unwrap();
+    }
+
+    fn load(path: &Path) -> Option<Checkpoint> {
+        let text = fs::read_to_string(path).ok()?;
+        let mut cp = Checkpoint { target: 0, nodes: 0, secs: 0.0, nogoods: Vec::new(), units: Vec::new() };
+        for line in text.lines() {
+            let (key, rest) = line.split_once(' ')?;
+            match key {
+                "target" => cp.target = rest.parse().ok()?,
+                "nodes" => cp.nodes = rest.parse().ok()?,
+                "secs" => cp.secs = rest.parse().ok()?,
+                "nogood" => cp.nogoods.push(rest.split(' ').map(|c| c.parse().unwrap()).collect()),
+                "unit" => cp.units.push(
+                    rest.chars()
+                        .map(|ch| match ch {
+                            'F' => Role::Free,
+                            'P' => Role::Pick,
+                            _ => Role::Barred,
+                        })
+                        .collect(),
+                ),
+                _ => return None,
+            }
+        }
+        Some(cp)
+    }
+}
+
+fn main() {
+    let (items, flags) = parse_items(std::env::args().skip(1));
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let (mut threads, mut seconds, mut budget) = (1usize, f64::INFINITY, u64::MAX);
+    let (mut all, mut segments) = (false, false);
+    let mut optimal = root.join("../../src/main/resources/optimal.json");
+    let mut results = root.join("../results/default.jsonl");
+    let mut checkpoints = root.join("work/checkpoints");
+    let mut out = PathBuf::new();
+    for (flag, value) in flags {
+        match flag.as_str() {
+            "--threads" => threads = value.parse().unwrap(),
+            "--seconds" => seconds = value.parse().unwrap(),
+            "--budget" => budget = value.parse().unwrap(),
+            "--all" => all = value == "1" || value == "true",
+            "--segments" => segments = value == "1" || value == "true",
+            "--checkpoints" => checkpoints = value.into(),
+            "--optimal" => optimal = value.into(),
+            "--results" => results = value.into(),
+            "--out" => out = value.into(),
+            _ => panic!("unknown flag {flag}"),
+        }
+    }
+    assert!(!out.as_os_str().is_empty(), "--out is required");
+    let mut known: std::collections::BTreeMap<u64, (u64, Vec<u32>)> = std::collections::BTreeMap::new();
+    for path in [&optimal, &results] {
+        let text = fs::read_to_string(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        for (n, score, moves) in games(&text) {
+            known.entry(n).or_insert((score, moves));
+        }
+    }
+    let items: Vec<u64> = items.into_iter().filter(|n| *n >= 2 && known.contains_key(n)).collect();
+    let spf = smallest_prime_factors(items.iter().copied().max().unwrap_or(2) as usize);
+    let pause_at = Instant::now() + Duration::from_secs_f64(seconds.min(1e9));
+    campaign("exact", &items, threads, seconds, &out, |n| {
+        let started = Instant::now();
+        let earlier = std::cell::Cell::new(0.0f64);
+        let (score, moves) = &known[&n];
+        let board = Board::new(n as u32, &spf);
+        let replayed = board.replay(moves);
+        assert_eq!(replayed, Ok(*score), "n={n}: the recorded game does not replay to its score");
+        let prev = known.get(&(n - 1)).map_or(0, |(s, _)| *s);
+        let relation = if *score == n + prev {
+            "chain"
+        } else if n > 2 && is_prime(n, &spf) && *score == n + prev - prime_below(n, &spf) {
+            "prime"
+        } else {
+            "none"
+        };
+        let mut prover = Prover::new(&board, *score, budget).pause_at(pause_at);
+        if segments {
+            let smaller: Vec<u64> = (0..n).map(|m| known.get(&m).map_or(0, |(s, _)| *s)).collect();
+            prover = prover.with_smaller_games(&smaller);
+        }
+        let fm = prover.root_bound();
+        assert!(fm >= *score, "n={n}: the matching bound {fm} is below a legal game's {score}");
+        let ckpt = checkpoints.join(format!("exact_{n}.ckpt"));
+        let (search, note) = if fm == *score || (relation != "none" && !all) {
+            ("skipped", None)
+        } else {
+            let verdict = match Checkpoint::load(&ckpt) {
+                Some(cp) => {
+                    assert_eq!(cp.target, *score, "n={n}: the checkpoint is for another target");
+                    prover.nodes = cp.nodes;
+                    earlier.set(cp.secs);
+                    prover.nogoods = cp.nogoods;
+                    prover.run_units(cp.units)
+                }
+                None => prover.run(),
+            };
+            match verdict {
+                Verdict::Proven => ("proven", None),
+                Verdict::Budget => ("budget", Some(format!("budget exhausted after {} nodes", prover.nodes))),
+                Verdict::Paused => {
+                    let cp = Checkpoint {
+                        target: *score,
+                        nodes: prover.nodes,
+                        secs: earlier.get() + started.elapsed().as_secs_f64(),
+                        nogoods: prover.nogoods.clone(),
+                        units: prover.open_units().to_vec(),
+                    };
+                    cp.save(&ckpt);
+                    let note = format!("paused after {} nodes, {} open units", prover.nodes, cp.units.len());
+                    return (None, Some(note));
+                }
+                Verdict::Beaten(picks) => {
+                    let sum: u64 = picks.iter().map(|&c| u64::from(c)).sum();
+                    panic!("n={n}: a playable set worth {sum} beats the recorded {score}: {picks:?}");
+                }
+            }
+        };
+        let _ = fs::remove_file(&ckpt);
+        let line = Obj::new()
+            .num("n", n)
+            .num("score", *score)
+            .num("fm_bound", fm)
+            .str("relation", relation)
+            .str("search", search)
+            .num("segments", u8::from(segments && search != "skipped"))
+            .num("nodes", prover.nodes)
+            .float("secs", earlier.get() + started.elapsed().as_secs_f64())
+            .finish();
+        (Some(line), note)
+    });
+}

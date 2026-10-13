@@ -374,7 +374,8 @@ impl<'a> Plus1<'a> {
                 return Outcome::Found(flagged(&state.iter().map(|&s| s != State::Excluded).collect::<Vec<_>>()));
             }
             for comp in components(inst, &rest) {
-                let mut ordered: Vec<u32> = comp.iter().copied().filter(|&m| state[m as usize] == State::Open).collect();
+                let mut ordered: Vec<u32> =
+                    comp.iter().copied().filter(|&m| state[m as usize] == State::Open).collect();
                 ordered.extend(comp.iter().copied().filter(|&m| state[m as usize] != State::Open));
                 let core = minimal_core(inst, &mut self.peeler, &ordered);
                 let open = core.iter().filter(|&&m| state[m as usize] == State::Open).count();

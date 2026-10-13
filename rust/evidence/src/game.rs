@@ -1,1 +1,1104 @@
-//! The full game, model-free.
+//! The full game, model-free: an exact upper bound on opt(n) that uses only proven facts.
+//!
+//! Nothing here knows about hives, frames, greedy, `unzip` or promotions.  It rests on:
+//!
+//! * **Theorem 1 with peel** (THEORY.md): a set S of picks can all be played iff dismantling the reduction
+//!   instance whose members are S, each listing its maximal factors outside S, removes everything.  (Peel
+//!   succeeds iff S is playable, Theorems 2 and 3; with every list a set of maximal factors and no member in any
+//!   list, playable implies no self-covering subset, Theorem 5 (⇒), and a full dismantling order rebuilds S by
+//!   the extension lemma, whose proof needs exactly that no member is in a list.)  So opt(n) is the largest sum
+//!   of a playable S ⊆ {2..n}, and every subset of a playable set is playable.
+//! * **The Franklín–Moniot matching bound**: a playable S pays each pick with a distinct maximal factor outside
+//!   S (Theorem 1), so S is the pick side of a matching in the graph joining each c to its maximal factors c/p,
+//!   with each number in at most one edge, weighing the larger end.  The graph is bipartite by the parity of Ω.
+//! * **opt(n) <= n + opt(n−1)** (deleting the move n from a game of n leaves a game of n − 1), and for a prime n,
+//!   **opt(n) <= n + opt(n−1) − p** with p the largest prime below n (a game playing n plays it first, paying 1;
+//!   swapping it for p, which divides nothing up to n − 1 by Bertrand, gives a game of n − 1).
+//!
+//! [`Prover`] decides "is there a playable S with sum > V?" by branch and bound over the numbers' roles: each
+//! number is a forced pick, free, or barred from picking.  A node's bound is the maximum matching with the forced
+//! picks matched downward and the barred ones only as payments; if the matching's picks are playable they are a
+//! game worth the bound; otherwise they contain an unplayable subset K (shrunk to a minimal one), every
+//! playable set leaves out some member of K, and child j bars the j-th free member of K and forces the ones
+//! before it.
+
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
+
+use crate::primes::{is_prime, maximal_factors};
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Role {
+    Free,
+    /// Must be picked.
+    Pick,
+    /// May not be picked (may still pay).
+    Barred,
+}
+
+/// The board 1..=n: maximal factors and the parity of Ω.
+pub struct Board {
+    pub n: u32,
+    pub mf: Vec<Vec<u32>>,
+    /// For each number, its maximal composites c·p <= n.
+    pub mc: Vec<Vec<u32>>,
+    pub even: Vec<bool>,
+}
+
+impl Board {
+    pub fn new(n: u32, spf: &[u32]) -> Self {
+        let size = n as usize + 1;
+        let mut mf = vec![Vec::new(); size];
+        let mut mc = vec![Vec::new(); size];
+        let mut omega = vec![0u32; size];
+        for c in 2..=n {
+            let p = spf[c as usize];
+            omega[c as usize] = omega[(c / p) as usize] + 1;
+            mf[c as usize] = maximal_factors(u64::from(c), spf).into_iter().map(|f| f as u32).collect();
+            for &f in &mf[c as usize] {
+                mc[f as usize].push(c);
+            }
+        }
+        let even = omega.iter().map(|o| o % 2 == 0).collect();
+        Board { n, mf, mc, even }
+    }
+
+    /// Plays `moves` by the rules (each move needs a proper divisor in the pot and takes all of them); the score.
+    pub fn replay(&self, moves: &[u32]) -> Result<u64, String> {
+        let n = self.n as usize;
+        let mut pot = vec![true; n + 1];
+        pot[0] = false;
+        let mut score = 0u64;
+        for &c in moves {
+            let c = c as usize;
+            if c > n || !pot[c] {
+                return Err(format!("{c} is not in the pot"));
+            }
+            let mut taxed = false;
+            for d in 1..=c / 2 {
+                if c % d == 0 && pot[d] {
+                    pot[d] = false;
+                    taxed = true;
+                }
+            }
+            if !taxed {
+                return Err(format!("{c} has no divisor left"));
+            }
+            pot[c] = false;
+            score += c as u64;
+        }
+        Ok(score)
+    }
+
+    /// Whether the picks flagged in `pick` can all be played: dismantle the instance whose members are the
+    /// picks, each listing its maximal factors that are not picks.
+    pub fn playable(&self, pick: &[bool]) -> bool {
+        self.residual(pick).iter().all(|&x| !x)
+    }
+
+    /// The members left by dismantling the picks (empty iff playable).
+    pub fn residual(&self, pick: &[bool]) -> Vec<bool> {
+        let n = self.n as usize;
+        let mut alive = pick.to_vec();
+        let mut degree = vec![0u32; n + 1];
+        for c in 2..=n {
+            if alive[c] {
+                for &f in &self.mf[c] {
+                    if !pick[f as usize] {
+                        degree[f as usize] += 1;
+                    }
+                }
+            }
+        }
+        let mut queue: Vec<u32> = (2..=n as u32)
+            .filter(|&c| {
+                alive[c as usize] && self.mf[c as usize].iter().any(|&f| !pick[f as usize] && degree[f as usize] == 1)
+            })
+            .collect();
+        while let Some(c) = queue.pop() {
+            if !alive[c as usize] {
+                continue;
+            }
+            alive[c as usize] = false;
+            for &f in &self.mf[c as usize] {
+                if pick[f as usize] {
+                    continue;
+                }
+                let d = &mut degree[f as usize];
+                *d -= 1;
+                if *d == 1 {
+                    let other = self.mc[f as usize].iter().find(|&&m| alive[m as usize]);
+                    queue.push(*other.expect("a factor of degree 1 has a live lister"));
+                }
+            }
+        }
+        alive
+    }
+
+    /// Shrinks an unplayable set of picks to an inclusion-minimal unplayable subset (every proper subset of it is
+    /// playable), trying first the members its dismantling removes.
+    pub fn minimal_unplayable(&self, pick: &[bool]) -> Vec<u32> {
+        let residual = self.residual(pick);
+        let mut set = pick.to_vec();
+        let order: Vec<u32> = (2..=self.n)
+            .filter(|&c| pick[c as usize] && !residual[c as usize])
+            .chain((2..=self.n).rev().filter(|&c| residual[c as usize]))
+            .collect();
+        for c in order {
+            set[c as usize] = false;
+            if self.playable(&set) {
+                set[c as usize] = true;
+            }
+        }
+        (2..=self.n).filter(|&c| set[c as usize]).collect()
+    }
+}
+
+/// The matching bound: a maximum-weight matching in the bipartite graph of the board (even Ω on the left, odd
+/// on the right), as a min-cost flow by successive shortest paths with potentials (Dijkstra on reduced costs),
+/// stopping when no augmenting path has negative cost.  Edges (c, c/p) weigh c; a forced pick's downward edges
+/// weigh BIG more and its upward ones are dropped (it may not pay); a barred number's downward edges are
+/// dropped (it may not be picked).
+pub struct MatchingBound {
+    /// Neighbours of each number (its maximal factors and maximal composites).
+    adj: Vec<Vec<u32>>,
+    dist: Vec<i64>,
+    pot: Vec<i64>,
+    prev: Vec<u32>,
+    mate: Vec<u32>,
+    /// The board size, and the multipliers of the weights of picks above and below n/2 (1 and 1 for the
+    /// matching bound; see [`set_scale`](Self::set_scale)).
+    n: u32,
+    scale: (i64, i64),
+    /// The optimal dual of the last solve, and its total (the bound plus BIG per forced pick).
+    dual: Vec<i64>,
+    total: i64,
+}
+
+const NONE: u32 = u32::MAX;
+const BIG: i64 = 1 << 40;
+const INF: i64 = i64::MAX / 4;
+
+impl MatchingBound {
+    pub fn new(board: &Board) -> Self {
+        let size = board.n as usize + 1;
+        let mut adj = vec![Vec::new(); size];
+        for c in 2..=board.n {
+            for &f in &board.mf[c as usize] {
+                adj[c as usize].push(f);
+                adj[f as usize].push(c);
+            }
+        }
+        MatchingBound {
+            adj,
+            dist: vec![INF; size],
+            pot: vec![0; size],
+            prev: vec![NONE; size],
+            mate: vec![NONE; size],
+            n: board.n,
+            scale: (1, 1),
+            dual: vec![0; size],
+            total: 0,
+        }
+    }
+
+    /// Weighs picks above n/2 by `upper` times their value and the others by `lower` times theirs (the value of
+    /// a solve is then in those units).
+    pub fn set_scale(&mut self, upper: i64, lower: i64) {
+        self.scale = (upper, lower);
+    }
+
+    /// The weight of edge {u, v} (u, v adjacent), or None if the roles forbid it.
+    fn weight(&self, roles: &[Role], u: u32, v: u32) -> Option<i64> {
+        let (hi, lo) = if u > v { (u, v) } else { (v, u) };
+        if roles[hi as usize] == Role::Barred || roles[lo as usize] == Role::Pick {
+            return None;
+        }
+        let bonus = if roles[hi as usize] == Role::Pick { BIG } else { 0 };
+        let scale = if 2 * hi > self.n { self.scale.0 } else { self.scale.1 };
+        Some(i64::from(hi) * scale + bonus)
+    }
+
+    /// The bound and the matching's picks, or None if some forced pick cannot be matched.
+    pub fn solve(&mut self, board: &Board, roles: &[Role]) -> Option<(u64, Vec<bool>)> {
+        let n = board.n as usize;
+        self.mate.iter_mut().for_each(|m| *m = NONE);
+        // Potentials (s at 0): left 0; right at most −w over its edges; t at most every right's.
+        let mut pot_t = 0i64;
+        for v in 1..=n {
+            self.pot[v] = 0;
+            if !board.even[v] {
+                let heaviest = self.adj[v].iter().filter_map(|&u| self.weight(roles, u, v as u32)).max();
+                self.pot[v] = -heaviest.unwrap_or(0);
+                pot_t = pot_t.min(self.pot[v]);
+            }
+        }
+        let mut heap: BinaryHeap<Reverse<(i64, u32)>> = BinaryHeap::new();
+        loop {
+            for v in 1..=n {
+                self.dist[v] = INF;
+                self.prev[v] = NONE;
+            }
+            heap.clear();
+            for v in 1..=n {
+                if board.even[v] && self.mate[v] == NONE {
+                    self.dist[v] = -self.pot[v];
+                    heap.push(Reverse((self.dist[v], v as u32)));
+                }
+            }
+            let mut dist_t = INF;
+            let mut last = NONE;
+            while let Some(Reverse((d, u))) = heap.pop() {
+                let u = u as usize;
+                if d > self.dist[u] {
+                    continue;
+                }
+                if board.even[u] {
+                    for i in 0..self.adj[u].len() {
+                        let r = self.adj[u][i];
+                        if self.mate[u] == r {
+                            continue;
+                        }
+                        let Some(w) = self.weight(roles, u as u32, r) else { continue };
+                        let nd = d + (-w + self.pot[u] - self.pot[r as usize]);
+                        debug_assert!(nd >= d, "reduced costs are nonnegative");
+                        if nd < self.dist[r as usize] {
+                            self.dist[r as usize] = nd;
+                            self.prev[r as usize] = u as u32;
+                            heap.push(Reverse((nd, r)));
+                        }
+                    }
+                } else {
+                    let l = self.mate[u];
+                    if l == NONE {
+                        let nd = d + self.pot[u] - pot_t;
+                        if nd < dist_t {
+                            dist_t = nd;
+                            last = u as u32;
+                        }
+                        continue;
+                    }
+                    let w = self.weight(roles, l, u as u32).expect("matched edges are allowed");
+                    let nd = d + (w + self.pot[u] - self.pot[l as usize]);
+                    if nd < self.dist[l as usize] {
+                        self.dist[l as usize] = nd;
+                        self.prev[l as usize] = u as u32;
+                        heap.push(Reverse((nd, l)));
+                    }
+                }
+            }
+            // The cheapest augmenting path costs dist_t + pot_t (s has potential 0); stop unless it gains.
+            if last == NONE || dist_t + pot_t >= 0 {
+                // Optimal.  Shift the potentials by min(dist, D) with D = −pot_t, which keeps every residual
+                // reduced cost nonnegative and brings t level with s; then y = max(p, 0) on the left and
+                // max(−p, 0) on the right is an optimal dual (y_l + y_r >= w on every edge, equality on the
+                // matching, zero on free vertices), as complementary slackness on the residual arcs shows.
+                let shift = -pot_t;
+                self.total = 0;
+                for v in 1..=n {
+                    let p = self.pot[v] + self.dist[v].min(shift);
+                    self.dual[v] = if board.even[v] { p.max(0) } else { (-p).max(0) };
+                    self.total += self.dual[v];
+                }
+                break;
+            }
+            for v in 1..=n {
+                self.pot[v] += self.dist[v].min(dist_t);
+            }
+            pot_t += dist_t;
+            let mut r = last as usize;
+            loop {
+                let l = self.prev[r] as usize;
+                let next = self.prev[l];
+                self.mate[l] = r as u32;
+                self.mate[r] = l as u32;
+                if next == NONE {
+                    break;
+                }
+                r = next as usize;
+            }
+        }
+        // `repair` expects every distance at INF.
+        self.dist.iter_mut().for_each(|d| *d = INF);
+        self.read(board, roles)
+    }
+
+    /// The mate of `v` in the current matching (NONE if unmatched).
+    pub fn mate_of(&self, v: u32) -> u32 {
+        self.mate[v as usize]
+    }
+
+    /// The neighbours of `v` in the graph (its maximal factors and composites).
+    pub fn neighbours(&self, v: u32) -> &[u32] {
+        &self.adj[v as usize]
+    }
+
+    /// The matching and dual, to resume from with [`update`](Self::update).
+    pub fn snapshot(&self) -> (Vec<u32>, Vec<i64>) {
+        (self.mate.clone(), self.dual.clone())
+    }
+
+    /// Re-optimizes after the roles changed from `old` to `new` (numbers only ever going from free to forced or
+    /// barred), starting from `snapshot`, the optimal matching and dual for `old`.  Barring a number removes its
+    /// downward edges, forcing one removes its upward edges and raises its downward ones by BIG (its dual rises
+    /// by BIG too, keeping the dual feasible); a matched edge removed frees its ends.  Each free vertex left with
+    /// a positive dual is then repaired by one Hungarian step ([`repair`](Self::repair)).  Returns the same as
+    /// [`solve`](Self::solve).
+    pub fn update(
+        &mut self,
+        board: &Board,
+        snapshot: &(Vec<u32>, Vec<i64>),
+        old: &[Role],
+        new: &[Role],
+    ) -> Option<(u64, Vec<bool>)> {
+        self.mate.clone_from(&snapshot.0);
+        self.dual.clone_from(&snapshot.1);
+        let mut deficient: Vec<u32> = Vec::new();
+        for c in 2..=board.n {
+            let (was, is) = (old[c as usize], new[c as usize]);
+            if was == is {
+                continue;
+            }
+            assert_eq!(was, Role::Free, "roles only go from free to forced or barred");
+            let m = self.mate[c as usize];
+            match is {
+                Role::Barred => {
+                    if m != NONE && m < c {
+                        self.mate[c as usize] = NONE;
+                        self.mate[m as usize] = NONE;
+                        deficient.extend([c, m]);
+                    }
+                }
+                Role::Pick => {
+                    if m != NONE && m > c {
+                        self.mate[c as usize] = NONE;
+                        self.mate[m as usize] = NONE;
+                        deficient.push(m);
+                    }
+                    self.dual[c as usize] += BIG;
+                    deficient.push(c);
+                }
+                Role::Free => unreachable!(),
+            }
+        }
+        for v in deficient {
+            if self.mate[v as usize] == NONE && self.dual[v as usize] > 0 {
+                self.repair(board, new, v);
+            }
+        }
+        self.read(board, new)
+    }
+
+    /// One Hungarian step from a free vertex with a positive dual: Dijkstra over the alternating paths from it
+    /// on edge slacks y_u + y_v − w (matching edges cost 0), stopping at the cheapest of: an unmatched vertex
+    /// of the other side (augment to it), or a vertex of the root's side whose dual reaches 0 first (flip the
+    /// path to it, freeing it; possibly the root itself).  The duals move by δ − dist on the vertices closer than
+    /// δ (down on the root's side, up on the other), which keeps them feasible and makes the path tight.
+    fn repair(&mut self, board: &Board, roles: &[Role], root: u32) {
+        let side = board.even[root as usize];
+        let mut touched: Vec<u32> = vec![root];
+        self.dist[root as usize] = 0;
+        self.prev[root as usize] = NONE;
+        let mut heap: BinaryHeap<Reverse<(i64, u32)>> = BinaryHeap::new();
+        heap.push(Reverse((0, root)));
+        let mut best = (self.dual[root as usize], root);
+        while let Some(Reverse((d, u))) = heap.pop() {
+            if d >= best.0 {
+                break;
+            }
+            if d > self.dist[u as usize] {
+                continue;
+            }
+            if board.even[u as usize] == side {
+                let end = d + self.dual[u as usize];
+                if end < best.0 {
+                    best = (end, u);
+                }
+                for i in 0..self.adj[u as usize].len() {
+                    let b = self.adj[u as usize][i];
+                    if self.mate[u as usize] == b {
+                        continue;
+                    }
+                    let Some(w) = self.weight(roles, u, b) else { continue };
+                    let nd = d + self.dual[u as usize] + self.dual[b as usize] - w;
+                    debug_assert!(nd >= d, "the dual is feasible");
+                    if self.dist[b as usize] == INF {
+                        touched.push(b);
+                    }
+                    if nd < self.dist[b as usize] {
+                        self.dist[b as usize] = nd;
+                        self.prev[b as usize] = u;
+                        heap.push(Reverse((nd, b)));
+                    }
+                }
+            } else {
+                let x = self.mate[u as usize];
+                if x == NONE {
+                    if d < best.0 {
+                        best = (d, u);
+                    }
+                    continue;
+                }
+                if self.dist[x as usize] == INF {
+                    touched.push(x);
+                }
+                if d < self.dist[x as usize] {
+                    self.dist[x as usize] = d;
+                    self.prev[x as usize] = u;
+                    heap.push(Reverse((d, x)));
+                }
+            }
+        }
+        let (delta, end) = best;
+        for &v in &touched {
+            let d = self.dist[v as usize];
+            if d < delta {
+                if board.even[v as usize] == side {
+                    self.dual[v as usize] -= delta - d;
+                } else {
+                    self.dual[v as usize] += delta - d;
+                }
+            }
+        }
+        if board.even[end as usize] == side {
+            // Flip root → … → end; end (whose dual is now 0) comes out free.
+            if end != root {
+                let mut x = end;
+                self.mate[end as usize] = NONE;
+                while x != root {
+                    let b = self.prev[x as usize];
+                    let px = self.prev[b as usize];
+                    self.mate[px as usize] = b;
+                    self.mate[b as usize] = px;
+                    x = px;
+                }
+            }
+        } else {
+            let mut b = end;
+            loop {
+                let x = self.prev[b as usize];
+                let next = self.prev[x as usize];
+                self.mate[x as usize] = b;
+                self.mate[b as usize] = x;
+                if x == root {
+                    break;
+                }
+                b = next;
+            }
+        }
+        for &v in &touched {
+            self.dist[v as usize] = INF;
+        }
+    }
+
+    /// The matching's value and picks under `roles`, or None if a forced pick is unmatched.
+    fn read(&mut self, board: &Board, roles: &[Role]) -> Option<(u64, Vec<bool>)> {
+        let n = board.n as usize;
+        let mut value: i64 = 0;
+        let mut picks = vec![false; n + 1];
+        for v in (1..=n).filter(|&v| board.even[v]) {
+            let m = self.mate[v];
+            if m != NONE {
+                value += self.weight(roles, v as u32, m).expect("matched edges are allowed");
+                picks[v.max(m as usize)] = true;
+            }
+        }
+        self.total = self.dual[1..=n].iter().sum();
+        debug_assert_eq!(value, self.total, "complementary slackness");
+        if (2..=n).any(|c| roles[c] == Role::Pick && !picks[c]) {
+            return None;
+        }
+        let forced = roles.iter().filter(|&&r| r == Role::Pick).count() as i64;
+        Some(((value - forced * BIG) as u64, picks))
+    }
+
+    /// After [`solve`](Self::solve): an upper bound on the bound with the pick `c` barred, from the optimal dual
+    /// alone.  Lower c's dual, and its payment's, as far as their remaining edges allow (c keeps only its upward
+    /// edges; its payment loses the edge to c); the result is still dual feasible.
+    pub fn bound_barring(&self, roles: &[Role], c: u32) -> i64 {
+        let lowest = |v: u32, skip: u32, roles: &[Role]| -> i64 {
+            self.adj[v as usize]
+                .iter()
+                .filter(|&&u| u != skip && !(u < v && v == c))
+                .filter_map(|&u| self.weight(roles, v, u).map(|w| w - self.dual[u as usize]))
+                .max()
+                .unwrap_or(0)
+                .max(0)
+        };
+        let m = self.mate[c as usize];
+        let mut drop = self.dual[c as usize] - lowest(c, m, roles);
+        if m != NONE && m < c {
+            drop += self.dual[m as usize] - lowest(m, c, roles);
+        }
+        let forced = roles.iter().filter(|&&r| r == Role::Pick).count() as i64;
+        self.total - drop - forced * BIG
+    }
+}
+
+/// What the branch and bound concluded.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Verdict {
+    /// No playable set beats the target: opt(n) <= target.
+    Proven,
+    /// A playable set with a larger sum (its picks).
+    Beaten(Vec<u32>),
+    /// The node budget ran out.
+    Budget,
+    /// Paused at the deadline; the open units are in [`Prover::open_units`].
+    Paused,
+}
+
+/// The branch and bound.  Besides the bound and the conflict branching described at the top:
+///
+/// * **Forced picks.**  For each free pick of the matching, the optimal dual bounds the matching with that pick
+///   barred ([`MatchingBound::bound_barring`]); if that is at most the target, every set beating the target
+///   picks it, so it is forced in this node and all its children.
+/// * **Nogoods.**  Every minimal unplayable set found is kept (it is unplayable at every node, since a set of
+///   picks is unplayable whatever else is picked).  A nogood all of whose members are forced ends the node; one
+///   with a single member not forced and free bars that member; and the matching's picks are checked against
+///   the nogoods before a new conflict is computed.
+/// * **Segment cuts** (with [`with_smaller_games`](Self::with_smaller_games)).  The picks of a playable S
+///   that are at most m are playable on the board 1..=m (a subset of a playable set is playable, and their
+///   maximal factors are all on that board), so they sum to at most opt(m).  Given opt(m) <= V(m) for every
+///   m < n, a set beating the target T has sum(S ∩ (m, n]) >= T + 1 − V(m) for every m: a node whose
+///   unbarred numbers above some m fall short is cut, and a number whose barring would make one fall short is
+///   forced.  (For m = n − 1 this says S contains n.)  The answer then rests on those smaller games' bounds.
+pub struct Prover<'a> {
+    board: &'a Board,
+    bound: MatchingBound,
+    target: u64,
+    /// For each m < n, the least weight S must have above m (empty: no segment cuts).
+    segment_need: Vec<i64>,
+    pub nogoods: Vec<Vec<u32>>,
+    max_nogoods: usize,
+    pub nodes: u64,
+    /// Diagnostics: [new conflicts, known conflicts, forced picks, children, cut by bound, max depth].
+    pub stats: [u64; 6],
+    pause_at: Option<std::time::Instant>,
+    next_check: u64,
+    paused: bool,
+    pending: Vec<Vec<Role>>,
+    budget: u64,
+}
+
+impl<'a> Prover<'a> {
+    pub fn new(board: &'a Board, target: u64, budget: u64) -> Self {
+        Prover {
+            board,
+            bound: MatchingBound::new(board),
+            target,
+            segment_need: Vec::new(),
+            nogoods: Vec::new(),
+            max_nogoods: 20_000,
+            nodes: 0,
+            stats: [0; 6],
+            pause_at: None,
+            next_check: 256,
+            paused: false,
+            pending: Vec::new(),
+            budget,
+        }
+    }
+
+    /// Turns on the segment cuts, given upper bounds `smaller[m]` on opt(m) for m = 0..n−1.
+    pub fn with_smaller_games(mut self, smaller: &[u64]) -> Self {
+        let n = self.board.n as usize;
+        assert!(smaller.len() >= n);
+        self.segment_need = (0..n).map(|m| self.target as i64 + 1 - smaller[m] as i64).collect();
+        self
+    }
+
+    /// The segment cuts: false if some segment (m, n] cannot reach its need; otherwise forces every free
+    /// number whose barring would leave a segment short, setting `changed`.
+    fn segments(&self, roles: &mut [Role], changed: &mut bool) -> bool {
+        if self.segment_need.is_empty() {
+            return true;
+        }
+        let n = self.board.n as usize;
+        // slack[m] = weight of unbarred numbers in (m, n] − need[m]; a free c is forced iff c > the least slack
+        // over the segments containing it (m < c).
+        let mut slack = vec![0i64; n];
+        let mut avail = 0i64;
+        for m in (1..n).rev() {
+            if roles[m + 1] != Role::Barred {
+                avail += (m + 1) as i64;
+            }
+            slack[m] = avail - self.segment_need[m];
+            if slack[m] < 0 {
+                return false;
+            }
+        }
+        let mut least = i64::MAX;
+        for c in 2..=n {
+            least = least.min(slack[c - 1]);
+            if roles[c] == Role::Free && (c as i64) > least {
+                roles[c] = Role::Pick;
+                *changed = true;
+            }
+        }
+        true
+    }
+
+    /// The matching bound of the whole board (the Franklín–Moniot bound).
+    pub fn root_bound(&mut self) -> u64 {
+        let roles = self.root_roles();
+        self.bound.solve(self.board, &roles).expect("nothing is forced").0
+    }
+
+    fn root_roles(&self) -> Vec<Role> {
+        let mut roles = vec![Role::Free; self.board.n as usize + 1];
+        roles[0] = Role::Barred;
+        roles[1] = Role::Barred;
+        roles
+    }
+
+    /// Is there a playable set of picks summing to more than the target?
+    pub fn run(&mut self) -> Verdict {
+        self.next_check = self.nodes + 256;
+        let roles = self.root_roles();
+        self.node(roles, None)
+    }
+
+    /// Nogood propagation: false if some nogood is entirely forced; bars the last free member of a nogood whose
+    /// other members are all forced.
+    fn propagate(&self, roles: &mut [Role]) -> bool {
+        loop {
+            let mut changed = false;
+            for nogood in &self.nogoods {
+                let mut free = NONE;
+                let mut free_count = 0;
+                let mut barred = false;
+                for &c in nogood {
+                    match roles[c as usize] {
+                        Role::Barred => {
+                            barred = true;
+                            break;
+                        }
+                        Role::Free => {
+                            free = c;
+                            free_count += 1;
+                        }
+                        Role::Pick => {}
+                    }
+                }
+                if barred {
+                    continue;
+                }
+                match free_count {
+                    0 => return false,
+                    1 => {
+                        roles[free as usize] = Role::Barred;
+                        changed = true;
+                    }
+                    _ => {}
+                }
+            }
+            if !self.segments(roles, &mut changed) {
+                return false;
+            }
+            if !changed {
+                return true;
+            }
+        }
+    }
+
+    /// The conflict-packing bound.  Every set beating the target leaves out a member of each conflict all of
+    /// whose members the matching picks; leaving out c costs the matching at least drop(c) = value −
+    /// [`bound_barring`](MatchingBound::bound_barring)(c).  Conflicts whose free members and their payments are
+    /// pairwise apart (no shared or adjacent vertices) can have their duals lowered together, so the bound with
+    /// one member of each left out is at most value − Σ min drop.  True if that cuts the node.
+    fn packing_cut(&self, roles: &[Role], picks: &[bool], value: u64) -> bool {
+        let gap = value as i64 - self.target as i64;
+        let mut costed: Vec<(i64, usize)> = Vec::new();
+        for (i, k) in self.nogoods.iter().enumerate() {
+            if !k.iter().all(|&c| picks[c as usize]) {
+                continue;
+            }
+            let cost = k
+                .iter()
+                .filter(|&&c| roles[c as usize] == Role::Free)
+                .map(|&c| value as i64 - self.bound.bound_barring(roles, c))
+                .min();
+            if let Some(cost) = cost {
+                costed.push((cost, i));
+            }
+        }
+        if costed.len() < 2 {
+            return false;
+        }
+        costed.sort_unstable_by(|a, b| b.cmp(a));
+        let mut blocked = vec![false; self.board.n as usize + 1];
+        let mut total = 0i64;
+        for (cost, i) in costed {
+            let mut vertices: Vec<u32> = Vec::new();
+            for &c in self.nogoods[i].iter().filter(|&&c| roles[c as usize] == Role::Free) {
+                vertices.push(c);
+                let m = self.bound.mate_of(c);
+                if m != NONE {
+                    vertices.push(m);
+                }
+            }
+            if vertices.iter().any(|&v| blocked[v as usize]) {
+                continue;
+            }
+            for &v in &vertices {
+                blocked[v as usize] = true;
+                for &u in self.bound.neighbours(v) {
+                    blocked[u as usize] = true;
+                }
+            }
+            total += cost;
+            if total >= gap {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// A node with these roles; `base` is the parent's roles and optimal matching, to re-optimize from (None:
+    /// solve from scratch).
+    fn node(&mut self, mut roles: Vec<Role>, base: Option<(&[Role], &(Vec<u32>, Vec<i64>))>) -> Verdict {
+        self.nodes += 1;
+        if self.nodes > self.budget {
+            return Verdict::Budget;
+        }
+        if !self.propagate(&mut roles) {
+            return Verdict::Proven;
+        }
+        let forced: Vec<bool> = roles.iter().map(|&r| r == Role::Pick).collect();
+        if !self.board.playable(&forced) {
+            return Verdict::Proven;
+        }
+        let mut solved = match base {
+            Some((old, snapshot)) => self.bound.update(self.board, snapshot, old, &roles),
+            None => self.bound.solve(self.board, &roles),
+        };
+        let n = self.board.n;
+        let (value, picks) = loop {
+            let Some((value, picks)) = solved else { return Verdict::Proven };
+            if value <= self.target {
+                self.stats[4] += 1;
+                return Verdict::Proven;
+            }
+            // Forced picks: barring one alone brings the bound down to the target.
+            let newly: Vec<u32> = (2..=n)
+                .filter(|&c| picks[c as usize] && roles[c as usize] == Role::Free)
+                .filter(|&c| self.bound.bound_barring(&roles, c) <= self.target as i64)
+                .collect();
+            if newly.is_empty() {
+                break (value, picks);
+            }
+            let (old, snapshot) = (roles.clone(), self.bound.snapshot());
+            self.stats[2] += newly.len() as u64;
+            newly.iter().for_each(|&c| roles[c as usize] = Role::Pick);
+            if !self.propagate(&mut roles) {
+                return Verdict::Proven;
+            }
+            let forced: Vec<bool> = roles.iter().map(|&r| r == Role::Pick).collect();
+            if !self.board.playable(&forced) {
+                return Verdict::Proven;
+            }
+            solved = self.bound.update(self.board, &snapshot, &old, &roles);
+        };
+        if self.board.playable(&picks) {
+            return Verdict::Beaten((2..=n).filter(|&c| picks[c as usize]).collect());
+        }
+        // Branch on the violated conflict with the fewest free members (measured: better than the one dearest to
+        // break, which doubles the tree at n = 600).
+        let known = self
+            .nogoods
+            .iter()
+            .filter(|k| k.iter().all(|&c| picks[c as usize]))
+            .min_by_key(|k| k.iter().filter(|&&c| roles[c as usize] == Role::Free).count());
+        let conflict = match known {
+            Some(k) => {
+                self.stats[1] += 1;
+                k.clone()
+            }
+            None => {
+                self.stats[0] += 1;
+                let k = self.board.minimal_unplayable(&picks);
+                if self.nogoods.len() < self.max_nogoods {
+                    self.nogoods.push(k.clone());
+                }
+                k
+            }
+        };
+        let branch: Vec<u32> = conflict.iter().copied().filter(|&c| roles[c as usize] == Role::Free).collect();
+        if branch.is_empty() {
+            return Verdict::Proven;
+        }
+        if self.packing_cut(&roles, &picks, value) {
+            self.stats[4] += 1;
+            return Verdict::Proven;
+        }
+        self.stats[3] += branch.len() as u64;
+        let (base_roles, snapshot) = (roles.clone(), self.bound.snapshot());
+        let child = |j: usize, roles: &[Role]| {
+            let mut child = roles.to_vec();
+            branch[..j].iter().for_each(|&d| child[d as usize] = Role::Pick);
+            child[branch[j] as usize] = Role::Barred;
+            child
+        };
+        for j in 0..branch.len() {
+            if self.pause_due() {
+                // Leave this child and the rest as open units.
+                (j..branch.len()).for_each(|k| self.pending.push(child(k, &base_roles)));
+                return Verdict::Paused;
+            }
+            match self.node(child(j, &base_roles), Some((&base_roles, &snapshot))) {
+                Verdict::Proven => {}
+                Verdict::Paused => {
+                    (j + 1..branch.len()).for_each(|k| self.pending.push(child(k, &base_roles)));
+                    return Verdict::Paused;
+                }
+                other => return other,
+            }
+        }
+        Verdict::Proven
+    }
+
+    /// Whether the pause deadline has passed (the clock is read every 256 nodes, the first time 256 nodes into
+    /// a run, so that every run makes progress).
+    fn pause_due(&mut self) -> bool {
+        match self.pause_at {
+            Some(at) if self.nodes >= self.next_check => {
+                self.next_check = self.nodes + 256;
+                self.paused = self.paused || std::time::Instant::now() >= at;
+                self.paused
+            }
+            _ => self.paused,
+        }
+    }
+
+    /// Runs the open units (each the roles of an unexplored subtree; the last is explored first), from a
+    /// checkpoint.  On a pause, `pending` holds every unit still open (the ones left of `units` included).
+    pub fn run_units(&mut self, mut units: Vec<Vec<Role>>) -> Verdict {
+        self.next_check = self.nodes + 256;
+        while let Some(unit) = units.pop() {
+            if self.pause_due() {
+                units.push(unit);
+                self.pending.extend(units);
+                return Verdict::Paused;
+            }
+            match self.node(unit, None) {
+                Verdict::Proven => {}
+                Verdict::Paused => {
+                    self.pending.extend(units);
+                    return Verdict::Paused;
+                }
+                other => return other,
+            }
+        }
+        Verdict::Proven
+    }
+
+    /// Stop at `at`, leaving the open units in `pending` (see [`run_units`](Self::run_units)).
+    pub fn pause_at(mut self, at: std::time::Instant) -> Self {
+        self.pause_at = Some(at);
+        self
+    }
+
+    /// The units left open by a pause (to checkpoint), and the nogoods learned so far.
+    pub fn open_units(&self) -> &[Vec<Role>] {
+        &self.pending
+    }
+}
+
+/// The largest prime below `n` (n >= 3).
+pub fn prime_below(n: u64, spf: &[u32]) -> u64 {
+    (2..n).rev().find(|&p| is_prime(p, spf)).expect("n > 2")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::primes::smallest_prime_factors;
+
+    /// opt(n) by brute force over pick sets (playability by dismantling), for small n.
+    fn brute(board: &Board) -> u64 {
+        let n = board.n as usize;
+        let mut best = 0;
+        for bits in 0u64..(1 << (n - 1)) {
+            let mut pick = vec![false; n + 1];
+            let mut sum = 0;
+            for c in 2..=n {
+                if bits >> (c - 2) & 1 == 1 {
+                    pick[c] = true;
+                    sum += c as u64;
+                }
+            }
+            if sum > best && board.playable(&pick) {
+                best = sum;
+            }
+        }
+        best
+    }
+
+    /// A search paused every few hundred nodes and resumed from its open units and nogoods reaches the verdict of
+    /// an uninterrupted one, on both sides of the optimum (opt(300) = 28691 and opt(432) = 59259, optimal.json).
+    #[test]
+    fn paused_searches_resume_to_the_same_verdict() {
+        let spf = smallest_prime_factors(500);
+        for (n, opt) in [(300u32, 28691u64), (432, 59259)] {
+            let board = Board::new(n, &spf);
+            for target in [opt, opt - 1] {
+                let straight = Prover::new(&board, target, u64::MAX).run();
+                let (mut units, mut nogoods, mut pauses) = (None::<Vec<Vec<Role>>>, Vec::new(), 0);
+                let resumed = loop {
+                    let mut p = Prover::new(&board, target, u64::MAX).pause_at(std::time::Instant::now());
+                    p.nogoods = std::mem::take(&mut nogoods);
+                    let verdict = match units.take() {
+                        Some(u) => p.run_units(u),
+                        None => p.run(),
+                    };
+                    if verdict != Verdict::Paused {
+                        break verdict;
+                    }
+                    pauses += 1;
+                    units = Some(p.open_units().to_vec());
+                    nogoods = p.nogoods;
+                };
+                assert_eq!(matches!(resumed, Verdict::Beaten(_)), matches!(straight, Verdict::Beaten(_)), "n={n}");
+                assert_eq!(resumed == Verdict::Proven, target == opt, "n={n} target={target}");
+                assert!(target != opt || n < 400 || pauses > 3, "n={n}: the test should pause");
+            }
+        }
+    }
+
+    /// The known optima of 1..=20 (optimal.json), by brute force and by the prover on both sides of the value.
+    #[test]
+    fn small_games() {
+        let spf = smallest_prime_factors(100);
+        let known = [0u64, 0, 2, 3, 7, 9, 15, 17, 21, 30, 40, 44, 50, 52, 66, 81, 89, 93, 111, 113, 124];
+        for n in 2..=20u32 {
+            let board = Board::new(n, &spf);
+            assert_eq!(brute(&board), known[n as usize], "n={n}");
+            for segments in [false, true] {
+                let prover = |target| {
+                    let p = Prover::new(&board, target, u64::MAX);
+                    if segments {
+                        p.with_smaller_games(&known)
+                    } else {
+                        p
+                    }
+                };
+                assert_eq!(prover(known[n as usize]).run(), Verdict::Proven, "n={n}");
+                match prover(known[n as usize] - 1).run() {
+                    Verdict::Beaten(picks) => {
+                        let sum: u64 = picks.iter().map(|&c| u64::from(c)).sum();
+                        assert!(sum >= known[n as usize], "n={n}");
+                    }
+                    other => panic!("n={n}: the optimum beats opt − 1, got {other:?}"),
+                }
+            }
+        }
+    }
+
+    /// Re-optimizing from a snapshot gives the same value as solving from scratch, along random chains of role
+    /// changes on boards up to 300.
+    #[test]
+    fn update_agrees_with_solving_from_scratch() {
+        let spf = smallest_prime_factors(400);
+        let mut state = 0x2545_F491_4F6C_DD1Du64;
+        let mut next = |below: u64| {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state % below
+        };
+        for _ in 0..60 {
+            let n = 10 + next(290) as u32;
+            let board = Board::new(n, &spf);
+            let mut roles = vec![Role::Free; n as usize + 1];
+            roles[0] = Role::Barred;
+            roles[1] = Role::Barred;
+            let mut inc = MatchingBound::new(&board);
+            let mut got = inc.solve(&board, &roles);
+            for _ in 0..12 {
+                let Some((_, picks)) = got.clone() else { break };
+                let snapshot = inc.snapshot();
+                let old = roles.clone();
+                for _ in 0..1 + next(3) {
+                    let c = 2 + next(u64::from(n) - 1) as usize;
+                    if roles[c] == Role::Free {
+                        // Mostly bar or force picks of the matching, as the search does.
+                        roles[c] = if picks[c] && next(2) == 0 { Role::Barred } else { Role::Pick };
+                    }
+                }
+                got = inc.update(&board, &snapshot, &old, &roles);
+                let fresh = MatchingBound::new(&board).solve(&board, &roles);
+                assert_eq!(got.as_ref().map(|g| g.0), fresh.as_ref().map(|f| f.0), "n={n}");
+            }
+        }
+    }
+
+    /// The matching bound against brute force over matchings on tiny boards, with random roles.
+    #[test]
+    fn matching_bound_against_brute_force() {
+        let spf = smallest_prime_factors(100);
+        let mut state = 0x9E37_79B9_7F4A_7C15u64;
+        let mut next = |below: u64| {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state % below
+        };
+        for _ in 0..300 {
+            let n = 4 + next(11) as u32;
+            let board = Board::new(n, &spf);
+            let mut roles = vec![Role::Free; n as usize + 1];
+            roles[0] = Role::Barred;
+            roles[1] = Role::Barred;
+            for c in 2..=n as usize {
+                roles[c] = match next(6) {
+                    0 => Role::Pick,
+                    1 => Role::Barred,
+                    _ => Role::Free,
+                };
+            }
+            // Brute force: every set of edges forming a matching.
+            let edges: Vec<(u32, u32)> =
+                (2..=n).flat_map(|c| board.mf[c as usize].iter().map(move |&f| (c, f))).collect();
+            let mut best: Option<u64> = None;
+            for bits in 0u64..(1 << edges.len()) {
+                let mut used = vec![false; n as usize + 1];
+                let mut ok = true;
+                let mut value = 0;
+                let mut picked = vec![false; n as usize + 1];
+                for (i, &(c, f)) in edges.iter().enumerate() {
+                    if bits >> i & 1 == 1 {
+                        if used[c as usize] || used[f as usize] {
+                            ok = false;
+                            break;
+                        }
+                        used[c as usize] = true;
+                        used[f as usize] = true;
+                        if roles[c as usize] == Role::Barred || roles[f as usize] == Role::Pick {
+                            ok = false;
+                            break;
+                        }
+                        picked[c as usize] = true;
+                        value += u64::from(c);
+                    }
+                }
+                if ok && (2..=n as usize).all(|c| roles[c] != Role::Pick || picked[c]) {
+                    best = Some(best.map_or(value, |b| b.max(value)));
+                }
+            }
+            let mut bound = MatchingBound::new(&board);
+            let got = bound.solve(&board, &roles);
+            assert_eq!(got.as_ref().map(|(v, _)| *v), best, "n={n} roles={roles:?}");
+            // The dual bound with a pick barred is never below the true bound with it barred.
+            if let Some((_, picks)) = got {
+                for c in (2..=n).filter(|&c| picks[c as usize] && roles[c as usize] == Role::Free) {
+                    let estimate = bound.bound_barring(&roles, c);
+                    let mut barred = roles.clone();
+                    barred[c as usize] = Role::Barred;
+                    let truth = MatchingBound::new(&board).solve(&board, &barred).map_or(i64::MIN, |(v, _)| v as i64);
+                    assert!(estimate >= truth, "n={n} c={c}: {estimate} < {truth}");
+                }
+            }
+        }
+    }
+}

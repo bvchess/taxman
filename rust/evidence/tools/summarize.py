@@ -61,12 +61,56 @@ def star(paths):
 
 
 def exact(paths):
-    rows = sorted(lines(paths), key=lambda r: r["n"])
-    verdicts = Counter(r["verdict"] for r in rows)
-    print(f"games {rows[0]['n']}..{rows[-1]['n']}: {len(rows)}; verdicts {dict(verdicts)}")
-    print(f"how proven: {dict(Counter(r['how'] for r in rows))}")
-    print(f"total seconds {sum(r['secs'] for r in rows):.0f}, max {max(r['secs'] for r in rows):.1f}")
+    """Which games are proven optimal without the frame model: n is proven when its matching bound equals the
+    recorded score, or the search proved it (if it used the segment cuts, only when every smaller game is
+    proven), or its score meets the chain or prime relation and n - 1 is proven."""
+    rows = {r["n"]: r for r in lines(paths)}
+    proven = {1: True}
+    how = Counter()
+    first_gap = None
+    for n in range(2, max(rows) + 1):
+        r = rows.get(n)
+        ok = False
+        if r is not None:
+            if r["fm_bound"] == r["score"]:
+                ok, kind = True, "matching bound"
+            elif r["search"] == "proven" and (not r.get("segments") or all(proven.get(m) for m in range(2, n))):
+                ok, kind = True, "search"
+            elif r["relation"] in ("chain", "prime") and proven.get(n - 1):
+                ok, kind = True, r["relation"]
+        proven[n] = ok
+        if ok:
+            how[kind] += 1
+        elif first_gap is None:
+            first_gap = n
+    done = sorted(rows)
+    print(f"games recorded: {len(rows)} ({done[0]}..{done[-1]}); proven: {sum(proven.values()) - 1}; "
+          f"by {dict(how)}")
+    print(f"every n in 2..{(first_gap or max(rows) + 1) - 1} proven; first unproven: {first_gap}")
+    searched = [r for r in rows.values() if r["search"] in ("proven", "budget")]
+    print(f"searches: {len(searched)}, total {sum(r['secs'] for r in searched) / 3600:.1f} h, "
+          f"most nodes {max((r['nodes'], r['n']) for r in searched)}, "
+          f"FM gap at the largest searched n: {max(searched, key=lambda r: r['n'])['fm_bound'] - max(searched, key=lambda r: r['n'])['score']}")
+    big = sorted(searched, key=lambda r: -r["secs"])[:5]
+    print("slowest: " + ", ".join(f"n={r['n']} {r['secs']:.0f}s {r['nodes']} nodes" for r in big))
+
+
+def adversary(paths):
+    for path in paths:
+        rows = list(lines([path]))
+        if not rows:
+            continue
+        diamond = sum(1 for r in rows if r["violations"])
+        star = Counter()
+        for r in rows:
+            star.update(r.get("star", {}))
+        beaten = sum(1 for r in rows if r.get("star", {}).get("counterexample", 0))
+        undecided = sum(1 for r in rows if r.get("star", {}).get("undecided", 0))
+        print(f"{path}: {len(rows)} instances (size {rows[0]['size']}, eps {rows[0]['eps']}); "
+              f"(♦) fails in {diamond}, (★) fails in {beaten}, undecided {undecided}; "
+              f"rejections {sum(r['rejections'] for r in rows)}, violating thresholds "
+              f"{sum(r['violations'] for r in rows)}; threshold verdicts {dict((k, v) for k, v in star.items() if v)}")
 
 
 if __name__ == "__main__":
-    {"span": span, "star": star, "exact": exact}[sys.argv[1]](sys.argv[2:])
+    {"span": span, "star": star, "exact": exact, "adversary": adversary}[sys.argv[1]](sys.argv[2:])

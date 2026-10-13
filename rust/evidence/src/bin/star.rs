@@ -92,6 +92,6 @@ fn main() {
                 report.count(Method::Counterexample)
             )
         });
-        (line(n, &report, started.elapsed().as_secs_f64()), note)
+        (Some(line(n, &report, started.elapsed().as_secs_f64())), note)
     });
 }

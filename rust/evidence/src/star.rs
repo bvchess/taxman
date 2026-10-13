@@ -49,8 +49,15 @@ pub enum Method {
 }
 
 impl Method {
-    pub const ALL: [Method; 7] =
-        [Method::Core, Method::Matching, Method::Lorea, Method::Rank, Method::Exact, Method::Undecided, Method::Counterexample];
+    pub const ALL: [Method; 7] = [
+        Method::Core,
+        Method::Matching,
+        Method::Lorea,
+        Method::Rank,
+        Method::Exact,
+        Method::Undecided,
+        Method::Counterexample,
+    ];
 
     pub fn name(self) -> &'static str {
         match self {
@@ -166,8 +173,7 @@ pub fn check(inst: &Instance, budget: u64, engine: Engine) -> Report {
                     family.push((c.clone(), g_of(c)));
                 }
             }
-            let inside: Vec<(Vec<u32>, usize)> =
-                family.iter().filter(|(s, _)| in_p[s[0] as usize]).cloned().collect();
+            let inside: Vec<(Vec<u32>, usize)> = family.iter().filter(|(s, _)| in_p[s[0] as usize]).cloned().collect();
             let mut threshold = decide(&local, &p, &kept, &old, &inside, &mut cores, budget, engine, &mut peeler);
             threshold.conditional = undecided_before && threshold.method == Method::Exact && engine == Engine::Plus1;
             undecided_before |= threshold.method == Method::Undecided;

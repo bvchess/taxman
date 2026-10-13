@@ -208,7 +208,8 @@ mod tests {
     #[test]
     fn the_n39_core_is_self_covering_and_minimal() {
         let spf = smallest_prime_factors(100);
-        let lists: Vec<Vec<u64>> = [39u64, 33, 26, 22].iter().map(|&c| crate::primes::maximal_factors(c, &spf)).collect();
+        let lists: Vec<Vec<u64>> =
+            [39u64, 33, 26, 22].iter().map(|&c| crate::primes::maximal_factors(c, &spf)).collect();
         let inst = Instance::new(vec![39, 33, 26, 22], &lists);
         let mut p = Peeler::new();
         assert_eq!(p.residual_of(&inst, &[0, 1, 2, 3]), vec![0, 1, 2, 3]);

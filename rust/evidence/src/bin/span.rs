@@ -59,6 +59,6 @@ fn main() {
                 star.count(Method::Counterexample)
             ));
         }
-        (line.float("secs", started.elapsed().as_secs_f64()).finish(), note)
+        (Some(line.float("secs", started.elapsed().as_secs_f64()).finish()), note)
     });
 }

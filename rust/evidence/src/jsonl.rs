@@ -127,11 +127,12 @@ pub fn done(lines: &[String], key: &str) -> HashSet<u64> {
 }
 
 /// Runs `work` on every item of `items` not yet recorded (by its `"n"` field) in `out`, on `threads` threads,
-/// appending each line as it finishes; starts no new item after `seconds`.  `work` returns the line and a
+/// appending each line as it finishes; starts no new item after `seconds`.  `work` returns the line (None for
+/// an item it could not finish, which is retried by the next run) and a
 /// progress note, printed when it is `Some` or every 20 seconds.
 pub fn campaign<F>(name: &str, items: &[u64], threads: usize, seconds: f64, out: &Path, work: F)
 where
-    F: Fn(u64) -> (String, Option<String>) + Sync,
+    F: Fn(u64) -> (Option<String>, Option<String>) + Sync,
 {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::mpsc;
@@ -143,7 +144,7 @@ where
     let next = AtomicUsize::new(0);
     let started = Instant::now();
     let deadline = started + Duration::from_secs_f64(seconds.min(1e9));
-    let (tx, rx) = mpsc::channel::<(u64, String, Option<String>)>();
+    let (tx, rx) = mpsc::channel::<(u64, Option<String>, Option<String>)>();
     std::thread::scope(|scope| {
         for _ in 0..threads {
             let (tx, todo, next, work) = (tx.clone(), &todo, &next, &work);
@@ -165,6 +166,10 @@ where
         let mut count = 0usize;
         let mut last = Instant::now();
         for (n, line, note) in rx {
+            let Some(line) = line else {
+                eprintln!("{name}: n={n} not finished: {}", note.unwrap_or_default());
+                continue;
+            };
             file.append(&line).expect("append a result");
             count += 1;
             if note.is_some() || last.elapsed() > Duration::from_secs(20) {
