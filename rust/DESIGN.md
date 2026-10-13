@@ -346,7 +346,11 @@ it is the one place that knows the tables → frames → prepare → cap and see
 `max_total` is a cap on the number of promotions, from the frames' freedoms.  The Java's `reviseFreedoms` lowers frame
 0's freedoms, hence `max_total`, by solving the two-frame game of frames 0 and 1 (a nested search through the same
 engine, within the run's time and node limits).  It assumes that the max-sum promotion set also has the max count, which
-is unproven; the soundness tests leave out the perturbed games on which it fails (about one in 1,300).
+is unproven; the soundness tests leave out the perturbed games on which it fails (about one in 1,300).  For the whole
+frame game the assumption is false: at n = 833 the optimal promotion set has 48 members and a lighter feasible one 49,
+whose game is one move longer (`tests/soundness.rs`;
+[evidence §6](evidence/README.md#6-does-an-optimal-game-play-the-most-moves)).  The tactic uses it only for the
+two-frame game of frames 0 and 1, where it is neither proven nor refuted.
 
 ## 5. Tactics
 

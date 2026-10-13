@@ -579,6 +579,87 @@ U\*.  At 686, a chain game, the recorded optimal game of 685 cannot
 take 686, while another optimal set of 685 can: a chain step needs
 all the optimal sets of n−1, not one.
 
+## Longest games
+
+Does an optimal game play as many moves as any game of the board
+can?  The wiki's "Questions" page asks it (its third question), and
+the Java's `reviseFreedoms` rests on a form of it (a comment in
+`UpperBoundEstimator.java` states, as a theorem it has no proof of,
+that the promotion set with the largest sum also has the most
+promotions).  It is false.  Let M(n) be the most moves of a game of
+n: a game's moves are its picks, so M(n) is the size of the largest
+playable subset of {2, …, n}.  (A game that ends with no legal move
+left can still be shorter than M(n): maximal playable sets can have
+different sizes, as n = 2873 shows above.)
+
+**Lemma (bounds on the most moves).**
+
+* M(n) ≤ ν(n), the matching number of the board's maximal-factor
+  graph (each number joined to its maximal factors).
+* M(n−1) ≤ M(n) ≤ M(n−1) + 1, and M(n) = M(n−1) for a prime n ≥ 3.
+* Given (★) in game n, a playable set has at most |U\*| members
+  above n/2.
+
+*Proof.*  Theorem 1 pays the picks of a playable set with distinct
+maximal factors outside it: a matching whose pick side is the set.
+A playable set of n−1 is one of n, and a playable set of n less the
+number n is one of n−1 (n is nobody's factor).  For a prime n, a
+playable set holds at most one prime (primes pay only with 1), and
+one that holds n becomes, with n swapped for p, the largest prime
+below n, a playable set of n−1 as large (p is nobody's maximal factor
+there and pays with 1, as in Theorem 9).  The part above n/2 of a
+playable set is a playable upper set, which Theorem 8's count
+inequality at t = n/2 bounds by |U\*|.  ∎
+
+So a legal game of ν(n) moves is a longest game, a certificate that
+costs one matching.  ν(n) can overshoot M(n), since a matchable set
+need not be playable (the n = 21 phenomenon above, counted in moves):
+first at n = 51, where ν = 23 and M = 22.
+
+**Proposition (an optimal game need not be a longest one).**  At
+n = 833 = 7²·17 every optimal game has 362 moves, and a legal game
+has 363.  The heaviest game of 363 moves scores 218,197, 29 less than
+opt(833) = 218,226; it keeps the optimal game's upper part, U\*, and
+differs from it below n/2 alone, by four of the optimal game's picks
+for five lighter ones:
+
+    optimal game:            {250, 252, 294, 400}         sum 1,196
+    heaviest longest game:   {116, 180, 200, 320, 351}    sum 1,167
+
+*Proof (computational, model-free).*  opt(833) = 218,226, and the
+optimal set is unique, with 362 members (`rust/evidence`, sections 3
+and 5).  The longer set replays by the rules, and ν(833) = 363, so
+M(833) = 363.  The branch and bound of `rust/evidence`, weighting the
+pick of c by K + c with K above every sum, proves that no playable
+set of 363 members sums to more than 218,197.  ∎
+
+The mechanism is a trade of weight for count below n/2.  Every
+payment is a maximal factor, so at most n/2; a pick above n/2 uses one
+number of the lower half (its payment) and a pick below it uses two
+(itself and its payment), so a playable S has
+|S| + |S ∩ [1, n/2]| ≤ ⌊n/2⌋.  At 833 the optimal game's 48 lower
+picks and 362 payments use 410 of the 416 lower numbers; the longest
+game's 49 and 363 use 412.  The optimal game leaves two more lower
+numbers idle and gives up a move for heavier lower picks: 1,196
+against 1,167.
+
+The same exchange is a promotion set of the frame model: the optimal
+game promotes 48 numbers and the longer one 49, which is `max_total`,
+so the "theorem" of the Java's comment is false for the whole frame
+game of 833 (`rust/tests/soundness.rs`).  `revise_freedoms` applies it
+only to the two-frame game of frames 0 and 1, where it stays
+unproven.
+
+What is measured (`rust/evidence`, "Does an optimal game play the
+most moves?"): to n = 1300 the recorded optimal game is a longest
+game in every game but 833, 834 and 835, where it is one move short.
+In 1,293 of the 1,299 games its moves meet ν(n), the certificate
+above; at 51, 182 and 183 ν(n) overshoots by one and a search shows
+that M(n) is the optimal game's.  So to 1300 an optimal game is at
+most one move short of a longest one.  A search that pruned the
+branches unable to reach M(n) moves would be unsound: at 833 it would
+return 218,197.  Whether the gap is bounded in general is open.
+
 ## Evidence
 
 Standing status for (★): zero counterexamples anywhere, and certified
@@ -610,6 +691,8 @@ the adversarial experiments: `rust/evidence/README.md`.
 | Optimal sets of n from those of n−1 (chain: T ∪ {n}; prime: T − p + n, a bijection); every optimal set holds the largest prime and no other | derivation = direct enumeration on every chain and prime game to 700 | proven (Thm 9, lemma) |
 | The optimal set is unique | all optimal sets enumerated model-free: every n ≤ 424; two at 425 | measured; false in general |
 | Every optimal game's upper part is U\*; a game's optimal sets have equal sizes and differ by equal-sum exchanges below n/2 | every completely enumerated game (`rust/evidence`, section 5) | measured; open |
+| M(n) ≤ ν(n); M(n−1) ≤ M(n) ≤ M(n−1) + 1, with equality on the left at a prime n | brute force to 22 | proven (Lemma, "Longest games") |
+| An optimal game has the most moves, M(n) | one move short at n = 833, 834 and 835, model-free; a longest game for every other n ≤ 1300, 1,293 of them by the matching certificate (`rust/evidence`, section 6) | **false** (n = 833); the gap is at most one to 1300, open beyond |
 | (★) on rejection-bearing components | every threshold of every game n = 2..20,000 certified by bounds; the earlier 5 undecided settled | certified per game; open in general |
 | (♦) and (★) under orders obeying the window law, adversarial or random, or its reverse | 1,981 instances, n = 2000..20,000, 0 failures (uniformly random orders: 16–50% fail; window law for a random prime ranking: 26–57%) | measured |
 | n=2873 component: greedy's 6 exclusions minimal | 12.4M playability checks over the 70-member residual | verified |

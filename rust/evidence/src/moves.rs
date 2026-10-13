@@ -210,6 +210,27 @@ mod tests {
     use crate::game::MatchingBound;
     use crate::primes::smallest_prime_factors;
 
+    /// The first game whose optimal game is not a longest one (README, section 6): the recorded game of 833 has
+    /// 362 moves, and exchanging four of its moves below n/2 for five lighter ones gives a legal game of 363, the
+    /// most any game of 833 can have (ν(833) = 363), worth 29 less.  (That no game of 363 moves is worth more is a
+    /// search of 2.6 million nodes, `bin/moves`.)
+    #[test]
+    fn game_833_has_a_longer_game_than_its_optimal_one() {
+        let path = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../src/main/resources/optimal.json"));
+        let (score, moves) = crate::jsonl::recorded_games(&[path])[&833].clone();
+        let spf = smallest_prime_factors(833);
+        let board = Board::new(833, &spf);
+        let mut longer: Vec<u32> = moves
+            .iter()
+            .copied()
+            .filter(|c| ![250, 252, 294, 400].contains(c))
+            .chain([116, 180, 200, 320, 351])
+            .collect();
+        longer.sort_unstable();
+        assert_eq!((moves.len(), score, matching_numbers(&board)[833]), (362, 218_226, 363));
+        assert_eq!(board.replay(&play_order(&board, &longer).unwrap()).map(|s| (longer.len(), s)), Ok((363, 218_197)));
+    }
+
     /// The moves of optimal.json's games to 400, in the order `play_order` gives them, replay by the rules to the
     /// recorded scores; a set with an unplayable subset has no payments.
     #[test]
