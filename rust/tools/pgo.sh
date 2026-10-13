@@ -21,7 +21,7 @@
 # targets generic armv8-a by default, unlike macOS (apple-m1, where target-cpu gains nothing), so build for the
 # machine with extra flags, for instance
 #
-#   TAXMAN_RUSTFLAGS="-Ctarget-cpu=native" tools/pgo.sh
+#   RUSTFLAGS="-C target-cpu=native" tools/pgo.sh
 #
 # (Graviton4 is a Neoverse V2; check /proc/cpuinfo.)  The probe measures cycles only on macOS; on Linux run it
 # under `perf stat` to compare builds.
@@ -38,7 +38,7 @@ fi
 
 CRATE="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." >/dev/null 2>&1 && pwd )"
 OUT="$CRATE/target/pgo"
-EXTRA="${TAXMAN_RUSTFLAGS:-}"
+EXTRA="${RUSTFLAGS:-}"  # kept, and added to the profile flags
 TARGETS=(--bin taxman --example perf --example ladder)
 
 # An llvm-profdata whose LLVM major version is rustc's.

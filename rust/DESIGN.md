@@ -1015,9 +1015,10 @@ Performance:
   on (880, 1050, 1100, 1170).  Long runs should use it; profile the plain
   build (in the other, the search is inlined into a few functions and
   `sample` sees little).  On Linux, rustup's `llvm-tools` has an
-  llvm-profdata that matches rustc's LLVM, and `TAXMAN_RUSTFLAGS=
-  -Ctarget-cpu=native` builds for the machine (aarch64 Linux targets generic
-  armv8-a; on the Mac the default, apple-m1, is the machine already).
+  llvm-profdata that matches rustc's LLVM, and the script keeps
+  `RUSTFLAGS="-C target-cpu=native"` (as `tools/cloud` sets it), which
+  builds for the machine (aarch64 Linux targets generic armv8-a; on the
+  Mac the default, apple-m1, is the machine already).
 * The ladder, `cargo run --release --example ladder -- [--threads T[,T…] |
   --scaling] [--seconds S] [--diag] [--seed-opt] [--known FILE] [--tactic …]
   N…`: standalone searches of hard games (default 760 800 840 880 900 960 992

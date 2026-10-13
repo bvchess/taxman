@@ -98,6 +98,8 @@ The binary finds `optimal.json` (the Java's table of optimal games for n <= 1000
 it (or be given `--optimal FILE`, or `--optimal none`).  The release profile uses fat LTO and `panic = "abort"`; the
 `test` profile is optimised (`opt-level = 2`) because the tests replay real games.  On a machine that will run only
 the binary, `RUSTFLAGS="-C target-cpu=native"` builds for that CPU (see [tools/cloud/RUNBOOK.md](tools/cloud/RUNBOOK.md)).
+`tools/pgo.sh` makes a profile-guided build in `target/pgo/release` (about 10% fewer cycles, the same answers and
+trees; its header says how, and DESIGN.md "Performance" what it gains); `examples/perf.rs` measures the hot paths.
 
 ```
 cargo test                         # the whole suite: about 1.5 minutes to compile, then about 30 s to run (2 test threads)
@@ -258,7 +260,7 @@ $ taxman verify-results results/strict.jsonl bench/curve/chain.jsonl     # see s
 $ taxman tables 85 8 45                         # the maximal factors and composites of 8 and 45 on the board 1..=85
 8: maximal factors [4]; maximal composites [16, 24, 40, 56]
 45: maximal factors [9, 15]; maximal composites []
-$ taxman bench --history /tmp/h.jsonl           # time the benchmark games 480 ... 760 (standalone, no derivation)
+$ taxman bench --history /tmp/h.jsonl           # time the benchmark games 936 ... 1184 (standalone, no derivation)
 ```
 
 `bench` appends one JSON line per run to its history file; the default is the tracked `bench/history.jsonl` inside the
@@ -416,7 +418,7 @@ chain, taint counts).
    |  solver::solve_range_each        n = A..B in order; the game of n-1 comes from this run, FILE or optimal.json,
    |                                  and is checked (legal, over, opens with the largest prime) before anything uses it
    v
- solver::solve_one(n) -> solve_with_width::<W>      W = 8, 16, 32 or 64 words of 64 bits, by n (<= 511, 1023, 2047, 4095)
+ solver::solve_one(n) -> solve_with_width::<W>      W = 8, 16, 20, 24, 28, 32 or 64 words of 64 bits (bits::WIDTHS), by n
    |
    |  numtheory::Tables                maximal factors and maximal composites of 1..=n
    |
