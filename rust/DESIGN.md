@@ -850,13 +850,15 @@ Correctness, all on games that finish in seconds:
   games in 1..200).
 * Tactic invariance: the regression with each unproven tactic off must give
   identical scores; so must games 1..300 forced to search with each sound
-  tactic off or changed (each `branching`, `match_refine` 0 and 3).
+  tactic off or changed (each `branching`, `match_refine` 0 and 3,
+  `fix_forced`, `nogoods`, `forget_nogoods`, ...), and a checkpoint is refused
+  when any of the nine search tactics differs.
 * Bound soundness: on small frame sets, the upper bound is never below the
   exhaustively computed best completion; the same for the matching bound and
   for its refinement by conflicts (whose exact completions must be
   promotable, and whose conflicts, carried down a path, must stay
   conflicts).  Conflicts and cores are checked against promoting the sets.
-* Golden parity: the searched golden games (93, up to 760) give the Java's
+* Golden parity: the searched golden games (94, up to 760) give the Java's
   promotion sums with the default tactics; the tactic variants give the same
   answers on those up to 400.
 * Engine: a toy problem with known optimum, run with 1 and many threads,
@@ -885,6 +887,76 @@ Correctness, all on games that finish in seconds:
   finishes at once; a limit stops `revise_freedoms`' own search; and the
   binary rejects bad times and limits, survives a closed stdout and stderr,
   and stops on SIGINT and SIGTERM with a checkpoint it then resumes.
+* Large boards (`tests/wide.rs`): `optimal.json` and the Java stop at 1000,
+  and the sets that hold a board are 8, 16, 32 and 64 words wide for n up to
+  511, 1023, 2047 and 4095, so nothing above 1023 meets anything but the
+  committed results (`results/strict.jsonl`, `default.jsonl`) and these
+  tests.  The same game at every width that holds it has the same frames,
+  candidates, greedy set, promotion cap, answer and tree (nodes counted); the
+  last board of each width (511, 1023, 2047) at the width and at the next;
+  game 1133 (W = 32, about 2,400 nodes) under every sound tactic against
+  `strict.jsonl`, on one thread and two; a slice of the strict chain
+  1127..1134; the sacrifice bound proves game 1133 by an independent route;
+  a W = 64 board (2050) through frames, matching bound, conflicts, greedy set
+  and a node-limited search; a W = 32 search interrupted and resumed under
+  several tactics, and a committed checkpoint of game 1133
+  (`testdata/n1133_after_1000_nodes.ckpt`) that must still resume (a
+  deliberate change of the checkpoint format fails it; the test says how to
+  make the file again); and the levels of a real depth-first stack of game
+  1215 (`testdata/n1215_deep_units.txt`, 0 to 34 promotions deep): the
+  incremental matching bound and the quick bounds without a member against the
+  min-cost-flow reference, and the subtrees of the deep levels under every
+  tactic.  The Bits unit tests cover W = 16, 32 and 64, every word included.
+* Java fixtures past 760 (`tests/golden_hives.rs`): `testdata/golden_wide/`
+  holds the Java's structure (hives, frames, candidates, reduced frame set,
+  greedy incumbent) for n = 511, 512, 1000, 1001, 1023, 1024, 1025, 1100,
+  1231, 2047 and 2048, checked at the width `words_for(n)` picks;
+  `accel_java.txt` the Java's acceptance of the previous game's promotions
+  for 94 boards of 763..1228 (with the fingerprint of the previous game the
+  decision was made with); `games_java.txt` its apiary game, move for move,
+  for 171 sets of promotions at 762..2049 that are not only the optimal ones.
+  The Java was run without `-ea` (its limit of 1023 is an `assert`) with
+  `tools/golden/org/.../AccelProbe.java` and `GameProbe.java`; the files say
+  how the lines are made.  Every second line of the two text files is checked
+  (`FIXTURE_STRIDE`).
+* Node-count tripwires (`tests/tripwires.rs`): a pruning tactic that stops
+  working changes no answer, so no assertion on answers sees it (a mutant
+  that ignored the result of `Nogoods::ruled_out` costs 27 to 67 % more
+  nodes).  With one thread the tree is deterministic, so the exact node count
+  of a fixed game under fixed tactics (n = 480 to 1133, every tactic off or
+  changed in turn) is asserted, and the tree of game 600 with the searchers
+  forgetting their nogoods every 500 steps (which sees the propagation of
+  known conflicts, that no game below 50,000 steps does otherwise).  **A
+  change that alters the tree on purpose fails them.**  Run `cargo test
+  --test tripwires -- --nocapture`: it prints the rows as observed, in the
+  layout of the table at the top of the file; check that the promotion sums
+  (the answers) have not moved, paste the rows in, and update the node counts
+  quoted in this file.
+* Soundness (`tests/soundness.rs`): the search is started with an incumbent
+  worth 1 or 5 less than the optimum and an empty payload, so that any
+  pruning that loses every best completion leaves the fake incumbent in
+  place (this tests the `<` and `<=` boundaries too): every game 2..=300
+  under each of 20 configurations (every tactic, forgetting every step, every
+  third, never; one thread and two); the same for 500 perturbed frame sets
+  (numbers dropped, role flipped, moved a frame; half of them with frame 0's
+  freedoms revised as `prepare` does) with the truth found exhaustively, at
+  the root and three levels down; promoting a set at once against one by
+  one in random orders, conflicts and nogoods on perturbed models; and
+  searches interrupted every 1,500 nodes, resumed from a checkpoint every
+  millisecond with units spilling.  A perturbed game whose revision changes
+  the best sum is left out: the search takes the revised freedoms for a fact
+  about the best set (the conjecture of `revise_freedoms`), and for a game
+  that breaks it (one in about 1,300 of the perturbed ones) may return a set
+  that they forbid.
+* Command line (`tests/cli.rs`): every subcommand's happy path and its usage
+  errors through the real binary; `bench --history FILE` keeps the tracked
+  `bench/history.jsonl` out of the tests.
+* Cost: the whole suite takes about 28 s with two test threads in the test
+  profile (`opt-level = 2`), 25 s in release.  A few tests sample what an
+  exhaustive run would cover (every 18th golden board for the peeling
+  agreement, every sixth board above 511 for the root promotability of the
+  frame builder's candidates, every second line of the Java fixtures); the
+  comment on each says what the whole run costs.
 
 Performance:
 

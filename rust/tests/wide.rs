@@ -17,14 +17,12 @@ use std::time::Duration;
 use taxman::bits::Bits;
 use taxman::engine::EngineConfig;
 use taxman::frames::build_frames;
-use taxman::game::{replay, Optimal};
-use taxman::json::Json;
 use taxman::matchbound::{match_bound, MatchBound, MatchGraph};
 use taxman::model::{Model, Scratch};
 use taxman::numtheory::Tables;
 use taxman::sacrifice::{sacrifice_bound, PuncturedOptions};
 use taxman::search::{Revise, SearchTactics, TaxUnit};
-use taxman::solver::{self, Method, SolveOptions};
+use taxman::solver::{self, Method, Prev, PrevSource, SolveOptions};
 
 // ---------------------------------------------------------------------------------------------------------
 // The width does not matter
@@ -92,49 +90,22 @@ fn every_tactic_gives_the_recorded_score_at_w32() {
 }
 
 /// A slice of the chain (every game feeding the next, from game 1126 as the committed results have it) reproduces
-/// the committed results with today's defaults, which the file predates (nogoods, `fix_forced`, forgetting).
+/// the committed results with today's defaults, which the file predates (nogoods, `fix_forced`, forgetting).  The
+/// games are handed on in memory; `tests/integrity.rs` covers the results file.
 #[test]
 fn a_slice_of_the_strict_chain_reproduces_the_results() {
     let games = stored_games("strict.jsonl");
-    let dir = TempDir::new("chain");
-    let out = dir.join("results.jsonl");
-    // Seed the results file with game 1126 only, as `taxman solve --out` would have left it.
-    let (score, moves) = &games[&1126];
-    let line = Json::object([
-        ("n", Json::from(1126u32)),
-        ("completed", Json::Bool(true)),
-        ("score", Json::from(*score)),
-        ("moves", Json::array(moves.iter().copied())),
-    ]);
-    std::fs::write(&out, format!("{line}\n")).unwrap();
-    let results = solver::solve_range(1127, 1134, &strict_options(2), Some(&out)).unwrap();
-    assert_eq!(results.len(), 8);
-    for r in &results {
-        assert!(r.completed, "n={}", r.n);
-        assert_eq!(r.score, games[&r.n].0, "n={}", r.n);
+    let opts = strict_options(2);
+    let mut prev = prev_of(&games, 1127);
+    let mut searched = 0;
+    for n in 1127..=1134 {
+        let r = solver::solve_game(n, Some(&prev), &opts).unwrap();
+        assert!(r.completed, "n={n}");
+        assert_eq!(r.score, games[&n].0, "n={n}");
+        searched += usize::from(r.method == Method::Search);
+        prev = Prev { moves: r.moves, score: r.score, source: PrevSource::Run, proof: r.proof, taint: r.taint };
     }
-    assert!(results.iter().filter(|r| r.method == Method::Search).count() >= 5);
-}
-
-/// The committed results replay as legal games and satisfy the invariants of `results/README.md`: contiguous from
-/// 1001, each score between the previous game's and `n` more, and `default.jsonl` agrees with `strict.jsonl` where
-/// they overlap.  They are the only oracle above n = 1000, so an accidental edit must not pass.
-#[test]
-fn the_committed_results_files_are_consistent() {
-    let optimal = Optimal::load_default().unwrap();
-    let files = [stored_games("default.jsonl"), stored_games("strict.jsonl")];
-    for games in &files {
-        for (&n, (score, moves)) in games {
-            assert_eq!(replay(n, moves), Ok(*score), "n={n}");
-            let before = games.get(&(n - 1)).map(|g| g.0).or_else(|| optimal.score(n - 1)).expect("a previous game");
-            assert!(*score >= before && *score <= u64::from(n) + before, "n={n}: {score} after {before}");
-        }
-        let last = *games.keys().last().unwrap();
-        assert_eq!(games.keys().copied().collect::<Vec<_>>(), (1001..=last).collect::<Vec<_>>(), "contiguous");
-    }
-    for (n, (score, _)) in &files[1] {
-        assert_eq!(files[0][n].0, *score, "n={n}");
-    }
+    assert!(searched >= 5, "{searched} of the 8 games were searched");
 }
 
 // ---------------------------------------------------------------------------------------------------------

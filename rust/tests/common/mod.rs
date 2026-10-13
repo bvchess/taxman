@@ -18,6 +18,7 @@ use taxman::json::Json;
 use taxman::matchbound::MatchGraph;
 use taxman::model::{FrameSet, Model, Scratch};
 use taxman::numtheory::Tables;
+use taxman::results::Taint;
 use taxman::search::{prepare, search, Branching, SearchSpace, SearchTactics, TaxSearcher, TaxUnit, NOGOOD_PERIOD};
 use taxman::solver::{Prev, PrevSource, SolveOptions};
 
@@ -101,10 +102,11 @@ pub fn stored_games(name: &str) -> StoredGames {
     games
 }
 
-/// The game `n − 1` of a results file as the previous game of `n`.
+/// The game `n − 1` of a committed strict results file as the previous game of `n`.  The strict games rest on
+/// nothing unproven (`results/README.md`), so the taint is empty; the proof only matters to the results lines.
 pub fn prev_of(games: &StoredGames, n: u32) -> Prev {
     let (score, moves) = &games[&(n - 1)];
-    Prev { moves: moves.clone(), score: *score, source: PrevSource::Results }
+    Prev { moves: moves.clone(), score: *score, source: PrevSource::Results, proof: None, taint: Taint::new() }
 }
 
 /// The options `results/strict.jsonl` was made with (neither unproven tactic that existed then): `reuse_prev` and
