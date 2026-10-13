@@ -37,7 +37,9 @@ a "schema" field (schema 1) proves by the cap when its promotions sum to setup.c
 on that is unproven: reuse_prev for a game it derived; revise_freedoms for a searched game whose setup.revise is
 GreedyIsMax, Searched or FromCheckpoint; legacy_bound for a searched game with it on; and, for a proof by the cap,
 the prime formula or reuse_prev, the taint of the game of n-1 ("optimal.json" for a game taken from that file).
-A line of a schema newer than this referee reads is a problem.
+From schema 3 on, a proof by the cap rests on nothing the game used itself (its game replays to n + score(n-1),
+the ceiling, whatever found it), so its taint is only that of the game of n-1.  A line of a schema newer than this
+referee reads is a problem.
 
 The report counts games by proof kind and by taint, and the arithmetic certificates: scores equal to n + score(n-1)
 or to the prime formula, which certify a game whatever found it, given that the game of n-1 is optimal.
@@ -58,7 +60,7 @@ OPTIMAL = REPO / "src" / "main" / "resources" / "optimal.json"
 FM_BOUND = REPO / "heuristics" / "results" / "fm_bound_2000.json"
 HEURISTIC_CHAIN = REPO / "heuristics" / "results" / "chain_1001_2000.json"
 
-SCHEMA = 2  # the newest format of a result line this referee reads
+SCHEMA = 3  # the newest format of a result line this referee reads
 RESTS_ON_PREV = {"prime_formula", "cap", "reuse_prev"}
 # The values of setup.revise, by kind: the plain ones, and those with numbers (u32 sizes, u64 node counts) in the
 # form Rust's Debug writes them, without signs or leading zeros.  REVISED are the kinds that taint a searched game.
@@ -327,7 +329,8 @@ def check_file(path, optimal, fm, heuristic, divisors, problems):
         # Proof and taint.
         if proof in RESTS_ON_PREV and prev is None:
             fail(f"its proof ({proof}) rests on a game of n-1 it does not name")
-        taint = own_taint(row) | (prev[3] if prev and proof in RESTS_ON_PREV else set())
+        own = set() if proof == "cap" and schema >= 3 else own_taint(row)
+        taint = own | (prev[3] if prev and proof in RESTS_ON_PREV else set())
         if schema >= 2:
             if row["proof"] != proof:
                 fail(f"records the proof {row['proof']}, but the rules give {proof}")

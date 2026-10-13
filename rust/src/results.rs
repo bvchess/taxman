@@ -17,15 +17,19 @@
 //! * `reuse_prev`: the tactic of that name accepted the game; a conjecture.
 //!
 //! `cap`, `prime_formula` and `reuse_prev` rest on the game of `n − 1` ([`Proof::rests_on_prev`]).  The *taint*
-//! is the set of unproven things a proof rests on: the unproven tactics the game used itself ([`own_taint`]),
-//! and, when the proof rests on the game of `n − 1`, that game's taint, and so on down the chain.  A game taken
+//! is the set of unproven things a proof rests on ([`taint_of`]): the unproven tactics the game used itself
+//! ([`own_taint`]), except in a proof by the cap, and, when the proof rests on the game of `n − 1`, that game's
+//! taint, and so on down the chain.  A proof by the cap rests on nothing the game used itself: the game replays
+//! legally to `n + score(n − 1)` (the line's arithmetic says so), which is the ceiling whatever found the game, so
+//! the tactics that shaped the search, frame 0's revised freedoms among them, play no part in it.  A game taken
 //! from `optimal.json` has the taint [`OPTIMAL_JSON`]: the Java made that file with `reuse_prev` and
 //! `revise_freedoms` on and records nothing about which games used them.  An empty taint means proven within the
 //! frame model, given that the solver is right.
 //!
 //! Lines without a `schema` field were written before there was provenance (schema 1).  Their proof and taint
 //! are derived from the fields they have, by the same rules: `reached_cap` is "the promotions sum to `setup.cap`"
-//! and the predecessor is the one `prev_source` names.
+//! and the predecessor is the one `prev_source` names.  Schema 2 recorded the proof and taint, and counted the
+//! game's own taint in a proof by the cap too, as schema 1 lines still do; schema 3 is schema 2 without that.
 //!
 //! # Checks
 //!
@@ -82,8 +86,9 @@ use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-/// The version of the result-line format.  1 (no `schema` field) is the format before provenance.
-pub const SCHEMA: u32 = 2;
+/// The version of the result-line format.  1 (no `schema` field) is the format before provenance; 2 counted a
+/// game's own taint in a proof by the cap.
+pub const SCHEMA: u32 = 3;
 
 /// The taint of a game taken from `optimal.json`.
 pub const OPTIMAL_JSON: &str = "optimal.json";
@@ -155,9 +160,16 @@ pub fn own_taint(method: Method, revise: Option<Revise>, legacy_bound: bool) -> 
     taint
 }
 
-/// A game's taint: its own, and that of the game of `n − 1` if its proof rests on it.
+/// A game's taint, by the rules of the current [`SCHEMA`]: its own (`own`, see [`own_taint`]) unless its proof is
+/// by the cap, which rests on nothing the game used itself (see the module documentation), and that of the game
+/// of `n − 1` if its proof rests on it.
 pub fn taint_of(own: Taint, proof: Proof, prev: Option<&Taint>) -> Taint {
-    let mut taint = own;
+    taint_by_schema(SCHEMA, own, proof, prev)
+}
+
+/// [`taint_of`] by the rules of `schema`: before schema 3, a proof by the cap counted the game's own taint too.
+fn taint_by_schema(schema: u32, own: Taint, proof: Proof, prev: Option<&Taint>) -> Taint {
+    let mut taint = if proof == Proof::Cap && schema >= 3 { Taint::new() } else { own };
     if proof.rests_on_prev() {
         taint.extend(prev.into_iter().flatten().cloned());
     }
@@ -686,7 +698,7 @@ fn check_entry(e: Entry, games: &BTreeMap<u32, StoredGame>, optimal: Option<&Opt
         return Err(fail(format!("its proof ({}) rests on a game of n − 1 that it does not name", proof.as_str())));
     }
     let own = own_taint(e.method, e.setup.map(|s| s.revise), e.legacy_bound);
-    let taint = taint_of(own, proof, pred.as_ref().map(|p| &p.taint));
+    let taint = taint_by_schema(e.schema, own, proof, pred.as_ref().map(|p| &p.taint));
     if let Some((recorded_proof, recorded_taint)) = &e.recorded {
         if *recorded_proof != proof {
             return Err(fail(format!(
@@ -955,6 +967,13 @@ mod tests {
         let prev = Taint::from([OPTIMAL_JSON.to_owned()]);
         assert_eq!(names(taint_of(Taint::new(), Proof::Cap, Some(&prev))), [OPTIMAL_JSON]);
         assert!(taint_of(Taint::new(), Proof::Exhausted, Some(&prev)).is_empty());
+        // A proof by the cap rests on nothing the game used itself (before schema 3 it counted it too); any other
+        // proof does.
+        let own = own_taint(Method::Search, Some(searched), true);
+        assert_eq!(names(taint_of(own.clone(), Proof::Cap, Some(&prev))), [OPTIMAL_JSON]);
+        let before = taint_by_schema(2, own.clone(), Proof::Cap, Some(&prev));
+        assert_eq!(names(before), ["legacy_bound", OPTIMAL_JSON, "revise_freedoms"]);
+        assert_eq!(taint_of(own.clone(), Proof::Exhausted, Some(&prev)), own);
     }
 
     #[test]
