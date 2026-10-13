@@ -30,7 +30,7 @@ ENV RUSTFLAGS="" \
     TAXMAN_WORK=/work
 
 WORKDIR /taxman/rust
-RUN cargo build --release --examples \
+RUN cargo build --release --bins --examples \
     && cargo test --no-run
 
 # Results, checkpoints and logs go to /work: mount a volume there (docker run -v taxman-work:/work) to keep them.
