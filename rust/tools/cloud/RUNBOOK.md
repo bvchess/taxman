@@ -97,8 +97,8 @@ larger N later continues the same file.
   builds; a binary built on a newer core can fail with an illegal instruction on an older one.  `setup.sh` prints the CPU
   that `native` resolved to (`native cpu:` line); it should be a Neoverse core name, not `generic`.  The gain of `native`
   has not been measured on Graviton (expect 0 to 3 %).
-* **Profile-guided optimization** (PGO) is optional and no script for it existed in `tools/` when this was written (if
-  your checkout has a `rust/tools/pgo.sh`, its header says how to use it).  PGO changes code
+* **Profile-guided optimization** (PGO) is optional: `rust/tools/pgo.sh` makes the build (its header says how; on the
+  M1 it adds 0 to 2 % now, see [DESIGN.md](../../DESIGN.md#10-performance)).  PGO changes code
   generation only: the search and its answers are the same, a checkpoint can be resumed by either binary, and
   `TAXMAN_BIN` / `LADDER_BIN` point these scripts at another binary.  Keep a non-PGO build too if you want to profile.
 
@@ -216,7 +216,7 @@ TXENGINE_STRESS=2000 cargo test --release --test engine -- --ignored stress
 TXENGINE_CONSERVATION=500 cargo test --release --test robustness conservation
 ```
 
-* The suite takes about 30 s to run after compiling, with two or four test threads (DESIGN.md, "Testing"); it includes
+* The suite takes about 30 s to run after compiling, with two or four test threads ([DESIGN.md](../../DESIGN.md#9-testing), "Testing"); it includes
   the node-count tripwires (`tests/tripwires.rs`), which assert exact trees on one thread and so check the arithmetic
   and the search against a different CPU and compiler.
 * `many_threads` runs the engine on a toy problem at 64 and at 192 workers: answers, splitting, checkpoints every 2 ms,
@@ -265,7 +265,7 @@ scaling, n=1184 (speedup over 1 thread(s), times 1; * = stopped by the time limi
 | `lock %` | time waiting for the deque's lock | should stay near 0; if it reaches a few percent on long games at high counts, the engine's one shared deque is contended and per-worker deques are the next step (`src/engine.rs`, "Why one deque") |
 | `splits`, `units` | times a worker handed work over, and the units those gave | grows with the thread count; the demand for work, not a defect |
 | `steals` | units taken from the front of the deque by workers that had waited | |
-| `runs`, `tiny` | units run, and those that polled once or never (nothing left in them) | compare the share with the rows of few threads; DESIGN.md records 13 of 227 at 2 threads |
+| `runs`, `tiny` | units run, and those that polled once or never (nothing left in them) | compare the share with the rows of few threads; [docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md) ("The engine") records 13 of 227 at 2 threads |
 | `full s` | time until every worker was running at once | milliseconds at 8 threads (0.9 to 2.8 ms observed); expect tens of ms at 192; seconds would mean the split protocol is too slow to ramp up |
 
 Notes on judging it:
@@ -448,5 +448,5 @@ scaling logs under `bench/` (say `bench/cloud/`), are your call.
 * **Graviton5.**  The speed of its cores against the M1's, the effect of `target-cpu=native`, the cache and memory
   behaviour of 192 cores sharing a chip.
 * **NUMA**, if the 48xlarge has more than one node.
-* **PGO.**  No script existed when this was written, and no gain from profile-guided builds is claimed for Graviton.
+* **PGO.**  `tools/pgo.sh` exists and was run on the M1 only; no gain from profile-guided builds is claimed for Graviton.
 * **The scripts on Linux and on EC2.**  See the status box.  The first run on the small instance is the test.
