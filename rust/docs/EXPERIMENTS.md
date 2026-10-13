@@ -1033,3 +1033,12 @@ change of slope; even on short searches, a loss where finding the optimum domina
   levels or cheaper repairs.
 * *The late-optimum games* (992, 1025) are where it does not pay; a search that knows it has not yet found the
   optimum (incumbent improvements still coming) could hold the bound back.
+
+**The whole strict chain with both of this month's shortcuts** (`same_search` and `lagrange`, build a2da702):
+`taxman solve 1-1300 --strict --threads 4` from n = 1, on the laptop while two other jobs ran, took 1038 s of wall
+time in all (3975 s of CPU).  Every one of the 1300 scores equals the committed `results/strict.jsonl`'s, no game is
+tainted, and both referees pass it; its proofs are same_search 545, exhausted 416, prime formula 211, cap 115,
+trivial 13.  Search seconds by range, against the committed run (bd9bb5d, 6 threads): 1..1000 51.8 against 82.8,
+1001..1231 184.6 against 409.7, 1232..1300 775.7 against 2866.3, so 3.7 times less wall time on two thirds of the
+threads at the frontier.  The slowest games are now 1232 (142 s, was 439), 1295 (107, was 259), 1300 (88, was 179) and
+1287 (85, was 273).
