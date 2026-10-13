@@ -587,7 +587,7 @@ impl RadixHeap {
         self.last = 0;
     }
 
-    #[inline]
+    #[inline(always)]
     fn push(&mut self, time: u64, code: u32) {
         debug_assert!(time >= self.last, "time went back");
         match self.bucket(time) {
@@ -599,6 +599,7 @@ impl RadixHeap {
         }
     }
 
+    #[inline(always)]
     fn pop(&mut self) -> Option<(u64, u32)> {
         if self.now.is_empty() {
             if self.full == 0 {
@@ -772,6 +773,7 @@ impl Search {
     }
 
     /// Adds the inner vertex `a` to the tree at distance `d`, and reaches its neighbours over unmatched edges.
+    #[inline(always)]
     fn add_inner<const W: usize>(&mut self, g: &MatchGraph, lv: &Level<W>, a: usize, d: i64) {
         self.slot[a] = Slot { dist: d, stamp: self.epoch, pred: self.slot[a].pred, tag: INNER };
         self.tree.push(a as u16);
