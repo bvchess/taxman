@@ -118,7 +118,7 @@ and at the nodes it fails to prune it is 25–45 above what was needed
 set; the tree peaks at 25–40 promotions deep.  Making the bound tighter was
 the lever, not cheaper nodes.
 
-* **Conflicts** (`model::conflict_using`).  When the heaviest matching's
+* **Conflicts** (`Model::conflict_using`).  When the heaviest matching's
   candidates `Q*` cannot all be promoted, some frame is unwinnable with them;
   the moves a peel of it cannot drop (its *core*) are stuck however the order
   goes, and the members of `Q*` the core needs (promoted into the frame and
@@ -129,7 +129,7 @@ the lever, not cheaper nodes.
   node's state, though it can from the root; see "Single-member conflicts
   belong to the node").  A subset of a promotable set is promotable, so
   every completion leaves out some member of a conflict — the basis of all
-  that follows, and of `search::Refiner`'s soundness proof.
+  that follows, and of `search::refine::Refiner`'s soundness proof.
 * **Refinement** (`match_refine`).  Bound the branches of the conflict too
   (`k₁` out; `k₁` in and `k₂` out; …), a few levels deep.  Alone, on the
   Java's branching, it cut nodes 2–70x but cost more per node than it saved

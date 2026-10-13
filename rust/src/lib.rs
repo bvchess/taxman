@@ -32,7 +32,7 @@
 //!        │
 //!        ▼
 //!       search::search ───────────────► engine::run: threads, shared deque with disk spill, checkpoints
-//!        │                               └ TaxSearcher::step per node: matchbound → conflicts, forced
+//!        │                               └ Stepper::step per node: matchbound → conflicts, forced
 //!        │                                 members, nogoods → branch → child
 //!        ▼
 //!       promotions ──► hives::Apiary ──► the moves ──► game::replay ──► score, results line

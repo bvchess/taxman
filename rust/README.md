@@ -439,8 +439,9 @@ chain, taint counts).
    |        search::search             starting incumbent = best of greedy / seed (n-1's promotions) / rounded root
    |                                   matching + local search; cap = n + score(n-1) - in_the_bag
    |          engine::run              worker threads; shared deque with disk spill; incumbent; checkpoints; signals
-   |            TaxSearcher::step      per node: matching bound (matchbound) -> conflicts, forced members, nogoods
-   |                                   (search::Refiner, model::Nogoods) -> choose a candidate -> make the child
+   |            Stepper::step          per node (search/searcher.rs): check_node = matching bound (matchbound) ->
+   |                                   conflicts, forced members, nogoods (search::refine::Refiner, model::Nogoods);
+   |                                   choose_branch (a candidate) -> make_child -> check_child
    |      promotions -> accelerate::solution_for_promotions   (Apiary with the promotions as sources) -> ordered moves
    |
    |  [1], [3] are skipped by --force-search and when the game has a checkpoint (a search is resumed, never replaced)
@@ -545,8 +546,8 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
   all of them together).  Also: a hive's *mandatory* move (`unzip`, "forced moves" in its docs), and a *forced pair*
   in `reduce`.  Three unrelated ideas.
 * **nogood**: a conflict of the *root* learned from a conflict found at a node; valid at every node, any thread, any
-  path.  Each searcher keeps a table, with 256-bit **signatures** to skip most of it quickly, and forgets it every
-  50,000 of its steps (`forget_nogoods`).
+  path.  Each searcher keeps a table, scanned exactly over compact member indices, and forgets it every 50,000 of its
+  steps (`forget_nogoods`).
 * **preclusion**: a depth-2 table that rules candidates out (tactic `preclusions`, off by default).
 * **certificate** **(overloaded)**: `model::Certificate` is a winning order that answers most single-edit winnability
   questions without a peel; `results::Certificate` is a score that equals a proven ceiling; the heuristics' "upper-delta
@@ -601,17 +602,20 @@ The code, in the order that builds understanding (each file starts with a module
 2. `src/numtheory.rs`: maximal factors and composites.
 3. `src/hives.rs`: sources, factors, hives, unzip, impossible moves, free factor counts.
 4. `src/frames.rs`: hives stacked into frames; the candidates.
-5. `src/model.rs`: `Frame`, `FrameSet`, `Model`: winnability, promotion, reduction, then conflicts and nogoods.
+5. `src/model/`: `mod.rs` says what is where: `Frame`, `FrameSet` (`frame.rs`), `Model`, winnability and reduction
+   (`peel.rs`), promotion (`promote.rs`), then conflicts (`conflict.rs`) and nogoods (`nogoods.rs`).
 6. `src/board.rs`, `src/solver.rs`: a board prepared for a search, and the per-game pipeline and the range driver.
 7. `src/matchbound.rs`: the matching bound; the module comment is the best explanation of it.
-8. `src/search.rs`: the search: `Refiner` (conflicts, refinement), `strongest`, `TaxSearcher::step`, `prepare`, the
-   checkpoint header.
+8. `src/search/`: `mod.rs` explains the step and says what is where: `searcher.rs` (`TaxSearcher` and `Stepper::step`,
+   whose phases are `check_node`, `choose_branch`, `make_child` and `check_child`), `refine.rs` (`Refiner`: conflicts,
+   refinement; `strongest`), `setup.rs` (`prepare`), `tactics.rs`, `incumbent.rs`, and `header.rs` (the checkpoint
+   header).
 9. `src/engine.rs`: the protocol in the module comment (conservation, splitting, checkpoint, termination).
 10. `src/tactics.rs`, `src/results.rs`, `src/paths.rs`, `src/commands.rs`, `src/main.rs`: the switchable tactics,
     provenance and verification, the default files, the command line.
 
 Skip on a first read: `src/bounds.rs` (the Java's `blameGame` bound and preclusions, mostly off the default path),
-`src/sacrifice.rs` and `src/brute.rs` (a study, and the test oracle it uses), `search::Diagnostics`.  Read the
+`src/sacrifice.rs` and `src/brute.rs` (a study, and the test oracle it uses), `src/search/diagnostics.rs`.  Read the
 comment of `prime_shortcut` in `src/accelerate.rs` for the proof of the prime shortcut.
 
 | document | what it holds |

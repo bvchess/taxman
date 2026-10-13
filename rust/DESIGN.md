@@ -212,7 +212,7 @@ When the heaviest matching's candidates `Q*` cannot all be promoted, some frame 
 of that frame run: the moves it cannot drop, its *core*, are stuck however the order goes, and the members of `Q*`
 that the core needs (promoted into the frame and core moves, or promoted out of it and factors of core moves) cannot be
 promoted together.  Minimized by peeling only the core, such a set `K ⊆ Q*` is a *conflict*: a set of candidates that
-cannot be promoted together from the node's state (`model::conflict_using`).  Conflicts are tiny (a median of two
+cannot be promoted together from the node's state (`Model::conflict_using`).  Conflicts are tiny (a median of two
 members at n = 760–1000, a quarter of them single members).
 
 The idea behind everything that follows: a subset of a promotable set is promotable (moves left out and factors kept
@@ -222,7 +222,7 @@ only help a frame), so **every feasible completion leaves out some member of a c
   conflict too: with members `k₁ < k₂ < … < k_r`, every feasible completion `F` is in exactly one branch "`k₁ … k_{j−1}`
   in `F`, `k_j` not", and the best completion is at most the largest of the branches' matching bounds (the matching
   with `k_j` no longer a candidate and `k₁ … k_{j−1}` required).  Each branch is refined the same way, one level
-  less deep.  By induction the refined bound is never below the best completion (`search::Refiner`).
+  less deep.  By induction the refined bound is never below the best completion (`search::refine::Refiner`).
 * **Conflict branching** (`branching`, default `conflict-strong`).  A node branches on a member of the conflict
   instead of its largest candidate: the child promotes it, and the node goes on without it, so that neither can
   reproduce the heaviest matching.  `conflict-strong` picks the member whose removal lowers the matching bound
@@ -270,17 +270,22 @@ is *forced*: every completion that beats the incumbent promotes it.
 
 ### The default step
 
-One step of a node's loop (`TaxSearcher::step`), with the default tactics:
+One step of a node's loop (`Stepper::step` in `src/search/searcher.rs`; the module comment of `src/search/mod.rs` says
+which of its four phases takes which of the steps below), with the default tactics:
 
 ```
 need = best + 1 − sum(promoted)                   # the loop goes on while the bound reaches this
 1. end the loop if cands is empty, or the max_add largest candidates sum below need
-2. look at the node's heaviest matching (matchbound), refining match_refine levels deep:
+2. look at the node's heaviest matching Q* (matchbound):
      value < need                                  -> end the loop (cut)
-     refined branches all < need                   -> end the loop (cut)
+     F = the forced members of Q* (those whose removal alone brings the bound below need)
+     the nogood table knows a conflict of Q* all of whose members are in F
+                                                   -> end the loop (cut)
      Q* can be promoted                            -> offer promoted ∪ Q* as incumbent; end the loop
-     otherwise: a conflict K ⊆ Q* (the nogood table's smallest, else computed and learned), and the
-                forced members F of Q* (those whose removal alone brings the bound below need)
+     otherwise: a conflict K ⊆ Q* (the nogood table's smallest, else computed and learned);
+                and if F is empty, refine it: bound the branches of K, match_refine levels deep
+       refined branches all < need                 -> end the loop (cut)
+     (with forced members the node's only child promotes them, and refining is left to it)
 3. if K ⊆ F: end the loop (every completion beating the incumbent promotes all of K, which cannot be)
 4. n = a member of F if there are forced members, else the member of K whose removal lowers the bound most
 5. remove n from cands; if F is non-empty the node has nothing left to try after this child
@@ -334,7 +339,7 @@ tactics of `tactics::Tactics`, in order, with their defaults, and grades exactly
 | `preclusions` | off | sound (promotion failure is monotone: more moves or fewer factors never make a frame winnable) | depth-2 preclusion table; prunes candidates (off since 2026-10: with nogoods it no longer pays for its setup) |
 | `match_bound` | on | sound (matchability relaxes winnability) | node bound = the matching relaxation instead of `blameGame`, and the children's candidate lists without the Java's promotability checks (the conflicts find those candidates); a heaviest matching that can be promoted is the node's best completion |
 | `branching` | conflict-strong | sound (any order explores every promotion set) | which candidate a node promotes next: `largest` (the Java's order), or a member of a conflict of the heaviest matching (these need `match_bound`): the smallest, the largest, or the one whose removal lowers the matching bound most |
-| `match_refine` | 1 | sound (see `search::Refiner`) | refine the matching bound by branching on conflicts this many levels deep, where it does not prune (0 = off, at most 7; needs `match_bound`) |
+| `match_refine` | 1 | sound (see `search::refine::Refiner`) | refine the matching bound by branching on conflicts this many levels deep, where it does not prune (0 = off, at most 7; needs `match_bound`) |
 | `fix_forced` | on | sound (every completion that beats the incumbent promotes them) | with `conflict-strong` branching, a node's child promotes all its forced candidates; the node's loop ends after that child |
 | `nogoods` | on | sound (a nogood holds at every node; see `model::Nogoods`) | learn each conflict as a nogood of the root and use the table at every node, for the conflict to branch on and refine with and to rule candidates out of children (needs `match_bound`) |
 | `forget_nogoods` | on | sound (the table is a cache) | with `nogoods`, each searcher forgets every nogood it knows after each 50,000 of its steps |
