@@ -21,29 +21,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
-use taxman_evidence::game::{prime_below, Board, Prover, Role, Verdict};
-use taxman_evidence::jsonl::{campaign, parse_items, Obj};
-use taxman_evidence::primes::{is_prime, smallest_prime_factors};
-
-/// (n, score, moves) of every game in a file of optimal.json's or the solver's results format: the first "n",
-/// "score" and "moves" of each line holding an "n".
-fn games(text: &str) -> Vec<(u64, u64, Vec<u32>)> {
-    fn after<'a>(line: &'a str, key: &str) -> Option<&'a str> {
-        let at = line.find(&format!("\"{key}\""))? + key.len() + 2;
-        Some(line[at..].trim_start().strip_prefix(':')?.trim_start())
-    }
-    let number = |s: &str| s.chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse::<u64>().ok();
-    text.lines()
-        .filter_map(|line| {
-            let n = number(after(line, "n")?)?;
-            let score = number(after(line, "score")?)?;
-            let moves = after(line, "moves")?.strip_prefix('[')?;
-            let moves = &moves[..moves.find(']')?];
-            let moves = moves.split(',').filter(|s| !s.trim().is_empty()).map(|s| s.trim().parse().unwrap()).collect();
-            Some((n, score, moves))
-        })
-        .collect()
-}
+use taxman_evidence::game::{relation, Board, Prover, Role, Verdict};
+use taxman_evidence::jsonl::{campaign, parse_items, recorded_games, Obj};
+use taxman_evidence::primes::smallest_prime_factors;
 
 /// A paused search: its target, nodes so far, nogoods and open units (roles as letters F, P, B).
 struct Checkpoint {
@@ -130,13 +110,7 @@ fn main() {
         }
     }
     assert!(!out.as_os_str().is_empty(), "--out is required");
-    let mut known: std::collections::BTreeMap<u64, (u64, Vec<u32>)> = std::collections::BTreeMap::new();
-    for path in [&optimal, &results] {
-        let text = fs::read_to_string(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-        for (n, score, moves) in games(&text) {
-            known.entry(n).or_insert((score, moves));
-        }
-    }
+    let known = recorded_games(&[&optimal, &results]);
     let items: Vec<u64> = items.into_iter().filter(|n| *n >= 2 && known.contains_key(n)).collect();
     let spf = smallest_prime_factors(items.iter().copied().max().unwrap_or(2) as usize);
     let pause_at = Instant::now() + Duration::from_secs_f64(seconds.min(1e9));
@@ -148,13 +122,7 @@ fn main() {
         let replayed = board.replay(moves);
         assert_eq!(replayed, Ok(*score), "n={n}: the recorded game does not replay to its score");
         let prev = known.get(&(n - 1)).map_or(0, |(s, _)| *s);
-        let relation = if *score == n + prev {
-            "chain"
-        } else if n > 2 && is_prime(n, &spf) && *score == n + prev - prime_below(n, &spf) {
-            "prime"
-        } else {
-            "none"
-        };
+        let relation = relation(n, *score, prev, &spf).name();
         let mut prover = Prover::new(&board, *score, budget).pause_at(pause_at);
         if segments {
             let smaller: Vec<u64> = (0..n).map(|m| known.get(&m).map_or(0, |(s, _)| *s)).collect();
