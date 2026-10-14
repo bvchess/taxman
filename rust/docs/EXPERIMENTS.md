@@ -3766,8 +3766,8 @@ the whole one-thread process.
 *The gap.*  Over the unseeded start the root's gap rises +57 per 100 n over the 39 boards, from 600-1200 at 2200-2950
 to 1300-2600 at 3100-4095; where the optimum is known the unseeded start is 0 to 403 below it (mean 172; a seeded
 one up to 472, at 2200), so the true gaps past 3100 are likely 1,000 or more, against at most 767 to 2175.  The
-true gaps of the c8g chain's dear games past 2175 (`gaps_c8g.jsonl`, seeded starts) are not larger than 2170's, yet
-their trees are: 2184 gap 887 and 25.6 million nodes (64 threads), 2260 721 and 10.4 M, 2268 636 and 6.6 M, 2254 and
+true gaps of the c8g chain's dear games past 2175 (`gaps_c8g.jsonl`, seeded starts) are close to 2170's, yet their
+trees are not: 2184 gap 887 and 25.6 million nodes (64 threads), 2260 721 and 10.4 M, 2268 636 and 6.6 M, 2254 and
 2256 713 and 5.3 M and 5.0 M, against 2170's 767 and 1.43 M (one thread).  The tenfold per 236 of gap of 1301..2175
 predicts 4.6 M for 2184: trees past 2175 grow faster than their root gaps say.
 
