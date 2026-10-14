@@ -983,7 +983,9 @@ impl<const R: usize> Meet<R> {
     /// "The heaviest set without a member": `limit` is the least that a set of another size than the heaviest set's
     /// loses); `None` if it is not, and the caller must solve.  `pot` is the weight split of the solve's heaviest set
     /// (its `w1` by element, as [`potentials`](Self::potentials) has it after [`split_bounds`](Self::split_bounds)).
-    /// The tableau is left as it was.
+    /// The cycle avoids the elements of `banned` (and the value is then the heaviest set's without `x` among the sets
+    /// that hold every member of `banned` and no other element of it: the decomposition of the module docs keeps
+    /// such sets' parts within the elements not banned).  The tableau is left as it was.
     ///
     /// Dijkstra's search from `x` over the split's reduced lengths, `w1(z) − w1(y)` on an arc `z → y` of `A` and
     /// `w2(z) − w2(y)` on an arc `y → z` of `B`, which are never negative and add up along a cycle to its length;
@@ -992,7 +994,7 @@ impl<const R: usize> Meet<R> {
     /// through the member with the least distance plus `w1`, in decreasing order of their own `w1`; an element free
     /// in `B` has an arc to every member, `x` included.  The search stops at the first distance that no cycle
     /// within `limit` and shorter than the best found can pass.
-    pub fn without(&mut self, p: &Problem<'_, R>, pot: &[i64], x: u32, limit: i64) -> Option<i64> {
+    pub fn without(&mut self, p: &Problem<'_, R>, pot: &[i64], x: u32, limit: i64, banned: &[u32]) -> Option<i64> {
         self.withouts += 1;
         if !self.settled || self.tableau != self.solves || !self.inside[x as usize] {
             debug_assert!(false, "the bound without a member needs the tableau of a settled solve holding it");
@@ -1017,6 +1019,10 @@ impl<const R: usize> Meet<R> {
         let (reach, back, seen, stamp) = (&mut self.reach, &mut self.back, &mut self.seen, &mut self.settled_at);
         let heap = &mut self.heap;
         heap.clear();
+        // A banned element counts as settled: never offered, nor reached as an element free in A.
+        for &e in banned {
+            stamp[e as usize] = settled;
+        }
         // Distances from `limit + 1` on cannot lead to a cycle that certifies.
         let bound = (limit + 1) * HOPS;
         let mut cycle = (bound, NONE);
@@ -1471,7 +1477,7 @@ mod tests {
                 let limit = if cap > size { loss.min(meet.gap) } else { loss };
                 for &x in &members {
                     asked += 1;
-                    if let Some(value) = meet.without(&p, &pot, x, limit) {
+                    if let Some(value) = meet.without(&p, &pot, x, limit, &[]) {
                         certified += 1;
                         let rest: Vec<u32> = live.iter().copied().filter(|&e| e != x).collect();
                         assert_eq!(value, brute(&p, &rest, cap), "trial {trial}: without {x}, at most {cap}");
