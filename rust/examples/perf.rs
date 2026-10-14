@@ -456,6 +456,31 @@ fn gf2_kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> R
             rounds as f64 / augmentations.max(1) as f64
         );
     }
+    // Strong branching as the search does it: the split, then the bounds the heaviest set's exchange graph
+    // certifies, and solves for the others.  The values, and so the fingerprint, are the kernel's above.
+    let (mut tried, mut certified) = (Vec::new(), Vec::new());
+    let before = b.stats();
+    let (cost, fp) = measure(reps, |fp| {
+        for &(promoted, cands, cap, need, conflict) in &nodes {
+            b.reset(&promoted, &cands);
+            b.evaluate(cap, Some(need));
+            tried.clear();
+            tried.extend(conflict.iter());
+            b.certified_excluding(&tried, cap, &mut certified);
+            for (&x, value) in tried.iter().zip(&certified) {
+                fp.add(value.unwrap_or_else(|| b.value_excluding(x, cap, u64::MAX)));
+            }
+        }
+    });
+    report.line("GF(2): split + bound without each, certified or solved", members, cost, fp);
+    if !report.brief {
+        let after = b.stats();
+        let runs = u64::from(reps.max(1));
+        println!(
+            "    (in this kernel {:.1}% of the bounds certified)",
+            100.0 * (after.certified - before.certified) as f64 / (members * runs).max(1) as f64
+        );
+    }
     Ok(())
 }
 

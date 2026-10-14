@@ -74,6 +74,9 @@
 //! equals the solve's); where it does not, the caller solves (see `docs/EXPERIMENTS.md`, "The inner loop of the
 //! GF(2) search").
 
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
+
 /// A block vector: bit `i` of word `i / 64` is coordinate `i` of the block's quotient space.
 pub type Vector<const R: usize> = [u64; R];
 
@@ -186,6 +189,8 @@ const HOPS: i64 = 1 << 16;
 const INF: Dist = i64::MAX;
 const NONE: u32 = u32::MAX;
 const NO_SLOT: u8 = u8::MAX;
+/// The heap entry of [`Meet::without`] that stands for the next element free in A.
+const FREE_A: u32 = u32::MAX - 1;
 
 /// The workspace of the intersection: everything a solve needs, kept between solves so that a solve allocates
 /// nothing once the vectors have grown.
@@ -236,6 +241,10 @@ pub struct Meet<const R: usize> {
     pub settled: bool,
     /// Whether the last solve stopped at its `stop` weight, before the heaviest set.
     pub stopped: bool,
+    /// After a solve that settled: how much lighter the heaviest common independent set one larger than the
+    /// heaviest set is (the last shortest path's length), `i64::MAX` if there is none.  The heaviest sets of all
+    /// larger sizes are lighter still (the weights by size are concave).
+    pub gap: i64,
     /// Solves made: a caller can tell whether the workspace still holds the tableau of a solve it made.
     pub solves: u64,
     /// The solve whose tableau the workspace holds (a greedy set counts as a solve and spoils it).
@@ -251,13 +260,17 @@ pub struct Meet<const R: usize> {
     /// The split's scratch: its potentials (one per element and one more), and the replacements' weights.
     pot: Vec<i64>,
     repl: [Vec<i64>; 2],
-    /// [`without`](Self::without)'s scratch: the distances and predecessors of its search from the member (0) and
-    /// towards it (1), the outside elements by block of each matroid (built for the solve `outside_for`), the changed
-    /// and the elements of the structure found.
-    reach: [Vec<Dist>; 2],
-    back: [Vec<u32>; 2],
-    outside_by: [Vec<Vec<u32>>; 2],
-    outside_for: u64,
+    /// [`without`](Self::without)'s scratch: its search's distances, predecessors (towards the member searched
+    /// from), settled stamps and heap; the elements outside the set in the span of A by the slots of their circuits
+    /// (`columns`, per block of A 64·R slots) and those free in A by decreasing `w1`, both built for the tableau
+    /// `columns_for`; and the elements of the cycle found.
+    reach: Vec<Dist>,
+    back: Vec<u32>,
+    settled_at: Vec<u32>,
+    heap: BinaryHeap<Reverse<(Dist, u32)>>,
+    columns: Vec<Vec<u32>>,
+    columns_for: u64,
+    free_a: Vec<u32>,
     flip: Vec<u32>,
     /// Counters of [`without`](Self::without): calls, and those it certified.
     pub withouts: u64,
@@ -290,6 +303,7 @@ impl<const R: usize> Meet<R> {
             dirty: blocks.map(|b| vec![false; b]),
             settled: false,
             stopped: false,
+            gap: 0,
             solves: 0,
             tableau: 0,
             value: 0,
@@ -299,10 +313,13 @@ impl<const R: usize> Meet<R> {
             split_rounds: 0,
             pot: vec![0; n + 1],
             repl: [vec![0; n], vec![0; n]],
-            reach: [vec![INF; n], vec![INF; n]],
-            back: [vec![NONE; n], vec![NONE; n]],
-            outside_by: blocks.map(|b| vec![Vec::with_capacity(n); b]),
-            outside_for: 0,
+            reach: vec![INF; n],
+            back: vec![NONE; n],
+            settled_at: vec![0; n],
+            heap: BinaryHeap::with_capacity(n),
+            columns: vec![Vec::new(); blocks[0] * 64 * R],
+            columns_for: 0,
+            free_a: Vec::with_capacity(n),
             flip: Vec::with_capacity(n),
             withouts: 0,
             withouts_exact: 0,
@@ -392,12 +409,14 @@ impl<const R: usize> Meet<R> {
             }
             let Some(sink) = self.shortest_path(p) else {
                 self.settled = true;
+                self.gap = i64::MAX;
                 return;
             };
             let gain = -self.dist[sink as usize].div_euclid(HOPS);
             if gain <= 0 {
                 // The heaviest set of all sizes (even if it has `cap` members).
                 self.settled = true;
+                self.gap = -gain;
                 return;
             }
             if self.members.len() >= cap {
@@ -930,64 +949,187 @@ impl<const R: usize> Meet<R> {
 
     /// After a [`solve`](Self::solve) that settled, with the workspace still holding it (no solve or greedy set
     /// since): the weight of the heaviest common independent set of the solve's live elements without its member
-    /// `x`, of at most `cap` elements, if the shortest structure through `x` certifies it (see the module docs, "The
-    /// heaviest set without a member"); `None` if it does not, and the caller must solve.  `cap` is at least the
-    /// heaviest set's size.  The tableau is left as it was.
-    pub fn without(&mut self, p: &Problem<'_, R>, x: u32, cap: usize) -> Option<i64> {
+    /// `x`, if the shortest cycle through `x` in the exchange graph is at most `limit` long (see the module docs,
+    /// "The heaviest set without a member": `limit` is the least that a set of another size than the heaviest set's
+    /// loses); `None` if it is not, and the caller must solve.  `pot` is the weight split of the solve's heaviest set
+    /// (its `w1` by element, as [`potentials`](Self::potentials) has it after [`split_bounds`](Self::split_bounds)).
+    /// The tableau is left as it was.
+    ///
+    /// Dijkstra's search from `x` over the split's reduced lengths, `w1(z) − w1(y)` on an arc `z → y` of `A` and
+    /// `w2(z) − w2(y)` on an arc `y → z` of `B`, which are never negative and add up along a cycle to its length;
+    /// distances packed with the number of arcs as for the augmenting paths, so that of the shortest cycles one with
+    /// the fewest arcs is found.  An element free in `A` has an arc from every member, so all of them are reached
+    /// through the member with the least distance plus `w1`, in decreasing order of their own `w1`; an element free
+    /// in `B` has an arc to every member, `x` included.  The search stops at the first distance that no cycle
+    /// within `limit` and shorter than the best found can pass.
+    pub fn without(&mut self, p: &Problem<'_, R>, pot: &[i64], x: u32, limit: i64) -> Option<i64> {
         self.withouts += 1;
-        if !self.settled || self.tableau != self.solves || !self.inside[x as usize] || cap < self.members.len() {
+        if !self.settled || self.tableau != self.solves || !self.inside[x as usize] {
             debug_assert!(false, "the bound without a member needs the tableau of a settled solve holding it");
             return None;
         }
-        if self.outside_for != self.solves {
-            for m in 0..2 {
-                for list in &mut self.outside_by[m] {
-                    list.clear();
-                }
-                for list in &self.out_a {
-                    for &y in list {
-                        self.outside_by[m][usize::from(p.block[m][y as usize])].push(y);
-                    }
-                }
-            }
-            self.outside_for = self.solves;
-        }
-        let from = self.search(p, x, 0)?;
-        let to = self.search(p, x, 1)?;
-        // The structures the searches see whole: (length, the search whose predecessors read it, its far end).
-        let alone = p.weight[x as usize] * HOPS;
-        let mut best = (alone, 0, NONE);
-        for (end, side) in [(from.close, 0), (from.free, 0), (from.member, 0), (to.free, 1), (to.member, 1)] {
-            if end.0 < best.0 {
-                best = (end.0, side, end.1);
-            }
-        }
-        // Paths with x inside, at least as long as a path to x plus a path from x, less x's length counted twice:
-        // between members, and from a source to a sink if a set larger than this one is allowed.
-        let length = |d: Dist| d.div_euclid(HOPS);
-        let inside = |a: Dist, b: Dist| if a == INF || b == INF { i64::MAX } else { length(a) + length(b) - length(alone) };
-        let mut least = inside(to.member.0, from.member.0);
-        if cap > self.members.len() {
-            least = least.min(inside(to.free.0, from.free.0));
-        }
-        if length(best.0) > least {
+        if !(0..i64::MAX / (2 * HOPS)).contains(&limit) {
             return None;
         }
-        // The structure's elements, and the set flipped along it checked common independent in the blocks it
-        // touches (the others hold the same members as before).
+        if self.columns_for != self.tableau {
+            self.build_columns(pot);
+        }
+        let w = p.weight;
+        let w1 = |e: u32| pot[e as usize];
+        let w2 = |e: u32| w[e as usize] - pot[e as usize];
+        // Two fresh stamps: reached (the distance in `reach` is current) and settled.
+        self.generation = self.generation.wrapping_add(2);
+        let (reached, settled) = (self.generation.wrapping_sub(1), self.generation);
+        let (reach, back, seen, stamp) = (&mut self.reach, &mut self.back, &mut self.seen, &mut self.settled_at);
+        let heap = &mut self.heap;
+        heap.clear();
+        // Distances from `limit + 1` on cannot lead to a cycle that certifies.
+        let bound = (limit + 1) * HOPS;
+        let mut cycle = (bound, NONE);
+        // The elements free in A, by decreasing w1: the next one unsettled, and the member through which they are
+        // reached (the least distance plus w1, packed).
+        let mut next_free = 0;
+        let mut through = (INF, NONE);
+        // Offers the distance `d` to `v` from `from`.
+        macro_rules! offer {
+            ($v:expr, $d:expr, $from:expr) => {{
+                let (v, d): (u32, Dist) = ($v, $d);
+                let i = v as usize;
+                if d < bound && stamp[i] != settled && (seen[i] != reached || d < reach[i]) {
+                    seen[i] = reached;
+                    reach[i] = d;
+                    back[i] = $from;
+                    heap.push(Reverse((d, v)));
+                }
+            }};
+        }
+        // Queues the next element free in A still unsettled, through `through`.
+        macro_rules! queue_free {
+            () => {{
+                while next_free < self.free_a.len() && stamp[self.free_a[next_free] as usize] == settled {
+                    next_free += 1;
+                }
+                if let Some(&y) = self.free_a.get(next_free) {
+                    let dy = through.0 - w1(y) * HOPS + 1;
+                    if dy < bound {
+                        heap.push(Reverse((dy, FREE_A)));
+                    }
+                }
+            }};
+        }
+        heap.push(Reverse((0, x)));
+        seen[x as usize] = reached;
+        reach[x as usize] = 0;
+        back[x as usize] = NONE;
+        while let Some(Reverse((d, v))) = heap.pop() {
+            if d >= cycle.0 {
+                break;
+            }
+            let v = if v == FREE_A {
+                // The element free in A with the largest w1 still unsettled, unless the entry is stale.
+                while next_free < self.free_a.len() && stamp[self.free_a[next_free] as usize] == settled {
+                    next_free += 1;
+                }
+                let Some(&y) = self.free_a.get(next_free) else { continue };
+                if d != through.0 - w1(y) * HOPS + 1 {
+                    continue;
+                }
+                seen[y as usize] = reached;
+                reach[y as usize] = d;
+                back[y as usize] = through.1;
+                stamp[y as usize] = settled;
+                queue_free!();
+                y
+            } else {
+                if stamp[v as usize] == settled || d > reach[v as usize] {
+                    continue;
+                }
+                stamp[v as usize] = settled;
+                v
+            };
+            let i = v as usize;
+            if self.inside[i] {
+                // A member: arcs of A to the elements whose circuit holds it, and to every element free in A.
+                let column = usize::from(p.block[0][i]) * 64 * R + usize::from(self.slot[0][i]);
+                for &y in &self.columns[column] {
+                    offer!(y, d + (w1(v) - w1(y)) * HOPS + 1, v);
+                }
+                if d + w1(v) * HOPS < through.0 {
+                    through = (d + w1(v) * HOPS, v);
+                    queue_free!();
+                }
+            } else if !is_zero(&self.res[1][i]) {
+                // Free in B: arcs to every member, x's closing a cycle.
+                if d + (w2(x) - w2(v)) * HOPS + 1 < cycle.0 {
+                    cycle = (d + (w2(x) - w2(v)) * HOPS + 1, v);
+                }
+                for &z in &self.members {
+                    if z != x {
+                        offer!(z, d + (w2(z) - w2(v)) * HOPS + 1, v);
+                    }
+                }
+            } else {
+                // The members of its circuit in B.
+                let elems = &self.slot_elem[1][usize::from(p.block[1][i])];
+                each_bit(&self.mask[1][i], |s| {
+                    let z = elems[s];
+                    let dz = d + (w2(z) - w2(v)) * HOPS + 1;
+                    if z == x {
+                        if dz < cycle.0 {
+                            cycle = (dz, v);
+                        }
+                    } else {
+                        offer!(z, dz, v);
+                    }
+                });
+            }
+        }
+        if cycle.1 == NONE {
+            return None;
+        }
+        // The cycle's elements, and the set flipped along it checked common independent in the blocks it touches
+        // (the others hold the same members as before).
         self.flip.clear();
         self.flip.push(x);
-        let mut v = best.2;
-        while v != NONE && v != x && self.flip.len() <= self.pos.len() {
+        let mut v = cycle.1;
+        while v != x && v != NONE && self.flip.len() <= self.pos.len() {
             self.flip.push(v);
-            v = self.back[best.1][v as usize];
+            v = self.back[v as usize];
         }
-        if !self.flipped_independent(p) {
-            debug_assert!(false, "a shortest structure through a member flips into a dependent set");
+        if v != x || !self.flipped_independent(p) {
+            debug_assert!(false, "the shortest cycle through a member flips into a dependent set");
             return None;
         }
         self.withouts_exact += 1;
-        Some(self.value - length(best.0))
+        Some(self.value - cycle.0.div_euclid(HOPS))
+    }
+
+    /// For [`without`](Self::without) on the current tableau: the elements outside the set in the span of A by the
+    /// slots of their circuits (each has an arc from those members), and those free in A by decreasing `w1`.
+    fn build_columns(&mut self, pot: &[i64]) {
+        for column in &mut self.columns {
+            column.clear();
+        }
+        self.free_a.clear();
+        let columns = &mut self.columns;
+        for (b, list) in self.out_a.iter().enumerate() {
+            for &y in list {
+                let i = y as usize;
+                if is_zero(&self.res[0][i]) {
+                    each_bit(&self.mask[0][i], |s| columns[b * 64 * R + s].push(y));
+                } else {
+                    self.free_a.push(y);
+                }
+            }
+        }
+        self.free_a.sort_unstable_by_key(|&y| (Reverse(pot[y as usize]), y));
+        self.columns_for = self.tableau;
+    }
+
+    /// The weight split's `w1` by element after a successful [`split_bounds`](Self::split_bounds) (meaningful for
+    /// the live elements).
+    pub fn potentials(&self) -> &[i64] {
+        &self.pot[..self.pot.len() - 1]
     }
 
     /// Whether the current set flipped on `self.flip` is independent in both matroids: in each block a flipped
@@ -1006,181 +1148,22 @@ impl<const R: usize> Meet<R> {
                 self.dirty[m][b] = true;
                 let span = &mut self.spans[m][b];
                 span.clear();
-                let stay = self.slot_elem[m][b][..self.next_slot[m][b]].iter().filter(|&&z| self.seen[z as usize] != self.generation);
-                let enter = self.flip.iter().filter(|&&y| !self.inside[y as usize] && usize::from(p.block[m][y as usize]) == b);
+                let stay = self.slot_elem[m][b][..self.next_slot[m][b]]
+                    .iter()
+                    .filter(|&&z| self.seen[z as usize] != self.generation);
+                let enter =
+                    self.flip.iter().filter(|&&y| !self.inside[y as usize] && usize::from(p.block[m][y as usize]) == b);
                 for &e in stay.chain(enter) {
                     if !span.insert(p.vector[m][e as usize], e) {
-                        for flag in &mut self.dirty[m] {
-                            *flag = false;
-                        }
+                        self.dirty[m].fill(false);
                         return false;
                     }
                 }
             }
-            for flag in &mut self.dirty[m] {
-                *flag = false;
-            }
+            self.dirty[m].fill(false);
         }
         true
     }
-
-    /// One search of [`without`](Self::without) over the current set's exchange graph, from its member `x`
-    /// (`d = 0`: the arcs of `A` from members to outside elements, then those of `B` back to members) or towards
-    /// it (`d = 1`: the arcs reversed, which is the same search with the matroids' roles exchanged).  Distances,
-    /// lexicographic in length and arcs as for the augmenting paths, with `x`'s own length counted at the start, go
-    /// to `reach[d]`, and each vertex's neighbour on its path, towards `x`, to `back[d]`.  `None` if the search runs
-    /// past its round limit (a negative cycle, which the weight split of a settled solve rules out).
-    fn search(&mut self, p: &Problem<'_, R>, x: u32, d: usize) -> Option<Ends> {
-        let w = p.weight;
-        let (a, b) = (d, 1 - d);
-        let (reach, back) = (&mut self.reach[d], &mut self.back[d]);
-        for &e in self.members.iter().chain(self.out_a.iter().flatten()) {
-            reach[e as usize] = INF;
-            back[e as usize] = NONE;
-        }
-        reach[x as usize] = w[x as usize] * HOPS;
-        self.changed_in.clear();
-        self.changed_in.push(x);
-        let mut ends = Ends { close: (INF, NONE), free: (INF, NONE), member: (INF, NONE) };
-        // The lightest member reached and the lightest outside element free in `b`: the first reaches every element
-        // free in `a`, the second every member.
-        let (mut best_member, mut best_free) = ((reach[x as usize], x), (INF, NONE));
-        let mut member_improved = true;
-        let limit = self.pos.len() + 2;
-        let mut rounds = 0;
-        while !self.changed_in.is_empty() {
-            rounds += 1;
-            if rounds > limit {
-                return None;
-            }
-            // Members to outside elements, through `a`: pulled from the changed members of their circuits.
-            self.changed_slots[a].fill([0; R]);
-            for &z in &self.changed_in {
-                let zi = z as usize;
-                let s = usize::from(self.slot[a][zi]);
-                self.changed_slots[a][usize::from(p.block[a][zi])][s / 64] |= 1 << (s % 64);
-            }
-            self.changed_out.clear();
-            for (ba, list) in self.outside_by[a].iter().enumerate() {
-                let changed = self.changed_slots[a][ba];
-                let any_changed = !is_zero(&changed);
-                if !any_changed && !member_improved {
-                    continue;
-                }
-                let elems = &self.slot_elem[a][ba];
-                for &y in list {
-                    let i = y as usize;
-                    let ly = 1 - w[i] * HOPS;
-                    let (mut dist, mut from) = (reach[i], NONE);
-                    if !is_zero(&self.res[a][i]) {
-                        if member_improved && best_member.0 + ly < dist {
-                            (dist, from) = (best_member.0 + ly, best_member.1);
-                        }
-                    } else if any_changed {
-                        let mut m = self.mask[a][i];
-                        let mut any = false;
-                        for (c, s) in m.iter_mut().zip(&changed) {
-                            *c &= s;
-                            any |= *c != 0;
-                        }
-                        if any {
-                            each_bit(&m, |s| {
-                                let z = elems[s];
-                                if reach[z as usize] + ly < dist {
-                                    (dist, from) = (reach[z as usize] + ly, z);
-                                }
-                            });
-                        }
-                    }
-                    if from != NONE {
-                        reach[i] = dist;
-                        back[i] = from;
-                        self.changed_out.push(y);
-                        if dist < ends.free.0 && !is_zero(&self.res[b][i]) {
-                            ends.free = (dist, y);
-                        }
-                    }
-                }
-            }
-            // Outside elements to members, through `b`; an arc into `x` closes a cycle.
-            self.generation = self.generation.wrapping_add(1);
-            let generation = self.generation;
-            self.changed_in.clear();
-            let mut free_improved = false;
-            for &y in &self.changed_out {
-                let i = y as usize;
-                let dy = reach[i];
-                if !is_zero(&self.res[b][i]) {
-                    if dy < best_free.0 {
-                        best_free = (dy, y);
-                        free_improved = true;
-                    }
-                    continue;
-                }
-                let elems = &self.slot_elem[b][usize::from(p.block[b][i])];
-                let (seen, changed) = (&mut self.seen, &mut self.changed_in);
-                each_bit(&self.mask[b][i], |s| {
-                    let z = elems[s];
-                    let zi = z as usize;
-                    if z == x {
-                        if dy + 1 < ends.close.0 {
-                            ends.close = (dy + 1, y);
-                        }
-                        return;
-                    }
-                    let cand = dy + w[zi] * HOPS + 1;
-                    if cand < reach[zi] {
-                        reach[zi] = cand;
-                        back[zi] = y;
-                        if seen[zi] != generation {
-                            seen[zi] = generation;
-                            changed.push(z);
-                        }
-                    }
-                });
-            }
-            if free_improved {
-                let (dy, y) = best_free;
-                if dy + 1 < ends.close.0 {
-                    ends.close = (dy + 1, y);
-                }
-                for &z in &self.members {
-                    let zi = z as usize;
-                    let cand = dy + w[zi] * HOPS + 1;
-                    if z != x && cand < reach[zi] {
-                        reach[zi] = cand;
-                        back[zi] = y;
-                        if self.seen[zi] != generation {
-                            self.seen[zi] = generation;
-                            self.changed_in.push(z);
-                        }
-                    }
-                }
-            }
-            member_improved = false;
-            for &z in &self.changed_in {
-                let dz = reach[z as usize];
-                if dz < ends.member.0 {
-                    ends.member = (dz, z);
-                }
-                if dz < best_member.0 {
-                    best_member = (dz, z);
-                    member_improved = true;
-                }
-            }
-        }
-        Some(ends)
-    }
-}
-
-/// The ends of one search of [`Meet::without`], each a packed distance and the vertex it is reached at: the best
-/// arc closing a cycle at the member searched from (from it only), the best outside element free in the matroid
-/// of the arcs into members (a sink from it, a source towards it), and the best other member.
-#[derive(Clone, Copy)]
-struct Ends {
-    close: (Dist, u32),
-    free: (Dist, u32),
-    member: (Dist, u32),
 }
 
 #[cfg(test)]
@@ -1305,5 +1288,41 @@ mod tests {
             }
         }
         assert!(warm > 10_000 && splits > 2_000, "{warm} warm starts, {splits} splits");
+    }
+
+    /// The heaviest set without each member of the heaviest set, read off its exchange graph where the sizes certify
+    /// it ([`Meet::without`], with the loss of the dominant set one smaller from the solve's chain and the gap to the
+    /// heaviest set one larger, under every size limit from the heaviest set's size up), against brute force.
+    #[test]
+    fn heaviest_set_without_a_member_against_brute_force() {
+        let mut rng = Rng(0x2545_F491_4F6C_DD1D);
+        let (mut asked, mut certified) = (0, 0);
+        for trial in 0..4000 {
+            let n = 2 + rng.below(10) as usize;
+            let owned = random(&mut rng, n, 4);
+            let p = owned.problem();
+            let mut meet = Meet::<1>::new(n, [3, 3]);
+            let live: Vec<u32> = (0..n as u32).collect();
+            let mut chain = Vec::new();
+            meet.solve(&p, &live, &[], n, i64::MAX, |set| chain.push(set.to_vec()));
+            let members: Vec<u32> = live.iter().copied().filter(|&e| meet.contains(e)).collect();
+            let size = members.len();
+            let Some(smaller) = chain.iter().find(|set| set.len() + 1 == size) else { continue };
+            let loss = meet.value - smaller.iter().map(|&e| p.weight[e as usize]).sum::<i64>();
+            assert!(meet.settled && meet.split_bounds(&p, &live, |_, _| {}), "trial {trial}: no split");
+            let pot = meet.potentials().to_vec();
+            for cap in size..=n {
+                let limit = if cap > size { loss.min(meet.gap) } else { loss };
+                for &x in &members {
+                    asked += 1;
+                    if let Some(value) = meet.without(&p, &pot, x, limit) {
+                        certified += 1;
+                        let rest: Vec<u32> = live.iter().copied().filter(|&e| e != x).collect();
+                        assert_eq!(value, brute(&p, &rest, cap), "trial {trial}: without {x}, at most {cap}");
+                    }
+                }
+            }
+        }
+        assert!(asked > 10_000 && certified > asked / 4, "{certified} of {asked} certified");
     }
 }

@@ -417,9 +417,15 @@ struct Level<const W: usize, const R: usize> {
     cap: usize,
     settled: bool,
     value: u64,
-    /// The bounds without each member of the heaviest set, from the weight split, once asked for.
+    /// After a settled solve: how much lighter the heaviest set one larger is ([`Meet::gap`]; for a level that
+    /// inherited its heaviest set, its parent's, which bounds it from below).
+    gap: i64,
+    /// The bounds without each member of the heaviest set, from the weight split, once asked for, and the split
+    /// itself (`w1` by element) if one was found.
     split: Vec<(u32, i64)>,
     has_split: bool,
+    pot: Vec<i64>,
+    has_pot: bool,
     /// The workspace's solve count when this level was last solved, unchanged since (0 for none): if the workspace
     /// has made no solve since, it still holds the level's tableau.
     meet_solve: u64,
@@ -435,8 +441,11 @@ impl<const W: usize, const R: usize> Level<W, R> {
             cap: 0,
             settled: false,
             value: 0,
+            gap: 0,
             split: Vec::new(),
             has_split: false,
+            pot: vec![0; n],
+            has_pot: false,
             meet_solve: 0,
         }
     }
@@ -450,6 +459,7 @@ impl<const W: usize, const R: usize> Level<W, R> {
         self.solved = false;
         self.settled = false;
         self.has_split = false;
+        self.has_pot = false;
         self.meet_solve = 0;
     }
 }
@@ -518,6 +528,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         level.solved = false;
         level.settled = false;
         level.has_split = false;
+        level.has_pot = false;
         level.meet_solve = 0;
         for x in promoted.iter() {
             contract(self.graph, level, x);
@@ -553,6 +564,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             child.settled = true;
             child.cap = parent.cap.saturating_sub(added.len() as usize);
             child.value = parent.value - added.sum();
+            child.gap = parent.gap;
             self.stats.inherited += 1;
         }
         self.depth = d + 1;
@@ -582,6 +594,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         }
         // Deleting a candidate outside the heaviest set leaves it the heaviest: the history still ends with it.
         level.has_split = false;
+        level.has_pot = false;
         level.meet_solve = 0;
     }
 
@@ -657,8 +670,23 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         out.clear();
         let graph = self.graph;
         let level = &mut self.levels[self.depth];
-        let qualifies = level.solved && level.settled && level.history.last().is_some_and(|last| last.len() as usize <= cap);
-        if !qualifies {
+        // The least that a set of another size than the heaviest set's loses (see `meet`'s module docs): a smaller
+        // set at least what the heaviest set gained over the dominant set one smaller in the history, a larger one
+        // (where the limit allows it) at least the gap to the heaviest set one larger.
+        let size = level.history.last().map_or(0, |last| last.len() as usize);
+        let smaller = level.history.iter().rev().find(|set| set.len() as usize + 1 == size);
+        let limit = match smaller {
+            Some(set) if level.solved && level.settled && level.has_pot && size <= cap => {
+                let loss = level.value as i64 - set.sum() as i64;
+                if cap > size {
+                    loss.min(level.gap)
+                } else {
+                    loss
+                }
+            }
+            _ => -1,
+        };
+        if limit < 0 {
             out.extend(xs.iter().map(|_| None));
             return;
         }
@@ -673,7 +701,10 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             weight: &graph.weight,
         };
         let before = self.meet.withouts_exact;
-        out.extend(xs.iter().map(|&x| self.meet.without(&problem, graph.index[x as usize], cap).map(|v| v as u64)));
+        for &x in xs {
+            let bound = self.meet.without(&problem, &level.pot, graph.index[x as usize], limit);
+            out.push(bound.map(|v| v as u64));
+        }
         self.stats.certified += self.meet.withouts_exact - before;
     }
 
@@ -759,7 +790,9 @@ fn solve<const W: usize, const R: usize>(
     level.meet_solve = meet.solves;
     level.cap = cap;
     level.value = meet.value as u64;
+    level.gap = meet.gap;
     level.has_split = false;
+    level.has_pot = false;
 }
 
 /// Solves `level` (solved and settled) again from its heaviest set, so that the workspace holds its tableau: the
@@ -784,6 +817,7 @@ fn resolve<const W: usize, const R: usize>(
     meet.solve(&problem, live_idx, start_idx, usize::MAX, i64::MAX, |_| {});
     debug_assert_eq!(meet.value as u64, level.value, "the heaviest set solved again changed");
     level.meet_solve = meet.solves;
+    level.gap = meet.gap;
 }
 
 /// The bounds without each member of `level`'s heaviest set (settled), from a weight split.  Unless the workspace
@@ -810,8 +844,10 @@ fn split<const W: usize, const R: usize>(
     stats.splits += 1;
     let out = &mut level.split;
     out.clear();
-    if meet.settled {
-        meet.split_bounds(&problem, live_idx, |e, bound| out.push((graph.elems[e as usize], bound)));
+    level.has_pot =
+        meet.settled && meet.split_bounds(&problem, live_idx, |e, bound| out.push((graph.elems[e as usize], bound)));
+    if level.has_pot {
+        level.pot.copy_from_slice(meet.potentials());
     }
     stats.split_rounds = meet.split_rounds;
     level.has_split = true;
