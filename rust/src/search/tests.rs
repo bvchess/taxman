@@ -453,6 +453,58 @@ fn seeds_and_caps() {
     assert_eq!(worse.sum, optimum.sum);
 }
 
+/// A start that reaches the ceiling is the incumbent as it stands: the search skips the dive and the local search,
+/// which could not have changed it, and ends before it starts, with that start.
+#[test]
+fn a_start_at_the_ceiling_is_neither_dived_nor_improved() {
+    let g = load(300);
+    let p = prepare_golden::<8>(&g, SearchTactics::default());
+    let optimum = search_checked(&p, 1, "plain");
+    let graph = MatchGraph::new(&p.model, &p.root);
+    let hood = Neighbourhood { model: &p.model, root: &p.root, candidates: &p.candidates };
+
+    // The seed (the optimum, plus a non-candidate) reaches the ceiling, which the optimum is: the start is the better
+    // of the greedy set and the seed's survivors, and the dive and the local search leave it as it is.
+    let seed = optimum.promotions.with(299);
+    let kept = surviving(&p, &seed);
+    let begun = if kept.sum() > p.greedy.sum() { kept } else { p.greedy };
+    assert_eq!(begun.sum(), optimum.sum);
+    assert!(dive(&p.model, &p.root, &graph, &p.candidates).sum() <= begun.sum());
+    assert_eq!(hood.improve(&mut Scratch::new(), &begun, true), begun);
+    let r = search(&p, &config(1), Some(&seed), Some(optimum.sum), false).unwrap();
+    assert!(r.completed && r.reached_cap && r.stats.nodes == 0 && r.found.is_none());
+    assert_eq!((r.start, r.promotions, r.sum), (begun, begun, optimum.sum));
+
+    // A ceiling below the optimum (which a game's proof never offers) that the greedy set reaches shows that the
+    // local search is skipped: it would have raised the start, as it does without the ceiling.
+    let improved = hood.improve(&mut Scratch::new(), &p.greedy, true);
+    assert!(improved.sum() > p.greedy.sum(), "the local search leaves the greedy set of 300 as it is");
+    let r = search(&p, &config(1), None, Some(p.greedy.sum()), false).unwrap();
+    assert!(r.completed && r.reached_cap && r.stats.nodes == 0);
+    assert_eq!((r.start, r.promotions), (p.greedy, p.greedy));
+}
+
+/// The start of a search does not depend on its threads: the local search on several of them finds what one does,
+/// with and without a seed, in the search of a game as a whole.
+#[test]
+fn the_start_is_the_same_on_every_number_of_threads() {
+    for n in [300, 600] {
+        let board = crate::board::Board::<16>::for_n(n);
+        let p = board.prepare(SearchTactics::default()).unwrap();
+        let optimal = crate::game::Optimal::built_in();
+        let seed = board.seed(optimal.moves(n - 1).unwrap());
+        let cap = board.promotion_cap(optimal.score(n - 1).unwrap());
+        for (seed, cap) in [(None, None), (Some(&seed), None), (Some(&seed), cap)] {
+            let one = search(&p, &config(1), seed, cap, false).unwrap();
+            for threads in [2, 4] {
+                let more = search(&p, &config(threads), seed, cap, false).unwrap();
+                let what = format!("n={n}, seeded {}, ceiling {cap:?}, {threads} threads", seed.is_some());
+                assert_eq!((more.start, more.sum, more.completed), (one.start, one.sum, one.completed), "{what}");
+            }
+        }
+    }
+}
+
 #[test]
 fn units_and_headers_round_trip() {
     let unit = TaxUnit::<3> { promoted: Bits::from_slice(&[1, 64, 190]), cands: Bits::from_slice(&[0, 63, 127]) };

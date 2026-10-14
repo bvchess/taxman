@@ -437,7 +437,11 @@ the largest down), the *seed* (the previous game's promotions that are candidate
 from the largest), and a rounding of the root's matching (the *dive*: drop the smallest
 member of a conflict until the rest can be promoted); then a local search improves it (fill greedily, then drop one
 or two members and refill, until nothing improves).  The *ceiling* on the promotion sum,
-`n + score(n − 1) − in_the_bag`, is proven; reaching it ends the search (`prev_cap`).  Board/search setup is in
+`n + score(n − 1) − in_the_bag`, is proven; reaching it ends the search (`prev_cap`).  When the greedy set or the
+seed's survivors already reach it, the dive is skipped, and the local search when the incumbent after the dive does:
+nothing can beat a set at the ceiling, so neither would change it, and the result is the same.  The local search runs
+on the search's threads, the refills of a pass in parallel, and keeps the first improvement in the order of the
+sequential pass, so its answer does not depend on the thread count.  Board/search setup is in
 `board::Board`: it is the one place that knows the tables → frames → prepare → ceiling and seed path.
 
 ## 5. Tactics
@@ -543,7 +547,8 @@ Step 2 needs the previous game, and the repeat of step 4 an earlier one; both ar
 the game has a checkpoint (a search that was interrupted is resumed, never replaced by a derivation).
 
 The previous game is checked before anything uses it: it must replay legally to its recorded score, be over, and open
-with the largest prime.  The results whose proofs rest on it assume what it assumes (section 8).
+with the largest prime (a game this run made was checked by `conclude` already).  The results whose proofs rest on it
+assume what it assumes (section 8).
 
 A search that a time or node limit stops gives an incomplete result (`completed` false, `best_so_far` the best game
 so far) and keeps its checkpoint; a range stops there.
@@ -660,7 +665,8 @@ the game of n − 1, and it assumes what m assumes.
 `force_search`), the solver looks at the completed games of the results file and of the run among the
 `SAME_SEARCH_WINDOW` = 8 board sizes before n, latest first, for one that set a search up and whose proof settles it.
 A game whose recorded digest differs is passed over; for one whose digest agrees, its problem is set up again from
-its board size (milliseconds; `board::search_problem`) and compared with n's whole.  The first equal one is m.
+its board size (milliseconds; `board::search_problem`), or, when the run set that board up itself, taken from memory
+(the problem its setup posed, which is the same problem), and compared with n's whole.  The first equal one is m.
 Setting m up again with this build stands for the problem m's own build searched, which the digest recorded by that
 build ties to it (a problem with the recorded digest is that problem, but for a 64-bit collision), and the problem
 set up again must also have the size its line records (frames, candidates, `max_total`).  Every repeat of 1..2175

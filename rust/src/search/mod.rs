@@ -111,7 +111,7 @@ pub struct SearchResult<const W: usize> {
     /// When this call found its best incumbent (`None` if it found none better than the starting one).
     pub found: Option<Found>,
     /// The incumbent the search started from: the best of the greedy set, the seed and the matching dive, improved
-    /// by the local search.
+    /// by the local search (the dive and the local search are skipped when the set before them reaches `cap`).
     pub start: Bits<W>,
 }
 
@@ -119,11 +119,14 @@ pub struct SearchResult<const W: usize> {
 ///
 /// The incumbent starts as the best of the greedy set, what survives of `seed` (its candidates that can still
 /// be promoted, from the largest down) and the dive (the root's matching rounded to a set that can be
-/// promoted), improved by a local search ([`Neighbourhood::improve`]).  `cap` is a proven ceiling
-/// on the sum; reaching it ends the search, also before it starts.  With `resume`, the search continues from
-/// the checkpoint configured in `cfg` (the `prepared` game must have been set up by [`prepare_for_resume`] or
-/// identically): its header must be this game's, and its incumbent a promotable set of candidates worth what
-/// the checkpoint says.  Otherwise it starts fresh.
+/// promoted), improved by a local search ([`Neighbourhood::improve_on`] on the `cfg.threads` threads, with the
+/// answer of [`Neighbourhood::improve`]).  `cap` is a proven ceiling on the sum; reaching it ends the search, also
+/// before it starts.  Nothing can beat a set that reaches it, so the dive is skipped when the best of the greedy
+/// set and the seed's survivors does, and the local search when the incumbent after the dive does: neither could
+/// change it as long as the ceiling holds, which the proof by the ceiling assumes (`solver::conclude` rejects any
+/// game above it).  With `resume`, the search continues from the checkpoint configured in `cfg` (the `prepared`
+/// game must have been set up by [`prepare_for_resume`] or identically): its header must be this game's, and its
+/// incumbent a promotable set of candidates worth what the checkpoint says.  Otherwise it starts fresh.
 ///
 /// # Errors
 ///
@@ -171,12 +174,20 @@ fn search_forgetting<const W: usize>(
             incumbent = kept;
         }
     }
-    let dived = dive(&prepared.model, &prepared.root, &match_graph, &prepared.candidates);
-    if dived.sum() > incumbent.sum() {
-        incumbent = dived;
+    // A start that reaches the ceiling cannot be beaten, so the dive and the local search are skipped: they could
+    // not change it if the ceiling holds, as the proof by the ceiling assumes (and `solver::conclude` rejects any
+    // game above it).  The dive is taken only when strictly heavier, and the local search keeps only strictly
+    // heavier sets, after a first fill that can only add candidates; no promotable set is heavier than the ceiling.
+    if !reaches(&incumbent, cap) {
+        let dived = dive(&prepared.model, &prepared.root, &match_graph, &prepared.candidates);
+        if dived.sum() > incumbent.sum() {
+            incumbent = dived;
+        }
     }
-    let hood = Neighbourhood { model: &prepared.model, root: &prepared.root, candidates: &prepared.candidates };
-    incumbent = hood.improve(&mut Scratch::new(), &incumbent, true);
+    if !reaches(&incumbent, cap) {
+        let hood = Neighbourhood { model: &prepared.model, root: &prepared.root, candidates: &prepared.candidates };
+        incumbent = hood.improve_on(cfg.threads, &incumbent, true);
+    }
     let checkpoint = cfg.checkpoint.as_ref().map(|(path, _)| path.as_path());
     let resumed = if resume {
         let path =
@@ -190,8 +201,8 @@ fn search_forgetting<const W: usize>(
         Some((kept, head)) => (if kept.sum() >= incumbent.sum() { *kept } else { incumbent }, head.stats, head.elapsed),
         None => (incumbent, Stats::default(), Duration::ZERO),
     };
-    if cap.is_some_and(|cap| best.sum() >= cap) {
-        // A resumed search that reaches the cap at once is finished like any other.
+    if reaches(&best, cap) {
+        // A resumed search that reaches the ceiling at once is finished like any other.
         if let (true, Some(path)) = (resume && !cfg.keep_completed_checkpoint, checkpoint) {
             engine::remove_finished_checkpoint(path);
         }
@@ -239,6 +250,11 @@ fn search_forgetting<const W: usize>(
         found: space.found.into_inner().unwrap_or_else(PoisonError::into_inner),
         start: incumbent,
     })
+}
+
+/// Whether `set` is worth `cap`, the ceiling on the promotion sum, or more, which proves it optimal.
+fn reaches<const W: usize>(set: &Bits<W>, cap: Option<u64>) -> bool {
+    cap.is_some_and(|cap| set.sum() >= cap)
 }
 
 /// The checkpoint `path` read and checked for resuming the search of `prepared`: its whole file (checksum
