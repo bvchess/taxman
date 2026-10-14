@@ -138,7 +138,7 @@ fn lines_whose_fields_contradict_each_other_are_refused_by_both_verifiers() {
         // Only schema 5 is read.
         (exhausted, vec![("schema", Json::from(4u32))], "older than the schema 5"),
         (exhausted, vec![("schema", Json::Null)], "bad \"schema\""),
-        // A proof by the cap passed off as an exhausted search, which would not inherit what n − 1 assumes.
+        // A proof by `cap` passed off as an exhausted search, which would not inherit what n − 1 assumes.
         (capped, vec![("reached_cap", Json::Bool(false)), ("proof", s("exhausted"))], "records not reaching"),
         (prime, vec![("setup", some_setup)], "a prime game with a \"setup\""),
         (prime, vec![("in_the_bag", Json::from(0u64))], "a prime game with \"in_the_bag\""),
@@ -152,9 +152,9 @@ fn lines_whose_fields_contradict_each_other_are_refused_by_both_verifiers() {
 }
 
 /// A proof assumes what the game it rests on assumes, and nothing else.  Games 33 to 50, the first built on
-/// `optimal.json`'s game of 32 (`--use-prev`): 33 reaches its cap and 34 repeats 33, so both assume that game
+/// `optimal.json`'s game of 32 (`--use-prev`): 33 reaches its ceiling and 34 repeats 33, so both assume that game
 /// optimal; 35 exhausts its search, which rests on no game, so it and the games after it that rest on it assume
-/// nothing.  Both verifiers refuse a line that records a proof by the cap without the assumption, an exhausted search
+/// nothing.  Both verifiers refuse a line that records a proof by `cap` without the assumption, an exhausted search
 /// with it, or a prime game built on a game that assumes nothing with it.
 #[test]
 fn a_proof_assumes_what_the_game_it_rests_on_assumes_and_nothing_else() {
@@ -315,7 +315,7 @@ fn forged_repeats_are_refused_by_both_verifiers() {
     let twinned: Vec<Json> = lines[..i].iter().cloned().chain([twinned]).collect();
     cases.push((twinned, Verdict::Refused { line: 65, n: 65, expected: "its search problem's digest is" }));
     // A repeat assumes what the game it repeats assumes: 34 repeats 33, which, built on optimal.json's 32, reaches
-    // its cap and so assumes that game optimal.
+    // its ceiling and so assumes that game optimal.
     let use_prev = SolveOptions { use_prev: true, ..common::options(1) };
     let assuming: Vec<Json> =
         solver::solve_range(33, 34, &use_prev, None).unwrap().iter().map(GameResult::to_json).collect();
@@ -435,7 +435,7 @@ fn the_committed_results_pass_the_verifier() {
         assert_eq!(Some(strict.contents.games[&n].score), optimal.score(n), "n={n}");
     }
     // And its sets of moves are the table's but at six games, 539, 770 to 773 and 1215, where the chain found another
-    // of the several optimal sets (evidence/README.md, "Is the optimal set unique?" lists the exchanges of the
+    // of the several optimal sets (prover/README.md, "Is the optimal set unique?" lists the exchanges of the
     // first five; it enumerates the sets only to 989).  The previous chain differed from the table at 684 to 687
     // instead.
     let sorted = |moves: &[u32]| {
@@ -455,7 +455,7 @@ fn the_committed_results_pass_the_verifier() {
         assert_eq!((score, moves, game.assumes.is_empty()), (game.score, &game.moves[..], true), "n={n}");
     }
 
-    // A chain from n = 1 assumes nothing.  Its proofs, in the order trivial, prime formula, cap, exhausted, same
+    // A chain from n = 1 assumes nothing.  Its proofs, in the order trivial, prime formula, `cap`, exhausted, same
     // search: in all, in the board sizes of the table (where the previous chain, of commit 271c817, had every one
     // of them), and past it.
     let kinds = [Proof::Trivial, Proof::PrimeFormula, Proof::Cap, Proof::Exhausted, Proof::SameSearch];

@@ -266,7 +266,7 @@ impl<const W: usize> Game<W> {
         Game { model, root, candidates, max_total, graph }
     }
 
-    /// The game with the frames `columns` (factors and moves per frame, bottom first), if every frame of the root is
+    /// The game with the frames `columns` (factors and moves per frame, front first), if every frame of the root is
     /// winnable.
     pub fn from_columns(tables: &Tables, columns: &[Vec<u32>], candidates: Bits<W>) -> Option<Self> {
         let (model, root) = Model::build::<W>(tables, columns).ok()?;

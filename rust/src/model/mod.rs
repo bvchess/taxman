@@ -1,22 +1,23 @@
 //! The frame model's search state: frames, frame sets, promotions, and which sets can be promoted together.
 //!
-//! The frame builder ([`crate::frames`]) turns the board into a stack of *frames*, bottom (frame 0, downstream)
-//! first.  Each frame is a game of *Taxman Mini*: a set of *moves* and a set of *factors*.  A move must still have
-//! one of its maximal factors among the frame's factors when it is taken, and taking it removes all of its
-//! factors still there (its tax).  A frame is *winnable* when some order takes every move.  (`rust/README.md`
-//! introduces the model with an example, and its glossary defines the words used here.)
+//! The frame builder ([`crate::frames`]) turns the board into *frames* numbered from the front (frame 0, played
+//! first) to the back.  Each frame is a game of *Taxman Mini*: a set of *moves* and a set of *factors*.  A move
+//! must still have one of its maximal factors among the frame's factors when it is taken, and taking it removes
+//! all of its factors still there (its tax).  A frame is *winnable* when some order takes every move.
+//! (`rust/README.md` introduces the model with an example, and its glossary defines the words used here.)
 //!
 //! A game chooses which candidates to *promote*: promoting `n` takes it out of the factors of its *home frame*
-//! `h ≥ 1` and makes it a move of frame `h − 1`, where it pays its tax.  That is legal when both frames stay
-//! winnable.  After a promotion both frames are *reduced*: a move left with a single live factor must be paid by
-//! it, so the two (a *forced pair*) are dropped, repeatedly.  Every frame's *freedoms* (initially factors minus
-//! moves) drop by one on each promotion into or out of it.  The search looks for the promotion set with the
-//! largest sum; the score of the game is what the game with no promotions scores plus that sum.
+//! (the frame it is promoted from) `h ≥ 1` and makes it a move of frame `h − 1`, one frame forward, where it pays
+//! its tax.  That is legal when both frames stay winnable.  After a promotion both frames are *reduced*: a move
+//! left with a single live factor is paid by it, and the pair is dropped, repeatedly.  Every frame's *freedoms*
+//! (initially factors minus moves) drop by one on each promotion into or out of it.  The search looks for the
+//! promotion set with the largest sum; the score of the game is what the game with no promotions scores plus
+//! that sum.
 //!
 //! What is where:
 //!
 //! * [`FactorProvider`] (`provider`): who can pay for whom, restricted to the frames each number belongs to.
-//! * `peel`: winnability of one frame (the *peel*), the *core* of an unwinnable frame, and reduction, on a
+//! * `peel`: winnability of one frame (the *peel*), the *residual* of an unwinnable frame, and reduction, on a
 //!   reusable [`Scratch`].
 //! * [`Frame`], [`FrameSet`] (`frame`): one frame, and a game's frames (`Copy`, no heap); narrowing the candidates
 //!   and counting the promotions left from the freedoms.
@@ -29,8 +30,8 @@
 //! (package `org.taxman.h6.search`), reimplemented for speed rather than translated: frames are inline bitsets,
 //! a [`FrameSet`] is `Copy` and never allocates, and promotions can be done in place.  The results are the
 //! Java's (the golden tests check them); how they are computed differs: the peel's rule, the reduction started
-//! only where a promotion can have made a forced pair (frames in a [`FrameSet`] are always reduced), and the
-//! factor lists restricted to the frames each number can take part in.
+//! only where a promotion can have left a move with a single live factor (frames in a [`FrameSet`] are always
+//! reduced), and the factor lists restricted to the frames each number can take part in.
 //!
 //! Numbers are `u32` game numbers throughout; the lists store them as `u16`, which bounds boards at 65535.
 
@@ -69,7 +70,7 @@ pub struct Model {
 }
 
 impl Model {
-    /// The Java's `FrameSet.create`: `columns` alternate factors and moves per frame, bottom first; each frame
+    /// The Java's `FrameSet.create`: `columns` alternate factors and moves per frame, front first; each frame
     /// is reduced.  Returns the model and the starting frame set.
     pub fn build<const W: usize>(tables: &Tables, columns: &[Vec<u32>]) -> Result<(Model, FrameSet<W>), String> {
         if !columns.len().is_multiple_of(2) {

@@ -1,16 +1,15 @@
-//! The model-free cross-check of optimal scores: for every game in a range, an upper bound on opt(n) proven
-//! without the frame model, compared with the recorded optimum V(n) (optimal.json, which reaches 1300, and for a
-//! board size it lacks the game of `--results`, by default the solver's `results/strict.jsonl`).  One line per
-//! game, resumable:
+//! The prover's proofs of optimal scores: for every game in a range, an upper bound on opt(n) proven without the
+//! frame model, compared with the recorded optimum V(n) (optimal.json, which reaches 1300, and for a board size it
+//! lacks the game of `--results`, by default the solver's `results/strict.jsonl`).  One line per game, resumable:
 //!
 //!     exact --from A --to B [--list ...] [--threads T] [--seconds S] [--budget NODES] [--all 1] [--parity 0]
 //!           [--segments 1] [--lagrangian 0|1] [--checkpoints DIR] [--optimal FILE] [--results FILE] --out FILE
 //!
 //! Per game: the recorded game is replayed by the rules (a lower bound, opt(n) >= V(n)); the Franklín–Moniot
-//! matching bound and the parity bound (THEORY.md, Theorem 10; `parity.rs`) are computed at the root; the
-//! relations opt(n) <= n + opt(n−1) and, for a prime n, opt(n) <= n + opt(n−1) − p are noted; and unless one of
-//! them already gives V(n) (or `--all`), the branch and bound of `game.rs` decides whether any playable set beats
-//! V(n), with the parity bound at every node (`--parity 0`: the matching bound alone, as the searches of
+//! bound and the parity bound (THEORY.md, Theorem 10; `parity.rs`) are computed at the root; the ceiling
+//! opt(n) <= n + opt(n−1) and, for a prime n, the prime formula opt(n) <= n + opt(n−1) − p are noted; and unless one
+//! of them already gives V(n) (or `--all`), the branch and bound of `game.rs` decides whether any playable set beats
+//! V(n), with the parity bound at every node (`--parity 0`: the Franklín–Moniot bound alone, as the searches of
 //! `data/exact_2_1231.jsonl` ran).  Which games end up proven, given their predecessors, is worked out by
 //! `tools/summarize.py exact` from the file.
 //!
@@ -26,10 +25,10 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
-use taxman_evidence::game::{relation, Board, Prover, Role, Verdict};
-use taxman_evidence::jsonl::{campaign, parse_items, recorded_games, Obj};
-use taxman_evidence::parity::{Meet, Outcome, Parity};
-use taxman_evidence::primes::smallest_prime_factors;
+use taxman_prover::game::{relation, Board, Prover, Role, Verdict};
+use taxman_prover::jsonl::{campaign, parse_items, recorded_games, Obj};
+use taxman_prover::parity::{Meet, Outcome, Parity};
+use taxman_prover::primes::smallest_prime_factors;
 
 /// A paused search: its target, nodes so far (and how many of them without the parity bound), nogoods and open
 /// units (roles as letters F, P, B).

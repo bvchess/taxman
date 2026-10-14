@@ -7,11 +7,11 @@
 
 use std::path::PathBuf;
 use std::time::Instant;
-use taxman_evidence::instance::Instance;
-use taxman_evidence::jsonl::{campaign, parse_items, Obj};
-use taxman_evidence::primes::smallest_prime_factors;
-use taxman_evidence::span::span_check;
-use taxman_evidence::star::{check, Engine, Method};
+use taxman_prover::instance::Instance;
+use taxman_prover::jsonl::{campaign, parse_items, Obj};
+use taxman_prover::primes::smallest_prime_factors;
+use taxman_prover::span::span_check;
+use taxman_prover::star::{check, Engine, Method};
 
 fn main() {
     let (games, flags) = parse_items(std::env::args().skip(1));

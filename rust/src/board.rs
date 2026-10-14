@@ -1,15 +1,15 @@
 //! A board `1..=n` analysed for the search: its number-theory tables, its frames, and the numbers the per-game
 //! pipeline derives from them before it decides how to solve the game.
 //!
-//! This is the one path from a board size to a search that is ready to run (tables → frames → [`prepare`] → cap and
-//! seed → [`search`]).  The per-game pipeline ([`crate::solver`]), the ladder and the benchmarks, and the tests
+//! This is the one path from a board size to a search that is ready to run (tables → frames → [`prepare`] → ceiling
+//! and seed → [`search`]).  The per-game pipeline ([`crate::solver`]), the ladder and the benchmarks, and the tests
 //! all take it, so that the facts that join the pieces are written once:
 //!
 //! * the score of a game of the frame model is `in_the_bag` plus the sum of its promotions, where `in_the_bag`
 //!   (the Java's `inTheBag`) is what the game with no promotions scores ([`Board::in_the_bag`]);
 //! * no game of `n` scores more than `n + opt(n − 1)` (deleting the move `n` from an optimal game leaves a game of
-//!   `n − 1`), so no promotion set sums to more than `n + opt(n − 1) − in_the_bag`: the search's *cap*, at which it
-//!   can stop ([`Board::promotion_cap`]);
+//!   `n − 1`), so no promotion set sums to more than `n + opt(n − 1) − in_the_bag`: the search's *ceiling*, at which
+//!   it can stop ([`Board::promotion_cap`]);
 //! * the promotions of the previous game that are candidates of this board are a good, usually near-optimal, first
 //!   incumbent: the search's *seed* ([`Board::seed`]).
 //!
@@ -31,20 +31,21 @@ use std::time::{Duration, Instant};
 pub struct Board<const W: usize> {
     /// The maximal factors and composites of the numbers on the board.
     pub tables: Tables,
-    /// The frames the board's hives make, with the promotion candidates.
+    /// The board's frames as the search takes them (numbered from the front, those with one number merged), with
+    /// the promotion candidates.
     pub frames: FrameColumns<W>,
     /// The game with no promotions, in play order.
     pub plain: Vec<u32>,
     /// What [`plain`](Self::plain) scores (the Java's `inTheBag`): the part of every score that no promotion
     /// changes.
     pub in_the_bag: u64,
-    /// How long building the hives and frames took.
+    /// How long forming, numbering and merging the frames took.
     pub frames_time: Duration,
 }
 
 impl<const W: usize> Board<W> {
-    /// The board of `tables`: its hives are built and stacked into frames, and the game with no promotions is
-    /// played.
+    /// The board of `tables`: its frames are formed, numbered from the front and merged, and the game with no
+    /// promotions is played.
     pub fn new(tables: Tables) -> Self {
         let start = Instant::now();
         let frames = build_frames::<W>(&tables);

@@ -1,4 +1,4 @@
-# Experiments: the lab notebook of the Rust solver
+# Experiments: the lab notebook of the solver
 
 What was tried, in what order, and what it was worth.  [DESIGN.md](../DESIGN.md) says how the solver works now;
 this page is the record of how it got there: a register of every experiment, kept or not, and every round of
@@ -11,6 +11,7 @@ Terms (conflict, nogood, forced member, step, `W`, ...) are defined in the [glos
 and in DESIGN.md; the measurements were made with the ladder, the probe and `taxman bench`, which DESIGN.md
 ("Performance") describes.
 
+* [Terms changed](#terms-changed-2026-10): the old words of the dated entries, and the words that replaced them.
 * [Register of everything tried](#register-of-everything-tried): one row per experiment, by subject, with where its
   details are and what decided it.  Look here first.
 * [Index of rounds](#index-of-rounds): the rounds of improvements in the order they happened, with their commits.
@@ -18,17 +19,41 @@ and in DESIGN.md; the measurements were made with the ladder, the probe and `tax
   [the benchmarks](#benchmarks-the-probe-pgo-and-scaling)), which hold the details; the pilots of ideas borrowed from
   other fields are in [IDEAS.md](IDEAS.md).
 
+## Terms changed (2026-10)
+
+The dated entries below use the words of their time; they were not rewritten.  In 2026-10 the project settled on the
+wiki's words, and the code, DESIGN.md, the README and the other guides, and the register and index below, use them.  An
+old word in an entry maps like this (the names of fields and files did not change: results keys, checkpoint headers,
+tactic names, data file fields, golden data keys, `results/strict.jsonl`):
+
+| in the entries | now |
+|---|---|
+| hive, apiary, level (of hives) | frame; the frames that get the same number are merged into one |
+| downstream / upstream, below / above, bottom / top | in front of / behind, front / back (frame 0 is the front) |
+| free factor count, spare factors | freedoms |
+| feasible (a set of promotions) | promotable |
+| cap, the cap on the promotion sum | the ceiling (`n + score(n − 1)`; as a promotion sum, minus `in_the_bag`); `cap`, `reached_cap`, `prev_cap` stay the names of fields, a proof kind and a tactic |
+| the cap on the number of promotions (`max_total`) | the most promotions the freedoms allow |
+| core (what a peel cannot drop in a frame) | residual |
+| the evidence crate, `rust/evidence/`, `evidence.sh`; the model-free search, checker, proofs, bound | the prover, `rust/prover/`, `tools/cloud/prover.sh`; the prover's search and proofs; a bound on the whole board |
+| the matching bound of the model-free search, chain relation, prime relation | the Franklín–Moniot bound, the ceiling, the prime formula |
+| the Rust solver, the exact solver | the solver |
+| strict chain, strict runs | the committed chain (the file keeps the name `results/strict.jsonl`) |
+| frontier (the largest n solved in a row, or the hardest games) | the end of the chain, the hardest games |
+| cores (CPU) | CPUs, threads |
+| selection, pick | move |
+
 ## Register of everything tried
 
-One row per experiment or idea tried on the exact solver and on the theory under it, kept or not, so that nothing is
+One row per experiment or idea tried on the solver and on the theory under it, kept or not, so that nothing is
 tried twice.  **Check it before proposing an experiment, and add a row when one finishes, failures included.**  The
 details stay where the row points: a round below, [IDEAS.md](IDEAS.md), [DESIGN.md](../DESIGN.md), the
-[evidence](../evidence/README.md), the [results](../results/README.md), or the module comment of the code of a study.
+[prover](../prover/README.md), the [results](../results/README.md), or the module comment of the code of a study.
 Where an experiment's code was discarded (the pilots of IDEAS.md), the page it points to describes what was computed,
 on which games and with which settings, well enough to repeat it.  The [index of rounds](#index-of-rounds) lists the
 rounds in the order they happened, with their commits.
 
-Outcomes: **kept** (in the solver or the evidence, or the finding stands), **not kept** (tried and taken out, or
+Outcomes: **kept** (in the solver or the prover, or the finding stands), **not kept** (tried and taken out, or
 never adopted because it did not pay or is false), **superseded** (kept for a while, replaced by something better),
 **open** (proposed, not tried or not decided), **measured** (a study whose result changed no code).  The numbers are
 those of the page the row points to; a game is named by its board size, and times are search seconds.
@@ -41,7 +66,7 @@ those of the page the row points to; a game is named by its board size, and time
 | A simpler sound runner-up: the largest candidate not in the bid | [port](#the-port-and-its-first-improvements) | not kept | n = 700 took over 10 minutes instead of 18 s |
 | Matching bound (max-weight bipartite matching, kept incrementally with dual potentials) instead of `blameGame` | [after parity](#improvements-after-parity) | kept | mean gap at the root 31 against the Java bound's 76 on the 94 golden games that need search; 1.5 to 85 times fewer nodes at n = 480-720 |
 | The minimum of `blameGame` and the matching bound | [after parity](#improvements-after-parity) | not kept | `blameGame` pruned nowhere the matching bound did not (0 at every check) |
-| Seed the incumbent from the game of n − 1 and stop at the cap n + opt(n − 1) (`seed_incumbent`, `prev_cap`) | [after parity](#improvements-after-parity) | kept | 415 of the 1300 proofs of the strict chain of commit bd9bb5d are the cap, reached before the first node; the committed chain, which also has `same_search`, has 115 and 545 repeats ([results](../results/README.md#what-supports-the-scores)) |
+| Seed the incumbent from the game of n − 1 and stop at the ceiling n + opt(n − 1) (`seed_incumbent`, `prev_cap`) | [after parity](#improvements-after-parity) | kept | 415 of the 1300 proofs of the chain of commit bd9bb5d are the ceiling, reached before the first node; the committed chain, which also has `same_search`, has 115 and 545 repeats ([results](../results/README.md#what-supports-the-scores)) |
 | Branch on a member of the heaviest matching's conflict instead of the largest candidate | [conflicts](#conflicts-of-the-matching-bound-2026-10) | kept, the decisive change | 936: 90.8 s to 31.8 s (12.3M to 2.62M nodes); 1000: open at 120 s to 27.5 s (10 threads) |
 | Strong branching: the member whose removal lowers the bound most, its level kept for the node (`conflict-strong`) | [conflicts](#conflicts-of-the-matching-bound-2026-10) | kept, the default | 936: 29.5 s to 17.7 s, 2.62M to 909k nodes |
 | The other branchings, `conflict-smallest` and `conflict-largest` | [conflicts](#conflicts-of-the-matching-bound-2026-10) | kept as switches, removed 2026-10 ([tactics review](#the-alternatives-that-are-off)) | smallest gives the smallest proof trees at 880 and 936 but finds good incumbents late; largest follows the dive and finds them early |
@@ -75,28 +100,28 @@ those of the page the row points to; a game is named by its board size, and time
 | Five smaller changes: no peel for the several moves of a forced set, a forced set promoted straight into the child's state, stopping the potentials' bound once its first part decides, the Dijkstra horizon, one branch for `reach`'s two tests | [faster nodes](#faster-nodes-same-trees-2026-10) | not kept | each within ±0.5% or worse (the horizon: windows +0.4% and +2.5%) |
 | Profile-guided optimization (`tools/pgo.sh`) | [benchmarks](#benchmarks-the-probe-pgo-and-scaling) | kept, optional | 12% on the code before the inner-loop round, 0-2% after it |
 | `i32` potentials; a warm-started unit rebuild; candidate-index sets for every search-level set; watched members for the nogoods | [faster nodes](#faster-nodes-same-trees-2026-10) | open | no bound on the potentials is proven; another optimal matching can change the tree; a large refactor; the nogood table is 3% of the time |
-| Cheaper matching repairs; incumbents for games whose optimum the search reaches late (992, 1025) | [benchmarks](#benchmarks-the-probe-pgo-and-scaling) | open | the repairs are 46-67% of the time at the frontier; 992 on 8 threads finds its optimum at 11.8 s of 12.0 s |
+| Cheaper matching repairs; incumbents for games whose optimum the search reaches late (992, 1025) | [benchmarks](#benchmarks-the-probe-pgo-and-scaling) | open | the repairs are 46-67% of the time on the hardest games; 992 on 8 threads finds its optimum at 11.8 s of 12.0 s |
 | Where the time goes in the hardest games (sampling profiles of 1232, 1287, 1299, 1295) | [IDEAS 2](IDEAS.md#2-where-the-time-goes-in-the-hardest-games) | measured | matching repairs 56-67%, strong branching 28-34%, conflict computation under 1%, the engine under 0.1% |
-| Same search: conclude a game whose search problem an earlier game of the chain settled, with that game's promotions (tactic and proof `same_search`; IDEAS rank 1) | [same search](#same-search-2026-10); [IDEAS 4.1](IDEAS.md#41-memoizing-searches-that-repeat-rank-1) | kept: on by default and in strict runs; results schema 4 | 545 of the 1076 searched games of 1-1300 repeat (n − 1, or n − 2 past a prime); 953 of 3359 s (28.4%) of the search of the strict chain of commit bd9bb5d, 851 of 2866 s in 1232-1300; 1299 in 0.08 s instead of 265 s |
-| A Lagrangian bound over the nogoods, kept incrementally, with forced members read off its potentials (tactic `lagrange`; IDEAS rank 2) | [Lagrangian bound](#a-lagrangian-bound-over-the-nogoods-2026-10); [IDEAS 4.2](IDEAS.md#42-a-lagrangian-bound-over-the-nogoods-rank-2) | kept: on by default | proofs 1184-1300 take 2-6 times fewer cycles (3.3 geometric mean, no trend in n); the strict chain 1201-1231 2.4 times less time; the pilot alone, incremental but without forced members, about break-even; 992 (optimum found late) +35% |
+| Same search: conclude a game whose search problem an earlier game of the chain settled, with that game's promotions (tactic and proof `same_search`; IDEAS rank 1) | [same search](#same-search-2026-10); [IDEAS 4.1](IDEAS.md#41-memoizing-searches-that-repeat-rank-1) | kept: on by default; results schema 4 | 545 of the 1076 searched games of 1-1300 repeat (n − 1, or n − 2 past a prime); 953 of 3359 s (28.4%) of the search of the chain of commit bd9bb5d, 851 of 2866 s in 1232-1300; 1299 in 0.08 s instead of 265 s |
+| A Lagrangian bound over the nogoods, kept incrementally, with forced members read off its potentials (tactic `lagrange`; IDEAS rank 2) | [Lagrangian bound](#a-lagrangian-bound-over-the-nogoods-2026-10); [IDEAS 4.2](IDEAS.md#42-a-lagrangian-bound-over-the-nogoods-rank-2) | kept: on by default | proofs 1184-1300 take 2-6 times fewer cycles (3.3 geometric mean, no trend in n); the chain 1201-1231 2.4 times less time; the pilot alone, incremental but without forced members, about break-even; 992 (optimum found late) +35% |
 | Variants of the Lagrangian bound: depth limits 8-32, multipliers fitted mid-path or at the deepest node, bound only at node re-checks, 20 or 100 subgradient steps, first refit at 500 steps, refits every 10,000 steps | [Lagrangian bound](#a-lagrangian-bound-over-the-nogoods-2026-10) | not kept | each within ±12% of the default or worse; the bound's cost follows the changes along the path, not how often it is asked |
 | Where the time goes with the Lagrangian bound (sampling profiles of 1254, 1272, 1288, 1290, 1300 as the chain runs them; the 1215 proof by source line) | [faster nodes with the Lagrangian bound](#faster-nodes-with-the-lagrangian-bound-same-trees-2026-10) | measured | Hungarian searches 55-60% (the matching's 33-39%, the Lagrangian levels' 16-18%), peels 17-20%, the Lagrangian levels 25-28% in all (refits 4%); the searches are large (88% of the vertices scanned in trees of 64-511 of 686) |
-| Faster nodes with the Lagrangian bound, same trees: strong branching takes the level refinement solved for its first member, the bound from the potentials stops at a tight edge, one settle for the forced members, a membership test for known conflicts, the Hungarian search's fields apart and a fixed-size code set, the Lagrangian bound's forced members only among those not forced yet | [faster nodes with the Lagrangian bound](#faster-nodes-with-the-lagrangian-bound-same-trees-2026-10) | kept | the probe's windows −10.6% and −10.2% cycles (−15.3% and −14.0% instructions), with `lagrange=off` −11.6% and −11.1%; proofs 936-1254 −5% to −10%; the strict chain 1201-1231 −8.1%; every node count and both fingerprints unchanged |
+| Faster nodes with the Lagrangian bound, same trees: strong branching takes the level refinement solved for its first member, the bound from the potentials stops at a tight edge, one settle for the forced members, a membership test for known conflicts, the Hungarian search's fields apart and a fixed-size code set, the Lagrangian bound's forced members only among those not forced yet | [faster nodes with the Lagrangian bound](#faster-nodes-with-the-lagrangian-bound-same-trees-2026-10) | kept | the probe's windows −10.6% and −10.2% cycles (−15.3% and −14.0% instructions), with `lagrange=off` −11.6% and −11.1%; proofs 936-1254 −5% to −10%; the chain 1201-1231 −8.1%; every node count and both fingerprints unchanged |
 | One key for a search slot's epoch and tag; `-C target-cpu=native`; skipping forced-member checks where `value − x ≥ need`; strong branching skipping members by the lower bound `value − x`; refinement after the Lagrangian bound | [faster nodes with the Lagrangian bound](#faster-nodes-with-the-lagrangian-bound-same-trees-2026-10) | not kept | instructions −0.02% and ±0.05%, cycles within noise; the third applies to 0.17 of 19.8 checks a step (1250); the fourth can never apply (members are solved in increasing order); the last changes trees |
-| `match_refine` = 0 with the Lagrangian bound | [faster nodes with the Lagrangian bound](#faster-nodes-with-the-lagrangian-bound-same-trees-2026-10) | measured: default kept at 1 | 19 proofs (936-1288) −3.0% geometric mean (±2.4% standard error), −5.3% in all, from −21% (1254) to +20% (1225); the strict chain 1..1000 −9.4%, 1201-1231 +0.4% |
+| `match_refine` = 0 with the Lagrangian bound | [faster nodes with the Lagrangian bound](#faster-nodes-with-the-lagrangian-bound-same-trees-2026-10) | measured: default kept at 1 | 19 proofs (936-1288) −3.0% geometric mean (±2.4% standard error), −5.3% in all, from −21% (1254) to +20% (1225); the chain 1..1000 −9.4%, 1201-1231 +0.4% |
 | Reduced-cost fixing of candidates from the dual | [IDEAS 4.3](IDEAS.md#43-reduced-cost-fixing-killed) | not kept | fixes 70.9 of 159 candidates outside `Q*` per node at 936, yet changes no tree: the matching relaxation is integral |
 | Component decomposition (AND/OR search, #SAT) | [IDEAS 4.4](IDEAS.md#44-component-decomposition-killed) | not kept | exactly one component holds candidates at the root of 936-1300 and at all 600 probe nodes |
 | Disjoint conflicts from the dual (MaxSAT's disjoint cores, the pair cut) | [IDEAS 4.5](IDEAS.md#45-disjoint-conflicts-from-the-dual-killed) | not kept | between 2.7% fewer and 0.3% more nodes for 12% more cycles |
-| A portfolio: another branching on some threads for finding incumbents | [IDEAS 4.7](IDEAS.md#47-a-portfolio-for-finding-incumbents-weak) | not kept | the frontier's cost is the proof; 8 of the 11 slowest games of 1232-1300 start at their optimum |
+| A portfolio: another branching on some threads for finding incumbents | [IDEAS 4.7](IDEAS.md#47-a-portfolio-for-finding-incumbents-weak) | not kept | the cost of the hardest games is the proof; 8 of the 11 slowest games of 1232-1300 start at their optimum |
 | Reliability branching (pseudocosts) in place of strong branching's exact solves | [IDEAS 5](IDEAS.md#5-every-idea-considered) | open | strong branching is 28-34% of the time; not piloted |
 | Knuth's estimate of a tree's size, to budget games and split work | [IDEAS 5](IDEAS.md#5-every-idea-considered) | open | not piloted |
 | Ideas considered and not piloted: restarts, bound nogoods and backjumping, cube-and-conquer splitting, best-bound node selection, cutting planes | [IDEAS 5](IDEAS.md#5-every-idea-considered) | open | each has its reason there (with the optimum known the tree is fixed by the bound; the matching LP is integral; ...); dominance rules and symmetry breaking were piloted later (rows below) |
-| What drives the slope: the root's gaps (matching, refined, Lagrangian over the root's own nogoods), the size (n, candidates, `max_total`), the cap and the start incumbent against the one-thread proofs of the 143 searched games of 880-1300 (`examples/slope.rs`) | [slope](#what-drives-the-slope-2026-10) | measured | log10 nodes against the Lagrangian gap R² 0.90 (sd 0.35), the matching gap 0.87, n 0.23, the candidates 0.26; with the gap in the fit n adds nothing (t 1.1); the slope in n is ×10 per ~130 of gap times the gap's growth (56 per 100 n, jagged: +304 from 1151-1200 to 1251-1300, flat to 1352) |
+| What drives the slope: the root's gaps (matching, refined, Lagrangian over the root's own nogoods), the size (n, candidates, `max_total`), the ceiling and the start incumbent against the one-thread proofs of the 143 searched games of 880-1300 (`examples/slope.rs`) | [slope](#what-drives-the-slope-2026-10) | measured | log10 nodes against the Lagrangian gap R² 0.90 (sd 0.35), the matching gap 0.87, n 0.23, the candidates 0.26; with the gap in the fit n adds nothing (t 1.1); the slope in n is ×10 per ~130 of gap times the gap's growth (56 per 100 n, jagged: +304 from 1151-1200 to 1251-1300, flat to 1352) |
 | Margin scans: proofs with every bound lowered by δ (the incumbent a value, `P*` + δ) | [slope](#what-drives-the-slope-2026-10) | measured | 19 games of 900-1300: 0.005-0.012 decades fewer nodes per unit of δ, no trend in n; a large game tightened costs what a small one with the same remaining gap costs |
-| The root's converged Lagrangian relaxation (its own nogoods, damped subgradient) as every searcher's starting relaxation | [slope](#what-drives-the-slope-2026-10) | not kept (pilot) | proofs −5% (1254) to −76% (1184) nodes, the least at the frontier: a constant factor; the gap that counts is the one at every node |
+| The root's converged Lagrangian relaxation (its own nogoods, damped subgradient) as every searcher's starting relaxation | [slope](#what-drives-the-slope-2026-10) | not kept (pilot) | proofs −5% (1254) to −76% (1184) nodes, the least on the hardest games: a constant factor; the gap that counts is the one at every node |
 | Damped Polyak steps in the refit (`fit`) | [slope](#what-drives-the-slope-2026-10) | not kept (pilot) | on the root's nogoods 50 damped steps reach the bound of 50 undamped ones within 8; one refit from zero multipliers stays 50-540 above the converged bound, by its step count |
 | A bound whose gap at every node grows more slowly with n, screened by its gaps at the root and at the probe's nodes before it is built | [slope](#what-drives-the-slope-2026-10) | open | the lever on the slope: a gap predicts a proof's nodes (×10 per ~130 of Lagrangian gap, ~270 of matching gap), and the relaxation's error, not the size, is what grows |
-| The heaviest common independent set of two GF(2) frame matroids (the even frames' and the odd frames'; every promotable set is independent in both) as a bound on the promotions (`examples/matroid.rs`) | [matroid](#matroid-intersection-bounds-2026-10) | measured; made the search's bound ([GF(2) search](#the-gf2-bound-in-the-search-2026-10)) | root gap 136 on average over 880-1300 against the Lagrangian bound's 269 and the matching bound's 760, growing 4.6 ± 2.4 per 100 n (14 ± 1 over 600-1300, model-free) against 56 and 142; below the root's Lagrangian bound at 346 of 371 roots; cuts 163 and 167 of the probe's 300 open nodes of 936 and 1215 (the matching bound none); 0.3-1.3 ms from scratch |
+| The heaviest common independent set of two GF(2) frame matroids (the even frames' and the odd frames'; every promotable set is independent in both) as a bound on the promotions (`examples/matroid.rs`) | [matroid](#matroid-intersection-bounds-2026-10) | measured; made the search's bound ([GF(2) search](#the-gf2-bound-in-the-search-2026-10)) | root gap 136 on average over 880-1300 against the Lagrangian bound's 269 and the matching bound's 760, growing 4.6 ± 2.4 per 100 n (14 ± 1 over 600-1300, on the whole board) against 56 and 142; below the root's Lagrangian bound at 346 of 371 roots; cuts 163 and 167 of the probe's 300 open nodes of 936 and 1215 (the matching bound none); 0.3-1.3 ms from scratch |
 | A plain branch and bound with the GF(2) bound alone, against the solver's one-thread proofs (`matroid bnb`) | [matroid](#matroid-intersection-bounds-2026-10) | measured | the 146 searched games of 880-1352: 12 (901-950) to 613 (1251-1300) times fewer nodes, log10 nodes +0.14 ± 0.05 per 100 n against +0.48 ± 0.07; 905 s against 3,408 s with the bound from scratch at every node; the matching bound in the same skeleton leaves 880 and 936 unfinished at 200,000 nodes |
 | A Lagrangian over the matching with nogoods of the node's own, fitted at each probe node (2,000 steps), against the GF(2) bound | [matroid](#matroid-intersection-bounds-2026-10) | measured | cuts 66 and 50 of 100 nodes (936, 1215) against 55 and 59, not the same ones (either: 69 and 67), at about a second a node |
 | Warm-start the intersection from the parent's heaviest set | [matroid](#matroid-intersection-bounds-2026-10) | not kept | extreme at 2 of the 2,543 nodes of 1250 and none of the 1,874 of 1100: deleting the member branched on breaks extremality |
@@ -115,8 +140,8 @@ those of the page the row points to; a game is named by its board size, and time
 | The Lagrangian bound over nogoods after the GF(2) bound (`lagrange` with `gf2`) | [GF(2) search](#the-gf2-bound-in-the-search-2026-10) | not kept: `lagrange` off by default | no tree changes but by one to three nodes at 992 and 1025, 0-7% more cycles |
 | `nogoods`, `fix_forced` and `forget_nogoods` with the GF(2) bound | [GF(2) search](#the-gf2-bound-in-the-search-2026-10) | kept | without nogoods 1.22 times the cycles, without forced members 2.76; forgetting changes nothing below 50,000 steps a searcher |
 | Cancel the negative cycles of the optimum less the member, to start a strong-branching solve next to its answer | [GF(2) search](#the-gf2-bound-in-the-search-2026-10) | open (untried) | strong branching makes 70% of the augmentations, each solve 22-32 of them |
-| The chain past 1300 with the GF(2) search (`solve 1301-4095 --use-prev`, 2 threads), the cost curve and the reach of a 192-core machine | [GF(2) search](#the-gf2-bound-in-the-search-2026-10) | measured | reached 2175 in 92 minutes of game time (875 games); cost in waves that follow the root's GF(2) gap, no growth a fit resolves (−0.012 ± 0.033 decades per 100 n); a day on 192 cores reaches 4095 at every slope the data support, about 3200 at the steepest GF(2) slope measured |
-| The frame-model search with the GF(2) bound against the model-free search with the parity bound (`evidence` crate, `exact`) on 990, 1232 and 1300 | [GF(2) search](#the-gf2-bound-in-the-search-2026-10) | measured | 24-36 times fewer cycles; trees within a factor of two, a node 15-17 times cheaper (contracted frame matroids kept by pivots) |
+| The chain past 1300 with the GF(2) search (`solve 1301-4095 --use-prev`, 2 threads), the cost curve and the reach of a 192-CPU machine | [GF(2) search](#the-gf2-bound-in-the-search-2026-10) | measured | reached 2175 in 92 minutes of game time (875 games); cost in waves that follow the root's GF(2) gap, no growth a fit resolves (−0.012 ± 0.033 decades per 100 n); a day on 192 CPUs reaches 4095 at every slope the data support, about 3200 at the steepest GF(2) slope measured |
+| The frame-model search with the GF(2) bound against the prover's search with the parity bound (`exact`) on 990, 1232 and 1300 | [GF(2) search](#the-gf2-bound-in-the-search-2026-10) | measured | 24-36 times fewer cycles; trees within a factor of two, a node 15-17 times cheaper (contracted frame matroids kept by pivots) |
 | The cover LP over all conflicts at the root over the matching (exact separation: the best any conflicts and multipliers give a Lagrangian bound over the matching) | [nogoods](#how-far-can-nogoods-go-2026-10) | measured | 0.2-11.6 below the slope study's root Lagrangian band by band (mean gap 264 against 269 over 880-1300), growing +54.7 per 100 in n against +56.0: the root's own conflicts were already all there is; it closes 67% of the matching gap, a share that does not grow |
 | Every minimal conflict of one to three members at the root (enumerated frame by frame) | [nogoods](#how-far-can-nogoods-go-2026-10) | not kept | close 24-37% of the matching gap against 57-66% for all conflicts, and nothing over GF(2); the binding conflicts are large |
 | The search's refits against the LP over the same nogoods, at the root | [nogoods](#how-far-can-nogoods-go-2026-10) | measured | warm-started, the 50 steps end 7.8 above that LP on average (1215, 23 refits): good multipliers at the root; the slope study's 50-540 was a refit from zero |
@@ -148,7 +173,7 @@ those of the page the row points to; a game is named by its board size, and time
 | Learn each conflict as a nogood of the root and use the table everywhere (`nogoods`) | [forced members](#forced-members-and-nogoods-2026-10-second-round) | kept | 936 from 8.05 s (320k nodes) to 1.09 s (50k); only 854 distinct nogoods in 291k conflicts at 1184 |
 | Nogood propagation alone, every conflict computed and made a nogood | [forced members](#forced-members-and-nogoods-2026-10-second-round) | not kept | cut nodes less (880 to 61k against 39k with lookups) and cost more than it saved |
 | 256-bit signatures to skip nogoods in a scan | [forced members](#forced-members-and-nogoods-2026-10-second-round) | superseded by exact lookups over compact member indices | −5% to −10% from the signatures, then about −2% more from the exact form |
-| Carry the nogoods of game n − 1 into game n | [carrying](#carrying-nogoods-over-2026-10-measured-not-kept) | not kept | 1227, the ceiling: −10% nodes, +3% time; the strict chain 1201-1231 617 s to 941 s |
+| Carry the nogoods of game n − 1 into game n | [carrying](#carrying-nogoods-over-2026-10-measured-not-kept) | not kept | 1227, the ceiling: −10% nodes, +3% time; the chain 1201-1231 617 s to 941 s |
 | Store the nogood tables in checkpoints | [carrying](#carrying-nogoods-over-2026-10-measured-not-kept) | not kept | a resume with empty tables loses nothing and is faster (1220: 143 s against 191 s with the tables kept) |
 | Forget each searcher's nogoods every N steps (`forget_nogoods`, N = 50,000) | [forgetting](#forgetting-nogoods-2026-10) | kept | 26% less time on 1024, 1025, 1215 and 1220 together; the chain 1201-1231 on 4 threads 571 s to 377 s |
 | Forget by table size (64, 128, 256) | [forgetting](#forgetting-nogoods-2026-10) | not kept | 15-22% less time on the hard four, but the smaller games slower (936: 0.51 s against 0.85/0.61/0.53 s) |
@@ -167,68 +192,74 @@ those of the page the row points to; a game is named by its board size, and time
 | tried | details | outcome | what decided it |
 |---|---|---|---|
 | A yielding searcher leaves out the nodes with nothing left to do | [engine](#the-engine) | kept | runs of at most one poll fell from 60 and 91 of 256 and 305 to 13 and 10 of 227 and 200 |
-| Splits sized for many cores: one open request per idle worker, any running worker may answer | [engine](#the-engine) | kept | the first design (one request at a time) serialized the distribution of work; all workers busy within 3-8 ms |
+| Splits sized for many threads: one open request per idle worker, any running worker may answer | [engine](#the-engine) | kept | the first design (one request at a time) serialized the distribution of work; all workers busy within 3-8 ms |
 | Per-worker deques with stealing instead of the one locked deque | [engine](#the-engine) | not kept, not built | units exist only after yields and a rebuild costs 30-170 µs against about a microsecond under the lock, so with every worker busy nobody takes it; revisit if a many-core run shows lock wait (`Counters::lock_wait`) |
 | Checkpoint pauses at any interval | [engine](#the-engine) | kept, a fix | an interval of 0 paused again at once and the workers never ran |
 | Set widths of 20, 24 and 28 words between 16 and 32 | [engine](#the-engine) | kept | `Bits<20>` for `Bits<32>`: 6% fewer cycles at 1184 and 1215 |
 | Set widths of 12 and 48 words | [faster nodes](#faster-nodes-same-trees-2026-10) | not kept | 3-4% at 512-767 (solved) and some at 2048-3071, for 12 s more of every build |
 | Thread scaling on the M1 Max | [benchmarks](#benchmarks-the-probe-pgo-and-scaling), [bench/curve](../bench/curve/README.md#thread-scaling-step-4-the-proof-of-1225-seeded-with-its-optimum) | measured | 1225 proof 150.9 s on 1 thread, 18.0 s on 8 (the tree also shrinks); the node rate falls 19% per thread |
-| Emulate many workers on few cores (`EngineConfig::cores`, `ladder --cores`) | [IDEAS 3](IDEAS.md#3-nogoods-with-very-many-threads) | kept | 64-128 workers split, steal and learn as they would on 64-128 cores, in counts if not in time |
+| Emulate many workers on few CPUs (`EngineConfig::cores`, `ladder --cores`) | [IDEAS 3](IDEAS.md#3-nogoods-with-very-many-threads) | kept | 64-128 workers split, steal and learn as they would on 64-128 CPUs, in counts if not in time |
 | The tree grows at many workers | [IDEAS 5](IDEAS.md#5-every-idea-considered) | open | 10-20% more nodes at 32-128 emulated workers than at 4-8 on 1225, with 10-25 times the unit starts; suspect: what a rebuilt unit forgets |
-| Anything above 8 threads, Graviton5, NUMA | [RUNBOOK 8](../tools/cloud/RUNBOOK.md#8-what-has-not-been-measured) | open | not measured; the 10x to 19x assumed for 192 cores comes from the design |
-| The cost of a game against n beyond the frontier (cost-curve study) | [bench/curve](../bench/curve/README.md#results) | measured | ×10 per 55-70 in n, jagged (×18 from 1250 to 1300); a standalone game costs 1.9 times the chained one where it matters |
+| Anything above 8 threads, Graviton5, NUMA | [RUNBOOK 8](../tools/cloud/RUNBOOK.md#8-what-has-not-been-measured) | open | not measured; the 10x to 19x assumed for 192 CPUs comes from the design |
+| The cost of a game against n beyond the end of the chain (cost-curve study) | [bench/curve](../bench/curve/README.md#results) | measured | ×10 per 55-70 in n, jagged (×18 from 1250 to 1300); a standalone game costs 1.9 times the chained one where it matters |
 
 ### Tactics and shortcuts
 
 | tried | details | outcome | what decided it |
 |---|---|---|---|
 | The prime shortcut (`prime_shortcut`) | [DESIGN 5](../DESIGN.md#5-tactics) | kept, proven | tight for every prime; the proof is with `accelerate::prime_shortcut` |
-| Reuse the previous game's promotions without a search (`reuse_prev`) | [tactics review](#reuse_prev-nothing-left-to-save) | removed 2026-10 (it was unproven, and the cap and same search had left it nothing to save) | with several optimal sets of n − 1 the result depends on which was recorded: the recorded game of 685 plus 686 is unplayable though opt(686) = 686 + opt(685) |
+| Reuse the previous game's promotions without a search (`reuse_prev`) | [tactics review](#reuse_prev-nothing-left-to-save) | removed 2026-10 (it was unproven, and the ceiling and same search had left it nothing to save) | with several optimal sets of n − 1 the result depends on which was recorded: the recorded game of 685 plus 686 is unplayable though opt(686) = 686 + opt(685) |
 | The sacrifice bound (games on punctured boards) as a proof for `reuse_prev` | [`src/sacrifice.rs`](../src/sacrifice.rs) | not kept | tight on 57 of the 152 `reuse_prev` games, and where it proves it costs 1.1-8.7 times the direct search; the theorem stays and `tests/wide.rs` uses it |
 | Bounds on opt(n) from the games above: opt(n) ≤ opt(n + K) − Σ_{even m ∈ (n, n+K]} m/2 − (q − P), proven | [going higher 1](#going-higher-and-coming-back-down-2026-10) | measured; not kept | holds on 2..1299; tight only through a prime n + 1 (whose search problem is n's: 204 of 204) and at 13 even m (2^k, 3·2^k); settles 1023 alone of the 416 exhausted games beyond what the prime formula gives |
-| Caps from neighbouring search problems that relax n's (a proven sufficient condition for one problem to relax another) | [going higher 2-3](#going-higher-and-coming-back-down-2026-10) | measured; not kept | 2708 relaxing pairs within 3, no violation; exact for 5 exhausted games (30, 45, 510, 765, 1023), a top-frame change; a relaxation's root bound is never smaller (972 pairs, GF(2) and matching), so an exact cap comes from a problem at least as hard and a cheaper one leaves a cap that misses (1235: 12 against a GF(2) gap of 164) and prunes nothing; from below never tighter than the chain's cap (70 games) |
+| Ceilings from neighbouring search problems that relax n's (a proven sufficient condition for one problem to relax another) | [going higher 2-3](#going-higher-and-coming-back-down-2026-10) | measured; not kept | 2708 relaxing pairs within 3, no violation; exact for 5 exhausted games (30, 45, 510, 765, 1023), a top-frame change; a relaxation's root bound is never smaller (972 pairs, GF(2) and matching), so an exact ceiling comes from a problem at least as hard and a cheaper one leaves a ceiling that misses (1235: 12 against a GF(2) gap of 164) and prunes nothing; from below never tighter than the chain's ceiling (70 games) |
 | Incumbents from the games above: n + 1's optimal set on n's board; the look-ahead start of n + 1..n + 3 seeded from n − 1 | [going higher 4](#going-higher-and-coming-back-down-2026-10) | not kept | the optimal set reaches P\* in 91 of the 110 exhausted games that start below it, but rests on n's optimum; the look-ahead beats n's start in 7 and reaches P\* in 1 (1290) |
 | A chain that comes back down: solve n + 1 first and derive n | [going higher 7](#going-higher-and-coming-back-down-2026-10) | not kept | in 1001-1300 only 1023 (from 1024, whose proof costs the same from 6 below): 0.55% of the nodes of the exhausted searches |
-| Equivalent search problems (same feasible sets, not equal) as a wider same search: strip the movers that a peel of each frame's hardest state drops, then a checked isomorphism fixing the candidates | [going higher 6](#going-higher-and-coming-back-down-2026-10) | not kept | 8 games beyond the 545 repeats, all below 186 (18 nodes); near repeats with the same P\* and candidates are not isomorphic and cost 643k nodes over 1001-1300 at most |
+| Equivalent search problems (same promotable sets, not equal) as a wider same search: strip the movers that a peel of each frame's hardest state drops, then a checked isomorphism fixing the candidates | [going higher 6](#going-higher-and-coming-back-down-2026-10) | not kept | 8 games beyond the 545 repeats, all below 186 (18 nodes); near repeats with the same P\* and candidates are not isomorphic and cost 643k nodes over 1001-1300 at most |
 | Proving a run of neighbours that share a core (equal GF(2) root gaps) in one search | [going higher 5](#going-higher-and-coming-back-down-2026-10) | open | every chain step after an exhausted game keeps the GF(2) gap (37 of 37); runs with equal gaps hold 19.8% of the proof nodes of 880-1300 beyond each run's dearest; trees within a run differ by up to ×3.9; not piloted |
-| Lower frame 0's freedoms by solving the two-frame game (`revise_freedoms`) | [tactics review](#revise_freedoms-the-same-trees) | removed 2026-10: its premise is false | assumes the max-sum set also has the max count, which fails on about one perturbed game in 1,300, and for the whole frame game of n = 833 (48 promotions optimal, 49 feasible: [evidence 6](../evidence/README.md#6-does-an-optimal-game-play-the-most-moves)); the two-frame form it applies is undecided |
-| What `reuse_prev` still saves in a strict chain that has `same_search`, the cap and the seed (from the setups, no search) | [tactics review](#reuse_prev-nothing-left-to-save) | measured; removed | of 2..1300 it accepts 670 games, every one settled anyway (545 repeats, 115 caps at once, 10 searches of at most 1.6 s): 3.8 s of the chain's 1052 s of search, 0.5 s of 813 s in 1232..1300; no score or move differs |
-| What `revise_freedoms` changes in the proofs at the frontier | [tactics review](#revise_freedoms-the-same-trees) | measured; removed | it changes the problem of every searched game of 1232..1300 (frame 0's freedoms down 4 to 6, `max_total` 0 to 5), yet the proofs of 1215, 1225, 1240, 1254, 1272, 1287 and 1300 have the same trees, node for node |
+| Lower frame 0's freedoms by solving the two-frame game (`revise_freedoms`) | [tactics review](#revise_freedoms-the-same-trees) | removed 2026-10: its premise is false | assumes the max-sum set also has the max count, which fails on about one perturbed game in 1,300, and for the whole frame game of n = 833 (48 promotions optimal, 49 promotable: [prover 6](../prover/README.md#6-does-an-optimal-game-play-the-most-moves)); the two-frame form it applies is undecided |
+| What `reuse_prev` still saves in a chain that has `same_search`, the ceiling and the seed (from the setups, no search) | [tactics review](#reuse_prev-nothing-left-to-save) | measured; removed | of 2..1300 it accepts 670 games, every one settled anyway (545 repeats, 115 at the ceiling at once, 10 searches of at most 1.6 s): 3.8 s of the chain's 1052 s of search, 0.5 s of 813 s in 1232..1300; no score or move differs |
+| What `revise_freedoms` changes in the proofs of the hardest games | [tactics review](#revise_freedoms-the-same-trees) | measured; removed | it changes the problem of every searched game of 1232..1300 (frame 0's freedoms down 4 to 6, `max_total` 0 to 5), yet the proofs of 1215, 1225, 1240, 1254, 1272, 1287 and 1300 have the same trees, node for node |
 | `preclusions`, `match_bound=off`, `legacy_bound` and the branchings other than `conflict-strong`, again with the Lagrangian bound | [tactics review](#the-alternatives-that-are-off) | measured; removed | the proof of 1215 on one thread: `preclusions` +80% cycles and 4.5 s for its table, `conflict-largest` ×6.3, `largest`, `conflict-smallest` and `match_bound=off` unfinished at 180 s (more than ×17); `legacy_bound` acts only without the matching bound |
 | `match_refine=0` with the Lagrangian bound | [tactics review](#the-alternatives-that-are-off) | open | the proof of 1215: cycles −12%, nodes +1%; its default needs the bench set and the small games |
 | Support for old file formats: result schemas 1 to 3, the committed schema-1 files, checkpoint compatibility, the golden tests of the Java's tactics | [tactics review](#old-file-formats) | removed | with the tactics: results schemas 1 to 4 (schema 5 only is read), `results/default.jsonl`, checkpoint headers before version 4 and the width widening; the Java's golden data for the frame builder stays |
 | Re-solve 1..1000 and 1001-1300 with no unproven tactic, and the non-primes of 1001-1231 standalone | [results](../results/README.md#what-supports-the-scores) | kept | `strict.jsonl` reproduces all 1000 scores of optimal.json; the 197 standalone searches agree with the chain |
-| The Java's merged-away hive branch (the stale-hive quirk) in the frame builder | [`src/hives.rs`](../src/hives.rs) | measured | reached once (n = 114) for 2 ≤ n ≤ 2000, and forcing it off changes no frame |
+| The Java's merged-away `Hive` branch (a quirk of using a stale `Hive`) in the frame builder | [`src/hives.rs`](../src/hives.rs) | measured | reached once (n = 114) for 2 ≤ n ≤ 2000, and forcing it off changes no frame |
 
-### Theory and evidence
+### Theory and the prover
 
-The model-free work of [evidence](../evidence/README.md) and the proofs of [THEORY.md](../../heuristics/THEORY.md).
+The work of [the prover](../prover/README.md) and the proofs of [THEORY.md](../../heuristics/THEORY.md).
 
 | tried | details | outcome | what decided it |
 |---|---|---|---|
-| Validate the frame model's assumptions against exhaustive search | [DESIGN 2](../DESIGN.md#what-optimal-means) | kept | `brute` agrees with the frame model to n = 40 in the tests (52 in `sacrifice validate`) and `certify.py` to 62; the model-free proofs below extend it to 989 |
-| A model-free exact search for opt(n): matching bound, branching on minimal unplayable sets, incremental dual repair, forced picks, the conflict-packing cut, nogoods | [evidence 3](../evidence/README.md#3-model-free-exact-cross-check-of-optn) | kept | proves optimal.json's score for every n ≤ 989 and 999-1019 in 10.0 CPU hours; the incremental repair made it 160 times faster than solving each node from scratch |
-| A Lagrangian bound over the nogoods in the model-free search | [evidence 3](../evidence/README.md#3-model-free-exact-cross-check-of-optn) | kept | 3.3 times fewer nodes at n = 793 |
-| Cap the upper half at W(U\*) through a Lagrangian in the model-free search | [evidence 8](../evidence/README.md#8-what-remains-open) | not kept | gains only 4% |
-| The model-free search past 989: games 990, 992, 993, 995, 996 and from 1020 | [parity bound](#the-parity-bound-in-the-model-free-proofs-2026-10) | kept: done with the parity bound | with the matching bound each needed tens of millions of nodes (its gap about 1,170 at n = 1000); the parity bound finished the saved searches in 4,000-215,000 more nodes each and proved every game to 1300 |
-| The span certificate (♦) for the upper-half conjecture (★) | [evidence 2](../evidence/README.md#2-conjecture--at-scale) | kept | holds for every n = 2..100,000 (602,777,907 rejections) and 902 sampled games to 2,000,000, 0 violations |
-| The threshold-by-threshold check of (★) by the cheapest sufficient bound | [evidence 2](../evidence/README.md#2-conjecture--at-scale) | kept | n = 2..20,000: 24,058,430 thresholds, none needing search (matching bound 86.2%, Lorea 8.3%, GF(2) rank 4.3%, one exclusion 1.2%) |
-| Exact maximum-cardinality searches over the residual (`maxcard`, `plus1`) | [evidence 2](../evidence/README.md#2-conjecture--at-scale) | superseded by the bounds, kept as the fallback | n = 9170 reached only its first 16 thresholds (P = 127, g = 13); the rank bound certifies it in milliseconds |
-| The earlier (★) campaign: exact searches over the residual components | [evidence 1](../evidence/README.md#1-what-existed-before) | superseded by (♦) | 3,231 of 3,236 components, n ≤ 1500 and samples to 4000, plus 2873 and 9170; five undecided (3103, 3872, 3936, 4000, 9170), all settled by the rank bound; its scripts were never committed |
-| An adversarial search over Taxman-shaped synthetic instances | [evidence 4](../evidence/README.md#4-adversarial-search-what-protects-greedy) | measured | what protects greedy is the window law taken for the real ranking of the primes: 0 failures in 1,981 such instances, against 16-57% for uniformly random orders and for the window law with a random ranking of the primes |
-| Enumerate every optimal set of every game, model-free; the theorems on uniqueness (Theorems 8 and 9) | [evidence 5](../evidence/README.md#5-is-the-optimal-set-unique) | kept | unique for every n ≤ 424; 30 of the 954 games completely enumerated, all in 425-779, have two or three, every one with upper part U\* |
-| Does every optimal game have upper part U\*? | [evidence 8](../evidence/README.md#8-what-remains-open) | open | true of every game enumerated; Theorem 8 settles the upper half alone |
-| Prove (♦), or (★), in general | [evidence 8](../evidence/README.md#8-what-remains-open) | open | certified game by game only; the sharpest form is (♦) for multiplicatively generated instances under any order obeying the window law |
+| Validate the frame model's assumptions against exhaustive search | [DESIGN 2](../DESIGN.md#what-optimal-means) | kept | `brute` agrees with the frame model to n = 40 in the tests (52 in `sacrifice validate`) and `certify.py` to 62; the prover's proofs below extend it to 989 |
+| The prover's exact search for opt(n): Franklín–Moniot bound, branching on minimal unplayable sets, incremental dual repair, forced picks, the conflict-packing cut, nogoods | [prover 3](../prover/README.md#3-the-proofs-of-optn) | kept | proves optimal.json's score for every n ≤ 989 and 999-1019 in 10.0 CPU hours; the incremental repair made it 160 times faster than solving each node from scratch |
+| A Lagrangian bound over the nogoods in the prover's search | [prover 3](../prover/README.md#3-the-proofs-of-optn) | kept | 3.3 times fewer nodes at n = 793 |
+| Bound the upper half by W(U\*) through a Lagrangian in the prover's search | [prover 8](../prover/README.md#8-what-remains-open) | not kept | gains only 4% |
+| The prover's search past 989: games 990, 992, 993, 995, 996 and from 1020 | [parity bound](#the-parity-bound-in-the-model-free-proofs-2026-10) | kept: done with the parity bound | with the Franklín–Moniot bound each needed tens of millions of nodes (its gap about 1,170 at n = 1000); the parity bound finished the saved searches in 4,000-215,000 more nodes each and proved every game to 1300 |
+| The span certificate (♦) for the upper-half conjecture (★) | [prover 2](../prover/README.md#2-conjecture--at-scale) | kept | holds for every n = 2..100,000 (602,777,907 rejections) and 902 sampled games to 2,000,000, 0 violations |
+| The threshold-by-threshold check of (★) by the cheapest sufficient bound | [prover 2](../prover/README.md#2-conjecture--at-scale) | kept | n = 2..20,000: 24,058,430 thresholds, none needing search (matching bound 86.2%, Lorea 8.3%, GF(2) rank 4.3%, one exclusion 1.2%) |
+| Exact maximum-cardinality searches over the residual (`maxcard`, `plus1`) | [prover 2](../prover/README.md#2-conjecture--at-scale) | superseded by the bounds, kept as the fallback | n = 9170 reached only its first 16 thresholds (P = 127, g = 13); the rank bound certifies it in milliseconds |
+| The earlier (★) campaign: exact searches over the residual components | [prover 1](../prover/README.md#1-what-existed-before) | superseded by (♦) | 3,231 of 3,236 components, n ≤ 1500 and samples to 4000, plus 2873 and 9170; five undecided (3103, 3872, 3936, 4000, 9170), all settled by the rank bound; its scripts were never committed |
+| An adversarial search over Taxman-shaped synthetic instances | [prover 4](../prover/README.md#4-adversarial-search-what-protects-greedy) | measured | what protects greedy is the window law taken for the real ranking of the primes: 0 failures in 1,981 such instances, against 16-57% for uniformly random orders and for the window law with a random ranking of the primes |
+| Enumerate every optimal set of every game with the prover; the theorems on uniqueness (Theorems 8 and 9) | [prover 5](../prover/README.md#5-is-the-optimal-set-unique) | kept | unique for every n ≤ 424; 30 of the 954 games completely enumerated, all in 425-779, have two or three, every one with upper part U\* |
+| Does every optimal game have upper part U\*? | [prover 8](../prover/README.md#8-what-remains-open) | open | true of every game enumerated; Theorem 8 settles the upper half alone |
+| Prove (♦), or (★), in general | [prover 8](../prover/README.md#8-what-remains-open) | open | certified game by game only; the sharpest form is (♦) for multiplicatively generated instances under any order obeying the window law |
 | The exchange property (a matroid) for playable sets, to justify greedy | [THEORY: where exchange breaks](../../heuristics/THEORY.md#where-exchange-breaks) | not kept: false | n = 2873 has two maximal playable sets of different sizes; greedy survives because the stuck one is the light one |
 | The single-sacrifice repair behind the frontier argument | [THEORY: the frontier argument](../../heuristics/THEORY.md#the-frontier-argument-and-exactly-where-it-stops) | not kept: false in general | at n = 9170 two minimal cores through d share nothing below it, so no single below-d sacrifice repairs |
-| A matroid relaxation that is exact for the whole game | [evidence 5](../evidence/README.md#5-is-the-optimal-set-unique) | not kept: false | game 425 has two optimal sets, and a matroid with distinct positive weights has one heaviest independent set |
-| A model-free bound on opt(n): every playable set of the board is independent in two linear matroids over GF(2) (split by the parity of Ω, with the unit vectors of the members), so their heaviest common independent set bounds opt(n) (`matroid whole`) | [matroid 6](#matroid-intersection-bounds-2026-10) | measured; kept in the evidence crate (next row) | gap 0-3 on average to 300, 15-90 to 900, 108-167 by band to 1300 (exact at 194 games), a tenth of the model-free matching bound's; equals the frame model's GF(2) bound plus `in_the_bag` at all 361 roots of 880-1300; 0.5 s at 1300 |
-| The parity bound in the evidence crate's model-free search: reimplemented from its mathematics, proven as THEORY.md's Theorem 10, every value certified by a weight split (`evidence/src/parity.rs`) | [parity bound](#the-parity-bound-in-the-model-free-proofs-2026-10) | kept | every game 2..1300 proven model-free (twice); 990 in 44,389 nodes from scratch where the matching bound had spent 70 million; the root value equals the study's at all 1,088 games it measured; 22 ms a root solve at 990, 43 ms at 1300 |
+| A matroid relaxation that is exact for the whole game | [prover 5](../prover/README.md#5-is-the-optimal-set-unique) | not kept: false | game 425 has two optimal sets, and a matroid with distinct positive weights has one heaviest independent set |
+| A bound on opt(n) on the whole board: every playable set of the board is independent in two linear matroids over GF(2) (split by the parity of Ω, with the unit vectors of the members), so their heaviest common independent set bounds opt(n) (`matroid whole`) | [matroid 6](#matroid-intersection-bounds-2026-10) | measured; kept in the prover (next row) | gap 0-3 on average to 300, 15-90 to 900, 108-167 by band to 1300 (exact at 194 games), a tenth of the Franklín–Moniot bound's; equals the frame model's GF(2) bound plus `in_the_bag` at all 361 roots of 880-1300; 0.5 s at 1300 |
+| The parity bound in the prover's search: reimplemented from its mathematics, proven as THEORY.md's Theorem 10, every value certified by a weight split (`prover/src/parity.rs`) | [parity bound](#the-parity-bound-in-the-model-free-proofs-2026-10) | kept | every game 2..1300 proven on the whole board (twice); 990 in 44,389 nodes from scratch where the matching bound had spent 70 million; the root value equals the study's at all 1,088 games it measured; 22 ms a root solve at 990, 43 ms at 1300 |
 | Warm starts of the parity bound from the parent node's certificate, improving cycles through the root found by Dijkstra on the inherited potentials | [parity bound](#the-parity-bound-in-the-model-free-proofs-2026-10) | superseded by the next row | 36% fell back to a solve from scratch at 990 (the parent's set minus a barred member is not the heaviest of its size, so an exchange can break the potentials); 108 s against 122 s cold |
 | The same with label-correcting searches (rescans allowed, at most 20 a vertex on average) | [parity bound](#the-parity-bound-in-the-model-free-proofs-2026-10) | kept | 2-12% fall back; the same trees twice as fast (990: 61 s against 122 s; 1250: 4.6 s against 13.6 s) |
 | The Lagrangian bound over the nogoods beside the parity bound | [parity bound](#the-parity-bound-in-the-model-free-proofs-2026-10) | not kept | cut nothing at 990: the same 44,411 nodes, 7% slower |
 | Resuming the matching bound's open searches with the parity bound, against starting afresh | [parity bound](#the-parity-bound-in-the-model-free-proofs-2026-10) | measured | both finish; resuming costs more (990: 89,639 more nodes against 44,389 from scratch; 992: 214,329 against 66,892) |
-| Does an optimal game play the most moves, M(n)?  (The wiki's open question; in its whole-game form, the conjecture behind `revise_freedoms`.)  M(n) model-free from the matching number ν(n) and a unit-weight search, against the optimal game's moves, n = 2..1300 | [evidence 6](../evidence/README.md#6-does-an-optimal-game-play-the-most-moves); [THEORY: longest games](../../heuristics/THEORY.md#longest-games) | not kept: false | at n = 833, 834 and 835 every optimal game is one move short of the longest (the heaviest 363-move game of 833 scores 29 less); every other game to 1300 is a longest game, 1,293 by ν(n) alone; pruning branches that cannot reach M(n) moves would be unsound |
+| Does an optimal game play the most moves, M(n)?  (The wiki's open question; in its whole-game form, the conjecture behind `revise_freedoms`.)  M(n) from the matching number ν(n) and a unit-weight search, against the optimal game's moves, n = 2..1300 | [prover 6](../prover/README.md#6-does-an-optimal-game-play-the-most-moves); [THEORY: longest games](../../heuristics/THEORY.md#longest-games) | not kept: false | at n = 833, 834 and 835 every optimal game is one move short of the longest (the heaviest 363-move game of 833 scores 29 less); every other game to 1300 is a longest game, 1,293 by ν(n) alone; pruning branches that cannot reach M(n) moves would be unsound |
+| Predict the cost of `exact` on 1301-2175 from the root's parity gap (tenfold nodes per 84 to 130 points of it, as over 900-1300) | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | not kept: wrong by 10 to 1000 times | gap 364 took 18 thousand nodes (1576), gap 401 63 thousand (1501), gap 315 300 thousand (1326); the slope from gap 310 to the 767 of 2170-2173 said 90 to 900 thread-hours for one game and 1,000 to 5,000 for the campaign |
+| Predict it from the nodes of the solver's own search of the game (`strict.jsonl`), times a ratio fitted on finished games | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | kept: the order of `prover.sh` and the estimate (about 140 thread-hours) | 34 games finished: 0.13 to 13 times the solver's nodes, the ratio growing tenfold per 1000 in n (geometric mean 0.9 at 1300-1400, 7 at 1975-2103), sd 0.28 decades; the first fit on 1302-1576 alone said 61 thread-hours, low by 2.3 times |
+| Thread scaling of `exact` (one game per thread) | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | measured | the same 275,105 nodes at 1, 2, 4 and 8 threads, user time a node 2.19 to 2.46 ms (+12%), the 8-thread wall time the longest game's (151 s of 606) |
+| A single game's search over several threads or processes (a `--shard i/K` over the open units of a checkpoint) | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | open: not needed | at 16 vCPUs the campaign ends with the dearest games (11 hours) and 4 to 5 of them run at once |
+| A clean pause of `exact` on SIGTERM (a stop handler) | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | open: replaced by passes in `prover.sh` | passes of 300 s bound what a kill loses to 5 minutes of the threads, and a resumed search has the nodes of an uninterrupted one |
+| A 192-vCPU instance for the proofs of 1301-2175 | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | not kept | from 16 vCPUs up the dearest games (2170-2173) set the wall time, 11 hours; 192 vCPUs cost eight times as much for the same hours |
 | How the parity bound relates to Franklín and Moniot's Theorem 1 and bound | [THEORY: relation to Franklín and Moniot](../../heuristics/THEORY.md#relation-to-franklín-and-moniot) | kept (proven; evaluation/fm_relation.py) | playable / independent / matchable iff exactly one / an odd number / at least one payment scheme onto some payment set (Theorem 12); no odd core below board 45, so the parity bound is exact to 44; checked on every pick set of 2..22 and 18,200 dense sets on 30-120 |
 
 ### The Python heuristics project
@@ -237,7 +268,7 @@ The strategies (solvent, onetax, maxturn, cascade, continuation), the certificat
 pay (a 2-tax rule for OneTax, the fork oracle, trusting certificates as cutoffs, the matroid frame, matching-existence
 as acceptance, bitsets) are in [heuristics/README.md, "Dead ends worth remembering"](../../heuristics/README.md#dead-ends-worth-remembering),
 with what is proven, conjectured and measured in [its ledger](../../heuristics/README.md#the-theory-the-upper-half-is-a-matching-problem)
-and [THEORY.md's table of evidence](../../heuristics/THEORY.md#evidence).  Entries that also bear on the Rust solver
+and [THEORY.md's table of evidence](../../heuristics/THEORY.md#evidence).  Entries that also bear on the solver
 (the matroid frame, the single-sacrifice route) have their row above.
 
 ## Index of rounds
@@ -246,30 +277,31 @@ and [THEORY.md's table of evidence](../../heuristics/THEORY.md#evidence).  Entri
 |---|---|---|---|
 | [The port](#the-port-and-its-first-improvements) | does a fresh implementation of the Java's algorithm reproduce its answers? | yes, and the Java's upper bound had a defect (the runner-up), fixed (`legacy_bound` reproduced it until it was removed) | before 2026-10 |
 | [Matching bound](#improvements-after-parity) | can a relaxation to bipartite matching bound the nodes better than `blameGame`? | kept; the default bound | before 2026-10 |
-| [Seed and cap](#improvements-after-parity) | start from the previous game and stop at `n + opt(n − 1)` | kept (`seed_incumbent`, `prev_cap`) | before 2026-10 |
+| [Seed and ceiling](#improvements-after-parity) | start from the previous game and stop at `n + opt(n − 1)` | kept (`seed_incumbent`, `prev_cap`) | before 2026-10 |
 | [Conflicts of the matching bound](#conflicts-of-the-matching-bound-2026-10) | does the conflict of the heaviest matching make a better branching and a tighter bound? | kept: conflict branching, strong branching, refinement; 1000 from open at 120 s to 11 s | f8d922d to 38cf168 |
 | [Forced members and nogoods](#forced-members-and-nogoods-2026-10-second-round) | can the search promote what every completion promotes, and learn conflicts as facts of the root? | kept: `fix_forced`, `nogoods`, bounds from the potentials, cheaper children; 1184 from 21.6 s to 1.3 s | 53a442a to 8bcfd36 |
 | [Carrying nogoods over](#carrying-nogoods-over-2026-10-measured-not-kept) | start a game's table with the nogoods of the last | not kept: a larger table costs every node | f41fff8 (taken out again) |
 | [Forgetting nogoods](#forgetting-nogoods-2026-10) | clear each searcher's table every N steps | kept (`forget_nogoods`, N = 50,000); 15–40% less time on hard games | 576e2e2 |
 | [Single-member conflicts](#single-member-conflicts-belong-to-the-node-2026-10) | are single-member conflicts root facts that can be filtered once? | no: nothing to filter | (a prototype, not kept) |
 | [Faster nodes, same trees](#faster-nodes-same-trees-2026-10) | make the inner loop cheaper without changing any tree | kept: 30% fewer cycles at the 1215 proof | e3b8ddc to 4b6ef38 |
-| [Engine](#the-engine) | scaling to many cores, and checkpoints at any interval | kept: split requests per idle worker, pauses that cannot starve the workers | 2026-10 |
-| [Same search](#same-search-2026-10) | conclude a game whose search problem an earlier game already settled? | kept (`same_search`, proven); 28.4% of the strict chain's search | f5a2af3 to 06efb4c |
-| [Lagrangian bound](#a-lagrangian-bound-over-the-nogoods-2026-10) | can a Lagrangian bound over the nogoods be kept incrementally and pay in cycles? | kept (`lagrange`); proofs at the frontier about 3.3 times fewer cycles | e6b37d2, b4f6b05 |
-| [Which tactics earn their keep](#which-tactics-earn-their-keep-2026-10) | which tactics pay in a strict chain at the frontier, and what support for old file formats can go? | removed `reuse_prev`, `revise_freedoms`, `legacy_bound`, `preclusions`, `match_bound=off` and the branchings other than `conflict-strong`, and with them strict runs and the old file formats; kept the proven switches | the solver of 243af9b |
+| [Engine](#the-engine) | scaling to many threads, and checkpoints at any interval | kept: split requests per idle worker, pauses that cannot starve the workers | 2026-10 |
+| [Same search](#same-search-2026-10) | conclude a game whose search problem an earlier game already settled? | kept (`same_search`, proven); 28.4% of the committed chain's search | f5a2af3 to 06efb4c |
+| [Lagrangian bound](#a-lagrangian-bound-over-the-nogoods-2026-10) | can a Lagrangian bound over the nogoods be kept incrementally and pay in cycles? | kept (`lagrange`); proofs of the hardest games about 3.3 times fewer cycles | e6b37d2, b4f6b05 |
+| [Which tactics earn their keep](#which-tactics-earn-their-keep-2026-10) | which tactics pay in a chain at its hardest games, and what support for old file formats can go? | removed `reuse_prev`, `revise_freedoms`, `legacy_bound`, `preclusions`, `match_bound=off` and the branchings other than `conflict-strong`, and with them the old file formats; kept the proven switches | the solver of 243af9b |
 | [Faster nodes with the Lagrangian bound](#faster-nodes-with-the-lagrangian-bound-same-trees-2026-10) | where do the cycles go with the Lagrangian bound, and what can be cheaper without changing any tree?  Does `match_refine` = 0 now pay? | kept: the probe's windows about 10.5% fewer cycles, proofs 5-10%; `match_refine` stays 1 | dd4f89c to 31b9c95 |
 | [Benchmarks](#benchmarks-the-probe-pgo-and-scaling) | what the bench set, the probe, PGO and the thread scaling showed | numbers | e3b8ddc and after |
 | [What drives the slope](#what-drives-the-slope-2026-10) | what makes a game's cost grow ×10 per 55-70 in n, and what would change the slope? | the root's gap: ×10 nodes per ~130 of it at every n, nothing from the size at a given gap; the slope is the gap's growth; seeding the search with a better root relaxation is a constant factor | db7faf1 (no solver change) |
 | [The committed chain, made again](#the-committed-chain-made-again-2026-10) | does the cleanup's build make the same chain? | yes: the same moves, proofs and scores as the chain of 243af9b; 1022.5 s of search | 271c817 |
-| [Matroid intersection bounds](#matroid-intersection-bounds-2026-10) | does the GF(2) independence of playable sets give a bound whose gap grows more slowly? | yes: the intersection of the even and odd frames' GF(2) matroids closes 82% of the matching gap at the root, more as n grows; a plain branch and bound with it needs 12-800 times fewer nodes than the solver, growing 0.14 decades per 100 n instead of 0.48; recommended for the search; model-free, a tenth of the matching bound's gap on opt(n) | 67bb492 to 12a0f60 and the entry (no solver change) |
+| [Matroid intersection bounds](#matroid-intersection-bounds-2026-10) | does the GF(2) independence of playable sets give a bound whose gap grows more slowly? | yes: the intersection of the even and odd frames' GF(2) matroids closes 82% of the matching gap at the root, more as n grows; a plain branch and bound with it needs 12-800 times fewer nodes than the solver, growing 0.14 decades per 100 n instead of 0.48; recommended for the search; on the whole board, a tenth of the Franklín–Moniot bound's gap on opt(n) | 67bb492 to 12a0f60 and the entry (no solver change) |
 | [How far can nogoods go](#how-far-can-nogoods-go-2026-10) | what is the best a Lagrangian bound over nogoods can do (all conflicts, ideal multipliers), at the root and at nodes, over the matching and over the GF(2) intersection, and is the gap it leaves still growing? | a constant factor: at the root over the matching it is the Lagrangian bound already (its gap growing as fast); at every node about 10x fewer steps at 1,000x the cost; over GF(2) 46% of the root gap and 6x smaller trees, less as n grows, in a quarter more time; superseded by GF(2) | the entry (no solver change; the study's code was not kept) |
 | [Dominance and symmetry](#dominance-and-symmetry-2026-10) | is part of the tree dominated, or explored twice under interchangeable promotions, and does a sound rule's share grow with n? | no transpositions or twins; the frame model has prime-exchange symmetries, and breaking them removes a seventh of the nodes on average (up to 43%), a constant share: not a slope lever | aa56590 to d2de73f (no solver change) |
-| [Going higher and coming back down](#going-higher-and-coming-back-down-2026-10) | can the games above n bound, seed or settle it, so that a dear game comes from a cheaper one above? | no: the games above bound n through relaxations, whose root bounds are never smaller, so an exact cap comes from a problem at least as hard; exact only for 1023 in 1001-1300 (0.55%); incumbents from above are n's optimum reflected; neighbours share their GF(2) gap | the entry (no solver change; the study's code was not kept) |
-| [The parity bound in the model-free proofs](#the-parity-bound-in-the-model-free-proofs-2026-10) | does the parity matroids' bound, reimplemented in the evidence crate and proven as a theorem, carry the model-free proofs of opt(n) from 989 to 1300? | yes: every game 2..1300 proven model-free (twice), the old open searches finished, a fresh proof of all 557 searched games in 1.2 thread-hours; cost ×10 per 84 points of the root's parity gap, about ×1.7 per 100 in n | ff714b3 to the entry (evidence crate only) |
+| [Going higher and coming back down](#going-higher-and-coming-back-down-2026-10) | can the games above n bound, seed or settle it, so that a dear game comes from a cheaper one above? | no: the games above bound n through relaxations, whose root bounds are never smaller, so an exact ceiling comes from a problem at least as hard; exact only for 1023 in 1001-1300 (0.55%); incumbents from above are n's optimum reflected; neighbours share their GF(2) gap | the entry (no solver change; the study's code was not kept) |
+| [The parity bound in the model-free proofs](#the-parity-bound-in-the-model-free-proofs-2026-10) | does the parity matroids' bound, reimplemented in the prover and proven as a theorem, carry its proofs of opt(n) from 989 to 1300? | yes: every game 2..1300 proven on the whole board (twice), the old open searches finished, a fresh proof of all 557 searched games in 1.2 thread-hours; cost ×10 per 84 points of the root's parity gap, about ×1.7 per 100 in n | ff714b3 to the entry (the prover only) |
 | [The anatomy of the gap](#the-anatomy-of-the-gap-2026-10) | where does the root's gap live, which rule do the relaxations break, and which valid inequalities cut it? | the relaxations promote as many as the optimum, the wrong ones; above the GF(2) bound only odd cores of frames 1-3 remain, growing with n; cover and rank cuts on top of it are a constant factor (about 4 in nodes with multipliers refitted at each node), not a lower slope | the entry (no solver change; the study's code was not kept) |
 | [The per-frame bound](#the-per-frame-bound-2026-10) | does a bound exact frame by frame (frames tied by Lagrangian multipliers) close a share of the GF(2) residual that holds with n? | where it can be computed it closes most of it (90-100% at 900, 936, 1088; 29 and 27 of 30 open probe nodes cut with node-level steps), but each evaluation solves the frames' own odd-core searches: within 200 steps 59% on average, falling with n (15-39% at 1254-1300); in the branch and bound 2.8 times fewer nodes at 28 times the time; not recommended | the entry (no solver change; the study's code was not kept) |
 | [The GF(2) bound in the search](#the-gf2-bound-in-the-search-2026-10) | can the search use the GF(2) intersection as its node bound at a cost a node that pays, what machinery earns its keep with it, and what does it do to the chain? | kept, the default: the 146 one-thread proofs 45 times faster (426 times fewer nodes); the chain 1001-1300 16 times faster on half the threads; a chain from 1300 reached 2175 in 92 minutes on 2 threads, with no growth a fit resolves; `lagrange` off | 679635b to the entry |
 | [The committed chain to 2175](#the-committed-chain-to-2175-2026-10) | does the build with the GF(2) bound make the committed chain from n = 1 as far as the chain from 1300 reached, in one invocation? | yes: 1..2175 in 1638.6 s on 8 threads, nothing assumed; every score and proof kind of 1..1300 is the previous chain's, every score of 1301..2175 the independent chain's from 1300 | feba6d0 |
+| [The model-free proofs of 1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | what does the prover's check of the chain's 1301..2175 cost, and how does it run on a cloud machine? | about 140 thread-hours (100 to 250) from the solver's node counts times a ratio that grows tenfold per 1000 in n; the root's gap does not predict it; one game a thread, so half a day on 16 vCPUs; `prover.sh`, not yet run | 888a718 |
 
 ## The port and its first improvements
 
@@ -1199,7 +1231,7 @@ game at the ceiling) and `same_search` (the rest) now prove.
 
 ### `revise_freedoms`: the same trees
 
-Its premise is false for the whole frame game ([n = 833](../evidence/README.md#6-does-an-optimal-game-play-the-most-moves),
+Its premise is false for the whole frame game ([n = 833](../prover/README.md#6-does-an-optimal-game-play-the-most-moves),
 `tests/soundness.rs`), and the owner decided to remove it; measuring stopped there.  Measured before that: in every
 one of the 60 searched or repeated games of 1232..1300 it searches the two-frame game (282 to 2,238 nodes, 16 to 27 ms,
 1.2 s for the 60) and lowers frame 0's freedoms by 4 to 6 and `max_total` by 0 to 5, so every problem changes; yet
@@ -2013,7 +2045,7 @@ with three or more live factors, over as many factors as movers or a few more.
 | 1201-1300 | 85 | 167.0 | 176 | 282 | 0 | 545 |
 
 The model-free matching bound's gap is 140-430 around 500-700 and 650-1,200 from 800 on
-([evidence 3](../evidence/README.md#3-model-free-exact-cross-check-of-optn)); this one's is a tenth of that, from the
+([prover 3](../prover/README.md#3-the-proofs-of-optn)); this one's is a tenth of that, from the
 reference algorithm in half a second at 1300.  That the two constructions agree at every root of 880-1300 checks
 each against the other.
 
@@ -2773,7 +2805,7 @@ runs of nearby searched games that hold a fifth of the proof nodes of 880-1300.
 
 ## The parity bound in the model-free proofs (2026-10)
 
-*Question.*  The model-free proofs of opt(n) ([evidence 3](../evidence/README.md#3-model-free-exact-cross-check-of-optn))
+*Question.*  The model-free proofs of opt(n) ([prover 3](../prover/README.md#3-the-proofs-of-optn))
 stopped at 989 (and 999-1019): the matching bound overrates the optimum by about 1,170 at n = 1000, and games 990,
 992, 993, 995, 996, 1020 and 1023-1027 had spent millions to tens of millions of nodes each without finishing.  The
 [matroid study](#matroid-intersection-bounds-2026-10) found a model-free bound with a tenth of that gap: every playable
@@ -2828,7 +2860,7 @@ games against one below its optimum: every one finds a set worth exactly V(n), w
 n, log10 nodes grows 0.16 ± 0.04 and log10 seconds 0.23 ± 0.04 per 100 (R² 0.06 and 0.11, the gap's swings between
 bands dominating), about 1.6 ms a node.  The trees are the size of the study's frame-model branch and bound with the
 same bound (992: 66,892 nodes from scratch against its 77,567).  The band table and the extrapolation are in
-[evidence 3](../evidence/README.md#3-model-free-exact-cross-check-of-optn): at that slope 1300–2000 would take about
+[prover 3](../prover/README.md#3-the-proofs-of-optn): at that slope 1300–2000 would take about
 57 thread-hours, the hardest single proofs about 3 hours; the recorded optima, not the search, stop the proofs at 1300.
 
 **4. Warm starts: kept, after one failed form.**  A child starts from its parent's certified set and split.  The split
@@ -3469,7 +3501,7 @@ What it agrees with:
 * The chain from `optimal.json`'s game of 1300 of the previous entry (`bench/gf2/chain.jsonl`, build 716ebd9, 2
   threads) in 1301..2175: every score, proof kind and method, and every move list but 1560-1563 (an exchange of five
   numbers of the sum 3008).  Both used the GF(2) bound, so this is a second run of the same search, not a check of the
-  bound; the model-free check of 1301..2175 (`rust/evidence`) is pending.
+  bound; the model-free check of 1301..2175 (`rust/evidence`) is pending ([prepared](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10), not run).
 * `optimal.json` in 1..1300 (`optimal_match` true).  It still ends at 1300 and was not extended (the lines of
   1301..2175 say `optimal_match` null); `taxman extend-optimal results/strict.jsonl` would add 875 games.
 
@@ -3477,3 +3509,80 @@ What it agrees with:
 Python referee takes 1 s.  Entries above that quote `results/strict.jsonl` mean the chain of 271c817 (git has it at the
 commit before the one that replaced it), unless they say otherwise; [results/README.md](../results/README.md)
 describes the present file.
+
+## The model-free proofs of 1301-2175: cost and the cloud run (2026-10)
+
+*Question.*  The committed chain now reaches 2175, and the model-free proofs of [prover 3](../prover/README.md#3-the-proofs-of-optn)
+stop at 1300 (the entry above says the check of 1301..2175 is pending).  What does it cost, can `exact` use the many
+cores of a cloud machine, and how should it be run?  Measured on the M1 Max (10 cores, other jobs running throughout),
+with `exact` as it is: no proving code was changed.
+
+*How `exact` uses threads (from the code, then measured).*  One game per thread: `campaign` (`evidence/src/jsonl.rs`)
+gives the games of a range to its workers through an atomic counter, each worker runs one game's search alone (a
+`Prover` is one thread), and a finished game is appended and synced as one line.  `--seconds` is a pause deadline for
+every search in flight and the end of new work; the paused searches write `exact_N.ckpt` (target, nodes, seconds,
+nogoods, open units; temp file, `fsync`, rename) and a rerun resumes them.  Checkpoints are written only at the pause and
+there is no signal handler, so a SIGTERM or a kill loses the pass in progress.  The same 12 games (1302-1364, 275,105
+nodes in all) at 1, 2, 4 and 8 threads, longest first:
+
+| threads | wall s | user s | speedup | user ms a node | longest game s |
+|---|---|---|---|---|---|
+| 1 | 606 | 601 | 1.00 | 2.19 | 141 |
+| 2 | 312 | 615 | 1.94 | 2.23 | 140 |
+| 4 | 171 | 637 | 3.53 | 2.31 | 147 |
+| 8 | 151 | 675 | 4.00 | 2.46 | 151 |
+
+The node counts are identical at every thread count (no sharing between games); the user time per node rises 12 % at 8
+threads on a busy machine; the 8-thread wall time is the longest game's, not the threads'.  Pausing does not change a tree:
+the same games stopped every 20-25 s (and by SIGTERM) and resumed took exactly the node counts of an uninterrupted run
+(1316: 12,567; 1320: 62,784; and the rest of the 13 searches of 1301-1320, in `evidence.sh` runs on macOS and in the
+Linux image).
+
+*The cost of the proofs of 1301..2175.*  (a) *The root's parity gap does not predict it.*  Over 900-1300 a proof's
+nodes grew tenfold per 84 points of gap (R² 0.76); over 1301-1360 the 18 games finished give tenfold per 130 (the
+solver's slope).  The gaps of 1301..2175 run 125 to 767 (mean 380 over the 490 games that need a search; 2170-2173 are
+the widest), and that slope from gap 310 (270 thousand nodes) predicts 90 to 900 thread-hours for one game of gap 767
+and 1,000 to 5,000 for the campaign.  But a game of gap 364 (1576) took 18 thousand nodes and one of gap 401 (1501)
+63 thousand; one of 315 (1326) took 301 thousand.  (b) *The solver's own node counts do.*  The committed chain records,
+for every game, the nodes of the search that settled it (`nodes`; for a repeated search, the source game's).  Over
+the 34 games finished, `exact`'s nodes over those are 0.13 to 13:
+
+| n | 1302-1364 (19 games) | 1497-1612 (6) | 1655-1923 (6) | 1975-2103 (3) |
+|---|---|---|---|---|
+| geometric mean of the ratio (range) | 0.9 (0.13-2.1) | 1.6 (0.66-3.4) | 2.4 (0.75-8.4) | 7.0 (4.7-13) |
+
+(the fit over all 34: log10 ratio = -0.07 + 1.02 (n - 1300)/1000, residual sd 0.28; the ratio of the dearest games run
+to the end are 1521: 0.66, 1612: 1.7, 1803: 3.1, 1805: 2.1, 1975: 5.4.)  Five dear games were stopped unfinished:
+1430 (2.19 million nodes so far, the solver's search 1.61 million), 1472 (1.83, 1.35), 1475 (1.73, 1.92), 2052
+(1.15, 0.21) and 2170 (1.25, 1.25), after 1 to 1.6 hours each of a thread on the busy machine.  The first estimate,
+from the 20 games of 1302-1576 alone (ratio 0.95, 61 thread-hours), was low by 2.3 times: the ratio grows with n.  490 of
+the 875 games need a search; with the fit (and the order `summarize.py order`, which weights the solver's nodes by
+10^((n - 1300)/1000)) the model gives, at 2.5 ms a node (the committed proofs of 1..1300 cost 1.2 to 1.7 ms on two quiet
+threads, 1.73 at 1200-1300; this sample 2.2 to 2.5 user time; no clean measure above 1500):
+
+| | nodes (M) | thread-hours | the dearest game |
+|---|---|---|---|
+| 2.0 ms a node | 207 | 115 | 9.2 h (4.6-22) |
+| **2.5** | 205 | **142** (126-165 over the draws) | 10.9 h (5.7-24) |
+| 3.0 | 206 | 171 | 13.4 h (7-31) |
+
+By list scheduling the wall time on 4, 8, 16, 32 and more threads is 36, 18, 11 and 11 hours at 2.5 ms a node; from 16
+threads up the dearest games (2170-2173, the model's 8 million nodes each) set it.  The range of the estimate is wider
+than the draws': the trend in n rests on 7 games above 1800 and a sample, not a random one, and the speed of a Graviton
+core is unmeasured.  The RUNBOOK ([section 9](../tools/cloud/RUNBOOK.md#9-the-provers-proofs-of-optn-1301-to-2175))
+gives the wall time and the price by size (about $3 to $4 on spot for 16 vCPUs) and says that the calibration on
+Graviton3, 4 and 5 (`rust/bench/cloud/`) refines the per-core figures.
+
+*Tooling.*  `tools/cloud/evidence.sh A B` runs `exact` in passes of 300 s over the range, dearest first,
+until every game has a line, then the check `summarize.py check A B` (every n in 2..B proven, every score the recorded
+one); `run.sh` holds what it shares with `chain.sh` (one run at a time, log, pid, deadline, S3 saves, clean stop,
+power-off), `setup.sh` builds and checks the evidence crate (`EVIDENCE_ONLY=1` skips the solver), `spot-watch.sh` stops
+either run, the Dockerfile builds the crate.  Tried on macOS and in the Linux image (arm64): 1301-1320, SIGTERM
+(status 143), a resume, `--verify` (passing, and failing on a missing game), a second run refused, `chain.sh` after the
+split (a complete chain to 120, a SIGTERM and a deadline).  The Docker build had to start from the image of an earlier
+build (`--build-arg RUST_IMAGE=taxman-cloud`): the registry's metadata did not answer.
+
+*Not done, and why.*  No change to `exact` to use many cores on one game (its open units are independent subtrees, so a
+`--shard i/K` over a checkpoint's units would do it), nor to pause on a signal: at 16 vCPUs the campaign ends when the
+dearest game does, and a pass of 300 s bounds what a kill loses.  The run on EC2 and the check of 1301..2175 are the
+owner's; the results go to `evidence/data/exact_parity_1301_2175.jsonl`.

@@ -14,8 +14,8 @@
 //!   are winnable exactly when every frame along the way is;
 //! * reducing never changes whether a frame is winnable, now or after further edits (the reduction lemma in
 //!   [`super::peel`]);
-//! * a member that a reduction took as the factor of a forced pair fails both ways: one after the other it is no
-//!   longer a factor of its home frame, and all at once the move of that pair is left with no factor.
+//! * a member that a reduction took as the paying factor of a move left with only that factor fails both ways: one
+//!   after the other it is no longer a factor of its home frame, and all at once that move is left with no factor.
 //!
 //! The state after promoting `S` is then the same in any order, since reduction is confluent on winnable frames,
 //! and [`Model::promote_all_using`] makes it by checking and reducing each frame once.  Everything that reasons
@@ -28,7 +28,7 @@ use crate::bits::Bits;
 
 impl Model {
     /// Whether the frame `moves -> factors` is winnable, where `moves` and `factors` are those of a frame of this
-    /// model with numbers promoted into and out of it (its moves plus factors of the frame above; its factors).
+    /// model with numbers promoted into and out of it (its moves plus factors of the frame behind it; its factors).
     /// Applied to each frame with a whole set promoted at once, this decides whether the set can be promoted
     /// (see the module docs).
     #[inline]
@@ -171,8 +171,9 @@ impl Model {
     }
 
     /// Adds `gained` to the moves of a winnable frame of this model and removes `lost` from its factors, then
-    /// reduces it.  The frame was reduced, so only the new moves and the moves that lost a factor can be in a
-    /// forced pair; on a winnable frame reduction is confluent, so starting there gives what a full sweep would.
+    /// reduces it.  The frame was reduced, so only the new moves and the moves that lost a factor can be left with
+    /// a single live factor; on a winnable frame reduction is confluent, so starting there gives what a full sweep
+    /// would.
     fn apply<const W: usize>(&self, frame: &mut Frame<W>, gained: &Bits<W>, lost: &Bits<W>) {
         let g = &self.graph;
         frame.moves |= *gained;
