@@ -1160,6 +1160,11 @@ impl<const R: usize> Meet<R> {
         self.columns_for = self.tableau;
     }
 
+    /// The cycle through the member that the last [`without`](Self::without) that answered found: its elements.
+    pub fn cycle(&self) -> &[u32] {
+        &self.flip
+    }
+
     /// The weight split's `w1` by element after a successful [`split_bounds`](Self::split_bounds) (meaningful for
     /// the live elements).
     pub fn potentials(&self) -> &[i64] {

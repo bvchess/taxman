@@ -48,10 +48,10 @@ const EXPECTED: [(u32, &str, u64, u64); 49] = [
     (936, "fix_forced=off", 20507, 1685),
     (936, "nogoods=off", 20507, 2330),
     (936, "lagrange=on", 20507, 2201),
-    (1000, "default", 24168, 5386),
+    (1000, "default", 24168, 5387),
     (1000, "fix_forced=off", 24168, 4427),
     (1000, "nogoods=off", 24168, 18410),
-    (1000, "lagrange=on", 24168, 5386),
+    (1000, "lagrange=on", 24168, 5387),
     (1133, "default", 28690, 93),
     (1133, "nogoods=off", 28690, 117),
     // The matching path.  W = 8, the small end: every tactic's effect shows in a few hundred nodes.

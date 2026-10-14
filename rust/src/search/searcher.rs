@@ -865,11 +865,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
                         }
                     }
                     // Unless forced members end the node's loop, it goes on without the chosen member, from that
-                    // member's level solved to the end (kept for it, the same level whichever way its bound was
-                    // found).
+                    // member's level, kept for it: solved, or certified.
                     if !to_need && !kept && !(space.fix_forced && !forced.is_empty()) {
-                        g.value_excluding(best.1, node.max_add, u64::MAX);
-                        g.keep_excluded();
+                        g.keep_certified(best.1);
                     }
                     if space.fix_forced { forced.max() } else { None }.or(Some(best.1))
                 }
