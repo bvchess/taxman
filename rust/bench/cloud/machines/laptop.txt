@@ -1,0 +1,6 @@
+2026-10-14
+Darwin 25.6.0 arm64
+Apple M1 Max, 10 cores (8 performance + 2 efficiency), 32 GiB
+rustc 1.99.0 (b940084d7 2026-09-28), Homebrew
+RUSTFLAGS=-C target-cpu=native (apple-m1)
+code of 407645f; load average 3 to 5 during the runs (other jobs on the machine), one run at a time
