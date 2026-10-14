@@ -266,17 +266,17 @@ fn a_search_resumed_over_and_over_finds_the_optimum() {
     let resumes = resumed_over_and_over::<16>(600, truth, 30, 1000, &dir, &[0, 12, 14]);
     assert!(resumes >= 10, "only {resumes} resumes");
     // The GF(2) bound searches 600 in too few nodes to be stopped (the engine checks the limit every 1,024 steps of
-    // a searcher), and game 1000 in several thousand: the default, without forced members, forgetting every step,
+    // a searcher), and game 992 in some ten thousand: the default, without forced members, forgetting every step,
     // and refitting the Lagrangian bound.
-    let truth = optimal_sum::<16>(optimal, 1000).unwrap();
-    let resumes = resumed_over_and_over::<16>(1000, truth, 30, 1000, &dir, &[19, 24, 26, 29]);
+    let truth = optimal_sum::<16>(optimal, 992).unwrap();
+    let resumes = resumed_over_and_over::<16>(992, truth, 30, 1000, &dir, &[19, 24, 26, 29]);
     assert!(resumes >= 8, "the GF(2) bound: only {resumes} resumes");
 }
 
 /// The same at W = 20, 24 and 64: on the matching path, game 1133 (its truth from `results/strict.jsonl`) from an
 /// incumbent 400 below it, stopped every 60 nodes or so (the engine checks every 1,024 steps of a searcher): its
 /// tactics, forgetting the nogoods every two or three steps, and refitting the Lagrangian bound every four; with the
-/// GF(2) bound, whose search of 1133 is too short to stop, game 1000 at those widths.
+/// GF(2) bound, whose search of 1133 is too short to stop, game 992 (some ten thousand nodes) at those widths.
 #[test]
 fn a_wide_search_resumed_over_and_over_finds_the_optimum() {
     let n = 1133;
@@ -286,10 +286,10 @@ fn a_wide_search_resumed_over_and_over_finds_the_optimum() {
         + resumed_over_and_over::<24>(n, truth, 400, 60, &dir, &[0])
         + resumed_over_and_over::<64>(n, truth, 400, 60, &dir, &[2]);
     assert!(resumes > 10, "only {resumes} resumes");
-    let truth = optimal_sum::<16>(Optimal::built_in(), 1000).unwrap();
-    let resumes = resumed_over_and_over::<20>(1000, truth, 30, 60, &dir, &[19, 26])
-        + resumed_over_and_over::<24>(1000, truth, 30, 60, &dir, &[19])
-        + resumed_over_and_over::<64>(1000, truth, 30, 60, &dir, &[29]);
+    let truth = optimal_sum::<16>(Optimal::built_in(), 992).unwrap();
+    let resumes = resumed_over_and_over::<20>(992, truth, 30, 60, &dir, &[19, 26])
+        + resumed_over_and_over::<24>(992, truth, 30, 60, &dir, &[19])
+        + resumed_over_and_over::<64>(992, truth, 30, 60, &dir, &[29]);
     assert!(resumes > 6, "the GF(2) bound: only {resumes} resumes");
 }
 

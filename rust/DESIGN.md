@@ -348,16 +348,31 @@ is a tenth of the matching bound's (EXPERIMENTS: "Matroid intersection bounds").
   member and matroid) with the candidates it lost deleted.  The intersection (`gf2::meet`: Lawler's shortest
   augmenting paths, over a tableau of bitset rows that a pivot updates per exchange) starts from the last of the sets
   the parent's augmentations passed through that the changes keep (every one is the heaviest of its size and heavier
-  than all smaller ones); when that is the parent's optimum, the child inherits it with no solve.
+  than all smaller ones); when that is the parent's optimum, the child inherits it with no solve.  The parent here
+  is the node as it was before it went on without the member the child promotes (it is kept aside for that), so
+  that the child finds the node's optimum among those sets.
+* **The heaviest set without a member, with no solve.**  The heaviest set without a member `x` of the optimum `I*`
+  is, in practice, `I*` flipped along one cycle of its exchange graph through `x`; `Meet::without` finds the shortest
+  such cycle by Dijkstra's search over the weight split's reduced lengths (below), checks the flipped set common
+  independent, and certifies it the heaviest when what the sets of other sizes lose against `I*` is at least the
+  cycle's length (the symmetric difference of `I*` and any set without `x` splits into cycles and paths of the
+  exchange graph, all of non-negative length but the one through `x`; the module comment of `src/gf2/meet.rs` has the
+  proof).  What the smaller sets lose comes from the level's history (a dominant set one smaller), a floor carried
+  along the path, or a search for the shortest path between members; what the larger sets lose is the solve's last
+  shortest path.  A child that loses one member of its parent's optimum besides those it promotes gets its own
+  optimum the same way, from the parent's exchange graph with the dropped elements banned from the cycle.
 * **Forced members.**  The optimum's weight split (Frank: `w = w1 + w2` with the optimum heaviest in `A` for `w1` and
-  in `B` for `w2`, from difference constraints by Bellman–Ford) bounds the intersection without each member in one
-  pass, by weak duality; a member without which it is below `need` is forced, as the matching's are.
+  in `B` for `w2`, from difference constraints by Bellman–Ford, each round from the vertices that changed) bounds the
+  intersection without each member in one pass, by weak duality; a member without which it is below `need` is
+  forced, as the matching's are.  The split's bound is loose, so for the members it leaves free within `FORCE_WINDOW`
+  (80) of `need`, the exchange graph decides: a member is forced too when no cycle through it is shorter than the
+  slack `value − need` and the sets of other sizes lose more than that (`Meet::has_cycle_within`).
 * **Exact strong branching.**  The member of the conflict to branch on is the one without which the intersection
-  is lowest, solved exactly for each member (in the order of the split's bounds, warm-started from the level's
-  history, each solve stopped once it reaches both the lowest so far and `need`, a greedy lower bound tried first);
-  a member whose solve falls below `need` is forced too, and the chosen member's solved level is what the node goes
-  on with.  The cheaper choices (the split's bound alone, the largest member) take more nodes and more time
-  (EXPERIMENTS: "The GF(2) bound in the search").
+  is lowest, each bound read off the exchange graph where it is certified and solved where not (in the order of the
+  split's bounds, each solve stopped once it reaches both the lowest so far and `need`, a greedy lower bound tried
+  first); a member whose bound falls below `need` is forced too, and the chosen member's level, certified or solved,
+  is what the node goes on with.  The cheaper choices (the split's bound alone, the largest member) take more nodes
+  and more time (EXPERIMENTS: "The GF(2) bound in the search").
 * **What it replaces.**  With `gf2` the matching bound is not computed (as a first check before the intersection it
   costs more than the cuts it saves), so `match_refine` has no effect; the conflicts, nogoods, forced members and
   exact sets are used as with the matching bound.  The Lagrangian bound over nogoods still applies after it when on,
@@ -378,14 +393,15 @@ need = best + 1 − sum(promoted)                   # the loop goes on while the
 1. end the loop if cands is empty, or the max_add largest candidates sum below need
 2. look at the node's heaviest common independent set I* (gf2) of at most max_add members:
      value < need                                  -> end the loop (cut)
-     F = the forced members of I* (by the weight split: those without which the bound is below need)
+     F = the forced members of I* (by the weight split: those without which the bound is below need; and those
+         near it whose exchange graph has no cycle through them within value − need)
      the nogood table knows a conflict of I* all of whose members are in F or promoted
                                                    -> end the loop (cut)
      I* can be promoted                            -> offer promoted ∪ I* as incumbent; end the loop
      otherwise: a conflict K ⊆ I* (the nogood table's smallest, else computed and learned)
 3. if K ⊆ F: end the loop (every completion beating the incumbent promotes all of K, which cannot be)
-4. if F is empty: solve the bound without each member of K (exact strong branching); a member without which it is
-   below need joins F; n = the member without which it is lowest
+4. if F is empty: the bound without each member of K, read off the exchange graph of I* or solved (exact strong
+   branching); a member without which it is below need joins F; n = the member without which it is lowest
 5. n = a member of F if there are forced members; remove n from cands; if F is non-empty the node has nothing left
    to try after this child
 6. child = the node with F (or n) promoted; if that fails, the step is over
@@ -801,9 +817,12 @@ on the machine moves wall times by up to 3×.  What measures what:
   600000`), resumed on one thread for 50,000 steps, one period of forgetting nogoods: the search itself,
   fingerprinted by its counters, with the tactics its checkpoint records (`--tactic` changes them; a search that ends
   inside the window is costed by the steps it took).  F4, with `--tactic gf2=on`: the GF(2) bound's kernels at the F1
-  nodes (the bound from scratch, with its weight split, and without each member of its heaviest set's conflict), and
-  the windows resumed with the GF(2) bound, which finish both searches.  The probe's fingerprint is
-  7e8e724717d26545, 5b83bbebf0bb2899 with `--tactic lagrange=off`, and 162e4e94a52a95c6 with `--tactic gf2=on`.  (The windows were made again when the search's counters were
+  nodes (the bound from scratch; with its weight split and forced members; without each member of its heaviest set's
+  conflict, solved, and as strong branching reads them, certified or solved), and the windows resumed with the GF(2)
+  bound, which finish both searches; a window's fingerprint leaves out the GF(2) bound's counts of solves and
+  augmentations, which measure work.  The probe's fingerprint is 7e8e724717d26545, 5b83bbebf0bb2899 with `--tactic
+  lagrange=off`, and f3deaac0dbdc030a with `--tactic gf2=on`.  (The windows were made again when the search's
+  counters were
   renumbered and the checkpoint header went to version 4, 2026-10; the fingerprints EXPERIMENTS quotes before then,
   36981d0eaeeae319 and 6197a47eae6cf8c8, are of the earlier windows, made before `lagrange`.)  About 5 s in all;
   `perf make-nodes` and `perf make-window` make the fixtures again, deterministically.
@@ -836,14 +855,17 @@ on the machine moves wall times by up to 3×.  What measures what:
   checkpoint pause, and the production chain (RUNBOOK.md).
 
 **Where it stands with the GF(2) bound** (the default since commit 7af8b0e; EXPERIMENTS, "The GF(2) bound in the
-search", has the tables; on the M1 Max): the proof of 1215 takes 10,371 nodes and 3.8 G cycles on one thread, against
-the matching path's 1.1 M nodes and 29 G; the 146 one-thread proofs of the slope study 76 s against 3,408 s; `taxman
-regress --to 1000` on 2 threads 21.6 s against 96.9 s; the chain 1..1300 on 2 threads 88 s, its games 1001–1300 60 s
-against the 988 s that the chain of commit 271c817 (the `results/strict.jsonl` before it; git has it) records on 4
-threads.  Where the time goes (the proof of 1287, one
-thread): the intersection's shortest paths 57%, the levels' own work (a solve's setup, the history, the weight split)
-22%, the tableau's pivots 8%, the peels 3%; strong branching makes 70% of the augmentations.  A step costs 9 to 13
-times as much as the matching path's (the probe's windows), in trees a hundred times smaller.  A chain from
+search" and "The inner loop of the GF(2) search", have the tables; on the M1 Max): the proof of 1215 takes 4,634 nodes
+and 0.85 G cycles on one thread, against the matching path's 1.1 M nodes and 29 G; the 146 one-thread proofs of the
+slope study 287,101 nodes and 52 G cycles (697,346 and 232 G before the inner-loop round; 3,408 s on the matching
+path); the proofs of 2170 and 2172 65 s each on one thread; `taxman regress --to 1000` on one thread 15.4 s; the
+chain 1..1300 on one thread 63 s (34 s of search), against the 988 s for 1001–1300 that the chain of commit 271c817
+(the `results/strict.jsonl` before it; git has it) records on 4 threads.  Strong branching makes almost no
+augmentations (the bounds without each member are read off the exchange graph), and most children inherit or are
+certified: where the time goes now (the proof of 1521, one thread) is the searches for forced members about a
+quarter, the weight split a quarter, the solves that are left a fifth (with the tableaux they build, a quarter), and
+the cycles of strong branching a ninth.  A node costs 180k cycles on average over the 146 proofs (330k before the
+round), in trees 2.4 times smaller.  A chain from
 optimal.json's game of 1300 reached 2175 in 92 minutes of game time on 2 threads, and the committed chain from n = 1
 took 27 minutes on 8 ([results/README.md](results/README.md)); its cost comes in waves that
 follow the root's GF(2) gap, with no growth that a fit over 1301–2175 resolves, and a day on 192 CPUs would take

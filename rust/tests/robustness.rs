@@ -627,13 +627,15 @@ fn a_checkpoint_directory_in_use_is_refused() {
 }
 
 /// Runs `solve 944` (on optimal.json's game of 943) with progress lines, and once the search is under way sends
-/// `signal` (if any); returns the exit status and stdout.
+/// `signal` (if any); returns the exit status and stdout.  The tactics are the matching path's, whose search of 944
+/// lasts long enough to be stopped (the GF(2) search's takes under a tenth of a second).
 #[cfg(unix)]
 fn solve_944(dir: &TempDir, signal: Option<&str>) -> (ExitStatus, String) {
     let out = dir.join("results.jsonl");
     let ckpt = dir.join("ckpt");
     let mut child = taxman()
         .args(["solve", "944", "--use-prev", "--force-search", "--threads", "2", "--progress", "0.02"])
+        .args(["--tactic", "gf2=off", "--tactic", "lagrange=on"])
         .args(["--out".as_ref(), out.as_os_str(), "--checkpoint-dir".as_ref(), ckpt.as_os_str()])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

@@ -105,14 +105,18 @@ fn bound_and_independence_on_small_boards() {
 }
 
 /// The bound of a node made by promoting and deleting along random paths equals the bound of the matroids built
-/// afresh from the node's state, whatever was inherited or restarted on the way; and the forced members are
-/// forced: without each, a fresh solve is below what was asked.
+/// afresh from the node's state, whatever was inherited, certified or restarted on the way; the forced members are
+/// forced: without each, a fresh solve is below what was asked; and the certified bounds without a member are the
+/// fresh solves'.  Half the promotions go as strong branching makes them: the bounds without some members of the
+/// heaviest set certified, the node going on without one of them (its certified level kept), and the child that
+/// promotes it pushed after that.
 #[test]
 fn levels_match_fresh_matroids_along_random_paths() {
     const W: usize = 16;
     let mut rng = Rng(0xA5A5_0123_4567_89AB);
     let mut scratch = Scratch::<W>::new();
-    let (mut checks, mut inherited, mut forced_checked) = (0, 0, 0);
+    let (mut checks, mut inherited, mut forced_checked, mut certified_checked, mut children) = (0, 0, 0, 0, 0);
+    let mut certified = Vec::new();
     for &n in &[60u32, 90, 120, 150, 200, 260, 330, 420, 520, 640, 760, 900, 1000] {
         let board = Board::<W>::for_n(n);
         let p = board.prepare(SearchTactics::default()).unwrap();
@@ -154,6 +158,26 @@ fn levels_match_fresh_matroids_along_random_paths() {
                             path.last_mut().unwrap().2.remove(x);
                             continue;
                         };
+                        // As strong branching does: the bounds without a few members certified (checked against
+                        // fresh solves), the node going on without x, from its certified level if it has one.
+                        let strong = rng.chance(50) && eval.chosen.contains(x);
+                        if strong {
+                            let tried: Vec<u32> = std::iter::once(x)
+                                .chain((eval.chosen & cands).iter().filter(|&y| y != x && rng.chance(30)))
+                                .collect();
+                            bound.certified_excluding(&tried, cap, &mut certified);
+                            for (&y, value) in tried.iter().zip(&certified) {
+                                if let Some(value) = *value {
+                                    assert_eq!(value, fresh.value_excluding(y, cap, u64::MAX), "n={n}: without {y}");
+                                    certified_checked += 1;
+                                }
+                            }
+                            if certified[0].is_some() {
+                                bound.keep_certified(x);
+                            }
+                            bound.remove_candidate(x);
+                            path.last_mut().unwrap().2.remove(x);
+                        }
                         let mut child_cands = next.narrow_candidates(&cands.without(x));
                         // Drop a few more, as the search's rule-outs do.
                         for y in child_cands.to_vec() {
@@ -187,6 +211,10 @@ fn levels_match_fresh_matroids_along_random_paths() {
                 }
             }
         }
+        children += bound.stats().certified_children;
     }
-    assert!(checks > 3000 && inherited > 300 && forced_checked > 1000, "{checks} {inherited} {forced_checked}");
+    assert!(
+        checks > 3000 && inherited > 300 && forced_checked > 1000 && certified_checked > 300 && children > 100,
+        "{checks} {inherited} {forced_checked} {certified_checked} {children}"
+    );
 }

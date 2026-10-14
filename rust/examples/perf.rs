@@ -26,7 +26,8 @@
 //! * `nNNNN.window.ckpt` (F3, a search window): a checkpoint (TXSH, as `taxman solve` writes) of that proof after
 //!   some nodes, resumed on one thread for `--steps` steps (default 50,000, one period of forgetting nogoods).  A
 //!   resumed search starts with empty nogood tables, so the window is the same tree every time, and its
-//!   fingerprint is the search's counters (steps, promotions, children, matching bounds, ...).  The checkpoint
+//!   fingerprint is the search's counters (steps, promotions, children, matching bounds, ...), less the GF(2)
+//!   bound's counts of solves and augmentations, which measure work rather than the tree.  The checkpoint
 //!   is read-only.  The window searches with the tactics the checkpoint records, the defaults (`make-window 936
 //!   4500` and `make-window 1215 600000`), which `--tactic` changes (the search tactics only, as for the ladder):
 //!   `--tactic lagrange=off`, say, searches the same window without the Lagrangian bound.
@@ -60,7 +61,7 @@ use taxman::game::Optimal;
 use taxman::gf2::{Gf2Bound, Gf2Graph};
 use taxman::matchbound::{MatchBound, MatchGraph};
 use taxman::model::{Lookup, Model, Nogoods, Scratch};
-use taxman::search::{search, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
+use taxman::search::{search, stat, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
 use taxman::tactics::Tactics;
 
 /// The games whose fixtures the probe runs by default.
@@ -456,6 +457,31 @@ fn gf2_kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> R
             rounds as f64 / augmentations.max(1) as f64
         );
     }
+    // Strong branching as the search does it: the split, then the bounds the heaviest set's exchange graph
+    // certifies, and solves for the others.  The values, and so the fingerprint, are the kernel's above.
+    let (mut tried, mut certified) = (Vec::new(), Vec::new());
+    let before = b.stats();
+    let (cost, fp) = measure(reps, |fp| {
+        for &(promoted, cands, cap, need, conflict) in &nodes {
+            b.reset(&promoted, &cands);
+            b.evaluate(cap, Some(need));
+            tried.clear();
+            tried.extend(conflict.iter());
+            b.certified_excluding(&tried, cap, &mut certified);
+            for (&x, value) in tried.iter().zip(&certified) {
+                fp.add(value.unwrap_or_else(|| b.value_excluding(x, cap, u64::MAX)));
+            }
+        }
+    });
+    report.line("GF(2): split + bound without each, certified or solved", members, cost, fp);
+    if !report.brief {
+        let after = b.stats();
+        let runs = u64::from(reps.max(1));
+        println!(
+            "    (in this kernel {:.1}% of the bounds certified)",
+            100.0 * (after.certified - before.certified) as f64 / (members * runs).max(1) as f64
+        );
+    }
     Ok(())
 }
 
@@ -495,7 +521,15 @@ fn window<const W: usize>(
         match engine::run(&cfg, Start::Resume(path.to_path_buf()), &header, |_| TaxSearcher::new(&space)) {
             Ok(o) => {
                 (done, completed) = (o.stats.nodes, o.completed);
-                for x in [o.stats.nodes, o.best].into_iter().chain(o.stats.extra) {
+                // The GF(2) bound's counters of solves and augmentations measure work, not the tree (a faster
+                // bound makes fewer for the same tree), so they count as zero, as on the matching path.
+                let mut extra = o.stats.extra;
+                for k in
+                    [stat::GF2_SOLVES, stat::GF2_AUGMENTATIONS, stat::GF2_STRONG_SOLVES, stat::GF2_STRONG_AUGMENTATIONS]
+                {
+                    extra[k] = 0;
+                }
+                for x in [o.stats.nodes, o.best].into_iter().chain(extra) {
                     fp.add(x);
                 }
             }
