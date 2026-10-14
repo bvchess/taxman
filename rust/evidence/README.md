@@ -13,7 +13,7 @@ method in it is tested against brute force.
 |---|---|---|---|
 | (★): descending greedy is maximum-cardinality on every component and truncation of the upper-half instance, hence U\* is the heaviest playable upper set (the upper-half conjecture) | 3,231 of 3,236 rejection-bearing components, n ≤ 1500 and 40 samples to 4000, plus n = 2873 and 9170; 5 undecided (n = 3103, 3872, 3936, 4000, 9170); scripts not kept | **every game n = 2 .. 100,000** (602,777,907 greedy rejections) and **902 games to 2,000,000** (60,183,674 more): every rejection a GF(2) linear dependency, which certifies (★) for the whole game; the five undecided components settled; no counterexample | certified per game (a bound met), open in general |
 | greedy removal of impossible sources in hives (`removeImpossible`) | agreement with optimal.json to 1000 | at the root (where it shapes the search space) it *is* descending greedy on each upper-half component, so it is certified with (★) for every n ≤ 100,000 | certified per game |
-| the frame model as a whole: `unzip`'s mandatory moves, free factor count, closed hives inert, one-level promotions, greedy removal | brute force (model-free) to n = 62; agreement with the Java's optimal.json, made by the same model, to 1000 | **opt(n) proven equal to the recorded score, model-free, for every n = 2 .. 989**, and for n = 999 .. 1019 (19 of them past the Java's 1000, the Rust solver's own results) | verified (exact, model-free) |
+| the frame model as a whole: `unzip`'s mandatory moves, free factor count, closed hives inert, one-level promotions, greedy removal | brute force (model-free) to n = 62; agreement with the Java's optimal.json, made by the same model, to 1000 | **opt(n) proven equal to the recorded score, model-free, for every n = 2 .. 1300**, the whole committed chain (300 of them past the Java's 1000, the Rust solver's own results) | verified (exact, model-free) |
 | uniqueness: one optimal set per game, and every optimal game's upper part U\* | the unique heaviest upper set by brute force to n = 62; one optimal game recorded per n | **U\* is the unique heaviest playable upper set wherever (★) holds** (Theorem 8), so to 100,000; every optimal set enumerated, model-free, in 954 of the games 2..989 (the other 34 with the upper half fixed): **the optimal set is unique for every n ≤ 424, not at 425**; 30 games have two or three; every optimal set found has upper part U\* | proven (upper half, given (★)); measured (whole game) |
 | the longest games: an optimal game plays the most moves a game of the board can (the wiki's open question; `revise_freedoms` assumes it for a two-frame game) | open; believed true (the wiki), unproven (a comment in the Java) | **false**: at n = 833, 834 and 835 every optimal game is one move short of the longest; every other game to 1300 is a longest game, the gap never above one | refuted (model-free); measured to 1300 |
 
@@ -26,10 +26,13 @@ What the evidence is, in one paragraph each:
   once, and greedy optimal for every weighting consistent with the order.  (♦) is cheap to check exactly (game
   2,000,000 takes 2.7 minutes), and it holds in every game checked.
 * **A model-free exact search for opt(n).**  A branch and bound over which numbers are picked, bounded by the
-  Franklín–Moniot matching relaxation (re-optimized incrementally from the parent node's optimal dual),
-  branching on minimal unplayable sets found by peel, with forced picks from the dual and learned nogoods; with
-  the proven relations opt(n) ≤ n + opt(n−1) and the prime formula, it proves the recorded optimum for every
-  n ≤ 989, sixteen times the old brute-force reach, and for 999–1019.
+  Franklín–Moniot matching relaxation (re-optimized incrementally from the parent node's optimal dual) and by the
+  *parity bound*: every playable set is independent in two linear matroids over GF(2), split by the parity of Ω
+  (THEORY.md, Theorem 10), and their heaviest common independent set, certified by a weight split, overrates the
+  optimum by a tenth of what the matching does.  It branches on minimal unplayable sets found by peel, with forced
+  picks from the duals and learned nogoods; with the proven relations opt(n) ≤ n + opt(n−1) and the prime formula,
+  it proves the recorded optimum for every n ≤ 1300, the whole committed chain (the matching bound alone had
+  reached 989).
 * **Every optimal set.**  The same search, run in an enumeration mode one below the optimum, lists every optimal
   set of a game for about the cost of proving the optimum.  The optimal set is unique for every n ≤ 424; from 425
   some games have two or three, always with the same upper part, U\*, and differing by an exchange of lower-half
@@ -131,15 +134,26 @@ Cross-checks: the Rust greedy equals `heuristics/core.py`'s `optimize_mini` on e
 
 `src/game.rs` proves upper bounds on opt(n) from proven facts only: Theorem 1 with peel (a set of picks is
 playable iff dismantling the instance of the picks, each listing its maximal factors that are not picks,
-removes everything), the Franklín–Moniot matching bound, opt(n) ≤ n + opt(n−1), and the prime formula's upper
-bound (a game playing a prime n plays it first; swapping it for the largest prime below n gives a game of
-n − 1).  It knows nothing of hives, frames, greedy, `unzip` or promotions.  The search:
+removes everything), the Franklín–Moniot matching bound, the parity bound (THEORY.md, Theorem 10),
+opt(n) ≤ n + opt(n−1), and the prime formula's upper bound (a game playing a prime n plays it first; swapping it for
+the largest prime below n gives a game of n − 1).  It knows nothing of hives, frames, greedy, `unzip` or
+promotions.  The search:
 
 * **Bound**: the maximum-weight matching between numbers and their maximal factors, with forced picks matched
   downward and barred numbers only paying, solved once by successive shortest paths and then re-optimized in
   each child from the parent's optimal matching and dual (each freed vertex repaired by one Hungarian step),
   which made the search 160 times faster than solving each node from scratch.
-* **Branching**: if the matching's picks are playable they are a game worth the bound; otherwise a minimal
+* **The parity bound** (`src/parity.rs`, `Prover::with_parity`; on in `exact` since 2026-10).  Every playable set
+  is independent in two linear matroids over GF(2), split by the parity of Ω (THEORY.md, [the parity
+  matroids](../../heuristics/THEORY.md#the-parity-matroids-a-bound-on-the-whole-game)), so at a node the heaviest set
+  independent in both, with the forced picks contracted and the barred numbers deleted, bounds every completion.
+  It is computed by shortest augmenting paths (a child starting from its parent's set and weight split) and reported
+  only with a weight split that satisfies the local optimality conditions of both matroids, checked explicitly, so
+  the bound rests on the theorem and weak duality, not on the algorithm.  It cuts the node, bars the free numbers
+  that depend on the forced picks, forces the members whose barring alone brings it to the target, and the node
+  branches on its heaviest set's conflicts instead of the matching's.  Its gap is about a tenth of the matching
+  bound's (130 points against 1,200 at n = 1000-1300).
+* **Branching**: if the bound's picks are playable they are a game worth the bound; otherwise a minimal
   unplayable subset (deletion filter with peel) must lose a member, and the children partition on which.
 * **Forced picks** (from the dual: barring the pick alone already brings the bound to the target), the
   **conflict-packing cut** (nogoods violated by the matching whose members are far apart in the graph must each
@@ -148,14 +162,19 @@ n − 1).  It knows nothing of hives, frames, greedy, `unzip` or promotions.  Th
 * **A Lagrangian bound** over the nogoods: a playable set picks at most |K| − 1 members of each nogood K, so a
   second matching, with each pick's weight lowered by the multipliers of the unbroken nogoods holding it (fitted
   by subgradient steps at the search's root, then fixed), bounds the search too; it runs alongside the first,
-  repaired incrementally the same way, and cut the tree 3.3-fold at n = 793.
+  repaired incrementally the same way, and cut the tree 3.3-fold at n = 793.  Beside the parity bound it cut
+  nothing at 990, so `exact` uses it only without the parity bound.
 * **Pausing**: a search still running at the end of a run saves its open subtrees and nogoods and resumes in the
   next run (depth first), so a game can take any number of ten-minute runs.
 
 The target is the recorded optimum V(n); the search proves that no playable set beats it, and the recorded game
 replays by the rules to V(n), so opt(n) = V(n).  Every rule above is tested against brute force or against the
-optimum (the search must still reach optimal.json's score from one below it, with each rule on).  Results
-(`data/exact_2_1231.jsonl`, `tools/summarize.py exact`):
+optimum (the search must still reach optimal.json's score from one below it, with each rule on, and the parity
+bound's intersection is checked against enumeration on random pairs of matroids).
+
+### With the matching bound (to 989)
+
+`data/exact_2_1231.jsonl`:
 
 | | games |
 |---|---|
@@ -167,13 +186,65 @@ optimum (the search must still reach optimal.json's score from one below it, wit
 
 The searches took 10.0 hours of CPU in all.  The cost is far from monotone in n: the matching bound's gap is
 140–430 points around n = 500–700 and 650–1200 from 800 on, and the hardest games are those whose optimum it
-overrates most: 798–804 at 7–12 million nodes, 987–989 at 19–53 million.  Games 990, 992, 993, 995 and 996 had
-taken 50–70 million nodes each, and 1020 and 1023–1027 several million, without finishing; their searches are
-saved in `data/checkpoints/exact_open_searches.tar.gz` (unpack into `work/` and rerun `exact` to continue).
-Games 991, 994, 997 and 998 meet the chain or prime relation and wait on their predecessors.  So the frame
-model's answer is the true optimum for every n ≤ 989 and for 999–1019, including 19 of the Rust solver's
-results past the Java's 1000: sixteen times the previous model-free reach (62), and evidence for every
-frame-model assumption at once.
+overrates most: 798–804 at 7–12 million nodes, 987–989 at 19–53 million.  Games 990, 992, 993, 995 and 996 took
+50–70 million nodes each, and 1020 and 1023–1027 several million, without finishing; their searches are saved in
+`data/checkpoints/exact_open_searches.tar.gz`.
+
+### With the parity bound (to 1300)
+### With the parity bound (to 1300)
+
+`data/exact_parity_990_1300.jsonl` continues that file: the open searches resumed with the parity bound, then every
+game from 1028 to 1300, then 999–1019 again.  The open searches finished in 4,000 to 215,000 more nodes each (17 to
+595 seconds; 990: 89,639 nodes after its 70.5 million, 992: 214,329 after 65.2 million), and with them 991, 994, 997
+and 998 by the chain and prime relations.  With the two files (`tools/summarize.py exact data/exact_2_1231.jsonl
+data/exact_parity_990_1300.jsonl`):
+
+| | games |
+|---|---|
+| matching bound already equals V(n) | 45 |
+| proven by a search (to 989 with the matching bound alone, from 990 with the parity bound) | 649 |
+| chain relation V(n) = n + V(n−1), predecessor proven | 407 |
+| prime relation, predecessor proven | 198 |
+| **every n in 2 .. 1300**, the whole committed chain | **1299** |
+
+The parity searches of this file took 2.7 hours of thread time (three threads; the warm starts came in for its last
+96 games), the hardest 1287 at 146,855 nodes and 279 seconds.  So the frame model's answer is the true optimum for
+every game of the committed chain, n ≤ 1300, including the Rust solver's own results past the Java's 1000.
+
+`data/exact_parity_2_1300.jsonl` proves every game again from scratch with the parity bound (no resumed search, no
+matching-bound proof needed; the final build, two threads): a second, self-standing proof of every n ≤ 1300 by a
+different bound, and the cost curve below.  And no rule cuts an optimal game: for every game that needs a search,
+the same search with the target one below V(n) finds a set worth V(n), which replays by the rules
+(`examples/paritycheck.rs`; all 665 such games to 1300, `data/paritycheck_2_1300.jsonl`, 31 minutes).
+
+### What a proof costs, and how far it reaches
+
+`tools/summarize.py cost data/exact_parity_2_1300.jsonl`: the 557 games that need a search, proven from scratch with
+the parity bound in 1.17 thread-hours (two threads; about 1.6 ms a node from 990 on, the warm starts included).
+
+| n | searches | the root's parity gap (mean) | median nodes | most nodes | seconds, all searches |
+|---|---|---|---|---|---|
+| 2–499 | 127 | 3–24 | ≤ 21 | 83 | 2 |
+| 500–799 | 154 | 44–78 | 74–402 | 2,673 | 44 |
+| 800–899 | 57 | 86 | 382 | 5,474 | 55 |
+| 900–999 | 53 | 164 | 2,406 | 68,260 (996) | 611 |
+| 1000–1099 | 54 | 120 | 2,358 | 91,928 (1023) | 974 |
+| 1100–1199 | 56 | 111 | 789 | 41,153 (1199) | 264 |
+| 1200–1300 | 56 | 169 | 18,247 | 146,855 (1287) | 2,276 |
+
+The cost follows the root's parity gap, as the solver's follows its root gap: over 900–1300 a search's nodes grow
+×10 per 84 points of gap (1.19 ± 0.05 decades per 100 points, R² 0.76), and the gap grows about 14 points per 100 in
+n with swings of ±50 between bands (the matroid study's measurement, which these roots reproduce).  Against n, log10
+nodes grows 0.16 ± 0.04 and log10 seconds 0.23 ± 0.04 per 100 in n over 900–1300 (R² 0.06 and 0.11: the gap's swings
+dominate), 0.33 and 0.34 from n = 78 on.  The matching-bound search had spent 50–70 million nodes on each of
+990–996 without finishing; the parity bound proves them from scratch in 44,000–68,000.
+
+1300 is not the limit.  At the measured 0.23 decades per 100 in n, from the 2,240 seconds of 1200–1299, the
+searches of 1300–1399 would take about an hour of thread time, those to 1500 about 3 hours, to 2000 about 57 hours (a
+day on three threads), with the hardest single proofs near 2000 about 3 hours each, which checkpointing handles.  What
+stops the proofs at 1300 is the recorded optima: past the committed chain there is no V(n) to prove, so going further
+needs the solver's chain first (or the search's own `optimize` mode, which finds opt(n) instead of checking it, at a
+higher cost).
 
 ## 4. Adversarial search: what protects greedy
 
@@ -463,20 +534,25 @@ cargo build --release
 ./target/release/span --from 2 --to 100000 --threads 6 --seconds 540 --out OUT.jsonl     # resumable; ~10 min
 ./target/release/span --from 101000 --to 1000000 --step 1000 --threads 6 --seconds 540 --out OUT.jsonl
 ./target/release/star --from 2 --to 20000 --threads 6 --seconds 540 --out OUT.jsonl
-./target/release/exact --from 2 --to 1231 --threads 6 --seconds 540 --out OUT.jsonl    # rerun until done
-tar -xzf data/checkpoints/exact_open_searches.tar.gz -C work   # to continue the open searches into data/
-./target/release/exact --from 990 --to 1231 --threads 6 --seconds 540 --out data/exact_2_1231.jsonl
+./target/release/exact --from 2 --to 1300 --threads 3 --seconds 540 --checkpoints work/fresh --out OUT.jsonl
+                                    # with the parity bound, rerun until done (data/exact_parity_2_1300.jsonl)
+./target/release/exact --from 2 --to 1231 --parity 0 --threads 6 --seconds 540 --out OUT.jsonl  # the matching
+                                    # bound alone (data/exact_2_1231.jsonl, which left open searches:)
+tar -xzf data/checkpoints/exact_open_searches.tar.gz -C work   # to resume them with the parity bound:
+./target/release/exact --from 990 --to 1300 --threads 3 --seconds 540 --out data/exact_parity_990_1300.jsonl
+cargo run --release --example parityroot 2 1300     # the root's parity bound, checked, for every game
+cargo run --release --example paritycheck 2 1300    # one below each optimum, the search finds it (~30 minutes)
 bash tools/adversary_campaign.sh                                                          # data/adversary/
 ./target/release/optsets --from 2 --to 989 --searched-only 1 --threads 3 --seconds 540 --budget 4000000 \
     --out OUT.jsonl                                     # the games that need a search; rerun until done
 ./target/release/optsets --from 2 --to 989 --out OUT.jsonl     # then the chain and prime games, derived
 ./target/release/optsets --list 798,799,800 --upper fixed --threads 1 --seconds 540 --out FIXED.jsonl
 ./target/release/moves --from 2 --to 1300 --seconds 540 --out OUT.jsonl         # one thread; ~7 minutes
-tools/summarize.py span|star|exact|adversary|optsets|moves FILE...
+tools/summarize.py span|star|exact|cost|adversary|optsets|moves FILE...
 tools/crosscheck_optsets.py data/optsets_2_989.jsonl --max 57 --budget 120     # theory-free, about 8 minutes
 tools/crosscheck_greedy.py data/span_2_100000.jsonl.gz --max 1000
 cargo run --release --example inspect 9170 4611     # a jam, its factorizations and bounds
-cargo run --release --example exactdiag 600 112623  # the model-free search's counters
+cargo run --release --example exactdiag 990 310049 --parity 1   # the model-free search's counters
 ```
 
 Every campaign appends one JSON line per game and skips games already in its output, so a stopped run is resumed
@@ -489,11 +565,12 @@ gzipped where large (`gunzip -k` to resume into it).
   rejection of descending greedy on an upper-half instance is a GF(2) dependency of what it kept above — a
   statement about cores and closed surfaces mod 2 that the adversarial results tie to the window law with the
   real ranking of the primes.
-* The model-free cross-check stops at n = 989 (and 999–1019): games 990, 992, 993, 995, 996 and from 1020 on
-  need more than tens of millions of nodes each (their searches are saved, to be resumed).  The matching bound's
-  looseness, about 1,170 points at n = 1000, is the obstacle; a relaxation that sees more of the game (the
-  matching misses that a pick sweeps every divisor, not one; capping the upper half at W(U\*) through a
-  Lagrangian was tried and gains only 4%) is the next lever.
+* The model-free cross-check reaches the end of the committed chain, 1300, and could go on (about a day of three
+  threads to 2000, section 3) if there were recorded optima to check.  What the parity bound still misses are the
+  odd cores (THEORY.md, Theorem 10): its root gap, 130 points on average at 1000–1300, grows about 14 per 100 in n,
+  and the cost with it; the conflicts of its heaviest sets are large (20–45 members at 990).
+* The optimal sets of 990–1300 are not enumerated.  The enumeration mode works with the parity bound (tested
+  against brute force), so `optsets` with it would extend section 5 at about the cost of the proofs.
 * The frame model's individual assumptions other than the greedy removal are tested only end to end (through
   the optimum), not one by one.
 * Whether every optimal game's upper part is U\*.  Theorem 8 settles the upper half alone; for the whole game, a
