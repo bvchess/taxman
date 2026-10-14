@@ -55,6 +55,13 @@
 //! [`meet`], "The heaviest set without a member").  A level's heaviest set may come from such a certificate too: the
 //! node's without the member it branched on, and a child's that lost one member of its parent's heaviest set
 //! (`certify_child`).
+//!
+//! # Other weights
+//!
+//! The matroids do not depend on the weights, so the top level's vectors serve for any weighting of its live
+//! candidates: [`Gf2Bound::value_weighted`] is the heaviest common independent set for weights it is given, as the
+//! Lagrangian relaxation of an inequality needs (`search::symmetry`).  It is solved from scratch in a workspace of
+//! its own, so that the level's solve, which its certificates and forced members rest on, stays in the main one.
 
 pub mod meet;
 
@@ -335,6 +342,10 @@ pub struct Gf2Stats {
     pub certified_children: u64,
     /// Members found forced by `Levels::force_by_cycles` where the split left them free.
     pub forced_by_cycles: u64,
+    /// The solves of [`Gf2Bound::value_weighted`] and their augmentations (made in a workspace of their own, so
+    /// counted apart from `solves` and `augmentations`).
+    pub weighted_solves: u64,
+    pub weighted_augmentations: u64,
 }
 
 impl<'g, const W: usize> Gf2Bound<'g, W> {
@@ -381,6 +392,15 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
     /// there); the top level is unchanged.
     pub fn value_excluding(&mut self, x: u32, cap: u32, stop: u64) -> u64 {
         dispatch!(self, l => l.value_excluding(x, cap as usize, stop))
+    }
+
+    /// The heaviest common independent set of at most `cap` of the top level's live candidates, each weighing
+    /// `weight(x)` (`x` the number) instead of `x`, those of weight `0` or less left out (they only lower a set's
+    /// weight): its weight, or some value of at least `stop` once the augmentations reach it.  The top level is
+    /// unchanged, and so is the main workspace, which holds the solve that the level's certificates and forced
+    /// members rest on: this solve is made from scratch in a workspace of its own (see `Levels::value_weighted`).
+    pub fn value_weighted(&mut self, weight: impl Fn(u32) -> i64, cap: u32, stop: i64) -> i64 {
+        dispatch!(self, l => l.value_weighted(weight, cap as usize, stop))
     }
 
     /// The bounds of the top level without each candidate of `xs` (members of its heaviest set), with at most `cap`
@@ -527,6 +547,12 @@ struct Levels<'g, const W: usize, const R: usize> {
     meet: Meet<R>,
     live_idx: Vec<u32>,
     start_idx: Vec<u32>,
+    /// A workspace for [`value_weighted`](Self::value_weighted), made on first use: its solves must not spoil
+    /// `meet`'s tableau, which the levels' certificates and `force_by_cycles` rely on holding their solve.  With the
+    /// weights of the live elements by element and the elements of positive weight by (weight, element).
+    weighted: Option<Meet<R>>,
+    weights: Vec<i64>,
+    weighted_live: Vec<u32>,
     stats: Gf2Stats,
 }
 
@@ -557,6 +583,9 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             meet: Meet::new(n, graph.blocks),
             live_idx: Vec::with_capacity(n),
             start_idx: Vec::with_capacity(n),
+            weighted: None,
+            weights: vec![0; n],
+            weighted_live: Vec::with_capacity(n),
             stats: Gf2Stats::default(),
         }
     }
@@ -765,6 +794,41 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         self.stats.excluded_stopped += u64::from(!self.scratch.solved);
         self.scratch_for = self.scratch.solved.then_some(x);
         self.scratch.value
+    }
+
+    /// The heaviest common independent set of at most `cap` live elements of the top level, the number `x` weighing
+    /// `weight(x)`, or some value of at least `stop` once the augmentations reach it.  Only the elements of positive
+    /// weight are solved over: an element of weight `0` or less only lowers the weight of a set that holds it, and
+    /// removing it from a common independent set leaves one, with no more members.  They are listed by (weight,
+    /// element), the order [`Meet::solve`] takes, and the solve starts from nothing (it takes the heaviest
+    /// uncontended prefix of that order), in the workspace `weighted`, whose tableau nothing else reads: the
+    /// workspace `meet` still holds the solve of the level that it held, and the levels' certificates and forced
+    /// members go on resting on it.
+    fn value_weighted(&mut self, weight: impl Fn(u32) -> i64, cap: usize, stop: i64) -> i64 {
+        let graph = self.graph;
+        let level = &self.levels[self.depth];
+        self.weighted_live.clear();
+        for x in level.live.iter() {
+            let e = graph.index[x as usize];
+            let w = weight(x);
+            if w > 0 {
+                self.weights[e as usize] = w;
+                self.weighted_live.push(e);
+            }
+        }
+        let weights = &self.weights;
+        self.weighted_live.sort_unstable_by_key(|&e| (weights[e as usize], e));
+        let problem = Problem {
+            block: [&graph.block[0], &graph.block[1]],
+            vector: [&level.vec[0], &level.vec[1]],
+            weight: weights,
+        };
+        let meet = self.weighted.get_or_insert_with(|| Meet::new(graph.len(), graph.blocks));
+        let before = meet.augmentations;
+        meet.solve(&problem, &self.weighted_live, &[], cap, stop, |_| {});
+        self.stats.weighted_solves += 1;
+        self.stats.weighted_augmentations += meet.augmentations - before;
+        meet.value
     }
 
     fn certified_excluding(&mut self, xs: &[u32], cap: usize, out: &mut Vec<Option<u64>>) {

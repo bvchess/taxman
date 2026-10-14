@@ -18,7 +18,8 @@
 //! cargo run --release --example matroid -- cores N|A-B...
 //! cargo run --release --example matroid -- whole [--known FILE] N|A-B...
 //! cargo run --release --example matroid -- prove [--known FILE] [--tactic NAME=VALUE]... [--branching B]
-//!     [--prefilter] [--strong K] [--first-forced] [--threads T] [--seconds S] N|A-B...
+//!     [--prefilter] [--strong K] [--first-forced] [--symmetry-bound off|pair|joint] [--threads T] [--seconds S]
+//!     N|A-B...
 //! ```
 //!
 //! Games are set up as `taxman solve` sets them up (the default tactics, all of them proven or sound).  `P*` is the
@@ -48,7 +49,9 @@
 //!   `taxman solve`) and the GF(2) bound's knobs, which are not tactics: `--branching` (`exact`, the default;
 //!   `split`, the member whose split bound is lowest; `largest`; `forced`, exact solves only to find forced
 //!   members), `--prefilter` (the matching bound as a first check), `--strong K` (solve at most K members of a
-//!   conflict) and `--first-forced` (stop solving at the first forced member) ([`prove`]).
+//!   conflict), `--first-forced` (stop solving at the first forced member) and, with the tactics `gf2` and
+//!   `symmetry`, `--symmetry-bound` (`off`, the default; `pair`, the Lagrangian bound of each symmetric pair whose
+//!   inequality the GF(2) bound's heaviest set breaks, alone; `joint`, of all those pairs at once) ([`prove`]).
 
 #[path = "common/meet.rs"]
 mod meet;
@@ -68,7 +71,7 @@ use taxman::json::Json;
 use taxman::matchbound::lagrange::SCALE;
 use taxman::matchbound::{MatchBound, MatchGraph};
 use taxman::model::{FrameSet, Model, Scratch};
-use taxman::search::{stat, Gf2Branching, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
+use taxman::search::{stat, Gf2Branching, Prepared, SearchSpace, SearchTactics, SymmetryBound, TaxSearcher, TaxUnit};
 use taxman::tactics::Tactics;
 
 #[path = "common/counters.rs"]
@@ -325,6 +328,7 @@ struct Options {
     branching: Gf2Branching,
     strong: usize,
     more_forced: bool,
+    symmetry_bound: SymmetryBound,
     threads: usize,
     seconds: Option<u64>,
 }
@@ -349,6 +353,7 @@ fn parse() -> Result<Options, String> {
         branching: Gf2Branching::Exact,
         strong: usize::MAX,
         more_forced: true,
+        symmetry_bound: SymmetryBound::Off,
         threads: 1,
         seconds: None,
     };
@@ -380,6 +385,14 @@ fn parse() -> Result<Options, String> {
                     "exact" => Gf2Branching::Exact,
                     "forced" => Gf2Branching::Forced,
                     other => return Err(format!("unknown branching {other:?}")),
+                }
+            }
+            "--symmetry-bound" => {
+                o.symmetry_bound = match args.next().ok_or("--symmetry-bound needs a value")?.as_str() {
+                    "off" => SymmetryBound::Off,
+                    "pair" => SymmetryBound::Pair,
+                    "joint" => SymmetryBound::Joint,
+                    other => return Err(format!("unknown symmetry bound {other:?}")),
                 }
             }
             "--threads" => {
@@ -1210,7 +1223,8 @@ fn forced<const W: usize>(path: &Path, every: usize) {
 // prove
 
 /// The search's proof that nothing beats `P*` (its incumbent a value, `P*`, with no set behind it; no seed, no
-/// ceiling), with the search tactics of `--tactic` and the GF(2) knobs `--prefilter` and `--branching`: nodes
+/// ceiling), with the search tactics of `--tactic` and the knobs `--prefilter`, `--branching` and
+/// `--symmetry-bound`: nodes
 /// (steps), seconds, the cycles and instructions of the process, and the GF(2) bound's counters.  On one thread (the
 /// default) the node counts are exact and repeatable, and compare with `examples/slope.rs`'s `prove` at δ = 0.
 fn prove<const W: usize>(n: u32, known: &Known, o: &Options) {
@@ -1229,6 +1243,7 @@ fn prove<const W: usize>(n: u32, known: &Known, o: &Options) {
         gf2_branching: o.branching,
         gf2_strong_limit: o.strong,
         gf2_more_forced: o.more_forced,
+        symmetry_bound: o.symmetry_bound,
         ..SearchSpace::new(&p, &graph, None)
     };
     let cfg = EngineConfig {
@@ -1252,12 +1267,14 @@ fn prove<const W: usize>(n: u32, known: &Known, o: &Options) {
     };
     let x = out.stats.extra;
     println!(
-        "{{\"n\":{n},\"opt\":{opt},\"tactics\":\"{}\",\"prefilter\":{},\"branching\":\"{:?}\",\"threads\":{},\
+        "{{\"n\":{n},\"opt\":{opt},\"tactics\":\"{}\",\"prefilter\":{},\"branching\":\"{:?}\",\
+         \"symmetry_bound\":\"{:?}\",\"threads\":{},\
          \"completed\":{},\"best\":{},\"nodes\":{},\"seconds\":{:.3},\"cycles\":{cycles},\"instructions\":{instructions},\
          \"checks\":{},\"gf2_solves\":{},\"gf2_augmentations\":{},\"gf2_strong_solves\":{},\"gf2_strong_augmentations\":{}}}",
         Tactics { search: o.tactics, ..Tactics::default() }.description(),
         o.prefilter,
         o.branching,
+        o.symmetry_bound,
         o.threads,
         out.completed,
         out.best,

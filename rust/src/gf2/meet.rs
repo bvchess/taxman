@@ -126,8 +126,10 @@ fn each_bit<const R: usize>(mask: &Vector<R>, mut f: impl FnMut(usize)) {
 pub struct Problem<'a, const R: usize> {
     pub block: [&'a [u8]; 2],
     pub vector: [&'a [Vector<R>]; 2],
-    /// The weight of each element: positive, and not decreasing with the element's index (the heaviest elements come
-    /// last).  In the search an element's weight is its number and the elements are indexed by increasing number.
+    /// The weight of each element: positive for the live elements of a solve, which [`Meet::solve`] and
+    /// [`Meet::greedy_from`] take listed by nondecreasing weight (the heaviest elements come last).  In the search
+    /// an element's weight is its number and the elements are indexed by increasing number, so ascending; a solve
+    /// of other weights lists its live elements in their own order.
     pub weight: &'a [i64],
 }
 
@@ -336,13 +338,15 @@ impl<const R: usize> Meet<R> {
         self.inside[e as usize]
     }
 
-    /// The heaviest common independent set of at most `cap` of the elements `live` (ascending), its weight in
-    /// `self.value` and its members marked ([`contains`](Self::contains)).  The augmentations start from the larger
-    /// of `start` (which must be a dominant common independent set of live elements, see the module docs; it may
-    /// be empty) and the heaviest uncontended elements.  `report` is called with the start set and then with each
-    /// set an augmentation reaches (all dominant), as the members of the set in ascending order.  The augmentations
-    /// stop as soon as the set weighs `stop` or more ([`stopped`](Self::stopped)): the heaviest set weighs at least
-    /// that much, since every augmentation gains.
+    /// The heaviest common independent set of at most `cap` of the elements `live`, listed by nondecreasing weight
+    /// (in the search the elements are indexed by increasing number, which is their weight, so ascending), its
+    /// weight in `self.value` and its members marked ([`contains`](Self::contains)).  The augmentations start from
+    /// the larger of `start` (which must be a dominant common independent set of live elements, see the module
+    /// docs; it may be empty) and the heaviest uncontended elements, the longest run of `live` from its end that is
+    /// common independent (the one use the solve makes of the order of `live`).  `report` is called with the start
+    /// set and then with each set an augmentation reaches (all dominant), as the members of the set (in no particular
+    /// order).  The augmentations stop as soon as the set weighs `stop` or more ([`stopped`](Self::stopped)): the
+    /// heaviest set weighs at least that much, since every augmentation gains.
     pub fn solve(
         &mut self,
         p: &Problem<'_, R>,
@@ -447,9 +451,10 @@ impl<const R: usize> Meet<R> {
         }
     }
 
-    /// The weight and size of a common independent set of the elements `live` (ascending) found greedily: `base` (common
-    /// independent), then each other element by decreasing weight that keeps it so.  A lower bound on the heaviest
-    /// common independent set, for a few reductions per element.
+    /// The weight and size of a common independent set of the elements `live` (listed by nondecreasing weight, as for
+    /// [`solve`](Self::solve)) found greedily: `base` (common independent), then each other element by decreasing
+    /// weight that keeps it so.  A lower bound on the heaviest common independent set, for a few reductions per
+    /// element.
     pub fn greedy_from(&mut self, p: &Problem<'_, R>, live: &[u32], base: &[u32]) -> (i64, usize) {
         // The workspace no longer holds the last solve.
         self.solves += 1;
@@ -1463,6 +1468,44 @@ mod tests {
             }
         }
         assert!(warm > 10_000 && splits > 2_000, "{warm} warm starts, {splits} splits");
+    }
+
+    /// Weights in no relation to the elements' indices, the live elements (not all of them) listed by (weight,
+    /// element): the solve is the brute-force value under every size limit, honours a stop, and the greedy set is a
+    /// lower bound.
+    #[test]
+    fn intersection_with_weights_in_any_order_against_brute_force() {
+        let mut rng = Rng(0x51ED_270B_1D3C_4A67);
+        let (mut stopped, mut cases) = (0, 0);
+        for trial in 0..2000 {
+            let n = 1 + rng.below(11) as usize;
+            let mut owned = random(&mut rng, n, 5);
+            for i in (1..n).rev() {
+                owned.weight.swap(i, rng.below(i as u64 + 1) as usize);
+            }
+            let p = owned.problem();
+            let mut live: Vec<u32> = (0..n as u32).filter(|_| rng.chance(85)).collect();
+            live.sort_unstable_by_key(|&e| (p.weight[e as usize], e));
+            let mut meet = Meet::<1>::new(n, [3, 3]);
+            for cap in 0..=live.len() {
+                meet.solve(&p, &live, &[], cap, i64::MAX, |_| {});
+                let truth = brute(&p, &live, cap);
+                assert_eq!(meet.value, truth, "trial {trial} cap {cap}");
+                let chosen: Vec<u32> = live.iter().copied().filter(|&e| meet.contains(e)).collect();
+                assert!(chosen.len() <= cap, "trial {trial} cap {cap}: {chosen:?}");
+                assert!(independent(p.block[0], p.vector[0], &chosen) && independent(p.block[1], p.vector[1], &chosen));
+                assert_eq!(chosen.iter().map(|&e| p.weight[e as usize]).sum::<i64>(), meet.value, "trial {trial}");
+                let stop = 1 + rng.below(truth as u64 + 5) as i64;
+                meet.solve(&p, &live, &[], cap, stop, |_| {});
+                assert!(meet.value <= truth && meet.stopped == (meet.value >= stop), "trial {trial} cap {cap}");
+                assert!(meet.stopped || meet.value == truth, "trial {trial} cap {cap}: stop {stop}");
+                stopped += usize::from(meet.stopped);
+                cases += 1;
+            }
+            let (greedy, size) = meet.greedy_from(&p, &live, &[]);
+            assert!(greedy <= brute(&p, &live, live.len()) && size <= live.len(), "trial {trial}: greedy {greedy}");
+        }
+        assert!(cases > 10_000 && stopped > 1000, "{cases} cases, {stopped} stopped");
     }
 
     /// The loss of the smaller sets ([`Meet::smaller_loss`], against the heaviest set one smaller, by brute force)

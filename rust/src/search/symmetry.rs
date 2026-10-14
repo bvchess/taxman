@@ -37,14 +37,39 @@
 //! node's candidates those that no such completion holds.  Both are arithmetic on the cofactor sums of the
 //! node's promotions and candidates, and allocate nothing.
 //!
+//! # The Lagrangian bound
+//!
+//! The rule above is arithmetic on cofactor sums.  [`Symmetries::lagrangian`] is the dearer test, for a node whose
+//! GF(2) bound ([`crate::gf2`]) did not cut: it bounds the completions that keep the inequalities of some pairs `L`
+//! by the GF(2) bound's problem under other weights, in which the breaking of an inequality costs.  For a pair
+//! `l = (p, q)` and a number `x`, let `δ_l(x) = (q − p)·x/p` if `p | x`, `−(q − p)·x/q` if `q | x`, and `0` otherwise
+//! (no candidate is divisible by both: the pairs are simple), and `D_l(S) = Σ_{x∈S} δ_l(x) = (q − p)·(c_p(S) −
+//! c_q(S))`; a set keeps the inequality of `l` exactly when `D_l(S) ≤ 0`.  Let `F` be a completion of the node with
+//! promotions `P` that keeps the inequalities of `L`, so `D_l(P ∪ F) ≤ 0` for each `l ∈ L`, and `k` a multiplier, 1
+//! or 2.  `P` and `F` are disjoint and `D_l` is a sum over members, so
+//!
+//! ```text
+//! 2·Σ F  ≤  2·Σ F − k·Σ_{l∈L} D_l(P ∪ F)  =  Σ_{x∈F} w(x) − k·Σ_{l∈L} D_l(P),    w(x) = 2x − k·Σ_{l∈L} δ_l(x).
+//! ```
+//!
+//! `F` is common independent in the node's matroids, with at most as many members as the node can still promote
+//! (Theorem 11), and a member of weight `w ≤ 0` only lowers the weight of a set: so `Σ_{x∈F} w(x)` is at most the
+//! heaviest common independent set of the live candidates of positive weight with that many members, `V`, and
+//! `2·Σ F ≤ V − k·Σ_{l∈L} D_l(P)`.  It is Theorem 13's Lagrangian ("Pruning with the inequalities", with the
+//! multiplier `μ = k(q − p)/2` of each pair), doubled so that every number is an integer.  If it is below twice what
+//! a completion must add, no completion that keeps the inequalities of `L` does: the node holds no heaviest
+//! promotion set, as it holds none if no completion keeps the inequalities at all.
+//!
 //! # What is where
 //!
 //! * [`swap_primes`], [`map_set`], [`cofactors`]: the arithmetic of an exchange, on a number and on a set, and of its
 //!   effect on a sum.
 //! * [`is_root_symmetry`], [`root_pairs`]: whether an exchange is a symmetry of the root, and which exchanges are.
-//! * [`Symmetries`], [`RuleScratch`]: the pairs of a game as the search's rule uses them, built once per search.
+//! * [`Symmetries`], [`RuleScratch`]: the pairs of a game as the search's rule uses them, built once per search;
+//!   [`Symmetries::broken`], [`Symmetries::excess`] and [`Symmetries::lagrangian`] for the bound above.
 
 use crate::bits::Bits;
+use crate::gf2::Gf2Bound;
 use crate::model::{FrameSet, Model};
 use crate::numtheory;
 
@@ -231,10 +256,13 @@ pub struct Symmetries {
     links: Vec<(u16, u16)>,
     /// For each prime `r` of `primes`: the candidates `x` divisible by `r`, with `x / r`, ascending.
     family: Vec<Vec<(u32, u32)>>,
+    /// The largest candidate (0 if there is none): the numbers [`Symmetries::lagrangian`] weighs are at most this.
+    top: u32,
 }
 
-/// The sums a call of [`Symmetries::exclude`] or [`Symmetries::hopeless`] works in, made by [`Symmetries::scratch`]
-/// and reused, so that the rule allocates nothing per call.
+/// The sums a call of [`Symmetries::exclude`], [`Symmetries::hopeless`], [`Symmetries::broken`] or
+/// [`Symmetries::lagrangian`] works in, made by [`Symmetries::scratch`] and reused, so that they allocate nothing
+/// per call.
 #[derive(Clone, Debug, Default)]
 pub struct RuleScratch {
     /// For each prime of the pairs: the cofactor sum `c_r` over the promotions.
@@ -243,6 +271,11 @@ pub struct RuleScratch {
     cands: Vec<i64>,
     /// For each prime: the largest cofactor that a candidate divisible by it may add, see `exclude`.
     limit: Vec<i64>,
+    /// The same over the set that [`Symmetries::broken`] last looked at.
+    set: Vec<i64>,
+    /// For each number up to the largest candidate: the sum of `δ_l` over the pairs `l` that
+    /// [`Symmetries::lagrangian`] is weighing by (see the module docs); all zero between calls.
+    delta: Vec<i64>,
 }
 
 impl Symmetries {
@@ -265,7 +298,7 @@ impl Symmetries {
             .iter()
             .map(|&r| candidates.iter().filter(|x| x.is_multiple_of(r)).map(|x| (x, x / r)).collect())
             .collect();
-        Symmetries { pairs, primes, links, family }
+        Symmetries { pairs, primes, links, family, top: candidates.max().unwrap_or(0) }
     }
 
     /// Whether the game has no symmetric pair, so the rule does nothing.
@@ -288,7 +321,13 @@ impl Symmetries {
     /// Space for the rule's sums.
     pub fn scratch(&self) -> RuleScratch {
         let zeros = vec![0; self.primes.len()];
-        RuleScratch { promoted: zeros.clone(), cands: zeros.clone(), limit: zeros }
+        RuleScratch {
+            promoted: zeros.clone(),
+            cands: zeros.clone(),
+            limit: zeros.clone(),
+            set: zeros,
+            delta: vec![0; self.top as usize + 1],
+        }
     }
 
     /// Whether the node with promotions `promoted` and candidates `cands` is *hopeless*: no completion `F ⊆ cands`
@@ -351,6 +390,84 @@ impl Symmetries {
         }
     }
 
+    /// The indices (into [`pairs`](Self::pairs)) of the pairs whose inequality `set` breaks: `c_p(set) > c_q(set)`,
+    /// ascending, in `out` (cleared first).  Leaves the cofactor sums of `set` in `s`, for
+    /// [`excess`](Self::excess).
+    pub fn broken<const W: usize>(&self, s: &mut RuleScratch, set: &Bits<W>, out: &mut Vec<usize>) {
+        self.sums(&mut s.set, set);
+        out.clear();
+        out.extend((0..self.links.len()).filter(|&l| {
+            let (p, q) = self.links[l];
+            s.set[usize::from(p)] > s.set[usize::from(q)]
+        }));
+    }
+
+    /// `Σ_{l∈links} D_l(S)` for the pairs `links` (indices into [`pairs`](Self::pairs)), `D_l(S) = (q − p)·(c_p(S) −
+    /// c_q(S))` of the pair `l = (p, q)` (see the module docs, "The Lagrangian bound"), where `S` is the set that the
+    /// last call of [`broken`](Self::broken) with `s` looked at.  What an exchange of the pair's primes would gain
+    /// `S`; positive for each pair that `S` breaks.
+    pub fn excess(&self, s: &RuleScratch, links: &[usize]) -> i64 {
+        self.excess_of(&s.set, links)
+    }
+
+    /// `Σ_{l∈links} D_l(S)` for the set whose cofactor sums are `sums` (as [`sums`](Self::sums) makes them).
+    fn excess_of(&self, sums: &[i64], links: &[usize]) -> i64 {
+        links
+            .iter()
+            .map(|&l| {
+                let ((p, q), (prime_p, prime_q)) = (self.links[l], self.pairs[l]);
+                i64::from(prime_q - prime_p) * (sums[usize::from(p)] - sums[usize::from(q)])
+            })
+            .sum()
+    }
+
+    /// Adds to `delta[x]`, for each candidate `x` divisible by a prime of a pair `l` of `links`, `sign` times
+    /// `δ_l(x)` (see the module docs): `(q − p)·x/p` if `p | x`, `−(q − p)·x/q` if `q | x`.
+    fn add_deltas(&self, delta: &mut [i64], links: &[usize], sign: i64) {
+        for &l in links {
+            let ((p, q), (prime_p, prime_q)) = (self.links[l], self.pairs[l]);
+            let gap = sign * i64::from(prime_q - prime_p);
+            for &(x, m) in &self.family[usize::from(p)] {
+                delta[x as usize] += gap * i64::from(m);
+            }
+            for &(x, m) in &self.family[usize::from(q)] {
+                delta[x as usize] -= gap * i64::from(m);
+            }
+        }
+    }
+
+    /// The Lagrangian bound of the node with promotions `promoted` on the completions that keep the inequalities of
+    /// the pairs `links` (indices into [`pairs`](Self::pairs)), with the multiplier `k` (1 or 2), doubled: `V − k·Σ_l
+    /// D_l(P)`, with `V` the heaviest common independent set of at most `cap` of the live candidates of `g`'s top
+    /// level, which must be the node (promotions `promoted`), under the weights `2x − k·Σ_l δ_l(x)` (the module docs
+    /// have the argument).  Every completion `F` that keeps those inequalities has `2·Σ F` at most this.
+    ///
+    /// Only an answer below `stop2` matters to a caller who cuts below it: the solve stops as soon as it reaches
+    /// `stop2 + k·Σ_l D_l(P)` ([`Gf2Bound::value_weighted`]), and the value returned is then some number of at least
+    /// `stop2`, not the bound.  Pass `i64::MAX` for the bound itself (the values are far below it).
+    ///
+    /// The weights are read from a dense table indexed by number, which is filled for the candidates divisible by a
+    /// prime of the pairs `links` before the solve and cleared after it, so the closure the solve calls is a lookup.
+    #[allow(clippy::too_many_arguments)]
+    pub fn lagrangian<const W: usize>(
+        &self,
+        s: &mut RuleScratch,
+        g: &mut Gf2Bound<'_, W>,
+        links: &[usize],
+        k: i64,
+        promoted: &Bits<W>,
+        cap: u32,
+        stop2: i64,
+    ) -> i64 {
+        self.sums(&mut s.promoted, promoted);
+        let shift = k * self.excess_of(&s.promoted, links);
+        self.add_deltas(&mut s.delta, links, 1);
+        let delta = &s.delta;
+        let doubled = g.value_weighted(|x| 2 * i64::from(x) - k * delta[x as usize], cap, stop2.saturating_add(shift));
+        self.add_deltas(&mut s.delta, links, -1);
+        doubled - shift
+    }
+
     /// `out[i]` = the cofactor sum `c_r(set)` of the `i`-th prime `r` of the pairs.
     fn sums<const W: usize>(&self, out: &mut [i64], set: &Bits<W>) {
         for (sum, family) in out.iter_mut().zip(&self.family) {
@@ -377,6 +494,7 @@ mod tests {
     use super::*;
     use crate::board::Board;
     use crate::game::Optimal;
+    use crate::gf2::Gf2Graph;
     use crate::model::Scratch;
     use crate::search::{Prepared, SearchTactics};
     use crate::test_support::Rng;
@@ -735,6 +853,125 @@ mod tests {
         let mut tally = Tally::default();
         check_rule(&symmetries, false, &promoted, &cands, &mut tally);
         assert_eq!(tally.cut_after_removals, 1, "{tally:?}");
+    }
+
+    /// Checks `broken` and `excess` on random sets of candidates of the board `n` against the definitions: the
+    /// pairs with `c_p > c_q`, and `(q − p)·(c_p − c_q)` of each, which is what the exchange of the pair's primes
+    /// gains the set.
+    fn broken_on<const W: usize>(n: u32, rng: &mut Rng, tally: &mut (usize, usize)) {
+        let Some(p) = setup::<W>(n) else { return };
+        let symmetries = Symmetries::of(&p.model, &p.root, &p.candidates);
+        if symmetries.is_empty() {
+            return;
+        }
+        let pairs = symmetries.pairs();
+        let (mut scratch, mut out) = (symmetries.scratch(), vec![usize::MAX]);
+        for _ in 0..10 {
+            let percent = rng.pick(&[5, 30, 70]);
+            let set: Bits<W> = p.candidates.iter().filter(|_| rng.chance(percent)).collect();
+            symmetries.broken(&mut scratch, &set, &mut out);
+            let excess =
+                |&(a, b): &(u32, u32)| i64::from(b - a) * (cofactors(&set, a) as i64 - cofactors(&set, b) as i64);
+            let expected: Vec<usize> = (0..pairs.len()).filter(|&l| excess(&pairs[l]) > 0).collect();
+            assert_eq!(out, expected, "n={n}: the pairs {set:?} breaks");
+            let mut total = 0;
+            for (l, pair) in pairs.iter().enumerate() {
+                let (a, b) = *pair;
+                assert_eq!(symmetries.excess(&scratch, &[l]), excess(pair), "n={n}: the excess of ({a}, {b})");
+                let image = map_set(&set, &|x| swap_primes(x, a, b)).expect("the candidates map onto themselves");
+                assert_eq!(image.sum() as i64 - set.sum() as i64, excess(pair), "n={n}: the gain of ({a}, {b})");
+                total += excess(pair);
+            }
+            let all: Vec<usize> = (0..pairs.len()).collect();
+            assert_eq!(symmetries.excess(&scratch, &all), total, "n={n}");
+            tally.0 += 1;
+            tally.1 += out.len();
+        }
+    }
+
+    #[test]
+    fn broken_pairs_and_the_excess_are_the_definition() {
+        let mut rng = Rng(0xB20C_E11D_5EED_0001);
+        let mut tally = (0, 0);
+        for n in (60..=400).step_by(17) {
+            crate::with_width!(n, W => broken_on::<W>(n, &mut rng, &mut tally));
+        }
+        assert!(tally.0 > 100 && tally.1 > 30, "{} sets, {} broken pairs", tally.0, tally.1);
+    }
+
+    /// Checks `lagrangian` at random nodes of the board `n` (a few random promotions) for random pairs and both
+    /// multipliers against the definition: the GF(2) bound's solve under the weights `2x − k·Σ δ_l(x)` (a
+    /// `value_weighted` with the weights computed from the definition, which the tests of `gf2` check against fresh
+    /// solves) less `k·Σ D_l(P)`; with a stop, a value of at least the stop if the bound is, else the bound; and the
+    /// table of weights is left all zero.
+    fn lagrangian_on<const W: usize>(n: u32, rng: &mut Rng, checked: &mut usize) {
+        let Some(p) = setup::<W>(n) else { return };
+        let symmetries = Symmetries::of(&p.model, &p.root, &p.candidates);
+        if symmetries.is_empty() {
+            return;
+        }
+        let pairs = symmetries.pairs();
+        let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates);
+        let mut bound = Gf2Bound::<W>::new(&graph);
+        let (mut rule, mut scratch) = (symmetries.scratch(), Scratch::new());
+        for _ in 0..6 {
+            let (mut state, mut promoted, mut cands) = (p.root, Bits::EMPTY, p.candidates);
+            for _ in 0..rng.below(8) {
+                let members = cands.to_vec();
+                if members.is_empty() {
+                    break;
+                }
+                let x = rng.pick(&members);
+                cands.remove(x);
+                if p.model.promote_in_place_using(&mut scratch, &mut state, x) {
+                    promoted.insert(x);
+                    cands = state.narrow_candidates(&cands);
+                }
+            }
+            bound.reset(&promoted, &cands);
+            let limit = (p.max_total - promoted.len()).min(state.max_promotions_among(&cands).max(0) as u32);
+            let links: Vec<usize> = (0..pairs.len()).filter(|_| rng.chance(40)).collect();
+            for k in [1i64, 2] {
+                let delta = |x: u32| -> i64 {
+                    let of_pair = |&(a, b): &(u32, u32)| match (x.is_multiple_of(a), x.is_multiple_of(b)) {
+                        (true, _) => i64::from(b - a) * i64::from(x / a),
+                        (_, true) => -i64::from(b - a) * i64::from(x / b),
+                        _ => 0,
+                    };
+                    links.iter().map(|&l| of_pair(&pairs[l])).sum()
+                };
+                let shift: i64 = links
+                    .iter()
+                    .map(|&l| {
+                        let (a, b) = pairs[l];
+                        k * i64::from(b - a) * (cofactors(&promoted, a) as i64 - cofactors(&promoted, b) as i64)
+                    })
+                    .sum();
+                let truth = bound.value_weighted(|x| 2 * i64::from(x) - k * delta(x), limit, i64::MAX) - shift;
+                let at = format!("n={n}: promoted {promoted:?}, pairs {links:?}, k={k}");
+                let got = symmetries.lagrangian(&mut rule, &mut bound, &links, k, &promoted, limit, i64::MAX);
+                assert_eq!(got, truth, "{at}");
+                for stop2 in [truth - 5, truth, truth + 1, truth + 50] {
+                    let got = symmetries.lagrangian(&mut rule, &mut bound, &links, k, &promoted, limit, stop2);
+                    assert!(
+                        if truth >= stop2 { (stop2..=truth).contains(&got) } else { got == truth },
+                        "{at}: {stop2}"
+                    );
+                }
+                assert!(rule.delta.iter().all(|&d| d == 0), "{at}: the table of weights is not clear");
+                *checked += 1;
+            }
+        }
+    }
+
+    #[test]
+    fn the_lagrangian_bound_is_the_weighted_solve_of_the_definition() {
+        let mut rng = Rng(0xB20C_E11D_5EED_0002);
+        let mut checked = 0;
+        for n in (60..=400).step_by(17) {
+            crate::with_width!(n, W => lagrangian_on::<W>(n, &mut rng, &mut checked));
+        }
+        assert!(checked > 150, "{checked} bounds");
     }
 
     #[test]

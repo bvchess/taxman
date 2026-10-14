@@ -427,6 +427,48 @@ fn checkpoint_and_resume_with_the_gf2_bound() {
     }
 }
 
+/// The knob `symmetry_bound` over the tactics `symmetry` and `gf2`: the games 880 to 1010 searched from a fake
+/// incumbent one below the optimum come back with the optimum and a promotable set that is worth it, with the knob
+/// off and with each way of using it; off, it solves and cuts nothing; on, it solves bounds and some cut nodes and
+/// children (a cut it makes is one of [`cut::SYMMETRY_BOUND`]).
+#[test]
+fn the_symmetry_bound_keeps_the_answer_and_cuts() {
+    const W: usize = 16;
+    let optimal = crate::game::Optimal::built_in();
+    let tactics = SearchTactics { symmetry: true, ..SearchTactics::default() };
+    let (mut solves, mut cuts) = (0, 0);
+    for n in [880, 912, 936, 960, 990, 1010] {
+        let board = crate::board::Board::<W>::for_n(n);
+        let p = board.prepare(tactics).unwrap();
+        let truth = optimal.score(n).unwrap() - board.in_the_bag;
+        let graph = MatchGraph::new(&p.model, &p.root);
+        for knob in [SymmetryBound::Off, SymmetryBound::Pair, SymmetryBound::Joint] {
+            let diag = Mutex::new(Diagnostics::default());
+            let space =
+                SearchSpace { symmetry_bound: knob, diagnostics: Some(&diag), ..SearchSpace::new(&p, &graph, None) };
+            let start = Start::Fresh {
+                units: vec![TaxUnit { promoted: Bits::EMPTY, cands: p.candidates }],
+                best: truth - 1,
+                payload: vec![0u8; 8 * W],
+            };
+            let out = engine::run(&config(1), start, b"symmetry-bound", |_| TaxSearcher::new(&space)).unwrap();
+            let found = get_bits::<W>(&out.payload);
+            let what = format!("n={n}, {knob:?}");
+            assert!(out.completed && out.best == truth && found.sum() == truth, "{what}: {} {found:?}", out.best);
+            assert!(p.model.promote_all_using(&mut Scratch::new(), &p.root, &found).is_some(), "{what}: {found:?}");
+            let d = diag.into_inner().unwrap();
+            let cut = d.loop_ends[cut::SYMMETRY_BOUND] + d.child_cuts[cut::SYMMETRY_BOUND];
+            if knob == SymmetryBound::Off {
+                assert_eq!((d.symmetry_solves, cut), (0, 0), "{what}");
+            } else {
+                assert!(cut <= d.symmetry_solves, "{what}: {cut} cuts from {} bounds", d.symmetry_solves);
+                (solves, cuts) = (solves + d.symmetry_solves, cuts + cut);
+            }
+        }
+    }
+    assert!(solves > 200 && cuts > 50, "{solves} bounds solved, {cuts} cuts");
+}
+
 #[test]
 fn a_checkpoint_of_another_game_is_refused() {
     let (a, b) = (load(760), load(720));

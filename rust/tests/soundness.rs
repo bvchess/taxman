@@ -25,12 +25,11 @@ use taxman::model::{FrameSet, Model, Scratch};
 use taxman::numtheory::Tables;
 use taxman::search::lagrange::Refits;
 use taxman::search::symmetry::Symmetries;
-use taxman::search::Gf2Branching;
-use taxman::search::TaxUnit;
+use taxman::search::{Gf2Branching, SymmetryBound, TaxUnit};
 
 /// Every tactic that acts inside the search, alone and in the combinations that matter: first the matching path
 /// ([`SearchTactics::matching`], 0 to 18), then the default, the GF(2) bound (19 to 29), then the rule of the root's
-/// symmetric pairs (tactic `symmetry`, 30 to 33).  The matching path with the
+/// symmetric pairs (tactic `symmetry`, 30 to 35).  The matching path with the
 /// forgetting of nogoods at the production period, every step, every third, and never; on one thread and two; and
 /// the GF(2) bound with each way of choosing the branch, with and without the matching bound as a first check,
 /// forced members, nogoods and the Lagrangian bound's early refits.  The Lagrangian
@@ -38,7 +37,8 @@ use taxman::search::TaxUnit;
 /// take, so some configurations refit them after the first few steps and every few steps after that (with and
 /// without forgetting at the same time, refinement, and a second thread), and one turns it off.  The rule of the
 /// symmetric pairs runs over the GF(2) bound, on two threads, with the nogoods forgotten at every step, and over the
-/// matching path.
+/// matching path; the Lagrangian relaxation of the pairs' inequalities on the GF(2) bound (the knob `symmetry_bound`)
+/// runs for each pair alone, and for the broken pairs together on two threads.
 fn configs() -> Vec<Config> {
     let (base, g) = (Config::matching(), Config::standard());
     vec![
@@ -76,6 +76,8 @@ fn configs() -> Vec<Config> {
         Config { symmetry: true, threads: 2, ..g },
         Config { symmetry: true, period: Some(1), ..g },
         Config { symmetry: true, ..base },
+        Config { symmetry: true, symmetry_bound: SymmetryBound::Pair, ..g },
+        Config { symmetry: true, symmetry_bound: SymmetryBound::Joint, threads: 2, ..g },
     ]
 }
 
@@ -246,7 +248,12 @@ impl<'a, const W: usize> Searched<'a, W> {
 fn the_symmetry_rule_finds_the_optimum_of_the_boards_with_pairs() {
     let optimal = Optimal::built_in();
     let (base, g) = (Config::matching(), Config::standard());
-    let configs = [Config { symmetry: true, ..g }, Config { symmetry: true, ..base }];
+    let configs = [
+        Config { symmetry: true, ..g },
+        Config { symmetry: true, ..base },
+        Config { symmetry: true, symmetry_bound: SymmetryBound::Pair, ..g },
+        Config { symmetry: true, symmetry_bound: SymmetryBound::Joint, threads: 2, ..g },
+    ];
     let boards =
         boards_with_pairs::<8>(optimal, 2..=511, &configs) + boards_with_pairs::<16>(optimal, 512..=600, &configs);
     assert!(boards >= 450, "{boards} boards with pairs");
@@ -285,45 +292,50 @@ fn boards_with_pairs<const W: usize>(
     boards
 }
 
-/// Units of game `n` at width `W`, after up to 14 random promotions, with their candidates thinned to 6 to 23 (the
-/// largest, or at random) so that the truth can be found exhaustively, searched from an incumbent worth 1, 2, 5
-/// or 30 less under random `configs`: the search must come back with the truth (with the tactic `symmetry`, as
-/// [`Searched::run`] says).  Returns the number of searches.
+/// A random unit of `game`: the node after up to 14 random promotions (the candidates narrowed as the search narrows
+/// them), with its candidates thinned to 6 to 23 (the largest, or at random) so that the truth can be found
+/// exhaustively.  Returns the state the unit's promotions reach and the unit, or `None` if no candidate is left.
+fn random_unit<const W: usize>(game: &Game<W>, rng: &mut Rng) -> Option<(FrameSet<W>, TaxUnit<W>)> {
+    let (mut state, mut promoted, mut cands) = (game.root, Bits::EMPTY, game.candidates);
+    for _ in 0..rng.below(14) {
+        let members = cands.to_vec();
+        if members.is_empty() {
+            break;
+        }
+        let x = rng.pick(&members);
+        cands.remove(x);
+        if game.model.promote_in_place(&mut state, x) {
+            promoted.insert(x);
+            cands = state.narrow_candidates(&cands);
+        }
+    }
+    let mut members = cands.to_vec();
+    if members.is_empty() {
+        return None;
+    }
+    if rng.chance(50) {
+        members.reverse();
+    } else {
+        for i in (1..members.len()).rev() {
+            members.swap(i, rng.below(i as u64 + 1) as usize);
+        }
+    }
+    members.truncate(6 + rng.below(18) as usize);
+    Some((state, TaxUnit { promoted, cands: members.into_iter().collect() }))
+}
+
+/// Units of game `n` at width `W` ([`random_unit`]), searched from an incumbent worth 1, 2, 5 or 30 less under
+/// random `configs`: the search must come back with the truth (with the tactic `symmetry`, as [`Searched::run`]
+/// says).  Returns the number of searches.
 fn handicapped_units<const W: usize>(n: u32, rng: &mut Rng, units: usize, configs: &[Config]) -> usize {
     let game = Game::<W>::of_board(n).expect("a game");
     let sym = game.symmetries();
     let (mut runs, mut made) = (0, 0);
     while made < units {
-        let (mut state, mut promoted, mut cands) = (game.root, Bits::EMPTY, game.candidates);
-        for _ in 0..rng.below(14) {
-            let members = cands.to_vec();
-            if members.is_empty() {
-                break;
-            }
-            let x = rng.pick(&members);
-            cands.remove(x);
-            if game.model.promote_in_place(&mut state, x) {
-                promoted.insert(x);
-                cands = state.narrow_candidates(&cands);
-            }
-        }
-        let mut members = cands.to_vec();
-        if members.is_empty() {
-            continue;
-        }
-        if rng.chance(50) {
-            members.reverse();
-        } else {
-            for i in (1..members.len()).rev() {
-                members.swap(i, rng.below(i as u64 + 1) as usize);
-            }
-        }
-        members.truncate(6 + rng.below(18) as usize);
-        let thin: Bits<W> = members.iter().copied().collect();
-        let unit = TaxUnit { promoted, cands: thin };
+        let Some((state, unit)) = random_unit(&game, rng) else { continue };
         let Some(searched) = Searched::of(&game, &sym, &state, unit, 3_000_000) else { continue };
         made += 1;
-        let at = format!("n={n} W={W} promoted {promoted:?} cands {thin:?}");
+        let at = format!("n={n} W={W} promoted {:?} cands {:?}", unit.promoted, unit.cands);
         for _ in 0..if searched.rest == 0 { 0 } else { 4 } {
             let cfg = rng.pick(configs);
             let k = rng.pick(&[1u64, 1, 2, 5, 30]);
@@ -350,6 +362,137 @@ fn units_of_wide_games_from_a_handicapped_incumbent_find_the_optimum() {
         + handicapped_units::<64>(2050, &mut rng, 40, &configs)
         + handicapped_units::<64>(3100, &mut rng, 40, &configs);
     assert!(runs > 1000, "{runs} runs");
+}
+
+/// Units on the path to an optimal promotion set `S*` of game `n` at width `W`: the promotions are `S*` less a random
+/// 30, 50 or 70 percent of its members, the candidates what the search leaves them, searched under each of `configs`
+/// from an incumbent one below the optimum.  A pruning that is valid keeps `S*` (it keeps every pair's inequality,
+/// Theorem 13, and is a bound above every completion), so each search must find the optimum; one that cuts a node
+/// on the path to `S*` does not.  The nodes of such a search are deep enough that the promotions and the GF(2)
+/// bound's heaviest set break the pairs' inequalities, which a game searched from its root rarely does.  Returns the
+/// number of searches.
+fn optimum_units<const W: usize>(optimal: &Optimal, n: u32, rng: &mut Rng, units: usize, configs: &[Config]) -> usize {
+    let game = Game::<W>::of_board(n).expect("a game");
+    let (truth, sym) = (optimal_sum::<W>(optimal, n).unwrap(), game.symmetries());
+    let moves = optimal.moves(n).expect("a known game");
+    let best: Bits<W> = moves.iter().copied().filter(|&x| game.candidates.contains(x)).collect();
+    if best.sum() != truth || sym.is_empty() {
+        return 0;
+    }
+    let (mut runs, mut scratch) = (0, Scratch::new());
+    for _ in 0..units {
+        let percent = rng.pick(&[30, 50, 70]);
+        let promoted: Bits<W> = best.iter().filter(|_| !rng.chance(percent)).collect();
+        // A unit that already holds the optimum has nothing to find: the search offers only what a child promotes.
+        let Some(state) =
+            game.model.promote_all_using(&mut scratch, &game.root, &promoted).filter(|_| promoted != best)
+        else {
+            continue;
+        };
+        let unit = TaxUnit { promoted, cands: state.narrow_candidates(&(game.candidates - promoted)) };
+        for cfg in configs {
+            let out = game.search(*cfg, vec![unit], truth - 1, None, None);
+            runs += 1;
+            assert!(out.completed, "n={n} {cfg:?} promoted {promoted:?}: not completed");
+            assert!(out.best == truth && out.real, "n={n} {cfg:?} promoted {promoted:?}: truth {truth}, got {out:?}");
+        }
+    }
+    runs
+}
+
+/// The searches of the units on the way to an optimal set ([`optimum_units`]) of the games 600 to 1000 (every 23rd),
+/// under the rule of the symmetric pairs alone and with the Lagrangian bound of the pairs (the knob
+/// `symmetry_bound`, both ways), over the GF(2) bound: where a wrong bound of the pairs would cut the optimum (a
+/// bound lowered by 30 does).
+#[test]
+fn units_on_the_way_to_the_optimum_find_it_with_the_symmetry_bound() {
+    let optimal = Optimal::built_in();
+    let g = Config::standard();
+    let configs = [
+        Config { symmetry: true, ..g },
+        Config { symmetry: true, symmetry_bound: SymmetryBound::Pair, ..g },
+        Config { symmetry: true, symmetry_bound: SymmetryBound::Joint, ..g },
+    ];
+    let mut rng = Rng(0x5B0D_1E57_C0DE_0003);
+    let runs: usize = (600..=1000).step_by(23).map(|n| optimum_units::<16>(optimal, n, &mut rng, 6, &configs)).sum();
+    assert!(runs > 200, "{runs} runs");
+}
+
+/// What [`lagrangian_bounds_on`] checked.
+#[derive(Debug, Default)]
+struct BoundTally {
+    /// Units with a completion that keeps every inequality, and the bounds checked against it.
+    units: usize,
+    bounds: usize,
+    /// Bounds below twice the GF(2) bound of the unit (the relaxation tightens it), and bounds equal to twice the
+    /// best completion that keeps the inequalities (it is exact).
+    below_plain: usize,
+    exact: usize,
+}
+
+/// The units ([`random_unit`]) of game `n` at width `W`, `units` of those with a completion that keeps every pair's
+/// inequality that the exhaustive search finds: the Lagrangian bound of the pairs ([`Symmetries::lagrangian`]) is at
+/// least twice the sum of the best such completion, for each pair alone and for all the pairs together, with the
+/// multipliers 1 and 2, at the node's GF(2) level and its limit of promotions.
+fn lagrangian_bounds_on<const W: usize>(n: u32, rng: &mut Rng, units: usize, tally: &mut BoundTally) {
+    let game = Game::<W>::of_board(n).expect("a game");
+    let sym = game.symmetries();
+    if sym.is_empty() {
+        return;
+    }
+    let graph = Gf2Graph::new(&game.model, &game.root, &game.candidates);
+    let mut bound = Gf2Bound::<W>::new(&graph);
+    let mut scratch = sym.scratch();
+    let pairs: Vec<usize> = (0..sym.pairs().len()).collect();
+    let (mut made, mut tried) = (0, 0);
+    while made < units && tried < 20 * units {
+        tried += 1;
+        let Some((state, unit)) = random_unit(&game, rng) else { continue };
+        let Some(Some((best, _))) = game.exhaustive_keeping(&state, &unit.promoted, &unit.cands, 1_000_000, &sym)
+        else {
+            continue;
+        };
+        made += 1;
+        bound.reset(&unit.promoted, &unit.cands);
+        let limit = (game.max_total - unit.promoted.len()).min(state.max_promotions_among(&unit.cands).max(0) as u32);
+        let plain = 2 * bound.evaluate(limit, None).value as i64;
+        let kept = 2 * best as i64;
+        let each_alone = pairs.iter().map(|&pair| vec![pair]);
+        for links in each_alone.chain([pairs.clone()]) {
+            for k in [1, 2] {
+                let doubled = sym.lagrangian(&mut scratch, &mut bound, &links, k, &unit.promoted, limit, i64::MAX);
+                assert!(
+                    doubled >= kept,
+                    "n={n} promoted {:?} cands {:?}: pairs {links:?}, k={k}: the bound {doubled} is below twice the \
+                     best completion that keeps the inequalities ({kept})",
+                    unit.promoted,
+                    unit.cands
+                );
+                tally.bounds += 1;
+                tally.below_plain += usize::from(doubled < plain);
+                tally.exact += usize::from(doubled == kept);
+            }
+        }
+    }
+    tally.units += made;
+}
+
+/// The Lagrangian bound of the symmetric pairs is never below a completion that keeps their inequalities (the
+/// completions the search with the tactic `symmetry` looks for), whatever pairs and multiplier: at several hundred
+/// units of the boards 60 to 600 that have pairs, with the best such completion found exhaustively.  And it is not
+/// vacuous: sometimes below the GF(2) bound it relaxes, and sometimes exact.
+#[test]
+fn the_lagrangian_bound_of_the_pairs_is_not_below_a_completion_that_keeps_the_inequalities() {
+    let mut rng = Rng(0x1A62_A4C1_0000_0B0D);
+    let mut tally = BoundTally::default();
+    for n in (60..=600).step_by(11) {
+        if n <= 511 {
+            lagrangian_bounds_on::<8>(n, &mut rng, 8, &mut tally);
+        } else {
+            lagrangian_bounds_on::<16>(n, &mut rng, 8, &mut tally);
+        }
+    }
+    assert!(tally.units >= 300 && tally.bounds > 3000 && tally.below_plain > 100 && tally.exact > 1000, "{tally:?}");
 }
 
 /// A search interrupted every `node_limit` nodes or so and resumed (two threads, a checkpoint every millisecond, a

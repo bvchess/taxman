@@ -294,7 +294,10 @@ fn print_diagnostics(d: &Diagnostics, nodes: u64, found_steps: Option<u64>) {
     };
     println!("    node loops ended: {}", named(&d.loop_ends));
     println!("    children cut: {}; promotions failed {}", named(&d.child_cuts), d.failed_promotions);
-    println!("    candidates excluded by the rule of symmetry: {}", d.symmetry_excluded);
+    println!(
+        "    candidates excluded by the rule of symmetry: {}; Lagrangian bounds of its pairs solved: {}",
+        d.symmetry_excluded, d.symmetry_solves
+    );
     let q = |x| Diagnostics::quantile(&d.gaps, x).map_or("-".into(), |v| v.to_string());
     let count: u64 = d.gaps.iter().sum();
     println!(
