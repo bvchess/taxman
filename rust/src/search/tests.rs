@@ -467,14 +467,20 @@ fn units_and_headers_round_trip() {
     // each switch that is on (the defaults: 0x79), and no higher bit is used.
     for refine in [0, 1, 7] {
         for (on, off) in [(true, false), (false, true)] {
-            let t =
-                SearchTactics { match_refine: refine, fix_forced: on, nogoods: off, forget_nogoods: on, lagrange: off };
+            let t = SearchTactics {
+                match_refine: refine,
+                fix_forced: on,
+                nogoods: off,
+                forget_nogoods: on,
+                lagrange: off,
+                gf2: on,
+            };
             assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
         }
     }
     assert_eq!(SearchTactics::default().bits(), 0x79);
     assert_eq!(SearchTactics::from_bits(0x79), Ok(SearchTactics::default()));
-    assert!(SearchTactics::from_bits(1 << 7).unwrap_err().contains("unknown tactics"));
+    assert!(SearchTactics::from_bits(1 << 8).unwrap_err().contains("unknown tactics"));
 }
 
 // ---- benchmark: cargo test --release bench_search -- --ignored --nocapture --test-threads=1 ----

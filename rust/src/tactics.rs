@@ -44,7 +44,7 @@ impl Default for Tactics {
 }
 
 /// The number of tactics.
-pub const TACTIC_COUNT: usize = 9;
+pub const TACTIC_COUNT: usize = 10;
 
 /// The value of a tactic: an on/off switch, or the depth of `match_refine`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -119,6 +119,7 @@ impl Tactics {
             ("nogoods", Slot::Switch(&mut self.search.nogoods)),
             ("forget_nogoods", Slot::Switch(&mut self.search.forget_nogoods)),
             ("lagrange", Slot::Switch(&mut self.search.lagrange)),
+            ("gf2", Slot::Switch(&mut self.search.gf2)),
             ("prev_cap", Slot::Switch(&mut self.prev_cap)),
             ("seed_incumbent", Slot::Switch(&mut self.seed_incumbent)),
         ]
@@ -185,12 +186,13 @@ mod tests {
                 "nogoods",
                 "forget_nogoods",
                 "lagrange",
+                "gf2",
                 "prev_cap",
                 "seed_incumbent"
             ]
         );
         let values: Vec<String> = t.settings().iter().map(|s| s.1.to_string()).collect();
-        let expected = ["on", "on", "1", "on", "on", "on", "on", "on", "on"];
+        let expected = ["on", "on", "1", "on", "on", "on", "on", "off", "on", "on"];
         assert_eq!(values, expected);
         // The values of the search tactics are those of `SearchTactics::default()`, not copies of them.
         assert_eq!(t.search, SearchTactics::default());
@@ -264,6 +266,7 @@ mod tests {
                 nogoods: false,
                 forget_nogoods: false,
                 lagrange: false,
+                gf2: true,
             },
             prime_shortcut: false,
             same_search: false,

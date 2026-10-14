@@ -15,14 +15,15 @@
 
 use super::diagnostics::{cut, Probe};
 use super::lagrange::{Lagrangian, Refits};
-use super::refine::{strongest, Learning, Refiner, Verdict};
+use super::refine::{strongest, Learning, Refiner, Seek, Verdict};
 use super::setup::Prepared;
 use super::{Diagnostics, NOGOOD_PERIOD};
 use crate::bits::Bits;
 use crate::bounds::max_additional;
 use crate::engine::{Ctx, Poll, Searcher, Stats, Unit};
+use crate::gf2::{Gf2Bound, Gf2Graph, Gf2Stats};
 use crate::matchbound::{MatchBound, MatchGraph};
-use crate::model::{ConflictCache, FrameSet, Model, Nogoods, Scratch};
+use crate::model::{ConflictCache, FrameSet, Lookup, Model, Nogoods, Scratch};
 use std::sync::{Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
@@ -101,6 +102,27 @@ pub struct SearchSpace<'a, const W: usize> {
     /// When the search began, and the best incumbent the searchers found (see [`Found`]).
     pub began: Instant,
     pub found: Mutex<Option<Found>>,
+    /// With the tactic `gf2`: the root's GF(2) frame matroids, which bound every node.
+    pub gf2: Option<Gf2Graph>,
+    /// With `gf2`: whether the matching bound is kept along the path too, as a cheaper first check.
+    pub gf2_prefilter: bool,
+    /// With `gf2`: how a node chooses the member of its conflict to branch on.
+    pub gf2_branching: Gf2Branching,
+}
+
+/// How a node chooses the member of its conflict to branch on with the tactic `gf2` (strong branching asks what each
+/// member's removal does to the bound).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Gf2Branching {
+    /// The largest member.
+    Largest,
+    /// The member whose removal lowers the weight split's bound most (see [`crate::gf2::meet`]).
+    Split,
+    /// The member whose removal lowers the bound most, solved exactly (warm-started).
+    Exact,
+    /// Each member solved only as far as `need` (to find the forced ones), the branch the member with the lowest
+    /// weight-split bound.
+    Forced,
 }
 
 impl<'a, const W: usize> SearchSpace<'a, W> {
@@ -125,6 +147,9 @@ impl<'a, const W: usize> SearchSpace<'a, W> {
             diagnostics: None,
             began: Instant::now(),
             found: Mutex::new(None),
+            gf2: tactics.gf2.then(|| Gf2Graph::new(&prepared.model, &prepared.root, &prepared.candidates)),
+            gf2_prefilter: false,
+            gf2_branching: Gf2Branching::Exact,
         }
     }
 }
@@ -154,6 +179,12 @@ pub mod stat {
     pub const CHILDREN: usize = 2;
     /// Matching bounds computed (checks of nodes and children).
     pub const MATCH_BOUNDS: usize = 3;
+    /// With the tactic `gf2`: levels solved (augmentations run), augmentations, levels whose heaviest set followed
+    /// from the parent's with none, and weight splits (see [`Gf2Stats`]).  Not in the results lines.
+    pub const GF2_SOLVES: usize = 4;
+    pub const GF2_AUGMENTATIONS: usize = 5;
+    pub const GF2_INHERITED: usize = 6;
+    pub const GF2_SPLITS: usize = 7;
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -254,8 +285,14 @@ struct Stepper<'a, const W: usize> {
     space: &'a SearchSpace<'a, W>,
     /// The scratch space of every peel the searcher makes.
     scratch: Scratch<W>,
-    /// The matching bound along the path, level for level with the stack.
+    /// The matching bound along the path, level for level with the stack; kept only while `matching_on`.
     matching: MatchBound<'a, W>,
+    /// Whether the matching bound is used: without the tactic `gf2`, or with it as a first check.
+    matching_on: bool,
+    /// The GF(2) bound along the path, level for level with the stack (tactic `gf2`).
+    gf2: Option<Gf2Bound<'a, W>>,
+    /// Scratch for strong branching with `gf2`: the members of a conflict in the order they are tried.
+    order: Vec<(i64, u32)>,
     /// Conflicts known for the node being worked on (see [`Refiner`]); `stack[d].known_end` of them hold for
     /// the node at depth `d`.
     known: Vec<Bits<W>>,
@@ -270,6 +307,8 @@ struct Stepper<'a, const W: usize> {
     /// The incumbents offered, encoded.
     payload: Vec<u8>,
     probe: Option<Probe<'a>>,
+    /// The GF(2) bound's counters as of the last flush.
+    gf2_flushed: Gf2Stats,
 }
 
 impl<'a, const W: usize> TaxSearcher<'a, W> {
@@ -280,6 +319,9 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 space,
                 scratch: Scratch::new(),
                 matching: MatchBound::new(space.match_graph),
+                matching_on: space.gf2.is_none() || space.gf2_prefilter,
+                gf2: space.gf2.as_ref().map(Gf2Bound::new),
+                order: Vec::new(),
                 known: Vec::new(),
                 conflict_cache: ConflictCache::default(),
                 nogoods: space.nogoods.then(|| Nogoods::new(space.root_max, NOGOOD_CAPACITY)),
@@ -288,6 +330,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 counts: Counts::default(),
                 payload: Vec::with_capacity(8 * W),
                 probe: space.diagnostics.map(Probe::new),
+                gf2_flushed: Gf2Stats::default(),
             },
         }
     }
@@ -309,7 +352,12 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         } else {
             self.stack[0] = node;
         }
-        self.stepper.matching.reset(&unit.promoted, &unit.cands);
+        if self.stepper.matching_on {
+            self.stepper.matching.reset(&unit.promoted, &unit.cands);
+        }
+        if let Some(g) = &mut self.stepper.gf2 {
+            g.reset(&unit.promoted, &unit.cands);
+        }
         if let Some(lagrange) = &mut self.stepper.lagrange {
             lagrange.start();
         }
@@ -362,7 +410,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
     #[inline]
     fn step(&mut self, node: &mut Node<W>, child: &mut Node<W>, pushed: bool, ctx: &mut Ctx<'_, TaxUnit<W>>) -> Next {
         self.known.truncate(node.known_end); // forget the conflicts of the child last considered
-        self.matching.take_kept(); // the node without the candidate it last branched on, if strong branching kept it
+        if self.matching_on {
+            self.matching.take_kept(); // the node without the candidate it last branched on, if strong branching kept it
+        }
         if let Some(p) = &mut self.probe {
             p.step(node.promoted.len());
         }
@@ -373,7 +423,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
             Ok(open) => open,
             Err(reason) => return self.end_loop(reason, &node.promoted, pushed),
         };
-        if let Some(p) = &mut self.probe {
+        if let (Some(p), None) = (&mut self.probe, &self.gf2) {
             p.open(&mut self.scratch, &mut self.matching, self.space.model, node, need);
         }
         let Some(branch) = self.choose_branch(node, open, need) else {
@@ -428,7 +478,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
             // first step): the verdict is the same, and so are the conflict and the forced members.
             return Ok(Open { conflict: Some(checked.conflict), forced: checked.forced });
         }
-        let open = self.check(&node.state, &node.promoted, &node.cands, need, true, ctx);
+        let open = self.check(&node.state, &node.promoted, &node.cands, need, node.max_add, true, ctx);
         node.known_end = self.known.len(); // the conflicts the check found hold for the node and its subtree
         open
     }
@@ -444,6 +494,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
     #[inline]
     fn choose_branch(&mut self, node: &mut Node<W>, open: Open<W>, need: u64) -> Option<Branch<W>> {
         let space = self.space;
+        if self.gf2.is_some() {
+            return self.choose_branch_gf2(node, open, need);
+        }
         let conflict = open.conflict.map(|k| k & node.cands).filter(|k| !k.is_empty());
         let mut forced = open.forced & node.cands;
         let mut kept = false; // whether the matching level without n is kept for the node
@@ -560,11 +613,16 @@ impl<'a, const W: usize> Stepper<'a, W> {
         if cands.is_empty() {
             return Ok(());
         }
-        self.matching.push_all(added, &cands);
-        match self.check(&child.state, &child.promoted, &cands, need, false, ctx) {
+        if self.matching_on {
+            self.matching.push_all(added, &cands);
+        }
+        if let Some(g) = &mut self.gf2 {
+            g.push_all(added, &cands);
+        }
+        match self.check(&child.state, &child.promoted, &cands, need, max_next, false, ctx) {
             Ok(open) => {
                 child.checked = open.conflict.map(|conflict| Checked { need, conflict, forced: open.forced });
-                if let Some(p) = &mut self.probe {
+                if let (Some(p), None) = (&mut self.probe, &self.gf2) {
                     p.matching_open(
                         &mut self.scratch,
                         &mut self.matching,
@@ -577,7 +635,12 @@ impl<'a, const W: usize> Stepper<'a, W> {
                 Ok(())
             }
             Err(reason) => {
-                self.matching.pop();
+                if self.matching_on {
+                    self.matching.pop();
+                }
+                if let Some(g) = &mut self.gf2 {
+                    g.pop();
+                }
                 if let Some(l) = &mut self.lagrange {
                     l.leave(&child.promoted);
                 }
@@ -593,15 +656,20 @@ impl<'a, const W: usize> Stepper<'a, W> {
     /// Lagrangian bound is below `need` ([`cut::LAGRANGE`]).  Else the conflict to branch on (when
     /// `wants_conflict`, or found by refining) and the forced members (of the matching and of the Lagrangian
     /// bound).  A promotable completion that refining finds is offered too.
+    #[allow(clippy::too_many_arguments)]
     fn check(
         &mut self,
         state: &FrameSet<W>,
         promoted: &Bits<W>,
         cands: &Bits<W>,
         need: u64,
+        cap: u32,
         wants_conflict: bool,
         ctx: &mut Ctx<'_, TaxUnit<W>>,
     ) -> Result<Open<W>, usize> {
+        if self.gf2.is_some() {
+            return self.check_gf2(state, promoted, cands, need, cap, ctx);
+        }
         let space = self.space;
         let m = &mut self.matching;
         self.counts.match_bounds += 1;
@@ -655,6 +723,144 @@ impl<'a, const W: usize> Stepper<'a, W> {
         }
     }
 
+    /// The check of [`check`](Self::check) with the tactic `gf2`, on the node on top of the GF(2) stack (and of
+    /// the matching stack, as a first check, with [`SearchSpace::gf2_prefilter`]), at `need`, with at most `cap`
+    /// promotions.  `Err(reason)`: the matching bound is below `need` ([`cut::MATCH`]), or the GF(2) bound is
+    /// ([`cut::GF2`]), or its heaviest set can be promoted ([`cut::EXACT`], the best completion, offered), or
+    /// every member of its conflict is forced, or a nogood is ([`cut::REFINED`]), or with the tactic `lagrange` the
+    /// Lagrangian bound is below `need` ([`cut::LAGRANGE`]).  Else the conflict of the heaviest set (from the nogood
+    /// table or computed, as [`Refiner`] finds the matching's) and, with `fix_forced`, the forced members: those of
+    /// the heaviest set without which the weight split's bound is below `need`, and those of the Lagrangian bound.
+    fn check_gf2(
+        &mut self,
+        state: &FrameSet<W>,
+        promoted: &Bits<W>,
+        cands: &Bits<W>,
+        need: u64,
+        cap: u32,
+        ctx: &mut Ctx<'_, TaxUnit<W>>,
+    ) -> Result<Open<W>, usize> {
+        let space = self.space;
+        self.counts.match_bounds += 1;
+        if self.matching_on && self.matching.value() < need {
+            return Err(cut::MATCH);
+        }
+        let g = self.gf2.as_mut().expect("the tactic gf2");
+        let eval = g.evaluate(cap, space.fix_forced.then_some(need));
+        if eval.value < need {
+            return Err(cut::GF2);
+        }
+        let forced = eval.forced;
+        let promoted = *promoted;
+        let mut learning = self.nogoods.as_mut().map(|table| Learning { table, root: space.root, promoted });
+        let mut seek = Seek {
+            model: space.model,
+            scratch: &mut self.scratch,
+            cache: &mut self.conflict_cache,
+            state,
+            known: &mut self.known,
+            learning: &mut learning,
+        };
+        let (found, computed) = seek.conflict(&eval.chosen, forced);
+        self.counts.conflicts += u64::from(computed);
+        let conflict = match found {
+            Lookup::Conflict(k) => k,
+            Lookup::None => {
+                // The heaviest set can be promoted: the best completion.
+                self.offer(ctx, &(promoted | eval.chosen));
+                return Err(cut::EXACT);
+            }
+            // A nogood all of whose members are forced or promoted: no completion reaches `need`.
+            Lookup::AllForced => return Err(cut::REFINED),
+        };
+        if conflict.is_subset(&forced) {
+            return Err(cut::REFINED);
+        }
+        match &mut self.lagrange {
+            None => Ok(Open { conflict: Some(conflict), forced }),
+            Some(l) => match l.check(&promoted, cands, need, space.fix_forced, &forced) {
+                None => Err(cut::LAGRANGE),
+                Some(more) => Ok(Open { conflict: Some(conflict), forced: forced | more }),
+            },
+        }
+    }
+
+    /// [`choose_branch`](Self::choose_branch) with the tactic `gf2`: the forced members if there are any (the child
+    /// promotes them all, with `fix_forced`), else a member of the conflict of the GF(2) bound's heaviest set chosen
+    /// as [`SearchSpace::gf2_branching`] says.  With [`Gf2Branching::Exact`], each member's bound is solved without
+    /// it, which also finds forced members among them.
+    fn choose_branch_gf2(&mut self, node: &mut Node<W>, open: Open<W>, need: u64) -> Option<Branch<W>> {
+        let space = self.space;
+        let g = self.gf2.as_mut().expect("the tactic gf2");
+        let conflict = open.conflict.map(|k| k & node.cands).filter(|k| !k.is_empty());
+        let mut forced = open.forced & node.cands;
+        let n = match conflict {
+            Some(_) if !forced.is_empty() => forced.max(),
+            Some(k) if k.len() > 1 => match space.gf2_branching {
+                Gf2Branching::Largest => k.max(),
+                Gf2Branching::Split => {
+                    let mut best = (i64::MAX, 0);
+                    for x in k.iter() {
+                        let bound = g.split_without(x).unwrap_or(i64::MAX);
+                        if bound <= best.0 {
+                            best = (bound, x);
+                        }
+                    }
+                    Some(best.1)
+                }
+                Gf2Branching::Exact | Gf2Branching::Forced => {
+                    // The members by their split bounds, the likeliest to lower the bound most first; each solve
+                    // stops as soon as its value reaches the best so far (it cannot be chosen, nor forced, since
+                    // the best is at least `need` while nothing is forced), or `need` once a member is forced
+                    // (with `fix_forced` only which are forced still matters).  The chosen member's level is kept
+                    // for the node going on without it.
+                    let order = &mut self.order;
+                    order.clear();
+                    order.extend(k.iter().map(|x| (g.split_without(x).unwrap_or(i64::MAX), u32::MAX - x)));
+                    order.sort_unstable();
+                    let mut best = (u64::MAX, 0);
+                    let to_need = space.gf2_branching == Gf2Branching::Forced;
+                    if to_need {
+                        best.1 = u32::MAX - order[0].1;
+                    }
+                    for &(_, key) in order.iter() {
+                        let x = u32::MAX - key;
+                        let stop = if to_need || (space.fix_forced && !forced.is_empty()) { need } else { best.0 };
+                        let bound = g.value_excluding(x, node.max_add, stop);
+                        if bound < need {
+                            forced.insert(x);
+                        }
+                        if bound < best.0 && !to_need {
+                            g.keep_excluded();
+                            best = (bound, x);
+                        }
+                    }
+                    if space.fix_forced { forced.max() } else { None }.or(Some(best.1))
+                }
+            },
+            Some(k) => k.max(),
+            None => node.cands.max(),
+        }
+        .expect("not empty");
+        if conflict.is_some_and(|k| k.is_subset(&forced)) {
+            // Every completion that reaches `need` promotes the whole conflict, so there is none.
+            return None;
+        }
+        node.cands.remove(n);
+        let left = node.cands;
+        if space.fix_forced && !forced.is_empty() {
+            // Every completion that reaches `need` promotes the forced members, so all of them are the child's.
+            node.cands = Bits::EMPTY;
+        } else {
+            g.remove_candidate(n);
+            if self.matching_on {
+                self.matching.remove_candidate(n);
+            }
+        }
+        let added = if space.fix_forced && forced.len() > 1 { forced } else { Bits::EMPTY.with(n) };
+        Some(Branch { n, added, left })
+    }
+
     /// Ends the loop of the node with the promotions `promoted` for `reason`: the search goes back to the parent,
     /// whose matching level is then on top again (`pushed`: the node had one of its own).
     #[inline]
@@ -663,7 +869,12 @@ impl<'a, const W: usize> Stepper<'a, W> {
             p.loop_end(reason);
         }
         if pushed {
-            self.matching.pop();
+            if self.matching_on {
+                self.matching.pop();
+            }
+            if let Some(g) = &mut self.gf2 {
+                g.pop();
+            }
         }
         if let Some(l) = &mut self.lagrange {
             l.leave(promoted);
@@ -720,6 +931,14 @@ impl<'a, const W: usize> Stepper<'a, W> {
         ];
         for (i, count) in extra {
             stats.extra[i] += count;
+        }
+        if let Some(g) = &self.gf2 {
+            let (now, before) = (g.stats(), self.gf2_flushed);
+            stats.extra[stat::GF2_SOLVES] += now.solves - before.solves;
+            stats.extra[stat::GF2_AUGMENTATIONS] += now.augmentations - before.augmentations;
+            stats.extra[stat::GF2_INHERITED] += now.inherited - before.inherited;
+            stats.extra[stat::GF2_SPLITS] += now.splits - before.splits;
+            self.gf2_flushed = now;
         }
         if let Some(p) = &mut self.probe {
             p.flush(&counts, &self.matching);

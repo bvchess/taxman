@@ -306,6 +306,8 @@ pub struct Gf2Stats {
     pub augmentations: u64,
     pub rounds: u64,
     pub splits: u64,
+    /// Blocks of the tableau rebuilt after a path whose changes were not all pivots.
+    pub rebuilds: u64,
 }
 
 impl<'g, const W: usize> Gf2Bound<'g, W> {
@@ -348,9 +350,23 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
     }
 
     /// The bound of the top level without the candidate `x` (its heaviest set restarted from the history), with at
-    /// most `cap` promotions; the top level is unchanged.
-    pub fn value_excluding(&mut self, x: u32, cap: u32) -> u64 {
-        dispatch!(self, l => l.value_excluding(x, cap as usize))
+    /// most `cap` promotions, or some value of at least `stop` if it is at least `stop` (the augmentations stop
+    /// there); the top level is unchanged.
+    pub fn value_excluding(&mut self, x: u32, cap: u32, stop: u64) -> u64 {
+        dispatch!(self, l => l.value_excluding(x, cap as usize, stop))
+    }
+
+    /// Keeps the level that the last [`value_excluding`](Self::value_excluding) solved (to the end, not stopped), so
+    /// that if the top level goes on without that candidate next ([`remove_candidate`](Self::remove_candidate)),
+    /// with nothing else done to the stack meanwhile, it becomes the top level, solved.
+    pub fn keep_excluded(&mut self) {
+        dispatch!(self, l => l.keep_excluded())
+    }
+
+    /// The weight split's bound on the top level without its member `x`, if the last evaluation asked for forced
+    /// members and the level has a split.
+    pub fn split_without(&mut self, x: u32) -> Option<i64> {
+        dispatch!(self, l => l.levels[l.depth].split.as_ref().and_then(|s| s.iter().find(|p| p.0 == x).map(|p| p.1)))
     }
 
     pub fn stats(&self) -> Gf2Stats {
@@ -414,8 +430,12 @@ struct Levels<'g, const W: usize, const R: usize> {
     root: [Vec<Vector<R>>; 2],
     levels: Vec<Level<W, R>>,
     depth: usize,
-    /// A level for [`value_excluding`](Self::value_excluding).
+    /// A level for [`value_excluding`](Self::value_excluding), and the candidate it was solved without (to the end).
     scratch: Level<W, R>,
+    scratch_for: Option<u32>,
+    /// A level kept by [`keep_excluded`](Self::keep_excluded), for the top level at the depth without the candidate.
+    kept: Level<W, R>,
+    kept_for: Option<(usize, u32)>,
     meet: Meet<R>,
     live_idx: Vec<u32>,
     start_idx: Vec<u32>,
@@ -440,6 +460,9 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             levels: vec![Level::new(n)],
             depth: 0,
             scratch: Level::new(n),
+            scratch_for: None,
+            kept: Level::new(n),
+            kept_for: None,
             meet: Meet::new(n, graph.blocks),
             live_idx: Vec::with_capacity(n),
             start_idx: Vec::with_capacity(n),
@@ -454,6 +477,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
 
     fn reset(&mut self, promoted: &Bits<W>, cands: &Bits<W>) {
         self.depth = 0;
+        self.kept_for = None;
         let live = self.live_of(cands);
         let level = &mut self.levels[0];
         for m in 0..2 {
@@ -471,6 +495,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
 
     fn push_all(&mut self, added: &Bits<W>, child_cands: &Bits<W>) {
         let d = self.depth;
+        self.kept_for = None;
         if self.levels.len() == d + 1 {
             let n = self.graph.len();
             self.levels.push(Level::new(n));
@@ -504,10 +529,15 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
 
     fn pop(&mut self) {
         assert!(self.depth > 0, "pop without push");
+        self.kept_for = None;
         self.depth -= 1;
     }
 
     fn remove_candidate(&mut self, x: u32) {
+        if self.kept_for.take() == Some((self.depth, x)) {
+            std::mem::swap(&mut self.levels[self.depth], &mut self.kept);
+            return;
+        }
         let level = &mut self.levels[self.depth];
         if !level.live.contains(x) {
             return;
@@ -531,7 +561,8 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         // sizes is the heaviest under any limit it fits.
         let ok = fits && (cap <= level.cap || level.settled);
         if !ok {
-            solve(self.graph, level, &mut self.meet, &mut self.live_idx, &mut self.start_idx, cap, &mut self.stats);
+            let (meet, live_idx, start_idx) = (&mut self.meet, &mut self.live_idx, &mut self.start_idx);
+            solve(self.graph, level, meet, live_idx, start_idx, cap, u64::MAX, &mut self.stats);
         }
         let level = &mut self.levels[d];
         let chosen = level.history.last().copied().unwrap_or(Bits::EMPTY);
@@ -551,14 +582,23 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         Eval { value: level.value, chosen, forced }
     }
 
-    fn value_excluding(&mut self, x: u32, cap: usize) -> u64 {
+    fn value_excluding(&mut self, x: u32, cap: usize, stop: u64) -> u64 {
         let level = &self.levels[self.depth];
         self.scratch.copy_from(level);
         self.scratch.history.extend(level.history.iter().filter(|set| !set.contains(x)));
         self.scratch.live.remove(x);
-        let s = &mut self.scratch;
-        solve(self.graph, s, &mut self.meet, &mut self.live_idx, &mut self.start_idx, cap, &mut self.stats);
+        let (s, meet, live_idx, start_idx) =
+            (&mut self.scratch, &mut self.meet, &mut self.live_idx, &mut self.start_idx);
+        solve(self.graph, s, meet, live_idx, start_idx, cap, stop, &mut self.stats);
+        self.scratch_for = self.scratch.solved.then_some(x);
         self.scratch.value
+    }
+
+    fn keep_excluded(&mut self) {
+        if let Some(x) = self.scratch_for.take() {
+            std::mem::swap(&mut self.scratch, &mut self.kept);
+            self.kept_for = Some((self.depth, x));
+        }
     }
 }
 
@@ -583,7 +623,9 @@ fn contract<const W: usize, const R: usize>(graph: &Gf2Graph, level: &mut Level<
     }
 }
 
-/// Solves `level` under the size limit `cap`, from the last entry of its history that fits it.
+/// Solves `level` under the size limit `cap`, from the last entry of its history that fits it, or until its value
+/// reaches `stop` (then it is left unsolved, its value what was reached and its history the sets passed through).
+#[allow(clippy::too_many_arguments)]
 fn solve<const W: usize, const R: usize>(
     graph: &Gf2Graph,
     level: &mut Level<W, R>,
@@ -591,6 +633,7 @@ fn solve<const W: usize, const R: usize>(
     live_idx: &mut Vec<u32>,
     start_idx: &mut Vec<u32>,
     cap: usize,
+    stop: u64,
     stats: &mut Gf2Stats,
 ) {
     live_idx.clear();
@@ -610,7 +653,8 @@ fn solve<const W: usize, const R: usize>(
     let before = meet.augmentations;
     let history = &mut level.history;
     let mut first = true;
-    meet.solve(&problem, live_idx, start_idx, cap, |set| {
+    let stop = i64::try_from(stop).unwrap_or(i64::MAX);
+    meet.solve(&problem, live_idx, start_idx, cap, stop, |set| {
         let bits: Bits<W> = set.iter().map(|&e| graph.elems[e as usize]).collect();
         if first {
             // The start: entries at least as large are off its chain.
@@ -625,7 +669,8 @@ fn solve<const W: usize, const R: usize>(
     stats.solves += 1;
     stats.augmentations += meet.augmentations - before;
     stats.rounds = meet.rounds;
-    level.solved = true;
+    stats.rebuilds = meet.rebuilds;
+    level.solved = !meet.stopped;
     level.settled = meet.settled;
     level.cap = cap;
     level.value = meet.value as u64;
@@ -651,7 +696,7 @@ fn split<const W: usize, const R: usize>(
         vector: [&level.vec[0], &level.vec[1]],
         weight: &graph.weight,
     };
-    meet.solve(&problem, live_idx, &start, usize::MAX, |_| {});
+    meet.solve(&problem, live_idx, &start, usize::MAX, i64::MAX, |_| {});
     debug_assert_eq!(meet.value as u64, level.value, "the heaviest set solved again changed");
     stats.splits += 1;
     let mut out = Vec::with_capacity(start.len());

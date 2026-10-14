@@ -63,6 +63,45 @@ pub(super) struct Learning<'r, const W: usize> {
     pub(super) promoted: Bits<W>,
 }
 
+/// Where a node's conflicts come from (shared by [`Refiner`] and the GF(2) check): the smallest the nogood table
+/// knows within a set (tactic `nogoods`), else a minimal conflict computed by a peel ([`Model::conflict_cached`]),
+/// which is then learned as a nogood; either way kept in `known` for the node and its subtree.
+pub(super) struct Seek<'r, 'l, const W: usize> {
+    pub(super) model: &'r Model,
+    pub(super) scratch: &'r mut Scratch<W>,
+    pub(super) cache: &'r mut ConflictCache<W>,
+    pub(super) state: &'r FrameSet<W>,
+    pub(super) known: &'r mut Vec<Bits<W>>,
+    pub(super) learning: &'r mut Option<Learning<'l, W>>,
+}
+
+impl<const W: usize> Seek<'_, '_, W> {
+    /// A conflict of `set` from the state, or [`Lookup::AllForced`] if the table knows one all of whose members are
+    /// in `forced`, or [`Lookup::None`] if `set` can be promoted; and whether the conflict had to be computed.
+    pub(super) fn conflict(&mut self, set: &Bits<W>, forced: Bits<W>) -> (Lookup<W>, bool) {
+        if let Some(l) = self.learning.as_ref() {
+            match l.table.lookup(&l.promoted, set, &forced) {
+                Lookup::None => {}
+                found => {
+                    if let Lookup::Conflict(k) = found {
+                        self.known.push(k);
+                    }
+                    return (found, false);
+                }
+            }
+        }
+        let found = self.model.conflict_cached(self.scratch, Some(self.cache), self.state, set, true);
+        let Some(k) = found else { return (Lookup::None, false) };
+        if let Some(l) = self.learning.as_mut() {
+            if let Some(n) = self.model.nogood(self.scratch, l.root, &l.promoted, &k) {
+                l.table.insert(n);
+            }
+        }
+        self.known.push(k);
+        (Lookup::Conflict(k), true)
+    }
+}
+
 /// What [`Refiner::top`] found out about the top level.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Verdict<const W: usize> {
@@ -138,27 +177,17 @@ impl<const W: usize> Refiner<'_, '_, W> {
     /// [`top_conflict`](Self::top_conflict), or [`Lookup::AllForced`] if the table knows a conflict all of whose
     /// members are in `forced`.
     fn find_conflict(&mut self, promoted: &Bits<W>, forced: Bits<W>) -> Lookup<W> {
-        if let Some(l) = &self.learning {
-            match l.table.lookup(&l.promoted, promoted, &forced) {
-                Lookup::None => {}
-                found => {
-                    if let Lookup::Conflict(k) = found {
-                        self.known.push(k);
-                    }
-                    return found;
-                }
-            }
-        }
-        let found = self.model.conflict_cached(self.scratch, Some(self.cache), self.state, promoted, true);
-        let Some(k) = found else { return Lookup::None };
-        self.computed += 1;
-        if let Some(l) = &mut self.learning {
-            if let Some(n) = self.model.nogood(self.scratch, l.root, &l.promoted, &k) {
-                l.table.insert(n);
-            }
-        }
-        self.known.push(k);
-        Lookup::Conflict(k)
+        let mut seek = Seek {
+            model: self.model,
+            scratch: &mut *self.scratch,
+            cache: &mut *self.cache,
+            state: self.state,
+            known: &mut *self.known,
+            learning: &mut self.learning,
+        };
+        let (found, computed) = seek.conflict(promoted, forced);
+        self.computed += u64::from(computed);
+        found
     }
 
     /// Whether the bound of the top level, with `required` (members of `C` required by the branches above)

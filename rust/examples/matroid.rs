@@ -58,8 +58,11 @@ use taxman::json::Json;
 use taxman::matchbound::lagrange::SCALE;
 use taxman::matchbound::{MatchBound, MatchGraph};
 use taxman::model::{FrameSet, Model, Scratch};
-use taxman::search::{Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
+use taxman::search::{stat, Gf2Branching, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
+use taxman::tactics::Tactics;
 
+#[path = "common/counters.rs"]
+mod counters;
 #[path = "common/fixtures.rs"]
 #[allow(dead_code)] // the hex writer is the probe's
 mod fixtures;
@@ -307,6 +310,11 @@ struct Options {
     every: usize,
     exact: u64,
     lagrange: usize,
+    tactics: SearchTactics,
+    prefilter: bool,
+    branching: Gf2Branching,
+    threads: usize,
+    seconds: Option<u64>,
 }
 
 fn parse() -> Result<Options, String> {
@@ -324,6 +332,11 @@ fn parse() -> Result<Options, String> {
         every: 1,
         exact: 0,
         lagrange: 0,
+        tactics: SearchTactics::default(),
+        prefilter: false,
+        branching: Gf2Branching::Exact,
+        threads: 1,
+        seconds: None,
     };
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -334,6 +347,28 @@ fn parse() -> Result<Options, String> {
             "--exact" => o.exact = args.next().ok_or("--exact needs seconds")?.parse().map_err(|e| format!("{e}"))?,
             "--lagrange" => {
                 o.lagrange = args.next().ok_or("--lagrange needs a value")?.parse().map_err(|e| format!("{e}"))?
+            }
+            "--tactic" => {
+                let spec = args.next().ok_or("--tactic needs NAME=VALUE")?;
+                let mut t = Tactics { search: o.tactics, ..Tactics::default() };
+                t.set(&spec)?;
+                o.tactics = t.search;
+            }
+            "--prefilter" => o.prefilter = true,
+            "--branching" => {
+                o.branching = match args.next().ok_or("--branching needs a value")?.as_str() {
+                    "largest" => Gf2Branching::Largest,
+                    "split" => Gf2Branching::Split,
+                    "exact" => Gf2Branching::Exact,
+                    "forced" => Gf2Branching::Forced,
+                    other => return Err(format!("unknown branching {other:?}")),
+                }
+            }
+            "--threads" => {
+                o.threads = args.next().ok_or("--threads needs a value")?.parse().map_err(|e| format!("{e}"))?
+            }
+            "--seconds" => {
+                o.seconds = Some(args.next().ok_or("--seconds needs a value")?.parse().map_err(|e| format!("{e}"))?)
             }
             "--bounds" => {
                 let list = args.next().ok_or("--bounds needs a list")?;
@@ -350,7 +385,7 @@ fn parse() -> Result<Options, String> {
             "--samples" => {
                 o.samples = args.next().ok_or("--samples needs a value")?.parse().map_err(|e| format!("{e}"))?
             }
-            file if o.command == "nodes" || o.command == "forced" => o.files.push(file.into()),
+            file if ["nodes", "forced", "kernel"].contains(&o.command.as_str()) => o.files.push(file.into()),
             range => {
                 let parse_n = |t: &str| t.parse::<u32>().map_err(|e| format!("{range}: {e}"));
                 match range.split_once('-') {
@@ -389,6 +424,11 @@ fn main() {
                 taxman::with_width!(n, W => nodes::<W>(path, o.every, o.samples, o.lagrange, o.exact));
             }
         }
+        "prove" => {
+            for &n in &o.games {
+                taxman::with_width!(n, W => prove::<W>(n, &known, &o));
+            }
+        }
         "bnb" => {
             for &n in &o.games {
                 for &bound in &o.bounds {
@@ -415,6 +455,12 @@ fn main() {
             for path in &o.files {
                 let n = first_n(path);
                 taxman::with_width!(n, W => forced::<W>(path, o.every));
+            }
+        }
+        "kernel" => {
+            for path in &o.files {
+                let n = first_n(path);
+                taxman::with_width!(n, W => kernel::<W>(path, o.every));
             }
         }
         other => {
@@ -1146,4 +1192,170 @@ fn forced<const W: usize>(path: &Path, every: usize) {
             exact_time.as_secs_f64(),
         );
     }
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// prove
+
+/// The search's proof that nothing beats `P*` (its incumbent a value, `P*`, with no set behind it; no seed, no cap),
+/// with the search tactics of `--tactic` and the GF(2) knobs `--prefilter` and `--branching`: nodes (steps),
+/// seconds, the cycles and instructions of the process, and the GF(2) bound's counters.  On one thread (the
+/// default) the node counts are exact and repeatable, and compare with `examples/slope.rs`'s `prove` at δ = 0.
+fn prove<const W: usize>(n: u32, known: &Known, o: &Options) {
+    let board = Board::<W>::for_n(n);
+    if board.is_trivial() {
+        return;
+    }
+    let Some(opt) = known.opt(n, board.in_the_bag) else {
+        eprintln!("n={n}: no known optimum, skipped");
+        return;
+    };
+    let p = board.prepare(o.tactics).expect("prepare");
+    let graph = MatchGraph::new(&p.model, &p.root);
+    let space =
+        SearchSpace { gf2_prefilter: o.prefilter, gf2_branching: o.branching, ..SearchSpace::new(&p, &graph, None) };
+    let cfg = EngineConfig {
+        threads: o.threads,
+        time_limit: o.seconds.map(std::time::Duration::from_secs),
+        ..EngineConfig::default()
+    };
+    let start = Start::Fresh {
+        units: vec![TaxUnit { promoted: Bits::<W>::EMPTY, cands: p.candidates }],
+        best: opt,
+        payload: vec![0u8; 8 * W],
+    };
+    let before = counters::now();
+    let t0 = Instant::now();
+    let out = engine::run(&cfg, start, b"matroid-prove", |_| TaxSearcher::new(&space)).expect("search");
+    let time = t0.elapsed();
+    let after = counters::now();
+    let (instructions, cycles) = match (before, after) {
+        (Some((i0, c0)), Some((i1, c1))) => (i1 - i0, c1 - c0),
+        _ => (0, 0),
+    };
+    let x = out.stats.extra;
+    println!(
+        "{{\"n\":{n},\"opt\":{opt},\"tactics\":\"{}\",\"prefilter\":{},\"branching\":\"{:?}\",\"threads\":{},\
+         \"completed\":{},\"best\":{},\"nodes\":{},\"seconds\":{:.3},\"cycles\":{cycles},\"instructions\":{instructions},\
+         \"checks\":{},\"gf2_solves\":{},\"gf2_augmentations\":{},\"gf2_inherited\":{},\"gf2_splits\":{}}}",
+        Tactics { search: o.tactics, ..Tactics::default() }.description(),
+        o.prefilter,
+        o.branching,
+        o.threads,
+        out.completed,
+        out.best,
+        out.stats.nodes,
+        time.as_secs_f64(),
+        x[stat::MATCH_BOUNDS],
+        x[stat::GF2_SOLVES],
+        x[stat::GF2_AUGMENTATIONS],
+        x[stat::GF2_INHERITED],
+        x[stat::GF2_SPLITS],
+    );
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// kernel
+
+/// The GF(2) bound's kernels at the nodes of a `.nodes` fixture, `reps` times each (the fastest kept), in cycles per
+/// operation, with a fingerprint of every value computed (an exact optimization must leave it unchanged): a node's
+/// level from the root (`reset`) and its bound from scratch; its forced members (the weight split); and the bound
+/// without each member of the conflict of its heaviest set (strong branching's solves, warm-started).
+fn kernel<const W: usize>(path: &Path, reps: usize) {
+    use taxman::gf2::{Gf2Bound, Gf2Graph};
+    let (n, incumbent, units) = fixtures::read_nodes::<W>(path).expect("a fixture");
+    let (_, p) = setup::<W>(n).expect("a game with candidates");
+    let model = &p.model;
+    let graph = Gf2Graph::new(model, &p.root, &p.candidates);
+    let mut scratch = Scratch::<W>::new();
+    let best = incumbent.sum();
+    struct Node<const W: usize> {
+        promoted: Bits<W>,
+        cands: Bits<W>,
+        cap: u32,
+        need: u64,
+        conflict: Bits<W>,
+    }
+    let mut nodes = Vec::new();
+    let mut bound = Gf2Bound::<W>::new(&graph);
+    for u in units.iter().filter(|u| !u.cands.is_empty()) {
+        let state = model.promote_all_using(&mut scratch, &p.root, &u.promoted).expect("a node");
+        let cap = (p.max_total - u.promoted.len()).min(state.max_promotions_among(&u.cands).max(0) as u32);
+        bound.reset(&u.promoted, &u.cands);
+        let chosen = bound.evaluate(cap, None).chosen;
+        let conflict = model.conflict_using(&mut scratch, &state, &chosen, true).unwrap_or(Bits::EMPTY);
+        let need = (best + 1).saturating_sub(u.promoted.sum());
+        nodes.push(Node { promoted: u.promoted, cands: u.cands, cap, need, conflict });
+    }
+    let run = |label: &str, mut f: Box<dyn FnMut(&mut Gf2Bound<W>, &Node<W>) -> (u64, u64)>| {
+        let mut fastest: Option<(u64, u64, f64)> = None;
+        let mut print = None;
+        for _ in 0..reps.max(1) {
+            let mut b = Gf2Bound::<W>::new(&graph);
+            let (mut fp, mut ops) = (0x243F_6A88_85A3_08D3u64, 0u64);
+            let before = counters::now();
+            let t0 = Instant::now();
+            let s0 = b.stats();
+            for x in &nodes {
+                let (value, count) = f(&mut b, x);
+                fp = (fp.rotate_left(5) ^ value).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+                ops += count;
+            }
+            let wall = t0.elapsed().as_secs_f64();
+            let cycles = match (before, counters::now()) {
+                (Some((_, c0)), Some((_, c1))) => c1 - c0,
+                _ => 0,
+            };
+            let s = b.stats();
+            if fastest.is_none_or(|(c, _, w)| if cycles > 0 { cycles < c } else { wall < w }) {
+                fastest = Some((cycles, fp, wall));
+                print = Some((
+                    ops,
+                    s.solves - s0.solves,
+                    s.augmentations - s0.augmentations,
+                    s.rounds - s0.rounds,
+                    s.rebuilds - s0.rebuilds,
+                    s.splits - s0.splits,
+                ));
+            }
+        }
+        let (cycles, fp, wall) = fastest.expect("a run");
+        let (ops, solves, augs, rounds, rebuilds, splits) = print.expect("a run");
+        println!(
+            "  {label:<34} {ops:>7} ops {:>10.0} cyc/op {:>8.1} µs/op  solves {solves:>6} augs/solve {:>5.1} \
+             rounds/aug {:>4.2} rebuilds {rebuilds:>6} splits {splits:>5}  {fp:016x}",
+            cycles as f64 / ops.max(1) as f64,
+            1e6 * wall / ops.max(1) as f64,
+            augs as f64 / solves.max(1) as f64,
+            rounds as f64 / (augs + solves).max(1) as f64,
+        );
+    };
+    println!("n={n}: {} nodes", nodes.len());
+    run(
+        "reset + bound from scratch",
+        Box::new(|b, x| {
+            b.reset(&x.promoted, &x.cands);
+            (b.evaluate(x.cap, None).value, 1)
+        }),
+    );
+    run(
+        "reset + bound + forced (split)",
+        Box::new(|b, x| {
+            b.reset(&x.promoted, &x.cands);
+            let e = b.evaluate(x.cap, Some(x.need));
+            (e.value ^ e.forced.sum() << 20, 1)
+        }),
+    );
+    run(
+        "bound without each conflict member",
+        Box::new(|b, x| {
+            b.reset(&x.promoted, &x.cands);
+            b.evaluate(x.cap, None);
+            let mut h = 0u64;
+            for m in x.conflict.iter() {
+                h = h.wrapping_mul(31).wrapping_add(b.value_excluding(m, x.cap, u64::MAX));
+            }
+            (h, u64::from(x.conflict.len()))
+        }),
+    );
 }

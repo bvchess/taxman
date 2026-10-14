@@ -136,7 +136,7 @@ fn levels_match_fresh_matroids_along_random_paths() {
                 let need = eval.value.saturating_sub(rng.below(40));
                 let with_forced = bound.evaluate(cap, Some(need));
                 for x in with_forced.forced.iter() {
-                    let without = fresh.value_excluding(x, cap);
+                    let without = fresh.value_excluding(x, cap, u64::MAX);
                     assert!(without < need, "n={n}: {x} is not forced: {without} without it, need {need}");
                     forced_checked += 1;
                 }

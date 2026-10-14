@@ -33,11 +33,24 @@ pub struct SearchTactics {
     /// duality; see [`crate::matchbound::lagrange`] and `search::lagrange`).  The multipliers are refitted as the
     /// searcher learns, so the tree depends on its history, as with `nogoods`.
     pub lagrange: bool,
+    /// Bound every node by the GF(2) bound ([`crate::gf2`]: the heaviest common independent set of the two GF(2)
+    /// frame matroids, kept along the searcher's path by contraction), branch on the conflicts of its heaviest set,
+    /// and (with `fix_forced`) force the members without which it would cut (proven: heuristics/THEORY.md, Theorem
+    /// 10, and weak duality for the forced members).  Replaces the matching bound and its refinement as the node
+    /// bound; the Lagrangian bound over nogoods still applies after it.
+    pub gf2: bool,
 }
 
 impl Default for SearchTactics {
     fn default() -> Self {
-        SearchTactics { match_refine: 1, fix_forced: true, nogoods: true, forget_nogoods: true, lagrange: true }
+        SearchTactics {
+            match_refine: 1,
+            fix_forced: true,
+            nogoods: true,
+            forget_nogoods: true,
+            lagrange: true,
+            gf2: false,
+        }
     }
 }
 
@@ -47,18 +60,20 @@ impl SearchTactics {
     pub const MAX_MATCH_REFINE: u8 = 7;
 
     /// The tactics as the header of a checkpoint records them: `match_refine` in bits 0 to 2, then one bit for each
-    /// switch that is on, `fix_forced` (bit 3), `nogoods` (4), `forget_nogoods` (5) and `lagrange` (6).
+    /// switch that is on, `fix_forced` (bit 3), `nogoods` (4), `forget_nogoods` (5), `lagrange` (6) and `gf2` (7).
+    /// (A checkpoint of a build before `gf2` has bit 7 clear: it resumes with `gf2` off.)
     pub(super) fn bits(self) -> u16 {
         u16::from(self.match_refine.min(Self::MAX_MATCH_REFINE))
             | u16::from(self.fix_forced) << 3
             | u16::from(self.nogoods) << 4
             | u16::from(self.forget_nogoods) << 5
             | u16::from(self.lagrange) << 6
+            | u16::from(self.gf2) << 7
     }
 
     /// The tactics [`bits`](Self::bits) recorded, or an error if a bit that no tactic uses is set.
     pub(super) fn from_bits(bits: u16) -> Result<Self, String> {
-        if bits >> 7 != 0 {
+        if bits >> 8 != 0 {
             return Err(format!("unknown tactics {bits:#x}"));
         }
         Ok(SearchTactics {
@@ -67,6 +82,7 @@ impl SearchTactics {
             nogoods: bits & 1 << 4 != 0,
             forget_nogoods: bits & 1 << 5 != 0,
             lagrange: bits & 1 << 6 != 0,
+            gf2: bits & 1 << 7 != 0,
         })
     }
 }

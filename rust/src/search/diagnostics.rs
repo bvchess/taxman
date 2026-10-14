@@ -30,8 +30,10 @@ pub mod cut {
     pub const FORCED: usize = 5;
     /// The Lagrangian bound over nogoods (where the matching bound and its refinement did not cut).
     pub const LAGRANGE: usize = 6;
-    pub const COUNT: usize = 7;
-    pub const NAMES: [&str; COUNT] = ["empty", "largest", "match", "refined", "exact", "forced", "lagrange"];
+    /// The GF(2) bound (tactic `gf2`).
+    pub const GF2: usize = 7;
+    pub const COUNT: usize = 8;
+    pub const NAMES: [&str; COUNT] = ["empty", "largest", "match", "refined", "exact", "forced", "lagrange", "gf2"];
 }
 
 /// Buckets of [`Diagnostics::gaps`]: excesses `0..GAP_BUCKETS − 1`, and the last for everything above.
