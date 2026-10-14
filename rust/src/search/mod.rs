@@ -68,7 +68,6 @@ mod setup;
 mod tactics;
 
 pub use diagnostics::{cut, Diagnostics, GAP_BUCKETS};
-pub use header::checkpoint_width;
 pub use incumbent::Neighbourhood;
 pub use searcher::{stat, Found, SearchSpace, TaxSearcher, TaxUnit};
 pub use setup::{prepare, prepare_for_resume, problem_of, PrepareTimings, Prepared, Problem, ProblemSize};

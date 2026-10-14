@@ -649,7 +649,7 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
 * **spill**: units moved from memory to segment files beyond `queue_mem_cap`.
 * **checkpoint, pause, park**: a periodic pause in which all workers yield and park, and the engine writes every unit,
   the incumbent and statistics to `nNNNN.ckpt`.  **header**: what identifies the search (n, width, digests of candidates
-  and frames, frame 0's freedoms, `max_total`, the tactics).
+  and frames, `max_total`, the tactics).
 * **eff, idle, lock, full occupancy, tiny run**: the engine's counters; see section 4 and the scaling reading guide in
   [tools/cloud/RUNBOOK.md](tools/cloud/RUNBOOK.md).
 * **W, `Bits<W>`**: the width in 64-bit words of the bitsets that hold game numbers; chosen from n.

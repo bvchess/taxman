@@ -160,11 +160,12 @@ margin); `tests/` the integration tests (section 9); `tools/` the results refere
 the PGO build, the Java golden export and the cloud scripts.
 
 **Width dispatch.**  Everything that holds sets of game numbers is generic over `const W: usize`, the number of 64-bit
-words, and the macro `with_width!` (in `bits`, used by the solver, the examples and the tests) picks the narrowest
-of `bits::WIDTHS` = {8, 16, 20, 24, 28, 32, 64} that holds n (n ≤ 511, 1023, 1279, 1535, 1791, 2047, 4095).  Every
-set operation is a loop over all W words, so the steps of 4 words near the frontier pay.  Each width is a copy of
-the search's code, which costs build time (a release build takes under a minute on an M1 Max; EXPERIMENTS has the
-times as widths were added).  A checkpoint records its width, and a search resumes at that width if this build has it.
+words, and the macro `with_width!` (in `bits`, used by the solver, the examples and the tests) picks the narrowest of
+`bits::WIDTHS` = {8, 16, 20, 24, 28, 32, 64} that holds n (n ≤ 511, 1023, 1279, 1535, 1791, 2047, 4095).  Every set
+operation is a loop over all W words, so the steps of 4 words near the frontier pay.  Each width is a copy of the
+search's code, which costs build time (a release build takes under a minute on an M1 Max; EXPERIMENTS has the times as
+widths were added).  A checkpoint records its width, and one made at another width than this build gives its game is
+refused.
 
 ## 4. The search
 
@@ -522,12 +523,13 @@ phase, the tactics, limits, options and the commit the binary was built from; th
 setup poses and a repeat's record of the game it repeats.  A line is never rewritten, and a run locks the results
 file it appends to.
 
-**What identifies a checkpoint.**  The header the search stores: a format version, the set width, n, digests of the
-root candidates and of the frames (every frame's moves, factors and freedoms, as built), frame 0's freedoms,
-`max_total` and the tactics.  Resuming checks all of them and says which differs, and checks that the stored incumbent
-is a set of candidates that can be promoted from the root and is worth the stored value; so a checkpoint of another
-game, or of an older build whose frame builder differs, is refused instead of pruning with a foreign incumbent or
-failing to rebuild its units.  A resumed game rests on nothing a game that ran in one piece does not.
+**What identifies a checkpoint.**  The header the search stores: a format version, the set width, n, digests of the root
+candidates and of the frames (every frame's moves, factors and freedoms, as built), `max_total` and the tactics (format
+version 4; this build refuses every other version with one message, so a checkpoint of an older build cannot resume with
+tactics that are gone).  Resuming checks all of them and says which differs, and checks that the stored incumbent is a
+set of candidates that can be promoted from the root and is worth the stored value; so a checkpoint of another game, or
+of an older build whose frame builder differs, is refused instead of pruning with a foreign incumbent or failing to
+rebuild its units.  A resumed game rests on nothing a game that ran in one piece does not.
 
 ### Same search
 
@@ -675,9 +677,9 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   width that holds it has the same frames, candidates, greedy set, promotion cap, answer and tree; game 1133 (W = 20,
   about 2,400 nodes) under every tactic against `strict.jsonl`; a slice of that chain; the sacrifice bound
   proves game 1133 by an independent route; a W = 64 board (2050) through frames, matching bound, conflicts, greedy set
-  and a node-limited search; a committed W = 32 checkpoint of game 1133 (`testdata/n1133_after_1000_nodes.ckpt`) that
-  must still resume, at its own width (a deliberate change of the checkpoint format fails it; the test says how to make
-  the file again); the levels of a real depth-first stack of game 1215 (`testdata/n1215_deep_units.txt`): the
+  and a node-limited search; a committed checkpoint of game 1133 (`testdata/n1133_after_1000_nodes.ckpt`, W = 20)
+  that must still resume (a deliberate change of the checkpoint format fails it; the test says how to make the file
+  again); the levels of a real depth-first stack of game 1215 (`testdata/n1215_deep_units.txt`): the
   incremental matching bound and the quick bounds without a member against the min-cost-flow reference; and promoting
   one number at a time (with its no-peel shortcut) against the peel of every frame, in reached states of boards at
   W = 20, 28 and 64.  (The unit tests check the nogood table's lookups against their definition at compact strides of
@@ -710,10 +712,12 @@ on the machine moves wall times by up to 3×.  What measures what:
   proofs of 936 and 1215, every kernel over all of them (the rebuild of a node, the promotion of every candidate,
   conflicts, the matching from scratch and warm-started, bounds without each member, strong branching's exact solves,
   children, nogood lookups and rule-outs).  F2: the frame checks of those promotions.  F3: a checkpoint of each proof
-  resumed on one thread for 50,000 steps, one period of forgetting nogoods: the search itself, fingerprinted by its
-  counters, with the tactics its checkpoint records (`--tactic` changes them).  The fixtures predate the tactic
-  `lagrange`, so they read back with it on; `--tactic lagrange=off` gives the windows of the build before it, and the
-  fingerprint 6197a47eae6cf8c8 of that build, and with it on the fingerprint is 36981d0eaeeae319.  About 5 s in all;
+  with the default tactics (`perf make-window 936 4500`, `perf make-window 1215 600000`) resumed on one thread for
+  50,000 steps, one period of forgetting nogoods: the search itself, fingerprinted by its counters, with the tactics
+  its checkpoint records (`--tactic` changes them).  The probe's fingerprint is 7e8e724717d26545, and
+  5b83bbebf0bb2899 with `--tactic lagrange=off`.  (The windows were made again when the search's counters were
+  renumbered and the checkpoint header went to version 4, 2026-10; the fingerprints EXPERIMENTS quotes before then,
+  36981d0eaeeae319 and 6197a47eae6cf8c8, are of the earlier windows, made before `lagrange`.)  About 5 s in all;
   `perf make-nodes` and `perf make-window` make the fixtures again, deterministically.
   For whole searches, `/usr/bin/time -l` reports the same counters per process.
   `cargo test --release` rebuilds the examples in its own configuration, with about 2% more instructions: run

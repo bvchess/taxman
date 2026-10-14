@@ -517,36 +517,6 @@ fn forge_header(path: &Path, edit: impl FnOnce(&mut [u8])) {
     fs::write(path, bytes).unwrap();
 }
 
-/// Changes the search's header in the checkpoint `path` to say that frame 0 has `freedoms`: a forgery that only the
-/// check of frame 0 against the frames can see.
-fn forge_frame_zero(path: &Path, freedoms: i32) {
-    forge_header(path, |header| {
-        // Frame 0's freedoms are at 33, after a byte that says there is a frame 0.
-        assert_eq!(header[32], 1);
-        header[33..37].copy_from_slice(&freedoms.to_le_bytes());
-    });
-}
-
-/// A checkpoint whose frame 0 has other freedoms than the built ones is refused, naming frame 0: nothing changes
-/// them, so its search cannot have had them.  (Resuming with forged ones once finished a game as exhausted, clean,
-/// and with a score below the optimum.)
-#[test]
-fn a_checkpoint_whose_frame_zero_its_search_cannot_have_had_is_refused() {
-    let n = 300;
-    let board = Board::<8>::for_n(n);
-    let dir = TempDir::new("frame0");
-    let opts = SolveOptions { time_limit: Some(Duration::ZERO), ..options(&dir.0) };
-    let checkpoint = dir.join("n0300.ckpt");
-    let f0 = board.prepare(opts.tactics.search).unwrap().root.frames()[0].freedoms;
-    for forged in [f0 - 1, f0 + 1, 0] {
-        assert!(!solver::solve_game(n, None, &opts).unwrap().completed);
-        forge_frame_zero(&checkpoint, forged);
-        let err = solver::solve_game(n, None, &opts).unwrap_err();
-        assert!(err.contains(&format!("frame 0's freedoms are {forged}, not the {f0} ")), "{err}");
-        fs::remove_file(&checkpoint).unwrap();
-    }
-}
-
 #[test]
 fn a_checkpoint_made_with_other_tactics_names_them() {
     let dir = TempDir::new("tactics");
@@ -561,17 +531,17 @@ fn a_checkpoint_made_with_other_tactics_names_them() {
     }
 }
 
-/// A checkpoint made by a build that had search tactics which this one does not (the preclusion table, bit 0 of the
-/// header's tactics, at byte 41) is refused, naming the tactic, and left alone.
+/// A checkpoint whose header has another format version (here 3, that of the builds before this one, whose headers
+/// recorded tactics that are gone) is refused with one message, naming the file, and left alone.
 #[test]
-fn a_checkpoint_made_with_a_removed_tactic_is_refused() {
-    let dir = TempDir::new("removed");
+fn a_checkpoint_of_another_format_is_refused() {
+    let dir = TempDir::new("format");
     let opts = SolveOptions { node_limit: Some(1500), ..options(&dir.0) };
     assert!(!solver::solve_game(600, None, &opts).unwrap().completed);
     let checkpoint = dir.join("n0600.ckpt");
-    forge_header(&checkpoint, |header| header[41] |= 1);
+    forge_header(&checkpoint, |header| header[4..8].copy_from_slice(&3u32.to_le_bytes()));
     let err = solver::solve_game(600, None, &opts).unwrap_err();
-    for part in ["n0600.ckpt", "preclusions=on", "no longer has"] {
+    for part in ["n0600.ckpt", "format version 3", "reads version 4 only", "delete the checkpoint"] {
         assert!(err.contains(part), "{part}: {err}");
     }
     assert!(checkpoint.exists(), "a refused checkpoint is left alone");

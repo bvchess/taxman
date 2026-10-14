@@ -46,74 +46,27 @@ impl SearchTactics {
     /// be told from this one on resuming.
     pub const MAX_MATCH_REFINE: u8 = 7;
 
-    /// The bits of a checkpoint's header that earlier builds used for tactics this one no longer has: bit 0
-    /// `preclusions`, bit 1 `legacy_bound`, bit 2 `revise_freedoms`, bit 3 `match_bound`, bits 7 and 8 `branching`.
-    const REMOVED_BITS: u16 = 0b111 | 1 << 3 | 3 << 7;
-
-    /// What those bits hold when a search runs as every search now does: `match_bound` on (bit 3), `branching` as
-    /// `conflict-strong` (3 in bits 7 and 8), `preclusions`, `legacy_bound` and `revise_freedoms` off (bits 0 to 2
-    /// clear).
-    const REMOVED_BITS_AS_RUN: u16 = 1 << 3 | 3 << 7;
-
-    /// The tactics as the header of a checkpoint records them.  Tactics added later are recorded by the bits of
-    /// their non-default values (`fix_forced` by bit 9, `nogoods` by bit 10, `forget_nogoods` by bit 11 and
-    /// `lagrange` by bit 12 when they are off), so that a checkpoint made before they existed reads back with their
-    /// defaults: they are sound, so a search resumed with them is still correct.  The bits of the tactics this
-    /// build no longer has are written as the search now runs.
+    /// The tactics as the header of a checkpoint records them: `match_refine` in bits 0 to 2, then one bit for each
+    /// switch that is on, `fix_forced` (bit 3), `nogoods` (4), `forget_nogoods` (5) and `lagrange` (6).
     pub(super) fn bits(self) -> u16 {
-        Self::REMOVED_BITS_AS_RUN
-            | u16::from(self.match_refine.min(Self::MAX_MATCH_REFINE)) << 4
-            | u16::from(!self.fix_forced) << 9
-            | u16::from(!self.nogoods) << 10
-            | u16::from(!self.forget_nogoods) << 11
-            | u16::from(!self.lagrange) << 12
+        u16::from(self.match_refine.min(Self::MAX_MATCH_REFINE))
+            | u16::from(self.fix_forced) << 3
+            | u16::from(self.nogoods) << 4
+            | u16::from(self.forget_nogoods) << 5
+            | u16::from(self.lagrange) << 6
     }
 
-    /// The tactics [`bits`](Self::bits) recorded, or an error if the checkpoint was made with a tactic that this
-    /// build no longer has (`preclusions`, `legacy_bound`, `revise_freedoms`, `match_bound` off, or a `branching`
-    /// other than `conflict-strong`), or with one it does not know.
+    /// The tactics [`bits`](Self::bits) recorded, or an error if a bit that no tactic uses is set.
     pub(super) fn from_bits(bits: u16) -> Result<Self, String> {
-        if bits >> 13 != 0 {
+        if bits >> 7 != 0 {
             return Err(format!("unknown tactics {bits:#x}"));
         }
-        if bits & Self::REMOVED_BITS != Self::REMOVED_BITS_AS_RUN {
-            return Err(format!(
-                "the checkpoint was made with a search tactic that this build no longer has ({}); finish it with the \
-                 build that made it",
-                Self::removed_settings(bits).join(", ")
-            ));
-        }
         Ok(SearchTactics {
-            match_refine: (bits >> 4 & 7) as u8,
-            fix_forced: bits & 1 << 9 == 0,
-            nogoods: bits & 1 << 10 == 0,
-            forget_nogoods: bits & 1 << 11 == 0,
-            lagrange: bits & 1 << 12 == 0,
+            match_refine: (bits & 7) as u8,
+            fix_forced: bits & 1 << 3 != 0,
+            nogoods: bits & 1 << 4 != 0,
+            forget_nogoods: bits & 1 << 5 != 0,
+            lagrange: bits & 1 << 6 != 0,
         })
-    }
-
-    /// The settings of the removed tactics that `bits` records and the search no longer runs, spelled as
-    /// `--tactic` once spelled them.
-    fn removed_settings(bits: u16) -> Vec<String> {
-        let mut settings = Vec::new();
-        if bits & 1 != 0 {
-            settings.push("preclusions=on".to_owned());
-        }
-        if bits & 2 != 0 {
-            settings.push("legacy_bound=on".to_owned());
-        }
-        if bits & 4 != 0 {
-            settings.push("revise_freedoms=on".to_owned());
-        }
-        if bits & 1 << 3 == 0 {
-            settings.push("match_bound=off".to_owned());
-        }
-        match bits >> 7 & 3 {
-            0 => settings.push("branching=largest".to_owned()),
-            1 => settings.push("branching=conflict-smallest".to_owned()),
-            2 => settings.push("branching=conflict-largest".to_owned()),
-            _ => {}
-        }
-        settings
     }
 }

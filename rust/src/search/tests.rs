@@ -435,21 +435,22 @@ fn units_and_headers_round_trip() {
     assert_eq!(bytes.len(), Header::<8>::LEN);
     let back = Header::<8>::decode(&bytes).unwrap();
     assert_eq!(back, header);
-    assert_eq!(
-        (back.n, back.max_total, back.frame0_freedoms, back.tactics),
-        (300, p.max_total, p.root.frames().first().map(|f| f.freedoms), p.tactics)
-    );
+    assert_eq!((back.n, back.max_total, back.tactics), (300, p.max_total, p.tactics));
     assert_eq!(back.mismatch(&header), None);
     assert!(Header::<16>::decode(&bytes).unwrap_err().contains("Bits<8>"));
-    assert!(Header::<8>::decode(b"nonsense").is_err());
+    assert!(Header::<8>::decode(b"nonsense").unwrap_err().contains("not a checkpoint"));
     assert!(Header::<8>::decode(&bytes[..20]).is_err());
-    let mut later = bytes.clone();
-    later[4] = 4;
-    assert!(Header::<8>::decode(&later).unwrap_err().contains("format version 4"));
-    // A header of the format before version 3 is refused, saying why.
-    let mut old = b"TXS2".to_vec();
-    old.extend_from_slice(&[0; 4 + 64 + 4 + 1 + 4 + 2]);
-    assert!(Header::<8>::decode(&old).unwrap_err().contains("older build"));
+    // Every other format version, the older ones (`TXS2` was version 2) and any later one, is refused with one
+    // message.
+    let mut txs2 = b"TXS2".to_vec();
+    txs2.extend_from_slice(&[0; 4 + 64 + 4 + 1 + 4 + 2]);
+    for (version, bytes) in [("2", txs2), ("3", [&bytes[..4], &3u32.to_le_bytes(), &bytes[8..]].concat())]
+        .into_iter()
+        .chain([("5", [&bytes[..4], &5u32.to_le_bytes(), &bytes[8..]].concat()), ("unreadable", b"TXSH".to_vec())])
+    {
+        let err = Header::<8>::decode(&bytes).unwrap_err();
+        assert!(err.contains(&format!("format version {version}, and this build reads version 4 only")), "{err}");
+    }
     // Every field that differs is named.
     let other = |change: fn(&mut Header<8>)| {
         let mut h = header;
@@ -460,14 +461,10 @@ fn units_and_headers_round_trip() {
     assert!(other(|h| h.candidates ^= 1).contains("candidates"));
     assert!(other(|h| h.frames ^= 1).contains("frames"));
     assert!(other(|h| h.max_total += 1).contains("max_total"));
-    assert!(other(|h| h.frame0_freedoms = None).contains("freedoms"));
     assert!(other(|h| h.tactics.nogoods = !h.tactics.nogoods).contains("tactics"));
 
-    // Every setting of the search tactics reads back as it was written, and the default tactics of a checkpoint
-    // made before `fix_forced`, `nogoods`, `forget_nogoods` and `lagrange` existed (0x198, with `revise_freedoms`
-    // off) read back with them on, as they are now.  Bit 11 is `forget_nogoods` off, bit 12 `lagrange` off, and no
-    // higher bit is used.
-    let default = SearchTactics::default();
+    // Every setting of the search tactics reads back as it was written: `match_refine` in bits 0 to 2, a bit for
+    // each switch that is on (the defaults: 0x79), and no higher bit is used.
     for refine in [0, 1, 7] {
         for (on, off) in [(true, false), (false, true)] {
             let t =
@@ -475,30 +472,9 @@ fn units_and_headers_round_trip() {
             assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
         }
     }
-    assert_eq!(default.bits(), 0x198);
-    assert_eq!(SearchTactics::from_bits(0x198), Ok(default));
-    assert_eq!(SearchTactics::from_bits(0x198 | 1 << 11), Ok(SearchTactics { forget_nogoods: false, ..default }));
-    assert_eq!(SearchTactics::from_bits(0x198 | 1 << 12), Ok(SearchTactics { lagrange: false, ..default }));
-    assert!(SearchTactics::from_bits(1 << 13).is_err());
-
-    // A checkpoint made with a tactic that this build no longer has is refused, naming it: the preclusion table
-    // (bit 0), the Java's runner-up (bit 1), the revision of frame 0's freedoms (bit 2, set in the checkpoints of
-    // runs that had it on, as they did by default), a search without the matching bound (bit 3 clear), and the
-    // branchings other than the strong one (bits 7 and 8 other than 3).
-    for (bits, named) in [
-        (0x199, "preclusions=on"),
-        (0x19a, "legacy_bound=on"),
-        (0x19c, "revise_freedoms=on"),
-        (0x190, "match_bound=off"),
-        (0x018, "branching=largest"),
-        (0x098, "branching=conflict-smallest"),
-        (0x118, "branching=conflict-largest"),
-        (0x19b, "preclusions=on, legacy_bound=on"),
-        (0x19f, "preclusions=on, legacy_bound=on, revise_freedoms=on"),
-    ] {
-        let err = SearchTactics::from_bits(bits).unwrap_err();
-        assert!(err.contains(named) && err.contains("no longer has"), "{bits:#x}: {err}");
-    }
+    assert_eq!(SearchTactics::default().bits(), 0x79);
+    assert_eq!(SearchTactics::from_bits(0x79), Ok(SearchTactics::default()));
+    assert!(SearchTactics::from_bits(1 << 7).unwrap_err().contains("unknown tactics"));
 }
 
 // ---- benchmark: cargo test --release bench_search -- --ignored --nocapture --test-threads=1 ----

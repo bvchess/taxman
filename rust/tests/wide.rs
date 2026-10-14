@@ -190,19 +190,17 @@ fn the_sacrifice_bound_proves_a_w20_result() {
 // ---------------------------------------------------------------------------------------------------------
 // Resuming
 
-/// A checkpoint that an earlier build wrote (`testdata/n1133_after_1000_nodes.ckpt`: game 1133 at W = 32 with
-/// the defaults of the time, stopped after 1,023 nodes on one thread; search header format TXSH v3)
-/// still resumes and finishes with the committed score.  Every write/read test of the format uses the code's own
-/// constants, so a change of the layout that round-trips (the version, the byte order of a set, the order of the
-/// header's fields, the packing of the tactics) passes them and refuses this file.  This build gives game 1133
-/// W = 20, so the search also resumes at the width it was made with rather than the one a new search would get.
+/// A checkpoint that an earlier build wrote (`testdata/n1133_after_1000_nodes.ckpt`: game 1133 at W = 20 with
+/// the default tactics, stopped after 1,023 nodes on one thread; search header format TXSH v4) still resumes and
+/// finishes with the committed score.  Every write/read test of the format uses the code's own constants, so a
+/// change of the layout that round-trips (the version, the byte order of a set, the order of the header's fields,
+/// the packing of the tactics) passes them and refuses this file.
 ///
 /// A deliberate change of the format (a new header version, say, which refuses older checkpoints) fails this test.
-/// To make the file again with the new build:
-/// `taxman solve 1133 --threads 1 --node-limit 1000 --out R --checkpoint-dir D` with `R` holding only game 1132's
-/// line of `results/strict.jsonl`, then copy `D/n1133.ckpt` over the fixture.
+/// To make the file again with the new build: `taxman solve 1133 --use-prev --threads 1 --node-limit 1000 --out R
+/// --checkpoint-dir D` with a new file `R`, then copy `D/n1133.ckpt` over the fixture.
 #[test]
-fn a_committed_checkpoint_of_a_w32_game_resumes() {
+fn a_committed_checkpoint_resumes() {
     let games = stored_games("strict.jsonl");
     let dir = TempDir::new("committed-checkpoint");
     let opts = SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), ..options(1) };
@@ -303,8 +301,8 @@ fn single_promotions_agree_with_the_peel_at_wide_widths() {
 /// default tactics, 30,000 nodes, one thread, from game 1214 of `strict.jsonl`): the levels of its depth-first
 /// stack, from the root to 34 promotions deep.  Returns the checkpoint's incumbent and the units.
 ///
-/// To make such a file again, run `taxman solve 1215 --threads 1 --node-limit 30000 --out R --checkpoint-dir D` (`R`
-/// holding game 1214's line) and list the
+/// To make such a file again, run `taxman solve 1215 --use-prev --threads 1 --node-limit 30000 --out R
+/// --checkpoint-dir D` (`R` a new file) and list the
 /// members of each unit of `D/n1215.ckpt` (a unit is its promoted set then its candidates, `W` little-endian words
 /// each; the engine's layout is described in `engine.rs`).
 fn deep_units() -> (u64, Vec<TaxUnit<32>>) {

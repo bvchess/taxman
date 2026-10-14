@@ -166,10 +166,8 @@ pub fn prepare<const W: usize>(
 }
 
 /// [`prepare`] for resuming the search checkpointed in `checkpoint`, with the tactics the checkpoint records.  Fails,
-/// saying what differs, if the checkpoint was made for another board size, width, candidates or frames, or by a build
-/// whose checkpoint headers had another format, or with a search tactic that this build no longer has, or if its
-/// frame 0 has other freedoms than the ones frame 0 is built with (nothing changes them now, so it is a checkpoint
-/// of another search).
+/// saying what differs, if the checkpoint was made for another board size, width, candidates, frames or `max_total`,
+/// or by a build whose checkpoint headers had another format.
 pub fn prepare_for_resume<const W: usize>(
     tables: &Tables,
     columns: &[Vec<u32>],

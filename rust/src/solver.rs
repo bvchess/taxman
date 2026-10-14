@@ -63,7 +63,7 @@
 //! repeat the search of are the file's and the range's own (a single game solved with [`solve_game`] has none).
 
 use crate::accelerate::{prime_shortcut, solution_for_promotions};
-use crate::bits::{width_for, words_for, Bits};
+use crate::bits::{words_for, Bits};
 use crate::board::{search_problem, Board};
 use crate::engine::{self, Counters, EngineConfig, Stats};
 use crate::game::{replay, replay_finished, Optimal};
@@ -641,12 +641,7 @@ fn solve_one(
     if n == 0 {
         return Err(Failure::Error("n must be at least 1".into()));
     }
-    // A search that was interrupted resumes at the set width it was made with, which an older build may have
-    // chosen otherwise for this game (if this build has that width and it holds the board; if not, resuming
-    // says why it cannot).
-    let checkpoint = opts.checkpoint_file(n).filter(|path| path.exists());
-    let made_with = checkpoint.and_then(|path| search::checkpoint_width(&path)).filter(|&w| width_for(w) == Some(w));
-    let words = words_for(n).max(made_with.unwrap_or(0));
+    let words = words_for(n);
     let beyond = || Failure::Error(format!("n={n} is beyond the largest supported board, n={MAX_N}"));
     let solve: SolveWithWidth = crate::with_words!(words, W => solve_with_width::<W>, else return Err(beyond()));
     solve(n, prev, opts, optimal, earlier_runs, earlier).map_err(|failure| match failure {

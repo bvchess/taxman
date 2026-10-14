@@ -7,16 +7,14 @@ use super::tactics::SearchTactics;
 use crate::bits::Bits;
 use crate::engine;
 use crate::model::FrameSet;
-use std::path::Path;
 
 /// What a checkpoint records about the search it belongs to, so that a resumed run can check it is the same
 /// search (the same game, frames, candidates and tactics).
 ///
 /// Encoded (little-endian) as the magic `TXSH`, the format [`Header::VERSION`] (u32), the width `W` (u32),
-/// `n` (u32), the digests of the candidates and of the frames (u64 each), whether there is a frame 0 (u8) and
-/// its freedoms (i32), `max_total` (u32) and the tactics' bits (u16).  Version 2 (magic `TXS2`, made
-/// before 2026-10-12) recorded neither `n` nor the frames, so a checkpoint of another game with the same
-/// candidates passed for this one; it is refused.
+/// `n` (u32), the digests of the candidates and of the frames (u64 each), `max_total` (u32) and the tactics' bits
+/// (u16, [`SearchTactics::bits`]).  This build reads version 4 only: the headers of older builds (magic `TXS2`, or
+/// `TXSH` with versions 3 and below) recorded tactics that are gone, and are refused with one message.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct Header<const W: usize> {
     pub(super) n: u32,
@@ -24,24 +22,20 @@ pub(super) struct Header<const W: usize> {
     pub(super) candidates: u64,
     /// [`Header::digest_frames`] of the frames as built.
     pub(super) frames: u64,
-    /// Frame 0's freedoms in the search's root (`None` without frames).  They are the ones it was built with,
-    /// which resuming requires: builds that had the tactic `revise_freedoms` could lower them.
-    pub(super) frame0_freedoms: Option<i32>,
     pub(super) max_total: u32,
     pub(super) tactics: SearchTactics,
 }
 
 impl<const W: usize> Header<W> {
     pub(super) const MAGIC: &'static [u8; 4] = b"TXSH";
-    pub(super) const VERSION: u32 = 3;
-    pub(super) const LEN: usize = 4 + 4 + 4 + 4 + 8 + 8 + 1 + 4 + 4 + 2;
+    pub(super) const VERSION: u32 = 4;
+    pub(super) const LEN: usize = 4 + 4 + 4 + 4 + 8 + 8 + 4 + 2;
 
     pub(super) fn of(prepared: &Prepared<W>) -> Self {
         Header {
             n: prepared.n,
             candidates: Self::digest_candidates(&prepared.candidates),
             frames: Self::digest_frames(&prepared.root),
-            frame0_freedoms: prepared.root.frames().first().map(|f| f.freedoms),
             max_total: prepared.max_total,
             tactics: prepared.tactics,
         }
@@ -71,27 +65,27 @@ impl<const W: usize> Header<W> {
         }
         out.extend_from_slice(&self.candidates.to_le_bytes());
         out.extend_from_slice(&self.frames.to_le_bytes());
-        out.push(u8::from(self.frame0_freedoms.is_some()));
-        out.extend_from_slice(&self.frame0_freedoms.unwrap_or(0).to_le_bytes());
         out.extend_from_slice(&self.max_total.to_le_bytes());
         out.extend_from_slice(&self.tactics.bits().to_le_bytes());
         out
     }
 
     pub(super) fn decode(bytes: &[u8]) -> Result<Self, String> {
-        if bytes.starts_with(b"TXS2") {
-            return Err("the checkpoint was made by an older build, whose checkpoints do not record the board size \
-                        or the frames, so it cannot be checked against this game; finish it with that build, or \
-                        delete it"
-                .into());
-        }
-        if !bytes.starts_with(Self::MAGIC) {
-            return Err("not a checkpoint of a Taxman search".into());
-        }
         let u32_at = |i: usize| bytes.get(i..i + 4).map(|b| u32::from_le_bytes(b.try_into().expect("4 bytes")));
-        let version = u32_at(4).unwrap_or(0);
-        if version != Self::VERSION {
-            return Err(format!("the checkpoint's header has format version {version}, not {}", Self::VERSION));
+        let version = if bytes.starts_with(b"TXS2") {
+            Some(2)
+        } else if bytes.starts_with(Self::MAGIC) {
+            u32_at(4)
+        } else {
+            return Err("not a checkpoint of a Taxman search".into());
+        };
+        if version != Some(Self::VERSION) {
+            let version = version.map_or_else(|| "unreadable".to_owned(), |v| v.to_string());
+            return Err(format!(
+                "the checkpoint's header has format version {version}, and this build reads version {} only: \
+                 finish the search with the build that made it, or delete the checkpoint",
+                Self::VERSION
+            ));
         }
         if bytes.len() != Self::LEN {
             return Err(format!("the checkpoint's header has {} bytes, not {}", bytes.len(), Self::LEN));
@@ -105,9 +99,8 @@ impl<const W: usize> Header<W> {
             n: u32_at(12).expect("length checked"),
             candidates: u64_at(16),
             frames: u64_at(24),
-            frame0_freedoms: (bytes[32] != 0).then(|| u32_at(33).expect("length checked") as i32),
-            max_total: u32_at(37).expect("length checked"),
-            tactics: SearchTactics::from_bits(u16::from_le_bytes([bytes[41], bytes[42]]))?,
+            max_total: u32_at(32).expect("length checked"),
+            tactics: SearchTactics::from_bits(u16::from_le_bytes([bytes[36], bytes[37]]))?,
         })
     }
 
@@ -119,13 +112,6 @@ impl<const W: usize> Header<W> {
             "other promotion candidates".into()
         } else if self.frames != expected.frames {
             "other frames (made by a build with another frame builder?)".into()
-        } else if self.frame0_freedoms != expected.frame0_freedoms {
-            let freedoms = |f: Option<i32>| f.map_or_else(|| "none".to_owned(), |f| f.to_string());
-            format!(
-                "a search whose frame 0's freedoms are {}, not the {} frame 0 is built with (nothing changes them)",
-                freedoms(self.frame0_freedoms),
-                freedoms(expected.frame0_freedoms)
-            )
         } else if self.max_total != expected.max_total {
             format!("max_total {}, not {}", self.max_total, expected.max_total)
         } else if self.tactics != expected.tactics {
@@ -135,13 +121,4 @@ impl<const W: usize> Header<W> {
         };
         Some(format!("the checkpoint is of {what}"))
     }
-}
-
-/// The set width `W` a checkpoint of a search was made with, if `path` holds one whose header this build can read
-/// (an older build may have chosen another width for the game than this one does).
-pub fn checkpoint_width(path: &Path) -> Option<usize> {
-    let bytes = engine::read_checkpoint_header(path).ok()?;
-    let u32_at = |i: usize| bytes.get(i..i + 4).map(|b| u32::from_le_bytes(b.try_into().expect("4 bytes")));
-    let ours = bytes.starts_with(Header::<1>::MAGIC) && u32_at(4) == Some(Header::<1>::VERSION);
-    ours.then(|| u32_at(8)).flatten().map(|width| width as usize)
 }

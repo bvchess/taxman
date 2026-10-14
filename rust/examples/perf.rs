@@ -26,9 +26,9 @@
 //!   some nodes, resumed on one thread for `--steps` steps (default 50,000, one period of forgetting nogoods).  A
 //!   resumed search starts with empty nogood tables, so the window is the same tree every time, and its
 //!   fingerprint is the search's counters (steps, promotions, children, matching bounds, ...).  The checkpoint
-//!   is read-only.  The window searches with the tactics the checkpoint records, which `--tactic` changes (the
-//!   search tactics only, as for the ladder): the fixtures predate the tactic `lagrange`, so they read back with
-//!   it on, its default, and `--tactic lagrange=off` gives the tree of the build before it.
+//!   is read-only.  The window searches with the tactics the checkpoint records, the defaults (`make-window 936
+//!   4500` and `make-window 1215 600000`), which `--tactic` changes (the search tactics only, as for the ladder):
+//!   `--tactic lagrange=off`, say, searches the same window without the Lagrangian bound.
 //!
 //! Each kernel runs `--reps` times (default 3; the window 2) and the fastest by cycles is reported, per
 //! operation and in all; the fingerprints of all runs must agree.  The incremental matching kernels (marked `+`)
