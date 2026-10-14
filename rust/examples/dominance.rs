@@ -14,6 +14,8 @@
 
 #[path = "common/fixtures.rs"]
 mod fixtures;
+#[path = "common/symmetry.rs"]
+mod symmetry;
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -24,6 +26,7 @@ use taxman::engine::{self, Ctx, EngineConfig, Searcher, Start};
 use taxman::game::Optimal;
 use taxman::matchbound::{MatchBound, MatchGraph};
 use taxman::model::{FactorProvider, Frame, FrameSet, Model, Scratch};
+use symmetry::{cofactors, map_set, primes_to, root_pairs, swap_primes};
 use taxman::search::{Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
 
 /// The search tactics of the frontier's results (the defaults, all of them proven).
@@ -53,31 +56,8 @@ fn main() {
 // ---------------------------------------------------------------------------------------------------------
 // symmetries
 
-/// Whether `pi` is a symmetry of the search problem at its root: it maps every frame's moves and factors onto
-/// themselves, the candidates onto themselves, and the factor graph among the frames' numbers onto itself.
-fn root_symmetry<const W: usize>(p: &Prepared<W>, pi: &impl Fn(u32) -> u32) -> bool {
-    let g = p.model.graph();
-    let mut all = Bits::<W>::EMPTY;
-    for f in p.root.frames() {
-        if map_set(&f.moves, pi) != Some(f.moves) || map_set(&f.factors, pi) != Some(f.factors) {
-            return false;
-        }
-        all |= f.moves | f.factors;
-    }
-    if map_set(&p.candidates, pi) != Some(p.candidates) {
-        return false;
-    }
-    all.iter().all(|x| {
-        let mut image: Vec<u32> = g.factors(x).iter().map(|&q| pi(u32::from(q))).collect();
-        let mut theirs: Vec<u32> = g.factors(pi(x)).iter().map(|&q| u32::from(q)).collect();
-        image.sort_unstable();
-        theirs.sort_unstable();
-        image == theirs
-    })
-}
-
 /// For each game: the pairs of primes whose exchange is a symmetry of the search problem at its root (see
-/// [`root_symmetry`]), and how many candidates they move.
+/// [`symmetry::root_pairs`]), and how many candidates they move.
 fn symmetries(args: &[String]) {
     let mut games = Vec::new();
     for arg in args {
@@ -97,20 +77,10 @@ fn symmetries_of<const W: usize>(n: u32) {
         return;
     }
     let p = board.prepare(tactics()).expect("prepare");
-    let primes = primes_to(n / 2);
-    let mut pairs = Vec::new();
+    let pairs = root_pairs(&p);
     let mut moved = Bits::<W>::EMPTY;
-    for (i, &a) in primes.iter().enumerate() {
-        if !p.candidates.iter().any(|x| x.is_multiple_of(a)) {
-            continue;
-        }
-        for &b in &primes[i + 1..] {
-            let pi = |x: u32| swap_primes(x, a, b);
-            if root_symmetry(&p, &pi) {
-                pairs.push((a, b));
-                moved |= p.candidates.iter().filter(|&x| pi(x) != x).collect::<Bits<W>>();
-            }
-        }
+    for &(a, b) in &pairs {
+        moved |= p.candidates.iter().filter(|&x| swap_primes(x, a, b) != x).collect::<Bits<W>>();
     }
     println!(
         "{{\"n\":{n},\"candidates\":{},\"symmetric_pairs\":{},\"moved\":{},\"pairs\":\"{pairs:?}\"}}",
@@ -412,33 +382,6 @@ fn covers<const W: usize>(
     Ok(())
 }
 
-/// `x` with the exponents of the primes `p` and `q` exchanged.
-fn swap_primes(x: u32, p: u32, q: u32) -> u32 {
-    let (mut rest, mut a, mut b) = (x, 0, 0);
-    while rest.is_multiple_of(p) {
-        rest /= p;
-        a += 1;
-    }
-    while rest.is_multiple_of(q) {
-        rest /= q;
-        b += 1;
-    }
-    rest * p.pow(b) * q.pow(a)
-}
-
-/// `set` mapped by `pi`, or `None` if an image is beyond `Bits<W>`.
-fn map_set<const W: usize>(set: &Bits<W>, pi: &impl Fn(u32) -> u32) -> Option<Bits<W>> {
-    let mut out = Bits::EMPTY;
-    for x in set.iter() {
-        let y = pi(x);
-        if y > Bits::<W>::MAX_VALUE {
-            return None;
-        }
-        out.insert(y);
-    }
-    Some(out)
-}
-
 /// [`covers`] up to the relabelling `pi` (an involution of the numbers): whether `other` covers `state` with
 /// every number of `state`'s cores renamed by `pi`, for the candidates `cands`, which `pi` must fix.  Frame by frame,
 /// `pi` must carry the factor graph between the moves of `state`'s core (and the members of `cands` that could be
@@ -486,10 +429,6 @@ fn covers_mapped<const W: usize>(
     Ok(())
 }
 
-/// The primes up to `n`.
-fn primes_to(n: u32) -> Vec<u32> {
-    (2..=n).filter(|&k| (2..).take_while(|d| d * d <= k).all(|d| !k.is_multiple_of(d))).collect()
-}
 
 /// The classes of *twins* among `cands` in `state`: candidates of the same home frame `h` with the same live
 /// maximal factors in frame `h − 1` and the same users in frame `h` (the moves of the core of frame `h` for
@@ -696,14 +635,7 @@ fn nodes_of<const W: usize>(path: &PathBuf, pairs: bool, explain: bool) {
     let mut scratch = Scratch::new();
     let best = incumbent.sum() + delta();
     let primes = primes_to(n / 2);
-    let mut sym_pairs = Vec::new();
-    for (i, &a) in primes.iter().enumerate() {
-        for &b in &primes[i + 1..] {
-            if root_symmetry(&p, &|x| swap_primes(x, a, b)) && p.candidates.iter().any(|x| x.is_multiple_of(a)) {
-                sym_pairs.push((a, b));
-            }
-        }
-    }
+    let sym_pairs = root_pairs(&p);
     let t0 = Instant::now();
     // Per kind (add, swap, pairs) and candidate set (all, relevant): nodes dominated, and the tallies.
     let mut dominated = [[0u64; 3]; 3];
@@ -782,11 +714,8 @@ fn nodes_of<const W: usize>(path: &PathBuf, pairs: bool, explain: bool) {
             }
         }
         // The root's prime symmetries: no completion can bring the cofactors of q up to those of p.
-        let cof = |set: &Bits<W>, r: u32| -> u64 {
-            set.iter().filter(|x| x.is_multiple_of(r)).map(|x| u64::from(x / r)).sum()
-        };
         let violated = |within: &Bits<W>| {
-            sym_pairs.iter().filter(|&&(a, b)| cof(&promoted, a) > cof(&promoted, b) + cof(within, b)).count()
+            sym_pairs.iter().filter(|&&(a, b)| cofactors(&promoted, a) > cofactors(&promoted, b) + cofactors(within, b)).count()
         };
         let (sym_all, sym_rel) = (violated(&cands), violated(&rel));
         // The matching bound of the completions that keep a symmetric pair's constraint, with the pair's multiples
@@ -795,7 +724,7 @@ fn nodes_of<const W: usize>(path: &PathBuf, pairs: bool, explain: bool) {
         // constraint, so its image under the pair's exchange beats it by more.
         let mut sym_cut = false;
         for &(a, b) in &sym_pairs {
-            let delta = cof(&promoted, a) as i64 - cof(&promoted, b) as i64;
+            let delta = cofactors(&promoted, a) as i64 - cofactors(&promoted, b) as i64;
             let family: Vec<u32> = rel.iter().filter(|x| x.is_multiple_of(a) || x.is_multiple_of(b)).collect();
             if family.len() > 12 {
                 continue;
@@ -804,7 +733,7 @@ fn nodes_of<const W: usize>(path: &PathBuf, pairs: bool, explain: bool) {
             let mut best_u = None;
             for mask in 0u32..(1 << family.len()) {
                 let u: Bits<W> = family.iter().enumerate().filter(|(i, _)| mask >> i & 1 == 1).map(|(_, &x)| x).collect();
-                if delta + cof(&u, a) as i64 - cof(&u, b) as i64 > 0 {
+                if delta + cofactors(&u, a) as i64 - cofactors(&u, b) as i64 > 0 {
                     continue; // breaks the constraint
                 }
                 let Some(st) = model.promote_all_using(&mut scratch, &state, &u) else { continue };
