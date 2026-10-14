@@ -310,7 +310,6 @@ impl<const W: usize> Game<W> {
             candidates: self.candidates,
             root_max: self.root.frames().iter().filter_map(|f| (f.moves | f.factors).max()).max().unwrap_or(0),
             max_total: self.max_total,
-            cap: None,
             diagnostics: None,
             began: Instant::now(),
             found: Mutex::new(None),

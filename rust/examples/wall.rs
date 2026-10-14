@@ -488,7 +488,7 @@ struct Run {
 /// it, with no seed and no ceiling.  Only the engine's run is timed, not the graphs it starts from.
 fn proof<const W: usize>(p: &Prepared<W>, cfg: &EngineConfig, best: u64) -> Run {
     let graph = MatchGraph::new(&p.model, &p.root);
-    let space = SearchSpace::new(p, &graph, None);
+    let space = SearchSpace::new(p, &graph);
     let units = vec![TaxUnit { promoted: Bits::<W>::EMPTY, cands: p.candidates }];
     // The incumbent is a value only: its payload, an empty set, is never read back here.
     let start = Start::Fresh { units, best, payload: vec![0u8; 8 * W] };

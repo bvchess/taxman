@@ -179,7 +179,7 @@ fn sample_one<const W: usize>(n: u32, optimal: &Optimal, o: &Options) {
     let p = setup::<W>(n);
     let incumbent = optimal_set(&p, optimal);
     let graph = MatchGraph::new(&p.model, &p.root);
-    let space = SearchSpace::new(&p, &graph, None);
+    let space = SearchSpace::new(&p, &graph);
     let payload: Vec<u8> = incumbent.as_words().iter().flat_map(|w| w.to_le_bytes()).collect();
     let best = incumbent.sum().checked_add_signed(o.delta).expect("a margin above zero");
     let start = || Start::Fresh {

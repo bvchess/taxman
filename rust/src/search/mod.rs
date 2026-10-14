@@ -56,7 +56,8 @@
 //! * [`lagrange`]: the Lagrangian bound in the search: where it is tried, its forced members, its refits.
 //! * `header`: the checkpoint's header.
 //! * `diagnostics`: [`Diagnostics`], for tuning.
-//! * here: [`search`], which starts or resumes the engine on a prepared game.
+//! * here: [`search`], which starts or resumes the engine on a prepared game; [`offer_seed`] and [`best_so_far`], for
+//!   a caller that steers searches through their [`Control`] (`EngineConfig::control`).
 
 mod diagnostics;
 mod header;
@@ -74,7 +75,7 @@ pub use setup::{prepare, prepare_for_resume, problem_of, PrepareTimings, Prepare
 pub use tactics::SearchTactics;
 
 use crate::bits::Bits;
-use crate::engine::{self, Counters, EngineConfig, Start, Stats};
+use crate::engine::{self, Control, Counters, EngineConfig, Start, Stats};
 use crate::matchbound::MatchGraph;
 use crate::model::Scratch;
 use header::Header;
@@ -82,7 +83,7 @@ use incumbent::{dive, surviving};
 use searcher::{get_bits, put_bits};
 use std::io;
 use std::path::Path;
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 /// With the tactic `forget_nogoods`, a searcher forgets its nogoods after each this many steps.  Every interval
@@ -96,9 +97,9 @@ pub struct SearchResult<const W: usize> {
     /// The best promotion set found (the optimum when `completed`).
     pub promotions: Bits<W>,
     pub sum: u64,
-    /// The search finished (or reached the cap); false when an engine limit stopped it.
+    /// The search finished (or reached the ceiling); false when an engine limit or a stop stopped it.
     pub completed: bool,
-    /// The incumbent reached the cap, which proves it optimal.
+    /// The incumbent reached the ceiling (`cap`, or one the control was given), which proves it optimal.
     pub reached_cap: bool,
     /// Engine statistics; see [`stat`] for `extra`.
     pub stats: Stats,
@@ -111,7 +112,8 @@ pub struct SearchResult<const W: usize> {
     /// When this call found its best incumbent (`None` if it found none better than the starting one).
     pub found: Option<Found>,
     /// The incumbent the search started from: the best of the greedy set, the seed and the matching dive, improved
-    /// by the local search (the dive and the local search are skipped when the set before them reaches `cap`).
+    /// by the local search (the dive and the local search are skipped when the set before them reaches the
+    /// ceiling).
     pub start: Bits<W>,
 }
 
@@ -119,14 +121,20 @@ pub struct SearchResult<const W: usize> {
 ///
 /// The incumbent starts as the best of the greedy set, what survives of `seed` (its candidates that can still
 /// be promoted, from the largest down) and the dive (the root's matching rounded to a set that can be
-/// promoted), improved by a local search ([`Neighbourhood::improve_on`] on the `cfg.threads` threads, with the
-/// answer of [`Neighbourhood::improve`]).  `cap` is a proven ceiling on the sum; reaching it ends the search, also
-/// before it starts.  Nothing can beat a set that reaches it, so the dive is skipped when the best of the greedy
-/// set and the seed's survivors does, and the local search when the incumbent after the dive does: neither could
-/// change it as long as the ceiling holds, which the proof by the ceiling assumes (`solver::conclude` rejects any
-/// game above it).  With `resume`, the search continues from the checkpoint configured in `cfg` (the `prepared`
-/// game must have been set up by [`prepare_for_resume`] or identically): its header must be this game's, and its
-/// incumbent a promotable set of candidates worth what the checkpoint says.  Otherwise it starts fresh.
+/// promoted), improved by a local search ([`Neighbourhood::improve_on`] on the run's threads, `cfg.threads` or the
+/// control's workers, with the answer of [`Neighbourhood::improve`]).
+///
+/// The ceiling is a proven upper bound on the sum; reaching it ends the search, also before it starts.  It is `cap`
+/// and any the run's control is given, before or while the search runs (the control is `cfg.control` if there is
+/// one, else the search's own; the lowest ceiling counts, see [`Control::set_ceiling`]).  Nothing can beat a set that
+/// reaches it, so the dive is skipped when the best of the greedy set and the seed's survivors does, and the local
+/// search when the incumbent after the dive does: neither could change it as long as the ceiling holds, which the
+/// proof by the ceiling assumes (`solver::conclude` rejects any game above it).  Each reads the ceiling when it is
+/// due, so one given while the dive or the local search runs counts.
+///
+/// With `resume`, the search continues from the checkpoint configured in `cfg` (the `prepared` game must have been
+/// set up by [`prepare_for_resume`] or identically): its header must be this game's, and its incumbent a promotable
+/// set of candidates worth what the checkpoint says.  Otherwise it starts fresh.
 ///
 /// # Errors
 ///
@@ -166,6 +174,11 @@ fn search_forgetting<const W: usize>(
     nogood_period: Option<u64>,
 ) -> io::Result<SearchResult<W>> {
     let t0 = Instant::now();
+    let control = cfg.control.clone().unwrap_or_else(Control::new);
+    if let Some(cap) = cap {
+        control.set_ceiling(cap);
+    }
+    let cfg = &EngineConfig { control: Some(Arc::clone(&control)), ..cfg.clone() };
     let match_graph = MatchGraph::new(&prepared.model, &prepared.root);
     let mut incumbent = prepared.greedy;
     if let Some(seed) = seed {
@@ -178,15 +191,16 @@ fn search_forgetting<const W: usize>(
     // not change it if the ceiling holds, as the proof by the ceiling assumes (and `solver::conclude` rejects any
     // game above it).  The dive is taken only when strictly heavier, and the local search keeps only strictly
     // heavier sets, after a first fill that can only add candidates; no promotable set is heavier than the ceiling.
-    if !reaches(&incumbent, cap) {
+    // The ceiling is read when each is due: the control may be given a lower one meanwhile.
+    if !reaches(&incumbent, control.ceiling()) {
         let dived = dive(&prepared.model, &prepared.root, &match_graph, &prepared.candidates);
         if dived.sum() > incumbent.sum() {
             incumbent = dived;
         }
     }
-    if !reaches(&incumbent, cap) {
+    if !reaches(&incumbent, control.ceiling()) {
         let hood = Neighbourhood { model: &prepared.model, root: &prepared.root, candidates: &prepared.candidates };
-        incumbent = hood.improve_on(cfg.threads, &incumbent, true);
+        incumbent = hood.improve_on(|| control.workers().unwrap_or(cfg.threads), &incumbent, true);
     }
     let checkpoint = cfg.checkpoint.as_ref().map(|(path, _)| path.as_path());
     let resumed = if resume {
@@ -201,7 +215,7 @@ fn search_forgetting<const W: usize>(
         Some((kept, head)) => (if kept.sum() >= incumbent.sum() { *kept } else { incumbent }, head.stats, head.elapsed),
         None => (incumbent, Stats::default(), Duration::ZERO),
     };
-    if reaches(&best, cap) {
+    if reaches(&best, control.ceiling()) {
         // A resumed search that reaches the ceiling at once is finished like any other.
         if let (true, Some(path)) = (resume && !cfg.keep_completed_checkpoint, checkpoint) {
             engine::remove_finished_checkpoint(path);
@@ -220,7 +234,7 @@ fn search_forgetting<const W: usize>(
         });
     }
 
-    let space = SearchSpace { nogood_period, diagnostics, began: t0, ..SearchSpace::new(prepared, &match_graph, cap) };
+    let space = SearchSpace { nogood_period, diagnostics, began: t0, ..SearchSpace::new(prepared, &match_graph) };
     let start = match checkpoint.filter(|_| resume) {
         Some(path) => Start::Resume(path.to_path_buf()),
         None => {
@@ -252,9 +266,27 @@ fn search_forgetting<const W: usize>(
     })
 }
 
-/// Whether `set` is worth `cap`, the ceiling on the promotion sum, or more, which proves it optimal.
-fn reaches<const W: usize>(set: &Bits<W>, cap: Option<u64>) -> bool {
-    cap.is_some_and(|cap| set.sum() >= cap)
+/// Offers the candidates of `seed` that can still be promoted in `prepared`, the game searched, as an incumbent to the
+/// run of `control`, as the start of [`search`] treats its `seed`.  A run not yet started starts from it if it beats
+/// the run's own start; a run that goes adopts it if it beats the incumbent.  Returns whether it became the
+/// incumbent ([`Control::offer`]).
+pub fn offer_seed<const W: usize>(prepared: &Prepared<W>, control: &Control, seed: &Bits<W>) -> bool {
+    let kept = surviving(prepared, seed);
+    let mut payload = Vec::new();
+    put_bits(&mut payload, &kept);
+    control.offer(kept.sum(), &payload)
+}
+
+/// The incumbent of the run of `control` as a promotion set, if it has one: the run's, while it goes and after it
+/// ended, else the best offered ([`Control::best`]).  The control must belong to a search of width `W`, whose payloads
+/// are promotion sets (as [`offer_seed`] makes them).
+pub fn best_so_far<const W: usize>(control: &Control) -> Option<Bits<W>> {
+    control.best().map(|(_, payload)| get_bits(&payload))
+}
+
+/// Whether `set` is worth `ceiling`, the ceiling on the promotion sum, or more, which proves it optimal.
+fn reaches<const W: usize>(set: &Bits<W>, ceiling: Option<u64>) -> bool {
+    ceiling.is_some_and(|ceiling| set.sum() >= ceiling)
 }
 
 /// The checkpoint `path` read and checked for resuming the search of `prepared`: its whole file (checksum

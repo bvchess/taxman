@@ -68,18 +68,26 @@ impl<const W: usize> Neighbourhood<'_, W> {
         best
     }
 
-    /// [`improve`](Self::improve) on `threads` threads, with exactly its answer.  The refills of one pass are
+    /// [`improve`](Self::improve) on `threads()` threads, with exactly its answer.  The refills of one pass are
     /// independent, so the threads take the moves of a pass in the order of their numbers, and the improvement with
-    /// the lowest number is the one the sequential pass would have kept.  With one thread it is `improve`.
-    pub fn improve_on(&self, threads: usize, start: &Bits<W>, pairs: bool) -> Bits<W> {
-        if threads <= 1 {
-            return self.improve(&mut Scratch::new(), start, pairs);
+    /// the lowest number is the one the sequential pass would have kept.  With one thread it is `improve`.  The
+    /// number of threads is read at the start of each pass, so a caller whose number changes meanwhile (a run's
+    /// workers) has the new one from the next pass; the answer does not depend on it.
+    pub fn improve_on(&self, threads: impl Fn() -> usize, start: &Bits<W>, pairs: bool) -> Bits<W> {
+        let mut scratch = Scratch::new();
+        let mut best = self.fill(&mut scratch, start, &Bits::EMPTY);
+        loop {
+            let threads = threads();
+            let better = if threads <= 1 {
+                self.first_improvement(&mut scratch, &best, pairs)
+            } else {
+                self.first_improvement_on(threads, &best, pairs)
+            };
+            match better {
+                Some(better) => best = better,
+                None => return best,
+            }
         }
-        let mut best = self.fill(&mut Scratch::new(), start, &Bits::EMPTY);
-        while let Some(better) = self.first_improvement_on(threads, &best, pairs) {
-            best = better;
-        }
-        best
     }
 
     /// `best` with the members that move number `i` of a pass over its `members` (ascending) names taken out and
@@ -188,6 +196,7 @@ mod tests {
     use crate::board::Board;
     use crate::game::Optimal;
     use crate::search::SearchTactics;
+    use std::cell::Cell;
 
     /// The local search as the nested loops spell it, which `Move` numbers: what `improve` must reproduce.
     fn improve_by_loops<const W: usize>(hood: &Neighbourhood<W>, start: &Bits<W>, pairs: bool) -> Bits<W> {
@@ -258,9 +267,21 @@ mod tests {
                 assert!(expected.sum() >= start.sum());
                 improved += usize::from(expected.sum() > start.sum());
                 for threads in 0..=4 {
-                    let got = hood.improve_on(threads, &start, pairs);
+                    let got = hood.improve_on(|| threads, &start, pairs);
                     assert_eq!(got, expected, "n={n} from the {what} set, pairs={pairs}, {threads} threads");
                 }
+                // A number that changes from pass to pass (read once per pass) changes nothing either.
+                let reads = Cell::new(0);
+                let got = hood.improve_on(
+                    || {
+                        reads.set(reads.get() + 1);
+                        reads.get() % 5
+                    },
+                    &start,
+                    pairs,
+                );
+                assert_eq!(got, expected, "n={n} from the {what} set, pairs={pairs}, a changing number of threads");
+                assert!(reads.get() > 0, "the number of threads is read at the start of each pass");
             }
         }
         improved

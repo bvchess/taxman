@@ -94,11 +94,10 @@ impl<const W: usize> Board<W> {
         search::prepare_for_resume(&self.tables, &self.frames.columns(), &self.frames.candidates, checkpoint)
     }
 
-    /// The ceiling on the promotion sum, given that the game of `n − 1` scores `prev_score` and is optimal:
-    /// `n + prev_score − in_the_bag`.  `None` if that is negative, which proves the game of `n − 1` was not
-    /// optimal (no game scores less than `in_the_bag`).
+    /// The ceiling on the promotion sum, given that the game of `n − 1` scores `prev_score` and is optimal; see
+    /// [`promotion_cap`].
     pub fn promotion_cap(&self, prev_score: u64) -> Option<u64> {
-        (prev_score + u64::from(self.n())).checked_sub(self.in_the_bag)
+        promotion_cap(self.n(), self.in_the_bag, prev_score)
     }
 
     /// The part of a game's moves that is a seed for the search: those that are promotion candidates here.
@@ -115,6 +114,14 @@ impl<const W: usize> Board<W> {
     pub fn problem(&self) -> Result<Problem, String> {
         search::problem_of(&self.tables, &self.frames.columns(), &self.frames.candidates)
     }
+}
+
+/// The ceiling on the promotion sum of the board `1..=n`, whose `in_the_bag` is given, given that the game of `n − 1`
+/// scores `prev_score` and is optimal: `n + prev_score − in_the_bag`.  `None` if that is negative, which proves the
+/// game of `n − 1` was not optimal (no game scores less than `in_the_bag`).  A free function, for code that knows a
+/// board only by its `in_the_bag`.
+pub fn promotion_cap(n: u32, in_the_bag: u64, prev_score: u64) -> Option<u64> {
+    (prev_score + u64::from(n)).checked_sub(in_the_bag)
 }
 
 /// The search problem of game `n` ([`Board::problem`], at the set width `with_width!` picks for `n`), and the board's

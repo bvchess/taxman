@@ -411,7 +411,7 @@ fn prove<const W: usize>(n: u32, o: &Options, known: &Known) {
     for &delta in &o.deltas {
         let best = opt.checked_add_signed(delta).expect("a margin below zero");
         let diag = o.diag.then(|| Mutex::new(Diagnostics::default()));
-        let space = SearchSpace { diagnostics: diag.as_ref(), ..SearchSpace::new(&p, &graph, None) };
+        let space = SearchSpace { diagnostics: diag.as_ref(), ..SearchSpace::new(&p, &graph) };
         let cfg = EngineConfig {
             threads: o.threads,
             time_limit: o.seconds.map(Duration::from_secs),
