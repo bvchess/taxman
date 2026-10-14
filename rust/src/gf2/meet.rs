@@ -45,34 +45,35 @@
 //! # The heaviest set without a member
 //!
 //! Strong branching asks, for each member `x` of a conflict of `I*` (the heaviest set of all sizes), for the heaviest
-//! common independent set without `x`.  [`Meet::without`] answers from `I*`'s exchange graph alone, with no
-//! augmentation: it finds the shortest *structure through `x`*, one of `x` alone, a cycle through `x`, a path from
-//! `x` to a member or to a sink (an element whose addition keeps `B` independent), or a path to `x` from a member or
-//! from a source (the same for `A`), by two Bellman–Ford searches, one from `x` and one towards it.  `I*` flipped
-//! along the structure, checked common independent, is a set without `x`, so its weight `w(I*)` less the
-//! structure's length is a lower bound.  It is the exact value when the structure is no longer than any path with
-//! `x` inside it could be:
+//! common independent set without `x`; forced members are those without which it is below what the node needs.
+//! [`Meet::without`] answers from `I*`'s exchange graph alone, with no augmentation: the shortest cycle through `x`
+//! (Dijkstra's search over the weight split's reduced lengths, below), along which `I*` flips to a set without `x`
+//! of the same size, checked common independent: its weight `w(I*) − ℓ`, for a cycle of length `ℓ`, is a lower
+//! bound.  It is the heaviest set without `x` when the sets of other sizes than `I*`'s lose at least `ℓ` against
+//! `I*`:
 //!
-//! * Let `J` be the heaviest set without `x` (of at most the size limit).  In each matroid the symmetric difference
-//!   of two independent sets of the same size has a perfect matching of exchange arcs (Schrijver, *Combinatorial
+//! * Let `J` be any common independent set without `x`.  In each matroid the symmetric difference of two
+//!   independent sets of the same size has a perfect matching of exchange arcs (Schrijver, *Combinatorial
 //!   Optimization*, Corollary 39.12a; when the sizes differ, the smaller set extended from the larger first), so
 //!   `I* Δ J` splits into vertex-disjoint parts of the exchange graph: cycles only when `|J| = |I*|`, cycles and
 //!   paths from member to member (a member alone included) when `J` is smaller, and cycles and paths from a source
-//!   to a sink when it is larger.  The lengths of the parts add up to `w(I*) − w(J)`.
+//!   (an element whose addition keeps `A` independent) to a sink (the same for `B`) when it is larger.  The lengths
+//!   of the parts add up to `w(I*) − w(J)`.
 //! * The weight split makes the reduced length of every arc non-negative, `w1(z) − w1(y)` for an arc `z → y` of
-//!   `A` and `w2(z) − w2(y)` for `y → z` of `B`, and a part's length is the sum of its arcs' reduced lengths plus
-//!   `w2` of a first member and `w1` of a last one, or less `w1` of a first source and `w2` of a last sink: never
-//!   negative.  So `w(J) ≤ w(I*) − ℓ`, where `ℓ` is the length of the part through `x`.
-//! * That part is a structure the searches see whole (a cycle, `x` alone, `x` at an end of a path between members;
-//!   a path from a source to `x` or from `x` to a sink is a cycle closed by an arc that every source has from every
-//!   member and every sink to every member), or a path with `x` inside it, which is at least as long as the
-//!   shortest path to `x` plus the shortest path from `x`, less `w(x)` (between members; or from a source to a
-//!   sink, only if the limit allows a set larger than `I*`).  If the structure found is no longer than those two
-//!   sums, `w(J) ≤ w(I*) − ℓ ≤` the lower bound.
+//!   `A` and `w2(z) − w2(y)` for `y → z` of `B`; a cycle's length is the sum of its arcs' reduced lengths, a path
+//!   between members' that plus `w2` of its first member and `w1` of its last, a path from a source to a sink's that
+//!   less `w1` of the source and `w2` of the sink: none is negative.
+//! * So if `|J| = |I*|`, `w(J) ≤ w(I*) − ℓ'`, `ℓ'` the length of the cycle through `x`, at least `ℓ`.  A smaller `J`
+//!   loses at least the shortest path between members ([`Meet::smaller_loss`]; exactly what `I*` gains over a dominant
+//!   set one smaller, where one is known), a larger one at least the gap to the heaviest set one larger
+//!   ([`Meet::gap`], the solve's last shortest path).  If both are at least `ℓ`, no set without `x` beats the
+//!   flipped one.
 //!
-//! The certificate holds at every one of the 10,183 strong-branching members of the proof of 1215 (and the value
-//! equals the solve's); where it does not, the caller solves (see `docs/EXPERIMENTS.md`, "The inner loop of the
-//! GF(2) search").
+//! The same argument restricted to the sets that hold some elements and avoid others certifies a child's heaviest
+//! set from its parent's exchange graph (a cycle that avoids them), and with no cycle within `value − need` and the
+//! other sizes losing more, shows a member forced ([`Meet::has_cycle_within`]).  In the proof of 1215, every bound
+//! without a member that strong branching asked for (10,183) was such a cycle's, as the solves found; where the
+//! certificate does not hold the caller solves (see `docs/EXPERIMENTS.md`, "The inner loop of the GF(2) search").
 
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;

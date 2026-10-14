@@ -610,7 +610,8 @@ the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#t
   node, any thread, any path.  Each searcher keeps a table of them and forgets it every 50,000 of its steps
   (`forget_nogoods`).
 * **strong branching**: which candidate a node promotes next: the member of the conflict whose removal lowers the
-  bound most (with `gf2`, solved exactly for each member).
+  bound most (with `gf2`, exactly for each member: read off the exchange graph of the heaviest set where that
+  certifies it, solved where not).
 * **forced member**: a member of a node's heaviest set whose removal alone brings the bound below what the node
   needs, so every completion that beats the incumbent promotes it (tactic `fix_forced`: the child promotes all of them
   together).

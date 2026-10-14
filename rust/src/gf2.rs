@@ -45,11 +45,16 @@
 //! promoted candidate and no deleted one), less what was promoted; and when that is the parent's heaviest set
 //! itself, which is the heaviest of all sizes, the child's heaviest set is known with no augmentation at all.
 //!
-//! # Forced members
+//! # Forced members, and the bound without a member
 //!
 //! With the heaviest set `I*` of all sizes, [`meet::Meet::split_bounds`] bounds the problem without each member of
 //! `I*` from a weight split, in one pass; a member without which the bound is below what the node needs is forced:
-//! every completion that beats the incumbent promotes it.
+//! every completion that beats the incumbent promotes it.  For the members the split leaves free near the need,
+//! `I*`'s exchange graph decides exactly (`Levels::force_by_cycles`), and strong branching reads the bound without
+//! each member of a conflict off it ([`Gf2Bound::certified_excluding`]), solving only where it is not certified (see
+//! [`meet`], "The heaviest set without a member").  A level's heaviest set may come from such a certificate too: the
+//! node's without the member it branched on, and a child's that lost one member of its parent's heaviest set
+//! (`certify_child`).
 
 pub mod meet;
 
@@ -260,7 +265,7 @@ impl Gf2Graph {
 // The bound along a search's path
 
 /// How far above `need` a member's split bound may be for [`Gf2Bound::evaluate`] to search whether it is forced
-/// after all ([`Levels::force_by_cycles`]).  The split's bound is often far above the exact one (half the members
+/// after all (`Levels::force_by_cycles`).  The split's bound is often far above the exact one (half the members
 /// it leaves free that the search finds forced are within 15 of `need`, nine in ten within 53, at 1215), and the
 /// searches of the members it leaves free cost more than they save: over the quick set of one-thread proofs
 /// (936-1350) a window of 25 costs 20.6 G cycles, 40 18.2, 60 17.3, 80 16.9, 120 17.6, no window 18.0 (without
@@ -328,7 +333,7 @@ pub struct Gf2Stats {
     /// ([`Gf2Bound::certified_excluding`]), and children whose heaviest set their parent's certified.
     pub certified: u64,
     pub certified_children: u64,
-    /// Members found forced by [`Levels::force_by_cycles`] where the split left them free.
+    /// Members found forced by `Levels::force_by_cycles` where the split left them free.
     pub forced_by_cycles: u64,
 }
 

@@ -266,10 +266,10 @@ fn a_search_resumed_over_and_over_finds_the_optimum() {
     let resumes = resumed_over_and_over::<16>(600, truth, 30, 1000, &dir, &[0, 12, 14]);
     assert!(resumes >= 10, "only {resumes} resumes");
     // The GF(2) bound searches 600 in too few nodes to be stopped (the engine checks the limit every 1,024 steps of
-    // a searcher), and game 1000 from 80 below its optimum in several thousand: the default, without forced members,
-    // forgetting every step, and refitting the Lagrangian bound.
-    let truth = optimal_sum::<16>(optimal, 1000).unwrap();
-    let resumes = resumed_over_and_over::<16>(1000, truth, 80, 1000, &dir, &[19, 24, 26, 29]);
+    // a searcher), and game 992 in some ten thousand: the default, without forced members, forgetting every step,
+    // and refitting the Lagrangian bound.
+    let truth = optimal_sum::<16>(optimal, 992).unwrap();
+    let resumes = resumed_over_and_over::<16>(992, truth, 30, 1000, &dir, &[19, 24, 26, 29]);
     assert!(resumes >= 8, "the GF(2) bound: only {resumes} resumes");
 }
 

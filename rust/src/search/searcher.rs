@@ -124,7 +124,8 @@ pub enum Gf2Branching {
     Largest,
     /// The member whose removal lowers the weight split's bound most (see [`crate::gf2::meet`]).
     Split,
-    /// The member whose removal lowers the bound most, solved exactly (warm-started).
+    /// The member whose removal lowers the bound most, exactly: read off the heaviest set's exchange graph where it
+    /// certifies the bound, solved (warm-started) where not.
     Exact,
     /// Each member solved only as far as `need` (to find the forced ones), the branch the member with the lowest
     /// weight-split bound.
@@ -800,8 +801,8 @@ impl<'a, const W: usize> Stepper<'a, W> {
 
     /// [`choose_branch`](Self::choose_branch) with the tactic `gf2`: the forced members if there are any (the child
     /// promotes them all, with `fix_forced`), else a member of the conflict of the GF(2) bound's heaviest set chosen
-    /// as [`SearchSpace::gf2_branching`] says.  With [`Gf2Branching::Exact`], each member's bound is solved without
-    /// it, which also finds forced members among them.
+    /// as [`SearchSpace::gf2_branching`] says.  With [`Gf2Branching::Exact`], each member's bound without it is found
+    /// exactly (certified or solved), which also finds forced members among them.
     fn choose_branch_gf2(&mut self, node: &mut Node<W>, open: Open<W>, need: u64) -> Option<Branch<W>> {
         let space = self.space;
         let g = self.gf2.as_mut().expect("the tactic gf2");
