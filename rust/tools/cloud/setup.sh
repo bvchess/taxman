@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Prepare a machine to build and run the Taxman solver and the evidence crate's model-free prover: packages, the Rust
-# toolchain, the checkout, the builds and quick checks.  Idempotent: run it again after a reboot, or to move to newer
-# commits (it fast-forwards the checkout).
+# Prepare a machine to build and run the Taxman solver and the prover: packages, the Rust toolchain, the checkout, the
+# builds and quick checks.  Idempotent: run it again after a reboot, or to move to newer commits (it fast-forwards the
+# checkout).
 #
 # Written for Amazon Linux 2023 (dnf) and Ubuntu 22.04/24.04 (apt), on arm64 and x86_64.  Other Linux with git, a C
 # compiler and curl works with SKIP_PACKAGES=1.
@@ -15,7 +15,7 @@
 #   TAXMAN_DIR      $HOME/taxman    where to clone, when the script is not inside a checkout
 #   NO_PULL=1       leave the checkout as it is (otherwise: git pull --ff-only, if it is clean and on a branch)
 #   SKIP_PACKAGES=1 SKIP_TESTS=1 SKIP_SMOKE=1
-#   PROVER_ONLY=1 build and check only the evidence crate (what prover.sh runs), not the solver: a few minutes less
+#   PROVER_ONLY=1 build and check only the prover (what prover.sh runs), not the solver: a few minutes less
 #   TAXMAN_WORK     where results, checkpoints and logs live (see env.sh)
 #   RUSTFLAGS       default "-C target-cpu=native" (see env.sh)
 
@@ -43,7 +43,7 @@ if [ "$(id -u)" -ne 0 ]; then
     command -v sudo >/dev/null 2>&1 && sudo_cmd="sudo"
 fi
 
-# Optional tools (GNU time reports the peak memory of a run; htop shows the cores): one at a time, so that a package
+# Optional tools (GNU time reports the peak memory of a run; htop shows the CPUs): one at a time, so that a package
 # a distribution does not have cannot fail the rest.
 optional_packages() {
     local manager="$1" package
@@ -142,7 +142,7 @@ if [ "${PROVER_ONLY:-0}" != 1 ]; then
     [ -x "$TAXMAN_BIN" ] || fail "the build did not produce $TAXMAN_BIN"
     [ -x "$LADDER_BIN" ] || fail "the build did not produce $LADDER_BIN"
 fi
-say "building the evidence crate (its own workspace): exact, the other tools and their examples"
+say "building the prover (its own workspace): exact, the other tools and their examples"
 (cd "$PROVER" && cargo build --release --bins --examples)
 [ -x "$EXACT_BIN" ] || fail "the build did not produce $EXACT_BIN"
 
@@ -157,7 +157,7 @@ if [ "${SKIP_SMOKE:-0}" != 1 ]; then
         say "smoke: games 1..400 against optimal.json"
         "$TAXMAN_BIN" regress --to 400 --threads "$(( $(ncpu) < 8 ? $(ncpu) : 8 ))"
     fi
-    say "smoke: the model-free prover on games 2..400, and the check of its proofs"
+    say "smoke: the prover on games 2..400, and the check of its proofs"
     smoke="$TAXMAN_WORK/smoke-exact"
     rm -rf "$smoke"
     "$EXACT_BIN" --from 2 --to 400 --threads "$(ncpu)" --checkpoints "$smoke/ckpt" --out "$smoke/exact.jsonl"
@@ -172,7 +172,7 @@ if [ "${SKIP_TESTS:-0}" != 1 ]; then
         say "cargo test -- --test-threads=4"
         (cd "$CRATE" && cargo test -- --test-threads=4)
     fi
-    say "cargo test --release -- --test-threads=4, in the evidence crate (about a minute)"
+    say "cargo test --release -- --test-threads=4, in the prover (about a minute)"
     (cd "$PROVER" && cargo test --release -- --test-threads=4)
 fi
 
@@ -185,6 +185,6 @@ echo "solver:         $TAXMAN_BIN"
 if [ -x "$CRATE/tools/pgo.sh" ]; then
     echo "note: $CRATE/tools/pgo.sh exists in this checkout; read its header for an optional profile-guided build"
 fi
-echo "evidence:       $EXACT_BIN"
-echo "next:           $CLOUD_DIR/scaling.sh (the solver) or $CLOUD_DIR/prover.sh A B (the model-free proofs);" \
+echo "prover:         $EXACT_BIN"
+echo "next:           $CLOUD_DIR/scaling.sh (the solver) or $CLOUD_DIR/prover.sh A B (the prover's proofs);" \
     "see RUNBOOK.md"

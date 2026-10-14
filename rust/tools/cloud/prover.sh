@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# The model-free proofs of opt(n) for a range of board sizes, on all the cores of a machine, resumable.
+# The prover's proofs of opt(n) for a range of board sizes, on all the CPUs of a machine, resumable.
 #
 #   rust/tools/cloud/prover.sh A B             prove opt(n) = V(n) for n = A..B  (V: rust/results/strict.jsonl)
 #   rust/tools/cloud/prover.sh --verify A B    check the output: every n in 2..B proven, every score the recorded one
 #
-# It runs `exact` of the evidence crate (rust/prover, README section 3), which knows nothing of the solver's frame
+# It runs `exact` of the prover (rust/prover, README section 3), which knows nothing of the solver's frame
 # model, over the range.  `exact` runs one game per thread (a game's search is one thread), so the games are spread over
-# the cores; it runs for PASS_SECONDS, then pauses every search still going, saving its open subtrees and learned
+# the CPUs; it runs for PASS_SECONDS, then pauses every search still going, saving its open subtrees and learned
 # conflicts to a checkpoint ($CKPT/exact_N.ckpt), and this script runs it again, which resumes them.  A game may take
 # any number of passes.  The games go dearest first, by the nodes the solver's search of each took (strict.jsonl;
 # `exact` takes one to three times as many), so that a long game starts early instead of last.
@@ -22,20 +22,20 @@
 #   124      the deadline (DEADLINE_HOURS) stopped it: the script ends
 #   1, 2, 101, 134
 #            the prover reported an error: a recorded game that does not replay, or (the finding to look for) a playable
-#            set that BEATS a recorded optimum.  Nothing is retried; read evidence.err
+#            set that BEATS a recorded optimum.  Nothing is retried; read prover.err
 #   other    a crash (the OOM killer): run again after 10 s; MAX_FAILS in a row with no new line end the script
 #
 # When the range is complete it runs the check (`--verify`) and exits 0 only if that passes.
 #
 # Output: $OUT (default $TAXMAN_WORK/results/exact_parity_A_B.jsonl, one line per game, the format of
-# rust/prover/data/exact_parity_2_1300.jsonl), logs in $LOGS: evidence.log (this script), evidence.err (`exact`).
+# rust/prover/data/exact_parity_2_1300.jsonl), logs in $LOGS: prover.log (this script), prover.err (`exact`).
 #
 # Environment (all optional):
 #   THREADS         threads, default every CPU
 #   PASS_SECONDS    the length of a pass, default 300: the work lost to a kill, against the small cost of a restart
 #   OUT             the output file
 #   STRICT          the recorded optima, default rust/results/strict.jsonl (committed)
-#   BASELINE        the proofs of the smaller games the check builds on (default: the evidence crate's
+#   BASELINE        the proofs of the smaller games the check builds on (default: the prover's
 #                   data/exact_parity_2_1300.jsonl)
 #   EXTRA_ARGS      more flags for `exact`
 #   MAX_FAILS       default 5
@@ -85,7 +85,7 @@ MAX_FAILS="${MAX_FAILS:-5}"
 SAVE_EVERY="${SAVE_EVERY:-$PASS_SECONDS}"
 # shellcheck source=run.sh
 . "$here/run.sh"
-run_begin evidence "$(dirname "$OUT")"
+run_begin prover "$(dirname "$OUT")"
 
 # The games of A..B with a line in $OUT.
 games_done() {
@@ -95,12 +95,12 @@ games_done() {
 }
 
 # The order of the games, the dearest first, made once and kept (the order does not change a result).
-order_file="$TAXMAN_WORK/evidence-order_${from}_${to}.txt"
+order_file="$TAXMAN_WORK/prover-order_${from}_${to}.txt"
 [ -s "$order_file" ] || "${SUMMARIZE[@]}" order "$from" "$to" >"$order_file" || die "could not order the games"
 list="$(cat "$order_file")"
 
-log "evidence $from-$to: $total games; threads $THREADS; passes of ${PASS_SECONDS}s; output $OUT; checkpoints $CKPT"
-env_report | tee -a "$LOGS/evidence.log" >&2
+log "prover $from-$to: $total games; threads $THREADS; passes of ${PASS_SECONDS}s; output $OUT; checkpoints $CKPT"
+env_report | tee -a "$LOGS/prover.log" >&2
 
 fails=0
 pass=0
@@ -124,7 +124,7 @@ while :; do
     fi
 
     lines_before="$done_now"
-    run_child "$LOGS/evidence.out" "$LOGS/evidence.err" "$EXACT_BIN" --list "$list" --threads "$THREADS" \
+    run_child "$LOGS/prover.out" "$LOGS/prover.err" "$EXACT_BIN" --list "$list" --threads "$THREADS" \
         --seconds "$PASS_SECONDS" --checkpoints "$CKPT" --results "$STRICT" --out "$OUT" ${EXTRA_ARGS:-}
     log "pass $pass: exact exited with status $status"
 
@@ -140,8 +140,8 @@ while :; do
             break
             ;;
         1 | 2 | 101 | 134)
-            log "exact reported an error; not retrying.  The last lines of evidence.err:"
-            tail -n 8 "$LOGS/evidence.err" >&2
+            log "exact reported an error; not retrying.  The last lines of prover.err:"
+            tail -n 8 "$LOGS/prover.err" >&2
             outcome="failed"
             break
             ;;
@@ -160,7 +160,7 @@ done
 
 log "ended: $outcome"
 if [ "$outcome" = complete ]; then
-    verify 2>&1 | tee -a "$LOGS/evidence.log" || outcome="failed"
+    verify 2>&1 | tee -a "$LOGS/prover.log" || outcome="failed"
 fi
 case "$outcome" in
     complete) exit 0 ;;

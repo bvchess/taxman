@@ -10,7 +10,7 @@
 # "Reading the sweep", says how to read the tables.  Run it on an idle machine.
 #
 # Environment (all optional):
-#   GAMES          games to sweep, default "1215 1225" (proofs that take about 1 and 2.5 minutes on one M1 core)
+#   GAMES          games to sweep, default "1215 1225" (proofs that take about 1 and 2.5 minutes on one M1 CPU)
 #   THREADS        a comma list such as 1,8,64,192, default: 1, 2, 4, ... and the number of CPUs
 #   SECONDS_LIMIT  per game and thread count, default 1800; a search that hits it is marked with * in the tables
 #   KNOWN          the results file the ladder takes games from, default rust/results/strict.jsonl

@@ -12,7 +12,7 @@
 #   LOGS          the log directory               (default $TAXMAN_WORK/logs)
 #   TAXMAN_BIN    the solver binary               (default rust/target/release/taxman)
 #   LADDER_BIN    the ladder example binary       (default rust/target/release/examples/ladder)
-#   EXACT_BIN     the evidence crate's `exact`    (default rust/prover/target/release/exact; prover.sh)
+#   EXACT_BIN     the prover's `exact`            (default rust/prover/target/release/exact; prover.sh)
 #   RUSTFLAGS     default "-C target-cpu=native" in these scripts (a plain `cargo build` builds generic code): build
 #                 for the CPU of the machine that builds.  Build on the machine type that will run the binary.  Set it
 #                 to the empty string to build generic code.

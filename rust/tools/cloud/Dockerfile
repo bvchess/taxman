@@ -1,17 +1,16 @@
 # A Linux build-and-test environment for the Taxman solver: the dry run before the cloud run.
 #
-# It builds the solver and the examples, the evidence crate (rust/prover, the model-free prover that prover.sh runs)
-# and compiles the tests on Linux (Debian), so that a Linux-only problem shows up on your own machine, and it holds the
-# scripts of this directory so that they can be tried too.  On an Apple-silicon Mac the container is linux/arm64, the
-# instruction set of Graviton.  The build context is the repository root, and only the files the build needs are sent
-# (Dockerfile.dockerignore).
+# It builds the solver and the examples, the prover (rust/prover, which prover.sh runs) and compiles the tests on Linux
+# (Debian), so that a Linux-only problem shows up on your own machine, and it holds the scripts of this directory so
+# that they can be tried too.  On an Apple-silicon Mac the container is linux/arm64, the instruction set of Graviton.
+# The build context is the repository root, and only the files the build needs are sent (Dockerfile.dockerignore).
 #
 # How to build and run it: RUNBOOK.md, "Dry run in Docker".
 
 ARG RUST_IMAGE=rust:1-bookworm
 FROM ${RUST_IMAGE}
 
-# python3: tools/check_results.py and the evidence crate's tools/summarize.py.  procps: the kill command, which tests
+# python3: tools/check_results.py and the prover's tools/summarize.py.  procps: the kill command, which tests
 # use to send signals.  time: GNU time, which scaling.sh uses to report peak memory.  tmux: the RUNBOOK's way to keep a
 # run alive over a dropped connection.
 RUN apt-get update \
@@ -35,7 +34,7 @@ WORKDIR /taxman/rust
 RUN cargo build --release --bins --examples \
     && cargo test --no-run
 
-# The evidence crate is a workspace of its own.
+# The prover is a workspace of its own.
 WORKDIR /taxman/rust/prover
 RUN cargo build --release --bins --examples \
     && cargo test --release --no-run

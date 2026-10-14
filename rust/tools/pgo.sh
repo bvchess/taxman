@@ -2,7 +2,7 @@
 #
 # Profile-guided build of the solver: an instrumented build runs a training workload, and the profile it records
 # steers the optimized build: the same answers and trees, and 0-2% fewer cycles than the plain release build on
-# the frontier's searches since the hot loop is inlined by hand (12% before; DESIGN.md, "Performance").
+# the searches at the end of the chain since the hot loop is inlined by hand (12% before; DESIGN.md, "Performance").
 #
 #   tools/pgo.sh [--no-train]
 #
@@ -71,7 +71,7 @@ if [ "$TRAIN" = 1 ]; then
     "$BIN/examples/perf" --reps 1
     # The probe's windows record the matching path's tactics; the GF(2) bound's kernels and windows as well.
     "$BIN/examples/perf" --reps 1 --tactic gf2=on
-    # A game of every width, from W = 8 to W = 64; the frontier's ones searched longer.
+    # A game of every width, from W = 8 to W = 64; those at the end of the chain searched longer.
     for game in 480:2 700:2 936:4 1184:8 1300:8 1600:3 1900:3 2500:2 3500:2; do
         "$BIN/examples/ladder" --threads 1 --seconds "${game#*:}" --known "$CRATE/results/strict.jsonl" \
             "${game%:*}" | cut -c1-100
