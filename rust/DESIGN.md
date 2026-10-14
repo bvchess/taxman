@@ -166,8 +166,10 @@ On the path of a solve are all the layers but the studies.  `examples/` holds th
 limits, thread scaling, diagnostics), the probe `perf` (the hot paths from fixtures, in cycles and instructions),
 the sacrifice study, `repeats` (the games whose search repeats an earlier game's, from the setups alone, and what
 a results file spent on them), `slope` (the gaps of a game's root, and proofs with every bound lowered by a
-margin) and `matroid` (the study of the GF(2) bound: at roots and nodes, as a plain branch and bound, and the
-search's proofs with it, `matroid prove`); `tests/` the integration tests (section 9); `tools/` the results referee in Python,
+margin), `matroid` (the study of the GF(2) bound: at roots and nodes, as a plain branch and bound, and the
+search's proofs with it, `matroid prove`) and `wall` (what grows with n and with a tree: a game's fixed costs piece by
+piece, a node's cost at any set width, large trees with their memory and checkpoints, the frames past 4095);
+`tests/` the integration tests (section 9); `tools/` the results referee in Python,
 the PGO build, the Java golden export and the cloud scripts.
 
 **Width dispatch.**  Everything that holds sets of game numbers is generic over `const W: usize`, the number of 64-bit
