@@ -1,33 +1,49 @@
-//! Frames: the hives of a board stacked into levels, which is the shape the search works on.
+//! Frames as the search takes them: the frames of a board numbered from the front, and those with the same number
+//! merged.
 //!
-//! Where this fits: [`build_frames`] takes the [`Apiary`] of a board (see [`crate::hives`] for the vocabulary:
-//! sources, factors, hives, free and closed hives) and turns it into the input of the search, a list of
-//! [`FrameColumn`]s plus the numbers that could be promoted.  The next step is [`crate::model::Model::build`],
-//! which takes [`FrameColumns::columns`], and then [`crate::search`].
+//! Where this fits: [`build_frames`] takes the [`Apiary`] of a board (see [`crate::hives`]: setup forms the frames,
+//! each source with the factors it can use, the sources that share a factor in one frame, and simplifies them, with
+//! their impossible sources, `unzip`'s mandatory moves and their freedoms) and turns it into the input of the
+//! search, a list of [`FrameColumn`]s plus the numbers that could be promoted.  The next step is
+//! [`crate::model::Model::build`], which takes [`FrameColumns::columns`], and then [`crate::search`].
 //!
 //! # What a frame is
 //!
-//! A hive that is **closed** (no free factor: it has exactly as many factors as moves) can neither spare a factor
-//! nor take another move, so it takes no part in the search.  The **free** hives are the ones that matter: each
-//! can give up a factor (to be promoted into a move of the hive below) and take in a promoted number from the hive
-//! above.  They are grouped into *levels*, and all the hives of a level are merged into one **frame**, a small
-//! game of Taxman Mini: a set of moves and a set of factors.  Frame 0 is the bottom, the downstream end (in the
-//! finished game its hives are played first); promoting a factor of frame `h` makes it a move of frame `h − 1`.
+//! A frame that is **closed** (no freedom: it has exactly as many factors as moves) can neither spare a factor
+//! nor take another move, so it takes no part in the search.  The frames that have freedoms are the ones that
+//! matter: each can give up a factor (to be promoted into a move of the frame in front of it) and take in a
+//! promoted number from a frame behind it.  They are numbered from the front, and all the frames with the same
+//! number are merged into one frame, a small game of Taxman Mini: a set of moves and a set of factors.  Frame 0 is
+//! the front (in the finished game its moves are played first); promoting a factor of frame `h` makes it a move of
+//! frame `h − 1`, one frame forward.
 //!
-//! The levels are built breadth first from the bottom:
+//! The frames are numbered breadth first from the front:
 //!
-//! * level 0 is every free hive that has no free hive directly downstream of it;
-//! * level `k + 1` is every free hive directly upstream of level `k` that is not already placed.
+//! * number 0 goes to every frame with freedoms that has no frame with freedoms directly in front of it;
+//! * number `k + 1` goes to every frame with freedoms directly behind a frame numbered `k` that is not already
+//!   numbered.
 //!
 //! ("Directly" is through `Apiary::downstream_hives` and `upstream_hives`, which look at the board's maximal
-//! factors and composites of every number in the hive.)  Within a level the hives are ordered by their smallest
-//! source.  The construction is the Java's and does not depend on it, but in every board up to 2000 the layering
-//! comes out clean: every free hive directly downstream of a hive of level `k > 0` is in level `k − 1` (and there
-//! is at least one), and no two hives of a level are neighbours.
+//! factors and composites of every number in the frame.)  Among the frames with one number, the order is that of
+//! their smallest source.  The construction is the Java's and does not depend on it, but in every board up to 2000
+//! the numbering comes out clean: every frame with freedoms directly in front of a frame numbered `k > 0` is
+//! numbered `k − 1` (and there is at least one), and no two frames with the same number are neighbours.
+//!
+//! # Why frames are merged
+//!
+//! Merging happens so that a promotion always has one frame to go to.  A promoted number is paid by one of its
+//! maximal factors; if those lie in two frames with the same number, the promotion would have two frames to go to,
+//! and as one merged frame they are the one frame it goes to.  It happens at n = 20: the frames of 14 (with the
+//! factors 2, 7) and of 15 (with 3, 5) share no factor, and both sit directly in front of the frame of 12, 18, 20
+//! (with 4, 6, 9, 10), whose 6 and 10 could be paid in either.  Both get number 0 and are merged into one frame
+//! (`B+C` in the golden data, `testdata/golden/n0020.json`: the move 15 and the factors 2, 3, 5, as `unzip` pairs 14
+//! with 7); the frame of 12, 18, 20 is frame 1.  At n = 21 it does not happen: the frames B (14, 15, 21 with 2, 3,
+//! 5, 7) and C (12, 18, 20 with 4, 6, 9, 10) are the only ones with freedoms and C is behind B, so they are frames 0
+//! and 1, and A (19) and D (16) are closed (`testdata/golden/n0021.json`).
 //!
 //! # An example
 //!
-//! The board `1..=85` (`tests::frames_of_85`, from the Java's tests) has three frames, bottom first:
+//! The board `1..=85` (`tests::frames_of_85`, from the Java's tests) has three frames, front first:
 //!
 //! ```text
 //! frame 0   moves 45 50 63 75    factors 4 6 9 10 14 15 21 25    4 freedoms
@@ -36,32 +52,32 @@
 //! candidates: 8 12 16 20 24 28 30 36 40 42
 //! ```
 //!
-//! The moves are the sources the hives found neither mandatory nor impossible; the factors are the ones not used
+//! The moves are the sources that setup found neither mandatory nor impossible; the factors are the ones not used
 //! up by mandatory moves; the *freedoms* are factors minus moves.  A promotion takes a number out of the factors of
-//! its frame and adds it to the moves of the frame below, which costs one freedom in each.
+//! its frame and adds it to the moves of the frame in front of it, which costs one freedom in each.
 //!
 //! # The order of operations matters
 //!
 //! The construction mirrors the Java `FrameBuilder`/`WorkingFrame`, and the order is part of what it computes,
-//! because merging changes what the hives above can do (a merged hive has more sources to place and more factors
-//! to share): the promotion candidates of a level are collected from its separate hives, *then* the level is
-//! merged, and only then is the next level looked at.  Once all levels are merged, every hive is simplified once
-//! more (`Apiary::finish_setup`), since merging forgets what the parts had found.
+//! because merging changes what the frames behind can do (a merged frame has more sources to place and more
+//! factors to share): the promotion candidates of the frames with one number are collected from them separately,
+//! *then* they are merged, and only then are the frames with the next number looked at.  Once all are merged,
+//! every frame is simplified once more (`Apiary::finish_setup`), since merging forgets what the parts had found.
 
 use crate::bits::Bits;
 use crate::hives::Apiary;
 use crate::numtheory::Tables;
 
-/// One frame: a level of hives, merged.
+/// A frame as the search takes it: the frames that got one number, merged.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrameColumn<const W: usize> {
-    /// The merged hives' names joined with `+`; for diagnostics only.
+    /// The names setup gave the merged frames (A, B, ...), joined with `+`; for diagnostics only.
     pub name: String,
     /// The frame's factors that are not already used up by mandatory moves.
     pub factors: Bits<W>,
     /// The frame's sources that are neither mandatory nor impossible: the moves the search still has to place.
     pub moves: Bits<W>,
-    /// `|factors| − |sources|` of the merged hive, the frame's *freedoms*: how many spare factors it has.  Each
+    /// `|factors| − |sources|` of the merged frame, the frame's *freedoms*: how many factors it can spare.  Each
     /// promotion into the frame or out of it uses one up.  (It equals `factors.len() − moves.len()`: the mandatory
     /// moves take one factor each.)
     pub free_factor_count: i32,
@@ -70,16 +86,16 @@ pub struct FrameColumn<const W: usize> {
 /// The frames of a board, with what the search needs to know about them.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrameColumns<const W: usize> {
-    /// Bottom (downstream) first.
+    /// In playing order: frame 0, the front, first.
     pub frames: Vec<FrameColumn<W>>,
-    /// Every number that could be promoted, in any frame: for each free hive, the factors it could spare that the
-    /// hive below could take on as a source ([`Apiary::hive_promotion_candidates`]), collected level by level
-    /// before the level is merged.
+    /// Every number that could be promoted, in any frame: for each frame with freedoms, the factors it could spare
+    /// that a frame in front of it could take on as a source ([`Apiary::hive_promotion_candidates`]), collected
+    /// number by number before the frames with that number are merged.
     pub candidates: Bits<W>,
 }
 
 impl<const W: usize> FrameColumns<W> {
-    /// The frames in the shape [`crate::model::Model::build`] takes: for each frame, bottom first, its factors
+    /// The frames in the shape [`crate::model::Model::build`] takes: for each frame, front first, its factors
     /// and then its moves.
     pub fn columns(&self) -> Vec<Vec<u32>> {
         self.frames.iter().flat_map(|f| [f.factors.to_vec(), f.moves.to_vec()]).collect()
@@ -90,9 +106,9 @@ impl<const W: usize> FrameColumns<W> {
 pub fn build_frames<const W: usize>(t: &Tables) -> FrameColumns<W> {
     let mut apiary = Apiary::<W>::new(t, Bits::EMPTY);
 
-    // The levels are found on the apiary as it is, before anything is merged.  A hive is named by its smallest
-    // factor, because merging changes the positions of the hives but not what they hold.  (A free hive has
-    // factors.)
+    // The frames with freedoms are numbered on the board's frames as they are, before anything is merged.  A frame
+    // is named by its smallest factor, because merging changes the positions of the frames but not what they hold.
+    // (A frame with freedoms has factors.)
     let levels = levels_of_free_hives(&apiary);
     let mut candidates = Bits::EMPTY;
     for level in &levels {
@@ -105,7 +121,7 @@ pub fn build_frames<const W: usize>(t: &Tables) -> FrameColumns<W> {
         }
     }
     // Merging forgot what the parts had found (the mandatory and impossible moves); find it again for the merged
-    // hives.
+    // frames.
     apiary.finish_setup();
 
     let frames: Vec<FrameColumn<W>> = levels
@@ -123,9 +139,10 @@ pub fn build_frames<const W: usize>(t: &Tables) -> FrameColumns<W> {
     FrameColumns { frames, candidates }
 }
 
-/// The levels of hives that still have free factors, bottom first, each hive named by its smallest factor.
-/// Within a level the hives are ordered by their smallest source.  See the module documentation for how the
-/// levels are formed.
+/// Numbers the frames that have freedoms from the front (0 is played first) and groups them by number: one entry
+/// per number, in order, listing the frames that got it, each named by its smallest factor; the frames of one entry
+/// are the ones to merge.  Among the frames with one number, the order is that of their smallest source.  See the
+/// module documentation for how the numbers are formed.
 fn levels_of_free_hives<const W: usize>(apiary: &Apiary<W>) -> Vec<Vec<u32>> {
     let hives = apiary.hives();
     let is_free = |i: usize| hives[i].has_free_factors();
@@ -189,9 +206,9 @@ mod tests {
         }
     }
 
-    /// The solver takes a prime game's promotions from the unmerged apiary's candidates (the prime shortcut), the
-    /// frame builder collects them level by level while merging; they are the same set on every board up to 2000
-    /// (checked once; this guards the small boards).
+    /// The solver takes a prime game's promotions from the candidates of the board's frames before any is merged
+    /// (the prime shortcut), the frame builder collects them number by number while merging; they are the same set
+    /// on every board up to 2000 (checked once; this guards the small boards).
     #[test]
     fn the_frames_candidates_are_the_plain_apiarys() {
         for n in 2..=300u32 {

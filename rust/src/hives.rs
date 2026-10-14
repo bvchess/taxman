@@ -1,13 +1,18 @@
-//! Hives: the units the frame model is built from.
+//! Frames as setup forms them: the units the frame model is built from.
 //!
 //! Where this fits: [`Apiary::new`] takes the tables of a board ([`crate::numtheory`]) and a set of promoted
-//! numbers and forms the board's hives.  [`crate::frames`] stacks the hives that can still change into the frames
-//! the search works on, and at the end of every game [`Apiary::solution`], on an apiary built with the winning
-//! promotions as sources, turns them into the moves of a game.  The names (apiary, hive, `unzip`,
-//! `removeImpossible`) come from the Java solver's `bombus` package, which this module reimplements; its results
-//! define the search space, so they are reproduced exactly (see "Parity with the Java" below).
+//! numbers and forms the board's frames: each source with the factors it can use, the sources that share a factor
+//! in one frame.  It then simplifies them: it drops the impossible sources, settles the mandatory moves (`unzip`)
+//! and counts the freedoms.  [`crate::frames`] numbers the frames that have freedoms from the front (0 is played
+//! first) and merges those with the same number, which gives the frames the search works on, and at the end of
+//! every game [`Apiary::solution`], on the frames built with the winning promotions as sources, turns them into
+//! the moves of a game.  The type [`Hive`] is a frame as setup forms it, before frames with the same number are
+//! merged; [`Apiary`] is all the frames of a board, in playing order.  Their names and those of `unzip` and
+//! `removeImpossible` come from the Java solver's `bombus` package (`bombus.Hive`, `bombus.Apiary`), which this
+//! module reimplements; its results define the search space, so they are reproduced exactly (see "Parity with the
+//! Java" below).
 //!
-//! # Sources, factors and hives
+//! # Sources, factors and frames
 //!
 //! The frame model looks at the board `1..=n` through *maximal* factors (see [`crate::numtheory`]): a move
 //! `m` is paid for by one of its maximal factors, and a factor can pay for only one move.  A number with no
@@ -18,63 +23,68 @@
 //! left to pay for it: promoting 8 on the board `1..=20` makes 16 a sink.  It is neither a move nor tax, and a
 //! sink that is a source is found impossible.)
 //!
-//! A **hive** is a connected component of the graph that joins every source to its factors: a set of sources
-//! together with all the factors they compete for.  Hives are independent of each other, except that a factor of
-//! one hive can be *promoted* into a source of the hive below it.  Hive `A` is *upstream* of hive `B`, and `B`
-//! *downstream* of `A`, when a number of `A` has a maximal factor in `B`: `A`'s numbers are multiples of `B`'s.
-//! An [`Apiary`] is the set of all hives of one board, in an order, downstream first, in which their games can
-//! simply be concatenated.  (A move takes all of its divisors, and they lie in its own hive or downstream of it;
-//! so a hive played after its downstream hives finds its factors untouched.)
+//! A **frame** is a connected component of the graph that joins every source to its factors: a set of sources
+//! together with all the factors they compete for, so that sources that share a factor are in the same frame.
+//! Frames are independent of each other, except that a factor of one frame can be *promoted* into a source of a
+//! frame in front of it.  Frame `X` is *in front of* frame `Y`, and `Y` *behind* `X`, when a number of `Y` has a
+//! maximal factor in `X`: `Y`'s numbers are multiples of `X`'s.  An [`Apiary`] holds all the frames of one board,
+//! in playing order, front first, in which their games can simply be concatenated.  (A move takes all of its
+//! divisors, and they lie in its own frame or in front of it; so a frame played after the frames in front of it
+//! finds its factors untouched.)
 //!
-//! The sources of a hive can be played together exactly when each can be given a factor of its own and the
+//! The sources of a frame can be played together exactly when each can be given a factor of its own and the
 //! moves can be put in an order that works; `Apiary::count_freedoms` decides that with a *peel*, described there.
 //!
-//! # Simplifying a hive
+//! # Simplifying a frame
 //!
-//! After the hives are formed, [`Apiary::new`] simplifies each one until nothing changes (`finish_setup`).
-//! Three things are decided hive by hive.  All three are part of the **frame model's assumptions**: they are
+//! After the frames are formed, [`Apiary::new`] simplifies each one until nothing changes (`finish_setup`).
+//! Three things are decided frame by frame.  All three are part of the **frame model's assumptions**: they are
 //! validated (the Java's table of optimal games is reproduced to n = 1000, and small boards agree with
 //! exhaustive search) but not proven; README §1 and DESIGN.md (§2, "What optimal means", and §5, "Tactics") list
 //! them.
 //!
-//! * **unzip** finds the hive's *mandatory* moves, in two ways: a source with a single usable factor must take
+//! * **unzip** finds the frame's *mandatory* moves, in two ways: a source with a single usable factor must take
 //!   it, and a factor wanted by a single source is given to that source.  A pair is settled only when the factor
-//!   cannot be put to better use outside the hive, as tax for a number promoted from another hive or (in the
-//!   second way) as a promoted number itself, a move of the hive below.  Each settled pair of a move and its
-//!   *claimed* factor leaves the hive's *remaining* sources and factors, which are what the frame shows the
-//!   search.  The assumption: a hive plays all of its sources, so a source with one choice makes it.  (Earlier
-//!   notes call these moves "forced"; this code keeps that word out of the hives, since the search has forced
+//!   cannot be put to better use outside the frame, as tax for a number promoted from another frame or (in the
+//!   second way) as a promoted number itself, a move of a frame in front of it.  Each settled pair of a move and
+//!   its *claimed* factor leaves the frame's *remaining* sources and factors, which are what the frame shows the
+//!   search.  The assumption: a frame plays all of its sources, so a source with one choice makes it.  (Earlier
+//!   notes call these moves "forced"; this code keeps that word out of the frames, since the search has forced
 //!   members of its own that are unrelated.)
 //! * **removeImpossible** drops, greedily from the largest source down, every source that cannot be played
-//!   together with the sources already kept.  They are the hive's *impossible* moves, which no game of the model
+//!   together with the sources already kept.  They are the frame's *impossible* moves, which no game of the model
 //!   plays.  The assumption: that this greedy choice keeps the heaviest playable set of sources.  It would, if the
-//!   playable subsets of a hive's sources formed a matroid; nobody has shown that they do.
-//! * The *free factor count* (the *freedoms*) is `|factors| − |sources|`: how many factors the hive can spare,
-//!   each promotion out of or into the hive using one up.  A hive with none is *closed* and takes no part in the
-//!   search; one with some is *free*.  The assumption: that this count is the hive's capacity.  (It is only a
-//!   count: the search still checks every single promotion for winnability.)
+//!   playable subsets of a frame's sources formed a matroid; nobody has shown that they do.
+//! * The *freedoms* (the field `free_factor_count`) are `|factors| − |sources|`: how many factors the frame can
+//!   spare, each promotion out of or into the frame using one up.  A frame with none is *closed* and takes no part
+//!   in the search; one with some goes on to it.  The assumption: that this count is the frame's capacity.  (It is
+//!   only a count: the search still checks every single promotion for winnability.)
 //!
 //! # Parity with the Java
 //!
 //! The results of the Java solver are what this module has to reproduce, so the order of every loop below is
 //! deliberate: which source is declared impossible, or which pair is claimed first, can depend on the order.  The
-//! golden tests (`tests/golden_hives.rs`) compare every field of every hive of the 318 boards in
-//! `testdata/golden` (up to n = 760), and the hives and frames of the eleven wide boards of
-//! `testdata/golden_wide` (up to n = 2048), with what the Java produced.  Two details reproduce quirks of the
-//! Java on purpose: a hive that has not been simplified yet counts as having free factors (`Hive::new`), and the
-//! stale-hive behaviour of `Home::MergedAway`.
+//! golden tests (`tests/golden_hives.rs`) compare every field of every frame as setup forms it of the 318 boards in
+//! `testdata/golden` (up to n = 760), and the frames before and after numbering and merging of the eleven wide
+//! boards of `testdata/golden_wide` (up to n = 2048), with what the Java produced.  (The golden data is the Java's
+//! export and keeps the Java's keys: `apiary` is the board's frames in playing order, its `hives` the frames as
+//! setup forms them, each with a `freeFactorCount` (its freedoms), and `frames` the frames after numbering and
+//! merging.)  Two details reproduce quirks of the Java on purpose: a frame that has not been simplified yet counts
+//! as having freedoms (`Hive::new`), and the stale-frame behaviour of `Home::MergedAway`.
 //!
 //! # Punctured boards
 //!
-//! An apiary can also be built on a board with *holes* ([`Tables::punctured`]): numbers that are never in the
-//! pot, so never moves and never tax, and belong to no hive.  Only the sacrifice study ([`crate::sacrifice`])
+//! The frames can also be formed on a board with *holes* ([`Tables::punctured`]): numbers that are never in the
+//! pot, so never moves and never tax, and belong to no frame.  Only the sacrifice study ([`crate::sacrifice`])
 //! does this; the cases it needs are marked `Home::OffBoard` and "through holes" below.
 
 use crate::bits::Bits;
 use crate::numtheory::Tables;
 use std::collections::VecDeque;
 
-/// One connected group of sources and the factors they compete for, plus what the simplification found.
+/// A frame as setup forms it: a connected group of sources with the factors they compete for, plus what the
+/// simplification found (the Java's `bombus.Hive`; before frames with the same number are merged, though a merged
+/// frame is a `Hive` again, see `Hive::merged`).
 ///
 /// The fields relate like this: `mandatory ⊆ sources`, `claimed ⊆ factors`, `|mandatory| = |claimed|` (every
 /// mandatory move is paired with the factor it uses), and `impossible` is disjoint from `sources` (an impossible
@@ -82,7 +92,7 @@ use std::collections::VecDeque;
 #[derive(Clone, Debug)]
 pub struct Hive<const W: usize> {
     name: String,
-    /// The moves of the hive, without those found impossible (mandatory ones included).
+    /// The moves of the frame, without those found impossible (mandatory ones included).
     sources: Bits<W>,
     /// Every number the sources can use as tax.
     factors: Bits<W>,
@@ -92,16 +102,16 @@ pub struct Hive<const W: usize> {
     claimed: Bits<W>,
     /// Sources that cannot be played together with the others.
     impossible: Bits<W>,
-    /// `|factors| − |sources|` once the hive has been simplified; see `Hive::new`.
+    /// The frame's freedoms, `|factors| − |sources|` once the frame has been simplified; see `Hive::new`.
     free_factor_count: i32,
 }
 
 impl<const W: usize> Hive<W> {
-    /// A hive that has only just been formed: nothing is mandatory or impossible, and every factor counts as
-    /// free.  The free factor count therefore starts as `|factors|`, not `|factors| − |sources|`: it is corrected
-    /// when the hive is first simplified (`Apiary::finish_hive`), so until then the hive counts as having free
-    /// factors, and a hive visited earlier in a round sees the hives not yet visited that way.  That is what the
-    /// Java does, and the results can depend on it.
+    /// A frame that has only just been formed: nothing is mandatory or impossible, and every factor counts as
+    /// spare.  The freedoms (`free_factor_count`) therefore start as `|factors|`, not `|factors| − |sources|`: they
+    /// are corrected when the frame is first simplified (`Apiary::finish_hive`), so until then the frame counts as
+    /// having freedoms, and a frame visited earlier in a round sees the frames not yet visited that way.  That is
+    /// what the Java does, and the results can depend on it.
     fn new(sources: Bits<W>, factors: Bits<W>) -> Self {
         Hive {
             name: String::new(),
@@ -114,11 +124,11 @@ impl<const W: usize> Hive<W> {
         }
     }
 
-    /// One hive made of several, as when the hives of a frame are treated as a single unit.  It starts from
-    /// scratch: the sources and factors are the unions of the current ones, and whatever the parts had found
-    /// mandatory or impossible is forgotten (and found again on the next `Apiary::finish_setup`).  Note what
-    /// that means for an impossible source: it is no longer among the parts' `sources`, so it is not carried
-    /// over, and the merged hive does not know it (see `Home::MergedAway`).
+    /// One frame made of several: the frames that get the same number are merged into one (see
+    /// [`crate::frames`]).  It starts from scratch: the sources and factors are the unions of the current ones, and
+    /// whatever the parts had found mandatory or impossible is forgotten (and found again on the next
+    /// `Apiary::finish_setup`).  Note what that means for an impossible source: it is no longer among the parts'
+    /// `sources`, so it is not carried over, and the merged frame does not know it (see `Home::MergedAway`).
     fn merged(parts: &[&Hive<W>]) -> Self {
         let sources = parts.iter().fold(Bits::EMPTY, |acc, h| acc | h.sources);
         let factors = parts.iter().fold(Bits::EMPTY, |acc, h| acc | h.factors);
@@ -127,18 +137,18 @@ impl<const W: usize> Hive<W> {
         hive
     }
 
-    /// A spreadsheet-style label (A, B, ... Z, AA, ...), by position in the apiary; merged hives join the
-    /// labels of their parts with `+`.  Only for diagnostics.
+    /// A spreadsheet-style label (A, B, ... Z, AA, ...), by position among the board's frames in playing order;
+    /// merged frames join the labels of their parts with `+`.  Only for diagnostics.
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    /// The hive's moves, mandatory ones included, impossible ones excluded.
+    /// The frame's moves, mandatory ones included, impossible ones excluded.
     pub fn sources(&self) -> Bits<W> {
         self.sources
     }
 
-    /// Every factor of the hive, including those used up by mandatory moves.
+    /// Every factor of the frame, including those used up by mandatory moves.
     pub fn factors(&self) -> Bits<W> {
         self.factors
     }
@@ -158,34 +168,34 @@ impl<const W: usize> Hive<W> {
         self.impossible
     }
 
-    /// `|factors| − |sources|`: how many factors are left over once every source has one.  (Both counts include
-    /// the mandatory pairs, so this is also `|remaining factors| − |remaining sources|`.)
+    /// The frame's freedoms, `|factors| − |sources|`: how many factors are left over once every source has one.
+    /// (Both counts include the mandatory pairs, so this is also `|remaining factors| − |remaining sources|`.)
     pub fn free_factor_count(&self) -> i32 {
         self.free_factor_count
     }
 
-    /// Whether the hive can spare a factor: a *free* hive, as opposed to a *closed* one.
+    /// Whether the frame has freedoms and can spare a factor, as opposed to being *closed*.
     pub fn has_free_factors(&self) -> bool {
         self.free_factor_count > 0
     }
 }
 
-/// Which hive a number belongs to.
+/// Which frame a number belongs to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Home {
-    /// The hive at this position in [`Apiary::hives`].
+    /// The frame at this position in [`Apiary::hives`].
     Live(u32),
-    /// The number is an impossible source of a hive that has since been merged into another one.
+    /// The number is an impossible source of a frame that has since been merged into another one.
     ///
-    /// Merging builds a new hive from the parts' `sources` and `factors`, and re-homes the numbers the new hive
+    /// Merging builds a new frame from the parts' `sources` and `factors`, and re-homes the numbers the new frame
     /// holds ([`Apiary::merge`]).  An impossible source is no longer among a part's `sources`, so it is not
-    /// re-homed: it keeps pointing at its old hive, which is no longer in the apiary but, as an object, still
-    /// remembers whether it had free factors when it was merged.  The Java behaves exactly so (`hiveMap` is
-    /// updated only for `result.allNumbers()`), and `unzip`'s test for outside moves goes on consulting the stale
-    /// hive for such a number (`Apiary::has_outside_move_using`).  It is a quirk, not something the model needs,
-    /// and it is reproduced for parity.
+    /// re-homed: it keeps pointing at its old frame, which is no longer one of the board's frames but, as an
+    /// object, still remembers whether it had freedoms when it was merged.  The Java behaves exactly so (`hiveMap`
+    /// is updated only for `result.allNumbers()`), and `unzip`'s test for outside moves goes on consulting the
+    /// stale frame for such a number (`Apiary::has_outside_move_using`).  It is a quirk, not something the model
+    /// needs, and it is reproduced for parity.
     ///
-    /// It is inert in practice.  Only [`frames::build_frames`](crate::frames::build_frames) merges hives, and
+    /// It is inert in practice.  Only [`frames::build_frames`](crate::frames::build_frames) merges frames, and
     /// for every board `2 ≤ n ≤ 2000` the test that reads this variant is reached on a single board (n = 114,
     /// twice), where it does not make the number an outside move; building the frames with the variant forced to
     /// answer `false` gives identical frames, candidates and freedoms on every one of those boards.  (Measured
@@ -196,26 +206,27 @@ enum Home {
     OffBoard,
 }
 
-/// All the hives of the board `1..=n`, for a given set of promoted numbers, simplified and in playing order
-/// (see the module documentation for what that means).  The tables `factors_of` and `composites_of` are the
-/// apiary's own view of the divisibility relation, with the promoted numbers and the sinks taken into account.
+/// All the frames of the board `1..=n` (the Java's `bombus.Apiary`), for a given set of promoted numbers,
+/// simplified and in playing order (see the module documentation for what that means).  The tables `factors_of`
+/// and `composites_of` are the view of the divisibility relation that setup takes, with the promoted numbers and
+/// the sinks taken into account.
 ///
-/// On a punctured board ([`Tables::punctured`]) the holes belong to no hive and to no factor or composite list,
+/// On a punctured board ([`Tables::punctured`]) the holes belong to no frame and to no factor or composite list,
 /// so they are never moves and never tax; a number whose maximal factor is a hole simply has one factor fewer.
 /// Everything else is as on the full board: in particular the sources are still the numbers above `n/2` (a number
 /// whose only maximal composites are holes is a factor nobody needs, not a source, so the search decides whether
-/// to promote it), and the hives are put in an order in which every number comes after its divisors' hives
-/// even when the chain of maximal factors between them passes through a hole (playing a number sweeps all of its
-/// divisors, holes or not in between).
+/// to promote it), and the frames are put in an order in which every number comes after the frames of its
+/// divisors even when the chain of maximal factors between them passes through a hole (playing a number sweeps
+/// all of its divisors, holes or not in between).
 pub struct Apiary<'t, const W: usize> {
     t: &'t Tables,
-    /// In apiary order: a hive is listed after every hive downstream of it.
+    /// In playing order: a frame is listed after every frame in front of it.
     hives: Vec<Hive<W>>,
-    /// The hive of every number, indexed by number (entry 0 is unused).
+    /// The frame of every number, indexed by number (entry 0 is unused).
     home: Vec<Home>,
     /// For each number, the factors it can use as tax: its maximal factors that are not sources (or holes);
     /// nothing for a *sink* (a number all of whose maximal factors are promoted or holes).  This is the table
-    /// the hive code uses wherever it asks what a move can be paid with, not `Tables::max_factors`.
+    /// setup uses wherever it asks what a move can be paid with, not `Tables::max_factors`.
     factors_of: Vec<Bits<W>>,
     /// For each number, the moves that could use it as tax: its maximal composites other than sinks (and holes);
     /// nothing for a source.  The mirror image of `factors_of`.
@@ -226,12 +237,12 @@ impl<'t, const W: usize> Apiary<'t, W> {
     // -----------------------------------------------------------------------------------------------------
     // Construction
 
-    /// Builds the apiary of the board `1..=t.n`, treating the numbers in `treat_as_sources` (the promoted
+    /// Builds the frames of the board `1..=t.n`, treating the numbers in `treat_as_sources` (the promoted
     /// numbers) as moves in addition to the numbers that are always moves.
     ///
     /// In order: find the sources and sinks, make the `factors_of` and `composites_of` tables for them, form the
-    /// hives (a union-find over the source-to-factor edges), put them in downstream-first order, and simplify them
-    /// (`finish_setup`: `removeImpossible` on every hive, then `unzip` and
+    /// frames (a union-find over the source-to-factor edges), put them in playing order (front first), and simplify
+    /// them (`finish_setup`: `removeImpossible` on every frame, then `unzip` and
     /// `removeImpossible` again until nothing changes).
     pub fn new(t: &'t Tables, treat_as_sources: Bits<W>) -> Self {
         let n = t.n;
@@ -289,16 +300,16 @@ impl<'t, const W: usize> Apiary<'t, W> {
         (sources, sinks)
     }
 
-    /// Joins every source to its factors and returns the connected components, with the hive of each number;
+    /// Joins every source to its factors and returns the connected components, with the frame of each number;
     /// holes are in none.  The joining is a union-find over the edges (source, factor); a component becomes a
-    /// hive when its smallest member is first met, so the hives come out ordered by smallest member (which only
-    /// matters for tie-breaking in [`order_hives`](Self::order_hives)).  Each number goes into its hive's sources
+    /// frame when its smallest member is first met, so the frames come out ordered by smallest member (which only
+    /// matters for tie-breaking in [`order_hives`](Self::order_hives)).  Each number goes into its frame's sources
     /// or factors according to whether it is a source.
     ///
-    /// A number that is neither a source nor a factor of one forms a hive of its own, without sources.  On the
+    /// A number that is neither a source nor a factor of one forms a frame of its own, without sources.  On the
     /// board `1..=n` that never happens, because every `x ≤ n/2` has a prime `p` with `n/2 < x·p ≤ n`, and `x·p`
     /// is a source of which `x` is a maximal factor.  On a punctured board it can, when every such `x·p` is a hole:
-    /// then `x` is a factor nobody needs, a free hive of one, which the search may promote.
+    /// then `x` is a factor nobody needs, a frame of that one number with a freedom, which the search may promote.
     fn form_hives(t: &Tables, sources: Bits<W>, factors_of: &[Bits<W>]) -> (Vec<Hive<W>>, Vec<Home>) {
         let n = t.n;
         let size = n as usize + 1;
@@ -332,11 +343,11 @@ impl<'t, const W: usize> Apiary<'t, W> {
         (hives, home)
     }
 
-    /// The order the hives are kept in: downstream before upstream, so that playing the hives one after the
-    /// other is always a legal game.  It is a breadth-first topological sort: start from the hives with nothing
-    /// downstream, smallest source first; after taking a hive, queue the hives directly upstream of it whose every
-    /// downstream hive is already taken, again smallest source first.  (Hives without a source sort first; among
-    /// those the order is that of formation.)  Downstream here passes through holes
+    /// The order the frames are kept in: those in front before those behind, so that playing the frames one after
+    /// the other is always a legal game.  It is a breadth-first topological sort: start from the frames with
+    /// nothing in front of them, smallest source first; after taking a frame, queue the frames directly behind it
+    /// whose every frame in front is already taken, again smallest source first.  (Frames without a source sort
+    /// first; among those the order is that of formation.)  "In front" here passes through holes
     /// ([`Self::neighbours_through_holes`]).
     ///
     /// The tie-breaking by smallest source is what makes the order, and with it the names and the final game,
@@ -368,7 +379,7 @@ impl<'t, const W: usize> Apiary<'t, W> {
         order
     }
 
-    /// Puts the hives into the given order (a permutation of positions) and gives them their names.
+    /// Puts the frames into the given order (a permutation of positions) and gives them their names.
     fn reorder(&mut self, order: &[usize]) {
         let mut new_pos = vec![0u32; order.len()];
         for (pos, &old) in order.iter().enumerate() {
@@ -387,15 +398,15 @@ impl<'t, const W: usize> Apiary<'t, W> {
     }
 
     // -----------------------------------------------------------------------------------------------------
-    // Looking up hives and their neighbours
+    // Looking up frames and their neighbours
 
-    /// The hives, in apiary order.
+    /// The frames, in playing order.
     pub fn hives(&self) -> &[Hive<W>] {
         &self.hives
     }
 
-    /// The position in [`hives`](Self::hives) of the hive that holds `x`, unless `x` is an impossible source
-    /// of a hive that has since been merged away (`Home::MergedAway`), or a hole.
+    /// The position in [`hives`](Self::hives) of the frame that holds `x`, unless `x` is an impossible source
+    /// of a frame that has since been merged away (`Home::MergedAway`), or a hole.
     pub(crate) fn hive_index_of(&self, x: u32) -> Option<usize> {
         match self.home.get(x as usize)? {
             Home::Live(p) => Some(*p as usize),
@@ -403,26 +414,27 @@ impl<'t, const W: usize> Apiary<'t, W> {
         }
     }
 
-    /// The hives (other than hive `i`) that hold a maximal factor of a number in hive `i`, ascending.
-    /// Note that this looks at the board's maximal factors, not at the hives' factor tables.
+    /// The frames in front of frame `i` (other than `i`): those that hold a maximal factor of a number in frame
+    /// `i`, ascending.  Note that this looks at the board's maximal factors, not at the frames' factor tables.
     pub(crate) fn downstream_hives(&self, i: usize) -> Vec<usize> {
         self.neighbours(i, &self.t.max_factors)
     }
 
-    /// The hives (other than hive `i`) that hold a maximal composite of a number in hive `i`, ascending.
+    /// The frames behind frame `i` (other than `i`): those that hold a maximal composite of a number in frame
+    /// `i`, ascending.
     pub(crate) fn upstream_hives(&self, i: usize) -> Vec<usize> {
         self.neighbours(i, &self.t.max_composites)
     }
 
-    /// The hives (other than hive `i`) that hold a number related to one in hive `i`.  Holes are skipped.
+    /// The frames (other than frame `i`) that hold a number related to one in frame `i`.  Holes are skipped.
     fn neighbours(&self, i: usize, board_relation: &[Vec<u32>]) -> Vec<usize> {
         let hive = &self.hives[i];
         let mut out = Vec::new();
         for x in (hive.sources | hive.factors).iter() {
             for &y in &board_relation[x as usize] {
-                // A number homed in a merged-away hive is skipped: that hive is not in the apiary, so there
-                // is nothing to reach.  (The Java's neighbour sets do contain the stale hive, but every use of
-                // them filters down to the hives that are still in the apiary.)
+                // A number homed in a merged-away frame is skipped: that frame is no longer one of the board's
+                // frames, so there is nothing to reach.  (The Java's neighbour sets do contain the stale frame,
+                // but every use of them filters down to the frames that are still there.)
                 if let Home::Live(j) = self.home[y as usize] {
                     if j as usize != i {
                         out.push(j as usize);
@@ -435,7 +447,7 @@ impl<'t, const W: usize> Apiary<'t, W> {
         out
     }
 
-    /// [`neighbours`](Self::neighbours), except that a related hole is passed through: the hives holding the
+    /// [`neighbours`](Self::neighbours), except that a related hole is passed through: the frames holding the
     /// numbers related to the hole are reached instead.  This keeps the relation transitive across holes, as
     /// divisibility is (a number sweeps its divisors whether or not the chain of maximal factors between them
     /// is on the board).  Without holes it is `neighbours`.
@@ -464,16 +476,16 @@ impl<'t, const W: usize> Apiary<'t, W> {
         out
     }
 
-    /// The position of the hive holding the factor `f`.  Factors are never removed from a hive, so they are
-    /// always homed in a hive of the apiary.
+    /// The position of the frame holding the factor `f`.  Factors are never removed from a frame, so they are
+    /// always homed in one of the board's frames.
     fn hive_of_factor(&self, f: u32) -> usize {
         self.hive_index_of(f).expect("a factor always has a live hive")
     }
 
-    /// Whether `pred` holds for any hive that holds one of the factors in `set` (each hive is tried once, which
-    /// only saves repeated work: several factors of a number are often in the same hive).  `set` is the maximal
+    /// Whether `pred` holds for any frame that holds one of the factors in `set` (each frame is tried once, which
+    /// only saves repeated work: several factors of a number are often in the same frame).  `set` is the maximal
     /// factors of one number, at most five on the boards the solver supports (30030 = 2·3·5·7·11·13 is the first
-    /// number with six), so the eight slots for the hives already tried always suffice.
+    /// number with six), so the eight slots for the frames already tried always suffice.
     fn any_hive_of(&self, set: Bits<W>, mut pred: impl FnMut(&Hive<W>) -> bool) -> bool {
         let mut tried = [usize::MAX; 8];
         let mut count = 0;
@@ -498,7 +510,7 @@ impl<'t, const W: usize> Apiary<'t, W> {
 
     /// If every move in `moves` can be played together, each with a factor of its own from `factors`, how many
     /// factors are left over (the *freedoms*); `None` if they cannot all be played.  The question every decision
-    /// in this file comes down to: whether a hive can keep a source, take on a promoted number, or spare a factor.
+    /// in this file comes down to: whether a frame can keep a source, take on a promoted number, or spare a factor.
     ///
     /// It is a *peel*, the decision procedure that [`crate::model`] also uses to test a frame for winnability
     /// (there with the second step below alone; the first is the Java's addition and gives the same answers).
@@ -519,7 +531,7 @@ impl<'t, const W: usize> Apiary<'t, W> {
     /// factors in some order: each step preserves playability, and a stall means unplayable, so it succeeds
     /// exactly when they can (`heuristics/THEORY.md`, Theorems 1 to 3; the order of the steps does not change
     /// the answer, but "smallest first" is the Java's and is kept).  What is assumed is that this is the right
-    /// question to put to a hive on its own (see the module documentation).
+    /// question to put to a frame on its own (see the module documentation).
     ///
     /// It is implemented with degree counters, so a call costs one pass over the moves and factors instead of
     /// a scan per step.  `lone_moves` and `lone_factors` hold the candidates for the two kinds of step;
@@ -582,24 +594,23 @@ impl<'t, const W: usize> Apiary<'t, W> {
         Some(factors.len())
     }
 
-    /// Whether `hive` could take the number `n` as an additional source: the peel with all the hive's sources
-    /// and `n` against all its factors (the mandatory pairs included).
+    /// Whether the frame `hive` could take the number `n` as an additional source: the peel with all the frame's
+    /// sources and `n` against all its factors (the mandatory pairs included).
     fn can_add_source(&self, hive: &Hive<W>, n: u32) -> bool {
         self.count_freedoms(hive.sources.with(n), hive.factors).is_some()
     }
 
     // -----------------------------------------------------------------------------------------------------
-    // Simplification of the hives
+    // Simplification of the frames
 
-    /// Runs the simplification on every hive, then keeps re-running it on the neighbours of any hive that
-    /// changed, until nothing changes.  First every hive drops its impossible sources (so that the checks in
-    /// `unzip` see the real hives); then, in rounds, the hives that have been touched are visited in apiary
-    /// order.  A hive's findings change what its neighbours may conclude (`unzip` asks whether a neighbour could
-    /// use a factor, and that depends on the neighbour's sources and free factors), which is why they are
-    /// revisited.
+    /// Runs the simplification on every frame, then keeps re-running it on the neighbours of any frame that
+    /// changed, until nothing changes.  First every frame drops its impossible sources (so that the checks in
+    /// `unzip` see the real frames); then, in rounds, the frames that have been touched are visited in playing
+    /// order.  A frame's findings change what its neighbours may conclude (`unzip` asks whether a neighbour could
+    /// use a factor, and that depends on the neighbour's sources and freedoms), which is why they are revisited.
     ///
-    /// Called by [`Apiary::new`], and again by the frame builder after it has merged hives
-    /// ([`crate::frames`]): a merged hive starts with nothing found, and has to be simplified again.
+    /// Called by [`Apiary::new`], and again by the frame builder after it has merged frames
+    /// ([`crate::frames`]): a merged frame starts with nothing found, and has to be simplified again.
     pub(crate) fn finish_setup(&mut self) {
         for i in 0..self.hives.len() {
             self.remove_impossible(i);
@@ -621,7 +632,7 @@ impl<'t, const W: usize> Apiary<'t, W> {
         }
     }
 
-    /// Simplifies hive `i` once (`unzip`, then `removeImpossible`, then the free factor count is recomputed as
+    /// Simplifies frame `i` once (`unzip`, then `removeImpossible`, then the freedoms are recomputed as
     /// `|factors| − |sources|`); whether it found anything new.
     fn finish_hive(&mut self, i: usize) -> bool {
         let found_mandatory = self.unzip(i);
@@ -631,24 +642,24 @@ impl<'t, const W: usize> Apiary<'t, W> {
         found_mandatory | found_impossible
     }
 
-    /// Finds the mandatory moves of hive `i` until there are no more, recording each with the factor it claims;
+    /// Finds the mandatory moves of frame `i` until there are no more, recording each with the factor it claims;
     /// whether it found any.  (Earlier notes call these moves "forced", which this code avoids: the search has
     /// forced members of its own that are unrelated.  The Java's field is `mandatoryMoves`.)  A model
     /// assumption, see the module documentation.
     ///
-    /// Two kinds of move are mandatory, as long as the factor involved is of no use outside the hive, so that
+    /// Two kinds of move are mandatory, as long as the factor involved is of no use outside the frame, so that
     /// settling the pair now takes nothing from the search:
     ///
-    /// * a remaining factor wanted by a single remaining source of the hive (a *private* factor of that source),
-    ///   which cannot go downstream (be promoted into a source of a hive below) and which no other hive could
-    ///   use as tax, goes to that source;
-    /// * a remaining source with a single unclaimed factor takes it, provided no other hive could use that
-    ///   factor.  This is "take the highest prime" for the whole hive: a hive is expected to play all of its
-    ///   sources, so a source with one choice makes it.  (It does not ask whether the factor could go
-    ///   downstream, since the source needs it either way.)
+    /// * a remaining factor wanted by a single remaining source of the frame (a *private* factor of that source),
+    ///   which cannot go forward (be promoted into a source of a frame in front of this one) and which no other
+    ///   frame could use as tax, goes to that source;
+    /// * a remaining source with a single unclaimed factor takes it, provided no other frame could use that
+    ///   factor.  This is "take the highest prime" for the whole frame: a frame is expected to play all of its
+    ///   sources, so a source with one choice makes it.  (It does not ask whether the factor could go forward,
+    ///   since the source needs it either way.)
     ///
-    /// Why "of no use outside the hive": the factor is a candidate for something the search may want to do,
-    /// either promoting it, or using it as tax for a number promoted from another hive
+    /// Why "of no use outside the frame": the factor is a candidate for something the search may want to do,
+    /// either promoting it, or using it as tax for a number promoted from another frame
     /// ([`has_outside_move_using`](Self::has_outside_move_using)); the pair would take that away.
     ///
     /// The factors are visited in ascending order against a snapshot, with the sources recomputed after each
@@ -671,7 +682,7 @@ impl<'t, const W: usize> Apiary<'t, W> {
                 }
             }
 
-            // A source's candidates are its own factors in `factors_of` (all of them in this hive), minus the
+            // A source's candidates are its own factors in `factors_of` (all of them in this frame), minus the
             // factors already claimed.
             let snapshot = sources - (mandatory | impossible);
             for s in snapshot.iter_desc() {
@@ -697,18 +708,18 @@ impl<'t, const W: usize> Apiary<'t, W> {
         found
     }
 
-    /// Whether factor `f` could be promoted into a source of some hive that holds one of its factors (the hive
-    /// below its own): the case where `f` has a use of its own, which `unzip` must leave to the search.
+    /// Whether factor `f` could be promoted into a source of some frame that holds one of its factors (a frame in
+    /// front of its own): the case where `f` has a use of its own, which `unzip` must leave to the search.
     fn factor_can_go_downstream(&self, f: u32) -> bool {
         self.any_hive_of(self.factors_of[f as usize], |hive| self.can_add_source(hive, f))
     }
 
-    /// Whether some move outside the hive of the factor `f` could use `f` as tax: a composite of `f` in a
-    /// different hive (that has free factors to spare, so that it might be promoted) which the hive of `f` could
-    /// take on as a source.  `unzip` leaves such a factor to the search, which may need it for that promotion.
+    /// Whether some move outside the frame of the factor `f` could use `f` as tax: a composite of `f` in a
+    /// different frame (that has freedoms, so that it might be promoted) which the frame of `f` could take on as a
+    /// source.  `unzip` leaves such a factor to the search, which may need it for that promotion.
     ///
-    /// A composite that is an impossible source of a hive that has since been merged away counts as being in
-    /// a different hive (see [`Home::MergedAway`]), with the free factors that hive had when it was merged.  That
+    /// A composite that is an impossible source of a frame that has since been merged away counts as being in
+    /// a different frame (see [`Home::MergedAway`]), with the freedoms that frame had when it was merged.  That
     /// is what the Java solver does, and it is inert (the variant's documentation gives the evidence).
     fn has_outside_move_using(&self, f: u32) -> bool {
         let f_hive = self.hive_of_factor(f);
@@ -722,10 +733,10 @@ impl<'t, const W: usize> Apiary<'t, W> {
         })
     }
 
-    /// Marks as impossible the remaining sources of hive `i` that cannot be played together with the others,
+    /// Marks as impossible the remaining sources of frame `i` that cannot be played together with the others,
     /// going from the largest source down and keeping each one that can be played together with the ones
     /// already kept (`count_freedoms` against the remaining factors).  Impossible sources
-    /// leave the hive's `sources`.  Whether any new impossible source was found.
+    /// leave the frame's `sources`.  Whether any new impossible source was found.
     ///
     /// This greedy choice, largest first, is a model assumption: it decides which sources the whole model
     /// gives up on, for good.  It keeps the heaviest playable set if the playable sets form a matroid, which is
@@ -752,13 +763,13 @@ impl<'t, const W: usize> Apiary<'t, W> {
     // -----------------------------------------------------------------------------------------------------
     // Merging
 
-    /// Replaces the hives at the given positions (at least two) by a single new hive, which is placed where
-    /// the first of them was, and returns its position.  See `Hive::merged` for what the new hive holds.  The
-    /// frame builder merges the hives of a level into one frame this way.
+    /// Replaces the frames at the given positions (at least two) by a single new frame, which is placed where
+    /// the first of them was, and returns its position.  See `Hive::merged` for what the new frame holds.  The
+    /// frame builder merges the frames that get the same number into one this way.
     ///
-    /// Every number is re-homed: those the merged hive holds point at it, the others at their hive's new
-    /// position.  The impossible sources of the parts are held by no hive any more, and keep a stale home
-    /// ([`Home::MergedAway`]); the new hive is not simplified until the next `finish_setup`.
+    /// Every number is re-homed: those the merged frame holds point at it, the others at their frame's new
+    /// position.  The impossible sources of the parts are held by no frame any more, and keep a stale home
+    /// ([`Home::MergedAway`]); the new frame is not simplified until the next `finish_setup`.
     pub(crate) fn merge(&mut self, group: &[usize]) -> usize {
         assert!(group.len() > 1, "merging fewer than two hives");
         let at = group[0];
@@ -801,10 +812,10 @@ impl<'t, const W: usize> Apiary<'t, W> {
     // -----------------------------------------------------------------------------------------------------
     // Results
 
-    /// The factors of hive `i` that could be promoted: those that could be dropped from the hive without
-    /// stopping its remaining sources from being played together, and that some hive holding one of their
+    /// The factors of frame `i` that could be promoted: those that could be dropped from the frame without
+    /// stopping its remaining sources from being played together, and that some frame holding one of their
     /// maximal factors could take on as a source.  These are two necessary conditions, each checked against one
-    /// hive on its own; whether a promotion really works, with the two frames it touches both staying winnable,
+    /// frame on its own; whether a promotion really works, with the two frames it touches both staying winnable,
     /// is for the search to decide.
     pub fn hive_promotion_candidates(&self, i: usize) -> Bits<W> {
         let hive = &self.hives[i];
@@ -818,26 +829,26 @@ impl<'t, const W: usize> Apiary<'t, W> {
             .collect()
     }
 
-    /// The promotion candidates of every hive.
+    /// The promotion candidates of every frame.
     pub fn promotion_candidates(&self) -> Bits<W> {
         (0..self.hives.len()).fold(Bits::EMPTY, |acc, i| acc | self.hive_promotion_candidates(i))
     }
 
-    /// The impossible sources of every hive.  (After a `merge` the impossible sources of the
-    /// merged hives are no longer listed by any hive.)
+    /// The impossible sources of every frame.  (After a `merge` the impossible sources of the
+    /// merged frames are no longer listed by any frame.)
     pub fn impossible(&self) -> Bits<W> {
         self.hives.iter().fold(Bits::EMPTY, |acc, h| acc | h.impossible)
     }
 
-    /// A legal order in which to play the sources of hive `i`: the peel of `count_freedoms`
+    /// A legal order in which to play the sources of frame `i`: the peel of `count_freedoms`
     /// again, this time keeping the order it finds.
     ///
     /// The game is built from both ends.  In each round, first every source that has exactly one factor left
     /// (visited in ascending order against a snapshot) is played now, with that factor; then every factor
-    /// wanted by exactly one source is paired with that source, which is set aside for the end of the hive's
+    /// wanted by exactly one source is paired with that source, which is set aside for the end of the frame's
     /// game (the sources set aside later are played earlier).  A move with a single choice goes first and one
     /// with a private factor goes last, as in the peel; that the result is a legal game is Theorem 2 of
-    /// `heuristics/THEORY.md`.  A round that makes no progress panics: it would mean the hive's sources cannot be
+    /// `heuristics/THEORY.md`.  A round that makes no progress panics: it would mean the frame's sources cannot be
     /// played together, which `removeImpossible` rules out.
     pub fn hive_solution(&self, i: usize) -> Vec<u32> {
         let hive = &self.hives[i];
@@ -873,8 +884,8 @@ impl<'t, const W: usize> Apiary<'t, W> {
         now
     }
 
-    /// The whole game with no promotions beyond those the apiary was built with: the hives' games, one after
-    /// the other in apiary order (downstream first).  Built on the plain board it scores `in_the_bag`, the
+    /// The whole game with no promotions beyond those these frames were built with: the frames' games, one after
+    /// the other in playing order (front first).  Built on the plain board it scores `in_the_bag`, the
     /// base of every score in the frame model; built with promotions it is the game those promotions make
     /// ([`crate::accelerate::solution_for_promotions`]).
     pub fn solution(&self) -> Vec<u32> {
@@ -970,7 +981,7 @@ mod tests {
         set.iter().filter(|_| rng.chance(percent)).collect()
     }
 
-    /// Hives of ascending size, plus a union of several hives' sources against all factors, as the places
+    /// Frames of ascending size, plus a union of several frames' sources against all factors, as the places
     /// where the matching is asked about.
     fn check_count_freedoms<const W: usize>(a: &Apiary<W>, rng: &mut Rng) {
         let all_factors = a.hives.iter().fold(Bits::<W>::EMPTY, |acc, h| acc | h.factors);
@@ -1024,7 +1035,7 @@ mod tests {
         let t = Tables::new(20);
         let a = Apiary::<1>::new(&t, Bits::EMPTY);
         let set = |v: &[u32]| Bits::<1>::from_slice(v);
-        // No moves: all factors are free.
+        // No moves: every factor is left over.
         assert_eq!(a.count_freedoms(set(&[]), set(&[2, 3])), Some(2));
         // More moves than factors.
         assert_eq!(a.count_freedoms(set(&[12, 14]), set(&[6])), None);
@@ -1087,7 +1098,7 @@ mod tests {
         assert_eq!(column_name(26 * 27), "AAA");
     }
 
-    /// `ApiaryTest.theMysteryOf528`: with these promotions the apiary's solution must be a legal game.
+    /// The Java's `ApiaryTest.theMysteryOf528`: with these promotions the board's frames must give a legal game.
     #[test]
     fn the_mystery_of_528() {
         let t = Tables::new(528);
@@ -1106,7 +1117,7 @@ mod tests {
             let a = Apiary::<5>::new(&t, Bits::EMPTY);
             let moves = a.solution();
             assert!(replay(n, &moves).is_ok(), "n={n}");
-            // Whatever the hives promise as candidates can be promoted without breaking the game.
+            // Whatever the frames promise as candidates can be promoted without breaking the game.
             for c in a.promotion_candidates().iter() {
                 let promoted = Bits::from_slice(&[c]);
                 let moves = Apiary::<5>::new(&t, promoted).solution();
@@ -1127,7 +1138,7 @@ mod tests {
         assert!(g > f);
         let (sources_f, sources_g) = (a.hives()[f].sources(), a.hives()[g].sources());
         let merged = a.merge(&[g, f]);
-        // The merged hive sits where the first listed hive (G) was, minus the removed F before it.
+        // The merged frame sits where the first listed frame (G) was, minus the removed F before it.
         assert_eq!(merged, g - 1);
         assert_eq!(a.hives().len(), 7);
         assert_eq!(a.hives()[merged].name(), "G+F");
@@ -1156,7 +1167,7 @@ mod tests {
             assert_eq!(a.hive_index_of(x), Some(merged), "number {x}");
         }
         assert!(a.hives()[merged].impossible().is_empty());
-        // The merged hive re-derives what it needs, and the apiary stays consistent.
+        // The merged frame re-derives what it needs, and the board's frames stay consistent.
         a.finish_setup();
         let hive = &a.hives()[merged];
         assert_eq!(hive.free_factor_count(), hive.factors().len() as i32 - hive.sources().len() as i32);
