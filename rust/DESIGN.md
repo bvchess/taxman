@@ -771,10 +771,13 @@ on the machine moves wall times by up to 3×.  What measures what:
   proofs of 936 and 1215, every kernel over all of them (the rebuild of a node, the promotion of every candidate,
   conflicts, the matching from scratch and warm-started, bounds without each member, strong branching's exact solves,
   children, nogood lookups and rule-outs).  F2: the frame checks of those promotions.  F3: a checkpoint of each proof
-  with the default tactics (`perf make-window 936 4500`, `perf make-window 1215 600000`) resumed on one thread for
-  50,000 steps, one period of forgetting nogoods: the search itself, fingerprinted by its counters, with the tactics
-  its checkpoint records (`--tactic` changes them).  The probe's fingerprint is 7e8e724717d26545, and
-  5b83bbebf0bb2899 with `--tactic lagrange=off`.  (The windows were made again when the search's counters were
+  with the default tactics of the time, the matching path's (`perf make-window 936 4500`, `perf make-window 1215
+  600000`), resumed on one thread for 50,000 steps, one period of forgetting nogoods: the search itself,
+  fingerprinted by its counters, with the tactics its checkpoint records (`--tactic` changes them; a search that ends
+  inside the window is costed by the steps it took).  F4, with `--tactic gf2=on`: the GF(2) bound's kernels at the F1
+  nodes (the bound from scratch, with its weight split, and without each member of its heaviest set's conflict), and
+  the windows resumed with the GF(2) bound, which finish both searches.  The probe's fingerprint is
+  7e8e724717d26545, 5b83bbebf0bb2899 with `--tactic lagrange=off`, and 162e4e94a52a95c6 with `--tactic gf2=on`.  (The windows were made again when the search's counters were
   renumbered and the checkpoint header went to version 4, 2026-10; the fingerprints EXPERIMENTS quotes before then,
   36981d0eaeeae319 and 6197a47eae6cf8c8, are of the earlier windows, made before `lagrange`.)  About 5 s in all;
   `perf make-nodes` and `perf make-window` make the fixtures again, deterministically.
@@ -806,8 +809,20 @@ on the machine moves wall times by up to 3×.  What measures what:
 * **The cloud** (`tools/cloud`) has the scripts for a many-core machine: the sweep to 192 threads, the cost of a
   checkpoint pause, and the production chain (RUNBOOK.md).
 
-**Where it stands** (the notebook has the tables; these are the build of commit 4b6ef38, on the M1 Max): the proof of
-1215 takes 33 s on one thread (106 G cycles), and 1184 takes 3.2 G cycles.  The strict chain 1..1231 took 279 s of
+**Where it stands with the GF(2) bound** (the default since commit 7af8b0e; EXPERIMENTS, "The GF(2) bound in the
+search", has the tables; on the M1 Max): the proof of 1215 takes 10,371 nodes and 3.8 G cycles on one thread, against
+the matching path's 1.1 M nodes and 29 G; the 146 one-thread proofs of the slope study 76 s against 3,408 s; `taxman
+regress --to 1000` on 2 threads 21.6 s against 96.9 s; the chain 1..1300 on 2 threads 88 s, its games 1001–1300 60 s
+against the 988 s that `results/strict.jsonl` records on 4 threads.  Where the time goes (the proof of 1287, one
+thread): the intersection's shortest paths 57%, the levels' own work (a solve's setup, the history, the weight split)
+22%, the tableau's pivots 8%, the peels 3%; strong branching makes 70% of the augmentations.  A step costs 9 to 13
+times as much as the matching path's (the probe's windows), in trees a hundred times smaller.  A chain from
+optimal.json's game of 1300 reached 2175 in 92 minutes of game time on 2 threads; its cost comes in waves that
+follow the root's GF(2) gap, with no growth that a fit over 1301–2175 resolves, and a day on 192 cores would take
+it to the end of the set widths (4095) at every slope the data support (EXPERIMENTS has the projections).
+
+**The matching path** (the default before the GF(2) bound; these are the build of commit 4b6ef38, on the M1 Max):
+the proof of 1215 takes 33 s on one thread (106 G cycles), and 1184 takes 3.2 G cycles.  The strict chain 1..1231 took 279 s of
 game time on 8 threads, 145 s of it for 1201–1231, at that commit; the committed `bench/curve/chain.jsonl`
 (1001–1231), made by the build before it (e710d16), records 318 s, and 207 s for 1201–1231.  The cost of a game
 grows by a factor of ten for every 55 to 70 in n past 1200 ([bench/curve/README.md](bench/curve/README.md)).  The
@@ -831,11 +846,11 @@ Every n to 1300 has a game proven within the frame model: `results/strict.jsonl`
 to 1000 reproduce optimal.json's scores and whose games 1001–1300 go beyond it (and are now appended to optimal.json
 too, by `taxman extend-optimal`); `results/README.md` says what supports each score.  The production chain on a
 many-core machine can start from `strict.jsonl` (`tools/cloud/RUNBOOK.md`), and a chain from n = 1 reproduces its
-scores.  What is left to try: the incumbents of games like 992 and 1025, whose optimum the
-search reaches late (the Lagrangian bound makes 992 slower); fewer or cheaper Hungarian searches (over half the time,
-and large); whether refinement still pays with the Lagrangian bound (without it 19 proofs took 3% fewer cycles on
-average but from 21% fewer to 20% more, and the strict chain 1201–1231 as many, so `match_refine` stays 1 until a
-larger sample of the frontier decides); refits of the Lagrangian multipliers that keep the levels instead of solving
-them afresh; a warm-started unit rebuild; and, for the many-core machine, whatever its first sweep shows that a laptop
-cannot.  Nothing about scaling beyond 8 threads or
-about Graviton has been measured (`tools/cloud/RUNBOOK.md`, section 8).
+scores.  With the GF(2) bound (section 4), the chain goes past 1300 on a laptop (EXPERIMENTS, "The GF(2) bound in the
+search").  What is left to try: strong branching's solves, 70% of the intersection's work, which restart far below
+their answer (canceling the negative cycles of the optimum less the member would start them next to it); the removal
+of the matching path's search machinery that the GF(2) bound leaves idle (refinement, the Lagrangian bound in the
+search; EXPERIMENTS has the list), once a production run has been made with it; a warm-started unit rebuild; and,
+for the many-core machine, whatever its first sweep shows that a laptop cannot: the GF(2) search's trees are a hundred
+times smaller, so how many threads a game can keep busy is open.  Nothing about scaling beyond 4 threads with the
+GF(2) bound, beyond 8 threads at all, or about Graviton has been measured (`tools/cloud/RUNBOOK.md`, section 8).

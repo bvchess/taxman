@@ -32,8 +32,10 @@ Finding an optimal game is a search over an enormous tree.  The solver's results
 moves with their scores, for every n from 1 to 1300: `results/strict.jsonl` is a chain from n = 1 (section 3),
 whose games 1 to 1000 reproduce the Java's table and whose games 1001 to 1300 go beyond it (the table `optimal.json`
 has them now too, see `extend-optimal` in section 3).  The code can attempt
-any larger n up to 4095, the largest board the set widths cover.  The cost of a game grows by a factor of ten for every
-55 to 70 in n past 1200, so what can be reached is a question of machine time
+any larger n up to 4095, the largest board the set widths cover.  With the GF(2) bound (the default since 2026-10), a
+chain from `optimal.json`'s game of 1300 reached 2175 in 92 minutes on two threads of a laptop, its cost in waves with
+no growth a fit resolves ([docs/EXPERIMENTS.md](docs/EXPERIMENTS.md#the-gf2-bound-in-the-search-2026-10)); before it,
+the cost of a game grew by a factor of ten for every 55 to 70 in n past 1200
 ([bench/curve/README.md](bench/curve/README.md)).
 
 ### How the solver sees the game (the frame model)
@@ -154,7 +156,7 @@ switchable piece of the algorithm; `--tactic NAME=VALUE` is repeatable, and the 
 
 ```
 $ taxman solve 480 --use-prev --show
-n=480   score=73120     search  nodes=387             0.007 s  optimal ok  proof=exhausted
+n=480   score=73120     search  nodes=68              0.009 s  optimal ok  proof=exhausted
   promotions: [68, 138, 147, 153, 168, 175, 180, 182, 190, 195, 196, 198, 200, 207, 208, 210, 220, 222, 224, ...]
   moves: [479, 361, 437, 299, 403, 341, 473, 301, 469, 335, 445, 267, 471, 314, 478, 466, 458, 454, 446, ...]
 ```
@@ -198,16 +200,16 @@ matters: `--out` appends to the file and `results/` must not be overwritten.
 
 ```
 $ taxman solve 1301-1302 --use-prev --threads 2 \
-      --out mine.jsonl --checkpoint-dir ckpt --time-limit 8 --progress 4
-n=1301  score=532272    prime   nodes=0               0.016 s  optimal unknown  proof=prime_formula  assumes the game of 1300 in optimal.json is optimal
-n=1302 4.0s nodes 815101 (203.5k/s) best 41423 queue 8 spilled 0 | eff 100.0% idle 0.0% lock 0.0% splits 1 steals 1 full 2.7ms
-n=1302 8.0s nodes 1575423 (stopped) best 41423 queue 79 spilled 0 | eff 99.9% idle 0.0% lock 0.0% ... pauses 1 (0.1%) ...
-n=1302  score=533546    search  nodes=1575423         8.152 s  incomplete
+      --out mine.jsonl --checkpoint-dir ckpt --node-limit 4000 --progress 4
+n=1301  score=532272    prime   nodes=0               0.015 s  optimal unknown  proof=prime_formula  assumes the game of 1300 in optimal.json is optimal
+n=1302 0.3s nodes 4225 (stopped) best 41423 queue 30 spilled 0 | eff 90.7% idle 3.8% lock 0.0% ... pauses 1 (5.2%) ...
+n=1302  score=533546    search  nodes=4225            0.406 s  incomplete
 stopped: the search for n=1302 hit a limit before it finished; run the same command to resume it
 ```
 
 Game 1301 (a prime) took the prime formula on `optimal.json`'s game of 1300 and records that it assumes that game
-optimal; game 1302 started from 1301, and the time limit stopped it with its checkpoint.  A game whose predecessor is in
+optimal; game 1302 started from 1301, and the node limit stopped it with its checkpoint (the engine checks the limit
+every 1,024 steps of a thread; the whole search takes about 16,000).  A game whose predecessor is in
 neither the run nor the results file, and not taken with `--use-prev` (for example `taxman solve 1400`, or `taxman solve
 480` without the flag), runs *standalone*, with no seed and no ceiling; `solve` says so on stderr (`note: no previous
 game for n=...`) and the result line has `"prev": null`.  That is still correct, but costs about twice as much on the
