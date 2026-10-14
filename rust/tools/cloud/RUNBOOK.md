@@ -357,7 +357,7 @@ optional) are documented at the top of the script: `THREADS`, `CHECKPOINT_INTERV
   ```
 
   The file is checked when `chain.sh` opens it, assumes nothing (a chain from n = 1), and its lines
-  keep the build that made them (commit 243af9b), as the lines added will keep the cloud's.  It was made in one
+  keep the build that made them (commit 271c817), as the lines added will keep the cloud's.  It was made in one
   invocation and holds no incomplete line.  The comparison of `verify.sh` with the committed file is then
   trivial for 1..1300, so the games above 1300 are checked by the referees alone (each game replayed, the chain
   bounds, Franklín–Moniot, the heuristic chain); a run from n = 1 is the cross-check of the machine and the build.  On

@@ -661,12 +661,10 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   what it says is refused; an assumption travels down a chain; a score that is not the table's is a hard error; a
   tampered results file, or one whose line contradicts itself or is of another schema, is refused naming the line, by
   both verifiers; a torn last line is dropped; the committed results pass the verifier with the counts
-  `results/README.md` quotes (skipped, saying so, while the file is of an older schema); a game stopped by a node
-  limit and resumed reads back assuming nothing.  Forged repeats (another game named, digests or promotions or the
-  promotion sum changed, the game repeated unfinished, after the repeat, settling no search, or its assumptions
-  dropped) are refused by both verifiers, and two that
-  only setting the problems up again can catch are refused by `verify-results` (the Python referee accepts them, as
-  its docstring says).
+  `results/README.md` quotes; a game stopped by a node limit and resumed reads back assuming nothing.  Forged repeats
+  (another game named, digests or promotions or the promotion sum changed, the game repeated unfinished, after the
+  repeat, settling no search, or its assumptions dropped) are refused by both verifiers, and two that only setting the
+  problems up again can catch are refused by `verify-results` (the Python referee accepts them, as its docstring says).
 * **Repeats** (`tests/same_search.rs`): the games that repeat an earlier search are found from the setups alone, and
   a chain concludes exactly those, with the scores of a chain that searches them: from n = 1 (1..300), and from a
   results file a stopped run left; a game with a checkpoint is resumed, not repeated; a repeat assumes what the game

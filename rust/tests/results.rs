@@ -13,9 +13,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use taxman::game::Optimal;
 use taxman::json::Json;
-use taxman::results::{
-    assumed_optimal, moves_digest, verify_files, Assumptions, Certificate, FileReport, Proof, SCHEMA,
-};
+use taxman::results::{assumed_optimal, moves_digest, verify_files, Assumptions, Certificate, FileReport, Proof};
 use taxman::solver::{self, GameResult, Method, SolveOptions};
 
 fn crate_path(relative: &str) -> PathBuf {
@@ -399,14 +397,6 @@ fn the_committed_results_pass_the_verifier() {
     paths.sort();
     let names: Vec<_> = paths.iter().map(|p| p.file_name().unwrap().to_string_lossy().into_owned()).collect();
     assert_eq!(names, ["strict.jsonl"], "a new results file needs its counts here and in the README");
-    // A file written under an older schema waits for its rerun: the verifier reads only the current schema.
-    let text = fs::read_to_string(&paths[0]).unwrap();
-    let schema = text.lines().next().and_then(|line| Json::parse(line).ok()?.get("schema")?.as_u32());
-    if schema != Some(SCHEMA) {
-        let schema = schema.map_or_else(|| "unreadable".to_owned(), |s| s.to_string());
-        eprintln!("skipped: results/strict.jsonl is schema {schema}, not {SCHEMA}, and waits for its rerun");
-        return;
-    }
 
     let optimal = Optimal::built_in();
     let report = verify_files(&paths, optimal).unwrap_or_else(|e| panic!("{e}"));
@@ -421,6 +411,16 @@ fn the_committed_results_pass_the_verifier() {
     for n in 1..=1000 {
         assert_eq!(Some(strict.contents.games[&n].score), optimal.score(n), "n={n}");
     }
+    // And its sets of moves are the table's (the Java's) but at 684 to 687, where the chain found another of the
+    // several optimal sets (evidence/README.md, "Is the optimal set unique?").
+    let sorted = |moves: &[u32]| {
+        let mut moves = moves.to_vec();
+        moves.sort_unstable();
+        moves
+    };
+    let other_set: Vec<u32> =
+        (1..=1000).filter(|&n| sorted(&strict.contents.games[&n].moves) != sorted(optimal.moves(n).unwrap())).collect();
+    assert_eq!(other_set, [684, 685, 686, 687]);
     // The games the table holds past 1000 were copied from it (`taxman extend-optimal`), move for move.
     for (n, score, moves) in optimal.games().filter(|&(n, _, _)| n > 1000) {
         let game =

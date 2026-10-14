@@ -411,9 +411,8 @@ Game 249 of that run repeated the search of 248; its line has `"method":"repeat"
 | `optimal_match` | true: the score equals `optimal.json`'s (a score that differs is a hard error, never written); null if the table has no game of n |
 | `build` | the commit the binary was built from, and whether its sources differed from it |
 
-This build reads schema 5 only: a results file of an older schema has to be made again
-([results/README.md](results/README.md) says where the committed one stands).  A line is never rewritten: a resumed
-game that is stopped again adds another incomplete line, and the completed line comes last.
+This build reads schema 5 only: a results file of an older schema has to be made again.  A line is never rewritten: a
+resumed game that is stopped again adds another incomplete line, and the completed line comes last.
 
 ## 5. Why the answers can be trusted
 

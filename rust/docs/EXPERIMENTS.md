@@ -203,6 +203,7 @@ and [THEORY.md's table of evidence](../../heuristics/THEORY.md#evidence).  Entri
 | [Faster nodes with the Lagrangian bound](#faster-nodes-with-the-lagrangian-bound-same-trees-2026-10) | where do the cycles go with the Lagrangian bound, and what can be cheaper without changing any tree?  Does `match_refine` = 0 now pay? | kept: the probe's windows about 10.5% fewer cycles, proofs 5-10%; `match_refine` stays 1 | dd4f89c to 31b9c95 |
 | [Benchmarks](#benchmarks-the-probe-pgo-and-scaling) | what the bench set, the probe, PGO and the thread scaling showed | numbers | e3b8ddc and after |
 | [What drives the slope](#what-drives-the-slope-2026-10) | what makes a game's cost grow ×10 per 55-70 in n, and what would change the slope? | the root's gap: ×10 nodes per ~130 of it at every n, nothing from the size at a given gap; the slope is the gap's growth; seeding the search with a better root relaxation is a constant factor | db7faf1 (no solver change) |
+| [The committed chain, made again](#the-committed-chain-made-again-2026-10) | does the cleanup's build make the same chain? | yes: the same moves, proofs and scores as the chain of 243af9b; 1022.5 s of search | 271c817 |
 
 ## The port and its first improvements
 
@@ -803,7 +804,7 @@ use them).
 * **The Java's best run, for comparison** (the owner's notes of 2022-09-09): the chain 1..1000 on an EC2 r6a.metal
   (192 vCPUs, 1,536 GB, $3.60 an hour), with `reuse_prev` and `revise_freedoms` on.  Its ten slowest games took
   29,766 s together, over 8 hours: 990 15,858 s, 987 3,896, 996 3,624, 992 3,519, 988 1,559, 999 516, 1000 314,
-  833 188, 969 175, 984 119.  The committed `results/strict.jsonl` (commit 243af9b, 2026-10-13, nothing unproven)
+  833 188, 969 175, 984 119.  The strict chain of commit 243af9b (2026-10-13, nothing unproven)
   took 58.7 s of game time for the whole of 1..1000 on 4 threads of the laptop; its times for those ten games are
   4.9, 0.84, 11.2, 12.9, 2.7, 3.6, 1.3, 0.09, 0.63 and 0.21 s (140 to 4,600 times less wall time on 4 threads
   against 192).  The same cluster, 987-999, holds the hardest games of both.  On this laptop's single thread, against
@@ -1092,11 +1093,12 @@ should be recorded here and removed?  And what support for old file formats can 
 default, and a doubtful tactic that stays must be switched on explicitly.  This entry measures and recommends; the
 removals are a later step.
 
-*How it was measured.*  The solver code of commit 243af9b, which made `results/strict.jsonl` (unchanged to 72601a2).
-Searches are the ladder's proof-only ones on one thread (`ladder --threads 1 --seed-opt --known results/strict.jsonl
---seconds S [--tactic …] N`), whose node counts are exact, with the process's cycles from `/usr/bin/time -l`, two at a
-time on the laptop while another agent measured cycles on it, so cycles are good to a few percent.  What `reuse_prev`
-and `revise_freedoms` do was worked out from setups alone, with no search, by a scratch example (not kept):
+*How it was measured.*  The solver code of commit 243af9b, which made `results/strict.jsonl` as it was then (unchanged
+to 72601a2).  Searches are the ladder's proof-only ones on one thread (`ladder --threads 1 --seed-opt --known
+results/strict.jsonl --seconds S [--tactic …] N`), whose node counts are exact, with the process's cycles from
+`/usr/bin/time -l`, two at a time on the laptop while another agent measured cycles on it, so cycles are good to a few
+percent.  What `reuse_prev` and `revise_freedoms` do was worked out from setups alone, with no search, by a scratch
+example (not kept):
 
 * `reuse_prev`: for every n of 2..1300 that is neither prime nor trivial, `accelerate::reuse_prev` with the strict
   chain's game of n − 1, its game compared with n's line in `strict.jsonl` (score, moves, proof, and
@@ -1726,3 +1728,18 @@ candidate relaxation's gap at the root and at the probe's 300 search nodes of 93
 the current bounds', and predict the proof's nodes by 10^(−c·Δgap) with c from the margin scans; build only a bound
 whose gap at the nodes is smaller by a share that grows with n.  (Evidence section 8 names one: a relaxation that
 sees that a move sweeps every divisor.)
+
+## The committed chain, made again (2026-10)
+
+`results/strict.jsonl` was replaced once more, by a run of the clean build of commit 271c817, the cleanup of "Which
+tactics earn their keep" (every run strict, schema 5): `taxman solve 1-1300 --threads 4 --out FILE --checkpoint-dir DIR
+--checkpoint-interval 60 --progress 0` from n = 1, in one invocation, on the laptop while four other jobs of two
+threads each ran: 1048.7 s of wall time and 3965 s of CPU.  Search seconds 46.3, 167.9 and 808.4 for 1..1000,
+1001..1231 and 1232..1300 (1022.5 in all), against 51.3, 187.8 and 813.2 (1052.2) of the chain of 243af9b.  Every
+score equals optimal.json's, and every move list, proof and method is that chain's (same_search 545, exhausted 416,
+prime formula 211, cap 115, trivial 13), with no game assuming anything; the move sets are optimal.json's but at
+684..687 ([results](../results/README.md#strictjsonl) has the rest).  The node counts of the other 1299 games total
+279.0 M against 280.1 M before; 1232 took 63% more nodes (53.0 M against 32.6 M) at a higher rate (256 k/s against
+178 k/s, under another load), so its 206.7 s against 183.6 s are the extra nodes.  This is the rerun that "Which tactics
+earn their keep" left for the owner: `tests/results.rs` no longer skips the file.  Entries above that quote
+`results/strict.jsonl` from the first replacement on mean the chain of 243af9b.

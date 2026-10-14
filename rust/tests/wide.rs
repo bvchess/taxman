@@ -106,8 +106,8 @@ fn every_tactic_gives_the_recorded_score_at_w20() {
 }
 
 /// A slice of the chain (every game feeding the next, from game 1126 as the committed results have it) reproduces
-/// the committed results with today's defaults, which the file predates (nogoods, `fix_forced`, forgetting).  The
-/// games are handed on in memory; `tests/integrity.rs` covers the results file.
+/// the committed results' scores with the defaults they were made with (on two threads, not four).  The games are
+/// handed on in memory; `tests/integrity.rs` covers the results file.
 #[test]
 fn a_slice_of_the_chain_reproduces_the_results() {
     let games = stored_games("strict.jsonl");
