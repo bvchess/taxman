@@ -321,8 +321,7 @@ fn gf2_at_probe_nodes<const W: usize>(fixture: &str) -> usize {
     let mut proved = 0;
     for unit in units.iter().filter(|u| !u.cands.is_empty()) {
         let state = game.model.promote_all_using(&mut scratch, &game.root, &unit.promoted).expect("a node");
-        let max_add =
-            (game.max_total - unit.promoted.len()).min(state.max_promotions_among(&unit.cands).max(0) as u32);
+        let max_add = (game.max_total - unit.promoted.len()).min(state.max_promotions_among(&unit.cands).max(0) as u32);
         bound.reset(&unit.promoted, &unit.cands);
         let value = bound.evaluate(max_add, None).value;
         let at = format!("n={n}, a node of {} promotions", unit.promoted.len());
