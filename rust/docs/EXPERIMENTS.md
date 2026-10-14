@@ -90,7 +90,7 @@ those of the page the row points to; a game is named by its board size, and time
 | A portfolio: another branching on some threads for finding incumbents | [IDEAS 4.7](IDEAS.md#47-a-portfolio-for-finding-incumbents-weak) | not kept | the frontier's cost is the proof; 8 of the 11 slowest games of 1232-1300 start at their optimum |
 | Reliability branching (pseudocosts) in place of strong branching's exact solves | [IDEAS 5](IDEAS.md#5-every-idea-considered) | open | strong branching is 28-34% of the time; not piloted |
 | Knuth's estimate of a tree's size, to budget games and split work | [IDEAS 5](IDEAS.md#5-every-idea-considered) | open | not piloted |
-| Ideas considered and not piloted: restarts, bound nogoods and backjumping, cube-and-conquer splitting, dominance rules, symmetry breaking, best-bound node selection, cutting planes | [IDEAS 5](IDEAS.md#5-every-idea-considered) | open | each has its reason there (with the optimum known the tree is fixed by the bound; the matching LP is integral; no symmetries found; ...) |
+| Ideas considered and not piloted: restarts, bound nogoods and backjumping, cube-and-conquer splitting, best-bound node selection, cutting planes | [IDEAS 5](IDEAS.md#5-every-idea-considered) | open | each has its reason there (with the optimum known the tree is fixed by the bound; the matching LP is integral; ...); dominance rules and symmetry breaking were piloted later (rows below) |
 | What drives the slope: the root's gaps (matching, refined, Lagrangian over the root's own nogoods), the size (n, candidates, `max_total`), the cap and the start incumbent against the one-thread proofs of the 143 searched games of 880-1300 (`examples/slope.rs`) | [slope](#what-drives-the-slope-2026-10) | measured | log10 nodes against the Lagrangian gap R² 0.90 (sd 0.35), the matching gap 0.87, n 0.23, the candidates 0.26; with the gap in the fit n adds nothing (t 1.1); the slope in n is ×10 per ~130 of gap times the gap's growth (56 per 100 n, jagged: +304 from 1151-1200 to 1251-1300, flat to 1352) |
 | Margin scans: proofs with every bound lowered by δ (the incumbent a value, `P*` + δ) | [slope](#what-drives-the-slope-2026-10) | measured | 19 games of 900-1300: 0.005-0.012 decades fewer nodes per unit of δ, no trend in n; a large game tightened costs what a small one with the same remaining gap costs |
 | The root's converged Lagrangian relaxation (its own nogoods, damped subgradient) as every searcher's starting relaxation | [slope](#what-drives-the-slope-2026-10) | not kept (pilot) | proofs −5% (1254) to −76% (1184) nodes, the least at the frontier: a constant factor; the gap that counts is the one at every node |
@@ -113,6 +113,10 @@ those of the page the row points to; a game is named by its board size, and time
 | A plain branch and bound with the cover LP over all conflicts at every node (matching inner, most fractional branching) | [nogoods](#how-far-can-nogoods-go-2026-10) | measured | 10-63 times fewer nodes than the solver's steps at 880-1184, log-log slope 1.15 ± 0.17 against them |
 | The cover LP over all conflicts with the GF(2) intersection as the inner problem, at the root and the probe's nodes | [nogoods](#how-far-can-nogoods-go-2026-10) | measured | closes 46% of the root's GF(2) gap, a share falling 3.8 points per 100 in n (the residual grows +8.4 against GF(2)'s +4.6); cuts 84% and 62% of the probe's nodes GF(2) leaves open (12 and 46 ms a node); relax-and-cut with 3-30 intersections 19-63% |
 | A branch and bound with GF(2) and the cover LP over all conflicts against the GF(2) branch and bound (146 games) | [nogoods](#how-far-can-nogoods-go-2026-10) | not kept | 6.2 times fewer nodes (geometric mean), less as n grows (−0.046 decades per 100 in n), the same 0.011 decades per unit of root GF(2) gap: a constant factor; 24% slower computed from scratch (1,125 s against 905 s) |
+| Dominance by exchange at search nodes: one excluded candidate added, one for one, two for one or two, judged by a cover of the node's state by the exchange's (literal, with moves relabelled) and by sampled maximal completions (`examples/dominance.rs nodes`) | [dominance](#dominance-and-symmetry-2026-10) | measured | proved at 0-1% of the probe's nodes and 0-5% of nodes sampled from the solver's proofs; sampled estimates up to 53%, nearly all of it prime exchanges (next rows); an excluded candidate can never be added for free (some maximal completion always blocks it) |
+| Twins (candidates with the same live factors and users) and transpositions (one reduced state reached by two promotion sets) | [dominance](#dominance-and-symmetry-2026-10) | measured: none | no twins at any sampled node; no transposition in the 133,006 nodes of six GF(2) branch-and-bound trees (930-1300) |
+| Symmetries of the frame model: exchanging two primes whose classes the frame builder treats alike maps promotable sets to promotable sets worth `(q − p)(c_p − c_q)` more (`examples/common/symmetry.rs`, `dominance symmetries`, `symcheck`) | [dominance](#dominance-and-symmetry-2026-10) | kept (the finding; research code) | 3.8-5.9 classes of primes a game at 851-1350, moving 11-14% of the candidates, the group's order 10^4.5 to 10^7.4; checked for every game 2-1300 (images, sums, 22 small boards enumerated, the oracle to 40); IDEAS.md's "no symmetries found" was wrong |
+| Breaking the prime symmetries (only sets with `c_p ≤ c_q` searched): hopeless test, the constraint's matching bound in a copy of the search, the constraint's Lagrangian on the GF(2) bound in a copy of `matroid bnb` (pilots, code not kept) | [dominance](#dominance-and-symmetry-2026-10) | not kept: a constant factor | nodes ×0.96 and ×0.88 (solver, 22 games of 880-1090; time +15% and ×1.9; 1184 +27%), ×0.95 and ×0.86 (GF(2) B&B, 43 games of 880-1300; time −3%); the share holds with n and over margin scans (`c` about 3% lower); every game 2-900 still finds its optimum from `P*` − 1 |
 
 ### Nogoods and conflicts
 
@@ -224,6 +228,7 @@ and [THEORY.md's table of evidence](../../heuristics/THEORY.md#evidence).  Entri
 | [The committed chain, made again](#the-committed-chain-made-again-2026-10) | does the cleanup's build make the same chain? | yes: the same moves, proofs and scores as the chain of 243af9b; 1022.5 s of search | 271c817 |
 | [Matroid intersection bounds](#matroid-intersection-bounds-2026-10) | does the GF(2) independence of playable sets give a bound whose gap grows more slowly? | yes: the intersection of the even and odd frames' GF(2) matroids closes 82% of the matching gap at the root, more as n grows; a plain branch and bound with it needs 12-800 times fewer nodes than the solver, growing 0.14 decades per 100 n instead of 0.48; recommended for the search; model-free, a tenth of the matching bound's gap on opt(n) | 67bb492 to 12a0f60 and the entry (no solver change) |
 | [How far can nogoods go](#how-far-can-nogoods-go-2026-10) | what is the best a Lagrangian bound over nogoods can do (all conflicts, ideal multipliers), at the root and at nodes, over the matching and over the GF(2) intersection, and is the gap it leaves still growing? | a constant factor: at the root over the matching it is the Lagrangian bound already (its gap growing as fast); at every node about 10x fewer steps at 1,000x the cost; over GF(2) 46% of the root gap and 6x smaller trees, less as n grows, in a quarter more time; superseded by GF(2) | the entry (no solver change; the study's code was not kept) |
+| [Dominance and symmetry](#dominance-and-symmetry-2026-10) | is part of the tree dominated, or explored twice under interchangeable promotions, and does a sound rule's share grow with n? | no transpositions or twins; the frame model has prime-exchange symmetries, and breaking them removes a seventh of the nodes on average (up to 43%), a constant share: not a slope lever | aa56590 to d2de73f (no solver change) |
 
 ## The port and its first improvements
 
@@ -2333,3 +2338,159 @@ Lagrangian bound's does, and over GF(2) the residual still grows (8.4 ± 2.0 per
 * *What conflicts miss* is what GF(2) misses, the large odd cores; their cover inequalities are weak (`|F ∩ K| ≤ 14`
   for 15 members).  Stronger families over the same sets (rank inequalities over a frame's candidates, frame-local
   hulls) were not tried; the register has no row for them.
+
+## Dominance and symmetry (2026-10)
+
+*Question.*  The slope study found a proof's nodes to be about `a + c·G` decades for a root gap `G`, with `c` the
+same at every n, so a lower cost per unit of gap cuts the slope as a tighter bound does.  A search that must rule
+out every promotion set inside the gap pays separately for every near-optimal variant; the uniqueness study found
+optimal sets that differ by exchanging equal-sum groups of lower-half numbers.  How much of a proof's tree is
+*dominated* (another promotion set does at least as well with every completion, so the node can be pruned) or
+explored twice under interchangeable promotions?  Which exchanges are provably safe, what share of nodes would a
+sound rule remove, and does that share hold or grow with n?  IDEAS.md section 5 had dominance rules and symmetry
+breaking as considered, not piloted, and "no symmetries found".
+
+*Definitions.*  A node `(P, C)` is dominated by a set `P'` (a candidate set, feasible, disjoint from `C`) when every
+completion `S ⊆ C` of the node that could beat the incumbent is promotable from `P'`'s state and `P' ∪ S` is worth
+more.  Pruning such nodes is sound: the pruned sets map to feasible sets worth strictly more (for two-for-two
+exchanges of equal sums, larger as binary numbers), so the heaviest feasible set, the largest of them in that
+order, is never pruned.  The completions that could beat the incumbent are within the node's *relevant* candidates:
+those that can be promoted and with which the matching bound, plus themselves, still reaches what the node needs.
+`P'`'s state *covers* the node's when, frame by frame, its *core* (the frame for the edits the relevant candidates
+can make, less the moves that can always go last and the factors nobody can use) has no move the node's core lacks
+and every factor of the node's core that its moves or the incoming candidates can use: then every completion
+promotable from the node's state is promotable from `P'`'s (the proof is the comment of `covers` in
+`examples/dominance.rs`).  The cover is also tried with moves relabelled (a move stands in for another with the same
+live factors) and up to an exchange of two primes (`covers_mapped`).  A *sampled* estimate replaces the proof by 64
+random maximal completions within the relevant candidates (infeasibility only grows with a set, so maximal sets are
+the ones to try): an upper estimate of what any cover could prove; 1,024 samples gave the same counts within two
+nodes in a hundred.
+
+*Method.*  No solver code changed.  `examples/dominance.rs` (commits aa56590 to d2de73f, on the cleaned-up build)
+and `examples/common/symmetry.rs`; `bench/dominance/` holds the node samples, the outputs and `dominance.py`, which
+makes the tables below (`dominance_output.md`).  One thread, at most two processes, on the shared laptop.
+
+* *Nodes.*  The probe's fixtures (units of the proofs of 936 and 1215, mostly shallow: 13-16 promotions); nodes of
+  the solver's own proofs sampled uniformly over their steps (`dominance sample --count K`: the deterministic
+  one-thread proof stopped after `k·T/(K+1)` steps and the node it stopped in read back from its checkpoint; 40-100
+  nodes each of 900, 936, 950, 1000, 1100, 1184, 1215, 1250, and of 1000 and 1250 with the incumbent at `P*` + 100
+  and + 200); and nodes of the GF(2) branch and bound's trees (`matroid bnb --bounds gf2`; one in 60 to one in 200
+  of 930, 990, 1020, 1210, 1230 and 1300).  `dominance nodes` tries at each node every exchange of one excluded
+  candidate added, one for one (`a > b`), and, with `--pairs`, two for one and two for two; every exchange of two
+  primes applied to `P`; twins among the candidates (same home frame, same live factors below, same users above:
+  an automorphism of the node's problem); and the symmetry rule below.
+* *Two pilots* (code not kept; how to rebuild them is here).  The *solver pilot* copied `src/search/searcher.rs`,
+  `refine.rs` and `lagrange.rs` into an example (paths adapted, the diagnostics probe stubbed) and added one hook in
+  `Stepper::check`, after the matching bound: the symmetry rule may cut the node (cut reason `refined`).  With the
+  rule off it reproduces the proofs node for node (900 4,194; 936 41,653; 950 460,813; 1000 366,846; 1100 29,614;
+  1184 52,259; 1250 709,893).  The *GF(2) pilot* copied `examples/matroid.rs`'s frame matroids and its `bnb` loop
+  (bound `gf2`) and added the rule after the bound; with it off it reproduces B's trees (936 3,392; 1100 1,874; 1184
+  1,093; 1250 2,543).  Both run the incumbent as a value, `P*` or `P*` + δ, as `slope prove` does.
+
+**1. No transpositions, no twins, and literal dominance is rare.**
+
+* *Transpositions*: in the GF(2) branch and bound's trees of 930, 990, 1020, 1210, 1230 and 1300 (133,006 nodes) no
+  reduced state is reached by two different promotion sets; the states that repeat (19-21% of the nodes) are the
+  conflict branching's siblings, the same `P` with fewer candidates.  Nothing is explored twice literally.
+* *Twins*: none at any node of any sample (the candidates' live neighbourhoods differ, as IDEAS.md expected).
+* *Adding an excluded candidate* (`P + a`, the "the node went on without `a`, but `a` fits anyway" case): proved at
+  no node; at 57% of the fixtures' nodes some excluded candidate can be added and no single relevant candidate
+  blocks it, yet some random maximal completion always does.  Excluded candidates stay blockable.
+* *Literal covers* (one for one, two for one or two, with or without relabelled moves) at the solver's nodes: 0-1%
+  of the fixtures' nodes, 0-5% of the sampled proof nodes; the sampled estimates are far higher (up to 53%), and the
+  exchanges behind the gap are the subject of 2.  For example, at a node of 936 the swap 426 → 438 (6·71 → 6·73)
+  passes every sample: the families {284, 426, 568, 852} and {292, 438, 584, 876} are the same graph in the node's
+  frames, and a literal cover cannot see it because the numbers differ.
+
+**2. The frame model has symmetries: exchanges of primes.**  Exchanging the exponents of two primes `p < q` in
+every number is an automorphism of divisibility.  When it maps the root's frames onto themselves (moves to moves,
+factors to factors, the factor graph among them onto itself) and the candidates onto themselves, it maps every
+promotable set `S` to a promotable set worth `(q − p)·(c_p(S) − c_q(S))` more, `c_r(S)` being the sum of `x / r`
+over the members of `S` divisible by `r` (`examples/common/symmetry.rs`, `root_symmetry` and `root_pairs`; no
+candidate is divisible by both or by a square in any pair found).  The pairs are found by checking that directly;
+they are not just the primes with the same multiples on the board (at 851, 59, 61 and 67 are one class though
+851/59, 851/61 and 851/67 have different floors: the frames see only some multiples).  At 1300 the classes are
+{41, 43}, {59, 61}, {67, 71}, {73, 79}, {89, 97, 101, 103, 107}, {109, 113, 127, 131, 137, 139} and {149, 151, 157}.
+
+| n | games | candidates | classes of primes | largest class | candidates moved | log10 of the group's order |
+|---|---|---|---|---|---|---|
+| 851-900 | 50 | 211 | 3.8 | 4.3 | 23.9 (11%) | 4.5 |
+| 951-1000 | 50 | 236 | 4.1 | 6.1 | 28.5 (12%) | 5.1 |
+| 1051-1100 | 50 | 266 | 4.6 | 6.3 | 28.3 (11%) | 5.2 |
+| 1151-1200 | 50 | 289 | 4.6 | 6.7 | 28.9 (10%) | 5.9 |
+| 1251-1300 | 50 | 322 | 5.8 | 6.7 | 41.5 (13%) | 6.7 |
+| 1301-1350 | 50 | 336 | 5.9 | 5.9 | 48.4 (14%) | 7.4 |
+
+*The rule.*  A set worth beating the incumbent with `c_p > c_q` for a symmetric pair has an image worth more, so
+only sets with `c_p ≤ c_q` for every pair need searching, and a heaviest set always keeps them all (otherwise its
+image would be heavier): a node can be cut when, for some pair, no completion that keeps the constraint can reach
+what the node needs.  The constraints of a class are the order of its primes by their cofactor sums, which is all
+that value can say about the class's whole symmetric group.  Three tests of that, from cheap to dear: *hopeless*,
+no completion can lift `c_q` to `c_p` (`c_p(P) > c_q(P) + c_q(C)`); the *matching bound of the constraint*, each
+subset `U` of the pair's multiples among the candidates (at most 10 or 12) promoted, the others left out, the rest
+relaxed (solver pilot and `dominance nodes`); the *Lagrangian of the constraint* on the GF(2) bound, each multiple
+`m·p` weighing `m(p − μ)` and `m·q` weighing `m(q + μ)`, plus `μ(c_q(P) − c_p(P))`, for `μ = (q − p)/2` and `q − p`
+(a bound on the completions that keep the constraint for any `μ ≥ 0`; GF(2) pilot).  The two dearer tests run only
+for pairs whose constraint the bound's heaviest set breaks.
+
+*Checks* (`dominance symcheck --known results/strict.jsonl 2-1300`, `bench/dominance/symcheck.jsonl`): in all 1,170
+games with pairs, the images of the optimal set and of 50 random maximal promotable sets are promotable and worth
+what the formula says; on the 22 boards with pairs and at most 22 candidates every promotable set (97,839 in all) is
+checked and the best that keeps the constraints is `P*`; the brute-force oracle scores the known optimum to n = 40.
+Both pilots with the incumbent at `P*` − 1, so that they must find an optimal set themselves, find one in every
+game of 2-900 (880 games each; the rule cut in 573 and 353 of them).
+
+**3. What the rule and the covers remove: a sixth to a third of the nodes, a constant share.**  At the sampled
+nodes (`dominance_output.md` has the per-game tables): "proved" is any of the covers, the prime exchanges and the
+rule's matching test; "sampled" its upper estimate.
+
+| tree | n | proved | sampled |
+|---|---|---|---|
+| solver proofs | 900, 936, 950, 1000 | 0%, 25%, 32%, 43% | 0%, 46%, 53%, 50% |
+| | 1100, 1184, 1215, 1250 | 36%, 8%, 10%, 25% | 39%, 20%, 12%, 35% |
+| incumbent `P*` + 100 | 1000, 1250 | 28%, 8% | 52%, 15% |
+| incumbent `P*` + 200 | 1000, 1250 | 0%, 12% | 50%, 27% |
+| GF(2) branch and bound | 930, 990, 1020 | 54%, 25%, 16% | 55%, 25%, 21% |
+| | 1210, 1230, 1300 | 7%, 19%, 35% | 10%, 20%, 39% |
+
+Two-member exchanges add little (sampled, with everything else: 49%, 34%, 48% of the nodes of 936, 1184, 1250; 25%,
+7%, 46% of the GF(2) nodes of 1020, 1210, 1300).  In the GF(2) trees what is proved is nearly all that is sampled,
+and it is the rule; in the solver's trees the rest of the estimate is single swaps along a symmetry (426 → 438
+above, half of an exchange of 71 and 73) and exchanges of primes that are alike only at the node (29 and 31, 17 and
+19, 61 and 67 at nodes of 936, where the multiples that tell them apart are decided).
+
+The pilots, nodes with the rule against without, the incumbent at `P*`:
+
+| search, rule | games | nodes, geometric mean ratio | total | fewest | most | log ratio on log nodes | time |
+|---|---|---|---|---|---|---|---|
+| solver, hopeless | 880-1090 by 10 (22) | 0.962 | 0.960 | 0.85 (950) | 1.07 (1040) | −0.002 | +15% |
+| solver, matching bound of the constraint | the same | 0.878 | 0.829 | 0.67 (1000) | 1.16 (940) | −0.028 | ×1.9 |
+| GF(2) B&B, hopeless | 880-1300 by 10 (43) | 0.948 | 0.925 | 0.71 (940) | 1.00 | −0.016 | −3% |
+| GF(2) B&B, Lagrangian of the constraint | the same | 0.859 | 0.826 | 0.57 (930) | 0.98 (1100) | −0.030 | −3% |
+
+In the solver the rule's cuts change what the searcher learns, so a tree can grow: 1184 52,259 to 66,250 (+27%) with
+the matching test, 940 +16%; 1250 709,893 to 678,415 (−4%).  The margin scans of the GF(2) pilot (δ = 0, 25, 50, 100)
+keep the ratio per game: 930 0.57, 0.60, 0.61, 0.92; 990 0.77, 0.77, 0.77, 0.79; 1300 0.69, 0.68, 0.67, 0.75.  The
+share does not grow with n (the log ratio changes by ±0.02 decades per 100 in n in both pilots) and barely with the tree
+(−0.03 decades per decade of nodes: `c` lowered by about 3%), although the symmetric part of the problem does grow
+(the table of 2): most rearrangements within a class differ in value by more than the bound leaves, and the bound
+already cuts them.
+
+*Conclusion.*  Literal dominance and transpositions are absent from the trees; what makes interchangeable
+alternatives is a real symmetry of the frame model, the exchange of primes within classes that the frame builder
+treats alike, which IDEAS.md's "no symmetries found" missed.  Breaking it is sound (proved, and checked to 1300) and
+removes about a seventh of the nodes on average (geometric mean 0.86 in the GF(2) branch and bound, 0.88 in the
+solver), up to 43% in some games: a constant factor, not a lower cost per unit of gap.  Exchanges that hold only
+at a node add a little more in the solver's trees and almost nothing in the GF(2) trees, and cost a state comparison
+per exchange, far more than a step.
+
+*What it implies.*
+
+* *Not a slope lever*, and not worth a phase of its own.  If the GF(2) bound goes into the search, the symmetry rule
+  is a cheap addition there: the hopeless test from cofactor sums kept along the path (nearly free, about 5% of
+  the nodes) and the constraint's Lagrangian at the nodes whose heaviest set breaks a pair (about 14%, at one or two
+  intersections there; time-neutral in the pilot, where every bound is computed from scratch).  In the matching
+  solver the constraint costs more than it saves.
+* The pairs are found at the root in about 20 ms a game (the setup included); `root_pairs` is the definition to reuse.
+* The equal-sum exchanges of the uniqueness study are not symmetries (e.g. 425's {110, 132, 168} ↔ {98, 150, 162});
+  they are coincidences of value that only the bound can rule out.
