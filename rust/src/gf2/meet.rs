@@ -978,11 +978,12 @@ impl<const R: usize> Meet<R> {
     }
 
     /// After a [`solve`](Self::solve) that settled, with the workspace still holding it (no solve or greedy set
-    /// since): the weight of the heaviest common independent set of the solve's live elements without its member
-    /// `x`, if the shortest cycle through `x` in the exchange graph is at most `limit` long (see the module docs,
-    /// "The heaviest set without a member": `limit` is the least that a set of another size than the heaviest set's
-    /// loses); `None` if it is not, and the caller must solve.  `pot` is the weight split of the solve's heaviest set
-    /// (its `w1` by element, as [`potentials`](Self::potentials) has it after [`split_bounds`](Self::split_bounds)).
+    /// since): the heaviest set flipped along the shortest cycle through its member `x` in the exchange graph, if
+    /// one is at most `limit` long: its weight (the elements of the cycle in [`cycle`](Self::cycle)), a common
+    /// independent set without `x`.  It is the heaviest without `x` if the sets of other sizes than the heaviest
+    /// set's lose at least as much (see the module docs, "The heaviest set without a member"), which the caller
+    /// judges.  `pot` is the weight split of the solve's heaviest set (its `w1` by element, as
+    /// [`potentials`](Self::potentials) has it after [`split_bounds`](Self::split_bounds)).
     /// The cycle avoids the elements of `banned` (and the value is then the heaviest set's without `x` among the sets
     /// that hold every member of `banned` and no other element of it: the decomposition of the module docs keeps
     /// such sets' parts within the elements not banned).  The tableau is left as it was.

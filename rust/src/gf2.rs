@@ -431,6 +431,9 @@ struct Level<const W: usize, const R: usize> {
     has_split: bool,
     pot: Vec<i64>,
     has_pot: bool,
+    /// A lower bound on what the common independent sets smaller than the heaviest set (of all sizes) lose against
+    /// it (0 if nothing more is known; see [`Losses`]).
+    loss_floor: i64,
     /// The workspace's solve count when this level was last solved, unchanged since (0 for none): if the workspace
     /// has made no solve since, it still holds the level's tableau.
     meet_solve: u64,
@@ -450,6 +453,7 @@ impl<const W: usize, const R: usize> Level<W, R> {
             has_split: false,
             pot: vec![0; n],
             has_pot: false,
+            loss_floor: 0,
             meet_solve: 0,
         }
     }
@@ -463,6 +467,7 @@ impl<const W: usize, const R: usize> Level<W, R> {
             self.pot.copy_from_slice(&other.pot);
         }
         self.meet_solve = other.meet_solve;
+        self.loss_floor = other.loss_floor;
         self.history.clone_from(&other.history);
         self.solved = other.solved;
         self.cap = other.cap;
@@ -502,8 +507,8 @@ struct Levels<'g, const W: usize, const R: usize> {
     prior: Level<W, R>,
     prior_for: Option<(usize, u32)>,
     /// The heaviest sets without the members that the last [`certified_excluding`](Self::certified_excluding)
-    /// certified, and their weights.
-    certified: Vec<(u32, Bits<W>, u64)>,
+    /// certified, their weights, and the lengths of their cycles.
+    certified: Vec<(u32, Bits<W>, u64, i64)>,
     meet: Meet<R>,
     live_idx: Vec<u32>,
     start_idx: Vec<u32>,
@@ -600,6 +605,8 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             child.settled = true;
             child.cap = parent.cap.saturating_sub(added.len() as usize);
             child.value = parent.value - added.sum();
+            // The child's smaller sets, with the promoted, are smaller sets of the parent's.
+            child.loss_floor = parent.loss_floor;
             self.stats.inherited += 1;
         } else if certify_child(self.graph, &lower[d], parent, child, added, &mut self.meet, &mut self.live_idx) {
             self.stats.certified_children += 1;
@@ -726,35 +733,30 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             vector: [&level.vec[0], &level.vec[1]],
             weight: &graph.weight,
         };
-        // The least that a set of another size than the heaviest set's loses (see `meet`'s module docs): a smaller
-        // one what the heaviest set gains over a dominant set one smaller in the history, if there is one, else at
-        // least the shortest path between members; a larger one (where the limit allows it) at least the gap to the
-        // heaviest set one larger.
-        let smaller = level.history.iter().rev().find(|set| set.len() as usize + 1 == size);
-        let mut limit = match smaller {
-            Some(set) => level.value as i64 - set.sum() as i64,
-            None => self.meet.smaller_loss(&problem, &level.pot),
-        };
-        if cap > size {
-            limit = limit.min(self.meet.gap);
-        }
-        let before = self.meet.withouts_exact;
         let last = level.history.last().copied().unwrap_or(Bits::EMPTY);
+        let mut losses = Losses::of(level, &self.meet, cap > size);
+        let reach = losses.reach(&last);
         self.certified.clear();
         for &x in xs {
-            let bound = self.meet.without(&problem, &level.pot, graph.index[x as usize], limit, &[]);
-            if let Some(value) = bound {
-                // The heaviest set without x: the heaviest set flipped along the cycle.
+            let mut bound = None;
+            if let Some(value) = self.meet.without(&problem, &level.pot, graph.index[x as usize], reach, &[]) {
+                // The heaviest set flipped along the cycle, which is the heaviest set without x if the sizes
+                // certify it.
                 let flip: Bits<W> = self.meet.cycle().iter().map(|&e| graph.elems[e as usize]).collect();
-                self.certified.push((x, (last - flip) | (flip - last), value as u64));
+                let delta = level.value as i64 - value;
+                if losses.certify(delta, &mut self.meet, &problem, &level.pot) {
+                    self.certified.push((x, (last - flip) | (flip - last), value as u64, delta));
+                    bound = Some(value as u64);
+                }
             }
-            out.push(bound.map(|v| v as u64));
+            out.push(bound);
         }
-        self.stats.certified += self.meet.withouts_exact - before;
+        level.loss_floor = losses.smaller;
+        self.stats.certified += out.iter().filter(|b| b.is_some()).count() as u64;
     }
 
     fn keep_certified(&mut self, x: u32) {
-        let &(_, set, value) = self.certified.iter().find(|c| c.0 == x).expect("a certified bound without x");
+        let &(_, set, value, delta) = self.certified.iter().find(|c| c.0 == x).expect("a certified bound without x");
         let level = &self.levels[self.depth];
         let kept = &mut self.kept;
         kept.copy_from(level);
@@ -766,6 +768,8 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         kept.settled = true;
         kept.cap = level.cap;
         kept.value = value;
+        // Without x the smaller sets weigh no more than with it.
+        kept.loss_floor = (level.loss_floor - delta).max(0);
         self.kept_for = Some((self.depth, x));
         self.scratch_for = None;
     }
@@ -852,6 +856,7 @@ fn solve<const W: usize, const R: usize>(
     level.meet_solve = meet.solves;
     level.cap = cap;
     level.value = meet.value as u64;
+    level.loss_floor = Losses::from_history(level).unwrap_or(0);
     level.has_split = false;
     level.has_pot = false;
 }
@@ -886,19 +891,19 @@ fn certify_child<const W: usize, const R: usize>(
         vector: [&vectors.vec[0], &vectors.vec[1]],
         weight: &graph.weight,
     };
-    // The heaviest set of all sizes: the least that the parent's sets of other sizes lose.
-    let size = last.len();
-    let smaller = match parent.history.iter().rev().find(|set| set.len() + 1 == size) {
-        Some(set) => parent.value as i64 - set.sum() as i64,
-        None => meet.smaller_loss(&problem, &parent.pot),
-    };
-    let limit = smaller.min(meet.gap);
+    // The child's heaviest set of all sizes: the parent's sets of every other size count.
+    let mut losses = Losses::of(parent, meet, true);
     banned.clear();
     banned.extend((*added | (parent.live - last - child.live)).iter().map(|y| graph.index[y as usize]));
-    let Some(value) = meet.without(&problem, &parent.pot, graph.index[x as usize], limit, banned) else {
+    let reach = losses.reach(&last);
+    let Some(value) = meet.without(&problem, &parent.pot, graph.index[x as usize], reach, banned) else {
         return false;
     };
     let flip: Bits<W> = meet.cycle().iter().map(|&e| graph.elems[e as usize]).collect();
+    let delta = parent.value as i64 - value;
+    if !losses.certify(delta, meet, &problem, &parent.pot) {
+        return false;
+    }
     let set = ((last - flip) | (flip - last)) - *added;
     while child.history.last().is_some_and(|entry| entry.len() >= set.len()) {
         child.history.pop();
@@ -908,7 +913,64 @@ fn certify_child<const W: usize, const R: usize>(
     child.settled = true;
     child.cap = parent.cap.saturating_sub(added.len() as usize);
     child.value = value as u64 - added.sum();
+    // The child's smaller sets, with the promoted, are smaller sets of the parent's without x.
+    child.loss_floor = (losses.smaller - delta).max(0);
     true
+}
+
+/// What the common independent sets of other sizes than a level's heaviest set (of all sizes, its tableau the
+/// workspace's) lose against it at least, which certifies a set read off its exchange graph as the heaviest without
+/// a member if the set loses no more (see `meet`'s module docs): the smaller ones `smaller` (exact once `exact`),
+/// the larger ones `larger` (`i64::MAX` where they do not count).
+struct Losses {
+    smaller: i64,
+    exact: bool,
+    larger: i64,
+}
+
+impl Losses {
+    /// What the smaller sets lose, exactly, from a dominant set one smaller in `level`'s history, if it has one.
+    fn from_history<const W: usize, const R: usize>(level: &Level<W, R>) -> Option<i64> {
+        let size = level.history.last()?.len();
+        let smaller = level.history.iter().rev().find(|set| set.len() + 1 == size)?;
+        Some(level.value as i64 - smaller.sum() as i64)
+    }
+
+    /// For `level`, whose tableau the workspace `meet` holds; the larger sets count if `larger`.
+    fn of<const W: usize, const R: usize>(level: &Level<W, R>, meet: &Meet<R>, larger: bool) -> Self {
+        let exact = Self::from_history(level);
+        Losses {
+            smaller: exact.unwrap_or(level.loss_floor).max(level.loss_floor),
+            exact: exact.is_some(),
+            larger: if larger { meet.gap } else { i64::MAX },
+        }
+    }
+
+    /// The longest cycle that can certify: no longer than what the larger sets lose, nor than the lightest member
+    /// of the heaviest set `last`, which is all that the heaviest set less it loses.
+    fn reach<const W: usize>(&self, last: &Bits<W>) -> i64 {
+        self.larger.min(last.min().map_or(0, i64::from))
+    }
+
+    /// Whether a set that loses `delta` against the heaviest set is the heaviest of its kind; if the bound on the
+    /// smaller sets does not decide, it is made exact first ([`Meet::smaller_loss`] on the workspace's tableau and
+    /// the level's split `pot`).
+    fn certify<const R: usize>(
+        &mut self,
+        delta: i64,
+        meet: &mut Meet<R>,
+        problem: &Problem<'_, R>,
+        pot: &[i64],
+    ) -> bool {
+        if delta > self.larger {
+            return false;
+        }
+        if delta > self.smaller && !self.exact {
+            self.smaller = self.smaller.max(meet.smaller_loss(problem, pot));
+            self.exact = true;
+        }
+        delta <= self.smaller
+    }
 }
 
 /// Solves `level` (solved and settled) again from its heaviest set, so that the workspace holds its tableau: the
