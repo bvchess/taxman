@@ -6,7 +6,8 @@
 
     summarize.py span FILE...     the (♦) span campaign: games, rejections, spanned, violations, by range
     summarize.py star FILE...     the threshold-by-threshold (★) campaign: thresholds and components by method
-    summarize.py exact FILE...    the model-free exact cross-check of optimal scores
+    summarize.py exact FILE...    the model-free exact cross-check of optimal scores (a later file overrides)
+    summarize.py cost FILE...     its cost curve: the searches made with the parity bound from scratch, by band
     summarize.py optsets FILE...  every optimal pick set per game (bin/optsets.rs): tables, exchanges, canonical sets
     summarize.py moves FILE...    the longest games against the optimal ones (bin/moves.rs)
 """
@@ -77,9 +78,10 @@ def star(paths):
 
 
 def exact(paths):
-    """Which games are proven optimal without the frame model: n is proven when its matching bound equals the
-    recorded score, or the search proved it (if it used the segment cuts, only when every smaller game is
-    proven), or its score meets the chain or prime relation and n - 1 is proven."""
+    """Which games are proven optimal without the frame model: n is proven when its matching bound or its parity
+    bound equals the recorded score, or the search proved it (if it used the segment cuts, only when every smaller
+    game is proven), or its score meets the chain or prime relation and n - 1 is proven.  A later file's line for
+    a game replaces an earlier file's."""
     rows = {r["n"]: r for r in lines(paths)}
     proven = {1: True}
     how = Counter()
@@ -90,6 +92,8 @@ def exact(paths):
         if r is not None:
             if r["fm_bound"] == r["score"]:
                 ok, kind = True, "matching bound"
+            elif r.get("parity_bound") == r["score"]:
+                ok, kind = True, "parity bound"
             elif r["search"] == "proven" and (not r.get("segments") or all(proven.get(m) for m in range(2, n))):
                 ok, kind = True, "search"
             elif r["relation"] in ("chain", "prime") and proven.get(n - 1):
@@ -114,6 +118,52 @@ def exact(paths):
     print(f"matching-bound gap at the largest searched n ({last['n']}): {last['fm_bound'] - last['score']}")
     big = sorted(searched, key=lambda r: -r["secs"])[:5]
     print("slowest: " + ", ".join(f"n={r['n']} {r['secs']:.0f}s {r['nodes']} nodes" for r in big))
+    resumed = [r for r in searched if r.get("parity") and r.get("matching_nodes")]
+    if resumed:
+        print("resumed with the parity bound: " + ", ".join(
+            f"n={r['n']} +{r['nodes'] - r['matching_nodes']} nodes" for r in sorted(resumed, key=lambda r: r["n"])))
+
+
+def exact_cost(paths, band=50):
+    """The cost curve of the searches made with the parity bound from scratch (no nodes without it), by band of n:
+    how many, nodes and seconds, the root's parity gap; and the least-squares slopes of log10 nodes and seconds."""
+    import math
+    import statistics
+    rows = sorted((r for r in lines(paths) if r.get("parity") and r["search"] == "proven"
+                   and not r.get("matching_nodes")), key=lambda r: r["n"])
+    print(f"searches with the parity bound from scratch: {len(rows)}, total {sum(r['secs'] for r in rows) / 3600:.2f} h")
+    print(f"{'n':>11} {'games':>5} {'gap':>6} {'median nodes':>12} {'max nodes':>10} {'median s':>9} {'max s':>8} "
+          f"{'total s':>8}")
+    for lo in range(rows[0]["n"] // band * band, rows[-1]["n"] + 1, band):
+        sel = [r for r in rows if lo <= r["n"] < lo + band]
+        if not sel:
+            continue
+        gaps = [r["parity_bound"] - r["score"] for r in sel]
+        nodes = [r["nodes"] for r in sel]
+        secs = [r["secs"] for r in sel]
+        print(f"{lo:>5}-{lo + band - 1:<5} {len(sel):>5} {statistics.mean(gaps):>6.0f} {statistics.median(nodes):>12.0f} "
+              f"{max(nodes):>10} {statistics.median(secs):>9.1f} {max(secs):>8.1f} {sum(secs):>8.0f}")
+
+    def slope(xs, ys):
+        mx, my = statistics.mean(xs), statistics.mean(ys)
+        sxx = sum((x - mx) ** 2 for x in xs)
+        b = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sxx
+        resid = sum((y - my - b * (x - mx)) ** 2 for x, y in zip(xs, ys))
+        se = math.sqrt(resid / (len(xs) - 2) / sxx)
+        r2 = 1 - resid / sum((y - my) ** 2 for y in ys)
+        return b, se, r2
+
+    for lo_n in (rows[0]["n"], 600, 900):
+        sel = [r for r in rows if r["n"] >= lo_n]
+        if len(sel) < 3:
+            continue
+        xs = [r["n"] for r in sel]
+        for key in ("nodes", "secs"):
+            b, se, r2 = slope(xs, [math.log10(max(r[key], 1e-3)) for r in sel])
+            print(f"from n = {lo_n}: log10 {key} grows {100 * b:.3f} ± {100 * se:.3f} per 100 in n (R² {r2:.2f})")
+        b, se, r2 = slope([r["parity_bound"] - r["score"] for r in sel], [math.log10(max(r["nodes"], 1)) for r in sel])
+        print(f"from n = {lo_n}: log10 nodes grows {100 * b:.3f} ± {100 * se:.3f} per 100 of the root's parity gap "
+              f"(R² {r2:.2f})")
 
 
 def adversary(paths):
@@ -365,5 +415,5 @@ def moves(paths):
 
 
 if __name__ == "__main__":
-    {"span": span, "star": star, "exact": exact, "adversary": adversary, "optsets": optsets,
+    {"span": span, "star": star, "exact": exact, "cost": exact_cost, "adversary": adversary, "optsets": optsets,
      "moves": moves}[sys.argv[1]](sys.argv[2:])

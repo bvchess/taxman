@@ -14,7 +14,8 @@ fn main() {
     let args: Vec<u32> = std::env::args().skip(1).map(|a| a.parse().unwrap()).collect();
     let (from, to, step) = (args[0], args[1], args.get(2).copied().unwrap_or(1));
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let known = recorded_games(&[&root.join("../../src/main/resources/optimal.json"), &root.join("../results/strict.jsonl")]);
+    let known =
+        recorded_games(&[&root.join("../../src/main/resources/optimal.json"), &root.join("../results/strict.jsonl")]);
     let spf = smallest_prime_factors(to as usize);
     for n in (from..=to).step_by(step as usize) {
         let Some((score, moves)) = known.get(&u64::from(n)) else { continue };

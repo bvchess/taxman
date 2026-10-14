@@ -1,7 +1,8 @@
 //! Diagnostics of the model-free search: `exactdiag N TARGET [--budget NODES] [--warmup NODES] [--show K]
-//! [--parity 1] [--iterations I]` runs it and prints its counters.  With a warm-up a first search of that many
-//! nodes collects nogoods, the Lagrangian bound is fitted to them (I subgradient steps, default 200), and the
-//! search is run again with both bounds.  `--parity 1` turns on the parity bound (`Prover::with_parity`).
+//! [--parity 1] [--warm 0] [--iterations I]` runs it and prints its counters.  With a warm-up a first search of
+//! that many nodes collects nogoods, the Lagrangian bound is fitted to them (I subgradient steps, default 200), and
+//! the search is run again with both bounds.  `--parity 1` turns on the parity bound (`Prover::with_parity`), `--warm 0`
+//! solves it from scratch at every node (`Prover::parity_cold`).
 
 use std::time::Instant;
 use taxman_evidence::game::{Board, Prover};
@@ -11,6 +12,7 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let (n, target): (u64, u64) = (args[0].parse().unwrap(), args[1].parse().unwrap());
     let (mut budget, mut warmup, mut show, mut parity, mut iterations) = (u64::MAX, 0u64, 0usize, false, 200usize);
+    let mut warm = true;
     for pair in args[2..].chunks(2) {
         let value = &pair[1];
         match pair[0].as_str() {
@@ -18,6 +20,7 @@ fn main() {
             "--warmup" => warmup = value.parse().unwrap(),
             "--show" => show = value.parse().unwrap(),
             "--parity" => parity = value == "1",
+            "--warm" => warm = value == "1",
             "--iterations" => iterations = value.parse().unwrap(),
             flag => panic!("unknown flag {flag}"),
         }
@@ -28,7 +31,12 @@ fn main() {
     let fresh = || {
         let p = Prover::new(&board, target, budget);
         if parity {
-            p.with_parity()
+            let p = p.with_parity();
+            if warm {
+                p
+            } else {
+                p.parity_cold()
+            }
         } else {
             p
         }
@@ -68,6 +76,14 @@ fn main() {
             s.augmentations as f64 / s.solves.max(1) as f64,
             s.arcs as f64 / s.solves.max(1) as f64,
             s.negative
+        );
+        println!(
+            "  warm starts: {} ({:.2} improving cycles each), {} fell back {:?}; with foreign forced {:?}",
+            s.warm,
+            s.cycles as f64 / s.warm.max(1) as f64,
+            s.fallbacks,
+            s.fallback_reasons,
+            s.foreign
         );
     }
     let mut sizes = std::collections::BTreeMap::new();

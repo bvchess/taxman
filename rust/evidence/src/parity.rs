@@ -248,19 +248,39 @@ pub struct Bound {
     pub loops: Vec<u32>,
     /// For each free member x of `set`: an upper bound on `value` with x barred.
     pub without: Vec<(u32, i64)>,
+    /// The certificate, to start a solve with more elements forced or barred from ([`Meet::solve_from`]).
+    pub warm: Warm,
+}
+
+/// A certified heaviest set's free members and its weight split (w1 of each candidate, w2 = w − w1).
+#[derive(Clone, Debug, Default)]
+pub struct Warm {
+    pub members: Vec<u32>,
+    pub w1: Vec<(u32, i64)>,
 }
 
 /// Counters of [`Meet`].
 #[derive(Clone, Copy, Debug, Default)]
 pub struct MeetStats {
     pub solves: u64,
-    /// Augmentations, and arcs of the exchange graphs built.
+    /// Augmentations of the solves from scratch, and arcs of the exchange graphs built.
     pub augmentations: u64,
     pub arcs: u64,
     /// Solves whose certificate failed (none expected; the value is then not reported).
     pub uncertified: u64,
-    /// Arcs found with a negative reduced cost (none expected).
+    /// Arcs found with a negative reduced cost in a solve from scratch (none expected).
     pub negative: u64,
+    /// Solves started from a parent's certificate, their improving cycles, and those that fell back to a solve from
+    /// scratch.
+    pub warm: u64,
+    pub cycles: u64,
+    pub fallbacks: u64,
+    /// Why they fell back: [the start set was dependent or the split unknown, a negative reduced cost, a dependent
+    /// exchange, the certificate failed].
+    pub fallback_reasons: [u64; 4],
+    /// Warm starts whose forced elements include a candidate of the certificate that was not in its set, and how
+    /// many of them fell back.
+    pub foreign: [u64; 2],
 }
 
 /// The weighted intersection of a [`Pair`] (see the module comment).
@@ -270,6 +290,21 @@ pub struct MeetStats {
 /// those from every y with I + y independent in class 1 to every member x through hub `B`, each such pair of arcs
 /// counting as one.  The other arcs are the circuits': x → y for x in y's circuit of class 0, y → x for x in its
 /// circuit of class 1.
+///
+/// A solve from a parent's certificate ([`solve_from`](Self::solve_from)) starts from the parent's free members
+/// that are still candidates, with the parent's split as potentials, which stay feasible on every circuit arc
+/// (forcing members of a heaviest set or barring elements only removes vertices and shortens circuits; barring a
+/// member makes the elements whose circuit held it independent of the rest).  What can fail are the conditions at
+/// the root: (2) for the elements made independent, (1) and (3) nowhere.  So it improves the set by shortest
+/// paths in the graph whose source and sink stand for adding an element or dropping a member: from the source to
+/// each y with I + y independent in class 0 (length −w(y)) and to each member (w(x)); to the sink from each y with
+/// I + y independent in class 1 and from each member (length 0); an improving path is a negative cycle through the
+/// root, and none left means the split from the distances certifies the set.  The set is not the heaviest of its
+/// size (the parent's minus a barred member seldom is), so after an exchange the potentials can fail on new
+/// circuit arcs: these searches are label-correcting ([`dijkstra`](Self::dijkstra), `tolerant`), exact unless a
+/// cycle away from the root is negative, in which case they give up.  That, or an exchange that leaves the set
+/// dependent, falls back to a solve from scratch (2-12% of the warm starts at n = 990-1250); the certificate is
+/// checked either way.
 pub struct Meet {
     pair: Pair,
     cw: usize,
@@ -287,6 +322,9 @@ pub struct Meet {
     out_start: Vec<u32>,
     out_list: Vec<u32>,
     heap: BinaryHeap<Reverse<(i64, u32, u32)>>,
+    /// Scratch: w1 of a warm start by element (INF where unknown), and whether an element is a candidate.
+    split: Vec<i64>,
+    is_cand: Vec<bool>,
     pub stats: MeetStats,
 }
 
@@ -314,6 +352,29 @@ fn relax(
     }
 }
 
+/// What [`Meet::dijkstra`] found: the source vertex's potential, the number of arcs met with a negative reduced cost,
+/// the best reduced distance to the sink and the last element before it, and whether a tolerant search gave up.
+struct Search {
+    pi_s: i64,
+    negative: u64,
+    best: (i64, u32),
+    last: u32,
+    overrun: bool,
+}
+
+/// The average number of scans of a vertex after which a tolerant search gives up.
+const TOLERANT_SCANS: usize = 20;
+
+/// How a search for an improving path ended.
+enum Step {
+    Improved,
+    Optimal,
+    /// A negative reduced cost: the potentials are not feasible (the warm start falls back).
+    Negative,
+    /// The exchange left the set dependent (the warm start falls back).
+    Dependent,
+}
+
 impl Meet {
     pub fn new(pair: Pair) -> Self {
         let len = pair.len();
@@ -336,6 +397,8 @@ impl Meet {
             out_start: vec![0; len + 1],
             out_list: Vec::new(),
             heap: BinaryHeap::new(),
+            split: vec![INF; len],
+            is_cand: vec![false; len],
             stats: MeetStats::default(),
         }
     }
@@ -381,55 +444,31 @@ impl Meet {
     /// The heaviest set independent in both matroids among those holding every element with role `Pick` and none
     /// with role `Barred`, certified (module comment).
     pub fn solve(&mut self, roles: &[Role]) -> Outcome {
-        let len = self.pair.len();
-        let w = self.pair.weight.clone();
-        let (ha, hb) = (len, len + 1);
+        self.solve_from(roles, None)
+    }
+
+    /// [`solve`](Self::solve), starting from `warm`, the certificate of a solve with fewer elements forced or
+    /// barred whose forced elements were members of its set (otherwise it falls back to a solve from scratch).
+    pub fn solve_from(&mut self, roles: &[Role], warm: Option<&Warm>) -> Outcome {
         self.stats.solves += 1;
-        for q in 0..2 {
-            self.rref[q].clear();
-        }
-        let mut forced_weight = 0;
-        let mut set: Vec<u32> = Vec::new();
-        for e in (0..len).filter(|&e| roles[e] == Role::Pick) {
-            if !(0..2).all(|q| self.reduce(q, e)) {
-                return Outcome::Infeasible;
+        let Some((forced_weight, forced, loops)) = self.setup(roles) else { return Outcome::Infeasible };
+        if let Some(warm) = warm {
+            self.stats.warm += 1;
+            let foreign = forced.iter().any(|&f| warm.w1.iter().any(|&(e, _)| e == f) && !warm.members.contains(&f));
+            let before = self.stats.fallbacks;
+            self.stats.foreign[0] += u64::from(foreign);
+            match self.start_warm(warm) {
+                Ok(()) => match self.finish(forced_weight, &forced, &loops) {
+                    Some(bound) => return Outcome::Bound(bound),
+                    None => self.stats.fallback_reasons[3] += 1,
+                },
+                Err(reason) => self.stats.fallback_reasons[reason] += 1,
             }
-            self.add(e, false);
-            forced_weight += w[e];
-            set.push(e as u32);
+            self.stats.fallbacks += 1;
+            self.stats.foreign[1] += u64::from(foreign && self.stats.fallbacks > before);
+            self.setup(roles).expect("the forced elements were independent a moment ago");
         }
-        let mut cands: Vec<u32> = Vec::new();
-        let mut loops: Vec<u32> = Vec::new();
-        for e in (0..len).filter(|&e| roles[e] == Role::Free) {
-            if (0..2).all(|q| self.reduce(q, e)) {
-                cands.push(e as u32);
-            } else {
-                loops.push(e as u32);
-            }
-        }
-        // Start from the longest prefix by weight that is independent in both: the heaviest set of its size, with
-        // the split w1 = w, w2 = 0 (every element left out weighs at most every one taken), that is, potentials w
-        // on the set, 0 off it, the least member's weight at hub A and 0 at hub B.
-        cands.sort_unstable_by_key(|&e| (Reverse(w[e as usize]), Reverse(e)));
-        for &e in &cands {
-            self.in_set[e as usize] = false;
-        }
-        let mut least = None;
-        for &e in &cands {
-            let e = e as usize;
-            if !(0..2).all(|q| self.reduce(q, e)) {
-                break;
-            }
-            self.add(e, true);
-            self.in_set[e] = true;
-            least = Some(w[e]);
-        }
-        for &e in &cands {
-            self.pot[e as usize] = if self.in_set[e as usize] { w[e as usize] } else { 0 };
-        }
-        self.pot[ha] = least.unwrap_or_else(|| cands.iter().map(|&e| w[e as usize]).max().unwrap_or(0));
-        self.pot[hb] = 0;
-        self.cands = cands;
+        self.start_prefix();
         loop {
             self.exchange_graph();
             #[cfg(test)]
@@ -444,17 +483,123 @@ impl Meet {
             }
             self.stats.augmentations += 1;
         }
-        let Some(without) = self.certify() else { return Outcome::Uncertified };
-        let mut value = forced_weight;
-        for &e in &self.cands {
-            if self.in_set[e as usize] {
-                value += w[e as usize];
-                set.push(e);
+        match self.finish(forced_weight, &forced, &loops) {
+            Some(bound) => Outcome::Bound(bound),
+            None => {
+                self.stats.uncertified += 1;
+                Outcome::Uncertified
             }
         }
-        set.sort_unstable();
-        let without = without.into_iter().map(|(x, drop)| (x, value - drop)).collect();
-        Outcome::Bound(Bound { value, set, loops, without })
+    }
+
+    /// Clears the rows, adds the forced elements (untracked), and sorts the free ones into candidates (by weight,
+    /// heaviest first) and loops.  None if the forced elements are dependent.
+    fn setup(&mut self, roles: &[Role]) -> Option<(i64, Vec<u32>, Vec<u32>)> {
+        let len = self.pair.len();
+        for q in 0..2 {
+            self.rref[q].clear();
+        }
+        for &e in &self.cands {
+            self.is_cand[e as usize] = false;
+        }
+        let mut forced_weight = 0;
+        let mut forced: Vec<u32> = Vec::new();
+        for e in (0..len).filter(|&e| roles[e] == Role::Pick) {
+            if !(0..2).all(|q| self.reduce(q, e)) {
+                self.cands.clear();
+                return None;
+            }
+            self.add(e, false);
+            forced_weight += self.pair.weight[e];
+            forced.push(e as u32);
+        }
+        let mut cands: Vec<u32> = Vec::new();
+        let mut loops: Vec<u32> = Vec::new();
+        for e in (0..len).filter(|&e| roles[e] == Role::Free) {
+            if (0..2).all(|q| self.reduce(q, e)) {
+                cands.push(e as u32);
+            } else {
+                loops.push(e as u32);
+            }
+        }
+        let w = &self.pair.weight;
+        cands.sort_unstable_by_key(|&e| (Reverse(w[e as usize]), Reverse(e)));
+        for &e in &cands {
+            self.in_set[e as usize] = false;
+            self.is_cand[e as usize] = true;
+        }
+        self.cands = cands;
+        Some((forced_weight, forced, loops))
+    }
+
+    /// The start of a solve from scratch: the longest prefix by weight that is independent in both, the heaviest
+    /// set of its size, with the split w1 = w, w2 = 0 (every element left out weighs at most every one taken),
+    /// that is, potentials w on the set, 0 off it, the least member's weight at hub A and 0 at hub B.
+    fn start_prefix(&mut self) {
+        let w = self.pair.weight.clone();
+        let len = self.pair.len();
+        let mut least = None;
+        for i in 0..self.cands.len() {
+            let e = self.cands[i] as usize;
+            if !(0..2).all(|q| self.reduce(q, e)) {
+                break;
+            }
+            self.add(e, true);
+            self.in_set[e] = true;
+            least = Some(w[e]);
+        }
+        for &e in &self.cands {
+            self.pot[e as usize] = if self.in_set[e as usize] { w[e as usize] } else { 0 };
+        }
+        self.pot[len] = least.unwrap_or_else(|| self.cands.iter().map(|&e| w[e as usize]).max().unwrap_or(0));
+        self.pot[len + 1] = 0;
+    }
+
+    /// The start of a solve from a certificate (see the type's comment): its members that are still candidates
+    /// and the potentials of its split, then improving paths through the root until none is left.  An error (the
+    /// index of [`MeetStats::fallback_reasons`]) if it must fall back to a solve from scratch.
+    fn start_warm(&mut self, warm: &Warm) -> Result<(), usize> {
+        let w = self.pair.weight.clone();
+        for &(e, w1) in &warm.w1 {
+            self.split[e as usize] = w1;
+        }
+        let known = self.cands.iter().all(|&e| self.split[e as usize] < INF);
+        let mut ok = known;
+        if ok {
+            for &e in &warm.members {
+                let e = e as usize;
+                if !self.is_cand[e] {
+                    continue;
+                }
+                if !(0..2).all(|q| self.reduce(q, e)) {
+                    ok = false;
+                    break;
+                }
+                self.add(e, true);
+                self.in_set[e] = true;
+            }
+        }
+        if ok {
+            for &e in &self.cands {
+                let e = e as usize;
+                self.pot[e] = if self.in_set[e] { self.split[e] } else { self.split[e] - w[e] };
+            }
+        }
+        for &(e, _) in &warm.w1 {
+            self.split[e as usize] = INF;
+        }
+        if !ok {
+            return Err(0);
+        }
+        loop {
+            self.exchange_graph();
+            match self.improve() {
+                Step::Improved => self.stats.cycles += 1,
+                Step::Optimal => return Ok(()),
+                Step::Negative => return Err(1),
+                Step::Dependent => return Err(2),
+            }
+        }
     }
 
     /// The circuits of the candidates outside the set in both classes, and the circuit arcs x → y of class 0 by x.
@@ -510,12 +655,22 @@ impl Meet {
         }
     }
 
-    /// Dijkstra over the exchange graph on reduced costs, lexicographic in (cost, arcs), from `sources` (element,
-    /// true cost of the arc from the source vertex) to every vertex, stopping at the sink if `to_sink` holds the
-    /// sink's potential.  Returns the source vertex's potential, and with `to_sink` the best reduced distance to
-    /// the sink and the last element before it.
-    fn dijkstra(&mut self, sources: &[(u32, i64)], to_sink: Option<i64>) -> (i64, (i64, u32), u32) {
-        let Meet { pair, cw, cands, in_set, pot, indep, circ, dist, prev, out_start, out_list, heap, stats, .. } = self;
+    /// Shortest paths over the exchange graph on reduced costs, lexicographic in (cost, arcs), from `sources`
+    /// (element, true cost of the arc from the source vertex) to every vertex, and with `to_sink` (the sink's
+    /// potential) to the sink.  With `hubs`, through the hubs too; with `drops`, every member reaches the sink (at
+    /// true cost 0).  Plain, it is Dijkstra, which needs the potentials feasible: it stops at the first arc with a
+    /// negative reduced cost, and at the sink.  `tolerant`, it is label-correcting (a vertex is scanned again when
+    /// its distance falls), which is exact whenever no cycle is negative, with no early stop and at most
+    /// [`TOLERANT_SCANS`] scans a vertex on average (else it gives up: `overrun`).
+    fn dijkstra(
+        &mut self,
+        sources: &[(u32, i64)],
+        to_sink: Option<i64>,
+        hubs: bool,
+        drops: bool,
+        tolerant: bool,
+    ) -> Search {
+        let Meet { pair, cw, cands, in_set, pot, indep, circ, dist, prev, out_start, out_list, heap, .. } = self;
         let (w, cw, len) = (&pair.weight, *cw, pair.len());
         let (ha, hb) = (len, len + 1);
         for &e in cands.iter() {
@@ -537,28 +692,40 @@ impl Meet {
         }
         let mut best = (INF, u32::MAX);
         let mut last = NONE;
-        let negative = &mut stats.negative;
+        let mut negative = 0u64;
+        let mut scans = TOLERANT_SCANS * (cands.len() + 2);
         while let Some(Reverse((d, h, u))) = heap.pop() {
             let u = u as usize;
             let at = (d, h);
             if at > dist[u] {
                 continue;
             }
-            if to_sink.is_some() && at >= best {
-                break;
+            if tolerant {
+                if scans == 0 {
+                    return Search { pi_s, negative, best, last, overrun: true };
+                }
+                scans -= 1;
+            } else {
+                if negative > 0 {
+                    // The potentials are not feasible: the distances mean nothing (and could fall forever).
+                    break;
+                }
+                if to_sink.is_some() && at >= best {
+                    break;
+                }
             }
             if u == ha {
                 for &y in cands.iter() {
                     let y = y as usize;
                     if !in_set[y] && indep[0][y] {
-                        relax(dist, prev, heap, negative, u, y, at, pot[ha] - w[y] - pot[y], 1);
+                        relax(dist, prev, heap, &mut negative, u, y, at, pot[ha] - w[y] - pot[y], 1);
                     }
                 }
             } else if u == hb {
                 for &x in cands.iter() {
                     let x = x as usize;
                     if in_set[x] {
-                        relax(dist, prev, heap, negative, u, x, at, pot[hb] + w[x] - pot[x], 1);
+                        relax(dist, prev, heap, &mut negative, u, x, at, pot[hb] + w[x] - pot[x], 1);
                     }
                 }
             } else if !in_set[u] {
@@ -570,21 +737,32 @@ impl Meet {
                             last = u as u32;
                         }
                     }
-                    relax(dist, prev, heap, negative, u, hb, at, pot[u] - pot[hb], 0);
+                    if hubs {
+                        relax(dist, prev, heap, &mut negative, u, hb, at, pot[u] - pot[hb], 0);
+                    }
                 } else {
                     for x in ones(&circ[1][u * cw..(u + 1) * cw]) {
-                        relax(dist, prev, heap, negative, u, x, at, pot[u] + w[x] - pot[x], 1);
+                        relax(dist, prev, heap, &mut negative, u, x, at, pot[u] + w[x] - pot[x], 1);
                     }
                 }
             } else {
+                if let (Some(pi_t), true) = (to_sink, drops) {
+                    let reach = (d + pot[u] - pi_t, h + 1);
+                    if reach < best {
+                        best = reach;
+                        last = u as u32;
+                    }
+                }
                 for i in out_start[u]..out_start[u + 1] {
                     let y = out_list[i as usize] as usize;
-                    relax(dist, prev, heap, negative, u, y, at, pot[u] - w[y] - pot[y], 1);
+                    relax(dist, prev, heap, &mut negative, u, y, at, pot[u] - w[y] - pot[y], 1);
                 }
-                relax(dist, prev, heap, negative, u, ha, at, pot[u] - pot[ha], 0);
+                if hubs {
+                    relax(dist, prev, heap, &mut negative, u, ha, at, pot[u] - pot[ha], 0);
+                }
             }
         }
-        (pi_s, best, last)
+        Search { pi_s, negative, best, last, overrun: false }
     }
 
     /// Test aid: an arc of the exchange graph with a negative reduced cost, if any.
@@ -633,8 +811,7 @@ impl Meet {
 
     /// One augmentation along a shortest path if it gains weight; false if none does.
     fn augment(&mut self) -> bool {
-        let w = self.pair.weight.clone();
-        let len = self.pair.len();
+        let w = &self.pair.weight;
         let sources: Vec<(u32, i64)> = self
             .cands
             .iter()
@@ -648,16 +825,60 @@ impl Meet {
             .map(|&y| self.pot[y as usize])
             .min();
         let (Some(pi_t), false) = (pi_t, sources.is_empty()) else { return false };
-        let (pi_s, best, last) = self.dijkstra(&sources, Some(pi_t));
+        let Search { pi_s, negative, best, last, .. } = self.dijkstra(&sources, Some(pi_t), true, false, false);
+        self.stats.negative += negative;
         if last == NONE || best.0 - pi_s + pi_t >= 0 {
             return false;
         }
+        let flipped = self.flip(best.0, last, true);
+        assert!(flipped, "an augmenting path keeps the set independent in both matroids");
+        self.set_hubs();
+        true
+    }
+
+    /// One improving cycle through the root (see the type's comment), if any.
+    fn improve(&mut self) -> Step {
+        let w = &self.pair.weight;
+        let sources: Vec<(u32, i64)> = self
+            .cands
+            .iter()
+            .filter(|&&e| self.in_set[e as usize] || self.indep[0][e as usize])
+            .map(|&e| (e, if self.in_set[e as usize] { w[e as usize] } else { -w[e as usize] }))
+            .collect();
+        let pi_t = self
+            .cands
+            .iter()
+            .filter(|&&e| self.in_set[e as usize] || self.indep[1][e as usize])
+            .map(|&e| self.pot[e as usize])
+            .min();
+        let Some(pi_t) = pi_t else { return Step::Optimal };
+        let Search { pi_s, best, last, overrun, .. } = self.dijkstra(&sources, Some(pi_t), false, true, true);
+        if overrun {
+            return Step::Negative;
+        }
+        if last == NONE || best.0 - pi_s + pi_t >= 0 {
+            return Step::Optimal;
+        }
+        if self.flip(best.0, last, false) {
+            Step::Improved
+        } else {
+            Step::Dependent
+        }
+    }
+
+    /// Updates the potentials by the last Dijkstra's distances (capped at `best`) and exchanges the elements of the
+    /// path ending at `last`: the members on it leave, the others enter.  The weight split w1 = π on the set and
+    /// π + w off it is what carries over, so an element changing sides changes its potential by its weight.
+    /// False if an entering element turns out dependent (then the state is left broken).
+    fn flip(&mut self, best: i64, last: u32, trusted: bool) -> bool {
+        let w = self.pair.weight.clone();
+        let len = self.pair.len();
         for i in 0..self.cands.len() {
             let e = self.cands[i] as usize;
-            self.pot[e] += self.dist[e].0.min(best.0);
+            self.pot[e] += self.dist[e].0.min(best);
         }
         for hub in [len, len + 1] {
-            self.pot[hub] += self.dist[hub].0.min(best.0);
+            self.pot[hub] += self.dist[hub].0.min(best);
         }
         let (mut entering, mut leaving) = (Vec::new(), Vec::new());
         let mut v = last;
@@ -672,19 +893,19 @@ impl Meet {
             }
             v = self.prev[e];
         }
-        // The weight split w1 = π on the set and π + w off it is what carries over: an element changing sides
-        // changes its potential by its weight.
         for &x in &leaving {
             self.take_out(x);
             self.in_set[x] = false;
             self.pot[x] -= w[x];
         }
         for &y in &entering {
+            if !trusted && !(0..2).all(|q| self.reduce(q, y)) {
+                return false;
+            }
             self.add(y, true);
             self.in_set[y] = true;
             self.pot[y] += w[y];
         }
-        self.set_hubs();
         true
     }
 
@@ -700,11 +921,11 @@ impl Meet {
         }
     }
 
-    /// The certificate: a weight split from the distances of every vertex from a source joined to each y with
-    /// I + y independent in class 0 (cost −w(y)) and to each x ∈ I (cost w(x)), checked against conditions
-    /// (1)-(3) of the module comment in both classes.  Returns, for each member x of I, how much its barring takes
-    /// off the bound at least; None if a condition fails.
-    fn certify(&mut self) -> Option<Vec<(u32, i64)>> {
+    /// The bound of the current set if its certificate holds: a weight split from the distances of every vertex
+    /// from a source joined to each y with I + y independent in class 0 (cost −w(y)) and to each member x (cost
+    /// w(x)), over the circuit arcs, checked against conditions (1)-(3) of the module comment in both classes.
+    /// (The distances are the largest potentials meeting the arcs, so if any split satisfies (1)-(3) these do.)
+    fn finish(&mut self, forced_weight: i64, forced: &[u32], loops: &[u32]) -> Option<Bound> {
         let w = self.pair.weight.clone();
         let cw = self.cw;
         let sources: Vec<(u32, i64)> = self
@@ -713,14 +934,16 @@ impl Meet {
             .filter(|&&e| self.in_set[e as usize] || self.indep[0][e as usize])
             .map(|&e| (e, if self.in_set[e as usize] { w[e as usize] } else { -w[e as usize] }))
             .collect();
-        let (pi_s, _, _) = self.dijkstra(&sources, None);
+        let Search { pi_s, overrun, .. } = self.dijkstra(&sources, None, false, false, true);
+        if overrun {
+            return None;
+        }
         let len = self.pair.len();
         // w1 = σ on the set, σ + w off it, σ the true distance; w2 = w − w1.
         let mut w1 = vec![0i64; len];
         for &e in &self.cands {
             let e = e as usize;
             if self.dist[e].0 >= INF {
-                self.stats.uncertified += 1;
                 return None;
             }
             // A reduced distance is the true one plus π_s − π(e).
@@ -736,7 +959,7 @@ impl Meet {
                 ok &= w1[e] >= 0 && w2(e, &w1) >= 0;
                 continue;
             }
-            for q in 0..2 {
+            for (q, best_q) in best.iter_mut().enumerate() {
                 let wq = if q == 0 { w1[e] } else { w2(e, &w1) };
                 if self.indep[q][e] {
                     ok &= wq <= 0;
@@ -744,26 +967,28 @@ impl Meet {
                     for x in ones(&self.circ[q][e * cw..(e + 1) * cw]) {
                         let wx = if q == 0 { w1[x] } else { w2(x, &w1) };
                         ok &= wq <= wx;
-                        best[q][x] = best[q][x].max(wq);
+                        best_q[x] = best_q[x].max(wq);
                     }
                 }
             }
         }
         if !ok {
-            self.stats.uncertified += 1;
             return None;
         }
-        Some(
-            self.cands
-                .iter()
-                .filter(|&&x| self.in_set[x as usize])
-                .map(|&x| {
-                    let x = x as usize;
-                    let drop = (w1[x] - best[0][x]) + (w2(x, &w1) - best[1][x]);
-                    (x as u32, drop)
-                })
-                .collect(),
-        )
+        let members: Vec<u32> = self.cands.iter().copied().filter(|&e| self.in_set[e as usize]).collect();
+        let value = forced_weight + members.iter().map(|&e| w[e as usize]).sum::<i64>();
+        let without = members
+            .iter()
+            .map(|&x| {
+                let x = x as usize;
+                let drop = (w1[x] - best[0][x]) + (w2(x, &w1) - best[1][x]);
+                (x as u32, value - drop)
+            })
+            .collect();
+        let mut set: Vec<u32> = forced.iter().chain(&members).copied().collect();
+        set.sort_unstable();
+        let split = self.cands.iter().map(|&e| (e, w1[e as usize])).collect();
+        Some(Bound { value, set, loops: loops.to_vec(), without, warm: Warm { members, w1: split } })
     }
 }
 
@@ -903,6 +1128,94 @@ mod tests {
             }
             check(&pair, &vec![Role::Free; len], &mut meet);
         }
+    }
+
+    /// A solve started from a parent's certificate equals enumeration: children of random parents with members of
+    /// the parent's set forced or barred, other elements barred, and now and then a non-member forced (which the
+    /// warm start does not expect, so it may fall back).  Most children must not fall back.
+    #[test]
+    fn warm_starts_against_brute_force() {
+        let mut rng = Rng(0xD1B5_4A32_D192_ED03);
+        let (mut warm, mut fallbacks, mut expected_fallbacks) = (0u64, 0u64, 0u64);
+        let mut reasons = [0u64; 4];
+        for round in 0..2000 {
+            let len = 3 + rng.below(9) as usize;
+            let dims = [1 + rng.below(6) as usize, 1 + rng.below(6) as usize];
+            let mut coords = [vec![Vec::new(); len], vec![Vec::new(); len]];
+            for q in 0..2 {
+                for e in 0..len {
+                    if rng.below(8) == 0 {
+                        continue;
+                    }
+                    let k = 1 + rng.below(3);
+                    let mut c: Vec<u32> = (0..k).map(|_| rng.below(dims[q] as u64) as u32).collect();
+                    c.sort_unstable();
+                    c.dedup();
+                    coords[q][e] = c;
+                }
+            }
+            let weight: Vec<i64> = (0..len)
+                .map(|_| if round % 3 == 0 { 1 + rng.below(4) as i64 } else { 1 + rng.below(100) as i64 })
+                .collect();
+            let pair = Pair { dims, coords, weight };
+            let mut meet = Meet::new(pair.clone());
+            let roles: Vec<Role> =
+                (0..len).map(|_| if rng.below(6) == 0 { Role::Barred } else { Role::Free }).collect();
+            let Outcome::Bound(parent) = meet.solve(&roles) else { continue };
+            for _ in 0..4 {
+                let mut child = roles.clone();
+                for &x in &parent.warm.members {
+                    match rng.below(5) {
+                        0 => child[x as usize] = Role::Pick,
+                        1 => child[x as usize] = Role::Barred,
+                        _ => {}
+                    }
+                }
+                for e in 0..len {
+                    if child[e] == Role::Free && !parent.set.contains(&(e as u32)) {
+                        match rng.below(12) {
+                            0 => child[e] = Role::Pick,
+                            1 | 2 => child[e] = Role::Barred,
+                            _ => {}
+                        }
+                    }
+                }
+                let before = meet.stats;
+                let want = brute(&pair, &child);
+                let got = match meet.solve_from(&child, Some(&parent.warm)) {
+                    Outcome::Bound(b) => Some(b),
+                    Outcome::Infeasible => None,
+                    Outcome::Uncertified => panic!("uncertified child {child:?} of {roles:?}"),
+                };
+                assert_eq!(got.as_ref().map(|b| b.value), want, "child {child:?} of {roles:?}, pair {:?}", pair.coords);
+                if let Some(b) = got {
+                    let set: Vec<usize> = b.set.iter().map(|&e| e as usize).collect();
+                    assert!(independent(&pair, 0, &set) && independent(&pair, 1, &set));
+                    for &(x, bound) in &b.without {
+                        let mut barred = child.clone();
+                        barred[x as usize] = Role::Barred;
+                        assert!(bound >= brute(&pair, &barred).unwrap_or(i64::MIN), "barring {x}");
+                    }
+                }
+                warm += meet.stats.warm - before.warm;
+                fallbacks += meet.stats.fallbacks - before.fallbacks;
+                let expected = (0..len).all(|e| child[e] != Role::Pick || parent.set.contains(&(e as u32)));
+                if expected {
+                    expected_fallbacks += meet.stats.fallbacks - before.fallbacks;
+                    for (r, (a, b)) in
+                        reasons.iter_mut().zip(meet.stats.fallback_reasons.iter().zip(before.fallback_reasons))
+                    {
+                        *r += a - b;
+                    }
+                }
+            }
+        }
+        assert!(warm > 3000 && fallbacks * 10 < warm, "{fallbacks} fallbacks in {warm} warm starts");
+        eprintln!(
+            "warm starts: {warm}, fallbacks {fallbacks}, of them with only members forced {expected_fallbacks}; \
+             reasons {:?}",
+            reasons
+        );
     }
 
     /// Theorem 10 on small boards: every playable set of 2..=n is independent in both parity matroids, so the

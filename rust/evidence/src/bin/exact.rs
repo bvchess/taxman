@@ -73,14 +73,8 @@ impl Checkpoint {
 
     fn load(path: &Path) -> Option<Checkpoint> {
         let text = fs::read_to_string(path).ok()?;
-        let mut cp = Checkpoint {
-            target: 0,
-            nodes: 0,
-            matching_nodes: None,
-            secs: 0.0,
-            nogoods: Vec::new(),
-            units: Vec::new(),
-        };
+        let mut cp =
+            Checkpoint { target: 0, nodes: 0, matching_nodes: None, secs: 0.0, nogoods: Vec::new(), units: Vec::new() };
         for line in text.lines() {
             let (key, rest) = line.split_once(' ')?;
             match key {

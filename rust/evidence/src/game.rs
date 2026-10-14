@@ -28,7 +28,7 @@
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 
-use crate::parity::{Meet, Outcome, Parity};
+use crate::parity::{Meet, Outcome, Parity, Warm};
 use crate::primes::{is_prime, maximal_factors};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -634,6 +634,8 @@ pub struct Prover<'a> {
     bound: MatchingBound,
     lag: Option<Lag>,
     parity: Option<Meet>,
+    /// Whether a parity solve starts from the parent node's certificate (on by default).
+    parity_warm: bool,
     /// The weight of picking each number (c by default; see [`weighted`](Self::weighted)).
     weights: Vec<i64>,
     target: u64,
@@ -706,12 +708,14 @@ impl Lag {
     }
 }
 
-/// A parent's state for its children: its roles, and the optimal matching and dual of each bound.
+/// A parent's state for its children: its roles, the optimal matching and dual of each bound, and the parity
+/// bound's certificate (a child starts its parity solve from it).
 type Snapshot = (Vec<u32>, Vec<i64>);
 struct Base<'b> {
     roles: &'b [Role],
     plain: &'b Snapshot,
     lag: Option<&'b Snapshot>,
+    parity: Option<&'b Warm>,
 }
 
 impl<'a> Prover<'a> {
@@ -721,6 +725,7 @@ impl<'a> Prover<'a> {
             bound: MatchingBound::new(board),
             lag: None,
             parity: None,
+            parity_warm: true,
             weights: (0..=i64::from(board.n)).collect(),
             target,
             smaller: Vec::new(),
@@ -764,10 +769,7 @@ impl<'a> Prover<'a> {
     /// and before running.
     pub fn weighted(mut self, weights: Vec<i64>) -> Self {
         assert!(weights.len() == self.board.n as usize + 1 && weights[2..].iter().all(|&w| w > 0));
-        assert!(
-            self.lag.is_none() && self.parity.is_none() && self.nodes == 0,
-            "set the weights before anything else"
-        );
+        assert!(self.lag.is_none() && self.parity.is_none() && self.nodes == 0, "set the weights before anything else");
         self.bound.set_weights(&weights);
         self.weights = weights;
         self
@@ -781,6 +783,13 @@ impl<'a> Prover<'a> {
     /// the node branches on a minimal unplayable subset of its heaviest set instead of the matching's picks.
     pub fn with_parity(mut self) -> Self {
         self.parity = Some(Meet::new(Parity::pair(self.board, &self.weights)));
+        self
+    }
+
+    /// Solves every parity bound from scratch instead of from the parent node's certificate (to measure the warm
+    /// starts; the bounds are the same).
+    pub fn parity_cold(mut self) -> Self {
+        self.parity_warm = false;
         self
     }
 
@@ -1015,7 +1024,10 @@ impl<'a> Prover<'a> {
             self.lag.as_mut().map(|l| l.solve(board, base.as_ref().and_then(|b| b.lag.map(|s| (b.roles, s))), &roles));
         let n = self.board.n;
         // (value, picks): the matching's bound and picks; (best, source): the set the node branches on, the parity
-        // bound's heaviest set when that bound is on (else the matching's picks), and its weight.
+        // bound's heaviest set when that bound is on (else the matching's picks), and its weight.  The parity solves
+        // start from the last certificate: the parent's, then the node's own.
+        let mut warm: Option<Warm> = None;
+        let parent_warm = base.as_ref().and_then(|b| b.parity).filter(|_| self.parity_warm);
         let (value, picks, best, source) = loop {
             let Some((value, picks)) = solved else { return Verdict::Proven };
             if value <= self.target {
@@ -1050,7 +1062,7 @@ impl<'a> Prover<'a> {
             let mut parity_set = None;
             if newly.is_empty() {
                 if let Some(meet) = self.parity.as_mut() {
-                    match meet.solve(&roles) {
+                    match meet.solve_from(&roles, warm.as_ref().filter(|_| self.parity_warm).or(parent_warm)) {
                         Outcome::Infeasible => {
                             self.stats[6] += 1;
                             return Verdict::Proven;
@@ -1068,6 +1080,7 @@ impl<'a> Prover<'a> {
                                 b.set.iter().for_each(|&c| set[c as usize] = true);
                                 parity_set = Some((b.value as u64, set));
                             }
+                            warm = Some(b.warm);
                         }
                     }
                 }
@@ -1170,7 +1183,7 @@ impl<'a> Prover<'a> {
                 (j..branch.len()).for_each(|k| self.pending.push(child(k, &base_roles)));
                 return Verdict::Paused;
             }
-            let base = Base { roles: &base_roles, plain: &snapshot, lag: lag_snapshot.as_ref() };
+            let base = Base { roles: &base_roles, plain: &snapshot, lag: lag_snapshot.as_ref(), parity: warm.as_ref() };
             match self.node(child(j, &base_roles), Some(base)) {
                 Verdict::Proven => {}
                 Verdict::Paused => {
