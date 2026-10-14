@@ -100,8 +100,7 @@ fn a_search_with_the_lagrangian_bound_from_a_handicapped_incumbent_finds_the_opt
         Config { refits: Some(Refits { first: 25, every: 100 }), period: Some(100), ..base },
         Config { refits: Some(Refits { first: 10, every: 60 }), threads: 2, ..base },
     ];
-    let runs =
-        lagrangian_runs::<8>(optimal, 301..=511, &configs) + lagrangian_runs::<16>(optimal, 512..=600, &configs);
+    let runs = lagrangian_runs::<8>(optimal, 301..=511, &configs) + lagrangian_runs::<16>(optimal, 512..=600, &configs);
     assert!(runs > 150, "{runs} runs");
 }
 
