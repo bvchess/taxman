@@ -1,7 +1,10 @@
-//! Matroid bounds for the promotions: the heaviest common independent set of the two GF(2) frame matroids
-//! (`common/meet.rs` has the matroids, the proof that every promotable set is independent in both, and the
-//! intersection algorithm), measured against the matching bound at the roots and at search nodes.  Research code:
-//! nothing in the solver calls it.  The study is in docs/EXPERIMENTS.md, "Matroid intersection bounds (2026-10)".
+//! Matroid bounds for the promotions: the heaviest common independent set of the two GF(2) frame matroids,
+//! measured against the matching bound at the roots and at search nodes, and the search's proofs with it.  The
+//! search's bound is the crate's `taxman::gf2` (tactic `gf2`), which `prove` runs; the other commands are the study
+//! that led to it and use its research implementation, `common/meet.rs` (the matroids built afresh at each node, a
+//! reference algorithm and a fast one), which stays as an independent check of the crate's (`nodes` asserts that the
+//! crate's contraction gives the matroids built at the node).  The studies are in docs/EXPERIMENTS.md, "Matroid
+//! intersection bounds (2026-10)" and "The GF(2) bound in the search (2026-10)".
 //!
 //! ```text
 //! cargo run --release --example matroid -- roots [--known FILE] [--opts FILE] N|A-B...
@@ -14,6 +17,8 @@
 //! cargo run --release --example matroid -- forced [--every K] FIXTURE...
 //! cargo run --release --example matroid -- cores N|A-B...
 //! cargo run --release --example matroid -- whole [--known FILE] N|A-B...
+//! cargo run --release --example matroid -- prove [--known FILE] [--tactic NAME=VALUE]... [--branching B]
+//!     [--prefilter] [--strong K] [--first-forced] [--threads T] [--seconds S] N|A-B...
 //! ```
 //!
 //! Games are set up as `taxman solve` sets them up (the default tactics, which are strict).  `P*` is the
@@ -39,6 +44,11 @@
 //! * **cores**: the cores that the GF(2) bound's heaviest set runs into at the root, and whether Lorea's matroid
 //!   sees them.
 //! * **whole**: the same bound for the whole game, with no frame model: an upper bound on `opt(n)` ([`whole`]).
+//! * **prove**: the search's proof that nothing beats `P*`, with the search tactics of `--tactic` (named as for
+//!   `taxman solve`) and the GF(2) bound's knobs, which are not tactics: `--branching` (`exact`, the default;
+//!   `split`, the member whose split bound is lowest; `largest`; `forced`, exact solves only to find forced
+//!   members), `--prefilter` (the matching bound as a first check), `--strong K` (solve at most K members of a
+//!   conflict) and `--first-forced` (stop solving at the first forced member) ([`prove`]).
 
 #[path = "common/meet.rs"]
 mod meet;
