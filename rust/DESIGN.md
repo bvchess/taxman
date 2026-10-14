@@ -715,6 +715,11 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   760 the Java's structure is fixed in `testdata/golden_wide/` (n = 511, 512, 1000, 1001, 1023, 1024, 1025, 1100, 1231,
   2047 and 2048, checked at the width `with_width!` picks) and `games_java.txt` (the Java's `Apiary` game, move for move, for
   171 sets of promotions at 762–2049).
+* **The board layer against the chain** (`tests/board_layer.rs`): for every 25th searched game of
+  `results/strict.jsonl` (and the last, n = 2175), the moves that the game's promotions make and the digest of the
+  board's search problem are the line's, which the golden data (up to 2049) cannot say of the boards that matter.  The
+  unit tests of `hives` check what the frames remember (which numbers each can take on, which sources
+  `removeImpossible` has been through) against a fresh computation.
 * **Regression**: `taxman regress --to N` solves 1..N as one range and checks every score against optimal.json.
 * **Tactic invariance**: games 1..300 forced to search with each tactic off or changed must give identical scores,
   and a checkpoint is refused when any of the search tactics differs.

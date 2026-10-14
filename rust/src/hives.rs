@@ -72,6 +72,15 @@
 //! merging.)  Two details reproduce quirks of the Java on purpose: a frame that has not been simplified yet counts
 //! as having freedoms (`Hive::new`), and the stale-frame behaviour of `Home::MergedAway`.
 //!
+//! # What setup costs
+//!
+//! Almost all of it is the peel (`Apiary::count_freedoms`), which setup asks of whole frames thousands of times for
+//! a board of a few thousand numbers.  Three things keep that cheap, and none changes an answer.  The peel works
+//! on a graph as large as the sets it is given, not as the width of a set (`Peel`).  A frame remembers which
+//! numbers it can take on as a source, until its sources change (`Hive::can_add`), and which of its sources
+//! `removeImpossible` has been through (`Hive::swept`).  And `unzip` asks each question about a factor once, however
+//! many passes visit it (`Answers`).
+//!
 //! # Punctured boards
 //!
 //! The frames can also be formed on a board with *holes* ([`Tables::punctured`]): numbers that are never in the
@@ -80,7 +89,8 @@
 
 use crate::bits::Bits;
 use crate::numtheory::Tables;
-use std::collections::VecDeque;
+use std::cell::RefCell;
+use std::collections::{HashMap, VecDeque};
 
 /// A frame as setup forms it: a connected group of sources with the factors they compete for, plus what the
 /// simplification found (the Java's `bombus.Hive`; before frames with the same number are merged, though a merged
@@ -104,6 +114,13 @@ pub struct Hive<const W: usize> {
     impossible: Bits<W>,
     /// The frame's freedoms, `|factors| − |sources|` once the frame has been simplified; see `Hive::new`.
     free_factor_count: i32,
+    /// What `Apiary::can_add_source` has answered for this frame, by number.  The answer depends on nothing but the
+    /// frame's `sources` and `factors`, so the memo is emptied when `sources` changes (`factors` never does).
+    can_add: RefCell<HashMap<u32, bool>>,
+    /// Whether `Apiary::remove_impossible` has been through the frame's remaining sources and factors as they are
+    /// now.  Every remaining source was kept, so another pass over the same ones would keep them all again and find
+    /// nothing; it is skipped.  `unzip` clears the flag when it takes moves and factors out of them.
+    swept: bool,
 }
 
 impl<const W: usize> Hive<W> {
@@ -121,6 +138,8 @@ impl<const W: usize> Hive<W> {
             claimed: Bits::EMPTY,
             impossible: Bits::EMPTY,
             free_factor_count: factors.len() as i32,
+            can_add: RefCell::default(),
+            swept: false,
         }
     }
 
@@ -207,7 +226,7 @@ enum Home {
 }
 
 /// All the frames of the board `1..=n` (the Java's `bombus.Apiary`), for a given set of promoted numbers,
-/// simplified and in playing order (see the module documentation for what that means).  The tables `factors_of`
+/// simplified and in playing order (see the module documentation for what that means).  The lists `factors_of`
 /// and `composites_of` are the view of the divisibility relation that setup takes, with the promoted numbers and
 /// the sinks taken into account.
 ///
@@ -218,19 +237,25 @@ enum Home {
 /// to promote it), and the frames are put in an order in which every number comes after the frames of its
 /// divisors even when the chain of maximal factors between them passes through a hole (playing a number sweeps
 /// all of its divisors, holes or not in between).
+///
+/// An `Apiary` is used on one thread: `count_freedoms` keeps its working storage in it, and its frames keep what
+/// they have been asked (`Hive::can_add`), both behind a `RefCell`.
 pub struct Apiary<'t, const W: usize> {
     t: &'t Tables,
     /// In playing order: a frame is listed after every frame in front of it.
     hives: Vec<Hive<W>>,
     /// The frame of every number, indexed by number (entry 0 is unused).
     home: Vec<Home>,
-    /// For each number, the factors it can use as tax: its maximal factors that are not sources (or holes);
-    /// nothing for a *sink* (a number all of whose maximal factors are promoted or holes).  This is the table
-    /// setup uses wherever it asks what a move can be paid with, not `Tables::max_factors`.
-    factors_of: Vec<Bits<W>>,
-    /// For each number, the moves that could use it as tax: its maximal composites other than sinks (and holes);
-    /// nothing for a source.  The mirror image of `factors_of`.
-    composites_of: Vec<Bits<W>>,
+    /// For each number, the factors it can use as tax, ascending: its maximal factors that are not sources (or
+    /// holes); nothing for a *sink* (a number all of whose maximal factors are promoted or holes).  This is the
+    /// table setup uses wherever it asks what a move can be paid with, not `Tables::max_factors`.
+    factors_of: Lists,
+    /// For each number, the moves that could use it as tax, ascending: its maximal composites other than sinks
+    /// (and holes); nothing for a source.  The mirror image of `factors_of`: `c` is in the list of `f` exactly
+    /// when `f` is in the list of `c`.
+    composites_of: Lists,
+    /// The working storage of `count_freedoms`.
+    peel: RefCell<Peel>,
 }
 
 impl<'t, const W: usize> Apiary<'t, W> {
@@ -256,23 +281,22 @@ impl<'t, const W: usize> Apiary<'t, W> {
         );
 
         let (sources, sinks) = Self::sources_and_sinks(t, treat_as_sources);
-        let size = n as usize + 1;
-        let mut factors_of = vec![Bits::EMPTY; size];
-        let mut composites_of = vec![Bits::EMPTY; size];
-        for x in (1..=n).filter(|&x| !t.is_hole(x)) {
-            let xi = x as usize;
-            if !sinks.contains(x) {
+        let factors_of = Lists::new(n, |x, list| {
+            if !t.is_hole(x) && !sinks.contains(x) {
                 let usable = |f: &u32| !sources.contains(*f) && !t.is_hole(*f);
-                factors_of[xi] = t.max_factors[xi].iter().copied().filter(usable).collect();
+                list.extend(t.max_factors[x as usize].iter().copied().filter(usable));
             }
-            if !sources.contains(x) {
+        });
+        let composites_of = Lists::new(n, |x, list| {
+            if !t.is_hole(x) && !sources.contains(x) {
                 let usable = |c: &u32| !sinks.contains(*c) && !t.is_hole(*c);
-                composites_of[xi] = t.max_composites[xi].iter().copied().filter(usable).collect();
+                list.extend(t.max_composites[x as usize].iter().copied().filter(usable));
             }
-        }
+        });
 
         let (hives, home) = Self::form_hives(t, sources, &factors_of);
-        let mut apiary = Apiary { t, hives, home, factors_of, composites_of };
+        let peel = RefCell::default();
+        let mut apiary = Apiary { t, hives, home, factors_of, composites_of, peel };
         let order = apiary.order_hives();
         apiary.reorder(&order);
         apiary.finish_setup();
@@ -310,12 +334,12 @@ impl<'t, const W: usize> Apiary<'t, W> {
     /// board `1..=n` that never happens, because every `x ≤ n/2` has a prime `p` with `n/2 < x·p ≤ n`, and `x·p`
     /// is a source of which `x` is a maximal factor.  On a punctured board it can, when every such `x·p` is a hole:
     /// then `x` is a factor nobody needs, a frame of that one number with a freedom, which the search may promote.
-    fn form_hives(t: &Tables, sources: Bits<W>, factors_of: &[Bits<W>]) -> (Vec<Hive<W>>, Vec<Home>) {
+    fn form_hives(t: &Tables, sources: Bits<W>, factors_of: &Lists) -> (Vec<Hive<W>>, Vec<Home>) {
         let n = t.n;
         let size = n as usize + 1;
         let mut parent: Vec<u32> = (0..=n).collect();
         for s in sources.iter() {
-            for f in factors_of[s as usize].iter() {
+            for &f in factors_of.of(s) {
                 let (a, b) = (find(&mut parent, s), find(&mut parent, f));
                 parent[a as usize] = b;
             }
@@ -482,14 +506,14 @@ impl<'t, const W: usize> Apiary<'t, W> {
         self.hive_index_of(f).expect("a factor always has a live hive")
     }
 
-    /// Whether `pred` holds for any frame that holds one of the factors in `set` (each frame is tried once, which
-    /// only saves repeated work: several factors of a number are often in the same frame).  `set` is the maximal
+    /// Whether `pred` holds for any frame that holds one of the factors in `list` (each frame is tried once, which
+    /// only saves repeated work: several factors of a number are often in the same frame).  `list` is the maximal
     /// factors of one number, at most five on the boards the solver supports (30030 = 2·3·5·7·11·13 is the first
     /// number with six), so the eight slots for the frames already tried always suffice.
-    fn any_hive_of(&self, set: Bits<W>, mut pred: impl FnMut(&Hive<W>) -> bool) -> bool {
+    fn any_hive_of(&self, list: &[u32], mut pred: impl FnMut(&Hive<W>) -> bool) -> bool {
         let mut tried = [usize::MAX; 8];
         let mut count = 0;
-        for f in set.iter() {
+        for &f in list {
             let h = self.hive_of_factor(f);
             if tried[..count].contains(&h) {
                 continue;
@@ -514,8 +538,10 @@ impl<'t, const W: usize> Apiary<'t, W> {
     ///
     /// It is a *peel*, the decision procedure that [`crate::model`] also uses to test a frame for winnability
     /// (there with the second step below alone; the first is the Java's addition and gives the same answers).
-    /// "Usable" below means listed in `factors_of` / `composites_of` and still in `factors` / `moves`.  While
-    /// moves remain, take one of two steps, the smallest candidate first:
+    /// A factor is *usable* by a move when it is in the move's list in `factors_of` and still among the `factors`;
+    /// a move *wants* a factor when the factor is usable by it (so the moves a factor is wanted by are the ones in
+    /// its `composites_of` list that are still among the `moves`).  While moves remain, take one of two steps, the
+    /// smallest candidate first:
     ///
     /// 1. A move with exactly one usable factor: pair them and remove both.  (The move has no choice, so it can
     ///    be played first, with that factor, which is gone for the others.)
@@ -533,71 +559,33 @@ impl<'t, const W: usize> Apiary<'t, W> {
     /// the answer, but "smallest first" is the Java's and is kept).  What is assumed is that this is the right
     /// question to put to a frame on its own (see the module documentation).
     ///
-    /// It is implemented with degree counters, so a call costs one pass over the moves and factors instead of
-    /// a scan per step.  `lone_moves` and `lone_factors` hold the candidates for the two kinds of step;
-    /// their smallest members are the ones the plain scan would reach first (the tests compare it with the plain
-    /// scan, the Java's recursion, on random inputs).
-    fn count_freedoms(&self, mut moves: Bits<W>, mut factors: Bits<W>) -> Option<u32> {
-        if moves.len() > factors.len() {
+    /// It is implemented with degree counters on a graph of the moves, the factors they can use, and the edges
+    /// between them (`Peel`), so a call costs one pass over the edges instead of a scan per step, and what it costs
+    /// depends on how many moves and factors it is given, not on the width of a set or the size of the board.  The
+    /// edges are found from the moves' side alone (`Peel::load` reads `factors_of` only, and gives each factor its
+    /// moves by turning the edges round: the list of a small factor in `composites_of` has a multiple for every
+    /// prime, far more than the moves that want it here).  `Peel::run` keeps the candidates for the two kinds of
+    /// step in sets of its own, so that the smallest members are the ones the plain scan would reach first.  The
+    /// tests compare the result with the plain scan, the Java's recursion, on random inputs; it reads both lists, so
+    /// they also show that the two are mirror images, which turning the edges round relies on.
+    fn count_freedoms(&self, moves: Bits<W>, factors: Bits<W>) -> Option<u32> {
+        let (move_count, factor_count) = (moves.len(), factors.len());
+        if move_count > factor_count {
             return None;
         }
-        let mut move_degree = Degrees::<W>::new();
-        let mut factor_degree = Degrees::<W>::new();
-        let mut lone_moves = Bits::<W>::EMPTY;
-        let mut lone_factors = Bits::<W>::EMPTY;
-        for m in moves.iter() {
-            let degree = (self.factors_of[m as usize] & factors).len();
-            if degree == 0 {
-                return None; // can never be paired, so the peeling could never finish
-            }
-            move_degree.set(m, degree);
-            if degree == 1 {
-                lone_moves.insert(m);
-            }
-        }
-        for f in factors.iter() {
-            let degree = (self.composites_of[f as usize] & moves).len();
-            factor_degree.set(f, degree);
-            if degree == 1 {
-                lone_factors.insert(f);
-            }
-        }
-
-        while !moves.is_empty() {
-            let (m, f) = if let Some(m) = lone_moves.min() {
-                (m, (self.factors_of[m as usize] & factors).min()?)
-            } else {
-                let f = lone_factors.min()?; // none: every move has two factors, and every factor two moves
-                ((self.composites_of[f as usize] & moves).min()?, f)
-            };
-            moves.remove(m);
-            factors.remove(f);
-            lone_moves.remove(m);
-            lone_factors.remove(f);
-            // The other factors `m` could have used are now wanted by one move fewer ...
-            for g in (self.factors_of[m as usize] & factors).iter() {
-                match factor_degree.decrement(g) {
-                    0 => lone_factors.remove(g),
-                    1 => lone_factors.insert(g),
-                    _ => {}
-                }
-            }
-            // ... and the other moves that could have used `f` have one factor fewer.
-            for k in (self.composites_of[f as usize] & moves).iter() {
-                match move_degree.decrement(k) {
-                    0 => return None,
-                    1 => lone_moves.insert(k),
-                    _ => {}
-                }
-            }
-        }
-        Some(factors.len())
+        let mut peel = self.peel.borrow_mut();
+        let playable = peel.load(&self.factors_of, &moves, &factors) && peel.run(move_count as usize);
+        playable.then_some(factor_count - move_count)
     }
 
     /// Whether the frame `hive` could take the number `n` as an additional source: the peel with all the frame's
     /// sources and `n` against all its factors (the mandatory pairs included).
     fn can_add_source(&self, hive: &Hive<W>, n: u32) -> bool {
-        self.count_freedoms(hive.sources.with(n), hive.factors).is_some()
+        *hive
+            .can_add
+            .borrow_mut()
+            .entry(n)
+            .or_insert_with(|| self.count_freedoms(hive.sources.with(n), hive.factors).is_some())
     }
 
     // -----------------------------------------------------------------------------------------------------
@@ -665,20 +653,32 @@ impl<'t, const W: usize> Apiary<'t, W> {
     /// The factors are visited in ascending order against a snapshot, with the sources recomputed after each
     /// claim.  The sources are visited in descending order and the pass restarts after the first claim, since
     /// a claim can make a larger source eligible.  Both orders are the Java's.
+    ///
+    /// The questions about a factor's use (`factor_can_go_downstream` and `has_outside_move_using`) are about
+    /// other frames and about this frame's sources and factors as they were when `unzip` began, none of which a
+    /// claim changes (the claims are written to the frame at the end), so each is asked once, however many passes
+    /// visit the factor (`Answers`).
     fn unzip(&mut self, i: usize) -> bool {
         let (sources, factors, impossible) = (self.hives[i].sources, self.hives[i].factors, self.hives[i].impossible);
         let (mut mandatory, mut claimed) = (self.hives[i].mandatory, self.hives[i].claimed);
+        let mut answers = Answers::default();
         let mut found = false;
         loop {
             let mut made_claim = false;
 
             let snapshot = factors - claimed;
             for f in snapshot.iter() {
-                let wanting = (sources - (mandatory | impossible)) & self.composites_of[f as usize];
-                if wanting.len() == 1 && !self.factor_can_go_downstream(f) && !self.has_outside_move_using(f) {
-                    mandatory.insert(wanting.min().expect("one composite"));
-                    claimed.insert(f);
-                    made_claim = true;
+                // The sources still to be settled that want `f`: its composites among the remaining sources.
+                let wanting = self.composites_of.of(f).iter().copied();
+                let wanting =
+                    wanting.filter(|&c| sources.contains(c) && !mandatory.contains(c) && !impossible.contains(c));
+                if let Some(s) = the_only(wanting) {
+                    if !self.factor_can_go_downstream(f, &mut answers) && !self.has_outside_move_using(f, &mut answers)
+                    {
+                        mandatory.insert(s);
+                        claimed.insert(f);
+                        made_claim = true;
+                    }
                 }
             }
 
@@ -686,10 +686,9 @@ impl<'t, const W: usize> Apiary<'t, W> {
             // factors already claimed.
             let snapshot = sources - (mandatory | impossible);
             for s in snapshot.iter_desc() {
-                let open = self.factors_of[s as usize] - claimed;
-                if open.len() == 1 {
-                    let f = open.min().expect("one factor");
-                    if !self.has_outside_move_using(f) {
+                let open = self.factors_of.of(s).iter().copied().filter(|&f| !claimed.contains(f));
+                if let Some(f) = the_only(open) {
+                    if !self.has_outside_move_using(f, &mut answers) {
                         mandatory.insert(s);
                         claimed.insert(f);
                         made_claim = true;
@@ -703,15 +702,20 @@ impl<'t, const W: usize> Apiary<'t, W> {
                 break;
             }
         }
-        self.hives[i].mandatory = mandatory;
-        self.hives[i].claimed = claimed;
+        let hive = &mut self.hives[i];
+        hive.mandatory = mandatory;
+        hive.claimed = claimed;
+        hive.swept &= !found;
         found
     }
 
     /// Whether factor `f` could be promoted into a source of some frame that holds one of its factors (a frame in
     /// front of its own): the case where `f` has a use of its own, which `unzip` must leave to the search.
-    fn factor_can_go_downstream(&self, f: u32) -> bool {
-        self.any_hive_of(self.factors_of[f as usize], |hive| self.can_add_source(hive, f))
+    fn factor_can_go_downstream(&self, f: u32, answers: &mut Answers) -> bool {
+        *answers
+            .downstream
+            .entry(f)
+            .or_insert_with(|| self.any_hive_of(self.factors_of.of(f), |hive| self.can_add_source(hive, f)))
     }
 
     /// Whether some move outside the frame of the factor `f` could use `f` as tax: a composite of `f` in a
@@ -721,16 +725,21 @@ impl<'t, const W: usize> Apiary<'t, W> {
     /// A composite that is an impossible source of a frame that has since been merged away counts as being in
     /// a different frame (see [`Home::MergedAway`]), with the freedoms that frame had when it was merged.  That
     /// is what the Java solver does, and it is inert (the variant's documentation gives the evidence).
-    fn has_outside_move_using(&self, f: u32) -> bool {
+    fn has_outside_move_using(&self, f: u32, answers: &mut Answers) -> bool {
+        if let Some(&known) = answers.outside.get(&f) {
+            return known;
+        }
         let f_hive = self.hive_of_factor(f);
-        self.composites_of[f as usize].iter().any(|c| {
+        let answer = self.composites_of.of(f).iter().any(|&c| {
             let c_hive_has_free_factors = match self.home[c as usize] {
                 Home::Live(p) => p as usize != f_hive && self.hives[p as usize].has_free_factors(),
                 Home::MergedAway { had_free_factors } => had_free_factors,
                 Home::OffBoard => unreachable!("a hole is nobody's composite"),
             };
             c_hive_has_free_factors && self.can_add_source(&self.hives[f_hive], c)
-        })
+        });
+        answers.outside.insert(f, answer);
+        answer
     }
 
     /// Marks as impossible the remaining sources of frame `i` that cannot be played together with the others,
@@ -741,7 +750,14 @@ impl<'t, const W: usize> Apiary<'t, W> {
     /// This greedy choice, largest first, is a model assumption: it decides which sources the whole model
     /// gives up on, for good.  It keeps the heaviest playable set if the playable sets form a matroid, which is
     /// not known.  (Sources that were mandatory are not reconsidered: they are not in the remaining sources.)
+    ///
+    /// It looks at nothing but the frame's own remaining sources and factors, and keeps every source that
+    /// remains, so a second pass over the same ones would keep them all again.  The frame's `swept` flag records
+    /// that it has been through them, and the pass is skipped.
     fn remove_impossible(&mut self, i: usize) -> bool {
+        if self.hives[i].swept {
+            return false;
+        }
         let hive = &self.hives[i];
         let factors = hive.remaining_factors();
         let mut impossible = hive.impossible;
@@ -756,7 +772,12 @@ impl<'t, const W: usize> Apiary<'t, W> {
         }
         let hive = &mut self.hives[i];
         hive.impossible = impossible;
+        let before = hive.sources;
         hive.sources -= impossible;
+        if hive.sources != before {
+            hive.can_add.get_mut().clear();
+        }
+        hive.swept = true;
         impossible.len() > known
     }
 
@@ -824,7 +845,7 @@ impl<'t, const W: usize> Apiary<'t, W> {
             .iter()
             .filter(|&f| {
                 self.count_freedoms(sources, factors.without(f)).is_some()
-                    && self.any_hive_of(self.factors_of[f as usize], |h| self.can_add_source(h, f))
+                    && self.any_hive_of(self.factors_of.of(f), |h| self.can_add_source(h, f))
             })
             .collect()
     }
@@ -859,19 +880,16 @@ impl<'t, const W: usize> Apiary<'t, W> {
             let mut progress = false;
             let snapshot = sources;
             for s in snapshot.iter() {
-                let open = self.factors_of[s as usize] & factors;
-                if open.len() == 1 {
+                if let Some(f) = the_only(self.factors_of.of(s).iter().copied().filter(|&f| factors.contains(f))) {
                     now.push(s);
                     sources.remove(s);
-                    factors -= open;
+                    factors.remove(f);
                     progress = true;
                 }
             }
             let snapshot = factors;
             for f in snapshot.iter() {
-                let wanting = self.composites_of[f as usize] & sources;
-                if wanting.len() == 1 {
-                    let m = wanting.min().expect("one move");
+                if let Some(m) = the_only(self.composites_of.of(f).iter().copied().filter(|&c| sources.contains(c))) {
                     at_end.push(m);
                     sources.remove(m);
                     factors.remove(f);
@@ -897,25 +915,245 @@ impl<'t, const W: usize> Apiary<'t, W> {
     }
 }
 
-/// Small counters for the numbers of a board, kept on the stack: the number of moves wanting a factor, or of
-/// factors usable by a move, for `Apiary::count_freedoms` (which is called very often, so it must not allocate).
-/// Indexed by the number itself.
-struct Degrees<const W: usize>([[u16; 64]; W]);
+/// A list of numbers for each number of the board `0..=n`, all in one allocation (the tables `Apiary::factors_of`
+/// and `composites_of`): the list of `x` is `items[starts[x]..starts[x + 1]]`.
+struct Lists {
+    starts: Vec<u32>,
+    items: Vec<u32>,
+}
 
-impl<const W: usize> Degrees<W> {
-    fn new() -> Self {
-        Degrees([[0; 64]; W])
+impl Lists {
+    /// The lists of the numbers `0..=n`: `fill(x, list)` appends the list of `x` to `list`.
+    fn new(n: u32, mut fill: impl FnMut(u32, &mut Vec<u32>)) -> Self {
+        let mut starts = Vec::with_capacity(n as usize + 2);
+        let mut items = Vec::new();
+        for x in 0..=n {
+            starts.push(items.len() as u32);
+            fill(x, &mut items);
+        }
+        starts.push(items.len() as u32);
+        Lists { starts, items }
     }
 
-    fn set(&mut self, x: u32, value: u32) {
-        self.0[(x >> 6) as usize][(x & 63) as usize] = value as u16;
+    /// The list of `x`.
+    fn of(&self, x: u32) -> &[u32] {
+        let x = x as usize;
+        &self.items[self.starts[x] as usize..self.starts[x + 1] as usize]
+    }
+}
+
+/// The only item, if `items` has exactly one.
+fn the_only<T>(mut items: impl Iterator<Item = T>) -> Option<T> {
+    let first = items.next()?;
+    items.next().is_none().then_some(first)
+}
+
+/// A set of the positions `0..size` in a [`Peel`]'s graph, in as many words as they need.
+#[derive(Default)]
+struct Positions {
+    words: Vec<u64>,
+    /// No word before this one has a member, so that finding the smallest member does not look at them again.
+    first: usize,
+}
+
+impl Positions {
+    /// Empties the set, making room for the positions `0..size`.
+    fn reset(&mut self, size: usize) {
+        self.words.clear();
+        self.words.resize(size.div_ceil(64), 0);
+        self.first = 0;
     }
 
-    /// Subtracts one and returns the new value.
-    fn decrement(&mut self, x: u32) -> u16 {
-        let slot = &mut self.0[(x >> 6) as usize][(x & 63) as usize];
-        *slot -= 1;
-        *slot
+    fn insert(&mut self, i: usize) {
+        self.words[i >> 6] |= 1 << (i & 63);
+        self.first = self.first.min(i >> 6);
+    }
+
+    fn remove(&mut self, i: usize) {
+        self.words[i >> 6] &= !(1 << (i & 63));
+    }
+
+    /// The smallest member.
+    fn min(&mut self) -> Option<usize> {
+        while let Some(&word) = self.words.get(self.first) {
+            if word != 0 {
+                return Some(self.first * 64 + word.trailing_zeros() as usize);
+            }
+            self.first += 1;
+        }
+        None
+    }
+}
+
+/// The answers one `unzip` has been given so far (see there): what its questions look at does not change while it
+/// runs, so none is asked twice.
+#[derive(Default)]
+struct Answers {
+    /// `factor_can_go_downstream`, by factor.
+    downstream: HashMap<u32, bool>,
+    /// `has_outside_move_using`, by factor.
+    outside: HashMap<u32, bool>,
+}
+
+/// The degree of a move or a factor that has been paired (removed from the peel).
+const PAIRED: u32 = u32::MAX;
+
+/// The graph that `Apiary::count_freedoms` peels, and the counters it peels it with: the moves and factors it is
+/// given, with an edge from a move to every factor it can use.  The moves are numbered by position (move `i` is
+/// the `i`th smallest of them), and so are the factors, so the arrays are as long as the sets are large, not as the
+/// board is, and the smallest candidate of a step is the one with the smallest position.
+///
+/// `count_freedoms` is called very often, so the `Peel` lives in the [`Apiary`] and keeps the storage of its
+/// vectors from one call to the next.
+#[derive(Default)]
+struct Peel {
+    /// The edges of move `i`, as positions of factors, ascending, are
+    /// `move_factors[move_starts[i]..move_starts[i + 1]]`.
+    move_starts: Vec<u32>,
+    move_factors: Vec<u32>,
+    /// The same edges from the factors: those of factor `r`, as positions of moves, ascending, are
+    /// `factor_moves[factor_starts[r]..factor_starts[r + 1]]`.
+    factor_starts: Vec<u32>,
+    factor_moves: Vec<u32>,
+    /// How many unpaired factors each move can use, and how many unpaired moves can use each factor; [`PAIRED`]
+    /// for those that have been paired.
+    move_degree: Vec<u32>,
+    factor_degree: Vec<u32>,
+    /// The unpaired moves with one unpaired factor, and the unpaired factors wanted by one unpaired move: the
+    /// candidates for the two kinds of step.
+    lone_moves: Positions,
+    lone_factors: Positions,
+}
+
+impl Peel {
+    /// Builds the graph of `moves` and `factors`, with the edges the lists `factors_of` give, and the degrees of
+    /// everything in it.  False if some move has no factor to use, which is as good as a peel that failed.
+    fn load<const W: usize>(&mut self, factors_of: &Lists, moves: &Bits<W>, factors: &Bits<W>) -> bool {
+        // The position of a factor among the factors: those in the words before its own, and those below it in its
+        // own word.
+        let words = factors.as_words();
+        let mut before = [0u32; W];
+        let mut seen = 0;
+        for (count, word) in before.iter_mut().zip(words) {
+            *count = seen;
+            seen += word.count_ones();
+        }
+        let position = |f: u32| {
+            let (w, bit) = ((f >> 6) as usize, f & 63);
+            (before[w] + (words[w] & ((1 << bit) - 1)).count_ones()) as usize
+        };
+        let (move_count, factor_count) = (moves.len() as usize, seen as usize);
+
+        // The edges of each move, and the degrees.
+        self.move_starts.clear();
+        self.move_factors.clear();
+        self.move_degree.clear();
+        self.factor_degree.clear();
+        self.factor_degree.resize(factor_count, 0);
+        self.lone_moves.reset(move_count);
+        self.lone_factors.reset(factor_count);
+        for (i, m) in moves.iter().enumerate() {
+            let start = self.move_factors.len();
+            self.move_starts.push(start as u32);
+            for &f in factors_of.of(m).iter().filter(|&&f| factors.contains(f)) {
+                let r = position(f);
+                self.move_factors.push(r as u32);
+                self.factor_degree[r] += 1;
+            }
+            let degree = self.move_factors.len() - start;
+            if degree == 0 {
+                return false; // can never be paired, so the peeling could never finish
+            }
+            self.move_degree.push(degree as u32);
+            if degree == 1 {
+                self.lone_moves.insert(i);
+            }
+        }
+        let edge_count = self.move_factors.len();
+        self.move_starts.push(edge_count as u32);
+
+        // The edges of each factor: a counting sort of the edges by factor.  `factor_starts[r]` first holds the end
+        // of factor `r`'s block (the factors' degrees, summed); placing the edges from the last move to the first,
+        // each at the end of its block, moves it to the block's start, which is where the block of factor `r + 1`
+        // begins.
+        self.factor_starts.clear();
+        let mut end = 0;
+        for (r, &degree) in self.factor_degree.iter().enumerate() {
+            end += degree;
+            self.factor_starts.push(end);
+            if degree == 1 {
+                self.lone_factors.insert(r);
+            }
+        }
+        self.factor_starts.push(end);
+        self.factor_moves.clear();
+        self.factor_moves.resize(edge_count, 0);
+        for i in (0..move_count).rev() {
+            for &r in &self.move_factors[self.move_starts[i] as usize..self.move_starts[i + 1] as usize] {
+                self.factor_starts[r as usize] -= 1;
+                self.factor_moves[self.factor_starts[r as usize] as usize] = i as u32;
+            }
+        }
+        true
+    }
+
+    /// Peels the graph that `load` built, which has `moves` moves: whether every move gets a factor of its own.
+    /// The steps and their order are those described at `Apiary::count_freedoms`.
+    fn run(&mut self, moves: usize) -> bool {
+        let Peel {
+            move_starts,
+            move_factors,
+            factor_starts,
+            factor_moves,
+            move_degree,
+            factor_degree,
+            lone_moves,
+            lone_factors,
+        } = self;
+        let factors_of = |i: usize| &move_factors[move_starts[i] as usize..move_starts[i + 1] as usize];
+        let moves_of = |r: usize| &factor_moves[factor_starts[r] as usize..factor_starts[r + 1] as usize];
+        for _ in 0..moves {
+            let (m, f) = if let Some(m) = lone_moves.min() {
+                let Some(&f) = factors_of(m).iter().find(|&&r| factor_degree[r as usize] != PAIRED) else {
+                    return false;
+                };
+                (m, f as usize)
+            } else {
+                // None: every move has two factors, and every factor two moves.
+                let Some(f) = lone_factors.min() else { return false };
+                let Some(&m) = moves_of(f).iter().find(|&&i| move_degree[i as usize] != PAIRED) else { return false };
+                (m as usize, f)
+            };
+            move_degree[m] = PAIRED;
+            factor_degree[f] = PAIRED;
+            lone_moves.remove(m);
+            lone_factors.remove(f);
+            // The other factors `m` could have used are now wanted by one move fewer ...
+            for &g in factors_of(m) {
+                let g = g as usize;
+                if factor_degree[g] != PAIRED {
+                    factor_degree[g] -= 1;
+                    match factor_degree[g] {
+                        0 => lone_factors.remove(g),
+                        1 => lone_factors.insert(g),
+                        _ => {}
+                    }
+                }
+            }
+            // ... and the other moves that could have used `f` have one factor fewer.
+            for &k in moves_of(f) {
+                let k = k as usize;
+                if move_degree[k] != PAIRED {
+                    move_degree[k] -= 1;
+                    match move_degree[k] {
+                        0 => return false,
+                        1 => lone_moves.insert(k),
+                        _ => {}
+                    }
+                }
+            }
+        }
+        true
     }
 }
 
@@ -955,7 +1193,7 @@ mod tests {
             return None;
         }
         for m in moves.iter() {
-            let usable = a.factors_of[m as usize] & factors;
+            let usable = Bits::from_slice(a.factors_of.of(m)) & factors;
             match usable.len() {
                 0 => return None,
                 1 => return naive_count_freedoms(a, moves.without(m), factors - usable),
@@ -963,7 +1201,7 @@ mod tests {
             }
         }
         for f in factors.iter() {
-            let wanting = a.composites_of[f as usize] & moves;
+            let wanting = Bits::from_slice(a.composites_of.of(f)) & moves;
             if wanting.len() == 1 {
                 return naive_count_freedoms(a, moves - wanting, factors.without(f));
             }
@@ -1028,6 +1266,108 @@ mod tests {
                 check_count_freedoms(&Apiary::<5>::new(&t, promoted), &mut rng);
             }
         }
+    }
+
+    /// Boards with and without promotions, for the tests of what the frames remember.
+    fn some_apiaries<'t>(t: &'t Tables, rng: &mut Rng) -> Vec<Apiary<'t, 9>> {
+        let plain = Apiary::<9>::new(t, Bits::EMPTY);
+        let promotable = plain.promotion_candidates();
+        let mut apiaries = vec![plain];
+        for _ in 0..3 {
+            apiaries.push(Apiary::<9>::new(t, subset(rng, promotable, 50)));
+        }
+        apiaries
+    }
+
+    /// `can_add_source` is remembered by each frame, from the moment it is first asked until its sources change; no
+    /// entry may be left over from before the last change.
+    #[test]
+    fn what_a_frame_remembers_of_taking_on_a_source_is_not_stale() {
+        let mut rng = Rng(0x2545_F491_4F6C_DD1D);
+        for n in [85, 200, 301, 500] {
+            let t = Tables::new(n);
+            for a in some_apiaries(&t, &mut rng) {
+                for hive in a.hives() {
+                    for x in 1..=n {
+                        let fresh = a.count_freedoms(hive.sources.with(x), hive.factors).is_some();
+                        assert_eq!(a.can_add_source(hive, x), fresh, "n={n} frame {} number {x}", hive.name);
+                    }
+                }
+            }
+        }
+    }
+
+    /// A frame forgets what it remembers when its sources change.  Put into each frame, by hand, a source that has
+    /// no factor there and so cannot be played: while it is there nothing can be added, and the frame remembers
+    /// that; once `remove_impossible` has taken it out again, the frame must be able to take on what it could
+    /// before.
+    #[test]
+    fn a_frame_forgets_what_it_remembers_when_its_sources_change() {
+        let n = 200;
+        let t = Tables::new(n);
+        let mut a = Apiary::<4>::new(&t, Bits::EMPTY);
+        let mut checked = 0;
+        for i in 0..a.hives.len() {
+            let hive = &a.hives[i];
+            let Some(x) = (1..=n).find(|&x| a.can_add_source(hive, x)) else { continue };
+            let in_the_frame =
+                |b: u32| hive.sources.contains(b) || hive.factors.contains(b) || hive.impossible.contains(b);
+            let stranger = (1..=n)
+                .find(|&b| !in_the_frame(b) && a.factors_of.of(b).iter().all(|&f| !hive.factors.contains(f)))
+                .expect("a number with no factor in the frame");
+            let hive = &mut a.hives[i];
+            hive.sources.insert(stranger);
+            hive.can_add.get_mut().clear(); // the sources were changed by hand
+            hive.swept = false;
+            assert!(!a.can_add_source(&a.hives[i], x), "frame {i}: with {stranger}, number {x}");
+            assert!(a.remove_impossible(i), "frame {i}");
+            assert!(a.can_add_source(&a.hives[i], x), "frame {i}: without {stranger}, number {x}");
+            checked += 1;
+        }
+        assert!(checked >= 3, "{checked} frames checked");
+    }
+
+    /// `remove_impossible` is not run again on remaining sources it has been through (`Hive::swept`) because it
+    /// would keep every one of them again: run on the finished frames it changes nothing.
+    #[test]
+    fn going_through_a_finished_frame_again_removes_nothing() {
+        let mut rng = Rng(0x1B87_3593_E6A8_C0DD);
+        for n in [85, 200, 301, 500] {
+            let t = Tables::new(n);
+            for mut a in some_apiaries(&t, &mut rng) {
+                for i in 0..a.hives.len() {
+                    assert!(a.hives[i].swept, "n={n} frame {i}");
+                    let (sources, impossible) = (a.hives[i].sources, a.hives[i].impossible);
+                    a.hives[i].swept = false;
+                    assert!(!a.remove_impossible(i), "n={n} frame {i}");
+                    assert_eq!((a.hives[i].sources, a.hives[i].impossible), (sources, impossible), "n={n} frame {i}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn positions_find_their_smallest_member_and_lists_their_numbers() {
+        let mut p = Positions::default();
+        p.reset(200);
+        assert_eq!(p.min(), None);
+        p.insert(130);
+        assert_eq!(p.min(), Some(130));
+        p.insert(5); // below the word that `min` has moved on to
+        assert_eq!(p.min(), Some(5));
+        p.remove(5);
+        p.insert(64);
+        assert_eq!(p.min(), Some(64));
+        p.remove(64);
+        p.remove(130);
+        assert_eq!(p.min(), None);
+        p.insert(199);
+        p.reset(10);
+        assert_eq!(p.min(), None);
+
+        assert_eq!((the_only(0..0), the_only(7..8), the_only(7..9)), (None, Some(7), None));
+        let lists = Lists::new(4, |x, list| list.extend(0..x));
+        assert_eq!((lists.of(0), lists.of(1), lists.of(4)), (&[][..], &[0][..], &[0, 1, 2, 3][..]));
     }
 
     #[test]
