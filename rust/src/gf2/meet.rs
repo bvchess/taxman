@@ -1138,6 +1138,109 @@ impl<const R: usize> Meet<R> {
         Some(self.value - cycle.0.div_euclid(HOPS))
     }
 
+    /// After a [`solve`](Self::solve) that settled, with the workspace still holding it, and `pot` the weight split
+    /// of its heaviest set (as for [`without`](Self::without)): the least that a smaller common independent set
+    /// loses against the heaviest set.  The symmetric difference of the two splits into cycles of the exchange graph
+    /// and paths from member to member, at least one (see the module docs), so that loss is at least the shortest
+    /// such path, a member alone included, whose length is the sum of the reduced lengths of its arcs plus `w2` of
+    /// its first member and `w1` of its last: Dijkstra's search from every member at its `w2`, as in
+    /// [`without`](Self::without).  `i64::MAX` if there is no smaller set (an empty heaviest set).
+    pub fn smaller_loss(&mut self, p: &Problem<'_, R>, pot: &[i64]) -> i64 {
+        if self.columns_for != self.tableau {
+            self.build_columns();
+        }
+        if self.free_sorted_for != self.tableau {
+            self.free_a.sort_unstable_by_key(|&y| (Reverse(pot[y as usize]), y));
+            self.free_sorted_for = self.tableau;
+        }
+        let w = p.weight;
+        let w1 = |e: u32| pot[e as usize];
+        let w2 = |e: u32| w[e as usize] - pot[e as usize];
+        self.generation = self.generation.wrapping_add(2);
+        let (reached, settled) = (self.generation.wrapping_sub(1), self.generation);
+        let (reach, seen, stamp) = (&mut self.reach, &mut self.seen, &mut self.settled_at);
+        let heap = &mut self.heap;
+        heap.clear();
+        let mut best = INF;
+        macro_rules! offer {
+            ($v:expr, $d:expr) => {{
+                let (v, d): (u32, Dist) = ($v, $d);
+                let i = v as usize;
+                if d < best && stamp[i] != settled && (seen[i] != reached || d < reach[i]) {
+                    seen[i] = reached;
+                    reach[i] = d;
+                    heap.push(Reverse((d, v)));
+                }
+            }};
+        }
+        let mut next_free = 0;
+        let mut through = INF;
+        macro_rules! queue_free {
+            () => {{
+                while next_free < self.free_a.len() && stamp[self.free_a[next_free] as usize] == settled {
+                    next_free += 1;
+                }
+                if let Some(&y) = self.free_a.get(next_free) {
+                    heap.push(Reverse((through - w1(y) * HOPS + 1, FREE_A)));
+                }
+            }};
+        }
+        for &z in &self.members {
+            offer!(z, w2(z) * HOPS);
+        }
+        while let Some(Reverse((d, v))) = heap.pop() {
+            if d >= best {
+                break;
+            }
+            let v = if v == FREE_A {
+                while next_free < self.free_a.len() && stamp[self.free_a[next_free] as usize] == settled {
+                    next_free += 1;
+                }
+                let Some(&y) = self.free_a.get(next_free) else { continue };
+                if d != through - w1(y) * HOPS + 1 {
+                    continue;
+                }
+                stamp[y as usize] = settled;
+                queue_free!();
+                y
+            } else {
+                if stamp[v as usize] == settled || d > reach[v as usize] {
+                    continue;
+                }
+                stamp[v as usize] = settled;
+                v
+            };
+            let i = v as usize;
+            if self.inside[i] {
+                // A path may end here, at w1, or go on along the arcs of A.
+                best = best.min(d + w1(v) * HOPS);
+                let column = usize::from(p.block[0][i]) * 64 * R + usize::from(self.slot[0][i]);
+                for &y in &self.columns[column] {
+                    offer!(y, d + (w1(v) - w1(y)) * HOPS + 1);
+                }
+                if d + w1(v) * HOPS < through {
+                    through = d + w1(v) * HOPS;
+                    queue_free!();
+                }
+            } else if !is_zero(&self.res[1][i]) {
+                for &z in &self.members {
+                    offer!(z, d + (w2(z) - w2(v)) * HOPS + 1);
+                }
+            } else {
+                let elems = &self.slot_elem[1][usize::from(p.block[1][i])];
+                each_bit(&self.mask[1][i], |s| {
+                    let z = elems[s];
+                    offer!(z, d + (w2(z) - w2(v)) * HOPS + 1);
+                });
+            }
+        }
+        if best == INF {
+            i64::MAX
+        } else {
+            best.div_euclid(HOPS)
+        }
+    }
+
     /// For [`split_bounds`](Self::split_bounds) and [`without`](Self::without) on the current tableau: the elements
     /// outside the set in the span of A by the slots of their circuits (each has an arc from those members), and
     /// those free in A.
@@ -1329,27 +1432,41 @@ mod tests {
         assert!(warm > 10_000 && splits > 2_000, "{warm} warm starts, {splits} splits");
     }
 
-    /// The heaviest set without each member of the heaviest set, read off its exchange graph where the sizes certify
-    /// it ([`Meet::without`], with the loss of the dominant set one smaller from the solve's chain and the gap to the
-    /// heaviest set one larger, under every size limit from the heaviest set's size up), against brute force.
+    /// The loss of the smaller sets ([`Meet::smaller_loss`], against the heaviest set one smaller, by brute force)
+    /// and of the larger ones ([`Meet::gap`]), and the heaviest set without each member of the heaviest set read off
+    /// its exchange graph where they certify it ([`Meet::without`]), under every size limit from the heaviest set's
+    /// size up, against brute force.
     #[test]
     fn heaviest_set_without_a_member_against_brute_force() {
         let mut rng = Rng(0x2545_F491_4F6C_DD1D);
-        let (mut asked, mut certified) = (0, 0);
+        let (mut asked, mut certified, mut exact_losses) = (0, 0, 0);
         for trial in 0..4000 {
             let n = 2 + rng.below(10) as usize;
             let owned = random(&mut rng, n, 4);
             let p = owned.problem();
             let mut meet = Meet::<1>::new(n, [3, 3]);
             let live: Vec<u32> = (0..n as u32).collect();
-            let mut chain = Vec::new();
-            meet.solve(&p, &live, &[], n, i64::MAX, |set| chain.push(set.to_vec()));
+            meet.solve(&p, &live, &[], n, i64::MAX, |_| {});
             let members: Vec<u32> = live.iter().copied().filter(|&e| meet.contains(e)).collect();
             let size = members.len();
-            let Some(smaller) = chain.iter().find(|set| set.len() + 1 == size) else { continue };
-            let loss = meet.value - smaller.iter().map(|&e| p.weight[e as usize]).sum::<i64>();
             assert!(meet.settled && meet.split_bounds(&p, &live, |_, _| {}), "trial {trial}: no split");
             let pot = meet.potentials().to_vec();
+            let loss = meet.smaller_loss(&p, &pot);
+            if size == 0 {
+                assert_eq!(loss, i64::MAX);
+                continue;
+            }
+            let smaller = brute(&p, &live, size - 1);
+            assert!(loss <= meet.value - smaller, "trial {trial}: the loss of the smaller sets");
+            exact_losses += usize::from(loss == meet.value - smaller);
+            // The heaviest common independent set of exactly one more element, if there is one.
+            let larger = (0u32..1 << n)
+                .filter(|mask| mask.count_ones() as usize == size + 1)
+                .map(|mask| (0..n as u32).filter(|&i| mask >> i & 1 == 1).collect::<Vec<u32>>())
+                .filter(|set| independent(p.block[0], p.vector[0], set) && independent(p.block[1], p.vector[1], set))
+                .map(|set| set.iter().map(|&e| p.weight[e as usize]).sum::<i64>())
+                .max();
+            assert_eq!(meet.gap, larger.map_or(i64::MAX, |w| meet.value - w), "trial {trial}: the gap");
             for cap in size..=n {
                 let limit = if cap > size { loss.min(meet.gap) } else { loss };
                 for &x in &members {
@@ -1362,6 +1479,7 @@ mod tests {
                 }
             }
         }
+        assert!(exact_losses > 3000, "{exact_losses} exact losses");
         assert!(asked > 10_000 && certified > asked / 4, "{certified} of {asked} certified");
     }
 }

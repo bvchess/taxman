@@ -424,13 +424,6 @@ struct Level<const W: usize, const R: usize> {
     cap: usize,
     settled: bool,
     value: u64,
-    /// What every common independent set of another size than the heaviest set's (when it is of all sizes) weighs
-    /// at most: `below` for the smaller ones (the weight of a dominant set one smaller, `i64::MAX` if none is
-    /// known), the heaviest set's weight less `gap` for the larger ones (`gap` as [`Meet::gap`], `i64::MAX` if
-    /// there are none).  A level whose heaviest set comes from its parent's carries its parent's bounds, which
-    /// hold for it too (see [`Levels::other_sizes_lose`]).
-    below: i64,
-    gap: i64,
     /// The bounds without each member of the heaviest set, from the weight split, once asked for, and the split
     /// itself (`w1` by element) if one was found.
     split: Vec<(u32, i64)>,
@@ -443,21 +436,6 @@ struct Level<const W: usize, const R: usize> {
 }
 
 impl<const W: usize, const R: usize> Level<W, R> {
-    /// For a level solved to its heaviest set of all sizes: the least that a common independent set of another size,
-    /// of at most `cap` members, loses against the heaviest set, or a negative number if that is not known.
-    fn other_sizes_lose(&self, cap: usize) -> i64 {
-        let size = self.history.last().map_or(0, |last| last.len() as usize);
-        if !self.solved || !self.settled || size > cap || self.below == i64::MAX {
-            return -1;
-        }
-        let smaller = self.value as i64 - self.below;
-        if cap > size {
-            smaller.min(self.gap)
-        } else {
-            smaller
-        }
-    }
-
     fn new(n: usize) -> Self {
         Level {
             vec: [vec![[0; R]; n], vec![[0; R]; n]],
@@ -467,14 +445,22 @@ impl<const W: usize, const R: usize> Level<W, R> {
             cap: 0,
             settled: false,
             value: 0,
-            below: i64::MAX,
-            gap: 0,
             split: Vec::new(),
             has_split: false,
             pot: vec![0; n],
             has_pot: false,
             meet_solve: 0,
         }
+    }
+
+    /// What `other` knows of its heaviest set (its dominant sets and their bounds), without its vectors: enough
+    /// for a child to start from (see [`Levels::push_all`]).
+    fn copy_sets_from(&mut self, other: &Self) {
+        self.history.clone_from(&other.history);
+        self.solved = other.solved;
+        self.cap = other.cap;
+        self.settled = other.settled;
+        self.value = other.value;
     }
 
     fn copy_from(&mut self, other: &Self) {
@@ -503,6 +489,11 @@ struct Levels<'g, const W: usize, const R: usize> {
     /// A level kept by [`keep_excluded`](Self::keep_excluded), for the top level at the depth without the candidate.
     kept: Level<W, R>,
     kept_for: Option<(usize, u32)>,
+    /// The top level as it was before it went on without a candidate ([`remove_candidate`](Self::remove_candidate)),
+    /// at the depth and for the candidate of `prior_for`: the child pushed next, which promotes that candidate,
+    /// starts from its dominant sets (the level without the candidate has none that hold it).
+    prior: Level<W, R>,
+    prior_for: Option<(usize, u32)>,
     /// The heaviest sets without the members that the last [`certified_excluding`](Self::certified_excluding)
     /// certified, and their weights.
     certified: Vec<(u32, Bits<W>, u64)>,
@@ -533,6 +524,8 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             scratch_for: None,
             kept: Level::new(n),
             kept_for: None,
+            prior: Level::new(n),
+            prior_for: None,
             certified: Vec::new(),
             meet: Meet::new(n, graph.blocks),
             live_idx: Vec::with_capacity(n),
@@ -549,6 +542,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
     fn reset(&mut self, promoted: &Bits<W>, cands: &Bits<W>) {
         self.depth = 0;
         self.kept_for = None;
+        self.prior_for = None;
         let live = self.live_of(cands);
         let level = &mut self.levels[0];
         for m in 0..2 {
@@ -569,15 +563,19 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
     fn push_all(&mut self, added: &Bits<W>, child_cands: &Bits<W>) {
         let d = self.depth;
         self.kept_for = None;
+        let from_prior = self.prior_for.take().is_some_and(|(depth, x)| depth == d && added.contains(x));
         if self.levels.len() == d + 1 {
             let n = self.graph.len();
             self.levels.push(Level::new(n));
         }
         let child_live = self.live_of(child_cands);
         let (lower, upper) = self.levels.split_at_mut(d + 1);
-        let (parent, child) = (&lower[d], &mut upper[0]);
-        child.copy_from(parent);
+        let child = &mut upper[0];
+        child.copy_from(&lower[d]);
         child.live = child_live;
+        // The child's problem is the top level's before it went on without the candidate the child promotes (the
+        // same vectors), so it starts from that level's dominant sets.
+        let parent = if from_prior { &self.prior } else { &lower[d] };
         for x in added.iter() {
             contract(self.graph, child, x);
         }
@@ -595,9 +593,6 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             child.settled = true;
             child.cap = parent.cap.saturating_sub(added.len() as usize);
             child.value = parent.value - added.sum();
-            // The child's sets of another size, with the promoted, are the parent's of another size.
-            child.below = parent.below.saturating_sub(added.sum() as i64);
-            child.gap = parent.gap;
             self.stats.inherited += 1;
         }
         self.depth = d + 1;
@@ -606,15 +601,19 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
     fn pop(&mut self) {
         assert!(self.depth > 0, "pop without push");
         self.kept_for = None;
+        self.prior_for = None;
         self.depth -= 1;
     }
 
     fn remove_candidate(&mut self, x: u32) {
+        self.prior_for = Some((self.depth, x));
         if self.kept_for.take() == Some((self.depth, x)) {
             std::mem::swap(&mut self.levels[self.depth], &mut self.kept);
+            std::mem::swap(&mut self.kept, &mut self.prior);
             return;
         }
         let level = &mut self.levels[self.depth];
+        self.prior.copy_sets_from(level);
         if !level.live.contains(x) {
             return;
         }
@@ -703,8 +702,8 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         out.clear();
         let graph = self.graph;
         let level = &mut self.levels[self.depth];
-        let limit = if level.has_pot { level.other_sizes_lose(cap) } else { -1 };
-        if limit < 0 {
+        let size = level.history.last().map_or(0, |last| last.len() as usize);
+        if !(level.solved && level.settled && level.has_pot && size <= cap) {
             out.extend(xs.iter().map(|_| None));
             return;
         }
@@ -718,6 +717,13 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             vector: [&level.vec[0], &level.vec[1]],
             weight: &graph.weight,
         };
+        // The least that a set of another size than the heaviest set's loses (see `meet`'s module docs): a smaller
+        // one at least the shortest path between members, a larger one (where the limit allows it) at least the gap
+        // to the heaviest set one larger.
+        let mut limit = self.meet.smaller_loss(&problem, &level.pot);
+        if cap > size {
+            limit = limit.min(self.meet.gap);
+        }
         let before = self.meet.withouts_exact;
         let last = level.history.last().copied().unwrap_or(Bits::EMPTY);
         self.certified.clear();
@@ -746,9 +752,6 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         kept.settled = true;
         kept.cap = level.cap;
         kept.value = value;
-        // Without x the sets of other sizes weigh no more than with it.
-        kept.below = level.below;
-        kept.gap = if level.gap == i64::MAX { i64::MAX } else { level.gap - (level.value - value) as i64 };
         self.kept_for = Some((self.depth, x));
         self.scratch_for = None;
     }
@@ -835,9 +838,6 @@ fn solve<const W: usize, const R: usize>(
     level.meet_solve = meet.solves;
     level.cap = cap;
     level.value = meet.value as u64;
-    let size = level.history.last().map_or(0, |last| last.len());
-    level.below = level.history.iter().rev().find(|set| set.len() + 1 == size).map_or(i64::MAX, |set| set.sum() as i64);
-    level.gap = meet.gap;
     level.has_split = false;
     level.has_pot = false;
 }
@@ -864,7 +864,6 @@ fn resolve<const W: usize, const R: usize>(
     meet.solve(&problem, live_idx, start_idx, usize::MAX, i64::MAX, |_| {});
     debug_assert_eq!(meet.value as u64, level.value, "the heaviest set solved again changed");
     level.meet_solve = meet.solves;
-    level.gap = meet.gap;
 }
 
 /// The bounds without each member of `level`'s heaviest set (settled), from a weight split.  Unless the workspace
