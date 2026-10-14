@@ -511,7 +511,8 @@ fn first_n(path: &Path) -> u32 {
 }
 
 /// The nodes of the fixture `path` (every `every`-th): the bounds, and the validity checks of `check` at the node
-/// (`samples` completions in random orders, each independent in the node's matroids).  With `lagrange` steps, also
+/// (`samples` completions in random orders, each independent in the node's matroids), and that the node's bound is
+/// that of the root's matroids contracted by the node's promotions.  With `lagrange` steps, also
 /// the Lagrangian bound over the matching with nogoods of the node's own (`root_lagrange` with the node as the
 /// root): what the matching bound's Lagrangian makes of the node without a search.
 fn nodes<const W: usize>(path: &Path, every: usize, samples: usize, lagrange: usize, exact: u64) {
@@ -523,6 +524,7 @@ fn nodes<const W: usize>(path: &Path, every: usize, samples: usize, lagrange: us
     let mut scratch = Scratch::<W>::new();
     let mut rng = Rng(0x2545_F491_4F6C_DD1D ^ u64::from(n));
     let best = incumbent.sum();
+    let root_fm = frame_matroids(model, &p.root, &p.candidates);
     for u in units.iter().filter(|u| !u.cands.is_empty()).step_by(every.max(1)) {
         let state = model.promote_all_using(&mut scratch, &p.root, &u.promoted).expect("a node of the game");
         mb.reset(&u.promoted, &u.cands);
@@ -533,6 +535,22 @@ fn nodes<const W: usize>(path: &Path, every: usize, samples: usize, lagrange: us
         let capped = fm.bound(max_add.max(0) as usize);
         let time = t0.elapsed();
         let target = best as i64 - u.promoted.sum() as i64;
+        // The node's matroids are the root's contracted by its promotions: weighing the promotions above everything
+        // else in the root's matroids, the heaviest common independent set holds them all and is otherwise the
+        // node's (the node's candidates that its frames no longer hold are loops of the contraction).
+        let heavy = 1i64 << 40;
+        let w: Vec<i64> = root_fm
+            .elems
+            .iter()
+            .map(|&x| match () {
+                () if u.promoted.contains(x) => heavy,
+                () if u.cands.contains(x) => i64::from(x),
+                () => 0,
+            })
+            .collect();
+        let size = u.promoted.len() as usize + max_add.max(0) as usize;
+        let contracted = root_fm.solve(&w, size).value - heavy * i64::from(u.promoted.len());
+        assert_eq!(contracted, capped.value, "n={n}: the node's matroids are not the root's contracted");
         // Validity at the node: maximal completions in random orders are independent.
         let cands: Vec<u32> = u.cands.iter().collect();
         for _ in 0..samples {
