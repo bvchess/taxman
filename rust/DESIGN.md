@@ -678,7 +678,9 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   bound is never below the exhaustive best completion and the optimal promotions are independent in both matroids;
   and along random paths of games 60–1000 (promotions, deletions, backtracking) every level equals the matroids built
   afresh at its node, and every member it calls forced is (the bound without it, solved afresh, is below what the
-  node needs).  Conflicts and cores are checked against promoting the sets.
+  node needs); at the 600 nodes of the probe's fixtures (936 and 1215), completions promoted in random orders are
+  independent in the node's matroids and no heavier than its bound, and the matching path's search started from the
+  bound finds nothing above it (`tests/soundness.rs`).  Conflicts and cores are checked against promoting the sets.
 * **Soundness harness** (`tests/soundness.rs`): the search is started with an incumbent worth 1 or 5 less than the
   optimum and an empty payload, so that any pruning that loses every best completion leaves the fake incumbent in place
   (this tests the `<` and `<=` boundaries too): every game 2..=300 under each of 30 configurations (19 of the matching

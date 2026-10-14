@@ -8,14 +8,18 @@
 //! units deep in the tree.
 
 mod common;
+#[allow(dead_code)]
+#[path = "../examples/common/fixtures.rs"]
+mod fixtures;
 
-use common::{config, random_subset, stored_games, Config, Game, Rng, TempDir};
+use common::{config, random_subset, stored_games, testdata, Config, Game, Rng, TempDir};
 use std::time::Duration;
 use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::engine::EngineConfig;
 use taxman::frames::build_frames;
 use taxman::game::Optimal;
+use taxman::gf2::{Gf2Bound, Gf2Graph};
 use taxman::model::{FrameSet, Model, Scratch};
 use taxman::numtheory::Tables;
 use taxman::search::lagrange::Refits;
@@ -287,6 +291,64 @@ fn a_wide_search_resumed_over_and_over_finds_the_optimum() {
         + resumed_over_and_over::<24>(1000, truth, 30, 60, &dir, &[19])
         + resumed_over_and_over::<64>(1000, truth, 30, 60, &dir, &[29]);
     assert!(resumes > 6, "the GF(2) bound: only {resumes} resumes");
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// The GF(2) bound at nodes of the frontier
+
+/// At the nodes of the probe's fixtures (`testdata/perf/`: 300 nodes each of the proofs of 936 and 1215, from the root
+/// to 30 promotions deep), with the oracles that do not use the bound: every completion made by promoting the node's
+/// candidates in a random order, each if it can be, is independent in both of the node's matroids (the bound of the
+/// node with only its members as candidates is their sum) and no heavier than the bound; and the search of the
+/// matching path, started from the bound, finds no completion above it (where it ends within its time limit, it
+/// proves the bound is at least the best completion).
+#[test]
+fn the_gf2_bound_holds_at_the_nodes_of_the_probe() {
+    // All but 3 of the 600 searches end within 200 ms on an idle machine.
+    let proved = gf2_at_probe_nodes::<16>("n0936.nodes") + gf2_at_probe_nodes::<20>("n1215.nodes");
+    assert!(proved >= 550, "only {proved} nodes proved by a search");
+}
+
+/// [`the_gf2_bound_holds_at_the_nodes_of_the_probe`] at the nodes of `fixture`: returns the nodes at which the
+/// search of the matching path ended.
+fn gf2_at_probe_nodes<const W: usize>(fixture: &str) -> usize {
+    let (n, _, units) = fixtures::read_nodes::<W>(&testdata(&format!("perf/{fixture}"))).unwrap();
+    let game = Game::<W>::of_board(n).unwrap();
+    let graph = Gf2Graph::new(&game.model, &game.root, &game.candidates);
+    let mut bound = Gf2Bound::<W>::new(&graph);
+    let mut scratch = Scratch::<W>::new();
+    let mut rng = Rng(0x6F2B_C0DE_0000_0000 ^ u64::from(n));
+    let mut proved = 0;
+    for unit in units.iter().filter(|u| !u.cands.is_empty()) {
+        let state = game.model.promote_all_using(&mut scratch, &game.root, &unit.promoted).expect("a node");
+        let max_add =
+            (game.max_total - unit.promoted.len()).min(state.max_promotions_among(&unit.cands).max(0) as u32);
+        bound.reset(&unit.promoted, &unit.cands);
+        let value = bound.evaluate(max_add, None).value;
+        let at = format!("n={n}, a node of {} promotions", unit.promoted.len());
+        for _ in 0..4 {
+            let mut order = unit.cands.to_vec();
+            for i in (1..order.len()).rev() {
+                order.swap(i, rng.below(i as u64 + 1) as usize);
+            }
+            let (mut completion, mut s) = (Bits::<W>::EMPTY, state);
+            for x in order {
+                if game.model.promote_in_place(&mut s, x) {
+                    completion.insert(x);
+                }
+            }
+            assert!(completion.len() <= max_add, "{at}: a completion of {} promotions", completion.len());
+            bound.reset(&unit.promoted, &completion);
+            let independent = bound.evaluate(completion.len(), None).value == completion.sum();
+            assert!(independent && completion.sum() <= value, "{at}: {completion:?} against the bound {value}");
+        }
+        let start = unit.promoted.sum() + value;
+        let engine = EngineConfig { time_limit: Some(Duration::from_millis(200)), ..config(1) };
+        let out = game.search(Config::matching(), vec![*unit], start, Some(engine), None);
+        assert_eq!(out.best, start, "{at}: a completion above the bound {value}: {:?}", out.set);
+        proved += usize::from(out.completed);
+    }
+    proved
 }
 
 // ---------------------------------------------------------------------------------------------------------
