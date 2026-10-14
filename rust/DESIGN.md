@@ -554,7 +554,8 @@ A search that a time or node limit stops gives an incomplete result (`completed`
 so far) and keeps its checkpoint; a range stops there.
 
 **Range runs** feed each game's solution to the next and resume from the results file, which is checked when it is
-opened (every game replayed, the chain from n − 1, each line's arithmetic and provenance).  Games completed in it
+opened (every game replayed, the chain from n − 1, each line's arithmetic and provenance; the search problems that the
+checks of repeats set up again are set up first, on the run's threads).  Games completed in it
 are skipped; each result is appended and synced as soon as it is done, and only then is the game's checkpoint deleted
 (a checkpoint left for a game the file has completed is deleted when a range starts).  The n − 1 solution comes
 from, in order: this run, the results file, and with `use_prev` (`--use-prev`) optimal.json; with none, the game is

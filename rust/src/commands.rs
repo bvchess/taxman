@@ -267,16 +267,18 @@ pub fn verify_optimal(args: &[String]) -> CliResult {
     Ok(())
 }
 
-/// `verify-results FILE...`: checks results files without changing them (`results::verify_files`), their scores
-/// against the built-in `optimal.json`.
+/// `verify-results [--threads K] FILE...`: checks results files without changing them (`results::verify_files`), their
+/// scores against the built-in `optimal.json`.  The check sets up the search problems of the repeats on K threads,
+/// as many as `solve` takes by default (the CPUs) unless `--threads` says.
 pub fn verify_results(args: &[String]) -> CliResult {
-    let args = Args::parse(args, &[], &[])?;
+    let args = Args::parse(args, &["--threads"], &[])?;
     if args.positional().is_empty() {
-        return Err(CliError::Usage("usage: verify-results FILE...".into()));
+        return Err(CliError::Usage("usage: verify-results [--threads K] FILE...".into()));
     }
     let paths: Vec<PathBuf> = args.positional().iter().map(PathBuf::from).collect();
+    let threads = solver_options(&args)?.threads;
     let start = Instant::now();
-    let report = verify_files(&paths, Optimal::built_in()).map_err(CliError::Failed)?;
+    let report = verify_files(&paths, Optimal::built_in(), threads).map_err(CliError::Failed)?;
     outln!("{report}");
     outln!("checked in {:.1} ms", millis(start));
     Ok(())
@@ -308,7 +310,7 @@ pub fn extend_optimal(args: &[String]) -> CliResult {
         None => Optimal::built_in().clone(),
     };
 
-    let contents = taxman::results::read_results_file(results, &optimal).map_err(failed)?;
+    let contents = taxman::results::read_results_file(results, &optimal, 1).map_err(failed)?;
     if contents.torn {
         errln!("note: the last line of {} is torn and was ignored", results.display());
     }

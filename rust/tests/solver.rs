@@ -148,7 +148,7 @@ fn run_stopped_and_resumed(name: &str, base: SolveOptions, n: u32) -> (Vec<GameR
     // A later invocation finds both games in the file, which agrees with what they say of themselves.
     let again = solver::solve_range_each(n, n + 1, &unlimited, Some(&results), |_| {}).unwrap();
     assert_eq!((again.solved, again.skipped), (0, 2));
-    verify_files(std::slice::from_ref(&results), Optimal::built_in()).unwrap_or_else(|e| panic!("{e}"));
+    verify_files(std::slice::from_ref(&results), Optimal::built_in(), 1).unwrap_or_else(|e| panic!("{e}"));
 
     let text = fs::read_to_string(&results).unwrap();
     (games, text.lines().map(|line| Json::parse(line).unwrap()).collect())

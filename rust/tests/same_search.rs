@@ -107,7 +107,7 @@ fn a_chain_from_1_repeats_exactly_the_searches_that_repeat() {
     let dir = TempDir::new("same-search-chain");
     let path = dir.join("on.jsonl");
     fs::write(&path, on.iter().map(|g| format!("{}\n", g.to_json())).collect::<String>()).unwrap();
-    let report = verify_files(std::slice::from_ref(&path), Optimal::built_in()).unwrap_or_else(|e| panic!("{e}"));
+    let report = verify_files(std::slice::from_ref(&path), Optimal::built_in(), 1).unwrap_or_else(|e| panic!("{e}"));
     let games = &report.files[0].contents.games;
     assert_eq!(games.values().filter(|g| g.proof == Proof::SameSearch).count(), 107);
 }
@@ -132,7 +132,7 @@ fn a_range_run_again_repeats_the_searches_of_its_results_file() {
     let in_one_piece = solver::solve_range(1, 120, &options(true), None).unwrap();
     assert_eq!(repeats_of(&in_one_piece[64..]), expected);
     assert!(second.iter().zip(&in_one_piece[64..]).all(|(a, b)| (a.n, a.score) == (b.n, b.score)));
-    verify_files(std::slice::from_ref(&path), Optimal::built_in()).unwrap_or_else(|e| panic!("{e}"));
+    verify_files(std::slice::from_ref(&path), Optimal::built_in(), 1).unwrap_or_else(|e| panic!("{e}"));
 }
 
 /// A game whose search was stopped with a checkpoint is resumed, not repeated, even when an earlier game posed its
@@ -166,7 +166,7 @@ fn a_game_with_a_checkpoint_is_resumed_not_repeated() {
     assert_eq!((games[0].invocations, games[0].proof), (2, Some(Proof::Exhausted)), "265 was resumed");
     assert!(games.iter().all(|g| g.assumes.is_empty()));
     assert!(!checkpoints.join("n0265.ckpt").exists());
-    verify_files(std::slice::from_ref(&path), Optimal::built_in()).unwrap_or_else(|e| panic!("{e}"));
+    verify_files(std::slice::from_ref(&path), Optimal::built_in(), 1).unwrap_or_else(|e| panic!("{e}"));
 }
 
 /// A repeat assumes what the game it repeats assumes: 34 repeats 33, which, built on optimal.json's 32 (`--use-prev`),
@@ -190,5 +190,5 @@ fn a_repeat_assumes_what_the_game_it_repeats_assumes() {
     let next = solver::solve_range(33, 34, &uncapped, Some(&path)).unwrap().remove(0);
     assert_eq!((next.n, next.method, next.proof), (34, Method::Search, Some(Proof::Exhausted)));
     assert!(next.assumes.is_empty());
-    verify_files(std::slice::from_ref(&path), Optimal::built_in()).unwrap_or_else(|e| panic!("{e}"));
+    verify_files(std::slice::from_ref(&path), Optimal::built_in(), 1).unwrap_or_else(|e| panic!("{e}"));
 }

@@ -1131,7 +1131,7 @@ pub fn solve_range_each_with(
     if lo < 1 || lo > hi {
         return Err(format!("the range {lo}..={hi} is empty or starts below 1"));
     }
-    let mut results = results_path.map(|path| ResultsFile::open(path, optimal)).transpose()?;
+    let mut results = results_path.map(|path| ResultsFile::open(path, optimal, opts.threads)).transpose()?;
     if let Some(file) = &results {
         // Left by a crash between saving a result and deleting its checkpoint.
         for n in (lo..=hi).filter(|&n| file.completed(n).is_some()) {
@@ -1208,7 +1208,7 @@ mod tests {
             (options.get("force_search"), options.get("use_prev")),
             (Some(&Json::Bool(false)), Some(&Json::Bool(false)))
         );
-        let contents = crate::results::read_results(&format!("{json}\n"), Optimal::built_in()).unwrap();
+        let contents = crate::results::read_results(&format!("{json}\n"), Optimal::built_in(), 1).unwrap();
         let stored = &contents.games[&10];
         assert_eq!((stored.score, &stored.moves, stored.proof), (r.score, &r.moves, Proof::Trivial));
     }
@@ -1241,7 +1241,7 @@ mod tests {
 
         // A malformed line that is not the last is an error, not something to skip.
         fs::write(&path, format!("garbage\n{}", lines.lines().next().unwrap())).unwrap();
-        assert!(ResultsFile::open(&path, Optimal::built_in()).is_err());
+        assert!(ResultsFile::open(&path, Optimal::built_in(), 1).is_err());
     }
 
     #[test]

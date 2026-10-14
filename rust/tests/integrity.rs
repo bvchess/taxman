@@ -153,7 +153,7 @@ fn the_results_built_on_a_game_of_optimal_json_assume_it_as_far_as_their_proofs_
     assert_eq!((games[2].proof, games[2].assumes.is_empty()), (Some(Proof::Exhausted), true));
     assert_eq!((games[4].proof, games[4].assumes.is_empty()), (Some(Proof::PrimeFormula), true));
     // The file reads back with the same assumptions, and the lines carry them.
-    let reread = ResultsFile::open(&results, Optimal::built_in()).unwrap();
+    let reread = ResultsFile::open(&results, Optimal::built_in(), 1).unwrap();
     assert!(games.iter().all(|g| reread.completed(g.n).unwrap().assumes == g.assumes));
     assert_eq!(assumptions_of_line(&completed_line(&results, 34)), optimal_json);
     assert!(assumptions_of_line(&completed_line(&results, 35)).is_empty());
@@ -188,7 +188,7 @@ fn a_tampered_results_file_is_refused() {
         fs::write(&results, changed.join("\n") + "\n").unwrap();
         let err = solver::solve_range(1, 14, &options(1), Some(&results)).unwrap_err();
         assert!(err.contains(&format!("line {} (n={})", i + 1, i + 1)), "{err}");
-        let err = taxman::results::verify_files(std::slice::from_ref(&results), Optimal::built_in()).unwrap_err();
+        let err = taxman::results::verify_files(std::slice::from_ref(&results), Optimal::built_in(), 1).unwrap_err();
         assert!(err.contains(&format!("line {} ", i + 1)), "{err}");
         err
     };
@@ -353,7 +353,7 @@ fn result_lines_carry_their_provenance() {
     assert_eq!(limits.get("nodes").and_then(Json::as_u64), Some(200));
     assert_eq!(unfinished.get("options").unwrap().get("force_search"), Some(&Json::Bool(true)));
     // The file reads back, with the unfinished search's invocation counted.
-    assert_eq!(ResultsFile::open(&results, Optimal::built_in()).unwrap().earlier_runs(600), 1);
+    assert_eq!(ResultsFile::open(&results, Optimal::built_in(), 1).unwrap().earlier_runs(600), 1);
 }
 
 #[test]

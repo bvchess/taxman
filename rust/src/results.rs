@@ -63,7 +63,8 @@
 //!
 //! The digest a line that is not a repeat records is not checked against its problem: it is how the solver finds
 //! an earlier game to repeat, which it then sets up again and compares problem for problem, as the check of the
-//! repeat's line does.
+//! repeat's line does.  Those setups are independent of each other and of the order of the checks, so given several
+//! threads ([`read_results`]) they are done first, side by side, and the checks then run in order as on one thread.
 //!
 //! # Torn lines
 //!
@@ -103,6 +104,8 @@ use std::fmt;
 use std::fs::{self, File, OpenOptions, TryLockError};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::thread;
 
 /// The version of the result-line format, the only one this build reads.
 pub const SCHEMA: u32 = 5;
@@ -289,7 +292,7 @@ fn replaced_by_prime(n: u32) -> u64 {
 }
 
 /// What [`read_results`] found in a results file.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Contents {
     pub games: BTreeMap<u32, StoredGame>,
     /// For each board size whose search was stopped by a limit and not yet completed: how many invocations its
@@ -499,7 +502,13 @@ fn parse_line(json: &Json, line: usize) -> Result<Line, String> {
 }
 
 /// Reads and checks the text of a results file (see the module documentation).  Errors name the line.
-pub fn read_results(text: &str, optimal: &Optimal) -> Result<Contents, String> {
+///
+/// The checks of the repeats set up search problems, which is most of what a check costs at a large `n`, and those
+/// setups depend neither on each other nor on the order of the checks.  With `threads` above 1 they are done first,
+/// on that many threads ([`set_up_boards`]); the checks themselves run in order on the calling thread, so the result
+/// and the first error are the same whatever `threads` is.  With 1 no thread is spawned and each setup waits for
+/// the check that needs it.
+pub fn read_results(text: &str, optimal: &Optimal, threads: usize) -> Result<Contents, String> {
     let mut contents = Contents::default();
     let mut entries: Vec<Entry> = Vec::new();
     let lines: Vec<&str> = text.split_inclusive('\n').collect();
@@ -538,7 +547,7 @@ pub fn read_results(text: &str, optimal: &Optimal) -> Result<Contents, String> {
             ));
         }
     }
-    let mut problems = Problems::new();
+    let mut problems = if threads > 1 { set_up_boards(&repeat_boards(&entries), threads) } else { Problems::new() };
     for entry in entries {
         contents.runs.remove(&entry.n);
         let game = check_entry(entry, &contents.games, optimal, &mut problems)?;
@@ -548,13 +557,64 @@ pub fn read_results(text: &str, optimal: &Optimal) -> Result<Contents, String> {
 }
 
 /// The search problems of the games of a file that the checks of its repeats set up again, and their boards'
-/// `in_the_bag`, by board size.
-type Problems = BTreeMap<u32, (Problem, u64)>;
+/// `in_the_bag`, by board size.  A board whose setup failed keeps the error, to be reported where a check reaches
+/// the board, whether the board was set up beforehand ([`set_up_boards`]) or when that check asked for it
+/// ([`problem_of`]).
+type Problems = BTreeMap<u32, Result<(Problem, u64), String>>;
+
+/// The search problem of game `k` set up again from its board size, and the board's `in_the_bag` ([`search_problem`]).
+fn set_up(k: u32) -> Result<(Problem, u64), String> {
+    search_problem(k).map_err(|e| format!("the search of game {k} cannot be set up: {e}"))
+}
+
+/// The boards whose problems the checks of the repeats among the completed lines `entries` set up: a repeat's own and
+/// the one it repeats.  A repeat of a game that is not a completed game of the file below it fails ([`check_repeat`])
+/// before any setup, and asks for none.
+fn repeat_boards(entries: &[Entry]) -> BTreeSet<u32> {
+    // Every board size of a line is from 1 to `MAX_N` (`parse_line`), so a board size in this set is at least 1.
+    let completed: BTreeSet<u32> = entries.iter().map(|e| e.n).collect();
+    let mut boards = BTreeSet::new();
+    for e in entries {
+        if let Some(record) = &e.same_search {
+            if record.n < e.n && completed.contains(&record.n) {
+                boards.extend([e.n, record.n]);
+            }
+        }
+    }
+    boards
+}
+
+/// Sets up the search problems of `boards` on `threads` threads, each taking the next board from one counter.  The
+/// setup of a board costs more the larger its size, so the largest come first, and the threads end together.
+fn set_up_boards(boards: &BTreeSet<u32>, threads: usize) -> Problems {
+    let order: Vec<u32> = boards.iter().rev().copied().collect();
+    let next = AtomicUsize::new(0);
+    thread::scope(|scope| {
+        let workers: Vec<_> = (0..threads.min(order.len()))
+            .map(|_| {
+                scope.spawn(|| {
+                    let mut done = Vec::new();
+                    while let Some(&k) = order.get(next.fetch_add(1, Ordering::Relaxed)) {
+                        done.push((k, set_up(k)));
+                    }
+                    done
+                })
+            })
+            .collect();
+        // A worker that panicked panics here, as the same setup would have on the calling thread.
+        workers.into_iter().flat_map(|w| w.join().unwrap_or_else(|panic| std::panic::resume_unwind(panic))).collect()
+    })
+}
+
+/// The search problem of game `k` and its board's `in_the_bag`: the one in `problems`, or else set up now and kept.
+fn problem_of(problems: &mut Problems, k: u32) -> Result<&(Problem, u64), String> {
+    problems.entry(k).or_insert_with(|| set_up(k)).as_ref().map_err(String::clone)
+}
 
 /// [`read_results`] on the file at `path`, without changing it.  Errors name the file.
-pub fn read_results_file(path: &Path, optimal: &Optimal) -> Result<Contents, String> {
+pub fn read_results_file(path: &Path, optimal: &Optimal, threads: usize) -> Result<Contents, String> {
     let text = fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    read_results(&text, optimal).map_err(|e| format!("{}: {e}", path.display()))
+    read_results(&text, optimal, threads).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 /// The game of `n − 1` that a line was built from, as far as it is known.  For a game of `optimal.json` that the
@@ -648,18 +708,16 @@ fn check_repeat<'a>(
         return Err(format!("it or game {m} has no setup to set its search up from"));
     };
     for (k, size) in [(e.n, setup.size), (m, size)] {
-        if let std::collections::btree_map::Entry::Vacant(slot) = problems.entry(k) {
-            let set_up = search_problem(k).map_err(|e| format!("the search of game {k} cannot be set up: {e}"))?;
-            slot.insert(set_up);
-        }
-        if problems[&k].0.size() != size {
+        let set_up_size = problem_of(problems, k)?.0.size();
+        if set_up_size != size {
             return Err(format!(
-                "the search problem of game {k} set up again is {:?}, not the {size:?} its line records",
-                problems[&k].0.size()
+                "the search problem of game {k} set up again is {set_up_size:?}, not the {size:?} its line records"
             ));
         }
     }
-    let ((mine, bag), (their_problem, their_bag)) = (&problems[&e.n], &problems[&m]);
+    let (Some(Ok((mine, bag))), Some(Ok((their_problem, their_bag)))) = (problems.get(&e.n), problems.get(&m)) else {
+        unreachable!("the loop above found both boards set up, without error");
+    };
     if mine.digest() != record.digest {
         return Err(format!(
             "its search problem's digest is {}, not the {} it records",
@@ -860,7 +918,9 @@ impl ResultsFile {
     /// for a game, which no later run opens; so a file another process has open is refused, as `taxman solve`
     /// refuses a checkpoint directory in use (`engine::lock_dir`).  Two handles in one process exclude each other
     /// too.
-    pub fn open(path: &Path, optimal: &Optimal) -> Result<ResultsFile, String> {
+    ///
+    /// The check runs on `threads` threads where it can ([`read_results`]).
+    pub fn open(path: &Path, optimal: &Optimal, threads: usize) -> Result<ResultsFile, String> {
         let io_error = |e: std::io::Error| format!("{}: {e}", path.display());
         let mut file = OpenOptions::new().create(true).read(true).append(true).open(path).map_err(io_error)?;
         match file.try_lock() {
@@ -875,7 +935,7 @@ impl ResultsFile {
         }
         let mut text = String::new();
         file.read_to_string(&mut text).map_err(io_error)?;
-        let contents = read_results(&text, optimal).map_err(|e| format!("{}: {e}", path.display()))?;
+        let contents = read_results(&text, optimal, threads).map_err(|e| format!("{}: {e}", path.display()))?;
         if contents.torn {
             file.set_len(contents.valid_len as u64).map_err(io_error)?;
         }
@@ -983,12 +1043,12 @@ pub struct Report {
     pub shared: usize,
 }
 
-/// Checks results files without changing them: each as [`read_results`] does, and that files agree on the
-/// score of every board size they share.
-pub fn verify_files(paths: &[PathBuf], optimal: &Optimal) -> Result<Report, String> {
+/// Checks results files without changing them: each as [`read_results`] does (on `threads` threads), and that files
+/// agree on the score of every board size they share.
+pub fn verify_files(paths: &[PathBuf], optimal: &Optimal, threads: usize) -> Result<Report, String> {
     let mut files = Vec::new();
     for path in paths {
-        files.push(FileReport { path: path.clone(), contents: read_results_file(path, optimal)? });
+        files.push(FileReport { path: path.clone(), contents: read_results_file(path, optimal, threads)? });
     }
     let mut seen: BTreeMap<u32, (&Path, &StoredGame)> = BTreeMap::new();
     let mut shared = BTreeSet::new();
@@ -1196,7 +1256,7 @@ mod tests {
     #[test]
     fn a_file_reads_back_with_its_proofs() {
         let lines = lines_1_to_12();
-        let contents = read_results(&text(&lines), Optimal::built_in()).unwrap();
+        let contents = read_results(&text(&lines), Optimal::built_in(), 1).unwrap();
         assert_eq!(contents.games.keys().copied().collect::<Vec<_>>(), (1..=12).collect::<Vec<_>>());
         assert!(!contents.torn && contents.incomplete_lines == 0 && contents.lines == 12);
         assert_eq!(contents.games[&11].proof, Proof::PrimeFormula);
@@ -1208,16 +1268,16 @@ mod tests {
     fn a_torn_last_line_is_dropped_and_any_other_bad_line_is_an_error() {
         let good = text(&lines_1_to_12());
         for tail in ["{\"n\":13,\"sco", "{\"n\":13,\"sco\n", "\0\0\0\0\0\0\0\0 13,\"score\":5}\n", "garbage\n\n\n"] {
-            let contents = read_results(&format!("{good}{tail}"), Optimal::built_in()).unwrap();
+            let contents = read_results(&format!("{good}{tail}"), Optimal::built_in(), 1).unwrap();
             assert!(contents.torn, "{tail:?}");
             assert_eq!((contents.games.len(), contents.valid_len), (12, good.len()), "{tail:?}");
         }
         // A last line that parses but is not a result, and a bad line before the last, are errors.
-        let err = read_results(&format!("{good}{{\"schema\":5}}\n"), Optimal::built_in()).unwrap_err();
+        let err = read_results(&format!("{good}{{\"schema\":5}}\n"), Optimal::built_in(), 1).unwrap_err();
         assert!(err.starts_with("line 13: missing \"n\""), "{err}");
-        let err = read_results(&format!("garbage\n{good}"), Optimal::built_in()).unwrap_err();
+        let err = read_results(&format!("garbage\n{good}"), Optimal::built_in(), 1).unwrap_err();
         assert!(err.starts_with("line 1: JSON syntax error"), "{err}");
-        assert!(read_results("", Optimal::built_in()).unwrap().games.is_empty());
+        assert!(read_results("", Optimal::built_in(), 1).unwrap().games.is_empty());
     }
 
     #[test]
@@ -1226,7 +1286,7 @@ mod tests {
         let refused = |i: usize, line: Json, expected: &str| {
             let mut tampered = lines.clone();
             tampered[i] = line;
-            let err = read_results(&text(&tampered), Optimal::built_in()).unwrap_err();
+            let err = read_results(&text(&tampered), Optimal::built_in(), 1).unwrap_err();
             assert!(err.starts_with(&format!("line {} ", i + 1)) && err.contains(expected), "{expected}: {err}");
         };
         let score = |i: usize| lines[i].get("score").and_then(Json::as_u64).unwrap();
@@ -1243,7 +1303,7 @@ mod tests {
         refused(11, with(&lines[11], "assumes", Json::array([assumed_optimal(11)])), "records the assumptions");
         // A score that is not the table's: here the table is wrong about game 12, which the check cannot tell.
         let other = Optimal::from_json(&Json::parse(r#"[{"n":12,"score":51,"moves":[]}]"#).unwrap()).unwrap();
-        let err = read_results(&text(&lines), &other).unwrap_err();
+        let err = read_results(&text(&lines), &other, 1).unwrap_err();
         assert!(err.starts_with("line 12 (n=12): scores 50, but optimal.json has 51"), "{err}");
         refused(11, with(&lines[11], "proof", Json::from("cap")), "records the proof cap");
         refused(11, with(&lines[11], "promotions", Json::array([12u32, 8])), "not in ascending order");
@@ -1251,7 +1311,7 @@ mod tests {
         let unreadable = |i: usize, line: Json, expected: &str| {
             let mut tampered = lines.clone();
             tampered[i] = line;
-            let err = read_results(&text(&tampered), Optimal::built_in()).unwrap_err();
+            let err = read_results(&text(&tampered), Optimal::built_in(), 1).unwrap_err();
             assert!(err.starts_with(&format!("line {}: ", i + 1)) && err.contains(expected), "{expected}: {err}");
         };
         for (schema, expected) in [(4u32, "schema 4 is older than the schema 5"), (6, "schema 6 is newer than")] {
@@ -1262,7 +1322,7 @@ mod tests {
         unreadable(11, unversioned, "missing \"schema\"");
         let mut twice = lines.clone();
         twice.push(lines[4].clone());
-        assert!(read_results(&text(&twice), Optimal::built_in()).unwrap_err().contains("lines 5 and 13 both hold"));
+        assert!(read_results(&text(&twice), Optimal::built_in(), 1).unwrap_err().contains("lines 5 and 13 both hold"));
     }
 
     /// An open results file is locked: opening it again (from this process or another) is refused until it is
@@ -1271,11 +1331,11 @@ mod tests {
     fn a_results_file_is_locked_while_it_is_open() {
         let dir = crate::test_support::TempDir::new("results-lock");
         let path = dir.join("r.jsonl");
-        let held = ResultsFile::open(&path, Optimal::built_in()).unwrap();
-        let err = ResultsFile::open(&path, Optimal::built_in()).err().expect("a second handle is refused");
+        let held = ResultsFile::open(&path, Optimal::built_in(), 1).unwrap();
+        let err = ResultsFile::open(&path, Optimal::built_in(), 1).err().expect("a second handle is refused");
         assert!(err.contains("r.jsonl is in use by another process"), "{err}");
         drop(held);
-        assert!(ResultsFile::open(&path, Optimal::built_in()).is_ok());
+        assert!(ResultsFile::open(&path, Optimal::built_in(), 1).is_ok());
     }
 
     /// A closed results file is free at once, though a copy of its descriptor lives on, as in a child process
@@ -1284,10 +1344,10 @@ mod tests {
     fn a_closed_results_file_is_free_while_a_copy_of_its_descriptor_lives() {
         let dir = crate::test_support::TempDir::new("results-lock-copy");
         let path = dir.join("r.jsonl");
-        let held = ResultsFile::open(&path, Optimal::built_in()).unwrap();
+        let held = ResultsFile::open(&path, Optimal::built_in(), 1).unwrap();
         let copy = held.file.try_clone().unwrap();
         drop(held);
-        let again = ResultsFile::open(&path, Optimal::built_in()).err();
+        let again = ResultsFile::open(&path, Optimal::built_in(), 1).err();
         assert!(again.is_none(), "{again:?}");
         drop(copy);
     }
@@ -1301,11 +1361,11 @@ mod tests {
         for (score, expected) in [(30, "more than n + score(n − 1) = 42"), (51, "less than the 51 of n − 1")] {
             let optimal =
                 Optimal::from_json(&Json::parse(&format!(r#"[{{"n":11,"score":{score},"moves":[]}}]"#)).unwrap());
-            let err = read_results(&line, &optimal.unwrap()).unwrap_err();
+            let err = read_results(&line, &optimal.unwrap(), 1).unwrap_err();
             assert!(err.starts_with("line 1 (n=12)") && err.contains(expected), "{err}");
         }
         // Without a game of 11 the line cannot stand: it names one from this file.
-        let err = read_results(&line, Optimal::built_in()).unwrap_err();
+        let err = read_results(&line, Optimal::built_in(), 1).unwrap_err();
         assert!(err.contains("which the file does not hold"), "{err}");
     }
 
@@ -1331,7 +1391,7 @@ mod tests {
 
     #[test]
     fn the_table_is_extended_by_the_games_that_follow_it() {
-        let contents = read_results(&text(&lines_1_to_12()), Optimal::built_in()).unwrap();
+        let contents = read_results(&text(&lines_1_to_12()), Optimal::built_in(), 1).unwrap();
         assert!(contents.games.values().all(|game| game.assumes.is_empty()));
         let mut table = table_of(&contents, 5);
         let extension = extend_optimal(&mut table, &contents).unwrap();
@@ -1357,7 +1417,7 @@ mod tests {
         let mut lines: Vec<Json> = solve_range(51, 52, &opts, None).unwrap().iter().map(GameResult::to_json).collect();
         let prev = Prev::from_optimal(optimal, 52).unwrap();
         lines.push(solve_game(53, Some(&prev), &opts).unwrap().to_json());
-        let contents = read_results(&text(&lines), optimal).unwrap();
+        let contents = read_results(&text(&lines), optimal, 1).unwrap();
         assert!(contents.games[&51].assumes.is_empty() && contents.games[&52].assumes.is_empty());
         assert!(contents.games[&53].assumes.iter().eq([&assumed_optimal(52)]));
 
@@ -1378,8 +1438,8 @@ mod tests {
     fn the_extension_stops_at_an_unfinished_search_or_a_gap() {
         let lines = lines_1_to_12();
         let extend = |lines: &[Json]| {
-            let mut table = table_of(&read_results(&text(&lines[..7]), Optimal::built_in()).unwrap(), 7);
-            extend_optimal(&mut table, &read_results(&text(lines), Optimal::built_in()).unwrap()).unwrap()
+            let mut table = table_of(&read_results(&text(&lines[..7]), Optimal::built_in(), 1).unwrap(), 7);
+            extend_optimal(&mut table, &read_results(&text(lines), Optimal::built_in(), 1).unwrap()).unwrap()
         };
 
         // The file ends with a search of 10 that a limit stopped.
@@ -1413,11 +1473,60 @@ mod tests {
 
     #[test]
     fn the_extension_refuses_results_that_score_differently_from_the_table() {
-        let contents = read_results(&text(&lines_1_to_12()), Optimal::built_in()).unwrap();
+        let contents = read_results(&text(&lines_1_to_12()), Optimal::built_in(), 1).unwrap();
         let wrong = r#"[{"n":3,"score":4,"moves":[3]}]"#;
         let mut table = Optimal::from_json(&Json::parse(wrong).unwrap()).unwrap();
         let err = extend_optimal(&mut table, &contents).unwrap_err();
         assert!(err.starts_with("n=3: the results (line 3) score 3, but the table has 4"), "{err}");
         assert_eq!(table.max_n(), 3, "nothing was appended");
+    }
+
+    /// The first 700 lines of the committed chain, which include hundreds of repeats, whose checks set search
+    /// problems up.
+    fn committed_lines() -> Vec<Json> {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("results/strict.jsonl");
+        let text = fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        text.lines().take(700).map(|line| Json::parse(line).unwrap()).collect()
+    }
+
+    /// The error that `lines` give on one thread, which they give on three as well (nothing else is checked of it).
+    fn error_on_one_and_on_three_threads(lines: &[Json]) -> String {
+        let [one, three] = [1, 3].map(|threads| read_results(&text(lines), Optimal::built_in(), threads).unwrap_err());
+        assert_eq!(one, three);
+        one
+    }
+
+    #[test]
+    fn the_checks_give_the_same_result_on_one_thread_and_on_several() {
+        let lines = committed_lines();
+        let repeats: Vec<usize> =
+            (0..lines.len()).filter(|&i| lines[i].get("method").and_then(Json::as_str) == Some("repeat")).collect();
+        assert!(repeats.len() > 100, "the test needs repeats to set problems up for");
+        let one = read_results(&text(&lines), Optimal::built_in(), 1).unwrap();
+        assert_eq!(one.games.len(), 700);
+        for threads in [2, 3] {
+            assert_eq!(read_results(&text(&lines), Optimal::built_in(), threads).unwrap(), one, "{threads} threads");
+        }
+
+        // A repeat whose problem set up again is not the size its line records: the first such line fails, whichever
+        // way the problems were set up.
+        let resized = |i: usize| {
+            let setup = lines[i].get("setup").unwrap();
+            let candidates = setup.get("candidates").unwrap().as_u32().unwrap();
+            with(&lines[i], "setup", with(setup, "candidates", Json::from(candidates + 1)))
+        };
+        let (first, last) = (repeats[100], repeats[repeats.len() - 1]);
+        let mut tampered = lines.clone();
+        (tampered[first], tampered[last]) = (resized(first), resized(last));
+        let err = error_on_one_and_on_three_threads(&tampered);
+        assert!(err.starts_with(&format!("line {} (n=", first + 1)) && err.contains("set up again is"), "{err}");
+
+        // A repeat of a game that is not below it fails before any problem is set up for it.
+        let n = lines[first].get("n").unwrap().clone();
+        let same_search = lines[first].get("same_search").unwrap();
+        let mut tampered = lines.clone();
+        tampered[first] = with(&lines[first], "same_search", with(same_search, "n", n));
+        let err = error_on_one_and_on_three_threads(&tampered);
+        assert!(err.contains("which is not a completed game of the file below it"), "{err}");
     }
 }

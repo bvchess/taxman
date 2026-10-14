@@ -325,6 +325,12 @@ hard games and for scaling over thread counts: `cargo run --release --example la
 results/strict.jsonl --seconds 600 1215` (its flags are documented at the top of
 `examples/ladder.rs`).
 
+`verify-results [--threads K] FILE...` checks each file as `solve` checks its `--out FILE` when it opens it.  The
+checks run in order, but the search problems that they set up again for the repeats (most of the time on a long file)
+are set up first, on K threads (default: all CPUs); `--threads 1` sets them up one at a time, as the checks need them.
+The result and the first line to fail are the same for any K.  `solve` takes the threads for this from its own
+`--threads`.
+
 `extend-optimal RESULTS --out FILE` writes the table of optimal games (the built-in one, or the file `--table FILE`
 names, say a table extended before the binary was rebuilt with it) to FILE with the games of the results file RESULTS
 appended.  It reads RESULTS with the checks of `verify-results`, which refuse it if a score differs from the table's
