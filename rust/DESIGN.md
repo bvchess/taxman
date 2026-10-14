@@ -154,8 +154,9 @@ On the default path of a solve are all the layers but the studies and most of th
 which the default search uses only the greedy incumbent, `max_additional`, the narrowing of the candidate lists and
 the peel scratch space its `Bounds` owns).  `examples/` holds the ladder (standalone searches of hard games with time
 limits, thread scaling, diagnostics), the probe `perf` (the hot paths from fixtures, in cycles and instructions),
-the sacrifice study and `repeats` (the games whose search repeats an earlier game's, from the setups alone, and what
-a results file spent on them); `tests/` the integration tests (section 9); `tools/` the results referee in Python,
+the sacrifice study, `repeats` (the games whose search repeats an earlier game's, from the setups alone, and what
+a results file spent on them) and `slope` (the gaps of a game's root, and proofs with every bound lowered by a
+margin); `tests/` the integration tests (section 9); `tools/` the results referee in Python,
 the PGO build, the Java golden export and the cloud scripts.
 
 **Width dispatch.**  Everything that holds sets of game numbers is generic over `const W: usize`, the number of 64-bit
