@@ -869,6 +869,7 @@ fn search_game<const W: usize>(
         node_limit: opts.node_limit,
         label: format!("n={n}"),
         cores: None,
+        control: None,
     };
     let found = search::search(&prepared, &cfg, seed.as_ref(), cap, resuming);
     if ours {

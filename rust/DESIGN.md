@@ -525,10 +525,16 @@ design in outline.
   deletes those of processes that no longer exist.  Progress lines and results on stdout ignore write errors, so a
   closed pipe cannot kill a run.  A panic in a release build aborts (`panic = "abort"`); the previous checkpoint stays
   valid, which is the property that matters.
+* **Control** (`engine::Control`): a handle through which another thread steers a run while it goes: a ceiling (a
+  proven upper bound, which ends the run once the incumbent reaches it), outside incumbents, a stop, and the number of
+  workers, which grows by starting workers and shrinks by retiring workers that hold no unit (a running one hands all
+  its units to the deque first).  Requests made before the run apply when it starts (engine docs, "The control").
 * **Instrumentation** (`engine::Counters`, per invocation): each worker's time split into busy, idle, parked and lock
-  wait; the effective parallelism busy / (wall × threads); splits and the units they gave, steals, runs and tiny runs;
-  when all workers first ran at once; the pauses and the longest wait for the workers to park.  Every progress line ends
-  with them in short (README, "Reading the output").
+  wait; the effective parallelism busy / capacity (the workers' lifetimes summed, wall × threads when their number is
+  fixed); splits and the units they gave, steals, runs and tiny runs; when all workers first ran at once; the workers
+  added and retired; the idle time of the ramp and of the tail, the time to a unit's first step (the rebuild) and the
+  time in it; the pauses and the longest wait for the workers to park.  Every progress line ends with them in short
+  (README, "Reading the output").
 
 ## 7. Per-game pipeline (`solver`)
 

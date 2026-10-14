@@ -370,20 +370,22 @@ repeats; and what the proof assumes, if anything (section 5).
 ### The progress line (stderr, every `--progress` seconds and at the end)
 
 ```
-n=992 3.0s nodes 576381 (stopped) best 24144 queue 30 spilled 0 | eff 99.5% idle 0.0% lock 0.0% splits 1 steals 1 full 2.8ms pauses 1 (0.4%) max 13.1ms park 0.1ms
+n=992 0.3s nodes 11527 (stopped) best 24175 queue 42 spilled 0 | eff 95.8% idle 1.0% lock 0.0% splits 1 steals 1 full 6.6ms ramp 1.0% tail 0.0% rebuild 0.1% first 1.0% pauses 1 (3.2%) max 9.8ms park 0.0ms
 ```
 
 | field | meaning |
 |---|---|
-| `n=992 3.0s` | the game and the time its search has run over all invocations (`1m05s`, `1h02m03s` later) |
-| `nodes 576381 (stopped)` | steps taken; in the middle of a run the rate (`164.6k/s`), at the end `done`, `optimal`, or `stopped` |
-| `best 24144` | the incumbent: the largest *promotion sum* so far (the score is `in_the_bag` plus this) |
-| `queue 30 spilled 0` | work units in the shared in-memory deque, and spilled to disk |
-| `eff` | effective parallelism: time workers spent searching over wall time times threads |
+| `n=992 0.3s` | the game and the time its search has run over all invocations (`1m05s`, `1h02m03s` later) |
+| `nodes 11527 (stopped)` | steps taken; in the middle of a run the rate (`164.6k/s`), at the end `done`, `optimal`, or `stopped` |
+| `best 24175` | the incumbent: the largest *promotion sum* so far (the score is `in_the_bag` plus this) |
+| `queue 42 spilled 0` | work units in the shared in-memory deque, and spilled to disk |
+| `eff` | effective parallelism: time workers spent searching over the time they were alive (wall time times threads, unless the number of workers changed) |
 | `idle`, `lock` | shares of that time spent waiting for work, and waiting for the deque's lock |
 | `splits steals` | times a worker handed work to idle ones, and units taken from the front of the deque |
-| `full 2.8ms` | time until every worker first ran at once |
-| `pauses 1 (0.4%) max 13.1ms park 0.1ms` | checkpoints (each parks all workers): their share of worker time, the longest pause, the longest wait for the workers to park |
+| `full 6.6ms` | time until every worker first ran at once |
+| `ramp`, `tail` | shares of worker time spent waiting for work before every worker first ran at once, and after the last time a worker finished a unit while all were running (the search's start and its end, when there is not yet or no longer work for all) |
+| `rebuild`, `first` | shares of worker time from the start of a unit to its first step (rebuilding the search's state from the unit), and in that first step (its bounds solved from scratch) |
+| `pauses 1 (3.2%) max 9.8ms park 0.0ms` | checkpoints (each parks all workers): their share of worker time, the longest pause, the longest wait for the workers to park |
 
 ### A results line (`--out`, schema 5)
 
