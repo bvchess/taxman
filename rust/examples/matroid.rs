@@ -25,7 +25,7 @@
 #[path = "common/meet.rs"]
 mod meet;
 
-use meet::{intersect, intersect_fast, BlockMatroid, Meet, Reduced, Span};
+use meet::{intersect, intersect_fast, intersect_warm, BlockMatroid, Meet, Reduced, Span};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
@@ -225,11 +225,23 @@ impl FrameMatroids {
     /// The heaviest common independent set of at most `cap` candidates.
     fn bound(&self, cap: usize) -> Meet {
         let w: Vec<i64> = self.elems.iter().map(|&x| i64::from(x)).collect();
+        self.solve(&w, cap)
+    }
+
+    /// The heaviest common independent set of at most `cap` candidates, element `i` weighing `w[i]`.
+    fn solve(&self, w: &[i64], cap: usize) -> Meet {
         if self.a.words.iter().chain(&self.b.words).all(|&w| w == 1) {
-            intersect_fast(&self.a, &self.b, &w, cap)
+            intersect_fast(&self.a, &self.b, w, cap)
         } else {
-            intersect(&self.a, &self.b, &w, cap, false)
+            intersect(&self.a, &self.b, w, cap, false)
         }
+    }
+
+    /// [`bound`](Self::bound) started from the elements `start`, if they are an extreme common independent set
+    /// (see `meet::intersect_warm`).
+    fn warm(&self, start: &[bool], cap: usize) -> Option<Meet> {
+        let w: Vec<i64> = self.elems.iter().map(|&x| i64::from(x)).collect();
+        intersect_warm(&self.a, &self.b, &w, cap, start)
     }
 
     /// [`bound`](Self::bound) by the reference algorithm.
@@ -298,6 +310,7 @@ fn parse() -> Result<Options, String> {
                     .split(',')
                     .map(|b| match b {
                         "gf2" => Ok(BoundKind::Gf2),
+                        "gf2warm" => Ok(BoundKind::Gf2Warm),
                         "matching" => Ok(BoundKind::Matching),
                         other => Err(format!("unknown bound {other:?}")),
                     })
@@ -350,6 +363,11 @@ fn main() {
                 for &bound in &o.bounds {
                     taxman::with_width!(n, W => bnb::<W>(n, &known, bound, o.limit));
                 }
+            }
+        }
+        "lagrange" => {
+            for &n in &o.games {
+                taxman::with_width!(n, W => lagrange::<W>(n, &known, o.limit as usize));
             }
         }
         other => {
@@ -561,6 +579,8 @@ fn check<const W: usize>(n: u32, known: &Known, samples: usize) {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum BoundKind {
     Gf2,
+    /// The GF(2) bound, started from the parent's heaviest set where that is extreme.
+    Gf2Warm,
     Matching,
 }
 
@@ -580,13 +600,17 @@ fn bnb<const W: usize>(n: u32, known: &Known, kind: BoundKind, limit: u64) {
     let graph = MatchGraph::new(model, &p.root);
     let mut mb = MatchBound::new(&graph);
     let mut scratch = Scratch::<W>::new();
-    let mut stack: Vec<(Bits<W>, FrameSet<W>, Bits<W>)> = vec![(Bits::EMPTY, p.root, p.candidates)];
+    // Each node with the heaviest set of its parent's bound (a warm start for Gf2Warm).
+    let mut stack: Vec<(Bits<W>, FrameSet<W>, Bits<W>, Bits<W>)> =
+        vec![(Bits::EMPTY, p.root, p.candidates, Bits::EMPTY)];
     let (mut nodes, mut cut_count, mut cut_bound, mut better, mut branches) = (0u64, 0u64, 0u64, 0u64, 0u64);
+    let (mut warm, mut cold, mut augmentations) = (0u64, 0u64, 0u64);
     let t0 = Instant::now();
     let mut bound_time = std::time::Duration::ZERO;
-    while let Some((promoted, state, cands)) = stack.pop() {
+    let mut build_time = std::time::Duration::ZERO;
+    while let Some((promoted, state, cands, parent)) = stack.pop() {
         if nodes >= limit {
-            stack.push((promoted, state, cands));
+            stack.push((promoted, state, cands, parent));
             break;
         }
         nodes += 1;
@@ -599,9 +623,25 @@ fn bnb<const W: usize>(n: u32, known: &Known, kind: BoundKind, limit: u64) {
         }
         let tb = Instant::now();
         let (value, chosen) = match kind {
-            BoundKind::Gf2 => {
+            BoundKind::Gf2 | BoundKind::Gf2Warm => {
                 let fm = frame_matroids(model, &state, &cands);
-                let m = fm.bound(max_add as usize);
+                build_time += tb.elapsed();
+                let start: Vec<bool> = fm.elems.iter().map(|&x| parent.contains(x)).collect();
+                let size = start.iter().filter(|&&s| s).count();
+                let warmed = (kind == BoundKind::Gf2Warm && size > 0 && size <= max_add as usize)
+                    .then(|| fm.warm(&start, max_add as usize))
+                    .flatten();
+                let m = match warmed {
+                    Some(m) => {
+                        warm += 1;
+                        m
+                    }
+                    None => {
+                        cold += 1;
+                        fm.bound(max_add as usize)
+                    }
+                };
+                augmentations += m.augmentations as u64;
                 (m.value as u64, fm.chosen::<W>(&m))
             }
             BoundKind::Matching => {
@@ -621,7 +661,7 @@ fn bnb<const W: usize>(n: u32, known: &Known, kind: BoundKind, limit: u64) {
         let (mut required, mut rest, mut at) = (Bits::<W>::EMPTY, cands, state);
         for x in k.iter() {
             rest.remove(x);
-            stack.push((promoted | required, at, rest));
+            stack.push((promoted | required, at, rest, chosen - required));
             branches += 1;
             match model.promote_all_using(&mut scratch, &at, &Bits::EMPTY.with(x)) {
                 Some(next) => {
@@ -634,10 +674,124 @@ fn bnb<const W: usize>(n: u32, known: &Known, kind: BoundKind, limit: u64) {
     }
     println!(
         "{{\"n\":{n},\"bound\":\"{kind:?}\",\"opt\":{opt},\"completed\":{},\"nodes\":{nodes},\"cut_by_count\":{cut_count},\
-         \"cut_by_bound\":{cut_bound},\"branches\":{branches},\"better\":{better},\"seconds\":{:.3},\
-         \"bound_seconds\":{:.3}}}",
+         \"cut_by_bound\":{cut_bound},\"branches\":{branches},\"better\":{better},\"warm\":{warm},\"cold\":{cold},\
+         \"augmentations\":{augmentations},\"seconds\":{:.3},\"bound_seconds\":{:.3},\"build_seconds\":{:.3}}}",
         stack.is_empty(),
         t0.elapsed().as_secs_f64(),
         bound_time.as_secs_f64(),
+        build_time.as_secs_f64(),
+    );
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// lagrange
+
+/// Weights and multipliers in units of `1/SCALE` of a promoted number (as `matchbound::lagrange`).
+const SCALE: i64 = 64;
+/// The damping of [`lagrange`]'s steps halves after this many steps without a lower bound.
+const STALL: usize = 80;
+/// Conflicts looked for at each step: of the optimum `Q`, then of `Q` without its largest member, and so on.
+const CONFLICTS_PER_STEP: usize = 12;
+
+/// A Lagrangian bound over nogoods with the GF(2) intersection as the inner problem, at the root: for multipliers
+/// `λ_N ≥ 0` on nogoods `N` (sets that cannot all be promoted, so every completion `F` has `|F ∩ N| ≤ |N| − 1`),
+/// the heaviest common independent set with each candidate weighing its number less the multipliers of the nogoods
+/// it is in, plus `Σ λ_N (|N| − 1)`, bounds every completion (weak duality, as the matching bound's Lagrangian in
+/// `matchbound::lagrange`).  The nogoods are generated as the multipliers are fitted, from the conflicts of each
+/// step's optimum (as `examples/slope.rs`'s `root_lagrange` does for the matching bound), and the multipliers by
+/// at most `steps` damped Polyak steps towards `P* + 1`.  Also: the conflicts of the GF(2) optimum itself.
+fn lagrange<const W: usize>(n: u32, known: &Known, steps: usize) {
+    let Some((board, p)) = setup::<W>(n) else { return };
+    let Some(opt) = known.opt(n, board.in_the_bag) else {
+        eprintln!("n={n}: no known optimum, skipped");
+        return;
+    };
+    let model = &p.model;
+    let t0 = Instant::now();
+    let fm = frame_matroids(model, &p.root, &p.candidates);
+    let cap = p.max_total as usize;
+    let plain = fm.bound(cap);
+    let target = SCALE * (opt as i64 + 1);
+    let index: HashMap<u32, usize> = fm.elems.iter().enumerate().map(|(i, &x)| (x, i)).collect();
+    let mut scratch = Scratch::<W>::new();
+
+    // The conflicts of the GF(2) optimum: the odd cores it runs into.
+    let q0: Bits<W> = fm.chosen(&plain);
+    let mut first = Vec::new();
+    let mut rest = q0;
+    while let Some(k) = model.conflict_using(&mut scratch, &p.root, &rest, true) {
+        first.push(k.len());
+        rest.remove(k.max().expect("a conflict has members"));
+    }
+
+    let mut nogoods: Vec<Bits<W>> = Vec::new();
+    let mut members: Vec<Vec<usize>> = Vec::new();
+    let mut lambda: Vec<i64> = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    let (mut lowest, mut best) = (i64::MAX, Vec::new());
+    let (mut damping, mut stalled) = (1.0f64, 0usize);
+    let (mut done, mut closed_at) = (0, None);
+    for step in 0..steps {
+        done = step + 1;
+        let mut w: Vec<i64> = fm.elems.iter().map(|&x| SCALE * i64::from(x)).collect();
+        let mut constant = 0i64;
+        for ((k, mem), &l) in nogoods.iter().zip(&members).zip(&lambda) {
+            if l > 0 {
+                mem.iter().for_each(|&i| w[i] -= l);
+                constant += l * (i64::from(k.len()) - 1);
+            }
+        }
+        let m = fm.solve(&w, cap);
+        let value = m.value + constant;
+        if value < lowest {
+            (lowest, stalled) = (value, 0);
+            best.clone_from(&lambda);
+        } else {
+            stalled += 1;
+            if stalled == STALL {
+                (damping, stalled) = (damping / 2.0, 0);
+                if damping < 1e-3 {
+                    break;
+                }
+                lambda.iter_mut().zip(best.iter().chain(std::iter::repeat(&0))).for_each(|(l, b)| *l = *b);
+                continue;
+            }
+        }
+        if lowest < target {
+            closed_at = Some(step + 1);
+            break;
+        }
+        let q: Bits<W> = fm.chosen(&m);
+        let mut rest = q;
+        for _ in 0..CONFLICTS_PER_STEP {
+            let Some(k) = model.conflict_using(&mut scratch, &p.root, &rest, true) else { break };
+            if seen.insert(k) {
+                nogoods.push(k);
+                members.push(k.iter().filter_map(|x| index.get(&x).copied()).collect());
+                lambda.push(0);
+            }
+            rest.remove(k.max().expect("a conflict has members"));
+        }
+        let g: Vec<i64> = nogoods.iter().map(|k| i64::from((q & *k).len()) - (i64::from(k.len()) - 1)).collect();
+        let norm: i64 = g.iter().map(|x| x * x).sum();
+        if norm == 0 {
+            break;
+        }
+        let size = damping * (value - target + SCALE) as f64 / norm as f64;
+        for (l, g) in lambda.iter_mut().zip(&g) {
+            *l = (*l + (size * *g as f64).round() as i64).max(0);
+        }
+    }
+    let positive = best.iter().filter(|&&l| l > 0).count();
+    let list = |v: &[u32]| v.iter().map(u32::to_string).collect::<Vec<_>>().join(",");
+    println!(
+        "{{\"n\":{n},\"opt\":{opt},\"gf2\":{},\"lagrange_gf2\":{},\"scaled\":{lowest},\"nogoods\":{},\"positive\":{positive},\
+         \"steps\":{done},\"closed_at\":{},\"first_conflicts\":[{}],\"seconds\":{:.3}}}",
+        plain.value,
+        lowest.div_euclid(SCALE),
+        nogoods.len(),
+        closed_at.map_or("null".into(), |s: usize| s.to_string()),
+        list(&first),
+        t0.elapsed().as_secs_f64(),
     );
 }

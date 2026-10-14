@@ -178,6 +178,8 @@ pub struct Meet {
     /// Augmentations made and Bellman–Ford rounds run (cost counters).
     pub augmentations: usize,
     pub rounds: usize,
+    /// How many of the heaviest elements the fast algorithm started from (0 for the others).
+    pub prefix: usize,
 }
 
 /// The heaviest common independent set of `a` and `b` of at most `max_size` elements, weights `w`.  Elements of
@@ -191,7 +193,7 @@ pub fn intersect(a: &BlockMatroid, b: &BlockMatroid, w: &[i64], max_size: usize,
     let mut inside = vec![false; n];
     let mut span_a = Span::new(a);
     let mut span_b = Span::new(b);
-    let mut meet = Meet { by_size: vec![0], chosen: vec![false; n], value: 0, augmentations: 0, rounds: 0 };
+    let mut meet = Meet { by_size: vec![0], chosen: vec![false; n], value: 0, augmentations: 0, rounds: 0, prefix: 0 };
     let mut weight = 0i64;
     let usable: Vec<bool> = (0..n).map(|e| w[e] > 0).collect();
     // Exchange data for the elements outside I: whether I + y is independent, else the circuit's part in I.
@@ -322,8 +324,35 @@ pub fn intersect(a: &BlockMatroid, b: &BlockMatroid, w: &[i64], max_size: usize,
 pub fn intersect_fast(a: &BlockMatroid, b: &BlockMatroid, w: &[i64], max_size: usize) -> Meet {
     assert!(a.words.iter().chain(&b.words).all(|&w| w == 1), "intersect_fast needs blocks of rank at most 64");
     let mut fast = Fast::new(a, b, w);
-    fast.run(max_size);
+    // Start from the heaviest elements, as many as are common independent before the first that is not: they
+    // are the heaviest set of their size, and heavier than any smaller set (the weights are positive), so the
+    // augmentations may start there.
+    let mut order: Vec<usize> = (0..a.len()).filter(|&e| w[e] > 0).collect();
+    order.sort_by_key(|&e| std::cmp::Reverse(w[e]));
+    for &e in order.iter().take(max_size) {
+        let (ra, _) = fast.spans[0].reduce(a.block[e], fast.va[e]);
+        let (rb, _) = fast.spans[1].reduce(b.block[e], fast.vb[e]);
+        if ra == 0 || rb == 0 {
+            break;
+        }
+        fast.spans[0].insert(a.block[e], fast.va[e], e as u32);
+        fast.spans[1].insert(b.block[e], fast.vb[e], e as u32);
+        fast.inside[e] = true;
+        fast.meet.prefix += 1;
+    }
+    fast.run(max_size, false);
     fast.meet
+}
+
+/// [`intersect_fast`] started from the common independent set `start` instead of the empty set, if `start` is
+/// extreme (the heaviest common independent set of its size, which its exchange graph having no negative cycle
+/// decides); `None` if it is not (or is not common independent).  The augmentations from an extreme set give the
+/// same value as from the empty set.  `by_size` then starts at `start`'s size.
+pub fn intersect_warm(a: &BlockMatroid, b: &BlockMatroid, w: &[i64], max_size: usize, start: &[bool]) -> Option<Meet> {
+    assert!(a.words.iter().chain(&b.words).all(|&w| w == 1), "intersect_warm needs blocks of rank at most 64");
+    let mut fast = Fast::new(a, b, w);
+    fast.inside.copy_from_slice(start);
+    fast.run(max_size, true).then_some(fast.meet)
 }
 
 /// One matroid's span of the current set, per block: rows by pivot (vector, mask of slots), and the element in
@@ -408,14 +437,20 @@ impl<'a> Fast<'a> {
             vb: b.vecs.iter().map(|v| v[0]).collect(),
             inside: vec![false; n],
             spans: [Spans1::new(a.words.len()), Spans1::new(b.words.len())],
-            meet: Meet { by_size: vec![0], chosen: vec![false; n], value: 0, augmentations: 0, rounds: 0 },
+            meet: Meet { by_size: vec![0], chosen: vec![false; n], value: 0, augmentations: 0, rounds: 0, prefix: 0 },
         }
     }
 
-    fn run(&mut self, max_size: usize) {
+    /// Augments from `self.inside` (empty, or a warm start) up to `max_size` elements.  With `check`, first makes
+    /// sure the start is common independent and extreme (no negative cycle in its exchange graph, Schrijver
+    /// Theorem 41.5), and returns false if it is not.
+    fn run(&mut self, max_size: usize, check: bool) -> bool {
         let n = self.a.len();
         let w = self.w;
         let usable: Vec<usize> = (0..n).filter(|&e| w[e] > 0).collect();
+        for e in (0..n).filter(|&e| w[e] <= 0) {
+            self.inside[e] = false;
+        }
         let mut members: Vec<usize> = Vec::new();
         let mut outside: Vec<usize> = Vec::new();
         let mut free_a = vec![false; n];
@@ -425,9 +460,15 @@ impl<'a> Fast<'a> {
         let (mut sa, mut sb) = (vec![(0u32, 0u32); n], vec![(0u32, 0u32); n]);
         let mut dist = vec![INF; n];
         let mut pred = vec![u32::MAX; n];
-        let mut weight = 0i64;
-        let mut count = 0usize;
-        while count < max_size {
+        let mut weight: i64 = usable.iter().filter(|&&e| self.inside[e]).map(|&e| w[e]).sum();
+        let mut count = usable.iter().filter(|&&e| self.inside[e]).count();
+        if weight > self.meet.value {
+            self.meet.value = weight;
+            self.meet.chosen.clone_from(&self.inside);
+        }
+        self.meet.by_size = vec![weight];
+        let mut checking = check;
+        while checking || count < max_size {
             members.clear();
             outside.clear();
             for &e in &usable {
@@ -441,8 +482,13 @@ impl<'a> Fast<'a> {
                 s.clear();
             }
             for &e in &members {
-                self.spans[0].insert(self.a.block[e], self.va[e], e as u32);
-                self.spans[1].insert(self.b.block[e], self.vb[e], e as u32);
+                for (s, m, v) in [(0, self.a, &self.va), (1, self.b, &self.vb)] {
+                    let blk = m.block[e];
+                    if checking && self.spans[s].reduce(blk, v[e]).0 == 0 {
+                        return false;
+                    }
+                    self.spans[s].insert(blk, v[e], e as u32);
+                }
             }
             ca.clear();
             cb.clear();
@@ -468,15 +514,29 @@ impl<'a> Fast<'a> {
                 dist[e] = INF;
                 pred[e] = u32::MAX;
             }
-            for &y in &outside {
-                if free_a[y] {
+            if checking {
+                // From every vertex: the distances settle within one round per vertex unless a cycle is negative.
+                for &x in &members {
+                    dist[x] = (w[x], 0);
+                }
+                for &y in &outside {
                     dist[y] = (-w[y], 0);
                 }
+            } else {
+                for &y in &outside {
+                    if free_a[y] {
+                        dist[y] = (-w[y], 0);
+                    }
+                }
             }
+            let limit = members.len() + outside.len() + 1;
             let mut rounds = 0;
             loop {
                 rounds += 1;
-                assert!(rounds <= 2 * n + 2, "a negative cycle in the exchange graph");
+                if rounds > limit + 1 {
+                    assert!(checking, "a negative cycle in the exchange graph of an extreme set");
+                    return false;
+                }
                 let mut changed = false;
                 // y → x when I − x + y is independent in B.
                 let mut best_free = (INF, u32::MAX);
@@ -550,6 +610,62 @@ impl<'a> Fast<'a> {
                 }
             }
             self.meet.rounds += rounds;
+            if checking {
+                // No negative cycle: the start is extreme.  It must also be at least as heavy as every smaller
+                // common independent set (the weights by size are concave but can fall): a path from a member to
+                // a member, x₀ → y₁ → x₁ → … → y_k → x_k, exchanges the y's for the x's, one fewer, and weighs
+                // its length less; none may be negative.
+                for &e in members.iter().chain(&outside) {
+                    dist[e] = INF;
+                }
+                for &x in &members {
+                    dist[x] = (w[x], 0);
+                }
+                let mut rounds = 0;
+                loop {
+                    rounds += 1;
+                    assert!(rounds <= limit + 1, "a negative cycle after the check");
+                    let mut changed = false;
+                    for &y in &outside {
+                        let d = dist[y];
+                        if d == INF {
+                            continue;
+                        }
+                        let targets: &[usize] = if free_b[y] { &members } else { &[] };
+                        let circuit = &cb[sb[y].0 as usize..sb[y].1 as usize];
+                        for x in targets.iter().copied().chain(circuit.iter().map(|&x| x as usize)) {
+                            let cand = (d.0 + w[x], d.1 + 1);
+                            if cand < dist[x] {
+                                dist[x] = cand;
+                                changed = true;
+                            }
+                        }
+                    }
+                    for &y in &outside {
+                        let sources: &[usize] = if free_a[y] { &members } else { &[] };
+                        let circuit = &ca[sa[y].0 as usize..sa[y].1 as usize];
+                        for x in sources.iter().copied().chain(circuit.iter().map(|&x| x as usize)) {
+                            let d = dist[x];
+                            if d != INF {
+                                let cand = (d.0 - w[y], d.1 + 1);
+                                if cand < dist[y] {
+                                    dist[y] = cand;
+                                    changed = true;
+                                }
+                            }
+                        }
+                    }
+                    if !changed {
+                        break;
+                    }
+                }
+                self.meet.rounds += rounds;
+                if members.iter().any(|&x| dist[x].0 < 0) {
+                    return false;
+                }
+                checking = false;
+                continue;
+            }
             let sink = outside.iter().copied().filter(|&y| free_b[y] && dist[y] != INF).min_by_key(|&y| dist[y]);
             let Some(sink) = sink else { break };
             let gain = -dist[sink].0;
@@ -576,6 +692,7 @@ impl<'a> Fast<'a> {
                 self.meet.chosen.clone_from(&self.inside);
             }
         }
+        true
     }
 }
 
@@ -631,6 +748,7 @@ mod tests {
     #[test]
     fn intersection_against_brute_force() {
         let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
+        let (mut warm_ok, mut warm_refused) = (0, 0);
         for trial in 0..3000 {
             let n = 1 + rng.below(11) as usize;
             let a = random_matroid(&mut rng, n);
@@ -645,6 +763,43 @@ mod tests {
             }
             let heaviest = want.iter().flatten().copied().max().unwrap();
             assert_eq!(got.value, heaviest, "trial {trial}");
+            // Warm starts: the optimum without one member, and random common independent sets.  When the start
+            // passes the check, the result is the optimum.
+            let opt: Vec<usize> = (0..n).filter(|&e| got.chosen[e]).collect();
+            let mut starts: Vec<Vec<bool>> = Vec::new();
+            for &z in &opt {
+                let mut s = got.chosen.clone();
+                s[z] = false;
+                starts.push(s);
+            }
+            for _ in 0..4 {
+                let mut s = vec![false; n];
+                let mut set = Vec::new();
+                for _ in 0..n {
+                    let e = rng.below(n as u64) as usize;
+                    if !s[e] {
+                        set.push(e);
+                        if independent(&a, &set) && independent(&b, &set) {
+                            s[e] = true;
+                        } else {
+                            set.pop();
+                        }
+                    }
+                }
+                starts.push(s);
+            }
+            for s in &starts {
+                let size = s.iter().filter(|&&x| x).count();
+                for cap in size..=n {
+                    if let Some(m) = intersect_warm(&a, &b, &w, cap, s) {
+                        let limited = want[..=cap].iter().flatten().copied().max().unwrap();
+                        assert_eq!(m.value, limited, "trial {trial}: warm start {s:?}, cap {cap}");
+                        warm_ok += 1;
+                    } else {
+                        warm_refused += 1;
+                    }
+                }
+            }
             let chosen: Vec<usize> = (0..n).filter(|&e| got.chosen[e]).collect();
             assert!(independent(&a, &chosen) && independent(&b, &chosen));
             assert_eq!(chosen.iter().map(|&e| w[e]).sum::<i64>(), got.value);
@@ -661,5 +816,8 @@ mod tests {
                 assert_eq!(chosen.iter().map(|&e| w[e]).sum::<i64>(), fast.value);
             }
         }
+        // The check must let most starts through, or the warm start tests nothing.
+        assert!(warm_ok > warm_refused / 4, "warm starts: {warm_ok} accepted, {warm_refused} refused");
+        eprintln!("warm starts: {warm_ok} accepted, {warm_refused} refused");
     }
 }
