@@ -98,7 +98,7 @@ fn a_chain_from_1_repeats_exactly_the_searches_that_repeat() {
     let expected = repeats_by_problem(1, 300);
     assert_eq!((expected.len(), expected[0]), (107, (22, 21)));
     compare(&on, &off, &expected);
-    // The proofs of the games repeated: a search to exhaustion, one that reached its cap, or a repeat again.
+    // The proofs of the games repeated: a search to exhaustion, one that reached its ceiling, or a repeat again.
     let proof_of = |n: u32| on.iter().find(|g| g.n == n).and_then(|g| g.proof).unwrap();
     let proofs: std::collections::BTreeSet<Proof> = expected.iter().map(|&(_, m)| proof_of(m)).collect();
     assert_eq!(proofs, [Proof::Cap, Proof::Exhausted, Proof::SameSearch].into());
@@ -170,9 +170,9 @@ fn a_game_with_a_checkpoint_is_resumed_not_repeated() {
 }
 
 /// A repeat assumes what the game it repeats assumes: 34 repeats 33, which, built on optimal.json's 32 (`--use-prev`),
-/// reaches its cap and so assumes that game optimal, and so does 34 then, though it ran no search.  Searched without
-/// the repeat and without the cap (a proof by the cap would rest on 33 too), 34 is an exhausted search and assumes
-/// nothing.
+/// reaches its ceiling and so assumes that game optimal, and so does 34 then, though it ran no search.  Searched
+/// without the repeat and without the ceiling (a proof by `cap` would rest on 33 too), 34 is an exhausted search
+/// and assumes nothing.
 #[test]
 fn a_repeat_assumes_what_the_game_it_repeats_assumes() {
     let dir = TempDir::new("same-search-assumes");

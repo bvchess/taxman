@@ -210,7 +210,7 @@ fn validate(args: &[String]) -> Result<(), String> {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Select {
     All,
-    /// Neither prime nor exact: the games that need more than the prime shortcut or the cap.
+    /// Neither prime nor exact: the games that need more than the prime shortcut or the ceiling.
     Needs,
     /// Of those, the ones that are not trivial (which need a search).
     Search,

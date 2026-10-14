@@ -29,7 +29,7 @@ use taxman::with_width;
 // ---------------------------------------------------------------------------------------------------------
 // The width does not matter
 
-/// The same game, built at every width that holds it, has the same frames, candidates, greedy set, promotion cap,
+/// The same game, built at every width that holds it, has the same frames, candidates, greedy set, `max_total`,
 /// search and tree (nodes counted).  A bug that depends on the width (a loop over fewer words than the set has, a
 /// mask that is wrong at the top, a width that is not a power of two) shows as a different tree: the widths above
 /// the ones the boards below need are otherwise reached by no test.
@@ -73,7 +73,7 @@ fn the_search_does_not_depend_on_the_width() {
 }
 
 /// The last board a width holds (511, 1023, 1279, 1535, 1791, 2047) fills the top bit of its set: the start of every
-/// search (frames, candidates, greedy set, promotion cap, the first nodes) is the same at the width the board
+/// search (frames, candidates, greedy set, `max_total`, the first nodes) is the same at the width the board
 /// dispatches to and at the next one.  (The boards just above 511, 1023 and 2047 are in `testdata/golden_wide` at
 /// their own widths.)
 #[test]
@@ -92,9 +92,9 @@ fn the_edges_of_the_widths_hold() {
 // ---------------------------------------------------------------------------------------------------------
 // Games of 1100 and more, against the committed results
 
-/// Game 1133 (W = 20, the frontier's width) searches in a few thousand nodes: every sound tactic must give the score
-/// of `results/strict.jsonl`, on one thread, and the default also on two.  Nothing else searches at a width of 20 or
-/// more and checks the answer.
+/// Game 1133 (W = 20, the width of the hardest games) searches in a few thousand nodes: every sound tactic must
+/// give the score of `results/strict.jsonl`, on one thread, and the default also on two.  Nothing else searches at
+/// a width of 20 or more and checks the answer.
 #[test]
 fn every_tactic_gives_the_recorded_score_at_w20() {
     let games = stored_games("strict.jsonl");
@@ -260,7 +260,7 @@ fn a_w20_search_interrupted_and_resumed_gives_the_same_answer() {
 // Promoting on wide boards
 
 /// Promoting one number at a time (`Model::promote`, which skips the peel when the move has a factor no move of
-/// the frame below uses) leaves the same state, and fails in the same places, as promoting it with the peel of
+/// the frame in front of it uses) leaves the same state, and fails in the same places, as promoting it with the peel of
 /// every frame (`promote_all_using` of the one number), in states reached by promoting random candidates; and those
 /// states are what promoting them all at once leaves.  The shortcut is exact only in winnable frames, which every
 /// reached state has because every root frame is (the frame builder's roots; `search::prepare` checks it in debug

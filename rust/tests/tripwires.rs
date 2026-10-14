@@ -83,7 +83,7 @@ const EXPECTED: [(u32, &str, u64, u64); 49] = [
     // (`forget_nogoods=off` as well: 56,990).
     (936, "matching", 20507, 41653),
     (936, "matching,lagrange=off", 20507, 59055),
-    // W = 20, the frontier's width.
+    // W = 20, the width of the hardest games.
     (1133, "matching", 28690, 2122),
     (1133, "matching,lagrange=off", 28690, 2386),
     (1133, "matching,nogoods=off", 28690, 5269),

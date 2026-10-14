@@ -28,9 +28,9 @@
 //! * **symmetries**: the root's prime symmetries of each game (`common/symmetry.rs`).
 //! * **symcheck**: their checks ([`symcheck_one`]).
 //!
-//! **Soundness** of pruning a dominated node: the pruned completions `S` are those with `P' ∪ S` feasible and
+//! **Soundness** of pruning a dominated node: the pruned completions `S` are those with `P' ∪ S` promotable and
 //! worth strictly more (or, for a two-for-two exchange of equal sums, larger in the order of sets as binary
-//! numbers), so a heaviest feasible set (the largest of them in that order) is never pruned.
+//! numbers), so a heaviest promotable set (the largest of them in that order) is never pruned.
 
 #[path = "common/fixtures.rs"]
 mod fixtures;
@@ -255,12 +255,12 @@ fn used_by<const W: usize>(g: &FactorProvider, f: u32, xs: &Bits<W>, except: u32
     g.composites(f).iter().any(|&c| u32::from(c) != except && xs.contains(u32::from(c)))
 }
 
-/// The *core* of the frame `moves -> factors` for edits that add moves from `cin` and remove factors from `cout`:
-/// moves that can always be taken last are dropped (a move with a factor outside `cout` that no other move and no
-/// member of `cin` has), and then the factors outside `cout` that no remaining move nor member of `cin` has, until
-/// nothing changes.  For every `G ⊆ cin` and `L ⊆ cout`, the frame with `G` added and `L` removed is winnable exactly
-/// when its core is: a dropped move goes last (its private factor is never taken, nor removed), and a dropped
-/// factor is never used.
+/// The *residual* (`core`, here) of the frame `moves -> factors` for edits that add moves from `cin` and remove
+/// factors from `cout`: moves that can always be taken last are dropped (a move with a factor outside `cout` that no
+/// other move and no member of `cin` has), and then the factors outside `cout` that no remaining move nor member of
+/// `cin` has, until nothing changes.  For every `G ⊆ cin` and `L ⊆ cout`, the frame with `G` added and `L` removed
+/// is winnable exactly when its residual is: a dropped move goes last (its private factor is never taken, nor
+/// removed), and a dropped factor is never used.
 fn core<const W: usize>(g: &FactorProvider, frame: &Frame<W>, cin: &Bits<W>, cout: &Bits<W>) -> (Bits<W>, Bits<W>) {
     let (mut moves, mut factors) = (frame.moves, frame.factors);
     loop {
@@ -290,16 +290,16 @@ fn core<const W: usize>(g: &FactorProvider, frame: &Frame<W>, cin: &Bits<W>, cou
 /// Whether `other` *covers* `state` for the candidates `cands`: every `S ⊆ cands` that can be promoted from `state`
 /// can be promoted from `other`.  Frame by frame, with `cin` the candidates that `S` could promote into the frame
 /// and `cout` those it could promote out of it (both as `state` has them): every member of `cout` must be a factor
-/// of `other`'s frame, the core of `other`'s frame (see [`core`]) can have no move that the core of `state`'s has
-/// not, and must have every factor of `state`'s core that its own moves or the members of `cin` could use.  Then
-/// for `G ⊆ cin`, `L ⊆ cout`: `state`'s core with `G` and `L` winnable ⇒ the same with `other`'s moves (fewer) ⇒
-/// with only the factors those moves and `G` can use ⇒ with `other`'s factors (more, minus `L`).
+/// of `other`'s frame, the residual of `other`'s frame (see [`core`]) can have no move that the residual of `state`'s
+/// has not, and must have every factor of `state`'s residual that its own moves or the members of `cin` could use.
+/// Then for `G ⊆ cin`, `L ⊆ cout`: `state`'s residual with `G` and `L` winnable ⇒ the same with `other`'s moves
+/// (fewer) ⇒ with only the factors those moves and `G` can use ⇒ with `other`'s factors (more, minus `L`).
 ///
-/// With `relabel`, a move of `other`'s core may also stand in for a different move of `state`'s with the same live
-/// factors among those both cores have (a frame's game sees a move only through its factors), each move of
-/// `state`'s core standing in for one at most, provided it uses no factor that `other`'s core lacks: then
-/// `state`'s core with `G` and `L` winnable ⇒ the same with only the stand-ins and the common factors (the others
-/// unused) ⇒ the same graph with `other`'s moves ⇒ with `other`'s factors (more).
+/// With `relabel`, a move of `other`'s residual may also stand in for a different move of `state`'s with the same
+/// live factors among those both residuals have (a frame's game sees a move only through its factors), each move of
+/// `state`'s residual standing in for one at most, provided it uses no factor that `other`'s residual lacks: then
+/// `state`'s residual with `G` and `L` winnable ⇒ the same with only the stand-ins and the common factors (the
+/// others unused) ⇒ the same graph with `other`'s moves ⇒ with `other`'s factors (more).
 fn covers<const W: usize>(
     g: &FactorProvider,
     other: &FrameSet<W>,
@@ -347,10 +347,10 @@ fn covers<const W: usize>(
 }
 
 /// [`covers`] up to the renaming `pi` (an involution of the numbers that fixes every member of `cands`): whether
-/// `other` covers `state` with every number of `state`'s cores renamed by `pi`.  Frame by frame, `pi` must carry the
-/// factor graph between the moves of `state`'s core (and the members of `cands` that could be promoted into the
-/// frame) and the factors of its core onto the graph between their images: then the renamed core is the same game
-/// for every `G ⊆ cin`, `L ⊆ cout` (which `pi` fixes), and the literal test of [`covers`] applies to it.
+/// `other` covers `state` with every number of `state`'s residuals renamed by `pi`.  Frame by frame, `pi` must carry
+/// the factor graph between the moves of `state`'s residual (and the members of `cands` that could be promoted into
+/// the frame) and the factors of its residual onto the graph between their images: then the renamed residual is the
+/// same game for every `G ⊆ cin`, `L ⊆ cout` (which `pi` fixes), and the literal test of [`covers`] applies to it.
 fn covers_mapped<const W: usize>(
     g: &FactorProvider,
     other: &FrameSet<W>,
@@ -386,7 +386,7 @@ fn covers_mapped<const W: usize>(
 }
 
 /// The classes of *twins* among `cands` in `state`: candidates of the same home frame `h` with the same live
-/// maximal factors in frame `h − 1` and the same users in frame `h` (the moves of the core of frame `h` for
+/// maximal factors in frame `h − 1` and the same users in frame `h` (the moves of the residual of frame `h` for
 /// completions within `cands`, and the members of `cands` that could be promoted into it).  Exchanging two twins is
 /// an automorphism of the node's problem restricted to `cands`.  The members of the classes of two or more.
 fn twins<const W: usize>(model: &Model, state: &FrameSet<W>, cands: &Bits<W>) -> usize {

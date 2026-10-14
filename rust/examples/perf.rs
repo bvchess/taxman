@@ -1,4 +1,4 @@
-//! The performance probe: replays of the search's hot paths at the frontier, measured in CPU cycles and
+//! The performance probe: replays of the search's hot paths on the hardest games, measured in CPU cycles and
 //! instructions retired of this process (other load on the machine barely moves them, unlike wall time), each with
 //! a fingerprint of everything it computes.  An optimization that keeps the search exact must leave every
 //! fingerprint unchanged; one that changes the tree on purpose changes the window's.
@@ -11,12 +11,13 @@
 //! ```
 //!
 //! The fixtures, in `testdata/perf/` unless `--fixtures` says otherwise (games 936 and 1215 by default: W = 16,
-//! and the frontier):
+//! and the hardest games):
 //!
 //! * `nNNNN.nodes` (F1, search nodes): nodes of the proof of game N (one thread, the default tactics, seeded with
 //!   the optimum), each its promotions and candidates.  Each kernel replays all of them: the rebuild of a node's
 //!   state (`promote_all_using`), the promotion of every candidate (`promote_in_place_using`, the peel) and
-//!   `can_promote_using`, the minimal conflict and the core of the heaviest matching, the matching from scratch
+//!   `can_promote_using`, the minimal conflict and the one from the residual (the `core` line) of the heaviest
+//!   matching, the matching from scratch
 //!   and warm-started from the root's, the bounds without each member of the heaviest matching from the
 //!   potentials, the exact ones without each member of the conflict (strong branching), children pushed and
 //!   evaluated, and lookups and rule-outs in a nogood table learned from the nodes' conflicts.
@@ -166,7 +167,7 @@ impl Report {
 // ---------------------------------------------------------------------------------------------------------
 // Games and fixtures
 
-/// A game set up as the frontier's searches are: from the frame builder, with the default tactics.
+/// A game set up as the searches of the hardest games are: from the frame builder, with the default tactics.
 fn setup<const W: usize>(n: u32) -> Prepared<W> {
     Board::<W>::for_n(n).prepare(SearchTactics::default()).expect("prepare")
 }
