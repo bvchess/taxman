@@ -46,6 +46,7 @@ fn main() {
         "nodes" => nodes(&rest),
         "sample" => sample(&rest),
         "symmetries" => symmetries(&rest),
+        "symcheck" => symcheck(&rest),
         _ => {
             eprintln!("usage: dominance nodes [--pairs] FIXTURE... | sample --known FILE --every K --out DIR N...");
             std::process::exit(2);
@@ -87,6 +88,98 @@ fn symmetries_of<const W: usize>(n: u32) {
         p.candidates.len(),
         pairs.len(),
         moved.len()
+    );
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// symcheck
+
+/// Checks of the root's prime symmetries (`symmetry::root_pairs`), per game: for every pair `(a, b)`, the image of
+/// the optimal set and of `samples` random maximal promotable sets (and, on boards of at most 22 candidates, of every
+/// promotable set) can be promoted, and is worth `(b − a)(c_a − c_b)` more; on those small boards, the best set that
+/// keeps every pair's constraint `c_a ≤ c_b` is worth the optimum; and up to `n = 40`, the brute-force oracle
+/// (`taxman::brute`, no frame model) scores the known optimum.  Prints a line per game with pairs, and panics on a
+/// failure.
+fn symcheck(args: &[String]) {
+    let (mut known, mut samples_per_pair, mut games) = (None, 50usize, Vec::new());
+    let mut it = args.iter();
+    while let Some(arg) = it.next() {
+        match arg.as_str() {
+            "--known" => known = it.next().map(PathBuf::from),
+            "--samples" => samples_per_pair = it.next().and_then(|v| v.parse().ok()).expect("--samples K"),
+            g => match g.split_once('-') {
+                Some((a, b)) => games.extend(a.parse::<u32>().expect("A")..=b.parse::<u32>().expect("B")),
+                None => games.push(g.parse::<u32>().expect("N")),
+            },
+        }
+    }
+    let optimal = Optimal::built_in().with_results_files(known.as_slice()).expect("known games");
+    for n in games {
+        taxman::with_width!(n, W => symcheck_one::<W>(n, &optimal, samples_per_pair));
+    }
+}
+
+fn symcheck_one<const W: usize>(n: u32, optimal: &Optimal, samples_per_pair: usize) {
+    let board = Board::<W>::for_n(n);
+    if board.is_trivial() {
+        return;
+    }
+    let p = board.prepare(tactics()).expect("prepare");
+    let pairs = root_pairs(&p);
+    if n <= 40 {
+        let exact = taxman::brute::solve(n, &[], taxman::brute::Rule::Divisor).score;
+        assert_eq!(Some(exact), optimal.score(n), "n={n}: the oracle disagrees with the known optimum");
+    }
+    if pairs.is_empty() {
+        return;
+    }
+    let (model, root) = (&*p.model, &p.root);
+    let mut scratch = Scratch::new();
+    let opt = optimal.score(n).expect("a known game") - board.in_the_bag;
+    let best: Bits<W> = optimal.moves(n).expect("moves").iter().copied().filter(|&x| p.candidates.contains(x)).collect();
+    assert_eq!(best.sum(), opt);
+    let check = |set: &Bits<W>, scratch: &mut Scratch<W>| {
+        for &(a, b) in &pairs {
+            let image = map_set(set, &|x| swap_primes(x, a, b)).expect("in range");
+            assert!(model.promote_all_using(scratch, root, &image).is_some(), "n={n}: ({a}, {b}) of {set:?}");
+            let gain = i64::from(b - a) * (cofactors(set, a) as i64 - cofactors(set, b) as i64);
+            assert_eq!(image.sum() as i64 - set.sum() as i64, gain, "n={n}: the sum of the image of {set:?}");
+        }
+    };
+    check(&best, &mut scratch);
+    let mut rng = 0x5eed_u64 ^ u64::from(n);
+    for _ in 0..samples_per_pair {
+        let s = random_maximal(model, &mut scratch, root, &p.candidates, &mut rng);
+        check(&s, &mut scratch);
+    }
+    // Small boards: every promotable set, and the best that keeps the constraints.
+    let mut enumerated = 0u64;
+    let mut kept_best = None;
+    if p.candidates.len() <= 22 {
+        let cands = p.candidates.to_vec();
+        let mut stack = vec![(0usize, Bits::<W>::EMPTY, *root)];
+        while let Some((i, set, state)) = stack.pop() {
+            if i == cands.len() {
+                enumerated += 1;
+                check(&set, &mut scratch);
+                let keeps = pairs.iter().all(|&(a, b)| cofactors(&set, a) <= cofactors(&set, b));
+                if keeps {
+                    kept_best = kept_best.max(Some(set.sum()));
+                }
+                continue;
+            }
+            stack.push((i + 1, set, state));
+            if let Some(next) = model.promote(&state, cands[i]) {
+                stack.push((i + 1, set.with(cands[i]), next));
+            }
+        }
+        assert_eq!(kept_best, Some(opt), "n={n}: the sets that keep the constraints miss the optimum");
+    }
+    println!(
+        "{{\"n\":{n},\"pairs\":{},\"candidates\":{},\"enumerated\":{enumerated},\"kept_best\":{},\"opt\":{opt}}}",
+        pairs.len(),
+        p.candidates.len(),
+        kept_best.map_or("null".into(), |v: u64| v.to_string()),
     );
 }
 
