@@ -104,7 +104,7 @@ sources).  A worked example, the board 1..=85, is in the
   impossible sources at the root, where it shapes the search space, is descending greedy on each upper-half
   component, which `evidence/` certifies maximum-weight (for every weighting consistent with the order) in every
   game n ≤ 100,000.  The sacrifice bound (`sacrifice`) is an upper bound on opt(n) by a different route (games on
-  punctured boards); it proves game 1133 and disagrees with nothing.  [evidence/README.md](evidence/README.md) has the
+  punctured boards); it proves game 1133 and disagrees with nothing.  [evidence/README.md](prover/README.md) has the
   details.
 * **Given the pruning is exact.**  Every tactic is proven or sound (section 5 grades each).  The Java used two
   shortcuts that rest on conjectures (`reuse_prev` and `revise_freedoms`); the Rust had them as tactics for a while,
@@ -116,7 +116,7 @@ sources).  A worked example, the board 1..=85, is in the
   n = 425 some games have two or three optimal sets (all with upper part U\*, differing below n/2), and the
   recorded game of 685 plus 686 is unplayable although opt(686) = 686 + opt(685), through another optimal set of
   685.  A chain step is decided by the complete list of n − 1's optimal sets, not by one of them
-  ([evidence/README.md §5](evidence/README.md)).
+  ([evidence/README.md §5](prover/README.md)).
 
 ### The Java solver and this one
 

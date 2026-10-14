@@ -249,7 +249,7 @@ tracks the cost over 900–1300, does not predict it past 1300.  With the solver
 the fitted ratio, 1301..2175 take about 200 million nodes, **about 140 thread-hours** (100 to 250) at 2.5 ms a node,
 the dearest games, 2170–2173, about 6 hours each, 1475, 1430, 1472 and 1521 about 1.5 hours; the games are independent
 and one thread each, so it is half a day on 16 cores ([EXPERIMENTS.md](../docs/EXPERIMENTS.md#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10)
-has the measurements; `../tools/cloud/evidence.sh` runs it, [RUNBOOK section 9](../tools/cloud/RUNBOOK.md#9-the-model-free-proofs-of-optn-1301-to-2175)
+has the measurements; `../tools/cloud/prover.sh` runs it, [RUNBOOK section 9](../tools/cloud/RUNBOOK.md#9-the-model-free-proofs-of-optn-1301-to-2175)
 the procedure).  Not yet run; the table at the top says 1300 until it is.
 
 ## 4. Adversarial search: what protects greedy
@@ -554,7 +554,7 @@ bash tools/adversary_campaign.sh                                                
 ./target/release/optsets --from 2 --to 989 --out OUT.jsonl     # then the chain and prime games, derived
 ./target/release/optsets --list 798,799,800 --upper fixed --threads 1 --seconds 540 --out FIXED.jsonl
 ./target/release/moves --from 2 --to 1300 --seconds 540 --out OUT.jsonl         # one thread; ~7 minutes
-../tools/cloud/evidence.sh 1301 2175                # `exact` over a range in resumable passes, all cores, then the check
+../tools/cloud/prover.sh 1301 2175                # `exact` over a range in resumable passes, all cores, then the check
 tools/summarize.py check 1301 2175 data/exact_parity_2_1300.jsonl OUT.jsonl     # every n in 2..2175 proven, scores recorded
 tools/summarize.py span|star|exact|cost|adversary|optsets|moves FILE...
 tools/crosscheck_optsets.py data/optsets_2_989.jsonl --max 57 --budget 120     # theory-free, about 8 minutes
@@ -574,7 +574,7 @@ gzipped where large (`gunzip -k` to resume into it).
   statement about cores and closed surfaces mod 2 that the adversarial results tie to the window law with the
   real ranking of the primes.
 * The model-free cross-check reaches 1300; the committed chain now reaches 2175 and the check of 1301..2175 is
-  prepared (`../tools/cloud/evidence.sh`; about 140 thread-hours, section 3), not run.  What the parity bound still misses are the
+  prepared (`../tools/cloud/prover.sh`; about 140 thread-hours, section 3), not run.  What the parity bound still misses are the
   odd cores (THEORY.md, Theorem 10): its root gap, 130 points on average at 1000–1300, grows about 14 per 100 in n,
   and the cost with it; the conflicts of its heaviest sets are large (20–45 members at 990).
 * The optimal sets of 990–1300 are not enumerated.  The enumeration mode works with the parity bound (tested

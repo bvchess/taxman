@@ -8,7 +8,7 @@
     summarize.py star FILE...     the threshold-by-threshold (★) campaign: thresholds and components by method
     summarize.py exact FILE...    the model-free exact cross-check of optimal scores (a later file overrides)
     summarize.py check A B FILE...  FILEs prove every n in 2..B, with the recorded scores in A..B
-    summarize.py order A B        the games A..B, dearest first by the solver's nodes (the order evidence.sh runs them)
+    summarize.py order A B        the games A..B, dearest first by the solver's nodes (the order prover.sh runs them)
     summarize.py cost FILE...     its cost curve: the searches made with the parity bound from scratch, by band
     summarize.py optsets FILE...  every optimal pick set per game (bin/optsets.rs): tables, exchanges, canonical sets
     summarize.py moves FILE...    the longest games against the optimal ones (bin/moves.rs)

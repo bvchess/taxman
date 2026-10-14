@@ -1,5 +1,5 @@
 //! The longest games against the optimal ones: for every game of a range, M(n), the most moves a game of n can
-//! have, decided model-free ([`taxman_evidence::moves`]), against the moves of the recorded optimal game
+//! have, decided model-free ([`taxman_prover::moves`]), against the moves of the recorded optimal game
 //! (optimal.json, which reaches 1300, and for a board size it lacks the game of `--results`).  One line per
 //! game, resumable:
 //!
@@ -27,10 +27,10 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
-use taxman_evidence::game::Board;
-use taxman_evidence::jsonl::{field_nums, field_u64, parse_items, recorded_games, Appender, Obj};
-use taxman_evidence::moves::{heaviest_longest, longest, matching_numbers, play_order};
-use taxman_evidence::primes::{is_prime, smallest_prime_factors};
+use taxman_prover::game::Board;
+use taxman_prover::jsonl::{field_nums, field_u64, parse_items, recorded_games, Appender, Obj};
+use taxman_prover::moves::{heaviest_longest, longest, matching_numbers, play_order};
+use taxman_prover::primes::{is_prime, smallest_prime_factors};
 
 /// What a game's line says its successor needs: M(n) if decided, and a longest game found (its moves).
 struct Known {

@@ -1,5 +1,5 @@
 [package]
-name = "taxman-evidence"
+name = "taxman-prover"
 version = "0.1.0"
 edition = "2021"
 description = "Independent empirical checks of the assumptions behind the Taxman solver's optimal results"

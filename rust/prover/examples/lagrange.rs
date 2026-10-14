@@ -7,10 +7,10 @@
 //! `lagrange conflicts N TARGET NODES [ITERATIONS]`: run the model-free search for NODES nodes to collect
 //! nogoods, then fit the Lagrangian bound over them (`Prover::enable_lagrangian`) and print it.
 
-use taxman_evidence::game::{Board, MatchingBound, Prover, Role};
-use taxman_evidence::instance::Instance;
-use taxman_evidence::primes::smallest_prime_factors;
-use taxman_evidence::span::span_check;
+use taxman_prover::game::{Board, MatchingBound, Prover, Role};
+use taxman_prover::instance::Instance;
+use taxman_prover::primes::smallest_prime_factors;
+use taxman_prover::span::span_check;
 
 fn cap(ns: &[u64]) {
     let spf = smallest_prime_factors(*ns.iter().max().unwrap() as usize);

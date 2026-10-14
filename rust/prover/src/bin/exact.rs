@@ -26,10 +26,10 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
-use taxman_evidence::game::{relation, Board, Prover, Role, Verdict};
-use taxman_evidence::jsonl::{campaign, parse_items, recorded_games, Obj};
-use taxman_evidence::parity::{Meet, Outcome, Parity};
-use taxman_evidence::primes::smallest_prime_factors;
+use taxman_prover::game::{relation, Board, Prover, Role, Verdict};
+use taxman_prover::jsonl::{campaign, parse_items, recorded_games, Obj};
+use taxman_prover::parity::{Meet, Outcome, Parity};
+use taxman_prover::primes::smallest_prime_factors;
 
 /// A paused search: its target, nodes so far (and how many of them without the parity bound), nogoods and open
 /// units (roles as letters F, P, B).

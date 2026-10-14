@@ -88,7 +88,7 @@ Several games have more than one optimal set of moves, and which one a run finds
 scores are reproducible, move lists need not be.  The sets of this file differ from the earlier files' in these games:
 
 * 539, 684–687 and 770–773, which the evidence crate lists with two or three optimal sets each
-  ([evidence/README.md](../evidence/README.md#5-is-the-optimal-set-unique) has the exchanges).  `optimal.json`'s games
+  ([evidence/README.md](../prover/README.md#5-is-the-optimal-set-unique) has the exchanges).  `optimal.json`'s games
   1–1000 are the Java's, and this file has the same set of moves in each of them but 539 and 770–773, where the chain
   found another optimal set.  The previous file (the chain of commit 271c817, and that of 243af9b) had the table's
   sets at 539 and 770–773 and another at 684–687, where this file has the table's.
@@ -172,7 +172,7 @@ What that evidence amounts to:
    built from optimal.json (which is only compared with, up to 1300: a score that differs would be a hard error), and
    all 2175 games record that they assume nothing.
 6. **The model-free check.**  The evidence crate proves every n up to 1300 optimal without the frame model (no hives,
-   frames or promotions: [evidence/README.md](../evidence/README.md); [THEORY.md](../../heuristics/THEORY.md),
+   frames or promotions: [evidence/README.md](../prover/README.md); [THEORY.md](../../heuristics/THEORY.md),
    Theorem 10), so `strict.jsonl`'s games to 1300 do not rest on the frame model either.  That check of 1301–2175 is
    pending.
 

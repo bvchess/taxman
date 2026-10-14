@@ -23,7 +23,7 @@ and in DESIGN.md; the measurements were made with the ladder, the probe and `tax
 One row per experiment or idea tried on the exact solver and on the theory under it, kept or not, so that nothing is
 tried twice.  **Check it before proposing an experiment, and add a row when one finishes, failures included.**  The
 details stay where the row points: a round below, [IDEAS.md](IDEAS.md), [DESIGN.md](../DESIGN.md), the
-[evidence](../evidence/README.md), the [results](../results/README.md), or the module comment of the code of a study.
+[evidence](../prover/README.md), the [results](../results/README.md), or the module comment of the code of a study.
 Where an experiment's code was discarded (the pilots of IDEAS.md), the page it points to describes what was computed,
 on which games and with which settings, well enough to repeat it.  The [index of rounds](#index-of-rounds) lists the
 rounds in the order they happened, with their commits.
@@ -191,7 +191,7 @@ those of the page the row points to; a game is named by its board size, and time
 | A chain that comes back down: solve n + 1 first and derive n | [going higher 7](#going-higher-and-coming-back-down-2026-10) | not kept | in 1001-1300 only 1023 (from 1024, whose proof costs the same from 6 below): 0.55% of the nodes of the exhausted searches |
 | Equivalent search problems (same feasible sets, not equal) as a wider same search: strip the movers that a peel of each frame's hardest state drops, then a checked isomorphism fixing the candidates | [going higher 6](#going-higher-and-coming-back-down-2026-10) | not kept | 8 games beyond the 545 repeats, all below 186 (18 nodes); near repeats with the same P\* and candidates are not isomorphic and cost 643k nodes over 1001-1300 at most |
 | Proving a run of neighbours that share a core (equal GF(2) root gaps) in one search | [going higher 5](#going-higher-and-coming-back-down-2026-10) | open | every chain step after an exhausted game keeps the GF(2) gap (37 of 37); runs with equal gaps hold 19.8% of the proof nodes of 880-1300 beyond each run's dearest; trees within a run differ by up to ×3.9; not piloted |
-| Lower frame 0's freedoms by solving the two-frame game (`revise_freedoms`) | [tactics review](#revise_freedoms-the-same-trees) | removed 2026-10: its premise is false | assumes the max-sum set also has the max count, which fails on about one perturbed game in 1,300, and for the whole frame game of n = 833 (48 promotions optimal, 49 feasible: [evidence 6](../evidence/README.md#6-does-an-optimal-game-play-the-most-moves)); the two-frame form it applies is undecided |
+| Lower frame 0's freedoms by solving the two-frame game (`revise_freedoms`) | [tactics review](#revise_freedoms-the-same-trees) | removed 2026-10: its premise is false | assumes the max-sum set also has the max count, which fails on about one perturbed game in 1,300, and for the whole frame game of n = 833 (48 promotions optimal, 49 feasible: [evidence 6](../prover/README.md#6-does-an-optimal-game-play-the-most-moves)); the two-frame form it applies is undecided |
 | What `reuse_prev` still saves in a strict chain that has `same_search`, the cap and the seed (from the setups, no search) | [tactics review](#reuse_prev-nothing-left-to-save) | measured; removed | of 2..1300 it accepts 670 games, every one settled anyway (545 repeats, 115 caps at once, 10 searches of at most 1.6 s): 3.8 s of the chain's 1052 s of search, 0.5 s of 813 s in 1232..1300; no score or move differs |
 | What `revise_freedoms` changes in the proofs at the frontier | [tactics review](#revise_freedoms-the-same-trees) | measured; removed | it changes the problem of every searched game of 1232..1300 (frame 0's freedoms down 4 to 6, `max_total` 0 to 5), yet the proofs of 1215, 1225, 1240, 1254, 1272, 1287 and 1300 have the same trees, node for node |
 | `preclusions`, `match_bound=off`, `legacy_bound` and the branchings other than `conflict-strong`, again with the Lagrangian bound | [tactics review](#the-alternatives-that-are-off) | measured; removed | the proof of 1215 on one thread: `preclusions` +80% cycles and 4.5 s for its table, `conflict-largest` ×6.3, `largest`, `conflict-smallest` and `match_bound=off` unfinished at 180 s (more than ×17); `legacy_bound` acts only without the matching bound |
@@ -202,33 +202,33 @@ those of the page the row points to; a game is named by its board size, and time
 
 ### Theory and evidence
 
-The model-free work of [evidence](../evidence/README.md) and the proofs of [THEORY.md](../../heuristics/THEORY.md).
+The model-free work of [evidence](../prover/README.md) and the proofs of [THEORY.md](../../heuristics/THEORY.md).
 
 | tried | details | outcome | what decided it |
 |---|---|---|---|
 | Validate the frame model's assumptions against exhaustive search | [DESIGN 2](../DESIGN.md#what-optimal-means) | kept | `brute` agrees with the frame model to n = 40 in the tests (52 in `sacrifice validate`) and `certify.py` to 62; the model-free proofs below extend it to 989 |
-| A model-free exact search for opt(n): matching bound, branching on minimal unplayable sets, incremental dual repair, forced picks, the conflict-packing cut, nogoods | [evidence 3](../evidence/README.md#3-model-free-exact-cross-check-of-optn) | kept | proves optimal.json's score for every n ≤ 989 and 999-1019 in 10.0 CPU hours; the incremental repair made it 160 times faster than solving each node from scratch |
-| A Lagrangian bound over the nogoods in the model-free search | [evidence 3](../evidence/README.md#3-model-free-exact-cross-check-of-optn) | kept | 3.3 times fewer nodes at n = 793 |
-| Cap the upper half at W(U\*) through a Lagrangian in the model-free search | [evidence 8](../evidence/README.md#8-what-remains-open) | not kept | gains only 4% |
+| A model-free exact search for opt(n): matching bound, branching on minimal unplayable sets, incremental dual repair, forced picks, the conflict-packing cut, nogoods | [evidence 3](../prover/README.md#3-model-free-exact-cross-check-of-optn) | kept | proves optimal.json's score for every n ≤ 989 and 999-1019 in 10.0 CPU hours; the incremental repair made it 160 times faster than solving each node from scratch |
+| A Lagrangian bound over the nogoods in the model-free search | [evidence 3](../prover/README.md#3-model-free-exact-cross-check-of-optn) | kept | 3.3 times fewer nodes at n = 793 |
+| Cap the upper half at W(U\*) through a Lagrangian in the model-free search | [evidence 8](../prover/README.md#8-what-remains-open) | not kept | gains only 4% |
 | The model-free search past 989: games 990, 992, 993, 995, 996 and from 1020 | [parity bound](#the-parity-bound-in-the-model-free-proofs-2026-10) | kept: done with the parity bound | with the matching bound each needed tens of millions of nodes (its gap about 1,170 at n = 1000); the parity bound finished the saved searches in 4,000-215,000 more nodes each and proved every game to 1300 |
-| The span certificate (♦) for the upper-half conjecture (★) | [evidence 2](../evidence/README.md#2-conjecture--at-scale) | kept | holds for every n = 2..100,000 (602,777,907 rejections) and 902 sampled games to 2,000,000, 0 violations |
-| The threshold-by-threshold check of (★) by the cheapest sufficient bound | [evidence 2](../evidence/README.md#2-conjecture--at-scale) | kept | n = 2..20,000: 24,058,430 thresholds, none needing search (matching bound 86.2%, Lorea 8.3%, GF(2) rank 4.3%, one exclusion 1.2%) |
-| Exact maximum-cardinality searches over the residual (`maxcard`, `plus1`) | [evidence 2](../evidence/README.md#2-conjecture--at-scale) | superseded by the bounds, kept as the fallback | n = 9170 reached only its first 16 thresholds (P = 127, g = 13); the rank bound certifies it in milliseconds |
-| The earlier (★) campaign: exact searches over the residual components | [evidence 1](../evidence/README.md#1-what-existed-before) | superseded by (♦) | 3,231 of 3,236 components, n ≤ 1500 and samples to 4000, plus 2873 and 9170; five undecided (3103, 3872, 3936, 4000, 9170), all settled by the rank bound; its scripts were never committed |
-| An adversarial search over Taxman-shaped synthetic instances | [evidence 4](../evidence/README.md#4-adversarial-search-what-protects-greedy) | measured | what protects greedy is the window law taken for the real ranking of the primes: 0 failures in 1,981 such instances, against 16-57% for uniformly random orders and for the window law with a random ranking of the primes |
-| Enumerate every optimal set of every game, model-free; the theorems on uniqueness (Theorems 8 and 9) | [evidence 5](../evidence/README.md#5-is-the-optimal-set-unique) | kept | unique for every n ≤ 424; 30 of the 954 games completely enumerated, all in 425-779, have two or three, every one with upper part U\* |
-| Does every optimal game have upper part U\*? | [evidence 8](../evidence/README.md#8-what-remains-open) | open | true of every game enumerated; Theorem 8 settles the upper half alone |
-| Prove (♦), or (★), in general | [evidence 8](../evidence/README.md#8-what-remains-open) | open | certified game by game only; the sharpest form is (♦) for multiplicatively generated instances under any order obeying the window law |
+| The span certificate (♦) for the upper-half conjecture (★) | [evidence 2](../prover/README.md#2-conjecture--at-scale) | kept | holds for every n = 2..100,000 (602,777,907 rejections) and 902 sampled games to 2,000,000, 0 violations |
+| The threshold-by-threshold check of (★) by the cheapest sufficient bound | [evidence 2](../prover/README.md#2-conjecture--at-scale) | kept | n = 2..20,000: 24,058,430 thresholds, none needing search (matching bound 86.2%, Lorea 8.3%, GF(2) rank 4.3%, one exclusion 1.2%) |
+| Exact maximum-cardinality searches over the residual (`maxcard`, `plus1`) | [evidence 2](../prover/README.md#2-conjecture--at-scale) | superseded by the bounds, kept as the fallback | n = 9170 reached only its first 16 thresholds (P = 127, g = 13); the rank bound certifies it in milliseconds |
+| The earlier (★) campaign: exact searches over the residual components | [evidence 1](../prover/README.md#1-what-existed-before) | superseded by (♦) | 3,231 of 3,236 components, n ≤ 1500 and samples to 4000, plus 2873 and 9170; five undecided (3103, 3872, 3936, 4000, 9170), all settled by the rank bound; its scripts were never committed |
+| An adversarial search over Taxman-shaped synthetic instances | [evidence 4](../prover/README.md#4-adversarial-search-what-protects-greedy) | measured | what protects greedy is the window law taken for the real ranking of the primes: 0 failures in 1,981 such instances, against 16-57% for uniformly random orders and for the window law with a random ranking of the primes |
+| Enumerate every optimal set of every game, model-free; the theorems on uniqueness (Theorems 8 and 9) | [evidence 5](../prover/README.md#5-is-the-optimal-set-unique) | kept | unique for every n ≤ 424; 30 of the 954 games completely enumerated, all in 425-779, have two or three, every one with upper part U\* |
+| Does every optimal game have upper part U\*? | [evidence 8](../prover/README.md#8-what-remains-open) | open | true of every game enumerated; Theorem 8 settles the upper half alone |
+| Prove (♦), or (★), in general | [evidence 8](../prover/README.md#8-what-remains-open) | open | certified game by game only; the sharpest form is (♦) for multiplicatively generated instances under any order obeying the window law |
 | The exchange property (a matroid) for playable sets, to justify greedy | [THEORY: where exchange breaks](../../heuristics/THEORY.md#where-exchange-breaks) | not kept: false | n = 2873 has two maximal playable sets of different sizes; greedy survives because the stuck one is the light one |
 | The single-sacrifice repair behind the frontier argument | [THEORY: the frontier argument](../../heuristics/THEORY.md#the-frontier-argument-and-exactly-where-it-stops) | not kept: false in general | at n = 9170 two minimal cores through d share nothing below it, so no single below-d sacrifice repairs |
-| A matroid relaxation that is exact for the whole game | [evidence 5](../evidence/README.md#5-is-the-optimal-set-unique) | not kept: false | game 425 has two optimal sets, and a matroid with distinct positive weights has one heaviest independent set |
+| A matroid relaxation that is exact for the whole game | [evidence 5](../prover/README.md#5-is-the-optimal-set-unique) | not kept: false | game 425 has two optimal sets, and a matroid with distinct positive weights has one heaviest independent set |
 | A model-free bound on opt(n): every playable set of the board is independent in two linear matroids over GF(2) (split by the parity of Ω, with the unit vectors of the members), so their heaviest common independent set bounds opt(n) (`matroid whole`) | [matroid 6](#matroid-intersection-bounds-2026-10) | measured; kept in the evidence crate (next row) | gap 0-3 on average to 300, 15-90 to 900, 108-167 by band to 1300 (exact at 194 games), a tenth of the model-free matching bound's; equals the frame model's GF(2) bound plus `in_the_bag` at all 361 roots of 880-1300; 0.5 s at 1300 |
 | The parity bound in the evidence crate's model-free search: reimplemented from its mathematics, proven as THEORY.md's Theorem 10, every value certified by a weight split (`evidence/src/parity.rs`) | [parity bound](#the-parity-bound-in-the-model-free-proofs-2026-10) | kept | every game 2..1300 proven model-free (twice); 990 in 44,389 nodes from scratch where the matching bound had spent 70 million; the root value equals the study's at all 1,088 games it measured; 22 ms a root solve at 990, 43 ms at 1300 |
 | Warm starts of the parity bound from the parent node's certificate, improving cycles through the root found by Dijkstra on the inherited potentials | [parity bound](#the-parity-bound-in-the-model-free-proofs-2026-10) | superseded by the next row | 36% fell back to a solve from scratch at 990 (the parent's set minus a barred member is not the heaviest of its size, so an exchange can break the potentials); 108 s against 122 s cold |
 | The same with label-correcting searches (rescans allowed, at most 20 a vertex on average) | [parity bound](#the-parity-bound-in-the-model-free-proofs-2026-10) | kept | 2-12% fall back; the same trees twice as fast (990: 61 s against 122 s; 1250: 4.6 s against 13.6 s) |
 | The Lagrangian bound over the nogoods beside the parity bound | [parity bound](#the-parity-bound-in-the-model-free-proofs-2026-10) | not kept | cut nothing at 990: the same 44,411 nodes, 7% slower |
 | Resuming the matching bound's open searches with the parity bound, against starting afresh | [parity bound](#the-parity-bound-in-the-model-free-proofs-2026-10) | measured | both finish; resuming costs more (990: 89,639 more nodes against 44,389 from scratch; 992: 214,329 against 66,892) |
-| Does an optimal game play the most moves, M(n)?  (The wiki's open question; in its whole-game form, the conjecture behind `revise_freedoms`.)  M(n) model-free from the matching number ν(n) and a unit-weight search, against the optimal game's moves, n = 2..1300 | [evidence 6](../evidence/README.md#6-does-an-optimal-game-play-the-most-moves); [THEORY: longest games](../../heuristics/THEORY.md#longest-games) | not kept: false | at n = 833, 834 and 835 every optimal game is one move short of the longest (the heaviest 363-move game of 833 scores 29 less); every other game to 1300 is a longest game, 1,293 by ν(n) alone; pruning branches that cannot reach M(n) moves would be unsound |
+| Does an optimal game play the most moves, M(n)?  (The wiki's open question; in its whole-game form, the conjecture behind `revise_freedoms`.)  M(n) model-free from the matching number ν(n) and a unit-weight search, against the optimal game's moves, n = 2..1300 | [evidence 6](../prover/README.md#6-does-an-optimal-game-play-the-most-moves); [THEORY: longest games](../../heuristics/THEORY.md#longest-games) | not kept: false | at n = 833, 834 and 835 every optimal game is one move short of the longest (the heaviest 363-move game of 833 scores 29 less); every other game to 1300 is a longest game, 1,293 by ν(n) alone; pruning branches that cannot reach M(n) moves would be unsound |
 | Predict the cost of `exact` on 1301-2175 from the root's parity gap (tenfold nodes per 84 to 130 points of it, as over 900-1300) | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | not kept: wrong by 10 to 1000 times | gap 364 took 18 thousand nodes (1576), gap 401 63 thousand (1501), gap 315 300 thousand (1326); the slope from gap 310 to the 767 of 2170-2173 said 90 to 900 thread-hours for one game and 1,000 to 5,000 for the campaign |
 | Predict it from the nodes of the solver's own search of the game (`strict.jsonl`), times a ratio fitted on finished games | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | kept: the order of `evidence.sh` and the estimate (about 140 thread-hours) | 34 games finished: 0.13 to 13 times the solver's nodes, the ratio growing tenfold per 1000 in n (geometric mean 0.9 at 1300-1400, 7 at 1975-2103), sd 0.28 decades; the first fit on 1302-1576 alone said 61 thread-hours, low by 2.3 times |
 | Thread scaling of `exact` (one game per thread) | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | measured | the same 275,105 nodes at 1, 2, 4 and 8 threads, user time a node 2.19 to 2.46 ms (+12%), the 8-thread wall time the longest game's (151 s of 606) |
@@ -1206,7 +1206,7 @@ game at the ceiling) and `same_search` (the rest) now prove.
 
 ### `revise_freedoms`: the same trees
 
-Its premise is false for the whole frame game ([n = 833](../evidence/README.md#6-does-an-optimal-game-play-the-most-moves),
+Its premise is false for the whole frame game ([n = 833](../prover/README.md#6-does-an-optimal-game-play-the-most-moves),
 `tests/soundness.rs`), and the owner decided to remove it; measuring stopped there.  Measured before that: in every
 one of the 60 searched or repeated games of 1232..1300 it searches the two-frame game (282 to 2,238 nodes, 16 to 27 ms,
 1.2 s for the 60) and lowers frame 0's freedoms by 4 to 6 and `max_total` by 0 to 5, so every problem changes; yet
@@ -2020,7 +2020,7 @@ with three or more live factors, over as many factors as movers or a few more.
 | 1201-1300 | 85 | 167.0 | 176 | 282 | 0 | 545 |
 
 The model-free matching bound's gap is 140-430 around 500-700 and 650-1,200 from 800 on
-([evidence 3](../evidence/README.md#3-model-free-exact-cross-check-of-optn)); this one's is a tenth of that, from the
+([evidence 3](../prover/README.md#3-model-free-exact-cross-check-of-optn)); this one's is a tenth of that, from the
 reference algorithm in half a second at 1300.  That the two constructions agree at every root of 880-1300 checks
 each against the other.
 
@@ -2780,7 +2780,7 @@ runs of nearby searched games that hold a fifth of the proof nodes of 880-1300.
 
 ## The parity bound in the model-free proofs (2026-10)
 
-*Question.*  The model-free proofs of opt(n) ([evidence 3](../evidence/README.md#3-model-free-exact-cross-check-of-optn))
+*Question.*  The model-free proofs of opt(n) ([evidence 3](../prover/README.md#3-model-free-exact-cross-check-of-optn))
 stopped at 989 (and 999-1019): the matching bound overrates the optimum by about 1,170 at n = 1000, and games 990,
 992, 993, 995, 996, 1020 and 1023-1027 had spent millions to tens of millions of nodes each without finishing.  The
 [matroid study](#matroid-intersection-bounds-2026-10) found a model-free bound with a tenth of that gap: every playable
@@ -2835,7 +2835,7 @@ games against one below its optimum: every one finds a set worth exactly V(n), w
 n, log10 nodes grows 0.16 ± 0.04 and log10 seconds 0.23 ± 0.04 per 100 (R² 0.06 and 0.11, the gap's swings between
 bands dominating), about 1.6 ms a node.  The trees are the size of the study's frame-model branch and bound with the
 same bound (992: 66,892 nodes from scratch against its 77,567).  The band table and the extrapolation are in
-[evidence 3](../evidence/README.md#3-model-free-exact-cross-check-of-optn): at that slope 1300–2000 would take about
+[evidence 3](../prover/README.md#3-model-free-exact-cross-check-of-optn): at that slope 1300–2000 would take about
 57 thread-hours, the hardest single proofs about 3 hours; the recorded optima, not the search, stop the proofs at 1300.
 
 **4. Warm starts: kept, after one failed form.**  A child starts from its parent's certified set and split.  The split
@@ -3487,7 +3487,7 @@ describes the present file.
 
 ## The model-free proofs of 1301-2175: cost and the cloud run (2026-10)
 
-*Question.*  The committed chain now reaches 2175, and the model-free proofs of [evidence 3](../evidence/README.md#3-model-free-exact-cross-check-of-optn)
+*Question.*  The committed chain now reaches 2175, and the model-free proofs of [evidence 3](../prover/README.md#3-model-free-exact-cross-check-of-optn)
 stop at 1300 (the entry above says the check of 1301..2175 is pending).  What does it cost, can `exact` use the many
 cores of a cloud machine, and how should it be run?  Measured on the M1 Max (10 cores, other jobs running throughout),
 with `exact` as it is: no proving code was changed.

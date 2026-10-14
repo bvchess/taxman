@@ -6,10 +6,10 @@
 
 use std::path::PathBuf;
 use std::time::Instant;
-use taxman_evidence::game::{relation, Board, Prover, Verdict};
-use taxman_evidence::jsonl::recorded_games;
-use taxman_evidence::moves::play_order;
-use taxman_evidence::primes::smallest_prime_factors;
+use taxman_prover::game::{relation, Board, Prover, Verdict};
+use taxman_prover::jsonl::recorded_games;
+use taxman_prover::moves::play_order;
+use taxman_prover::primes::smallest_prime_factors;
 
 fn main() {
     let args: Vec<u32> = std::env::args().skip(1).map(|a| a.parse().unwrap()).collect();

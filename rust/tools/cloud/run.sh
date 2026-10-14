@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# What the long-run scripts (chain.sh, evidence.sh) share: one run at a time, a log, a pid file, a deadline, periodic
+# What the long-run scripts (chain.sh, prover.sh) share: one run at a time, a log, a pid file, a deadline, periodic
 # copies to S3, a clean stop on a signal, and an optional power-off.  Source it after env.sh; do not run it.
 #
 #   run_begin NAME DIR...        NAME is the run's name (chain, evidence); DIR... are directories that must survive
@@ -24,7 +24,7 @@
 #                    600) and when the script ends; see save.sh
 #
 # SIGTERM and SIGINT are forwarded, once, to the command: the solver of chain.sh writes a final checkpoint and exits
-# (a second stop signal would make it exit at once, without one), and exact of evidence.sh has no handler, so the
+# (a second stop signal would make it exit at once, without one), and exact of prover.sh has no handler, so the
 # games in its pass are lost back to their last checkpoint.
 
 : "${POWEROFF:=never}"

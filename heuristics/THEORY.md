@@ -449,7 +449,7 @@ never rejected because of one.  Checking (♦) is greedy itself plus
 Gaussian elimination, a few seconds per game at n = 500,000, and it
 held in every game checked (Evidence, below).  The open problem
 becomes: **prove (♦)**.  The adversarial experiments in
-`rust/evidence` locate what it needs: it holds under every order of
+`rust/prover` locate what it needs: it holds under every order of
 the real incidence structure that obeys the window law, even
 adversarially chosen ones, and under the window law reversed, but
 fails as often as a uniformly random order under the window law for a
@@ -568,7 +568,7 @@ positive weights allow only one (Theorem 8's layer-cake argument,
 for any matroid).  The certificate that settles the upper half has
 no analogue that is exact for the whole game.
 
-What is measured (`rust/evidence`, "Is the optimal set unique?"):
+What is measured (`rust/prover`, "Is the optimal set unique?"):
 every optimal set is enumerated, model-free, in 954 of the games
 2..989 (the other 34, the most expensive, with the upper half fixed).
 The optimal set is unique in every game n ≤ 424; 30 games between 425
@@ -627,9 +627,9 @@ for five lighter ones:
     heaviest longest game:   {116, 180, 200, 320, 351}    sum 1,167
 
 *Proof (computational, model-free).*  opt(833) = 218,226, and the
-optimal set is unique, with 362 members (`rust/evidence`, sections 3
+optimal set is unique, with 362 members (`rust/prover`, sections 3
 and 5).  The longer set replays by the rules, and ν(833) = 363, so
-M(833) = 363.  The branch and bound of `rust/evidence`, weighting the
+M(833) = 363.  The branch and bound of `rust/prover`, weighting the
 pick of c by K + c with K above every sum, proves that no playable
 set of 363 members sums to more than 218,197.  ∎
 
@@ -650,7 +650,7 @@ game of 833 (`rust/tests/soundness.rs`).  `revise_freedoms` applies it
 only to the two-frame game of frames 0 and 1, where it stays
 unproven.
 
-What is measured (`rust/evidence`, "Does an optimal game play the
+What is measured (`rust/prover`, "Does an optimal game play the
 most moves?"): to n = 1300 the recorded optimal game is a longest
 game in every game but 833, 834 and 835, where it is one move short.
 In 1,293 of the 1,299 games its moves meet ν(n), the certificate
@@ -1079,7 +1079,7 @@ alternating cycles, both through 30, so never disjoint: three sets
 
 The bound is exact longer than the proof reaches.  It equals opt(n)
 for every n ≤ 77 and first exceeds it at 78, with 1,992 against 1,991
-(`rust/evidence/data/exact_parity_2_1300.jsonl`).  So odd cores exist
+(`rust/prover/data/exact_parity_2_1300.jsonl`).  So odd cores exist
 from 45 on, and none weighs in before 78.
 
 ### The hardness
@@ -1170,7 +1170,7 @@ components verified or certified) had left five components undecided,
 n = 3103, 3872, 3936, 4000 and 9170; the rank bound settles all five,
 n=9170's (residual jam of 304 members, greedy's 37 exclusions, the
 matching bound proving only 19) in milliseconds.  Data, programs and
-the adversarial experiments: `rust/evidence/README.md`.
+the adversarial experiments: `rust/prover/README.md`.
 
 | Claim | Evidence | Status |
 | --- | --- | --- |
@@ -1182,12 +1182,12 @@ the adversarial experiments: `rust/evidence/README.md`.
 | U\* is the unique heaviest playable upper set, every playable upper set termwise below it | follows from (★); brute force (`certify.py`) to 62 | proven given (★) (Thm 8), so certified per game to 100,000 |
 | Optimal sets of n from those of n−1 (chain: T ∪ {n}; prime: T − p + n, a bijection); every optimal set holds the largest prime and no other | derivation = direct enumeration on every chain and prime game to 700 | proven (Thm 9, lemma) |
 | The optimal set is unique | all optimal sets enumerated model-free: every n ≤ 424; two at 425 | measured; false in general |
-| Every optimal game's upper part is U\*; a game's optimal sets have equal sizes and differ by equal-sum exchanges below n/2 | every completely enumerated game (`rust/evidence`, section 5) | measured; open |
+| Every optimal game's upper part is U\*; a game's optimal sets have equal sizes and differ by equal-sum exchanges below n/2 | every completely enumerated game (`rust/prover`, section 5) | measured; open |
 | M(n) ≤ ν(n); M(n−1) ≤ M(n) ≤ M(n−1) + 1, with equality on the left at a prime n | brute force to 22 | proven (Lemma, "Longest games") |
 | Playable sets, with each pick's own coordinate taken out, are GF(2)-independent; the parity matroids bound opt(n) | every playable set independent in both matroids on every board to 18 (enumerated); the bound at least opt(n), and the recorded game independent in both, at every n ≤ 1300; the certified intersection equal to enumeration on 3,000 random pairs of matroids | proven (Thm 10) |
 | Promotable sets of the frame model are independent in the even and the odd frames' GF(2) matroids, whose heaviest common independent set bounds the best promotion set, at every node in their contractions | every promotable set of every board with ≤ 22 candidates independent; the bound at least the best promotion set at every n ≤ 1300; never below the best completion at the 600 nodes of the solver's probe; the solver's chain 1..2175 with it reproduces every score to 1300 (optimal.json's, made without it) | proven (Thm 11) |
-| opt(n) equals the recorded score: the frame model's answer is the true optimum | model-free exact searches (playability theorems, the matching and parity bounds, the chain and prime relations; `rust/evidence`, section 3): every n = 2..1300, the committed chain to there (1301..2175 pending) | verified (exact, model-free) to 1300 |
-| An optimal game has the most moves, M(n) | one move short at n = 833, 834 and 835, model-free; a longest game for every other n ≤ 1300, 1,293 of them by the matching certificate (`rust/evidence`, section 6) | **false** (n = 833); the gap is at most one to 1300, open beyond |
+| opt(n) equals the recorded score: the frame model's answer is the true optimum | model-free exact searches (playability theorems, the matching and parity bounds, the chain and prime relations; `rust/prover`, section 3): every n = 2..1300, the committed chain to there (1301..2175 pending) | verified (exact, model-free) to 1300 |
+| An optimal game has the most moves, M(n) | one move short at n = 833, 834 and 835, model-free; a longest game for every other n ≤ 1300, 1,293 of them by the matching certificate (`rust/prover`, section 6) | **false** (n = 833); the gap is at most one to 1300, open beyond |
 | (★) on rejection-bearing components | every threshold of every game n = 2..20,000 certified by bounds; the earlier 5 undecided settled | certified per game; open in general |
 | (♦) and (★) under orders obeying the window law, adversarial or random, or its reverse | 1,981 instances, n = 2000..20,000, 0 failures (uniformly random orders: 16–50% fail; window law for a random prime ranking: 26–57%) | measured |
 | n=2873 component: greedy's 6 exclusions minimal | 12.4M playability checks over the 70-member residual | verified |

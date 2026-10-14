@@ -7,7 +7,7 @@ What the solver is and how to read its output is in [../../README.md](../../READ
 
 **Status of this procedure.**  The scripts were exercised on macOS (arm64): `chain.sh` through a complete chain, a
 SIGTERM stop, forced interruptions and resumes, a crash loop and a deadline; `scaling.sh` in all three modes (a sweep,
-`--engine`, `--pauses`); `setup.sh` through its build and checks; `verify.sh`.  `evidence.sh` (section 9) ran on macOS
+`--engine`, `--pauses`); `setup.sh` through its build and checks; `verify.sh`.  `prover.sh` (section 9) ran on macOS
 and in the Docker image (Linux, arm64) over a range, with a SIGTERM stop and a resume; `chain.sh` also ran in the image
 after the `run.sh` split.  Nothing has been run on Amazon Linux, Ubuntu or EC2; `save.sh` and `spot-watch.sh` need S3
 and EC2 and have not been run at all.  Sections 2 and 3 exist to find the problems that a macOS run cannot, on a
@@ -48,12 +48,12 @@ The files in this directory:
 | `chain.sh N` | the production run: the chain 1..N in a loop, resumable, logged, optional deadline and power-off |
 | `verify.sh [FILE...]` | both referees on a results file, and against the committed results |
 | `save.sh` | copy results, logs and checkpoints to S3 (`--restore` on a fresh machine) |
-| `evidence.sh A B` | the model-free proofs of opt(n) for n = A..B (section 9): resumable passes, all cores; `--verify` checks the output |
-| `spot-watch.sh` | on a spot interruption notice: stop `chain.sh` or `evidence.sh` and save |
+| `prover.sh A B` | the model-free proofs of opt(n) for n = A..B (section 9): resumable passes, all cores; `--verify` checks the output |
+| `spot-watch.sh` | on a spot interruption notice: stop `chain.sh` or `prover.sh` and save |
 | `Dockerfile`, `Dockerfile.dockerignore` | a Linux build-and-test image (section 2) |
 
 All state lives in one directory, `$TAXMAN_WORK` (default `~/taxman-work`): `results/strict.jsonl` (and
-`exact_parity_A_B.jsonl` of `evidence.sh`), `ckpt/` (the checkpoints, `taxman.lock`), `logs/`, `chain.pid`
+`exact_parity_A_B.jsonl` of `prover.sh`), `ckpt/` (the checkpoints, `taxman.lock`), `logs/`, `chain.pid`
 (`evidence.pid`), `deadline`.  Nothing is written inside the checkout except
 `rust/target` (and `rust/bench/history.jsonl` if you run `taxman bench` without `--history`).
 
@@ -516,9 +516,9 @@ with.
 
 ## 9. The model-free proofs of opt(n), 1301 to 2175
 
-The committed chain (`results/strict.jsonl`) reaches 2175, and the independent checker in `rust/evidence` has proven
-opt(n) = V(n) without the frame model only to 1300 ([evidence README, section 3](../../evidence/README.md#3-model-free-exact-cross-check-of-optn)).
-`evidence.sh` runs the same checker, `exact`, over 1301..2175 on a cloud machine.  It is a small job next to the
+The committed chain (`results/strict.jsonl`) reaches 2175, and the independent checker in `rust/prover` has proven
+opt(n) = V(n) without the frame model only to 1300 ([evidence README, section 3](../../prover/README.md#3-model-free-exact-cross-check-of-optn)).
+`prover.sh` runs the same checker, `exact`, over 1301..2175 on a cloud machine.  It is a small job next to the
 chain: about 140 thread-hours (100 to 250), half a day on 16 vCPUs, for a few dollars.  The estimate rests on
 measurements on a laptop and on the committed data of the 1..1300 proofs, not on a Graviton core; a separate calibration
 (`rust/bench/cloud/`, when it exists) measures the prover and the solver per core on Graviton3, 4 and 5 spot instances, and
@@ -536,7 +536,7 @@ its figures replace the milliseconds per node and the factor of 1.0 to 1.6 below
 * **Passes, not a signal.**  A search that is still going when `--seconds` run out pauses: its open subtrees and learned
   conflicts go to `ckpt/exact_N.ckpt`, and a rerun resumes it (the tree is the same: node counts are identical to an
   uninterrupted run).  Checkpoints are written only then, and `exact` has no signal handler, so a kill or a SIGTERM
-  loses the searches of the pass in progress back to their last checkpoint.  `evidence.sh` therefore runs `exact` in
+  loses the searches of the pass in progress back to their last checkpoint.  `prover.sh` therefore runs `exact` in
   passes of `PASS_SECONDS` (default 300) and starts it again until every game has a line: an interruption costs at
   most one pass of the games in flight (the restart of a pass costs about a second).
 * **Order.**  The games are given dearest first, by the nodes the solver's search of each took in the committed chain
@@ -544,7 +544,7 @@ its figures replace the milliseconds per node and the factor of 1.0 to 1.6 below
   at once instead of last.  The order is made once and kept in `$TAXMAN_WORK/evidence-order_A_B.txt`.
 * **The tail.**  The last games run alone, so at the end most of a big machine idles; the log says so
   ("N games are left for T threads").  This is why more than 16 to 32 vCPUs buys nothing (section 9.2).  If the tail
-  matters to you, stop (Ctrl-C), start a smaller instance, restore (`save.sh --restore`) and run `evidence.sh A B` again
+  matters to you, stop (Ctrl-C), start a smaller instance, restore (`save.sh --restore`) and run `prover.sh A B` again
   there: `THREADS` may differ between runs.
 * **What would make `exact` use many cores on one game** is not needed here: its open units are independent subtrees
   (`Prover::run_units` takes a list), so a `--shard i/K` that gives a process every K-th unit of a game's checkpoint
@@ -643,7 +643,7 @@ aws ec2 run-instances --profile bvc --region us-east-1 --instance-type c8g.4xlar
     --image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64 \
     --key-name YOUR-KEY --security-group-ids sg-YOURS \
     --block-device-mappings 'DeviceName=/dev/xvda,Ebs={VolumeSize=20,VolumeType=gp3}' \
-    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=taxman-evidence},{Key=owner,Value=bvc}]' \
+    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=taxman-prover},{Key=owner,Value=bvc}]' \
     --instance-market-options 'MarketType=spot'            # leave this line out for on demand
 ```
 
@@ -652,13 +652,13 @@ On the instance (a copy of the repository with these scripts: a pushed branch or
 ```
 sudo dnf install -y git tmux
 git clone https://github.com/bvchess/taxman.git && cd taxman           # BRANCH=... for another branch
-EVIDENCE_ONLY=1 rust/tools/cloud/setup.sh                              # a few minutes: the evidence crate, its checks
+PROVER_ONLY=1 rust/tools/cloud/setup.sh                              # a few minutes: the evidence crate, its checks
 tmux new -s ev
-DEADLINE_HOURS=48 POWEROFF=always S3_DEST=s3://YOUR-BUCKET/evidence1 rust/tools/cloud/evidence.sh 1301 2175
+DEADLINE_HOURS=48 POWEROFF=always S3_DEST=s3://YOUR-BUCKET/evidence1 rust/tools/cloud/prover.sh 1301 2175
 ```
 
 `S3_DEST` needs an instance role that may write that prefix.  On spot it is not optional with `POWEROFF`: a spot
-instance is terminated when it shuts down, and its root volume with it, so `evidence.sh` copies the results to S3 first.
+instance is terminated when it shuts down, and its root volume with it, so `prover.sh` copies the results to S3 first.
 On demand, leave it out if you will pull the files yourself (below) and use `POWEROFF=done` or none.
 `POWEROFF=always` shuts the machine down whenever the script ends (all 875 games and the check, the deadline, an error:
 an idle machine costs as much as a busy one; `POWEROFF=done` only when the range is complete), and `DEADLINE_HOURS`
@@ -670,11 +670,11 @@ the check, in a work directory of its own.  It replaces a dry run on a laptop.
 
 ```
 export TAXMAN_WORK=~/rehearsal THREADS=2 PASS_SECONDS=20
-rust/tools/cloud/evidence.sh 1301 1310 &              # makes the order, then passes of 20 s
+rust/tools/cloud/prover.sh 1301 1310 &              # makes the order, then passes of 20 s
 sleep 40; kill -TERM $(cat ~/rehearsal/evidence.pid)    # a stop in the middle: "ended: stopped", status 143
 wait; ls ~/rehearsal/ckpt                               # exact_N.ckpt: the searches that were paused
-rust/tools/cloud/evidence.sh 1301 1310                  # resumes ("N searches paused"), finishes, runs the check
-OUT=~/rehearsal/results/exact_parity_1301_1310.jsonl rust/tools/cloud/evidence.sh --verify 1301 1311   # must FAIL
+rust/tools/cloud/prover.sh 1301 1310                  # resumes ("N searches paused"), finishes, runs the check
+OUT=~/rehearsal/results/exact_parity_1301_1310.jsonl rust/tools/cloud/prover.sh --verify 1301 1311   # must FAIL
 unset TAXMAN_WORK THREADS PASS_SECONDS; rm -rf ~/rehearsal
 ```
 
@@ -683,7 +683,7 @@ status 0, and the last command must print `without a line: 1311` and `FAILED` (o
 ten games take about 3 minutes of one thread; their node counts are the same whatever the stops).  The `ms/node` of the real cores is
 also here: `secs` over `nodes` of the lines of `~/rehearsal/results/exact_parity_1301_1310.jsonl`.
 
-First minutes of the full run: `evidence.sh` prints the machine, makes the order, and logs `pass 1: 0 of 875 games done`.
+First minutes of the full run: `prover.sh` prints the machine, makes the order, and logs `pass 1: 0 of 875 games done`.
 In `~/taxman-work/logs/evidence.err` the lines `exact: n=... paused after N nodes, U open units` give the nodes a long
 game has done; divide the seconds of a pass by the nodes of one pass for milliseconds per node (the laptop: 2.2 to 2.5).
 
@@ -698,8 +698,8 @@ ls -l ~/taxman-work/ckpt                         # a checkpoint per unfinished s
 
 * **Stop**: Ctrl-C in tmux or `kill -TERM $(cat ~/taxman-work/evidence.pid)`; the searches of the pass in progress go
   back to their last checkpoint.  **Resume**: the same command (`THREADS`, `S3_DEST` may differ).
-* **Spot interruption**: `spot-watch.sh` stops it and saves; on a replacement machine run `EVIDENCE_ONLY=1 setup.sh`, then
-  `S3_DEST=... rust/tools/cloud/save.sh --restore`, then the same `evidence.sh` command.  Without a saved copy, the
+* **Spot interruption**: `spot-watch.sh` stops it and saves; on a replacement machine run `PROVER_ONLY=1 setup.sh`, then
+  `S3_DEST=... rust/tools/cloud/save.sh --restore`, then the same `prover.sh` command.  Without a saved copy, the
   results file and checkpoints are on the root volume, which a spot termination deletes: use `S3_DEST`, or `rsync`
   the work directory home from time to time.
 * **An error stop** (exit status 1): `exact` panicked.  Read the end of `evidence.err`.  A message
@@ -713,27 +713,27 @@ ls -l ~/taxman-work/ckpt                         # a checkpoint per unfinished s
 
 ```
 export AWS_PROFILE=bvc                                                    # after: aws login --profile bvc
-aws s3 cp s3://YOUR-BUCKET/evidence1/results/exact_parity_1301_2175.jsonl rust/evidence/data/     # or, without S3:
-rsync -av ec2-user@HOST:taxman-work/results/exact_parity_1301_2175.jsonl rust/evidence/data/
+aws s3 cp s3://YOUR-BUCKET/evidence1/results/exact_parity_1301_2175.jsonl rust/prover/data/     # or, without S3:
+rsync -av ec2-user@HOST:taxman-work/results/exact_parity_1301_2175.jsonl rust/prover/data/
 rsync -av ec2-user@HOST:taxman-work/logs/ ./evidence-logs/
-OUT=rust/evidence/data/exact_parity_1301_2175.jsonl rust/tools/cloud/evidence.sh --verify 1301 2175
+OUT=rust/prover/data/exact_parity_1301_2175.jsonl rust/tools/cloud/prover.sh --verify 1301 2175
 ```
 
-The check (`summarize.py check 1301 2175`, which `evidence.sh` already ran at the end) passes only if every n in
+The check (`summarize.py check 1301 2175`, which `prover.sh` already ran at the end) passes only if every n in
 2..2175 is proven (a line for each n of 1301..2175, and with `data/exact_parity_2_1300.jsonl` each proven by a bound,
 a search to completion, or the chain or prime relation from a proven predecessor) and every line's score is the
 recorded optimum of `results/strict.jsonl`.  It exits 0 and prints `OK: opt(n) is proven equal to the recorded score
 for every n in 2..2175`; anything else prints which n.  Then, on your machine:
 
 ```
-python3 rust/evidence/tools/summarize.py exact rust/evidence/data/exact_parity_2_1300.jsonl rust/evidence/data/exact_parity_1301_2175.jsonl
-python3 rust/evidence/tools/summarize.py cost rust/evidence/data/exact_parity_1301_2175.jsonl      # the cost table by band
+python3 rust/prover/tools/summarize.py exact rust/prover/data/exact_parity_2_1300.jsonl rust/prover/data/exact_parity_1301_2175.jsonl
+python3 rust/prover/tools/summarize.py cost rust/prover/data/exact_parity_1301_2175.jsonl      # the cost table by band
 ```
 
-Commit `rust/evidence/data/exact_parity_1301_2175.jsonl` (about 200 KB, never overwritten by a later run: `OUT` names
+Commit `rust/prover/data/exact_parity_1301_2175.jsonl` (about 200 KB, never overwritten by a later run: `OUT` names
 another file).  Do not commit the work directory, the checkpoints or the logs.  Then update the three places that say
 the model-free check stops at 1300 or is pending: the table and sections 3 and 8 of
-[../../evidence/README.md](../../evidence/README.md), the "pending" sentence of the entry "The committed chain to
+[../../prover/README.md](../../prover/README.md), the "pending" sentence of the entry "The committed chain to
 2175" and the register row of [../../docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md), with the totals from the two
 commands above and the real milliseconds per node of a Graviton core (this section's table is a prediction).  Terminate the
 instance and delete its volume (section 5, "Cost guardrails").

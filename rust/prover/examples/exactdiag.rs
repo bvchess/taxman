@@ -5,8 +5,8 @@
 //! solves it from scratch at every node (`Prover::parity_cold`).
 
 use std::time::Instant;
-use taxman_evidence::game::{Board, Prover};
-use taxman_evidence::primes::smallest_prime_factors;
+use taxman_prover::game::{Board, Prover};
+use taxman_prover::primes::smallest_prime_factors;
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();

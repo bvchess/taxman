@@ -11,10 +11,10 @@
 
 use std::path::PathBuf;
 use std::time::Instant;
-use taxman_evidence::instance::Instance;
-use taxman_evidence::jsonl::{campaign, parse_items, Obj};
-use taxman_evidence::primes::smallest_prime_factors;
-use taxman_evidence::star::{check, Engine, Method, Report};
+use taxman_prover::instance::Instance;
+use taxman_prover::jsonl::{campaign, parse_items, Obj};
+use taxman_prover::primes::smallest_prime_factors;
+use taxman_prover::star::{check, Engine, Method, Report};
 
 fn line(n: u64, report: &Report, secs: f64) -> String {
     let mut by_method = Obj::new();

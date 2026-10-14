@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # The model-free proofs of opt(n) for a range of board sizes, on all the cores of a machine, resumable.
 #
-#   rust/tools/cloud/evidence.sh A B             prove opt(n) = V(n) for n = A..B  (V: rust/results/strict.jsonl)
-#   rust/tools/cloud/evidence.sh --verify A B    check the output: every n in 2..B proven, every score the recorded one
+#   rust/tools/cloud/prover.sh A B             prove opt(n) = V(n) for n = A..B  (V: rust/results/strict.jsonl)
+#   rust/tools/cloud/prover.sh --verify A B    check the output: every n in 2..B proven, every score the recorded one
 #
-# It runs `exact` of the evidence crate (rust/evidence, README section 3), which knows nothing of the solver's frame
+# It runs `exact` of the evidence crate (rust/prover, README section 3), which knows nothing of the solver's frame
 # model, over the range.  `exact` runs one game per thread (a game's search is one thread), so the games are spread over
 # the cores; it runs for PASS_SECONDS, then pauses every search still going, saving its open subtrees and learned
 # conflicts to a checkpoint ($CKPT/exact_N.ckpt), and this script runs it again, which resumes them.  A game may take
@@ -14,7 +14,7 @@
 # Safe to run again at any time, after a crash, a reboot, a spot interruption or a SIGTERM: finished games are in the
 # output file (one line each, appended and synced), unfinished ones in their checkpoints.  `exact` has no stop handler,
 # so a stop or a kill loses the work of the pass in progress (at most PASS_SECONDS of each thread) and nothing else.
-# THREADS may differ between runs (a smaller machine for the last games).  A second evidence.sh is refused.
+# THREADS may differ between runs (a smaller machine for the last games).  A second prover.sh is refused.
 #
 # What it does with `exact`'s exit status:
 #   0        a pass ended (the pause, or all games done): go on, or finish when every game of the range has its line
@@ -28,7 +28,7 @@
 # When the range is complete it runs the check (`--verify`) and exits 0 only if that passes.
 #
 # Output: $OUT (default $TAXMAN_WORK/results/exact_parity_A_B.jsonl, one line per game, the format of
-# rust/evidence/data/exact_parity_2_1300.jsonl), logs in $LOGS: evidence.log (this script), evidence.err (`exact`).
+# rust/prover/data/exact_parity_2_1300.jsonl), logs in $LOGS: evidence.log (this script), evidence.err (`exact`).
 #
 # Environment (all optional):
 #   THREADS         threads, default every CPU
@@ -49,10 +49,10 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$here/env.sh"
 
 STRICT="${STRICT:-$CRATE/results/strict.jsonl}"
-BASELINE="${BASELINE:-$EVIDENCE/data/exact_parity_2_1300.jsonl}"
-SUMMARIZE=("python3" "$EVIDENCE/tools/summarize.py")
+BASELINE="${BASELINE:-$PROVER/data/exact_parity_2_1300.jsonl}"
+SUMMARIZE=("python3" "$PROVER/tools/summarize.py")
 
-usage() { die "usage: evidence.sh [--verify] A B   (the first and last board size, 2 <= A <= B)"; }
+usage() { die "usage: prover.sh [--verify] A B   (the first and last board size, 2 <= A <= B)"; }
 verify_only=0
 if [ "${1:-}" = "--verify" ]; then
     verify_only=1

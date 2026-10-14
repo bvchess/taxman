@@ -1,6 +1,6 @@
 # A Linux build-and-test environment for the Taxman solver: the dry run before the cloud run.
 #
-# It builds the solver and the examples, the evidence crate (rust/evidence, the model-free prover that evidence.sh runs)
+# It builds the solver and the examples, the evidence crate (rust/prover, the model-free prover that prover.sh runs)
 # and compiles the tests on Linux (Debian), so that a Linux-only problem shows up on your own machine, and it holds the
 # scripts of this directory so that they can be tried too.  On an Apple-silicon Mac the container is linux/arm64, the
 # instruction set of Graviton.  The build context is the repository root, and only the files the build needs are sent
@@ -36,7 +36,7 @@ RUN cargo build --release --bins --examples \
     && cargo test --no-run
 
 # The evidence crate is a workspace of its own.
-WORKDIR /taxman/rust/evidence
+WORKDIR /taxman/rust/prover
 RUN cargo build --release --bins --examples \
     && cargo test --release --no-run
 WORKDIR /taxman/rust

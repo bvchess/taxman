@@ -15,7 +15,7 @@
 #   TAXMAN_DIR      $HOME/taxman    where to clone, when the script is not inside a checkout
 #   NO_PULL=1       leave the checkout as it is (otherwise: git pull --ff-only, if it is clean and on a branch)
 #   SKIP_PACKAGES=1 SKIP_TESTS=1 SKIP_SMOKE=1
-#   EVIDENCE_ONLY=1 build and check only the evidence crate (what evidence.sh runs), not the solver: a few minutes less
+#   PROVER_ONLY=1 build and check only the evidence crate (what prover.sh runs), not the solver: a few minutes less
 #   TAXMAN_WORK     where results, checkpoints and logs live (see env.sh)
 #   RUSTFLAGS       default "-C target-cpu=native" (see env.sh)
 
@@ -136,19 +136,19 @@ mkdir -p "$TAXMAN_WORK/results" "$CKPT" "$LOGS"
 exec > >(tee -a "$LOGS/setup.log") 2>&1
 
 # --- the build ---------------------------------------------------------------------------------------------------
-if [ "${EVIDENCE_ONLY:-0}" != 1 ]; then
+if [ "${PROVER_ONLY:-0}" != 1 ]; then
     say "building (RUSTFLAGS='${RUSTFLAGS:-}'): the solver and the examples (ladder, sacrifice)"
     (cd "$CRATE" && cargo build --release --bins --examples)
     [ -x "$TAXMAN_BIN" ] || fail "the build did not produce $TAXMAN_BIN"
     [ -x "$LADDER_BIN" ] || fail "the build did not produce $LADDER_BIN"
 fi
 say "building the evidence crate (its own workspace): exact, the other tools and their examples"
-(cd "$EVIDENCE" && cargo build --release --bins --examples)
+(cd "$PROVER" && cargo build --release --bins --examples)
 [ -x "$EXACT_BIN" ] || fail "the build did not produce $EXACT_BIN"
 
 # --- checks ------------------------------------------------------------------------------------------------------
 if [ "${SKIP_SMOKE:-0}" != 1 ]; then
-    if [ "${EVIDENCE_ONLY:-0}" != 1 ]; then
+    if [ "${PROVER_ONLY:-0}" != 1 ]; then
         say "smoke: replay optimal.json"
         "$TAXMAN_BIN" verify-optimal
         say "smoke: the committed results files, with the solver's verifier and the independent Python one"
@@ -161,19 +161,19 @@ if [ "${SKIP_SMOKE:-0}" != 1 ]; then
     smoke="$TAXMAN_WORK/smoke-exact"
     rm -rf "$smoke"
     "$EXACT_BIN" --from 2 --to 400 --threads "$(ncpu)" --checkpoints "$smoke/ckpt" --out "$smoke/exact.jsonl"
-    python3 "$EVIDENCE/tools/summarize.py" check 2 400 "$smoke/exact.jsonl"
+    python3 "$PROVER/tools/summarize.py" check 2 400 "$smoke/exact.jsonl"
     rm -rf "$smoke"
 fi
 if [ "${SKIP_TESTS:-0}" != 1 ]; then
     # A handful of test threads (DESIGN.md times the suite with two): many tests start a thread per CPU themselves,
     # and a test thread per CPU on top of that only oversubscribes a large machine.  The ignored large-machine tests
     # are run by hand (RUNBOOK.md).
-    if [ "${EVIDENCE_ONLY:-0}" != 1 ]; then
+    if [ "${PROVER_ONLY:-0}" != 1 ]; then
         say "cargo test -- --test-threads=4"
         (cd "$CRATE" && cargo test -- --test-threads=4)
     fi
     say "cargo test --release -- --test-threads=4, in the evidence crate (about a minute)"
-    (cd "$EVIDENCE" && cargo test --release -- --test-threads=4)
+    (cd "$PROVER" && cargo test --release -- --test-threads=4)
 fi
 
 # --- report ------------------------------------------------------------------------------------------------------
@@ -186,5 +186,5 @@ if [ -x "$CRATE/tools/pgo.sh" ]; then
     echo "note: $CRATE/tools/pgo.sh exists in this checkout; read its header for an optional profile-guided build"
 fi
 echo "evidence:       $EXACT_BIN"
-echo "next:           $CLOUD_DIR/scaling.sh (the solver) or $CLOUD_DIR/evidence.sh A B (the model-free proofs);" \
+echo "next:           $CLOUD_DIR/scaling.sh (the solver) or $CLOUD_DIR/prover.sh A B (the model-free proofs);" \
     "see RUNBOOK.md"

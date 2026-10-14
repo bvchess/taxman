@@ -246,7 +246,7 @@ default, about 3 times fewer cycles on the proofs of 1184-1300 ([EXPERIMENTS.md]
 `λ`, the bound `max_M Σ_{x ∈ Q(M)} (x − Σ_{N ∋ x} λ_N) + Σ_N λ_N (|N − P| − 1)`: a matching with each
 candidate's weight lowered by the multipliers of its nogoods, plus a constant.  A nogood with a member that has left
 the candidates cannot be broken any more and is left out (multiplier 0 at that node).  It is the evidence crate's
-second bound ([evidence/README.md](../evidence/README.md), section 3: 3.3× fewer nodes at n = 793 for its model-free
+second bound ([evidence/README.md](../prover/README.md), section 3: 3.3× fewer nodes at n = 793 for its model-free
 search), brought to the frame solver, and MaxSAT's core-guided bounds in spirit: each nogood is a core, and the
 multipliers say how much each costs.
 

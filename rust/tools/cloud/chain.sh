@@ -33,7 +33,7 @@
 #   EXTRA_ARGS           more flags for `taxman solve`, e.g. "--mem-cap 100000"
 #   MAX_FAILS            default 5
 #   CHAIN_TO             N, if not given as the argument
-#   DEADLINE_HOURS, POWEROFF, S3_DEST, SAVE_EVERY: as in run.sh, which this script and evidence.sh share
+#   DEADLINE_HOURS, POWEROFF, S3_DEST, SAVE_EVERY: as in run.sh, which this script and prover.sh share
 
 set -u
 set -o pipefail

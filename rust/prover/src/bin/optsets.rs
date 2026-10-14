@@ -31,13 +31,13 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Instant;
-use taxman_evidence::game::{
+use taxman_prover::game::{
     derive_optimal_sets, relation, the_prime_of_every_optimal_set, Board, Prover, Relation, Role, Verdict,
 };
-use taxman_evidence::instance::Instance;
-use taxman_evidence::jsonl::{campaign, field_nums, field_str, field_u64, parse_items, recorded_games, Obj};
-use taxman_evidence::peel::{greedy, Peeler};
-use taxman_evidence::primes::smallest_prime_factors;
+use taxman_prover::instance::Instance;
+use taxman_prover::jsonl::{campaign, field_nums, field_str, field_u64, parse_items, recorded_games, Obj};
+use taxman_prover::peel::{greedy, Peeler};
+use taxman_prover::primes::smallest_prime_factors;
 
 /// At most this many sets are written per line (besides the canonical one).
 const WRITTEN: usize = 200;
