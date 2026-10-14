@@ -94,9 +94,10 @@ sources).  A worked example, the board 1..=85, is in the
 * **Within the frame model.**  The decomposition rests on assumptions that are validated, not proven: the greedy
   removal of impossible sources inside hives, the mandatory moves of `unzip`, free factor count = factors − sources,
   closed hives (those with no free factor) taking no part in the search, and a promoted number paying tax only from
-  the frame directly below.  They are validated by agreement with the Java's optimal.json for n ≤ 1000, which a
-  model-free exact search (`evidence/`: the playability theorems, the Franklín–Moniot matching bound, the chain
-  and prime relations, and nothing of hives or frames) confirms for every n ≤ 989, and an independent brute force
+  the frame directly below.  They are validated by agreement with the Java's optimal.json for n ≤ 1000; by a
+  model-free exact search (`evidence/`: the playability theorems, the Franklín–Moniot matching bound, the parity
+  matroids' bound of THEORY.md's Theorem 10, the chain and prime relations, and nothing of hives or frames), which
+  confirms the optimum of every game of the committed chain, n ≤ 1300; by an independent brute force
   (`heuristics/evaluation/certify.py`) for n ≤ 62; and by the Rust exact oracle `brute`, which checks frame-model
   games on small boards (up to 40 in the test suite, 52 in `examples/sacrifice validate`).  The greedy removal of
   impossible sources at the root, where it shapes the search space, is descending greedy on each upper-half

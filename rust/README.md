@@ -86,7 +86,7 @@ from frame 0 (the factor 4) and scores 8.  The search is over such choices: n = 
   ([DESIGN.md, Tactics](DESIGN.md#5-tactics)).  They were validated by agreement with the Java's
   `optimal.json` for n <= 1000, by exhaustive search (`src/brute.rs`, `heuristics/evaluation/certify.py`) for small
   boards (n <= 62), and by a model-free exact search ([`evidence/`](evidence/README.md)) that confirms the optimum
-  for every n <= 989.
+  for every n <= 1300, the whole committed chain.
 * **Given the pruning is exact.**  Every tactic is proven or sound: none prunes a promotion set that could win
   ([DESIGN.md, Tactics](DESIGN.md#5-tactics) grades each).  So a result rests on nothing but the frame model, the
   correctness of the code and, where its proof says so, the game it was built from.

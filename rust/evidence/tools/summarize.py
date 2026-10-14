@@ -110,7 +110,7 @@ def exact(paths):
     if first_gap:
         beyond = [n for n in range(first_gap, max(rows) + 1) if proven.get(n)]
         open_ = [n for n in range(first_gap, max(rows) + 1) if not proven.get(n)]
-        print(f"beyond it, proven: {beyond}; not (yet): {open_}")
+        print(f"beyond it, proven: {compact_ranges(beyond)}; not (yet): {compact_ranges(open_)}")
     searched = [r for r in rows.values() if r["search"] in ("proven", "budget")]
     print(f"searches: {len(searched)}, total {sum(r['secs'] for r in searched) / 3600:.1f} h, "
           f"most nodes {max((r['nodes'], r['n']) for r in searched)}")
