@@ -8,7 +8,7 @@
 #   probe                    the solver's probe (examples/perf.rs), default and GF(2), three times each
 #   ladder [N...]            one-thread proof-only runs (ladder --threads 1 --seed-opt), default 1215 1232 1287 2170 2172
 #   prover [N...]            one-thread runs of the prover (rust/evidence, exact), default 1300 990
-#   contention-solver K...   K copies at once of the proof of $CONTENTION_GAME (default 1287), for each K given
+#   contention-solver K...   K copies at once of the proof of $CONTENTION_GAME (default 1326), for each K given
 #   contention-prover K...   K copies at once of the prover on $CONTENTION_PROVER_GAME (default 990), for each K given
 #   scaling T... [-- N]      the proof-only run of game N (default 2172) at each thread count T
 #   chain MINUTES THREADS    taxman solve 2176-4095 from a copy of results/strict.jsonl for MINUTES minutes
@@ -24,7 +24,7 @@ LADDER="$CRATE/target/release/examples/ladder"
 TAXMAN="$CRATE/target/release/taxman"
 PROVER="$CRATE/evidence/target/release/exact"
 KNOWN="$CRATE/results/strict.jsonl"
-CONTENTION_GAME="${CONTENTION_GAME:-1287}"
+CONTENTION_GAME="${CONTENTION_GAME:-1326}"
 CONTENTION_PROVER_GAME="${CONTENTION_PROVER_GAME:-990}"
 
 phase="$1"
