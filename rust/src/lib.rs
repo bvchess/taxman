@@ -75,8 +75,9 @@
 //! greedy incumbent, the narrowing of the children's candidates and the scratch space of its peels (the module
 //! comment lists them), and `sacrifice` and `brute` are studies; a first read can skip those two and read `bounds`
 //! for that list only.  `examples/` holds the ladder (searches of hard games with time limits and thread counts), the
-//! probe of the hot paths, the sacrifice study, and the list of games whose search repeats an earlier game's;
-//! `tests/` the integration tests.
+//! probe of the hot paths, the sacrifice study, the list of games whose search repeats an earlier game's, and the
+//! slope study (the gaps of a game's root, and proofs with every bound lowered by a margin); `tests/` the
+//! integration tests.
 
 pub mod accelerate;
 pub mod bits;
