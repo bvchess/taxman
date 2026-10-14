@@ -59,7 +59,6 @@ use taxman::game::Optimal;
 use taxman::matchbound::{MatchBound, MatchGraph};
 use taxman::model::{Lookup, Model, Nogoods, Scratch};
 use taxman::search::{search, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
-use taxman::solver::SolveOptions;
 use taxman::tactics::Tactics;
 
 /// The games whose fixtures the probe runs by default.
@@ -565,7 +564,7 @@ fn run() -> Result<(), String> {
             _ => numbers.push(parse(arg)?),
         }
     }
-    let optimal = || SolveOptions::default().known_games(known.as_slice());
+    let optimal = || Optimal::built_in().with_results_files(known.as_slice());
     match (command.as_deref(), &numbers[..]) {
         (Some("make-nodes"), &[n]) => {
             let n = n as u32;

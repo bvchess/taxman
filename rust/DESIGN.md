@@ -457,14 +457,14 @@ comment of `src/solver.rs`.  Each step, with the Java class it reimplements:
 | 2 | prime shortcut: a prime n plays the game of n − 1 with its first move replaced by n (method `prime`) | `FrameSolver.solutionForPrime` |
 | 3 | hives → frames; with no candidates the game with no promotions is the only one (method `trivial`) | `bombus.Apiary`, `Hive`, `frame.FrameBuilder`, `WorkingFrame` |
 | 4 | the search (method `search`): the frame set and greedy incumbent (`search::prepare`); a repeat of an earlier game's search (method `repeat`, tactic `same_search`, section 8); the starting incumbent, cap and seed; the engine; promotions → moves | `search.SearchManager.create`, `Frame`, `FrameSet`, `LowerBoundEstimator.greedy`, `BranchExplorer`; `Apiary(board, promotions).getSolution()` |
-| 5 | `conclude`: replay and check the game, compare with optimal.json, assign its proof and taint | `game.Solution.verify` |
+| 5 | `conclude`: replay and check the game, confirm its score against optimal.json, assign its proof and what it assumes | `game.Solution.verify` |
 | 6 | record the result (a range) | |
 
 Step 2 needs the previous game, and the repeat of step 4 an earlier one; both are skipped by `force_search` and when
 the game has a checkpoint (a search that was interrupted is resumed, never replaced by a derivation).
 
 The previous game is checked before anything uses it: it must replay legally to its recorded score, be over, and open
-with the largest prime.  The results whose proofs rest on it inherit its taint (section 8).
+with the largest prime.  The results whose proofs rest on it assume what it assumes (section 8).
 
 A search that a time or node limit stops gives an incomplete result (`completed` false, `best_so_far` the best game
 so far) and keeps its checkpoint; a range stops there.
@@ -473,13 +473,19 @@ so far) and keeps its checkpoint; a range stops there.
 opened (every game replayed, the chain from n − 1, each line's arithmetic and provenance).  Games completed in it
 are skipped; each result is appended and synced as soon as it is done, and only then is the game's checkpoint deleted
 (a checkpoint left for a game the file has completed is deleted when a range starts).  The n − 1 solution comes
-from, in order: this run, the results file, optimal.json; with none, the game is solved standalone, with no seed and
-no cap.
+from, in order: this run, the results file, and with `use_prev` (`--use-prev`) optimal.json; with none, the game is
+solved standalone, with no seed and no cap.
+
+**optimal.json** is built into the binary (`include_str!`, `game::Optimal::built_in`): the table as it was when the
+crate was compiled, which a rebuild picks up when the file changes.  Every completed game's score is confirmed against
+it, and a score that differs is a hard error naming the game; no option names another table, so a run cannot be
+checked against anything else.  The library takes another table where a test needs one
+(`solver::solve_range_each_with`, `results::read_results`).
 
 ## 8. Results and the trust model
 
-Every completed game records *how its optimality is established* (its proof) and *what that rests on beyond the frame
-model* (its taint); `src/results.rs` has the full rules and the checks.
+Every completed game records *how its optimality is established* (its proof) and *what that assumes beyond the frame
+model* (`assumes`); `src/results.rs` has the full rules and the checks.
 
 | proof | meaning | rests on the game of n − 1? |
 |---|---|---|
@@ -489,25 +495,28 @@ model* (its taint); `src/results.rs` has the full rules and the checks.
 | `prime_formula` | a prime n plays the game of n − 1 with its first move replaced by n (proved at `accelerate::prime_shortcut`) | yes |
 | `same_search` | an earlier game m posed the same search problem and settled it; the game is m's promotions ("Same search", below) | no: on the game m |
 
-The *taint* of a game is what its proof rests on beyond the frame model: if its proof rests on the game of n − 1,
-that game's taint, and so on down the chain (a repeat rests on the game it repeats instead, and takes its taint).  A
-game taken from optimal.json has the taint `optimal.json`, whichever game it is: the file records nothing about where
-a game came from.  An empty taint means: proven within the frame model, given that the solver is right.  A chain from
-n = 1 rests on nothing beyond it.
+What a game *assumes* is what its proof rests on beyond the frame model: if its proof rests on the game of n − 1,
+what that game assumes, and so on down the chain (a repeat rests on the game it repeats instead, and assumes what that
+game assumes).  A game taken from optimal.json (`--use-prev`) is assumed optimal, since the table records nothing
+about how a game was found: a proof that rests on its game of n − 1 assumes "the game of n − 1 in optimal.json is
+optimal".  A game that assumes nothing is proven within the frame model, given that the solver is right.  A chain from
+n = 1 assumes nothing beyond it.  Nothing refuses a game for what it assumes; the line says it, and the verifiers
+count it.
 
 **Checks and referees.**  Every game is replayed by `game::replay_finished` before it counts, with the arithmetic and
 the ceilings `score(n−1) ≤ score(n) ≤ n + score(n−1)`; a game that fails after it was found goes to
 `<results>.rejected.jsonl` and the run fails.  `taxman verify-results` reads results files without changing them and
 runs the same checks plus agreement between files; `tools/check_results.py` is an independent referee in Python that
-re-derives every proof and taint and compares scores with the Franklín–Moniot upper bound and the best-known
-heuristic chain.  Both refuse a line whose fields contradict each other (say a sum at the cap without `reached_cap`),
-since the proof and taint are derived from them.  What no check can catch
-is a game that is legal, finished and within the bounds but not optimal when the game of n − 1 is not optimal either;
-that is what the proof kinds and the taint track, and why a chain from n = 1 matters.
+re-derives every proof and assumption and compares scores with optimal.json, the Franklín–Moniot upper bound and the
+best-known heuristic chain.  Both read results lines of schema 5 only, and refuse a line whose fields contradict each
+other (say a sum at the cap without `reached_cap`), since the proof and the assumptions are derived from them.  What
+no check can catch is a game that is legal, finished and within the bounds but not optimal when the game of n − 1 is
+not optimal either; that is what the proof kinds and the assumptions track, and why a chain from n = 1 matters.
 [results/README.md](results/README.md) says what supports each committed score.
 
-**Result lines** are one JSON object per line (README, "A results line"): the game, its proof and taint, the game of
-n − 1 it was built from (score, source, digest of its moves, proof, taint), node counts and search counters, seconds per
+**Result lines** are one JSON object per line (README, "A results line"): the game, its proof and assumptions, the
+game of n − 1 it was built from (score, source, digest of its moves, proof, assumptions), node counts and search
+counters, seconds per
 phase, the tactics, limits, options and the commit the binary was built from; the digest of the search problem a
 setup poses and a repeat's record of the game it repeats.  A line is never rewritten, and a run locks the results
 file it appends to.
@@ -550,7 +559,7 @@ change how the search runs, not what it finds (section 4).  A results line recor
   And every feasible set T of Π_m is a legal game of m scoring in_the_bag(m) + sum(T): this is the direction of the
   frame model that every search relies on each time it offers an incumbent, and the referee replays every game built
   from one (none has ever failed).  So in_the_bag(m) + P\*(Π_m) ≤ opt(m) ≤ m + opt(m − 1) = m + score(m − 1), given
-  that the game of m − 1 is optimal (which the proof by the cap rests on, and m's taint records), and P\*(Π_m) =
+  that the game of m − 1 is optimal (which the proof by the cap rests on, and m's assumptions record), and P\*(Π_m) =
   cap(m), the sum of m's promotions, whatever tactics shaped the search;
 * `same_search`: by induction, m repeats a game k with Π_k = Π_m whose proof settles P\*(Π_k), and m's promotions are
   k's.
@@ -565,7 +574,7 @@ it goes through `conclude` like any game: it must replay legally, be over and op
 in_the_bag(n) + P, stay within `score(n − 1) ≤ score(n) ≤ n + score(n − 1)`, and match optimal.json where that has n.
 It is optimal on the premise of an exhausted proof of n, the frame model's (the best game of n scores in_the_bag(n) +
 P\*(Π_n)), with P\*(Π_n) established by m's proof instead of a search.  Its proof `same_search` rests on m, not on
-the game of n − 1, and its taint is m's.
+the game of n − 1, and it assumes what m assumes.
 
 *Finding m.*  Before n's search (and only for a search that is not resumed from a checkpoint, and without
 `force_search`), the solver looks at the completed games of the results file and of the run among the
@@ -578,14 +587,14 @@ set up again must also have the size its line records (frames, candidates, `max_
 repeats the last game before it that set a search up (n − 1, or n − 2 past a prime), so the window loses nothing
 there, keeps the setups a range starts with to eight, and makes m a function of the window's games.
 
-*The verifiers.*  `taxman verify-results` checks a repeat's line against m's: m is a completed game of the same file
-on an earlier line, its proof settles its search, the line's record of m (proof, taint, digest) is m's, the
-promotions are m's and sum to the recorded promotion sum; then it sets both problems up again from the two board
-sizes, checks that each is as large as its line records, that their digest is the recorded one and that they are
-equal, and that both games score their board's in_the_bag plus that sum; and it derives the proof and the taint
-(m's) as for any line.  `tools/check_results.py` shares no code with the solver and cannot build the model: it checks
-the same structure from the lines (m earlier, completed, settling its search; the recorded digests and sizes equal;
-the promotions equal; score − in_the_bag equal; the taint inherited), and says that it takes the problems' equality,
+*The verifiers.*  `taxman verify-results` checks a repeat's line against m's: m is a completed game of the same file on
+an earlier line, its proof settles its search, the line's record of m (proof, assumptions, digest) is m's, the
+promotions are m's and sum to the recorded promotion sum; then it sets both problems up again from the two board sizes,
+checks that each is as large as its line records, that their digest is the recorded one and that they are equal, and
+that both games score their board's in_the_bag plus that sum; and it derives the proof and the assumptions (m's) as for
+any line.  `tools/check_results.py` shares no code with the solver and cannot build the model: it checks the same
+structure from the lines (m earlier, completed, settling its search; the recorded digests and sizes equal; the
+promotions equal; score − in_the_bag equal; the assumptions inherited), and says that it takes the problems' equality,
 like an exhausted search, on trust.
 
 ## 9. Testing
@@ -646,18 +655,20 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   incumbent that does not fit is refused; and the binary rejects bad
   times, survives a closed stdout and stderr, and stops on SIGINT and SIGTERM with a checkpoint it then resumes.
 * **Integrity of results** (`tests/integrity.rs`, `tests/results.rs`, `tests/solver.rs`): a previous game that is not
-  what it says is refused; taint travels down a chain; a tampered results file, or one whose line contradicts itself, is
-  refused naming the line, by both verifiers; a torn last line is dropped; the committed results pass the verifier with
-  the counts `results/README.md` quotes; a game stopped by a node limit and resumed reads back with an empty taint.
-  Forged repeats (another game named, digests or promotions or the promotion sum changed, the game repeated
-  unfinished, after the repeat, settling no search, or its taint dropped) are refused by both verifiers, and two that
+  what it says is refused; an assumption travels down a chain; a score that is not the table's is a hard error; a
+  tampered results file, or one whose line contradicts itself or is of another schema, is refused naming the line, by
+  both verifiers; a torn last line is dropped; the committed results pass the verifier with the counts
+  `results/README.md` quotes (skipped, saying so, while the file is of an older schema); a game stopped by a node
+  limit and resumed reads back assuming nothing.  Forged repeats (another game named, digests or promotions or the
+  promotion sum changed, the game repeated unfinished, after the repeat, settling no search, or its assumptions
+  dropped) are refused by both verifiers, and two that
   only setting the problems up again can catch are refused by `verify-results` (the Python referee accepts them, as
   its docstring says).
 * **Repeats** (`tests/same_search.rs`): the games that repeat an earlier search are found from the setups alone, and
   a chain concludes exactly those, with the scores of a chain that searches them: from n = 1 (1..300), and from a
-  results file a stopped run left; a game with a checkpoint is resumed, not repeated; a repeat takes the taint of the
-  game it repeats.  A unit test of `board` checks that the problem set up again from a board size is the one the setup
-  posed, and the same at two set widths.
+  results file a stopped run left; a game with a checkpoint is resumed, not repeated; a repeat assumes what the game
+  it repeats assumes.  A unit test of `board` checks that the problem set up again from a board size is the one the
+  setup posed, and the same at two set widths.
 * **Large boards** (`tests/wide.rs`): the Java stopped at 1000, and the sets that hold a board are 8 to 64 words
   wide, so nothing above 1023 meets anything but the committed results and these tests.  The same game at every
   width that holds it has the same frames, candidates, greedy set, promotion cap, answer and tree; game 1133 (W = 20,

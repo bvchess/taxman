@@ -2,19 +2,17 @@
 //! the flags describe, and output that survives a closed stdout or stderr.
 //!
 //! There is no parser crate.  A command line is positional arguments and flags; a flag is `--name VALUE` or
-//! `--name=VALUE` if it takes a value and `--name` if it is a switch, each command says which of its flags are
-//! which ([`Args::parse`]), and any other `--flag` is a usage error.  The flags every solving command takes
-//! ([`SOLVER_FLAGS`]: `--threads`, `--tactic`, `--optimal`) are turned into [`SolveOptions`] by
-//! [`solver_options`]; the others (`--out`, `--time-limit`, ...) are each command's
-//! own.  A usage error makes `main` print the usage and exit with status 2; a command that ran and failed exits
-//! with status 1 ([`CliError`]).
+//! `--name=VALUE` if it takes a value and `--name` if it is a switch, each command says which of its flags are which
+//! ([`Args::parse`]), and any other `--flag` is a usage error.  The flags every solving command takes
+//! ([`SOLVER_FLAGS`]: `--threads`, `--tactic`) are turned into [`SolveOptions`] by [`solver_options`]; the others
+//! (`--out`, `--time-limit`, `--use-prev`, ...) are each command's own.  A usage error makes `main` print the usage and
+//! exit with status 2; a command that ran and failed exits with status 1 ([`CliError`]).
 
 use std::fmt;
 use std::io::Write;
-use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
-use taxman::solver::{OptimalSource, SolveOptions};
+use taxman::solver::SolveOptions;
 
 /// Write one line, ignoring write errors: a closed pipe (EPIPE, say a `head` or a `tee` that has exited) must
 /// not kill a run whose results and checkpoints are safe on disk.  (`println!` panics on it, and release
@@ -54,7 +52,7 @@ pub enum CliError {
 pub type CliResult = Result<(), CliError>;
 
 /// Flags every solving command takes (each followed by a value).
-pub const SOLVER_FLAGS: [&str; 3] = ["--threads", "--tactic", "--optimal"];
+pub const SOLVER_FLAGS: [&str; 2] = ["--threads", "--tactic"];
 
 /// The command line after the subcommand name: flags with their values, and positional arguments.
 #[derive(Debug)]
@@ -152,9 +150,6 @@ pub fn solver_options(args: &Args) -> Result<SolveOptions, CliError> {
     for assignment in args.values("--tactic") {
         opts.tactics.set(assignment).map_err(CliError::Usage)?;
     }
-    if let Some(path) = args.value("--optimal") {
-        opts.optimal = if path == "none" { OptimalSource::None } else { OptimalSource::File(PathBuf::from(path)) };
-    }
     Ok(opts)
 }
 
@@ -235,23 +230,16 @@ mod tests {
     }
 
     #[test]
-    fn seconds_and_optimal() {
-        let args =
-            Args::parse(&strings(&["--progress", "0.5", "--optimal", "none"]), &["--progress", "--optimal"], &[]);
-        let args = args.unwrap();
+    fn seconds() {
+        let args = Args::parse(&strings(&["--progress", "0.5"]), &["--progress"], &[]).unwrap();
         assert_eq!(args.seconds("--progress").unwrap(), Some(Duration::from_millis(500)));
         assert_eq!(args.seconds("--time-limit").unwrap(), None);
         assert!(Args::parse(&strings(&["--progress", "-1"]), &["--progress"], &[])
             .unwrap()
             .seconds("--progress")
             .is_err());
-        let optimal = |given: &[&str]| {
-            let args = Args::parse(&strings(given), &SOLVER_FLAGS, &[]).unwrap();
-            solver_options(&args).unwrap().optimal
-        };
-        assert_eq!(optimal(&[]), OptimalSource::Repository);
-        assert_eq!(optimal(&["--optimal", "none"]), OptimalSource::None);
-        assert_eq!(optimal(&["--optimal", "t.json"]), OptimalSource::File(PathBuf::from("t.json")));
+        let solver = Args::parse(&strings(&["--optimal", "t.json"]), &SOLVER_FLAGS, &[]).map(|_| ()).map_err(usage);
+        assert!(solver.unwrap_err().contains("unknown option --optimal"));
     }
 
     #[test]

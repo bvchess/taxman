@@ -11,12 +11,12 @@ For every completed game:
   over        no legal move is left at the end (one more move would only add to the score)
   first       the first move is the largest prime <= n (every optimal game opens with it)
   promoted    the promotions are moves, in ascending order
-  fields      the fields the proof and taint come from agree with each other, as the solver writes them: a searched
-              or repeat game, and only such a game, has a setup, which records the digest of its search problem and,
-              if it has a revise field (builds that had the tactic revise_freedoms wrote one; results/strict.jsonl
-              says "Off" on every setup), says "Off"; every game but a prime one records in_the_bag; only a search
-              reaches a cap; a prime game's n is prime; a trivial game promotes nothing; a repeat, and only a repeat,
-              records the game it repeats (same_search) and has no cap in its setup
+  fields      the fields the proof and the assumptions come from agree with each other, as the solver writes them: a
+              searched or repeat game, and only such a game, has a setup, which records the digest of its search
+              problem; every game but a prime one records in_the_bag; only a search reaches a cap; a prime game's n
+              is prime; a trivial game promotes nothing; a repeat, and only a repeat, records the game it repeats
+              (same_search), and its setup has no cap
+  optimal     the score is optimal.json's, where the table has the game
   chain       score(n-1) <= score(n) <= n + score(n-1), with n-1 from the same file, else from optimal.json
               (both are theorems about optimal games: a game of n-1 is a game of n, and deleting the move n from
               a game of n leaves a game of n-1)
@@ -25,14 +25,14 @@ For every completed game:
   arithmetic  a searched game: in_the_bag + promotions = score, the cap is n + score(n-1) - in_the_bag, the
               promotions do not exceed it, and a game records reaching the cap exactly when its promotions sum to it
               (where the search stops); a prime game scores n + score(n-1) - P, P the largest prime below n
-  provenance  the predecessor a line names is in the file (or optimal.json) and its record matches that game
-              (score, FNV-1a digest of the moves, proof, taint); the recorded proof and taint are the ones the
-              rules below give
-  repeat      a repeat (method "repeat", proof same_search) names a game m that is a completed game of the same
-              file on an earlier line, whose proof is exhausted, cap or same_search; the record's proof and taint
-              are m's; the recorded digests agree (the repeat's setup.digest, its record's digest and m's
-              setup.digest), and so do the two setups' frames, candidates and max_total; the promotions are m's, and
-              promotion_sum is their sum; score(n) - in_the_bag(n) = score(m) - in_the_bag(m)
+  provenance  the game of n-1 a line names (prev) is the file's game of n-1 (source run or results) or optimal.json's
+              (source optimal), and the line's record of it matches that game (score, FNV-1a digest of the moves,
+              proof, assumptions); the recorded proof and assumptions are the ones the rules below give
+  repeat      a repeat (method "repeat", proof same_search) names a game m that is a completed game of the same file
+              on an earlier line, whose proof is exhausted, cap or same_search; the record's proof and assumptions are
+              m's; the repeat's setup.digest, its record's digest and m's setup.digest agree, and so do the two
+              setups' frames, candidates and max_total; the promotions are m's, and promotion_sum is their sum;
+              score(n) - in_the_bag(n) = score(m) - in_the_bag(m)
 and across files: every board size that two files share has the same score in both.
 
 What this referee cannot check, because it does not rebuild the frame model: that an exhausted search explored its
@@ -41,16 +41,16 @@ m's.  The digests a line records are hashes of the problems, which only the solv
 that they agree and that the two games are consistent with sharing one problem, and `taxman verify-results` sets
 both problems up again and compares them.
 
-Proof kinds (rust/src/results.rs explains them): trivial, exhausted, cap, prime_formula, same_search.  The taint is
-what a proof rests on that is unproven: for a proof by the cap or the prime formula, the taint of the game of n-1
-("optimal.json" for a game taken from that file); for same_search, the taint of the game it repeats; none for the
-others.  The only taint there is, is optimal.json.  Only schema 4 is read: a line of another schema, or of none, is a
-problem.
+Proof kinds (rust/src/results.rs explains them): trivial, exhausted, cap, prime_formula, same_search.  The assumptions
+of a game are what its proof takes as given beyond the frame model: a proof by the cap or by the prime formula rests on
+the game of n-1, so it assumes what that game's proof assumes, and for a game of n-1 taken from optimal.json, that
+"the game of n-1 in optimal.json is optimal"; a repeat assumes what the game it repeats assumes; other proofs assume
+nothing.  A line of another schema than this referee reads is a problem.
 
-The report counts games by proof kind and by taint, and the arithmetic certificates: scores equal to n + score(n-1)
-or to the prime formula, which certify a game whatever found it, given that the game of n-1 is optimal.
+The report counts games by proof kind and by assumption, and the arithmetic certificates: scores equal to
+n + score(n-1) or to the prime formula, which certify a game whatever found it, given that the game of n-1 is optimal.
 
-usage: check_results.py [FILE ...] [--optimal PATH] [--fm PATH] [--chain PATH]
+usage: check_results.py [FILE ...] [--fm PATH] [--chain PATH]
 Without FILEs it checks rust/results/*.jsonl.  The exit status is 1 if any check fails.
 """
 import argparse
@@ -66,11 +66,16 @@ OPTIMAL = REPO / "src" / "main" / "resources" / "optimal.json"
 FM_BOUND = REPO / "heuristics" / "results" / "fm_bound_2000.json"
 HEURISTIC_CHAIN = REPO / "heuristics" / "results" / "chain_1001_2000.json"
 
-SCHEMA = 4  # the only format of a result line this referee reads
+SCHEMA = 5  # the only format of a result line this referee reads
 RESTS_ON_PREV = {"prime_formula", "cap"}
 SETTLES_SEARCH = {"exhausted", "cap", "same_search"}  # the proofs a repeat can repeat
 SETS_UP = {"search", "repeat"}  # the methods whose lines have a setup
 DIGEST = re.compile("[0-9a-f]{16}")
+
+
+def assumed_optimal(n):
+    """What a proof that rests on optimal.json's game of n assumes."""
+    return f"the game of {n} in optimal.json is optimal"
 
 
 def is_prime(n):
@@ -140,7 +145,7 @@ def read_lines(path, problems):
 
 def contradictions(n, row, reached):
     """What the fields of a line say against each other: combinations the solver never writes, through which a
-    hand-edited line could change the proof or the taint derived from it."""
+    hand-edited line could change the proof or the assumptions derived from it."""
     method, setup = row["method"], row.get("setup")
     found = []
     if (method in SETS_UP) != (setup is not None):
@@ -152,9 +157,6 @@ def contradictions(n, row, reached):
         digest = setup.get("digest")
         if not (isinstance(digest, str) and DIGEST.fullmatch(digest)):
             found.append(f"setup.digest {digest!r} is not 16 hexadecimal digits")
-        # Builds that had the tactic revise_freedoms wrote what it did; with it off, "Off".
-        if "revise" in setup and setup["revise"] != "Off":
-            found.append(f"bad setup.revise {setup['revise']!r}: when a setup has one, it is \"Off\"")
         if repeat and setup.get("cap") is not None:
             found.append("a repeat game whose setup has a cap, which only a search has")
     if (row.get("in_the_bag") is None) != (method == "prime"):
@@ -187,13 +189,13 @@ def repeat_problems(n, number, row, done):
     m = record.get("n")
     if not isinstance(m, int) or m >= n or m not in done:
         return [f"it repeats the search of game {m}, which is not a completed game of the file below it"]
-    _score, _moves, proof, taint, line, earlier = done[m]
+    _score, _moves, proof, assumes, line, earlier = done[m]
     if line > number:
         return [f"it repeats the search of game {m}, whose line ({line}) comes after it"]
     found = []
     if proof not in SETTLES_SEARCH:
         found.append(f"it repeats the search of game {m}, whose proof ({proof}) settles no search")
-    if record.get("proof") != proof or set(record.get("taint") or []) != taint:
+    if record.get("proof") != proof or set(record.get("assumes") or []) != assumes:
         found.append(f"its record of game {m} does not match line {line}")
     digests = {(r.get("setup") or {}).get("digest") for r in (row, earlier)} | {record.get("digest")}
     if len(digests) != 1:
@@ -213,7 +215,8 @@ def repeat_problems(n, number, row, done):
 
 
 def check_file(path, optimal, fm, heuristic, divisors, problems):
-    """Checks one file; returns {n: (score, proof, taint)} of its completed games and the report's counters."""
+    """Checks one file; returns {n: (score, moves, proof, assumptions, line, row)} of its completed games and the
+    report's counters."""
     rows = read_lines(path, problems)
     games = {}
     for number, row in rows:
@@ -231,10 +234,10 @@ def check_file(path, optimal, fm, heuristic, divisors, problems):
             continue
         games[n] = (number, row)
 
-    done = {}  # n -> (score, moves, proof, taint, line, row)
+    done = {}  # n -> (score, moves, proof, assumptions, line, row)
     counts = Counter()
     certificates = Counter()
-    taints = Counter()
+    assumed = Counter()
     for n in sorted(games):
         number, row = games[n]
 
@@ -255,6 +258,8 @@ def check_file(path, optimal, fm, heuristic, divisors, problems):
             fail(f"opens with {moves[:1]}, not the largest prime {largest_prime_at_most(n)}")
         if promotions != sorted(set(promotions)) or not set(promotions) <= set(moves):
             fail("the promotions are not moves in ascending order")
+        if n in optimal and score != optimal[n]["score"]:
+            fail(f"scores {score}, but optimal.json has {optimal[n]['score']}")
         reached = reached_cap(row)
         for message in contradictions(n, row, reached):
             fail(message)
@@ -273,34 +278,29 @@ def check_file(path, optimal, fm, heuristic, divisors, problems):
                 fail(f"scores {score}, more than n + score(n-1) = {before + n}")
 
         # The predecessor the line names.
-        source = row.get("prev_source")
-        prev = None  # (score, moves, proof, taint)
+        record = row["prev"]
+        source = record["source"] if record is not None else None
+        prev = None  # (score, moves, proof, assumptions)
         if source in ("run", "results"):
             if below is None:
                 fail(f"built from game {n - 1} of this file, which it does not hold")
                 continue
             prev = below[:4]
         elif source == "optimal":
+            # A game of optimal.json is assumed optimal; the table at hand may lack it (a line made with a longer one).
             entry = optimal.get(n - 1)
-            if entry is not None:
-                prev = (entry["score"], entry["moves"], None, {"optimal.json"})
-            elif row.get("prev"):
-                prev = (row["prev"]["score"], None, None, {"optimal.json"})
-            else:
-                prev = (None, None, None, {"optimal.json"})
-        elif source is not None:
-            fail(f"unknown prev_source {source!r}")
-        if (row["prev"] is None) != (prev is None):
-            fail("prev and prev_source disagree")
+            score_before = entry["score"] if entry is not None else record["score"]
+            moves_before = entry["moves"] if entry is not None else None
+            prev = (score_before, moves_before, None, {assumed_optimal(n - 1)})
+        elif record is not None:
+            fail(f"unknown prev.source {source!r}")
         if prev is not None:
-            record = row["prev"]
             same = (
                 record["n"] == n - 1
-                and record["source"] == source
                 and record["score"] == prev[0]
                 and (prev[1] is None or record["moves_digest"] == digest(prev[1]))
                 and record["proof"] == prev[2]
-                and set(record["taint"]) == prev[3]
+                and set(record["assumes"]) == prev[3]
             )
             if not same:
                 fail("its record of the game of n-1 does not match that game")
@@ -336,29 +336,29 @@ def check_file(path, optimal, fm, heuristic, divisors, problems):
             m = row["same_search"].get("n")
             repeated = done.get(m) if isinstance(m, int) and m < n else None
 
-        # Proof and taint.
+        # Proof and assumptions.
         if proof in RESTS_ON_PREV and prev is None:
             fail(f"its proof ({proof}) rests on a game of n-1 it does not name")
         if repeated is not None:
-            taint = repeated[3]
+            assumes = repeated[3]
         else:
-            taint = prev[3] if prev and proof in RESTS_ON_PREV else set()
+            assumes = prev[3] if prev and proof in RESTS_ON_PREV else set()
         if row["proof"] != proof:
             fail(f"records the proof {row['proof']}, but the rules give {proof}")
-        if set(row["taint"]) != taint:
-            fail(f"records the taint {sorted(row['taint'])}, but the rules give {sorted(taint)}")
+        if set(row["assumes"]) != assumes:
+            fail(f"records the assumptions {sorted(row['assumes'])}, but the rules give {sorted(assumes)}")
 
-        done[n] = (score, moves, proof, taint, number, row)
+        done[n] = (score, moves, proof, assumes, number, row)
         counts[proof] += 1
-        taints.update(taint)
-        if not taint:
-            taints["(nothing unproven)"] += 1
+        assumed.update(assumes)
+        if not assumes:
+            assumed["(nothing)"] += 1
         if prev_score is not None:
             if score == prev_score + n:
                 certificates["n + score(n-1)"] += 1
             elif is_prime(n) and score == prev_score + n - replaced:
                 certificates["prime formula"] += 1
-    return done, counts, taints, certificates
+    return done, counts, assumed, certificates
 
 
 def listing(counter):
@@ -368,14 +368,13 @@ def listing(counter):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("files", nargs="*", type=Path)
-    ap.add_argument("--optimal", type=Path, default=OPTIMAL)
     ap.add_argument("--fm", type=Path, default=FM_BOUND)
     ap.add_argument("--chain", type=Path, default=HEURISTIC_CHAIN)
     args = ap.parse_args()
     files = args.files or sorted(RESULTS.glob("*.jsonl"))
     files = [f for f in files if not f.name.endswith(".rejected.jsonl")]
 
-    optimal = {entry["n"]: entry for entry in json.loads(args.optimal.read_text())}
+    optimal = {entry["n"]: entry for entry in json.loads(OPTIMAL.read_text())}
     fm = json.loads(args.fm.read_text())
     heuristic = {entry["n"]: entry["score"] for entry in json.loads(args.chain.read_text())}
     largest = 2
@@ -392,12 +391,12 @@ def main():
     shared = set()
     for path in files:
         print(f"{path}:")
-        done, counts, taints, certificates = check_file(path, optimal, fm, heuristic, divisors, problems)
+        done, counts, assumed, certificates = check_file(path, optimal, fm, heuristic, divisors, problems)
         if done:
             missing = sum(1 for n in range(min(done), max(done) + 1) if n not in done)
             print(f"  {len(done)} completed games, n = {min(done)}..{max(done)} ({missing} missing)")
         print("  proof: " + listing(counts))
-        print("  taint: " + listing(taints))
+        print("  assumed: " + listing(assumed))
         print("  arithmetic certificates: " + listing(certificates))
         for n, (score, *_rest) in done.items():
             if n in seen:

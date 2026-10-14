@@ -12,8 +12,10 @@
 //!   ([`taxman::paths`]) unless `--history` and `--known` name them.
 //!
 //! The small ones: `verify-optimal` replays every game of the table of optimal games, `verify-results` checks results
-//! files without changing them, `extend-optimal` writes the table with the proven games of a results file appended
-//! to it, and `tables` prints the maximal factors and composites of numbers on a board.
+//! files without changing them, `extend-optimal` writes the table with the games of a results file that continue it
+//! appended, and `tables` prints the maximal factors and composites of numbers on a board.  Every command that
+//! meets a score of a board size `optimal.json` has checks it against the table built into the binary
+//! ([`Optimal::built_in`]): no flag turns that off or points at another file.
 
 use crate::cli::{errln, outln, parse_range, solver_options, Args, CliError, CliResult, SOLVER_FLAGS};
 use std::io::Write;
@@ -25,7 +27,7 @@ use taxman::json::Json;
 use taxman::numtheory::Tables;
 use taxman::paths;
 use taxman::results::{build, verify_files, Build};
-use taxman::solver::{self, GameResult, Method, OptimalSource, Prev, SolveOptions};
+use taxman::solver::{self, GameResult, Method, Prev, SolveOptions};
 
 fn failed(message: String) -> CliError {
     CliError::Failed(message)
@@ -45,12 +47,13 @@ const SOLVE_FLAGS: [&str; 7] =
 /// `solve N|A-B [options]`: solves one board size or a range, each from the one before (`solver::solve_range_each`).
 pub fn solve(args: &[String]) -> CliResult {
     let usage = || CliError::Usage("usage: solve N|A-B [options]".into());
-    let args = Args::parse(args, &flags_with(&SOLVE_FLAGS), &["--force-search", "--show"])?;
+    let args = Args::parse(args, &flags_with(&SOLVE_FLAGS), &["--force-search", "--use-prev", "--show"])?;
     let [range] = args.positional() else { return Err(usage()) };
     let (lo, hi) = parse_range(range)?;
 
     let mut opts = solver_options(&args)?;
     opts.force_search = args.has("--force-search");
+    opts.use_prev = args.has("--use-prev");
     opts.checkpoint_dir = args.value("--checkpoint-dir").map(PathBuf::from);
     if let Some(interval) = args.positive_seconds("--checkpoint-interval")? {
         opts.checkpoint_interval = interval;
@@ -109,20 +112,17 @@ pub fn solve(args: &[String]) -> CliResult {
 // ---------------------------------------------------------------------------------------------------------
 // regress
 
-/// `regress [--from A] [--to N]`: solves A..N in memory and checks every score against optimal.json.
+/// `regress [--from A] [--to N] [--use-prev]`: solves A..N in memory and checks every score against optimal.json
+/// (the first that differs is an error, as in any run).
 pub fn regress(args: &[String]) -> CliResult {
-    let args = Args::parse(args, &flags_with(&["--to", "--from"]), &[])?;
+    let args = Args::parse(args, &flags_with(&["--to", "--from"]), &["--use-prev"])?;
     if !args.positional().is_empty() {
         return Err(CliError::Usage("regress takes no positional arguments".into()));
     }
     let from = args.parsed::<u32>("--from")?.unwrap_or(1);
     let to = args.parsed::<u32>("--to")?.unwrap_or(400);
     let mut opts: SolveOptions = solver_options(&args)?;
-    let Some(optimal) = opts.load_optimal().map_err(failed)? else {
-        return Err(CliError::Usage("regress compares with optimal.json, so --optimal none makes no sense".into()));
-    };
-    // Report every mismatch instead of stopping at the first.
-    opts.allow_optimal_mismatch = true;
+    opts.use_prev = args.has("--use-prev");
 
     let start = Instant::now();
     let mut results: Vec<GameResult> = Vec::new();
@@ -147,26 +147,8 @@ pub fn regress(args: &[String]) -> CliResult {
         .collect();
     outln!("by method: {}", counts.join(", "));
     let unchecked = results.iter().filter(|r| r.optimal_match.is_none()).count();
-    let mismatches: Vec<&GameResult> = results.iter().filter(|r| r.optimal_match == Some(false)).collect();
-    for r in &mismatches {
-        let expected = optimal.score(r.n).map_or_else(|| "?".to_owned(), |s| s.to_string());
-        outln!(
-            "MISMATCH n={}: scored {} but optimal.json says {expected} (method {})",
-            r.n,
-            r.score,
-            r.method.as_str()
-        );
-    }
-    outln!(
-        "{} games match optimal.json, {} do not, {unchecked} are not in it",
-        results.len() - mismatches.len() - unchecked,
-        mismatches.len()
-    );
-    if mismatches.is_empty() {
-        Ok(())
-    } else {
-        Err(CliError::Failed(format!("{} scores differ from optimal.json", mismatches.len())))
-    }
+    outln!("{} games match optimal.json, {unchecked} are not in it", results.len() - unchecked);
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -194,15 +176,10 @@ pub fn bench(args: &[String]) -> CliResult {
         args.positional().iter().map(parse).collect::<Result<_, _>>()?
     };
     let mut opts = solver_options(&args)?;
-    if opts.optimal == OptimalSource::None {
-        return Err(CliError::Usage(
-            "bench takes the previous games from optimal.json, so --optimal none makes no sense".into(),
-        ));
-    }
-    // Every game on its own: the previous game from optimal.json or, past it, from the committed strict results, and
-    // no derivation.
+    // Every game on its own: the previous game from optimal.json or, past it, from the committed results, and no
+    // derivation.
     opts.force_search = true;
-    let known = opts.known_games(&[results]).map_err(failed)?;
+    let known = Optimal::built_in().with_results_files(&[results]).map_err(failed)?;
 
     outln!("{} threads, tactics {}", opts.threads, opts.tactics.description());
     let [n, nodes, greedy, search, total] = ["n", "nodes", "greedy s", "search s", "total s"];
@@ -210,7 +187,7 @@ pub fn bench(args: &[String]) -> CliResult {
     let mut results = Vec::new();
     for &n in &ns {
         let prev = n.checked_sub(1).and_then(|before| Prev::from_optimal(&known, before));
-        let result = solver::solve_game_with(n, prev.as_ref(), &opts, Some(&known)).map_err(failed)?;
+        let result = solver::solve_game_with(n, prev.as_ref(), &opts, &known).map_err(failed)?;
         let p = &result.phases;
         let secs = |d: Duration| d.as_secs_f64();
         outln!("{:>5} {:>13} {:>9.3} {:>9.3} {:>9.3}", n, result.nodes, secs(p.greedy), secs(p.search), secs(p.total));
@@ -269,16 +246,15 @@ fn millis(since: Instant) -> f64 {
     since.elapsed().as_secs_f64() * 1000.0
 }
 
-/// `verify-optimal [FILE]`: replays every game of the table of optimal games (the default one if no file is given)
+/// `verify-optimal [FILE]`: replays every game of the table of optimal games (the built-in one if no file is given)
 /// and checks its recorded score.
 pub fn verify_optimal(args: &[String]) -> CliResult {
-    let path = match args {
-        [] => paths::optimal_json().map_err(CliError::Failed)?,
-        [file] => file.into(),
+    let start = Instant::now();
+    let optimal = match args {
+        [] => Optimal::built_in().clone(),
+        [file] => Optimal::load(file).map_err(CliError::Failed)?,
         _ => return Err(CliError::Usage("verify-optimal takes at most one argument".into())),
     };
-    let start = Instant::now();
-    let optimal = Optimal::load(&path).map_err(CliError::Failed)?;
     let load_ms = millis(start);
 
     let start = Instant::now();
@@ -291,28 +267,28 @@ pub fn verify_optimal(args: &[String]) -> CliResult {
     Ok(())
 }
 
-/// `verify-results FILE... [--optimal FILE|none]`: checks results files without changing them
-/// (`results::verify_files`).
+/// `verify-results FILE...`: checks results files without changing them (`results::verify_files`), their scores
+/// against the built-in `optimal.json`.
 pub fn verify_results(args: &[String]) -> CliResult {
-    let args = Args::parse(args, &["--optimal"], &[])?;
+    let args = Args::parse(args, &[], &[])?;
     if args.positional().is_empty() {
-        return Err(CliError::Usage("usage: verify-results FILE... [--optimal FILE|none]".into()));
+        return Err(CliError::Usage("usage: verify-results FILE...".into()));
     }
-    let optimal = solver_options(&args)?.load_optimal().map_err(CliError::Failed)?;
     let paths: Vec<PathBuf> = args.positional().iter().map(PathBuf::from).collect();
     let start = Instant::now();
-    let report = verify_files(&paths, optimal.as_ref()).map_err(CliError::Failed)?;
+    let report = verify_files(&paths, Optimal::built_in()).map_err(CliError::Failed)?;
     outln!("{report}");
     outln!("checked in {:.1} ms", millis(start));
     Ok(())
 }
 
-/// `extend-optimal RESULTS --out FILE [--optimal FILE]`: writes the table of optimal games to `FILE` with the games of
-/// the results file `RESULTS` that continue it appended (`results::extend_optimal`).  The table is read from
-/// `--optimal` as for the other commands; it is written to `FILE` only, which the command line must name.
+/// `extend-optimal RESULTS --out FILE [--table FILE]`: writes the table of optimal games to `--out FILE` with the
+/// games of the results file `RESULTS` that continue it appended (`results::extend_optimal`).  The table is the
+/// built-in one, or the file `--table` names (say a table extended before the binary was rebuilt with it); it is
+/// written to `--out` only, which the command line must name, and checks the results' scores.
 pub fn extend_optimal(args: &[String]) -> CliResult {
-    let usage = || CliError::Usage("usage: extend-optimal RESULTS --out FILE [--optimal FILE]".into());
-    let args = Args::parse(args, &["--out", "--optimal"], &[])?;
+    let usage = || CliError::Usage("usage: extend-optimal RESULTS --out FILE [--table FILE]".into());
+    let args = Args::parse(args, &["--out", "--table"], &[])?;
     let [results] = args.positional() else { return Err(usage()) };
     let Some(out) = args.value("--out") else {
         return Err(CliError::Usage(
@@ -327,11 +303,12 @@ pub fn extend_optimal(args: &[String]) -> CliResult {
             out.display()
         )));
     }
-    let Some(mut optimal) = solver_options(&args)?.load_optimal().map_err(failed)? else {
-        return Err(CliError::Usage("extend-optimal extends optimal.json, so --optimal none makes no sense".into()));
+    let mut optimal = match args.value("--table") {
+        Some(table) => Optimal::load(table).map_err(failed)?,
+        None => Optimal::built_in().clone(),
     };
 
-    let contents = taxman::results::read_results_file(results, Some(&optimal)).map_err(failed)?;
+    let contents = taxman::results::read_results_file(results, &optimal).map_err(failed)?;
     if contents.torn {
         errln!("note: the last line of {} is torn and was ignored", results.display());
     }

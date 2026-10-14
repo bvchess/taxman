@@ -65,12 +65,12 @@ fn optimal_sum<const W: usize>(optimal: &Optimal, n: u32) -> Option<u64> {
 /// the golden tests, which start from the greedy set, this starts from a weak incumbent.
 #[test]
 fn a_search_from_a_handicapped_incumbent_finds_the_optimum() {
-    let optimal = Optimal::load_default().unwrap();
+    let optimal = Optimal::built_in();
     let configs = configs();
     let mut runs = 0;
     for n in 2..=300 {
         let Some(game) = Game::<8>::of_board(n) else { continue };
-        let truth = optimal_sum::<8>(&optimal, n).unwrap();
+        let truth = optimal_sum::<8>(optimal, n).unwrap();
         // The big trees are for one configuration of each kind; the small ones for all.
         for (i, cfg) in configs.iter().enumerate() {
             for k in [1, 5] {
@@ -93,7 +93,7 @@ fn a_search_from_a_handicapped_incumbent_finds_the_optimum() {
 /// for its multipliers to have much to fit.
 #[test]
 fn a_search_with_the_lagrangian_bound_from_a_handicapped_incumbent_finds_the_optimum() {
-    let optimal = Optimal::load_default().unwrap();
+    let optimal = Optimal::built_in();
     let base = Config::standard();
     let configs = [
         Config { refits: Some(Refits { first: 10, every: 60 }), ..base },
@@ -101,7 +101,7 @@ fn a_search_with_the_lagrangian_bound_from_a_handicapped_incumbent_finds_the_opt
         Config { refits: Some(Refits { first: 10, every: 60 }), threads: 2, ..base },
     ];
     let runs =
-        lagrangian_runs::<8>(&optimal, 301..=511, &configs) + lagrangian_runs::<16>(&optimal, 512..=600, &configs);
+        lagrangian_runs::<8>(optimal, 301..=511, &configs) + lagrangian_runs::<16>(optimal, 512..=600, &configs);
     assert!(runs > 150, "{runs} runs");
 }
 
@@ -234,14 +234,14 @@ fn resumed_over_and_over<const W: usize>(
 
 #[test]
 fn a_search_resumed_over_and_over_finds_the_optimum() {
-    let optimal = Optimal::load_default().unwrap();
+    let optimal = Optimal::built_in();
     let dir = TempDir::new("churn");
     // Game 600 takes 7,000 to 17,000 nodes from an incumbent that far below the optimum (two threads: the count
     // depends on timing), so a limit of 1,000 stops it at least six times in each of the three configurations: the
     // default tactics, the searchers forgetting their nogoods every two steps, and their Lagrangian bounds refitted
     // every four.  The bound below only checks that the resuming really happened; it leaves room for the smallest
     // trees a loaded machine produces.
-    let truth = optimal_sum::<16>(&optimal, 600).unwrap();
+    let truth = optimal_sum::<16>(optimal, 600).unwrap();
     let resumes = resumed_over_and_over::<16>(600, truth, 30, 1000, &dir, &[0, 12, 14]);
     assert!(resumes >= 10, "only {resumes} resumes");
 }

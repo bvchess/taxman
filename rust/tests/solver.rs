@@ -12,7 +12,7 @@ use taxman::hives::Apiary;
 use taxman::json::Json;
 use taxman::numtheory::Tables;
 use taxman::results::{verify_files, Proof};
-use taxman::solver::{self, GameResult, Method, OptimalSource, SolveOptions};
+use taxman::solver::{self, GameResult, Method, SolveOptions};
 
 fn solve_all(lo: u32, hi: u32, opts: &SolveOptions) -> Vec<GameResult> {
     let results = solver::solve_range(lo, hi, opts, None).unwrap_or_else(|e| panic!("{e}"));
@@ -22,13 +22,13 @@ fn solve_all(lo: u32, hi: u32, opts: &SolveOptions) -> Vec<GameResult> {
 
 #[test]
 fn a_range_reproduces_optimal_json() {
-    let optimal = Optimal::load_default().unwrap();
+    let optimal = Optimal::built_in();
     let results = solve_all(1, 300, &options(2));
     for r in &results {
         assert!(r.completed, "n={}", r.n);
         assert_eq!(Some(r.score), optimal.score(r.n), "n={}", r.n);
         assert_eq!(r.optimal_match, Some(true), "n={}", r.n);
-        assert_eq!(r.prev_source.is_some(), r.n > 1, "n={}", r.n);
+        assert_eq!(r.prev_source().is_some(), r.n > 1, "n={}", r.n);
     }
     // A promotion is exactly a candidate that the game plays, however the game was found.
     for r in &results {
@@ -41,7 +41,7 @@ fn a_range_reproduces_optimal_json() {
 
 #[test]
 fn every_tactic_gives_the_same_scores() {
-    let optimal = Optimal::load_default().unwrap();
+    let optimal = Optimal::built_in();
     // Each variant is a `--tactic` assignment.
     let with = |assignment: &str| {
         let mut opts = SolveOptions { force_search: true, ..options(1) };
@@ -94,7 +94,7 @@ fn derivations_can_be_switched_off() {
 
 #[test]
 fn an_interrupted_game_resumes_from_its_checkpoint() {
-    let optimal = Optimal::load_default().unwrap();
+    let optimal = Optimal::built_in();
     let dir = TempDir::new("resume");
     // Without the n − 1 solution to start from, the search has real work to do.
     let opts = SolveOptions {
@@ -108,7 +108,7 @@ fn an_interrupted_game_resumes_from_its_checkpoint() {
     let checkpoint = dir.0.join("n0600.ckpt");
     let mut pieces = 0;
     let result = loop {
-        let r = solver::solve_game_with(600, None, &opts, Some(&optimal)).unwrap();
+        let r = solver::solve_game_with(600, None, &opts, optimal).unwrap();
         pieces += 1;
         if r.completed {
             break r;
@@ -126,18 +126,13 @@ fn an_interrupted_game_resumes_from_its_checkpoint() {
 }
 
 /// Solves `n` (600 or 760, games with a search of a few thousand nodes) and `n + 1` (the prime after it, which takes
-/// `n` as its predecessor) from `base`, with no `optimal.json` to start from: a node limit stops the search of `n`,
+/// `n` as its predecessor) from `base`, with no previous game to start from: a node limit stops the search of `n`,
 /// and a second run, without the limit, resumes it and goes on.  Returns the games of the second run and the lines
 /// of the results file, which the verifier accepts.
 fn run_stopped_and_resumed(name: &str, base: SolveOptions, n: u32) -> (Vec<GameResult>, Vec<Json>) {
     let dir = TempDir::new(name);
     let results = dir.join("results.jsonl");
-    let limited = SolveOptions {
-        checkpoint_dir: Some(dir.join("ckpt")),
-        node_limit: Some(300),
-        optimal: OptimalSource::None,
-        ..base
-    };
+    let limited = SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), node_limit: Some(300), ..base };
     let summary = solver::solve_range_each(n, n + 1, &limited, Some(&results), |_| {}).unwrap();
     assert_eq!(summary.stopped_at, Some(n), "the node limit stops the search of {n}");
     assert!(limited.checkpoint_file(n).unwrap().exists());
@@ -148,41 +143,41 @@ fn run_stopped_and_resumed(name: &str, base: SolveOptions, n: u32) -> (Vec<GameR
     // A later invocation finds both games in the file, which agrees with what they say of themselves.
     let again = solver::solve_range_each(n, n + 1, &unlimited, Some(&results), |_| {}).unwrap();
     assert_eq!((again.solved, again.skipped), (0, 2));
-    verify_files(std::slice::from_ref(&results), None).unwrap_or_else(|e| panic!("{e}"));
+    verify_files(std::slice::from_ref(&results), Optimal::built_in()).unwrap_or_else(|e| panic!("{e}"));
 
     let text = fs::read_to_string(&results).unwrap();
     (games, text.lines().map(|line| Json::parse(line).unwrap()).collect())
 }
 
-/// What a results line says of the game's taint.
-fn taint(line: &Json) -> Vec<&str> {
-    line.get("taint").and_then(Json::as_arr).expect("taint").iter().filter_map(Json::as_str).collect()
+/// What a results line says the game assumes.
+fn assumptions(line: &Json) -> Vec<&str> {
+    line.get("assumes").and_then(Json::as_arr).expect("assumes").iter().filter_map(Json::as_str).collect()
 }
 
-/// A game rests on nothing unproven whether its search ran in one piece or was stopped and resumed, and so does the
+/// A game assumes nothing whether its search ran in one piece or was stopped and resumed, and so does the
 /// next game, built on it.
 #[test]
-fn a_game_resumed_from_its_checkpoint_rests_on_nothing_unproven() {
+fn a_game_resumed_from_its_checkpoint_assumes_nothing() {
     let (games, lines) = run_stopped_and_resumed("resume", options(1), 600);
     let [resumed, next] = &games[..] else { panic!("{} games", games.len()) };
     assert_eq!((resumed.n, resumed.invocations), (600, 2), "600 was resumed, not started over");
-    assert!(resumed.taint.is_empty(), "{:?}", resumed.taint);
+    assert!(resumed.assumes.is_empty(), "{:?}", resumed.assumes);
     // 601 takes 600 as its predecessor, and its proof rests on it.
-    assert!(next.completed && next.proof == Some(Proof::PrimeFormula) && next.taint.is_empty(), "{next:?}");
+    assert!(next.completed && next.proof == Some(Proof::PrimeFormula) && next.assumes.is_empty(), "{next:?}");
 
     let [stopped, finished, prime] = &lines[..] else { panic!("{} lines", lines.len()) };
     assert_eq!(stopped.get("completed").and_then(Json::as_bool), Some(false));
     assert_eq!(finished.get("invocations").and_then(Json::as_u32), Some(2));
-    assert!(taint(finished).is_empty() && taint(prime).is_empty());
+    assert!(assumptions(finished).is_empty() && assumptions(prime).is_empty());
 }
 
 #[test]
 fn a_checkpoint_for_another_game_or_other_tactics_is_refused() {
-    let optimal = Optimal::load_default().unwrap();
+    let optimal = Optimal::built_in();
     let dir = TempDir::new("refuse");
     let opts =
         SolveOptions { checkpoint_dir: Some(dir.0.clone()), node_limit: Some(2_000), force_search: true, ..options(1) };
-    assert!(!solver::solve_game_with(600, None, &opts, Some(&optimal)).unwrap().completed);
+    assert!(!solver::solve_game_with(600, None, &opts, optimal).unwrap().completed);
     let checkpoint = dir.0.join("n0600.ckpt");
 
     // Other tactics: each of the five search tactics (a checkpoint records them all), the switches turned the other
@@ -192,24 +187,24 @@ fn a_checkpoint_for_another_game_or_other_tactics_is_refused() {
     for assignment in assignments {
         let mut other = opts.clone();
         other.tactics.set(assignment).unwrap();
-        let err = solver::solve_game_with(600, None, &other, Some(&optimal)).unwrap_err();
+        let err = solver::solve_game_with(600, None, &other, optimal).unwrap_err();
         assert!(err.contains("different search tactics") && err.contains("n0600.ckpt"), "{assignment}: {err}");
     }
 
     // Another game, of the same width.
     fs::copy(&checkpoint, dir.0.join("n0620.ckpt")).unwrap();
-    let err = solver::solve_game_with(620, None, &opts, Some(&optimal)).unwrap_err();
+    let err = solver::solve_game_with(620, None, &opts, optimal).unwrap_err();
     assert!(err.contains("cannot resume") && err.contains("n0620.ckpt"), "{err}");
 
     // Another width.
     fs::copy(&checkpoint, dir.0.join("n0400.ckpt")).unwrap();
-    let err = solver::solve_game_with(400, None, &opts, Some(&optimal)).unwrap_err();
+    let err = solver::solve_game_with(400, None, &opts, optimal).unwrap_err();
     assert!(err.contains("cannot resume") && err.contains("n0400.ckpt"), "{err}");
 
     // The refused files are untouched, and the game itself still resumes and finishes.
     assert!(checkpoint.exists() && dir.0.join("n0620.ckpt").exists());
     let resumed = SolveOptions { node_limit: None, ..opts };
-    let r = solver::solve_game_with(600, None, &resumed, Some(&optimal)).unwrap();
+    let r = solver::solve_game_with(600, None, &resumed, optimal).unwrap();
     assert!(r.completed && r.optimal_match == Some(true));
 }
 

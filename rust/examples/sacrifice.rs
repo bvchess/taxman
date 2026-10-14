@@ -36,9 +36,9 @@ use taxman::brute::{self, Rule};
 use taxman::game::Optimal;
 use taxman::json::Json;
 use taxman::numtheory::Tables;
-use taxman::results::{Taint, OPTIMAL_JSON};
+use taxman::results::{assumed_optimal, Assumptions};
 use taxman::sacrifice::{bound_value, punctured, sacrifice_bound, PuncturedOptions};
-use taxman::solver::{solve_game_with, OptimalSource, Prev, PrevSource, SolveOptions};
+use taxman::solver::{solve_game_with, Prev, PrevSource, SolveOptions};
 use taxman::tactics::Tactics;
 
 fn main() {
@@ -62,7 +62,7 @@ fn main() {
 /// The known optimal games by n: optimal.json plus the completed games of the results files `extra`.
 fn load_games(extra: &[String]) -> Result<Optimal, String> {
     let paths: Vec<PathBuf> = extra.iter().map(PathBuf::from).collect();
-    SolveOptions::default().known_games(&paths)
+    Optimal::built_in().with_results_files(&paths)
 }
 
 fn secs(d: Duration) -> f64 {
@@ -340,15 +340,14 @@ fn one_game<const W: usize>(n: u32, o: &RangeOptions, games: &Optimal) -> Result
             tactics: o.tactics,
             threads: o.threads,
             force_search: true,
-            optimal: OptimalSource::None,
             time_limit: o.time_limit,
             ..SolveOptions::default()
         };
-        // The previous game is optimal.json's.
-        let taint = Taint::from([OPTIMAL_JSON.to_owned()]);
+        // The previous game is optimal.json's (or a results file's past it): assumed optimal.
+        let assumes = Assumptions::from([assumed_optimal(n - 1)]);
         let prev =
-            Prev { moves: prev_moves.to_vec(), score: prev_score, source: PrevSource::Optimal, proof: None, taint };
-        let r = solve_game_with(n, Some(&prev), &opts, None)?;
+            Prev { moves: prev_moves.to_vec(), score: prev_score, source: PrevSource::Optimal, proof: None, assumes };
+        let r = solve_game_with(n, Some(&prev), &opts, Optimal::built_in())?;
         if r.completed && opt.is_some_and(|s| s != r.score) {
             return Err(format!("n={n}: the direct search scores {}, not {opt:?}", r.score));
         }

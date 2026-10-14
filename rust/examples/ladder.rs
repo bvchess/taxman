@@ -41,7 +41,6 @@ use taxman::board::Board;
 use taxman::engine::{Counters, EngineConfig};
 use taxman::game::Optimal;
 use taxman::search::{cut, search_with, Diagnostics, SearchTactics};
-use taxman::solver::SolveOptions;
 use taxman::tactics::Tactics;
 
 struct Options {
@@ -130,7 +129,7 @@ fn main() {
             std::process::exit(2);
         }
     };
-    let optimal = match SolveOptions::default().known_games(o.known.as_slice()) {
+    let optimal = match Optimal::built_in().with_results_files(o.known.as_slice()) {
         Ok(optimal) => optimal,
         Err(e) => {
             eprintln!("error: {e}");

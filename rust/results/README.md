@@ -1,7 +1,7 @@
 # Results of the Rust solver
 
 One JSON line per game, as `taxman solve --out` writes it (the fields are described in `src/results.rs` and in
-[../README.md](../README.md#a-results-line---out-schema-4)).  This page says what each file is, how it was made, and
+[../README.md](../README.md#a-results-line---out-schema-5)).  This page says what each file is, how it was made, and
 what supports the scores in it.  The counts in it are pinned by `tests/results.rs`, so changing a file means updating
 both together.
 
@@ -16,7 +16,11 @@ it until 2026-10 and agree with it (see "What supports the scores"): `default.js
 1000, made with the unproven tactics `reuse_prev` and `revise_freedoms` on, schema 1), which is gone from the tree
 (`git show f72c332:rust/results/default.jsonl` has it), and the cost-curve study's `bench/curve/chain.jsonl` (a chain
 1001–1231 with those tactics off, schema 1, commit e710d16), which stays as that study's data but is no longer a file
-the verifiers read: this build reads schema 4 only.
+the verifiers read.
+
+This build reads schema 5 only, and `strict.jsonl` is schema 4: until it is made again (the command below, without
+`--strict`, which is gone), neither verifier reads it and `tests/results.rs` skips it, saying so.  What this page says
+of it is what its schema-4 lines record, in which `taint` is the field that schema 5 calls `assumes`.
 
 ## strict.jsonl
 
@@ -88,15 +92,16 @@ n ≤ 62), and given that the solver is right.  Two checkers, each under a secon
     taxman verify-results results/strict.jsonl
     python3 tools/check_results.py results/strict.jsonl
 
-(from the `rust` directory; the proof kinds and the taint are defined in
+(from the `rust` directory; the proof kinds and the assumptions are defined in
 [DESIGN.md](../DESIGN.md#8-results-and-the-trust-model))
 
 The first is the solver's own (also run on any results file `solve --out` opens, and by `tests/results.rs`).  The
 second is an independent referee in Python that shares no code with the solver; it also checks every score against the
 Franklín–Moniot upper bound and the best-known heuristic chain in `heuristics/results`.  Both replay every game
-(legal, its recorded score, no legal move left, opening with the largest prime), check score(n − 1) ≤ score(n) ≤ n +
-score(n − 1), the arithmetic of each line and the predecessor it names, and that the files agree; both derive each
-line's proof kind and taint by the rules in `src/results.rs`.  They pass on the file.
+(legal, its recorded score, no legal move left, opening with the largest prime), confirm its score against
+optimal.json, check score(n − 1) ≤ score(n) ≤ n + score(n − 1), the arithmetic of each line and the predecessor it
+names, and that the files agree; both derive each line's proof kind and what it assumes by the rules in
+`src/results.rs`.  They passed on the file when it was read as schema 4.
 
 What that evidence amounts to:
 
@@ -130,20 +135,20 @@ What that evidence amounts to:
      games a search finds depends on its order.
    * The strict chain of commit bd9bb5d that `strict.jsonl` replaces had the same scores in all 1300 games, and the
      same moves in all but 1221–1224 (those of `chain.jsonl`).
-5. **Taint.**  `strict.jsonl` rests on nothing beyond the frame model: no unproven tactic was on, and it starts at
-   n = 1, so no game of it is built from optimal.json (which is only compared with: a mismatch would be a hard error),
-   and all 1300 games have an empty taint.
+5. **Assumptions.**  `strict.jsonl` assumes nothing beyond the frame model: no unproven tactic was on, and it starts
+   at n = 1, so no game of it is built from optimal.json (which is only compared with: a score that differs would be
+   a hard error), and all 1300 games record that they assume nothing.
 
 The checks cannot catch a game that is legal, finished and within the chain bounds but not optimal when the game of
-n − 1 is not optimal either.  That is what the proof kinds and the taint track, and why the chain from n = 1 and the
-standalone re-solves (3) matter.
+n − 1 is not optimal either.  That is what the proof kinds and the assumptions track, and why the chain from n = 1 and
+the standalone re-solves (3) matter.
 
 ## optimal.json
 
 optimal.json's games 1–1000 were made by the Java with `reuse_prev` and `revise_freedoms` on, and 1001–1300 are
 `strict.jsonl`'s, added by `taxman extend-optimal` (first from the chain of commit bd9bb5d, then from this file, which
-differs from it at 1221–1224 only).  The file records no proofs and no provenance, so a game taken from it counts as
-resting on that file (taint `optimal.json`), whichever game it is, and the results that rest on it say so; a chain
-that rests on nothing beyond the frame model starts at n = 1.  `strict.jsonl` is such a chain, and its games 1–1000
-reproduce optimal.json with no unproven tactic on: 416 repeats, 311 exhausted, 92 by the cap, 168 prime and 13
-trivial, 51 s of search in all on 4 threads, the slowest n = 992 at 13 s.
+differs from it at 1221–1224 only).  The file records no proofs and no provenance, so a game taken from it
+(`--use-prev`) is assumed optimal, and the results whose proofs rest on it say so ("the game of n in optimal.json is
+optimal"); a chain that assumes nothing beyond the frame model starts at n = 1.  `strict.jsonl` is such a chain, and its
+games 1–1000 reproduce optimal.json with no unproven tactic on: 416 repeats, 311 exhausted, 92 by the cap, 168 prime and
+13 trivial, 51 s of search in all on 4 threads, the slowest n = 992 at 13 s.

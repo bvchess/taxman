@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Step 1: the chain baseline, `taxman solve 1001-1231` with strict tactics, resumable.
+"""Step 1: the chain baseline, `taxman solve 1001-1231 --use-prev` with the default tactics, resumable.
 
 Each invocation runs the solver for at most `INVOCATION_BUDGET` seconds of wall time (see common.py) and then
 stops it; the results file and the per-game checkpoints let the next invocation continue (finished games are
@@ -26,9 +26,10 @@ def main():
 
     budget = Budget(args.budget)
     log_load(f"chain start (budget {args.budget} s)")
-    # The chain starts from optimal.json's game of 1000; the games whose proofs rest on it say so in their lines.
+    # The chain starts from optimal.json's game of 1000 (--use-prev); the games whose proofs rest on it assume it
+    # optimal, and their lines say so.
     cmd = [
-        str(TAXMAN), "solve", f"{args.first}-{args.last}", "--threads", str(args.threads),
+        str(TAXMAN), "solve", f"{args.first}-{args.last}", "--use-prev", "--threads", str(args.threads),
         "--out", args.out, "--checkpoint-dir", args.checkpoint_dir, "--progress", "0",
     ]
     proc = subprocess.Popen(cmd)

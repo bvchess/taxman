@@ -239,7 +239,7 @@ fn wide_boards_match_the_java() {
 /// `FrameSolver.solveBasedOnPrev` for a prime: the shortcut gives the game that the Java accelerated.
 #[test]
 fn acceleration_matches_java() {
-    let optimal = Optimal::load_default().unwrap();
+    let optimal = Optimal::built_in();
     let mut bad = Mismatches::default();
     let golden = load_golden();
     let mut primes = 0;

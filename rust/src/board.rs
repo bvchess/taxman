@@ -149,12 +149,12 @@ mod tests {
         // A board without candidates has one game, which is the one with no promotions.
         let trivial = Board::<8>::for_n(10);
         assert!(trivial.is_trivial());
-        assert_eq!(Some(trivial.in_the_bag), Optimal::load_default().unwrap().score(10));
+        assert_eq!(Some(trivial.in_the_bag), Optimal::built_in().score(10));
     }
 
     #[test]
     fn the_cap_and_the_seed_are_derived_from_the_previous_game() {
-        let optimal = Optimal::load_default().unwrap();
+        let optimal = Optimal::built_in();
         let board = Board::<8>::for_n(85);
         let (prev_score, prev_moves) = (optimal.score(84).unwrap(), optimal.moves(84).unwrap());
         // No game of 85 scores above 85 + opt(84), and every game scores in_the_bag + its promotions.

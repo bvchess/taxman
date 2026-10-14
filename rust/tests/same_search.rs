@@ -15,8 +15,9 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 use taxman::board::Board;
+use taxman::game::Optimal;
 use taxman::json::Json;
-use taxman::results::{verify_files, Proof, Taint, OPTIMAL_JSON};
+use taxman::results::{assumed_optimal, verify_files, Assumptions, Proof};
 use taxman::search::Problem;
 use taxman::solver::{self, GameResult, Method, SolveOptions, SAME_SEARCH_WINDOW};
 
@@ -65,7 +66,7 @@ fn compare(on: &[GameResult], off: &[GameResult], expected: &[(u32, u32)]) {
     assert_eq!(repeats_of(on), expected);
     assert!(off.iter().all(|g| g.method != Method::Repeat && g.same_search.is_none()));
     for g in on {
-        assert!(g.completed && g.taint.is_empty() && g.optimal_match == Some(true), "n={}: {g:?}", g.n);
+        assert!(g.completed && g.assumes.is_empty() && g.optimal_match == Some(true), "n={}: {g:?}", g.n);
         if let Some(same) = &g.same_search {
             let earlier = on.iter().chain(off).find(|e| e.n == same.n);
             let sum: u64 = g.promotions.iter().map(|&p| u64::from(p)).sum();
@@ -106,7 +107,7 @@ fn a_chain_from_1_repeats_exactly_the_searches_that_repeat() {
     let dir = TempDir::new("same-search-chain");
     let path = dir.join("on.jsonl");
     fs::write(&path, on.iter().map(|g| format!("{}\n", g.to_json())).collect::<String>()).unwrap();
-    let report = verify_files(std::slice::from_ref(&path), None).unwrap_or_else(|e| panic!("{e}"));
+    let report = verify_files(std::slice::from_ref(&path), Optimal::built_in()).unwrap_or_else(|e| panic!("{e}"));
     let games = &report.files[0].contents.games;
     assert_eq!(games.values().filter(|g| g.proof == Proof::SameSearch).count(), 107);
 }
@@ -131,7 +132,7 @@ fn a_range_run_again_repeats_the_searches_of_its_results_file() {
     let in_one_piece = solver::solve_range(1, 120, &options(true), None).unwrap();
     assert_eq!(repeats_of(&in_one_piece[64..]), expected);
     assert!(second.iter().zip(&in_one_piece[64..]).all(|(a, b)| (a.n, a.score) == (b.n, b.score)));
-    verify_files(std::slice::from_ref(&path), None).unwrap_or_else(|e| panic!("{e}"));
+    verify_files(std::slice::from_ref(&path), Optimal::built_in()).unwrap_or_else(|e| panic!("{e}"));
 }
 
 /// A game whose search was stopped with a checkpoint is resumed, not repeated, even when an earlier game posed its
@@ -163,29 +164,31 @@ fn a_game_with_a_checkpoint_is_resumed_not_repeated() {
     ];
     assert_eq!(methods, expected);
     assert_eq!((games[0].invocations, games[0].proof), (2, Some(Proof::Exhausted)), "265 was resumed");
-    assert!(games.iter().all(|g| g.taint.is_empty()));
+    assert!(games.iter().all(|g| g.assumes.is_empty()));
     assert!(!checkpoints.join("n0265.ckpt").exists());
-    verify_files(std::slice::from_ref(&path), None).unwrap_or_else(|e| panic!("{e}"));
+    verify_files(std::slice::from_ref(&path), Optimal::built_in()).unwrap_or_else(|e| panic!("{e}"));
 }
 
-/// A repeat rests on the game it repeats: 34 repeats 33, which built on optimal.json's 32 reaches its cap and so rests
-/// on optimal.json, and so does 34 then, though it ran no search.  Searched without the repeat and without the cap (a
-/// proof by the cap would rest on 33 too), 34 is an exhausted search and rests on nothing.
+/// A repeat assumes what the game it repeats assumes: 34 repeats 33, which, built on optimal.json's 32 (`--use-prev`),
+/// reaches its cap and so assumes that game optimal, and so does 34 then, though it ran no search.  Searched without
+/// the repeat and without the cap (a proof by the cap would rest on 33 too), 34 is an exhausted search and assumes
+/// nothing.
 #[test]
-fn a_repeat_rests_on_the_game_it_repeats() {
-    let dir = TempDir::new("same-search-taint");
-    let games = solver::solve_range(33, 34, &options(true), None).unwrap();
-    let optimal_json = Taint::from([OPTIMAL_JSON.to_owned()]);
-    assert_eq!((games[0].proof, &games[0].taint), (Some(Proof::Cap), &optimal_json));
-    assert_eq!(games[1].same_search.as_ref().map(|s| (s.n, &s.taint)), Some((33, &optimal_json)));
-    assert_eq!(games[1].taint, optimal_json);
+fn a_repeat_assumes_what_the_game_it_repeats_assumes() {
+    let dir = TempDir::new("same-search-assumes");
+    let use_prev = SolveOptions { use_prev: true, ..options(true) };
+    let games = solver::solve_range(33, 34, &use_prev, None).unwrap();
+    let optimal_json = Assumptions::from([assumed_optimal(32)]);
+    assert_eq!((games[0].proof, &games[0].assumes), (Some(Proof::Cap), &optimal_json));
+    assert_eq!(games[1].same_search.as_ref().map(|s| (s.n, &s.assumes)), Some((33, &optimal_json)));
+    assert_eq!(games[1].assumes, optimal_json);
 
     let path = dir.join("r.jsonl");
-    solver::solve_range(33, 33, &options(true), Some(&path)).unwrap();
+    solver::solve_range(33, 33, &use_prev, Some(&path)).unwrap();
     let mut uncapped = options(false);
     uncapped.tactics.prev_cap = false;
     let next = solver::solve_range(33, 34, &uncapped, Some(&path)).unwrap().remove(0);
     assert_eq!((next.n, next.method, next.proof), (34, Method::Search, Some(Proof::Exhausted)));
-    assert!(next.taint.is_empty());
-    verify_files(std::slice::from_ref(&path), None).unwrap_or_else(|e| panic!("{e}"));
+    assert!(next.assumes.is_empty());
+    verify_files(std::slice::from_ref(&path), Optimal::built_in()).unwrap_or_else(|e| panic!("{e}"));
 }

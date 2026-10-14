@@ -417,7 +417,7 @@ mod tests {
     /// `cargo run --release --example sacrifice -- validate 52`.
     #[test]
     fn small_punctured_boards_match_the_brute_force() {
-        let optimal = Optimal::load_default().unwrap();
+        let optimal = Optimal::built_in();
         let opts = PuncturedOptions::default();
         for n in 1..=36u32 {
             let (full, full_score) = (optimal.moves(n).unwrap(), optimal.score(n).unwrap());
@@ -434,7 +434,7 @@ mod tests {
     /// The two boards on which a first version of the punctured frame model went wrong.
     #[test]
     fn punctured_boards_that_once_failed() {
-        let optimal = Optimal::load_default().unwrap();
+        let optimal = Optimal::built_in();
         let opts = PuncturedOptions::default();
         // Without 16, 8 has no maximal composite; were it a source (a move the model always plays) the model would
         // play 8 and miss 9: [17, 9, 15, 10, 18, 14, 12] scores 95.
@@ -465,7 +465,7 @@ mod tests {
     /// sample of boards that need W = 16 (0.5 s in all).
     #[test]
     fn the_bound_holds_and_is_tight_for_primes() {
-        let optimal = Optimal::load_default().unwrap();
+        let optimal = Optimal::built_in();
         let opts = PuncturedOptions::default();
         let mut tight = 0;
         for n in (2..=200u32).chain([500, 600, 609, 611, 660, 700]) {

@@ -28,7 +28,7 @@ about scaling beyond 8 threads or about Graviton5 has been measured (section 8).
    up to its 8 threads (section 3).
 3. The big instance, on-demand, for the checks: the large-machine tests, the sweep to 192 threads, the cost of a
    checkpoint pause, and a rehearsal of the whole chain to 1231 with forced interruptions (section 4).
-4. The production chain, strict, from n = 1 or from the committed `results/strict.jsonl` (which holds it to 1300), in
+4. The production chain, from n = 1 or from the committed `results/strict.jsonl` (which holds it to 1300), in
    tmux, on spot or on-demand, with a deadline and a copy of the state kept off the machine (section 5).
 5. Verify, bring the results home, shut everything down (section 6).
 
@@ -39,7 +39,7 @@ The files in this directory:
 | `env.sh` | settings and helpers the scripts share (paths, defaults, `env_report`); sourced, not run |
 | `setup.sh` | packages, Rust, the checkout, the build (`target-cpu=native`), smoke checks and the tests; idempotent |
 | `scaling.sh` | the scaling sweep (`--engine`: the engine benchmark; `--pauses`: the cost of checkpoints; `--quick`) |
-| `chain.sh N` | the production run: the strict chain 1..N in a loop, resumable, logged, optional deadline and power-off |
+| `chain.sh N` | the production run: the chain 1..N in a loop, resumable, logged, optional deadline and power-off |
 | `verify.sh [FILE...]` | both referees on a results file, and against the committed results |
 | `save.sh` | copy results, logs and checkpoints to S3 (`--restore` on a fresh machine) |
 | `spot-watch.sh` | on a spot interruption notice: stop `chain.sh` cleanly and save |
@@ -53,13 +53,12 @@ checkpoints, `taxman.lock`), `logs/`, `chain.pid`, `deadline`.  Nothing is writt
 
 ### What is being computed
 
-`chain.sh N` runs `taxman solve 1-N --strict` (no unproven tactic: `--tactic reuse_prev=off --tactic
-revise_freedoms=off`) into one results file:
-every game from n = 1, each built from the one before, with no unproven tactic.  Nothing rests on `optimal.json` (it is
-only compared with, to n = 1300).  The committed `results/strict.jsonl` is exactly such a file for n = 1 to 1300, made
-on a laptop ([results/README.md](../../results/README.md)): a run from n = 1 reproduces its scores (the run is checked
-against it by `verify.sh`), and the production chain can instead start from it, as section 5 says, so that only the
-games above 1300 are new.  The solver is the same code as on a laptop; the machine only changes how long it takes.
+`chain.sh N` runs `taxman solve 1-N` into one results file: every game from n = 1, each built from the one before.
+Nothing is taken from `optimal.json` (it is only compared with, to n = 1300), so nothing assumes it.  The committed
+`results/strict.jsonl` is exactly such a file for n = 1 to 1300, made on a laptop
+([results/README.md](../../results/README.md)): a run from n = 1 reproduces its scores (the run is checked against it by
+`verify.sh`), and the production chain can instead start from it, as section 5 says, so that only the games above 1300
+are new.  The solver is the same code as on a laptop; the machine only changes how long it takes.
 
 Cost grows by a factor of 10 for every 55 to 70 in n past 1200 ([bench/curve/README.md](../../bench/curve/README.md)).
 From that file, the cost of extending the chain from 1231 to N on a 192-core machine, taking it to be 10 to 19 times
@@ -249,9 +248,9 @@ GAMES=1230 THREADS=4,16,64,192 rust/tools/cloud/scaling.sh    # a longer proof, 
 ```
 
 Each ladder line is a search of one game at one thread count, with the optimum given as the starting incumbent
-(`--seed-opt`) so that the work is the proof alone and the node count barely depends on the threads, strict tactics, and
-the cap of the chain.  The tables are printed per game and for all games together.  Run it on an idle machine; the log
-(`~/taxman-work/logs/scaling-*.txt`) starts with the machine and the build.
+(`--seed-opt`) so that the work is the proof alone and the node count barely depends on the threads, the default
+tactics, and the cap of the chain.  The tables are printed per game and for all games together.  Run it on an idle
+machine; the log (`~/taxman-work/logs/scaling-*.txt`) starts with the machine and the build.
 
 ### 4.3 Reading the sweep
 
@@ -298,7 +297,7 @@ Notes on judging it:
 
 ### 4.4 The cost of a checkpoint
 
-`scaling.sh --pauses` solves game 1230 (from the committed chain up to 1229) at all CPUs, strict, with a checkpoint every 0.5 s,
+`scaling.sh --pauses` solves game 1230 (from the committed chain up to 1229) at all CPUs, with a checkpoint every 0.5 s,
 and prints the progress line of the end: `pauses N (x%) max Yms park Zms`.  `x` is the share of the workers' time spent
 parked in checkpoints at that absurd rate; at the real interval of 60 s the share is 120 times smaller.  `max` is the
 longest pause (the wait for the slowest worker, then writing and `fsync`-ing a few MB to EBS), and `park` the longest
@@ -315,12 +314,11 @@ TAXMAN_WORK=~/rehearsal EXTRA_ARGS="--time-limit 5" rust/tools/cloud/chain.sh 12
 ```
 
 It takes minutes.  The log (`~/rehearsal/logs/chain.log`) shows each pass; at the end `verify.sh` runs both referees on
-the new file and the committed ones.  **Pass = the chain completes, "both referees agree", and the line `1231 board
-sizes are in more than one file, with equal scores in all`** (the scores of 1..1231 equal the committed strict chain's,
-and those of 1001..1231 the other two files'; the moves may differ, which is allowed).  A strict game that was stopped
-and resumed is no different from one that ran in one piece (`"taint":[]`, `setup.revise` `Off`), so the chain goes on
-from it.  Then the two harder interruptions, by hand, with `TAXMAN_WORK` exported as `~/rehearsal2` in both tmux
-windows:
+the new file and the committed one.  **Pass = the chain completes, "both referees agree", and the line `1231 board sizes
+are in more than one file, with equal scores in all`** (the scores of 1..1231 equal the committed chain's; the moves may
+differ, which is allowed).  A game that was stopped and resumed is no different from one that ran in one piece
+(`"assumes":[]`), so the chain goes on from it.  Then the two harder interruptions, by hand, with `TAXMAN_WORK` exported
+as `~/rehearsal2` in both tmux windows:
 
 ```
 rust/tools/cloud/chain.sh 1231                    # window 1
@@ -343,7 +341,7 @@ tmux new -s tx
 DEADLINE_HOURS=30 POWEROFF=always S3_DEST=s3://YOUR-BUCKET/taxman-run1 rust/tools/cloud/chain.sh 1400
 ```
 
-In a second window, if spot: `rust/tools/cloud/spot-watch.sh`.  `chain.sh N` is the whole command: the strict chain 1..N
+In a second window, if spot: `rust/tools/cloud/spot-watch.sh`.  `chain.sh N` is the whole command: the chain 1..N
 into `~/taxman-work/results/strict.jsonl`, all CPUs, a checkpoint and a progress line every 60 s.  Its variables (all
 optional) are documented at the top of the script: `THREADS`, `CHECKPOINT_INTERVAL`, `PROGRESS`, `EXTRA_ARGS`,
 `DEADLINE_HOURS`, `POWEROFF`, `MAX_FAILS`, `S3_DEST`, `SAVE_EVERY`.
@@ -358,7 +356,7 @@ optional) are documented at the top of the script: `THREADS`, `CHECKPOINT_INTERV
   rust/tools/cloud/chain.sh 1400                    # skips the 1300 games it holds and solves 1301 on
   ```
 
-  The file is checked when `chain.sh` opens it, rests on nothing unproven (a strict run builds on it), and its lines
+  The file is checked when `chain.sh` opens it, assumes nothing (a chain from n = 1), and its lines
   keep the build that made them (commit 243af9b), as the lines added will keep the cloud's.  It was made in one
   invocation and holds no incomplete line.  The comparison of `verify.sh` with the committed file is then
   trivial for 1..1300, so the games above 1300 are checked by the referees alone (each game replayed, the chain
@@ -438,12 +436,12 @@ appended and synced one at a time; a torn last line is dropped when the file is 
 rust/tools/cloud/verify.sh results-from-cloud/strict.jsonl
 ```
 
-It runs `taxman verify-results` and `tools/check_results.py` on the file together with the three committed ones
-(`results/default.jsonl`, `results/strict.jsonl`, `bench/curve/chain.jsonl`): every game replayed legally and finished
-and opening with the largest prime, the chain bounds `score(n-1) <= score(n) <= n + score(n-1)`, each line's arithmetic and
-provenance, the Franklin-Moniot bound and the best heuristic chain, and that every board size shared with a committed
-file has the same score.  For a clean strict chain from 1: the report says `taint: N of N games rest on nothing unproven`.
-Any other taint, or any problem line, means the run is not what it should be: stop and read the line.  (A count of
+It runs `taxman verify-results` and `tools/check_results.py` on the file together with the committed
+`results/strict.jsonl`: every game replayed legally and finished and opening with the largest prime, its score
+confirmed against `optimal.json`, the chain bounds `score(n-1) <= score(n) <= n + score(n-1)`, each line's arithmetic
+and provenance, the Franklin-Moniot bound and the best heuristic chain, and that every board size shared with the
+committed file has the same score.  For a chain from 1: the report says `assumptions: none in N of N games`.  Any
+assumption, or any problem line, means the run is not what it should be: stop and read the line.  (A count of
 incomplete lines is not a problem: every search that was stopped and resumed left one.)
 
 Then decide what to keep.  The file is about 2 KB per game.  The committed `results/` must not be overwritten by
@@ -452,8 +450,9 @@ scaling logs under `bench/` (say `bench/cloud/`), are your call.
 
 To put the new games into the table of optimal games, run `taxman extend-optimal` on the verified file from a checkout:
 `taxman extend-optimal results-from-cloud/strict.jsonl --out /tmp/optimal.json`.  It appends the games past the table's
-end that the file completed with an empty taint, and says where it stopped; check the result with `taxman
-verify-optimal /tmp/optimal.json` and `diff`, then copy it over `src/main/resources/optimal.json`.
+end that the file completed, and says where it stopped; check the result with `taxman verify-optimal /tmp/optimal.json`
+and `diff`, then copy it over `src/main/resources/optimal.json` and rebuild: the binary carries the table it was built
+with.
 
 ## 7. When something goes wrong
 
@@ -466,7 +465,6 @@ verify-optimal /tmp/optimal.json` and `diff`, then copy it over `src/main/resour
 | `cannot resume from ...` for another game or build | delete the named `.ckpt` file; the game restarts from its beginning |
 | the solver exits with status 137 | the OOM killer or a spot reclaim; `chain.sh` retries; look at `dmesg` if it repeats (it should not: memory use is tiny) |
 | `rustc ... older than 1.89` / an error about `try_lock` | `rustup update stable`; `setup.sh` does this when rustup is present |
-| `optimal.json` not found | the binary looks for `src/main/resources/optimal.json` at run time, above the working directory and then above the binary (`src/paths.rs`), and neither is inside a checkout: run from inside one, or pass `--optimal FILE` or set `TAXMAN_OPTIMAL` |
 | `eff` low and `idle` high on a short game at 192 threads | expected (section 4.3); judge long games |
 | `lock` of several percent on long games | the shared deque is contended: report it; fewer threads is the immediate remedy (`THREADS=96`) |
 | `/tmp` or `$TAXMAN_WORK` is a memory filesystem | `chain.sh` refuses: set `TAXMAN_WORK` to a directory on EBS |

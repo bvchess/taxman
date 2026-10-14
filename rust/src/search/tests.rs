@@ -314,7 +314,7 @@ fn tactics_do_not_change_answers() {
             }
         }
     }
-    assert!(differences.is_empty(), "AN UNPROVEN TACTIC CHANGES ANSWERS:\n{}", differences.join("\n"));
+    assert!(differences.is_empty(), "A TACTIC CHANGES ANSWERS:\n{}", differences.join("\n"));
 }
 
 /// The searches of these games are shorter than [`NOGOOD_PERIOD`] steps, so they never forget with it: forget
@@ -549,7 +549,8 @@ fn bench_search_one() {
         ..config(threads)
     };
     // What optimal.json says the best promotion sum is, and the `prev_cap` ceiling.
-    if let Ok(optimal) = crate::game::Optimal::load_default() {
+    {
+        let optimal = crate::game::Optimal::built_in();
         let in_the_bag: u64 =
             crate::hives::Apiary::<16>::new(&tables, Bits::EMPTY).solution().iter().map(|&x| u64::from(x)).sum();
         let best = optimal.score(n).map(|s| s - in_the_bag);

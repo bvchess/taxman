@@ -119,7 +119,7 @@ fn a_slice_of_the_chain_reproduces_the_results() {
         assert!(r.completed, "n={n}");
         assert_eq!(r.score, games[&n].0, "n={n}");
         searched += usize::from(r.method == Method::Search);
-        prev = Prev { moves: r.moves, score: r.score, source: PrevSource::Run, proof: r.proof, taint: r.taint };
+        prev = Prev { moves: r.moves, score: r.score, source: PrevSource::Run, proof: r.proof, assumes: r.assumes };
     }
     assert!(searched >= 5, "{searched} of the 8 games were searched");
 }
@@ -214,7 +214,7 @@ fn a_committed_checkpoint_of_a_w32_game_resumes() {
     assert!(r.completed && r.method == Method::Search);
     assert_eq!(r.score, games[&1133].0);
     assert_eq!(r.invocations, 2, "the game was resumed, not started over");
-    assert!(r.taint.is_empty(), "{:?}", r.taint);
+    assert!(r.assumes.is_empty(), "{:?}", r.assumes);
     assert!(r.nodes > 1000, "{} nodes in all, 1,000 of them before the checkpoint", r.nodes);
     assert!(!checkpoint.exists(), "a finished game removes its checkpoint");
 }

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Where the time of a hard game goes (docs/IDEAS.md, section 2): solves game N of the strict chain for SECONDS on
+# Where the time of a hard game goes (docs/IDEAS.md, section 2): solves game N of the chain from 1 for SECONDS on
 # THREADS threads, as the chain solves it (its predecessor from a copy of results/strict.jsonl cut before N), samples
 # it with macOS `sample` every millisecond, and charges each sample to a kind of work and a purpose (attribute.py).
 #

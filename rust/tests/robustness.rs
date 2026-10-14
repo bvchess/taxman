@@ -21,7 +21,7 @@ use taxman::board::Board;
 use taxman::engine::{self, Ctx, EngineConfig, Poll, Searcher, Start, Unit};
 use taxman::json::Json;
 use taxman::search::{self, SearchTactics, TaxUnit};
-use taxman::solver::{self, OptimalSource, SolveOptions};
+use taxman::solver::{self, SolveOptions};
 
 // ------------------------------------------------------------------------------------------------------------
 // A tree of known size
@@ -490,7 +490,7 @@ fn options(dir: &Path) -> SolveOptions {
 #[test]
 fn a_checkpoint_renamed_to_another_game_is_refused() {
     let dir = TempDir::new("renamed");
-    let opts = SolveOptions { time_limit: Some(Duration::ZERO), optimal: OptimalSource::None, ..options(&dir.0) };
+    let opts = SolveOptions { time_limit: Some(Duration::ZERO), ..options(&dir.0) };
     assert!(!solver::solve_game(140, None, &opts).unwrap().completed);
     fs::copy(dir.join("n0140.ckpt"), dir.join("n0141.ckpt")).unwrap();
     let err = solver::solve_game(141, None, &opts).unwrap_err();
@@ -535,7 +535,7 @@ fn a_checkpoint_whose_frame_zero_its_search_cannot_have_had_is_refused() {
     let n = 300;
     let board = Board::<8>::for_n(n);
     let dir = TempDir::new("frame0");
-    let opts = SolveOptions { time_limit: Some(Duration::ZERO), optimal: OptimalSource::None, ..options(&dir.0) };
+    let opts = SolveOptions { time_limit: Some(Duration::ZERO), ..options(&dir.0) };
     let checkpoint = dir.join("n0300.ckpt");
     let f0 = board.prepare(opts.tactics.search).unwrap().root.frames()[0].freedoms;
     for forged in [f0 - 1, f0 + 1, 0] {
@@ -653,14 +653,14 @@ fn a_checkpoint_directory_in_use_is_refused() {
     assert!(stderr.contains("in use by another process"), "{stderr}");
 }
 
-/// Runs `solve 944` with progress lines, and once the search is under way sends `signal` (if any); returns the
-/// exit status and stdout.
+/// Runs `solve 944` (on optimal.json's game of 943) with progress lines, and once the search is under way sends
+/// `signal` (if any); returns the exit status and stdout.
 #[cfg(unix)]
 fn solve_944(dir: &TempDir, signal: Option<&str>) -> (ExitStatus, String) {
     let out = dir.join("results.jsonl");
     let ckpt = dir.join("ckpt");
     let mut child = taxman()
-        .args(["solve", "944", "--force-search", "--threads", "2", "--progress", "0.02"])
+        .args(["solve", "944", "--use-prev", "--force-search", "--threads", "2", "--progress", "0.02"])
         .args(["--out".as_ref(), out.as_os_str(), "--checkpoint-dir".as_ref(), ckpt.as_os_str()])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
