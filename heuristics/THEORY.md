@@ -660,6 +660,104 @@ most one move short of a longest one.  A search that pruned the
 branches unable to reach M(n) moves would be unsound: at 833 it would
 return 218,197.  Whether the gap is bounded in general is open.
 
+## A bound from two matroids
+
+The lemma behind Theorem 7 gives every playable set independent
+vectors, but one linear matroid cannot bound a weighted game well:
+the remark above shows that no matroid is exact for the whole game,
+and the GF(2) rank alone counts members without weighing them.  Two
+matroids can: playable sets are independent in both, and the heaviest
+set independent in both (weighted matroid intersection, solvable in
+polynomial time) bounds the heaviest playable set.
+
+**Theorem 10 (two GF(2) matroids).**
+
+1. *The whole game.*  For each s in {2, …, n} let v(s) be the vector
+   over GF(2), indexed by 1, …, ⌊n/2⌋, with a 1 at each maximal
+   factor of s, and e_s the unit vector of s if s ≤ n/2.  If S is
+   playable, the vectors {v(s) : s ∈ S} ∪ {e_s : s ∈ S, s ≤ n/2} are
+   linearly independent.  Every maximal factor of s has one prime
+   factor fewer than s (Ω(s) − 1), so v(s) lies in the coordinates of
+   the other parity of Ω than s and e_s in those of its own; let A
+   assign each s its vector among the coordinates of even Ω (v(s) if
+   Ω(s) is odd, e_s if Ω(s) is even, and a coordinate of its own if
+   s > n/2 has none there), and B likewise among those of odd Ω.  Then
+   every playable set is independent in the linear matroids A and B on
+   {2, …, n}, and opt(n) is at most the weight of their heaviest common
+   independent set, each s weighing s.
+2. *The frame model.*  Give each frame h of a state the coordinates
+   of its factors, each mover u paying in h (a move of h, or a number
+   of home h + 1 promoted into it) the vector v_h(u) of its maximal
+   factors among them, and each factor y of h the unit vector e_y.  If
+   a set Q of candidates can be promoted, then in every frame h the
+   vectors of its moves, the v_h(x) of Q's members promoted into h and
+   the e_y of Q's members promoted out of h are linearly independent.
+   So Q is independent in the matroid of each frame on the candidates
+   that touch it (the frame's moves contracted); a candidate of home h
+   touches frames h and h − 1, one even and one odd, so the even
+   frames' matroids are the blocks of a matroid A on the candidates and
+   the odd frames' of a matroid B, and Q is independent in both.  The
+   heaviest common independent set of A and B bounds the best
+   promotion set.  At a node reached by promoting P, a completion F
+   makes P ∪ F promotable from the root, so F is independent in A and
+   B contracted by P: the bound of the node is the heaviest common
+   independent set of the contractions.
+
+*Proof.*  (1) In a legal game each pick pays with a maximal factor
+still in the pot (the lifting argument of Theorem 1).  That factor is
+no maximal factor of an earlier pick, which would have taken it, and
+it is not a member of S, since it is taken now and was not played
+before.  So in any vanishing sum of the vectors v(s), restricted to
+the coordinates outside S, the last-played member of the sum has a
+coordinate no other member of the sum has: the restricted vectors are
+independent.  A sum of the v(s) that vanishes off S is a sum of unit
+vectors e_s with s ∈ S, so independence restricted to the coordinates
+outside S is independence of the v(s) together with those unit
+vectors.  A set of vectors each of which lies in one of two
+complementary sets of coordinates is independent exactly when the
+part in each is (a dependency splits into one on each side); each
+s has exactly one vector on each side of the parity split (the extra
+coordinates of the numbers above n/2 are free), which gives A and B.
+The bound follows: a playable set is common independent, and weighs
+at most the heaviest common independent set.
+
+(2) Promoting Q succeeds exactly when every frame is winnable with
+all of Q applied at once, its moves plus Q's members promoted into it
+and its factors less Q's members promoted out of it (rust/DESIGN.md,
+section 4; `model::promote`).  A winnable frame peels completely
+(`model::peel`): each move dropped has a live factor that no move
+still there has, so as in (1) the movers' vectors restricted to the
+live factors are independent, which is independence together with
+the unit vectors of the factors taken out.  The moves of a frame are
+fixed, so the frame's condition is independence of Q's part in the
+contraction by them; frames have disjoint coordinates, and the even
+and odd frames' contractions are the blocks of A and B.  At a node, F
+completes P exactly when P ∪ F is promotable from the root, so P ∪ F
+is independent in A and in B, and F is independent in their
+contractions by P (which P, independent, makes well defined).  ∎
+
+Three facts about the bound.  It is never above the matching bound
+of rust/DESIGN.md: linearly independent vectors have a system of
+distinct representatives (a nonzero maximal minor has a nonzero
+term), and in each frame that is an assignment of the movers to
+distinct live factors in which each unit vector e_y takes y itself,
+so no promoted number pays as a factor: the matching bound's
+relaxation, frame by frame.  On movers with at most two live factors
+(graph edges, with a ground vertex for one) independence over GF(2)
+is being a forest, which is winnability itself, so what the bound
+misses are the *odd* cores of movers with three or more factors:
+self-covering sets no subset of which lists every factor an even
+number of times (the residual cores at the roots of 936-1300 hold
+18-65 movers, and Lorea's matroid misses them too).  And it is no
+matroid relaxation: two matroids, so the remark above does not apply
+to it.  The bound of form (1) equals in_the_bag plus that of form (2)
+at every root of 880-1300; its gap to opt(n) is a tenth of the
+Franklín–Moniot matching bound's to 1300.  The measurements are in
+rust/docs/EXPERIMENTS.md ("Matroid intersection bounds", "The GF(2)
+bound in the search"); the search's tactic `gf2` uses form (2), and
+its forced members rest on weak duality for a weight split (Frank's
+theorem; `gf2::meet`).
+
 ## Evidence
 
 Standing status for (★): zero counterexamples anywhere, and certified
@@ -686,6 +784,7 @@ the adversarial experiments: `rust/evidence/README.md`.
 | Victim law: a single sacrifice repairs iff it lies in every minimal core | 22,998 trials, 0 exceptions | machine-cross-checked lemma |
 | Greedy weight-optimal where the jam is hyperedge-free | — | proven (frontier argument) |
 | Playable sets are GF(2)-independent; (♦) implies (★) and the upper-half conjecture | — | proven (span certificate, Thm 7) |
+| Playable sets (and promotable sets of the frame model) are independent in two GF(2) matroids, whose heaviest common independent set bounds opt(n) (and the best promotion set) | bound ≥ opt(n) for every n ≤ 1300; every promotable set of every board with ≤ 22 candidates independent; the solver's best completion never above it at the probe's nodes | proven (Thm 10) |
 | (♦): every greedy rejection is a GF(2) dependency of the kept members above it | every game n = 2..100,000 and 902 samples to 2,000,000; 0 violations | certified per game; open in general |
 | U\* is the unique heaviest playable upper set, every playable upper set termwise below it | follows from (★); brute force (`certify.py`) to 62 | proven given (★) (Thm 8), so certified per game to 100,000 |
 | Optimal sets of n from those of n−1 (chain: T ∪ {n}; prime: T − p + n, a bijection); every optimal set holds the largest prime and no other | derivation = direct enumeration on every chain and prime game to 700 | proven (Thm 9, lemma) |

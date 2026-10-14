@@ -370,6 +370,40 @@ impl<const R: usize> Meet<R> {
         }
     }
 
+    /// The weight and size of a common independent set of the elements `live` (ascending) found greedily: `base` (common
+    /// independent), then each other element by decreasing weight that keeps it so.  A lower bound on the heaviest
+    /// common independent set, for a few reductions per element.
+    pub fn greedy_from(&mut self, p: &Problem<'_, R>, live: &[u32], base: &[u32]) -> (i64, usize) {
+        // The workspace no longer holds the last solve.
+        self.solves += 1;
+        for &e in live {
+            self.inside[e as usize] = false;
+        }
+        for spans in &mut self.spans {
+            for s in spans {
+                s.clear();
+            }
+        }
+        let (mut total, mut size) = (0, base.len());
+        for &e in base {
+            let added = self.insert_both(p, e);
+            debug_assert!(added, "the base of a greedy set is common independent");
+            self.inside[e as usize] = true;
+            total += p.weight[e as usize];
+        }
+        for &e in live.iter().rev() {
+            let i = e as usize;
+            if !self.inside[i] && self.insert_both(p, e) {
+                total += p.weight[i];
+                size += 1;
+            }
+        }
+        for &e in base {
+            self.inside[e as usize] = false;
+        }
+        (total, size)
+    }
+
     /// Moves `e`, just flipped, to the list of its new side.
     #[inline]
     fn move_list(&mut self, p: &Problem<'_, R>, e: u32) {

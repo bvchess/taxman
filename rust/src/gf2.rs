@@ -310,6 +310,11 @@ pub struct Gf2Stats {
     pub rebuilds: u64,
     /// The weight splits' Bellman–Ford rounds.
     pub split_rounds: u64,
+    /// Of the solves and augmentations, those of [`Gf2Bound::value_excluding`] (strong branching).
+    pub excluded_solves: u64,
+    pub excluded_augmentations: u64,
+    /// Of those, the ones a greedy lower bound settled with no solve.
+    pub greedy_stops: u64,
 }
 
 impl<'g, const W: usize> Gf2Bound<'g, W> {
@@ -593,12 +598,38 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
 
     fn value_excluding(&mut self, x: u32, cap: usize, stop: u64) -> u64 {
         let level = &self.levels[self.depth];
+        // A lower bound first: the level's heaviest set without x, completed greedily.  If it reaches `stop`, so
+        // does the bound without x, and no solve is needed.
+        if stop != u64::MAX && level.solved {
+            if let Some(&last) = level.history.last() {
+                let graph = self.graph;
+                self.live_idx.clear();
+                self.live_idx.extend(level.live.iter().filter(|&y| y != x).map(|y| graph.index[y as usize]));
+                self.start_idx.clear();
+                self.start_idx.extend(last.iter().filter(|&y| y != x).map(|y| graph.index[y as usize]));
+                let problem = Problem {
+                    block: [&graph.block[0], &graph.block[1]],
+                    vector: [&level.vec[0], &level.vec[1]],
+                    weight: &graph.weight,
+                };
+                let (lower, size) = self.meet.greedy_from(&problem, &self.live_idx, &self.start_idx);
+                // A greedy set larger than the limit proves nothing about the limited bound.
+                if lower as u64 >= stop && size <= cap {
+                    self.stats.greedy_stops += 1;
+                    self.scratch_for = None;
+                    return lower as u64;
+                }
+            }
+        }
         self.scratch.copy_from(level);
         self.scratch.history.extend(level.history.iter().filter(|set| !set.contains(x)));
         self.scratch.live.remove(x);
         let (s, meet, live_idx, start_idx) =
             (&mut self.scratch, &mut self.meet, &mut self.live_idx, &mut self.start_idx);
+        let before = self.stats.augmentations;
         solve(self.graph, s, meet, live_idx, start_idx, cap, stop, &mut self.stats);
+        self.stats.excluded_solves += 1;
+        self.stats.excluded_augmentations += self.stats.augmentations - before;
         self.scratch_for = self.scratch.solved.then_some(x);
         self.scratch.value
     }

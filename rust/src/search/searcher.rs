@@ -108,6 +108,9 @@ pub struct SearchSpace<'a, const W: usize> {
     pub gf2_prefilter: bool,
     /// With `gf2`: how a node chooses the member of its conflict to branch on.
     pub gf2_branching: Gf2Branching,
+    /// With [`Gf2Branching::Exact`]: how many members of a conflict (the most promising by their split bounds) are
+    /// solved exactly; the others are not tried.
+    pub gf2_strong_limit: usize,
 }
 
 /// How a node chooses the member of its conflict to branch on with the tactic `gf2` (strong branching asks what each
@@ -150,6 +153,7 @@ impl<'a, const W: usize> SearchSpace<'a, W> {
             gf2: tactics.gf2.then(|| Gf2Graph::new(&prepared.model, &prepared.root, &prepared.candidates)),
             gf2_prefilter: false,
             gf2_branching: Gf2Branching::Exact,
+            gf2_strong_limit: usize::MAX,
         }
     }
 }
@@ -823,15 +827,12 @@ impl<'a, const W: usize> Stepper<'a, W> {
                     if to_need {
                         best.1 = u32::MAX - order[0].1;
                     }
-                    for &(_, key) in order.iter() {
+                    for &(_, key) in order.iter().take(space.gf2_strong_limit.max(1)) {
                         let x = u32::MAX - key;
                         // A solve that stops has a value of at least `stop`, which is never below `need`: only a
                         // solve that ran to the end can show a member forced.
-                        let stop = if to_need || (space.fix_forced && !forced.is_empty()) {
-                            need
-                        } else {
-                            best.0.max(need)
-                        };
+                        let stop =
+                            if to_need || (space.fix_forced && !forced.is_empty()) { need } else { best.0.max(need) };
                         let bound = g.value_excluding(x, node.max_add, stop);
                         if bound < need {
                             forced.insert(x);
@@ -943,7 +944,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
             stats.extra[stat::GF2_SOLVES] += now.solves - before.solves;
             stats.extra[stat::GF2_AUGMENTATIONS] += now.augmentations - before.augmentations;
             stats.extra[stat::GF2_INHERITED] += now.inherited - before.inherited;
-            stats.extra[stat::GF2_SPLITS] += now.splits - before.splits;
+            stats.extra[stat::GF2_SPLITS] += now.excluded_augmentations - before.excluded_augmentations;
             self.gf2_flushed = now;
         }
         if let Some(p) = &mut self.probe {

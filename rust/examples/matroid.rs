@@ -313,6 +313,7 @@ struct Options {
     tactics: SearchTactics,
     prefilter: bool,
     branching: Gf2Branching,
+    strong: usize,
     threads: usize,
     seconds: Option<u64>,
 }
@@ -335,6 +336,7 @@ fn parse() -> Result<Options, String> {
         tactics: SearchTactics::default(),
         prefilter: false,
         branching: Gf2Branching::Exact,
+        strong: usize::MAX,
         threads: 1,
         seconds: None,
     };
@@ -355,6 +357,9 @@ fn parse() -> Result<Options, String> {
                 o.tactics = t.search;
             }
             "--prefilter" => o.prefilter = true,
+            "--strong" => {
+                o.strong = args.next().ok_or("--strong needs a value")?.parse().map_err(|e| format!("{e}"))?
+            }
             "--branching" => {
                 o.branching = match args.next().ok_or("--branching needs a value")?.as_str() {
                     "largest" => Gf2Branching::Largest,
@@ -1212,8 +1217,12 @@ fn prove<const W: usize>(n: u32, known: &Known, o: &Options) {
     };
     let p = board.prepare(o.tactics).expect("prepare");
     let graph = MatchGraph::new(&p.model, &p.root);
-    let space =
-        SearchSpace { gf2_prefilter: o.prefilter, gf2_branching: o.branching, ..SearchSpace::new(&p, &graph, None) };
+    let space = SearchSpace {
+        gf2_prefilter: o.prefilter,
+        gf2_branching: o.branching,
+        gf2_strong_limit: o.strong,
+        ..SearchSpace::new(&p, &graph, None)
+    };
     let cfg = EngineConfig {
         threads: o.threads,
         time_limit: o.seconds.map(std::time::Duration::from_secs),
