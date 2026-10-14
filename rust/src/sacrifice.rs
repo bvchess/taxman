@@ -92,17 +92,17 @@
 //! # Computing it
 //!
 //! [`punctured`] computes `opt_M(B)` for `B = [n] ∖ {hole}` with the frame model on [`Tables::punctured`]: the
-//! hole is in no hive and no factor or composite list ([`Apiary`](crate::hives::Apiary)), so the frame model
-//! plays exactly the maximal-factor rule.  Two things had to be right for that, both found by the brute force:
-//! the sources stay the numbers above `n/2` (a number whose only maximal composite is the hole is optional, not a
-//! source, which the model plays), and the hives are ordered through the hole (a number still sweeps divisors
-//! whose maximal-factor chain to it passes through the hole).  The frame model's own assumptions (greedy
-//! impossible sources, mandatory moves, closed hives, one-frame promotions; DESIGN.md §2 and §5, and
+//! hole is in no frame and no factor or composite list ([`Apiary`](crate::hives::Apiary), the board's frames), so
+//! the frame model plays exactly the maximal-factor rule.  Two things had to be right for that, both found by the
+//! brute force: the sources stay the numbers above `n/2` (a number whose only maximal composite is the hole is
+//! optional, not a source, which the model plays), and the frames are ordered through the hole (a number still
+//! sweeps divisors whose maximal-factor chain to it passes through the hole).  The frame model's own assumptions
+//! (greedy impossible sources, mandatory moves, closed frames, one-frame promotions; DESIGN.md §2 and §5, and
 //! [`crate::hives`]) apply to punctured boards as they do to `[n]`, and they are only validated, not proven: against
 //! the brute force
 //! ([`crate::brute`]) on every board `[N] ∖ {h}` with `N ≤ 52`.  A bound computed this way is as sound as the frame
-//! model, no more.  Each punctured game is warm-started from an optimal game of the unpunctured board, which caps
-//! it: if that game replays on the punctured board, its score is the answer with no search.
+//! model, no more.  Each punctured game is warm-started from an optimal game of the unpunctured board, which is its
+//! ceiling: if that game replays on the punctured board, its score is the answer with no search.
 //!
 //! # Findings (the negative result)
 //!
@@ -118,8 +118,8 @@
 //!   were semiprimes.
 //! * A punctured game is about as hard as game `n` itself (for `pq` the two searches nearly copy the direct one),
 //!   so on the games it proves the bound costs 1.1–8.7 times the direct search (median 2.0, 1001–1199).  Putting
-//!   it between the cap and the search (prime → cap → bound → search) made 93 games of 1001–1199 73% slower than
-//!   prime → cap → search.  It is no sound replacement for `reuse_prev`: it proved too few of its games, and
+//!   it between the ceiling and the search (prime → ceiling → bound → search) made 93 games of 1001–1199 73% slower
+//!   than prime → ceiling → search.  It is no sound replacement for `reuse_prev`: it proved too few of its games, and
 //!   searching proves all of them sooner.
 
 use crate::accelerate::solution_for_promotions;
@@ -185,8 +185,8 @@ impl Default for PuncturedOptions {
 
 /// The best game on `[n] ∖ {hole}` under the maximal-factor rule (`opt_M`), by the frame model.
 ///
-/// `full` is an optimal game of `[n]` and `full_score` its score: since `opt_M([n] ∖ {hole}) ≤ opt(n)`, it caps
-/// the search, and its moves seed it (those still promotable).  If `full` replays on the punctured board it is
+/// `full` is an optimal game of `[n]` and `full_score` its score: since `opt_M([n] ∖ {hole}) ≤ opt(n)`, it is the
+/// search's ceiling, and its moves seed it (those still promotable).  If `full` replays on the punctured board it is
 /// the answer.  `stop_at`, if given, ends the search as soon as a game scoring that much is found (a decision
 /// search: "is `opt_M` at least `stop_at`?"); the result is then exact only if no such game exists.
 pub fn punctured(
@@ -211,7 +211,7 @@ pub fn punctured(
     Ok(result)
 }
 
-/// `full` as the answer on `[n] ∖ {hole}`, if it replays there and scores `full_score` (the cap).
+/// `full` as the answer on `[n] ∖ {hole}`, if it replays there and scores `full_score` (the ceiling).
 fn replayed(n: u32, hole: u32, full: &[u32], full_score: u64) -> Option<Punctured> {
     let start = Instant::now();
     let score = replay_punctured(n, &[hole], full).ok().filter(|&s| s == full_score)?;
@@ -255,7 +255,7 @@ fn punctured_with_width<const W: usize>(
     let prepared = board.prepare(opts.tactics)?;
     // The ceiling is the unpunctured board's score (or the decision's target, if lower), not `n + opt(n − 1)`, so
     // `Board::promotion_cap` does not apply.  The seed is the game's moves that are candidates here; the hole is
-    // in no hive, so it is never one.
+    // in no frame, so it is never one.
     let ceiling = stop_at.map_or(full_score, |s| s.min(full_score));
     let cap = Some(ceiling.saturating_sub(board.in_the_bag));
     let seed = board.seed(full);
@@ -438,8 +438,8 @@ mod tests {
         let opts = PuncturedOptions::default();
         // Without 16, 8 has no maximal composite; were it a source (a move the model always plays) the model would
         // play 8 and miss 9: [17, 9, 15, 10, 18, 14, 12] scores 95.
-        // Without 8, the hive of 32 (paid by 16) is not downstream of 4's by maximal factors, but 32 sweeps 4 and
-        // 2: ordered first, it left 22 nothing to pay with.
+        // Without 8, the frame of 4 is not in front of the frame of 32 (paid by 16) by maximal factors, but 32
+        // sweeps 4 and 2: ordered first, it left 22 nothing to pay with.
         for (n, hole) in [(18, 16), (38, 8)] {
             let (full, full_score) = (optimal.moves(n).unwrap(), optimal.score(n).unwrap());
             let p = punctured(n, hole, full, full_score, None, &opts).unwrap();

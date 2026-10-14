@@ -1,4 +1,4 @@
-//! Winnability of one frame: the peel, the core of an unwinnable frame, and reduction.
+//! Winnability of one frame: the peel, the residual of an unwinnable frame, and reduction.
 //!
 //! A frame here is a set of moves and a set of factors (see the [module docs](super)); "live" factors of a move
 //! are its maximal factors among the frame's factors ([`FactorProvider::factors`]).
@@ -20,28 +20,29 @@
 //! procedure and, on small frames, against an exhaustive search of orders).  The dropping is done as in an
 //! invertible Bloom lookup table: each factor keeps the count and the XOR of its live moves, so a factor with
 //! count 1 names its move.  (`heuristics/THEORY.md`, Theorem 4, proves the same facts for the Python side's
-//! `peel`, there called dismantling, and its residual, which is the core below.)  "Peel" means this procedure
-//! throughout the Rust code; `hives::count_freedoms` and the Python `peel` are other procedures.
+//! `peel`, there called dismantling; its residual is the residual below.)  "Peel" means this procedure
+//! throughout the Rust code; `hives::count_freedoms` (setup's count of a frame's freedoms) and the Python `peel`
+//! are other procedures.
 //!
-//! # The core
+//! # The residual
 //!
-//! The moves a peel cannot drop are the frame's *core* ([`Scratch::stuck`]): empty exactly when the frame is
-//! winnable.  Every live factor of a core move is shared with another core move, so no order takes all of them
-//! (the last would find its factors taken), and the frame stays unwinnable however many moves are added, factors
-//! removed, or factors added that no core move has.  Conflicts are built from it
+//! The moves a peel cannot drop are the frame's *residual* ([`Scratch::stuck`]): empty exactly when the frame is
+//! winnable.  Every live factor of a residual move is shared with another residual move, so no order takes all of
+//! them (the last would find its factors taken), and the frame stays unwinnable however many moves are added,
+//! factors removed, or factors added that no residual move has.  Conflicts are built from it
 //! ([`Model::conflict_using`](super::Model::conflict_using)).
 //!
-//! # Reduction and forced pairs
+//! # Reduction
 //!
-//! A move left with a single live factor must be paid by it: the two form a *forced pair* (not to be confused
-//! with the search's forced members, or with a hive's mandatory moves).  *Reducing* drops forced pairs until
-//! none is left ([`reduce_from`]).  It never changes whether the frame is winnable, now or after further edits
-//! (moves added, other factors removed): if `(m, q)` is a forced pair, any winning order takes `m` before every
-//! other move that has `q` (whichever came first would take `q`, and `m` has no other factor), so dropping `m`
-//! leaves a winning order of the frame without `m` and `q`; conversely, `m` taken first wins `q` and then
-//! anything that wins the frame without them.  Two moves forced onto the same `q` make the frame unwinnable, so
-//! on a winnable frame a forced pair stays forced until it is dropped, and reduction is confluent: every order
-//! of drops ends at the same frame.
+//! A move left with a single live factor must be paid by it: the move and that factor form a pair, which is
+//! dropped (not to be confused with the search's forced members, or with the mandatory moves that setup settles
+//! with `unzip`).  *Reducing* drops such pairs until none is left ([`reduce_from`]).  It never changes whether the
+//! frame is winnable, now or after further edits (moves added, other factors removed): if `m` is left with the
+//! single live factor `q`, any winning order takes `m` before every other move that has `q` (whichever came first
+//! would take `q`, and `m` has no other factor), so dropping `m` leaves a winning order of the frame without `m`
+//! and `q`; conversely, `m` taken first wins `q` and then anything that wins the frame without them.  Two moves
+//! left with only `q` make the frame unwinnable, so on a winnable frame such a pair stays a pair until it is
+//! dropped, and reduction is confluent: every order of drops ends at the same frame.
 
 use super::FactorProvider;
 use crate::bits::Bits;
@@ -155,11 +156,11 @@ impl<const W: usize> Scratch<W> {
         peel(self.cells.as_flattened_mut(), moves, factors, g, &mut stack)
     }
 
-    /// The moves a peel of the frame `moves -> factors` cannot drop, its *core*: empty exactly when the frame is
-    /// winnable.  Every live factor of a core move is a factor of another core move (else the peel could drop
-    /// it), so no order takes all the core moves: the last of them would need a factor that an earlier one has
-    /// already taken.  So the core keeps the frame unwinnable with other moves added and with factors added that
-    /// no core move has.  Unlike [`winnable`](Self::winnable), this always peels to the end.
+    /// The moves a peel of the frame `moves -> factors` cannot drop, its *residual*: empty exactly when the frame
+    /// is winnable.  Every live factor of a residual move is a factor of another residual move (else the peel could
+    /// drop it), so no order takes all the residual moves: the last of them would need a factor that an earlier
+    /// one has already taken.  So the residual keeps the frame unwinnable with other moves added and with factors
+    /// added that no residual move has.  Unlike [`winnable`](Self::winnable), this always peels to the end.
     pub(super) fn stuck(&mut self, moves: &Bits<W>, factors: &Bits<W>, g: &FactorProvider) -> Bits<W> {
         let cells = self.cells.as_flattened_mut();
         let mut pending = Stack { items: self.stack.as_flattened_mut(), top: 0 };
@@ -288,9 +289,9 @@ pub(super) fn winnable<const W: usize>(moves: &Bits<W>, factors: &Bits<W>, g: &F
     Scratch::new().winnable(moves, factors, g)
 }
 
-/// Reduction: drops each move with a single live factor together with that factor (a forced pair), until none
-/// is left, examining `pending` and whatever the drops affect.  A move with no live factor is dropped alone, as
-/// the Java does with assertions off (it cannot happen on a winnable frame).
+/// Reduction: drops each move with a single live factor together with that factor, until none is left,
+/// examining `pending` and whatever the drops affect.  A move with no live factor is dropped alone, as the Java
+/// does with assertions off (it cannot happen on a winnable frame).
 pub(super) fn reduce_from<const W: usize>(
     moves: &mut Bits<W>,
     factors: &mut Bits<W>,

@@ -16,29 +16,29 @@ which settings, and the numbers that decided it.  The register of everything tri
 * [5. Every idea considered](#5-every-idea-considered)
 * [6. The tools, and what became of the pilot code](#6-the-tools-and-what-became-of-the-pilot-code)
 
-How it was measured.  The machine is the 10-core M1 Max laptop, shared with other jobs the whole time (its load
-average stayed between 4 and 8), so every pilot uses at most 4 cores at a time and reports counts (nodes, lookups,
-nogoods learned, cuts) and cycles of the process before wall time; wall times are quoted only where nothing else
-says what something costs, and only as ratios within one run.  All searches are strict (`revise_freedoms=off`) and,
-unless they say otherwise, *proof-only*: seeded with the game's own optimum (`ladder --seed-opt`), which makes the
-node count of a one-thread search exact and leaves the tree to the bound and the branching, the parts these ideas
-change.  "Fast set" is EXPERIMENTS' 880, 936, 1050, 1100, 1170, 1184 seeded from n − 1.  What matters at the
-frontier is the slope of the cost curve ([bench/curve/README.md](../bench/curve/README.md): ×10 per 55-70 in n), so
-each result says whether its effect grows with n where that could be measured.
+How it was measured.  The machine is the 10-CPU M1 Max laptop, shared with other jobs the whole time (its load average
+stayed between 4 and 8), so every pilot uses at most 4 CPUs at a time and reports counts (nodes, lookups, nogoods
+learned, cuts) and cycles of the process before wall time; wall times are quoted only where nothing else says what
+something costs, and only as ratios within one run.  All searches use only proven tactics (`revise_freedoms=off`) and,
+unless they say otherwise, *proof-only*: seeded with the game's own optimum (`ladder --seed-opt`), which makes the node
+count of a one-thread search exact and leaves the tree to the bound and the branching, the parts these ideas change.
+"Fast set" is EXPERIMENTS' 880, 936, 1050, 1100, 1170, 1184 seeded from n − 1.  What matters at the end of the chain is
+the slope of the cost curve ([bench/curve/README.md](../bench/curve/README.md): ×10 per 55-70 in n), so each result says
+whether its effect grows with n where that could be measured.
 
 ## 1. The recommended order
 
 | rank | idea | borrowed from | sound? | pilot result | expected payoff | cost |
 |---|---|---|---|---|---|---|
-| 1 | Reuse the answer of a game whose search space an earlier game already searched | memoization: dynamic programming, the component cache of #SAT, transposition tables | proven, given the earlier game's proof (a new proof kind) | 29.7% of the search time of the strict chain 1232-1300 of commit bd9bb5d (851 of 2866 s), 16.6% of 1201-1231, is spent re-searching a space already solved | the same fraction of the chain, at once; constant factor, not slope | small: a digest per game, a proof kind, the verifiers |
-| 2 | A Lagrangian bound over the nogoods | Lagrangian relaxation (MIP), core-guided bounds (MaxSAT); already in `evidence/` | sound (weak duality) | proof nodes −19% to −67% with multipliers fitted once at the root to the nogoods of a short warm-up (1184: 168k → 55k; 1215: 5.1-5.7M → 3.9M; 1225: 9.5-10.1M → 7.6M; 1250: 3.1M → 2.1M) | up to 1.3-3× fewer nodes, if a second matching can be kept incrementally for less than that | large: weighted incremental matching with weight raises, multiplier fitting, a nogood source |
-| 3 | Knuth's estimator of a tree's size | backtrack-search estimation (Knuth 1975), cube-and-conquer's lookahead | not a pruning: nothing to prove | not piloted | a game's cost before running it (budgets for the 192-core machine); split work by estimated size | small to medium |
-| 4 | Reliability branching (pseudocosts) for strong branching | MIP branching | sound (any order explores every set) | strong branching is 28-34% of the time at the frontier (section 2) | up to a quarter of the time, if the tree does not grow | medium |
+| 1 | Reuse the answer of a game whose search space an earlier game already searched | memoization: dynamic programming, the component cache of #SAT, transposition tables | proven, given the earlier game's proof (a new proof kind) | 29.7% of the search time of the committed chain 1232-1300 of commit bd9bb5d (851 of 2866 s), 16.6% of 1201-1231, is spent re-searching a space already solved | the same fraction of the chain, at once; constant factor, not slope | small: a digest per game, a proof kind, the verifiers |
+| 2 | A Lagrangian bound over the nogoods | Lagrangian relaxation (MIP), core-guided bounds (MaxSAT); already in the prover | sound (weak duality) | proof nodes −19% to −67% with multipliers fitted once at the root to the nogoods of a short warm-up (1184: 168k → 55k; 1215: 5.1-5.7M → 3.9M; 1225: 9.5-10.1M → 7.6M; 1250: 3.1M → 2.1M) | up to 1.3-3× fewer nodes, if a second matching can be kept incrementally for less than that | large: weighted incremental matching with weight raises, multiplier fitting, a nogood source |
+| 3 | Knuth's estimator of a tree's size | backtrack-search estimation (Knuth 1975), cube-and-conquer's lookahead | not a pruning: nothing to prove | not piloted | a game's cost before running it (budgets for the 192-CPU machine); split work by estimated size | small to medium |
+| 4 | Reliability branching (pseudocosts) for strong branching | MIP branching | sound (any order explores every set) | strong branching is 28-34% of the time in the hardest games (section 2) | up to a quarter of the time, if the tree does not grow | medium |
 | 5 | Less fragmentation at many workers | parallel B&B, work stealing | sound (units are caches) | 32-128 emulated workers take 10-20% more nodes than 1-8 on the proofs of 1215 and 1225, and sharing nogoods does not bring it back (section 3) | 10-20% at 192 threads | small to medium |
 | — | Periodic clearing of each thread's nogoods | CDCL clause-database reduction | (keeps) | still right at 192 threads (section 3) | — | — |
 
 Measured and not kept (section 4 has the numbers): reduced-cost fixing (it cannot change a tree: the matching
-relaxation is integral), component decomposition (the residual problem never splits), disjoint conflicts from the
+relaxation is integral), component decomposition (the problem left at a node never splits), disjoint conflicts from the
 dual (MaxSAT's disjoint cores; 1% fewer nodes for 12% more cycles), the most recent conflict instead of the one
 with the largest member (VSIDS-like activity; no gain), sharing nogoods between threads, keeping the short ones
 across a clearing, and a portfolio of branchings for finding incumbents (8 of the 11 hardest games 1232-1300 start
@@ -53,9 +53,9 @@ are second-order and can wait for (2), which changes the time split they would a
 
 ## 2. Where the time goes in the hardest games
 
-The three slowest games of the strict chain 1232-1300 of commit bd9bb5d (1232 439 s, 1287 273 s, 1299 265 s on 6
+The three slowest games of the committed chain 1232-1300 of commit bd9bb5d (1232 439 s, 1287 273 s, 1299 265 s on 6
 threads; `results/strict.jsonl` is a later run), each run as the chain runs it (`taxman solve N --strict`, its
-predecessor from a copy of the strict results truncated before N) for 40-70 s on 4 threads and sampled every
+predecessor from a copy of the chain's results truncated before N) for 40-70 s on 4 threads and sampled every
 millisecond by macOS `sample`.  Each sample's return addresses were symbolicated with their inlined frames (`atos -i`),
 so that code the compiler inlined into the step is charged to the function it came from: the *kind* of work is the
 innermost function of the crate, the *purpose* the innermost search function above it.  Shares of busy samples (the
@@ -69,7 +69,7 @@ idle coordinator thread excluded):
 | bounds from the potentials (`bound_excluding`) | 4.3% | 4.8% | 4.8% |
 | copies (matching levels, frame sets) | 3.0% | 3.8% | 4.2% |
 | nogood table (scans for lookups, rule-outs) | 2.2% | 5.1% | 5.0% |
-| conflict minimization (peels of a core) | 0.2% | < 0.5% | < 0.5% |
+| conflict minimization (peels of a residual) | 0.2% | < 0.5% | < 0.5% |
 | engine | < 0.1% | < 0.1% | < 0.1% |
 
 | purpose | 1232 | 1287 | 1299 |
@@ -93,7 +93,7 @@ What follows for the ideas:
 * Finding the incumbent is not where most of the time goes: in 8 of the 11 slowest games 1232-1300 the seed (the
   previous game's promotions, improved by the local search) is already optimal; 1290 and 1300 reach their optimum
   after 14 and 19 s on 4 threads, of runs that take 142 and 179 s on 6; only 1232 and 1287 had not reached theirs
-  after 45 s (1232 at 37005 of 37113, 1287 at 38936 of 38977).  The frontier's cost is mostly the proof.
+  after 45 s (1232 at 37005 of 37113, 1287 at 38936 of 38977).  The cost of the hardest games is mostly the proof.
 
 A fourth game, 1295 (25 s), gives the same split to within two points (repairs 58.1%, peels 20.8%; strong branching
 29.0%, making children 25.5%, refinement 19.8%).  (This is the solver before the Lagrangian bound; with it, the
@@ -106,9 +106,9 @@ a step 16-17 k).
 
 The question: each thread keeps its own table and clears it every 50,000 of its steps; at 192 threads is that still
 right, or should threads share nogoods, or keep the good ones?  It was measured on this laptop by *emulating* many
-workers on 4 cores: `EngineConfig::cores` (`ladder --cores C`) lets at most C of the T worker threads search at
+workers on 4 CPUs: `EngineConfig::cores` (`ladder --cores C`) lets at most C of the T worker threads search at
 once, taking turns every 1024 polls in ticket order, so that 64 or 128 workers split, steal and learn exactly as
-they would on 64 or 128 cores, in counts if not in time.
+they would on 64 or 128 CPUs, in counts if not in time.
 
 The study of the tables was a tracking mode of the nogood table plus a registry shared by the searchers of one
 search, set up by the ladder for these runs only (the code is gone, section 6).  What it computed:
@@ -134,8 +134,8 @@ search, set up by the ladder for these runs only (the code is gone, section 6). 
   searcher puts each such nogood it learns into one common pool and, at every step, imports those the others have
   put there since it last looked, unless its table holds them already.
 
-Every run of this section is a proof (seeded with the game's own optimum), strict, with the solver's default
-tactics otherwise.
+Every run of this section is a proof (seeded with the game's own optimum), with `revise_freedoms=off` and the solver's
+default tactics otherwise.
 
 **How useful an old nogood is.**  Uses (a lookup answered or a candidate ruled out) per 1000 steps a nogood spends in
 the table, by its age, on the proof of 1215 never forgetting (one thread):
@@ -178,7 +178,7 @@ Nearly all of it at many workers; but learning is cheap (4-7 nogoods per 1000 st
 to 6.81 at 128 on 1225 because of the re-derivations, about 1.4% of the cycles), and the tables grow only a little
 with it (an average of 153 nogoods at a lookup at 4 workers, 228 at 128).
 
-**Policies, in nodes** (proofs, T workers taking turns on 4 cores; many-worker runs vary by ±10% from run to run, so
+**Policies, in nodes** (proofs, T workers taking turns on 4 CPUs; many-worker runs vary by ±10% from run to run, so
 repeats are given):
 
 | proof, workers | clear every 50k (as now) | share every nogood | share those of ≤ 3 members | keep those of ≤ 3 members at a clear |
@@ -197,40 +197,40 @@ have 8 or more members, 1,945 have 2), and the large ones answer most lookups (1
 candidates (2.7 M of 4.7 M).  "Short" or "low glue" is not where the value is here; size is the natural stand-in for
 glue (the members of a nogood come from at most two adjacent frames), and recency is what the period keeps.
 
-**Answer.**  Periodic clearing of per-thread tables is still right at 192 threads, for three reasons measured here:
-an old nogood earns little (a few uses per thousand steps) against a scan cost on every lookup; more nogoods do not
-make smaller trees (never forgetting: same nodes; sharing: more); and re-deriving what another thread knows costs
-about 1% of the cycles.  The regime does not change at 192 threads: a frontier game of 10^8-10^9 nodes gives each
+**Answer.**  Periodic clearing of per-thread tables is still right at 192 threads, for three reasons measured here: an
+old nogood earns little (a few uses per thousand steps) against a scan cost on every lookup; more nogoods do not make
+smaller trees (never forgetting: same nodes; sharing: more); and re-deriving what another thread knows costs about 1% of
+the cycles.  The regime does not change at 192 threads: a game at the end of the chain, of 10^8-10^9 nodes, gives each
 of 192 threads 0.5-5 M steps, which is the 1215 proof on 1-16 workers, where clearing behaves as on one thread.  Two
-small adjustments are worth a test on the big machine, not more: a period of about 30,000 steps keeps the tables at
-the size they have at 4 workers (they learn ~1.7× faster at 128), and the time to full occupancy and the unit count
-should be watched, because what does grow with the number of workers is the tree, by 10-20% from 4-8 to 32-128
-workers on 1225 (9.3-10.1 M to 10.3-13.6 M nodes; the committed `bench/curve/scaling.jsonl` has 9.45 M at 4 and
-9.30 M at 8), with ten to twenty-five times as many unit starts (385 at 4 workers, 4,000-10,000 at 32-128), each a
-rebuild that forgets the conflicts known along its path.  That is idea 5.
+small adjustments are worth a test on the big machine, not more: a period of about 30,000 steps keeps the tables at the
+size they have at 4 workers (they learn ~1.7× faster at 128), and the time to full occupancy and the unit count should
+be watched, because what does grow with the number of workers is the tree, by 10-20% from 4-8 to 32-128 workers on 1225
+(9.3-10.1 M to 10.3-13.6 M nodes; the committed `bench/curve/scaling.jsonl` has 9.45 M at 4 and 9.30 M at 8), with ten
+to twenty-five times as many unit starts (385 at 4 workers, 4,000-10,000 at 32-128), each a rebuild that forgets the
+conflicts known along its path.  That is idea 5.
 
 ## 4. The pilots
 
 ### 4.1 Memoizing searches that repeat (rank 1)
 
 Many consecutive games have exactly the same search space: the same frames (moves, factors, freedoms), the same
-candidates and the same `max_total`, so the same best promotion set; only the cap `n + score(n − 1) − in_the_bag`
-differs, and when it is above the optimum the search runs a full proof again (EXPERIMENTS noticed this in 1201-1231).
-The pilot computed, for every game of a range that is neither trivial nor prime, a 64-bit digest of what a strict
-search depends on: the root's frames (moves, factors and freedoms of each), the candidates and `max_total`, as
-`Board::prepare` gives them with `revise_freedoms=off`.  Games with the same digest search the same space; the first
-game with a digest is the original and the later ones repeat it.  Joined with the search seconds that the strict
-chain of commit bd9bb5d recorded for each game:
+candidates and the same `max_total`, so the same best promotion set; only the ceiling on the promotion sum,
+`n + score(n − 1) − in_the_bag`, differs, and when it is above the optimum the search runs a full proof again
+(EXPERIMENTS noticed this in 1201-1231).  The pilot computed, for every game of a range that is neither trivial nor
+prime, a 64-bit digest of what a search with only proven tactics depends on: the root's frames (moves, factors and
+freedoms of each), the candidates and `max_total`, as `Board::prepare` gives them with `revise_freedoms=off`.  Games
+with the same digest search the same space; the first game with a digest is the original and the later ones repeat it.
+Joined with the search seconds that the committed chain of commit bd9bb5d recorded for each game:
 
 * 1232-1300: 29 of the 60 searched games repeat an earlier space; their searches took **851 s of the 2866 s** of the
   chain (29.7%): 1299 repeats 1296 (265 s), 1293 repeats 1292 (207 s), 1271 repeats 1269 (75 s), 1267 repeats 1265
-  (64 s), 1263 and 1261 repeat 1260 (51 s and 48 s), ...; the others reached the cap at once.
+  (64 s), 1263 and 1261 repeat 1260 (51 s and 48 s), ...; the others reached the ceiling at once.
 * 1201-1231: 46 s of 276 s (16.6%).
 
 Soundness: the search space is a function of the root frames, the candidates and `max_total` (the model's graph is the
 maximal-factor relation restricted to those numbers), so its best promotion sum is the same for both games; the earlier
-game's proof (exhausted, or the cap) establishes that sum, and the later game's score is its own `in_the_bag` plus it,
-replayed by the referee as always.  It needs a proof kind ("same search as game m", resting on m's proof and what it
+game's proof (exhausted, or the ceiling) establishes that sum, and the later game's score is its own `in_the_bag` plus
+it, replayed by the referee as always.  It needs a proof kind (a repeat of game m, resting on m's proof and what it
 assumes), the digest in the result line or recomputed when the range starts, and the two verifiers.  The payoff is a
 constant fraction of the chain, at no risk, and it multiplies with everything else here.
 Implemented as the tactic and proof kind `same_search`
@@ -245,9 +245,9 @@ default, about 3 times fewer cycles on the proofs of 1184-1300 ([EXPERIMENTS.md]
 `|N − P| − 1` members of each nogood `N`; dualizing these inequalities with multipliers `λ_N ≥ 0` gives, for every
 `λ`, the bound `max_M Σ_{x ∈ Q(M)} (x − Σ_{N ∋ x} λ_N) + Σ_N λ_N (|N − P| − 1)`: a matching with each
 candidate's weight lowered by the multipliers of its nogoods, plus a constant.  A nogood with a member that has left
-the candidates cannot be broken any more and is left out (multiplier 0 at that node).  It is the evidence crate's
-second bound ([evidence/README.md](../evidence/README.md), section 3: 3.3× fewer nodes at n = 793 for its model-free
-search), brought to the frame solver, and MaxSAT's core-guided bounds in spirit: each nogood is a core, and the
+the candidates cannot be broken any more and is left out (multiplier 0 at that node).  It is the prover's
+second bound ([the prover's README](../prover/README.md), section 3: 3.3× fewer nodes at n = 793 in the
+prover), brought to the frame solver, and MaxSAT's core-guided bounds in spirit: each nogood is a core, and the
 multipliers say how much each costs.
 
 *Soundness.*  Weak duality, for any `λ ≥ 0` and any set of valid inequalities; it needs no proof beyond the
@@ -283,7 +283,7 @@ What the pilot also showed:
   by 66 and 69 on average and cut 34 and 21 of 300 nodes (refinement cuts 27 and 10); refitted at each node (20
   steps from the root's) they lower it by 110 and 130 and cut 81 and 33.
 * Across 1100-1250 the effect is −19% to −67% with no clear trend in n: it varies more from game to game than with
-  n.  The frontier needs its own measurement (step (a) below gives it at no extra cost).
+  n.  The end of the chain needs its own measurement (step (a) below gives it at no extra cost).
 
 *Cost, and the experiment.*  The pilot's evaluation is a matching solved from scratch at each check (0.7 per node),
 which makes it 7× slower per node at 1184; useless as it is, and not meant to be used.  The real cost is that of a
@@ -331,7 +331,7 @@ component, the best completion is the sum of the parts' best, and searching them
 A frame is winnable exactly when each connected component of its move-factor graph is, and an undecided candidate
 links the component where it is a factor to the one it would pay in, so the parts are the connected components of
 that graph.  Computed with a union-find over the numbers of the state: for each frame, each mover (a move of the
-frame, or a candidate that is a factor of the frame above, which would be promoted into this one) is joined to each
+frame, or a candidate that is a factor of the frame behind, which would be promoted into this one) is joined to each
 of its maximal factors that is a factor of the frame; a candidate belongs to the component of its own number.  At the
 root of 936, 1000, 1100, 1215, 1232, 1287 and 1300, and at all 600 search nodes of the probe's fixtures (936 and
 1215; each node's state rebuilt from its promotions, the candidates its own), there is exactly one component holding
@@ -339,7 +339,7 @@ candidates.  Nothing to split.
 
 ### 4.5 Disjoint conflicts from the dual (killed)
 
-From MaxSAT's disjoint-core bounds (and the evidence crate's "conflict-packing cut"): two disjoint conflicts within
+From MaxSAT's disjoint-core bounds (and the prover's "conflict-packing cut"): two disjoint conflicts within
 `Q*` must each lose a member, and lowering the potentials of both excluded members (and their partners) one after
 the other keeps the dual feasible, so their drops add up.
 
@@ -356,8 +356,8 @@ single drop `value − bound_excluding(x)` over its members; for each pair of di
 to more than the gap `value − need`, the node is cut if the bound with both an `x` of the first and a `y` of the
 second excluded is below `need` for every such pair `(x, y)` (every completion leaves out a member of each, so its
 value is at most the largest of them).  The fast set took between 2.7% fewer and 0.3% more nodes, and 12% more
-cycles.  The frame solver's bound is already tight where it matters (forced members and one level of refinement
-catch nearly all of what pairs of conflicts would), unlike the model-free search's, whose gap is about 1,170 at
+cycles.  The frame solver's bound is already tight where it matters (forced members and a refinement one deep
+catch nearly all of what pairs of conflicts would), unlike the prover's, whose gap is about 1,170 at
 n = 1000.
 
 ### 4.6 Recency in the choice of conflict (killed)
@@ -374,13 +374,13 @@ better than size and the largest member.
 
 ### 4.7 A portfolio for finding incumbents (weak)
 
-From parallel SAT portfolios: run some threads with another branching that finds good sets early
-(`conflict-largest` follows the dive).  Section 2 shows the frontier's cost is the proof, so there is little to win;
-on the games that do improve their start (4 threads, 45 s, time to the best set found with the tactic
-`branching=conflict-largest` against the default `conflict-strong`): 1290 at 9.3 s against 13.9 s, 1287 at 13.7 s
-against 26.6 s (the same set, 41 below the optimum), 1300 not found in 45 s against 19.2 s, 1232 found by neither.
-Not worth a mechanism; worth remembering for games like 992 and 1025 whose optimum the search reaches late, if they
-come back at the frontier.
+From parallel SAT portfolios: run some threads with another branching that finds good sets early (`conflict-largest`
+follows the dive).  Section 2 shows the cost of the hardest games is the proof, so there is little to win; on the games
+that do improve their start (4 threads, 45 s, time to the best set found with the tactic `branching=conflict-largest`
+against the default `conflict-strong`): 1290 at 9.3 s against 13.9 s, 1287 at 13.7 s against 26.6 s (the same set, 41
+below the optimum), 1300 not found in 45 s against 19.2 s, 1232 found by neither.  Not worth a mechanism; worth
+remembering for games like 992 and 1025 whose optimum the search reaches late, if they come back among the hardest
+games.
 
 ## 5. Every idea considered
 
@@ -417,14 +417,14 @@ experiment.  "Pilot" refers to section 4.
 **From MaxSAT**
 
 * *Core-guided bounds*: the conflicts are cores; refinement by one conflict is a one-core disjunctive bound;
-  disjoint cores are pilot 4.5 (killed); the Lagrangian over all cores is pilot 4.2 (rank 2).
+  disjoint cores are pilot 4.5 (killed); the Lagrangian over every core is pilot 4.2 (rank 2).
 
 **From MIP branch and bound**
 
 * *Reduced-cost fixing*: pilot 4.3, killed by integrality.
 * *Pseudocost / reliability branching* (rank 4): estimate each candidate's exclusion drop from the drops measured
   before, and solve exactly only for members whose estimate is unreliable (few observations).  Strong branching is
-  28-34% of the time at the frontier.  Sound.  The risk is the forced members: strong branching's exact solves also
+  28-34% of the time in the hardest games.  Sound.  The risk is the forced members: strong branching's exact solves also
   find members whose exclusion drops the bound below `need`, which `fix_forced` turns into single-child nodes, and
   EXPERIMENTS found that deciding by the potentials alone traded nodes for time at about even.  Experiment: record,
   per candidate, the exact drops strong branching computes (a counter, no change), and measure how well a pseudocost
@@ -437,7 +437,7 @@ experiment.  "Pilot" refers to section 4.
 
 **From constraint programming**
 
-* *Dominance rules*: a candidate `y` dominated by a larger `x` (every frame-level role `y` can play, `x` can play,
+* *Dominance rules*: a candidate `y` dominated by a larger `x` (every role `y` can play in a frame, `x` can play,
   and promoting `x` instead of `y` keeps every frame winnable) would allow "if `x` is excluded, exclude `y`".  In
   Taxman Mini a move takes *all* its factors still in the frame, so having more maximal factors is not monotone
   (more ways to be paid, but more taken), and a sound dominance needs a proof per pair; the symmetric case (two
@@ -474,7 +474,7 @@ known; report the median and spread of the estimate against the truth for 100, 1
 tables make the real tree history-dependent, so the walks should run with empty tables and be compared with the
 real search, not with a tree the walks define.
 
-**Engine-side, for many cores** (rank 5).  The tree grows by 10-20% from 4-8 to 32-128 emulated workers on 1225, with
+**Engine-side, for many CPUs** (rank 5).  The tree grows by 10-20% from 4-8 to 32-128 emulated workers on 1225, with
 ten to twenty-five times as many unit starts, and sharing nogoods does not bring it back, so the suspect is what a
 rebuilt unit forgets: the conflicts known along its path (`known`), the kept strong-branching level and the
 verdict of its first check.  Experiment (with `--cores`): count, per unit start, how often the first steps recompute a
@@ -488,7 +488,7 @@ The pilots' code hooked the searcher's inner loop (the probe measured 0.5% more 
 research scaffolding, not a tactic, so it was not merged: after the study it was discarded, and sections 2-4 are the
 record of what it did.  Two pieces were useful on their own and are on `master`:
 
-* `EngineConfig::cores` (with a test in `tests/engine.rs` and `ladder --cores C`), which makes a few cores take
+* `EngineConfig::cores` (with a test in `tests/engine.rs` and `ladder --cores C`), which makes a few CPUs take
   turns as many workers.  It costs nothing unless set: the check is in the engine's every-1024-polls slow path, and
   the probe's cycles and fingerprint are unchanged.
 * `examples/common/fixtures.rs` (the `.nodes` fixtures and the hex text sets are written in) and
@@ -507,7 +507,7 @@ graduates (rank 2 first, once its incremental matching pays) comes to `master` a
 To reproduce what is still reproducible (from `rust/`, after `cargo build --release --examples`; `K=results/strict.jsonl`):
 
 ```
-ladder --threads 16 --cores 4 --seed-opt --known $K --tactic revise_freedoms=off 1215    # 16 workers on 4 cores
+ladder --threads 16 --cores 4 --seed-opt --known $K --tactic revise_freedoms=off 1215    # 16 workers on 4 CPUs
 tools/profile/profile.sh 1232 40 4 /tmp/prof    # the profile of section 2
 ```
 

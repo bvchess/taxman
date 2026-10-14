@@ -278,7 +278,7 @@ fn extend_optimal_stops_at_the_first_game_that_is_not_there() {
     let kept = table_text(12);
 
     // Games that assume a game of the table optimal are appended: 33 is built on optimal.json's game of 32
-    // (`--use-prev`) and reaches its cap, which assumes nothing the table does not stand for.
+    // (`--use-prev`) and reaches its ceiling, which assumes nothing the table does not stand for.
     let table32 = write_table(&dir, "table32.json", 32);
     let assuming = dir.join("assuming.jsonl");
     let run = taxman(&["solve", "33-40", "--use-prev", "--threads", "1", "--progress", "0", "--out", path(&assuming)]);

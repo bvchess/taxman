@@ -1,16 +1,16 @@
-//! Experiments with Lagrangian strengthenings of the matching bound at the root of game N.
+//! Experiments with Lagrangian strengthenings of the Franklín–Moniot bound at the root of game N.
 //!
 //! `lagrange cap N...`: cap the upper half at W(U*): for λ = k/8, opt(n) <= max over matchings of
 //! [(1−λ)·upper + lower] + λ·W(U*), valid because every playable upper set weighs at most W(U*) (certified per
-//! game by the span check).  Prints the bound for each λ.  (Measured: at best 4% of the matching bound's gap.)
+//! game by the span check).  Prints the bound for each λ.  (Measured: at best 4% of the Franklín–Moniot bound's gap.)
 //!
-//! `lagrange conflicts N TARGET NODES [ITERATIONS]`: run the model-free search for NODES nodes to collect
+//! `lagrange conflicts N TARGET NODES [ITERATIONS]`: run the prover's search for NODES nodes to collect
 //! nogoods, then fit the Lagrangian bound over them (`Prover::enable_lagrangian`) and print it.
 
-use taxman_evidence::game::{Board, MatchingBound, Prover, Role};
-use taxman_evidence::instance::Instance;
-use taxman_evidence::primes::smallest_prime_factors;
-use taxman_evidence::span::span_check;
+use taxman_prover::game::{Board, MatchingBound, Prover, Role};
+use taxman_prover::instance::Instance;
+use taxman_prover::primes::smallest_prime_factors;
+use taxman_prover::span::span_check;
 
 fn cap(ns: &[u64]) {
     let spf = smallest_prime_factors(*ns.iter().max().unwrap() as usize);

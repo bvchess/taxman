@@ -30,7 +30,7 @@
 //! speedup measures the parallel search alone; seeded from n − 1 it also depends on when each run happens to
 //! find the optimum.
 //!
-//! Many workers on few cores: `--cores C` lets at most C of the threads search at once, taking turns
+//! Many workers on few CPUs: `--cores C` lets at most C of the threads search at once, taking turns
 //! (`EngineConfig::cores`), so that `--threads 64 --cores 4` measures in counts (nodes, lookups, splits) what 64
 //! workers would do, though not in time, which the turns inflate.
 

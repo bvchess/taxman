@@ -1,4 +1,4 @@
-//! The parity matroids: a model-free upper bound on opt(n) by weighted matroid intersection over GF(2).
+//! The parity matroids: an upper bound on opt(n) on the whole board by weighted matroid intersection over GF(2).
 //!
 //! THEORY.md, Theorem 10.  Give every number s of the board 2..=n the vector v(s) over GF(2) with a 1 at each of
 //! its maximal factors (coordinates 1..=n/2), and, when s <= n/2, also the unit vector e_s.  If S is playable, the

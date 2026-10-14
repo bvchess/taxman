@@ -1,4 +1,5 @@
-//! The longest games: M(n), the most moves a game of n can have, model-free, to set against the optimal game's.
+//! The longest games: M(n), the most moves a game of n can have, on the whole board, to set against the optimal
+//! game's.
 //!
 //! A game's moves are its picks, so M(n) is the size of the largest playable set of picks on the board 1..=n.
 //! Three proven facts bound it:
@@ -249,7 +250,7 @@ mod tests {
         assert_eq!(payments(&board, &[22, 26, 33, 39]), None, "the self-covering core of THEORY.md");
     }
 
-    /// The incremental matching numbers equal the unit-weight matching bound solved afresh on each board.
+    /// The incremental matching numbers equal the unit-weight Franklín–Moniot bound solved afresh on each board.
     #[test]
     fn matching_numbers_are_the_unit_matching_bound() {
         let spf = smallest_prime_factors(400);

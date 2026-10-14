@@ -27,10 +27,13 @@ The *maximal factors* of c are the divisors f with c/f prime — the
 divisors reached by deleting one prime from c (mf(4) = {2},
 mf(6) = {2, 3}; a prime's only maximal factor is 1).  A *reduction
 instance* is a set of members C, a factor pool F disjoint from C, and
-each member's candidate list mf(c) ∩ F; `core.peel` reduces such
-instances by forced moves only.  The upper half of game n — the
-numbers above n/2, which never divide one another — forms one
-naturally, with F the union of the members' maximal factors.
+each member's factor list mf(c) ∩ F; `core.peel` reduces such
+instances by forced moves only (a member with one live factor takes it;
+a factor with one live lister goes to that lister).  The upper half of
+game n — the numbers above n/2, which never divide one another — forms
+one naturally, with F the union of the members' maximal factors.  A
+number a game takes is a *pick* (the solver's and the wiki's *move*);
+Theorem 1 says *selection*.
 
 ## The decision procedure
 
@@ -369,9 +372,9 @@ n=2873's 377-member component has a 70-member residual.)
 
 *Matching certifies most components.*  Playable ⊆ matchable gives
 the free bound |G ∩ K| ≤ max-cardinality ≤ ν(K), the component's
-maximum-matching size; greedy meets ν on 86.8% of the large
-components, certifying (★) there with no search.  Where ν
-overshoots, every exactly-probed case found greedy still optimal —
+maximum-matching size (the *matching-number bound*); greedy meets ν on
+86.8% of the large components, certifying (★) there with no search.
+Where ν overshoots, every exactly-probed case found greedy still optimal —
 the surplus was sets that admit a matching but no acyclic one, the
 cardinality twin of the weight slack in the Franklín–Moniot bound
 (first visible at n=21, where a 145-sum set is matchable but the
@@ -420,7 +423,8 @@ some order x₁, x₂, … each xᵢ has a factor that no later member lists.
 In a vanishing sum over a nonempty set of members, the coordinate of
 the earliest member's private factor is 1.  ∎
 
-So no playable subset of a set K is larger than the GF(2) rank of K.
+So no playable subset of a set K is larger than the GF(2) rank of K
+(the *rank bound*).
 On members with at most two distinct primes this is the graphic
 matroid's rank, exact there; on three-prime members, whose factors
 pq, pr, qr are the edges of a triangle on the primes, a dependency is
@@ -448,8 +452,9 @@ GF(2)-independent sets do satisfy exchange — but descending greedy has
 never rejected because of one.  Checking (♦) is greedy itself plus
 Gaussian elimination, a few seconds per game at n = 500,000, and it
 held in every game checked (Evidence, below).  The open problem
-becomes: **prove (♦)**.  The adversarial experiments in
-`rust/evidence` locate what it needs: it holds under every order of
+becomes: **prove (♦)**.  The adversarial experiments of the prover
+(`rust/prover`, a branch and bound over sets of picks on the whole
+board) locate what it needs: it holds under every order of
 the real incidence structure that obeys the window law, even
 adversarially chosen ones, and under the window law reversed, but
 fails as often as a uniformly random order under the window law for a
@@ -528,18 +533,19 @@ in S is below q.  ∎
 **Theorem 9 (optimal sets from the game before).**  Let p be the
 largest prime below n.
 
-* (Chain.)  If opt(n) = n + opt(n−1), the optimal sets of n are
-  exactly the playable sets T ∪ {n} with T an optimal set of n−1.  In
-  particular opt(n) = n + opt(n−1) iff some optimal set of n−1 stays
-  playable with n added.
+* (At the ceiling.)  If opt(n) = n + opt(n−1), the most opt(n) can be
+  (the *ceiling*), the optimal sets of n are exactly the playable sets
+  T ∪ {n} with T an optimal set of n−1.  In particular opt(n) =
+  n + opt(n−1) iff some optimal set of n−1 stays playable with n
+  added.
 * (Prime.)  If n is prime, opt(n) = n + opt(n−1) − p, and
   T ↦ T − p + n is a bijection from the optimal sets of n−1 onto
   those of n.
 
 *Proof.*  A playable set of n without n is a playable set of n−1 (n
-is nobody's factor), worth at most opt(n−1).  Chain: an optimal S of
-n is worth more than opt(n−1), so it holds n, and S − n, playable as
-a subset, is worth opt(n−1): an optimal set of n−1.  Conversely a
+is nobody's factor), worth at most opt(n−1).  At the ceiling: an
+optimal S of n is worth more than opt(n−1), so it holds n, and S − n,
+playable as a subset, is worth opt(n−1): an optimal set of n−1.  Conversely a
 playable T ∪ {n} with T optimal for n−1 is worth opt(n).  Prime: let
 T be optimal for n−1; by the lemma it holds p and no other prime.  p
 and n are nobody's maximal factor on either board (2p > n − 1, and
@@ -552,11 +558,11 @@ throughout, both maps are well defined between optimal sets, and they
 are inverse to each other.  ∎
 
 So the number of optimal sets is the same at a prime n as at n−1, can
-only fall at a chain n, and can grow only at a composite n meeting
-neither relation.  For a solver this is reuse made exact: when the
+only fall at a game at its ceiling, and can grow only at a composite n
+below its ceiling.  For a solver this is reuse made exact: when the
 optimal set of n−1 is unique, one peel of T ∪ {n} decides whether n
-meets the chain bound (if not, opt(n) < n + opt(n−1)), and when it
-does, the optimal set of n is known with no search.
+is at its ceiling (if not, opt(n) < n + opt(n−1)), and when it is,
+the optimal set of n is known with no search.
 
 **Remark (no exact matroid relaxation of the whole game).**  Game
 425 has two optimal sets (they differ by {110, 132, 168} ↔
@@ -568,16 +574,16 @@ positive weights allow only one (Theorem 8's layer-cake argument,
 for any matroid).  The certificate that settles the upper half has
 no analogue that is exact for the whole game.
 
-What is measured (`rust/evidence`, "Is the optimal set unique?"):
-every optimal set is enumerated, model-free, in 954 of the games
-2..989 (the other 34, the most expensive, with the upper half fixed).
+What is measured (`rust/prover`, "Is the optimal set unique?"):
+the prover enumerates every optimal set in 954 of the games 2..989
+(the other 34, the most expensive, with the upper half fixed).
 The optimal set is unique in every game n ≤ 424; 30 games between 425
 and 779 have two or three, always with the same upper part, U\*, and
 the same number of members, differing by an exchange of equally many
 lower-half numbers of equal sum, each a maximal factor of a member of
-U\*.  At 686, a chain game, the recorded optimal game of 685 cannot
-take 686, while another optimal set of 685 can: a chain step needs
-all the optimal sets of n−1, not one.
+U\*.  At 686, a game at its ceiling, the recorded optimal game of 685
+cannot take 686, while another optimal set of 685 can: a step to the
+ceiling needs all the optimal sets of n−1, not one.
 
 ## Longest games
 
@@ -626,10 +632,10 @@ for five lighter ones:
     optimal game:            {250, 252, 294, 400}         sum 1,196
     heaviest longest game:   {116, 180, 200, 320, 351}    sum 1,167
 
-*Proof (computational, model-free).*  opt(833) = 218,226, and the
-optimal set is unique, with 362 members (`rust/evidence`, sections 3
+*Proof (computational, by the prover).*  opt(833) = 218,226, and the
+optimal set is unique, with 362 members (`rust/prover`, sections 3
 and 5).  The longer set replays by the rules, and ν(833) = 363, so
-M(833) = 363.  The branch and bound of `rust/evidence`, weighting the
+M(833) = 363.  The branch and bound of `rust/prover`, weighting the
 pick of c by K + c with K above every sum, proves that no playable
 set of 363 members sums to more than 218,197.  ∎
 
@@ -650,7 +656,7 @@ game of 833 (`rust/tests/soundness.rs`).  `revise_freedoms` applies it
 only to the two-frame game of frames 0 and 1, where it stays
 unproven.
 
-What is measured (`rust/evidence`, "Does an optimal game play the
+What is measured (`rust/prover`, "Does an optimal game play the
 most moves?"): to n = 1300 the recorded optimal game is a longest
 game in every game but 833, 834 and 835, where it is one move short.
 In 1,293 of the 1,299 games its moves meet ν(n), the certificate
@@ -719,7 +725,8 @@ matroid on {2, …, n} in which s is represented by
 
 Every playable set is independent in M₀ and in M₁.  Hence opt(n) is at
 most the heaviest weight Σ_{s∈I} s of a set I independent in both.
-More generally, for forced picks P and barred numbers X, every playable
+More generally, for forced picks P (the numbers a node of a search
+fixes in) and barred numbers X (those it fixes out), every playable
 S with P ⊆ S and S ∩ X = ∅ weighs at most w(P) plus the heaviest
 common independent set of M₀/P ∖ X and M₁/P ∖ X (and there is none
 unless P is independent in both).
@@ -758,7 +765,7 @@ Three facts make it usable as evidence.
   the maximum with one member x of I barred, since the heaviest
   independent set avoiding x is I − x plus the heaviest y with
   I − x + y independent, if that weighs more than 0.
-* **It is never above the matching bound** (by the minor argument
+* **It is never above the Franklín–Moniot bound** (by the minor argument
   above).  It is not one matroid, so the remark that no matroid
   relaxation is exact for the whole game (game 425) does not touch it.
 
@@ -771,7 +778,7 @@ The same construction, frame by frame, bounds the frame model's
 promotions (Theorem 11, below), and the two agree at every root
 measured ([rust/docs/EXPERIMENTS.md, "Matroid intersection
 bounds"](../rust/docs/EXPERIMENTS.md#matroid-intersection-bounds-2026-10)).
-What the bound buys the model-free search is in the evidence table
+What the bound buys the prover's search is in the evidence table
 below.
 
 ## The frame matroids: a bound on the promotions
@@ -779,7 +786,7 @@ below.
 Theorem 10's lemma, applied frame by frame, bounds the frame model's
 promotions in the same way: two matroids, one of the even frames and
 one of the odd frames, in both of which every promotable set is
-independent.  This is the bound of the solver's search (tactic `gf2`;
+independent.  This is the solver's GF(2) bound (tactic `gf2`;
 rust/DESIGN.md, section 4, "The GF(2) bound").
 
 **Theorem 11 (the frame matroids).**  Give each frame h of a state
@@ -825,11 +832,11 @@ factor, is the matching bound's relaxation.  On movers with at most
 two live factors (graph edges, with a ground vertex for one)
 independence over GF(2) is being a forest, which is winnability
 itself, so what it misses are, as for Theorem 10, the odd cores of
-movers with three or more factors (the residual cores at the roots of
-936-1300 hold 18-65 movers, and Lorea's matroid misses them too).  And
+movers with three or more factors (the frames' residuals at the roots
+of 936-1300 hold 18-65 movers, and Lorea's matroid misses them too).  And
 Theorem 10's bound equals in_the_bag plus Theorem 11's at every root
 of 880-1300; its gap to opt(n) is a tenth of the Franklín–Moniot
-matching bound's to 1300.  The measurements are in
+bound's to 1300.  The measurements are in
 rust/docs/EXPERIMENTS.md ("Matroid intersection bounds", "The GF(2)
 bound in the search"); the search's forced members rest on weak
 duality for a weight split, as Theorem 10's certificate does
@@ -1079,7 +1086,7 @@ alternating cycles, both through 30, so never disjoint: three sets
 
 The bound is exact longer than the proof reaches.  It equals opt(n)
 for every n ≤ 77 and first exceeds it at 78, with 1,992 against 1,991
-(`rust/evidence/data/exact_parity_2_1300.jsonl`).  So odd cores exist
+(`rust/prover/data/exact_parity_2_1300.jsonl`).  So odd cores exist
 from 45 on, and none weighs in before 78.
 
 ### The hardness
@@ -1134,7 +1141,7 @@ alternating cycle in G.
   hierarchy holds.  1,112 sets are matchable and dependent, the
   smallest {6, 10, 15}.  There are no odd cores.  The heaviest
   playable, independent and matchable sets give opt(n), the parity
-  bound and the F–M bound, which equal the evidence crate's values at
+  bound and the F–M bound, which equal the prover's values at
   every n ≤ 22.
 * 18,200 random matchable sets of up to 12 members on the boards
   30–120.  Each was grown around a member with three or more distinct
@@ -1163,14 +1170,14 @@ rejections) and in 902 sampled games to 2,000,000 (60,183,674 more).
 Threshold by threshold, every game n = 2..20,000 (24,058,430
 rejection thresholds in 58,306 rejection-bearing components) is
 certified by bounds alone: one exclusion is always needed, the
-matching bound, Lorea's hypergraphic-matroid bound, or the GF(2) rank
+matching-number bound, Lorea's hypergraphic-matroid bound, or the rank
 bound — no search.  The earlier campaign (all n = 6..1500, forty
 samples to 4000, n=2873, n=9170: 3,231 of 3,236 rejection-bearing
 components verified or certified) had left five components undecided,
 n = 3103, 3872, 3936, 4000 and 9170; the rank bound settles all five,
 n=9170's (residual jam of 304 members, greedy's 37 exclusions, the
-matching bound proving only 19) in milliseconds.  Data, programs and
-the adversarial experiments: `rust/evidence/README.md`.
+matching-number bound proving only 19) in milliseconds.  Data, programs
+and the adversarial experiments: `rust/prover/README.md`.
 
 | Claim | Evidence | Status |
 | --- | --- | --- |
@@ -1180,14 +1187,14 @@ the adversarial experiments: `rust/evidence/README.md`.
 | Playable sets are GF(2)-independent; (♦) implies (★) and the upper-half conjecture | — | proven (span certificate, Thm 7) |
 | (♦): every greedy rejection is a GF(2) dependency of the kept members above it | every game n = 2..100,000 and 902 samples to 2,000,000; 0 violations | certified per game; open in general |
 | U\* is the unique heaviest playable upper set, every playable upper set termwise below it | follows from (★); brute force (`certify.py`) to 62 | proven given (★) (Thm 8), so certified per game to 100,000 |
-| Optimal sets of n from those of n−1 (chain: T ∪ {n}; prime: T − p + n, a bijection); every optimal set holds the largest prime and no other | derivation = direct enumeration on every chain and prime game to 700 | proven (Thm 9, lemma) |
-| The optimal set is unique | all optimal sets enumerated model-free: every n ≤ 424; two at 425 | measured; false in general |
-| Every optimal game's upper part is U\*; a game's optimal sets have equal sizes and differ by equal-sum exchanges below n/2 | every completely enumerated game (`rust/evidence`, section 5) | measured; open |
+| Optimal sets of n from those of n−1 (at the ceiling: T ∪ {n}; prime: T − p + n, a bijection); every optimal set holds the largest prime and no other | derivation = direct enumeration on every game at its ceiling and every prime game to 700 | proven (Thm 9, lemma) |
+| The optimal set is unique | all optimal sets enumerated by the prover: every n ≤ 424; two at 425 | measured; false in general |
+| Every optimal game's upper part is U\*; a game's optimal sets have equal sizes and differ by equal-sum exchanges below n/2 | every completely enumerated game (`rust/prover`, section 5) | measured; open |
 | M(n) ≤ ν(n); M(n−1) ≤ M(n) ≤ M(n−1) + 1, with equality on the left at a prime n | brute force to 22 | proven (Lemma, "Longest games") |
 | Playable sets, with each pick's own coordinate taken out, are GF(2)-independent; the parity matroids bound opt(n) | every playable set independent in both matroids on every board to 18 (enumerated); the bound at least opt(n), and the recorded game independent in both, at every n ≤ 1300; the certified intersection equal to enumeration on 3,000 random pairs of matroids | proven (Thm 10) |
 | Promotable sets of the frame model are independent in the even and the odd frames' GF(2) matroids, whose heaviest common independent set bounds the best promotion set, at every node in their contractions | every promotable set of every board with ≤ 22 candidates independent; the bound at least the best promotion set at every n ≤ 1300; never below the best completion at the 600 nodes of the solver's probe; the solver's chain 1..2175 with it reproduces every score to 1300 (optimal.json's, made without it) | proven (Thm 11) |
-| opt(n) equals the recorded score: the frame model's answer is the true optimum | model-free exact searches (playability theorems, the matching and parity bounds, the chain and prime relations; `rust/evidence`, section 3): every n = 2..1300, the committed chain to there (1301..2175 pending) | verified (exact, model-free) to 1300 |
-| An optimal game has the most moves, M(n) | one move short at n = 833, 834 and 835, model-free; a longest game for every other n ≤ 1300, 1,293 of them by the matching certificate (`rust/evidence`, section 6) | **false** (n = 833); the gap is at most one to 1300, open beyond |
+| opt(n) equals the recorded score: the frame model's answer is the true optimum | the prover's exact searches on the whole board (playability theorems, the Franklín–Moniot and parity bounds, the ceiling and the prime formula; `rust/prover`, section 3): every n = 2..1300, the committed chain to there (1301..2175 pending) | verified (exact, on the whole board) to 1300 |
+| An optimal game has the most moves, M(n) | one move short at n = 833, 834 and 835, proven by the prover; a longest game for every other n ≤ 1300, 1,293 of them by the matching certificate (`rust/prover`, section 6) | **false** (n = 833); the gap is at most one to 1300, open beyond |
 | (★) on rejection-bearing components | every threshold of every game n = 2..20,000 certified by bounds; the earlier 5 undecided settled | certified per game; open in general |
 | (♦) and (★) under orders obeying the window law, adversarial or random, or its reverse | 1,981 instances, n = 2000..20,000, 0 failures (uniformly random orders: 16–50% fail; window law for a random prime ranking: 26–57%) | measured |
 | n=2873 component: greedy's 6 exclusions minimal | 12.4M playability checks over the 70-member residual | verified |

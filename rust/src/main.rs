@@ -23,7 +23,7 @@ commands:
                           of A-1 in --out FILE, or with --use-prev in optimal.json (with neither it is solved
                           standalone, which costs more: no seed from the game before and no ceiling).  Every
                           score is checked against optimal.json, which is built into this program
-      --threads K              worker threads (default: all cores)
+      --threads K              worker threads (default: all CPUs)
       --tactic NAME=VALUE      set a tactic (repeatable).  A switch is on or off, match_refine is 0-{max_refine}.
                                Names: {tactics}
       --out FILE               append each result as a JSON line; games already completed in FILE are skipped

@@ -1,8 +1,10 @@
-# Taxman: the exact solver in Rust
+# Taxman: the solver in Rust
 
 `rust/` is a Cargo crate (a library and one binary, `taxman`; no third-party dependencies) that finds optimal games of
 Taxman.  It reimplements the algorithm of the Java solver in the repository root (`src/main/java`) with a search built
-for speed and for many cores, and it has found optimal games for every n up to 2175 (the Java solver got to 1000).
+for speed and for many threads, and it has found optimal games for every n up to 2175 (the Java solver got to 1000).
+A second program, the prover ([prover/](prover/README.md)), checks its answers on the whole board, without the frame
+model.
 
 This page is the user guide: what the solver computes and what "optimal" means here, how to build and run it, how to
 read its output, why its answers can be trusted (and what they assume), the project's vocabulary,
@@ -42,7 +44,7 @@ cost of a game grew by a factor of ten for every 55 to 70 in n past 1200
 ### How the solver sees the game (the frame model)
 
 1. Every number above n/2 divides nothing else on the board, so it can only be a move, never tax: these are the
-   *sources* (played unless the hive finds them impossible, see the glossary).  Every other number is a *factor*: it
+   *sources* (played unless they are found impossible, see the glossary).  Every other number is a *factor*: it
    can be tax for a larger number, and sometimes a move itself.
 2. A move m is paid for by one of its *maximal factors* m/p (p a prime dividing m); a factor can pay for one move.
    Maximal factors are enough although the game takes *every* divisor of a move: if some proper divisor d of m is
@@ -50,46 +52,59 @@ cost of a game grew by a factor of ten for every 55 to 70 in n past 1200
    too), and one of those f is a maximal factor of m.  So m is playable exactly when one of its maximal factors is
    in the pot, and the model needs nothing else of divisibility (the *lifting* argument of
    [src/numtheory.rs](src/numtheory.rs) and Theorem 1 of [../heuristics/THEORY.md](../heuristics/THEORY.md)).
-3. Sources and the factors they compete for fall into independent groups, the *hives*.  One hive is *downstream* of
-   another (the other is *upstream*) when the other's numbers are multiples of its own.  Hives that have factors to
-   spare are stacked into levels, bottom up: the first level is every such hive with none downstream of it, the next
-   is every one directly upstream of those, and so on.  A level is merged into one *frame*; frame 0 is the bottom,
-   the downstream end.  Each frame is a small game, *Taxman Mini*: a set of moves and a set of factors, in which the
-   moves must be playable in some order.
+3. Sources and the factors they compete for fall into independent groups, the *frames*: sources that share a factor are
+   in one frame, with all the factors they can be paid with.  Frame X is *in front of* frame Y (and Y *behind* X) when
+   a number of Y has a maximal factor in X, that is, when Y's numbers are multiples of X's; the frames in front are
+   played first.  Each frame is a small game, *Taxman Mini*: a set of moves and a set of factors, in which the moves
+   must be playable in some order.  Setup drops a frame's *impossible* sources, settles the moves a source with one
+   usable factor must make, and counts its *freedoms*, its factors minus its moves: how many factors it can spare.  A
+   frame with none is *closed* and takes no part in the search.  The others are numbered from the front: frame 0 is
+   every one that has no other in front of it, frame 1 every one directly behind those, and so on.  Frames with the
+   same number are merged into one, so that a promotion always has one frame to go to.
 4. What a game can choose is which of the spare factors to *promote*: to play it as a move instead of leaving it as
-   tax.  Promoting a factor of frame h makes it a move of frame h-1: its own maximal factors, which would pay for it,
-   are in the hives directly downstream of its hive, and the levels put the free ones in frame h-1 (that nothing
-   further down is needed is an assumption of the model, see "What optimal means" below).  Both frames must stay
-   winnable.
+   tax.  Promoting a factor of frame h makes it a move of frame h-1, one frame forward: its own maximal factors, which
+   would pay for it, are in the frames directly in front of its frame, and the numbering puts those with freedoms in
+   frame h-1 (that nothing further forward is needed is an assumption of the model, see "What optimal means" below).
+   Both frames must stay winnable.
 5. The score of a game is `in_the_bag` (what the game with no promotions scores) plus the sum of its promotions.  So
    the solver searches for the *promotion set* with the largest sum, with a branch-and-bound over which candidates to
-   promote; the moves of the game follow from the promotions (`Apiary`, see the pipeline below).
+   promote; the moves of the game follow from the promotions (`hives::Apiary`, see the pipeline below).
 
-A small example, the board 1..=85 (`frames::tests::frames_of_85`; it comes from the Java tests):
+A small example, the board 1..=21 (the Java's golden data, `testdata/golden/n0021.json`; the wiki's [walkthrough for
+n = 21](https://github.com/bvchess/taxman/wiki/Walkthrough-for-N=21) shows it in pictures):
 
 ```
-frame 0   moves 45 50 63 75    factors 4 6 9 10 14 15 21 25    4 freedoms (factors minus moves)
-frame 1   moves 56 60 84       factors 8 12 20 28 30 42        3 freedoms
-frame 2   moves 48 72 80       factors 16 24 36 40             1 freedom
-candidates: 8 12 16 20 24 28 30 36 40 42
+frame A   sources 19 11 13 17   factors 1           closed: 11, 13 and 17 are impossible (the 1 pays for one of them)
+frame B   sources 14 15 21      factors 2 3 5 7     1 freedom (15 must take 5)             frame 0
+frame C   sources 12 18 20      factors 4 6 9 10    1 freedom (20 must take 10)            frame 1
+frame D   sources 16            factors 8           closed
+candidates: 4 9 (factors of C that B can accept as moves and still play all its own)
 ```
 
-Promoting 8 (a factor of frame 1) takes it out of frame 1's factors and makes it a move of frame 0.  Frame 0 stays
-winnable.  The frames are then *reduced*: 8's only maximal factor is 4, so (8, 4) is a forced pair and drops out of
-frame 0; in frame 1, 56 has lost the factor 8 and is left with 28, so (56, 28) drops out there.  Frame 0 ends with 3
-freedoms and frame 1 with 2: one freedom spent on each side.  In the game, 8 is now played as a move that pays its tax
-from frame 0 (the factor 4) and scores 8.  The search is over such choices: n = 85 has 10 candidates, n = 1100 has 273.
+B is in front of C, because 9, a factor of C, has the maximal factor 3 in B.  The game with no promotions plays every
+source that is not impossible and scores `in_the_bag` = 135 (19 + 14 + 15 + 21 + 12 + 18 + 20 + 16).  Promoting 9 (a
+factor of C) takes it out of C's factors and makes it a move of B, so the game scores 144; promoting 4 would score 139.
+Both frames stay winnable.  The frames are then *reduced*: 9's only maximal factor is 3, so the pair (9, 3) drops out
+of B, which leaves 21 only the factor 7 and 14 only the factor 2, so they drop out too; in C, 18 is left with 6 and
+12 with 4.  Both frames end with no freedom: one freedom spent on each side.  The game plays the frames from the
+front: 19; 9, 15, 21, 14; 18, 12, 20; 16.  The search is over such choices: n = 21 has 2 candidates, n = 85 has 10,
+n = 1100 has 273.
+
+Frames are merged from n = 20 on.  At n = 20 the frames of 14 and of 15 share no factor, but neither has a frame
+with freedoms in front of it, so both are frame 0, and they are merged into one frame with two freedoms: both sit
+directly in front of the frame of 12, 18 and 20, whose factor 6 has a maximal factor in each (2 and 3), and a
+promotion from that frame needs one frame to go to.
 
 ### What "optimal" means
 
 * **Within the frame model.**  The decomposition above rests on assumptions that are validated, not proven: the greedy
-  removal of impossible sources inside hives, the mandatory moves of `unzip` (a source with only one usable factor
-  must take it), `free factors = factors - sources`, closed hives (those with no free factor) taking no part in the
-  search, and a promoted number paying tax only from the frame directly below
-  ([DESIGN.md, Tactics](DESIGN.md#5-tactics)).  They were validated by agreement with the Java's
-  `optimal.json` for n <= 1000, by exhaustive search (`src/brute.rs`, `heuristics/evaluation/certify.py`) for small
-  boards (n <= 62), and by a model-free exact search ([`evidence/`](evidence/README.md)) that confirms the optimum
-  for every n <= 1300, the committed chain to there (its check of 1301 to 2175 is pending).
+  removal of impossible sources inside frames, the mandatory moves of `unzip` (a source with only one usable factor
+  must take it), freedoms = factors - sources, closed frames (those with no freedom) taking no part in the search, and
+  a promoted number paying tax only from the frame one forward ([DESIGN.md, Tactics](DESIGN.md#5-tactics)).  They
+  were validated by agreement with the Java's `optimal.json` for n <= 1000, by exhaustive search (`src/brute.rs`,
+  `heuristics/evaluation/certify.py`) for small boards (n <= 62), and by [the prover](prover/README.md), which proves
+  the optimum on the whole board, without the frame model, for every n <= 1300, the committed chain to there (its
+  proofs of 1301 to 2175 are pending).
 * **Given the pruning is exact.**  Every tactic is proven or sound: none prunes a promotion set that could win
   ([DESIGN.md, Tactics](DESIGN.md#5-tactics) grades each).  So a result rests on nothing but the frame model, the
   correctness of the code and, where its proof says so, the game it was built from.
@@ -135,7 +150,7 @@ how, and DESIGN.md "Performance" what it gains); `examples/perf.rs` measures the
 cargo test                         # the whole suite: about 1.5 minutes to compile, then about 30 s to run
 ```
 
-`cargo test` runs as many test threads as the machine has cores; the timings here and in DESIGN.md are with
+`cargo test` runs as many test threads as the machine has CPUs; the timings here and in DESIGN.md are with
 `-- --test-threads=2`.
 
 The ignored tests are for large machines and long runs: `cargo test --release --test engine -- --ignored
@@ -162,7 +177,7 @@ n=480   score=73120     search  nodes=68              0.009 s  optimal ok  proof
   moves: [479, 361, 437, 299, 403, 341, 473, 301, 469, 335, 445, 267, 471, 314, 478, 466, 458, 454, 446, ...]
 ```
 
-`--use-prev` takes the game of n - 1 from `optimal.json` (n - 1 <= 1300), which seeds and caps the search; a result
+`--use-prev` takes the game of n - 1 from `optimal.json` (n - 1 <= 1300), which seeds the search and gives it a ceiling; a result
 whose proof rests on that game records that it assumes it optimal (section 5).  Without `--use-prev` a single game has
 no predecessor and is solved standalone (below).  The node count of a multi-threaded search varies a little from run to
 run.  "optimal ok" means the score equals the table's, not that it is proven (section 5).
@@ -269,7 +284,7 @@ counts them.
 
 | flag | meaning |
 |---|---|
-| `--threads K` | worker threads (default: all cores; honours affinity masks and cgroup limits) |
+| `--threads K` | worker threads (default: all CPUs; honours affinity masks and cgroup limits) |
 | `--tactic NAME=VALUE` | set a tactic, repeatable |
 | `--out FILE` | append result lines; skip games the file completed; the predecessor of the first game comes from it |
 | `--checkpoint-dir DIR`, `--checkpoint-interval S` | checkpoints (default every 60 s) |
@@ -409,7 +424,7 @@ Game 249 of that run repeated the search of 248; its line has `"method":"repeat"
 | `same_search` | for a repeat, the earlier game of the file whose search it repeats: its board size, the digest of the search problem they share, the problem's best promotion sum, that game's proof and what it assumes; null otherwise |
 | `nodes`, `stats` | search steps over all invocations, and the searcher's counters (`match_bounds` is the number of node bounds computed, GF(2) or matching) |
 | `engine` | this invocation's splits, checkpoints written, units spilled, largest in-memory queue |
-| `setup` | null on a `trivial` or `prime` line, which set up no search; otherwise the frames and candidates found, `max_total` (cap on the number of promotions), the greedy start, `cap` (ceiling on the promotion sum, `n + score(n-1) - in_the_bag`; null on a repeat, which ran no search to stop), and `digest`, a digest of the search problem the setup poses (DESIGN.md, "Same search"), by which a later game finds this one to repeat |
+| `setup` | null on a `trivial` or `prime` line, which set up no search; otherwise the frames and candidates found, `max_total` (the most promotions the freedoms allow), the greedy start, `cap` (ceiling on the promotion sum, `n + score(n-1) - in_the_bag`; null on a repeat, which ran no search to stop), and `digest`, a digest of the search problem the setup poses (DESIGN.md, "Same search"), by which a later game finds this one to repeat |
 | `seconds` | per phase, this invocation (`search_all_runs`: the search over every invocation of a resumed game) |
 | `invocations` | how many invocations ran the search (a resumed game has more than one) |
 | `threads`, `tactics`, `tactic_switches`, `limits`, `options` | what the last invocation ran with; `tactics` is `default` or the changes from the defaults, `options` the flags `--force-search` and `--use-prev` |
@@ -487,9 +502,9 @@ second build's chain, what the games assume).
    |  [1] numtheory::Tables            maximal factors and maximal composites of 1..=n; the set width W
    |  [2] n prime ............ accelerate::prime_shortcut   the game of n-1 with its first move replaced by n
    |                                                         method=prime        proof=prime_formula
-   |  [3] board::Board::new            hives::Apiary: sources (never tax) + factors -> hives; unzip, removeImpossible
-   |                                   frames::build_frames: free hives stacked into levels = frames (0 = bottom);
-   |                                   candidates; in_the_bag
+   |  [3] board::Board::new            hives::Apiary: sources (never tax) + factors -> frames; unzip, removeImpossible
+   |                                   frames::build_frames: frames with freedoms numbered from the front (0 = front)
+   |                                   and merged; candidates; in_the_bag
    |      no candidates ...... the game with no promotions   method=trivial      proof=trivial
    |  [4] search ............. method=search                 proof=exhausted | cap
    |        Board::prepare             search::prepare: model::Model::build -> the root FrameSet; greedy set;
@@ -504,7 +519,7 @@ second build's chain, what the games assume).
    |                                   members, nogoods (search::refine, model::Nogoods) -> with lagrange the
    |                                   Lagrangian bound over the nogoods (search::lagrange);
    |                                   choose_branch (a candidate) -> make_child -> check_child
-   |      promotions -> accelerate::solution_for_promotions   (Apiary with the promotions as sources) -> ordered moves
+   |      promotions -> accelerate::solution_for_promotions   (hives::Apiary with the promotions as sources) -> ordered moves
    |
    |  [2] and same_search are skipped by --force-search and when the game has a checkpoint (a search is resumed,
    |  never replaced)
@@ -521,158 +536,125 @@ replaces, and of the module comment of `src/solver.rs`, which gives the checks o
 
 ## 7. Glossary
 
-Words that mean more than one thing in this code base are marked **(overloaded)**, with each meaning.
+Words that mean more than one thing in this code base are marked **(overloaded)**, with each meaning.  Words used
+inside one part of the code are defined where they are used, not here: the setup's (`unzip`, mandatory moves, claimed
+factors) in the module comment of `src/hives.rs`; the peel, `reduce` and the home frame in `src/model/`; the
+bounds' internals (potentials, weight splits, contraction, refinement, refits) in [DESIGN.md, section
+4](DESIGN.md#4-the-search); the engine's (units, splits, steals, spills, pauses) in [section
+6](DESIGN.md#6-engine) and the module comment of `src/engine.rs`; the fields of the progress line in section 4 above;
+the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#the-java-solver-and-this-one).
 
 ### The game
 
 * **board, pot, n**: the numbers 1..=n; the pot is what is still on it during a game.  In the code `board::Board` is a
   board analysed for the search: its tables, frames, candidates and `in_the_bag`.
 * **move, tax**: a number the player takes, and the divisors the taxman takes with it.
+* **score, opt(n), optimal game**: the sum of the player's moves; the best score on the board 1..=n; a game that
+  scores it.
 * **maximal factor** of m: m/p for a prime p dividing m (a divisor reached by deleting one prime).  Its inverse is the
-  **maximal composite**.  A move is playable if one of its maximal factors is still in the pot (equivalent, on a board
-  without holes, to "some divisor is": the lifting argument in `src/numtheory.rs`).
-* **score, opt(n)**: the sum of the player's moves; the best score on the board 1..=n.
-* **hole**: a number taken off the board; used only by the sacrifice study and the brute-force solver.
+  **maximal composite**; the **maximal factor graph** joins each number to its maximal factors.  A move is playable if
+  one of its maximal factors is still in the pot (equivalent, on a board without holes, to "some divisor is": the
+  lifting argument in `src/numtheory.rs`).
 
 ### The frame model
 
 * **source**: a number with no maximal composite (every number above n/2): never tax, and played unless it is found
-  impossible (below).  (Hives call moves *sources*, frames call them *moves*, and the matching code *movers*; same
-  thing.)
-* **factor**: any number that is not a source.
-* **hive**: a connected group of sources together with all the factors they compete for.  The code's bee names
-  (**apiary** = all hives of a board, **unzip**, **removeImpossible**) come from the Java.  **downstream / upstream**:
-  hive B is downstream of hive A, and A upstream of B, when a number of A has a maximal factor in B (A's numbers are
-  multiples of B's).  In a game the downstream hives are played first.
-* **unzip**: finds the *mandatory* moves of a hive: a source with one usable factor must take it, and so on.  The
-  Java docs say "forced"; see **forced**.  **claimed** factors are the ones those moves use up.
-* **impossible**: a source that cannot be played together with the sources already kept (found greedily from the
-  largest).  Impossible moves are dropped from the frame's moves.
-* **free factor count**: factors minus sources of a hive: how many factors it can spare.  A **free** hive has some; a
-  **closed** hive has none and takes no part in the search.  **(overloaded)** *free* is also a hive, a factor, and a
-  vertex of the matching that is unmatched.
-* **frame, level**: free hives stacked in levels (a level is every free hive with no free hive downstream of it, then
-  the next level up, ...) and merged; each level is one frame.  Frame 0 is the bottom (downstream).  A promotion moves a
-  factor of frame h to a move of frame h - 1.  "Above", "upstream" and "top" mean larger h; "below", "downstream" and
-  "bottom" mean smaller.
+  impossible (below).  **factor**: any number that is not a source.
+* **frame**: a connected group of sources together with all the factors they compete for (sources that share a factor
+  are in one frame).  Setup simplifies the frames, numbers the ones that have freedoms from the front (0 is played
+  first) and merges those with the same number, so that a promotion always has one frame to go to; the search works
+  on the merged frames.  In the code the setup's frames are the types `Hive` and `Apiary` (all of a board's) of
+  `src/hives.rs` and, as the search takes them, `FrameColumn` of `src/frames.rs`; the Java's golden data keeps its keys
+  `apiary`, `hives` and `freeFactorCount`.
+* **front, back**: frame X is in front of frame Y (and Y behind X) when a number of Y has a maximal factor in X, that
+  is, when Y's numbers are multiples of X's.  Frames in front are played first, so frame 0 is the front, and a
+  promotion moves a factor of frame h to a move of frame h - 1, one frame forward.
 * **Taxman Mini**: the game a frame plays: a set of moves and a set of factors; each move must still have one of its
   maximal factors in the frame when taken, and taking it removes all of its factors still there.
-* **winnable**: some order takes every move of a frame.
-* **peel**: the test for winnable: repeatedly drop a move that has a *private* live factor (one no other move has);
-  winnable exactly when all moves drop.  **(overloaded)** `hives::count_freedoms` is the same kind of peel, which also
-  takes a move with a single live factor first, for a hive's moves; and `heuristics/core.py` has a `peel` that is a
-  different procedure.
-* **reduce**: remove forced pairs: a move left with a single live factor must be paid by it, so the pair is dropped,
-  repeatedly.  **(forced pair)**
-* **freedoms**: a frame's factors minus its moves, which drops by one on each promotion into or out of it.  The same
-  quantity as the *free factor count* at the start (two names).
-* **promotion, promote**: play a factor as a move: take it out of its home frame's factors and make it a move of the
-  frame below.  Legal when both frames stay winnable.  **home frame**: the frame a number is a factor of.
-* **candidate**: **(overloaded)** (1) a number the frame builder says could be promoted (`FrameColumns::candidates`,
+* **impossible**: a source that cannot be played together with the sources already kept (found greedily from the
+  largest).  Impossible sources are dropped from the frame's moves.
+* **freedoms**: a frame's factors minus its moves: how many factors it can spare.  A promotion into or out of the frame
+  uses one up, and none may go below zero.  A frame with none is **closed** and takes no part in the search.
+* **winnable**: some order takes every move of a frame.  A **peel** tests it ([DESIGN.md, section
+  2](DESIGN.md#2-the-game-and-the-frame-model)).
+* **promotion, promote**: play a factor as a move: take it out of its frame's factors and make it a move of the frame
+  in front of it.  Legal when both frames stay winnable.
+* **candidate** **(overloaded)**: (1) a number setup says could be promoted (`FrameColumns::candidates`,
   `Apiary::promotion_candidates`); (2) `cands` in a search node: the candidates the node's loop still has to try; (3) a
-  vertex role in the matching graph: a number that may be matched as a promoted mover, may pay for one above it, or stay
-  free.
-* **in the bag** (`in_the_bag`, the Java's `inTheBag`): what the game with no promotions scores.  The score of any game
-  of the model is `in_the_bag` plus the sum of its promotions.
-* **max_total** (`maxTotalPromotions`): a cap on the *number* of promotions, from the frames' freedoms.
-* **cap, prev_cap** **(overloaded)**: (1) the ceiling on the promotion *sum*: `n + score(n-1) - in_the_bag`; reaching
-  it ends the search (tactic `prev_cap`, proof `cap`); (2) `max_total`, "the cap on the number of promotions"; (3)
-  `queue_mem_cap` and `NOGOOD_CAPACITY`, sizes.
-* **model assumptions**: see section 1.  `model::Model` is the immutable factor graph and home frames, not "the
-  model".
-* **prime shortcut**: for a prime n, the game of n - 1 with its first move replaced by n.  **sacrifice**: study code
-  (`src/sacrifice.rs`, not used by the solver) with the proven bound `opt(n) <= max(opt(n-1), n + max over maximal
-  factors f of opt_M([n-1] minus f))`.
+  vertex role in the matching graph: a number that may be matched as a promoted mover, may pay for one behind it, or
+  stay free.
+* **promotion set, promotable**: a set of candidates that can be promoted together from the root, keeping every frame
+  winnable and its freedoms at least 0.  The score of a game of the model is `in_the_bag` plus the sum of its promotion
+  set.
+* **in the bag** (`in_the_bag`, the Java's `inTheBag`): what the game with no promotions scores.
+* **max_total** (`maxTotalPromotions`): the most promotions the frames' freedoms allow.
+* **the frame model**: this decomposition and its assumptions (section 1).  `model::Model` is the immutable factor
+  graph and home frames, not "the model".
 
 ### The search
 
 * **tactic**: a switchable piece of the algorithm (`--tactic`).  **sound / proven**: the grading in
   [DESIGN.md](DESIGN.md#5-tactics); every tactic is one or the other.
-* **incumbent**: the best promotion set found so far, shared by all threads; **offer** raises it.  **greedy**: promote
-  every candidate that can be, from the largest down.  **seed**: the previous game's promotions that are still
-  candidates.  **dive**: round the root's matching into a feasible set.  The starting incumbent is the best of the
-  three, improved by a local search.
-* **node, step, unit** **(overloaded)**: a search node is a set of promotions made from the root plus the candidates
-  left; a **unit** is a node as the engine passes it around, `(promoted, cands)`, from which the state is rebuilt; and
-  the `nodes` that results and progress lines count are *steps*, one per candidate a node's loop tries.
-* **upper bound**: what no completion of a node can exceed: the **GF(2) bound** by default; with `gf2=off` the
-  **matching bound**, refined by conflicts and with the Lagrangian bound beside it.  (**blameGame**, the Java's, was
-  the starting point and is gone: DESIGN.md, section 2.)
-* **GF(2) bound** (`gf2`): every frame's movers get vectors over GF(2) (their maximal factors in the frame, and a
-  number promoted out of it its own), which a winnable frame keeps linearly independent; the even frames make one
-  matroid on the candidates and the odd frames another, and the heaviest set independent in both (**weighted matroid
-  intersection**) bounds a node's completions (heuristics/THEORY.md, Theorem 11).  Kept along the search path by
-  **contraction** by the promoted numbers (`gf2`).  **I\***: its heaviest set.  The **weight split** of `I*` gives the
-  bound without each member at once, which finds forced members.
-* **matching bound**: relax winnability to matchability: choose promotions maximising their sum such that every move
-  and every promoted number gets a distinct maximal factor in its frame.  A maximum-weight bipartite matching, kept
-  incrementally with dual **potentials** along the search path (`matchbound`).  **Q\***: the promotions of the
-  heaviest matching.
+* **node, step**: a search node is a set of promotions made from the root plus the candidates left; the `nodes` that
+  results and progress lines count are *steps*, one per candidate a node's loop tries.
+* **incumbent**: the best promotion set found so far, shared by all threads.  **greedy**: promote every candidate that
+  can be, from the largest down; the search starts from the best of that, the previous game's promotions and a rounding
+  of the root's matching ([DESIGN.md, section 4](DESIGN.md#the-starting-incumbent-the-ceiling-and-the-seed)).
+* **GF(2) bound** (`gf2`, the default): what no completion of a node can exceed, from the heaviest set that is
+  independent in two matroids over GF(2), one for the even frames and one for the odd ones (heuristics/THEORY.md,
+  Theorem 11; DESIGN.md, section 4).  **matching bound** (`gf2=off`): winnability relaxed to matchability, the largest
+  sum of promotions such that every move and every promoted number gets a distinct maximal factor in its frame, a
+  maximum-weight bipartite matching kept along the search path (`matchbound`).
 * **conflict**: a subset of a promotion set that cannot be promoted together from a state.  Every completion leaves out
-  one of its members.  **core**: the moves of an unwinnable frame that a peel cannot drop; a conflict is built from it.
-* **refinement** (`match_refine`): bound the branches of a conflict too (member k1 out; k1 in and k2 out; ...) to a few
-  levels.
-* **branching**: which candidate a node promotes next.  **strong branching**, the only one: the member of the
-  conflict whose removal lowers the bound most (with `gf2`, solved exactly for each member: *exact strong
-  branching*).
-* **forced member** **(overloaded)**: in the search, a member of the heaviest set (`I*`, or the heaviest matching)
-  whose removal alone brings the bound (GF(2), matching or Lagrangian) below what the node needs, so every completion
-  that beats the incumbent promotes it (tactic `fix_forced`: the child promotes all of them together).  Also: a hive's *mandatory* move (`unzip`, "forced moves" in its docs), and a *forced pair*
-  in `reduce`.  Three unrelated ideas.
-* **nogood**: a conflict of the *root* learned from a conflict found at a node; valid at every node, any thread, any
-  path.  Each searcher keeps a table, scanned exactly over compact member indices, and forgets it every 50,000 of its
-  steps (`forget_nogoods`).
-* **Lagrangian bound** (`lagrange`): the matching bound with the searcher's nogoods folded into the weights of their
-  members by *multipliers* (Lagrangian relaxation): a bound whatever the multipliers, often well below the matching
-  bound; kept along the path the same way, and its potentials find forced members too.  A nogood is **live** at a node
-  when its members outside the node's promotions are all still candidates; a **refit** fits the multipliers again (at
-  the root, to the nogoods learned), after 2,000 steps and with each forgetting (DESIGN.md, section 4).
-* **certificate** **(overloaded)**: `results::Certificate` is a score that equals a proven ceiling; the Python heuristics'
-  "upper-delta certificate" is a prediction of a score from the previous game's
-  ([heuristics/README.md](../heuristics/README.md#certificates)); `certify.py` is the brute-force certification of
-  small boards.
-* **reuse_prev, revise_freedoms**: the Java's two conjectures, once tactics here and removed (DESIGN.md, section 5).
-* **search problem, digest, repeat, same search**: what a game's setup gives the search, in a canonical form
-  (`search::Problem`: the frames, the candidates, `max_total` and the factor graph among their numbers), and a 64-bit
-  digest of it (`setup.digest`).  A game whose problem an earlier game posed and settled *repeats* its search: the
-  tactic `same_search` concludes it with that game's promotions (method `repeat`, proof `same_search`).
+  one of its members.  **nogood**: a conflict of the *root* learned from a conflict found at a node; valid at every
+  node, any thread, any path.  Each searcher keeps a table of them and forgets it every 50,000 of its steps
+  (`forget_nogoods`).
+* **strong branching**: which candidate a node promotes next: the member of the conflict whose removal lowers the
+  bound most (with `gf2`, solved exactly for each member).
+* **forced member**: a member of a node's heaviest set whose removal alone brings the bound below what the node
+  needs, so every completion that beats the incumbent promotes it (tactic `fix_forced`: the child promotes all of them
+  together).
 
 ### Results and trust
 
+* **chain**: games each built from the one before (n = 1, 2, 3 ...): a game's search starts from the previous game's
+  promotions and stops at its ceiling.  A game solved with no predecessor is *standalone*.
+* **ceiling**: `n + score(n-1)`, which no game of n can exceed; a score that reaches it needs no search to prove (it is
+  recorded as a `results::Certificate`).  As a bound on the promotion *sum* it is `n + score(n-1) - in_the_bag`, which
+  the results lines and the tactic call `cap` (proof `cap`, `reached_cap`, `setup.cap`, tactic `prev_cap`).
+* **prime formula**: for a prime n, the game of n - 1 with its first move replaced by n (tactic `prime_shortcut`, proof
+  `prime_formula`).
+* **search problem, digest, repeat**: what a game's setup gives the search, in a canonical form (`search::Problem`:
+  the frames, the candidates, `max_total` and the factor graph among their numbers), and a 64-bit digest of it
+  (`setup.digest`).  A game whose problem an earlier game posed and settled *repeats* its search: the tactic
+  `same_search` concludes it with that game's promotions (method `repeat`, proof `same_search`).
 * **proof (kind)**: how a completed game's optimality is established: `trivial`, `exhausted`, `cap`, `prime_formula`,
-  `same_search` (section 5).  **ceiling**: `n + score(n-1)`, which no game of n can exceed; a score that reaches it
-  needs no search to prove.
-* **assumes, assumption**: what a proof rests on beyond the frame model, inherited down the chain of games; a game
-  of n - 1 taken from `optimal.json` (`--use-prev`) is assumed optimal (section 5).
+  `same_search` (section 5).  **assumes**: what a proof rests on beyond the frame model, inherited down the chain; a
+  game of n - 1 taken from `optimal.json` (`--use-prev`) is assumed optimal (section 5).
 * **optimal ok / optimal match**: the score equals `optimal.json`'s, the table built into the binary.  It is not a
   proof, and does not exist above the table's last game; a score that differs is a hard error.
 * **referee**: code that checks a game or a results file independently of the code that made it: `game::replay`,
   `taxman verify-results`, `tools/check_results.py`.  **rejected**: a game that failed a check after it was found,
   written to `<results>.rejected.jsonl`.
-* **schema 5**: the format of a results line (section 4); this build reads no other.
+* **results line, schema 5**: the format of a line of `--out` (section 4); this build reads no other.  Two words
+  survive only as field names there: `nodes` counts steps, and `prev.source` says where the game of n - 1 came from.
+* **checkpoint**: a periodic pause in which all workers stop and the engine writes the unexplored work, the incumbent
+  and statistics to `nNNNN.ckpt`; its **header** is what identifies the search (n, width, digests of candidates and
+  frames, `max_total`, the tactics).
 
-### The engine and a run
+### Other programs and bounds
 
-* **engine**: the problem-independent parallel depth-first branch-and-bound driver (`engine.rs`); the Taxman search is a
-  `Searcher` it runs.  **worker**: a thread with its own searcher.  **deque**: the shared queue of units.
-* **yield, split, steal**: a searcher gives its unexplored work back by *yielding*; a *split* is a yield answering an
-  idle worker; a *steal* takes a unit from the front of the deque (the shallowest, largest subtree).  **poll**: the
-  searcher asking whether to yield.
-* **spill**: units moved from memory to segment files beyond `queue_mem_cap`.
-* **checkpoint, pause, park**: a periodic pause in which all workers yield and park, and the engine writes every unit,
-  the incumbent and statistics to `nNNNN.ckpt`.  **header**: what identifies the search (n, width, digests of candidates
-  and frames, `max_total`, the tactics).
-* **eff, idle, lock, full occupancy, tiny run**: the engine's counters; see section 4 and the scaling reading guide in
-  [tools/cloud/RUNBOOK.md](tools/cloud/RUNBOOK.md).
-* **W, `Bits<W>`**: the width in 64-bit words of the bitsets that hold game numbers; chosen from n.
-* **standalone vs chained**: a game solved alone (no predecessor: no seed, no cap) or as part of a chain from n - 1
-  ([bench/curve/README.md](bench/curve/README.md)).
-* **frontier** **(overloaded)**: the largest n solved contiguously (2175).  Unrelated to the "frontier" argument of
-  `heuristics/THEORY.md`.
-* **ladder**: a harness (`examples/ladder.rs`) that searches hard games standalone, with time limits, at several thread
-  counts.  **Java**: the original solver in `src/main/java`; **optimal.json**: the table of optimal games, n <= 1300
-  (the Java's games 1 to 1000, then those of the chain from n = 1, appended by `taxman extend-optimal`), built
-  into the binary.
+* **the Java solver** (`src/main/java`): the original, whose algorithm the solver reimplements.  **optimal.json**: the
+  table of optimal games, n <= 1300 (the Java's games 1 to 1000, then those of the chain from n = 1, appended by
+  `taxman extend-optimal`), built into the binary.
+* **the prover** ([prover/](prover/README.md)): a branch and bound over sets of moves on the whole board, which decides
+  playability by peel and uses only proven bounds; it proves that no set of moves beats a recorded score.
+  **Franklín–Moniot bound**: the maximum-weight matching relaxation of the whole game, an upper bound on opt(n);
+  `tools/check_results.py` compares scores with it.  **parity bound**: the prover's sharper bound, from two matroids
+  over GF(2) split by the parity of Ω (heuristics/THEORY.md, Theorem 10).
+* **brute force**: `src/brute.rs`, the exhaustive search that is the test oracle for small boards.  **U\***:
+  heuristics/THEORY.md's name for the heaviest playable set of sources, which the sources that setup keeps at the root
+  are wherever the upper-half conjecture holds ([prover/README.md, section 2](prover/README.md#2-conjecture--at-scale)).
 
 ## 8. Reading order and map of the documents
 
@@ -684,8 +666,8 @@ comment that is worth reading first; section 6 above is the map of how the piece
 3. `src/bits.rs`: `Bits<W>`, the fixed-width bitsets of game numbers that everything below is generic over, and the
    set widths.  The module comment is enough at first.
 4. `src/json.rs`: the small JSON reader and writer.  Skim; it matters once you read results lines.
-5. `src/hives.rs`: sources, factors, hives, unzip, impossible moves, free factor counts.
-6. `src/frames.rs`: hives stacked into frames; the candidates.
+5. `src/hives.rs`: sources, factors, the setup's frames, unzip, impossible moves, freedoms.
+6. `src/frames.rs`: the frames numbered from the front and merged; the candidates.
 7. `src/model/`: `mod.rs` says what is where: `Frame`, `FrameSet` (`frame.rs`), `Model`, winnability and reduction
    (`peel.rs`), promotion (`promote.rs`), then conflicts (`conflict.rs`) and nogoods (`nogoods.rs`).
 8. `src/accelerate.rs`: the shortcuts from the game of n - 1 (read the comment of `prime_shortcut` for the proof of the
@@ -718,7 +700,8 @@ comment that is worth reading first; section 6 above is the map of how the piece
 | [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) | the register of everything tried, kept or not (check it before proposing an experiment), and the lab notebook: every round of improvements with its measurements |
 | [docs/IDEAS.md](docs/IDEAS.md) | ideas borrowed from other fields (SAT, MaxSAT, MIP, #SAT, ...), ranked, with pilot measurements, the profile of the hardest games and the study of nogoods at many threads |
 | [results/README.md](results/README.md) | the committed results files and what supports their scores |
-| [bench/curve/README.md](bench/curve/README.md) | how the cost grows with n beyond the frontier, and projections for a larger machine |
-| [tools/cloud/RUNBOOK.md](tools/cloud/RUNBOOK.md) | running the solver on a many-core cloud machine |
+| [bench/curve/README.md](bench/curve/README.md) | how the cost grows with n beyond the end of the chain, and projections for a larger machine |
+| [prover/README.md](prover/README.md) | the prover: independent proofs and checks of the solver's results on the whole board, and the conjecture checks |
+| [tools/cloud/RUNBOOK.md](tools/cloud/RUNBOOK.md) | running the solver, and the prover's proofs, on a many-core cloud machine |
 | [../heuristics/THEORY.md](../heuristics/THEORY.md) | the theory (maximal factors, playable sets) the model rests on |
 | the [wiki](https://github.com/bvchess/taxman/wiki) | the Java solver's algorithm and definitions |

@@ -2,13 +2,13 @@
 # Copyright (c) Brian Chess 2026
 # SPDX-License-Identifier: MIT
 
-"""Summaries of the evidence campaigns' JSONL files (plain or .gz).
+"""Summaries of the prover's campaigns' JSONL files (plain or .gz).
 
     summarize.py span FILE...     the (♦) span campaign: games, rejections, spanned, violations, by range
     summarize.py star FILE...     the threshold-by-threshold (★) campaign: thresholds and components by method
-    summarize.py exact FILE...    the model-free exact cross-check of optimal scores (a later file overrides)
+    summarize.py exact FILE...    the proofs of optimal scores (a later file overrides)
     summarize.py check A B FILE...  FILEs prove every n in 2..B, with the recorded scores in A..B
-    summarize.py order A B        the games A..B, dearest first by the solver's nodes (the order evidence.sh runs them)
+    summarize.py order A B        the games A..B, dearest first by the solver's nodes (the order prover.sh runs them)
     summarize.py cost FILE...     its cost curve: the searches made with the parity bound from scratch, by band
     summarize.py optsets FILE...  every optimal pick set per game (bin/optsets.rs): tables, exchanges, canonical sets
     summarize.py moves FILE...    the longest games against the optimal ones (bin/moves.rs)
@@ -80,11 +80,11 @@ def star(paths):
 
 
 def exact_proofs(rows):
-    """Which games are proven optimal without the frame model: n is proven when its matching bound or its parity
-    bound equals the recorded score, or the search proved it (if it used the segment cuts, only when every smaller
-    game is proven), or its score meets the chain or prime relation and n - 1 is proven.  Returns (proven, how,
-    first_gap): whether each n in 1..max(rows) is proven, how the proven ones were (counts by kind), and the
-    first n that is not (None if all are)."""
+    """Which games are proven optimal without the frame model: n is proven when its Franklín–Moniot bound or its
+    parity bound equals the recorded score, or the search proved it (if it used the segment cuts, only when every
+    smaller game is proven), or its score is at its ceiling (`chain`) or meets the prime formula (`prime`) and n - 1
+    is proven.  Returns (proven, how, first_gap): whether each n in 1..max(rows) is proven, how the proven ones were
+    (counts by kind), and the first n that is not (None if all are)."""
     proven = {1: True}
     how = Counter()
     first_gap = None
@@ -93,7 +93,7 @@ def exact_proofs(rows):
         ok = False
         if r is not None:
             if r["fm_bound"] == r["score"]:
-                ok, kind = True, "matching bound"
+                ok, kind = True, "Franklín–Moniot bound"
             elif r.get("parity_bound") == r["score"]:
                 ok, kind = True, "parity bound"
             elif r["search"] == "proven" and (not r.get("segments") or all(proven.get(m) for m in range(2, n))):
@@ -109,8 +109,7 @@ def exact_proofs(rows):
 
 
 def exact(paths):
-    """The model-free exact cross-check of optimal scores (`exact_proofs`); a later file's line for a game replaces
-    an earlier file's."""
+    """The proofs of optimal scores (`exact_proofs`); a later file's line for a game replaces an earlier file's."""
     rows = {r["n"]: r for r in lines(paths)}
     proven, how, first_gap = exact_proofs(rows)
     done = sorted(rows)
@@ -125,7 +124,7 @@ def exact(paths):
     print(f"searches: {len(searched)}, total {sum(r['secs'] for r in searched) / 3600:.1f} h, "
           f"most nodes {max((r['nodes'], r['n']) for r in searched)}")
     last = max(searched, key=lambda r: r['n'])
-    print(f"matching-bound gap at the largest searched n ({last['n']}): {last['fm_bound'] - last['score']}")
+    print(f"Franklín–Moniot-bound gap at the largest searched n ({last['n']}): {last['fm_bound'] - last['score']}")
     big = sorted(searched, key=lambda r: -r["secs"])[:5]
     print("slowest: " + ", ".join(f"n={r['n']} {r['secs']:.0f}s {r['nodes']} nodes" for r in big))
     resumed = [r for r in searched if r.get("parity") and r.get("matching_nodes")]
@@ -351,8 +350,8 @@ def optsets_exchanges(rows, sets_of):
 
 
 def optsets_canonical(rows, sets_of):
-    """Whether the canonical set of n - 1 maps to that of n at each chain or prime step, and where the recorded
-    game's set stands among the canonically ordered sets."""
+    """Whether the canonical set of n - 1 maps to that of n at each step to a game at its ceiling (`chain`) or to a
+    prime (`prime`), and where the recorded game's set stands among the canonically ordered sets."""
     kept, steps, broken = 0, 0, []
     for n in sorted(sets_of):
         before = sets_of.get(n - 1)
@@ -439,7 +438,8 @@ def exact_order(args):
     repeated search) times 10^((n - 1300)/1000): over 34 games of 1302-2124 `exact` took 0.13 to 13 times as many
     nodes (the geometric mean 0.97 at 1300-1500 and 3.8 at 1800-2124, the scatter 0.28 decades), because the parity
     bound is the weaker bound and its gap grows faster than the solver's.  It is a guide to the order, not an estimate.
-    Games that meet the chain or prime relation, which `exact` does not search, go last."""
+    Games at their ceiling (`chain`) or meeting the prime formula (`prime`), which `exact` does not search, go
+    last."""
     lo, hi = int(args[0]), int(args[1])
     rows = {}
     for r in lines([str(STRICT_JSONL)]):

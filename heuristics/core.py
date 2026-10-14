@@ -38,7 +38,9 @@ peel is NOT equivalent to checking
 that a matching exists (Hall's condition).  There are sets where a
 perfect payment matching exists but every such matching is impossible
 to schedule — peel's forced-move discipline rejects those too.
-The smallest example lives at n=21; see the README's ledger.
+The smallest example is {6, 10, 15} on the board 15: 6 can pay with 2 or 3, 10 with 2 or 5, 15 with 3 or 5, so a
+perfect payment matching exists, but every one is precedence-cyclic.  The README's house example, n=21, is the first
+board where such a set raises the Franklín–Moniot bound; see its ledger.
 """
 
 from __future__ import annotations

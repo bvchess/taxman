@@ -1,21 +1,27 @@
-# Evidence for the assumptions behind "optimal"
+# The prover: independent proofs and checks of the solver's results
 
-The solver's optimal games (`rust/results`, `src/main/resources/optimal.json`) are optimal *within the frame
-model*, whose assumptions are validated, not proven ([DESIGN.md §2](../DESIGN.md#what-optimal-means)), and the
-frame model's handling of the numbers above n/2 rests on an open conjecture, the upper-half optimality
-conjecture, equivalently conjecture (★) ([THEORY.md](../../heuristics/THEORY.md#the-open-problem)).  This crate
-collects empirical evidence for those assumptions, as much and as independent as could be had cheaply.  It
-shares no code with the solver or with the Python heuristics; it rests only on THEORY.md's theorems (Theorem 1
-with peel as the playability oracle, and the residual theorems) and on elementary bounds, and every exact
-method in it is tested against brute force.
+The prover is the second program of this repository.  The solver finds the optimal games (`rust/results`,
+`src/main/resources/optimal.json`) by searching promotions within the frame model, whose assumptions are validated,
+not proven ([DESIGN.md §2](../DESIGN.md#what-optimal-means)), and whose handling of the numbers above n/2 rests on an
+open conjecture, the upper-half optimality conjecture, equivalently conjecture (★)
+([THEORY.md](../../heuristics/THEORY.md#the-open-problem)).  The prover is a branch and bound over sets of moves on
+the whole board.  It decides playability by peel (THEORY.md, Theorem 1), uses only proven bounds, takes the recorded
+score as its target and proves that no set of moves beats it, so that the frame model's answers are checked without
+assuming the frame model.  It also lists every optimal set of a game, finds the longest games, certifies conjecture (★)
+at scale and searches for adversarial instances.  It shares no code with the solver or with the Python heuristics; it
+rests only on THEORY.md's theorems (Theorem 1 with peel as the playability oracle, and the residual theorems) and on
+elementary bounds, and every exact method in it is tested against brute force.
+
+This document says *pick* for a number the player takes (the solver's and the wiki's *move*) and *forced picks* for
+the numbers fixed in at a node (the solver's *forced member* is the same idea for its own search).
 
 | assumption | before this work | now | grade |
 |---|---|---|---|
 | (★): descending greedy is maximum-cardinality on every component and truncation of the upper-half instance, hence U\* is the heaviest playable upper set (the upper-half conjecture) | 3,231 of 3,236 rejection-bearing components, n ≤ 1500 and 40 samples to 4000, plus n = 2873 and 9170; 5 undecided (n = 3103, 3872, 3936, 4000, 9170); scripts not kept | **every game n = 2 .. 100,000** (602,777,907 greedy rejections) and **902 games to 2,000,000** (60,183,674 more): every rejection a GF(2) linear dependency, which certifies (★) for the whole game; the five undecided components settled; no counterexample | certified per game (a bound met), open in general |
-| greedy removal of impossible sources in hives (`removeImpossible`) | agreement with optimal.json to 1000 | at the root (where it shapes the search space) it *is* descending greedy on each upper-half component, so it is certified with (★) for every n ≤ 100,000 | certified per game |
-| the frame model as a whole: `unzip`'s mandatory moves, free factor count, closed hives inert, one-level promotions, greedy removal | brute force (model-free) to n = 62; agreement with the Java's optimal.json, made by the same model, to 1000 | **opt(n) proven equal to the recorded score, model-free, for every n = 2 .. 1300**, the whole committed chain (300 of them past the Java's 1000, the Rust solver's own results) | verified (exact, model-free) |
-| uniqueness: one optimal set per game, and every optimal game's upper part U\* | the unique heaviest upper set by brute force to n = 62; one optimal game recorded per n | **U\* is the unique heaviest playable upper set wherever (★) holds** (Theorem 8), so to 100,000; every optimal set enumerated, model-free, in 954 of the games 2..989 (the other 34 with the upper half fixed): **the optimal set is unique for every n ≤ 424, not at 425**; 30 games have two or three; every optimal set found has upper part U\* | proven (upper half, given (★)); measured (whole game) |
-| the longest games: an optimal game plays the most moves a game of the board can (the wiki's open question; `revise_freedoms` assumes it for a two-frame game) | open; believed true (the wiki), unproven (a comment in the Java) | **false**: at n = 833, 834 and 835 every optimal game is one move short of the longest; every other game to 1300 is a longest game, the gap never above one | refuted (model-free); measured to 1300 |
+| greedy removal of impossible sources in frames (`removeImpossible`) | agreement with optimal.json to 1000 | at the root (where it shapes the search space) it *is* descending greedy on each upper-half component, so it is certified with (★) for every n ≤ 100,000 | certified per game |
+| the frame model as a whole: `unzip`'s mandatory moves, freedoms, closed frames inert, promotions one frame forward, greedy removal | brute force over pot states to n = 62; agreement with the Java's optimal.json, made by the same model, to 1000 | **opt(n) proven equal to the recorded score, on the whole board, for every n = 2 .. 1300**, the whole committed chain (300 of them past the Java's 1000, the solver's own results) | verified (exact, on the whole board) |
+| uniqueness: one optimal set per game, and every optimal game's upper part U\* | the unique heaviest upper set by brute force to n = 62; one optimal game recorded per n | **U\* is the unique heaviest playable upper set wherever (★) holds** (Theorem 8), so to 100,000; every optimal set enumerated, on the whole board, in 954 of the games 2..989 (the other 34 with the upper half fixed): **the optimal set is unique for every n ≤ 424, not at 425**; 30 games have two or three; every optimal set found has upper part U\* | proven (upper half, given (★)); measured (whole game) |
+| the longest games: an optimal game plays the most moves a game of the board can (the wiki's open question; the Java's `reviseFreedoms` assumes it for a two-frame game) | open; believed true (the wiki), unproven (a comment in the Java) | **false**: at n = 833, 834 and 835 every optimal game is one move short of the longest; every other game to 1300 is a longest game, the gap never above one | refuted (on the whole board); measured to 1300 |
 
 What the evidence is, in one paragraph each:
 
@@ -25,14 +31,15 @@ What the evidence is, in one paragraph each:
   set is a basis at every threshold, so nothing playable is larger: (★) for every component and truncation at
   once, and greedy optimal for every weighting consistent with the order.  (♦) is cheap to check exactly (game
   2,000,000 takes 2.7 minutes), and it holds in every game checked.
-* **A model-free exact search for opt(n).**  A branch and bound over which numbers are picked, bounded by the
-  Franklín–Moniot matching relaxation (re-optimized incrementally from the parent node's optimal dual) and by the
-  *parity bound*: every playable set is independent in two linear matroids over GF(2), split by the parity of Ω
-  (THEORY.md, Theorem 10), and their heaviest common independent set, certified by a weight split, overrates the
-  optimum by a tenth of what the matching does.  It branches on minimal unplayable sets found by peel, with forced
-  picks from the duals and learned nogoods; with the proven relations opt(n) ≤ n + opt(n−1) and the prime formula,
-  it proves the recorded optimum for every n ≤ 1300, the whole committed chain (the matching bound alone had
-  reached 989).
+* **The proofs of opt(n).**  A branch and bound over which numbers are picked, bounded by the Franklín–Moniot bound
+  (the matching of numbers to their maximal factors, re-optimized incrementally from the parent node's optimal dual)
+  and by the *parity bound*: every playable set is independent in two linear matroids over GF(2), split by the parity
+  of Ω (THEORY.md, Theorem 10), and their heaviest common independent set, certified by a weight split, overrates the
+  optimum by a tenth of what the Franklín–Moniot bound does.  It branches on minimal unplayable sets found by peel,
+  with forced picks from the duals and learned nogoods; with the proven ceiling opt(n) ≤ n + opt(n−1) and the prime
+  formula (in the data, `relation: chain` is a game at its ceiling, V(n) = n + V(n−1), and `relation: prime` one given
+  by the prime formula), it proves the recorded optimum for every n ≤ 1300, the whole committed chain (the
+  Franklín–Moniot bound alone had reached 989).
 * **Every optimal set.**  The same search, run in an enumeration mode one below the optimum, lists every optimal
   set of a game for about the cost of proving the optimum.  The optimal set is unique for every n ≤ 424; from 425
   some games have two or three, always with the same upper part, U\*, and differing by an exchange of lower-half
@@ -50,10 +57,10 @@ What the evidence is, in one paragraph each:
 * **Proven** (THEORY.md): playability ⟺ maximal-factor matching with acyclic precedence (Theorem 1); peel decides
   it (Theorems 2, 3); playable ⟺ no self-covering subset, and minimal exclusion sets lie in the residual, for
   separated instances (Theorems 4–6); greedy is weight-optimal wherever the frontier jam is hyperedge-free; the
-  bounds opt(n) ≤ n + opt(n−1), the prime formula, and the Franklín–Moniot matching bound.
+  bounds opt(n) ≤ n + opt(n−1), the prime formula, and the Franklín–Moniot bound.
 * **(★) / the upper-half conjecture.**  THEORY.md's "Evidence": 3,231 of 3,236 rejection-bearing components
   (all n = 6..1500, forty samples to 4000, n = 2873 and 9170) verified by exact search over the residual or
-  certified by the matching bound; five undecided (n = 3103, 3872, 3936, 4000, 9170, search budgets 2.7×10⁹ to
+  certified by the matching-number bound; five undecided (n = 3103, 3872, 3936, 4000, 9170, search budgets 2.7×10⁹ to
   1.1×10⁴⁷), the last "to be settled only by a theorem".  Exhaustive U\* = max-playable for n = 2..99.  The 3-prime
   padded-jam census (428 shapes, 22,909 trap orderings, zero unprotected).  `heuristics/evaluation/verify.py`:
   U\* equals the optimal game's upper half for n ≤ 1000.  The scripts and data of the (★) campaign and the census
@@ -61,11 +68,11 @@ What the evidence is, in one paragraph each:
   43936d3), so that evidence could not be reproduced; this crate's checks can.  (The uncertified 0.2% were
   exactly those five components.)
 * **The frame model** ([DESIGN.md §2](../DESIGN.md#what-optimal-means)): its assumptions (greedy removal of
-  impossible sources, `unzip`'s mandatory moves, free factor count = factors − sources, closed hives inert,
-  promotions one level down) were validated end to end: the Rust solver reproduces the Java's optimal.json to
+  impossible sources, `unzip`'s mandatory moves, freedoms = factors − sources, closed frames inert,
+  promotions one frame forward) were validated end to end: the solver reproduces the Java's optimal.json to
   1000 (made by the same model, so not independent), `src/brute.rs` matches it to 40 in its tests (52 in
-  `examples/sacrifice validate`), and `heuristics/evaluation/certify.py`'s model-free brute force confirms it to
-  n = 62.  Beyond 1000 (`rust/results`), nothing model-free.
+  `examples/sacrifice validate`), and `heuristics/evaluation/certify.py`'s brute force over pot states confirms it to
+  n = 62.  Beyond 1000 (`rust/results`), nothing independent of the frame model.
 
 ## 2. Conjecture (★) at scale
 
@@ -109,16 +116,16 @@ the cheapest sufficient argument, ran on every game n = 2 .. 20,000 (`data/star_
 | argument | thresholds | share |
 |---|---|---|
 | one exclusion is always needed (the jam is a nonempty residual) | 295,020 | 1.2% |
-| matching bound \|P\| − ν(P) | 20,730,083 | 86.2% |
+| matching-number bound \|P\| − ν(P) | 20,730,083 | 86.2% |
 | Lorea's hypergraphic-matroid bound | 2,004,572 | 8.3% |
-| GF(2) incidence-rank bound | 1,028,755 | 4.3% |
+| rank bound (the GF(2) rank of the incidence vectors) | 1,028,755 | 4.3% |
 | exact search needed | 0 | |
 | **total** | **24,058,430** | |
 
 By component (the unit of the old campaign: 58,306 rejection-bearing components, 3,119 of them in n ≤ 1500), the
-hardest argument needed was the matching bound (or one exclusion) for 21,015, Lorea's bound for 19,798 and the
-rank bound for 17,493.  The five components left undecided before all fall to the rank bound: n = 9170's jam
-(P = 304 members, greedy's 37 exclusions; the matching bound proves only 19) is certified in milliseconds.
+hardest argument needed was the matching-number bound (or one exclusion) for 21,015, Lorea's bound for 19,798 and
+the rank bound for 17,493.  The five components left undecided before all fall to the rank bound: n = 9170's jam
+(P = 304 members, greedy's 37 exclusions; the matching-number bound proves only 19) is certified in milliseconds.
 
 Before the rank bound was found, the exact searches (`src/maxcard.rs` from scratch; `src/plus1.rs`, which
 proves each threshold's "+1" given the earlier thresholds, with the laminar family of earlier jams as cardinality
@@ -130,13 +137,13 @@ Cross-checks: the Rust greedy equals `heuristics/core.py`'s `optimize_mini` on e
 6000, and its kept set's sum equals the upper half of optimal.json's game for every n ≤ 1000
 (`tools/crosscheck_greedy.py`).
 
-## 3. Model-free exact cross-check of opt(n)
+## 3. The proofs of opt(n)
 
 `src/game.rs` proves upper bounds on opt(n) from proven facts only: Theorem 1 with peel (a set of picks is
 playable iff dismantling the instance of the picks, each listing its maximal factors that are not picks,
-removes everything), the Franklín–Moniot matching bound, the parity bound (THEORY.md, Theorem 10),
+removes everything), the Franklín–Moniot bound, the parity bound (THEORY.md, Theorem 10),
 opt(n) ≤ n + opt(n−1), and the prime formula's upper bound (a game playing a prime n plays it first; swapping it for
-the largest prime below n gives a game of n − 1).  It knows nothing of hives, frames, greedy, `unzip` or
+the largest prime below n gives a game of n − 1).  It knows nothing of frames, greedy, `unzip` or
 promotions.  The search:
 
 * **Bound**: the maximum-weight matching between numbers and their maximal factors, with forced picks matched
@@ -151,8 +158,8 @@ promotions.  The search:
   only with a weight split that satisfies the local optimality conditions of both matroids, checked explicitly, so
   the bound rests on the theorem and weak duality, not on the algorithm.  It cuts the node, bars the free numbers
   that depend on the forced picks, forces the members whose barring alone brings it to the target, and the node
-  branches on its heaviest set's conflicts instead of the matching's.  Its gap is about a tenth of the matching
-  bound's (130 points against 1,200 at n = 1000-1300).
+  branches on its heaviest set's conflicts instead of the matching's.  Its gap is about a tenth of the
+  Franklín–Moniot bound's (130 points against 1,200 at n = 1000-1300).
 * **Branching**: if the bound's picks are playable they are a game worth the bound; otherwise a minimal
   unplayable subset (deletion filter with peel) must lose a member, and the children partition on which.
 * **Forced picks** (from the dual: barring the pick alone already brings the bound to the target), the
@@ -172,49 +179,48 @@ replays by the rules to V(n), so opt(n) = V(n).  Every rule above is tested agai
 optimum (the search must still reach optimal.json's score from one below it, with each rule on, and the parity
 bound's intersection is checked against enumeration on random pairs of matroids).
 
-### With the matching bound (to 989)
+### With the Franklín–Moniot bound (to 989)
 
 `data/exact_2_1231.jsonl`:
 
 | | games |
 |---|---|
-| matching bound already equals V(n) | 45 |
+| Franklín–Moniot bound already equals V(n) | 45 |
 | proven by the search | 487 |
-| chain relation V(n) = n + V(n−1), predecessor proven | 321 |
-| prime relation, predecessor proven | 156 |
+| `chain`, at its ceiling V(n) = n + V(n−1), predecessor proven | 321 |
+| `prime`, by the prime formula, predecessor proven | 156 |
 | **every n in 2 .. 989**, and 999 .. 1019 | **1009** |
 
-The searches took 10.0 hours of CPU in all.  The cost is far from monotone in n: the matching bound's gap is
+The searches took 10.0 hours of CPU in all.  The cost is far from monotone in n: the Franklín–Moniot bound's gap is
 140–430 points around n = 500–700 and 650–1200 from 800 on, and the hardest games are those whose optimum it
 overrates most: 798–804 at 7–12 million nodes, 987–989 at 19–53 million.  Games 990, 992, 993, 995 and 996 took
 50–70 million nodes each, and 1020 and 1023–1027 several million, without finishing; their searches are saved in
 `data/checkpoints/exact_open_searches.tar.gz`.
 
 ### With the parity bound (to 1300)
-### With the parity bound (to 1300)
 
 `data/exact_parity_990_1300.jsonl` continues that file: the open searches resumed with the parity bound, then every
 game from 1028 to 1300, then 999–1019 again.  The open searches finished in 4,000 to 215,000 more nodes each (17 to
 595 seconds; 990: 89,639 nodes after its 70.5 million, 992: 214,329 after 65.2 million), and with them 991, 994, 997
-and 998 by the chain and prime relations.  With the two files (`tools/summarize.py exact data/exact_2_1231.jsonl
+and 998 by the ceiling and the prime formula.  With the two files (`tools/summarize.py exact data/exact_2_1231.jsonl
 data/exact_parity_990_1300.jsonl`):
 
 | | games |
 |---|---|
-| matching bound already equals V(n) | 45 |
-| proven by a search (to 989 with the matching bound alone, from 990 with the parity bound) | 649 |
-| chain relation V(n) = n + V(n−1), predecessor proven | 407 |
-| prime relation, predecessor proven | 198 |
+| Franklín–Moniot bound already equals V(n) | 45 |
+| proven by a search (to 989 with the Franklín–Moniot bound alone, from 990 with the parity bound) | 649 |
+| `chain`, at its ceiling V(n) = n + V(n−1), predecessor proven | 407 |
+| `prime`, by the prime formula, predecessor proven | 198 |
 | **every n in 2 .. 1300**, the whole committed chain | **1299** |
 
 The parity searches of this file took 2.7 hours of thread time (three threads; the warm starts came in for its last
 96 games), the hardest 1287 at 146,855 nodes and 279 seconds.  So the frame model's answer is the true optimum for
-every game of the committed chain, n ≤ 1300, including the Rust solver's own results past the Java's 1000.
+every game of the committed chain, n ≤ 1300, including the solver's own results past the Java's 1000.
 
 `data/exact_parity_2_1300.jsonl` proves every game again from scratch with the parity bound (no resumed search, no
-matching-bound proof needed; the final build, two threads): a second, self-standing proof of every n ≤ 1300 by a
-different bound, and the cost curve below.  And no rule cuts an optimal game: for every game that needs a search,
-the same search with the target one below V(n) finds a set worth V(n), which replays by the rules
+proof by the Franklín–Moniot bound alone needed; the final build, two threads): a second, self-standing proof of
+every n ≤ 1300 by a different bound, and the cost curve below.  And no rule cuts an optimal game: for every game that
+needs a search, the same search with the target one below V(n) finds a set worth V(n), which replays by the rules
 (`examples/paritycheck.rs`; all 665 such games to 1300, `data/paritycheck_2_1300.jsonl`, 31 minutes).
 
 ### What a proof costs, and how far it reaches
@@ -236,8 +242,8 @@ The cost follows the root's parity gap, as the solver's follows its root gap: ov
 ×10 per 84 points of gap (1.19 ± 0.05 decades per 100 points, R² 0.76), and the gap grows about 14 points per 100 in
 n with swings of ±50 between bands (the matroid study's measurement, which these roots reproduce).  Against n, log10
 nodes grows 0.16 ± 0.04 and log10 seconds 0.23 ± 0.04 per 100 in n over 900–1300 (R² 0.06 and 0.11: the gap's swings
-dominate), 0.33 and 0.34 from n = 78 on.  The matching-bound search had spent 50–70 million nodes on each of
-990–996 without finishing; the parity bound proves them from scratch in 44,000–68,000.
+dominate), 0.33 and 0.34 from n = 78 on.  The search with the Franklín–Moniot bound alone had spent 50–70 million
+nodes on each of 990–996 without finishing; the parity bound proves them from scratch in 44,000–68,000.
 
 1300 is not the limit, and the recorded optima no longer stop the proofs there: the committed chain
 (`../results/strict.jsonl`) reaches 2175.  The extrapolation from the bands above (0.23 decades per 100 in n: to 2000
@@ -248,9 +254,11 @@ the ratio growing about tenfold per 1000 in n (the parity bound is the weaker on
 tracks the cost over 900–1300, does not predict it past 1300.  With the solver's nodes (`tools/summarize.py order`) and
 the fitted ratio, 1301..2175 take about 200 million nodes, **about 140 thread-hours** (100 to 250) at 2.5 ms a node,
 the dearest games, 2170–2173, about 6 hours each, 1475, 1430, 1472 and 1521 about 1.5 hours; the games are independent
-and one thread each, so it is half a day on 16 cores ([EXPERIMENTS.md](../docs/EXPERIMENTS.md#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10)
-has the measurements; `../tools/cloud/evidence.sh` runs it, [RUNBOOK section 9](../tools/cloud/RUNBOOK.md#9-the-model-free-proofs-of-optn-1301-to-2175)
-the procedure).  Not yet run; the table at the top says 1300 until it is.
+and one thread each, so it is half a day on 16 CPUs
+([EXPERIMENTS.md](../docs/EXPERIMENTS.md#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) has the
+measurements; `../tools/cloud/prover.sh` runs it,
+[RUNBOOK section 9](../tools/cloud/RUNBOOK.md#9-the-provers-proofs-of-optn-1301-to-2175) the procedure).  Not yet
+run; the table at the top says 1300 until it is.
 
 ## 4. Adversarial search: what protects greedy
 
@@ -309,36 +317,36 @@ THEORY.md, ["Uniqueness of the optimal set"](../../heuristics/THEORY.md#uniquene
   every optimal game's upper part is U\*: a game with a lighter upper part could in principle win the difference
   back below n/2.
 * **The prime of every optimal set**: every optimal set of n holds the largest prime q ≤ n and no other prime.
-* **Theorem 9: optimal sets from the game before.**  If opt(n) = n + opt(n − 1) (a *chain* game), the optimal
-  sets of n are exactly the playable T ∪ {n}, T optimal for n − 1.  If n is prime, T ↦ T − p + n (p the largest
-  prime below n) is a bijection from the optimal sets of n − 1 onto those of n.  So a game has as many optimal
-  sets as its predecessor at a prime, no more at a chain game, and only a composite game meeting neither relation
-  can have more.
+* **Theorem 9: optimal sets from the game before.**  If opt(n) = n + opt(n − 1) (a game at its ceiling), the
+  optimal sets of n are exactly the playable T ∪ {n}, T optimal for n − 1.  If n is prime, T ↦ T − p + n (p the
+  largest prime below n) is a bijection from the optimal sets of n − 1 onto those of n.  So a game has as many
+  optimal sets as its predecessor at a prime, no more at a game at its ceiling, and only a composite game below its
+  ceiling can have more.
 * **No matroid relaxation is exact for the whole game**: game 425 has two optimal sets (below), and a matroid
   with distinct positive weights has one heaviest independent set.
 
 ### Method
 
-`src/bin/optsets.rs` lists every optimal set of a game, model-free, with the branch and bound of section 3 in an
-enumeration mode (`Prover::enumerate`): every pruning rule of the search cuts only sets worth at most its target,
+`src/bin/optsets.rs` lists every optimal set of a game, on the whole board, with the branch and bound of section 3 in
+an enumeration mode (`Prover::enumerate`): every pruning rule of the search cuts only sets worth at most its target,
 so after a playable set P is found the search goes on, partitioning the rest of P's node by the first number on
 which a set disagrees with P.  With target V(n) − 1, the recorded optimum minus one, it lists every playable set
-worth at least V(n), so every optimal set (and would stop on one worth more, refuting V(n)).  Games meeting the
-chain or prime relation take their sets from the predecessor's by Theorem 9 (`derive_optimal_sets`).  Optionally
+worth at least V(n), so every optimal set (and would stop on one worth more, refuting V(n)).  Games at their ceiling
+and prime games take their sets from the predecessor's by Theorem 9 (`derive_optimal_sets`).  Optionally
 (`--upper fixed` / `other`) the question splits in two: the optimal sets whose upper part is U\* (a search with
 the upper half fixed, which is cheap), and those whose upper part is not (a search whose root is split on the
 largest upper number where the set and U\* disagree, which costs as much as a proof of optimality).
 
 Checks: the enumeration equals brute force on every n ≤ 19 at the optimum and below it (where sets containing a
-found one also qualify); the derivations equal direct enumeration on every chain and prime game to 700 (and to 260
-in the test suite); `tools/crosscheck_optsets.py` compares the lists with `heuristics/evaluation/certify.py`'s
-theory-free brute force over raw pot states, which agrees on every n ≤ 57; both optimal sets of 425 replay by the
-rules (`heuristics/core.py`'s ordering and `check_sequence`); every optimal set found holds the largest prime and
-no other.
+found one also qualify); the derivations equal direct enumeration on every game at its ceiling and every prime game
+to 700 (and to 260 in the test suite); `tools/crosscheck_optsets.py` compares the lists with
+`heuristics/evaluation/certify.py`'s theory-free brute force over raw pot states, which agrees on every n ≤ 57; both
+optimal sets of 425 replay by the rules (`heuristics/core.py`'s ordering and `check_sequence`); every optimal set
+found holds the largest prime and no other.
 
 Enumerating at V(n) − 1 costs about what the proof at V(n) costs: over 68 games whose proof took at least 10,000
-nodes, the ratio runs from 0.94 to 1.20, 4% more in total.  So a model-free proof of opt(n) can return the complete
-list of optimal sets almost for free.
+nodes, the ratio runs from 0.94 to 1.20, 4% more in total.  So a proof of opt(n) by the prover can return the
+complete list of optimal sets almost for free.
 
 ### Results
 
@@ -356,17 +364,17 @@ list of optimal sets almost for free.
 | **total** | **988** | **954** | **924** | **27** | **3** | **34** |
 
 Searches with a budget of 4 million nodes (each under about seven minutes) covered every game whose optimality
-proof had taken fewer than 3.6 million; the chain and prime games were derived.  The 34 others are the most
-expensive proofs of section 3 (798–804, 945–954, 969–983, 987–989) and the chain and prime games that follow
-them; their lines record the budget each was given (4 million nodes for 798–800 and 803–804, a short 300,000
-for the others, which were not attempted in full).  For them `data/optsets_fixed_798_1019.jsonl` lists the optimal sets whose upper part is U\* (the upper
-half fixed: 10 seconds to 2 minutes each), and so it does for 990–1019.  Each of those 34 games, and 990, 991
-and 999–1019, has exactly one optimal set with upper part U\* (57 games); for 992–998, whose optima the frame
-model's search also reaches late, the fixed-upper search spent its 2.5 or 4 million nodes without reaching even
-the recorded set.
+proof had taken fewer than 3.6 million; the games at their ceiling and the prime games were derived.  The 34 others
+are the most expensive proofs of section 3 (798–804, 945–954, 969–983, 987–989) and the games at their ceiling and
+the prime games that follow them; their lines record the budget each was given (4 million nodes for 798–800 and
+803–804, a short 300,000 for the others, which were not attempted in full).  For them
+`data/optsets_fixed_798_1019.jsonl` lists the optimal sets whose upper part is U\* (the upper half fixed: 10 seconds
+to 2 minutes each), and so it does for 990–1019.  Each of those 34 games, and 990, 991 and 999–1019, has exactly one
+optimal set with upper part U\* (57 games); for 992–998, whose optima the frame model's search also reaches late, the
+fixed-upper search spent its 2.5 or 4 million nodes without reaching even the recorded set.
 
 The games with more than one optimal set fall in six clusters, each started by an exchange new at its first game
-and carried by the chain and prime relations (and by some games meeting neither):
+and carried from game to game at a ceiling or a prime (and by some games meeting neither):
 
 | games | sets | exchange (canonical set's numbers ↔ the other set's) | sum | size |
 |---|---|---|---|---|
@@ -392,13 +400,14 @@ What the data shows (observed, not proven):
   factors are picked and which are free to pay for their upper multiples.  At 425, with peel's payments: in one
   set 110, 132 and 168 are picked and 98, 150 and 162 pay for 196, 300 and 324; in the other, 98, 150 and 162 are
   picked and 110, 132 and 168 pay for 330, 396 and 336.
-* **The canonical set (the largest in decreasing lexicographic order) survives every chain and prime step**
-  observed from a game with several sets: canonical(n) = canonical(n − 1) + n (chain), or − p + n (prime; this
-  part is a theorem, the lexicographic order being preserved by the bijection): 13 of 13 such steps.  optimal.json
-  records the canonical set in 23 of the 30 games with several sets; not at 684 and 685 (it records the third of
-  three) or at 775–779 (the second of two).
-* **The recorded game of n − 1 is not always extendable.**  At 686, a chain game, the recorded optimal game of 685
-  plus 686 is unplayable; opt(686) = 686 + opt(685) holds through another optimal set of 685 (the canonical one).
+* **The canonical set (the largest in decreasing lexicographic order) survives every step to a game at its ceiling
+  or to a prime** observed from a game with several sets: canonical(n) = canonical(n − 1) + n (at its ceiling), or
+  − p + n (prime; this part is a theorem, the lexicographic order being preserved by the bijection): 13 of 13 such
+  steps.  optimal.json records the canonical set in 23 of the 30 games with several sets; not at 684 and 685 (it
+  records the third of three) or at 775–779 (the second of two).
+* **The recorded game of n − 1 is not always extendable.**  At 686, a game at its ceiling, the recorded optimal game
+  of 685 plus 686 is unplayable; opt(686) = 686 + opt(685) holds through another optimal set of 685 (the canonical
+  one).
 
 ### What it buys a solver
 
@@ -406,24 +415,24 @@ What the data shows (observed, not proven):
   the unique heaviest playable upper set (proven given (★), so to 100,000), and every optimal game observed has
   upper part U\*.  The second statement is the one still open in general.
 * **Reuse of n − 1 (Theorem 9).**  The prime step is exact: the optimal sets of a prime n are those of n − 1 with
-  p swapped for n.  The chain step is decidable from the complete list of n − 1's optimal sets: n meets the bound
-  n + opt(n − 1) iff one of them stays playable with n added, and then the optimal sets of n are known without
-  search.  With only one recorded set the test is not decisive (685 → 686).  The lists are short (1–3 sets so
-  far), and the part with upper part U\* is cheap to get with the upper half fixed: seconds to two minutes per
-  game to 1019, except 990–998 (six and seven minutes for 990 and 991, out of budget for 992–998).  That part is
+  p swapped for n.  The step to a game at its ceiling is decidable from the complete list of n − 1's optimal sets: n
+  meets the bound n + opt(n − 1) iff one of them stays playable with n added, and then the optimal sets of n are
+  known without search.  With only one recorded set the test is not decisive (685 → 686).  The lists are short (1–3
+  sets so far), and the part with upper part U\* is cheap to get with the upper half fixed: seconds to two minutes
+  per game to 1019, except 990–998 (six and seven minutes for 990 and 991, out of budget for 992–998).  That part is
   the whole list wherever every optimal set has upper part U\*, which is observed but not proven.
 * **Symmetry breaking.**  A proof of optimality (target V, a set worth more than V) already cuts every tie, so a
-  canonical-set rule prunes nothing there.  It matters where ties are accepted: a search for a game reaching a
-  cap, or a step reusing the previous game, such as the solver's `reuse_prev`.  There, carrying the canonical set
-  (rather than whichever optimal set a search happened to return) is consistent with every chain and prime step
-  observed, and well defined.
+  canonical-set rule prunes nothing there.  It matters where ties are accepted: a search for a game reaching its
+  ceiling, or a step reusing the previous game, such as the Java's `reusePrev`.  There, carrying the canonical set
+  (rather than whichever optimal set a search happened to return) is consistent with every step to a game at its
+  ceiling or to a prime observed, and well defined.
 
 ## 6. Does an optimal game play the most moves?
 
 The wiki's "Questions" page asks it (its third question, left open, with the belief that the answer is yes): does an
 optimal game take as many moves as any game of the board can, or does some longer game score less?  If optimal
-games were always longest, a solver could stop searching every branch that cannot reach the most moves.  Neither
-solver does that (below), but the Java's `reviseFreedoms` rests on a local form of the claim.
+games were always longest, a solver could stop searching every branch that cannot reach the most moves.  Neither the
+Java solver nor the solver does that (below), but the Java's `reviseFreedoms` rests on a local form of the claim.
 
 ### What is proven
 
@@ -433,8 +442,8 @@ the size of the largest playable set of picks.
 * **M(n) <= ν(n)**, the matching number of the board's maximal-factor graph (each number joined to its maximal
   factors): a playable set pays each pick with a distinct maximal factor outside it (Theorem 1).  So a legal game of
   ν(n) moves is a longest game, a certificate that costs one matching.
-* **M(n − 1) <= M(n) <= M(n − 1) + 1**, and **M(n) = M(n − 1) for a prime n >= 3** (the count forms of the chain
-  and prime relations).
+* **M(n − 1) <= M(n) <= M(n − 1) + 1**, and **M(n) = M(n − 1) for a prime n >= 3** (the count forms of the ceiling
+  and the prime formula).
 * Given (★), a playable set has at most |U\*| members above n/2 (Theorem 8's count inequality): a longest game
   cannot gain on an optimal game whose upper part is U\* except below n/2.
 
@@ -466,7 +475,7 @@ the heaviest longest game, 2.5 to 2.6 million nodes each; `tools/summarize.py mo
 | n | optimal game: moves (above n/2) | M(n) | heaviest longest game | below the optimum | its exchange of the optimal game's moves below n/2 |
 |---|---|---|---|---|---|
 | 833 = 7²·17 | 362 (314) | 363 | 218,197 | 29 | {250, 252, 294, 400} out, {116, 180, 200, 320, 351} in |
-| 834 | 363 (315) | 364 | 219,031 | 29 | the same (834 is a chain game: both games of 833 plus 834) |
+| 834 | 363 (315) | 364 | 219,031 | 29 | the same (834 is a game at its ceiling: both games of 833 plus 834) |
 | 835 = 5·167 | 363 (315) | 364 | 219,377 | 29 | the same |
 
 The two games of 833 in full (the optimal one is optimal.json's): above n/2 both play the same 314 moves (U\*);
@@ -498,37 +507,39 @@ What the data shows:
   payments use 410 of the 416 lower numbers, the longest game's 49 and 363 use 412.  Four heavy lower picks
   (1,196) outweigh five light ones (1,167).
 * **ν(n) is a strong bound on moves.**  It exceeds M(n) only at 51, 182 and 183 (by one, where every maximum
-  matching is precedence-cyclic), against the value-weighted matching bound's gap of hundreds of points.
+  matching is precedence-cyclic), against the value-weighted Franklín–Moniot bound's gap of hundreds of points.
 
 ### The solvers and the wiki
 
-* **Neither solver prunes a branch for having fewer moves than possible.**  Counts enter the Java's search only as
-  upper bounds.  A frame's *freedoms* are its factors minus its moves (`search/Frame.java:43`).
-  `FrameSet.computeMaxNumberOfPromotions` (`search/FrameSet.java:136-151`) turns them into `maxTotalPromotions`, a
-  cap on the *number* of promotions (`search/SearchManager.java:121-122`, `maxAdditionalPromotions` at :192-197).
+* **Neither the Java solver nor the solver prunes a branch for having fewer moves than possible.**  Counts enter the
+  Java's search only as upper bounds.  A frame's *freedoms* are its factors minus its moves (`search/Frame.java:43`).
+  `FrameSet.computeMaxNumberOfPromotions` (`search/FrameSet.java:136-151`) turns them into `maxTotalPromotions`, the
+  most promotions the freedoms allow (`search/SearchManager.java:121-122`, `maxAdditionalPromotions` at :192-197).
   The upper bound then sums at most that many of the largest candidates, and a branch is cut on that *sum*
   (`search/BranchExplorer.java:77`).  *In the bag* is a score, what the game with no promotions makes
-  (`frame/FrameSolver.java:155-160`), not a count.  The Rust's `max_total` (`search/setup.rs`), `max_additional`
+  (`frame/FrameSolver.java:155-160`), not a count.  The solver's `max_total` (`search/setup.rs`), `max_additional`
   (`bounds.rs`) and `in_the_bag` (`board.rs`) are the same.
 * **The belief appears once, in `reviseFreedoms`** (`search/UpperBoundEstimator.java:41-90`).  Its comment states
   as a theorem, without proof, that the promotion set with the largest sum also has the most promotions.  It
   solves the two-frame game of frames 0 and 1 for its heaviest promotion set and lowers frame 0's freedoms to that
-  set's size, which can cut sets with *more* promotions into frame 0, never fewer.  The Rust keeps it as the
-  tactic `revise_freedoms`, graded unproven and off in strict runs.  (`SearchManager.finalReport`, :185-188,
-  reports an optimum with fewer promotions than `maxTotalPromotions` as the cap "over-estimated".)
-* **833 refutes the comment's "theorem" for the whole frame game.**  The exchange above is a feasible promotion
-  set: the optimal game promotes 48 numbers and the longest 49, which is the frame model's `max_total`
-  (`rust/tests/soundness.rs`, `the_heaviest_promotion_set_of_833_is_not_the_largest`), so at 833 the cap was not an
-  over-estimate.  It does not decide the two-frame form the tactic uses: at 833 the tactic searched the two-frame
-  game (`Searched { size: 21 }`) and left `max_total` at 49, and the scores of 833-835 are proven model-free.
+  set's size, which can cut sets with *more* promotions into frame 0, never fewer.  The solver ported it as the
+  tactic `revise_freedoms`, measured it and removed it ([which tactics earn their
+  keep](../docs/EXPERIMENTS.md#which-tactics-earn-their-keep-2026-10)).  (`SearchManager.finalReport`, :185-188,
+  reports an optimum with fewer promotions than `maxTotalPromotions` as "max promotions was over-estimated".)
+* **833 refutes the comment's "theorem" for the whole frame game.**  The exchange above is a promotable set: the
+  optimal game promotes 48 numbers and the longest 49, which is the frame model's `max_total`
+  (`rust/tests/soundness.rs`, `the_heaviest_promotion_set_of_833_is_not_the_largest`), so at 833 `max_total` was not
+  an over-estimate.  It does not decide the two-frame form the tactic used: at 833 the tactic searched the two-frame
+  game (`Searched { size: 21 }`) and left `max_total` at 49, and the scores of 833-835 are proven on the whole board.
 
 ### What it would buy a solver
 
-A sound statement about move counts can only cap them, as `max_total` and ν(n) do, and a cap on counts bounds a sum
-only through the largest candidates, which the solver's matching bound already outdoes.  The tempting unsound one,
-pruning every branch that cannot reach M(n) moves, would return 218,197 at n = 833 instead of 218,226, and 29 too
-little at 834 and 835; in the frame model, pruning the branches that cannot reach `max_total` promotions would do
-the same.  The certificate is still useful as a check: a game with ν(n) moves is a longest game, in milliseconds.
+A sound statement about move counts can only bound them from above, as `max_total` and ν(n) do, and such a bound on
+counts limits a sum only through the largest candidates, which the solver's matching bound already outdoes.  The
+tempting unsound one, pruning every branch that cannot reach M(n) moves, would return 218,197 at n = 833 instead of
+218,226, and 29 too little at 834 and 835; in the frame model, pruning the branches that cannot reach `max_total`
+promotions would do the same.  The certificate is still useful as a check: a game with ν(n) moves is a longest game,
+in milliseconds.
 
 ## 7. Reproducing
 
@@ -542,8 +553,9 @@ cargo build --release
 ./target/release/star --from 2 --to 20000 --threads 6 --seconds 540 --out OUT.jsonl
 ./target/release/exact --from 2 --to 1300 --threads 3 --seconds 540 --checkpoints work/fresh --out OUT.jsonl
                                     # with the parity bound, rerun until done (data/exact_parity_2_1300.jsonl)
-./target/release/exact --from 2 --to 1231 --parity 0 --threads 6 --seconds 540 --out OUT.jsonl  # the matching
-                                    # bound alone (data/exact_2_1231.jsonl, which left open searches:)
+./target/release/exact --from 2 --to 1231 --parity 0 --threads 6 --seconds 540 --out OUT.jsonl
+                                    # the Franklín–Moniot bound alone (data/exact_2_1231.jsonl, which left open
+                                    # searches:)
 tar -xzf data/checkpoints/exact_open_searches.tar.gz -C work   # to resume them with the parity bound:
 ./target/release/exact --from 990 --to 1300 --threads 3 --seconds 540 --out data/exact_parity_990_1300.jsonl
 cargo run --release --example parityroot 2 1300     # the root's parity bound, checked, for every game
@@ -551,16 +563,16 @@ cargo run --release --example paritycheck 2 1300    # one below each optimum, th
 bash tools/adversary_campaign.sh                                                          # data/adversary/
 ./target/release/optsets --from 2 --to 989 --searched-only 1 --threads 3 --seconds 540 --budget 4000000 \
     --out OUT.jsonl                                     # the games that need a search; rerun until done
-./target/release/optsets --from 2 --to 989 --out OUT.jsonl     # then the chain and prime games, derived
+./target/release/optsets --from 2 --to 989 --out OUT.jsonl     # then the games at their ceiling and the primes, derived
 ./target/release/optsets --list 798,799,800 --upper fixed --threads 1 --seconds 540 --out FIXED.jsonl
 ./target/release/moves --from 2 --to 1300 --seconds 540 --out OUT.jsonl         # one thread; ~7 minutes
-../tools/cloud/evidence.sh 1301 2175                # `exact` over a range in resumable passes, all cores, then the check
+../tools/cloud/prover.sh 1301 2175                # `exact` over a range in resumable passes, all CPUs, then the check
 tools/summarize.py check 1301 2175 data/exact_parity_2_1300.jsonl OUT.jsonl     # every n in 2..2175 proven, scores recorded
 tools/summarize.py span|star|exact|cost|adversary|optsets|moves FILE...
 tools/crosscheck_optsets.py data/optsets_2_989.jsonl --max 57 --budget 120     # theory-free, about 8 minutes
 tools/crosscheck_greedy.py data/span_2_100000.jsonl.gz --max 1000
 cargo run --release --example inspect 9170 4611     # a jam, its factorizations and bounds
-cargo run --release --example exactdiag 990 310049 --parity 1   # the model-free search's counters
+cargo run --release --example exactdiag 990 310049 --parity 1   # the search's counters
 ```
 
 Every campaign appends one JSON line per game and skips games already in its output, so a stopped run is resumed
@@ -573,10 +585,10 @@ gzipped where large (`gunzip -k` to resume into it).
   rejection of descending greedy on an upper-half instance is a GF(2) dependency of what it kept above — a
   statement about cores and closed surfaces mod 2 that the adversarial results tie to the window law with the
   real ranking of the primes.
-* The model-free cross-check reaches 1300; the committed chain now reaches 2175 and the check of 1301..2175 is
-  prepared (`../tools/cloud/evidence.sh`; about 140 thread-hours, section 3), not run.  What the parity bound still misses are the
-  odd cores (THEORY.md, Theorem 10): its root gap, 130 points on average at 1000–1300, grows about 14 per 100 in n,
-  and the cost with it; the conflicts of its heaviest sets are large (20–45 members at 990).
+* The prover's proofs reach 1300; the committed chain now reaches 2175 and the check of 1301..2175 is prepared
+  (`../tools/cloud/prover.sh`; about 140 thread-hours, section 3), not run.  What the parity bound still misses are
+  the odd cores (THEORY.md, Theorem 10): its root gap, 130 points on average at 1000–1300, grows about 14 per 100 in
+  n, and the cost with it; the conflicts of its heaviest sets are large (20–45 members at 990).
 * The optimal sets of 990–1300 are not enumerated.  The enumeration mode works with the parity bound (tested
   against brute force), so `optsets` with it would extend section 5 at about the cost of the proofs.
 * The frame model's individual assumptions other than the greedy removal are tested only end to end (through

@@ -8,10 +8,10 @@
 
 use std::path::PathBuf;
 use std::time::Instant;
-use taxman_evidence::adversary::{generate, Family};
-use taxman_evidence::jsonl::{campaign, parse_items, Obj};
-use taxman_evidence::span::span_check;
-use taxman_evidence::star::{check, Engine, Method};
+use taxman_prover::adversary::{generate, Family};
+use taxman_prover::jsonl::{campaign, parse_items, Obj};
+use taxman_prover::span::span_check;
+use taxman_prover::star::{check, Engine, Method};
 
 fn main() {
     let (seeds, flags) = parse_items(std::env::args().skip(1));

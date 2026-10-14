@@ -18,8 +18,8 @@
 //!   parts' exclusions, and greedy uses exactly that many.)
 //!
 //! Each such P is decided by the cheapest argument that works: a single exclusion is always needed (P is a
-//! nonempty residual, so it is unplayable); the matching bound |P| − ν(P); the Lorea bound |P| − rank(P); the
-//! incidence-rank bound |P| − rank_GF(2)(P) ([`crate::bounds`]); or an
+//! nonempty residual, so it is unplayable); the matching-number bound |P| − ν(P); the Lorea bound |P| − rank(P); the
+//! rank bound |P| − rank_GF(2)(P) ([`crate::bounds`]); or an
 //! exact search, which either proves the bound or finds a counterexample.  The exact search is
 //! [`crate::plus1`], which leans on the earlier thresholds of the same component (each needs exactly its g);
 //! a threshold decided after an undecided one in the same component is marked conditional.
@@ -88,11 +88,11 @@ pub struct Threshold {
     pub p_size: usize,
     /// Greedy's exclusions in P.
     pub g: usize,
-    /// The matching bound's lower bound on the exclusions: |P| − ν(P).
+    /// The matching-number bound's lower bound on the exclusions: |P| − ν(P).
     pub matching_lb: usize,
-    /// The Lorea bound's: |P| − rank(P) (computed only when the matching bound falls short).
+    /// The Lorea bound's: |P| − rank(P) (computed only when the matching-number bound falls short).
     pub lorea_lb: Option<usize>,
-    /// The incidence-rank bound's: |P| − rank_GF(2)(P) (computed only when the Lorea bound falls short).
+    /// The rank bound's: |P| − rank_GF(2)(P) (computed only when the Lorea bound falls short).
     pub rank_lb: Option<usize>,
     pub method: Method,
     pub nodes: u64,

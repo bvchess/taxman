@@ -273,8 +273,8 @@ fn check_frame<const W: usize>(
         stats.exhaustive += 1;
     }
     stats.checks += 1;
-    // The core: empty exactly on winnable frames; each live factor of a core move is shared within the core,
-    // and the core alone is unwinnable.
+    // The residual: empty exactly on winnable frames; each live factor of a residual move is shared within the
+    // residual, and the residual alone is unwinnable.
     let core = Scratch::new().stuck(&moves, &factors, graph);
     assert_eq!(core.is_empty(), fast, "core {core:?} of {moves:?} -> {factors:?}");
     for m in core.iter() {
@@ -403,7 +403,7 @@ fn confluence<const W: usize>(g: &Golden, rng: &mut Rng) -> (u64, u64) {
     let candidates = Bits::<W>::from_slice(&g.candidates);
     let (mut orders, mut failed_orders) = (0, 0);
     for _ in 0..20 {
-        // A feasible set, chosen at random in descending order.
+        // A promotable set, chosen at random in descending order.
         let mut state = root;
         let mut chosen = Vec::new();
         for n in candidates.iter_desc() {
@@ -441,7 +441,7 @@ fn promotion_order_does_not_matter() {
 }
 
 /// Checks [`Model::conflict_using`] on `set` in `state`: none exactly when the set can be promoted, else a
-/// non-empty subset that cannot, the minimal one no larger than the core one.
+/// non-empty subset that cannot, the minimal one no larger than the one the residual gives.
 fn check_conflicts<const W: usize>(model: &Model, state: &FrameSet<W>, set: &Bits<W>, feasible: bool) {
     let mut scratch = Scratch::new();
     let core = model.conflict_using(&mut scratch, state, set, false);

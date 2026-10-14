@@ -20,7 +20,7 @@
 //!    [`search::search`] for the promotion set with the largest sum.  It starts from the better of the greedy set
 //!    and the previous game's promotions that are candidates here (`seed_incumbent`, [`Board::seed`]) and stops
 //!    as soon as it reaches `n + opt(n − 1) − in_the_bag` (`prev_cap`, [`Board::promotion_cap`]).  The promotions
-//!    become a game through the hives ([`solution_for_promotions`]).  Between the setup and the search, the
+//!    become a game through the frames ([`solution_for_promotions`]).  Between the setup and the search, the
 //!    tactic `same_search` may find that an earlier game already settled this search (method `repeat`, below).
 //! 5. `conclude`: the game is checked before it counts, and given its proof and assumptions.
 //! 6. Recording (a range only): the result is appended to the results file and synced, and only then is the
@@ -32,7 +32,7 @@
 //! # Repeats of earlier searches
 //!
 //! Consecutive boards often pose exactly the same search problem ([`search::Problem`]: the frames, the candidates,
-//! `max_total` and the factor graph among their numbers), only with another cap.  With the tactic `same_search`
+//! `max_total` and the factor graph among their numbers), only with another ceiling.  With the tactic `same_search`
 //! (proven, on by default), a game whose problem an earlier game `m` of the range or of the results file posed, within
 //! the [`SAME_SEARCH_WINDOW`] board sizes before it, and whose proof settles that problem's best promotion sum
 //! ([`Proof::settles_search`]), is `m`'s promotions played on its own board, with no search: method `repeat`, proof
@@ -45,7 +45,7 @@
 //!
 //! `conclude` checks that the game replays legally ([`replay`]); that a completed game is also over and opens with
 //! the largest prime; that a game from the frame model scores `in_the_bag` plus its promotions; that no game
-//! scores more than `n + score(n − 1)` (nor its promotions exceed the cap), which would prove the previous game
+//! scores more than `n + score(n − 1)` (nor its promotions exceed the ceiling), which would prove the previous game
 //! was not optimal, and that a completed game does not score less than the previous one; and, for a completed
 //! game, that its score is `optimal.json`'s when that has the game (the table built into the binary,
 //! [`Optimal::built_in`]).  Each failure is a hard error, and a game that fails after it was found is recorded,
@@ -56,7 +56,7 @@
 //! [`solve_range_each`] solves the board sizes `lo..=hi` in order.  The previous game of each is the one just
 //! solved; for `lo` it is the results file's game of `lo − 1`, else, with [`SolveOptions::use_prev`],
 //! `optimal.json`'s (assumed optimal, which the results that rest on it record), else there is none and the game is
-//! solved *standalone*, with no seed and no cap (and a note on stderr says so).  Every result is appended to
+//! solved *standalone*, with no seed and no ceiling (and a note on stderr says so).  Every result is appended to
 //! the results file (one JSON object per line) as soon as it is done, so that a restarted run skips what is
 //! finished; the file is checked when it is opened ([`ResultsFile::open`]).  A game whose search a limit or a signal
 //! stopped is recorded as incomplete, keeps its checkpoint, and ends the range.  The games a game of the range may
@@ -338,7 +338,7 @@ pub fn parse_digest(text: &str) -> Option<u64> {
 /// Wall time of each phase of a game.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Phases {
-    /// Hives, frames, and the search model.
+    /// Forming, numbering and merging the frames, and the search model.
     pub frames: Duration,
     pub greedy: Duration,
     /// The branch and bound (this invocation only).
@@ -661,7 +661,7 @@ fn solve_with_width<const W: usize>(
     let start = Instant::now();
     let tactics = opts.tactics;
     if let Some(prev) = prev {
-        // The prime shortcut and the cap trust the previous game, so make sure it is what it says it is.
+        // The prime shortcut and the ceiling trust the previous game, so make sure it is what it says it is.
         prev.check(n)?;
     }
     let tables = Tables::new(n);
@@ -923,7 +923,7 @@ fn spill_dir(opts: &SolveOptions, n: u32) -> (PathBuf, bool) {
 
 /// How far back a game looks for an earlier game whose search problem it repeats (tactic `same_search`): the board
 /// sizes `n − SAME_SEARCH_WINDOW` to `n − 1`.  A board's frames change a little with each number: each of the 914
-/// games of the strict chain 1..2175 whose problem an earlier game posed repeats the last board size before it that
+/// games of the committed chain 1..2175 whose problem an earlier game posed repeats the last board size before it that
 /// set a search up, `n − 1`, or `n − 2` when `n − 1` is prime (docs/EXPERIMENTS.md, "Same search").  The window
 /// keeps the setups a range starts with to a few, and makes the game repeated a function of the window's games alone.
 pub const SAME_SEARCH_WINDOW: u32 = 8;
