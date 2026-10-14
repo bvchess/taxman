@@ -308,6 +308,8 @@ pub struct Gf2Stats {
     pub splits: u64,
     /// Blocks of the tableau rebuilt after a path whose changes were not all pivots.
     pub rebuilds: u64,
+    /// The weight splits' Bellman–Ford rounds.
+    pub split_rounds: u64,
 }
 
 impl<'g, const W: usize> Gf2Bound<'g, W> {
@@ -677,6 +679,7 @@ fn solve<const W: usize, const R: usize>(
     stats.augmentations += meet.augmentations - before;
     stats.rounds = meet.rounds;
     stats.rebuilds = meet.rebuilds;
+    stats.split_rounds = meet.split_rounds;
     level.solved = !meet.stopped;
     level.settled = meet.settled;
     level.meet_solve = meet.solves;
@@ -713,6 +716,7 @@ fn split<const W: usize, const R: usize>(
     if meet.settled {
         meet.split_bounds(&problem, live_idx, |e, bound| out.push((graph.elems[e as usize], bound)));
     }
+    stats.split_rounds = meet.split_rounds;
     out
 }
 

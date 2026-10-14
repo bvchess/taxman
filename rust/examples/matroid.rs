@@ -1315,7 +1315,7 @@ fn kernel<const W: usize>(path: &Path, reps: usize) {
                     s.augmentations - s0.augmentations,
                     s.rounds - s0.rounds,
                     s.rebuilds - s0.rebuilds,
-                    s.splits - s0.splits,
+                    (s.splits - s0.splits, s.split_rounds - s0.split_rounds),
                 ));
             }
         }
@@ -1323,11 +1323,13 @@ fn kernel<const W: usize>(path: &Path, reps: usize) {
         let (ops, solves, augs, rounds, rebuilds, splits) = print.expect("a run");
         println!(
             "  {label:<34} {ops:>7} ops {:>10.0} cyc/op {:>8.1} µs/op  solves {solves:>6} augs/solve {:>5.1} \
-             rounds/aug {:>4.2} rebuilds {rebuilds:>6} splits {splits:>5}  {fp:016x}",
+             rounds/aug {:>4.2} rebuilds {rebuilds:>6} splits {:>5} rounds/split {:>5.1}  {fp:016x}",
             cycles as f64 / ops.max(1) as f64,
             1e6 * wall / ops.max(1) as f64,
             augs as f64 / solves.max(1) as f64,
             rounds as f64 / (augs + solves).max(1) as f64,
+            splits.0,
+            splits.1 as f64 / splits.0.max(1) as f64,
         );
     };
     println!("n={n}: {} nodes", nodes.len());

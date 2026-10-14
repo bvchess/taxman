@@ -212,6 +212,8 @@ pub struct Meet<const R: usize> {
     pub augmentations: u64,
     pub rounds: u64,
     pub rebuilds: u64,
+    /// The weight splits' Bellman–Ford rounds.
+    pub split_rounds: u64,
     /// The split's scratch: its potentials (one per element and one more), and the replacements' weights.
     pot: Vec<i64>,
     repl: [Vec<i64>; 2],
@@ -248,6 +250,7 @@ impl<const R: usize> Meet<R> {
             augmentations: 0,
             rounds: 0,
             rebuilds: 0,
+            split_rounds: 0,
             pot: vec![0; n + 1],
             repl: [vec![0; n], vec![0; n]],
         }
@@ -714,6 +717,7 @@ impl<const R: usize> Meet<R> {
         let limit = live.len() + 3;
         let mut settled = false;
         for _ in 0..limit {
+            self.split_rounds += 1;
             let mut changed = false;
             let pot = &mut self.pot;
             let mut relax = |u: usize, v: usize, c: i64| {
