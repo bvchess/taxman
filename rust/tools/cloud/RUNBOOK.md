@@ -28,7 +28,7 @@ about scaling beyond 8 threads or about Graviton5 has been measured (section 8).
    up to its 8 threads (section 3).
 3. The big instance, on-demand, for the checks: the large-machine tests, the sweep to 192 threads, the cost of a
    checkpoint pause, and a rehearsal of the whole chain to 1231 with forced interruptions (section 4).
-4. The production chain, from n = 1 or from the committed `results/strict.jsonl` (which holds it to 1300), in
+4. The production chain, from n = 1 or from the committed `results/strict.jsonl` (which holds it to 2175), in
    tmux, on spot or on-demand, with a deadline and a copy of the state kept off the machine (section 5).
 5. Verify, bring the results home, shut everything down (section 6).
 
@@ -55,9 +55,9 @@ checkpoints, `taxman.lock`), `logs/`, `chain.pid`, `deadline`.  Nothing is writt
 
 `chain.sh N` runs `taxman solve 1-N` into one results file: every game from n = 1, each built from the one before.
 Nothing is taken from `optimal.json` (it is only compared with, to n = 1300), so nothing assumes it.  The committed
-`results/strict.jsonl` is exactly such a file for n = 1 to 1300, made on a laptop
+`results/strict.jsonl` is exactly such a file for n = 1 to 2175, made on a laptop
 ([results/README.md](../../results/README.md)): a run from n = 1 reproduces its scores (the run is checked against it by
-`verify.sh`), and the production chain can instead start from it, as section 5 says, so that only the games above 1300
+`verify.sh`), and the production chain can instead start from it, as section 5 says, so that only the games above 2175
 are new.  The solver is the same code as on a laptop; the machine only changes how long it takes.
 
 **With the GF(2) bound** (the default since 2026-10;
@@ -73,8 +73,8 @@ comparison.
 Cost grew by a factor of 10 for every 55 to 70 in n past 1200 ([bench/curve/README.md](../../bench/curve/README.md)).
 From that file, the cost of extending the chain from 1231 to N on a 192-core machine, taking it to be 10 to 19 times
 the 8 M1 threads of the measurements (an assumption, not a measurement), and the prices it assumes ($3.33/h spot,
-$8.35/h on-demand for the 48xlarge; check the current ones).  Starting from the committed file, the part of the
-cost up to 1300 is already paid:
+$8.35/h on-demand for the 48xlarge; check the current ones).  Starting from a file that holds 1..1300 (the committed
+file did when this was written; it now holds 2175), the part of the cost up to 1300 is already paid:
 
 | N | time | spot | on-demand |
 |---|---|---|---|
@@ -357,19 +357,19 @@ optional) are documented at the top of the script: `THREADS`, `CHECKPOINT_INTERV
 `DEADLINE_HOURS`, `POWEROFF`, `MAX_FAILS`, `S3_DEST`, `SAVE_EVERY`.
 
 * **Where the chain starts.**  From an empty `~/taxman-work`, `chain.sh` solves from n = 1, which reproduces the
-  committed `rust/results/strict.jsonl` (n = 1 to 1300; the scores equal, the moves may differ) in minutes on the big
+  committed `rust/results/strict.jsonl` (n = 1 to 2175; the scores equal, the moves may differ) in minutes on the big
   machine, and `verify.sh` then checks the machine and the build against it.  To skip those games, copy the committed
   file in before the first run, once:
 
   ```
   mkdir -p ~/taxman-work/results && cp rust/results/strict.jsonl ~/taxman-work/results/strict.jsonl
-  rust/tools/cloud/chain.sh 1400                    # skips the 1300 games it holds and solves 1301 on
+  rust/tools/cloud/chain.sh 2300                    # skips the 2175 games it holds and solves 2176 on
   ```
 
   The file is checked when `chain.sh` opens it, assumes nothing (a chain from n = 1), and its lines
-  keep the build that made them (commit 271c817), as the lines added will keep the cloud's.  It was made in one
+  keep the build that made them (commit feba6d0), as the lines added will keep the cloud's.  It was made in one
   invocation and holds no incomplete line.  The comparison of `verify.sh` with the committed file is then
-  trivial for 1..1300, so the games above 1300 are checked by the referees alone (each game replayed, the chain
+  trivial for 1..2175, so the games above 2175 are checked by the referees alone (each game replayed, the chain
   bounds, Franklín–Moniot, the heuristic chain); a run from n = 1 is the cross-check of the machine and the build.  On
   a replacement machine, restore the saved state instead (below), never the committed file over it.
 

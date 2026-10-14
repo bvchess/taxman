@@ -26,7 +26,7 @@ measured.  Each term is defined where it first matters.
 ## 1. Goals and constraints
 
 * Find optimal games beyond n = 1000, where the Java solver's table of optimal games stopped, as far as the machines
-  at hand reach: today every n to 1300 on one laptop (Apple M1 Max, 10 cores, 32 GB RAM, fast SSD), and the same
+  at hand reach: today every n to 2175 on one laptop (Apple M1 Max, 10 cores, 32 GB RAM, fast SSD), and the same
   chain on a many-core cloud machine for what is beyond (`tools/cloud/RUNBOOK.md`).
 * Be right before being fast.  Every game is replayed by an independent referee before it counts, every result
   records how its optimality is established and what that proof takes as given, every tactic is proven or sound, and
@@ -97,7 +97,8 @@ sources).  A worked example, the board 1..=85, is in the
   the frame directly below.  They are validated by agreement with the Java's optimal.json for n ≤ 1000; by a
   model-free exact search (`evidence/`: the playability theorems, the Franklín–Moniot matching bound, the parity
   matroids' bound of THEORY.md's Theorem 10, the chain and prime relations, and nothing of hives or frames), which
-  confirms the optimum of every game of the committed chain, n ≤ 1300; by an independent brute force
+  confirms the optimum of every game of the committed chain to n = 1300 (its check of 1301–2175 is pending); by an
+  independent brute force
   (`heuristics/evaluation/certify.py`) for n ≤ 62; and by the Rust exact oracle `brute`, which checks frame-model
   games on small boards (up to 40 in the test suite, 52 in `examples/sacrifice validate`).  The greedy removal of
   impossible sources at the root, where it shapes the search space, is descending greedy on each upper-half
@@ -582,11 +583,11 @@ rebuild its units.  A resumed game rests on nothing a game that ran in one piece
 
 ### Same search
 
-Consecutive boards often pose exactly the same search problem with another cap: of the 1076 games of the strict chain
-1..1300 that need a search, 545 pose the problem of the game before them (or the one before that, past a prime).  The
-chain of commit bd9bb5d, which searched them, spent 953 of its 3359 s on those, 851 s of them in 1232–1300 (EXPERIMENTS,
-"Same search").  The tactic `same_search` (proven, on by default) concludes such a game from the earlier one with no
-search; the committed `results/strict.jsonl` was made with it.
+Consecutive boards often pose exactly the same search problem with another cap: of the 1836 games of the strict chain
+1..2175 that need a search, 914 pose the problem of the game before them (or the one before that, past a prime).  The
+chain of commit bd9bb5d, which searched the 545 of them in 1..1300, spent 953 of its 3359 s on those, 851 s of them in
+1232–1300 (EXPERIMENTS, "Same search").  The tactic `same_search` (proven, on by default) concludes such a game from the
+earlier one with no search; the committed `results/strict.jsonl` was made with it.
 
 *The problem.*  After setup (`search::prepare`) the searcher is given the model (the factor graph among the frames'
 numbers and each number's home frame), the root frame set (every frame's moves, factors and freedoms), the candidates
@@ -635,7 +636,7 @@ A game whose recorded digest differs is passed over; for one whose digest agrees
 its board size (milliseconds; `board::search_problem`) and compared with n's whole.  The first equal one is m.
 Setting m up again with this build stands for the problem m's own build searched, which the digest recorded by that
 build ties to it (a problem with the recorded digest is that problem, but for a 64-bit collision), and the problem
-set up again must also have the size its line records (frames, candidates, `max_total`).  Every repeat of 1..1300
+set up again must also have the size its line records (frames, candidates, `max_total`).  Every repeat of 1..2175
 repeats the last game before it that set a search up (n − 1, or n − 2 past a prime), so the window loses nothing
 there, keeps the setups a range starts with to eight, and makes m a function of the window's games.
 
@@ -813,11 +814,13 @@ on the machine moves wall times by up to 3×.  What measures what:
 search", has the tables; on the M1 Max): the proof of 1215 takes 10,371 nodes and 3.8 G cycles on one thread, against
 the matching path's 1.1 M nodes and 29 G; the 146 one-thread proofs of the slope study 76 s against 3,408 s; `taxman
 regress --to 1000` on 2 threads 21.6 s against 96.9 s; the chain 1..1300 on 2 threads 88 s, its games 1001–1300 60 s
-against the 988 s that `results/strict.jsonl` records on 4 threads.  Where the time goes (the proof of 1287, one
+against the 988 s that the chain of commit 271c817 (the `results/strict.jsonl` before it; git has it) records on 4
+threads.  Where the time goes (the proof of 1287, one
 thread): the intersection's shortest paths 57%, the levels' own work (a solve's setup, the history, the weight split)
 22%, the tableau's pivots 8%, the peels 3%; strong branching makes 70% of the augmentations.  A step costs 9 to 13
 times as much as the matching path's (the probe's windows), in trees a hundred times smaller.  A chain from
-optimal.json's game of 1300 reached 2175 in 92 minutes of game time on 2 threads; its cost comes in waves that
+optimal.json's game of 1300 reached 2175 in 92 minutes of game time on 2 threads, and the committed chain from n = 1
+took 27 minutes on 8 ([results/README.md](results/README.md)); its cost comes in waves that
 follow the root's GF(2) gap, with no growth that a fit over 1301–2175 resolves, and a day on 192 cores would take
 it to the end of the set widths (4095) at every slope the data support (EXPERIMENTS has the projections).
 
@@ -842,15 +845,16 @@ strong branching 11%.
 
 ## 11. Status and what is left
 
-Every n to 1300 has a game proven within the frame model: `results/strict.jsonl` is a chain from n = 1 whose games
-to 1000 reproduce optimal.json's scores and whose games 1001–1300 go beyond it (and are now appended to optimal.json
-too, by `taxman extend-optimal`); `results/README.md` says what supports each score.  The production chain on a
-many-core machine can start from `strict.jsonl` (`tools/cloud/RUNBOOK.md`), and a chain from n = 1 reproduces its
-scores.  With the GF(2) bound (section 4), the chain goes past 1300 on a laptop (EXPERIMENTS, "The GF(2) bound in the
-search").  What is left to try: strong branching's solves, 70% of the intersection's work, which restart far below
-their answer (canceling the negative cycles of the optimum less the member would start them next to it); the removal
-of the matching path's search machinery that the GF(2) bound leaves idle (refinement, the Lagrangian bound in the
-search; EXPERIMENTS has the list), once a production run has been made with it; a warm-started unit rebuild; and,
-for the many-core machine, whatever its first sweep shows that a laptop cannot: the GF(2) search's trees are a hundred
-times smaller, so how many threads a game can keep busy is open.  Nothing about scaling beyond 4 threads with the
-GF(2) bound, beyond 8 threads at all, or about Graviton has been measured (`tools/cloud/RUNBOOK.md`, section 8).
+Every n to 2175 has a game proven within the frame model: `results/strict.jsonl` is a chain from n = 1 whose games to
+1000 reproduce optimal.json's scores, whose games 1001–1300 go beyond it (and are now appended to optimal.json too, by
+`taxman extend-optimal`) and whose games 1301–2175 are past the table; `results/README.md` says what supports each
+score.  The production chain on a many-core machine can start from `strict.jsonl` (`tools/cloud/RUNBOOK.md`), and a
+chain from n = 1 reproduces its scores.  With the GF(2) bound (section 4), the chain goes past 1300 on a laptop
+(EXPERIMENTS, "The GF(2) bound in the search" and "The committed chain to 2175").  What is left to try: strong
+branching's solves, 70% of the intersection's work, which restart far below their answer (canceling the negative cycles
+of the optimum less the member would start them next to it); the removal of the matching path's search machinery that
+the GF(2) bound leaves idle (refinement, the Lagrangian bound in the search; EXPERIMENTS has the list), once a
+production run has been made with it; a warm-started unit rebuild; and, for the many-core machine, whatever its first
+sweep shows that a laptop cannot: the GF(2) search's trees are a hundred times smaller, so how many threads a game can
+keep busy is open.  Nothing about scaling beyond 4 threads with the GF(2) bound, beyond 8 threads at all, or about
+Graviton has been measured (`tools/cloud/RUNBOOK.md`, section 8).

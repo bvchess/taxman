@@ -268,6 +268,7 @@ and [THEORY.md's table of evidence](../../heuristics/THEORY.md#evidence).  Entri
 | [The anatomy of the gap](#the-anatomy-of-the-gap-2026-10) | where does the root's gap live, which rule do the relaxations break, and which valid inequalities cut it? | the relaxations promote as many as the optimum, the wrong ones; above the GF(2) bound only odd cores of frames 1-3 remain, growing with n; cover and rank cuts on top of it are a constant factor (about 4 in nodes with multipliers refitted at each node), not a lower slope | the entry (no solver change; the study's code was not kept) |
 | [The per-frame bound](#the-per-frame-bound-2026-10) | does a bound exact frame by frame (frames tied by Lagrangian multipliers) close a share of the GF(2) residual that holds with n? | where it can be computed it closes most of it (90-100% at 900, 936, 1088; 29 and 27 of 30 open probe nodes cut with node-level steps), but each evaluation solves the frames' own odd-core searches: within 200 steps 59% on average, falling with n (15-39% at 1254-1300); in the branch and bound 2.8 times fewer nodes at 28 times the time; not recommended | the entry (no solver change; the study's code was not kept) |
 | [The GF(2) bound in the search](#the-gf2-bound-in-the-search-2026-10) | can the search use the GF(2) intersection as its node bound at a cost a node that pays, what machinery earns its keep with it, and what does it do to the chain? | kept, the default: the 146 one-thread proofs 45 times faster (426 times fewer nodes); the chain 1001-1300 16 times faster on half the threads; a chain from 1300 reached 2175 in 92 minutes on 2 threads, with no growth a fit resolves; `lagrange` off | 679635b to the entry |
+| [The committed chain to 2175](#the-committed-chain-to-2175-2026-10) | does the build with the GF(2) bound make the committed chain from n = 1 as far as the chain from 1300 reached, in one invocation? | yes: 1..2175 in 1638.6 s on 8 threads, nothing assumed; every score and proof kind of 1..1300 is the previous chain's, every score of 1301..2175 the independent chain's from 1300 | feba6d0 |
 
 ## The port and its first improvements
 
@@ -3444,3 +3445,34 @@ reproduces `results/strict.jsonl`, and the numbers of both are above.
   weights do not decrease with the element's index (the candidates by increasing number); a reweighting needs its own
   element order (the root's matroids built in it) or those two starts switched off.  The levels, the contraction and
   the split do not depend on the order.
+
+## The committed chain to 2175 (2026-10)
+
+`results/strict.jsonl` was replaced once more, and now reaches 2175: a run of the clean build of commit feba6d0, the
+merge of the GF(2) bound into the search ("The GF(2) bound in the search"), `taxman solve 1-2175 --threads 8 --out FILE
+--checkpoint-dir DIR --checkpoint-interval 60 --progress 0` from n = 1, in one invocation, on the 10-core M1 Max with
+nothing else running: 1638.6 s of wall time and 10,890 s of CPU.  Search seconds 28.4 for 1..1300 (7.5, 11.8 and 9.1
+for 1..1000, 1001..1231 and 1232..1300; 1.08 M nodes, the dearest game 1287 at 1.6 s) and 1422.1 for 1301..2175 (47.4 M
+nodes, against 48.9 M of the chain from 1300 on 2 threads), against 1022.5 s and 332.0 M nodes for 1..1300 in the chain
+of 271c817 (4 threads, other jobs running).  The slowest games are 2172 (73.1 s), 2170 (68.5), 1475 (50.1), 1472 (37.8)
+and 1430 (35.0); the queue never held more than 178 units and none spilled.  No game assumes anything.  Proofs:
+trivial 13, prime formula 326, cap 192, exhausted 730, same search 914.
+
+What it agrees with:
+
+* The previous file (271c817) in 1..1300: every score, proof kind and method, game by game.  The moves differ in ten
+  games, each a different one of the several optimal sets (539, 684-687, 770-773 and 1215): this file's sets are
+  `optimal.json`'s but at 539, 770-773 and 1215, where the previous file's were the table's, and the previous file's
+  differed from the table at 684-687.  Of the 192 proofs by the cap, 191 were decided before the first node and 686's
+  took 29.
+* The chain from `optimal.json`'s game of 1300 of the previous entry (`bench/gf2/chain.jsonl`, build 716ebd9, 2
+  threads) in 1301..2175: every score, proof kind and method, and every move list but 1560-1563 (an exchange of five
+  numbers of the sum 3008).  Both used the GF(2) bound, so this is a second run of the same search, not a check of the
+  bound; the model-free check of 1301..2175 (`rust/evidence`) is pending.
+* `optimal.json` in 1..1300 (`optimal_match` true).  It still ends at 1300 and was not extended (the lines of
+  1301..2175 say `optimal_match` null); `taxman extend-optimal results/strict.jsonl` would add 875 games.
+
+`taxman verify-results` takes 47.6 s on the file (6.4 s for its first 1300 games) and `tests/results.rs` 49 s; the
+Python referee takes 1 s.  Entries above that quote `results/strict.jsonl` mean the chain of 271c817 (git has it at the
+commit before the one that replaced it), unless they say otherwise; [results/README.md](../results/README.md)
+describes the present file.

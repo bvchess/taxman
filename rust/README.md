@@ -2,7 +2,7 @@
 
 `rust/` is a Cargo crate (a library and one binary, `taxman`; no third-party dependencies) that finds optimal games of
 Taxman.  It reimplements the algorithm of the Java solver in the repository root (`src/main/java`) with a search built
-for speed and for many cores, and it has found optimal games for every n up to 1300 (the Java solver got to 1000).
+for speed and for many cores, and it has found optimal games for every n up to 2175 (the Java solver got to 1000).
 
 This page is the user guide: what the solver computes and what "optimal" means here, how to build and run it, how to
 read its output, why its answers can be trusted (and what they assume), the project's vocabulary,
@@ -29,13 +29,14 @@ scores the most.  The best score for each n is the Taxman sequence ([OEIS A01931
 n = 4 the optimal game is 3, 4 (the taxman takes 1, then 2) and scores 7.
 
 Finding an optimal game is a search over an enormous tree.  The solver's results are the optimal games, as sequences of
-moves with their scores, for every n from 1 to 1300: `results/strict.jsonl` is a chain from n = 1 (section 3),
-whose games 1 to 1000 reproduce the Java's table and whose games 1001 to 1300 go beyond it (the table `optimal.json`
-has them now too, see `extend-optimal` in section 3).  The code can attempt
-any larger n up to 4095, the largest board the set widths cover.  With the GF(2) bound (the default since 2026-10), a
-chain from `optimal.json`'s game of 1300 reached 2175 in 92 minutes on two threads of a laptop, its cost in waves with
-no growth a fit resolves ([docs/EXPERIMENTS.md](docs/EXPERIMENTS.md#the-gf2-bound-in-the-search-2026-10)); before it,
-the cost of a game grew by a factor of ten for every 55 to 70 in n past 1200
+moves with their scores, for every n from 1 to 2175: `results/strict.jsonl` is a chain from n = 1 (section 3),
+whose games 1 to 1000 reproduce the Java's table, whose games 1001 to 1300 go beyond it (the table `optimal.json`
+has them now too, see `extend-optimal` in section 3) and whose games 1301 to 2175 are past the table.  The code can
+attempt any larger n up to 4095, the largest board the set widths cover.  With the GF(2) bound (the default since
+2026-10), a chain from `optimal.json`'s game of 1300 reached 2175 in 92 minutes on two threads of a laptop, and the
+committed chain from n = 1 in 27 minutes on eight ([results/README.md](results/README.md)), the cost in waves with no
+growth a fit resolves ([docs/EXPERIMENTS.md](docs/EXPERIMENTS.md#the-gf2-bound-in-the-search-2026-10)); before it, the
+cost of a game grew by a factor of ten for every 55 to 70 in n past 1200
 ([bench/curve/README.md](bench/curve/README.md)).
 
 ### How the solver sees the game (the frame model)
@@ -88,7 +89,7 @@ from frame 0 (the factor 4) and scores 8.  The search is over such choices: n = 
   ([DESIGN.md, Tactics](DESIGN.md#5-tactics)).  They were validated by agreement with the Java's
   `optimal.json` for n <= 1000, by exhaustive search (`src/brute.rs`, `heuristics/evaluation/certify.py`) for small
   boards (n <= 62), and by a model-free exact search ([`evidence/`](evidence/README.md)) that confirms the optimum
-  for every n <= 1300, the whole committed chain.
+  for every n <= 1300, the committed chain to there (its check of 1301 to 2175 is pending).
 * **Given the pruning is exact.**  Every tactic is proven or sound: none prunes a promotion set that could win
   ([DESIGN.md, Tactics](DESIGN.md#5-tactics) grades each).  So a result rests on nothing but the frame model, the
   correctness of the code and, where its proof says so, the game it was built from.
@@ -180,7 +181,7 @@ n=12    score=50        trivial nodes=0               0.000 s  optimal ok  proof
 
 Each game is built from the one before it.  A game whose search problem an earlier game of the range or of the results
 file already posed and settled is concluded at once with that game's promotions (tactic `same_search`, method
-`repeat`, proof `same_search`, section 5): 545 of the 1076 games of a chain to 1300 that would be searched.
+`repeat`, proof `same_search`, section 5): 914 of the 1836 games of a chain to 2175 that would be searched.
 With `--out FILE`, each result is appended to the file (one JSON line per game, flushed and synced) as soon as it is
 done, and a rerun skips every game the file already completed, whatever the tactics of the rerun (the file's lines
 keep the tactics they were made with and what they assume):
@@ -195,7 +196,7 @@ skipped 300 games already done in mine.jsonl
 
 `optimal.json` stops at 1300.  A game above 1300 needs its predecessor in the run or the results file: extend a copy
 of a file that has it, or start at 1301 with `--use-prev`, which takes `optimal.json`'s game of 1300.  The committed
-`results/strict.jsonl` (1-1300, a chain from n = 1) assumes nothing, and a copy of it extended stays so.  The copy
+`results/strict.jsonl` (1-2175, a chain from n = 1) assumes nothing, and a copy of it extended stays so.  The copy
 matters: `--out` appends to the file and `results/` must not be overwritten.
 
 ```
@@ -219,11 +220,11 @@ hard games, and many times more on games that a chain settles at once by reachin
 ### A chain from n = 1
 
 ```
-$ taxman solve 1-1300 --out strict.jsonl --checkpoint-dir ckpt --checkpoint-interval 60 --progress 60
+$ taxman solve 1-2175 --out strict.jsonl --checkpoint-dir ckpt --checkpoint-interval 60 --progress 60
 ```
 
-Starting at n = 1, no game is taken from `optimal.json` (it is only compared with, up to 1300: a score that differs
-is a hard error), so no proof in the file assumes anything beyond the frame model.  The committed
+Starting at n = 1, no game is taken from `optimal.json` (it is only compared with, up to 1300, where it ends: a score
+that differs is a hard error), so no proof in the file assumes anything beyond the frame model.  The committed
 `results/strict.jsonl` is such a run ([results/README.md](results/README.md) has the details of it), and this command
 reproduces its scores.  A run that takes a game from `optimal.json` (`--use-prev`) records, in every result whose proof
 rests on it, that it assumes that game optimal.
@@ -262,7 +263,7 @@ counts them.
 * **The result is recorded before the checkpoint is deleted**, so a crash never loses a finished game; at worst the
   checkpoint of a finished game is left over, and the next run deletes it.
 * **Memory.**  Searcher state is bounded; the shared queue of work units spills to `DIR/spill` beyond `--mem-cap` units
-  (default 1048576).  The committed runs never got near it: their queue peaked at 313 units.
+  (default 1048576).  The committed run never got near it: its queue peaked at 178 units.
 
 ### All flags of `solve`
 
@@ -316,12 +317,13 @@ for any n they share.  Then, from the board size after the table's last, it take
 to the first that is missing or only an unfinished search, and says which and why.  A game that assumes a game of the
 table optimal is taken too: it assumes nothing the table does not stand for.  The old games are written back byte for
 byte, FILE is written whole or not at all, and RESULTS can never be FILE.  This is how games 1001 to 1300 were added to
-the Java's 1000 (the table now reaches 1300, so the same command now adds nothing):
+the Java's 1000.  The table has not been extended past 1300, so the same command on the committed file adds the games
+to 2175:
 
 ```
 $ taxman extend-optimal results/strict.jsonl --out /tmp/optimal.json
-added 300 games (n = 1001..=1300); the table has 1300 games, n up to 1300; wrote /tmp/optimal.json
-stopped at n = 1301: the results end at n = 1300
+added 875 games (n = 1301..=2175); the table has 2175 games, n up to 2175; wrote /tmp/optimal.json
+stopped at n = 2176: the results end at n = 2175
 ```
 
 Check the new file with `taxman verify-optimal /tmp/optimal.json` before it replaces `src/main/resources/optimal.json`;
@@ -460,10 +462,10 @@ what a game assumes in the summary line.
 
 ```
 $ taxman verify-results results/strict.jsonl
-results/strict.jsonl: 1300 completed games, n = 1..=1300 (0 missing), 0 incomplete lines
-  proof: trivial 13, prime_formula 211, cap 115, exhausted 416, same_search 545
-  assumptions: none in 1300 of 1300 games
-  scores at a proven ceiling, given the game of n-1: n + score(n-1) 424, prime formula 210
+results/strict.jsonl: 2175 completed games, n = 1..=2175 (0 missing), 0 incomplete lines
+  proof: trivial 13, prime_formula 326, cap 192, exhausted 730, same_search 914
+  assumptions: none in 2175 of 2175 games
+  scores at a proven ceiling, given the game of n-1: n + score(n-1) 694, prime formula 325
 0 board sizes are in more than one file, with equal scores in all
 ```
 
@@ -665,7 +667,7 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
 * **W, `Bits<W>`**: the width in 64-bit words of the bitsets that hold game numbers; chosen from n.
 * **standalone vs chained**: a game solved alone (no predecessor: no seed, no cap) or as part of a chain from n - 1
   ([bench/curve/README.md](bench/curve/README.md)).
-* **frontier** **(overloaded)**: the largest n solved contiguously (1300).  Unrelated to the "frontier" argument of
+* **frontier** **(overloaded)**: the largest n solved contiguously (2175).  Unrelated to the "frontier" argument of
   `heuristics/THEORY.md`.
 * **ladder**: a harness (`examples/ladder.rs`) that searches hard games standalone, with time limits, at several thread
   counts.  **Java**: the original solver in `src/main/java`; **optimal.json**: the table of optimal games, n <= 1300

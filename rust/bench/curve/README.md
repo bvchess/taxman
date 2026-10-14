@@ -7,7 +7,8 @@ frontier.
 This is the curve of the matching path, the search before the GF(2) bound.  The search with the GF(2) bound (the
 default since 2026-10) changes it: a chain from 1300 reached 2175 in 92 minutes on 2 threads, with no growth a fit
 resolves; its curve and projections are in [docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#the-gf2-bound-in-the-search-2026-10)
-and its data in `bench/gf2/`.
+and its data in `bench/gf2/`.  The committed `results/strict.jsonl` is a chain from n = 1 to 2175 made with it, in 27
+minutes on 8 threads ([results/README.md](../../results/README.md)).
 
 * Machine: Apple M1 Max (8 performance + 2 efficiency cores), 8 search threads for every main run.
 * Build: master at e710d16, `cargo build --release --examples`; binaries not rebuilt during the runs.
@@ -43,8 +44,8 @@ Regenerate the tables with `./analysis.py > analysis_output.md` (and the slope s
    a game's time is its *chained* cost.  Every score equals `results/strict.jsonl` (1001-1219, as it was then) and
    `results/default.jsonl` (1001-1231).  (`strict.jsonl` then ended at 1219, not 1231; the chain file written here is
    the strict file through 1231 and is what `--known` used wherever a game past 1219 was needed.  `strict.jsonl` has
-   since been regenerated as a strict chain 1-1300, and its games 1001-1231 are this file's, move for move but for
-   1221-1224, which have at least two optimal sets; see `results/README.md`.)
+   since been regenerated as a strict chain 1-2175, and its games 1001-1231 are this file's, move for move but for
+   1215 and 1221-1224, which have at least two optimal sets; see `results/README.md`.)
 2. **Calibration.**  `ladder --threads 8 --no-seed --no-cap --tactic revise_freedoms=off` on every non-prime in
    1001-1231, one process per game.  Each standalone result was checked against the chain's optimum (all 197
    agree).  Compared per game with step 1.
