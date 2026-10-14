@@ -718,9 +718,14 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             weight: &graph.weight,
         };
         // The least that a set of another size than the heaviest set's loses (see `meet`'s module docs): a smaller
-        // one at least the shortest path between members, a larger one (where the limit allows it) at least the gap
-        // to the heaviest set one larger.
-        let mut limit = self.meet.smaller_loss(&problem, &level.pot);
+        // one what the heaviest set gains over a dominant set one smaller in the history, if there is one, else at
+        // least the shortest path between members; a larger one (where the limit allows it) at least the gap to the
+        // heaviest set one larger.
+        let smaller = level.history.iter().rev().find(|set| set.len() as usize + 1 == size);
+        let mut limit = match smaller {
+            Some(set) => level.value as i64 - set.sum() as i64,
+            None => self.meet.smaller_loss(&problem, &level.pot),
+        };
         if cap > size {
             limit = limit.min(self.meet.gap);
         }
