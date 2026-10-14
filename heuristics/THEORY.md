@@ -660,6 +660,116 @@ most one move short of a longest one.  A search that pruned the
 branches unable to reach M(n) moves would be unsound: at 833 it would
 return 218,197.  Whether the gap is bounded in general is open.
 
+## The parity matroids: a bound on the whole game
+
+The span certificate's lemma (playable sets are independent) is about
+the upper half, whose members are never anyone's factors.  It extends
+to the whole board once each pick's own coordinate is taken out, and
+the extension splits by the parity of Ω into two matroids, so that the
+heaviest set independent in both is an upper bound on opt(n) that
+polynomial algorithms compute.
+
+Fix a board n and h = ⌊n/2⌋.  The coordinates are the numbers 1..h
+(every maximal factor of a number up to n is at most n/2).  Each number
+s of 2..n has the vector v(s) over GF(2) with a 1 at each of its
+maximal factors, and each s ≤ h also the unit vector e_s.
+
+**Lemma (playable sets with their own coordinates are independent).**
+If S ⊆ {2, …, n} is playable, the family
+
+    {v(s) : s ∈ S} ∪ {e_s : s ∈ S, s ≤ h}
+
+is linearly independent over GF(2).
+
+*Proof.*  Play S in a legal order x₁, …, x_k (Theorem 1 gives one).
+The move xᵢ surrenders a proper divisor d still in the pot; lift it to
+a maximal factor fᵢ = xᵢ/p with p a prime dividing xᵢ/d, so
+d | fᵢ | xᵢ.  fᵢ is in the pot when xᵢ is played: whatever removed it
+earlier, playing it or taking it as tax for a multiple, would have
+removed d with it.  Hence (a) fᵢ divides no earlier move xⱼ (j < i),
+which would have taken it, so it is no maximal factor of one; and
+(b) fᵢ ∉ S: it is not xᵢ (a proper divisor), not an earlier move (it
+is still in the pot), and not a later one (xᵢ takes it).  Let u(s) be
+v(s) with the coordinates in S deleted.  A nonempty vanishing sum of
+some u(xᵢ) is impossible: for the largest i in it, coordinate fᵢ
+survives the deletion by (b), is 1 in u(xᵢ), and is 0 in every other
+term by (a).  So the u(s), s ∈ S, are independent.  Now let
+Σ_{s∈A} v(s) + Σ_{s∈B} e_s = 0 with A ⊆ S and B ⊆ S ∩ [2, h].
+Deleting the coordinates in S removes every e_s and leaves
+Σ_{s∈A} u(s) = 0, so A = ∅, and then Σ_{s∈B} e_s = 0 gives B = ∅.  ∎
+
+For S in the upper half no coordinate lies in S and no e_s appears: the
+lemma is then the span certificate's (a dismantling order is a play
+order read backwards).  It is also stronger than Theorem 1's matching:
+independent u(s) have a nonzero maximal minor, and a nonzero term of
+its expansion matches each s ∈ S to a distinct maximal factor outside
+S, which is the Franklín–Moniot relaxation; a matchable set need not be
+independent.
+
+**Theorem 10 (the parity matroids).**  Split the coordinates by the
+parity of Ω (1 counts as even).  For q ∈ {0, 1} let M_q be the linear
+matroid on {2, …, n} in which s is represented by
+
+* v(s), if Ω(s) and q have different parities;
+* e_s, if they have the same parity and s ≤ h;
+* a coloop, if they have the same parity and s > h.
+
+Every playable set is independent in M₀ and in M₁.  Hence opt(n) is at
+most the heaviest weight Σ_{s∈I} s of a set I independent in both.
+More generally, for forced picks P and barred numbers X, every playable
+S with P ⊆ S and S ∩ X = ∅ weighs at most w(P) plus the heaviest
+common independent set of M₀/P ∖ X and M₁/P ∖ X (and there is none
+unless P is independent in both).
+
+*Proof.*  A maximal factor f of s has Ω(f) = Ω(s) − 1, so v(s) lies in
+the coordinates whose parity differs from Ω(s)'s and e_s in those of
+Ω(s)'s own: every vector of the lemma's family lies in one of the two
+coordinate subspaces E₀ (Ω even) and E₁ (Ω odd).  Since GF(2)^h is
+their direct sum, such a family is independent iff its members in E₀
+are and its members in E₁ are.  For a playable S, the members in E_q
+are the vectors representing in M_q the elements of S that are not
+coloops of M_q, so they are independent, and adding coloops keeps a set
+independent: S is independent in M_q.  opt(n) is the weight of a
+heaviest playable set.  At a node, a playable S ⊇ P is independent in
+M_q, so P is, and S ∖ P is independent in the contraction M_q/P; it
+avoids X.  ∎
+
+Three facts make it usable as evidence.
+
+* **It is computable.**  The heaviest common independent set of two
+  matroids is a polynomial problem (weighted matroid intersection;
+  Lawler, Frank), and over GF(2) with these sparse vectors a solve
+  takes milliseconds: 22 ms at n = 990 and 43 ms at 1300 from scratch.
+* **Its value can be certified without trusting the algorithm.**  For
+  any split w = w₀ + w₁, every T independent in both matroids has
+  w(T) = w₀(T) + w₁(T) ≤ max_{M₀} w₀ + max_{M₁} w₁ (weak duality).
+  And in one matroid an independent I is a heaviest independent set,
+  over all sizes and for weights of either sign, iff (1) w(x) ≥ 0 for
+  x ∈ I, (2) w(y) ≤ 0 whenever I + y is independent, and (3)
+  w(y) ≤ w(x) whenever x lies in the circuit of I + y.  (Add r dummy
+  coloops of weight 0 and truncate to rank r: the independent sets,
+  padded with dummies, become the bases, and (1)–(3) are the classical
+  criterion that no single exchange improves a basis.)  So a common
+  independent I with a split satisfying (1)–(3) in both matroids proves
+  that w(I) is the maximum, whatever produced it; the same split bounds
+  the maximum with one member x of I barred, since the heaviest
+  independent set avoiding x is I − x plus the heaviest y with
+  I − x + y independent, if that weighs more than 0.
+* **It is never above the matching bound** (by the minor argument
+  above).  It is not one matroid, so the remark that no matroid
+  relaxation is exact for the whole game (game 425) does not touch it.
+
+What it misses are the *odd cores*: unplayable sets whose vectors, with
+their own coordinates taken out, are still independent; these are the
+self-covering sets no subset of which lists every factor an even number
+of times.  Over another field it would miss more: over GF(3) or the
+rationals the unsigned vectors of a triangle of moves are independent.
+The same construction, frame by frame, bounds the frame model's
+promotions ([rust/docs/EXPERIMENTS.md, "Matroid intersection
+bounds"](../rust/docs/EXPERIMENTS.md#matroid-intersection-bounds-2026-10)),
+and the two agree at every root measured there.  What the bound buys
+the model-free search is in the evidence table below.
+
 ## Evidence
 
 Standing status for (★): zero counterexamples anywhere, and certified
