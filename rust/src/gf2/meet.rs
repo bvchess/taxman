@@ -181,8 +181,11 @@ pub struct Meet<const R: usize> {
     spans: [Vec<BlockSpan<R>>; 2],
     /// Element `e` is in the current set.
     inside: Vec<bool>,
+    /// The members of the current set, and the elements outside it by their block of `A` (in no order), each
+    /// element's index in its list in `pos`.
     members: Vec<u32>,
-    outside: Vec<u32>,
+    out_a: Vec<Vec<u32>>,
+    pos: Vec<u32>,
     dist: Vec<Dist>,
     pred: Vec<u32>,
     /// The last augmenting path, from its source to its sink.
@@ -201,6 +204,8 @@ pub struct Meet<const R: usize> {
     pub settled: bool,
     /// Whether the last solve stopped at its `stop` weight, before the heaviest set.
     pub stopped: bool,
+    /// Solves made: a caller can tell whether the workspace still holds the tableau of a solve it made.
+    pub solves: u64,
     /// The heaviest set found and its weight.
     pub value: i64,
     /// Counters: augmentations made, Bellman–Ford rounds run, blocks rebuilt after a path.
@@ -225,7 +230,8 @@ impl<const R: usize> Meet<R> {
             spans: blocks.map(|b| vec![BlockSpan::new(); b]),
             inside: vec![false; n],
             members: Vec::with_capacity(n),
-            outside: Vec::with_capacity(n),
+            out_a: vec![Vec::with_capacity(n); blocks[0]],
+            pos: vec![0; n],
             dist: vec![INF; n],
             pred: vec![NONE; n],
             path: Vec::with_capacity(n),
@@ -237,6 +243,7 @@ impl<const R: usize> Meet<R> {
             dirty: blocks.map(|b| vec![false; b]),
             settled: false,
             stopped: false,
+            solves: 0,
             value: 0,
             augmentations: 0,
             rounds: 0,
@@ -269,6 +276,7 @@ impl<const R: usize> Meet<R> {
         mut report: impl FnMut(&[u32]),
     ) {
         let w = p.weight;
+        self.solves += 1;
         for &e in live {
             self.inside[e as usize] = false;
         }
@@ -307,7 +315,15 @@ impl<const R: usize> Meet<R> {
             }
         }
         self.members.clear();
-        self.members.extend(live.iter().copied().filter(|&e| self.inside[e as usize]));
+        for list in &mut self.out_a {
+            list.clear();
+        }
+        for &e in live {
+            let i = e as usize;
+            let list = if self.inside[i] { &mut self.members } else { &mut self.out_a[usize::from(p.block[0][i])] };
+            self.pos[i] = list.len() as u32;
+            list.push(e);
+        }
         self.value = self.members.iter().map(|&e| w[e as usize]).sum();
         report(&self.members);
         self.settled = false;
@@ -316,15 +332,6 @@ impl<const R: usize> Meet<R> {
             if self.value >= stop {
                 self.stopped = true;
                 return;
-            }
-            self.members.clear();
-            self.outside.clear();
-            for &e in live {
-                if self.inside[e as usize] {
-                    self.members.push(e);
-                } else {
-                    self.outside.push(e);
-                }
             }
             let Some(sink) = self.shortest_path(p) else {
                 self.settled = true;
@@ -346,6 +353,7 @@ impl<const R: usize> Meet<R> {
                 self.path.push(v);
                 let i = v as usize;
                 self.inside[i] = !self.inside[i];
+                self.move_list(p, v);
                 if self.pred[i] == NONE {
                     break;
                 }
@@ -355,10 +363,28 @@ impl<const R: usize> Meet<R> {
             self.apply_path(p);
             self.value += gain;
             self.augmentations += 1;
-            self.members.clear();
-            self.members.extend(live.iter().copied().filter(|&e| self.inside[e as usize]));
             report(&self.members);
         }
+    }
+
+    /// Moves `e`, just flipped, to the list of its new side.
+    #[inline]
+    fn move_list(&mut self, p: &Problem<'_, R>, e: u32) {
+        let i = e as usize;
+        let block = usize::from(p.block[0][i]);
+        let (from, to) = if self.inside[i] {
+            (&mut self.out_a[block], &mut self.members)
+        } else {
+            let (members, out_a) = (&mut self.members, &mut self.out_a);
+            (members, &mut out_a[block])
+        };
+        let at = self.pos[i] as usize;
+        from.swap_remove(at);
+        if let Some(&moved) = from.get(at) {
+            self.pos[moved as usize] = at as u32;
+        }
+        self.pos[i] = to.len() as u32;
+        to.push(e);
     }
 
     /// Adds `e` to the spans of both matroids if it is independent in both; false (nothing added) otherwise.
@@ -527,22 +553,33 @@ impl<const R: usize> Meet<R> {
     /// phase before, which reaches the distances a full round would: an unchanged vertex has already offered its
     /// distance along all its arcs.  An element independent of `I` has arcs to or from every member; those go
     /// through one minimum, offered again only when it improves.  A pull into an outside element reads only the
-    /// circuit members that changed: its mask and the mask of the block's changed slots.
+    /// circuit members that changed: its mask and the mask of the block's changed slots (a block of `A` with none
+    /// is skipped).  The best sink is kept as distances fall.
     fn shortest_path(&mut self, p: &Problem<'_, R>) -> Option<u32> {
         let w = p.weight;
-        for &e in self.members.iter().chain(&self.outside) {
-            self.dist[e as usize] = INF;
-            self.pred[e as usize] = NONE;
+        for &x in &self.members {
+            self.dist[x as usize] = INF;
+            self.pred[x as usize] = NONE;
         }
         self.changed_out.clear();
-        for &y in &self.outside {
-            let i = y as usize;
-            if !is_zero(&self.res[0][i]) {
-                self.dist[i] = -w[i] * HOPS;
-                self.changed_out.push(y);
+        let mut sink = (INF, NONE);
+        for list in &self.out_a {
+            for &y in list {
+                let i = y as usize;
+                self.pred[i] = NONE;
+                if is_zero(&self.res[0][i]) {
+                    self.dist[i] = INF;
+                } else {
+                    let d = -w[i] * HOPS;
+                    self.dist[i] = d;
+                    self.changed_out.push(y);
+                    if !is_zero(&self.res[1][i]) && d < sink.0 {
+                        sink = (d, y);
+                    }
+                }
             }
         }
-        let limit = self.members.len() + self.outside.len() + 2;
+        let limit = self.pos.len() + 2;
         let (mut best_free, mut best_member) = ((INF, NONE), (INF, NONE));
         let mut rounds = 0;
         while !self.changed_out.is_empty() {
@@ -612,52 +649,53 @@ impl<const R: usize> Meet<R> {
                 }
             }
             self.changed_out.clear();
-            for &y in &self.outside {
-                let i = y as usize;
-                let ly = 1 - w[i] * HOPS;
-                let mut best = self.dist[i];
-                let mut from = NONE;
-                if !is_zero(&self.res[0][i]) {
-                    if member_improved && best_member.0 + ly < best {
-                        (best, from) = (best_member.0 + ly, best_member.1);
-                    }
-                } else {
-                    let ba = usize::from(p.block[0][i]);
-                    let mut m = self.mask[0][i];
-                    let mut any = false;
-                    for (a, c) in m.iter_mut().zip(&self.changed_slots[ba]) {
-                        *a &= c;
-                        any |= *a != 0;
-                    }
-                    if any {
-                        let elems = &self.slot_elem[0][ba];
-                        let dist = &self.dist;
-                        each_bit(&m, |s| {
-                            let x = elems[s];
-                            let d = dist[x as usize];
-                            if d + ly < best {
-                                (best, from) = (d + ly, x);
-                            }
-                        });
-                    }
+            for (ba, list) in self.out_a.iter().enumerate() {
+                let changed = self.changed_slots[ba];
+                let any_changed = !is_zero(&changed);
+                if !any_changed && !member_improved {
+                    continue;
                 }
-                if from != NONE {
-                    self.dist[i] = best;
-                    self.pred[i] = from;
-                    self.changed_out.push(y);
+                let elems = &self.slot_elem[0][ba];
+                for &y in list {
+                    let i = y as usize;
+                    let ly = 1 - w[i] * HOPS;
+                    let mut best = self.dist[i];
+                    let mut from = NONE;
+                    if !is_zero(&self.res[0][i]) {
+                        if member_improved && best_member.0 + ly < best {
+                            (best, from) = (best_member.0 + ly, best_member.1);
+                        }
+                    } else if any_changed {
+                        let mut m = self.mask[0][i];
+                        let mut any = false;
+                        for (a, c) in m.iter_mut().zip(&changed) {
+                            *a &= c;
+                            any |= *a != 0;
+                        }
+                        if any {
+                            let dist = &self.dist;
+                            each_bit(&m, |s| {
+                                let x = elems[s];
+                                let d = dist[x as usize];
+                                if d + ly < best {
+                                    (best, from) = (d + ly, x);
+                                }
+                            });
+                        }
+                    }
+                    if from != NONE {
+                        self.dist[i] = best;
+                        self.pred[i] = from;
+                        self.changed_out.push(y);
+                        if best < sink.0 && !is_zero(&self.res[1][i]) {
+                            sink = (best, y);
+                        }
+                    }
                 }
             }
         }
         self.rounds += rounds as u64;
-        let mut sink = None;
-        let mut best = INF;
-        for &y in &self.outside {
-            let i = y as usize;
-            if !is_zero(&self.res[1][i]) && self.dist[i] < best {
-                (sink, best) = (Some(y), self.dist[i]);
-            }
-        }
-        sink
+        (sink.1 != NONE).then_some(sink.1)
     }
 
     /// After a [`solve`](Self::solve) that settled (see [`settled`](Self::settled)): the bound on the heaviest
@@ -841,7 +879,9 @@ mod tests {
                 let chosen: Vec<u32> = live.iter().copied().filter(|&e| meet.contains(e)).collect();
                 assert!(chosen.len() <= cap && independent(&ba, &va, &chosen) && independent(&bb, &vb, &chosen));
                 assert_eq!(chosen.iter().map(|&e| weight[e as usize]).sum::<i64>(), meet.value);
-                assert_eq!(reported.last(), Some(&chosen), "trial {trial}: the last set reported is the heaviest");
+                let mut last = reported.last().cloned().unwrap_or_default();
+                last.sort_unstable();
+                assert_eq!(last, chosen, "trial {trial}: the last set reported is the heaviest");
                 if cap < n {
                     continue;
                 }

@@ -396,6 +396,9 @@ struct Level<const W: usize, const R: usize> {
     value: u64,
     /// The bounds without each member of the heaviest set, from the weight split, once asked for.
     split: Option<Vec<(u32, i64)>>,
+    /// The workspace's solve count when this level was last solved, unchanged since (0 for none): if the workspace
+    /// has made no solve since, it still holds the level's tableau.
+    meet_solve: u64,
 }
 
 impl<const W: usize, const R: usize> Level<W, R> {
@@ -409,6 +412,7 @@ impl<const W: usize, const R: usize> Level<W, R> {
             settled: false,
             value: 0,
             split: None,
+            meet_solve: 0,
         }
     }
 
@@ -421,6 +425,7 @@ impl<const W: usize, const R: usize> Level<W, R> {
         self.solved = false;
         self.settled = false;
         self.split = None;
+        self.meet_solve = 0;
     }
 }
 
@@ -488,6 +493,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         level.solved = false;
         level.settled = false;
         level.split = None;
+        level.meet_solve = 0;
         for x in promoted.iter() {
             contract(self.graph, level, x);
         }
@@ -551,6 +557,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         }
         // Deleting a candidate outside the heaviest set leaves it the heaviest: the history still ends with it.
         level.split = None;
+        level.meet_solve = 0;
     }
 
     fn evaluate(&mut self, cap: usize, need: Option<u64>) -> Eval<W> {
@@ -672,14 +679,15 @@ fn solve<const W: usize, const R: usize>(
     stats.rebuilds = meet.rebuilds;
     level.solved = !meet.stopped;
     level.settled = meet.settled;
+    level.meet_solve = meet.solves;
     level.cap = cap;
     level.value = meet.value as u64;
     level.split = None;
 }
 
-/// The bounds without each member of `level`'s heaviest set (settled), from a weight split.  The workspace may hold
-/// another level's last solve, so the level's heaviest set is solved again from itself (one round of exchange data,
-/// no augmentation) first.
+/// The bounds without each member of `level`'s heaviest set (settled), from a weight split.  Unless the workspace
+/// still holds the level's last solve, the level's heaviest set is solved again from itself first (the tableau built
+/// and one shortest path, no augmentation).
 fn split<const W: usize, const R: usize>(
     graph: &Gf2Graph,
     level: &Level<W, R>,
@@ -696,8 +704,10 @@ fn split<const W: usize, const R: usize>(
         vector: [&level.vec[0], &level.vec[1]],
         weight: &graph.weight,
     };
-    meet.solve(&problem, live_idx, &start, usize::MAX, i64::MAX, |_| {});
-    debug_assert_eq!(meet.value as u64, level.value, "the heaviest set solved again changed");
+    if level.meet_solve != meet.solves {
+        meet.solve(&problem, live_idx, &start, usize::MAX, i64::MAX, |_| {});
+        debug_assert_eq!(meet.value as u64, level.value, "the heaviest set solved again changed");
+    }
     stats.splits += 1;
     let mut out = Vec::with_capacity(start.len());
     if meet.settled {
