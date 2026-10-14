@@ -239,12 +239,18 @@ nodes grows 0.16 ± 0.04 and log10 seconds 0.23 ± 0.04 per 100 in n over 900–
 dominate), 0.33 and 0.34 from n = 78 on.  The matching-bound search had spent 50–70 million nodes on each of
 990–996 without finishing; the parity bound proves them from scratch in 44,000–68,000.
 
-1300 is not the limit.  At the measured 0.23 decades per 100 in n, from the 2,240 seconds of 1200–1299, the
-searches of 1300–1399 would take about an hour of thread time, those to 1500 about 3 hours, to 2000 about 57 hours (a
-day on three threads), with the hardest single proofs near 2000 about 3 hours each, which checkpointing handles.  What
-stops the proofs at 1300 is the recorded optima: past the committed chain there is no V(n) to prove, so going further
-needs the solver's chain first (or the search's own `optimize` mode, which finds opt(n) instead of checking it, at a
-higher cost).
+1300 is not the limit, and the recorded optima no longer stop the proofs there: the committed chain
+(`../results/strict.jsonl`) reaches 2175.  The extrapolation from the bands above (0.23 decades per 100 in n: to 2000
+about 57 hours of thread time, the hardest proofs about 3 hours) was made before there was anything to measure it
+against, and it is low.  Over 34 games of 1302–2124 that `exact` finished (and five dear ones stopped unfinished at
+1.1–2.2 million nodes), the nodes of the proof were 0.13 to 13 times the nodes of the solver's own search of the game,
+the ratio growing about tenfold per 1000 in n (the parity bound is the weaker one), and the root's parity gap, which
+tracks the cost over 900–1300, does not predict it past 1300.  With the solver's nodes (`tools/summarize.py order`) and
+the fitted ratio, 1301..2175 take about 200 million nodes, **about 140 thread-hours** (100 to 250) at 2.5 ms a node,
+the dearest games, 2170–2173, about 6 hours each, 1475, 1430, 1472 and 1521 about 1.5 hours; the games are independent
+and one thread each, so it is half a day on 16 cores ([EXPERIMENTS.md](../docs/EXPERIMENTS.md#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10)
+has the measurements; `../tools/cloud/evidence.sh` runs it, [RUNBOOK section 9](../tools/cloud/RUNBOOK.md#9-the-model-free-proofs-of-optn-1301-to-2175)
+the procedure).  Not yet run; the table at the top says 1300 until it is.
 
 ## 4. Adversarial search: what protects greedy
 
@@ -548,6 +554,8 @@ bash tools/adversary_campaign.sh                                                
 ./target/release/optsets --from 2 --to 989 --out OUT.jsonl     # then the chain and prime games, derived
 ./target/release/optsets --list 798,799,800 --upper fixed --threads 1 --seconds 540 --out FIXED.jsonl
 ./target/release/moves --from 2 --to 1300 --seconds 540 --out OUT.jsonl         # one thread; ~7 minutes
+../tools/cloud/evidence.sh 1301 2175                # `exact` over a range in resumable passes, all cores, then the check
+tools/summarize.py check 1301 2175 data/exact_parity_2_1300.jsonl OUT.jsonl     # every n in 2..2175 proven, scores recorded
 tools/summarize.py span|star|exact|cost|adversary|optsets|moves FILE...
 tools/crosscheck_optsets.py data/optsets_2_989.jsonl --max 57 --budget 120     # theory-free, about 8 minutes
 tools/crosscheck_greedy.py data/span_2_100000.jsonl.gz --max 1000
@@ -565,8 +573,8 @@ gzipped where large (`gunzip -k` to resume into it).
   rejection of descending greedy on an upper-half instance is a GF(2) dependency of what it kept above — a
   statement about cores and closed surfaces mod 2 that the adversarial results tie to the window law with the
   real ranking of the primes.
-* The model-free cross-check reaches the end of the committed chain, 1300, and could go on (about a day of three
-  threads to 2000, section 3) if there were recorded optima to check.  What the parity bound still misses are the
+* The model-free cross-check reaches 1300; the committed chain now reaches 2175 and the check of 1301..2175 is
+  prepared (`../tools/cloud/evidence.sh`; about 140 thread-hours, section 3), not run.  What the parity bound still misses are the
   odd cores (THEORY.md, Theorem 10): its root gap, 130 points on average at 1000–1300, grows about 14 per 100 in n,
   and the cost with it; the conflicts of its heaviest sets are large (20–45 members at 990).
 * The optimal sets of 990–1300 are not enumerated.  The enumeration mode works with the parity bound (tested

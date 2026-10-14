@@ -8,6 +8,7 @@
     summarize.py star FILE...     the threshold-by-threshold (★) campaign: thresholds and components by method
     summarize.py exact FILE...    the model-free exact cross-check of optimal scores (a later file overrides)
     summarize.py check A B FILE...  FILEs prove every n in 2..B, with the recorded scores in A..B
+    summarize.py order A B        the games A..B, dearest first by the solver's nodes (the order evidence.sh runs them)
     summarize.py cost FILE...     its cost curve: the searches made with the parity bound from scratch, by band
     summarize.py optsets FILE...  every optimal pick set per game (bin/optsets.rs): tables, exchanges, canonical sets
     summarize.py moves FILE...    the longest games against the optimal ones (bin/moves.rs)
@@ -432,6 +433,33 @@ def recorded_scores():
     return scores
 
 
+def exact_order(args):
+    """order A B: the games A..B, comma separated, the ones `exact` will search the longest first.  A game's cost is
+    predicted by the nodes of the solver's search that settled it in the committed chain (the source game's for a
+    repeated search) times 10^((n - 1300)/1000): over 34 games of 1302-2124 `exact` took 0.13 to 13 times as many
+    nodes (the geometric mean 0.97 at 1300-1500 and 3.8 at 1800-2124, the scatter 0.28 decades), because the parity
+    bound is the weaker bound and its gap grows faster than the solver's.  It is a guide to the order, not an estimate.
+    Games that meet the chain or prime relation, which `exact` does not search, go last."""
+    lo, hi = int(args[0]), int(args[1])
+    rows = {}
+    for r in lines([str(STRICT_JSONL)]):
+        rows.setdefault(r["n"], r)
+
+    def solver_nodes(n):
+        r = rows[n]
+        while r["proof"] == "same_search":
+            r = rows[r["same_search"]["n"]]
+        return r["nodes"]
+
+    def searched(n):
+        score, prev = rows[n]["score"], rows[n - 1]["score"]
+        prime = n > 2 and prime_factors(n) == [n] and score == n + prev - previous_prime(n)
+        return score != n + prev and not prime
+
+    cost = {n: solver_nodes(n) * 10 ** ((n - 1300) / 1000) if searched(n) else -1 for n in range(lo, hi + 1)}
+    print(",".join(str(n) for n in sorted(cost, key=lambda n: (-cost[n], -n))))
+
+
 def exact_check(args):
     """check A B FILE...: the files (a later file's line for a game replaces an earlier file's) prove opt(n) for every
     n in 2..B (`exact_proofs`: so the files must reach back to 2, as data/exact_parity_2_1300.jsonl does), have a
@@ -454,5 +482,5 @@ def exact_check(args):
 
 
 if __name__ == "__main__":
-    {"span": span, "star": star, "exact": exact, "check": exact_check, "cost": exact_cost, "adversary": adversary,
-     "optsets": optsets, "moves": moves}[sys.argv[1]](sys.argv[2:])
+    {"span": span, "star": star, "exact": exact, "check": exact_check, "order": exact_order, "cost": exact_cost,
+     "adversary": adversary, "optsets": optsets, "moves": moves}[sys.argv[1]](sys.argv[2:])

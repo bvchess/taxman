@@ -8,8 +8,8 @@
 # model, over the range.  `exact` runs one game per thread (a game's search is one thread), so the games are spread over
 # the cores; it runs for PASS_SECONDS, then pauses every search still going, saving its open subtrees and learned
 # conflicts to a checkpoint ($CKPT/exact_N.ckpt), and this script runs it again, which resumes them.  A game may take
-# any number of passes.  The games go in the order of their parity bound's gap at the root, the widest first (a
-# search's cost follows its gap, roughly), so that a long game starts early instead of last.
+# any number of passes.  The games go dearest first, by the nodes the solver's search of each took (strict.jsonl;
+# `exact` takes one to three times as many), so that a long game starts early instead of last.
 #
 # Safe to run again at any time, after a crash, a reboot, a spot interruption or a SIGTERM: finished games are in the
 # output file (one line each, appended and synced), unfinished ones in their checkpoints.  `exact` has no stop handler,
@@ -35,7 +35,8 @@
 #   PASS_SECONDS    the length of a pass, default 300: the work lost to a kill, against the small cost of a restart
 #   OUT             the output file
 #   STRICT          the recorded optima, default rust/results/strict.jsonl (committed)
-#   BASELINE        the proofs of the smaller games the check builds on, default rust/evidence/data/exact_parity_2_1300.jsonl
+#   BASELINE        the proofs of the smaller games the check builds on (default: the evidence crate's
+#                   data/exact_parity_2_1300.jsonl)
 #   EXTRA_ARGS      more flags for `exact`
 #   MAX_FAILS       default 5
 #   DEADLINE_HOURS, POWEROFF, S3_DEST, SAVE_EVERY: as in run.sh (SAVE_EVERY defaults to PASS_SECONDS here)
@@ -93,20 +94,9 @@ games_done() {
         wc -l | tr -d ' '
 }
 
-# The order of the games, widest root gap first, made once and kept (the order does not change a result).
+# The order of the games, the dearest first, made once and kept (the order does not change a result).
 order_file="$TAXMAN_WORK/evidence-order_${from}_${to}.txt"
-if [ ! -s "$order_file" ]; then
-    if [ -x "$PARITYROOT_BIN" ]; then
-        log "ordering the games by the gap of their parity bound at the root"
-        "$PARITYROOT_BIN" "$from" "$to" |
-            sed -E 's/^\{"n":([0-9]+),.*"gap":(-?[0-9]+),.*$/\2 \1/' | sort -rn | awk '{printf "%s%s", sep, $2; sep = ","}' \
-            >"$order_file"
-    fi
-    if [ ! -s "$order_file" ]; then
-        log "no order from $PARITYROOT_BIN: largest n first"
-        seq "$to" -1 "$from" | paste -sd, - >"$order_file"
-    fi
-fi
+[ -s "$order_file" ] || "${SUMMARIZE[@]}" order "$from" "$to" >"$order_file" || die "could not order the games"
 list="$(cat "$order_file")"
 
 log "evidence $from-$to: $total games; threads $THREADS; passes of ${PASS_SECONDS}s; output $OUT; checkpoints $CKPT"
@@ -129,8 +119,8 @@ while :; do
     paused="$(find "$CKPT" -maxdepth 1 -name 'exact_*.ckpt' 2>/dev/null | wc -l | tr -d ' ')"
     log "pass $pass: $done_now of $total games done, $paused searches paused in $CKPT"
     if [ "$((total - done_now))" -lt "$THREADS" ] && [ "$THREADS" -gt 1 ]; then
-        log "note: $((total - done_now)) games are left for $THREADS threads: most of the machine idles (a search is one thread);" \
-            "a smaller instance finishes them for less (stop, then run this again there with S3_DEST: THREADS may differ)"
+        log "note: $((total - done_now)) games are left for $THREADS threads, and a search is one thread: most of the" \
+            "machine idles.  A smaller instance finishes them for less (stop, run this again there: THREADS may differ)"
     fi
 
     lines_before="$done_now"

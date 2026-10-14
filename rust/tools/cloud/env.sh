@@ -28,7 +28,6 @@ TAXMAN_BIN="${TAXMAN_BIN:-$CRATE/target/release/taxman}"
 LADDER_BIN="${LADDER_BIN:-$CRATE/target/release/examples/ladder}"
 EVIDENCE="$CRATE/evidence"
 EXACT_BIN="${EXACT_BIN:-$EVIDENCE/target/release/exact}"
-PARITYROOT_BIN="${PARITYROOT_BIN:-$EVIDENCE/target/release/examples/parityroot}"
 CLOUD_DIR="$_cloud_dir"
 
 # The results file committed with the code, which a production run must agree with where they overlap.

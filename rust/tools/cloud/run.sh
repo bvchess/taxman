@@ -15,9 +15,9 @@
 #   $status                      the exit status of the last run_child
 #
 # Environment (all optional):
-#   DEADLINE_HOURS   stop the command (cleanly, with SIGTERM) this many hours after the FIRST start.  The deadline is kept
-#                    in $TAXMAN_WORK/deadline (chain) or deadline.NAME, so a restart does not extend it; delete the file
-#                    to set another.
+#   DEADLINE_HOURS   stop the command (cleanly, with SIGTERM) this many hours after the FIRST start.  The deadline is
+#                    kept in $TAXMAN_WORK/deadline (chain) or deadline.NAME, so a restart does not extend it; delete
+#                    the file to set another.
 #   POWEROFF         never (default) | done (when outcome is complete) | always (whenever the script ends): run
 #                    `sudo shutdown -h now`, so that a forgotten instance stops billing
 #   S3_DEST          s3://bucket/prefix: copy results, checkpoints and logs there every SAVE_EVERY seconds (default
@@ -103,7 +103,8 @@ run_begin() {
     local deadline_file="$TAXMAN_WORK/deadline"
     [ "$RUN_NAME" = chain ] || deadline_file="$deadline_file.$RUN_NAME"
     if [ -n "${DEADLINE_HOURS:-}" ] && [ ! -e "$deadline_file" ]; then
-        awk -v now="$(date +%s)" -v hours="$DEADLINE_HOURS" 'BEGIN {printf "%d\n", now + hours * 3600}' >"$deadline_file"
+        awk -v now="$(date +%s)" -v hours="$DEADLINE_HOURS" 'BEGIN {printf "%d\n", now + hours * 3600}' \
+            >"$deadline_file"
     fi
     [ -r "$deadline_file" ] && deadline="$(cat "$deadline_file")"
     if [ -n "$deadline" ] && ! command -v timeout >/dev/null 2>&1; then

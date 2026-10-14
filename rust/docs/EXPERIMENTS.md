@@ -229,6 +229,12 @@ The model-free work of [evidence](../evidence/README.md) and the proofs of [THEO
 | The Lagrangian bound over the nogoods beside the parity bound | [parity bound](#the-parity-bound-in-the-model-free-proofs-2026-10) | not kept | cut nothing at 990: the same 44,411 nodes, 7% slower |
 | Resuming the matching bound's open searches with the parity bound, against starting afresh | [parity bound](#the-parity-bound-in-the-model-free-proofs-2026-10) | measured | both finish; resuming costs more (990: 89,639 more nodes against 44,389 from scratch; 992: 214,329 against 66,892) |
 | Does an optimal game play the most moves, M(n)?  (The wiki's open question; in its whole-game form, the conjecture behind `revise_freedoms`.)  M(n) model-free from the matching number ν(n) and a unit-weight search, against the optimal game's moves, n = 2..1300 | [evidence 6](../evidence/README.md#6-does-an-optimal-game-play-the-most-moves); [THEORY: longest games](../../heuristics/THEORY.md#longest-games) | not kept: false | at n = 833, 834 and 835 every optimal game is one move short of the longest (the heaviest 363-move game of 833 scores 29 less); every other game to 1300 is a longest game, 1,293 by ν(n) alone; pruning branches that cannot reach M(n) moves would be unsound |
+| Predict the cost of `exact` on 1301-2175 from the root's parity gap (tenfold nodes per 84 to 130 points of it, as over 900-1300) | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | not kept: wrong by 10 to 1000 times | gap 364 took 18 thousand nodes (1576), gap 401 63 thousand (1501), gap 315 300 thousand (1326); the slope from gap 310 to the 767 of 2170-2173 said 90 to 900 thread-hours for one game and 1,000 to 5,000 for the campaign |
+| Predict it from the nodes of the solver's own search of the game (`strict.jsonl`), times a ratio fitted on finished games | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | kept: the order of `evidence.sh` and the estimate (about 140 thread-hours) | 34 games finished: 0.13 to 13 times the solver's nodes, the ratio growing tenfold per 1000 in n (geometric mean 0.9 at 1300-1400, 7 at 1975-2103), sd 0.28 decades; the first fit on 1302-1576 alone said 61 thread-hours, low by 2.3 times |
+| Thread scaling of `exact` (one game per thread) | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | measured | the same 275,105 nodes at 1, 2, 4 and 8 threads, user time a node 2.19 to 2.46 ms (+12%), the 8-thread wall time the longest game's (151 s of 606) |
+| A single game's search over several threads or processes (a `--shard i/K` over the open units of a checkpoint) | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | open: not needed | at 16 vCPUs the campaign ends with the dearest games (11 hours) and 4 to 5 of them run at once |
+| A clean pause of `exact` on SIGTERM (a stop handler) | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | open: replaced by passes in `evidence.sh` | passes of 300 s bound what a kill loses to 5 minutes of the threads, and a resumed search has the nodes of an uninterrupted one |
+| A 192-vCPU instance for the proofs of 1301-2175 | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | not kept | from 16 vCPUs up the dearest games (2170-2173) set the wall time, 11 hours; 192 vCPUs cost eight times as much for the same hours |
 
 ### The Python heuristics project
 
@@ -269,6 +275,7 @@ and [THEORY.md's table of evidence](../../heuristics/THEORY.md#evidence).  Entri
 | [The per-frame bound](#the-per-frame-bound-2026-10) | does a bound exact frame by frame (frames tied by Lagrangian multipliers) close a share of the GF(2) residual that holds with n? | where it can be computed it closes most of it (90-100% at 900, 936, 1088; 29 and 27 of 30 open probe nodes cut with node-level steps), but each evaluation solves the frames' own odd-core searches: within 200 steps 59% on average, falling with n (15-39% at 1254-1300); in the branch and bound 2.8 times fewer nodes at 28 times the time; not recommended | the entry (no solver change; the study's code was not kept) |
 | [The GF(2) bound in the search](#the-gf2-bound-in-the-search-2026-10) | can the search use the GF(2) intersection as its node bound at a cost a node that pays, what machinery earns its keep with it, and what does it do to the chain? | kept, the default: the 146 one-thread proofs 45 times faster (426 times fewer nodes); the chain 1001-1300 16 times faster on half the threads; a chain from 1300 reached 2175 in 92 minutes on 2 threads, with no growth a fit resolves; `lagrange` off | 679635b to the entry |
 | [The committed chain to 2175](#the-committed-chain-to-2175-2026-10) | does the build with the GF(2) bound make the committed chain from n = 1 as far as the chain from 1300 reached, in one invocation? | yes: 1..2175 in 1638.6 s on 8 threads, nothing assumed; every score and proof kind of 1..1300 is the previous chain's, every score of 1301..2175 the independent chain's from 1300 | feba6d0 |
+| [The model-free proofs of 1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | what does the model-free check of the chain's 1301..2175 cost, and how does it run on a cloud machine? | about 140 thread-hours (100 to 250) from the solver's node counts times a ratio that grows tenfold per 1000 in n; the root's gap does not predict it; one game a thread, so half a day on 16 vCPUs; `evidence.sh`, not yet run | (this round) |
 
 ## The port and its first improvements
 
@@ -3468,7 +3475,7 @@ What it agrees with:
 * The chain from `optimal.json`'s game of 1300 of the previous entry (`bench/gf2/chain.jsonl`, build 716ebd9, 2
   threads) in 1301..2175: every score, proof kind and method, and every move list but 1560-1563 (an exchange of five
   numbers of the sum 3008).  Both used the GF(2) bound, so this is a second run of the same search, not a check of the
-  bound; the model-free check of 1301..2175 (`rust/evidence`) is pending.
+  bound; the model-free check of 1301..2175 (`rust/evidence`) is pending ([prepared](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10), not run).
 * `optimal.json` in 1..1300 (`optimal_match` true).  It still ends at 1300 and was not extended (the lines of
   1301..2175 say `optimal_match` null); `taxman extend-optimal results/strict.jsonl` would add 875 games.
 
@@ -3476,3 +3483,80 @@ What it agrees with:
 Python referee takes 1 s.  Entries above that quote `results/strict.jsonl` mean the chain of 271c817 (git has it at the
 commit before the one that replaced it), unless they say otherwise; [results/README.md](../results/README.md)
 describes the present file.
+
+## The model-free proofs of 1301-2175: cost and the cloud run (2026-10)
+
+*Question.*  The committed chain now reaches 2175, and the model-free proofs of [evidence 3](../evidence/README.md#3-model-free-exact-cross-check-of-optn)
+stop at 1300 (the entry above says the check of 1301..2175 is pending).  What does it cost, can `exact` use the many
+cores of a cloud machine, and how should it be run?  Measured on the M1 Max (10 cores, other jobs running throughout),
+with `exact` as it is: no proving code was changed.
+
+*How `exact` uses threads (from the code, then measured).*  One game per thread: `campaign` (`evidence/src/jsonl.rs`)
+gives the games of a range to its workers through an atomic counter, each worker runs one game's search alone (a
+`Prover` is one thread), and a finished game is appended and synced as one line.  `--seconds` is a pause deadline for
+every search in flight and the end of new work; the paused searches write `exact_N.ckpt` (target, nodes, seconds,
+nogoods, open units; temp file, `fsync`, rename) and a rerun resumes them.  Checkpoints are written only at the pause and
+there is no signal handler, so a SIGTERM or a kill loses the pass in progress.  The same 12 games (1302-1364, 275,105
+nodes in all) at 1, 2, 4 and 8 threads, longest first:
+
+| threads | wall s | user s | speedup | user ms a node | longest game s |
+|---|---|---|---|---|---|
+| 1 | 606 | 601 | 1.00 | 2.19 | 141 |
+| 2 | 312 | 615 | 1.94 | 2.23 | 140 |
+| 4 | 171 | 637 | 3.53 | 2.31 | 147 |
+| 8 | 151 | 675 | 4.00 | 2.46 | 151 |
+
+The node counts are identical at every thread count (no sharing between games); the user time per node rises 12 % at 8
+threads on a busy machine; the 8-thread wall time is the longest game's, not the threads'.  Pausing does not change a tree:
+the same games stopped every 20-25 s (and by SIGTERM) and resumed took exactly the node counts of an uninterrupted run
+(1316: 12,567; 1320: 62,784; and the rest of the 13 searches of 1301-1320, in `evidence.sh` runs on macOS and in the
+Linux image).
+
+*The cost of the proofs of 1301..2175.*  (a) *The root's parity gap does not predict it.*  Over 900-1300 a proof's
+nodes grew tenfold per 84 points of gap (R² 0.76); over 1301-1360 the 18 games finished give tenfold per 130 (the
+solver's slope).  The gaps of 1301..2175 run 125 to 767 (mean 380 over the 490 games that need a search; 2170-2173 are
+the widest), and that slope from gap 310 (270 thousand nodes) predicts 90 to 900 thread-hours for one game of gap 767
+and 1,000 to 5,000 for the campaign.  But a game of gap 364 (1576) took 18 thousand nodes and one of gap 401 (1501)
+63 thousand; one of 315 (1326) took 301 thousand.  (b) *The solver's own node counts do.*  The committed chain records,
+for every game, the nodes of the search that settled it (`nodes`; for a repeated search, the source game's).  Over
+the 34 games finished, `exact`'s nodes over those are 0.13 to 13:
+
+| n | 1302-1364 (19 games) | 1497-1612 (6) | 1655-1923 (6) | 1975-2103 (3) |
+|---|---|---|---|---|
+| geometric mean of the ratio (range) | 0.9 (0.13-2.1) | 1.6 (0.66-3.4) | 2.4 (0.75-8.4) | 7.0 (4.7-13) |
+
+(the fit over all 34: log10 ratio = -0.07 + 1.02 (n - 1300)/1000, residual sd 0.28; the ratio of the dearest games run
+to the end are 1521: 0.66, 1612: 1.7, 1803: 3.1, 1805: 2.1, 1975: 5.4.)  Five dear games were stopped unfinished:
+1430 (2.19 million nodes so far, the solver's search 1.61 million), 1472 (1.83, 1.35), 1475 (1.73, 1.92), 2052
+(1.15, 0.21) and 2170 (1.25, 1.25), after 1 to 1.6 hours each of a thread on the busy machine.  The first estimate,
+from the 20 games of 1302-1576 alone (ratio 0.95, 61 thread-hours), was low by 2.3 times: the ratio grows with n.  490 of
+the 875 games need a search; with the fit (and the order `summarize.py order`, which weights the solver's nodes by
+10^((n - 1300)/1000)) the model gives, at 2.5 ms a node (the committed proofs of 1..1300 cost 1.2 to 1.7 ms on two quiet
+threads, 1.73 at 1200-1300; this sample 2.2 to 2.5 user time; no clean measure above 1500):
+
+| | nodes (M) | thread-hours | the dearest game |
+|---|---|---|---|
+| 2.0 ms a node | 207 | 115 | 9.2 h (4.6-22) |
+| **2.5** | 205 | **142** (126-165 over the draws) | 10.9 h (5.7-24) |
+| 3.0 | 206 | 171 | 13.4 h (7-31) |
+
+By list scheduling the wall time on 4, 8, 16, 32 and more threads is 36, 18, 11 and 11 hours at 2.5 ms a node; from 16
+threads up the dearest games (2170-2173, the model's 8 million nodes each) set it.  The range of the estimate is wider
+than the draws': the trend in n rests on 7 games above 1800 and a sample, not a random one, and the speed of a Graviton
+core is unmeasured.  The RUNBOOK ([section 9](../tools/cloud/RUNBOOK.md#9-the-model-free-proofs-of-optn-1301-to-2175))
+gives the wall time and the price by size (about $3 to $4 on spot for 16 vCPUs) and says that the calibration on
+Graviton3, 4 and 5 (`rust/bench/cloud/`) refines the per-core figures.
+
+*Tooling.*  `tools/cloud/evidence.sh A B` runs `exact` in passes of 300 s over the range, dearest first,
+until every game has a line, then the check `summarize.py check A B` (every n in 2..B proven, every score the recorded
+one); `run.sh` holds what it shares with `chain.sh` (one run at a time, log, pid, deadline, S3 saves, clean stop,
+power-off), `setup.sh` builds and checks the evidence crate (`EVIDENCE_ONLY=1` skips the solver), `spot-watch.sh` stops
+either run, the Dockerfile builds the crate.  Tried on macOS and in the Linux image (arm64): 1301-1320, SIGTERM
+(status 143), a resume, `--verify` (passing, and failing on a missing game), a second run refused, `chain.sh` after the
+split (a complete chain to 120, a SIGTERM and a deadline).  The Docker build had to start from the image of an earlier
+build (`--build-arg RUST_IMAGE=taxman-cloud`): the registry's metadata did not answer.
+
+*Not done, and why.*  No change to `exact` to use many cores on one game (its open units are independent subtrees, so a
+`--shard i/K` over a checkpoint's units would do it), nor to pause on a signal: at 16 vCPUs the campaign ends when the
+dearest game does, and a pass of 300 s bounds what a kill loses.  The run on EC2 and the check of 1301..2175 are the
+owner's; the results go to `evidence/data/exact_parity_1301_2175.jsonl`.

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Prepare a machine to build and run the Taxman solver and the evidence crate's model-free prover: packages, the Rust
-# toolchain, the checkout, the builds and quick checks.  Idempotent: run it again after a reboot, or to move to newer commits (it fast-forwards the checkout).
+# toolchain, the checkout, the builds and quick checks.  Idempotent: run it again after a reboot, or to move to newer
+# commits (it fast-forwards the checkout).
 #
 # Written for Amazon Linux 2023 (dnf) and Ubuntu 22.04/24.04 (apt), on arm64 and x86_64.  Other Linux with git, a C
 # compiler and curl works with SKIP_PACKAGES=1.
@@ -14,6 +15,7 @@
 #   TAXMAN_DIR      $HOME/taxman    where to clone, when the script is not inside a checkout
 #   NO_PULL=1       leave the checkout as it is (otherwise: git pull --ff-only, if it is clean and on a branch)
 #   SKIP_PACKAGES=1 SKIP_TESTS=1 SKIP_SMOKE=1
+#   EVIDENCE_ONLY=1 build and check only the evidence crate (what evidence.sh runs), not the solver: a few minutes less
 #   TAXMAN_WORK     where results, checkpoints and logs live (see env.sh)
 #   RUSTFLAGS       default "-C target-cpu=native" (see env.sh)
 
@@ -134,24 +136,27 @@ mkdir -p "$TAXMAN_WORK/results" "$CKPT" "$LOGS"
 exec > >(tee -a "$LOGS/setup.log") 2>&1
 
 # --- the build ---------------------------------------------------------------------------------------------------
-say "building (RUSTFLAGS='${RUSTFLAGS:-}'): the solver and the examples (ladder, sacrifice)"
-(cd "$CRATE" && cargo build --release --bins --examples)
-[ -x "$TAXMAN_BIN" ] || fail "the build did not produce $TAXMAN_BIN"
-[ -x "$LADDER_BIN" ] || fail "the build did not produce $LADDER_BIN"
+if [ "${EVIDENCE_ONLY:-0}" != 1 ]; then
+    say "building (RUSTFLAGS='${RUSTFLAGS:-}'): the solver and the examples (ladder, sacrifice)"
+    (cd "$CRATE" && cargo build --release --bins --examples)
+    [ -x "$TAXMAN_BIN" ] || fail "the build did not produce $TAXMAN_BIN"
+    [ -x "$LADDER_BIN" ] || fail "the build did not produce $LADDER_BIN"
+fi
 say "building the evidence crate (its own workspace): exact, the other tools and their examples"
 (cd "$EVIDENCE" && cargo build --release --bins --examples)
 [ -x "$EXACT_BIN" ] || fail "the build did not produce $EXACT_BIN"
-[ -x "$PARITYROOT_BIN" ] || fail "the build did not produce $PARITYROOT_BIN"
 
 # --- checks ------------------------------------------------------------------------------------------------------
 if [ "${SKIP_SMOKE:-0}" != 1 ]; then
-    say "smoke: replay optimal.json"
-    "$TAXMAN_BIN" verify-optimal
-    say "smoke: the committed results files, with the solver's verifier and the independent Python one"
-    "$TAXMAN_BIN" verify-results "${COMMITTED_RESULTS[@]}"
-    python3 "$CRATE/tools/check_results.py" "${COMMITTED_RESULTS[@]}"
-    say "smoke: games 1..400 against optimal.json"
-    "$TAXMAN_BIN" regress --to 400 --threads "$(( $(ncpu) < 8 ? $(ncpu) : 8 ))"
+    if [ "${EVIDENCE_ONLY:-0}" != 1 ]; then
+        say "smoke: replay optimal.json"
+        "$TAXMAN_BIN" verify-optimal
+        say "smoke: the committed results files, with the solver's verifier and the independent Python one"
+        "$TAXMAN_BIN" verify-results "${COMMITTED_RESULTS[@]}"
+        python3 "$CRATE/tools/check_results.py" "${COMMITTED_RESULTS[@]}"
+        say "smoke: games 1..400 against optimal.json"
+        "$TAXMAN_BIN" regress --to 400 --threads "$(( $(ncpu) < 8 ? $(ncpu) : 8 ))"
+    fi
     say "smoke: the model-free prover on games 2..400, and the check of its proofs"
     smoke="$TAXMAN_WORK/smoke-exact"
     rm -rf "$smoke"
@@ -163,8 +168,10 @@ if [ "${SKIP_TESTS:-0}" != 1 ]; then
     # A handful of test threads (DESIGN.md times the suite with two): many tests start a thread per CPU themselves,
     # and a test thread per CPU on top of that only oversubscribes a large machine.  The ignored large-machine tests
     # are run by hand (RUNBOOK.md).
-    say "cargo test -- --test-threads=4"
-    (cd "$CRATE" && cargo test -- --test-threads=4)
+    if [ "${EVIDENCE_ONLY:-0}" != 1 ]; then
+        say "cargo test -- --test-threads=4"
+        (cd "$CRATE" && cargo test -- --test-threads=4)
+    fi
     say "cargo test --release -- --test-threads=4, in the evidence crate (about a minute)"
     (cd "$EVIDENCE" && cargo test --release -- --test-threads=4)
 fi
