@@ -1,7 +1,7 @@
 //! The span check (♦): is every rejection of descending greedy a linear dependency over GF(2)?
 //!
 //! Give each member its incidence vector over GF(2) (a 1 at each of its factors).  A playable set's vectors are
-//! independent ([`crate::bounds`], the incidence-rank bound), so for every truncation K_{≥t} of the instance no
+//! independent ([`crate::bounds`], the rank bound), so for every truncation K_{≥t} of the instance no
 //! playable subset is larger than the GF(2) rank of K_{≥t}.  Now suppose
 //!
 //! > **(♦)** whenever descending greedy rejects x, x's vector is a sum of vectors of members greedy kept above x.

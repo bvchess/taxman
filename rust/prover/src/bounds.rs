@@ -1,6 +1,6 @@
 //! Upper bounds on the largest playable subset of a set of members.
 //!
-//! * The **matching bound** ν: a playable set gives its members distinct factors (Theorem 1), so it is
+//! * The **matching-number bound** ν: a playable set gives its members distinct factors (Theorem 1), so it is
 //!   matchable, and no playable subset is larger than a maximum matching of members to factors.
 //! * The **hypergraphic-matroid bound** (Lorea's matroid).  Add one *ground* factor to the list of every member
 //!   with a single factor (the primes and prime powers), so that every list has at least two entries.  A
@@ -14,7 +14,7 @@
 //!   greedy algorithm.  Independence is tested with a matching: S is independent iff it is matchable and every
 //!   member can reach an unmatched factor by an alternating path (the matching survives doubling any member,
 //!   which is Hall's condition with the +1).
-//! * The **incidence-rank bound**.  Give each member the vector over GF(2) with a 1 at each of its factors.  A
+//! * The **rank bound**.  Give each member the vector over GF(2) with a 1 at each of its factors.  A
 //!   playable set's vectors are linearly independent: in a dismantling order x₁, x₂, … each x_i has a factor
 //!   that no later member lists, so in any vanishing sum the earliest member's private coordinate is 1.  So no
 //!   playable subset is larger than the GF(2) rank.  On members with at most two factors this is exactly the

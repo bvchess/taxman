@@ -1,5 +1,5 @@
 //! A check that the parity search finds what it proves absent: `paritycheck A B [STEP]` runs, for each game in
-//! the range that needs a search, the model-free search with the parity bound against the target V(n) − 1, one
+//! the range that needs a search, the prover's search with the parity bound against the target V(n) − 1, one
 //! below the recorded optimum (optimal.json, then `../results/strict.jsonl`).  It must return a playable set worth
 //! at least V(n), which replays by the rules; a bound or a pruning rule that cut an optimal game would make it
 //! fail.  One JSON line per game.

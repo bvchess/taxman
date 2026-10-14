@@ -2,7 +2,7 @@
 name = "taxman-prover"
 version = "0.1.0"
 edition = "2021"
-description = "Independent empirical checks of the assumptions behind the Taxman solver's optimal results"
+description = "Independent proofs and checks of the Taxman solver's results"
 publish = false
 
 # Its own workspace: this crate shares no code with the solver in ../ (independence is the point).

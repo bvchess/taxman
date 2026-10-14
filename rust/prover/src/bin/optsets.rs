@@ -1,4 +1,4 @@
-//! Every optimal set, model-free: for every game in a range, all playable sets of picks worth the recorded
+//! Every optimal set, on the whole board: for every game in a range, all playable sets of picks worth the recorded
 //! optimum V(n) (optimal.json to 1000, the solver's results beyond).  One line per game, resumable:
 //!
 //!     optsets --from A --to B [--list ...] [--threads T] [--seconds S] [--budget NODES] [--limit SETS]
@@ -10,11 +10,11 @@
 //! upper part is not U\*, by a search whose root is split on the largest upper number where the set and U\*
 //! disagree.  The two lists partition the full one (`all`, the default).  Derivations are made only for `all`.
 //!
-//! A game whose V(n) meets the chain or prime relation gets its sets from those of n − 1
+//! A game whose V(n) is at its ceiling or meets the prime formula gets its sets from those of n − 1
 //! ([`derive_optimal_sets`]; the line says `"source":"chain"` or `"prime"`, and rests on V(n − 1) being the true
-//! optimum, proven model-free to 989); every other game, and every game with `--derive 0`, is searched: the branch
-//! and bound of `game.rs` in enumeration mode with target V(n) − 1 lists every playable set beating it (one beating
-//! V(n) would refute the recorded optimum and stops the run), up to `--limit` sets (default unlimited) within
+//! optimum, proven on the whole board to 989); every other game, and every game with `--derive 0`, is searched: the
+//! branch and bound of `game.rs` in enumeration mode with target V(n) − 1 lists every playable set beating it (one
+//! beating V(n) would refute the recorded optimum and stops the run), up to `--limit` sets (default unlimited) within
 //! `--budget` nodes.  The predecessors a derivation needs come from earlier lines of the output file, or are
 //! worked out on the spot.  Threads working on neighbouring games would work out the same predecessors, so a
 //! long range is best run in two passes: `--searched-only 1` (only the games that need a search, in parallel),

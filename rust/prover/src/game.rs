@@ -1,6 +1,6 @@
-//! The full game, model-free: an exact upper bound on opt(n) that uses only proven facts.
+//! The full game on the whole board: an exact upper bound on opt(n) that uses only proven facts.
 //!
-//! Nothing here knows about hives, frames, greedy, `unzip` or promotions.  It rests on:
+//! Nothing here knows about frames, greedy, `unzip` or promotions.  It rests on:
 //!
 //! * **Theorem 1 with peel** (THEORY.md): a set S of picks can all be played iff dismantling the reduction
 //!   instance whose members are S, each listing its maximal factors outside S, removes everything.  (Peel
@@ -8,7 +8,7 @@
 //!   list, playable implies no self-covering subset, Theorem 5 (⇒), and a full dismantling order rebuilds S by
 //!   the extension lemma, whose proof needs exactly that no member is in a list.)  So opt(n) is the largest sum
 //!   of a playable S ⊆ {2..n}, and every subset of a playable set is playable.
-//! * **The Franklín–Moniot matching bound**: a playable S pays each pick with a distinct maximal factor outside
+//! * **The Franklín–Moniot bound**: a playable S pays each pick with a distinct maximal factor outside
 //!   S (Theorem 1), so S is the pick side of a matching in the graph joining each c to its maximal factors c/p,
 //!   with each number in at most one edge, weighing the larger end.  The graph is bipartite by the parity of Ω.
 //! * **opt(n) <= n + opt(n−1)** (deleting the move n from a game of n leaves a game of n − 1), and for a prime n,
@@ -160,8 +160,8 @@ impl Board {
     }
 }
 
-/// The matching bound: a maximum-weight matching in the bipartite graph of the board (even Ω on the left, odd
-/// on the right), as a min-cost flow by successive shortest paths with potentials (Dijkstra on reduced costs),
+/// The Franklín–Moniot bound: a maximum-weight matching in the bipartite graph of the board (even Ω on the left,
+/// odd on the right), as a min-cost flow by successive shortest paths with potentials (Dijkstra on reduced costs),
 /// stopping when no augmenting path has negative cost.  Edges (c, c/p) weigh the weight of picking c (c itself
 /// unless [`set_weights`](Self::set_weights) or [`set_scale`](Self::set_scale) says otherwise); a forced pick's
 /// downward edges weigh BIG more and its upward ones are dropped (it may not pay); a barred number's downward
@@ -885,7 +885,7 @@ impl<'a> Prover<'a> {
         Some(best.0 as f64 / SCALE as f64)
     }
 
-    /// The matching bound of the whole board (the Franklín–Moniot bound).
+    /// The Franklín–Moniot bound of the whole board.
     pub fn root_bound(&mut self) -> u64 {
         let roles = self.root_roles();
         self.bound.solve(self.board, &roles).expect("nothing is forced").0
@@ -1265,9 +1265,9 @@ pub fn prime_below(n: u64, spf: &[u32]) -> u64 {
 /// How a recorded optimum V(n) meets the proven upper bounds from V(n − 1).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Relation {
-    /// V(n) = n + V(n − 1).
+    /// V(n) = n + V(n − 1): a game at its ceiling (the data's `chain`).
     Chain,
-    /// n is prime and V(n) = n + V(n − 1) − p, p the largest prime below n.
+    /// n is prime and V(n) = n + V(n − 1) − p, p the largest prime below n: the prime formula (the data's `prime`).
     Prime,
     /// Neither.
     None,
@@ -1310,10 +1310,11 @@ pub fn the_prime_of_every_optimal_set(set: &[u32], n: u32, spf: &[u32]) -> Resul
 
 /// The optimal sets of game n from all those of game n − 1, when V(n) meets a relation and V(n − 1) = opt(n − 1):
 ///
-/// * **Chain** (opt(n) = n + opt(n − 1)): a playable S without n is a game of n − 1, worth at most opt(n − 1),
-///   so every optimal S holds n, and S − n (playable: a subset; n is no one's factor) is worth opt(n − 1), an
-///   optimal set of n − 1.  So the optimal sets of n are the T + n, T optimal for n − 1, that are playable.
-/// * **Prime** (n prime, opt(n) = n + opt(n − 1) − p): every optimal S holds n (as for a chain, since n > p),
+/// * **At its ceiling** (`Relation::Chain`, opt(n) = n + opt(n − 1)): a playable S without n is a game of n − 1,
+///   worth at most opt(n − 1), so every optimal S holds n, and S − n (playable: a subset; n is no one's factor) is
+///   worth opt(n − 1), an optimal set of n − 1.  So the optimal sets of n are the T + n, T optimal for n − 1,
+///   that are playable.
+/// * **Prime** (n prime, opt(n) = n + opt(n − 1) − p): every optimal S holds n (as at the ceiling, since n > p),
 ///   so no other prime; S − n + p is playable (p > (n − 1)/2 is no one's maximal factor on either board, and
 ///   pays with 1 as n did) and worth opt(n − 1).  Conversely every optimal T of n − 1 holds p (it holds the
 ///   largest prime <= n − 1, [`the_prime_of_every_optimal_set`]) and T − p + n is playable and worth opt(n).
@@ -1609,8 +1610,8 @@ mod tests {
         }
     }
 
-    /// Where V(n) meets the chain or prime relation, the optimal sets derived from those of n − 1 are the ones
-    /// enumerated directly; and every optimal set holds the largest prime <= n and no other.  Every game to 260
+    /// Where V(n) is at its ceiling or meets the prime formula, the optimal sets derived from those of n − 1 are the
+    /// ones enumerated directly; and every optimal set holds the largest prime <= n and no other.  Every game to 260
     /// (optimal.json's values; the optimal set is unique in all of them but 2..260 still exercises both rules).
     #[test]
     fn derived_optimal_sets_are_the_enumerated_ones() {
@@ -1716,7 +1717,7 @@ mod tests {
         }
     }
 
-    /// The matching bound against brute force over matchings on tiny boards, with random roles.
+    /// The Franklín–Moniot bound against brute force over matchings on tiny boards, with random roles.
     #[test]
     fn matching_bound_against_brute_force() {
         let spf = smallest_prime_factors(100);
