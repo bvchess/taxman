@@ -924,7 +924,9 @@ node's contracted matroids, so their heaviest common independent set
 under w_μ (of members of positive weight, and no more than the node
 can still promote), plus μ (c_q(P) − c_p(P)), bounds every such
 completion: a Lagrangian relaxation of the inequality (weak duality,
-as for Theorem 11's weight split).
+as for Theorem 11's weight split).  The solver uses the first two;
+the third was measured and not kept (rust/docs/EXPERIMENTS.md, "Prime
+exchanges in the search").
 
 These hold for the search of the root's problem, whose subtrees all
 are; a search of one node's completions for their own best (as some
@@ -1281,6 +1283,7 @@ and the adversarial experiments: `rust/prover/README.md`.
 | M(n) ≤ ν(n); M(n−1) ≤ M(n) ≤ M(n−1) + 1, with equality on the left at a prime n | brute force to 22 | proven (Lemma, "Longest games") |
 | Playable sets, with each pick's own coordinate taken out, are GF(2)-independent; the parity matroids bound opt(n) | every playable set independent in both matroids on every board to 18 (enumerated); the bound at least opt(n), and the recorded game independent in both, at every n ≤ 1300; the certified intersection equal to enumeration on 3,000 random pairs of matroids | proven (Thm 10) |
 | Promotable sets of the frame model are independent in the even and the odd frames' GF(2) matroids, whose heaviest common independent set bounds the best promotion set, at every node in their contractions | every promotable set of every board with ≤ 22 candidates independent; the bound at least the best promotion set at every n ≤ 1300; never below the best completion at the 600 nodes of the solver's probe; the solver's chain 1..2175 with it reproduces every score to 1300 (optimal.json's, made without it) | proven (Thm 11) |
+| A prime exchange that maps the frame model's root onto itself maps promotion sets to promotion sets worth (q − p)(c_p − c_q) more, so every heaviest set keeps c_p ≤ c_q for every such pair at once | the images of the optimal set and of random maximal promotion sets promotable and worth the formula at every board with pairs to 400 and a sample to 1300, every optimum keeping every inequality; every promotion set of the boards with pairs and ≤ 22 candidates likewise, the best that keeps the inequalities the optimum; the solver with the rule finds the optimum of every board with pairs to 600 and its chains reproduce every score to 1300 and on 2126-2175 | proven (Thm 13) |
 | opt(n) equals the recorded score: the frame model's answer is the true optimum | the prover's exact searches on the whole board (playability theorems, the Franklín–Moniot and parity bounds, the ceiling and the prime formula; `rust/prover`, section 3): every n = 2..1300, the committed chain to there (1301..2175 pending) | verified (exact, on the whole board) to 1300 |
 | An optimal game has the most moves, M(n) | one move short at n = 833, 834 and 835, proven by the prover; a longest game for every other n ≤ 1300, 1,293 of them by the matching certificate (`rust/prover`, section 6) | **false** (n = 833); the gap is at most one to 1300, open beyond |
 | (★) on rejection-bearing components | every threshold of every game n = 2..20,000 certified by bounds; the earlier 5 undecided settled | certified per game; open in general |
