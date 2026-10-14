@@ -11,7 +11,10 @@
 #   contention-solver K...   K copies at once of the proof of $CONTENTION_GAME (default 1326), for each K given
 #   contention-prover K...   K copies at once of the prover on $CONTENTION_PROVER_GAME (default 990), for each K given
 #   scaling T... [-- N]      the proof-only run of game N (default 2172) at each thread count T
-#   chain MINUTES THREADS    taxman solve 2176-4095 from a copy of results/strict.jsonl for MINUTES minutes
+#   chain FROM TO MINUTES THREADS
+#                            taxman solve FROM-TO on a copy of results/strict.jsonl cut after game FROM-1, for at most
+#                            MINUTES minutes.  FROM = 2126, TO = 2175 re-solves games the file already has (the same
+#                            scores; its seconds to compare); FROM = 2176 extends the chain
 #
 # Environment: ROOT (the checkout; default: the one this file is in), CONTENTION_GAME, CONTENTION_PROVER_GAME.
 
@@ -98,16 +101,22 @@ scaling)
     done
     ;;
 chain)
-    minutes="$1"
-    threads="$2"
-    results="$out/chain.jsonl"
-    cp "$KNOWN" "$results"
-    say "chain: $threads threads for $minutes minutes, from a copy of strict.jsonl ($(wc -l < "$results") games)"
+    from="$1"
+    to="$2"
+    minutes="$3"
+    threads="$4"
+    results="$out/chain-$from.jsonl"
+    # The committed file has game n on line n: keep the games before FROM, and extend the copy.
+    head -n "$((from - 1))" "$KNOWN" > "$results"
+    tail -n 1 "$results" | grep -q "\"n\":$((from - 1)),"
+    echo "$from" > "$out/chain-$from.from"
+    say "chain: games $from-$to on $threads threads, at most $minutes minutes, from a copy of strict.jsonl to $((from - 1))"
     # timeout stops the run with SIGTERM, which `taxman solve` answers by checkpointing and exiting; every finished game
     # is already in the file.
-    "$here/timed.sh" "$out" "chain.t$threads" timeout -s TERM "$((minutes * 60))" \
-        "$TAXMAN" solve 2176-4095 --threads "$threads" --out "$results" --checkpoint-dir "$out/chain-ckpt" --progress 0
-    say "chain: $(wc -l < "$results") games in the file"
+    "$here/timed.sh" "$out" "chain-$from.t$threads" timeout -s TERM "$((minutes * 60))" \
+        "$TAXMAN" solve "$from-$to" --threads "$threads" --out "$results" --checkpoint-dir "$out/chain-$from-ckpt" \
+        --progress 0
+    say "chain: $(( $(wc -l < "$results") - from + 1 )) games added"
     ;;
 *)
     echo "unknown phase: $phase" >&2
