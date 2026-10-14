@@ -84,6 +84,31 @@ fn bad_command_lines_are_usage_errors() {
     assert_usage_error(&["extend-optimal"], "usage: extend-optimal RESULTS --out FILE");
     assert_usage_error(&["extend-optimal", "a", "b", "--out", "c"], "usage: extend-optimal RESULTS --out FILE");
     assert_usage_error(&["extend-optimal", "a"], "extend-optimal needs --out FILE");
+    assert_usage_error(&["verify-results"], "usage: verify-results [--threads K] FILE...");
+    assert_usage_error(&["verify-results", "--threads", "0", "a"], "--threads must be at least 1");
+    assert_usage_error(&["verify-results", "--tactic", "nogoods=on", "a"], "unknown option --tactic");
+}
+
+/// `verify-results` reports the same on one thread and on several (the games of 22, 34 and 38 are repeats, whose
+/// checks set up search problems).
+#[test]
+fn verify_results_reports_the_same_on_any_number_of_threads() {
+    let dir = TempDir::new("verify-results");
+    let results = solve_into(&dir, "results.jsonl", "1-60");
+    // The report, without the line that says how long the check took.
+    let report = |threads: &str| {
+        let run = taxman(&["verify-results", "--threads", threads, &results]);
+        assert_eq!(run.code, Some(0), "{}", run.stderr);
+        run.stdout.lines().filter(|line| !line.starts_with("checked in")).collect::<Vec<_>>().join("\n")
+    };
+    let one = report("1");
+    assert!(one.contains("60 completed games"), "{one}");
+    assert!(one.contains("same_search"), "{one}");
+    assert_eq!(report("2"), one);
+    assert_eq!(report("4"), one);
+    // Without the flag, it takes the CPUs.
+    let run = taxman(&["verify-results", &results]);
+    assert!(run.code == Some(0) && run.stdout.contains("checked in"), "{}{}", run.stdout, run.stderr);
 }
 
 #[test]
@@ -405,7 +430,7 @@ fn solve_refuses_a_results_file_another_process_has_open() {
     let dir = TempDir::new("solve-lock");
     let results = dir.join("results.jsonl");
     let args = ["solve", "5-9", "--threads", "1", "--progress", "0", "--out", path(&results)];
-    let held = taxman::results::ResultsFile::open(&results, Optimal::built_in()).unwrap();
+    let held = taxman::results::ResultsFile::open(&results, Optimal::built_in(), 1).unwrap();
     let run = taxman(&args);
     assert_eq!(run.code, Some(1), "{}", run.stderr);
     assert!(run.stderr.contains("results.jsonl is in use by another process"), "{}", run.stderr);

@@ -148,7 +148,7 @@ fn run_stopped_and_resumed(name: &str, base: SolveOptions, n: u32) -> (Vec<GameR
     // A later invocation finds both games in the file, which agrees with what they say of themselves.
     let again = solver::solve_range_each(n, n + 1, &unlimited, Some(&results), |_| {}).unwrap();
     assert_eq!((again.solved, again.skipped), (0, 2));
-    verify_files(std::slice::from_ref(&results), Optimal::built_in()).unwrap_or_else(|e| panic!("{e}"));
+    verify_files(std::slice::from_ref(&results), Optimal::built_in(), 1).unwrap_or_else(|e| panic!("{e}"));
 
     let text = fs::read_to_string(&results).unwrap();
     (games, text.lines().map(|line| Json::parse(line).unwrap()).collect())
@@ -264,11 +264,12 @@ fn a_range_stops_at_an_unfinished_game_and_picks_up_where_it_left_off() {
     assert_eq!(lines.len(), 5 + 1);
 }
 
-/// 1500 gets `W = 24` and 2050 `W = 64` (the first board with a number above 2047 in its frames); `tests/wide.rs`
-/// goes further into the latter.  The setup's cost is mostly the local search for a better first incumbent.
+/// 1500 gets `W = 24`, 2050 `W = 36` (the first board with a number above 2047 in its frames) and 3600 `W = 64` (the
+/// widest set, which the boards from 3584 up get); `tests/wide.rs` goes further into the second and compares the
+/// widths from 36 to 56 with 64.  The setup's cost is mostly the local search for a better first incumbent.
 #[test]
 fn big_boards_get_through_setup() {
-    for n in [1500, 2050] {
+    for n in [1500, 2050, 3600] {
         // Setup is the cost here, mostly the starting incumbent's local search, which runs on one thread.
         let opts = SolveOptions { node_limit: Some(1), force_search: true, ..options(2) };
         let r = solver::solve_game(n, None, &opts).unwrap_or_else(|e| panic!("{e}"));

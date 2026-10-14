@@ -37,11 +37,13 @@
 //! the [`SAME_SEARCH_WINDOW`] board sizes before it, and whose proof settles that problem's best promotion sum
 //! ([`Proof::settles_search`]), is `m`'s promotions played on its own board, with no search: method `repeat`, proof
 //! `same_search`, resting on `m`'s proof and its assumptions.  The game is found by the problem's digest and confirmed
-//! by setting `m`'s problem up again and comparing the two; it then goes through `conclude` like any game.  DESIGN.md,
-//! "Same search", has why it is optimal.
+//! by comparing the two problems, taking `m`'s from this run's own setup of its board when there was one and setting
+//! it up again otherwise; the game then goes through `conclude` like any game.  DESIGN.md, "Same search", has why it
+//! is optimal.
 //!
 //! The previous game is checked before anything uses it: it must replay legally to its recorded score, be over
-//! (no legal move left) and open with the largest prime, as every optimal game does.
+//! (no legal move left) and open with the largest prime, as every optimal game does.  A game this run made is
+//! not checked again: `conclude` made the same check before the game was recorded.
 //!
 //! `conclude` checks that the game replays legally ([`replay`]); that a completed game is also over and opens with
 //! the largest prime; that a game from the frame model scores `in_the_bag` plus its promotions; that no game
@@ -76,6 +78,7 @@ use crate::results::{
 };
 use crate::search::{self, stat, Problem, ProblemSize, SearchTactics};
 use crate::tactics::Tactics;
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
@@ -145,7 +148,7 @@ impl SolveOptions {
 /// Where the solution of the previous game came from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PrevSource {
-    /// Solved earlier in this run.
+    /// Solved earlier in this run: refereed by `conclude` already, so not checked again before it is used.
     Run,
     /// Read from the results file.
     Results,
@@ -661,8 +664,12 @@ fn solve_with_width<const W: usize>(
     let start = Instant::now();
     let tactics = opts.tactics;
     if let Some(prev) = prev {
-        // The prime shortcut and the ceiling trust the previous game, so make sure it is what it says it is.
-        prev.check(n)?;
+        // The prime shortcut and the ceiling trust the previous game, so make sure it is what it says it is.  Not for
+        // a game this run made: `conclude` has refereed those moves already, with the same `replay_finished` and to
+        // the score the game is given as, before the game became the previous one.
+        if prev.source != PrevSource::Run {
+            prev.check(n)?;
+        }
     }
     let tables = Tables::new(n);
     let mut result = GameResult::new(n, opts, prev);
@@ -792,14 +799,15 @@ fn conclude(
 ///
 /// Before it searches, the tactic `same_search` looks in `earlier` for a game whose search problem is this one's
 /// and whose proof settles it: then the game is that game's promotions (method `repeat`), with no search.  Not for a
-/// search that a checkpoint resumes (resumed, never replaced), or with `force_search`.
+/// search that a checkpoint resumes (resumed, never replaced), or with `force_search`.  Either way the game's own
+/// problem is kept in `earlier`, for the games that follow to compare with.
 fn search_game<const W: usize>(
     board: &Board<W>,
     prev: Option<&Prev>,
     opts: &SolveOptions,
     checkpoint: Option<PathBuf>,
     earlier_runs: u32,
-    earlier: Option<&mut Earlier>,
+    mut earlier: Option<&mut Earlier>,
     result: &mut GameResult,
 ) -> Result<Bits<W>, Failure> {
     let n = board.n();
@@ -830,7 +838,12 @@ fn search_game<const W: usize>(
         digest: problem.digest(),
     };
     let repeats = tactics.same_search && !resuming && !opts.force_search;
-    if let Some((same, promotions)) = earlier.filter(|_| repeats).and_then(|e| e.find(n, &problem)) {
+    let repeated = earlier.as_deref_mut().filter(|_| repeats).and_then(|e| e.find(n, &problem));
+    // The games that follow compare their problems with this one from memory, whether this game repeats or searches.
+    if let Some(earlier) = earlier {
+        earlier.remember(n, problem);
+    }
+    if let Some((same, promotions)) = repeated {
         result.method = Method::Repeat;
         result.setup = Some(setup);
         result.same_search = Some(same);
@@ -945,6 +958,10 @@ struct Searched {
 #[derive(Default)]
 struct Earlier {
     games: BTreeMap<u32, Searched>,
+    /// The search problems of the boards this run set up ([`remember`](Self::remember)), by board size, for the last
+    /// [`SAME_SEARCH_WINDOW`] board sizes: what a comparison with an earlier game needs, so that it need not set
+    /// that game's board up again.
+    setups: BTreeMap<u32, Problem>,
 }
 
 impl Earlier {
@@ -972,12 +989,25 @@ impl Earlier {
         }
     }
 
+    /// Remembers the search problem that this run set board `n` up with (`search_game`), and forgets the problems of
+    /// the boards more than [`SAME_SEARCH_WINDOW`] sizes before the latest one remembered: no game that follows
+    /// looks that far back.
+    ///
+    /// The problem that this run's own setup of board `m` poses is the problem `search_problem(m)` builds
+    /// ([`Board::problem`] is the problem [`Board::prepare`] poses, which a test in `board.rs` checks), so a
+    /// comparison may use either.
+    fn remember(&mut self, n: u32, problem: Problem) {
+        self.setups.insert(n, problem);
+        let latest = self.setups.keys().next_back().copied().unwrap_or(n);
+        self.setups.retain(|&m, _| latest - m <= SAME_SEARCH_WINDOW);
+    }
+
     /// The latest game of the window before `n` ([`SAME_SEARCH_WINDOW`]) whose search problem is `problem`, as the
     /// record a repeat of it keeps, and its promotions.  A game whose digest is not `problem`'s is passed over; for
-    /// one whose digest is, the problem is set up again from its board size ([`search_problem`]) and compared with
-    /// `problem` itself, so that the answer never rests on two digests alone.  A game whose problem is not as large
-    /// as its line says (a line made by a build whose frame builder posed another problem) is dropped: a verifier
-    /// would refuse it too.
+    /// one whose digest is, its problem (the one this run set its board up with when it did, else set up again from
+    /// the board size, [`search_problem`]) is compared with `problem` itself, so that the answer never rests on two
+    /// digests alone.  A game whose problem is not as large as its line says (a line made by a build whose frame
+    /// builder posed another problem) is dropped: a verifier would refuse it too.
     fn find(&mut self, n: u32, problem: &Problem) -> Option<(SameSearch, Vec<u32>)> {
         let digest = problem.digest();
         for m in (n.saturating_sub(SAME_SEARCH_WINDOW)..n).rev() {
@@ -985,18 +1015,28 @@ impl Earlier {
             if game.digest != digest {
                 continue;
             }
-            let theirs = search_problem(m).ok().filter(|(theirs, _)| theirs.size() == game.size);
-            let Some((theirs, _)) = theirs else {
+            let theirs = problem_of_board(&self.setups, m).filter(|theirs| theirs.size() == game.size);
+            let Some(theirs) = theirs else {
                 self.games.remove(&m);
                 continue;
             };
-            if theirs == *problem {
+            if *theirs == *problem {
                 let promotion_sum = game.promotions.iter().map(|&p| u64::from(p)).sum();
                 let same = SameSearch { n: m, digest, promotion_sum, proof: game.proof, assumes: game.assumes.clone() };
                 return Some((same, game.promotions.clone()));
             }
         }
         None
+    }
+}
+
+/// The search problem of board `m`: the one in `setups` (the boards this run set up), else the one set up again from
+/// the board size (a game of the results file), if the board can be set up.  The two are the same problem: the one a
+/// run's own setup of the board posed is what `search_problem(m)` builds, as [`Earlier::remember`] says.
+fn problem_of_board(setups: &BTreeMap<u32, Problem>, m: u32) -> Option<Cow<'_, Problem>> {
+    match setups.get(&m) {
+        Some(problem) => Some(Cow::Borrowed(problem)),
+        None => search_problem(m).ok().map(|(problem, _)| Cow::Owned(problem)),
     }
 }
 
@@ -1091,7 +1131,7 @@ pub fn solve_range_each_with(
     if lo < 1 || lo > hi {
         return Err(format!("the range {lo}..={hi} is empty or starts below 1"));
     }
-    let mut results = results_path.map(|path| ResultsFile::open(path, optimal)).transpose()?;
+    let mut results = results_path.map(|path| ResultsFile::open(path, optimal, opts.threads)).transpose()?;
     if let Some(file) = &results {
         // Left by a crash between saving a result and deleting its checkpoint.
         for n in (lo..=hi).filter(|&n| file.completed(n).is_some()) {
@@ -1168,7 +1208,7 @@ mod tests {
             (options.get("force_search"), options.get("use_prev")),
             (Some(&Json::Bool(false)), Some(&Json::Bool(false)))
         );
-        let contents = crate::results::read_results(&format!("{json}\n"), Optimal::built_in()).unwrap();
+        let contents = crate::results::read_results(&format!("{json}\n"), Optimal::built_in(), 1).unwrap();
         let stored = &contents.games[&10];
         assert_eq!((stored.score, &stored.moves, stored.proof), (r.score, &r.moves, Proof::Trivial));
     }
@@ -1201,7 +1241,7 @@ mod tests {
 
         // A malformed line that is not the last is an error, not something to skip.
         fs::write(&path, format!("garbage\n{}", lines.lines().next().unwrap())).unwrap();
-        assert!(ResultsFile::open(&path, Optimal::built_in()).is_err());
+        assert!(ResultsFile::open(&path, Optimal::built_in(), 1).is_err());
     }
 
     #[test]
@@ -1236,19 +1276,86 @@ mod tests {
     #[test]
     fn a_previous_game_that_does_not_check_out_is_refused() {
         let opts = one_thread();
-        let prev = |moves: &[u32], score| Prev {
+        let prev = |moves: &[u32], score, source| Prev {
             moves: moves.to_vec(),
             score,
-            source: PrevSource::Run,
+            source,
             proof: Some(Proof::Exhausted),
             assumes: Assumptions::new(),
         };
         // [5, 4, 6] is the game for 6, scoring 15.
-        assert!(solve_game(7, Some(&prev(&[5, 4, 6], 15)), &opts).is_ok());
-        let err = solve_game(7, Some(&prev(&[5, 4, 6], 14)), &opts).unwrap_err();
-        assert!(err.contains("scores 15, not the 14"), "{err}");
-        let err = solve_game(7, Some(&prev(&[5, 4, 4], 13)), &opts).unwrap_err();
-        assert!(err.contains("not a legal game of n=6"), "{err}");
+        for source in [PrevSource::Results, PrevSource::Optimal] {
+            assert!(solve_game(7, Some(&prev(&[5, 4, 6], 15, source)), &opts).is_ok());
+            let err = solve_game(7, Some(&prev(&[5, 4, 6], 14, source)), &opts).unwrap_err();
+            assert!(err.contains("scores 15, not the 14"), "{err}");
+            let err = solve_game(7, Some(&prev(&[5, 4, 4], 13, source)), &opts).unwrap_err();
+            assert!(err.contains("not a legal game of n=6"), "{err}");
+        }
+        // A game this run made was refereed by `conclude` before it became the previous game, so it is not checked
+        // again: a wrong score goes unnoticed (the game of 7 built from it is still refereed), and moves that are
+        // not a game fail only in the game built from them.
+        assert!(solve_game(7, Some(&prev(&[5, 4, 6], 14, PrevSource::Run)), &opts).is_ok());
+        let err = solve_game(7, Some(&prev(&[5, 4, 4], 13, PrevSource::Run)), &opts).unwrap_err();
+        assert!(err.contains("does not stand up") && !err.contains("not a legal game of n=6"), "{err}");
+    }
+
+    /// Solves the board sizes `lo..=hi` as a range does, in order, each from the one before (the first from
+    /// `optimal.json`'s game before it), with the `Earlier` that the run keeps; returns it and the results.
+    fn solved_with_earlier(lo: u32, hi: u32) -> (Earlier, Vec<GameResult>) {
+        let (opts, optimal) = (one_thread(), Optimal::built_in());
+        let mut earlier = Earlier::default();
+        let mut prev = Prev::from_optimal(optimal, lo - 1);
+        let mut results = Vec::new();
+        for n in lo..=hi {
+            let solved = solve_one(n, prev.as_ref(), &opts, optimal, 0, Some(&mut earlier));
+            let result = solved.map_err(Failure::message).unwrap();
+            earlier.add_result(&result);
+            prev = Some(Prev::from_result(&result));
+            results.push(result);
+        }
+        (earlier, results)
+    }
+
+    /// The boards 300 and 301 pose one search problem (as the committed chain, `results/strict.jsonl`, has it): 301
+    /// repeats 300's search.  The `Earlier` of a run finds that out from the problem that the run set 300 up with, as
+    /// it does from the one set up again, and compares that problem, not another.
+    #[test]
+    fn a_problem_the_run_set_up_is_compared_as_the_one_set_up_again_is() {
+        let (earlier, results) = solved_with_earlier(300, 301);
+        assert_eq!((results[0].method, results[1].method), (Method::Search, Method::Repeat));
+        // The run kept the problem of each board it set up, repeats included.
+        assert_eq!(earlier.setups.keys().copied().collect::<Vec<_>>(), [300, 301]);
+        let ours = search_problem(301).unwrap().0;
+        assert_eq!(earlier.setups[&301], ours);
+        assert_eq!(earlier.setups[&300], search_problem(300).unwrap().0);
+
+        // The same games, with nothing remembered, find the same game.
+        let mut set_up_again = Earlier { games: earlier.games.clone(), setups: BTreeMap::new() };
+        let mut remembered = Earlier { games: earlier.games.clone(), setups: earlier.setups.clone() };
+        let found = remembered.find(301, &ours);
+        assert_eq!(found, set_up_again.find(301, &ours));
+        let (same, promotions) = found.expect("301 repeats 300");
+        assert_eq!((same.n, &promotions), (300, &results[0].promotions));
+        assert_eq!(Some(&same), results[1].same_search.as_ref());
+
+        // What is remembered is what is compared: were another board's problem remembered for 300, 301 would not
+        // repeat it, though the digest the game of 300 recorded is 301's.
+        let mut wrong = Earlier { games: earlier.games.clone(), setups: BTreeMap::new() };
+        wrong.remember(300, search_problem(310).unwrap().0);
+        assert!(wrong.find(301, &ours).is_none());
+    }
+
+    #[test]
+    fn only_the_problems_within_the_window_are_remembered() {
+        let problem = search_problem(85).unwrap().0;
+        let mut earlier = Earlier::default();
+        for n in [300, 301, 302, 309, 310] {
+            earlier.remember(n, problem.clone());
+        }
+        // Boards up to SAME_SEARCH_WINDOW sizes before the latest, 310.
+        assert_eq!(earlier.setups.keys().copied().collect::<Vec<_>>(), [302, 309, 310]);
+        earlier.remember(311, problem.clone());
+        assert_eq!(earlier.setups.keys().copied().collect::<Vec<_>>(), [309, 310, 311]);
     }
 
     #[test]

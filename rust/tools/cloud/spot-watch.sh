@@ -8,7 +8,7 @@
 # and chain.sh ends; prover.sh ends, and the searches of its pass go back to their last checkpoints), waits up to 90
 # seconds for it, then runs save.sh (which copies to S3 if S3_DEST is set).  It also logs a rebalance recommendation,
 # which comes earlier and is only a hint.  Without this script a spot interruption costs at most one checkpoint
-# interval (60 s) of the chain's work, or one pass (PASS_SECONDS) of prover.sh's; with it, nothing for the chain.
+# interval (300 s) of the chain's work, or one pass (PASS_SECONDS) of prover.sh's; with it, nothing for the chain.
 #
 # Not on EC2 (no metadata service) it says so and exits.
 

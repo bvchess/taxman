@@ -48,9 +48,11 @@ commands:
                           --history (default rust/bench/history.jsonl; both in the repository)
   verify-optimal [FILE]   replay every game of the built-in optimal.json (or of the table FILE) and check its
                           recorded score
-  verify-results FILE...  check results files without changing them: every game replayed and its score checked
+  verify-results [--threads K] FILE...
+                          check results files without changing them: every game replayed and its score checked
                           against optimal.json, the chain from n-1, each line's proof and provenance, and that the
-                          files agree; counts games by proof and by what they assume
+                          files agree; counts games by proof and by what they assume.  K threads set up the
+                          searches of the repeats (default: all CPUs)
   extend-optimal RESULTS --out FILE [--table FILE]
                           write the built-in optimal.json (or the table FILE) to --out FILE with the games of the
                           results file RESULTS appended: from the board size after the table's last, each game that

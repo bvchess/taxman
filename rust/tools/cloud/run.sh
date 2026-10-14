@@ -21,7 +21,8 @@
 #   POWEROFF         never (default) | done (when outcome is complete) | always (whenever the script ends): run
 #                    `sudo shutdown -h now`, so that a forgotten instance stops billing
 #   S3_DEST          s3://bucket/prefix: copy results, checkpoints and logs there every SAVE_EVERY seconds (default
-#                    600) and when the script ends; see save.sh
+#                    600) and when the script ends; see save.sh.  Every save runs at the lowest priority (`nice -n 19`,
+#                    and `ionice -c 3` where there is an ionice, on Linux), so that it never competes with the workers
 #
 # SIGTERM and SIGINT are forwarded, once, to the command: the solver of chain.sh writes a final checkpoint and exits
 # (a second stop signal would make it exit at once, without one), and exact of prover.sh has no handler, so the
@@ -48,12 +49,23 @@ log() {
     printf '%s\n' "$line" >&2
 }
 
+# Runs a command at the lowest CPU priority, and at the lowest I/O priority too where ionice(1) exists (Linux): the
+# saves to S3 (an `aws s3 sync` costs about 0.4 s of CPU, a save about 1.5 s) squander nothing, and this keeps them out
+# of the workers' way.
+quietly() {
+    if command -v ionice >/dev/null 2>&1; then
+        nice -n 19 ionice -c 3 "$@"
+    else
+        nice -n 19 "$@"
+    fi
+}
+
 run_cleanup() {
     if [ -n "$saver" ]; then
         pkill -P "$saver" 2>/dev/null
         kill "$saver" 2>/dev/null
     fi
-    [ -n "${S3_DEST:-}" ] && "$CLOUD_DIR/save.sh" >>"$LOGS/save.log" 2>&1
+    [ -n "${S3_DEST:-}" ] && quietly "$CLOUD_DIR/save.sh" >>"$LOGS/save.log" 2>&1
     rm -f "$TAXMAN_WORK/$RUN_NAME.pid"
     if [ "$POWEROFF" = always ] || { [ "$POWEROFF" = done ] && [ "$outcome" = complete ]; }; then
         log "powering off (POWEROFF=$POWEROFF, outcome $outcome)"
@@ -118,7 +130,7 @@ run_begin() {
     if [ -n "${S3_DEST:-}" ]; then
         (
             while sleep "$SAVE_EVERY"; do
-                "$CLOUD_DIR/save.sh" >>"$LOGS/save.log" 2>&1
+                quietly "$CLOUD_DIR/save.sh" >>"$LOGS/save.log" 2>&1
             done
         ) &
         saver=$!

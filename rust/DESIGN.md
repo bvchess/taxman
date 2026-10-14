@@ -174,11 +174,12 @@ the PGO build, the Java golden export and the cloud scripts.
 
 **Width dispatch.**  Everything that holds sets of game numbers is generic over `const W: usize`, the number of 64-bit
 words, and the macro `with_width!` (in `bits`, used by the solver, the examples and the tests) picks the narrowest of
-`bits::WIDTHS` = {8, 16, 20, 24, 28, 32, 64} that holds n (n ≤ 511, 1023, 1279, 1535, 1791, 2047, 4095).  Every set
-operation is a loop over all W words, so the steps of 4 words past n = 1023 pay.  Each width is a copy of the
-search's code, which costs build time (a release build takes under a minute on an M1 Max; EXPERIMENTS has the times as
-widths were added).  A checkpoint records its width, and one made at another width than this build gives its game is
-refused.
+`bits::WIDTHS` = {8, 16, 20, 24, 28, 32, 36, 40, 48, 56, 64} that holds n (n ≤ 511, 1023, 1279, 1535, 1791, 2047, 2303,
+2559, 3071, 3583, 4095).  Every set operation is a loop over all W words, so the steps of 4 to 8 words past n = 1023
+pay.  Each width is a copy of the search's code, which costs build time (a release build takes about 75 seconds on an
+M1 Max; EXPERIMENTS has the times as widths were added).  A checkpoint records its width, and one made at another
+width than this build gives its game is refused, so a checkpoint of a game of 2048 to 3583 made at 64, before the
+widths of 36, 40, 48 and 56 were added, is refused by a build that has them.
 
 ## 4. The search
 
@@ -437,7 +438,11 @@ the largest down), the *seed* (the previous game's promotions that are candidate
 from the largest), and a rounding of the root's matching (the *dive*: drop the smallest
 member of a conflict until the rest can be promoted); then a local search improves it (fill greedily, then drop one
 or two members and refill, until nothing improves).  The *ceiling* on the promotion sum,
-`n + score(n − 1) − in_the_bag`, is proven; reaching it ends the search (`prev_cap`).  Board/search setup is in
+`n + score(n − 1) − in_the_bag`, is proven; reaching it ends the search (`prev_cap`).  When the greedy set or the
+seed's survivors already reach it, the dive is skipped, and the local search when the incumbent after the dive does:
+nothing can beat a set at the ceiling, so neither would change it, and the result is the same.  The local search runs
+on the search's threads, the refills of a pass in parallel, and keeps the first improvement in the order of the
+sequential pass, so its answer does not depend on the thread count.  Board/search setup is in
 `board::Board`: it is the one place that knows the tables → frames → prepare → ceiling and seed path.
 
 ## 5. Tactics
@@ -543,13 +548,15 @@ Step 2 needs the previous game, and the repeat of step 4 an earlier one; both ar
 the game has a checkpoint (a search that was interrupted is resumed, never replaced by a derivation).
 
 The previous game is checked before anything uses it: it must replay legally to its recorded score, be over, and open
-with the largest prime.  The results whose proofs rest on it assume what it assumes (section 8).
+with the largest prime (a game this run made was checked by `conclude` already).  The results whose proofs rest on it
+assume what it assumes (section 8).
 
 A search that a time or node limit stops gives an incomplete result (`completed` false, `best_so_far` the best game
 so far) and keeps its checkpoint; a range stops there.
 
 **Range runs** feed each game's solution to the next and resume from the results file, which is checked when it is
-opened (every game replayed, the chain from n − 1, each line's arithmetic and provenance).  Games completed in it
+opened (every game replayed, the chain from n − 1, each line's arithmetic and provenance; the search problems that the
+checks of repeats set up again are set up first, on the run's threads).  Games completed in it
 are skipped; each result is appended and synced as soon as it is done, and only then is the game's checkpoint deleted
 (a checkpoint left for a game the file has completed is deleted when a range starts).  The n − 1 solution comes
 from, in order: this run, the results file, and with `use_prev` (`--use-prev`) optimal.json; with none, the game is
@@ -660,7 +667,8 @@ the game of n − 1, and it assumes what m assumes.
 `force_search`), the solver looks at the completed games of the results file and of the run among the
 `SAME_SEARCH_WINDOW` = 8 board sizes before n, latest first, for one that set a search up and whose proof settles it.
 A game whose recorded digest differs is passed over; for one whose digest agrees, its problem is set up again from
-its board size (milliseconds; `board::search_problem`) and compared with n's whole.  The first equal one is m.
+its board size (milliseconds; `board::search_problem`), or, when the run set that board up itself, taken from memory
+(the problem its setup posed, which is the same problem), and compared with n's whole.  The first equal one is m.
 Setting m up again with this build stands for the problem m's own build searched, which the digest recorded by that
 build ties to it (a problem with the recorded digest is that problem, but for a 64-bit collision), and the problem
 set up again must also have the size its line records (frames, candidates, `max_total`).  Every repeat of 1..2175
@@ -708,6 +716,11 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   760 the Java's structure is fixed in `testdata/golden_wide/` (n = 511, 512, 1000, 1001, 1023, 1024, 1025, 1100, 1231,
   2047 and 2048, checked at the width `with_width!` picks) and `games_java.txt` (the Java's `Apiary` game, move for move, for
   171 sets of promotions at 762–2049).
+* **The board layer against the chain** (`tests/board_layer.rs`): for every 25th searched game of
+  `results/strict.jsonl` (and the last, n = 2175), the moves that the game's promotions make and the digest of the
+  board's search problem are the line's, which the golden data (up to 2049) cannot say of the boards that matter.  The
+  unit tests of `hives` check what the frames remember (which numbers each can take on, which sources
+  `removeImpossible` has been through) against a fresh computation.
 * **Regression**: `taxman regress --to N` solves 1..N as one range and checks every score against optimal.json.
 * **Tactic invariance**: games 1..300 forced to search with each tactic off or changed must give identical scores,
   and a checkpoint is refused when any of the search tactics differs.
@@ -777,10 +790,12 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   wide, so nothing above 1023 meets anything but the committed results and these tests.  The same game at every
   width that holds it has the same frames, candidates, greedy set, `max_total`, answer and tree; game 1133 (W = 20,
   about 2,400 nodes) under every tactic against `strict.jsonl`; a slice of that chain; the sacrifice bound
-  proves game 1133 by an independent route; a W = 64 board (2050) through frames, matching bound, conflicts, greedy set
-  and a node-limited search; a committed checkpoint of game 1133 (`testdata/n1133_after_1000_nodes.ckpt`, W = 20)
-  that must still resume (a deliberate change of the checkpoint format fails it; the test says how to make the file
-  again); the levels of a real depth-first stack of game 1215 (`testdata/n1215_deep_units.txt`): the
+  proves game 1133 by an independent route; a board of 2050 built at W = 64 (it dispatches to 36) through frames,
+  matching bound, conflicts, greedy set and a node-limited search; boards of 2050, 2400, 2800 and 3100 at the widths
+  they dispatch to (36, 40, 48 and 56) and at 64, with the same start and the same node-limited search; a committed
+  checkpoint of game 1133 (`testdata/n1133_after_1000_nodes.ckpt`, W = 20) that must still resume (a deliberate
+  change of the checkpoint format fails it; the test says how to make the file again); the levels of a real
+  depth-first stack of game 1215 (`testdata/n1215_deep_units.txt`): the
   incremental matching bound and the quick bounds without a member against the min-cost-flow reference; and promoting
   one number at a time (with its no-peel shortcut) against the peel of every frame, in reached states of boards at
   W = 20, 28 and 64.  (The unit tests check the nogood table's lookups against their definition at compact strides of

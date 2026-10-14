@@ -55,7 +55,7 @@ fn load_golden() -> Vec<Golden> {
 }
 
 /// The boards at the edges of the set widths and beyond: the last and first n of `W = 8` / 16 (511, 512), 16 / 20
-/// (1023, 1024) and 32 / 64 (2047, 2048), the Java's former limit and the games past it.
+/// (1023, 1024) and 32 / 36 (2047, 2048), the Java's former limit and the games past it.
 const WIDE: [u32; 11] = [511, 512, 1000, 1001, 1023, 1024, 1025, 1100, 1231, 2047, 2048];
 
 fn load_wide() -> Vec<Golden> {
@@ -222,7 +222,7 @@ fn wide_boards_match_the_java() {
     let mut bad = Mismatches::default();
     let golden = load_wide();
     let widths: Vec<usize> = golden.iter().map(|g| with_width!(g.n, W => W)).collect();
-    assert_eq!(widths, [8, 16, 16, 16, 16, 20, 20, 20, 20, 32, 64], "the set width each board dispatches to");
+    assert_eq!(widths, [8, 16, 16, 16, 16, 20, 20, 20, 20, 32, 36], "the set width each board dispatches to");
     for g in &golden {
         with_width!(g.n, W => {
             check_apiary::<W>(g, &mut bad);

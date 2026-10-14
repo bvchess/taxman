@@ -6,7 +6,7 @@
 # It runs
 #
 #   taxman solve 1-N [--threads $THREADS] \
-#       --out $RESULTS --checkpoint-dir $CKPT --checkpoint-interval 60 --progress 60
+#       --out $RESULTS --checkpoint-dir $CKPT --checkpoint-interval 300 --progress 60
 #
 # in a loop.  From n = 1, so that no proof rests on anything beyond the frame model.  Safe to run again at any time, after
 # a crash, a reboot, a spot interruption or a SIGTERM: the solver skips the games the results file has completed and
@@ -29,7 +29,9 @@
 #
 # Environment (all optional):
 #   THREADS              worker threads, default all CPUs the solver may use
-#   CHECKPOINT_INTERVAL  seconds, default 60        PROGRESS  seconds between progress lines, default 60
+#   CHECKPOINT_INTERVAL  seconds, default 300       PROGRESS  seconds between progress lines, default 60
+#                        (a checkpoint stops every worker for the slowest one's step, up to 0.4 s near n = 4000: 0.15%
+#                        of the machine at 300 s, 0.7% at 60 s; SIGTERM still writes a final one)
 #   EXTRA_ARGS           more flags for `taxman solve`, e.g. "--mem-cap 100000"
 #   MAX_FAILS            default 5
 #   CHAIN_TO             N, if not given as the argument
@@ -54,7 +56,7 @@ esac
 # Without THREADS the solver uses every CPU it is allowed (in a container, the cgroup quota).
 thread_args=()
 [ -n "${THREADS:-}" ] && thread_args=(--threads "$THREADS")
-CHECKPOINT_INTERVAL="${CHECKPOINT_INTERVAL:-60}"
+CHECKPOINT_INTERVAL="${CHECKPOINT_INTERVAL:-300}"
 PROGRESS="${PROGRESS:-60}"
 MAX_FAILS="${MAX_FAILS:-5}"
 

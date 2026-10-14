@@ -1,12 +1,12 @@
 //! Large boards without large searches.
 //!
 //! The Java stopped at n = 1000, and the sets that hold the numbers of a board are 8 words wide up
-//! to n = 511, then 16, 20, 24, 28 and 32 words up to 1023, 1279, 1535, 1791 and 2047, and 64 up to 4095
-//! (`bits::WIDTHS`), so nothing above n = 1023 meets anything but these tests and the committed results
-//! (`results/strict.jsonl`, n = 1..2175; `optimal.json` has its games to 1300, but that is the solver's own answer
-//! and no check of it).  What is cheap to run here: the same
-//! small game at every width that holds it (a width-dependent bug changes the tree), games of 1100 to 1250 that need
-//! a few thousand nodes against the committed results, and boards of 2048 and more through their setup.
+//! to n = 511, then 16, 20, 24, 28, 32, 36, 40, 48 and 56 words up to 1023, 1279, 1535, 1791, 2047, 2303, 2559, 3071
+//! and 3583, and 64 up to 4095 (`bits::WIDTHS`), so nothing above n = 1023 meets anything but these tests and the
+//! committed results (`results/strict.jsonl`, n = 1..2175; `optimal.json` has its games to 1300, but that is the
+//! solver's own answer and no check of it).  What is cheap to run here: the same small game at every width that holds
+//! it (a width-dependent bug changes the tree), games of 1100 to 1250 that need a few thousand nodes against the
+//! committed results, and boards of 2048 and more through their setup.
 
 mod common;
 
@@ -16,6 +16,7 @@ use common::{
 };
 use std::time::Duration;
 use taxman::bits::Bits;
+use taxman::board::Board;
 use taxman::engine::EngineConfig;
 use taxman::frames::build_frames;
 use taxman::matchbound::{match_bound, MatchBound, MatchGraph};
@@ -46,6 +47,10 @@ fn the_search_does_not_depend_on_the_width() {
             (24, profile_at_width::<24>(n, default, None)),
             (28, profile_at_width::<28>(n, default, None)),
             (32, profile_at_width::<32>(n, default, None)),
+            (36, profile_at_width::<36>(n, default, None)),
+            (40, profile_at_width::<40>(n, default, None)),
+            (48, profile_at_width::<48>(n, default, None)),
+            (56, profile_at_width::<56>(n, default, None)),
             (64, profile_at_width::<64>(n, default, None)),
         ];
         for (w, profile) in others {
@@ -72,10 +77,32 @@ fn the_search_does_not_depend_on_the_width() {
     }
 }
 
-/// The last board a width holds (511, 1023, 1279, 1535, 1791, 2047) fills the top bit of its set: the start of every
-/// search (frames, candidates, greedy set, `max_total`, the first nodes) is the same at the width the board
-/// dispatches to and at the next one.  (The boards just above 511, 1023 and 2047 are in `testdata/golden_wide` at
-/// their own widths.)
+/// What a search starts from at width `W`, before its first node: the frames, candidates, greedy set and `max_total`
+/// of the board `n` (a [`Profile`] without the search, which costs seconds on the boards past 2047: the root's
+/// exact solves).
+#[derive(Debug, PartialEq, Eq)]
+struct Setup {
+    columns: Vec<Vec<u32>>,
+    candidates: Vec<u32>,
+    greedy: Vec<u32>,
+    max_total: u32,
+}
+
+fn setup_at_width<const W: usize>(n: u32) -> Setup {
+    let board = Board::<W>::for_n(n);
+    let prepared = board.prepare(SearchTactics::default()).unwrap();
+    Setup {
+        columns: board.frames.columns(),
+        candidates: board.candidates().to_vec(),
+        greedy: prepared.greedy.to_vec(),
+        max_total: prepared.max_total,
+    }
+}
+
+/// The last board a width holds (511, 1023, 1279, 1535, 1791, 2047, 2303, 2559, 3071, 3583) fills the top bit of its
+/// set: the start of every search (frames, candidates, greedy set, `max_total`; up to 2047 also the first nodes) is
+/// the same at the width the board dispatches to and at the next one.  (The boards just above 511, 1023 and 2047 are
+/// in `testdata/golden_wide` at their own widths.)
 #[test]
 fn the_edges_of_the_widths_hold() {
     let default = SearchTactics::default();
@@ -86,7 +113,30 @@ fn the_edges_of_the_widths_hold() {
     check([profile_at_width::<20>(1279, default, limit), profile_at_width::<24>(1279, default, limit)], 1279);
     check([profile_at_width::<24>(1535, default, limit), profile_at_width::<28>(1535, default, limit)], 1535);
     check([profile_at_width::<28>(1791, default, limit), profile_at_width::<32>(1791, default, limit)], 1791);
-    check([profile_at_width::<32>(2047, default, limit), profile_at_width::<64>(2047, default, limit)], 2047);
+    check([profile_at_width::<32>(2047, default, limit), profile_at_width::<36>(2047, default, limit)], 2047);
+    let check_setup = |setups: [Setup; 2], n: u32| assert_eq!(setups[0], setups[1], "n={n}");
+    check_setup([setup_at_width::<36>(2303), setup_at_width::<40>(2303)], 2303);
+    check_setup([setup_at_width::<40>(2559), setup_at_width::<48>(2559)], 2559);
+    check_setup([setup_at_width::<48>(3071), setup_at_width::<56>(3071)], 3071);
+    check_setup([setup_at_width::<56>(3583), setup_at_width::<64>(3583)], 3583);
+}
+
+/// A board at each of the widths of 36, 40, 48 and 56 words (2050, 2400, 2800 and 3100 here; the boards 2048 to 3583
+/// dispatch to them) gives the same frames, candidates, greedy set, `max_total` and the same node-limited search on
+/// one thread (its nodes, best and promotions) at its own width and at 64, the width all of them had before the four
+/// were added.  The trees of these boards are far larger than the limit.  (The root's exact solves make the first
+/// 1,023 nodes of a search cost 0.6 s at 2050, 3 s at 3100 and 7 s at 3300, so the boards stay low in their widths.)
+#[test]
+fn boards_past_2047_give_the_same_search_at_their_width_and_at_64() {
+    let default = SearchTactics::default();
+    let limit = Some(2000);
+    for (n, width) in [(2050, 36), (2400, 40), (2800, 48), (3100, 56)] {
+        assert_eq!(with_width!(n, W => W), width, "n={n}: the width the board dispatches to");
+        let at_its_width = with_width!(n, W => profile_at_width::<W>(n, default, limit));
+        assert!(!at_its_width.completed && at_its_width.nodes >= 2000, "n={n}: {} nodes", at_its_width.nodes);
+        assert!(at_its_width.candidates.len() > 500 && at_its_width.sum > 0, "n={n}: {at_its_width:?}");
+        assert_eq!(profile_at_width::<64>(n, default, limit), at_its_width, "n={n} at W=64 and W={width}");
+    }
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -131,7 +181,7 @@ fn a_slice_of_the_chain_reproduces_the_results() {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// Boards that need W = 64
+// Boards of 2048 and more
 
 /// A frame set holds `MAX_FRAMES` = 8 frames, which the largest boards have (every board up to 4095, the largest
 /// supported, was checked when it came down from 12: 6 frames from n = 512, 7 from 1024, 8 from 2048).  The boards
@@ -145,11 +195,13 @@ fn the_largest_boards_fit_in_a_frame_set() {
     }
 }
 
-/// The first board with a number above 2047 is n = 2048 (W = 64 by dispatch only until a frame holds one); n = 2050
-/// has such numbers in its frames.  Its frames, model, matching bound, conflicts, greedy set, setup and a short
-/// search, which nothing else runs at W = 64.
+/// The first board with a number above 2047 is n = 2048 (dispatched to more than 32 words whether or not a frame
+/// holds one); n = 2050 has such numbers in its frames.  Its frames, model, matching bound, conflicts, greedy set,
+/// setup and a short search, built at W = 64 although it dispatches to 36: the widest set, which only the boards from
+/// 3584 up dispatch to, runs here on a board the tests can afford (`tests/solver.rs` runs the pipeline's own
+/// dispatch on a board of 3600).
 #[test]
-fn a_board_that_needs_w64_builds_bounds_and_searches() {
+fn a_board_past_2047_builds_bounds_and_searches_at_w64() {
     let n = 2050;
     let tables = Tables::new(n);
     let frames = build_frames::<64>(&tables);

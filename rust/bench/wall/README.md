@@ -46,16 +46,17 @@ calibration found no contention among 64 copies).
 
 1. The fixed costs on Graviton, every 25 boards past 2175 (one thread, about 15 minutes):
    `wall setup K $(seq 2200 25 4095) > setup_c8g.jsonl`.
-2. Large GF(2) trees at the set width of 64 words, on one thread each, a time series of 10^7 nodes and more: the dear
-   games of the c8g chain, `wall grow K2 --nodes 40000000 --progress 30 --ckpt-dir ck_N --every 60 N > grow_N.jsonl
+2. Large GF(2) trees past 2175 (sets of 36 words since round A), on one thread each, a time series of 10^7 nodes and
+   more: the dear games of the c8g chain, `wall grow K2 --nodes 40000000 --progress 30 --ckpt-dir ck_N --every 60 N > grow_N.jsonl
    2> grow_N.progress` for N = 2184 (25.6 million nodes on 64 threads), 2260, 2268, 2254 (hours each: about 0.5 ms a
    node).
 3. The pause of a checkpoint with 192 (or 64) threads near the wall, the real one rather than one worker's: on a copy of
    the committed results cut after 2183 and extended with the c8g lines to 2183, `taxman solve 2184 --threads 192
    --out COPY --checkpoint-dir DIR --checkpoint-interval 1 --progress 10 --time-limit 600`; the end of its progress
-   line gives `pauses N (x%) max Y park Z`.  Then the same at `--checkpoint-interval 60`.
+   line gives `pauses N (x%) max Y park Z`.  Then the same at `--checkpoint-interval 300` (the chain's default since
+   round A).
 4. Memory, the queue and the checkpoint at 192 threads at 4000, standalone (no game of 3999): `/usr/bin/time -v
-   taxman solve 4000 --threads 192 --out scratch.jsonl --checkpoint-dir DIR --checkpoint-interval 60 --progress 10
+   taxman solve 4000 --threads 192 --out scratch.jsonl --checkpoint-dir DIR --checkpoint-interval 300 --progress 10
    --time-limit 600`, with `ls -l DIR` once a minute (maximum resident set size from `time`; the queue and the pauses
    from the progress lines; `max_queue` and `checkpoints` from the incomplete results line).
 5. The results check: `time taxman verify-results results/strict.jsonl` on the instance, and on the instance's own

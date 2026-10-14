@@ -57,7 +57,7 @@ fn verifiers_agree(dir: &TempDir, cases: &[(Vec<Json>, Verdict)]) {
     for (k, (lines, verdict)) in cases.iter().enumerate() {
         let path = dir.join(format!("case-{k:02}.jsonl"));
         fs::write(&path, lines.iter().map(|line| format!("{line}\n")).collect::<String>()).unwrap();
-        let verified = verify_files(std::slice::from_ref(&path), optimal);
+        let verified = verify_files(std::slice::from_ref(&path), optimal, 1);
         match (verified, verdict) {
             (Ok(_), Verdict::Accepted) => {}
             (Err(err), Verdict::Refused { line, n, expected }) => {
@@ -367,7 +367,7 @@ fn forged_repeats_are_refused_by_both_verifiers() {
     for (case, (file, n, expected)) in only_rust.into_iter().enumerate() {
         let path = dir.join(format!("rust-only-{case}.jsonl"));
         fs::write(&path, file.iter().map(|line| format!("{line}\n")).collect::<String>()).unwrap();
-        let err = verify_files(std::slice::from_ref(&path), optimal).unwrap_err();
+        let err = verify_files(std::slice::from_ref(&path), optimal, 1).unwrap_err();
         assert!(err.contains(&format!("line {n} (n={n}): ")) && err.contains(&expected), "{case}: {err}");
         paths.push(path);
     }
@@ -405,7 +405,7 @@ fn the_committed_results_pass_the_verifier() {
     assert_eq!(names, ["strict.jsonl"], "a new results file needs its counts here and in the README");
 
     let optimal = Optimal::built_in();
-    let report = verify_files(&paths, optimal).unwrap_or_else(|e| panic!("{e}"));
+    let report = verify_files(&paths, optimal, 1).unwrap_or_else(|e| panic!("{e}"));
     println!("{report}");
     let [strict] = &report.files[..] else { panic!("one file") };
     // strict.jsonl is a chain from n = 1 made in one invocation: it holds no line of a stopped search.
