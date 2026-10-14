@@ -299,7 +299,8 @@ fn sums_by_tactics<const W: usize>(g: &Golden) -> Vec<(SearchTactics, u64)> {
         SearchTactics { forget_nogoods: false, ..default },
         SearchTactics { lagrange: false, ..default },
         SearchTactics { match_refine: 0, ..default },
-        SearchTactics { symmetry: true, ..default },
+        SearchTactics { symmetry: false, ..default },
+        SearchTactics::matching(),
         SearchTactics { symmetry: true, ..SearchTactics::matching() },
     ];
     variants.iter().map(|&t| (t, search_checked(&prepare_golden::<W>(g, t), 1, "tactics").sum)).collect()
@@ -389,17 +390,17 @@ fn checkpoint_and_resume_four_threads() {
     resume_in_pieces(4, SearchTactics { symmetry: true, ..weak }, 2);
 }
 
-/// The default search (tactic `gf2`), and with the rule of the symmetric pairs (tactic `symmetry`, whose tree is
-/// smaller, so its limit is), stopped every few hundred nodes and resumed from its checkpoint, on one thread and on
-/// two, until it finishes with game 1000's optimum: its searches of 760 are too short to interrupt (the engine
-/// checks the node limit every 1024 nodes).
+/// The default search (tactic `gf2`, with the rule of the symmetric pairs, tactic `symmetry`), and without the rule
+/// (whose tree is larger, so its limit is), stopped every few hundred nodes and resumed from its checkpoint, on one
+/// thread and on two, until it finishes with game 1000's optimum: its searches of 760 are too short to interrupt (the
+/// engine checks the node limit every 1024 nodes).
 #[test]
 fn checkpoint_and_resume_with_the_gf2_bound() {
     let n = 1000;
     let board = crate::board::Board::<16>::for_n(n);
     let opt = crate::game::Optimal::built_in().score(n).unwrap() - board.in_the_bag;
     let default = SearchTactics::default();
-    for (tactics, node_limit) in [(default, 1500), (SearchTactics { symmetry: true, ..default }, 1000)] {
+    for (tactics, node_limit) in [(default, 1000), (SearchTactics { symmetry: false, ..default }, 1500)] {
         let p = board.prepare(tactics).unwrap();
         for threads in [1, 2] {
             let what = format!("{threads} threads, symmetry {}", tactics.symmetry);
@@ -559,7 +560,7 @@ fn units_and_headers_round_trip() {
     assert!(other(|h| h.tactics.nogoods = !h.tactics.nogoods).contains("tactics"));
 
     // Every setting of the search tactics reads back as it was written: `match_refine` in bits 0 to 2, a bit for
-    // each switch that is on (the defaults: 0xB9, `symmetry` is bit 8 and off), and no higher bit is used.
+    // each switch that is on (the defaults: 0x1B9, `symmetry` is bit 8), and no higher bit is used.
     for refine in [0, 1, 7] {
         for (on, off) in [(true, false), (false, true)] {
             let t = SearchTactics {
@@ -577,9 +578,9 @@ fn units_and_headers_round_trip() {
             assert_eq!(t.bits() >> 8, u16::from(on));
         }
     }
-    assert_eq!(SearchTactics::default().bits(), 0xB9);
-    assert_eq!(SearchTactics::from_bits(0xB9), Ok(SearchTactics::default()));
-    assert_eq!(SearchTactics::from_bits(0x1B9), Ok(SearchTactics { symmetry: true, ..SearchTactics::default() }));
+    assert_eq!(SearchTactics::default().bits(), 0x1B9);
+    assert_eq!(SearchTactics::from_bits(0x1B9), Ok(SearchTactics::default()));
+    assert_eq!(SearchTactics::from_bits(0xB9), Ok(SearchTactics { symmetry: false, ..SearchTactics::default() }));
     assert!(SearchTactics::from_bits(1 << 9).unwrap_err().contains("unknown tactics"));
 }
 

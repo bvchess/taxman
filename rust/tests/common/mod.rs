@@ -107,7 +107,7 @@ pub fn matching_options(threads: usize) -> SolveOptions {
 }
 
 /// The search tactics a differential test compares: the default and every sound variant that is cheap at n ~ 1100,
-/// then the matching path ([`SearchTactics::matching`]) and its variants.
+/// then the matching path ([`SearchTactics::matching`], which is without the rule of `symmetry`) and its variants.
 pub fn variants() -> Vec<(&'static str, SearchTactics)> {
     let (d, m) = (SearchTactics::default(), SearchTactics::matching());
     vec![
@@ -116,7 +116,7 @@ pub fn variants() -> Vec<(&'static str, SearchTactics)> {
         ("fix_forced=off", SearchTactics { fix_forced: false, ..d }),
         ("forget_nogoods=off", SearchTactics { forget_nogoods: false, ..d }),
         ("lagrange=on", SearchTactics { lagrange: true, ..d }),
-        ("symmetry=on", SearchTactics { symmetry: true, ..d }),
+        ("symmetry=off", SearchTactics { symmetry: false, ..d }),
         ("matching", m),
         ("matching,nogoods=off", SearchTactics { nogoods: false, ..m }),
         ("matching,fix_forced=off", SearchTactics { fix_forced: false, ..m }),

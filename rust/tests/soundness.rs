@@ -29,16 +29,16 @@ use taxman::search::Gf2Branching;
 use taxman::search::TaxUnit;
 
 /// Every tactic that acts inside the search, alone and in the combinations that matter: first the matching path
-/// ([`SearchTactics::matching`], 0 to 18), then the default, the GF(2) bound (19 to 29), then the rule of the root's
-/// symmetric pairs (tactic `symmetry`, 30 to 33).  The matching path with the
+/// ([`SearchTactics::matching`], which is without the rule of the root's symmetric pairs, tactic `symmetry`; 0 to
+/// 18), then the default, the GF(2) bound with the rule (19 to 29), then the GF(2) bound without the rule (30 to 32),
+/// and the matching path with it (33).  The matching path with the
 /// forgetting of nogoods at the production period, every step, every third, and never; on one thread and two; and
 /// the GF(2) bound with each way of choosing the branch, with and without the matching bound as a first check,
 /// forced members, nogoods and the Lagrangian bound's early refits.  The Lagrangian
 /// bound (tactic `lagrange`) refits its multipliers only after 2,000 steps, which most of these searches never
 /// take, so some configurations refit them after the first few steps and every few steps after that (with and
-/// without forgetting at the same time, refinement, and a second thread), and one turns it off.  The rule of the
-/// symmetric pairs runs over the GF(2) bound, on two threads, with the nogoods forgotten at every step, and over the
-/// matching path.
+/// without forgetting at the same time, refinement, and a second thread), and one turns it off.  The GF(2) bound
+/// without the rule runs on one thread, on two, and with the nogoods forgotten at every step.
 fn configs() -> Vec<Config> {
     let (base, g) = (Config::matching(), Config::standard());
     vec![
@@ -72,9 +72,9 @@ fn configs() -> Vec<Config> {
         Config { threads: 2, ..g },
         Config { refits: Some(Refits { first: 1, every: 4 }), ..g },
         Config { refits: Some(Refits { first: 2, every: 5 }), threads: 2, period: Some(3), ..g },
-        Config { symmetry: true, ..g },
-        Config { symmetry: true, threads: 2, ..g },
-        Config { symmetry: true, period: Some(1), ..g },
+        Config { symmetry: false, ..g },
+        Config { symmetry: false, threads: 2, ..g },
+        Config { symmetry: false, period: Some(1), ..g },
         Config { symmetry: true, ..base },
     ]
 }
@@ -246,7 +246,7 @@ impl<'a, const W: usize> Searched<'a, W> {
 fn the_symmetry_rule_finds_the_optimum_of_the_boards_with_pairs() {
     let optimal = Optimal::built_in();
     let (base, g) = (Config::matching(), Config::standard());
-    let configs = [Config { symmetry: true, ..g }, Config { symmetry: true, ..base }];
+    let configs = [g, Config { symmetry: true, ..base }];
     let boards =
         boards_with_pairs::<8>(optimal, 2..=511, &configs) + boards_with_pairs::<16>(optimal, 512..=600, &configs);
     assert!(boards >= 450, "{boards} boards with pairs");
@@ -394,8 +394,7 @@ fn optimum_units<const W: usize>(optimal: &Optimal, n: u32, rng: &mut Rng, units
 fn units_on_the_way_to_the_optimum_find_it_with_the_symmetry_rule() {
     let optimal = Optimal::built_in();
     let (base, g) = (Config::matching(), Config::standard());
-    let configs =
-        [Config { symmetry: true, ..g }, Config { symmetry: true, threads: 2, ..g }, Config { symmetry: true, ..base }];
+    let configs = [g, Config { threads: 2, ..g }, Config { symmetry: true, ..base }];
     let mut rng = Rng(0x5B0D_1E57_C0DE_0003);
     let runs: usize = (600..=1000).step_by(23).map(|n| optimum_units::<16>(optimal, n, &mut rng, 6, &configs)).sum();
     assert!(runs > 200, "{runs} runs");
