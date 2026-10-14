@@ -7,6 +7,7 @@
     summarize.py span FILE...     the (♦) span campaign: games, rejections, spanned, violations, by range
     summarize.py star FILE...     the threshold-by-threshold (★) campaign: thresholds and components by method
     summarize.py exact FILE...    the model-free exact cross-check of optimal scores (a later file overrides)
+    summarize.py check A B FILE...  FILEs prove every n in 2..B, with the recorded scores in A..B
     summarize.py cost FILE...     its cost curve: the searches made with the parity bound from scratch, by band
     summarize.py optsets FILE...  every optimal pick set per game (bin/optsets.rs): tables, exchanges, canonical sets
     summarize.py moves FILE...    the longest games against the optimal ones (bin/moves.rs)
@@ -77,12 +78,12 @@ def star(paths):
     print(f"largest P: {max(r['largest_p'] for r in rows)}, largest g: {max(r['max_g'] for r in rows)}")
 
 
-def exact(paths):
+def exact_proofs(rows):
     """Which games are proven optimal without the frame model: n is proven when its matching bound or its parity
     bound equals the recorded score, or the search proved it (if it used the segment cuts, only when every smaller
-    game is proven), or its score meets the chain or prime relation and n - 1 is proven.  A later file's line for
-    a game replaces an earlier file's."""
-    rows = {r["n"]: r for r in lines(paths)}
+    game is proven), or its score meets the chain or prime relation and n - 1 is proven.  Returns (proven, how,
+    first_gap): whether each n in 1..max(rows) is proven, how the proven ones were (counts by kind), and the
+    first n that is not (None if all are)."""
     proven = {1: True}
     how = Counter()
     first_gap = None
@@ -103,6 +104,14 @@ def exact(paths):
             how[kind] += 1
         elif first_gap is None:
             first_gap = n
+    return proven, how, first_gap
+
+
+def exact(paths):
+    """The model-free exact cross-check of optimal scores (`exact_proofs`); a later file's line for a game replaces
+    an earlier file's."""
+    rows = {r["n"]: r for r in lines(paths)}
+    proven, how, first_gap = exact_proofs(rows)
     done = sorted(rows)
     print(f"games recorded: {len(rows)} ({done[0]}..{done[-1]}); proven: {sum(proven.values()) - 1}; "
           f"by {dict(how)}")
@@ -414,6 +423,36 @@ def moves(paths):
               f"M(n) = {r['most']} ({r['how']}){heaviest}")
 
 
+def recorded_scores():
+    """The recorded optimum V(n) of each n: optimal.json's, then the solver's committed results for the n it lacks
+    (the order `exact` reads them in)."""
+    scores = {g["n"]: g["score"] for g in json.loads(OPTIMAL_JSON.read_text())}
+    for r in lines([str(STRICT_JSONL)]):
+        scores.setdefault(r["n"], r["score"])
+    return scores
+
+
+def exact_check(args):
+    """check A B FILE...: the files (a later file's line for a game replaces an earlier file's) prove opt(n) for every
+    n in 2..B (`exact_proofs`: so the files must reach back to 2, as data/exact_parity_2_1300.jsonl does), have a
+    line for every n in A..B, and each line's score is the recorded optimum.  Exits 1 if any of that fails."""
+    lo, hi = int(args[0]), int(args[1])
+    rows = {r["n"]: r for r in lines(args[2:])}
+    scores = recorded_scores()
+    missing = [n for n in range(lo, hi + 1) if n not in rows]
+    wrong = [n for n in range(lo, hi + 1) if n in rows and rows[n]["score"] != scores.get(n)]
+    proven, how, _ = exact_proofs({n: r for n, r in rows.items() if n <= hi})
+    unproven = [n for n in range(2, hi + 1) if not proven.get(n)]
+    in_range = Counter(rows[n]["search"] for n in range(lo, hi + 1) if n in rows)
+    print(f"games {lo}..{hi}: {hi - lo + 1 - len(missing)} of {hi - lo + 1} have a line; searches: "
+          f"{dict(in_range)}; proven by {dict(how)}")
+    print(f"without a line: {compact_ranges(missing) or 'none'}; score not the recorded optimum: "
+          f"{compact_ranges(wrong) or 'none'}; not proven in 2..{hi}: {compact_ranges(unproven) or 'none'}")
+    ok = not (missing or wrong or unproven)
+    print(f"{'OK: opt(n) is proven equal to the recorded score for every n in 2..' + str(hi) if ok else 'FAILED'}")
+    sys.exit(0 if ok else 1)
+
+
 if __name__ == "__main__":
-    {"span": span, "star": star, "exact": exact, "cost": exact_cost, "adversary": adversary, "optsets": optsets,
-     "moves": moves}[sys.argv[1]](sys.argv[2:])
+    {"span": span, "star": star, "exact": exact, "check": exact_check, "cost": exact_cost, "adversary": adversary,
+     "optsets": optsets, "moves": moves}[sys.argv[1]](sys.argv[2:])
