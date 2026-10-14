@@ -1802,8 +1802,8 @@ member); `v(s)` lies in the coordinates of the other parity of Ω than `s`, `e_s
 parities make two matroids on `2..=n`, and `opt(n)` is at most their heaviest common independent set.  The
 Franklín–Moniot matching bound is this construction with Hall's condition in place of linear independence.
 
-*Method.*  No solver code changed.  The data were made on the build of 4372b36, before the tactics cleanup (271c817), with
-`revise_freedoms` off; on the cleaned-up build the examples reproduce `roots.jsonl` exactly, and every command's
+*Method.*  No solver code changed.  The data were made on the build of 4372b36, before the tactics cleanup
+(271c817), with `revise_freedoms` off; on the cleaned-up build the examples reproduce `roots.jsonl` exactly, and every command's
 values that were checked.  `examples/common/meet.rs` (commits 67bb492, 8ee0199, 12a0f60): direct sums of
 linear matroids over GF(2), the weighted intersection by shortest augmenting paths (Lawler; Schrijver, Theorem
 41.7: Bellman–Ford lexicographic in length and arcs; the reference `intersect`), a fast form for blocks of rank at
