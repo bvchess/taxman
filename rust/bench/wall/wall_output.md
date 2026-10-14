@@ -315,9 +315,9 @@ Least-squares lines through the games above, as the change per 100 in n; the sta
 | log10 µs an augmentation (decades) | 39 | +0.020 |
 | log10 augmentations a node (decades) | 39 | +0.021 |
 
-## Gaps of the root's GF(2) bound and the cost of a node on c8g
+## Gaps of the dear games past 2175, against the c8g chain's optima
 
-The root's GF(2) bound over the unseeded start incumbent (and over the optimum where it is known), how far the start is below the optimum, and the cost of a node, a game to a row, from gaps_c8g.jsonl.
+The root's GF(2) bound over the start incumbent (seeded from the game of n - 1) and over the optimum that the c8g chain found, how far the start is below it, and the cost of a node, a game to a row, from gaps_c8g.jsonl (measured on the laptop).
 
 | n | W | gap over start | gap over opt | start below opt | gap over best | µs a node | augmentations a node | µs an augmentation | candidates | max total |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -333,18 +333,6 @@ The root's GF(2) bound over the unseeded start incumbent (and over the optimum w
 | 2260 | 64 | 779 | 721 | 58 | 779 | 639.033 | 49.5 | 12.911 | 599 | 135 |
 | 2268 | 64 | 678 | 636 | 42 | 678 | 635.485 | 55.1 | 11.543 | 597 | 136 |
 | 2275 | 64 | 631 | 623 | 8 | 631 | 721.311 | 57.4 | 12.576 | 598 | 135 |
-
-## Trends in n of the gaps and of the cost of a node on c8g
-
-Least-squares lines through the games above, as the change per 100 in n; the start incumbent is 122 below the optimum on average and 472 at most over the 12 games with a known optimum.
-
-| quantity | games | change per 100 in n |
-|---|---|---|
-| gap over start | 12 | -411.2 |
-| gap over opt (games with a known optimum) | 12 | -115.2 |
-| log10 µs a node (decades) | 12 | +0.147 |
-| log10 µs an augmentation (decades) | 12 | +0.074 |
-| log10 augmentations a node (decades) | 12 | +0.073 |
 
 ## The node rate through a long run
 
@@ -392,7 +380,7 @@ The same rate by fifth of the period of forgetting nogoods (50000 steps a search
 
 ## The long runs
 
-The summary line of each `wall grow` run, with the largest checkpoint that its monitor lines report and the number of points in its progress lines (grow_1230_matching is the matching path, grow_2170_t64c1 runs 64 threads on one core).
+The summary line of each `wall grow` run, with the largest checkpoint that its monitor lines report and the number of points in its progress lines (grow_1230_matching is the matching path, grow_2170_t64c1 runs 64 threads taking turns on one CPU).
 
 | run | n | threads | cores | completed | nodes | seconds | pauses | longest pause ms | longest park ms | max queue | last checkpoint bytes | largest checkpoint bytes | rss MB | progress points |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|

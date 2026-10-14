@@ -27,7 +27,8 @@ The tables, with their inputs (files of this directory unless a path says otherw
   widths_2170 and widths_3000.jsonl).
 * start: the start's local search, singles against pairs, by band (start.jsonl).
 * gaps: the root bound's gaps over the start incumbent and the cost of a node, with trends in n (gaps.jsonl with
-  nodes_start_low and nodes_start_high.jsonl; gaps_c8g.jsonl apart).
+  nodes_start_low and nodes_start_high.jsonl), and the dear games past 2175 against the c8g chain's optima, with no
+  trends (gaps_c8g.jsonl, seeded starts).
 * series: the node rate through a long run, by tenth of the run and by phase of the period of forgetting nogoods
   (grow_1430.progress, grow_1230_matching.progress).
 * grow: the summary lines of the long runs and their largest checkpoints (grow_1430, grow_1230_matching and
@@ -411,50 +412,58 @@ def start_search():
          "pairs = opt", "mean gain of pairs", "singles s", "pairs s", "gains of pairs over singles"], rows)
 
 
-def gap_sections(rows, source, scope):
+def gap_sections(rows, title, sentence, trends=True):
+    """The gap table of the games of rows (a game in more than one file keeps its last line), and with trends, a
+    table of the least-squares change per 100 in n of the gaps and of the cost of a node."""
     rows = sorted({r["n"]: r for r in rows}.values(), key=lambda r: r["n"])
-    known = [r for r in rows if r["opt"]]
+    sections = [section(
+        title, sentence,
+        ["n", "W", "gap over start", "gap over opt", "start below opt", "gap over best", "µs a node",
+         "augmentations a node", "µs an augmentation", "candidates", "max total"],
+        [[r["n"], r["width"], r["gap_start"], r["gap_opt"], r["opt"] - r["start"] if r["opt"] else None,
+          r["root_bound"] - r["best"], r["us_per_node"], f"{r['gf2_augmentations'] / r['nodes']:.1f}",
+          r["us_per_aug"], r["candidates"], r["max_total"]] for r in rows])]
+    if trends:
+        known = [r for r in rows if r["opt"]]
 
-    def slope(games, y):
-        """Least-squares change of y per 100 in n over the games."""
-        return 100 * fit([(r["n"], y(r)) for r in games])[1]
+        def slope(games, y):
+            """Least-squares change of y per 100 in n over the games."""
+            return 100 * fit([(r["n"], y(r)) for r in games])[1]
 
-    trends = [
-        ["gap over start", len(rows), f"{slope(rows, lambda r: r['gap_start']):+.1f}"],
-        ["gap over opt (games with a known optimum)", len(known), f"{slope(known, lambda r: r['gap_opt']):+.1f}"],
-        ["log10 µs a node (decades)", len(rows), f"{slope(rows, lambda r: math.log10(r['us_per_node'])):+.3f}"],
-        ["log10 µs an augmentation (decades)", len(rows),
-         f"{slope(rows, lambda r: math.log10(r['us_per_aug'])):+.3f}"],
-        ["log10 augmentations a node (decades)", len(rows),
-         f"{slope(rows, lambda r: math.log10(r['gf2_augmentations'] / r['nodes'])):+.3f}"],
-    ]
-    below = [r["opt"] - r["start"] for r in known]
-    return "\n\n".join([
-        section(
-            f"Gaps of the root's GF(2) bound and the cost of a node{scope}",
-            "The root's GF(2) bound over the unseeded start incumbent (and over the optimum where it is known), how "
-            "far the start is below the optimum, and the cost of a node, a game to a row, from "
-            f"{source}.",
-            ["n", "W", "gap over start", "gap over opt", "start below opt", "gap over best", "µs a node",
-             "augmentations a node", "µs an augmentation", "candidates", "max total"],
-            [[r["n"], r["width"], r["gap_start"], r["gap_opt"], r["opt"] - r["start"] if r["opt"] else None,
-              r["root_bound"] - r["best"], r["us_per_node"], f"{r['gf2_augmentations'] / r['nodes']:.1f}",
-              r["us_per_aug"], r["candidates"], r["max_total"]] for r in rows]),
-        section(
-            f"Trends in n of the gaps and of the cost of a node{scope}",
+        trend_rows = [
+            ["gap over start", len(rows), f"{slope(rows, lambda r: r['gap_start']):+.1f}"],
+            ["gap over opt (games with a known optimum)", len(known), f"{slope(known, lambda r: r['gap_opt']):+.1f}"],
+            ["log10 µs a node (decades)", len(rows), f"{slope(rows, lambda r: math.log10(r['us_per_node'])):+.3f}"],
+            ["log10 µs an augmentation (decades)", len(rows),
+             f"{slope(rows, lambda r: math.log10(r['us_per_aug'])):+.3f}"],
+            ["log10 augmentations a node (decades)", len(rows),
+             f"{slope(rows, lambda r: math.log10(r['gf2_augmentations'] / r['nodes'])):+.3f}"],
+        ]
+        below = [r["opt"] - r["start"] for r in known]
+        sections.append(section(
+            "Trends in n of the gaps and of the cost of a node",
             "Least-squares lines through the games above, as the change per 100 in n; the start incumbent is "
             f"{mean(below):.0f} below the optimum on average and {max(below)} at most over the {len(known)} games "
             "with a known optimum.",
-            ["quantity", "games", "change per 100 in n"], trends),
-    ])
+            ["quantity", "games", "change per 100 in n"], trend_rows))
+    return "\n\n".join(sections)
 
 
 def gaps():
     return "\n\n".join([
-        gap_sections(node_lines("gaps.jsonl", "nodes_start_low.jsonl", "nodes_start_high.jsonl"),
-                     "gaps.jsonl, nodes_start_low.jsonl and nodes_start_high.jsonl (a game in more than one file "
-                     "keeps the last line)", ""),
-        gap_sections(node_lines("gaps_c8g.jsonl"), "gaps_c8g.jsonl", " on c8g"),
+        gap_sections(
+            node_lines("gaps.jsonl", "nodes_start_low.jsonl", "nodes_start_high.jsonl"),
+            "Gaps of the root's GF(2) bound and the cost of a node",
+            "The root's GF(2) bound over the unseeded start incumbent (and over the optimum where it is known), how "
+            "far the start is below the optimum, and the cost of a node, a game to a row, from gaps.jsonl, "
+            "nodes_start_low.jsonl and nodes_start_high.jsonl (a game in more than one file keeps the last line)."),
+        gap_sections(
+            node_lines("gaps_c8g.jsonl"),
+            "Gaps of the dear games past 2175, against the c8g chain's optima",
+            "The root's GF(2) bound over the start incumbent (seeded from the game of n - 1) and over the optimum "
+            "that the c8g chain found, how far the start is below it, and the cost of a node, a game to a row, from "
+            "gaps_c8g.jsonl (measured on the laptop).",
+            trends=False),
     ])
 
 
@@ -509,7 +518,7 @@ def grow_runs():
         "The long runs",
         "The summary line of each `wall grow` run, with the largest checkpoint that its monitor lines report and the "
         "number of points in its progress lines (grow_1230_matching is the matching path, grow_2170_t64c1 runs 64 "
-        "threads on one core).",
+        "threads taking turns on one CPU).",
         ["run", "n", "threads", "cores", "completed", "nodes", "seconds", "pauses", "longest pause ms",
          "longest park ms", "max queue", "last checkpoint bytes", "largest checkpoint bytes", "rss MB",
          "progress points"], rows)
