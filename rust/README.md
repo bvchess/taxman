@@ -405,7 +405,8 @@ short, the fields regrouped and comments added, so it is not valid JSON as print
  "invocations":1, "threads":2,
  "tactics":"default",
  "tactic_switches":{"prime_shortcut":true,"same_search":true,"match_refine":1,"fix_forced":true,"nogoods":true,
-                    "forget_nogoods":true,"lagrange":false,"gf2":true,"prev_cap":true,"seed_incumbent":true},
+                    "forget_nogoods":true,"lagrange":false,"gf2":true,"symmetry":false,"prev_cap":true,
+                    "seed_incumbent":true},
  "limits":{"seconds":null,"nodes":null},
  "options":{"force_search":false,"use_prev":false},
  "optimal_match":true, "build":{"commit":"8a6df9028f54...","dirty":true}}

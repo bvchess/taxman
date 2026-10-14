@@ -18,11 +18,14 @@
 //!
 //! * `check_node` (steps 1 and 2): does the node's loop go on?  The sum of its `max_add` largest candidates, then
 //!   the matching check, or the verdict the node's check left when it was made as a child, if `need` is the same.
+//!   With the tactic `symmetry`, the rule of [`symmetry`] comes between them (`Stepper::apply_symmetry`): it cuts
+//!   the node, or drops candidates from its loop, and the sum of the largest is checked again for what is left.
 //! * `choose_branch` (steps 3 to 5): the member of the conflict to branch on (with strong branching,
 //!   `refine::strongest`), or with `fix_forced` the forced members, which the child promotes together.
 //! * `make_child` (steps 6 and 7): the child's state and candidates, without the last member of a conflict known
-//!   along the path or of a nogood.
-//! * `check_child` (steps 8 and 9): the child's own check; then it is offered as the incumbent and pushed.
+//!   along the path or of a nogood, and with `symmetry` without the candidates the rule drops.
+//! * `check_child` (steps 8 and 9): the child's own check, which with `symmetry` begins with the rule's test of the
+//!   child (cut if no completion keeps the inequalities); then it is offered as the incumbent and pushed.
 //!
 //! The matching check of a node or a child is `Stepper::check` with `refine::Refiner::top`: the matching bound
 //! ([`crate::matchbound`]), the forced members, the conflict of the heaviest matching (the smallest the nogood table
@@ -41,6 +44,16 @@
 //!   refinement and forced members: `refine::Refiner` and `refine::strongest`; the rule-outs of children:
 //!   `Stepper::make_child`; the Lagrangian bound and its forced members: [`crate::matchbound::lagrange`] and
 //!   [`lagrange`].
+//! * The rule of the tactic `symmetry` ([`symmetry`]): every heaviest promotion set keeps the inequality
+//!   `c_p ≤ c_q` of each symmetric pair `(p, q)` of the root (heuristics/THEORY.md, Theorem 13), so a node none of
+//!   whose completions keeps them all holds no heaviest set, and neither does a completion that holds a candidate
+//!   no such completion holds: the node is cut and the candidate dropped, whatever bound the search uses.  The
+//!   other prunings hold for the completions that keep the inequalities as for all (bounds above every completion,
+//!   members every completion that beats the incumbent promotes, sets that cannot be promoted).  The rule is a
+//!   function of the node's promotions and candidates, so it changes which tree is searched, not the answer of a
+//!   search from the root.  A search of a node below the root finds the best of its completions that keep the
+//!   inequalities, which can be lighter than its best completion (THEORY.md, last paragraph of "Pruning with the
+//!   inequalities").
 //! * What a searcher remembers (the conflicts known along the path, the nogoods, the frames' last conflicts, the
 //!   matching levels kept by strong branching, a child's verdict) are facts that hold where they are used, or
 //!   caches of them: they change which tree is searched, never the answer.  So a search's tree depends on its

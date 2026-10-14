@@ -39,7 +39,8 @@
 //!
 //! # What is where
 //!
-//! * [`swap_primes`], [`cofactors`]: the arithmetic of an exchange and of its effect on a sum.
+//! * [`swap_primes`], [`map_set`], [`cofactors`]: the arithmetic of an exchange, on a number and on a set, and of its
+//!   effect on a sum.
 //! * [`is_root_symmetry`], [`root_pairs`]: whether an exchange is a symmetry of the root, and which exchanges are.
 //! * [`Symmetries`], [`RuleScratch`]: the pairs of a game as the search's rule uses them, built once per search.
 
@@ -63,6 +64,19 @@ pub fn swap_primes(x: u32, p: u32, q: u32) -> u32 {
         (Some(p_b), Some(q_a)) => rest.checked_mul(p_b).and_then(|r| r.checked_mul(q_a)).unwrap_or(u32::MAX),
         _ => u32::MAX,
     }
+}
+
+/// `set` with every member mapped by `pi`, or `None` if an image is beyond what a [`Bits`] holds.
+pub fn map_set<const W: usize>(set: &Bits<W>, pi: &impl Fn(u32) -> u32) -> Option<Bits<W>> {
+    let mut out = Bits::EMPTY;
+    for x in set.iter() {
+        let y = pi(x);
+        if y > Bits::<W>::MAX_VALUE {
+            return None;
+        }
+        out.insert(y);
+    }
+    Some(out)
 }
 
 /// `c_r(set)`: the sum of `x / r` over the members `x` of `set` divisible by `r`.
@@ -221,7 +235,7 @@ pub struct Symmetries {
 
 /// The sums a call of [`Symmetries::exclude`] or [`Symmetries::hopeless`] works in, made by [`Symmetries::scratch`]
 /// and reused, so that the rule allocates nothing per call.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct RuleScratch {
     /// For each prime of the pairs: the cofactor sum `c_r` over the promotions.
     promoted: Vec<i64>,
@@ -373,24 +387,6 @@ mod tests {
         (!board.is_trivial()).then(|| board.prepare(SearchTactics::default()).expect("prepare"))
     }
 
-    /// `set` mapped by `pi`, or `None` if an image is beyond `Bits<W>`.
-    fn map_set<const W: usize>(set: &Bits<W>, pi: &impl Fn(u32) -> u32) -> Option<Bits<W>> {
-        let mut out = Bits::EMPTY;
-        for x in set.iter() {
-            let y = pi(x);
-            if y > Bits::<W>::MAX_VALUE {
-                return None;
-            }
-            out.insert(y);
-        }
-        Some(out)
-    }
-
-    /// The primes up to `n`, by trial division.
-    fn primes_to(n: u32) -> Vec<u32> {
-        (2..=n).filter(|&k| (2..).take_while(|d| d * d <= k).all(|d| !k.is_multiple_of(d))).collect()
-    }
-
     /// The definition of a symmetry of the root, with every number looked at: `pi` maps every frame's moves and
     /// factors onto themselves, the candidates onto themselves, and the factor graph among the frames' numbers onto
     /// itself.
@@ -417,7 +413,7 @@ mod tests {
 
     /// The definition of the symmetric pairs, with every pair of primes up to `n / 2` tried.
     fn brute_pairs<const W: usize>(p: &Prepared<W>) -> Vec<(u32, u32)> {
-        let primes = primes_to(p.n / 2);
+        let primes = numtheory::sieve(p.n / 2).1;
         let simple = |a: u32, b: u32| {
             p.candidates
                 .iter()
@@ -437,16 +433,23 @@ mod tests {
         pairs
     }
 
-    fn pairs_agree<const W: usize>(n: u32) {
-        let Some(p) = setup::<W>(n) else { return };
-        assert_eq!(root_pairs(&p.model, &p.root, &p.candidates), brute_pairs(&p), "n={n}");
+    /// Checks `root_pairs` of the board `n` against the definition, and returns the number of pairs.
+    fn pairs_agree<const W: usize>(n: u32) -> usize {
+        let Some(p) = setup::<W>(n) else { return 0 };
+        let pairs = root_pairs(&p.model, &p.root, &p.candidates);
+        assert_eq!(pairs, brute_pairs(&p), "n={n}");
+        pairs.len()
     }
 
     #[test]
     fn root_pairs_is_the_definition() {
+        let (mut games, mut pairs) = (0, 0);
         for n in (2..=300).chain((301..=2200).step_by(53)).chain([1300, 2175]) {
-            crate::with_width!(n, W => pairs_agree::<W>(n));
+            let found = crate::with_width!(n, W => pairs_agree::<W>(n));
+            games += usize::from(found > 0);
+            pairs += found;
         }
+        assert!(games > 150 && pairs > 500, "{pairs} pairs in {games} games");
     }
 
     #[test]
@@ -507,12 +510,20 @@ mod tests {
         }
     }
 
-    fn images_on<const W: usize>(n: u32, optimal: &Optimal) {
+    /// How many games `images_on` checked, and in how many of them it enumerated every promotable set.
+    #[derive(Default)]
+    struct Covered {
+        games: usize,
+        enumerated: usize,
+    }
+
+    fn images_on<const W: usize>(n: u32, optimal: &Optimal, covered: &mut Covered) {
         let Some(p) = setup::<W>(n) else { return };
         let symmetries = Symmetries::of(&p.model, &p.root, &p.candidates);
         if symmetries.is_empty() {
             return;
         }
+        covered.games += 1;
         let pairs = symmetries.pairs();
         let mut scratch = Scratch::new();
         let moves = optimal.moves(n).expect("a known game");
@@ -529,6 +540,7 @@ mod tests {
             return;
         }
         // Every promotable set, by depth-first search over the candidates in order.
+        covered.enumerated += 1;
         let cands = p.candidates.to_vec();
         let mut best_kept = None;
         let mut stack = vec![(0usize, Bits::<W>::EMPTY, p.root)];
@@ -550,10 +562,16 @@ mod tests {
 
     #[test]
     fn images_are_promotable_and_worth_the_formula() {
-        let optimal = Optimal::built_in();
+        let (optimal, mut covered) = (Optimal::built_in(), Covered::default());
         for n in (2..=400).chain((401..=1300).step_by(25)) {
-            crate::with_width!(n, W => images_on::<W>(n, optimal));
+            crate::with_width!(n, W => images_on::<W>(n, optimal, &mut covered));
         }
+        assert!(
+            covered.games > 150 && covered.enumerated > 10,
+            "{} games, {} enumerated",
+            covered.games,
+            covered.enumerated
+        );
     }
 
     /// How the cases of `the_rule_is_its_definition` came out.

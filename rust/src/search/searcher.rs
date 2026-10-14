@@ -17,6 +17,7 @@ use super::diagnostics::{cut, Probe};
 use super::lagrange::{Lagrangian, Refits};
 use super::refine::{strongest, Learning, Refiner, Seek, Verdict};
 use super::setup::Prepared;
+use super::symmetry::{RuleScratch, Symmetries};
 use super::{Diagnostics, NOGOOD_PERIOD};
 use crate::bits::Bits;
 use crate::bounds::max_additional;
@@ -114,6 +115,9 @@ pub struct SearchSpace<'a, const W: usize> {
     /// With [`Gf2Branching::Exact`] and `fix_forced`: once a member is found forced, whether the others are still
     /// solved (as far as the need) to find more forced members.
     pub gf2_more_forced: bool,
+    /// With the tactic `symmetry`: the root's symmetric pairs, whose inequalities the search keeps (`None` without
+    /// the tactic, or when the root has no pair).
+    pub symmetry: Option<Symmetries>,
 }
 
 /// How a node chooses the member of its conflict to branch on with the tactic `gf2` (strong branching asks what each
@@ -159,6 +163,10 @@ impl<'a, const W: usize> SearchSpace<'a, W> {
             gf2_branching: Gf2Branching::Exact,
             gf2_strong_limit: usize::MAX,
             gf2_more_forced: true,
+            symmetry: tactics
+                .symmetry
+                .then(|| Symmetries::of(&prepared.model, &prepared.root, &prepared.candidates))
+                .filter(|pairs| !pairs.is_empty()),
         }
     }
 }
@@ -278,6 +286,8 @@ pub(super) struct Counts {
     pub(super) refinements: u64,
     pub(super) evaluations: u64,
     pub(super) conflicts: u64,
+    /// Candidates the rule of the tactic `symmetry` dropped from the candidates of children and of nodes.
+    pub(super) symmetry_excluded: u64,
 }
 
 /// The Taxman searcher: explores units depth-first on a stack of nodes it reuses (no recursion, and no
@@ -315,6 +325,8 @@ struct Stepper<'a, const W: usize> {
     steps_since_clear: u64,
     /// The Lagrangian bound over the nogoods along the path (tactic `lagrange`).
     lagrange: Option<Lagrangian<'a, W>>,
+    /// The sums of the rule of the tactic `symmetry` (empty without it).
+    symmetry_scratch: RuleScratch,
     counts: Counts,
     /// The incumbents offered, encoded.
     payload: Vec<u8>,
@@ -341,6 +353,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 nogoods: space.nogoods.then(|| Nogoods::new(space.root_max, NOGOOD_CAPACITY)),
                 steps_since_clear: 0,
                 lagrange: space.lagrange.map(|refits| Lagrangian::new(space.match_graph, refits)),
+                symmetry_scratch: space.symmetry.as_ref().map(Symmetries::scratch).unwrap_or_default(),
                 counts: Counts::default(),
                 payload: Vec::with_capacity(8 * W),
                 probe: space.diagnostics.map(Probe::new),
@@ -476,8 +489,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
     /// the matching check found for choosing the branch.
     ///
     /// Cheapest first: candidates left; the sum of the `max_add` largest (no completion has more promotions, nor
-    /// larger ones: a bound of its own); then the matching check, unless the node kept its verdict from when it
-    /// was made at this `need`.
+    /// larger ones: a bound of its own); then, unless the node kept its verdict from when it was made at this
+    /// `need`, the rule of the tactic `symmetry` (a function of the node's promotions and candidates alone, and
+    /// cheaper than the bounds), then the matching check.
     #[inline]
     fn check_node(&mut self, node: &mut Node<W>, need: u64, ctx: &mut Ctx<'_, TaxUnit<W>>) -> Result<Open<W>, usize> {
         let checked = node.checked.take();
@@ -489,12 +503,61 @@ impl<'a, const W: usize> Stepper<'a, W> {
         }
         if let Some(checked) = checked.filter(|checked| checked.need == need) {
             // The node was checked when it was made, at the same need and with the same matching (this is its
-            // first step): the verdict is the same, and so are the conflict and the forced members.
+            // first step): the verdict is the same, and so are the conflict and the forced members.  So is the
+            // rule of `symmetry`, which `make_child` applied to the same promotions and candidates.
             return Ok(Open { conflict: Some(checked.conflict), forced: checked.forced });
+        }
+        let space = self.space;
+        if let Some(sym) = &space.symmetry {
+            self.apply_symmetry(sym, node, need)?;
         }
         let open = self.check(&node.state, &node.promoted, &node.cands, need, node.max_add, true, ctx);
         node.known_end = self.known.len(); // the conflicts the check found hold for the node and its subtree
         open
+    }
+
+    /// The rule of the tactic `symmetry` at `node`, for the root's symmetric pairs `sym` ([`Symmetries::exclude`]):
+    /// `Err` with [`cut::SYMMETRY`] if no completion keeps every pair's inequality, else the candidates that no
+    /// completion keeping them holds are dropped from the node's loop and from the bounds' levels, and the cheap
+    /// checks of [`check_node`](Self::check_node) are made again for what is left.
+    ///
+    /// The rule has work to do at a node that has been through a loop step: the node goes on without the member
+    /// it branched on, which can lower the cofactor sum of a larger prime of a pair that the candidates can still
+    /// reach.  A node's first step finds the rule's fixed point already (`make_child` reached it), unless the
+    /// node is a unit, rebuilt from its promotions and candidates alone.
+    ///
+    /// The removal from the bounds is the one the node makes of the member it branches on
+    /// ([`choose_branch`](Self::choose_branch)), and is safe here for the same reasons: the node's levels are on top
+    /// of both stacks (the child of the last step was popped, or never pushed), the matching bound has taken the
+    /// level kept for the node at the start of the step (so it holds none for the node as it was before the
+    /// removal), and the GF(2) bound keeps the level before the removal only for a child that promotes `x`, which
+    /// no child of this node does, `x` being no candidate of it now.  A node cut as hopeless is left as it is: its
+    /// loop ends, and its levels are popped or, for a unit, reset.
+    fn apply_symmetry(&mut self, sym: &Symmetries, node: &mut Node<W>, need: u64) -> Result<(), usize> {
+        let before = node.cands;
+        if sym.exclude(&mut self.symmetry_scratch, &node.promoted, &mut node.cands) {
+            return Err(cut::SYMMETRY);
+        }
+        let dropped = before - node.cands;
+        if dropped.is_empty() {
+            return Ok(());
+        }
+        self.counts.symmetry_excluded += u64::from(dropped.len());
+        for x in dropped.iter() {
+            if let Some(g) = &mut self.gf2 {
+                g.remove_candidate(x);
+            }
+            if self.matching_on {
+                self.matching.remove_candidate(x);
+            }
+        }
+        if node.cands.is_empty() {
+            return Err(cut::EMPTY);
+        }
+        if node.cands.sum_largest(node.max_add) < need {
+            return Err(cut::LARGEST);
+        }
+        Ok(())
     }
 
     /// Phase 2: the candidate `node` branches on, taken out of its loop, and what the child promotes; `None` if
@@ -551,7 +614,8 @@ impl<'a, const W: usize> Stepper<'a, W> {
     /// candidate is ruled out if promoting it would complete a conflict known for the node (or above it), or a
     /// nogood: the child's state is the node's with more promotions, so promoting the last member would promote
     /// the whole conflict there.  (The heaviest matching of the node promotes the branch already, so without this
-    /// the child's matching bound would not drop.)
+    /// the child's matching bound would not drop.)  With the tactic `symmetry`, the candidates that no completion
+    /// keeping the symmetric pairs' inequalities holds go too ([`Symmetries::exclude`]).
     #[inline]
     fn make_child(&mut self, node: &Node<W>, child: &mut Node<W>, branch: &Branch<W>) -> Option<u32> {
         let space = self.space;
@@ -598,6 +662,15 @@ impl<'a, const W: usize> Stepper<'a, W> {
         if let Some(table) = &self.nogoods {
             cands -= table.ruled_out(&added, &child.promoted, &cands);
         }
+        if let Some(sym) = &space.symmetry {
+            // The candidates the rule drops are in no completion of the child that keeps the symmetric pairs'
+            // inequalities, which are the only ones the search needs (Theorem 13).  Whether the child has any such
+            // completion is `check_child`'s to ask, of these candidates; the count leaves out a child it cuts.
+            let before = cands;
+            if !sym.exclude(&mut self.symmetry_scratch, &child.promoted, &mut cands) {
+                self.counts.symmetry_excluded += u64::from((before - cands).len());
+            }
+        }
         child.cands = cands;
         Some(max_next)
     }
@@ -626,6 +699,13 @@ impl<'a, const W: usize> Stepper<'a, W> {
         }
         if cands.is_empty() {
             return Ok(());
+        }
+        if let Some(sym) = &self.space.symmetry {
+            // No completion of the child keeps every pair's inequality, and a heaviest promotion set keeps them
+            // (Theorem 13, "Pruning with the inequalities"): none of its completions beats the incumbent.
+            if sym.hopeless(&mut self.symmetry_scratch, &child.promoted, &cands) {
+                return Err(cut::SYMMETRY);
+            }
         }
         if self.matching_on {
             self.matching.push_all(added, &cands);

@@ -378,7 +378,9 @@ fn deep_units() -> (u64, Vec<TaxUnit<32>>) {
 /// Along the path of a real search to 34 promotions deep, the incremental matching bound and the quick bounds
 /// without a member equal the min-cost-flow reference (the unit tests walk only ~10 deep, at n <= 760), and the
 /// subtrees of the deep levels give the same answer under every tactic: states and conflicts that no search of
-/// the unit tests' size reaches.
+/// the unit tests' size reaches.  The variants with the tactic `symmetry` are left out of the last comparison: a
+/// search of a unit below the root with that rule finds the best completion that keeps the symmetric pairs'
+/// inequalities, which can be lighter than the unit's best.
 #[test]
 fn deep_levels_of_a_large_game() {
     let (best, units) = deep_units();
@@ -425,7 +427,7 @@ fn deep_levels_of_a_large_game() {
     let mut compared = 0;
     for unit in units.iter().filter(|u| u.promoted.len() >= 13).take(8) {
         for start in [best, best - 25] {
-            let all = variants();
+            let all: Vec<_> = variants().into_iter().filter(|(_, tactics)| !tactics.symmetry).collect();
             let expected = search_unit(&all[0].1, *unit, start);
             for (name, tactics) in &all[1..] {
                 assert_eq!(search_unit(tactics, *unit, start), expected, "{name}: unit of {}", unit.promoted.len());

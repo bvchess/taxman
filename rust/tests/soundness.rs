@@ -13,6 +13,7 @@ mod common;
 mod fixtures;
 
 use common::{config, random_subset, stored_games, testdata, Config, Game, Rng, TempDir};
+use std::cell::OnceCell;
 use std::time::Duration;
 use taxman::bits::Bits;
 use taxman::board::Board;
@@ -23,17 +24,21 @@ use taxman::gf2::{Gf2Bound, Gf2Graph};
 use taxman::model::{FrameSet, Model, Scratch};
 use taxman::numtheory::Tables;
 use taxman::search::lagrange::Refits;
+use taxman::search::symmetry::Symmetries;
 use taxman::search::Gf2Branching;
 use taxman::search::TaxUnit;
 
 /// Every tactic that acts inside the search, alone and in the combinations that matter: first the matching path
-/// ([`SearchTactics::matching`], 0 to 18), then the default, the GF(2) bound (19 to 29).  The matching path with the
+/// ([`SearchTactics::matching`], 0 to 18), then the default, the GF(2) bound (19 to 29), then the rule of the root's
+/// symmetric pairs (tactic `symmetry`, 30 to 33).  The matching path with the
 /// forgetting of nogoods at the production period, every step, every third, and never; on one thread and two; and
 /// the GF(2) bound with each way of choosing the branch, with and without the matching bound as a first check,
 /// forced members, nogoods and the Lagrangian bound's early refits.  The Lagrangian
 /// bound (tactic `lagrange`) refits its multipliers only after 2,000 steps, which most of these searches never
-/// take, so the last configurations refit them after the first few steps and every few steps after that (with and
-/// without forgetting at the same time, refinement, and a second thread), and one turns it off.
+/// take, so some configurations refit them after the first few steps and every few steps after that (with and
+/// without forgetting at the same time, refinement, and a second thread), and one turns it off.  The rule of the
+/// symmetric pairs runs over the GF(2) bound, on two threads, with the nogoods forgotten at every step, and over the
+/// matching path.
 fn configs() -> Vec<Config> {
     let (base, g) = (Config::matching(), Config::standard());
     vec![
@@ -67,6 +72,10 @@ fn configs() -> Vec<Config> {
         Config { threads: 2, ..g },
         Config { refits: Some(Refits { first: 1, every: 4 }), ..g },
         Config { refits: Some(Refits { first: 2, every: 5 }), threads: 2, period: Some(3), ..g },
+        Config { symmetry: true, ..g },
+        Config { symmetry: true, threads: 2, ..g },
+        Config { symmetry: true, period: Some(1), ..g },
+        Config { symmetry: true, ..base },
     ]
 }
 
@@ -145,11 +154,144 @@ fn lagrangian_runs<const W: usize>(optimal: &Optimal, ns: std::ops::RangeInclusi
     runs
 }
 
+/// A unit below the root of a game, searched from a handicapped incumbent, with what an exhaustive search found in it.
+///
+/// Theorem 13 (heuristics/THEORY.md, "Prime exchanges") says that every heaviest promotion set of the *root* keeps
+/// the inequality of each symmetric pair, and the search with the tactic `symmetry` looks at the completions that
+/// keep them, at every node.  A unit below the root is no root: its best completion can break an inequality (some
+/// promotion of its `promoted` may even break one already, which no completion mends), and its search finds the best
+/// completion that keeps them ("Pruning with the inequalities", last paragraph).  So a search with the rule is
+/// compared with the oracle for that, [`Game::exhaustive_keeping`], and the others with [`Game::exhaustive`].
+struct Searched<'a, const W: usize> {
+    game: &'a Game<W>,
+    sym: &'a Symmetries,
+    /// The unit, the state its promotions reach, and the nodes the oracles may take.
+    unit: TaxUnit<W>,
+    state: FrameSet<W>,
+    budget: u64,
+    /// The sum of the best completion (not counting the promotions).
+    rest: u64,
+    /// The sum of the best completion that keeps the pairs' inequalities with the promotions: `None` if finding it
+    /// took more than the budget, `Some(None)` if no completion keeps them.  Found when a search with the rule asks
+    /// for it ([`kept`](Self::kept)), and not at all if the best completion keeps them.
+    kept: OnceCell<Option<Option<u64>>>,
+}
+
+impl<'a, const W: usize> Searched<'a, W> {
+    /// The oracles for `unit`, whose state is `state`, or `None` if the best completion took more than `budget`
+    /// nodes to find.
+    ///
+    /// The best completion that keeps the inequalities needs a search of its own, which prunes worse than the first
+    /// (until it has found a completion that keeps them it has no sum to prune by).  But the best of all
+    /// completions is the best of those that keep the inequalities whenever it is one of them: the latter are among
+    /// the former, so none is heavier.  So if the best completion found keeps them with the promotions (which is
+    /// trivially so where the root has no pair), that is the answer, and the second search is not made.
+    fn of(game: &'a Game<W>, sym: &'a Symmetries, state: &FrameSet<W>, unit: TaxUnit<W>, budget: u64) -> Option<Self> {
+        let (rest, best) = game.exhaustive(state, &unit.cands, budget)?;
+        let kept = if sym.keeps(&(unit.promoted | best)) { OnceCell::from(Some(Some(rest))) } else { OnceCell::new() };
+        Some(Searched { game, sym, unit, state: *state, budget, rest, kept })
+    }
+
+    /// The sum of the best completion that keeps the pairs' inequalities (see the field `kept`), found once.
+    fn kept(&self) -> Option<Option<u64>> {
+        *self.kept.get_or_init(|| {
+            let (unit, state) = (&self.unit, &self.state);
+            let found = self.game.exhaustive_keeping(state, &unit.promoted, &unit.cands, self.budget, self.sym);
+            found.map(|found| found.map(|(sum, _)| sum))
+        })
+    }
+
+    /// Searches the unit under `cfg` from an incumbent `k` (or less, where the unit has less to find) below what the
+    /// search must come back with, and checks the outcome; returns whether there was a search to make.
+    ///
+    /// Without the tactic `symmetry` the search must find the best completion.  With it, the best completion that
+    /// keeps the inequalities, or something at least as heavy (a promotable set that breaks them can be heavier);
+    /// where none keeps them there is nothing to find, but whatever the search ends with is the fake incumbent or a
+    /// promotable set.
+    fn run(&self, cfg: Config, k: u64, at: &str) -> bool {
+        let promoted = self.unit.promoted.sum();
+        let truth = promoted + self.rest;
+        // The best completion that the search is to find: with the rule the best one that keeps the inequalities
+        // (which is not looked for unless a search needs it), else the best one.
+        let kept = if cfg.symmetry { self.kept() } else { Some(Some(self.rest)) };
+        // What the search must find (`None`: nothing), and the sum of the completion that the incumbent is below.
+        let (target, reach) = match kept {
+            Some(Some(kept)) => (Some(kept), kept),
+            Some(None) => (None, self.rest),
+            None => return false,
+        };
+        let k = k.min(reach);
+        if k == 0 {
+            return false;
+        }
+        let start = promoted + reach - k;
+        let out = self.game.search(cfg, vec![self.unit], start, None, None);
+        let at = format!("{at} {cfg:?} from {start}: truth {truth}, kept {kept:?}, got {out:?}");
+        assert!(out.completed, "{at}: not completed");
+        match target {
+            Some(target) if !cfg.symmetry => assert!(out.best == promoted + target && out.real, "{at}"),
+            Some(target) => assert!(out.best >= promoted + target && out.best <= truth && out.real, "{at}"),
+            None => assert!(out.best <= truth && (out.best == start || out.real), "{at}"),
+        }
+        true
+    }
+}
+
+/// Every board 2..=600 whose root has symmetric pairs, searched from the root with the rule of the pairs' inequalities
+/// (tactic `symmetry`) over the GF(2) bound and over the matching bound, from an incumbent 1 and 5 below
+/// `optimal.json`'s promotion sum: the search must complete with exactly that sum and a promotable set (Theorem 13:
+/// the root's heaviest set keeps the inequalities, so a search from the root loses nothing).  For the boards to 40 the
+/// optimum is also checked against the exhaustive search without the frame model.
+#[test]
+fn the_symmetry_rule_finds_the_optimum_of_the_boards_with_pairs() {
+    let optimal = Optimal::built_in();
+    let (base, g) = (Config::matching(), Config::standard());
+    let configs = [Config { symmetry: true, ..g }, Config { symmetry: true, ..base }];
+    let boards =
+        boards_with_pairs::<8>(optimal, 2..=511, &configs) + boards_with_pairs::<16>(optimal, 512..=600, &configs);
+    assert!(boards >= 450, "{boards} boards with pairs");
+}
+
+/// The searches of [`the_symmetry_rule_finds_the_optimum_of_the_boards_with_pairs`] of the boards `ns` at width `W`;
+/// returns the number of boards with pairs.
+fn boards_with_pairs<const W: usize>(
+    optimal: &Optimal,
+    ns: std::ops::RangeInclusive<u32>,
+    configs: &[Config],
+) -> usize {
+    let mut boards = 0;
+    for n in ns {
+        let Some(game) = Game::<W>::of_board(n) else { continue };
+        if game.symmetries().is_empty() {
+            continue;
+        }
+        boards += 1;
+        let truth = optimal_sum::<W>(optimal, n).unwrap();
+        if n <= 40 {
+            let exact = taxman::brute::solve(n, &[], taxman::brute::Rule::Divisor).score;
+            assert_eq!(Board::<W>::for_n(n).in_the_bag + truth, exact, "n={n}: the optimum against the oracle");
+        }
+        for cfg in configs {
+            for k in [1, 5] {
+                if k > truth {
+                    continue;
+                }
+                let out = game.search(*cfg, vec![game.root_unit()], truth - k, None, None);
+                assert!(out.completed, "n={n} {cfg:?} from {}: not completed", truth - k);
+                assert!(out.best == truth && out.real, "n={n} {cfg:?} from {}: truth {truth}, got {out:?}", truth - k);
+            }
+        }
+    }
+    boards
+}
+
 /// Units of game `n` at width `W`, after up to 14 random promotions, with their candidates thinned to 6 to 23 (the
 /// largest, or at random) so that the truth can be found exhaustively, searched from an incumbent worth 1, 2, 5
-/// or 30 less under random `configs`: the search must come back with the truth.  Returns the number of searches.
+/// or 30 less under random `configs`: the search must come back with the truth (with the tactic `symmetry`, as
+/// [`Searched::run`] says).  Returns the number of searches.
 fn handicapped_units<const W: usize>(n: u32, rng: &mut Rng, units: usize, configs: &[Config]) -> usize {
     let game = Game::<W>::of_board(n).expect("a game");
+    let sym = game.symmetries();
     let (mut runs, mut made) = (0, 0);
     while made < units {
         let (mut state, mut promoted, mut cands) = (game.root, Bits::EMPTY, game.candidates);
@@ -178,19 +320,14 @@ fn handicapped_units<const W: usize>(n: u32, rng: &mut Rng, units: usize, config
         }
         members.truncate(6 + rng.below(18) as usize);
         let thin: Bits<W> = members.iter().copied().collect();
-        let Some(rest) = game.exhaustive(&state, &thin, 3_000_000) else { continue };
+        let unit = TaxUnit { promoted, cands: thin };
+        let Some(searched) = Searched::of(&game, &sym, &state, unit, 3_000_000) else { continue };
         made += 1;
-        let truth = promoted.sum() + rest;
-        for _ in 0..if rest == 0 { 0 } else { 4 } {
+        let at = format!("n={n} W={W} promoted {promoted:?} cands {thin:?}");
+        for _ in 0..if searched.rest == 0 { 0 } else { 4 } {
             let cfg = rng.pick(configs);
-            let k = rng.pick(&[1u64, 1, 2, 5, 30]).min(rest);
-            let out = game.search(cfg, vec![TaxUnit { promoted, cands: thin }], truth - k, None, None);
-            runs += 1;
-            assert!(
-                out.completed && out.best == truth && out.real,
-                "n={n} W={W} {cfg:?} promoted {promoted:?} cands {thin:?} from {}: truth {truth}, got {out:?}",
-                truth - k
-            );
+            let k = rng.pick(&[1u64, 1, 2, 5, 30]);
+            runs += usize::from(searched.run(cfg, k, &at));
         }
     }
     runs
@@ -437,28 +574,19 @@ fn perturbed_frame_sets_are_searched_exactly() {
         let (frames, density) = (2 + rng.below(6), 94 + rng.below(7));
         let Some(game) = perturbed(&mut rng, n, frames, density) else { continue };
         let truth = game.exhaustive(&game.root, &game.candidates, 2_000_000);
-        if truth.is_none_or(|truth| truth == 0) {
+        if truth.is_none_or(|(truth, _)| truth == 0) {
             continue;
         }
         games += 1;
+        let sym = game.symmetries();
         for (promoted, cands, state) in path(&mut rng, &game) {
-            let Some(rest) = game.exhaustive(&state, &cands, 2_000_000) else { continue };
-            let truth = promoted.sum() + rest;
+            let unit = TaxUnit { promoted, cands };
+            let Some(searched) = Searched::of(&game, &sym, &state, unit, 2_000_000) else { continue };
+            let at = format!("n={n} frames {:?} promoted {promoted:?} cands {cands:?}", game.root);
             for _ in 0..6 {
                 let cfg = rng.pick(&configs);
-                let k = rng.pick(&[1u64, 1, 2, 3, 9, 30, 1000]).min(rest);
-                if k == 0 {
-                    continue;
-                }
-                let out = game.search(cfg, vec![TaxUnit { promoted, cands }], truth - k, None, None);
-                runs += 1;
-                assert!(
-                    out.best == truth && out.real,
-                    "n={n} frames {:?} {cfg:?} promoted {promoted:?} cands {cands:?} from {}: truth {truth}, \
-                     got {out:?}",
-                    game.root,
-                    truth - k
-                );
+                let k = rng.pick(&[1u64, 1, 2, 3, 9, 30, 1000]);
+                runs += usize::from(searched.run(cfg, k, &at));
             }
         }
     }

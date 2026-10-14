@@ -189,7 +189,7 @@ fn a_checkpoint_for_another_game_or_other_tactics_is_refused() {
     assert!(!solver::solve_game_with(600, None, &opts, optimal).unwrap().completed);
     let checkpoint = dir.0.join("n0600.ckpt");
 
-    // Other tactics: each of the six search tactics (a checkpoint records them all), the switches turned the other
+    // Other tactics: each of the seven search tactics (a checkpoint records them all), the switches turned the other
     // way and `match_refine` changed.
     let assignments = [
         "fix_forced=off",
@@ -197,6 +197,7 @@ fn a_checkpoint_for_another_game_or_other_tactics_is_refused() {
         "forget_nogoods=off",
         "lagrange=off",
         "gf2=on",
+        "symmetry=on",
         "match_refine=0",
         "match_refine=2",
     ];

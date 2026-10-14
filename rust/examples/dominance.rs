@@ -45,29 +45,12 @@ use taxman::engine::{self, Ctx, EngineConfig, Searcher, Start};
 use taxman::game::Optimal;
 use taxman::matchbound::{MatchBound, MatchGraph};
 use taxman::model::{FactorProvider, Frame, FrameSet, Model, Scratch};
-use taxman::search::symmetry::{cofactors, root_pairs, swap_primes};
+use taxman::numtheory::sieve;
+use taxman::search::symmetry::{cofactors, map_set, root_pairs, swap_primes};
 use taxman::search::{Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
 
 fn setup<const W: usize>(n: u32) -> Prepared<W> {
     Board::<W>::for_n(n).prepare(SearchTactics::default()).expect("prepare")
-}
-
-/// `set` mapped by `pi`, or `None` if an image is beyond `Bits<W>`.
-fn map_set<const W: usize>(set: &Bits<W>, pi: &impl Fn(u32) -> u32) -> Option<Bits<W>> {
-    let mut out = Bits::EMPTY;
-    for x in set.iter() {
-        let y = pi(x);
-        if y > Bits::<W>::MAX_VALUE {
-            return None;
-        }
-        out.insert(y);
-    }
-    Some(out)
-}
-
-/// The primes up to `n`.
-fn primes_to(n: u32) -> Vec<u32> {
-    (2..=n).filter(|&k| (2..).take_while(|d| d * d <= k).all(|d| !k.is_multiple_of(d))).collect()
 }
 
 /// The command's options: `--known`, `--count`, `--samples`, `--delta`, `--out`, `--pairs`, and the games or files.
@@ -554,7 +537,7 @@ fn nodes_of<const W: usize>(path: &Path, o: &Options) {
     let mut m = MatchBound::new(&graph);
     let mut scratch = Scratch::new();
     let best = incumbent.sum().checked_add_signed(o.delta).expect("a margin above zero");
-    let primes = primes_to(n / 2);
+    let primes = sieve(n / 2).1;
     let pairs = root_pairs(model, root, &p.candidates);
     let t0 = Instant::now();
     for unit in &units {
