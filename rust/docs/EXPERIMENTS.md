@@ -90,7 +90,7 @@ those of the page the row points to; a game is named by its board size, and time
 | A portfolio: another branching on some threads for finding incumbents | [IDEAS 4.7](IDEAS.md#47-a-portfolio-for-finding-incumbents-weak) | not kept | the frontier's cost is the proof; 8 of the 11 slowest games of 1232-1300 start at their optimum |
 | Reliability branching (pseudocosts) in place of strong branching's exact solves | [IDEAS 5](IDEAS.md#5-every-idea-considered) | open | strong branching is 28-34% of the time; not piloted |
 | Knuth's estimate of a tree's size, to budget games and split work | [IDEAS 5](IDEAS.md#5-every-idea-considered) | open | not piloted |
-| Ideas considered and not piloted: restarts, bound nogoods and backjumping, cube-and-conquer splitting, dominance rules, symmetry breaking, best-bound node selection, cutting planes | [IDEAS 5](IDEAS.md#5-every-idea-considered) | open | each has its reason there (with the optimum known the tree is fixed by the bound; the matching LP is integral; no symmetries found; ...) |
+| Ideas considered and not piloted: restarts, bound nogoods and backjumping, cube-and-conquer splitting, best-bound node selection, cutting planes | [IDEAS 5](IDEAS.md#5-every-idea-considered) | open | each has its reason there (with the optimum known the tree is fixed by the bound; the matching LP is integral; ...); dominance rules and symmetry breaking were piloted later (rows below) |
 | What drives the slope: the root's gaps (matching, refined, Lagrangian over the root's own nogoods), the size (n, candidates, `max_total`), the cap and the start incumbent against the one-thread proofs of the 143 searched games of 880-1300 (`examples/slope.rs`) | [slope](#what-drives-the-slope-2026-10) | measured | log10 nodes against the Lagrangian gap R² 0.90 (sd 0.35), the matching gap 0.87, n 0.23, the candidates 0.26; with the gap in the fit n adds nothing (t 1.1); the slope in n is ×10 per ~130 of gap times the gap's growth (56 per 100 n, jagged: +304 from 1151-1200 to 1251-1300, flat to 1352) |
 | Margin scans: proofs with every bound lowered by δ (the incumbent a value, `P*` + δ) | [slope](#what-drives-the-slope-2026-10) | measured | 19 games of 900-1300: 0.005-0.012 decades fewer nodes per unit of δ, no trend in n; a large game tightened costs what a small one with the same remaining gap costs |
 | The root's converged Lagrangian relaxation (its own nogoods, damped subgradient) as every searcher's starting relaxation | [slope](#what-drives-the-slope-2026-10) | not kept (pilot) | proofs −5% (1254) to −76% (1184) nodes, the least at the frontier: a constant factor; the gap that counts is the one at every node |
@@ -104,6 +104,19 @@ those of the page the row points to; a game is named by its board size, and time
 | Forced members of the GF(2) bound from a weight split of its heaviest set (Frank) | [matroid](#matroid-intersection-bounds-2026-10) | measured | where the bound does not cut, 26-28 members a node are forced; the split finds 60-66% of them at two greedy runs a member |
 | A Lagrangian over nogoods with the GF(2) intersection as its inner problem, at the root | [matroid](#matroid-intersection-bounds-2026-10) | measured | closes 7-36% of the remaining gap at 936-1300; the heaviest set's conflicts have 7-18 members |
 | Lorea's hypergraphic matroid per frame, for what the GF(2) bound misses | [matroid](#matroid-intersection-bounds-2026-10) | not kept | sees none of the 14 cores that the root's GF(2) heaviest set runs into at 936-1300 (each subset lists more factors than movers) |
+| The cover LP over all conflicts at the root over the matching (exact separation: the best any conflicts and multipliers give a Lagrangian bound over the matching) | [nogoods](#how-far-can-nogoods-go-2026-10) | measured | 0.2-11.6 below the slope study's root Lagrangian band by band (mean gap 264 against 269 over 880-1300), growing +54.7 per 100 in n against +56.0: the root's own conflicts were already all there is; it closes 67% of the matching gap, a share that does not grow |
+| Every minimal conflict of one to three members at the root (enumerated frame by frame) | [nogoods](#how-far-can-nogoods-go-2026-10) | not kept | close 24-37% of the matching gap against 57-66% for all conflicts, and nothing over GF(2); the binding conflicts are large |
+| The search's refits against the LP over the same nogoods, at the root | [nogoods](#how-far-can-nogoods-go-2026-10) | measured | warm-started, the 50 steps end 7.8 above that LP on average (1215, 23 refits): good multipliers at the root; the slope study's 50-540 was a refit from zero |
+| The search's Lagrangian bound at its own open checks against the best its nogoods allow there (traces of 936 and 1215) | [nogoods](#how-far-can-nogoods-go-2026-10) | measured | the LP over the nogoods it holds would cut 74% and 67% of the checks it leaves open, all conflicts 97% and 95%; refitting its relaxation's nogoods alone 5% and 24% (1 and 9 of them live at a typical node): its multipliers are the root's |
+| An extra cut by the cover LP over all conflicts at every open check of the search (matching inner, instrumented build) | [nogoods](#how-far-can-nogoods-go-2026-10) | not kept | 5-31 times fewer steps on 9 games of 880-1184 (1000 and 1196 unfinished, under 14x), log-log slope 0.81 ± 0.14, the advantage shrinking as δ → 0 in margin scans: a constant factor; 5-40 ms a check, 1,000-5,000 steps' worth |
+| Cheap node-level forms: the LP over the nogoods held, refits from the search's multipliers (5-50 steps) with or without conflicts added (relax-and-cut), per-subtree multipliers (an LP fit every 4-16 promotions), the ideal only at shallow nodes | [nogoods](#how-far-can-nogoods-go-2026-10) | not kept | 2.3-7 times fewer steps at 880, 936 and 1184 with their forced members, for 80-550 steps' cost a check (the per-subtree fits 25-70): 11-100 times slower; at nodes of at most 16 promotions the ideal saves 5% |
+| A plain branch and bound with the cover LP over all conflicts at every node (matching inner, most fractional branching) | [nogoods](#how-far-can-nogoods-go-2026-10) | measured | 10-63 times fewer nodes than the solver's steps at 880-1184, log-log slope 1.15 ± 0.17 against them |
+| The cover LP over all conflicts with the GF(2) intersection as the inner problem, at the root and the probe's nodes | [nogoods](#how-far-can-nogoods-go-2026-10) | measured | closes 46% of the root's GF(2) gap, a share falling 3.8 points per 100 in n (the residual grows +8.4 against GF(2)'s +4.6); cuts 84% and 62% of the probe's nodes GF(2) leaves open (12 and 46 ms a node); relax-and-cut with 3-30 intersections 19-63% |
+| A branch and bound with GF(2) and the cover LP over all conflicts against the GF(2) branch and bound (146 games) | [nogoods](#how-far-can-nogoods-go-2026-10) | not kept | 6.2 times fewer nodes (geometric mean), less as n grows (−0.046 decades per 100 in n), the same 0.011 decades per unit of root GF(2) gap: a constant factor; 24% slower computed from scratch (1,125 s against 905 s) |
+| Dominance by exchange at search nodes: one excluded candidate added, one for one, two for one or two, judged by a cover of the node's state by the exchange's (literal, with moves relabelled) and by sampled maximal completions (`examples/dominance.rs nodes`) | [dominance](#dominance-and-symmetry-2026-10) | measured | proved at 0-1% of the probe's nodes and 0-5% of nodes sampled from the solver's proofs; sampled estimates up to 53%, nearly all of it prime exchanges (next rows); an excluded candidate can never be added for free (some maximal completion always blocks it) |
+| Twins (candidates with the same live factors and users) and transpositions (one reduced state reached by two promotion sets) | [dominance](#dominance-and-symmetry-2026-10) | measured: none | no twins at any sampled node; no transposition in the 133,006 nodes of six GF(2) branch-and-bound trees (930-1300) |
+| Symmetries of the frame model: exchanging two primes whose classes the frame builder treats alike maps promotable sets to promotable sets worth `(q − p)(c_p − c_q)` more (`examples/common/symmetry.rs`, `dominance symmetries`, `symcheck`) | [dominance](#dominance-and-symmetry-2026-10) | kept (the finding; research code) | 3.8-5.9 classes of primes a game at 851-1350, moving 11-14% of the candidates, the group's order 10^4.5 to 10^7.4; checked for every game 2-1300 (images, sums, 22 small boards enumerated, the oracle to 40); IDEAS.md's "no symmetries found" was wrong |
+| Breaking the prime symmetries (only sets with `c_p ≤ c_q` searched): hopeless test, the constraint's matching bound in a copy of the search, the constraint's Lagrangian on the GF(2) bound in a copy of `matroid bnb` (pilots, code not kept) | [dominance](#dominance-and-symmetry-2026-10) | not kept: a constant factor | nodes ×0.96 and ×0.88 (solver, 22 games of 880-1090; time +15% and ×1.9; 1184 +27%), ×0.95 and ×0.86 (GF(2) B&B, 43 games of 880-1300; time −3%); the share holds with n and over margin scans (`c` about 3% lower); every game 2-900 still finds its optimum from `P*` − 1 |
 
 ### Nogoods and conflicts
 
@@ -149,6 +162,12 @@ those of the page the row points to; a game is named by its board size, and time
 | The prime shortcut (`prime_shortcut`) | [DESIGN 5](../DESIGN.md#5-tactics) | kept, proven | tight for every prime; the proof is with `accelerate::prime_shortcut` |
 | Reuse the previous game's promotions without a search (`reuse_prev`) | [tactics review](#reuse_prev-nothing-left-to-save) | removed 2026-10 (it was unproven, and the cap and same search had left it nothing to save) | with several optimal sets of n − 1 the result depends on which was recorded: the recorded game of 685 plus 686 is unplayable though opt(686) = 686 + opt(685) |
 | The sacrifice bound (games on punctured boards) as a proof for `reuse_prev` | [`src/sacrifice.rs`](../src/sacrifice.rs) | not kept | tight on 57 of the 152 `reuse_prev` games, and where it proves it costs 1.1-8.7 times the direct search; the theorem stays and `tests/wide.rs` uses it |
+| Bounds on opt(n) from the games above: opt(n) ≤ opt(n + K) − Σ_{even m ∈ (n, n+K]} m/2 − (q − P), proven | [going higher 1](#going-higher-and-coming-back-down-2026-10) | measured; not kept | holds on 2..1299; tight only through a prime n + 1 (whose search problem is n's: 204 of 204) and at 13 even m (2^k, 3·2^k); settles 1023 alone of the 416 exhausted games beyond what the prime formula gives |
+| Caps from neighbouring search problems that relax n's (a proven sufficient condition for one problem to relax another) | [going higher 2-3](#going-higher-and-coming-back-down-2026-10) | measured; not kept | 2708 relaxing pairs within 3, no violation; exact for 5 exhausted games (30, 45, 510, 765, 1023), a top-frame change; a relaxation's root bound is never smaller (972 pairs, GF(2) and matching), so an exact cap comes from a problem at least as hard and a cheaper one leaves a cap that misses (1235: 12 against a GF(2) gap of 164) and prunes nothing; from below never tighter than the chain's cap (70 games) |
+| Incumbents from the games above: n + 1's optimal set on n's board; the look-ahead start of n + 1..n + 3 seeded from n − 1 | [going higher 4](#going-higher-and-coming-back-down-2026-10) | not kept | the optimal set reaches P\* in 91 of the 110 exhausted games that start below it, but rests on n's optimum; the look-ahead beats n's start in 7 and reaches P\* in 1 (1290) |
+| A chain that comes back down: solve n + 1 first and derive n | [going higher 7](#going-higher-and-coming-back-down-2026-10) | not kept | in 1001-1300 only 1023 (from 1024, whose proof costs the same from 6 below): 0.55% of the nodes of the exhausted searches |
+| Equivalent search problems (same feasible sets, not equal) as a wider same search: strip the movers that a peel of each frame's hardest state drops, then a checked isomorphism fixing the candidates | [going higher 6](#going-higher-and-coming-back-down-2026-10) | not kept | 8 games beyond the 545 repeats, all below 186 (18 nodes); near repeats with the same P\* and candidates are not isomorphic and cost 643k nodes over 1001-1300 at most |
+| Proving a run of neighbours that share a core (equal GF(2) root gaps) in one search | [going higher 5](#going-higher-and-coming-back-down-2026-10) | open | every chain step after an exhausted game keeps the GF(2) gap (37 of 37); runs with equal gaps hold 19.8% of the proof nodes of 880-1300 beyond each run's dearest; trees within a run differ by up to ×3.9; not piloted |
 | Lower frame 0's freedoms by solving the two-frame game (`revise_freedoms`) | [tactics review](#revise_freedoms-the-same-trees) | removed 2026-10: its premise is false | assumes the max-sum set also has the max count, which fails on about one perturbed game in 1,300, and for the whole frame game of n = 833 (48 promotions optimal, 49 feasible: [evidence 6](../evidence/README.md#6-does-an-optimal-game-play-the-most-moves)); the two-frame form it applies is undecided |
 | What `reuse_prev` still saves in a strict chain that has `same_search`, the cap and the seed (from the setups, no search) | [tactics review](#reuse_prev-nothing-left-to-save) | measured; removed | of 2..1300 it accepts 670 games, every one settled anyway (545 repeats, 115 caps at once, 10 searches of at most 1.6 s): 3.8 s of the chain's 1052 s of search, 0.5 s of 813 s in 1232..1300; no score or move differs |
 | What `revise_freedoms` changes in the proofs at the frontier | [tactics review](#revise_freedoms-the-same-trees) | measured; removed | it changes the problem of every searched game of 1232..1300 (frame 0's freedoms down 4 to 6, `max_total` 0 to 5), yet the proofs of 1215, 1225, 1240, 1254, 1272, 1287 and 1300 have the same trees, node for node |
@@ -219,6 +238,9 @@ and [THEORY.md's table of evidence](../../heuristics/THEORY.md#evidence).  Entri
 | [What drives the slope](#what-drives-the-slope-2026-10) | what makes a game's cost grow ×10 per 55-70 in n, and what would change the slope? | the root's gap: ×10 nodes per ~130 of it at every n, nothing from the size at a given gap; the slope is the gap's growth; seeding the search with a better root relaxation is a constant factor | db7faf1 (no solver change) |
 | [The committed chain, made again](#the-committed-chain-made-again-2026-10) | does the cleanup's build make the same chain? | yes: the same moves, proofs and scores as the chain of 243af9b; 1022.5 s of search | 271c817 |
 | [Matroid intersection bounds](#matroid-intersection-bounds-2026-10) | does the GF(2) independence of playable sets give a bound whose gap grows more slowly? | yes: the intersection of the even and odd frames' GF(2) matroids closes 82% of the matching gap at the root, more as n grows; a plain branch and bound with it needs 12-800 times fewer nodes than the solver, growing 0.14 decades per 100 n instead of 0.48; recommended for the search; model-free, a tenth of the matching bound's gap on opt(n) | 67bb492 to 12a0f60 and the entry (no solver change) |
+| [How far can nogoods go](#how-far-can-nogoods-go-2026-10) | what is the best a Lagrangian bound over nogoods can do (all conflicts, ideal multipliers), at the root and at nodes, over the matching and over the GF(2) intersection, and is the gap it leaves still growing? | a constant factor: at the root over the matching it is the Lagrangian bound already (its gap growing as fast); at every node about 10x fewer steps at 1,000x the cost; over GF(2) 46% of the root gap and 6x smaller trees, less as n grows, in a quarter more time; superseded by GF(2) | the entry (no solver change; the study's code was not kept) |
+| [Dominance and symmetry](#dominance-and-symmetry-2026-10) | is part of the tree dominated, or explored twice under interchangeable promotions, and does a sound rule's share grow with n? | no transpositions or twins; the frame model has prime-exchange symmetries, and breaking them removes a seventh of the nodes on average (up to 43%), a constant share: not a slope lever | aa56590 to d2de73f (no solver change) |
+| [Going higher and coming back down](#going-higher-and-coming-back-down-2026-10) | can the games above n bound, seed or settle it, so that a dear game comes from a cheaper one above? | no: the games above bound n through relaxations, whose root bounds are never smaller, so an exact cap comes from a problem at least as hard; exact only for 1023 in 1001-1300 (0.55%); incumbents from above are n's optimum reflected; neighbours share their GF(2) gap | the entry (no solver change; the study's code was not kept) |
 | [The parity bound in the model-free proofs](#the-parity-bound-in-the-model-free-proofs-2026-10) | does the parity matroids' bound, reimplemented in the evidence crate and proven as a theorem, carry the model-free proofs of opt(n) from 989 to 1300? | yes: every game 2..1300 proven model-free (twice), the old open searches finished, a fresh proof of all 557 searched games in 1.2 thread-hours; cost ×10 per 84 points of the root's parity gap, about ×1.7 per 100 in n | ff714b3 to the entry (evidence crate only) |
 
 ## The port and its first improvements
@@ -1798,8 +1820,8 @@ member); `v(s)` lies in the coordinates of the other parity of Ω than `s`, `e_s
 parities make two matroids on `2..=n`, and `opt(n)` is at most their heaviest common independent set.  The
 Franklín–Moniot matching bound is this construction with Hall's condition in place of linear independence.
 
-*Method.*  No solver code changed.  The data were made on the build before the tactics cleanup (271c817), with
-`revise_freedoms` off; on the cleaned-up build the examples reproduce `roots.jsonl` exactly, and every command's
+*Method.*  No solver code changed.  The data were made on the build of 4372b36, before the tactics cleanup
+(271c817), with `revise_freedoms` off; on the cleaned-up build the examples reproduce `roots.jsonl` exactly, and every command's
 values that were checked.  `examples/common/meet.rs` (commits 67bb492, 8ee0199, 12a0f60): direct sums of
 linear matroids over GF(2), the weighted intersection by shortest augmenting paths (Lawler; Schrijver, Theorem
 41.7: Bellman–Ford lexicographic in length and arcs; the reference `intersect`), a fast form for blocks of rank at
@@ -1989,6 +2011,737 @@ What it misses is large odd cores, which neither Lorea's matroid nor nogood cuts
   for, a tenth of the matching bound's gap, and should take its model-free cross-check of opt(n) well past 989.
 * *For THEORY.md*: the lemma that a playable set stays independent with the unit vectors of its members below n/2,
   and the split by the parity of Ω into two matroids, extend Theorem 7's lemma from the upper half to the whole game.
+
+## How far can nogoods go (2026-10)
+
+*Question.*  The Lagrangian bound over the nogoods (tactic `lagrange`) fits its multipliers at the root, to the
+nogoods each searcher has learned, and uses them at every node.  The [slope study](#what-drives-the-slope-2026-10)'s
+two pilots found that the root's best-fitted bound given to every searcher saved little, and that a refit from zero
+multipliers ends 50-540 above the best bound the same nogoods allow.  (1) What is the best bound the nogoods a
+searcher holds could give, at the root and at its nodes, and how far is the search's own bound from it?  (2) What does
+the bound become with more conflicts: every minimal conflict of a few members, every conflict of the node?  (3) Does
+the gap left by the best possible use of all conflicts still grow with n?  If it does, that bounds what this direction
+can do.  (4) Is something cheap worth most of it?  And once the
+[matroid study](#matroid-intersection-bounds-2026-10) made the GF(2) bound the baseline: (5) what share of its
+residual gap do conflicts close, at the root and at nodes, by n, and at what cost?
+
+*What was kept.*  Nothing but this entry; the solver is unchanged.  The study's code lived on a branch that was never
+pushed and has been deleted, as the project does with research branches once they are harvested (the pilots of
+[IDEAS.md](IDEAS.md#6-the-tools-and-what-became-of-the-pilot-code) went the same way).  It was a library module that
+solves the LP below (Dantzig-Wolfe column generation with a dense revised simplex, and exact separation of conflicts),
+an example program that ran the measurements, a patch that instrumented the search, and a script that made the tables
+from the data; the data went with it.  So the method is written out here to be redone: which LP, with which inner
+problems, how it is solved, what was measured where, on which games and fixtures, and how it was checked.  What it
+read is on master: the games' optima (`results/strict.jsonl`, `bench/curve/bands.jsonl`), the probe's fixtures
+(`testdata/perf/n0936.nodes`, `n1215.nodes`), and the slope and matroid studies' data (`bench/curve/slope_roots.jsonl`
+and `slope_proofs.jsonl`, `bench/matroid/roots.jsonl` and `bnb.jsonl`), against which its tables were made.
+
+*The tool: the cover LP.*  A conflict `K` of a node (a set of its candidates that cannot all be promoted) gives every
+completion `F` the *cover inequality* `|F ∩ K| ≤ |K| − 1`.  The cover LP of a family of conflicts is `max Σ x·y_x` over
+the polytope of an *inner relaxation* (`y` has a number in [0, 1] for each candidate `x`) with those inequalities.  The
+inner relaxation's sets are the candidate sets that a matching can promote (the matching bound's relaxation), or the
+common independent sets of the two GF(2) frame matroids of the matroid study.  Both polytopes are integral (bipartite
+matching; Edmonds' matroid intersection), so the LP is the Lagrangian dual of the Lagrangian bound over the same
+conflicts with that inner problem (Geoffrion): the lowest that bound can be, whatever its multipliers, and the LP's
+optimal duals are the best multipliers.  The bound itself, for multipliers `λ_K ≥ 0`, is the inner problem's heaviest
+set with each candidate `x` weighed `x − Σ_{K ∋ x} λ_K`, plus the constant `Σ λ_K (|K| − 1)`; with the matching inner
+it is the bound of the `lagrange` tactic.
+
+*Solving it.*  The *master* is the LP over convex combinations `μ` of the inner problem's sets: a column for each set
+`Q` (its sum, and how many members of each conflict it holds), a row `Σ_j μ_j |Q_j ∩ K| ≤ |K| − 1` for each conflict,
+and `Σ μ = 1`; it starts from the empty set as its one column, which satisfies every row.  It is solved by a dense
+revised simplex with an explicit basis inverse (refactorized every 64 pivots, tolerances 1e-9, the right-hand sides
+perturbed by tiny amounts against degeneracy): a new column enters by the primal simplex, a new row with its slack
+basic and is repaired by the dual simplex.  A column is priced by the inner problem's heaviest set at multipliers that
+are the master's duals smoothed towards the best multipliers found so far (Wentges, weight 0.5; if no column of
+positive reduced cost comes out, the plain duals; if none still, the master is optimal).  The matching inner problem
+was the solver's own weighted matching solved from scratch, the intersection the matroid study's.  Every pricing is a
+Lagrangian bound, an upper bound on the LP whatever its multipliers (weak duality), computed in fixed point with
+multipliers rounded to 2⁻²⁰, so exact for the multipliers it used; the master's value is a lower bound on the LP over
+the rows it has.  The solve stops when they are within 1e-3 (or after 50,000 pricings).
+
+*Separation, exact.*  The rows to add are the cover inequalities of *all* conflicts of the node that the master's
+solution `y = Σ μ_j 1_{Q_j}` violates.  A conflict `K` is violated when its *deficit* `Σ_{x ∈ K} (1 − y_x)` is below 1,
+so it lies in `I ∪ F`, where `I` is the set of the candidates with `y_x = 1` and `F` a set of fractional ones whose
+deficits sum below 1.  A minimal conflict fails in one frame `i` (a set that cannot be promoted has a frame that is
+not winnable with it), and all its members are promoted into or out of frame `i` (one that is not could be left out,
+and frame `i` would still fail), so `F` lies among the fractional candidates of homes `i` and `i + 1`.  A subset of a
+set that can be promoted can be promoted, so it is enough to check the *maximal* such sets `I ∪ F`, frame by frame
+(enumerated by branching on the fractional candidates in ascending order of deficit, pruned when the room left cannot
+be filled): if every one can be promoted, no cover is violated, and each that cannot holds a violated conflict, which
+the model's conflict analysis finds inside it (its deficit is at most that of `F`; `Model::conflict_using`).  If `I`
+alone cannot be promoted, the conflicts are the one found and, for each of its members, the one found without it.
+Solving and separating alternate, at most 400 rounds of at most 200,000 feasibility checks, until separation adds
+nothing.  The LP over *all* conflicts of the node (`ideal`) is then between the master's value and the lowest
+Lagrangian bound found, and is *certified* (exact) when the master was optimal and the last separation complete within
+its budget.  Every LP reported below is, except where said.
+
+*Relax-and-cut*, the cheap relative: from some conflicts and multipliers, at most `s` subgradient steps on the
+Lagrangian bound (Polyak's rule towards the target, a node's `need`: step `damping × (bound − need + 1) / ‖g‖²` with
+`g_K = |Q ∩ K| − (|K| − 1)` for the inner problem's heaviest set `Q`, the damping halved after 3 steps without a lower
+bound, multipliers kept at least 0), each step first adding up to `p` conflicts of `Q` with multiplier 0 (the conflict
+of `Q`, then of `Q` without that conflict's largest member, and so on), stopping as soon as the bound is below `need`.
+
+*Validity.*  The LP over all conflicts, over the matching, was tested on the matching bound's walk harness (random walks
+of the search from the root, 2 walks of 25 loop iterations for each game 40-200 with a golden file in `testdata/golden`,
+seeded by n) at 5,495 nodes: separation certified; the LP at least the best completion of the node (exhaustive) and at
+most the matching bound; the columns of one node's LP carried to the next node of the walk (a matching of a node is a
+matching of the next if every promotion the next has and the first does not is promoted in it, every promotion the first
+has and the next does not is a candidate of the next, and it promotes no candidate the next does not have) are matchings
+there, and starting from them gives the same LP; and every forced member read off the potentials (13,642 of them) is
+promoted by every best completion.  Over the GF(2) intersection, a branch and bound with the incumbent one below the
+optimum (which must find a set worth `P*`) finds it in all 709 non-prime games 30-879 (largest tree 1,222 nodes), and
+the 146 proofs of section 6 met no promotable set above `P*`.
+
+*Method.*  No solver code changed.  Games are set up with the default (strict) tactics, the optimum promotion sum `P*`
+read as the slope study reads it (from `results/strict.jsonl`, and `bench/curve/bands.jsonl` past 1300), and everything
+is one thread a process and at most two processes, on the laptop shared with four other agents: times are indicative.  A
+node's *excess* under a bound is the bound's integer part less `P* − sum(promoted)`, the most a completion can be worth
+without beating the incumbent; the node is cut when that is at most 0 (its `need` is `P* + 1 − sum(promoted)`).  The `±`
+of a trend is the standard error of its least-squares slope.  The measurements:
+
+* *Roots*: for each of the 370 non-prime games of 880-1310 and 1350-1352 with a known optimum (371 over GF(2), which
+  has 1351 too), the matching bound, the inner problem's own bound, and the LP over all conflicts of the root, with the
+  matching or the GF(2) intersection inside; the number and sizes of the covers with a positive dual at the end, the
+  columns, pricings and simplex pivots.  The slope study's root Lagrangian bound (8,000 damped steps over conflicts of
+  its own Lagrangian matchings) and the matroid study's GF(2) bound are those of `slope_roots.jsonl` and
+  `roots.jsonl`.
+* *Small conflicts*, at the roots of 880, 1000, 1215 and 1300: every minimal conflict of one, two and three members,
+  by the same frame argument as the separation (all of a minimal conflict's members are candidates of home `i` or
+  `i + 1` for the frame `i` it fails in): a pair is a conflict if promoting both fails, a triple a minimal one if no
+  pair of it is a conflict and promoting all three fails; then the LP, by solving only (no separation), over the
+  conflicts of at most one, two and three members, against the LP over all.
+* *Nodes*: the 300 nodes of each of the probe's fixtures `n0936.nodes` and `n1215.nodes` (units that the solver's
+  proof handed to its searcher; the incumbent is the optimum): the LP over all conflicts of each node, with either
+  inner problem, and relax-and-cut from no conflicts and zero multipliers, 3, 10 and 30 steps of 4 conflicts each.
+* *Traces of the search*, from an instrumented build of the solver of 4372b36 (before the tactics cleanup, with
+  `revise_freedoms` off: the trees the default build makes now) running a one-thread proof seeded with the optimum.
+  The instrumentation wrote, to one file: each nogood the table learns (its members in hexadecimal, one digit for four
+  numbers, lowest first) and each time the table is cleared; at each refit of the Lagrangian relaxation, its nogoods
+  and their integer multipliers (64ths); and, at every K-th Lagrangian check (K = 100 at 936, 2,000 at 1215), the
+  node's promotions and candidates, its `need` and the value of the search's bound.  Replaying the file rebuilds the
+  table and the relaxation at each sampled check, and measures there: the LP over the relaxation's nogoods that are
+  live at the node (the nogood less the promotions, nonempty and among the candidates), the LP over those and the
+  table's, relax-and-cut from the search's multipliers (5, 20 and 50 steps, adding 0 or 4 conflicts a step; the table's
+  nogoods start at 0), and the LP over all conflicts; and at each refit, the bound its multipliers give at the root
+  against the LP over the nogoods it fitted (the relaxation's and the table's).
+* *Extra checks in the search*, the same build with a bound added where the search's matching check and Lagrangian bound
+  leave a node or child open: if the extra bound is below `need` the node is cut; if it is not, and forced members are
+  asked for, the members of the heaviest set at its best multipliers without which its bound (read from the inner
+  problem's potentials, as the Lagrangian bound reads its forced members) falls below `need` join the node's forced
+  members.  The bound was one of: the LP over all conflicts of the node (`ideal`), stopped at the first Lagrangian bound
+  below `need`, starting from the nogoods the searcher holds that are live there, from every conflict found at earlier
+  nodes (kept in a pool, as nogoods of the root, and added where live) and from the columns of the last LP carried over;
+  the LP over the relaxation's live nogoods (`relax`) or over those and the table's (`known`), solved without
+  separation; relax-and-cut from the search's multipliers over the relaxation's and the table's nogoods, 5 or 20 steps,
+  with no conflicts added (`rf`) or 4 a step (`rc`); *per-subtree multipliers* (`anchor`): at each node whose promotions
+  number a multiple of 4, 8 or 16 and which has no anchor of its own, the LP over the nogoods live there (and those of
+  the enclosing anchor), after which the covers with a positive dual are made nogoods of the root and, with their duals
+  as multipliers, give the bound of every node below it, by one pricing; and the LP over all conflicts used only at
+  nodes of at most 8, 16 or 24 promotions.  (A solve stopped at the first bound below `need` is not certified; any
+  Lagrangian bound cuts soundly.)  The searches are the slope study's proofs (one thread; the incumbent a value `P* + δ`
+  with no set behind it, so δ = 0 is the proof of the optimum), and the "search's" steps those of `slope_proofs.jsonl`
+  (the traced proofs of 936 and 1215 took its 41,653 and 1,111,451 steps).
+* *Branch and bound with the LP at every node*: a node is cut when the LP over all conflicts of the node has a
+  Lagrangian bound below `need` (checked first with no conflicts); an integral LP solution is a promotable set, the
+  node's best completion; the children inherit the conflicts that still hold in them.  Branching, with the matching
+  inside, on the most fractional candidate of the LP's solution (promoted first, then left out); with GF(2) inside, as
+  the matroid study's branch and bound branches, on a conflict `k₁ < … < k_r` of the heaviest set at the best
+  multipliers ("`k₁ … k_{j−1}` promoted, `k_j` not", for each `j`).  The incumbent is `P*`, or `P* − 1` for the
+  soundness check.
+
+**1. At the root, all conflicts are worth what the root's own conflicts are.**  The LP over every conflict of the
+root, over the matching (every LP exact; the GF(2) gap is the [matroid study's](#matroid-intersection-bounds-2026-10),
+the Lagrangian gap the [slope study's](#what-drives-the-slope-2026-10)):
+
+| n | games | matching gap | Lagrangian gap (slope study) | all conflicts | GF(2) gap | ms |
+|---|---|---|---|---|---|---|
+| 851-900 | 18 | 432 | 112 | 110 | 88 | 30 |
+| 901-950 | 43 | 619 | 185 | 180 | 147 | 79 |
+| 951-1000 | 43 | 749 | 261 | 256 | 172 | 168 |
+| 1001-1050 | 42 | 795 | 362 | 358 | 156 | 203 |
+| 1051-1100 | 42 | 546 | 206 | 199 | 81 | 160 |
+| 1101-1150 | 45 | 522 | 162 | 162 | 107 | 112 |
+| 1151-1200 | 43 | 629 | 154 | 150 | 108 | 182 |
+| 1201-1250 | 42 | 1091 | 426 | 419 | 148 | 348 |
+| 1251-1300 | 43 | 1277 | 471 | 459 | 185 | 424 |
+| 1301-1310 | 7 | 1445 | 554 | 547 | 154 | 685 |
+| 1350-1352 | 2 | 1238 | 452 | 430 | 267 | 490 |
+
+Over 880-1300 its gap is 263.9 on average against the slope study's 269.0 (8,000 damped steps over conflicts of its
+own Lagrangian matchings), 0.2 to 11.6 below it band by band, and it grows 54.7 ± 5.1 per 100 in n against 56.0 ± 5.2:
+those conflicts were already all the root has, and that fit had converged.  It closes 67% of the matching gap, a share
+that does not grow (−0.8 ± 0.4 points per 100 in n).  So over the matching the best a Lagrangian over nogoods can do at
+the root leaves a gap growing with n as fast as the Lagrangian bound's.  About 30 covers bind at the optimum, a third
+of them pairs and 36% of eight members or more; at 880 the root's LP solution is half-integral and its binding covers
+span frames 0-2.
+
+**2. Small conflicts are not enough.**  Every minimal conflict of one, two and three members of the root (none of one
+member, 245-413 pairs, 892-1,723 triples, 2-11 s to enumerate), against all conflicts (gaps):
+
+| n | matching | ≤ 2 members | ≤ 3 | all | GF(2) | ≤ 3 members | all |
+|---|---|---|---|---|---|---|---|
+| 880 | 487 | 371 | 371 | 167 | 56 | 56 | 1 |
+| 1000 | 911 | 576 | 576 | 392 | 214 | 214 | 130 |
+| 1215 | 966 | 739 | 702 | 366 | 213 | 213 | 165 |
+| 1300 | 1421 | 1043 | 973 | 520 | 151 | 151 | 130 |
+
+Over the matching they close 24-37% of the gap, against 57-66% for all conflicts, and the triples add almost nothing
+to the pairs; over GF(2) they add nothing at all (the intersection already implies them).  The conflicts that bind
+are large, and generating them proactively by size cannot reach them.
+
+**3. The search's bound: near the best its nogoods allow at the root, far from it at the nodes.**  Traces of the
+one-thread proofs of 936 (41,653 steps, every 100th Lagrangian check) and 1215 (1,111,451 steps, every 2,000th),
+replayed.
+
+* *At the root*: at each refit, the bound its multipliers give against the LP over the nogoods it fitted.  At 1215
+  (23 refits, 88-329 nogoods each) the 50 warm-started steps end 7.8 above that LP on average, 14.3 at most, and the
+  final relaxation's root bound (35,445) is 29 above the LP over all conflicts (35,416; `P*` is 35,050).  The one refit
+  of 936 (from zero, after 2,000 steps) ends 39 above.  The slope study's "50-540 above" was a refit from zero
+  multipliers; the search refits from its last ones and converges over its refits (the slope
+  study did not measure that).
+* *At the nodes*, the checks the search leaves open (242 of 251 sampled at 936, 345 of 370 at 1215): the mean excess
+  of each bound, and the share of those checks it would cut.
+
+| | the search's | its relaxation, refitted at the node | all the nogoods it holds | all conflicts | 20 refit steps | 50 | 20 with conflicts added | 50 |
+|---|---|---|---|---|---|---|---|---|
+| 936: excess | 54 | 47 | −22 | −139 | 13 | 9 | 7 | 4 |
+| 936: cut | 0 | 5% | 74% | 97% | 38% | 54% | 62% | 79% |
+| 1215: excess | 73 | 38 | −18 | −191 | 24 | 18 | 12 | 6 |
+| 1215: cut | 0 | 24% | 67% | 95% | 30% | 41% | 46% | 66% |
+
+  (The refits start from the search's multipliers, the table's nogoods at 0; "conflicts added": 4 conflicts of each
+  step's Lagrangian matching.)  Refitting the relaxation's own nogoods at the node gains little: a typical node has 1
+  of 936's 16 live and 9 of 1215's 52-65, the others' members promoted or dropped on the way down.  The nogoods the
+  searcher holds in its table, 37 and 49 of them live at a typical node, would cut two thirds to three quarters of
+  the checks it leaves open with multipliers fitted there, and all conflicts of the node 95-97%.  The weakness is not
+  the nogoods but the multipliers: fitted at the root, for the root.
+
+**4. All conflicts at every node: a constant factor, not a slope.**  The instrumented build, cutting with the LP over
+all conflicts of the node wherever the search's own bounds leave a node or child open (one thread, seeded with the
+optimum):
+
+| n | the search's steps | with the extra cut | ratio | ms a check |
+|---|---|---|---|---|
+| 880 | 25,398 | 1,741 | 14.6 | 9 |
+| 900 | 4,194 | 397 | 10.6 | 12 |
+| 936 | 41,653 | 1,327 | 31.4 | 9 |
+| 950 | 460,813 | 14,658 | 31.4 | 29 |
+| 1000 | 366,846 | over 29,080 (stopped at 590 s) | under 12.6 | 22 |
+| 1050 | 46,527 | 4,207 | 11.1 | 25 |
+| 1088 | 6,205 | 454 | 13.7 | 31 |
+| 1100 | 29,614 | 6,157 | 4.8 | 6 |
+| 1150 | 4,858 | 550 | 8.8 | 20 |
+| 1184 | 52,259 | 6,469 (4,485 with its forced members) | 8.1 (11.7) | 5 |
+| 1196 | 216,076 | over 15,675 (stopped at 590 s) | under 13.8 | 39 |
+
+log10 of the steps with the cut against the search's: slope 0.81 ± 0.14 over the nine finished games, and the two
+stopped ones, among the largest trees, lie above that line.  Margin scans (incumbent `P* + δ`, the cut and its forced
+members): at 1215 the ratio is 1,614 at δ = 400, 209 at 300, 131 at 200, 49 at 150 and 24 at 100; at 936 604, 94, 64
+and 30 at δ = 200, 100, 50 and 0.  The advantage shrinks as the remaining gap grows: the LP over all conflicts is no
+tighter than the Lagrangian bound at the top of the tree (section 1) and far tighter deep down, so it removes the deep
+nodes of a tree whose top it leaves as it was.  A plain branch and bound with the LP at every node (on the most
+fractional candidate) needs 10-63 times fewer nodes than the solver's steps at 880, 900, 936, 1000, 1088, 1100 and
+1184 (2,439, 127, 1,503, 15,593, 99, 2,531 and 2,135 nodes), with a log-log slope of 1.15 ± 0.17 against them.  The
+two log-log slopes, 0.81 and 1.15, lie on either side of 1 and within 1.4 standard errors of it: about ten times fewer
+nodes, no visible change of the tree's growth, and a check costs 5-40 ms, 1,000-5,000 of the search's steps.
+
+**5. Nothing cheap gets enough of it.**  The same build with cheaper extra checks, their forced members joining the
+node's (steps; the cost of a check):
+
+| extra check at the open checks | 880 | 936 | 1184 | ms a check |
+|---|---|---|---|---|
+| none (the search) | 25,398 | 41,653 | 52,259 | |
+| the LP over the nogoods the searcher holds | 8,856 | 10,004 | 12,471 | 1.3-4.0 |
+| 5 refit steps from its multipliers, 4 conflicts added a step | 11,267 | 17,185 | 18,970 | 0.5-1.2 |
+| 20 such steps | 4,383 | 5,929 | 9,707 | 1.6-3.6 |
+| 20 refit steps, no conflicts added | | 15,741 | | 1.0 |
+| the LP over all conflicts at nodes of at most 8, 16 or 24 promotions only | | 39,858; 39,579; 27,507 | | 33-40 |
+| per-subtree multipliers: the LP over the nogoods held at every node of 4, 8 or 16k promotions, used below it | | 13,291; 17,841; 26,432 | | 0.2-0.5, and an LP fit every 8-34 steps |
+
+Apart from the per-subtree fits (25-70 steps' cost a check, and a fit every few steps) and the LP at shallow nodes
+(4,000-5,000 steps a check, for at most 1.5 times fewer), each costs per check what 80 to 550 of the search's steps
+cost, for 2.3-7 times fewer steps, and all lose time: by factors of 11 (the per-subtree multipliers at 936) to 100 (the
+table's LP at 1184).  At 936 the search takes 0.34 s and the cheap forms 3.7-13 s; at 880 0.16 s against 4-8 s, at 1184
+0.38 s against 15-38 s.  Raising multipliers lowers the weights of their members, which the incremental levels cannot
+repair without the Hungarian searches that make a solve, so the refits could not be made much cheaper; keeping the
+expensive check to the top of the tree saves nothing, since the gain is at the bottom; and subtrees are short chains
+(four nodes in five end after their first child), so per-subtree fits come every few steps.
+
+**6. With the GF(2) intersection inside.**  The GF(2) bound alone beats the best nogood bound over the matching at the
+root (section 1's last columns: its gap is 28-82% of the latter's band by band, and grows 4.6 per 100 in n against
+54.7), so nogoods over the matching are superseded.  With the heaviest common independent set of the two GF(2)
+frame matroids as the cover LP's inner problem:
+
+* *At the root* (all 371 roots of the matroid study, every LP exact, 10-158 ms):
+
+| n | games | GF(2) gap | with all conflicts | share closed |
+|---|---|---|---|---|
+| 851-900 | 18 | 88 | 26 | 0.73 |
+| 901-950 | 43 | 147 | 75 | 0.49 |
+| 951-1000 | 43 | 172 | 106 | 0.40 |
+| 1001-1050 | 42 | 156 | 107 | 0.32 |
+| 1051-1100 | 42 | 81 | 36 | 0.57 |
+| 1101-1150 | 45 | 107 | 55 | 0.53 |
+| 1151-1200 | 43 | 108 | 44 | 0.65 |
+| 1201-1250 | 42 | 148 | 105 | 0.29 |
+| 1251-1300 | 43 | 185 | 128 | 0.31 |
+| 1301-1310 | 7 | 154 | 138 | 0.10 |
+| 1350-1352 | 3 | 272 | 192 | 0.29 |
+
+  Over 880-1300 all conflicts close 46% of the GF(2) gap on average (79 left of 136), a share that falls 3.8 ± 0.8
+  points per 100 in n; what is left grows 8.4 ± 2.0 per 100 in n, the GF(2) gap 4.6 ± 2.4.  (The matroid study's
+  subgradient over the conflicts of each heaviest set closed 7-36% at five roots; the LP is the best any multipliers
+  can do, and its gap at 1300, 129.5, is that study's 129 to within the rounding of its integer bounds.)  About 10
+  covers bind at a root, 96% of them of eight members or more.
+* *At the probe's nodes*: GF(2) alone cuts 163 and 167 of the 300 nodes of 936 and 1215 (the matroid study's
+  figures); with all conflicts 278 and 249, that is 84% and 62% of the nodes it leaves open, at 12 and 46 ms a node.
+  Relax-and-cut with the intersection inside, from no conflicts, 4 conflicts of each heaviest set added a step, cuts
+  45%, 55% and 63% of them at 936 with 3, 10 and 30 intersections, and 19%, 39% and 42% at 1215.  (Over the
+  matching, for comparison: all conflicts cut 84% and 71% of the nodes, relax-and-cut 20-55% and 12-45%.)
+* *In a branch and bound* (the matroid study's skeleton and branching, with the LP over all conflicts in place of the
+  bare intersection), on the 146 games the slope study proves, against the matroid study's `bnb.jsonl`:
+
+| n | games | log10 nodes, solver | GF(2) B&B | GF(2) and all conflicts | ratio | s, GF(2) B&B | s, with all conflicts |
+|---|---|---|---|---|---|---|---|
+| 851-900 | 6 | 3.78 | 2.59 | 1.47 | 13.1 | 1.0 | 0.9 |
+| 901-950 | 16 | 4.56 | 3.48 | 2.50 | 9.6 | 22.8 | 22.8 |
+| 951-1000 | 16 | 5.21 | 3.74 | 2.82 | 8.3 | 120.1 | 136.8 |
+| 1001-1050 | 19 | 5.62 | 3.99 | 3.36 | 4.2 | 160.1 | 241.0 |
+| 1051-1100 | 18 | 4.46 | 2.77 | 2.09 | 4.8 | 8.0 | 8.9 |
+| 1101-1150 | 17 | 3.82 | 2.72 | 2.08 | 4.3 | 6.4 | 9.4 |
+| 1151-1200 | 16 | 4.52 | 2.90 | 2.10 | 6.4 | 32.8 | 28.1 |
+| 1201-1250 | 19 | 6.13 | 3.90 | 3.04 | 7.3 | 168.6 | 210.2 |
+| 1251-1300 | 16 | 6.90 | 4.11 | 3.43 | 4.8 | 240.5 | 334.6 |
+| 1309 | 1 | 7.14 | 4.24 | 3.34 | 8.1 | 16.3 | 14.7 |
+| 1350, 1352 | 2 | 6.88 | 4.79 | 3.74 | 11.1 | 128.3 | 117.2 |
+
+  All conflicts make the trees 6.2 times smaller (geometric mean; 231,592 nodes against 1,327,966 in all), less as n
+  grows (the ratio's logarithm −0.046 ± 0.016 per 100 in n), and the node count grows 0.18 ± 0.05 decades per 100 in n
+  against GF(2)'s 0.14 ± 0.05.  It follows the root's GF(2) gap at 0.0112 ± 0.0006 decades per unit, the matroid
+  study's 0.0111 for GF(2) alone: the conflicts move the line down, not its slope.  From the root alone, 0.0111 times
+  the gap they close there predicts 0.62 decades on average; the trees shrink by 0.79.  In time it is no gain: 1,125 s
+  against 905 s for the 146 proofs (545 against 409 s over 1201-1300), a quarter to a third slower, a node costing
+  2.4-11 ms against the bare intersection's 0.3-1.
+
+*Conclusion.*  A Lagrangian bound over nogoods can be no better than the cover LP over all conflicts, and that is a
+constant factor, not a slope.  Over the matching: at the root it is the slope study's Lagrangian bound (5 below it on
+average), whose gap grows 55 per 100 in n; the search's multipliers are near the best its nogoods allow at the root and
+far from it at the nodes, where the nogoods it already holds would cut two thirds of the checks it leaves open; but the
+best use of every conflict at every node makes the proofs about ten times smaller, with no visible change in how they
+grow, at a thousand or more steps' cost a check, and every cheap form tried loses time by a factor of 11 to 100.  Over
+the GF(2) intersection, which supersedes it: all conflicts close 46% of the root's gap, a share falling with n, cut
+62-84% of the probe's nodes it leaves open, and make its branch and bound about six times smaller (less as n grows)
+in a quarter more time.  So the answer to (3) is yes: over the matching the ideal leaves a gap that grows as the
+Lagrangian bound's does, and over GF(2) the residual still grows (8.4 ± 2.0 per 100 in n, against GF(2)'s own 4.6 ±
+2.4; the two do not differ by more than their errors).  In both, nogoods give a constant factor.
+
+*What it implies.*
+
+* *Nothing of this to implement now; the direction is superseded.*  The slope's lever is the GF(2) bound, going into
+  the search.  The existing `lagrange` tactic (the matching, root-fitted multipliers) should be measured again once
+  GF(2) bounds every node: GF(2) is tighter at the root than the best a nogood bound over the matching could ever be,
+  and what the Lagrangian adds at the nodes (the matroid study found a node-fitted one cutting different nodes from
+  GF(2)) is at most this study's constant factor, at its cost.
+* *Later, a constant factor over GF(2)*: a Lagrangian over nogoods with the intersection as the inner problem is worth
+  at most about six times fewer nodes at the frontier, less as n grows, and only if a node costs little more than one
+  intersection (multipliers carried from the parent and a step or two at a node, on an incremental intersection that
+  takes falling weights).  Relax-and-cut with three intersections a node already cuts 19-45% of the probe's nodes that
+  GF(2) leaves open.
+* *What conflicts miss* is what GF(2) misses, the large odd cores; their cover inequalities are weak (`|F ∩ K| ≤ 14`
+  for 15 members).  Stronger families over the same sets (rank inequalities over a frame's candidates, frame-local
+  hulls) were not tried; the register has no row for them.
+
+## Dominance and symmetry (2026-10)
+
+*Question.*  The slope study found a proof's nodes to be about `a + c·G` decades for a root gap `G`, with `c` the
+same at every n, so a lower cost per unit of gap cuts the slope as a tighter bound does.  A search that must rule
+out every promotion set inside the gap pays separately for every near-optimal variant; the uniqueness study found
+optimal sets that differ by exchanging equal-sum groups of lower-half numbers.  How much of a proof's tree is
+*dominated* (another promotion set does at least as well with every completion, so the node can be pruned) or
+explored twice under interchangeable promotions?  Which exchanges are provably safe, what share of nodes would a
+sound rule remove, and does that share hold or grow with n?  IDEAS.md section 5 had dominance rules and symmetry
+breaking as considered, not piloted, and "no symmetries found".
+
+*Definitions.*  A node `(P, C)` is dominated by a set `P'` (a candidate set, feasible, disjoint from `C`) when every
+completion `S ⊆ C` of the node that could beat the incumbent is promotable from `P'`'s state and `P' ∪ S` is worth
+more.  Pruning such nodes is sound: the pruned sets map to feasible sets worth strictly more (for two-for-two
+exchanges of equal sums, larger as binary numbers), so the heaviest feasible set, the largest of them in that
+order, is never pruned.  The completions that could beat the incumbent are within the node's *relevant* candidates:
+those that can be promoted and with which the matching bound, plus themselves, still reaches what the node needs.
+`P'`'s state *covers* the node's when, frame by frame, its *core* (the frame for the edits the relevant candidates
+can make, less the moves that can always go last and the factors nobody can use) has no move the node's core lacks
+and every factor of the node's core that its moves or the incoming candidates can use: then every completion
+promotable from the node's state is promotable from `P'`'s (the proof is the comment of `covers` in
+`examples/dominance.rs`).  The cover is also tried with moves relabelled (a move stands in for another with the same
+live factors) and up to an exchange of two primes (`covers_mapped`).  A *sampled* estimate replaces the proof by 64
+random maximal completions within the relevant candidates (infeasibility only grows with a set, so maximal sets are
+the ones to try): an upper estimate of what any cover could prove; 1,024 samples gave the same counts within two
+nodes in a hundred.
+
+*Method.*  No solver code changed.  `examples/dominance.rs` (commits aa56590 to d2de73f, on the cleaned-up build)
+and `examples/common/symmetry.rs`; `bench/dominance/` holds the node samples, the outputs and `dominance.py`, which
+makes the tables below (`dominance_output.md`).  One thread, at most two processes, on the shared laptop.
+
+* *Nodes.*  The probe's fixtures (units of the proofs of 936 and 1215, mostly shallow: 13-16 promotions); nodes of
+  the solver's own proofs sampled uniformly over their steps (`dominance sample --count K`: the deterministic
+  one-thread proof stopped after `k·T/(K+1)` steps and the node it stopped in read back from its checkpoint; 40-100
+  nodes each of 900, 936, 950, 1000, 1100, 1184, 1215, 1250, and of 1000 and 1250 with the incumbent at `P*` + 100
+  and + 200); and nodes of the GF(2) branch and bound's trees (`matroid bnb --bounds gf2`; one in 60 to one in 200
+  of 930, 990, 1020, 1210, 1230 and 1300).  `dominance nodes` tries at each node every exchange of one excluded
+  candidate added, one for one (`a > b`), and, with `--pairs`, two for one and two for two; every exchange of two
+  primes applied to `P`; twins among the candidates (same home frame, same live factors below, same users above:
+  an automorphism of the node's problem); and the symmetry rule below.
+* *Two pilots* (code not kept; how to rebuild them is here).  The *solver pilot* copied `src/search/searcher.rs`,
+  `refine.rs` and `lagrange.rs` into an example (paths adapted, the diagnostics probe stubbed) and added one hook in
+  `Stepper::check`, after the matching bound: the symmetry rule may cut the node (cut reason `refined`).  With the
+  rule off it reproduces the proofs node for node (900 4,194; 936 41,653; 950 460,813; 1000 366,846; 1100 29,614;
+  1184 52,259; 1250 709,893).  The *GF(2) pilot* copied `examples/matroid.rs`'s frame matroids and its `bnb` loop
+  (bound `gf2`) and added the rule after the bound; with it off it reproduces B's trees (936 3,392; 1100 1,874; 1184
+  1,093; 1250 2,543).  Both run the incumbent as a value, `P*` or `P*` + δ, as `slope prove` does.
+
+**1. No transpositions, no twins, and literal dominance is rare.**
+
+* *Transpositions*: in the GF(2) branch and bound's trees of 930, 990, 1020, 1210, 1230 and 1300 (133,006 nodes) no
+  reduced state is reached by two different promotion sets; the states that repeat (19-21% of the nodes) are the
+  conflict branching's siblings, the same `P` with fewer candidates.  Nothing is explored twice literally.
+* *Twins*: none at any node of any sample (the candidates' live neighbourhoods differ, as IDEAS.md expected).
+* *Adding an excluded candidate* (`P + a`, the "the node went on without `a`, but `a` fits anyway" case): proved at
+  no node; at 57% of the fixtures' nodes some excluded candidate can be added and no single relevant candidate
+  blocks it, yet some random maximal completion always does.  Excluded candidates stay blockable.
+* *Literal covers* (one for one, two for one or two, with or without relabelled moves) at the solver's nodes: 0-1%
+  of the fixtures' nodes, 0-5% of the sampled proof nodes; the sampled estimates are far higher (up to 53%), and the
+  exchanges behind the gap are the subject of 2.  For example, at a node of 936 the swap 426 → 438 (6·71 → 6·73)
+  passes every sample: the families {284, 426, 568, 852} and {292, 438, 584, 876} are the same graph in the node's
+  frames, and a literal cover cannot see it because the numbers differ.
+
+**2. The frame model has symmetries: exchanges of primes.**  Exchanging the exponents of two primes `p < q` in
+every number is an automorphism of divisibility.  When it maps the root's frames onto themselves (moves to moves,
+factors to factors, the factor graph among them onto itself) and the candidates onto themselves, it maps every
+promotable set `S` to a promotable set worth `(q − p)·(c_p(S) − c_q(S))` more, `c_r(S)` being the sum of `x / r`
+over the members of `S` divisible by `r` (`examples/common/symmetry.rs`, `root_symmetry` and `root_pairs`; no
+candidate is divisible by both or by a square in any pair found).  The pairs are found by checking that directly;
+they are not just the primes with the same multiples on the board (at 851, 59, 61 and 67 are one class though
+851/59, 851/61 and 851/67 have different floors: the frames see only some multiples).  At 1300 the classes are
+{41, 43}, {59, 61}, {67, 71}, {73, 79}, {89, 97, 101, 103, 107}, {109, 113, 127, 131, 137, 139} and {149, 151, 157}.
+
+| n | games | candidates | classes of primes | largest class | candidates moved | log10 of the group's order |
+|---|---|---|---|---|---|---|
+| 851-900 | 50 | 211 | 3.8 | 4.3 | 23.9 (11%) | 4.5 |
+| 951-1000 | 50 | 236 | 4.1 | 6.1 | 28.5 (12%) | 5.1 |
+| 1051-1100 | 50 | 266 | 4.6 | 6.3 | 28.3 (11%) | 5.2 |
+| 1151-1200 | 50 | 289 | 4.6 | 6.7 | 28.9 (10%) | 5.9 |
+| 1251-1300 | 50 | 322 | 5.8 | 6.7 | 41.5 (13%) | 6.7 |
+| 1301-1350 | 50 | 336 | 5.9 | 5.9 | 48.4 (14%) | 7.4 |
+
+*The rule.*  A set worth beating the incumbent with `c_p > c_q` for a symmetric pair has an image worth more, so
+only sets with `c_p ≤ c_q` for every pair need searching, and a heaviest set always keeps them all (otherwise its
+image would be heavier): a node can be cut when, for some pair, no completion that keeps the constraint can reach
+what the node needs.  The constraints of a class are the order of its primes by their cofactor sums, which is all
+that value can say about the class's whole symmetric group.  Three tests of that, from cheap to dear: *hopeless*,
+no completion can lift `c_q` to `c_p` (`c_p(P) > c_q(P) + c_q(C)`); the *matching bound of the constraint*, each
+subset `U` of the pair's multiples among the candidates (at most 10 or 12) promoted, the others left out, the rest
+relaxed (solver pilot and `dominance nodes`); the *Lagrangian of the constraint* on the GF(2) bound, each multiple
+`m·p` weighing `m(p − μ)` and `m·q` weighing `m(q + μ)`, plus `μ(c_q(P) − c_p(P))`, for `μ = (q − p)/2` and `q − p`
+(a bound on the completions that keep the constraint for any `μ ≥ 0`; GF(2) pilot).  The two dearer tests run only
+for pairs whose constraint the bound's heaviest set breaks.
+
+*Checks* (`dominance symcheck --known results/strict.jsonl 2-1300`, `bench/dominance/symcheck.jsonl`): in all 1,170
+games with pairs, the images of the optimal set and of 50 random maximal promotable sets are promotable and worth
+what the formula says; on the 22 boards with pairs and at most 22 candidates every promotable set (97,839 in all) is
+checked and the best that keeps the constraints is `P*`; the brute-force oracle scores the known optimum to n = 40.
+Both pilots with the incumbent at `P*` − 1, so that they must find an optimal set themselves, find one in every
+game of 2-900 (880 games each; the rule cut in 573 and 353 of them).
+
+**3. What the rule and the covers remove: a sixth to a third of the nodes, a constant share.**  At the sampled
+nodes (`dominance_output.md` has the per-game tables): "proved" is any of the covers, the prime exchanges and the
+rule's matching test; "sampled" its upper estimate.
+
+| tree | n | proved | sampled |
+|---|---|---|---|
+| solver proofs | 900, 936, 950, 1000 | 0%, 25%, 32%, 43% | 0%, 46%, 53%, 50% |
+| | 1100, 1184, 1215, 1250 | 36%, 8%, 10%, 25% | 39%, 20%, 12%, 35% |
+| incumbent `P*` + 100 | 1000, 1250 | 28%, 8% | 52%, 15% |
+| incumbent `P*` + 200 | 1000, 1250 | 0%, 12% | 50%, 27% |
+| GF(2) branch and bound | 930, 990, 1020 | 54%, 25%, 16% | 55%, 25%, 21% |
+| | 1210, 1230, 1300 | 7%, 19%, 35% | 10%, 20%, 39% |
+
+Two-member exchanges add little (sampled, with everything else: 49%, 34%, 48% of the nodes of 936, 1184, 1250; 25%,
+7%, 46% of the GF(2) nodes of 1020, 1210, 1300).  In the GF(2) trees what is proved is nearly all that is sampled,
+and it is the rule; in the solver's trees the rest of the estimate is single swaps along a symmetry (426 → 438
+above, half of an exchange of 71 and 73) and exchanges of primes that are alike only at the node (29 and 31, 17 and
+19, 61 and 67 at nodes of 936, where the multiples that tell them apart are decided).
+
+The pilots, nodes with the rule against without, the incumbent at `P*`:
+
+| search, rule | games | nodes, geometric mean ratio | total | fewest | most | log ratio on log nodes | time |
+|---|---|---|---|---|---|---|---|
+| solver, hopeless | 880-1090 by 10 (22) | 0.962 | 0.960 | 0.85 (950) | 1.07 (1040) | −0.002 | +15% |
+| solver, matching bound of the constraint | the same | 0.878 | 0.829 | 0.67 (1000) | 1.16 (940) | −0.028 | ×1.9 |
+| GF(2) B&B, hopeless | 880-1300 by 10 (43) | 0.948 | 0.925 | 0.71 (940) | 1.00 | −0.016 | −3% |
+| GF(2) B&B, Lagrangian of the constraint | the same | 0.859 | 0.826 | 0.57 (930) | 0.98 (1100) | −0.030 | −3% |
+
+In the solver the rule's cuts change what the searcher learns, so a tree can grow: 1184 52,259 to 66,250 (+27%) with
+the matching test, 940 +16%; 1250 709,893 to 678,415 (−4%).  The margin scans of the GF(2) pilot (δ = 0, 25, 50, 100)
+keep the ratio per game: 930 0.57, 0.60, 0.61, 0.92; 990 0.77, 0.77, 0.77, 0.79; 1300 0.69, 0.68, 0.67, 0.75.  The
+share does not grow with n (the log ratio changes by ±0.02 decades per 100 in n in both pilots) and barely with the tree
+(−0.03 decades per decade of nodes: `c` lowered by about 3%), although the symmetric part of the problem does grow
+(the table of 2): most rearrangements within a class differ in value by more than the bound leaves, and the bound
+already cuts them.
+
+*Conclusion.*  Literal dominance and transpositions are absent from the trees; what makes interchangeable
+alternatives is a real symmetry of the frame model, the exchange of primes within classes that the frame builder
+treats alike, which IDEAS.md's "no symmetries found" missed.  Breaking it is sound (proved, and checked to 1300) and
+removes about a seventh of the nodes on average (geometric mean 0.86 in the GF(2) branch and bound, 0.88 in the
+solver), up to 43% in some games: a constant factor, not a lower cost per unit of gap.  Exchanges that hold only
+at a node add a little more in the solver's trees and almost nothing in the GF(2) trees, and cost a state comparison
+per exchange, far more than a step.
+
+*What it implies.*
+
+* *Not a slope lever*, and not worth a phase of its own.  If the GF(2) bound goes into the search, the symmetry rule
+  is a cheap addition there: the hopeless test from cofactor sums kept along the path (nearly free, about 5% of
+  the nodes) and the constraint's Lagrangian at the nodes whose heaviest set breaks a pair (about 14%, at one or two
+  intersections there; time-neutral in the pilot, where every bound is computed from scratch).  In the matching
+  solver the constraint costs more than it saves.
+* The pairs are found at the root in about 20 ms a game (the setup included); `root_pairs` is the definition to reuse.
+* The equal-sum exchanges of the uniqueness study are not symmetries (e.g. 425's {110, 132, 168} ↔ {98, 150, 162});
+  they are coincidences of value that only the bound can rule out.
+
+## Going higher and coming back down (2026-10)
+
+*Question.*  The chain uses the game below: the ceiling opt(n) ≤ n + opt(n − 1) (the cap), the prime formula,
+`same_search` and the seed.  Can the games above n (their optima, optimal games, search problems and proofs) tighten
+n's upper bound, raise its incumbent or settle it, so that an expensive game is derived from a cheaper one above it?
+Since a proof's cost is set by the root's gap ([slope](#what-drives-the-slope-2026-10); the GF(2) gap for a search
+built on the [GF(2) bound](#matroid-intersection-bounds-2026-10)), a relation from above counts if it beats that gap
+where the searches are dear.
+
+*What was kept.*  Nothing but this entry; the solver is unchanged.  The study's code lived on a branch that was never
+pushed and has been deleted, as the project does with research branches once they are harvested.  It was two example
+programs (one that set up the boards n and n + 1..n + 3 and measured how their search problems relate and what each
+optimal set is worth on the other board; one that tests search problems for equivalence), a table script and the data
+they made, and one-line mentions of the programs in DESIGN.md and README.  The method is written out below to be
+redone, with the one result that lived only in the code, the sufficient condition for one problem to relax another,
+stated and proved.  What it read is on master: the chain (`results/strict.jsonl`), the GF(2) root gaps
+(`bench/matroid/roots.jsonl`) and the one-thread proofs (`bench/curve/slope_proofs.jsonl`).
+
+*Method.*  No solver code changed; one search was run (section 7).  For each board n of 2..1297 (primes and trivial
+boards included) and each m = n + 1..n + 3, both boards were set up as `taxman solve` sets them up (default tactics:
+the root's frames after reduction, the candidates with their home frames, `max_total`, `in_the_bag`), and the optimal
+games read from the chain (a game's P\* is its score less `in_the_bag`).  Recorded for each pair:
+
+* whether the two search problems are *equal* (the test of `same_search`, DESIGN.md
+  "[Same search](../DESIGN.md#same-search)") and whether each *relaxes* the other (below);
+* how m's root differs from n's, frame by frame: the moves and factors m has and n has not and the other way, the
+  change of the frame's freedoms, the candidates gained and lost, the change of `max_total`;
+* what each optimal promotion set is worth on the other board: the set's members that are candidates there, whether
+  they can all be promoted from the root, and the sum after *repairing* (dropping the smallest member of a conflict
+  until the rest can be promoted) and *filling* (adding the largest candidates that keep it promotable);
+* for n, the incumbent its chain search starts from (the search stopped before its first node, seeded from the game of
+  n − 1), and a *look-ahead* start: the incumbent the search of m starts from when seeded from the game of n − 1, which
+  an incumbent for n may use (n's own optimum, and m's, may not be), repaired and filled on n's board.
+
+A game is *exhausted* when the chain proved it by exhausting the search (416 of 1..1300).  The tables come from a
+script over those records and the files named above; "nodes" are the chain's, except in section 5, which uses the
+one-thread proofs.
+
+*When one problem relaxes another.*  Say problem Π′ *relaxes* Π when every promotion set that Π can promote from its
+root, Π′ can promote from its own.  Then P\*(Π) ≤ P\*(Π′), and every optimal set of Π is feasible in Π′.  The study
+used this sufficient condition, checked on the two roots as the solver holds them (reduced, with home frames; a problem
+without candidates is relaxed by every problem):
+
+* (a) every candidate of Π is a candidate of Π′ with the same home frame, and Π′ has at least as many frames; and
+* (b) for every frame i of Π: Π′'s frame i has every factor of Π's frame i, and each move a of Π′'s frame i that Π's
+  frame i lacks has a maximal factor y that is a factor of Π′'s frame i but not of Π's, and that no other number which
+  could be a move of frame i lists among its maximal factors: no other move of Π′'s frame i, and no candidate of Π of
+  home i + 1 (which becomes a move of frame i when promoted).
+
+*Proof.*  A set T of candidates can be promoted from a root exactly when each member is a factor of its home frame
+h ≥ 1 and every frame i is winnable with T applied all at once: its moves plus the members of T with home i + 1, its
+factors minus the members with home i, with no reduction in between (the module comment of `model::promote`;
+reduction never changes winnability).  Let T be promotable in Π.  By (a) its members are candidates of Π′ with the
+same homes, so T applies to Π′, and we show that each frame of Π′ is winnable with T applied.  Frames of Π′ above
+Π's top are untouched by T (no member has its home there or the one above) and winnable at the root, since the empty
+set can be promoted.  Take a frame i of Π; let B be Π's frame i with T applied, winnable by hypothesis, and R Π′'s.
+Write T_h for the members of T with home h.
+
+* R's factors are Π′'s factors of frame i less T_i, and so contain B's, which are Π's less T_i, by (b).
+* R's moves are Π′'s moves of frame i and T_{i+1}; B's are Π's and T_{i+1}.  Let A be the moves of Π′'s frame i that Π's
+  lacks.  No a in A is in T_{i+1} (a is a move of Π′'s frame i, and T_{i+1} are factors of its frame i + 1), so the
+  moves of R outside A are moves of B.
+* Each a in A has the y of (b).  It is a factor of R (it is not a factor of Π's frame i, and T_i consists of factors of
+  Π's frame i), and no other move of R lists it (R's other moves are moves of Π′'s frame i or members of T_{i+1}, which
+  are candidates of Π of home i + 1).  So y is private to a, and stays private as other moves are dropped.
+
+A frame is winnable exactly when the *peel* drops all its moves: repeatedly drop a move that has a private live factor
+(it can be taken last), in any order (`model::peel`).  Peel R by dropping all of A first.  What is left is R without
+A: moves of B, over factors that include all of B's.  Winnability only gets easier with fewer moves and more factors
+(a winning order of B, restricted to the moves left, still finds a factor of each move in the pot, which only has
+more in it), so the rest of the peel drops every move, and R is winnable.  ∎
+
+*Equivalent problems* (section 6) are tested by a separate method, described there.
+
+**1. What the game above proves: opt(n) ≤ opt(n + K) − Σ m/2 − (q − P).**  The sum is over the even m in
+(n, n + K], P and q are the largest primes at most n and n + K, and K < (n + 3)/2.  *Proof.*  Let G be an optimal
+game of n; it opens with P (every optimal game opens with the largest prime: Lemma A in the proof of
+`accelerate::prime_shortcut`).  For an even m in (n, n + K], f = m/2 is above n/2, so it divides nothing else on 1..n,
+and its multiples up to n + K are f and m (3f > n + K, since K < (n + 3)/2).  On 1..n + K, play G with each such f
+deleted (if G played it) and, if q > P, with its first move P replaced by q (as in the prime shortcut; q > n, as no
+prime lies in (P, n]); then every such m.  Deleting a move leaves more in the pot, so every later move of G keeps a
+proper divisor; q is inert (2q > n + K) and removes only 1, like P; each f stays in the pot until its m, which it pays,
+because the only multiples of f up to n + K are f and m, and no m removes another's f: m′/f = 2m′/m lies in (4/3, 3),
+so it is an integer only for m′ = m.  The game scores at least opt(n) + Σ (m − f) + q − P (at least: when f was not
+played, or is P, the deleted score was not there to lose).  ∎  With K = 1 it is opt(n) ≤ opt(n + 1) − (n + 1)/2 for odd
+n, and the prime shortcut's equality for a prime n + 1; nothing for an odd composite n + 1 = pf (p ≥ 3 its least
+prime), where making room for it can cost the moves f, 2f, …, (p − 1)f, as much as it brings.
+
+On the chain it holds for every n and K checked (2..1299, K up to 39), and it is tight 223 times at K = 1 (the 210 odd
+primes and 13 even m), 11 at K = 2 and once at K = 3.  The 13 even m have opt(m) = opt(m − 1) + m/2: 8, 12, 16, 24, 32,
+48, 64, 96, 256, 384, 512, 768, 1024.  Of the 416 exhausted games, the bound from n + 1 settles 107: 106 through a prime
+n + 1, whose search problem is n's own (each of the 204 primes whose predecessor sets a search up poses that problem,
+so nothing is learned), and 1023 through 1024.  The slack is large elsewhere: an even n + 1 above an exhausted odd game
+gains about 70, 220 and 450 more than (n + 1)/2 at the quartiles (118 games).
+
+**2. Neighbouring problems differ by a local edit, and the edit runs one way.**  From odd n to n + 1 = 2f, f leaves
+the moves of a frame h (a freedom more there) and becomes a candidate factor of frame h + 1 that pays for the new move
+2f; at 2^k a new top frame appears.  From even n to an odd composite n + 1, n + 1 joins frame 0 or 1 as a new move,
+or with a new hive (2f and 3f over f), a freedom less, at times while another hive leaves the frame.  So after an odd
+n, n + 1 *relaxes* n or poses the same problem (all but 6 of 434), and after an even n, n relaxes n + 1 or neither
+(pairs of games that are neither prime nor trivial, 2..1297):
+
+| n | equal | n + 1 relaxes n | n relaxes n + 1 | neither |
+|---|---|---|---|---|
+| odd | 226 | 202 | 0 | 6 |
+| even | 244 | 0 | 85 | 106 |
+
+A relaxation gives P\*(n) ≤ P\*(m), a cap from above in the frame model (and P\*(m) ≤ P\*(n) when n relaxes m).
+Over the 2708 and 1582 relaxing pairs within three of each other (equal problems included), no P\* breaks it and every
+optimal set of the relaxed problem can be promoted in the relaxation.
+
+**3. A cap from above is exact only where the problem above is no cheaper.**  172 of the exhausted games have a
+relaxation among n + 1..n + 3 that is not their own problem; its cap (P\* of the relaxation) is exact for 5: 30, 45,
+510, 765 and 1023, each at a change of the top frame that is worth nothing.  At 32, 512 and 1024 a new top frame
+appears (the move 3·2^(k−2) over the factors 2^(k−2) and 3·2^(k−3): 24 over 8 and 12 at 32; candidates never worth
+promoting); at 48 and 768 the move 24, resp. 384, becomes a factor (a freedom more in the top frame).  Elsewhere the cap
+misses by the worth of what the edit frees (a freedom of frame h, the candidate f), and a cap that misses prunes
+nothing: a node is cut by its own bound, and the cap only stops a search whose incumbent reaches it.  At 23 of the 66
+games of 880-1297 that have one, the cap from above is closer than the root's GF(2) bound (1235: 12 against 164, 1254
+and 1281: 24 against 204 and 206, 1110: 8 against 134), and at the dearest games it is absent or farther.  The 12
+dearest exhausted games of 1001-1300 (the root's GF(2) gap is the matroid study's `roots.jsonl`, less P\*; of the 20
+dearest 11 have a cap from above and 4 are closer than GF(2)):
+
+| n | nodes (chain) | GF(2) gap | cap from above, its gap |
+|---|---|---|---|
+| 1025 | 7,953,672 | 147 | 323 |
+| 1230 | 12,706,114 | 154 | 532 |
+| 1232 | 53,015,201 | 190 | none |
+| 1235 | 7,641,761 | 164 | 12 |
+| 1236 | 9,727,370 | 164 | none |
+| 1264 | 12,573,516 | 176 | none |
+| 1269 | 7,708,479 | 167 | 148 |
+| 1274 | 10,149,185 | 206 | none |
+| 1287 | 24,699,434 | 282 | 309 |
+| 1290 | 23,160,535 | 174 | 646 |
+| 1295 | 30,184,598 | 174 | 648 |
+| 1300 | 31,165,285 | 151 | not measured (1301 unsolved) |
+
+Why it cannot be otherwise: a relaxation has more factors, fewer moves, more candidates, and new moves only with
+private new factors (the condition above), so its matching graph and its GF(2) frame matroids contain those of the
+problem it relaxes (a move with a private coordinate contracts nothing the others use), and its root bound is at least
+as large: none of the 972 relaxing pairs with both root bounds known has a smaller GF(2) or matching bound.  So gap(m)
+≥ gap(n) − (P\*(m) − P\*(n)): a problem above that is cheaper than n's own leaves a cap that misses, and an exact cap
+comes from a problem at least as hard.  The cheap neighbours above are the restrictions (after an even n), and they
+bound n from below only.  The relaxations from below do no better than the chain's cap: 70 exhausted games have one,
+none exact and none tighter than the cap.
+
+**4. Incumbents from above are n's own optimum, reflected.**  The chain's search starts below the optimum in 110 of the
+415 exhausted games of 2..1297.  The optimal set of n + 1, on n's board, reaches P\* in 91 of them; but n + 1 comes
+after n and is often built on it (98 of the 416 exhausted games are followed by a chain game, opt(n + 1) = opt(n) +
+n + 1, whose optimal set is n's plus n + 1), so this is n's optimum coming back.  An incumbent n may use, the
+look-ahead start of n + 1..n + 3 seeded from the game of n − 1, beats n's own start in 7 of the 110 (462, 736, 837,
+1020, 1107, 1110, 1290) and reaches P\* in 1 (1290, from 1292's and 1293's).  Starting at the optimum would save at most
+what a start below costs, 0.9-1.8 times the proof at 10-100 below ([slope](#what-drives-the-slope-2026-10), section 4).
+
+**5. The gap is the same across a chain step.**  The 37 exhausted games of 880-1299 followed by a chain game (opt(n +
+1) = opt(n) + n + 1) have the same GF(2) root gap as that game ([matroid](#matroid-intersection-bounds-2026-10), section
+1): the edit adds the same to the bound and the optimum, so the hard part of the problem does not change, and solving n
++ 1 first would face n's gap.  More broadly, take the exhausted games of 880-1300 in order and cut the sequence where
+two consecutive ones are more than 6 apart or have different GF(2) gaps: 77 of the 143 games fall into 32 runs of two to
+five games with equal gaps (1235 and 1236, 1254 and 1256, 1274 with 1280, 1281 and 1284, 1290 and 1295, ...).  The
+one-thread proofs of a run beyond its dearest add up to 51,990,258 of the 262,711,582 proof nodes of the 143 games
+(19.8%).  That is the ceiling of a search that would prove a run's shared part once; equal root gaps do not make equal
+trees (proofs within a run differ by up to ×3.9, median ×1.31), and no mechanism was built.
+
+**6. Equivalent problems, a wider same search: almost nothing.**  Two problems with the same feasible sets have the
+same P\*, whether or not they are equal; `same_search` sees only equal problems.  The test (run for each non-prime
+non-trivial board of 2..1300 against the 8 earlier boards that set a search up, latest first) reduces a problem to a
+*form* and compares forms.
+
+* *The form.*  A set T of candidates is promotable exactly when each member is a factor of its home frame and each frame
+  is winnable with T applied (the proof above).  A frame's winnability is a property of the bipartite graph between
+  its *movers* (its moves and the candidates of home i + 1) and its factors, a mover listing its maximal factors (the
+  model's lists, restricted to the frame's factors); so the feasible sets are fixed by the candidates (with homes) and,
+  per frame, that graph with the candidates labelled.  The other numbers, the frame's moves and its factors that are
+  not candidates, are *anonymous* and can be renamed freely.
+* *Stripping.*  In each frame, peel the movers in the frame's *hardest state*, where every candidate of home i + 1 is a
+  mover and every candidate factor is gone: repeatedly drop a mover that lists a live anonymous factor no other
+  remaining mover lists.  What a peel drops there never matters: the factor it used is anonymous, so every state has
+  it, and is listed by no other mover, which holds in any state with T applied (fewer movers, more factors), so the
+  same drop is available at the same point, or the mover is a candidate that T does not promote and is absent.  With T
+  applied the frame is winnable exactly when a peel of the movers the hardest state could not drop succeeds, over the
+  factors they list.  The form of a frame is that remainder: the surviving candidate movers and anonymous movers, the
+  factors they list (candidate and anonymous), and the edges.
+* *Comparing.*  Two problems are equivalent when they have the same candidates with the same homes, the same number
+  of frames, and in each frame an isomorphism of the forms that fixes every candidate (mover and factor) and carries
+  the anonymous movers onto anonymous movers and anonymous factors onto anonymous factors, edges onto edges.  Then T
+  is winnable in a frame of one problem exactly when it is in the other's, so the feasible sets, and P\*, are the
+  same.  (`max_total` is a count every feasible set obeys, so it is not compared.)  The isomorphism is found by colour
+  refinement and then checked: an anonymous mover starts with the colour of the set of candidate factors it lists, an
+  anonymous factor with that of the candidate movers that list it; a vertex's next colour hashes its colour with the
+  sorted colours of its anonymous neighbours, until the number of colour classes stops growing; the anonymous
+  vertices of the two frames are paired by sorting on colour (a mismatch of the colour classes means not equivalent),
+  and the pairing is *checked* edge by edge: every mover's list must map onto its image's list exactly.  Only a checked
+  isomorphism counts, so a hash collision can only lose an equivalence, never invent one, and so can refinement on
+  symmetric forms.
+
+Over 2..1300 it finds the 545 equal problems that `same_search` finds, and 8 equivalent ones more: 21 (to 18), 51 (50),
+111 (110), 115 (112), 119 (118), 141 (140), 183 (182), 185 (184), each with the same P\*, all below 186, and exhausted
+in 18 nodes in all.  The near repeats it misses are not isomorphic: 1083 after 1080, 1183 after 1180 and 1209 after
+1208 have the same P\* and candidates, and frame 0 (which still has 76-83 anonymous movers over 102-111 factors after
+stripping) differs in one hive (578 and 867 over 289 at 1080, 722 and 1083 over 361 at 1083; 638 and 957 over 319 at
+1208, 806 and 1209 over 403 at 1209) or one move (605 at 1180, 1183 at 1183), with every other frame equal.  Any finer
+test of equivalence could save at most what such games cost: among the exhausted games with an earlier game within 8
+of the same P\* and as many candidates, 1..1000 14 games (11,262 nodes), 1001..1300 three (643,010 nodes).
+
+**7. A chain that comes back down.**  With every relation above, a chain could solve 1024 before 1023 (seeded from
+1022) and conclude 1023 from it: Π_1024 relaxes Π_1023 and 1024's promotions are 1023's optimum.  1024's proof costs
+the same from 6 below its optimum (one thread, the slope study's `prove` with the incumbent a value: 1,597,518 nodes
+at δ = 0 and 1,568,913 at δ = −6), so the saving is 1023's search: 1,730,169 of the 315,916,127 nodes (0.55%) and 5.3
+of the 975 s of the exhausted searches of 1001-1300.  Whether the same happens at 1536 or 2048 is beyond
+the chain.  No other game of 1001-1300 changes.
+
+*Conclusion.*  Going higher and coming back down does not make the expensive games cheap.  The games above bound n
+through relaxations of its problem (for an odd n, n + 1 relaxes it or poses the same problem but for 6 of 434), and a
+relaxation's root bound is at least n's own, so an exact cap from above comes from a problem at least as hard as n's,
+and a cheaper problem above leaves a cap that misses and prunes nothing.  The exact relations that exist are the
+prime formula (whose problem is n's) and changes of the top frame (1023 in 1001-1300).  Incumbents from above are
+n's optimum reflected; the look-ahead that does not use it beats the chain's start in 7 of 110 and reaches P\* once.
+What the study does show is that neighbouring problems share their hard part: the edit between them changes the bound
+and the optimum alike, so the GF(2) gap is the same across every chain step after an exhausted game, and equal across
+runs of nearby searched games that hold a fifth of the proof nodes of 880-1300.
+
+*What it implies.*
+
+* *Nothing to implement in the search.*  A proof kind for the exact relaxation from above (1023 from 1024) would
+  save 0.55% of 1001-1300; not worth the reordering of the chain it needs now.
+* *Shared cores (open)*: a search that proves a run of neighbours with equal gaps together (for a relaxing pair, one
+  tree over the relaxation that keeps both problems' incumbents and cuts a node only when both bounds allow) could
+  save up to a fifth of the proof nodes at 880-1300; whether the trees overlap enough is unmeasured, and is worth
+  measuring only once the GF(2) bound is in the search, which will change the trees (it is the bound whose gap the
+  runs share).
+* *The bound is the lever, not the neighbours*: since every exact relation above preserves the gap, the slope is set
+  by the shared core's gap, and closing it (the GF(2) bound in the search) is what changes the cost of these games.
 
 ## The parity bound in the model-free proofs (2026-10)
 
