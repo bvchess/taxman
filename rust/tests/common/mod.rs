@@ -26,9 +26,7 @@ use taxman::numtheory::Tables;
 use taxman::results::Assumptions;
 use taxman::search::lagrange::Refits;
 use taxman::search::symmetry::{cofactors, Symmetries};
-use taxman::search::{
-    search, Gf2Branching, SearchSpace, SearchTactics, SymmetryBound, TaxSearcher, TaxUnit, NOGOOD_PERIOD,
-};
+use taxman::search::{search, Gf2Branching, SearchSpace, SearchTactics, TaxSearcher, TaxUnit, NOGOOD_PERIOD};
 use taxman::solver::{Prev, PrevSource, SolveOptions};
 
 /// A committed file under `testdata/`.
@@ -212,10 +210,8 @@ pub struct Config {
     pub gf2: bool,
     pub gf2_prefilter: bool,
     pub gf2_branching: Gf2Branching,
-    /// The rule of the root's symmetric pairs (tactic `symmetry`), and with it, over the GF(2) bound, the Lagrangian
-    /// bound of the pairs.
+    /// The rule of the root's symmetric pairs (tactic `symmetry`).
     pub symmetry: bool,
-    pub symmetry_bound: SymmetryBound,
 }
 
 impl Config {
@@ -241,7 +237,6 @@ impl Config {
             gf2_prefilter: false,
             gf2_branching: Gf2Branching::Exact,
             symmetry: t.symmetry,
-            symmetry_bound: SymmetryBound::Off,
         }
     }
 }
@@ -331,7 +326,6 @@ impl<const W: usize> Game<W> {
             gf2_strong_limit: usize::MAX,
             gf2_more_forced: true,
             symmetry: cfg.symmetry.then(|| self.symmetries()).filter(|pairs| !pairs.is_empty()),
-            symmetry_bound: cfg.symmetry_bound,
         };
         let engine = engine.unwrap_or_else(|| config(cfg.threads));
         let start = match resume {

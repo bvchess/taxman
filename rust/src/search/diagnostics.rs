@@ -34,12 +34,9 @@ pub mod cut {
     pub const GF2: usize = 7;
     /// A symmetric pair's inequality: no completion keeps it (tactic `symmetry`, Theorem 13).
     pub const SYMMETRY: usize = 8;
-    /// The Lagrangian relaxation of the inequalities of the symmetric pairs that the GF(2) bound's heaviest set
-    /// breaks, on the GF(2) bound (the knob [`SymmetryBound`](crate::search::SymmetryBound)).
-    pub const SYMMETRY_BOUND: usize = 9;
-    pub const COUNT: usize = 10;
+    pub const COUNT: usize = 9;
     pub const NAMES: [&str; COUNT] =
-        ["empty", "largest", "match", "refined", "exact", "forced", "lagrange", "gf2", "symmetry", "symmetry_bound"];
+        ["empty", "largest", "match", "refined", "exact", "forced", "lagrange", "gf2", "symmetry"];
 }
 
 /// Buckets of [`Diagnostics::gaps`]: excesses `0..GAP_BUCKETS − 1`, and the last for everything above.
@@ -82,8 +79,6 @@ pub struct Diagnostics {
     pub refine_conflicts: u64,
     /// With the tactic `symmetry`: the candidates the rule dropped from nodes' and children's candidates.
     pub symmetry_excluded: u64,
-    /// With the knob `symmetry_bound`: the Lagrangian bounds of the symmetric pairs solved.
-    pub symmetry_solves: u64,
     /// The matching solvers' work: evaluations, Hungarian searches, vertices scanned (see
     /// [`MatchStats`](crate::matchbound::MatchStats)).
     pub matching: [u64; 3],
@@ -128,7 +123,6 @@ impl Diagnostics {
         self.refine_evaluations += other.refine_evaluations;
         self.refine_conflicts += other.refine_conflicts;
         self.symmetry_excluded += other.symmetry_excluded;
-        self.symmetry_solves += other.symmetry_solves;
         for (a, b) in self.matching.iter_mut().zip(other.matching) {
             *a += b;
         }
@@ -240,14 +234,13 @@ impl<'a> Probe<'a> {
         }
     }
 
-    /// Adds the searcher's counts of refinement and of the rule of the tactic `symmetry` and its bound, and the
-    /// matching solver's work since the last flush, and merges everything into the search's diagnostics.
+    /// Adds the searcher's counts of refinement and of the rule of the tactic `symmetry`, and the matching solver's
+    /// work since the last flush, and merges everything into the search's diagnostics.
     pub(super) fn flush<const W: usize>(&mut self, counts: &Counts, matching: &MatchBound<'_, W>) {
         self.local.refinements += counts.refinements;
         self.local.refine_evaluations += counts.evaluations;
         self.local.refine_conflicts += counts.conflicts;
         self.local.symmetry_excluded += counts.symmetry_excluded;
-        self.local.symmetry_solves += counts.symmetry_solves;
         let s = matching.stats();
         let now = [s.evaluations, s.searches, s.scanned];
         for ((total, seen), now) in self.local.matching.iter_mut().zip(&mut self.match_seen).zip(now) {

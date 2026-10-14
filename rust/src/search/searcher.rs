@@ -22,7 +22,7 @@ use super::{Diagnostics, NOGOOD_PERIOD};
 use crate::bits::Bits;
 use crate::bounds::max_additional;
 use crate::engine::{Ctx, Poll, Searcher, Stats, Unit};
-use crate::gf2::{Eval, Gf2Bound, Gf2Graph, Gf2Stats};
+use crate::gf2::{Gf2Bound, Gf2Graph, Gf2Stats};
 use crate::matchbound::{MatchBound, MatchGraph};
 use crate::model::{ConflictCache, FrameSet, Lookup, Model, Nogoods, Scratch};
 use std::sync::{Mutex, PoisonError};
@@ -118,28 +118,6 @@ pub struct SearchSpace<'a, const W: usize> {
     /// With the tactic `symmetry`: the root's symmetric pairs, whose inequalities the search keeps (`None` without
     /// the tactic, or when the root has no pair).
     pub symmetry: Option<Symmetries>,
-    /// With `symmetry` and `gf2`: whether, at a node whose GF(2) bound did not cut, the Lagrangian relaxation of the
-    /// pairs' inequalities on that bound is tried too.
-    pub symmetry_bound: SymmetryBound,
-}
-
-/// The Lagrangian bound of the symmetric pairs' inequalities on the GF(2) bound (a knob of the tactics `symmetry`
-/// and `gf2` together, to be measured: not a tactic, nothing proven rests on its being on or off).  At a node whose
-/// GF(2) bound did not cut, the pairs whose inequalities the bound's heaviest set `I*` breaks together with the
-/// node's promotions `P` are looked at: a completion that keeps them is a set the same matroids bound again under
-/// other weights ([`Symmetries::lagrangian`]), and the node is cut if that bound is below what a completion must
-/// add.  Each bound is tried with the multiplier `k = 2` and then `k = 1`, unless a free lower bound from `I*` shows
-/// that it cannot cut: `I*` is itself common independent, so the bound is at least `2·value − k·Σ D_l(P ∪ I*)`, and
-/// a `k` for which that is at least `2·need` is skipped.  The sum `Σ D_l` is positive (the pairs are broken), so
-/// the lower bound for `k = 1` is above that for `k = 2`: if `k = 2` is skipped so is `k = 1`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SymmetryBound {
-    /// Not tried.
-    Off,
-    /// Each broken pair alone.
-    Pair,
-    /// All the broken pairs at once.
-    Joint,
 }
 
 /// How a node chooses the member of its conflict to branch on with the tactic `gf2` (strong branching asks what each
@@ -189,7 +167,6 @@ impl<'a, const W: usize> SearchSpace<'a, W> {
                 .symmetry
                 .then(|| Symmetries::of(&prepared.model, &prepared.root, &prepared.candidates))
                 .filter(|pairs| !pairs.is_empty()),
-            symmetry_bound: SymmetryBound::Off,
         }
     }
 }
@@ -311,8 +288,6 @@ pub(super) struct Counts {
     pub(super) conflicts: u64,
     /// Candidates the rule of the tactic `symmetry` dropped from the candidates of children and of nodes.
     pub(super) symmetry_excluded: u64,
-    /// Lagrangian bounds of the symmetric pairs solved ([`SymmetryBound`]).
-    pub(super) symmetry_solves: u64,
 }
 
 /// The Taxman searcher: explores units depth-first on a stack of nodes it reuses (no recursion, and no
@@ -350,10 +325,8 @@ struct Stepper<'a, const W: usize> {
     steps_since_clear: u64,
     /// The Lagrangian bound over the nogoods along the path (tactic `lagrange`).
     lagrange: Option<Lagrangian<'a, W>>,
-    /// The sums of the rule of the tactic `symmetry` (empty without it), and the pairs that the heaviest set of the
-    /// GF(2) bound breaks with the node's promotions ([`SymmetryBound`]).
+    /// The sums of the rule of the tactic `symmetry` (empty without it).
     symmetry_scratch: RuleScratch,
-    broken: Vec<usize>,
     counts: Counts,
     /// The incumbents offered, encoded.
     payload: Vec<u8>,
@@ -381,7 +354,6 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 steps_since_clear: 0,
                 lagrange: space.lagrange.map(|refits| Lagrangian::new(space.match_graph, refits)),
                 symmetry_scratch: space.symmetry.as_ref().map(Symmetries::scratch).unwrap_or_default(),
-                broken: Vec::new(),
                 counts: Counts::default(),
                 payload: Vec::with_capacity(8 * W),
                 probe: space.diagnostics.map(Probe::new),
@@ -848,13 +820,11 @@ impl<'a, const W: usize> Stepper<'a, W> {
     /// The check of [`check`](Self::check) with the tactic `gf2`, on the node on top of the GF(2) stack (and of
     /// the matching stack, as a first check, with [`SearchSpace::gf2_prefilter`]), at `need`, with at most `cap`
     /// promotions.  `Err(reason)`: the matching bound is below `need` ([`cut::MATCH`]), or the GF(2) bound is
-    /// ([`cut::GF2`]), or with the knob [`SymmetryBound`] the Lagrangian bound of the symmetric pairs its heaviest
-    /// set breaks ([`cut::SYMMETRY_BOUND`]), or its heaviest set can be promoted ([`cut::EXACT`], the best completion,
-    /// offered), or every member of its conflict is forced, or a nogood is ([`cut::REFINED`]), or with the tactic
-    /// `lagrange` the Lagrangian bound is below `need` ([`cut::LAGRANGE`]).  Else the conflict of the heaviest set
-    /// (from the nogood table or computed, as [`Refiner`] finds the matching's) and, with `fix_forced`, the forced
-    /// members: those of the heaviest set without which the weight split's bound is below `need`, and those of the
-    /// Lagrangian bound.
+    /// ([`cut::GF2`]), or its heaviest set can be promoted ([`cut::EXACT`], the best completion, offered), or
+    /// every member of its conflict is forced, or a nogood is ([`cut::REFINED`]), or with the tactic `lagrange` the
+    /// Lagrangian bound is below `need` ([`cut::LAGRANGE`]).  Else the conflict of the heaviest set (from the nogood
+    /// table or computed, as [`Refiner`] finds the matching's) and, with `fix_forced`, the forced members: those of
+    /// the heaviest set without which the weight split's bound is below `need`, and those of the Lagrangian bound.
     fn check_gf2(
         &mut self,
         state: &FrameSet<W>,
@@ -873,11 +843,6 @@ impl<'a, const W: usize> Stepper<'a, W> {
         let eval = g.evaluate(cap, space.fix_forced.then_some(need));
         if eval.value < need {
             return Err(cut::GF2);
-        }
-        if let Some(sym) = space.symmetry.as_ref().filter(|_| space.symmetry_bound != SymmetryBound::Off) {
-            if self.symmetry_bound_cuts(sym, promoted, &eval, need, cap) {
-                return Err(cut::SYMMETRY_BOUND);
-            }
         }
         let forced = eval.forced;
         let promoted = *promoted;
@@ -912,61 +877,6 @@ impl<'a, const W: usize> Stepper<'a, W> {
                 Some(more) => Ok(Open { conflict: Some(conflict), forced: forced | more }),
             },
         }
-    }
-
-    /// The knob [`SymmetryBound`] at the node on top of the GF(2) stack (promotions `promoted`, at most `cap` more),
-    /// whose bound `eval` is not below `need`: whether the Lagrangian bound of the symmetric pairs that
-    /// `promoted ∪ eval.chosen` breaks is below what a completion must add.  A completion that beats the incumbent and
-    /// keeps every pair's inequality keeps those of the pairs tried, so none does, and by Theorem 13 the node holds no
-    /// heaviest promotion set ([`Symmetries::lagrangian`] has the argument).
-    fn symmetry_bound_cuts(
-        &mut self,
-        sym: &Symmetries,
-        promoted: &Bits<W>,
-        eval: &Eval<W>,
-        need: u64,
-        cap: u32,
-    ) -> bool {
-        let (value2, need2) = (2 * eval.value as i64, 2 * need as i64);
-        let mut broken = std::mem::take(&mut self.broken);
-        sym.broken(&mut self.symmetry_scratch, &(*promoted | eval.chosen), &mut broken);
-        let cuts = match self.space.symmetry_bound {
-            SymmetryBound::Off => false,
-            SymmetryBound::Pair => {
-                broken.iter().any(|&pair| self.lagrangian_cuts(sym, &[pair], promoted, value2, need2, cap))
-            }
-            SymmetryBound::Joint => {
-                !broken.is_empty() && self.lagrangian_cuts(sym, &broken, promoted, value2, need2, cap)
-            }
-        };
-        self.broken = broken;
-        cuts
-    }
-
-    /// Whether the Lagrangian bound of the pairs `links`, which the set `promoted ∪ I*` of the last
-    /// [`Symmetries::broken`] (`I*` the GF(2) bound's heaviest set, worth `value2 / 2`) breaks, is below `need2 / 2`,
-    /// with the multiplier `k = 2` and then `k = 1`: all doubled, see [`SymmetryBound`] for what is skipped.
-    fn lagrangian_cuts(
-        &mut self,
-        sym: &Symmetries,
-        links: &[usize],
-        promoted: &Bits<W>,
-        value2: i64,
-        need2: i64,
-        cap: u32,
-    ) -> bool {
-        let excess = sym.excess(&self.symmetry_scratch, links);
-        let g = self.gf2.as_mut().expect("the tactic gf2");
-        for k in [2, 1] {
-            if value2 - k * excess >= need2 {
-                return false;
-            }
-            self.counts.symmetry_solves += 1;
-            if sym.lagrangian(&mut self.symmetry_scratch, g, links, k, promoted, cap, need2) < need2 {
-                return true;
-            }
-        }
-        false
     }
 
     /// [`choose_branch`](Self::choose_branch) with the tactic `gf2`: the forced members if there are any (the child
