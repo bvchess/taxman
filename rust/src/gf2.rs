@@ -1,6 +1,6 @@
 //! The GF(2) bound: an upper bound on the sum of the promotions a search state can still make, from two linear
 //! matroids over GF(2) in which every promotable set is independent (tactic `gf2`).  It is never above the matching
-//! bound ([`crate::matchbound`]) and usually far below it; `heuristics/THEORY.md`, Theorem 10, has the proof, and
+//! bound ([`crate::matchbound`]) and usually far below it; `heuristics/THEORY.md`, Theorem 11, has the proof, and
 //! `docs/EXPERIMENTS.md`, "Matroid intersection bounds" and "The GF(2) bound in the search", the measurements.
 //!
 //! # The matroids
@@ -10,7 +10,7 @@
 //! among them ([`FactorProvider::factors`](crate::model::FactorProvider::factors)), and each candidate `y` of home
 //! `h` the unit vector `e_y`.  If a set `Q` of candidates can be promoted, then in every frame the vectors of its
 //! moves, of `Q`'s members promoted into it and the unit vectors of `Q`'s members promoted out of it are linearly
-//! independent (Theorem 10: a winnable frame peels completely, each mover dropped with a live factor no mover still
+//! independent (Theorem 11: a winnable frame peels completely, each mover dropped with a live factor no mover still
 //! there has).  The moves of a frame are fixed, so the frame's condition is a linear matroid on the candidates that
 //! touch it: their vectors reduced modulo the span of the moves (contraction), in the quotient's coordinates, whose
 //! number is the frame's freedoms.  A candidate touches its home frame and the one below, one of even index and one of

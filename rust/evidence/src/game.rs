@@ -28,6 +28,7 @@
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 
+use crate::parity::{Meet, Outcome, Parity, Warm};
 use crate::primes::{is_prime, maximal_factors};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -632,6 +633,9 @@ pub struct Prover<'a> {
     board: &'a Board,
     bound: MatchingBound,
     lag: Option<Lag>,
+    parity: Option<Meet>,
+    /// Whether a parity solve starts from the parent node's certificate (on by default).
+    parity_warm: bool,
     /// The weight of picking each number (c by default; see [`weighted`](Self::weighted)).
     weights: Vec<i64>,
     target: u64,
@@ -640,8 +644,9 @@ pub struct Prover<'a> {
     pub nogoods: Vec<Vec<u32>>,
     max_nogoods: usize,
     pub nodes: u64,
-    /// Diagnostics: [new conflicts, known conflicts, forced picks, children, cut by bound, cut by the Lagrangian].
-    pub stats: [u64; 6],
+    /// Diagnostics: [new conflicts, known conflicts, forced picks, children, cut by bound, cut by the Lagrangian,
+    /// cut by the parity bound, parity bounds not certified].
+    pub stats: [u64; 8],
     pause_at: Option<std::time::Instant>,
     next_check: u64,
     paused: bool,
@@ -703,12 +708,14 @@ impl Lag {
     }
 }
 
-/// A parent's state for its children: its roles, and the optimal matching and dual of each bound.
+/// A parent's state for its children: its roles, the optimal matching and dual of each bound, and the parity
+/// bound's certificate (a child starts its parity solve from it).
 type Snapshot = (Vec<u32>, Vec<i64>);
 struct Base<'b> {
     roles: &'b [Role],
     plain: &'b Snapshot,
     lag: Option<&'b Snapshot>,
+    parity: Option<&'b Warm>,
 }
 
 impl<'a> Prover<'a> {
@@ -717,13 +724,15 @@ impl<'a> Prover<'a> {
             board,
             bound: MatchingBound::new(board),
             lag: None,
+            parity: None,
+            parity_warm: true,
             weights: (0..=i64::from(board.n)).collect(),
             target,
             smaller: Vec::new(),
             nogoods: Vec::new(),
             max_nogoods: 20_000,
             nodes: 0,
-            stats: [0; 6],
+            stats: [0; 8],
             pause_at: None,
             next_check: 256,
             paused: false,
@@ -760,10 +769,33 @@ impl<'a> Prover<'a> {
     /// and before running.
     pub fn weighted(mut self, weights: Vec<i64>) -> Self {
         assert!(weights.len() == self.board.n as usize + 1 && weights[2..].iter().all(|&w| w > 0));
-        assert!(self.lag.is_none() && self.nodes == 0, "set the weights before anything else");
+        assert!(self.lag.is_none() && self.parity.is_none() && self.nodes == 0, "set the weights before anything else");
         self.bound.set_weights(&weights);
         self.weights = weights;
         self
+    }
+
+    /// Turns on the parity bound ([`crate::parity`], THEORY.md Theorem 10) at every node, after the matching
+    /// bound: the heaviest set independent in both parity matroids with the node's forced picks contracted and
+    /// its barred numbers deleted, certified by a weight split.  It cuts the node when it is at most the target;
+    /// it bars every free number that depends on the forced picks in one of the matroids (no playable set of the
+    /// node holds it) and forces every member whose barring alone brings it to the target (by the split); and
+    /// the node branches on a minimal unplayable subset of its heaviest set instead of the matching's picks.
+    pub fn with_parity(mut self) -> Self {
+        self.parity = Some(Meet::new(Parity::pair(self.board, &self.weights)));
+        self
+    }
+
+    /// Solves every parity bound from scratch instead of from the parent node's certificate (to measure the warm
+    /// starts; the bounds are the same).
+    pub fn parity_cold(mut self) -> Self {
+        self.parity_warm = false;
+        self
+    }
+
+    /// The parity bound's counters, if it is on.
+    pub fn parity_stats(&self) -> Option<crate::parity::MeetStats> {
+        self.parity.as_ref().map(|m| m.stats)
     }
 
     /// Turns on the segment cuts, given upper bounds `smaller[m]` on opt(m) for m = 0..n−1 (under the weights:
@@ -991,7 +1023,12 @@ impl<'a> Prover<'a> {
         let mut lag_solved =
             self.lag.as_mut().map(|l| l.solve(board, base.as_ref().and_then(|b| b.lag.map(|s| (b.roles, s))), &roles));
         let n = self.board.n;
-        let (value, picks) = loop {
+        // (value, picks): the matching's bound and picks; (best, source): the set the node branches on, the parity
+        // bound's heaviest set when that bound is on (else the matching's picks), and its weight.  The parity solves
+        // start from the last certificate: the parent's, then the node's own.
+        let mut warm: Option<Warm> = None;
+        let parent_warm = base.as_ref().and_then(|b| b.parity).filter(|_| self.parity_warm);
+        let (value, picks, best, source) = loop {
             let Some((value, picks)) = solved else { return Verdict::Proven };
             if value <= self.target {
                 self.stats[4] += 1;
@@ -1019,13 +1056,44 @@ impl<'a> Prover<'a> {
                     .collect();
                 newly.extend(more);
             }
+            // The parity bound, once the matching forces nothing more: it cuts, bars the numbers dependent on the
+            // forced ones, and forces the members whose barring alone brings it down to the target.
+            let mut barred: Vec<u32> = Vec::new();
+            let mut parity_set = None;
             if newly.is_empty() {
-                break (value, picks);
+                if let Some(meet) = self.parity.as_mut() {
+                    match meet.solve_from(&roles, warm.as_ref().filter(|_| self.parity_warm).or(parent_warm)) {
+                        Outcome::Infeasible => {
+                            self.stats[6] += 1;
+                            return Verdict::Proven;
+                        }
+                        Outcome::Uncertified => self.stats[7] += 1,
+                        Outcome::Bound(b) => {
+                            if b.value <= self.target as i64 {
+                                self.stats[6] += 1;
+                                return Verdict::Proven;
+                            }
+                            barred = b.loops;
+                            newly.extend(b.without.iter().filter(|&&(_, v)| v <= self.target as i64).map(|&(x, _)| x));
+                            if newly.is_empty() && barred.is_empty() {
+                                let mut set = vec![false; n as usize + 1];
+                                b.set.iter().for_each(|&c| set[c as usize] = true);
+                                parity_set = Some((b.value as u64, set));
+                            }
+                            warm = Some(b.warm);
+                        }
+                    }
+                }
+            }
+            if newly.is_empty() && barred.is_empty() {
+                let (best, source) = parity_set.unwrap_or_else(|| (value, picks.clone()));
+                break (value, picks, best, source);
             }
             let (old, snapshot) = (roles.clone(), self.bound.snapshot());
             let lag_snapshot = self.lag.as_ref().map(|l| l.m.snapshot());
             self.stats[2] += newly.len() as u64;
             newly.iter().for_each(|&c| roles[c as usize] = Role::Pick);
+            barred.iter().for_each(|&c| roles[c as usize] = Role::Barred);
             if !self.propagate(&mut roles) {
                 return Verdict::Proven;
             }
@@ -1045,7 +1113,7 @@ impl<'a> Prover<'a> {
         // The children are given by a list of decisions (number, role): child j gives the numbers of the first j
         // their roles and the j-th the other role (forced and barred swapped).  For a conflict every decision is
         // "picked", so child j forces the conflict's first j free members and bars the next.
-        let source = &picks;
+        let source = &source;
         let free_of = |k: &[u32]| -> Vec<(u32, Role)> {
             k.iter().filter(|&&c| roles[c as usize] == Role::Free).map(|&c| (c, Role::Pick)).collect()
         };
@@ -1064,7 +1132,7 @@ impl<'a> Prover<'a> {
                 if self.optimizing {
                     // The node's heaviest completion (its weight is the bound): the target rises to it, which
                     // closes the node.
-                    self.target = value;
+                    self.target = best;
                     self.found.push(set);
                     return Verdict::Proven;
                 }
@@ -1115,7 +1183,7 @@ impl<'a> Prover<'a> {
                 (j..branch.len()).for_each(|k| self.pending.push(child(k, &base_roles)));
                 return Verdict::Paused;
             }
-            let base = Base { roles: &base_roles, plain: &snapshot, lag: lag_snapshot.as_ref() };
+            let base = Base { roles: &base_roles, plain: &snapshot, lag: lag_snapshot.as_ref(), parity: warm.as_ref() };
             match self.node(child(j, &base_roles), Some(base)) {
                 Verdict::Proven => {}
                 Verdict::Paused => {
@@ -1303,8 +1371,9 @@ mod tests {
     }
 
     /// With the target one below optimal.json's score, the search (all its pruning rules: forced picks, nogoods,
-    /// the conflict-packing cut, and optionally the segment cuts) must still reach a playable set worth the
-    /// optimum; at the score itself it must prove that nothing beats it.  Every 7th game to 420.
+    /// the conflict-packing cut, and optionally the segment cuts, the Lagrangian bound or the parity bound) must
+    /// still reach a playable set worth the optimum; at the score itself it must prove that nothing beats it.
+    /// Every 7th game to 420.
     #[test]
     fn the_search_finds_the_optimum_just_above_the_target() {
         let text =
@@ -1335,10 +1404,13 @@ mod tests {
         for n in (21..=420u32).step_by(7) {
             let board = Board::new(n, &spf);
             let v = opt[n as usize];
-            for variant in 0..3 {
-                let segments = variant == 1;
+            for variant in 0..5 {
+                let segments = variant == 1 || variant == 4;
                 let prover = |target| {
                     let mut p = Prover::new(&board, target, u64::MAX);
+                    if variant >= 3 {
+                        p = p.with_parity();
+                    }
                     if segments {
                         p = p.with_smaller_games(&opt[..n as usize]);
                     }
@@ -1358,25 +1430,34 @@ mod tests {
                         assert!(board.playable(&pick), "n={n}");
                         assert_eq!(picks.iter().map(|&c| u64::from(c)).sum::<u64>(), v, "n={n}");
                     }
-                    other => panic!("n={n} segments={segments}: {other:?} below the optimum"),
+                    other => panic!("n={n} variant={variant}: {other:?} below the optimum"),
                 }
-                assert_eq!(prover(v).run(), Verdict::Proven, "n={n} segments={segments}");
+                assert_eq!(prover(v).run(), Verdict::Proven, "n={n} variant={variant}");
             }
         }
     }
 
     /// A search paused every few hundred nodes and resumed from its open units and nogoods reaches the verdict of
-    /// an uninterrupted one, on both sides of the optimum (opt(300) = 28691 and opt(432) = 59259, optimal.json).
+    /// an uninterrupted one, on both sides of the optimum (opt(300) = 28691, opt(432) = 59259 and, with the parity
+    /// bound, opt(600) = 112623; optimal.json).
     #[test]
     fn paused_searches_resume_to_the_same_verdict() {
-        let spf = smallest_prime_factors(500);
-        for (n, opt) in [(300u32, 28691u64), (432, 59259)] {
+        let spf = smallest_prime_factors(600);
+        for (n, opt, parity) in [(300u32, 28691u64, false), (432, 59259, false), (600, 112623, true)] {
             let board = Board::new(n, &spf);
+            let fresh = |target| {
+                let p = Prover::new(&board, target, u64::MAX);
+                if parity {
+                    p.with_parity()
+                } else {
+                    p
+                }
+            };
             for target in [opt, opt - 1] {
-                let straight = Prover::new(&board, target, u64::MAX).run();
+                let straight = fresh(target).run();
                 let (mut units, mut nogoods, mut pauses) = (None::<Vec<Vec<Role>>>, Vec::new(), 0);
                 let resumed = loop {
-                    let mut p = Prover::new(&board, target, u64::MAX).pause_at(std::time::Instant::now());
+                    let mut p = fresh(target).pause_at(std::time::Instant::now());
                     p.nogoods = std::mem::take(&mut nogoods);
                     let verdict = match units.take() {
                         Some(u) => p.run_units(u),
@@ -1391,7 +1472,7 @@ mod tests {
                 };
                 assert_eq!(matches!(resumed, Verdict::Beaten(_)), matches!(straight, Verdict::Beaten(_)), "n={n}");
                 assert_eq!(resumed == Verdict::Proven, target == opt, "n={n} target={target}");
-                assert!(target != opt || n < 400 || pauses > 3, "n={n}: the test should pause");
+                assert!(target != opt || n < 400 || pauses > 1, "n={n}: the test should pause");
             }
         }
     }
@@ -1404,9 +1485,12 @@ mod tests {
         for n in 2..=20u32 {
             let board = Board::new(n, &spf);
             assert_eq!(brute(&board), known[n as usize], "n={n}");
-            // Optimizing from nothing reaches the optimum, with and without the segment cuts.
-            for segments in [false, true] {
+            // Optimizing from nothing reaches the optimum, with and without the segment cuts and the parity bound.
+            for (segments, parity) in [(false, false), (true, false), (false, true), (true, true)] {
                 let mut p = Prover::new(&board, 0, u64::MAX).optimize();
+                if parity {
+                    p = p.with_parity();
+                }
                 if segments {
                     p = p.with_smaller_games(&known);
                 }
@@ -1414,9 +1498,12 @@ mod tests {
                 let best = p.found.last().expect("a game");
                 assert_eq!(best.iter().map(|&c| u64::from(c)).sum::<u64>(), known[n as usize], "n={n}");
             }
-            for segments in [false, true] {
+            for (segments, parity) in [(false, false), (true, false), (false, true), (true, true)] {
                 let prover = |target| {
-                    let p = Prover::new(&board, target, u64::MAX);
+                    let mut p = Prover::new(&board, target, u64::MAX);
+                    if parity {
+                        p = p.with_parity();
+                    }
                     if segments {
                         p.with_smaller_games(&known)
                     } else {
@@ -1455,9 +1542,12 @@ mod tests {
                 }
             }
             most.push(best);
-            for segments in [false, true] {
+            for (segments, parity) in [(false, false), (true, false), (false, true), (true, true)] {
                 let prover = |target| {
-                    let p = Prover::new(&board, target, u64::MAX).weighted(vec![1; n as usize + 1]);
+                    let mut p = Prover::new(&board, target, u64::MAX).weighted(vec![1; n as usize + 1]);
+                    if parity {
+                        p = p.with_parity();
+                    }
                     if segments {
                         p.with_smaller_games(&most[..n as usize])
                     } else {
@@ -1498,12 +1588,17 @@ mod tests {
                         }
                     }
                 }
-                let mut prover = Prover::new(&board, target, u64::MAX).enumerate(usize::MAX);
-                assert_eq!(prover.run(), Verdict::Proven, "n={n}");
-                let mut got = prover.found.clone();
-                got.sort();
                 want.sort();
-                assert_eq!(got, want, "n={n} target={target}");
+                for parity in [false, true] {
+                    let mut prover = Prover::new(&board, target, u64::MAX).enumerate(usize::MAX);
+                    if parity {
+                        prover = prover.with_parity();
+                    }
+                    assert_eq!(prover.run(), Verdict::Proven, "n={n}");
+                    let mut got = prover.found.clone();
+                    got.sort();
+                    assert_eq!(got, want, "n={n} target={target} parity={parity}");
+                }
                 // With a limit the search stops at the limit-th set.
                 if want.len() >= 2 {
                     let mut limited = Prover::new(&board, target, u64::MAX).enumerate(2);

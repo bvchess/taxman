@@ -36,7 +36,7 @@ pub struct SearchTactics {
     /// Bound every node by the GF(2) bound ([`crate::gf2`]: the heaviest common independent set of the two GF(2)
     /// frame matroids, kept along the searcher's path by contraction), branch on the conflicts of its heaviest set,
     /// and (with `fix_forced`) force the members without which it would cut (proven: heuristics/THEORY.md, Theorem
-    /// 10, and weak duality for the forced members).  Replaces the matching bound and its refinement as the node
+    /// 11, and weak duality for the forced members).  Replaces the matching bound and its refinement as the node
     /// bound; the Lagrangian bound over nogoods still applies after it.
     pub gf2: bool,
 }

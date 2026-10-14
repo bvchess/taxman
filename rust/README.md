@@ -86,7 +86,7 @@ from frame 0 (the factor 4) and scores 8.  The search is over such choices: n = 
   ([DESIGN.md, Tactics](DESIGN.md#5-tactics)).  They were validated by agreement with the Java's
   `optimal.json` for n <= 1000, by exhaustive search (`src/brute.rs`, `heuristics/evaluation/certify.py`) for small
   boards (n <= 62), and by a model-free exact search ([`evidence/`](evidence/README.md)) that confirms the optimum
-  for every n <= 989.
+  for every n <= 1300, the whole committed chain.
 * **Given the pruning is exact.**  Every tactic is proven or sound: none prunes a promotion set that could win
   ([DESIGN.md, Tactics](DESIGN.md#5-tactics) grades each).  So a result rests on nothing but the frame model, the
   correctness of the code and, where its proof says so, the game it was built from.
@@ -597,7 +597,7 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
 * **GF(2) bound** (`gf2`): every frame's movers get vectors over GF(2) (their maximal factors in the frame, and a
   number promoted out of it its own), which a winnable frame keeps linearly independent; the even frames make one
   matroid on the candidates and the odd frames another, and the heaviest set independent in both (**weighted matroid
-  intersection**) bounds a node's completions (heuristics/THEORY.md, Theorem 10).  Kept along the search path by
+  intersection**) bounds a node's completions (heuristics/THEORY.md, Theorem 11).  Kept along the search path by
   **contraction** by the promoted numbers (`gf2`).  **I\***: its heaviest set.  The **weight split** of `I*` gives the
   bound without each member at once, which finds forced members.
 * **matching bound**: relax winnability to matchability: choose promotions maximising their sum such that every move
@@ -690,7 +690,7 @@ comment that is worth reading first; section 6 above is the map of how the piece
    `src/matchbound/lagrange.rs` is the Lagrangian bound over the nogoods, built on the same levels and repairs.
 10. `src/gf2.rs`: the GF(2) bound, the default node bound: the module comment explains the two frame matroids, how
     a node's are kept by contraction along the search path, and the forced members; `src/gf2/meet.rs` is their
-    weighted intersection (the tableau, the augmenting paths, the weight split).  `heuristics/THEORY.md`, Theorem 10,
+    weighted intersection (the tableau, the augmenting paths, the weight split).  `heuristics/THEORY.md`, Theorem 11,
     is the proof.
 11. `src/search/`: `mod.rs` explains the step and says what is where: `searcher.rs` (`TaxSearcher` and `Stepper::step`,
     whose phases are `check_node`, `choose_branch`, `make_child` and `check_child`), `refine.rs` (`Refiner`: conflicts,

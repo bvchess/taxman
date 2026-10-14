@@ -94,9 +94,10 @@ sources).  A worked example, the board 1..=85, is in the
 * **Within the frame model.**  The decomposition rests on assumptions that are validated, not proven: the greedy
   removal of impossible sources inside hives, the mandatory moves of `unzip`, free factor count = factors − sources,
   closed hives (those with no free factor) taking no part in the search, and a promoted number paying tax only from
-  the frame directly below.  They are validated by agreement with the Java's optimal.json for n ≤ 1000, which a
-  model-free exact search (`evidence/`: the playability theorems, the Franklín–Moniot matching bound, the chain
-  and prime relations, and nothing of hives or frames) confirms for every n ≤ 989, and an independent brute force
+  the frame directly below.  They are validated by agreement with the Java's optimal.json for n ≤ 1000; by a
+  model-free exact search (`evidence/`: the playability theorems, the Franklín–Moniot matching bound, the parity
+  matroids' bound of THEORY.md's Theorem 10, the chain and prime relations, and nothing of hives or frames), which
+  confirms the optimum of every game of the committed chain, n ≤ 1300; by an independent brute force
   (`heuristics/evaluation/certify.py`) for n ≤ 62; and by the Rust exact oracle `brute`, which checks frame-model
   games on small boards (up to 40 in the test suite, 52 in `examples/sacrifice validate`).  The greedy removal of
   impossible sources at the root, where it shapes the search space, is descending greedy on each upper-half
@@ -325,8 +326,9 @@ linear matroid on the candidates that touch it (contracted by the moves; its ran
 candidate of home `h` touches frames `h` and `h − 1`, one even and one odd, so the even frames' matroids are the
 blocks of a matroid `A` on the candidates and the odd frames' of a matroid `B`; every promotable set is independent
 in both, and the heaviest common independent set of at most `max_add` members (weighted matroid intersection,
-polynomial) bounds a node's completions.  [heuristics/THEORY.md](../heuristics/THEORY.md#a-bound-from-two-matroids),
-Theorem 10, has the proof; the module comments of `src/gf2.rs` and `src/gf2/meet.rs` the algorithms.  It is never
+polynomial) bounds a node's completions.  [heuristics/THEORY.md](../heuristics/THEORY.md#the-frame-matroids-a-bound-on-the-promotions),
+Theorem 11, has the proof (the frame model's form of Theorem 10, the parity matroids' bound on the whole
+game, which the evidence crate's model-free search uses); the module comments of `src/gf2.rs` and `src/gf2/meet.rs` the algorithms.  It is never
 above the matching bound (independent vectors have a system of distinct representatives, which is a matching); what
 it misses are the *odd* cores of movers with three or more factors.  At the roots of 880–1300 its gap to the optimum
 is a tenth of the matching bound's (EXPERIMENTS: "Matroid intersection bounds").
@@ -391,7 +393,7 @@ forced, refinement of its conflict `match_refine` levels deep (a cut if every br
 Lagrangian bound over the nogoods (a cut, or more forced members); step 4 chooses the member whose removal lowers
 the matching bound most; and step 8 checks the child's matching bound, refinement and Lagrangian bound.
 
-Exactness rests on four facts: the bound is an upper bound (the GF(2) bound by Theorem 10, the matching bound with
+Exactness rests on four facts: the bound is an upper bound (the GF(2) bound by Theorem 11, the matching bound with
 refinement, and the Lagrangian bound for any multipliers); every feasible completion leaves out a member of a
 conflict, so branching on a member and then going on without it explores every feasible set; forced members (by
 weak duality, for the weight split and the potentials and the Lagrangian bound alike) are promoted by every
@@ -428,7 +430,7 @@ defaults.
 | `nogoods` | on | sound (a nogood holds at every node; see `model::Nogoods`) | learn each conflict as a nogood of the root and use the table at every node, for the conflict to branch on and refine with and to rule candidates out of children |
 | `forget_nogoods` | on | sound (the table is a cache) | with `nogoods`, each searcher forgets every nogood it knows after each 50,000 of its steps |
 | `lagrange` | off | proven (weak duality, for any multipliers over valid nogoods; `matchbound::lagrange`) | with `nogoods`, where the node bound leaves a node open, bound it also by a Lagrangian relaxation of the searcher's nogoods kept along its path (over the matching bound), and (with `fix_forced`) force the members without which that bound would cut; the multipliers are refitted at the root as the searcher learns (section 4).  On by default until `gf2`; with `gf2` it changes no tree and costs 2-4% |
-| `gf2` | on | proven (heuristics/THEORY.md, Theorem 10; weak duality for the forced members) | bound every node by the GF(2) bound (section 4) instead of the matching bound and its refinement, branch on the conflicts of its heaviest set by exact strong branching, and (with `fix_forced`) force the members without which it would cut; the Lagrangian bound over nogoods, if on, applies after it |
+| `gf2` | on | proven (heuristics/THEORY.md, Theorem 11; weak duality for the forced members) | bound every node by the GF(2) bound (section 4) instead of the matching bound and its refinement, branch on the conflicts of its heaviest set by exact strong branching, and (with `fix_forced`) force the members without which it would cut; the Lagrangian bound over nogoods, if on, applies after it |
 | `prev_cap` | on | proven if opt(n−1) is optimal | stop as soon as the incumbent reaches n + opt(n−1) − in_the_bag (`FrameSolver.getMaxPromotionSum`) |
 | `seed_incumbent` | on | sound (any feasible promotion set is a valid incumbent) | start from the better of greedy and the n−1 solution's promotions that are still feasible |
 
