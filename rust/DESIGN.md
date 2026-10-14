@@ -174,11 +174,12 @@ the PGO build, the Java golden export and the cloud scripts.
 
 **Width dispatch.**  Everything that holds sets of game numbers is generic over `const W: usize`, the number of 64-bit
 words, and the macro `with_width!` (in `bits`, used by the solver, the examples and the tests) picks the narrowest of
-`bits::WIDTHS` = {8, 16, 20, 24, 28, 32, 64} that holds n (n ≤ 511, 1023, 1279, 1535, 1791, 2047, 4095).  Every set
-operation is a loop over all W words, so the steps of 4 words past n = 1023 pay.  Each width is a copy of the
-search's code, which costs build time (a release build takes under a minute on an M1 Max; EXPERIMENTS has the times as
-widths were added).  A checkpoint records its width, and one made at another width than this build gives its game is
-refused.
+`bits::WIDTHS` = {8, 16, 20, 24, 28, 32, 36, 40, 48, 56, 64} that holds n (n ≤ 511, 1023, 1279, 1535, 1791, 2047, 2303,
+2559, 3071, 3583, 4095).  Every set operation is a loop over all W words, so the steps of 4 to 8 words past n = 1023
+pay.  Each width is a copy of the search's code, which costs build time (a release build takes about 75 seconds on an
+M1 Max; EXPERIMENTS has the times as widths were added).  A checkpoint records its width, and one made at another
+width than this build gives its game is refused, so a checkpoint of a game of 2048 to 3583 made at 64, before the
+widths of 36, 40, 48 and 56 were added, is refused by a build that has them.
 
 ## 4. The search
 
@@ -789,10 +790,12 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   wide, so nothing above 1023 meets anything but the committed results and these tests.  The same game at every
   width that holds it has the same frames, candidates, greedy set, `max_total`, answer and tree; game 1133 (W = 20,
   about 2,400 nodes) under every tactic against `strict.jsonl`; a slice of that chain; the sacrifice bound
-  proves game 1133 by an independent route; a W = 64 board (2050) through frames, matching bound, conflicts, greedy set
-  and a node-limited search; a committed checkpoint of game 1133 (`testdata/n1133_after_1000_nodes.ckpt`, W = 20)
-  that must still resume (a deliberate change of the checkpoint format fails it; the test says how to make the file
-  again); the levels of a real depth-first stack of game 1215 (`testdata/n1215_deep_units.txt`): the
+  proves game 1133 by an independent route; a board of 2050 built at W = 64 (it dispatches to 36) through frames,
+  matching bound, conflicts, greedy set and a node-limited search; boards of 2050, 2400, 2800 and 3100 at the widths
+  they dispatch to (36, 40, 48 and 56) and at 64, with the same start and the same node-limited search; a committed
+  checkpoint of game 1133 (`testdata/n1133_after_1000_nodes.ckpt`, W = 20) that must still resume (a deliberate
+  change of the checkpoint format fails it; the test says how to make the file again); the levels of a real
+  depth-first stack of game 1215 (`testdata/n1215_deep_units.txt`): the
   incremental matching bound and the quick bounds without a member against the min-cost-flow reference; and promoting
   one number at a time (with its no-peel shortcut) against the peel of every frame, in reached states of boards at
   W = 20, 28 and 64.  (The unit tests check the nogood table's lookups against their definition at compact strides of

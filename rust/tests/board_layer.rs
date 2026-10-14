@@ -63,7 +63,7 @@ fn moves_of(line: &Line) -> Vec<u32> {
 }
 
 /// The moves of the games a promotion set makes, and the digest of the search problem of a board, are those of the
-/// committed chain: at a sample of boards from 18 to 2175, the sets of 8 to 64 words.
+/// committed chain: at a sample of boards from 18 to 2175, the sets of 8 to 36 words.
 #[test]
 fn the_board_layer_reproduces_the_chains_moves_and_problems() {
     let lines = sampled_lines();

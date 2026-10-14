@@ -184,7 +184,7 @@ rerunning `chain.sh` with a larger N later continues the same file.
 
 * **On-demand for sections 3 and 4**: a spot interruption in the middle of a measurement ruins it.
 * **Spot for the production chain is reasonable**, because the run is built for it: a stop by SIGTERM loses nothing, a
-  kill loses at most one checkpoint interval (60 s), and `chain.sh` is safe to start again.  What an interruption
+  kill loses at most one checkpoint interval (300 s), and `chain.sh` is safe to start again.  What an interruption
   really costs is the time to get a machine again (the spot pool of a large size can be thin) and your attention; fall back to
   on-demand, or to a smaller size (`THREADS` can differ between resumes), if you cannot.  Use `spot-watch.sh` to turn the
   two-minute notice into a clean stop and a save.
@@ -372,10 +372,10 @@ Notes on judging it:
 
 `scaling.sh --pauses` solves game 1230 (from the committed chain up to 1229) at all CPUs, with a checkpoint every 0.5 s,
 and prints the progress line of the end: `pauses N (x%) max Yms park Zms`.  `x` is the share of the workers' time spent
-parked in checkpoints at that absurd rate; at the real interval of 60 s the share is 120 times smaller.  `max` is the
+parked in checkpoints at that absurd rate; at the real interval of 300 s the share is 600 times smaller.  `max` is the
 longest pause (the wait for the slowest worker, then writing and `fsync`-ing a few MB to EBS), and `park` the longest
 wait for the workers to park (10 to 15 ms at most on the M1).  A `max` of a few hundred milliseconds is fine at a
-60-second interval; seconds would mean slow storage, and `--checkpoint-interval` can go up (`CHECKPOINT_INTERVAL=300`).
+300-second interval; seconds would mean slow storage, and `CHECKPOINT_INTERVAL` can go up further.
 
 ### 4.5 Rehearsal of the chain, with interruptions
 
@@ -415,9 +415,9 @@ DEADLINE_HOURS=30 POWEROFF=always S3_DEST=s3://YOUR-BUCKET/taxman-run1 rust/tool
 ```
 
 In a second window, if spot: `rust/tools/cloud/spot-watch.sh`.  `chain.sh N` is the whole command: the chain 1..N
-into `~/taxman-work/results/strict.jsonl`, all CPUs, a checkpoint and a progress line every 60 s.  Its variables (all
-optional) are documented at the top of the script: `THREADS`, `CHECKPOINT_INTERVAL`, `PROGRESS`, `EXTRA_ARGS`,
-`DEADLINE_HOURS`, `POWEROFF`, `MAX_FAILS`, `S3_DEST`, `SAVE_EVERY`.
+into `~/taxman-work/results/strict.jsonl`, all CPUs, a checkpoint every 300 s and a progress line every 60 s.  Its
+variables (all optional) are documented at the top of the script: `THREADS`, `CHECKPOINT_INTERVAL`, `PROGRESS`,
+`EXTRA_ARGS`, `DEADLINE_HOURS`, `POWEROFF`, `MAX_FAILS`, `S3_DEST`, `SAVE_EVERY`.
 
 * **Where the chain starts.**  From an empty `~/taxman-work`, `chain.sh` solves from n = 1, which reproduces the
   committed `rust/results/strict.jsonl` (n = 1 to 2175; the scores equal, the moves may differ) in minutes on the big
@@ -445,8 +445,9 @@ optional) are documented at the top of the script: `THREADS`, `CHECKPOINT_INTERV
   `~/taxman-work/logs/chain.err`.
 * **Same build between a stop and its resume.**  A checkpoint records the game, the frames the build made, the
   candidates and the search tactics; one from a build that differs is refused with the reason (delete it, or run the old
-  build).  Do not `git pull` in the middle of a long game without a reason.  Changing only code generation (PGO,
-  `target-cpu`) is harmless.
+  build).  The width of the sets is part of that: a checkpoint of a game of 2048 to 3583 made at 64, before the widths
+  of 36, 40, 48 and 56 words were added, is refused by a build that has them.  Do not `git pull` in the middle of a
+  long game without a reason.  Changing only code generation (PGO, `target-cpu`) is harmless.
 
 ### Monitoring
 
@@ -472,7 +473,8 @@ n, not on a smooth curve.
 1. `spot-watch.sh` sees the two-minute notice, sends SIGTERM to `chain.sh`, waits for it, and runs `save.sh`.  Without
    it, the OS shutdown signals the processes, and in the worst case you lose one checkpoint interval.
 2. With `S3_DEST` set, `chain.sh` has been copying results, logs and checkpoints every 10 minutes (`save.sh`; the
-   checkpoints with `--delete`, so a finished game's disappears).
+   checkpoints with `--delete`, so a finished game's disappears), at the lowest CPU and I/O priority (`nice -n 19`,
+   `ionice -c 3` on Linux), so that a save (about 1.5 s of CPU) never competes with the workers.
 3. On a replacement machine: `setup.sh` (same commit: `git checkout` it if the branch moved, or the checkpoint may be
    refused), then `S3_DEST=... rust/tools/cloud/save.sh --restore`, then `chain.sh N` again.  It refuses to restore over
    an existing results file unless `FORCE=1`.  With a separate EBS volume instead, attach it in the same availability
