@@ -6,12 +6,12 @@
 //! never negative.  Two counts follow from the freedoms alone, and hold in every state the search reaches:
 //!
 //! * [`FrameSet::narrow_candidates`]: promoting a factor of frame `i` spends a freedom of frame `i` and one of
-//!   frame `i − 1`, so only the factors of frames that have freedoms left, above a frame that has too, can still
+//!   frame `i − 1`, so only the factors of frames that have freedoms left, behind a frame that has too, can still
 //!   be promoted.
 //! * [`FrameSet::max_promotions`]: with `c_i` further promotions out of frame `i` (into frame `i − 1`), frame `i`
-//!   spends `c_i + c_{i+1}` of its freedoms `F_i`.  Taking as many as fit from the bottom up maximizes `Σ c_i`
-//!   under those limits (raising `c_i` at the cost of `c_{i+1}` never lowers the sum), so the count it gives
-//!   bounds the promotions of any completion.  The search's `max_total` and `max_add` come from it.
+//!   spends `c_i + c_{i+1}` of its freedoms `F_i`.  Taking as many as fit, from the front to the back, maximizes
+//!   `Σ c_i` under those limits (raising `c_i` at the cost of `c_{i+1}` never lowers the sum), so the count it
+//!   gives bounds the promotions of any completion.  The search's `max_total` and `max_add` come from it.
 
 use super::peel::{reduce_from, winnable, Worklist};
 use super::{FactorProvider, MAX_FRAMES};
@@ -40,7 +40,8 @@ impl<const W: usize> Frame<W> {
         winnable(&self.moves, &self.factors, g)
     }
 
-    /// The Java's `Frame.reduce`: the frame with its forced pairs removed, freedoms recomputed from the sizes.
+    /// The Java's `Frame.reduce`: the frame with every move that is left with one live factor dropped together with
+    /// that factor, freedoms recomputed from the sizes.
     pub fn reduce(&self, g: &FactorProvider) -> Self {
         let (mut moves, mut factors) = (self.moves, self.factors);
         let pending = Worklist::of(&moves);
@@ -94,7 +95,7 @@ impl<const W: usize> fmt::Debug for Frame<W> {
     }
 }
 
-/// The frames of a game, bottom (frame 0) first, inline: `Copy`, no heap.  Created by
+/// The frames of a game, front (frame 0) first, inline: `Copy`, no heap.  Created by
 /// [`Model::build`](super::Model::build); every
 /// frame in it is reduced and winnable.  A search state is the root frame set with some candidates promoted.
 /// Equality and hashing look at the frames in use only.
@@ -116,7 +117,7 @@ impl<const W: usize> FrameSet<W> {
         self.len == 0
     }
 
-    /// The frames, bottom first.
+    /// The frames, front first.
     #[inline]
     pub fn frames(&self) -> &[Frame<W>] {
         &self.frames[..self.len]
@@ -157,7 +158,8 @@ impl<const W: usize> FrameSet<W> {
         self.max_promotions_with(|f| f.freedoms.min(f.factors.intersect(candidates).len() as i32))
     }
 
-    /// Bottom up, each frame promotes out as many numbers as it can (`out_limit`) and the frame below can take.
+    /// Front to back, each frame promotes out as many numbers as it can (`out_limit`) and the frame in front of it
+    /// can take.
     #[inline]
     fn max_promotions_with(&self, out_limit: impl Fn(&Frame<W>) -> i32) -> i32 {
         let mut total = 0;

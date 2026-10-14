@@ -186,7 +186,7 @@ impl Optimal {
 
     /// The table with the completed games of the results files `results` added (they replace the table's moves for
     /// the same board sizes; an unfinished search's line is skipped): how a measurement (the ladder, `taxman
-    /// bench`) gets the previous game of a board past the table's end, to seed and cap its search.
+    /// bench`) gets the previous game of a board past the table's end, to seed its search and give it a ceiling.
     ///
     /// # Errors
     ///

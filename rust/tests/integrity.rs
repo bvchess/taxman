@@ -123,13 +123,14 @@ fn a_ceiling_tripped_in_a_range_is_recorded_as_rejected() {
 // Assumptions
 
 /// A run told to (`use_prev`) builds on a game of optimal.json, which it assumes optimal, and each result records
-/// that assumption exactly where its proof rests on it: a proof by the cap or the prime formula on the game before, a
+/// that assumption exactly where its proof rests on it: a proof by `cap` or the prime formula on the game before, a
 /// repeat on the game it repeats, and an exhausted search on no game.
 #[test]
 fn the_results_built_on_a_game_of_optimal_json_assume_it_as_far_as_their_proofs_rest_on_it() {
     let dir = TempDir::new("assumes");
     let results = dir.join("r.jsonl");
-    // 33 reaches its cap and 34 repeats it, 35 is an exhausted search; 37 is a prime built on 36, an exhausted search.
+    // 33 reaches its ceiling and 34 repeats it, 35 is an exhausted search; 37 is a prime built on 36, an exhausted
+    // search.
     let opts = SolveOptions { use_prev: true, ..options(1) };
     let games = solver::solve_range(33, 50, &opts, Some(&results)).unwrap();
     let first = &games[0];

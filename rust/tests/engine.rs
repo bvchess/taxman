@@ -350,7 +350,7 @@ fn eight_threads_are_correct() {
     assert_accounting(&out.counters);
 }
 
-/// Many workers taking turns on a few cores (`EngineConfig::cores`, the emulation of a larger machine) give the
+/// Many workers taking turns on a few CPUs (`EngineConfig::cores`, the emulation of a larger machine) give the
 /// same answer, split the work among all of them, and stop at a node limit.
 #[test]
 fn many_workers_on_few_cores_are_correct() {
@@ -376,8 +376,8 @@ fn assert_accounting(c: &engine::Counters) {
     assert!(c.runs >= c.steals, "{c:?}");
 }
 
-// Many more workers than cores, as on a machine with 192 cores: answers, splitting, checkpoints, spill and panics
-// must work however the threads are scheduled.  They keep every core busy for seconds, so they run only when
+// Many more workers than CPUs, as on a machine with 192 CPUs: answers, splitting, checkpoints, spill and panics
+// must work however the threads are scheduled.  They keep every CPU busy for seconds, so they run only when
 // asked for: `cargo test --release --test engine -- --ignored many_threads`.
 
 const MANY: [usize; 2] = [64, 192];
@@ -427,7 +427,7 @@ fn many_threads_checkpoint_resume_and_spill() {
         assert!(runs.iter().any(|c| c.spilled_units > 0 && c.reloaded_segments > 0), "{threads} threads: {runs:?}");
         assert!(dir_is_empty(&spill), "{threads} threads: spill files left behind");
         // Periodic checkpoints every 2 ms, progress lines and spilling all at once.  How many pauses happen
-        // depends on when the coordinator gets a core, so only the answer and the bookkeeping are checked.
+        // depends on when the coordinator gets a CPU, so only the answer and the bookkeeping are checked.
         let big = big_instance();
         let cfg = EngineConfig {
             checkpoint: Some((ckpt.clone(), Duration::from_millis(2))),
@@ -502,7 +502,7 @@ fn run_in_pieces(cfg: &EngineConfig, inst: &Instance, ckpt: &Path) -> (Outcome, 
         counters.push(out.counters);
         // The elapsed time is this invocation's plus that of the runs before it (from the checkpoint).  (Checked
         // with the engine's own clocks: a test thread can be descheduled for long when the tests oversubscribe
-        // the cores.)
+        // the CPUs.)
         if invocation == 1 {
             assert!(out.elapsed >= out.counters.wall, "elapsed includes this run: {:?}", out.counters);
         } else {
@@ -639,7 +639,7 @@ fn worker_panic_propagates() {
     worker_panic_propagates_with(None);
 }
 
-/// A worker's panic gives its turn on the emulated cores up, so that the workers waiting for one do not wait forever.
+/// A worker's panic gives its turn on the emulated CPUs up, so that the workers waiting for one do not wait forever.
 #[test]
 fn worker_panic_propagates_on_one_core() {
     worker_panic_propagates_with(Some(1));
@@ -864,7 +864,7 @@ impl Searcher<Leafy> for Walker {
 /// The environment can change the thread counts (`TXENGINE_BENCH_THREADS`, default `1,2,4,8`), the knapsack's
 /// items (`TXENGINE_BENCH_ITEMS`, default [`BIG_ITEMS`]: 0.2 G nodes; 64: 0.65 G, 72: 4.2 G, 80: 60 G) and the
 /// binary tree's depth (`TXENGINE_BENCH_DEPTH`, default 27: 0.27 G nodes, each level more doubles it).  The
-/// unthreaded runs take about 2.6 ns per knapsack node and 1.2 ns per tree node on an M1 core, so on many cores
+/// unthreaded runs take about 2.6 ns per knapsack node and 1.2 ns per tree node on an M1 CPU, so on many CPUs
 /// the defaults finish in milliseconds; there `TXENGINE_BENCH_ITEMS=80 TXENGINE_BENCH_DEPTH=35` measure
 /// something (and take about four minutes for the unthreaded runs).
 fn bench() {
