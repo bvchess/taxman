@@ -146,7 +146,7 @@ those of the page the row points to; a game is named by its board size, and time
 | What `revise_freedoms` changes in the proofs at the frontier | [tactics review](#revise_freedoms-the-same-trees) | measured; removed | it changes the problem of every searched game of 1232..1300 (frame 0's freedoms down 4 to 6, `max_total` 0 to 5), yet the proofs of 1215, 1225, 1240, 1254, 1272, 1287 and 1300 have the same trees, node for node |
 | `preclusions`, `match_bound=off`, `legacy_bound` and the branchings other than `conflict-strong`, again with the Lagrangian bound | [tactics review](#the-alternatives-that-are-off) | measured; removed | the proof of 1215 on one thread: `preclusions` +80% cycles and 4.5 s for its table, `conflict-largest` ×6.3, `largest`, `conflict-smallest` and `match_bound=off` unfinished at 180 s (more than ×17); `legacy_bound` acts only without the matching bound |
 | `match_refine=0` with the Lagrangian bound | [tactics review](#the-alternatives-that-are-off) | open | the proof of 1215: cycles −12%, nodes +1%; its default needs the bench set and the small games |
-| Support for old file formats: result schemas 1 to 3, the committed schema-1 files, checkpoint compatibility, the golden tests of the Java's tactics | [tactics review](#old-file-formats) | open: to go with the tactics | an inventory, with what deleting each takes along |
+| Support for old file formats: result schemas 1 to 3, the committed schema-1 files, checkpoint compatibility, the golden tests of the Java's tactics | [tactics review](#old-file-formats) | removed | with the tactics: results schemas 1 to 4 (schema 5 only is read), `results/default.jsonl`, checkpoint headers before version 4 and the width widening; the Java's golden data for the frame builder stays |
 | Re-solve 1..1000 and 1001-1300 with no unproven tactic, and the non-primes of 1001-1231 standalone | [results](../results/README.md#what-supports-the-scores) | kept | `strict.jsonl` reproduces all 1000 scores of optimal.json; the 197 standalone searches agree with the chain |
 | The Java's merged-away hive branch (the stale-hive quirk) in the frame builder | [`src/hives.rs`](../src/hives.rs) | measured | reached once (n = 114) for 2 ≤ n ≤ 2000, and forcing it off changes no frame |
 
@@ -1327,7 +1327,38 @@ Everything that exists only to read what older builds wrote, and what deleting i
   `match_bound=off` and `legacy_bound`).  The golden files' fields that then nobody reads (`searchManager`'s
   `revisedFrame0Freedoms`, `solve.accelerated` if the prime half goes too) can stay as exported.
 
-*Decision.*  None yet: phase 2 removes what the owner accepts, once the rewrite of the inner loop has merged.
+*Decision.*  The owner took the recommendation and went further; the removals are commits f72c332, 8a6df90,
+49ec778 and a2bc798 (on 4372b36 by the merge 39ed18b), about 4,800 lines of code removed and 1,650 added (`src/`,
+`tests/`, `examples/`, `tools/`, `evidence/` and the study scripts; 3,600 and 990 of them in `src/`):
+
+* *Tactics.*  `reuse_prev`, `revise_freedoms` (premise refuted at n = 833), `legacy_bound`, `preclusions`,
+  `match_bound=off` with `blameGame` and the counters only they used, and the tactic `branching` with its three
+  losing values are gone, with their tests, tripwire rows and fixtures (`testdata/accel_java.txt`).  The nine proven or
+  sound tactics of the table stay as switches.
+* *No strict runs.*  With no unproven tactic left there is one kind of run: `--strict`, `UNPROVEN`, `Tactics::strict`,
+  `unproven_tactics_on` and the rules of a game's own taint are gone, and so are `STRICT_ARGS` in `tools/cloud`.
+* *Assumptions instead of taint.*  A range takes the game of n − 1 from the run or from the `--out` file and otherwise
+  solves its first game standalone; `--use-prev` takes it from optimal.json.  A result whose proof rests on such a game
+  records `"assumes": ["the game of 1300 in optimal.json is optimal"]` (say), carried down the chain as taint was, and
+  `[]` otherwise.  Nothing refuses a game for what it assumes (`--allow-tainted-prev` is gone), and `extend-optimal`
+  appends such games: they assume nothing the table does not stand for.
+* *optimal.json is built in.*  The binary carries the table it was compiled with (`include_str!`; a rebuild picks up a
+  changed file) and confirms every score against it, a difference being a hard error naming the game: `--optimal FILE`,
+  `--optimal none`, `TAXMAN_OPTIMAL` and `allow_optimal_mismatch` are gone.  Tests that need another table use the
+  library (`solver::solve_range_each_with`, `results::read_results`); `verify-optimal [FILE]` and `extend-optimal
+  RESULTS --out FILE [--table FILE]` still take files.
+* *Old formats.*  Results lines are schema 5 (`assumes`, `prev.assumes`, `same_search.assumes`, `options.use_prev`; no
+  `prev_source`, `setup.revise`, `seconds.revise` or `seconds.preclusions`, `unproven_tactics_on`, `optimal_file` or
+  `allow_optimal_mismatch`), and both verifiers read schema 5 only; `results/default.jsonl` and
+  `testdata/strict_schema3_1_90.jsonl` are deleted (`git show f72c332:rust/results/default.jsonl`), and
+  `bench/curve/chain.jsonl` stays as the cost-curve study's data, which no verifier reads.  The checkpoint header is
+  version 4 (no frame 0, the tactics recorded plainly), every other version is refused with one message, and the
+  widening to an older build's width is gone; `testdata/n1133_after_1000_nodes.ckpt` (now W = 20) and the probe's
+  windows were made again, the probe's fingerprint now 7e8e724717d26545 (5b83bbebf0bb2899 with `lagrange=off`).
+* *Left for the owner.*  `results/strict.jsonl` is schema 4, so until it is made again by this build (the chain from
+  n = 1, about 18 minutes on four threads) neither verifier reads it: `tests/results.rs`'s
+  `the_committed_results_pass_the_verifier` skips it, saying so, and `tools/cloud/verify.sh`, `setup.sh`'s verifier
+  smoke check, `tools/profile/profile.sh` and the README's commands that extend a copy of it wait for the rerun.
 
 ## Faster nodes with the Lagrangian bound, same trees (2026-10)
 
