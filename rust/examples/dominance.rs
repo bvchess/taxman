@@ -123,7 +123,8 @@ fn main() {
             for path in &o.rest {
                 let path = PathBuf::from(path);
                 let text = std::fs::read_to_string(&path).expect("fixture");
-                let n: u32 = text.lines().find_map(|l| l.strip_prefix("n ")).and_then(|v| v.trim().parse().ok()).expect("n");
+                let n: u32 =
+                    text.lines().find_map(|l| l.strip_prefix("n ")).and_then(|v| v.trim().parse().ok()).expect("n");
                 taxman::with_width!(n, W => nodes_of::<W>(&path, &o));
             }
         }
@@ -227,7 +228,12 @@ fn sample_one<const W: usize>(n: u32, optimal: &Optimal, o: &Options) {
     }
     let path = o.out.join(format!("n{n:04}.nodes"));
     std::fs::write(&path, text).expect("write the samples");
-    eprintln!("n={n}: {} nodes of {total} steps -> {} ({:.1} s)", samples.len(), path.display(), t0.elapsed().as_secs_f64());
+    eprintln!(
+        "n={n}: {} nodes of {total} steps -> {} ({:.1} s)",
+        samples.len(),
+        path.display(),
+        t0.elapsed().as_secs_f64()
+    );
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -294,7 +300,13 @@ fn core<const W: usize>(g: &FactorProvider, frame: &Frame<W>, cin: &Bits<W>, cou
 /// `state`'s core standing in for one at most, provided it uses no factor that `other`'s core lacks: then
 /// `state`'s core with `G` and `L` winnable ⇒ the same with only the stand-ins and the common factors (the others
 /// unused) ⇒ the same graph with `other`'s moves ⇒ with `other`'s factors (more).
-fn covers<const W: usize>(g: &FactorProvider, other: &FrameSet<W>, state: &FrameSet<W>, cands: &Bits<W>, relabel: bool) -> bool {
+fn covers<const W: usize>(
+    g: &FactorProvider,
+    other: &FrameSet<W>,
+    state: &FrameSet<W>,
+    cands: &Bits<W>,
+    relabel: bool,
+) -> bool {
     let (mine, theirs) = (state.frames(), other.frames());
     for h in 0..mine.len() {
         let cin = mine.get(h + 1).map_or(Bits::EMPTY, |above| above.factors & *cands);
@@ -317,7 +329,8 @@ fn covers<const W: usize>(g: &FactorProvider, other: &FrameSet<W>, state: &Frame
             return false;
         }
         let (common, only_mine) = (f1 & f2, f1 - f2);
-        let key = |x: u32| -> Vec<u16> { g.factors(x).iter().copied().filter(|&q| common.contains(u32::from(q))).collect() };
+        let key =
+            |x: u32| -> Vec<u16> { g.factors(x).iter().copied().filter(|&q| common.contains(u32::from(q))).collect() };
         let mut spare: std::collections::HashMap<Vec<u16>, i32> = Default::default();
         for x in m1.iter().filter(|&x| !g.factors(x).iter().any(|&q| only_mine.contains(u32::from(q)))) {
             *spare.entry(key(x)).or_default() += 1;
@@ -440,7 +453,13 @@ fn next(rng: &mut u64) -> u64 {
 
 /// A maximal subset of `cands` that can be promoted from `state`: the candidates in a random order, each kept if
 /// it can be promoted after those kept.
-fn random_maximal<const W: usize>(model: &Model, scratch: &mut Scratch<W>, state: &FrameSet<W>, cands: &Bits<W>, rng: &mut u64) -> Bits<W> {
+fn random_maximal<const W: usize>(
+    model: &Model,
+    scratch: &mut Scratch<W>,
+    state: &FrameSet<W>,
+    cands: &Bits<W>,
+    rng: &mut u64,
+) -> Bits<W> {
     let mut order: Vec<u32> = cands.iter().collect();
     for i in (1..order.len()).rev() {
         order.swap(i, (next(rng) % (i as u64 + 1)) as usize);
@@ -537,7 +556,11 @@ fn nodes_of<const W: usize>(path: &Path, o: &Options) {
         let mut check = |set: Bits<W>, kind: usize, scratch: &mut Scratch<W>| {
             let Some(other) = model.promote_all_using(scratch, root, &set) else { return };
             let takes_all = maximal.iter().all(|s| model.promote_all_using(scratch, &other, s).is_some());
-            let proved = [covers(g, &other, &state, &cands, false), covers(g, &other, &state, &rel, false), covers(g, &other, &state, &rel, true)];
+            let proved = [
+                covers(g, &other, &state, &cands, false),
+                covers(g, &other, &state, &rel, false),
+                covers(g, &other, &state, &rel, true),
+            ];
             assert!(takes_all || !proved.iter().any(|&c| c), "n={n}: a cover refuted by a completion: {set:?}");
             f.sampled[kind] |= takes_all;
             f.cover_all[kind] |= proved[0];
@@ -563,7 +586,8 @@ fn nodes_of<const W: usize>(path: &Path, o: &Options) {
                     for (j, &b1) in pr.iter().enumerate() {
                         for &b2 in &pr[j + 1..] {
                             let taken = Bits::EMPTY.with(b1).with(b2);
-                            let more = added.sum() > taken.sum() || (added.sum() == taken.sum() && added.max() > taken.max());
+                            let more =
+                                added.sum() > taken.sum() || (added.sum() == taken.sum() && added.max() > taken.max());
                             if more {
                                 check((promoted - taken) | added, 2, &mut scratch);
                             }
@@ -624,7 +648,8 @@ fn symmetries_of<const W: usize>(n: u32) {
     }
     let p = board.prepare(SearchTactics::default()).expect("prepare");
     let pairs = root_pairs(&p);
-    let moved: Bits<W> = p.candidates.iter().filter(|&x| pairs.iter().any(|&(a, b)| swap_primes(x, a, b) != x)).collect();
+    let moved: Bits<W> =
+        p.candidates.iter().filter(|&x| pairs.iter().any(|&(a, b)| swap_primes(x, a, b) != x)).collect();
     println!(
         "{{\"n\":{n},\"candidates\":{},\"symmetric_pairs\":{},\"moved\":{},\"pairs\":\"{pairs:?}\"}}",
         p.candidates.len(),
