@@ -235,6 +235,7 @@ The model-free work of [evidence](../evidence/README.md) and the proofs of [THEO
 | A single game's search over several threads or processes (a `--shard i/K` over the open units of a checkpoint) | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | open: not needed | at 16 vCPUs the campaign ends with the dearest games (11 hours) and 4 to 5 of them run at once |
 | A clean pause of `exact` on SIGTERM (a stop handler) | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | open: replaced by passes in `evidence.sh` | passes of 300 s bound what a kill loses to 5 minutes of the threads, and a resumed search has the nodes of an uninterrupted one |
 | A 192-vCPU instance for the proofs of 1301-2175 | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | not kept | from 16 vCPUs up the dearest games (2170-2173) set the wall time, 11 hours; 192 vCPUs cost eight times as much for the same hours |
+| How the parity bound relates to Franklín and Moniot's Theorem 1 and bound | [THEORY: relation to Franklín and Moniot](../../heuristics/THEORY.md#relation-to-franklín-and-moniot) | kept (proven; evaluation/fm_relation.py) | playable / independent / matchable iff exactly one / an odd number / at least one payment scheme onto some payment set (Theorem 12); no odd core below board 45, so the parity bound is exact to 44; checked on every pick set of 2..22 and 18,200 dense sets on 30-120 |
 
 ### The Python heuristics project
 
