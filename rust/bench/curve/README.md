@@ -17,7 +17,7 @@ frontier.
 | file | content |
 |---|---|
 | `common.py` | paths, constants (search limit, per-call budget), JSONL helpers, primes, background-load sampling |
-| `run_chain.py` | step 1: `taxman solve 1001-1231` (strict, 8 threads), resumable; writes `chain.jsonl` |
+| `run_chain.py` | step 1: `taxman solve 1001-1231 --use-prev` (8 threads), resumable; writes `chain.jsonl` |
 | `run_games.py` | steps 2-4: one `ladder` process per game, resumable (one JSON line per finished game) |
 | `analysis.py` | step 5: calibration, band statistics, fits, projections; prints markdown |
 | `analysis_output.md` | the output of `./analysis.py` (all tables, including the ones left out below) |

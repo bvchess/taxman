@@ -3,8 +3,7 @@
 //! A frame's *freedoms* start as its factors minus its moves and drop by one on every promotion into it (one move
 //! more) or out of it (one factor less); a reduction drops a move and a factor together, so the freedoms stay
 //! the factors minus the moves.  A winnable frame pays every move with a factor of its own, so its freedoms are
-//! never negative.  Two counts follow from the freedoms alone, and hold in every state the search reaches
-//! (unless frame 0's were lowered by the unproven tactic `revise_freedoms`; then they rest on it):
+//! never negative.  Two counts follow from the freedoms alone, and hold in every state the search reaches:
 //!
 //! * [`FrameSet::narrow_candidates`]: promoting a factor of frame `i` spends a freedom of frame `i` and one of
 //!   frame `i − 1`, so only the factors of frames that have freedoms left, above a frame that has too, can still
@@ -21,9 +20,8 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 
 /// One frame: its moves, its factors, and its freedoms.  Freedoms start at `|factors| − |moves|` and drop by one
-/// on every promotion into or out of the frame; frame 0's can also be lowered by
-/// [`FrameSet::with_frame_zero_freedoms`], so they can go negative.  Equality includes the freedoms (the Java's
-/// `Frame.equals` ignores them).
+/// on every promotion into or out of the frame.  Equality includes the freedoms (the Java's `Frame.equals` ignores
+/// them).
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct Frame<const W: usize> {
     pub moves: Bits<W>,
@@ -160,9 +158,6 @@ impl<const W: usize> FrameSet<W> {
     }
 
     /// Bottom up, each frame promotes out as many numbers as it can (`out_limit`) and the frame below can take.
-    /// (A frame with negative freedoms, which only a lowered frame 0 can lead to, makes the count of the frame
-    /// above it negative, and the total can then come out one too small; a set that gets there already breaks
-    /// the lowered freedoms, which the search takes as given.)
     #[inline]
     fn max_promotions_with(&self, out_limit: impl Fn(&Frame<W>) -> i32) -> i32 {
         let mut total = 0;
@@ -173,25 +168,6 @@ impl<const W: usize> FrameSet<W> {
             room_below = f.freedoms - count;
         }
         total
-    }
-
-    /// The Java's `setFrameZeroFreedoms`: this frame set with frame 0's freedoms replaced.
-    #[must_use]
-    pub fn with_frame_zero_freedoms(&self, freedoms: i32) -> Self {
-        let mut out = *self;
-        if out.len > 0 {
-            out.frames[0].freedoms = freedoms;
-        }
-        out
-    }
-
-    /// The two-frame game `{frame 0, frame 1}` (fewer if there are fewer frames), for the same
-    /// [`Model`](super::Model).
-    #[must_use]
-    pub fn front_pair(&self) -> Self {
-        let mut out = FrameSet { len: self.len.min(2), frames: [Frame::default(); MAX_FRAMES] };
-        out.frames[..out.len].copy_from_slice(&self.frames[..out.len]);
-        out
     }
 }
 

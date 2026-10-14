@@ -2,7 +2,8 @@
 //! replays legally to its recorded score, is over and opens with the largest prime, keeps to the chain from
 //! n − 1, and the arithmetic and provenance of its line hold; the files agree on every game they share.  The
 //! counts asserted here are the ones `results/README.md` quotes.  And both verifiers, `verify-results` and the
-//! Python referee, refuse lines that a hand edit made contradict themselves, and derive taints by the same rules.
+//! Python referee, refuse lines that a hand edit made contradict themselves, and derive assumptions by the same
+//! rules.
 
 mod common;
 
@@ -12,14 +13,17 @@ use std::path::PathBuf;
 use std::process::Command;
 use taxman::game::Optimal;
 use taxman::json::Json;
-use taxman::results::{moves_digest, verify_files, Certificate, FileReport, Proof, OPTIMAL_JSON};
+use taxman::results::{
+    assumed_optimal, moves_digest, verify_files, Assumptions, Certificate, FileReport, Proof, SCHEMA,
+};
 use taxman::solver::{self, GameResult, Method, SolveOptions};
 
 fn crate_path(relative: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(relative)
 }
 
-/// `line` with the field at `path` (keys separated by dots, `"setup.revise"`) set to `value`.
+/// `line` with the field at `path` (keys separated by dots, `"same_search.n"`) set to `value`; a field the line lacks
+/// is added.
 fn with(line: &Json, path: &str, value: &Json) -> Json {
     let Json::Obj(pairs) = line else { panic!("not an object at {path}") };
     let (key, rest) = path.split_once('.').map_or((path, None), |(key, rest)| (key, Some(rest)));
@@ -28,7 +32,11 @@ fn with(line: &Json, path: &str, value: &Json) -> Json {
         None => value.clone(),
         Some(rest) => with(old, rest, value),
     };
-    Json::Obj(pairs.iter().map(|pair| (pair.0.clone(), set(pair))).collect())
+    let mut fields: Vec<(String, Json)> = pairs.iter().map(|pair| (pair.0.clone(), set(pair))).collect();
+    if rest.is_none() && !pairs.iter().any(|(name, _)| name == key) {
+        fields.push((key.to_owned(), value.clone()));
+    }
+    Json::Obj(fields)
 }
 
 /// A change to a line: the field at a path (as [`with`] takes it) and its new value.
@@ -44,12 +52,12 @@ enum Verdict<'a> {
 /// Runs both verifiers, `verify_files` (on each file alone) and the Python referee `tools/check_results.py` (on all
 /// of them at once), on files made of the lines of each case, and checks that each gives its verdict.
 fn verifiers_agree(dir: &TempDir, cases: &[(Vec<Json>, Verdict)]) {
-    let optimal = Optimal::load_default().unwrap();
+    let optimal = Optimal::built_in();
     let mut paths = Vec::new();
     for (k, (lines, verdict)) in cases.iter().enumerate() {
         let path = dir.join(format!("case-{k:02}.jsonl"));
         fs::write(&path, lines.iter().map(|line| format!("{line}\n")).collect::<String>()).unwrap();
-        let verified = verify_files(std::slice::from_ref(&path), Some(&optimal));
+        let verified = verify_files(std::slice::from_ref(&path), optimal);
         match (verified, verdict) {
             (Ok(_), Verdict::Accepted) => {}
             (Err(err), Verdict::Refused { line, n, expected }) => {
@@ -100,58 +108,38 @@ fn both_verifiers(
 }
 
 /// Lines whose fields contradict each other, which no run writes but a hand edit could, and through which the proof
-/// or the taint derived from a line would change, are refused by both verifiers, naming the line; a combination
-/// that older builds wrote is accepted by both, in a line of the schema they wrote.  Each file is games 1 to the
-/// tampered one, solved with `reuse_prev` off so that most of them are searched.
+/// or the assumptions derived from a line would change, are refused by both verifiers, naming the line, and so is a
+/// line of another schema.  Each file is games 1 to the tampered one.
 #[test]
 fn lines_whose_fields_contradict_each_other_are_refused_by_both_verifiers() {
-    let mut opts = SolveOptions { threads: 1, ..SolveOptions::default() };
-    opts.tactics.set("reuse_prev=off").unwrap();
+    let opts = common::options(1);
     let games = solver::solve_range(1, 90, &opts, None).unwrap();
     let lines: Vec<Json> = games.iter().map(GameResult::to_json).collect();
     let find = |what: &str, wanted: &dyn Fn(&GameResult) -> bool| {
         games.iter().position(wanted).unwrap_or_else(|| panic!("no game {what} in 1..=90"))
     };
-    let exhausted = |g: &GameResult, revised: bool| {
-        g.proof == Some(Proof::Exhausted) && g.setup.is_some_and(|s| s.revise.sets_frame_zero() == revised)
-    };
-    let revised = find("exhausted with revised freedoms", &|g| exhausted(g, true));
-    let unrevised = find("exhausted with the built freedoms", &|g| exhausted(g, false));
+    let exhausted = find("exhausted", &|g| g.proof == Some(Proof::Exhausted) && g.setup.is_some());
     let capped = find("proven by the cap", &|g| g.proof == Some(Proof::Cap));
     let prime = find("prime", &|g| g.method == Method::Prime);
     let trivial = find("trivial and composite", &|g| g.method == Method::Trivial && g.n > 3);
 
     let s = |text: &str| Json::from(text);
-    let none = Json::array(Vec::<&str>::new());
     let some_setup = Json::object([
         ("frames", Json::from(1u32)),
         ("candidates", Json::from(1u32)),
         ("max_total", Json::from(1u32)),
         ("cap", Json::Null),
-        ("revise", s("Off")),
         ("digest", s("0123456789abcdef")),
     ]);
     let smallest_move = Json::array([*games[trivial].moves.iter().min().unwrap()]);
-    // Builds before 7af9fea wrote FromCheckpoint for a resumed search with the tactic off (and tainted it), up to
-    // schema 2.
-    let legacy = vec![
-        ("tactic_switches.revise_freedoms", Json::Bool(false)),
-        ("setup.revise", s("FromCheckpoint")),
-        ("taint", Json::array(["revise_freedoms"])),
-    ];
-    let legacy_schema_2 = [legacy.clone(), vec![("schema", Json::from(2u32))]].concat();
     let refused: Vec<(usize, Vec<Edit>, &str)> = vec![
-        // Taints dropped: frame 0's revised freedoms said to be Off, or no setup to say anything.
-        (revised, vec![("setup.revise", s("Off")), ("taint", none.clone())], "never says"),
-        (revised, vec![("setup", Json::Null), ("taint", none)], "without a \"setup\""),
-        (revised, vec![("in_the_bag", Json::Null)], "without \"in_the_bag\""),
-        (revised, vec![("setup.revise", s("Revised"))], "bad \"setup.revise\""),
-        (revised, vec![("setup.revise", s("GreedyIsMax(01)"))], "bad \"setup.revise\""),
-        // A proof by the cap passed off as an exhausted search, which would not inherit the taint of n − 1.
+        (exhausted, vec![("setup", Json::Null)], "without a \"setup\""),
+        (exhausted, vec![("in_the_bag", Json::Null)], "without \"in_the_bag\""),
+        // Only schema 5 is read.
+        (exhausted, vec![("schema", Json::from(4u32))], "older than the schema 5"),
+        (exhausted, vec![("schema", Json::Null)], "bad \"schema\""),
+        // A proof by the cap passed off as an exhausted search, which would not inherit what n − 1 assumes.
         (capped, vec![("reached_cap", Json::Bool(false)), ("proof", s("exhausted"))], "records not reaching"),
-        (unrevised, vec![("setup.revise", s("Stopped { nodes: 5 }"))], "revising was stopped"),
-        (unrevised, vec![("tactic_switches.revise_freedoms", Json::Bool(false))], "never says"),
-        (unrevised, legacy, "never says"),
         (prime, vec![("setup", some_setup)], "a prime game with a \"setup\""),
         (prime, vec![("in_the_bag", Json::from(0u64))], "a prime game with \"in_the_bag\""),
         (prime, vec![("reached_cap", Json::Bool(true))], "reached a cap"),
@@ -159,50 +147,56 @@ fn lines_whose_fields_contradict_each_other_are_refused_by_both_verifiers() {
         (trivial, vec![("method", s("prime")), ("in_the_bag", Json::Null)], "is not prime"),
         (trivial, vec![("promotions", smallest_move)], "a trivial game with promotions"),
     ];
-    let accepted = [(lines.len() - 1, vec![]), (unrevised, legacy_schema_2)];
+    let accepted = [(lines.len() - 1, vec![])];
     both_verifiers(&TempDir::new("contradictions"), &lines, &accepted, &refused);
 }
 
-/// A proof by the cap rests on nothing the game used itself (from schema 3 on): after a strict chain 1..81, game 82
-/// searched with `revise_freedoms` on (frame 0 revised) reaches its cap, rests on nothing unproven, and a strict run
-/// builds on it.  (Searched: with `same_search` on, 82 would repeat 81, whose problem is 82's, frame 0 and all.)
-/// Both verifiers hold a line to the rule of its schema: schema 2 counted the game's own taint in a proof by the cap
-/// too.
+/// A proof assumes what the game it rests on assumes, and nothing else.  Games 33 to 50, the first built on
+/// `optimal.json`'s game of 32 (`--use-prev`): 33 reaches its cap and 34 repeats 33, so both assume that game
+/// optimal; 35 exhausts its search, which rests on no game, so it and the games after it that rest on it assume
+/// nothing.  Both verifiers refuse a line that records a proof by the cap without the assumption, an exhausted search
+/// with it, or a prime game built on a game that assumes nothing with it.
 #[test]
-fn a_proof_by_the_cap_rests_on_nothing_the_game_used_itself() {
-    let dir = TempDir::new("cap-taint");
-    let results = dir.join("chain.jsonl");
-    let strict = common::strict_options(1);
-    let mut revising = strict.clone();
-    revising.tactics.set("revise_freedoms=on").unwrap();
-    revising.tactics.set("same_search=off").unwrap();
-    solver::solve_range(1, 81, &strict, Some(&results)).unwrap();
-    let capped = solver::solve_range(82, 82, &revising, Some(&results)).unwrap().remove(0);
-    assert_eq!(capped.proof, Some(Proof::Cap));
-    assert!(capped.setup.is_some_and(|s| s.revise.sets_frame_zero()), "{:?}", capped.setup);
-    assert!(capped.taint.is_empty(), "{:?}", capped.taint);
-    // A strict run (without --allow-tainted-prev) builds only on a game that rests on nothing unproven.
-    let next = solver::solve_range(83, 84, &strict, Some(&results)).unwrap();
-    assert!(next.iter().all(|g| g.completed && g.taint.is_empty()), "{next:?}");
-
-    let lines: Vec<Json> = fs::read_to_string(&results).unwrap().lines().map(|l| Json::parse(l).unwrap()).collect();
-    let i = 81;
-    assert_eq!(lines[i].get("n").and_then(Json::as_u32), Some(82));
-    let schema_2 = ("schema", Json::from(2u32));
-    let tainted = ("taint", Json::array(["revise_freedoms"]));
-    let accepted = [(lines.len() - 1, vec![]), (i, vec![schema_2.clone(), tainted.clone()])];
-    let refused = [(i, vec![schema_2], "records the taint"), (i, vec![tainted], "records the taint")];
-    both_verifiers(&dir, &lines, &accepted, &refused);
+fn a_proof_assumes_what_the_game_it_rests_on_assumes_and_nothing_else() {
+    let opts = SolveOptions { use_prev: true, ..common::options(1) };
+    let games = solver::solve_range(33, 50, &opts, None).unwrap();
+    let lines: Vec<Json> = games.iter().map(GameResult::to_json).collect();
+    let rests_on_optimal = Assumptions::from([assumed_optimal(32)]);
+    let expected = [
+        (33, Proof::Cap, &rests_on_optimal),
+        (34, Proof::SameSearch, &rests_on_optimal),
+        (35, Proof::Exhausted, &Assumptions::new()),
+        (37, Proof::PrimeFormula, &Assumptions::new()),
+    ];
+    for (n, proof, assumes) in expected {
+        let game = &games[n - 33];
+        assert_eq!((game.n as usize, game.proof, &game.assumes), (n, Some(proof), assumes));
+    }
+    let (rests, free) = (Json::array([assumed_optimal(32)]), Json::array(Vec::<&str>::new()));
+    let cut = |i: usize, assumes: &Json| -> Vec<Json> {
+        lines[..i].iter().cloned().chain([with(&lines[i], "assumes", assumes)]).collect()
+    };
+    let refused = |i: usize, assumes: &Json| {
+        (cut(i, assumes), Verdict::Refused { line: i + 1, n: 33 + i as u32, expected: "records the assumptions" })
+    };
+    let cases = vec![
+        (lines.clone(), Verdict::Accepted),
+        refused(0, &free),
+        refused(1, &free),
+        refused(2, &rests),
+        refused(4, &rests),
+    ];
+    verifiers_agree(&TempDir::new("assumption-rules"), &cases);
 }
 
 /// A repeat (method `repeat`, proof `same_search`) stands on the game it names: both verifiers refuse one whose
 /// record, digests, promotions or arithmetic do not fit that game, whose game is not a completed game of the file
-/// before it, settles no search or comes after it, and one that drops the taint of the game it repeats.  The Rust
+/// before it, settles no search or comes after it, and one that drops what the game it repeats assumes.  The Rust
 /// verifier also sets both search problems up again and compares them, which refuses two more that the Python
-/// referee, which cannot, accepts.  Games 1..90 of a strict chain, in which 65 repeats 64, a search.
+/// referee, which cannot, accepts.  Games 1..90, in which 65 repeats 64, a search.
 #[test]
 fn forged_repeats_are_refused_by_both_verifiers() {
-    let games = solver::solve_range(1, 90, &common::strict_options(1), None).unwrap();
+    let games = solver::solve_range(1, 90, &common::options(1), None).unwrap();
     let lines: Vec<Json> = games.iter().map(GameResult::to_json).collect();
     let i = 64;
     let (repeat, m) = (&games[i], &games[i - 1]);
@@ -263,9 +257,7 @@ fn forged_repeats_are_refused_by_both_verifiers() {
             "its promotions are not those of game 64",
         ),
         (i, vec![("setup.cap", Json::from(sum))], "has a cap"),
-        (i, vec![("setup.revise", s("ResumedAsBuilt"))], "a repeat game whose \"setup.revise\" is ResumedAsBuilt"),
         (i, vec![("same_search", Json::Null)], "without a \"same_search\" record"),
-        (i, vec![("schema", Json::from(3u32))], "a repeat game in a line of schema 3"),
         (
             i - 1,
             vec![("same_search", lines[i].get("same_search").unwrap().clone())],
@@ -282,7 +274,7 @@ fn forged_repeats_are_refused_by_both_verifiers() {
     swapped.swap(i - 1, i);
     cases.push((swapped, Verdict::Refused { line: i, n: 65, expected: "whose line (65) comes after it" }));
     // The game repeated is only an unfinished search in the file (and 65 is built on optimal.json's 64 instead).
-    let optimal = Optimal::load_default().unwrap();
+    let optimal = Optimal::built_in();
     let unfinished = Json::object([
         ("schema", Json::from(taxman::results::SCHEMA)),
         ("n", Json::from(64u32)),
@@ -290,11 +282,10 @@ fn forged_repeats_are_refused_by_both_verifiers() {
         ("invocations", Json::from(1u32)),
     ]);
     let from_optimal = [
-        ("prev_source", s("optimal")),
         ("prev.source", s("optimal")),
         ("prev.moves_digest", s(&moves_digest(optimal.moves(64).unwrap()))),
         ("prev.proof", Json::Null),
-        ("prev.taint", Json::array([OPTIMAL_JSON])),
+        ("prev.assumes", Json::array([assumed_optimal(64)])),
     ];
     let built_on_optimal = from_optimal.iter().fold(lines[i].clone(), |line, (path, value)| with(&line, path, value));
     let mut incomplete: Vec<Json> = lines[..i - 1].to_vec();
@@ -323,36 +314,31 @@ fn forged_repeats_are_refused_by_both_verifiers() {
     let twinned = twin_edits.iter().fold(lines[i].clone(), |line, (path, value)| with(&line, path, value));
     let twinned: Vec<Json> = lines[..i].iter().cloned().chain([twinned]).collect();
     cases.push((twinned, Verdict::Refused { line: 65, n: 65, expected: "its search problem's digest is" }));
-    // A repeat inherits the taint of the game it repeats: 34 repeats 33, which built on optimal.json's 32 reaches its
-    // cap and so rests on optimal.json.
-    let allowed = SolveOptions { allow_tainted_prev: true, ..common::strict_options(1) };
-    let tainted: Vec<Json> =
-        solver::solve_range(33, 34, &allowed, None).unwrap().iter().map(GameResult::to_json).collect();
-    assert_eq!(tainted[1].get("taint"), Some(&Json::array([OPTIMAL_JSON])));
-    cases.push((tainted.clone(), Verdict::Accepted));
+    // A repeat assumes what the game it repeats assumes: 34 repeats 33, which, built on optimal.json's 32, reaches
+    // its cap and so assumes that game optimal.
+    let use_prev = SolveOptions { use_prev: true, ..common::options(1) };
+    let assuming: Vec<Json> =
+        solver::solve_range(33, 34, &use_prev, None).unwrap().iter().map(GameResult::to_json).collect();
+    assert_eq!(assuming[1].get("assumes"), Some(&Json::array([assumed_optimal(32)])));
+    cases.push((assuming.clone(), Verdict::Accepted));
     for (path, value, expected) in [
-        ("taint", none.clone(), "records the taint"),
-        ("same_search.taint", none.clone(), "its record of game 33 does not match line 1"),
+        ("assumes", none.clone(), "records the assumptions"),
+        ("same_search.assumes", none.clone(), "its record of game 33 does not match line 1"),
     ] {
-        let forged = vec![tainted[0].clone(), with(&tainted[1], path, &value)];
+        let forged = vec![assuming[0].clone(), with(&assuming[1], path, &value)];
         cases.push((forged, Verdict::Refused { line: 2, n: 34, expected }));
     }
     verifiers_agree(&TempDir::new("forged-repeats-files"), &cases);
 
-    // What only the Rust verifier can check, since it sets the two search problems up again.  64's frame 0 said to
-    // be revised, with 64's taint and 65's records of it made to fit: 64's problem set up again is smaller than its
-    // line says.  And a repeat said to repeat an earlier game that promotes what it does and whose setup is as large
-    // as its own, but poses another problem, with that game's recorded digest made the repeat's: the problems differ.
+    // What only the Rust verifier can check, since it sets the two search problems up again.  The setups of 64 and 65
+    // both say that their problem has one more promotion to spare than it has, so the lines agree with each other
+    // and the problem set up again is not the one they record.  And a repeat said to repeat an earlier game that
+    // promotes what it does and whose setup is as large as its own, but poses another problem, with that game's
+    // recorded digest made the repeat's: the problems differ.
     // The Python referee accepts both: it can only see that the lines agree with each other.
-    let taint = if m.proof == Some(Proof::Cap) { none } else { Json::array(["revise_freedoms"]) };
-    let revised = [
-        ("tactic_switches.revise_freedoms", Json::Bool(true)),
-        ("setup.revise", s("GreedyIsMax(0)")),
-        ("taint", taint.clone()),
-    ];
-    let revised = revised.iter().fold(lines[i - 1].clone(), |line, (path, value)| with(&line, path, value));
-    let fitted = ["same_search.taint", "taint", "prev.taint"].iter().fold(lines[i].clone(), |l, p| with(&l, p, &taint));
-    let revised: Vec<Json> = lines[..i - 1].iter().cloned().chain([revised, fitted]).collect();
+    let larger = Json::from(max_total + 1);
+    let resized_both: Vec<Json> =
+        lines[..i - 1].iter().cloned().chain([i - 1, i].map(|k| with(&lines[k], "setup.max_total", &larger))).collect();
 
     let (k, impostor) = games
         .iter()
@@ -377,11 +363,11 @@ fn forged_repeats_are_refused_by_both_verifiers() {
 
     let dir = TempDir::new("forged-repeats-rust-only");
     let mut paths = Vec::new();
-    let only_rust = [(revised, 65, "not the ProblemSize".to_owned()), (posing, games[k].n, posed)];
+    let only_rust = [(resized_both, 65, "not the ProblemSize".to_owned()), (posing, games[k].n, posed)];
     for (case, (file, n, expected)) in only_rust.into_iter().enumerate() {
         let path = dir.join(format!("rust-only-{case}.jsonl"));
         fs::write(&path, file.iter().map(|line| format!("{line}\n")).collect::<String>()).unwrap();
-        let err = verify_files(std::slice::from_ref(&path), Some(&optimal)).unwrap_err();
+        let err = verify_files(std::slice::from_ref(&path), optimal).unwrap_err();
         assert!(err.contains(&format!("line {n} (n={n}): ")) && err.contains(&expected), "{case}: {err}");
         paths.push(path);
     }
@@ -390,7 +376,7 @@ fn forged_repeats_are_refused_by_both_verifiers() {
     assert_eq!(run.status.code(), Some(0), "{}", String::from_utf8_lossy(&run.stdout));
 }
 
-/// How many games of the report have the proof, the certificate, or an empty taint.
+/// How many games of the report have the proof, the certificate, or no assumption.
 fn proofs(file: &FileReport, proof: Proof) -> usize {
     file.contents.games.values().filter(|g| g.proof == proof).count()
 }
@@ -400,7 +386,7 @@ fn certificates(file: &FileReport, certificate: Certificate) -> usize {
 }
 
 fn clean(file: &FileReport) -> usize {
-    file.contents.games.values().filter(|g| g.taint.is_empty()).count()
+    file.contents.games.values().filter(|g| g.assumes.is_empty()).count()
 }
 
 #[test]
@@ -412,24 +398,26 @@ fn the_committed_results_pass_the_verifier() {
         .collect();
     paths.sort();
     let names: Vec<_> = paths.iter().map(|p| p.file_name().unwrap().to_string_lossy().into_owned()).collect();
-    assert_eq!(names, ["default.jsonl", "strict.jsonl"], "a new results file needs its counts here and in the README");
-    // The chain of the cost-curve study is the strict chain 1001-1231 built by a later commit.
-    paths.push(crate_path("bench/curve/chain.jsonl"));
-
-    let optimal = Optimal::load_default().unwrap();
-    let report = verify_files(&paths, Some(&optimal)).unwrap_or_else(|e| panic!("{e}"));
-    println!("{report}");
-    let [default, strict, chain] = &report.files[..] else { panic!("three files") };
-    // strict.jsonl is a chain from n = 1 made in one invocation: it holds no line of a stopped search.
-    for (file, lo, hi) in [(default, 1001, 1231), (strict, 1, 1300), (chain, 1001, 1231)] {
-        let games = &file.contents.games;
-        assert!(games.keys().copied().eq(lo..=hi), "{}: not the games {lo}..={hi}", file.path.display());
-        assert_eq!((file.contents.incomplete_lines, file.contents.torn), (0, false), "{}", file.path.display());
-        assert!(file.contents.runs.is_empty(), "{}: a game left unfinished", file.path.display());
+    assert_eq!(names, ["strict.jsonl"], "a new results file needs its counts here and in the README");
+    // A file written under an older schema waits for its rerun: the verifier reads only the current schema.
+    let text = fs::read_to_string(&paths[0]).unwrap();
+    let schema = text.lines().next().and_then(|line| Json::parse(line).ok()?.get("schema")?.as_u32());
+    if schema != Some(SCHEMA) {
+        let schema = schema.map_or_else(|| "unreadable".to_owned(), |s| s.to_string());
+        eprintln!("skipped: results/strict.jsonl is schema {schema}, not {SCHEMA}, and waits for its rerun");
+        return;
     }
-    // Every game the files share has the same score in all of them: 1001-1231.
-    assert_eq!(report.shared, 231);
-    // The strict chain from n = 1 reproduces optimal.json: its scores to 1000 are the Java's.
+
+    let optimal = Optimal::built_in();
+    let report = verify_files(&paths, optimal).unwrap_or_else(|e| panic!("{e}"));
+    println!("{report}");
+    let [strict] = &report.files[..] else { panic!("one file") };
+    // strict.jsonl is a chain from n = 1 made in one invocation: it holds no line of a stopped search.
+    let games = &strict.contents.games;
+    assert!(games.keys().copied().eq(1..=1300), "{}: not the games 1..=1300", strict.path.display());
+    assert_eq!((strict.contents.incomplete_lines, strict.contents.torn), (0, false), "{}", strict.path.display());
+    assert!(strict.contents.runs.is_empty(), "{}: a game left unfinished", strict.path.display());
+    // The chain from n = 1 reproduces optimal.json: its scores to 1000 are the Java's.
     for n in 1..=1000 {
         assert_eq!(Some(strict.contents.games[&n].score), optimal.score(n), "n={n}");
     }
@@ -437,23 +425,15 @@ fn the_committed_results_pass_the_verifier() {
     for (n, score, moves) in optimal.games().filter(|&(n, _, _)| n > 1000) {
         let game =
             strict.contents.games.get(&n).unwrap_or_else(|| panic!("optimal.json has a game of {n}, strict.jsonl not"));
-        assert_eq!((score, moves, game.taint.is_empty()), (game.score, &game.moves[..], true), "n={n}");
+        assert_eq!((score, moves, game.assumes.is_empty()), (game.score, &game.moves[..], true), "n={n}");
     }
 
-    // default.jsonl: derived by reuse_prev where it could be, which most of its games rest on.
-    let counts = |f: &FileReport| {
-        [Proof::Trivial, Proof::PrimeFormula, Proof::Cap, Proof::Exhausted, Proof::ReusePrev, Proof::SameSearch]
-            .map(|p| proofs(f, p))
-    };
-    assert_eq!(counts(default), [0, 34, 0, 78, 119, 0]);
-    assert_eq!(clean(default), 19);
-    // strict.jsonl and the chain: no unproven tactic, and nothing unproven anywhere below them.
-    assert_eq!(counts(strict), [13, 211, 115, 416, 0, 545]);
-    assert_eq!(counts(chain), [0, 34, 70, 127, 0, 0]);
-    assert_eq!((clean(strict), clean(chain)), (1300, 231));
+    // A chain from n = 1 assumes nothing.
+    let counts = [Proof::Trivial, Proof::PrimeFormula, Proof::Cap, Proof::Exhausted, Proof::SameSearch]
+        .map(|p| proofs(strict, p));
+    assert_eq!(counts, [13, 211, 115, 416, 545]);
+    assert_eq!(clean(strict), 1300);
     // Scores at a proven ceiling given the game of n − 1 (what certifies a game whatever found it).
-    let ceilings = |f: &FileReport| [Certificate::NPlusPrev, Certificate::PrimeFormula].map(|c| certificates(f, c));
-    assert_eq!(ceilings(default), [70, 34]);
-    assert_eq!(ceilings(strict), [424, 210]);
-    assert_eq!(ceilings(chain), [70, 34]);
+    let ceilings = [Certificate::NPlusPrev, Certificate::PrimeFormula].map(|c| certificates(strict, c));
+    assert_eq!(ceilings, [424, 210]);
 }

@@ -5,7 +5,7 @@ Taxman.  It reimplements the algorithm of the Java solver in the repository root
 for speed and for many cores, and it has found optimal games for every n up to 1300 (the Java solver got to 1000).
 
 This page is the user guide: what the solver computes and what "optimal" means here, how to build and run it, how to
-read its output, why its answers can be trusted (and where they rest on something unproven), the project's vocabulary,
+read its output, why its answers can be trusted (and what they assume), the project's vocabulary,
 and where to start reading the code.  The design is in [DESIGN.md](DESIGN.md) and the measurements behind it in
 [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md); this page links there instead of repeating them.
 
@@ -29,7 +29,7 @@ scores the most.  The best score for each n is the Taxman sequence ([OEIS A01931
 n = 4 the optimal game is 3, 4 (the taxman takes 1, then 2) and scores 7.
 
 Finding an optimal game is a search over an enormous tree.  The solver's results are the optimal games, as sequences of
-moves with their scores, for every n from 1 to 1300: `results/strict.jsonl` is a strict chain (section 3) from n = 1,
+moves with their scores, for every n from 1 to 1300: `results/strict.jsonl` is a chain from n = 1 (section 3),
 whose games 1 to 1000 reproduce the Java's table and whose games 1001 to 1300 go beyond it (the table `optimal.json`
 has them now too, see `extend-optimal` in section 3).  The code can attempt
 any larger n up to 4095, the largest board the set widths cover.  The cost of a game grows by a factor of ten for every
@@ -87,10 +87,9 @@ from frame 0 (the factor 4) and scores 8.  The search is over such choices: n = 
   `optimal.json` for n <= 1000, by exhaustive search (`src/brute.rs`, `heuristics/evaluation/certify.py`) for small
   boards (n <= 62), and by a model-free exact search ([`evidence/`](evidence/README.md)) that confirms the optimum
   for every n <= 989.
-* **Given the pruning is exact.**  The default search tactics are sound: they never prune a promotion set that could
-  win ([DESIGN.md, Tactics](DESIGN.md#5-tactics) grades each).  Two tactics are on by default for speed but are
-  *unproven*: `reuse_prev` and `revise_freedoms`.  A run with both turned off is called *strict* in this
-  repository, and a strict result rests on nothing unproven but the frame model and the correctness of the code.
+* **Given the pruning is exact.**  Every tactic is proven or sound: none prunes a promotion set that could win
+  ([DESIGN.md, Tactics](DESIGN.md#5-tactics) grades each).  So a result rests on nothing but the frame model, the
+  correctness of the code and, where its proof says so, the game it was built from.
 * **Given the previous game is optimal.**  A game of n is built from the game of n - 1: its search starts from the
   previous game's promotions and stops as soon as it reaches the proven ceiling `n + score(n-1)`.  So a chain of
   games from n = 1 is proven game by game from the one before.  Section 5 describes how each result records what it
@@ -113,12 +112,11 @@ cargo build --release --examples   # also the ladder (scaling and progress harne
 The build is long for a program of this size because the search is compiled once for every set width
 ([DESIGN.md](DESIGN.md#3-architecture), "Width dispatch").
 
-The binary finds `optimal.json` (the table of optimal games, n <= 1300: the Java's games to 1000, then the strict
-chain's) at run time: `$TAXMAN_OPTIMAL` if that
-is set, else `src/main/resources/optimal.json` of the repository, which it looks for above the working directory and, if
-it is not there, above the binary.  So it works from any directory of a checkout, and from a copy of the binary while
-the working directory is in one; elsewhere give `--optimal FILE` (or `--optimal none` to compare with nothing), which
-is what the error says.  `taxman bench` finds its two files in the repository the same way (below).
+The binary carries `optimal.json` (the table of optimal games, n <= 1300: the Java's games to 1000, then those of the
+chain from n = 1) built in: `src/main/resources/optimal.json` as it was when the binary was compiled.  Every run
+confirms its scores against that table, wherever the binary runs, and no option names another; a changed table takes a
+rebuild, which cargo does by itself when the file has changed.  `taxman bench` finds its two files in the repository
+(below), above the working directory and, if they are not there, above the binary.
 
 The release profile uses fat LTO and `panic = "abort"`; the `test` profile is optimised (`opt-level = 2`) because the
 tests replay real games.  A build is generic for its target architecture, so a binary runs on any machine of that
@@ -147,23 +145,23 @@ that alters the search tree on purpose fails it (DESIGN.md says how to update th
 
 `taxman help` lists everything; this section shows each command with output from this build.  A tactic is one
 switchable piece of the algorithm; `--tactic NAME=VALUE` is repeatable, and the names, values and defaults are in
-`taxman help` and [DESIGN.md](DESIGN.md#5-tactics).  Two of the tactics are on by default for speed but unproven
-(`reuse_prev` and `revise_freedoms`); a run with both off is called *strict*, and `--strict` (in `solve`, `regress` and
-`bench`) is shorthand for `--tactic reuse_prev=off --tactic revise_freedoms=off`.  A `--tactic` given as well is applied
-after it.  The other flags of `solve` are in the table at the end of this section.
+`taxman help` and [DESIGN.md](DESIGN.md#5-tactics).  Every tactic is proven or sound and on by default
+(`match_refine` is 1), so switching one changes how fast an answer comes, never the answer.  The other flags of
+`solve` are in the table at the end of this section.
 
 ### Solve one game
 
 ```
-$ taxman solve 480 --show
-n=480   score=73120     search  nodes=385             0.010 s  optimal ok  proof=exhausted
+$ taxman solve 480 --use-prev --show
+n=480   score=73120     search  nodes=387             0.007 s  optimal ok  proof=exhausted
   promotions: [68, 138, 147, 153, 168, 175, 180, 182, 190, 195, 196, 198, 200, 207, 208, 210, 220, 222, 224, ...]
   moves: [479, 361, 437, 299, 403, 341, 473, 301, 469, 335, 445, 267, 471, 314, 478, 466, 458, 454, 446, ...]
 ```
 
-A single game takes its predecessor from `optimal.json` (n - 1 <= 1300), which seeds and caps the search.  The node
-count of a multi-threaded search varies a little from run to run.  "optimal ok" means the score equals the table's,
-not that it is proven (section 5).
+`--use-prev` takes the game of n - 1 from `optimal.json` (n - 1 <= 1300), which seeds and caps the search; a result
+whose proof rests on that game records that it assumes it optimal (section 5).  Without `--use-prev` a single game has
+no predecessor and is solved standalone (below).  The node count of a multi-threaded search varies a little from run to
+run.  "optimal ok" means the score equals the table's, not that it is proven (section 5).
 
 ### Solve a range
 
@@ -179,55 +177,53 @@ n=12    score=50        trivial nodes=0               0.000 s  optimal ok  proof
 
 Each game is built from the one before it.  A game whose search problem an earlier game of the range or of the results
 file already posed and settled is concluded at once with that game's promotions (tactic `same_search`, method
-`repeat`, proof `same_search`, section 5): 545 of the 1076 games of a strict chain to 1300 that would be searched.
+`repeat`, proof `same_search`, section 5): 545 of the 1076 games of a chain to 1300 that would be searched.
 With `--out FILE`, each result is appended to the file (one JSON line per game, flushed and synced) as soon as it is
 done, and a rerun skips every game the file already completed, whatever the tactics of the rerun (the file's lines
-keep the tactics and taint they were made with):
+keep the tactics they were made with and what they assume):
 
 ```
-$ taxman solve 1-300 --strict --out mine.jsonl --checkpoint-dir ckpt
+$ taxman solve 1-300 --out mine.jsonl --checkpoint-dir ckpt
 $ taxman solve 1-300 --out mine.jsonl
 skipped 300 games already done in mine.jsonl
 ```
 
 ### Past n = 1300
 
-`optimal.json` stops at 1300.  A game above 1300 needs its predecessor in the results file, so copy one that has it and
-extend it; the committed files are `results/strict.jsonl` (1-1300, strict) and `bench/curve/chain.jsonl` (1001-1231,
-strict).  The copy matters: `--out` appends to the file and `results/` must not be overwritten.
+`optimal.json` stops at 1300.  A game above 1300 needs its predecessor in the run or the results file: extend a copy
+of a file that has it, or start at 1301 with `--use-prev`, which takes `optimal.json`'s game of 1300.  The committed
+`results/strict.jsonl` (1-1300, a chain from n = 1) assumes nothing, and a copy of it extended stays so.  The copy
+matters: `--out` appends to the file and `results/` must not be overwritten.
 
 ```
-$ cp results/strict.jsonl mine.jsonl
-$ taxman solve 1297-1302 --threads 2 --strict \
+$ taxman solve 1301-1302 --use-prev --threads 2 \
       --out mine.jsonl --checkpoint-dir ckpt --time-limit 8 --progress 4
-n=1301  score=532272    prime   nodes=0               0.015 s  optimal unknown  proof=prime_formula
-n=1302 4.0s nodes 914429 (228.4k/s) best 41423 queue 8 spilled 0 | eff 100.0% idle 0.0% lock 0.0% splits 1 steals 1 full 3.1ms
-n=1302 8.0s nodes 1814893 (stopped) best 41423 queue 52 spilled 0 | eff 99.9% idle 0.0% lock 0.0% ... pauses 1 (0.1%) ...
-n=1302  score=533546    search  nodes=1814893         8.164 s  incomplete
-skipped 4 games already done in mine.jsonl
+n=1301  score=532272    prime   nodes=0               0.016 s  optimal unknown  proof=prime_formula  assumes the game of 1300 in optimal.json is optimal
+n=1302 4.0s nodes 815101 (203.5k/s) best 41423 queue 8 spilled 0 | eff 100.0% idle 0.0% lock 0.0% splits 1 steals 1 full 2.7ms
+n=1302 8.0s nodes 1575423 (stopped) best 41423 queue 79 spilled 0 | eff 99.9% idle 0.0% lock 0.0% ... pauses 1 (0.1%) ...
+n=1302  score=533546    search  nodes=1575423         8.152 s  incomplete
 stopped: the search for n=1302 hit a limit before it finished; run the same command to resume it
 ```
 
-Games 1297-1300 were skipped, game 1301 (a prime) took the prime formula, game 1302 started from 1301, and the time
-limit stopped it with its checkpoint.  A game
-whose predecessor is in neither the results file nor `optimal.json` (for example `taxman solve 1400` without `--out`)
-runs *standalone*, with no seed and no ceiling; `solve` says so on stderr (`note: no previous game for n=...`) and the
-result line has `"prev": null`.  That is still correct, but costs about twice as much on the hard games, and many times
-more on games that a chain settles at once by reaching the ceiling ([bench/curve/README.md](bench/curve/README.md)).
+Game 1301 (a prime) took the prime formula on `optimal.json`'s game of 1300 and records that it assumes that game
+optimal; game 1302 started from 1301, and the time limit stopped it with its checkpoint.  A game whose predecessor is in
+neither the run nor the results file, and not taken with `--use-prev` (for example `taxman solve 1400`, or `taxman solve
+480` without the flag), runs *standalone*, with no seed and no ceiling; `solve` says so on stderr (`note: no previous
+game for n=...`) and the result line has `"prev": null`.  That is still correct, but costs about twice as much on the
+hard games, and many times more on games that a chain settles at once by reaching the ceiling
+([bench/curve/README.md](bench/curve/README.md)).
 
-### Strict mode, from n = 1
+### A chain from n = 1
 
 ```
-$ taxman solve 1-1300 --strict --out strict.jsonl --checkpoint-dir ckpt --checkpoint-interval 60 --progress 60
+$ taxman solve 1-1300 --out strict.jsonl --checkpoint-dir ckpt --checkpoint-interval 60 --progress 60
 ```
 
-Starting at n = 1, no game rests on `optimal.json` (it is only compared with, up to 1300: a mismatch is a hard error),
-so every proof in the file rests on nothing unproven.  The committed `results/strict.jsonl` is such a run
-([results/README.md](results/README.md) has the details of it), and this command reproduces its scores.  A strict run
-that starts from an `optimal.json` game or a result with an unproven taint refuses to, unless given
-`--allow-tainted-prev`, and then marks the results that rest on it.  The default tactics (both unproven ones on) are
-faster and good for exploring; a result made with them says so, as the n = 992 line in section 4 does: `(rests on
-revise_freedoms)`.
+Starting at n = 1, no game is taken from `optimal.json` (it is only compared with, up to 1300: a score that differs
+is a hard error), so no proof in the file assumes anything beyond the frame model.  The committed
+`results/strict.jsonl` is such a run ([results/README.md](results/README.md) has the details of it), and this command
+reproduces its scores.  A run that takes a game from `optimal.json` (`--use-prev`) records, in every result whose proof
+rests on it, that it assumes that game optimal.
 
 ### Checkpoints, resuming, signals
 
@@ -235,13 +231,13 @@ With `--checkpoint-dir DIR`, a game's search writes `DIR/nNNNN.ckpt` every `--ch
 atomically and synced, and on any stop.  The same command resumes it:
 
 ```
-$ taxman solve 992 --threads 2 --time-limit 3 --progress 1 --out r992.jsonl --checkpoint-dir c992
+$ taxman solve 992 --use-prev --threads 2 --time-limit 3 --progress 1 --out r992.jsonl --checkpoint-dir c992
 n=992 3.0s nodes 576381 (stopped) best 24144 queue 30 spilled 0 | eff 99.5% ... pauses 1 (0.4%) max 13.1ms park 0.1ms
 n=992   score=310644    search  nodes=576381          3.097 s  incomplete
 stopped: the search for n=992 hit a limit before it finished; run the same command to resume it
-$ taxman solve 992 --threads 2 --out r992.jsonl --checkpoint-dir c992      # resumes (here a SIGTERM stopped it again)
-$ taxman solve 992 --threads 2 --out r992.jsonl --checkpoint-dir c992      # resumes and finishes
-n=992   score=310690    search  nodes=6175330        30.925 s  optimal ok  proof=exhausted (rests on revise_freedoms)
+$ taxman solve 992 --use-prev --threads 2 --out r992.jsonl --checkpoint-dir c992   # resumes (a SIGTERM stopped it again)
+$ taxman solve 992 --use-prev --threads 2 --out r992.jsonl --checkpoint-dir c992   # resumes and finishes
+n=992   score=310690    search  nodes=6175330        30.925 s  optimal ok  proof=exhausted
 ```
 
 The last line is the third invocation of the game: its `nodes` cover all three, its seconds only the last.  The
@@ -271,15 +267,13 @@ counts them.
 |---|---|
 | `--threads K` | worker threads (default: all cores; honours affinity masks and cgroup limits) |
 | `--tactic NAME=VALUE` | set a tactic, repeatable |
-| `--strict` | no unproven tactic: `--tactic reuse_prev=off --tactic revise_freedoms=off` (a `--tactic` is applied after it) |
 | `--out FILE` | append result lines; skip games the file completed; the predecessor of the first game comes from it |
 | `--checkpoint-dir DIR`, `--checkpoint-interval S` | checkpoints (default every 60 s) |
 | `--progress S` | seconds between progress lines on stderr (default 60; 0: none) |
 | `--time-limit S`, `--node-limit N` | stop one game's search, keeping its checkpoint |
 | `--mem-cap UNITS` | work units kept in memory before spilling to disk |
-| `--force-search` | search where the previous game or an earlier search would give the answer (skips `prime_shortcut`, `reuse_prev`, `same_search`) |
-| `--allow-tainted-prev` | with no unproven tactic on, still build on a predecessor whose proof rests on something unproven |
-| `--optimal FILE` | `optimal.json` to compare with and take predecessors from (`none`: no file) |
+| `--force-search` | search where the previous game or an earlier search would give the answer (skips `prime_shortcut` and `same_search`) |
+| `--use-prev` | take the game of n - 1 from `optimal.json` when neither the run nor `--out` has it; a result whose proof rests on it records that it assumes it optimal |
 | `--show` | print each game's promotions and moves |
 
 ### The other commands
@@ -287,20 +281,17 @@ counts them.
 ```
 $ taxman regress --to 400                       # solve 1..400 in memory and check every score against optimal.json
 solved 1..=400 (2 threads, tactics default) in 0.4 s
-by method: trivial 13, prime 78, reuse 200, repeat 0, search 109
-games 1..=200 derived without search: 146
-400 games match optimal.json, 0 do not, 0 are not in it
+by method: trivial 13, prime 78, repeat 151, search 158
+400 games match optimal.json, 0 are not in it
 ```
 
-`regress` (default `--from 1 --to 400`; `--tactic` flags apply) is the quick end-to-end check that the build still
-gives the Java's answers.  With the defaults `reuse_prev` takes every game that would repeat an earlier search; with
-`--strict` the counts are trivial 13, prime 78, reuse 0, repeat 151, search 158.  "Derived without search" counts what
-the Java calls accelerated games (trivial, prime, reuse), not repeats.
+`regress` (default `--from 1 --to 400`; `--tactic` flags and `--use-prev` apply) is the quick end-to-end check that the
+build still gives the Java's answers; a score that differs stops it, as it stops any run.
 
 ```
 $ taxman verify-optimal                         # replay every game of optimal.json (1300 games, ~170 ms)
 verified 1300 games (n up to 1300, 367449 moves)
-$ taxman verify-results results/strict.jsonl bench/curve/chain.jsonl     # see section 5
+$ taxman verify-results results/strict.jsonl         # see section 5
 $ taxman extend-optimal results/strict.jsonl --out /tmp/optimal.json     # the table plus the games it lacks
 $ taxman tables 85 8 45                         # the maximal factors and composites of 8 and 45 on the board 1..=85
 8: maximal factors [4]; maximal composites [16, 24, 40, 56]
@@ -312,16 +303,17 @@ $ taxman bench --history /tmp/h.jsonl           # time the benchmark games 936 .
 `--history FILE` names another (pass it to keep the checkout clean), and takes the games past `optimal.json`'s from
 `rust/results/strict.jsonl` unless `--known FILE` names another results file.  The ladder is the harness for
 hard games and for scaling over thread counts: `cargo run --release --example ladder -- --scaling --seed-opt --known
-bench/curve/chain.jsonl --tactic revise_freedoms=off --seconds 600 1215` (its flags are documented at the top of
+results/strict.jsonl --seconds 600 1215` (its flags are documented at the top of
 `examples/ladder.rs`).
 
-`extend-optimal RESULTS --out FILE` writes the table of optimal games (`--optimal FILE` names another, as for the other
-commands) to FILE with the games of the results file RESULTS appended.  It reads RESULTS with the checks of
-`verify-results` and refuses it if a score differs from the table's for any n they share.  Then, from the board size
-after the table's last, it takes each game that RESULTS completed and that rests on nothing unproven (an empty taint),
-up to the first that is missing, only an unfinished search, or tainted, and says which and why.  The old games are
-written back byte for byte, FILE is written whole or not at all, and RESULTS can never be FILE.  This is how games 1001
-to 1300 were added to the Java's 1000 (the table now reaches 1300, so the same command now adds nothing):
+`extend-optimal RESULTS --out FILE` writes the table of optimal games (the built-in one, or the file `--table FILE`
+names, say a table extended before the binary was rebuilt with it) to FILE with the games of the results file RESULTS
+appended.  It reads RESULTS with the checks of `verify-results`, which refuse it if a score differs from the table's
+for any n they share.  Then, from the board size after the table's last, it takes each game that RESULTS completed, up
+to the first that is missing or only an unfinished search, and says which and why.  A game that assumes a game of the
+table optimal is taken too: it assumes nothing the table does not stand for.  The old games are written back byte for
+byte, FILE is written whole or not at all, and RESULTS can never be FILE.  This is how games 1001 to 1300 were added to
+the Java's 1000 (the table now reaches 1300, so the same command now adds nothing):
 
 ```
 $ taxman extend-optimal results/strict.jsonl --out /tmp/optimal.json
@@ -329,7 +321,8 @@ added 300 games (n = 1001..=1300); the table has 1300 games, n up to 1300; wrote
 stopped at n = 1301: the results end at n = 1300
 ```
 
-Check the new file with `taxman verify-optimal /tmp/optimal.json` before it replaces `src/main/resources/optimal.json`.
+Check the new file with `taxman verify-optimal /tmp/optimal.json` before it replaces `src/main/resources/optimal.json`;
+the binaries built after that carry the new table.
 
 ## 4. Reading the output
 
@@ -337,17 +330,16 @@ Check the new file with `taxman verify-optimal /tmp/optimal.json` before it repl
 
 ```
 n=250   score=19533     search  nodes=34   0.003 s  optimal ok  proof=exhausted
-n=992   score=310690    search  nodes=6175330   30.925 s  optimal ok  proof=exhausted (rests on revise_freedoms)
 n=1220  score=468662    search  nodes=1375952   8.209 s  incomplete
 n=1299  score=531389    repeat  nodes=0               0.079 s  optimal ok  proof=same_search of 1298
-n=1301  score=532272    prime   nodes=0               0.015 s  optimal unknown  proof=prime_formula
+n=1301  score=532272    prime   nodes=0               0.016 s  optimal unknown  proof=prime_formula  assumes the game of 1300 in optimal.json is optimal
 ```
 
-Board size; score (for an incomplete game, the best found so far); the method (`trivial`, `prime`, `reuse`, `repeat`,
+Board size; score (for an incomplete game, the best found so far); the method (`trivial`, `prime`, `repeat`,
 `search`); search nodes (steps, see the glossary); seconds for the game in this invocation; how it compares with
-`optimal.json` (`optimal ok`: equal; `OPTIMAL MISMATCH`: a hard error; `optimal unknown`: n above 1300 or `--optimal
-none`; `incomplete`); the proof kind, and for `same_search` the game whose search it repeats; and, if the proof rests
-on something unproven, which.
+`optimal.json` (`optimal ok`: equal; `optimal unknown`: the table has no game of n; `incomplete`; a score that differs
+is a hard error, which stops the run naming the game); the proof kind, and for `same_search` the game whose search it
+repeats; and what the proof assumes, if anything (section 5).
 
 ### The progress line (stderr, every `--progress` seconds and at the end)
 
@@ -367,67 +359,61 @@ n=992 3.0s nodes 576381 (stopped) best 24144 queue 30 spilled 0 | eff 99.5% idle
 | `full 2.8ms` | time until every worker first ran at once |
 | `pauses 1 (0.4%) max 13.1ms park 0.1ms` | checkpoints (each parks all workers): their share of worker time, the longest pause, the longest wait for the workers to park |
 
-### A results line (`--out`, schema 4)
+### A results line (`--out`, schema 5)
 
-One JSON object per line, compact.  Shown here for n = 250 (a real line, from a strict run of 1-300), with the moves
-cut short, the fields regrouped and comments added, so it is not valid JSON as printed:
+One JSON object per line, compact.  Shown here for n = 250 (a real line, from a run of 1-300), with the moves cut
+short, the fields regrouped and comments added, so it is not valid JSON as printed:
 
 ```
-{"schema":4, "n":250, "score":19533, "moves":[241,169,221,...], "promotions":[84,98,104,105,110,112,114,117,120,124,125],
+{"schema":5, "n":250, "score":19533, "moves":[241,169,221,...], "promotions":[84,98,104,105,110,112,114,117,120,124,125],
  "method":"search", "completed":true,
- "proof":"exhausted", "reached_cap":false, "taint":[],
+ "proof":"exhausted", "reached_cap":false, "assumes":[],
  "in_the_bag":18320,                      # score = in_the_bag + sum(promotions): 18320 + 1213 = 19533
- "prev":{"n":249,"score":19382,"source":"run","moves_digest":"44877b44d9bbf51a","proof":"same_search","taint":[]},
+ "prev":{"n":249,"score":19382,"source":"run","moves_digest":"44877b44d9bbf51a","proof":"same_search","assumes":[]},
  "same_search":null,                      # a repeat names the game it repeats here
- "nodes":34, "stats":{"promote_attempts":20,"promotions":36,"upper_bounds":0,"can_promotes":0,"children":13,
-                      "precluded":0,"certificates":0,"match_bounds":28},
+ "nodes":34, "stats":{"promote_attempts":20,"promotions":36,"children":13,"match_bounds":28},
  "engine":{"splits":0,"checkpoints":0,"spilled_units":0,"max_queue":1},
- "setup":{"frames":4,"candidates":48,"max_total":11,"greedy_sum":1194,"cap":1312,"revise":"Off",
+ "setup":{"frames":4,"candidates":48,"max_total":11,"greedy_sum":1194,"cap":1312,
           "digest":"fe5e05eb67406e98"},
- "seconds":{"frames":0.0005,"preclusions":0.0,"greedy":0.00002,"revise":0.0,"search":0.0015,"search_all_runs":0.0015,"total":0.0029},
+ "seconds":{"frames":0.0005,"greedy":0.00002,"search":0.0015,"search_all_runs":0.0015,"total":0.0029},
  "invocations":1, "threads":2,
- "tactics":"reuse_prev=off,revise_freedoms=off",
- "tactic_switches":{"prime_shortcut":true,"reuse_prev":false,"same_search":true,"revise_freedoms":false,
-                    "preclusions":false,"match_bound":true,"branching":"conflict-strong","match_refine":1,
-                    "fix_forced":true,"nogoods":true,"forget_nogoods":true,"lagrange":true,"legacy_bound":false,
-                    "prev_cap":true,"seed_incumbent":true},
- "unproven_tactics_on":[], "limits":{"seconds":null,"nodes":null},
- "options":{"force_search":false,"allow_tainted_prev":false,"allow_optimal_mismatch":false,"optimal_file":"default"},
- "optimal_match":true, "prev_source":"run", "build":{"commit":"c6cf8abe4349...","dirty":true}}
+ "tactics":"default",
+ "tactic_switches":{"prime_shortcut":true,"same_search":true,"match_refine":1,"fix_forced":true,"nogoods":true,
+                    "forget_nogoods":true,"lagrange":true,"prev_cap":true,"seed_incumbent":true},
+ "limits":{"seconds":null,"nodes":null},
+ "options":{"force_search":false,"use_prev":false},
+ "optimal_match":true, "build":{"commit":"8a6df9028f54...","dirty":true}}
 ```
 
 Game 249 of that run repeated the search of 248; its line has `"method":"repeat"`, `"proof":"same_search"`,
-`"same_search":{"n":248,"digest":"a1b7113c4c3d1567","promotion_sum":1187,"proof":"exhausted","taint":[]}`, and a
+`"same_search":{"n":248,"digest":"a1b7113c4c3d1567","promotion_sum":1187,"proof":"exhausted","assumes":[]}`, and a
 `setup` with `"cap":null` and the same `digest`.
 
 | field | meaning |
 |---|---|
-| `schema`, `n` | the format of the line (4; 3 had no search digests and no repeats, 2 differed in the taint of a proof by the cap) and the board size |
+| `schema`, `n` | the format of the line (5, the only one this build reads) and the board size |
 | `score`, `moves`, `best_so_far` | the game and its score; for an unfinished search `score` is null and `best_so_far` (a key only such a line has) has the best so far |
 | `promotions` | the promoted numbers, ascending |
-| `method` | `trivial`, `prime`, `reuse`, `repeat`, `search` (how the game was found) |
+| `method` | `trivial`, `prime`, `repeat`, `search` (how the game was found) |
 | `completed` | false only if a limit or a signal stopped the search; such a line is an unfinished-search record, and its checkpoint is kept |
-| `proof` | how optimality is established: `trivial`, `prime_formula`, `cap`, `exhausted`, `reuse_prev`, `same_search` (section 5); null if incomplete |
+| `proof` | how optimality is established: `trivial`, `prime_formula`, `cap`, `exhausted`, `same_search` (section 5); null if incomplete |
 | `reached_cap` | the search stopped because its incumbent reached `cap` |
-| `taint` | the unproven things the proof rests on, here or in the games it rests on (n - 1, or the game a repeat repeats); `[]` is clean |
+| `assumes` | what the proof assumes beyond the frame model, here or in the games it rests on (n - 1, or the game a repeat repeats): for a game of n - 1 taken from `optimal.json`, "the game of n - 1 in optimal.json is optimal"; `[]`: nothing |
 | `in_the_bag` | what the game with no promotions scores (null for prime shortcuts) |
-| `prev` | the game of n - 1 this one was built from: score, where it came from (`run`, `results`, `optimal`), a digest of its moves, its proof and taint; null if there was none |
-| `same_search` | for a repeat, the earlier game of the file whose search it repeats: its board size, the digest of the search problem they share, the problem's best promotion sum, that game's proof and taint; null otherwise |
+| `prev` | the game of n - 1 this one was built from: score, where it came from (`run`, `results`, `optimal`), a digest of its moves, its proof and what it assumes; null if there was none |
+| `same_search` | for a repeat, the earlier game of the file whose search it repeats: its board size, the digest of the search problem they share, the problem's best promotion sum, that game's proof and what it assumes; null otherwise |
 | `nodes`, `stats` | search steps over all invocations, and the searcher's counters (`match_bounds` is the number of matching bounds computed) |
 | `engine` | this invocation's splits, checkpoints written, units spilled, largest in-memory queue |
-| `setup` | null on a `trivial`, `prime` or `reuse` line, which set up no search; otherwise the frames and candidates found, `max_total` (cap on the number of promotions), the greedy start, `cap` (ceiling on the promotion sum, `n + score(n-1) - in_the_bag`; null on a repeat, which ran no search to stop), what `revise_freedoms` did in `revise` (`Off`, `NotNeeded`, `GreedyIsMax(k)`, `Unchanged`, `Searched{..}`, `Stopped{..}` when a limit stopped its own search; for a resumed search with the tactic on, `FromCheckpoint` if the checkpoint's frame 0 has revised freedoms, fewer than built, and `ResumedAsBuilt` if it has the built ones), and `digest`, a digest of the search problem the setup poses (DESIGN.md, "Same search"), by which a later game finds this one to repeat |
+| `setup` | null on a `trivial` or `prime` line, which set up no search; otherwise the frames and candidates found, `max_total` (cap on the number of promotions), the greedy start, `cap` (ceiling on the promotion sum, `n + score(n-1) - in_the_bag`; null on a repeat, which ran no search to stop), and `digest`, a digest of the search problem the setup poses (DESIGN.md, "Same search"), by which a later game finds this one to repeat |
 | `seconds` | per phase, this invocation (`search_all_runs`: the search over every invocation of a resumed game) |
 | `invocations` | how many invocations ran the search (a resumed game has more than one) |
-| `threads`, `tactics`, `tactic_switches`, `unproven_tactics_on`, `limits`, `options` | what the last invocation ran with; `tactics` is `default` or the changes from the defaults |
-| `optimal_match` | the score equals `optimal.json`'s (null if the table has no game of n) |
-| `prev_source` | as `prev.source` |
+| `threads`, `tactics`, `tactic_switches`, `limits`, `options` | what the last invocation ran with; `tactics` is `default` or the changes from the defaults, `options` the flags `--force-search` and `--use-prev` |
+| `optimal_match` | true: the score equals `optimal.json`'s (a score that differs is a hard error, never written); null if the table has no game of n |
 | `build` | the commit the binary was built from, and whether its sources differed from it |
 
-The committed `results/strict.jsonl` is schema 4.  `results/default.jsonl` and `bench/curve/chain.jsonl` are schema 1,
-kept as they were made (the first run past 1000, and the cost-curve study's chain): no `schema`, `proof`, `taint`,
-`prev`, `in_the_bag` or `build`; their provenance is derived from the fields they have, by the same rules.
-[results/README.md](results/README.md) says what is known about each file.  A line is never rewritten: a resumed game
-that is stopped again adds another incomplete line, and the completed line comes last.
+This build reads schema 5 only: a results file of an older schema has to be made again
+([results/README.md](results/README.md) says where the committed one stands).  A line is never rewritten: a resumed
+game that is stopped again adds another incomplete line, and the completed line comes last.
 
 ## 5. Why the answers can be trusted
 
@@ -441,23 +427,16 @@ Each completed game records how its optimality is established (`proof`):
 | `exhausted` | the search explored its whole tree | no |
 | `cap` | the search reached `n + score(n-1)`, which no game of n can exceed (removing the move n from an optimal game of n leaves a game of n - 1) | yes |
 | `prime_formula` | a prime n plays the game of n - 1 with its first move replaced by n; optimal if the game of n - 1 is (proved in `src/accelerate.rs`, at `prime_shortcut`) | yes |
-| `reuse_prev` | the tactic of that name accepted a game derived from the previous one: a conjecture | yes |
 | `same_search` | the game's search problem (frames, candidates, `max_total`, the factor graph among their numbers) is the one an earlier game m of the file posed, and m's proof (`exhausted`, `cap` or `same_search`) settled its best promotion sum; the game is m's promotions on this board (tactic `same_search`; the argument is in [DESIGN.md](DESIGN.md#same-search)) | no: on the game m it repeats |
 
-### Taint
+### Assumptions
 
-The *taint* of a game is the set of unproven things its proof rests on: the unproven tactics it used itself
-(`reuse_prev` if it derived the game; `revise_freedoms` if frame 0's freedoms came from it; `legacy_bound`, which is
-known to be unsound), plus, if its proof rests on the game of n - 1, that game's taint, and so on down the chain; a
-repeat rests on the game it repeats instead, and has its taint.  A
-proof by the cap rests on nothing the game used itself: the game replays to `n + score(n-1)`, the ceiling, whatever
-found it, so its taint is only that of the game of n - 1 (schema 2 lines counted its own tactics too).  A game taken
-from `optimal.json` has the taint `optimal.json`, whichever game it is: the file records nothing about where a game
-came from, and the Java made its games 1 to 1000 with both unproven tactics on, without recording which games used
-them.  (The games above 1000 were copied from the strict chain and are as proven as it is, but a table entry cannot
-show that, so the taint stays: the conservative reading.)  An empty taint means: proven within the frame model, given
-that the solver is right.  `taxman solve` prints the taint in the summary line, and a strict run refuses a predecessor
-with one.
+What a game *assumes* is what its proof rests on beyond the frame model: if its proof rests on the game of n - 1, what
+that game assumes, and so on down the chain; a repeat rests on the game it repeats instead, and assumes what that game
+assumes.  A game taken from `optimal.json` (`--use-prev`) is assumed optimal, since the table records nothing about how
+a game was found: a proof that rests on its game of n - 1 assumes "the game of n - 1 in optimal.json is optimal".  A
+game that assumes nothing is proven within the frame model, given that the solver is right.  `taxman solve` prints
+what a game assumes in the summary line.
 
 ### The verifiers
 
@@ -465,40 +444,38 @@ with one.
   solver's number theory (legal, over, opens with the largest prime, scores what is recorded), and checks the arithmetic
   and the ceilings `score(n-1) <= score(n) <= n + score(n-1)` before the game counts.  A game that fails after it was
   found goes to `<results>.rejected.jsonl` and the run fails.
-* `taxman verify-results FILE...` reads results files without changing them: every game replayed, the chain from n - 1,
-  each line's arithmetic and provenance, that its fields agree with each other as the solver writes them (so that a
-  hand edit cannot drop a taint or change a proof), that the files agree, and a count of games by proof kind and by
-  taint.  For a repeat it sets the search problems of both games up again and compares them.  Opening a results file
-  for `--out` runs the same checks.
+* `taxman verify-results FILE...` reads results files without changing them: every game replayed and its score confirmed
+  against `optimal.json`, the chain from n - 1, each line's arithmetic and provenance, that its fields agree with each
+  other as the solver writes them (so that a hand edit cannot drop an assumption or change a proof), that the files
+  agree, and a count of games by proof kind and by what they assume.  For a repeat it sets the search problems of both
+  games up again and compares them.  Opening a results file for `--out` runs the same checks.
 * `python3 tools/check_results.py [FILE...]` is an independent referee in Python (standard library only, no shared
-  code).  It re-derives every proof and taint, and also checks each score against the Franklín-Moniot upper bound and
-  the best-known heuristic chain in `heuristics/results`.  With no arguments it checks `results/*.jsonl`.  It cannot
-  rebuild the frame model: it takes an `exhausted` line at its word, and of a repeat checks only what the lines show
-  (the game repeated is earlier in the file and settles its search, the recorded digests and promotions agree).
+  code).  It re-derives every proof and assumption, and also checks each score against `optimal.json`, the
+  Franklín-Moniot upper bound and the best-known heuristic chain in `heuristics/results`.  With no arguments it checks
+  `results/*.jsonl`.  It cannot rebuild the frame model: it takes an `exhausted` line at its word, and of a repeat
+  checks only what the lines show (the game repeated is earlier in the file and settles its search, the recorded digests
+  and promotions agree).
 
 ```
-$ taxman verify-results results/strict.jsonl bench/curve/chain.jsonl
+$ taxman verify-results results/strict.jsonl
 results/strict.jsonl: 1300 completed games, n = 1..=1300 (0 missing), 0 incomplete lines
   proof: trivial 13, prime_formula 211, cap 115, exhausted 416, same_search 545
-  taint: 1300 of 1300 games rest on nothing unproven
+  assumptions: none in 1300 of 1300 games
   scores at a proven ceiling, given the game of n-1: n + score(n-1) 424, prime formula 210
-bench/curve/chain.jsonl: 231 completed games, n = 1001..=1231 (0 missing), 0 incomplete lines
-  proof: prime_formula 34, cap 70, exhausted 127
-  taint: 231 of 231 games rest on nothing unproven
-  scores at a proven ceiling, given the game of n-1: n + score(n-1) 70, prime formula 34
-231 board sizes are in more than one file, with equal scores in all
+0 board sizes are in more than one file, with equal scores in all
 ```
 
 What the checks cannot catch is a game that is legal, finished and within the chain bounds but not optimal when the game
-of n - 1 is not optimal either; that is what the proof kinds and the taint track, and why a chain from n = 1 matters.
-[results/README.md](results/README.md) says what supports each committed score (re-solves from scratch, a second build's
-chain, taint counts).
+of n - 1 is not optimal either; that is what the proof kinds and the assumptions track, and why a chain from n = 1
+matters.  [results/README.md](results/README.md) says what supports each committed score (re-solves from scratch, a
+second build's chain, what the games assume).
 
 ## 6. The pipeline
 
 ```
  taxman solve A-B --out FILE --checkpoint-dir DIR
-   |  solver::solve_range_each        n = A..B in order; the game of n-1 comes from this run, FILE or optimal.json,
+   |  solver::solve_range_each        n = A..B in order; the game of n-1 comes from this run, FILE or (--use-prev)
+   |                                  optimal.json,
    |                                  and is checked (legal, over, opens with the largest prime) before anything uses it
    v
  solver::solve_game(n) -> solve_with_width::<W>      W = 8, 16, 20, 24, 28, 32 or 64 words of 64 bits (bits::WIDTHS), by n
@@ -510,10 +487,9 @@ chain, taint counts).
    |                                   frames::build_frames: free hives stacked into levels = frames (0 = bottom);
    |                                   candidates; in_the_bag
    |      no candidates ...... the game with no promotions   method=trivial      proof=trivial
-   |  [4] reuse_prev (unproven) accelerate::reuse_prev        method=reuse        proof=reuse_prev
-   |  [5] search ............. method=search                 proof=exhausted | cap
+   |  [4] search ............. method=search                 proof=exhausted | cap
    |        Board::prepare             search::prepare: model::Model::build -> the root FrameSet; greedy set;
-   |                                   revise_freedoms -> max_total; the search::Problem it poses, and its digest
+   |                                   max_total; the search::Problem it poses, and its digest
    |        same_search ...... an earlier game of the window posed the same problem and settled it: its promotions
    |                                                         method=repeat       proof=same_search
    |        search::search             starting incumbent = best of greedy / seed (n-1's promotions) / rounded root
@@ -525,13 +501,13 @@ chain, taint counts).
    |                                   choose_branch (a candidate) -> make_child -> check_child
    |      promotions -> accelerate::solution_for_promotions   (Apiary with the promotions as sources) -> ordered moves
    |
-   |  [2], [4] and same_search are skipped by --force-search and when the game has a checkpoint (a search is resumed,
+   |  [2] and same_search are skipped by --force-search and when the game has a checkpoint (a search is resumed,
    |  never replaced)
    v
- [6] solver::conclude                replay (game::replay_finished); score == in_the_bag + promotions; the ceilings;
-   |                                 compare with optimal.json; proof and taint
+ [5] solver::conclude                replay (game::replay_finished); score == in_the_bag + promotions; the ceilings;
+   |                                 confirm the score against optimal.json; the proof and what it assumes
    v
- [7] results::ResultsFile::append    the JSON line, synced; only then is the game's checkpoint deleted;
+ [6] results::ResultsFile::append    the JSON line, synced; only then is the game's checkpoint deleted;
                                      the game becomes the previous game of n+1
 ```
 
@@ -583,8 +559,8 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
   different procedure.
 * **reduce**: remove forced pairs: a move left with a single live factor must be paid by it, so the pair is dropped,
   repeatedly.  **(forced pair)**
-* **freedoms**: a frame's factors minus its moves, which drops by one on each promotion into or out of it.  Frame 0's
-  can be lowered by `revise_freedoms`.  The same quantity as the *free factor count* at the start (two names).
+* **freedoms**: a frame's factors minus its moves, which drops by one on each promotion into or out of it.  The same
+  quantity as the *free factor count* at the start (two names).
 * **promotion, promote**: play a factor as a move: take it out of its home frame's factors and make it a move of the
   frame below.  Legal when both frames stay winnable.  **home frame**: the frame a number is a factor of.
 * **candidate**: **(overloaded)** (1) a number the frame builder says could be promoted (`FrameColumns::candidates`,
@@ -595,8 +571,8 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
   of the model is `in_the_bag` plus the sum of its promotions.
 * **max_total** (`maxTotalPromotions`): a cap on the *number* of promotions, from the frames' freedoms.
 * **cap, prev_cap** **(overloaded)**: (1) the ceiling on the promotion *sum*: `n + score(n-1) - in_the_bag`; reaching
-  it ends the search (tactic `prev_cap`, proof `cap`); (2) `max_total`, "the cap on the number of promotions"; (3) the
-  per-frame caps inside the Java bound (`largest_that_fit`); (4) `queue_mem_cap` and `NOGOOD_CAPACITY`, sizes.
+  it ends the search (tactic `prev_cap`, proof `cap`); (2) `max_total`, "the cap on the number of promotions"; (3)
+  `queue_mem_cap` and `NOGOOD_CAPACITY`, sizes.
 * **model assumptions**: see section 1.  `model::Model` is the immutable factor graph and home frames, not "the
   model".
 * **prime shortcut**: for a prime n, the game of n - 1 with its first move replaced by n.  **sacrifice**: study code
@@ -605,8 +581,8 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
 
 ### The search
 
-* **tactic**: a switchable piece of the algorithm (`--tactic`).  **sound / proven / unproven / unsound**: the grading in
-  [DESIGN.md](DESIGN.md#5-tactics).  **strict**: no unproven tactic on.
+* **tactic**: a switchable piece of the algorithm (`--tactic`).  **sound / proven**: the grading in
+  [DESIGN.md](DESIGN.md#5-tactics); every tactic is one or the other.
 * **incumbent**: the best promotion set found so far, shared by all threads; **offer** raises it.  **greedy**: promote
   every candidate that can be, from the largest down.  **seed**: the previous game's promotions that are still
   candidates.  **dive**: round the root's matching into a feasible set.  The starting incumbent is the best of the
@@ -614,9 +590,9 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
 * **node, step, unit** **(overloaded)**: a search node is a set of promotions made from the root plus the candidates
   left; a **unit** is a node as the engine passes it around, `(promoted, cands)`, from which the state is rebuilt; and
   the `nodes` that results and progress lines count are *steps*, one per candidate a node's loop tries.
-* **upper bound**: what no completion of a node can exceed.  **blameGame** is the Java's (`bounds::Bounds::upper_bound`:
-  a bid of the largest candidates that fit the frames' limits, with the first failing member swapped for a runner-up;
-  DESIGN.md, section 4), kept for parity; the default is the **matching bound**.
+* **upper bound**: what no completion of a node can exceed: the **matching bound**, refined by conflicts and with
+  the Lagrangian bound beside it.  (**blameGame**, the Java's, was the starting point and is gone: DESIGN.md, section
+  2.)
 * **matching bound**: relax winnability to matchability: choose promotions maximising their sum such that every move
   and every promoted number gets a distinct maximal factor in its frame.  A maximum-weight bipartite matching, kept
   incrementally with dual **potentials** along the search path (`matchbound`).  **Q\***: the promotions of the
@@ -625,8 +601,8 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
   one of its members.  **core**: the moves of an unwinnable frame that a peel cannot drop; a conflict is built from it.
 * **refinement** (`match_refine`): bound the branches of a conflict too (member k1 out; k1 in and k2 out; ...) to a few
   levels.
-* **branching**: which candidate a node promotes next.  **strong branching** (`conflict-strong`, the default): pick
-  the member of the conflict whose removal lowers the matching bound most.
+* **branching**: which candidate a node promotes next.  **strong branching**, the only one: the member of the
+  conflict whose removal lowers the matching bound most.
 * **forced member** **(overloaded)**: in the search, a member of the heaviest matching whose removal alone brings the
   matching bound (or the Lagrangian bound) below what the node needs, so every completion that beats the incumbent
   promotes it (tactic `fix_forced`: the child promotes all of them together).  Also: a hive's *mandatory* move (`unzip`, "forced moves" in its docs), and a *forced pair*
@@ -639,15 +615,11 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
   bound; kept along the path the same way, and its potentials find forced members too.  A nogood is **live** at a node
   when its members outside the node's promotions are all still candidates; a **refit** fits the multipliers again (at
   the root, to the nogoods learned), after 2,000 steps and with each forgetting (DESIGN.md, section 4).
-* **preclusion**: a depth-2 table that rules candidates out (tactic `preclusions`, off by default).
-* **certificate** **(overloaded)**: `model::Certificate` is a winning order that answers most single-edit winnability
-  questions without a peel; `results::Certificate` is a score that equals a proven ceiling; the Python heuristics'
-  "upper-delta certificate" is a similar prediction from the previous game's score, defined once, in the comment of
-  `reuse_prev` in `src/accelerate.rs`; `certify.py` is the brute-force certification of small boards.
-* **revise freedoms** (`revise_freedoms`): lower frame 0's freedoms, hence `max_total`, by solving the two-frame game of
-  frames 0 and 1 (unproven: it assumes the max-sum set also has the max count).
-* **reuse_prev**: build a game from the previous game's promotions that are still possible and accept it with no search
-  if it scores what the previous game suggests (unproven).
+* **certificate** **(overloaded)**: `results::Certificate` is a score that equals a proven ceiling; the Python heuristics'
+  "upper-delta certificate" is a prediction of a score from the previous game's
+  ([heuristics/README.md](../heuristics/README.md#certificates)); `certify.py` is the brute-force certification of
+  small boards.
+* **reuse_prev, revise_freedoms**: the Java's two conjectures, once tactics here and removed (DESIGN.md, section 5).
 * **search problem, digest, repeat, same search**: what a game's setup gives the search, in a canonical form
   (`search::Problem`: the frames, the candidates, `max_total` and the factor graph among their numbers), and a 64-bit
   digest of it (`setup.digest`).  A game whose problem an earlier game posed and settled *repeats* its search: the
@@ -656,16 +628,16 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
 ### Results and trust
 
 * **proof (kind)**: how a completed game's optimality is established: `trivial`, `exhausted`, `cap`, `prime_formula`,
-  `reuse_prev`, `same_search` (section 5).  **ceiling**: `n + score(n-1)`, which no game of n can exceed; a score that
-  reaches it needs no search to prove.
-* **taint**: the unproven things a proof rests on, inherited down the chain of games (section 5).  **strict / default**:
-  a run with no unproven tactic on, and a run with the defaults (both unproven tactics on).
-* **optimal ok / optimal match**: the score equals `optimal.json`'s.  It compares with the table of optimal games; it is
-  not a proof, and does not exist above the table's last game.
+  `same_search` (section 5).  **ceiling**: `n + score(n-1)`, which no game of n can exceed; a score that reaches it
+  needs no search to prove.
+* **assumes, assumption**: what a proof rests on beyond the frame model, inherited down the chain of games; a game
+  of n - 1 taken from `optimal.json` (`--use-prev`) is assumed optimal (section 5).
+* **optimal ok / optimal match**: the score equals `optimal.json`'s, the table built into the binary.  It is not a
+  proof, and does not exist above the table's last game; a score that differs is a hard error.
 * **referee**: code that checks a game or a results file independently of the code that made it: `game::replay`,
   `taxman verify-results`, `tools/check_results.py`.  **rejected**: a game that failed a check after it was found,
   written to `<results>.rejected.jsonl`.
-* **schema 1 / 2 / 3 / 4**: the formats of a results line (section 4).
+* **schema 5**: the format of a results line (section 4); this build reads no other.
 
 ### The engine and a run
 
@@ -677,7 +649,7 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
 * **spill**: units moved from memory to segment files beyond `queue_mem_cap`.
 * **checkpoint, pause, park**: a periodic pause in which all workers yield and park, and the engine writes every unit,
   the incumbent and statistics to `nNNNN.ckpt`.  **header**: what identifies the search (n, width, digests of candidates
-  and frames, frame 0's freedoms, `max_total`, the tactics).
+  and frames, `max_total`, the tactics).
 * **eff, idle, lock, full occupancy, tiny run**: the engine's counters; see section 4 and the scaling reading guide in
   [tools/cloud/RUNBOOK.md](tools/cloud/RUNBOOK.md).
 * **W, `Bits<W>`**: the width in 64-bit words of the bitsets that hold game numbers; chosen from n.
@@ -687,7 +659,8 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
   `heuristics/THEORY.md`.
 * **ladder**: a harness (`examples/ladder.rs`) that searches hard games standalone, with time limits, at several thread
   counts.  **Java**: the original solver in `src/main/java`; **optimal.json**: the table of optimal games, n <= 1300
-  (the Java's games 1 to 1000, then the strict chain's, appended by `taxman extend-optimal`).
+  (the Java's games 1 to 1000, then those of the chain from n = 1, appended by `taxman extend-optimal`), built
+  into the binary.
 
 ## 8. Reading order and map of the documents
 
@@ -713,9 +686,8 @@ comment that is worth reading first; section 6 above is the map of how the piece
     `setup.rs` (`prepare`), `tactics.rs`, `incumbent.rs`, and `header.rs` (the checkpoint header).  The
     `if let Some(p) = &mut self.probe` lines in `searcher.rs` are instrumentation
     (`diagnostics.rs`), which can be skipped.
-11. `src/bounds.rs`: the Java's `blameGame` bound and preclusions, mostly off the default path.  The default step does
-    use three of its functions (`max_additional`, `greedy`, `new_candidate_list_after`) and the peel scratch space its
-    `Bounds` owns; the module comment lists them, and the rest can wait.
+11. `src/bounds.rs`: two small functions the Java has too, the limit on a node's further promotions and the greedy
+    incumbent.
 12. `src/engine.rs`: the protocol in the module comment (conservation, splitting, checkpoint, termination).
 13. `src/tactics.rs`, `src/board.rs`, `src/solver.rs`, `src/results.rs`, `src/paths.rs`: the switchable tactics, a board
     prepared for a search, the per-game pipeline and the range driver, provenance and verification, the default files.

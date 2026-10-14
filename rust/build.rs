@@ -10,8 +10,8 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// The files the binary is compiled from, relative to the crate.
-const SOURCES: [&str; 4] = ["src", "build.rs", "Cargo.toml", "Cargo.lock"];
+/// The files the binary is compiled from, relative to the crate (the table of optimal games is built in).
+const SOURCES: [&str; 5] = ["src", "build.rs", "Cargo.toml", "Cargo.lock", "../src/main/resources/optimal.json"];
 
 /// The output of `git -C dir args...`, if it runs and succeeds.
 fn git(dir: &Path, args: &[&str]) -> Option<String> {

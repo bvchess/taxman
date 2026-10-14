@@ -1,7 +1,7 @@
 use super::header::Header;
 use super::refine::{strongest, Learning, Refiner, Verdict};
 use super::*;
-use crate::bounds::{self, max_additional, Preclusions};
+use crate::bounds::max_additional;
 use crate::engine::Unit;
 use crate::frames::build_frames;
 use crate::json::Json;
@@ -31,7 +31,7 @@ fn golden_sum(g: &Golden) -> u64 {
 }
 
 fn prepare_golden<const W: usize>(g: &Golden, tactics: SearchTactics) -> Prepared<W> {
-    prepare::<W>(&Tables::new(g.n), &g.columns, &Bits::from_slice(&g.candidates), tactics, 2).unwrap()
+    prepare::<W>(&Tables::new(g.n), &g.columns, &Bits::from_slice(&g.candidates), tactics).unwrap()
 }
 
 /// Searches and checks that the result is complete, made of candidates, and feasible.
@@ -46,11 +46,12 @@ fn search_checked<const W: usize>(p: &Prepared<W>, threads: usize, what: &str) -
 
 fn check_against_java<const W: usize>(g: &Golden) {
     let p = prepare_golden::<W>(g, SearchTactics::default());
-    let manager = g.json.get("searchManager").expect("searchManager");
-    let frame0 = manager.get("revisedFrame0Freedoms").and_then(Json::as_i64);
+    // The Java's frame set and promotion cap before its revision of frame 0, which this build does not have.
+    let frames = g.json.get("frameSet").and_then(Json::as_arr).expect("frameSet");
+    let frame0 = frames.first().and_then(|frame| frame.get("freedoms")).and_then(Json::as_i64);
     assert_eq!(p.root.frames().first().map(|f| i64::from(f.freedoms)), frame0, "n={} frame 0 freedoms", g.n);
-    let max_total = manager.get("maxTotalPromotions").and_then(Json::as_i64).expect("maxTotalPromotions");
-    assert_eq!(i64::from(p.max_total), max_total, "n={} max_total ({:?})", g.n, p.revise);
+    let max_total = g.json.get("maxPromotionsUnrevised").and_then(Json::as_i64).expect("maxPromotionsUnrevised");
+    assert_eq!(i64::from(p.max_total), max_total, "n={} max_total", g.n);
     for threads in [1, 4] {
         let r = search_checked(&p, threads, &format!("n={} with {threads} threads", g.n));
         assert_eq!(r.sum, golden_sum(g), "n={} with {threads} threads: {:?}", g.n, r.promotions);
@@ -74,7 +75,6 @@ fn refinement_soundness<const W: usize>(g: &Golden, rng: &mut Rng) -> [u64; 3] {
     let (model, root) = Model::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
     let all = Bits::<W>::from_slice(&g.candidates);
     let max_total = root.max_promotions_among(&all).max(0) as u32;
-    let preclusions = Preclusions::build(&model, &root, &all, 2);
     let graph = MatchGraph::new(&model, &root);
     let mut m = MatchBound::new(&graph);
     let mut scratch = Scratch::new();
@@ -141,9 +141,7 @@ fn refinement_soundness<const W: usize>(g: &Golden, rng: &mut Rng) -> [u64; 3] {
             }) else {
                 break;
             };
-            let rest = cands.without(n);
-            let max_next = max_additional(max_total, &next, &promoted.with(n), &rest);
-            cands = bounds::new_candidate_list(&model, Some(&preclusions), n, max_next, &next, &rest, &promoted);
+            cands = next.narrow_candidates(&cands.without(n));
             (state, promoted) = (next, promoted.with(n));
         }
     }
@@ -174,7 +172,6 @@ fn forced_soundness<const W: usize>(g: &Golden, rng: &mut Rng) -> [u64; 2] {
     let (model, root) = Model::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
     let all = Bits::<W>::from_slice(&g.candidates);
     let max_total = root.max_promotions_among(&all).max(0) as u32;
-    let preclusions = Preclusions::build(&model, &root, &all, 2);
     let graph = MatchGraph::new(&model, &root);
     let mut m = MatchBound::new(&graph);
     let mut scratch = Scratch::new();
@@ -233,9 +230,7 @@ fn forced_soundness<const W: usize>(g: &Golden, rng: &mut Rng) -> [u64; 2] {
             }) else {
                 break;
             };
-            let rest = cands.without(n);
-            let max_next = max_additional(max_total, &next, &promoted.with(n), &rest);
-            cands = bounds::new_candidate_list(&model, Some(&preclusions), n, max_next, &next, &rest, &promoted);
+            cands = next.narrow_candidates(&cands.without(n));
             (state, promoted) = (next, promoted.with(n));
         }
     }
@@ -295,22 +290,15 @@ fn sums_by_tactics<const W: usize>(g: &Golden) -> Vec<(SearchTactics, u64)> {
     let default = SearchTactics::default();
     let variants = [
         default,
-        SearchTactics { preclusions: true, ..default },
-        SearchTactics { legacy_bound: true, ..default },
-        SearchTactics { revise_freedoms: false, ..default },
-        SearchTactics { match_bound: false, ..default },
-        SearchTactics { branching: Branching::Largest, match_refine: 0, ..default },
-        SearchTactics { branching: Branching::ConflictSmallest, match_refine: 0, ..default },
-        SearchTactics { branching: Branching::ConflictLargest, match_refine: 2, ..default },
-        SearchTactics { branching: Branching::ConflictLargest, ..default },
-        SearchTactics { branching: Branching::Largest, match_refine: 3, ..default },
+        SearchTactics { match_refine: 3, ..default },
         SearchTactics { fix_forced: false, ..default },
         SearchTactics { fix_forced: false, match_refine: 0, ..default },
+        SearchTactics { fix_forced: false, match_refine: 2, ..default },
         SearchTactics { nogoods: false, ..default },
         SearchTactics { nogoods: false, match_refine: 0, ..default },
         SearchTactics { forget_nogoods: false, ..default },
+        SearchTactics { lagrange: false, ..default },
         SearchTactics { match_refine: 0, ..default },
-        SearchTactics { branching: Branching::ConflictSmallest, match_refine: 2, ..default },
     ];
     variants.iter().map(|&t| (t, search_checked(&prepare_golden::<W>(g, t), 1, "tactics").sum)).collect()
 }
@@ -326,7 +314,7 @@ fn tactics_do_not_change_answers() {
             }
         }
     }
-    assert!(differences.is_empty(), "AN UNPROVEN TACTIC CHANGES ANSWERS:\n{}", differences.join("\n"));
+    assert!(differences.is_empty(), "A TACTIC CHANGES ANSWERS:\n{}", differences.join("\n"));
 }
 
 /// The searches of these games are shorter than [`NOGOOD_PERIOD`] steps, so they never forget with it: forget
@@ -351,16 +339,8 @@ fn resume_in_pieces(threads: usize, tactics: SearchTactics, min_pieces: usize) {
     let g = load(760);
     let tables = Tables::new(g.n);
     let cands = Bits::<16>::from_slice(&g.candidates);
-    let whole = prepare::<16>(&tables, &g.columns, &cands, tactics, 2).unwrap();
+    let whole = prepare::<16>(&tables, &g.columns, &cands, tactics).unwrap();
     let nodes = search_checked(&whole, 1, "uninterrupted").stats.nodes;
-    // A checkpoint's frame 0 counts as revised only if the tactic was on and it is not the built one (760's
-    // two-frame search lowers it).
-    let from_checkpoint = match (tactics.revise_freedoms, whole.root == whole.unrevised) {
-        (false, _) => Revise::Off,
-        (true, true) => Revise::ResumedAsBuilt,
-        (true, false) => Revise::FromCheckpoint,
-    };
-    assert_eq!(from_checkpoint == Revise::Off, whole.root == whole.unrevised, "760's frame 0 is revised");
 
     let dir = TempDir::new(&format!("resume{threads}-{}", tactics.bits()));
     let ckpt = dir.0.join("ckpt.bin");
@@ -375,8 +355,7 @@ fn resume_in_pieces(threads: usize, tactics: SearchTactics, min_pieces: usize) {
     let mut pieces = 1;
     while !result.completed {
         assert!(ckpt.exists(), "a stopped run leaves a checkpoint");
-        let resumed = prepare_for_resume::<16>(&tables, &g.columns, &cands, &ckpt, 2).unwrap();
-        assert_eq!(resumed.revise, from_checkpoint);
+        let resumed = prepare_for_resume::<16>(&tables, &g.columns, &cands, &ckpt).unwrap();
         assert_eq!(resumed.root, whole.root);
         result = search(&resumed, &cfg, None, None, true).unwrap();
         pieces += 1;
@@ -394,14 +373,15 @@ fn resume_in_pieces(threads: usize, tactics: SearchTactics, min_pieces: usize) {
 fn checkpoint_and_resume_one_thread() {
     resume_in_pieces(1, SearchTactics::default(), 3);
     resume_in_pieces(1, SearchTactics { fix_forced: false, ..SearchTactics::default() }, 4);
-    resume_in_pieces(1, SearchTactics { revise_freedoms: false, ..SearchTactics::default() }, 3);
 }
 
 #[test]
 fn checkpoint_and_resume_four_threads() {
-    // The default tactics search 760 in too few nodes for four threads to reach the node limit before the
-    // end; the Java's branching takes many more.
-    resume_in_pieces(4, SearchTactics { branching: Branching::Largest, ..SearchTactics::default() }, 2);
+    // The default tactics search 760 in too few nodes (about 2,300) for four threads to reach the node limit
+    // before the end; without refinement, forced members and nogoods they take about 4,700, which some thread
+    // always meets the limit in.
+    let weak = SearchTactics { match_refine: 0, fix_forced: false, nogoods: false, ..SearchTactics::default() };
+    resume_in_pieces(4, weak, 2);
 }
 
 #[test]
@@ -414,9 +394,9 @@ fn a_checkpoint_of_another_game_is_refused() {
         EngineConfig { checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))), node_limit: Some(50), ..config(1) };
     assert!(!search(&pa, &cfg, None, None, false).unwrap().completed);
     let cands = Bits::<16>::from_slice(&b.candidates);
-    assert!(prepare_for_resume::<16>(&Tables::new(b.n), &b.columns, &cands, &ckpt, 1).is_err());
+    assert!(prepare_for_resume::<16>(&Tables::new(b.n), &b.columns, &cands, &ckpt).is_err());
     let cands = Bits::<32>::from_slice(&a.candidates);
-    assert!(prepare_for_resume::<32>(&Tables::new(a.n), &a.columns, &cands, &ckpt, 1).is_err());
+    assert!(prepare_for_resume::<32>(&Tables::new(a.n), &a.columns, &cands, &ckpt).is_err());
 }
 
 #[test]
@@ -441,45 +421,6 @@ fn seeds_and_caps() {
     assert_eq!(worse.sum, optimum.sum);
 }
 
-/// What revising did reads back from the form a results line records it in, and nothing else reads as a value.
-#[test]
-fn revise_values_read_back_from_their_results_form() {
-    let values = [
-        Revise::Off,
-        Revise::NotNeeded,
-        Revise::GreedyIsMax(0),
-        Revise::GreedyIsMax(u32::MAX),
-        Revise::Unchanged,
-        Revise::Searched { size: 12, nodes: 8 },
-        Revise::Searched { size: u32::MAX, nodes: u64::MAX },
-        Revise::Stopped { nodes: 4321 },
-        Revise::FromCheckpoint,
-        Revise::ResumedAsBuilt,
-    ];
-    for value in values {
-        assert_eq!(Revise::parse(&format!("{value:?}")), Some(value));
-    }
-    let taints: Vec<bool> = values.iter().map(|v| v.sets_frame_zero()).collect();
-    assert_eq!(taints, [false, false, true, true, false, true, true, false, true, false]);
-    let near_misses = [
-        "",
-        "off",
-        "Off ",
-        "GreedyIsMax(+4)",
-        "GreedyIsMax(04)",
-        "GreedyIsMax(4294967296)",
-        "GreedyIsMax()",
-        "Searched { size: 12 }",
-        "Searched { nodes: 8, size: 12 }",
-        "Searched{ size: 12, nodes: 8 }",
-        "Stopped { nodes: -1 }",
-        "FromCheckpoint(3)",
-    ];
-    for text in near_misses {
-        assert_eq!(Revise::parse(text), None, "{text:?}");
-    }
-}
-
 #[test]
 fn units_and_headers_round_trip() {
     let unit = TaxUnit::<3> { promoted: Bits::from_slice(&[1, 64, 190]), cands: Bits::from_slice(&[0, 63, 127]) };
@@ -488,27 +429,28 @@ fn units_and_headers_round_trip() {
     assert_eq!(bytes.len(), 48);
     assert_eq!(TaxUnit::<3>::decode(&bytes), unit);
 
-    let p = prepare_golden::<8>(&load(300), SearchTactics { legacy_bound: true, ..SearchTactics::default() });
+    let p = prepare_golden::<8>(&load(300), SearchTactics { match_refine: 3, ..SearchTactics::default() });
     let header = Header::of(&p);
     let bytes = header.encode();
     assert_eq!(bytes.len(), Header::<8>::LEN);
     let back = Header::<8>::decode(&bytes).unwrap();
     assert_eq!(back, header);
-    assert_eq!(
-        (back.n, back.max_total, back.frame0_freedoms, back.tactics),
-        (300, p.max_total, p.root.frames().first().map(|f| f.freedoms), p.tactics)
-    );
+    assert_eq!((back.n, back.max_total, back.tactics), (300, p.max_total, p.tactics));
     assert_eq!(back.mismatch(&header), None);
     assert!(Header::<16>::decode(&bytes).unwrap_err().contains("Bits<8>"));
-    assert!(Header::<8>::decode(b"nonsense").is_err());
+    assert!(Header::<8>::decode(b"nonsense").unwrap_err().contains("not a checkpoint"));
     assert!(Header::<8>::decode(&bytes[..20]).is_err());
-    let mut later = bytes.clone();
-    later[4] = 4;
-    assert!(Header::<8>::decode(&later).unwrap_err().contains("format version 4"));
-    // A header of the format before version 3 is refused, saying why.
-    let mut old = b"TXS2".to_vec();
-    old.extend_from_slice(&[0; 4 + 64 + 4 + 1 + 4 + 2]);
-    assert!(Header::<8>::decode(&old).unwrap_err().contains("older build"));
+    // Every other format version, the older ones (`TXS2` was version 2) and any later one, is refused with one
+    // message.
+    let mut txs2 = b"TXS2".to_vec();
+    txs2.extend_from_slice(&[0; 4 + 64 + 4 + 1 + 4 + 2]);
+    for (version, bytes) in [("2", txs2), ("3", [&bytes[..4], &3u32.to_le_bytes(), &bytes[8..]].concat())]
+        .into_iter()
+        .chain([("5", [&bytes[..4], &5u32.to_le_bytes(), &bytes[8..]].concat()), ("unreadable", b"TXSH".to_vec())])
+    {
+        let err = Header::<8>::decode(&bytes).unwrap_err();
+        assert!(err.contains(&format!("format version {version}, and this build reads version 4 only")), "{err}");
+    }
     // Every field that differs is named.
     let other = |change: fn(&mut Header<8>)| {
         let mut h = header;
@@ -519,84 +461,53 @@ fn units_and_headers_round_trip() {
     assert!(other(|h| h.candidates ^= 1).contains("candidates"));
     assert!(other(|h| h.frames ^= 1).contains("frames"));
     assert!(other(|h| h.max_total += 1).contains("max_total"));
-    assert!(other(|h| h.frame0_freedoms = None).contains("freedoms"));
     assert!(other(|h| h.tactics.nogoods = !h.tactics.nogoods).contains("tactics"));
 
-    // Every setting of the search tactics reads back as it was written, and the default tactics of a checkpoint
-    // made before `fix_forced`, `nogoods`, `forget_nogoods` and `lagrange` existed (0x19d) read back with them on,
-    // as they are now; so do those of one made before `forget_nogoods` (0x19c, the preclusions off).  Bit 11 is
-    // `forget_nogoods` off, bit 12 `lagrange` off, and no higher bit is used.
-    let default = SearchTactics::default();
+    // Every setting of the search tactics reads back as it was written: `match_refine` in bits 0 to 2, a bit for
+    // each switch that is on (the defaults: 0x79), and no higher bit is used.
     for refine in [0, 1, 7] {
-        for branching in Branching::ALL {
-            for (on, off) in [(true, false), (false, true)] {
-                let t = SearchTactics {
-                    preclusions: on,
-                    legacy_bound: off,
-                    revise_freedoms: on,
-                    match_bound: off,
-                    match_refine: refine,
-                    branching,
-                    fix_forced: on,
-                    nogoods: off,
-                    forget_nogoods: on,
-                    lagrange: off,
-                };
-                assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
-            }
+        for (on, off) in [(true, false), (false, true)] {
+            let t =
+                SearchTactics { match_refine: refine, fix_forced: on, nogoods: off, forget_nogoods: on, lagrange: off };
+            assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
         }
     }
-    assert_eq!(SearchTactics::from_bits(0x19d), Ok(SearchTactics { preclusions: true, ..default }));
-    assert_eq!(SearchTactics::from_bits(0x19c), Ok(default));
-    assert_eq!(SearchTactics::from_bits(0x19c | 1 << 11), Ok(SearchTactics { forget_nogoods: false, ..default }));
-    assert_eq!(SearchTactics::from_bits(0x19c | 1 << 12), Ok(SearchTactics { lagrange: false, ..default }));
-    assert!(SearchTactics::from_bits(1 << 13).is_err());
+    assert_eq!(SearchTactics::default().bits(), 0x79);
+    assert_eq!(SearchTactics::from_bits(0x79), Ok(SearchTactics::default()));
+    assert!(SearchTactics::from_bits(1 << 7).unwrap_err().contains("unknown tactics"));
 }
 
 // ---- benchmark: cargo test --release bench_search -- --ignored --nocapture --test-threads=1 ----
 
-/// Prepares and searches one game with each thread count and both settings of `match_bound` (`TAXMAN_BENCH_MATCH`
-/// = `on` or `off` restricts it to one), printing one line each.
+/// Prepares and searches one game with each thread count, printing one line each.
 fn bench_game<const W: usize>(n: u32, columns: &[Vec<u32>], cands: &Bits<W>, java: (f64, f64)) {
     let tables = Tables::new(n);
-    let only = std::env::var("TAXMAN_BENCH_MATCH").ok();
-    let settings = [true, false].into_iter().filter(|&on| only.as_deref().is_none_or(|s| (s == "on") == on));
-    for match_bound in settings {
-        for (threads, java_secs) in [(1, java.0), (10, java.1)] {
-            let tactics = SearchTactics { match_bound, ..SearchTactics::default() };
-            let t0 = Instant::now();
-            let p = prepare::<W>(&tables, columns, cands, tactics, threads).unwrap();
-            let r = search(&p, &config(threads), None, None, false).unwrap();
-            let total = t0.elapsed().as_secs_f64();
-            let t = &p.timings;
-            let revise_nodes = if let Revise::Searched { nodes, .. } = p.revise { nodes } else { 0 };
-            eprintln!(
-                "n={n:4} match={:3} threads={threads:2}: total {total:7.3} s (Java {java_secs:5.1} s) | prec {:.3} \
-                 revise {:.3} ({revise_nodes} nodes) search {:.3} | nodes {} | sum {} | extra {:?}",
-                if match_bound { "on" } else { "off" },
-                t.preclusions.as_secs_f64(),
-                t.revise.as_secs_f64(),
-                r.time.as_secs_f64(),
-                r.stats.nodes,
-                r.sum,
-                r.stats.extra,
-            );
-        }
+    for (threads, java_secs) in [(1, java.0), (10, java.1)] {
+        let t0 = Instant::now();
+        let p = prepare::<W>(&tables, columns, cands, SearchTactics::default()).unwrap();
+        let r = search(&p, &config(threads), None, None, false).unwrap();
+        let total = t0.elapsed().as_secs_f64();
+        let t = &p.timings;
+        eprintln!(
+            "n={n:4} threads={threads:2}: total {total:7.3} s (Java {java_secs:5.1} s) | greedy {:.3} search {:.3} \
+             | nodes {} | sum {} | extra {:?}",
+            t.greedy.as_secs_f64(),
+            r.time.as_secs_f64(),
+            r.stats.nodes,
+            r.sum,
+            r.stats.extra,
+        );
     }
 }
 
-/// One game (`TAXMAN_BENCH_N`, default 700; `TAXMAN_BENCH_THREADS`, default 1; tactics changed by
-/// `TAXMAN_BENCH_MATCH=off`, `TAXMAN_BENCH_NO_PRECLUSIONS`, and `TAXMAN_BENCH_LEGACY` for the
-/// legacy bound), with progress lines, for profiling.
+/// One game (`TAXMAN_BENCH_N`, default 700; `TAXMAN_BENCH_THREADS`, default 1), with progress lines, for
+/// profiling.
 #[test]
 #[ignore]
 fn bench_search_one() {
     let n = std::env::var("TAXMAN_BENCH_N").ok().and_then(|s| s.parse().ok()).unwrap_or(700);
     let threads = std::env::var("TAXMAN_BENCH_THREADS").ok().and_then(|s| s.parse().ok()).unwrap_or(1);
-    let legacy_bound = std::env::var_os("TAXMAN_BENCH_LEGACY").is_some();
-    let match_bound = std::env::var("TAXMAN_BENCH_MATCH").map_or(true, |s| s == "on");
-    let preclusions = std::env::var_os("TAXMAN_BENCH_NO_PRECLUSIONS").is_none();
-    let tactics = SearchTactics { legacy_bound, match_bound, preclusions, ..SearchTactics::default() };
+    let tactics = SearchTactics::default();
     let seconds = std::env::var("TAXMAN_BENCH_SECONDS").ok().and_then(|s| s.parse().ok());
     let tables = Tables::new(n);
     // The golden columns if there are any, else the frame builder's.
@@ -607,14 +518,15 @@ fn bench_search_one() {
         let frames = build_frames::<16>(&tables);
         (frames.frames.iter().flat_map(|f| [f.factors.to_vec(), f.moves.to_vec()]).collect(), frames.candidates)
     };
-    let p = prepare::<16>(&tables, &columns, &cands, tactics, threads).unwrap();
+    let p = prepare::<16>(&tables, &columns, &cands, tactics).unwrap();
     let cfg = EngineConfig {
         progress: Some(Duration::from_secs(10)),
         time_limit: seconds.map(Duration::from_secs),
         ..config(threads)
     };
     // What optimal.json says the best promotion sum is, and the `prev_cap` ceiling.
-    if let Ok(optimal) = crate::game::Optimal::load_default() {
+    {
+        let optimal = crate::game::Optimal::built_in();
         let in_the_bag: u64 =
             crate::hives::Apiary::<16>::new(&tables, Bits::EMPTY).solution().iter().map(|&x| u64::from(x)).sum();
         let best = optimal.score(n).map(|s| s - in_the_bag);

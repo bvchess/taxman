@@ -42,7 +42,8 @@ This command will show debugging output as it searches for an optimal solution f
 The program includes pre-computed solutions to games from 1 to 1300 so that it can make use of the solution to N-1
 without having to compute it on every run.  These pre-computed solutions are available in JSON format
 [here](src/main/resources/optimal.json).  Games 1 to 1000 are this program's; games 1001 to 1300 come from the Rust
-solver's strict chain ([rust/results/strict.jsonl](rust/results/strict.jsonl)), which rests on no unproven tactic.
+solver's chain from n = 1 ([rust/results/strict.jsonl](rust/results/strict.jsonl)), which assumes nothing beyond its
+frame model.
 
 I use the Java [BitSet](https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/BitSet.html) class for
 fast operations on sets of small integers.  I use

@@ -37,14 +37,14 @@ those of the page the row points to; a game is named by its board size, and time
 
 | tried | details | outcome | what decided it |
 |---|---|---|---|
-| Reimplement the Java's search and check its upper bound | [port](#the-port-and-its-first-improvements) | kept, with a fix | the Java's runner-up can be too low (root of n = 114: 358 against the best completion's 360); the sound runner-up is the default, `legacy_bound` reproduces the Java's |
+| Reimplement the Java's search and check its upper bound | [port](#the-port-and-its-first-improvements) | kept, with a fix; the Java's bound removed 2026-10 | the Java's runner-up can be too low (root of n = 114: 358 against the best completion's 360); the sound runner-up was the default and `legacy_bound` reproduced the Java's, until the matching bound left `blameGame` nothing to do and both went ([tactics review](#which-tactics-earn-their-keep-2026-10)) |
 | A simpler sound runner-up: the largest candidate not in the bid | [port](#the-port-and-its-first-improvements) | not kept | n = 700 took over 10 minutes instead of 18 s |
 | Matching bound (max-weight bipartite matching, kept incrementally with dual potentials) instead of `blameGame` | [after parity](#improvements-after-parity) | kept | mean gap at the root 31 against the Java bound's 76 on the 94 golden games that need search; 1.5 to 85 times fewer nodes at n = 480-720 |
 | The minimum of `blameGame` and the matching bound | [after parity](#improvements-after-parity) | not kept | `blameGame` pruned nowhere the matching bound did not (0 at every check) |
 | Seed the incumbent from the game of n − 1 and stop at the cap n + opt(n − 1) (`seed_incumbent`, `prev_cap`) | [after parity](#improvements-after-parity) | kept | 415 of the 1300 proofs of the strict chain of commit bd9bb5d are the cap, reached before the first node; the committed chain, which also has `same_search`, has 115 and 545 repeats ([results](../results/README.md#what-supports-the-scores)) |
 | Branch on a member of the heaviest matching's conflict instead of the largest candidate | [conflicts](#conflicts-of-the-matching-bound-2026-10) | kept, the decisive change | 936: 90.8 s to 31.8 s (12.3M to 2.62M nodes); 1000: open at 120 s to 27.5 s (10 threads) |
 | Strong branching: the member whose removal lowers the bound most, its level kept for the node (`conflict-strong`) | [conflicts](#conflicts-of-the-matching-bound-2026-10) | kept, the default | 936: 29.5 s to 17.7 s, 2.62M to 909k nodes |
-| The other branchings, `conflict-smallest` and `conflict-largest` | [conflicts](#conflicts-of-the-matching-bound-2026-10) | kept as switches | smallest gives the smallest proof trees at 880 and 936 but finds good incumbents late; largest follows the dive and finds them early |
+| The other branchings, `conflict-smallest` and `conflict-largest` | [conflicts](#conflicts-of-the-matching-bound-2026-10) | kept as switches, removed 2026-10 ([tactics review](#the-alternatives-that-are-off)) | smallest gives the smallest proof trees at 880 and 936 but finds good incumbents late; largest follows the dive and finds them early |
 | Propagate the known conflicts into the children | [conflicts](#conflicts-of-the-matching-bound-2026-10) | kept | −17% nodes |
 | Refinement (bound the branches of the conflict) on the Java's branching | [conflicts](#conflicts-of-the-matching-bound-2026-10) | not kept | nodes 2-70 times fewer but dearer: 880 from 4.8M to 68k nodes at depth 7, yet only 31 s to 21 s, and slower than none at depth 1-3 |
 | Refinement one level deep with conflict branching (`match_refine` = 1) | [conflicts](#conflicts-of-the-matching-bound-2026-10) | kept | 2-15% faster than none on the benchmarks; deeper is slower |
@@ -66,7 +66,7 @@ those of the page the row points to; a game is named by its board size, and time
 | Skip strong branching's exact solves when the potentials found a forced member, or choose the branch by the potentials alone | [forced members](#forced-members-and-nogoods-2026-10-second-round) | not kept | each traded nodes for time at about even |
 | Round the heaviest matching into an incumbent at every node | [forced members](#forced-members-and-nogoods-2026-10-second-round) | not kept | 5 times slower per node; the optimum of 1050 was found at the same step |
 | A large-neighbourhood search before the search | [forced members](#forced-members-and-nogoods-2026-10-second-round) | not kept | 1025: 25080 in 1.3 s, but the optimum only from the search, at about the same point |
-| The Java's depth-2 preclusion table | [forced members](#forced-members-and-nogoods-2026-10-second-round) | superseded by nogoods (`preclusions` off) | without it 992 and 1215 take +5% and −4%; 1101-1217 on 8 threads spent 53 of 131 s building tables |
+| The Java's depth-2 preclusion table | [forced members](#forced-members-and-nogoods-2026-10-second-round) | superseded by nogoods (`preclusions` off), removed 2026-10 ([tactics review](#the-alternatives-that-are-off)) | without it 992 and 1215 take +5% and −4%; 1101-1217 on 8 threads spent 53 of 131 s building tables |
 | Faster nodes, same trees: bucket 0 of the radix heap a bitset, packed per-vertex slots, `MAX_FRAMES` 12 to 8, exact nogood lookups, no peel for a factor no other move uses, the heap inlined | [faster nodes](#faster-nodes-same-trees-2026-10) | kept | 30% fewer cycles at the 1215 proof (151.3 G to 106.2 G), the set widths below included |
 | An undo trail for the matching levels | [faster nodes](#faster-nodes-same-trees-2026-10) | not kept | windows +0.8% and +0.9% cycles, instructions +4% |
 | The peel in frame-local form | [faster nodes](#faster-nodes-same-trees-2026-10) | not kept | bit-parallel peel +8% and +16% on forced sets; counting peel +0.5% and +0.8% |
@@ -139,14 +139,14 @@ those of the page the row points to; a game is named by its board size, and time
 | tried | details | outcome | what decided it |
 |---|---|---|---|
 | The prime shortcut (`prime_shortcut`) | [DESIGN 5](../DESIGN.md#5-tactics) | kept, proven | tight for every prime; the proof is with `accelerate::prime_shortcut` |
-| Reuse the previous game's promotions without a search (`reuse_prev`) | [DESIGN 5](../DESIGN.md#5-tactics) | kept, unproven; off in a strict run | with several optimal sets of n − 1 the result depends on which was recorded: the recorded game of 685 plus 686 is unplayable though opt(686) = 686 + opt(685) |
+| Reuse the previous game's promotions without a search (`reuse_prev`) | [tactics review](#reuse_prev-nothing-left-to-save) | removed 2026-10 (it was unproven, and the cap and same search had left it nothing to save) | with several optimal sets of n − 1 the result depends on which was recorded: the recorded game of 685 plus 686 is unplayable though opt(686) = 686 + opt(685) |
 | The sacrifice bound (games on punctured boards) as a proof for `reuse_prev` | [`src/sacrifice.rs`](../src/sacrifice.rs) | not kept | tight on 57 of the 152 `reuse_prev` games, and where it proves it costs 1.1-8.7 times the direct search; the theorem stays and `tests/wide.rs` uses it |
-| Lower frame 0's freedoms by solving the two-frame game (`revise_freedoms`) | [DESIGN 4](../DESIGN.md#revise_freedoms) | not kept: its premise is false, so it is to be removed (decided 2026-10-13) | assumes the max-sum set also has the max count, which fails on about one perturbed game in 1,300, and for the whole frame game of n = 833 (48 promotions optimal, 49 feasible: [evidence 6](../evidence/README.md#6-does-an-optimal-game-play-the-most-moves)); the two-frame form it applies is undecided |
-| What `reuse_prev` still saves in a strict chain that has `same_search`, the cap and the seed (from the setups, no search) | [tactics review](#reuse_prev-nothing-left-to-save) | measured; to be removed | of 2..1300 it accepts 670 games, every one settled anyway (545 repeats, 115 caps at once, 10 searches of at most 1.6 s): 3.8 s of the chain's 1052 s of search, 0.5 s of 813 s in 1232..1300; no score or move differs |
-| What `revise_freedoms` changes in the proofs at the frontier | [tactics review](#revise_freedoms-the-same-trees) | measured | it changes the problem of every searched game of 1232..1300 (frame 0's freedoms down 4 to 6, `max_total` 0 to 5), yet the proofs of 1215, 1225, 1240, 1254, 1272, 1287 and 1300 have the same trees, node for node |
-| `preclusions`, `match_bound=off`, `legacy_bound` and the branchings other than `conflict-strong`, again with the Lagrangian bound | [tactics review](#the-alternatives-that-are-off) | measured; to be removed | the proof of 1215 on one thread: `preclusions` +80% cycles and 4.5 s for its table, `conflict-largest` ×6.3, `largest`, `conflict-smallest` and `match_bound=off` unfinished at 180 s (more than ×17); `legacy_bound` acts only without the matching bound |
+| Lower frame 0's freedoms by solving the two-frame game (`revise_freedoms`) | [tactics review](#revise_freedoms-the-same-trees) | removed 2026-10: its premise is false | assumes the max-sum set also has the max count, which fails on about one perturbed game in 1,300, and for the whole frame game of n = 833 (48 promotions optimal, 49 feasible: [evidence 6](../evidence/README.md#6-does-an-optimal-game-play-the-most-moves)); the two-frame form it applies is undecided |
+| What `reuse_prev` still saves in a strict chain that has `same_search`, the cap and the seed (from the setups, no search) | [tactics review](#reuse_prev-nothing-left-to-save) | measured; removed | of 2..1300 it accepts 670 games, every one settled anyway (545 repeats, 115 caps at once, 10 searches of at most 1.6 s): 3.8 s of the chain's 1052 s of search, 0.5 s of 813 s in 1232..1300; no score or move differs |
+| What `revise_freedoms` changes in the proofs at the frontier | [tactics review](#revise_freedoms-the-same-trees) | measured; removed | it changes the problem of every searched game of 1232..1300 (frame 0's freedoms down 4 to 6, `max_total` 0 to 5), yet the proofs of 1215, 1225, 1240, 1254, 1272, 1287 and 1300 have the same trees, node for node |
+| `preclusions`, `match_bound=off`, `legacy_bound` and the branchings other than `conflict-strong`, again with the Lagrangian bound | [tactics review](#the-alternatives-that-are-off) | measured; removed | the proof of 1215 on one thread: `preclusions` +80% cycles and 4.5 s for its table, `conflict-largest` ×6.3, `largest`, `conflict-smallest` and `match_bound=off` unfinished at 180 s (more than ×17); `legacy_bound` acts only without the matching bound |
 | `match_refine=0` with the Lagrangian bound | [tactics review](#the-alternatives-that-are-off) | open | the proof of 1215: cycles −12%, nodes +1%; its default needs the bench set and the small games |
-| Support for old file formats: result schemas 1 to 3, the committed schema-1 files, checkpoint compatibility, the golden tests of the Java's tactics | [tactics review](#old-file-formats) | open: to go with the tactics | an inventory, with what deleting each takes along |
+| Support for old file formats: result schemas 1 to 3, the committed schema-1 files, checkpoint compatibility, the golden tests of the Java's tactics | [tactics review](#old-file-formats) | removed | with the tactics: results schemas 1 to 4 (schema 5 only is read), `results/default.jsonl`, checkpoint headers before version 4 and the width widening; the Java's golden data for the frame builder stays |
 | Re-solve 1..1000 and 1001-1300 with no unproven tactic, and the non-primes of 1001-1231 standalone | [results](../results/README.md#what-supports-the-scores) | kept | `strict.jsonl` reproduces all 1000 scores of optimal.json; the 197 standalone searches agree with the chain |
 | The Java's merged-away hive branch (the stale-hive quirk) in the frame builder | [`src/hives.rs`](../src/hives.rs) | measured | reached once (n = 114) for 2 ≤ n ≤ 2000, and forcing it off changes no frame |
 
@@ -187,7 +187,7 @@ and [THEORY.md's table of evidence](../../heuristics/THEORY.md#evidence).  Entri
 
 | round | question | outcome | commits |
 |---|---|---|---|
-| [The port](#the-port-and-its-first-improvements) | does a fresh implementation of the Java's algorithm reproduce its answers? | yes, and the Java's upper bound had a defect (the runner-up), fixed behind `legacy_bound` | before 2026-10 |
+| [The port](#the-port-and-its-first-improvements) | does a fresh implementation of the Java's algorithm reproduce its answers? | yes, and the Java's upper bound had a defect (the runner-up), fixed (`legacy_bound` reproduced it until it was removed) | before 2026-10 |
 | [Matching bound](#improvements-after-parity) | can a relaxation to bipartite matching bound the nodes better than `blameGame`? | kept; the default bound | before 2026-10 |
 | [Seed and cap](#improvements-after-parity) | start from the previous game and stop at `n + opt(n − 1)` | kept (`seed_incumbent`, `prev_cap`) | before 2026-10 |
 | [Conflicts of the matching bound](#conflicts-of-the-matching-bound-2026-10) | does the conflict of the heaviest matching make a better branching and a tighter bound? | kept: conflict branching, strong branching, refinement; 1000 from open at 120 s to 11 s | f8d922d to 38cf168 |
@@ -199,7 +199,7 @@ and [THEORY.md's table of evidence](../../heuristics/THEORY.md#evidence).  Entri
 | [Engine](#the-engine) | scaling to many cores, and checkpoints at any interval | kept: split requests per idle worker, pauses that cannot starve the workers | 2026-10 |
 | [Same search](#same-search-2026-10) | conclude a game whose search problem an earlier game already settled? | kept (`same_search`, proven); 28.4% of the strict chain's search | f5a2af3 to 06efb4c |
 | [Lagrangian bound](#a-lagrangian-bound-over-the-nogoods-2026-10) | can a Lagrangian bound over the nogoods be kept incrementally and pay in cycles? | kept (`lagrange`); proofs at the frontier about 3.3 times fewer cycles | e6b37d2, b4f6b05 |
-| [Which tactics earn their keep](#which-tactics-earn-their-keep-2026-10) | which tactics pay in a strict chain at the frontier, and what support for old file formats can go? | recommended: remove `reuse_prev`, `revise_freedoms`, `legacy_bound`, `preclusions`, `match_bound=off` and the branchings other than `conflict-strong`; keep the proven switches | the solver of 243af9b |
+| [Which tactics earn their keep](#which-tactics-earn-their-keep-2026-10) | which tactics pay in a strict chain at the frontier, and what support for old file formats can go? | removed `reuse_prev`, `revise_freedoms`, `legacy_bound`, `preclusions`, `match_bound=off` and the branchings other than `conflict-strong`, and with them strict runs and the old file formats; kept the proven switches | the solver of 243af9b |
 | [Faster nodes with the Lagrangian bound](#faster-nodes-with-the-lagrangian-bound-same-trees-2026-10) | where do the cycles go with the Lagrangian bound, and what can be cheaper without changing any tree?  Does `match_refine` = 0 now pay? | kept: the probe's windows about 10.5% fewer cycles, proofs 5-10%; `match_refine` stays 1 | dd4f89c to 31b9c95 |
 | [Benchmarks](#benchmarks-the-probe-pgo-and-scaling) | what the bench set, the probe, PGO and the thread scaling showed | numbers | e3b8ddc and after |
 | [What drives the slope](#what-drives-the-slope-2026-10) | what makes a game's cost grow ×10 per 55-70 in n, and what would change the slope? | the root's gap: ×10 nodes per ~130 of it at every n, nothing from the size at a given gap; the slope is the gap's growth; seeding the search with a better root relaxation is a constant factor | db7faf1 (no solver change) |
@@ -1327,7 +1327,38 @@ Everything that exists only to read what older builds wrote, and what deleting i
   `match_bound=off` and `legacy_bound`).  The golden files' fields that then nobody reads (`searchManager`'s
   `revisedFrame0Freedoms`, `solve.accelerated` if the prime half goes too) can stay as exported.
 
-*Decision.*  None yet: phase 2 removes what the owner accepts, once the rewrite of the inner loop has merged.
+*Decision.*  The owner took the recommendation and went further; the removals are commits f72c332, 8a6df90,
+49ec778 and a2bc798 (on 4372b36 by the merge 39ed18b), about 4,800 lines of code removed and 1,650 added (`src/`,
+`tests/`, `examples/`, `tools/`, `evidence/` and the study scripts; 3,600 and 990 of them in `src/`):
+
+* *Tactics.*  `reuse_prev`, `revise_freedoms` (premise refuted at n = 833), `legacy_bound`, `preclusions`,
+  `match_bound=off` with `blameGame` and the counters only they used, and the tactic `branching` with its three
+  losing values are gone, with their tests, tripwire rows and fixtures (`testdata/accel_java.txt`).  The nine proven or
+  sound tactics of the table stay as switches.
+* *No strict runs.*  With no unproven tactic left there is one kind of run: `--strict`, `UNPROVEN`, `Tactics::strict`,
+  `unproven_tactics_on` and the rules of a game's own taint are gone, and so are `STRICT_ARGS` in `tools/cloud`.
+* *Assumptions instead of taint.*  A range takes the game of n − 1 from the run or from the `--out` file and otherwise
+  solves its first game standalone; `--use-prev` takes it from optimal.json.  A result whose proof rests on such a game
+  records `"assumes": ["the game of 1300 in optimal.json is optimal"]` (say), carried down the chain as taint was, and
+  `[]` otherwise.  Nothing refuses a game for what it assumes (`--allow-tainted-prev` is gone), and `extend-optimal`
+  appends such games: they assume nothing the table does not stand for.
+* *optimal.json is built in.*  The binary carries the table it was compiled with (`include_str!`; a rebuild picks up a
+  changed file) and confirms every score against it, a difference being a hard error naming the game: `--optimal FILE`,
+  `--optimal none`, `TAXMAN_OPTIMAL` and `allow_optimal_mismatch` are gone.  Tests that need another table use the
+  library (`solver::solve_range_each_with`, `results::read_results`); `verify-optimal [FILE]` and `extend-optimal
+  RESULTS --out FILE [--table FILE]` still take files.
+* *Old formats.*  Results lines are schema 5 (`assumes`, `prev.assumes`, `same_search.assumes`, `options.use_prev`; no
+  `prev_source`, `setup.revise`, `seconds.revise` or `seconds.preclusions`, `unproven_tactics_on`, `optimal_file` or
+  `allow_optimal_mismatch`), and both verifiers read schema 5 only; `results/default.jsonl` and
+  `testdata/strict_schema3_1_90.jsonl` are deleted (`git show f72c332:rust/results/default.jsonl`), and
+  `bench/curve/chain.jsonl` stays as the cost-curve study's data, which no verifier reads.  The checkpoint header is
+  version 4 (no frame 0, the tactics recorded plainly), every other version is refused with one message, and the
+  widening to an older build's width is gone; `testdata/n1133_after_1000_nodes.ckpt` (now W = 20) and the probe's
+  windows were made again, the probe's fingerprint now 7e8e724717d26545 (5b83bbebf0bb2899 with `lagrange=off`).
+* *Left for the owner.*  `results/strict.jsonl` is schema 4, so until it is made again by this build (the chain from
+  n = 1, about 18 minutes on four threads) neither verifier reads it: `tests/results.rs`'s
+  `the_committed_results_pass_the_verifier` skips it, saying so, and `tools/cloud/verify.sh`, `setup.sh`'s verifier
+  smoke check, `tools/profile/profile.sh` and the README's commands that extend a copy of it wait for the rerun.
 
 ## Faster nodes with the Lagrangian bound, same trees (2026-10)
 
@@ -1513,29 +1544,29 @@ candidates, `max_total`), or something else?  And so what would change it?
 with the incumbent set by value, through the library's public interfaces (`Board`, `MatchBound`,
 `matchbound::lagrange`, `engine::run`); `bench/curve/slope.py` makes the tables below (and more) from its two data
 files, `bench/curve/slope_roots.jsonl` and `bench/curve/slope_proofs.jsonl`, and `results/strict.jsonl`.  The solver
-of 331eb09 with `--tactic revise_freedoms=off` (the strict tactics), one thread a process and at most two processes, on
+of 331eb09 with `--tactic revise_freedoms=off` (the strict tactics; the tactic has been removed since, and the
+commands below, which no longer pass it, run the same searches), one thread a process and at most two processes, on
 the laptop while another agent ran the test suite.  `P*` is a game's optimum promotion sum (its score minus
 `in_the_bag`).
 
-* *Roots* (`slope roots --known results/strict.jsonl --sums bench/curve/bands.jsonl --tactic revise_freedoms=off
-  880-1300` and the games past 1300 that `bands.jsonl` solved; about a second a game): the root's matching bound; the
-  matching bound refined one to three levels deep (the search's refinement, computed to a value); and a Lagrangian
-  bound over nogoods of the root, made without a search: the conflicts the refinement found, then up to 8,000
-  subgradient steps towards `P* + 1` (Polyak's rule damped by halving after 80 steps without a lower bound), each
-  adding up to 12 new conflicts of the weighted matching's candidates; it settles on 140-840 nogoods (band means).  The
-  *matching*, *refined* and *Lagrangian gaps* are these bounds minus `P*`.  Also the chain's start incumbent and cap,
-  and the candidates each bound leaves undecided with the incumbent at the optimum.
-* *Proofs* (`slope prove --known results/strict.jsonl --tactic revise_freedoms=off --deltas ... N`, with `--sums` as
-  above past 1300): the search of the game on one thread, its incumbent a value `P* + δ` with no set behind it, no
-  seed, no cap.  With δ = 0 it is the proof of the optimum (the `--seed-opt` ladder's node counts: 29,614 for 1100,
-  19,473,016 for 1290 and 28,024,916 for 1300, as in
-  ["A Lagrangian bound over the nogoods"](#a-lagrangian-bound-over-the-nogoods-2026-10)), for all 143 games of 880-1300
-  that `strict.jsonl` searched to exhaustion (the others are repeats, caps and primes) and for 1309, 1350 and 1352.
-  With δ > 0 nothing beats the incumbent, and every cut is the cut the search would make with every
-  bound it uses (matching, refined, Lagrangian, forced members) lowered by δ: a *margin scan* over δ = 25 to 800
-  measures how the tree shrinks as all the bounds tighten uniformly, for 19 games of 900-1300, and at δ = 100-300 for
-  1302, 1305, 1309, 1350 and 1352.  With δ < 0 the search starts below the optimum.  (`--diag` runs, whose lines
-  carry `steps_by_depth`, have the same trees and slower times.)
+* *Roots* (`slope roots --known results/strict.jsonl --sums bench/curve/bands.jsonl 880-1300` and the games past 1300
+  that `bands.jsonl` solved; about a second a game): the root's matching bound; the matching bound refined one to three
+  levels deep (the search's refinement, computed to a value); and a Lagrangian bound over nogoods of the root, made
+  without a search: the conflicts the refinement found, then up to 8,000 subgradient steps towards `P* + 1` (Polyak's
+  rule damped by halving after 80 steps without a lower bound), each adding up to 12 new conflicts of the weighted
+  matching's candidates; it settles on 140-840 nogoods (band means).  The *matching*, *refined* and *Lagrangian gaps*
+  are these bounds minus `P*`.  Also the chain's start incumbent and cap, and the candidates each bound leaves undecided
+  with the incumbent at the optimum.
+* *Proofs* (`slope prove --known results/strict.jsonl --deltas ... N`, with `--sums` as above past 1300): the search of
+  the game on one thread, its incumbent a value `P* + δ` with no set behind it, no seed, no cap.  With δ = 0 it is the
+  proof of the optimum (the `--seed-opt` ladder's node counts: 29,614 for 1100, 19,473,016 for 1290 and 28,024,916 for
+  1300, as in ["A Lagrangian bound over the nogoods"](#a-lagrangian-bound-over-the-nogoods-2026-10)), for all 143 games
+  of 880-1300 that `strict.jsonl` searched to exhaustion (the others are repeats, caps and primes) and for 1309, 1350
+  and 1352.  With δ > 0 nothing beats the incumbent, and every cut is the cut the search would make with every bound it
+  uses (matching, refined, Lagrangian, forced members) lowered by δ: a *margin scan* over δ = 25 to 800 measures how the
+  tree shrinks as all the bounds tighten uniformly, for 19 games of 900-1300, and at δ = 100-300 for 1302, 1305, 1309,
+  1350 and 1352.  With δ < 0 the search starts below the optimum.  (`--diag` runs, whose lines carry `steps_by_depth`,
+  have the same trees and slower times.)
 * The recorded node counts of `strict.jsonl` are of four threads from the chain's start incumbent: 1.35 times the
   proof's (geometric mean) for the 87 games that start at the optimum, 1.63 times for the 56 that start below it (63
   below on average).  Every fit gives the same answer on either count; the tables use the proofs.

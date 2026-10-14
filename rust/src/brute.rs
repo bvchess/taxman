@@ -235,7 +235,7 @@ mod tests {
 
     #[test]
     fn small_boards_match_optimal_json() {
-        let optimal = Optimal::load_default().unwrap();
+        let optimal = Optimal::built_in();
         for n in 1..=40 {
             let exact = solve(n, &[], Rule::Divisor);
             assert_eq!(Some(exact.score), optimal.score(n), "n={n}");
