@@ -661,6 +661,20 @@ like an exhausted search, on trust.
 
 ## 9. Testing
 
+**Before a change is merged** (what a reviewer of a subagent's work runs, besides reading it; the tests are described
+below, the probe in section 10):
+
+* every change: `cargo test --release` in `rust/` and in `rust/prover/`, then `cargo clippy --all-targets` and
+  `cargo fmt --check` in both;
+* a bound, or anything that prunes: the bound-soundness tests and the soundness harness pass, and a bound never falls
+  below the best completion of its node;
+* a pure speedup: every search tree identical, so the probe's fingerprints and the node-count tripwires do not move;
+* anything that touches the search, the chain or the results: `taxman regress --to 1000`; a scratch chain (`taxman
+  solve 1-N --out FILE`, not in `results/`) compared with `results/strict.jsonl`; and both verifiers on it, since a
+  results line carries provenance that they check (`tools/cloud/verify.sh FILE` runs `taxman verify-results` and
+  `tools/check_results.py`, and compares with the committed chain);
+* a change to an on-disk format (results line, checkpoint header, `testdata/`): the commit message says so, and why.
+
 Correctness, all on games that finish in seconds: the fast fixtures and small boards stand in for the large boards
 that cannot be run in a test, and the tripwires and soundness tests catch the failures that no assertion on an
 answer sees.  `cargo test` takes about half a minute after compiling, with two test threads, in the test profile

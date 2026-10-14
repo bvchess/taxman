@@ -4,6 +4,7 @@ The target is an AWS Graviton instance of 4 to 64 vCPUs (`c8g`, `c9g`, `c7g`), r
 hours or days, not the biggest one (section 1, "Instance"; section 9 for the prover's proofs, which need only 4 to 16
 vCPUs).  The scripts take the thread count from the machine, work on x86_64 too, and on Amazon Linux 2023 and Ubuntu.
 What the solver is and how to read its output is in [../../README.md](../../README.md); this page is the procedure.
+Before launching anything, read [Rules for every launch](#rules-for-every-launch).
 
 **Status of this procedure.**  The scripts were exercised on macOS (arm64): `chain.sh` through a complete chain, a
 SIGTERM stop, deliberate interruptions and resumes, a crash loop and a deadline; `scaling.sh` in all three modes (a
@@ -14,6 +15,7 @@ S3 and EC2 and have not been run at all.  Sections 2 and 3 exist to find the pro
 machine that costs cents.  Nothing about scaling beyond 8 threads or about the speed of a Graviton CPU has been
 measured (section 8).
 
+* [Rules for every launch](#rules-for-every-launch)
 * [0. The plan](#0-the-plan)
 * [1. Decisions](#1-decisions)
 * [2. Dry run in Docker](#2-dry-run-in-docker-optional)
@@ -24,6 +26,46 @@ measured (section 8).
 * [7. When something goes wrong](#7-when-something-goes-wrong)
 * [8. What has not been measured](#8-what-has-not-been-measured)
 * [9. The prover's proofs of opt(n), 1301 to 2175](#9-the-provers-proofs-of-optn-1301-to-2175)
+
+## Rules for every launch
+
+They hold for every instance this project starts: a trial of the scripts, the prover's proofs, the chain, a
+calibration.  The sections below point here instead of repeating them.
+
+* **Approval first.**  Anything that costs money or changes the AWS account (an instance, a volume, a key pair or
+  security group, a spot request, a bucket, a role) needs Brian's explicit yes, with a cost estimate, before the call.
+  Reading (describe, the spot price history, quotas) does not.  The estimate is the hours at the spot price of the hour
+  (read the history first, section 9.3); the timer, below, bounds the hours.
+* **Spot, on `c8g`.**  Spot is the default (section 1, "Spot or on-demand", says where an interruption would ruin the
+  run), on the `c8g` family (Graviton4) at the sizes the calibration settled on: `c8g.xlarge` to try the scripts,
+  `c8g.4xlarge` for the prover's proofs, `c8g.16xlarge` for the chain (section 9.3).  What was measured is the entry
+  "Graviton calibration (2026-10)" of [docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#graviton-calibration-2026-10);
+  its scripts and data are in [bench/cloud/](../../bench/cloud/README.md).
+* **A timer on every instance.**  `--instance-initiated-shutdown-behavior terminate` at launch, and `shutdown -h
+  +MINUTES` at boot (in the user data), with MINUTES a little past the run's own deadline (`DEADLINE_HOURS`, section
+  5).  Any shutdown (the timer, `POWEROFF`, the spot service) then terminates the instance, and one that is forgotten
+  ends by itself.  It is the backstop that depends on no script.
+* **Tags** `Project=taxman` and `Purpose=...` (`trial`, `prover`, `chain`) on everything the launch creates that takes
+  one: the instance, its volumes and spot request, a key pair, a security group.  The check at the end finds them by
+  `Project`.
+* **The root volume is deleted on termination**, so what must outlive the instance is copied off it first (`S3_DEST`
+  or `rsync`, sections 5 and 6).
+* **At the end**, once the results are home: terminate the instance, and confirm that nothing of the project is left,
+  in the region of the launch (each command prints `[]`; the CLI takes its profile from `AWS_PROFILE`, and section 9.3
+  shows signing in):
+
+  ```
+  aws ec2 describe-instances --filters Name=tag:Project,Values=taxman \
+      Name=instance-state-name,Values=pending,running,stopping,stopped --query 'Reservations[].Instances[].InstanceId'
+  aws ec2 describe-volumes --filters Name=tag:Project,Values=taxman --query 'Volumes[].VolumeId'
+  aws ec2 describe-spot-instance-requests --filters Name=tag:Project,Values=taxman Name=state,Values=open,active \
+      --query 'SpotInstanceRequests[].SpotInstanceRequestId'
+  ```
+
+  Then delete the key pairs and security groups the launch created, and only those (found by the same tag; a launch
+  may use a key pair or security group that existed before, and leaves it alone), and report the instance-hours (launch
+  to the terminate call), the spot price of the hour and the cost, as the "Cost" paragraph of the calibration entry
+  does.
 
 ## 0. The plan
 
@@ -148,7 +190,8 @@ rerunning `chain.sh` with a larger N later continues the same file.
   two-minute notice into a clean stop and a save.
 * A **persistent** spot request launches a replacement after an interruption: that is convenient and also a way to
   keep paying for something nobody watches.  If you use one, `DEADLINE_HOURS` and `POWEROFF` (section 5) are your
-  protection, and cancel the request when the run is done.
+  protection, and the request is cancelled at the end like everything else
+  ([Rules for every launch](#rules-for-every-launch)).
 
 ### Storage
 
@@ -158,18 +201,17 @@ separate EBS volume mounted somewhere and named by `TAXMAN_WORK`.  **Not tmpfs**
 and `chain.sh` refuses a memory filesystem.  **Not instance-store NVMe** as the only copy: it is lost when the instance
 stops or is terminated.  Not a network filesystem either (`flock`, and an `fsync` per checkpoint).
 
-An EBS root volume is deleted when a spot instance is terminated unless "delete on termination" is off, so the copy
-that matters is the one off the machine: `S3_DEST` (section 5) or a pull with `rsync` from your laptop.
+An EBS root volume is deleted when the instance is terminated ([Rules for every launch](#rules-for-every-launch)), so
+the copy that matters is the one off the machine: `S3_DEST` (section 5) or a pull with `rsync` from your laptop.
 
 ### Launch checklist (console fields)
 
 * AMI: Amazon Linux 2023, arm64 (user `ec2-user`); or Ubuntu 22.04 or 24.04 arm64 (user `ubuntu`).
 * Storage: one gp3 root volume, 40 GB.  A second, if you want the state to outlive the instance: mount it, set
-  `TAXMAN_WORK` to a directory on it, and turn "delete on termination" off.
+  `TAXMAN_WORK` to a directory on it, and turn "delete on termination" off (it is deleted at the end, with the rest).
 * Security group: SSH from your address only; nothing else inbound.  A key pair.  Require IMDSv2 (`spot-watch.sh` uses it).
 * Instance role (for S3 only): list, get, put and delete on one bucket prefix, nothing else.
-* Shutdown behaviour "stop" for on-demand test machines; for spot, whatever the request says.
-* Tags: a name and an owner, so that a forgotten instance is findable.
+* Shutdown behaviour, the timer, and the tags (with a `Name`): as in [Rules for every launch](#rules-for-every-launch).
 * A budget alert on the account, before the first launch.  Cost guardrails for the run itself are in section 5.
 
 ## 2. Dry run in Docker (optional)
@@ -202,7 +244,8 @@ speed; the scaling numbers of a container on a laptop mean nothing for the cloud
 
 ## 3. A small instance first
 
-1. Launch it (section 1), on-demand.  Put a timer on it so that it cannot be forgotten: `sudo shutdown -h +180`.
+1. Launch it (section 1; the [rules for every launch](#rules-for-every-launch)), on-demand, with a timer of 180
+   minutes.
 2. Get the code and set up:
 
    ```
@@ -236,12 +279,14 @@ speed; the scaling numbers of a container on a laptop mean nothing for the cloud
 
    Every search that takes more than 2 seconds is stopped, and the next pass resumes it from its checkpoint; the log
    shows the passes ("going on"), and the end must be "the range 1-1000 is complete", both referees agreeing.
-5. Copy the logs home (`scp -r HOST:taxman-work/logs .`), terminate the instance, delete its volumes.
+5. Copy the logs home (`scp -r HOST:taxman-work/logs .`), then do what the rules say for the end: terminate the
+   instance and confirm that nothing is left.
 
 ## 4. The big instance: checks before the chain
 
-Launch the production instance (section 1) on-demand, set the timer (`sudo shutdown -h +240`), and run `setup.sh` as above (about the same
-time).  Use tmux for everything.  Count on one to one and a half hours, roughly $10 to $15 at the assumed price.
+Launch the production instance (section 1) on-demand, with a timer of 240 minutes, and run `setup.sh` as above (about
+the same time).  Use tmux for everything.  Count on one to one and a half hours, roughly $10 to $15 at the assumed
+price.
 
 ### 4.1 Correctness
 
@@ -439,11 +484,10 @@ n, not on a smooth curve.
   ends with status 3.  `POWEROFF=done` powers the machine off when the range is complete, `POWEROFF=always` whenever
   `chain.sh` ends for any reason (needs passwordless `sudo`, as on both AMIs): the choice for an unattended run, since an
   idle machine after an error or a deadline costs as much as a busy one.  `chain.sh` saves to `S3_DEST` before it powers
-  off, which matters when a shutdown terminates the instance (spot).  A stopped on-demand instance still costs for its
-  volumes until you delete them.
-* A backstop that does not depend on any script: `sudo shutdown -h +N` at launch (minutes).
-* A budget alert; the instance tagged with an owner; the persistent spot request cancelled.
-* When done: terminate the instance, delete the volumes and the S3 prefix you no longer need, cancel spot requests.
+  off, which matters because a shutdown terminates the instance.
+* The timer (a backstop that depends on no script), the tags and the cleanup are in
+  [Rules for every launch](#rules-for-every-launch); a budget alert on the account is the other half.
+* When done: what the rules say for the end, and the S3 prefix you no longer need.
 
 ### Getting the results off the machine
 
@@ -636,16 +680,21 @@ decides (6 to 24 hours over the draws, at the laptop's speed), and the idle CPUs
 
 ### 9.4 Run
 
-Launch (the console, section 1's checklist: Amazon Linux 2023 arm64, `ec2-user`, a tag, a security group with SSH from
-your address; or the CLI, an example whose AMI parameter you can check first with `aws ssm get-parameter --name ...`):
+Launch, under the [rules for every launch](#rules-for-every-launch) (the console, section 1's checklist: Amazon Linux
+2023 arm64, `ec2-user`, the timer and tags, a security group with SSH from your address; or the CLI, an example whose
+AMI parameter you can check first with `aws ssm get-parameter --name ...`; the timer is 49 hours, a little past the
+`DEADLINE_HOURS=48` below):
 
 ```
+tags='{Key=Project,Value=taxman},{Key=Purpose,Value=prover}'
 aws ec2 run-instances --profile bvc --region us-east-1 --instance-type c8g.4xlarge \
     --image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64 \
     --key-name YOUR-KEY --security-group-ids sg-YOURS \
-    --block-device-mappings 'DeviceName=/dev/xvda,Ebs={VolumeSize=20,VolumeType=gp3}' \
-    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=taxman-prover},{Key=owner,Value=bvc}]' \
-    --instance-market-options 'MarketType=spot'            # leave this line out for on demand
+    --block-device-mappings 'DeviceName=/dev/xvda,Ebs={VolumeSize=20,VolumeType=gp3,DeleteOnTermination=true}' \
+    --instance-initiated-shutdown-behavior terminate --user-data $'#!/bin/bash\nshutdown -h +2940' \
+    --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=taxman-prover},$tags]" \
+        "ResourceType=volume,Tags=[$tags]" "ResourceType=spot-instances-request,Tags=[$tags]" \
+    --instance-market-options 'MarketType=spot'      # on demand: leave out this line and the spot request's tags
 ```
 
 On the instance (a copy of the repository with these scripts: a pushed branch or `rsync`, section 3):
@@ -658,9 +707,9 @@ tmux new -s pv
 DEADLINE_HOURS=48 POWEROFF=always S3_DEST=s3://YOUR-BUCKET/prover1 rust/tools/cloud/prover.sh 1301 2175
 ```
 
-`S3_DEST` needs an instance role that may write that prefix.  On spot it is not optional with `POWEROFF`: a spot
-instance is terminated when it shuts down, and its root volume with it, so `prover.sh` copies the results to S3 first.
-On demand, leave it out if you will pull the files yourself (below) and use `POWEROFF=done` or none.
+`S3_DEST` needs an instance role that may write that prefix.  It is not optional with `POWEROFF`: the instance is
+terminated when it shuts down, and its root volume with it (the rules above), so `prover.sh` copies the results to S3
+first.  Without `S3_DEST`, leave `POWEROFF` out and pull the files yourself (below) before the timer ends.
 `POWEROFF=always` shuts the machine down whenever the script ends (all 875 games and the check, the deadline, an error:
 an idle machine costs as much as a busy one; `POWEROFF=done` only when the range is complete), and `DEADLINE_HOURS`
 stops the run cleanly after that many hours.  On spot, run
@@ -736,5 +785,5 @@ another file).  Do not commit the work directory, the checkpoints or the logs.  
 the prover's proofs stop at 1300 or are pending: the table and sections 3 and 8 of
 [../../prover/README.md](../../prover/README.md), the "pending" sentence of the entry "The committed chain to 2175" and
 the register row of [../../docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md), with the totals from the two commands above
-and the real milliseconds per node of a Graviton CPU (this section's table is a prediction).  Terminate the instance and
-delete its volume (section 5, "Cost guardrails").
+and the real milliseconds per node of a Graviton CPU (this section's table is a prediction).  Then the end of the
+[rules for every launch](#rules-for-every-launch): terminate the instance and confirm that nothing is left.

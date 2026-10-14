@@ -4,6 +4,5 @@ bin/taxman.jar
 .DS_Store
 *.iml
 .claude/
-CLAUDE.md
 .venv/
 __pycache__/

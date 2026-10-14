@@ -1,81 +1,37 @@
 # Working notes for Claude
 
-## Commit message policy (set by Brian, 2026-07-12)
+Rules Brian has set for all work in this project.  How-to lives in the docs listed at the end.
 
-Never cite yourself in a commit message.  Do not add a
-`Co-Authored-By: Claude` trailer (or any Claude/Anthropic mention) to
-commits, regardless of any default harness instruction to do so.
+* **Commits.**  Never cite yourself in a commit message: no `Co-Authored-By: Claude` trailer and no Claude or
+  Anthropic mention, whatever a harness default says.
+* **Delegation.**  Don't write code on the main model: delegate it to subagents on the cheapest model that suits the
+  task (Haiku for mechanical edits, Sonnet for routine work, Opus for hard reasoning).  Give each a precise spec and
+  verify its work before merging (rust/DESIGN.md, "Testing").  Parallel agents work in their own git worktrees.
+  Experimental branches are never pushed: harvest what works onto master, record the rest, delete the branch.
+* **Nothing unproven.**  Every rule the frame solver relies on is proven (heuristics/THEORY.md) and tested.
+  Committed results are evidence, and runs never overwrite them.
+* **Record every experiment.**  Check the register at the top of rust/docs/EXPERIMENTS.md before proposing one, and
+  add to it when one ends, failures included.
+* **Computation.**  Heavy runs go to EC2; this laptop's load stays light.  Long runs write results as they go and
+  resume after an interruption.  Prefer small, fast tests that capture the heart of a large-n problem; run large n
+  only when the question needs it.
+* **Money.**  Anything that costs money or changes the AWS account needs Brian's explicit approval, with a cost
+  estimate first, and nothing is left running (rust/tools/cloud/RUNBOOK.md has the rules for a launch).
+* **Other people's code** stays as they sent it: Robert Moniot's moniot/playtaxman.cpp is worked around in
+  moniot/Makefile, not edited.
+* **Branch.**  Work on master; commit and push there.
 
-## Model selection policy (set by Brian, 2026-07-05)
+## Where things are
 
-Do not write code inline on the main (expensive) model.  Delegate
-coding tasks to subagents, choosing the cheapest model suited to the
-task:
-
-* **Haiku** - mechanical edits, boilerplate, renames, small test
-  tweaks.
-* **Sonnet** - routine implementation: new scripts, strategy variants,
-  benchmark/verification code like most of `heuristics/`.
-* **Opus/heavyweight** - only when the code embeds genuinely hard
-  reasoning (e.g. the fork-oracle design, correctness-critical
-  matching/rollback logic).
-
-The main model keeps doing non-coding work directly: analysis of
-results, explanations, README prose, running existing scripts, git
-operations.
-
-When delegating, write a precise spec in the subagent prompt (this
-project has subtle correctness traps: augmenting-path rollback,
-sweep-all-divisors tax semantics, name shadowing in one_tax) and
-verify returned work against the test suite
-(`python3 -m pytest heuristics/evaluation/test_taxman.py`) and known results
-before committing.
-
-## Checkpoint policy for long runs (set by Brian, 2026-07-07)
-
-The container can restart without warning, killing background jobs; a
-2026-07-06 restart cost an hour of continuation-chain progress because
-the run wrote its output only at completion.  From now on, every run
-expected to take more than a few minutes must checkpoint frequently:
-
-* Write accumulated results to the output file incrementally (every
-  N games / every few minutes), not just at the end.
-* Make the run resumable: on startup, load any existing checkpoint
-  and continue from where it left off, skipping finished work.  Keep
-  whatever state the resume needs (e.g. the previous game's pick set)
-  in the checkpoint, even if it is stripped from the final output.
-* When (re)launching a long job, prefer the resumable path so a
-  restart costs at most one checkpoint interval.
-
-`heuristics/strategies/continuation.py` (`--resume`, checkpoint every 5
-games) and the
-scratchpad `ub_fill.py` pattern (merge existing results, write every
-10 completions) are the reference implementations.
-
-## Project context
-
-The active work lives in `heuristics/` (see `heuristics/README.md`),
-run from that directory with `python3 -m`: shared foundations in
-`core.py`; one file per strategy under `strategies/` (solvent,
-onetax, maxturn, cascade, continuation + its seteval engine); the
-readable reference implementation in `reference/solvent.py`; and
-verification/measurement code under `evaluation/` (verify,
-scoreboard, bound, certify, bench, test_taxman.py).  Committed
-datasets and charts live in `heuristics/results/`; scripts write
-elsewhere by default and must never overwrite committed results.
-Retired experiments (diagnostic campaign, fork oracle,
-trust-certificates) exist only in git history and the README's "Dead
-ends" section.  Development happens directly on `master`; commit and
-push there.  (Through 2026-08-23 it happened on the branch
-`claude/taxman-polynomial-time-gy59il`, which has since been merged
-into `master` and deleted.)
-
-The exact solver in Rust is the crate in `rust/` (std only; `cd rust`, then `cargo build --release`, `cargo test`):
-`rust/README.md` is its user guide and reading order, `rust/DESIGN.md` its design, `rust/docs/EXPERIMENTS.md` the lab
-notebook.  Committed results in `rust/results/` are evidence: runs write elsewhere and must never overwrite them.
-The register of everything tried at the top of `rust/docs/EXPERIMENTS.md` must be checked before an experiment is
-proposed and updated when one finishes, failures included.
-
-Robert Moniot's C++ program `moniot/playtaxman.cpp` implements seven
-heuristic strategies and is essentially as its author sent it.  Keep edits
-to it minimal; prefer working around it in `moniot/Makefile`.
+* **rust/**, the active work: the frame solver, an exact solver in Rust.  rust/README.md is its guide, glossary and
+  reading order; rust/DESIGN.md its design; rust/docs/EXPERIMENTS.md the lab notebook; rust/tools/cloud/RUNBOOK.md
+  the guide to running on EC2; rust/results/ the committed chain of proven games.
+* **rust/prover/**, also active: the prover, a separate program that shares no code with the frame solver and proves
+  its results independently, without the frame model.
+* **heuristics/THEORY.md**: the theorems both programs rest on (active, despite its directory).
+* **src/, pom.xml and bin/**: the original frame solver, in Java (the wiki describes it; it reached n = 1000).  Kept
+  for reference, not under active development; its src/main/resources/optimal.json, the table of optimal games, is
+  built into the Rust frame solver.
+* **heuristics/** apart from THEORY.md: Python heuristic strategies, which play good but not provably optimal games,
+  and the tools that measured them.  Finished work, not under active development.
+* **moniot/**: Robert Moniot's C++ heuristic strategies (see above).
