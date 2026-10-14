@@ -39,6 +39,12 @@ pub struct SearchTactics {
     /// 11, and weak duality for the forced members).  Replaces the matching bound and its refinement as the node
     /// bound; the Lagrangian bound over nogoods still applies after it.
     pub gf2: bool,
+    /// Cut a node none of whose completions keeps the inequality of every symmetric pair of the root, and drop from a
+    /// node's candidates those that no such completion holds ([`crate::search::symmetry`]; proven:
+    /// heuristics/THEORY.md, Theorem 13 and "Pruning with the inequalities": every heaviest promotion set keeps the
+    /// inequalities, so a search for one needs only the completions that do).  It acts with either node bound.  The
+    /// rule is a function of the node's promotions and candidates alone, so the tree depends on nothing but the node.
+    pub symmetry: bool,
 }
 
 impl Default for SearchTactics {
@@ -50,6 +56,7 @@ impl Default for SearchTactics {
             forget_nogoods: true,
             lagrange: false,
             gf2: true,
+            symmetry: true,
         }
     }
 }
@@ -60,16 +67,21 @@ impl SearchTactics {
     pub const MAX_MATCH_REFINE: u8 = 7;
 
     /// The tactics of the matching path, the default before `gf2`: the matching bound with its refinement, then the
-    /// Lagrangian bound over the nogoods.  Its trees are several times larger than the default's at a fraction of
+    /// Lagrangian bound over the nogoods, and without the rule of `symmetry`, as it was before that tactic (its trees
+    /// stay those of the build before it).  Its trees are several times larger than the default's at a fraction of
     /// the cost a node, so the tests of interrupted searches use it on the small games: the engine checks a node
     /// limit only every 1,024 steps of a searcher, which the default's searches of those games do not reach.
     pub fn matching() -> Self {
-        SearchTactics { gf2: false, lagrange: true, ..SearchTactics::default() }
+        SearchTactics { gf2: false, lagrange: true, symmetry: false, ..SearchTactics::default() }
     }
 
     /// The tactics as the header of a checkpoint records them: `match_refine` in bits 0 to 2, then one bit for each
-    /// switch that is on, `fix_forced` (bit 3), `nogoods` (4), `forget_nogoods` (5), `lagrange` (6) and `gf2` (7).
-    /// (A checkpoint of a build before `gf2` has bit 7 clear: it resumes with `gf2` off.)
+    /// switch that is on, `fix_forced` (bit 3), `nogoods` (4), `forget_nogoods` (5), `lagrange` (6), `gf2` (7) and
+    /// `symmetry` (8); the defaults are `0x1B9`.  (A checkpoint of a build before `gf2` has bit 7 clear: it resumes
+    /// with `gf2` off.  One of a build before `symmetry` has bit 8 clear: it resumes with `symmetry` off, which the
+    /// default no longer is, so a run resumes it only with `--tactic symmetry=off`.  A build before `symmetry`
+    /// refuses a checkpoint with the tactic on, as "unknown tactics": it would resume the search without a rule that
+    /// shaped the tree it wrote.)
     pub(super) fn bits(self) -> u16 {
         u16::from(self.match_refine.min(Self::MAX_MATCH_REFINE))
             | u16::from(self.fix_forced) << 3
@@ -77,11 +89,12 @@ impl SearchTactics {
             | u16::from(self.forget_nogoods) << 5
             | u16::from(self.lagrange) << 6
             | u16::from(self.gf2) << 7
+            | u16::from(self.symmetry) << 8
     }
 
     /// The tactics [`bits`](Self::bits) recorded, or an error if a bit that no tactic uses is set.
     pub(super) fn from_bits(bits: u16) -> Result<Self, String> {
-        if bits >> 8 != 0 {
+        if bits >> 9 != 0 {
             return Err(format!("unknown tactics {bits:#x}"));
         }
         Ok(SearchTactics {
@@ -91,6 +104,7 @@ impl SearchTactics {
             forget_nogoods: bits & 1 << 5 != 0,
             lagrange: bits & 1 << 6 != 0,
             gf2: bits & 1 << 7 != 0,
+            symmetry: bits & 1 << 8 != 0,
         })
     }
 }

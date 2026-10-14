@@ -696,7 +696,7 @@ fn solve_944(dir: &TempDir, signal: Option<&str>) -> (ExitStatus, String) {
     let ckpt = dir.join("ckpt");
     let mut child = taxman()
         .args(["solve", "944", "--use-prev", "--force-search", "--threads", "2", "--progress", "0.02"])
-        .args(["--tactic", "gf2=off", "--tactic", "lagrange=on"])
+        .args(["--tactic", "gf2=off", "--tactic", "lagrange=on", "--tactic", "symmetry=off"])
         .args(["--out".as_ref(), out.as_os_str(), "--checkpoint-dir".as_ref(), ckpt.as_os_str()])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

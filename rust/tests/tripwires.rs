@@ -29,31 +29,36 @@ use taxman::with_width;
 
 /// (board, tactics, promotion sum, nodes): the game searched from the frame builder on one thread.  The tactics are
 /// `--tactic` assignments after the default or `matching`, the tactics of the matching path
-/// ([`SearchTactics::matching`], the default before the GF(2) bound).  The Lagrangian bound (tactic `lagrange`) first
-/// fits its multipliers after 2,000 steps, so the games that take fewer (480, 640) do not see it; the matching path's
-/// rows `lagrange=off` are the trees of the build before it.
-const EXPECTED: [(u32, &str, u64, u64); 49] = [
-    // The default, the GF(2) bound: trees of tens to thousands of nodes; `lagrange=on` (which refits after 2,000
-    // steps) changes none of them.
+/// ([`SearchTactics::matching`], the default before the GF(2) bound, and without the rule of the tactic `symmetry`
+/// as it was).  The Lagrangian bound (tactic `lagrange`) first fits its multipliers after 2,000 steps, so the games
+/// that take fewer (480, 640) do not see it; the matching path's rows `lagrange=off` are the trees of the build
+/// before it.
+const EXPECTED: [(u32, &str, u64, u64); 54] = [
+    // The default, the GF(2) bound with the rule of the root's symmetric pairs: trees of tens to thousands of nodes;
+    // `lagrange=on` (which refits after 2,000 steps) changes none of them, and `symmetry=off` (the default before the
+    // rule) makes them larger with the same answers.
     (480, "default", 5350, 37),
-    (600, "default", 8507, 533),
-    (600, "fix_forced=off", 8507, 716),
-    (600, "nogoods=off", 8507, 669),
-    (640, "default", 9220, 21),
-    (660, "default", 10242, 573),
-    (660, "fix_forced=off", 10242, 1009),
-    (660, "nogoods=off", 10242, 737),
-    (760, "default", 14170, 186),
-    (936, "default", 20507, 665),
-    (936, "fix_forced=off", 20507, 1685),
-    (936, "nogoods=off", 20507, 751),
-    (936, "lagrange=on", 20507, 665),
-    (1000, "default", 24168, 2657),
-    (1000, "fix_forced=off", 24168, 4427),
-    (1000, "nogoods=off", 24168, 4807),
-    (1000, "lagrange=on", 24168, 2657),
+    (600, "default", 8507, 365),
+    (600, "fix_forced=off", 8507, 530),
+    (600, "nogoods=off", 8507, 372),
+    (600, "symmetry=off", 8507, 533),
+    (640, "default", 9220, 15),
+    (660, "default", 10242, 524),
+    (660, "fix_forced=off", 10242, 908),
+    (660, "nogoods=off", 10242, 618),
+    (760, "default", 14170, 182),
+    (936, "default", 20507, 385),
+    (936, "fix_forced=off", 20507, 830),
+    (936, "nogoods=off", 20507, 352),
+    (936, "lagrange=on", 20507, 385),
+    (936, "symmetry=off", 20507, 665),
+    (1000, "default", 24168, 2172),
+    (1000, "fix_forced=off", 24168, 4000),
+    (1000, "nogoods=off", 24168, 3032),
+    (1000, "lagrange=on", 24168, 2172),
+    (1000, "symmetry=off", 24168, 2657),
     (1133, "default", 28690, 41),
-    (1133, "nogoods=off", 28690, 37),
+    (1133, "nogoods=off", 28690, 34),
     // The matching path.  W = 8, the small end: every tactic's effect shows in a few hundred nodes.
     (480, "matching", 5350, 393),
     (480, "matching,nogoods=off", 5350, 417),
@@ -67,6 +72,7 @@ const EXPECTED: [(u32, &str, u64, u64); 49] = [
     (600, "matching,fix_forced=off", 8507, 7723),
     (600, "matching,match_refine=0", 8507, 4711),
     (600, "matching,match_refine=3", 8507, 3469),
+    (600, "matching,symmetry=on", 8507, 3856),
     (640, "matching", 9220, 676),
     (640, "matching,nogoods=off", 9220, 1099),
     (640, "matching,fix_forced=off", 9220, 1569),
@@ -79,6 +85,7 @@ const EXPECTED: [(u32, &str, u64, u64); 49] = [
     (760, "matching,nogoods=off", 14170, 3361),
     (760, "matching,fix_forced=off", 14170, 4317),
     (760, "matching,match_refine=3", 14170, 1643),
+    (760, "matching,symmetry=on", 14170, 2292),
     // W = 16, and without the Lagrangian bound a search of more than 50,000 steps, which forgets its nogoods once
     // (`forget_nogoods=off` as well: 56,990).
     (936, "matching", 20507, 41653),
@@ -157,6 +164,21 @@ fn a_search_on_one_thread_is_deterministic() {
     for (n, t) in [(1000, SearchTactics::default()), (760, SearchTactics::matching())] {
         assert_eq!(search_at_width::<16>(n, t), search_at_width::<16>(n, t), "n={n}");
     }
+}
+
+/// The rule of the tactic `symmetry` (the default has it) is a function of a node's promotions and candidates, so a
+/// search with it on one thread is as deterministic as without: the same tree, and the same set at the end.
+#[test]
+fn a_search_with_the_symmetry_rule_on_one_thread_is_deterministic() {
+    let game = Game::<16>::of_board(1000).unwrap();
+    assert!(!game.symmetries().is_empty(), "1000 has symmetric pairs, which the rule works with");
+    let cfg = Config::standard();
+    assert!(cfg.symmetry, "the default has the rule");
+    let start = greedy(&game.model, &game.root, &game.candidates).sum();
+    let run = || game.search(cfg, vec![game.root_unit()], start, None, None);
+    let (first, again) = (run(), run());
+    assert!(first.completed && first.real);
+    assert_eq!((first.nodes, first.best, first.set), (again.nodes, again.best, again.set));
 }
 
 /// (game, nodes forgetting the nogoods every 500 steps, nodes never forgetting) for [`forgetting_search`].

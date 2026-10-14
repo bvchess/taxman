@@ -408,7 +408,8 @@ short, the fields regrouped and comments added, so it is not valid JSON as print
  "invocations":1, "threads":2,
  "tactics":"default",
  "tactic_switches":{"prime_shortcut":true,"same_search":true,"match_refine":1,"fix_forced":true,"nogoods":true,
-                    "forget_nogoods":true,"lagrange":false,"gf2":true,"prev_cap":true,"seed_incumbent":true},
+                    "forget_nogoods":true,"lagrange":false,"gf2":true,"symmetry":true,"prev_cap":true,
+                    "seed_incumbent":true},
  "limits":{"seconds":null,"nodes":null},
  "options":{"force_search":false,"use_prev":false},
  "optimal_match":true, "build":{"commit":"8a6df9028f54...","dirty":true}}
@@ -524,7 +525,8 @@ second build's chain, what the games assume).
    |        search::search             starting incumbent = best of greedy / seed (n-1's promotions) / rounded root
    |                                   matching + local search; cap = n + score(n-1) - in_the_bag
    |          engine::run              worker threads; shared deque with disk spill; incumbent; checkpoints; signals
-   |            Stepper::step          per node (search/searcher.rs): check_node = GF(2) bound (gf2; with gf2=off
+   |            Stepper::step          per node (search/searcher.rs): check_node = the rule of symmetric pairs
+   |                                   (symmetry, search::symmetry) -> GF(2) bound (gf2; with gf2=off
    |                                   the matching bound, matchbound, and its refinement) -> conflicts, forced
    |                                   members, nogoods (search::refine, model::Nogoods) -> with lagrange the
    |                                   Lagrangian bound over the nogoods (search::lagrange);
@@ -625,6 +627,11 @@ the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#t
 * **forced member**: a member of a node's heaviest set whose removal alone brings the bound below what the node
   needs, so every completion that beats the incumbent promotes it (tactic `fix_forced`: the child promotes all of them
   together).
+* **prime exchange, symmetric pair**: exchanging two primes `p < q` in every number; a pair whose exchange maps the
+  root's frames and candidates onto themselves is *symmetric*, and maps promotion sets to promotion sets worth
+  `(q − p)(c_p − c_q)` more (`c_r` the sum of a set's cofactors `x / r`), so every heaviest set keeps `c_p ≤ c_q`
+  for every symmetric pair (heuristics/THEORY.md, Theorem 13).  The search cuts a node none of whose completions
+  can keep them, and drops the candidates none that does holds (tactic `symmetry`; DESIGN.md, section 4).
 
 ### Results and trust
 

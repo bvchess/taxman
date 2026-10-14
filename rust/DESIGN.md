@@ -386,6 +386,47 @@ is a tenth of the matching bound's (EXPERIMENTS: "Matroid intersection bounds").
   cover LP with this intersection as its inner problem, as the nogoods study suggests) needs its own element order,
   or those two starts switched off; the levels, the contraction and the split do not depend on the order.
 
+### Prime exchanges
+
+Exchanging two primes `p < q` in every number (`p^a q^b m ↦ p^b q^a m`) is an automorphism of divisibility.  Where it
+maps every frame of the root onto itself (moves to moves, factors to factors) and the candidates onto themselves, it
+maps promotion sets to promotion sets, worth `(q − p)(c_p − c_q)` more, `c_r(S)` being the sum of `x / r` over the
+members of `S` divisible by `r` (no candidate is divisible by `pq`, `p²` or `q²` in the pairs used).  So every
+heaviest promotion set keeps `c_p ≤ c_q` for every such *symmetric pair* at once: a set that breaks one pair's
+inequality is beaten by its image under that pair's exchange alone
+([heuristics/THEORY.md](../heuristics/THEORY.md#prime-exchanges-symmetries-of-the-promotions), Theorem 13).  The
+pairs come in classes of primes that the frame builder treats alike (at 1300 {41, 43}, {59, 61}, {67, 71}, {73, 79},
+{89, …, 107}, {109, …, 139}, {149, 151, 157}: 32 pairs; 99 at 2175, 300 at 4000), and `search::symmetry::root_pairs`
+finds them when a search is set up, in under a millisecond: the full check only for the primes whose multiples have
+the same places and exponents in the frames, and over the multiples alone (EXPERIMENTS: "Dominance and symmetry"
+found the exchanges, "Prime exchanges in the search" put them in).
+
+With the tactic `symmetry` (the default) the search uses them, from the cofactor sums of a node's promotions `P` and
+candidates `C` (`Symmetries::exclude`, a few hundred bit tests: under 1% of the time of a proof of 1472):
+
+* a node is cut when some pair has `c_p(P) > c_q(P) + c_q(C)`: no completion lifts `c_q` to `c_p` (it is
+  *hopeless*);
+* a candidate `mp` with `c_p(P) + m > c_q(P) + c_q(C)` is in no completion that keeps the pair's inequality, and is
+  dropped from the node's candidates, which tightens its bound (repeated until nothing more drops, a drop lowering
+  `c_q(C)` of other pairs).  Children are made without them, and a node's later steps drop more as the node goes on
+  without the members it branched on; the dropped candidates leave the GF(2) and matching levels as a branch member
+  does.
+
+The drops are most of the gain: the hopeless test alone takes 0.97 of the nodes at the proof of 1287, the rule
+0.57.  A Lagrangian of the inequality on the GF(2) bound (the heaviest set under weights `m(p − μ)` and `m(q + μ)`
+for the pairs its heaviest set breaks) was measured and not kept: it cut little that the drops left, and cost more.
+
+The rule is sound for the search of the root's problem: if the incumbent is not optimal, every heaviest set beats it
+and keeps every inequality, and the other prunings (bounds above every completion, members that every completion
+beating the incumbent promotes, sets that cannot be promoted) hold for the completions that keep the inequalities as
+for all.  It learns nothing: a cut ends a loop and a drop shrinks a candidate set, while the conflicts and nogoods the
+search learns are facts about promotability, which hold everywhere whatever the rule cut; the rule changes which
+conflicts a searcher meets, as any change of the tree does, never their truth.  It is a function of a node's `P` and
+`C`, so a unit (a subtree of the root) rebuilt from a checkpoint or on another thread keeps the guarantee.  A search
+of one node's completions for their own best, as the soundness harness runs below the root, finds the best of those
+that keep the inequalities, which can be lighter.  The matching path (`SearchTactics::matching`) is without the rule,
+as it was before it.
+
 ### The default step
 
 One step of a node's loop (`Stepper::step` in `src/search/searcher.rs`; the module comment of `src/search/mod.rs` says
@@ -393,7 +434,10 @@ which of its four phases takes which of the steps below), with the default tacti
 
 ```
 need = best + 1 − sum(promoted)                   # the loop goes on while the bound reaches this
-1. end the loop if cands is empty, or the max_add largest candidates sum below need
+1. end the loop if cands is empty, or the max_add largest candidates sum below need; unless this is the node's
+   first step (its candidates as step 7 left them), drop from cands the candidates that no completion keeping the
+   symmetric pairs' inequalities holds, and end the loop if none keeps them (symmetry), or if what is left is empty
+   or its max_add largest sum below need
 2. look at the node's heaviest common independent set I* (gf2) of at most max_add members:
      value < need                                  -> end the loop (cut)
      F = the forced members of I* (by the weight split: those without which the bound is below need; and those
@@ -408,28 +452,32 @@ need = best + 1 − sum(promoted)                   # the loop goes on while the
 5. n = a member of F if there are forced members; remove n from cands; if F is non-empty the node has nothing left
    to try after this child
 6. child = the node with F (or n) promoted; if that fails, the step is over
-7. child cands = the rest, narrowed, minus the members that a known conflict or a nogood rules out
+7. child cands = the rest, narrowed, minus the members that a known conflict or a nogood rules out, minus those
+   that no completion keeping the symmetric pairs' inequalities holds (symmetry)
 8. cut the child if the max_next largest of its cands sum below its need (max_next: how many more promotions the
-   child can make among its remaining candidates, the child's own max_add), or its GF(2) bound is below it, or its
+   child can make among its remaining candidates, the child's own max_add), or no completion of it keeps the
+   inequalities (symmetry), or its GF(2) bound is below it, or its
    heaviest set is exact (offered as incumbent); a child that stays open keeps this verdict, with its forced
    members, for its first step; a child with no candidates is not pushed
 9. otherwise offer the child's own promotions as incumbent, and push it
 ```
 
-With `gf2=off` (the matching path, `SearchTactics::matching`: the default before the GF(2) bound, with `lagrange` on)
-step 2 looks at the heaviest matching `Q*` instead: its forced members from the potentials, then, where none is
+On the matching path (`SearchTactics::matching`, `--tactic gf2=off --tactic lagrange=on --tactic symmetry=off`: the
+default before the GF(2) bound, without the rule of symmetric pairs, which it takes too if asked) step 2 looks at
+the heaviest matching `Q*` instead: its forced members from the potentials, then, where none is
 forced, refinement of its conflict `match_refine` levels deep (a cut if every branch is below `need`), then the
 Lagrangian bound over the nogoods (a cut, or more forced members); step 4 chooses the member whose removal lowers
 the matching bound most; and step 8 checks the child's matching bound, refinement and Lagrangian bound.
 
-Exactness rests on four facts: the bound is an upper bound (the GF(2) bound by Theorem 11, the matching bound with
+Exactness rests on five facts: the bound is an upper bound (the GF(2) bound by Theorem 11, the matching bound with
 refinement, and the Lagrangian bound for any multipliers); every promotable completion leaves out a member of a
 conflict, so branching on a member and then going on without it explores every promotable set; forced members (by
 weak duality, for the weight split and the potentials and the Lagrangian bound alike) are promoted by every
-completion that can beat the incumbent; and nogoods and known conflicts hold at every node they are applied to
-(subset closure).  A node is cut only when its bound is below `need` (a completion that merely ties the incumbent is
-of no use), and a unit rebuilt from a checkpoint is a node whose bound can only be tighter.  `tests/soundness.rs`
-attacks each of these (section 9).
+completion that can beat the incumbent; nogoods and known conflicts hold at every node they are applied to
+(subset closure); and every heaviest promotion set keeps the symmetric pairs' inequalities (Theorem 13), so the
+completions the rule leaves out hold none of them.  A node is cut only when its bound is below `need` (a completion
+that merely ties the incumbent is of no use), and a unit rebuilt from a checkpoint is a node whose bound can only be
+tighter.  `tests/soundness.rs` attacks each of these (section 9).
 
 ### The starting incumbent, the ceiling and the seed
 
@@ -467,6 +515,7 @@ defaults.
 | `forget_nogoods` | on | sound (the table is a cache) | with `nogoods`, each searcher forgets every nogood it knows after each 50,000 of its steps |
 | `lagrange` | off | proven (weak duality, for any multipliers over valid nogoods; `matchbound::lagrange`) | with `nogoods`, where the node bound leaves a node open, bound it also by a Lagrangian relaxation of the searcher's nogoods kept along its path (over the matching bound), and (with `fix_forced`) force the members without which that bound would cut; the multipliers are refitted at the root as the searcher learns (section 4).  On by default until `gf2`; with `gf2` it changes no tree and costs 2-4% |
 | `gf2` | on | proven (heuristics/THEORY.md, Theorem 11; weak duality for the forced members) | bound every node by the GF(2) bound (section 4) instead of the matching bound and its refinement, branch on the conflicts of its heaviest set by exact strong branching, and (with `fix_forced`) force the members without which it would cut; the Lagrangian bound over nogoods, if on, applies after it |
+| `symmetry` | on | proven (heuristics/THEORY.md, Theorem 13) | cut a node whose completions all break a symmetric pair's inequality, and drop from a node's candidates those that no completion keeping the inequalities holds (section 4, "Prime exchanges") |
 | `prev_cap` | on | proven if opt(n−1) is optimal | stop as soon as the incumbent reaches n + opt(n−1) − in_the_bag (`FrameSolver.getMaxPromotionSum`) |
 | `seed_incumbent` | on | sound (any promotion set is a valid incumbent) | start from the better of greedy and the n−1 solution's promotions that are still promotable |
 
@@ -747,12 +796,21 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   node needs); at the 600 nodes of the probe's fixtures (936 and 1215), completions promoted in random orders are
   independent in the node's matroids and no heavier than its bound, and the matching path's search started from the
   bound finds nothing above it (`tests/soundness.rs`).  Conflicts and residuals are checked against promoting the sets.
+  The prime exchanges (`src/search/symmetry.rs`): the symmetric pairs against their definition (every number looked
+  at, every pair of primes tried) on the boards 2..=300 and a sample to 2200; the images of the optimal set and of
+  random maximal promotable sets promotable and worth the formula, every optimum keeping every inequality, and on the
+  boards with at most 22 candidates every promotable set so checked and the best that keeps the inequalities the
+  optimum; the rule's cuts and drops against its definition by enumeration (exact where the pairs are independent).
 * **Soundness harness** (`tests/soundness.rs`): the search is started with an incumbent worth 1 or 5 less than the
   optimum and an empty payload, so that any pruning that loses every best completion leaves the fake incumbent in place
-  (this tests the `<` and `<=` boundaries too): every game 2..=300 under each of 30 configurations (19 of the matching
+  (this tests the `<` and `<=` boundaries too): every game 2..=300 under each of 34 configurations (19 of the matching
   path: every tactic, forgetting every step, every third, never; the Lagrangian bound refitted every few steps; one
-  thread and two; and 11 of the GF(2) bound: every way of choosing the branch, the matching bound as a first check,
-  without forced members or nogoods, forgetting every step, two threads, the Lagrangian bound after it), and games
+  thread and two; 11 of the default, the GF(2) bound with the rule of symmetric pairs: every way of choosing the
+  branch, the matching bound as a first check, without forced members or nogoods, forgetting every step, two threads,
+  the Lagrangian bound after it; the GF(2) bound without the rule on one thread, two, and forgetting every step; and
+  the matching path with the rule), every board 2..=600 with symmetric pairs with the rule over either bound (and the
+  oracle without the frame model to 40), units on the way to the optimum (an optimal set less 30 to 70% of its
+  members, boards 600..1000) with the rule, and games
   301..=600 (every tenth, searches of hundreds to thousands of steps) with the Lagrangian bound refitted early and
   often, over either bound, where it cuts and forces thousands of times; the same for 500 perturbed frame sets (numbers
   dropped, role flipped, moved a frame) with the truth found exhaustively; promoting a set at once against one by one in random orders, conflicts and nogoods on perturbed
@@ -760,14 +818,18 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   the matching path, one of them with the Lagrangian bound refitted every four steps; game 1000 with the GF(2) bound,
   whose search of 600 is too short to stop).  Units of real boards at W = 20 to 64 (thinned so that the truth is found
   exhaustively) from a handicapped incumbent, and games 1133 (matching) and 1000 (GF(2)) resumed every 1,024 steps at
-  W = 20, 24 and 64, carry the harness past the widths of the Java's table (n ≤ 1000).
+  W = 20, 24 and 64, carry the harness past the widths of the Java's table (n ≤ 1000).  A search below the root with
+  the rule of symmetric pairs is held to the best completion that keeps their inequalities (an exhaustive oracle of
+  its own, which prunes by the same bound but shares no code with the rule), which it must reach; at the root that is
+  the optimum (Theorem 13).
 * **Node-count tripwires** (`tests/tripwires.rs`): a pruning tactic that stops working changes no answer, so no
   assertion on answers sees it (a mutant that ignored the result of `Nogoods::ruled_out` costs 27 to 67 % more nodes).
   With one thread the tree is deterministic, so the exact node count of a fixed game under fixed tactics (n = 480 to
   1133, every tactic off or changed in turn, with the GF(2) bound and on the matching path) is asserted, and the tree
   of game 600 on the matching path with the searchers forgetting their nogoods every 500 steps; the matching path's
-  rows are the default's trees before the GF(2) bound, and its rows with `lagrange=off` those of the build before
-  that tactic.  **A change that alters the tree on purpose fails them.**  Run `cargo test --test tripwires
+  rows are the default's trees before the GF(2) bound, its rows with `lagrange=off` those of the build before
+  that tactic, and the rows `symmetry=off` the default's before the rule of symmetric pairs.  **A change that alters
+  the tree on purpose fails them.**  Run `cargo test --test tripwires
   -- --nocapture`: it prints the rows as observed, in the layout of the table at the top of the file; check that the
   promotion sums (the answers) have not moved, paste the rows in, and update any node counts quoted in the docs.
 * **Engine** (`tests/engine.rs`, `tests/robustness.rs`, `tests/stop_signal.rs`): a toy problem with a known optimum
@@ -891,7 +953,11 @@ augmentations (the bounds without each member are read off the exchange graph), 
 certified: where the time goes now (the proof of 1521, one thread) is the searches for forced members about a
 quarter, the weight split a quarter, the solves that are left a fifth (with the tableaux they build, a quarter), and
 the cycles of strong branching a ninth.  A node costs 180k cycles on average over the 146 proofs (330k before the
-round), in trees 2.4 times smaller.  A chain from
+round), in trees 2.4 times smaller.  These are without the rule of symmetric pairs (section 4, "Prime exchanges"),
+on by default since: it takes the proof of 1215 to 3,647 nodes and 0.74 G cycles, 2170 and 2172 to 55 s and 62 s,
+the chain 1..1300 on one thread to 36 s (26 s of search) and 290,503 nodes against 42 s (31 s) and 402,205 just
+before it; the one-thread proofs of the quick set and the bench set 0.75 of the nodes and 0.81 of the cycles
+(geometric means; EXPERIMENTS, "Prime exchanges in the search").  A chain from
 optimal.json's game of 1300 reached 2175 in 92 minutes of game time on 2 threads, and the committed chain from n = 1
 took 27 minutes on 8 ([results/README.md](results/README.md)); its cost comes in waves that
 follow the root's GF(2) gap, with no growth that a fit over 1301–2175 resolves, and a day on 192 CPUs would take

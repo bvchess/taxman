@@ -257,8 +257,8 @@ fn the_sacrifice_bound_proves_a_w20_result() {
 ///
 /// A deliberate change of the format (a new header version, say, which refuses older checkpoints) fails this test.
 /// To make the file again with the new build: `taxman solve 1133 --use-prev --threads 1 --node-limit 1000 --out R
-/// --checkpoint-dir D --tactic gf2=off --tactic lagrange=on` with a new file `R`, then copy `D/n1133.ckpt` over the
-/// fixture.
+/// --checkpoint-dir D --tactic gf2=off --tactic lagrange=on --tactic symmetry=off` with a new file `R`, then copy
+/// `D/n1133.ckpt` over the fixture.
 #[test]
 fn a_committed_checkpoint_resumes() {
     let games = stored_games("strict.jsonl");
@@ -378,7 +378,9 @@ fn deep_units() -> (u64, Vec<TaxUnit<32>>) {
 /// Along the path of a real search to 34 promotions deep, the incremental matching bound and the quick bounds
 /// without a member equal the min-cost-flow reference (the unit tests walk only ~10 deep, at n <= 760), and the
 /// subtrees of the deep levels give the same answer under every tactic: states and conflicts that no search of
-/// the unit tests' size reaches.
+/// the unit tests' size reaches.  The last comparison is made among the variants without the rule of the tactic
+/// `symmetry` and among those with it: a search of a unit below the root with the rule finds the best completion
+/// that keeps the symmetric pairs' inequalities, which can be lighter than the unit's best.
 #[test]
 fn deep_levels_of_a_large_game() {
     let (best, units) = deep_units();
@@ -415,7 +417,9 @@ fn deep_levels_of_a_large_game() {
     }
 
     // The subtrees below the deepest levels (milliseconds each), searched from the checkpoint's incumbent and a
-    // little below it, must end with the same incumbent under every tactic.
+    // little below it, must end with the same incumbent under every tactic, with the rule of `symmetry` off and on
+    // in turn (with it a search of a unit below the root finds the best completion that keeps the symmetric pairs'
+    // inequalities, which can be lighter than the unit's best).
     let search_unit = |tactics: &SearchTactics, unit: TaxUnit<32>, start: u64| {
         let engine = EngineConfig { time_limit: Some(Duration::from_secs(5)), ..config(1) };
         let out = game.search(Config::of(tactics), vec![unit], start, Some(engine), None);
@@ -423,15 +427,24 @@ fn deep_levels_of_a_large_game() {
         out.best
     };
     let mut compared = 0;
-    for unit in units.iter().filter(|u| u.promoted.len() >= 13).take(8) {
-        for start in [best, best - 25] {
-            let all = variants();
-            let expected = search_unit(&all[0].1, *unit, start);
-            for (name, tactics) in &all[1..] {
-                assert_eq!(search_unit(tactics, *unit, start), expected, "{name}: unit of {}", unit.promoted.len());
+    for rule in [false, true] {
+        let mut all: Vec<(&str, SearchTactics)> = Vec::new();
+        for (name, tactics) in variants() {
+            let tactics = SearchTactics { symmetry: rule, ..tactics };
+            if all.iter().all(|(_, seen)| *seen != tactics) {
+                all.push((name, tactics));
             }
-            compared += 1;
+        }
+        for unit in units.iter().filter(|u| u.promoted.len() >= 13).take(8) {
+            for start in [best, best - 25] {
+                let expected = search_unit(&all[0].1, *unit, start);
+                for (name, tactics) in &all[1..] {
+                    let what = format!("{name}, symmetry {rule}: unit of {}", unit.promoted.len());
+                    assert_eq!(search_unit(tactics, *unit, start), expected, "{what}");
+                }
+                compared += 1;
+            }
         }
     }
-    assert!(compared >= 10, "{compared}");
+    assert!(compared >= 20, "{compared}");
 }
