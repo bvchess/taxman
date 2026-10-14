@@ -765,10 +765,72 @@ self-covering sets no subset of which lists every factor an even number
 of times.  Over another field it would miss more: over GF(3) or the
 rationals the unsigned vectors of a triangle of moves are independent.
 The same construction, frame by frame, bounds the frame model's
-promotions ([rust/docs/EXPERIMENTS.md, "Matroid intersection
-bounds"](../rust/docs/EXPERIMENTS.md#matroid-intersection-bounds-2026-10)),
-and the two agree at every root measured there.  What the bound buys
-the model-free search is in the evidence table below.
+promotions (Theorem 11, below), and the two agree at every root
+measured ([rust/docs/EXPERIMENTS.md, "Matroid intersection
+bounds"](../rust/docs/EXPERIMENTS.md#matroid-intersection-bounds-2026-10)).
+What the bound buys the model-free search is in the evidence table
+below.
+
+## The frame matroids: a bound on the promotions
+
+Theorem 10's lemma, applied frame by frame, bounds the frame model's
+promotions in the same way: two matroids, one of the even frames and
+one of the odd frames, in both of which every promotable set is
+independent.  This is the bound of the solver's search (tactic `gf2`;
+rust/DESIGN.md, section 4, "The GF(2) bound").
+
+**Theorem 11 (the frame matroids).**  Give each frame h of a state
+the coordinates of its factors, each mover u paying in h (a move of
+h, or a number of home h + 1 promoted into it) the vector v_h(u) of
+its maximal factors among them, and each factor y of h the unit vector
+e_y.  If a set Q of candidates can be promoted, then in every frame h
+the vectors of its moves, the v_h(x) of Q's members promoted into h
+and the e_y of Q's members promoted out of h are linearly independent.
+So Q is independent in the matroid of each frame on the candidates
+that touch it (the frame's moves contracted); a candidate of home h
+touches frames h and h − 1, one even and one odd, so the even frames'
+matroids are the blocks of a matroid A on the candidates and the odd
+frames' of a matroid B, and Q is independent in both.  The heaviest
+common independent set of A and B bounds the best promotion set.  At
+a node reached by promoting P, a completion F makes P ∪ F promotable
+from the root, so F is independent in A and B contracted by P: the
+bound of the node is the heaviest common independent set of the
+contractions.
+
+*Proof.*  Promoting Q succeeds exactly when every frame is winnable
+with all of Q applied at once, its moves plus Q's members promoted
+into it and its factors less Q's members promoted out of it
+(rust/DESIGN.md, section 4; `model::promote`).  A winnable frame
+peels completely (`model::peel`): each move dropped has a live factor
+that no move still there has, so, as in the proof of Theorem 10's
+lemma (the peel's order read backwards is the play order there), the
+movers' vectors restricted to the live factors are independent, which
+is independence together with the unit vectors of the factors taken
+out.  The moves of a frame are fixed, so the frame's condition is
+independence of Q's part in the contraction by them; frames have
+disjoint coordinates, and the even and odd frames' contractions are
+the blocks of A and B.  At a node, F completes P exactly when P ∪ F is
+promotable from the root, so P ∪ F is independent in A and in B, and F
+is independent in their contractions by P (which P, independent, makes
+well defined).  ∎
+
+Three facts about it.  It is never above the matching bound of
+rust/DESIGN.md, by Theorem 10's minor argument frame by frame: an
+assignment of the movers to distinct live factors in which each unit
+vector e_y takes y itself, so that no promoted number pays as a
+factor, is the matching bound's relaxation.  On movers with at most
+two live factors (graph edges, with a ground vertex for one)
+independence over GF(2) is being a forest, which is winnability
+itself, so what it misses are, as for Theorem 10, the odd cores of
+movers with three or more factors (the residual cores at the roots of
+936-1300 hold 18-65 movers, and Lorea's matroid misses them too).  And
+Theorem 10's bound equals in_the_bag plus Theorem 11's at every root
+of 880-1300; its gap to opt(n) is a tenth of the Franklín–Moniot
+matching bound's to 1300.  The measurements are in
+rust/docs/EXPERIMENTS.md ("Matroid intersection bounds", "The GF(2)
+bound in the search"); the search's forced members rest on weak
+duality for a weight split, as Theorem 10's certificate does
+(`gf2::meet`).
 
 ## Evidence
 
@@ -803,6 +865,7 @@ the adversarial experiments: `rust/evidence/README.md`.
 | Every optimal game's upper part is U\*; a game's optimal sets have equal sizes and differ by equal-sum exchanges below n/2 | every completely enumerated game (`rust/evidence`, section 5) | measured; open |
 | M(n) ≤ ν(n); M(n−1) ≤ M(n) ≤ M(n−1) + 1, with equality on the left at a prime n | brute force to 22 | proven (Lemma, "Longest games") |
 | Playable sets, with each pick's own coordinate taken out, are GF(2)-independent; the parity matroids bound opt(n) | every playable set independent in both matroids on every board to 18 (enumerated); the bound at least opt(n), and the recorded game independent in both, at every n ≤ 1300; the certified intersection equal to enumeration on 3,000 random pairs of matroids | proven (Thm 10) |
+| Promotable sets of the frame model are independent in the even and the odd frames' GF(2) matroids, whose heaviest common independent set bounds the best promotion set, at every node in their contractions | every promotable set of every board with ≤ 22 candidates independent; the bound at least the best promotion set at every n ≤ 1300; never below the best completion at the 600 nodes of the solver's probe; the solver's chain 1..1300 with it reproduces every score | proven (Thm 11) |
 | opt(n) equals the recorded score: the frame model's answer is the true optimum | model-free exact searches (playability theorems, the matching and parity bounds, the chain and prime relations; `rust/evidence`, section 3): every n = 2..1300, the whole committed chain | verified (exact, model-free) |
 | An optimal game has the most moves, M(n) | one move short at n = 833, 834 and 835, model-free; a longest game for every other n ≤ 1300, 1,293 of them by the matching certificate (`rust/evidence`, section 6) | **false** (n = 833); the gap is at most one to 1300, open beyond |
 | (★) on rejection-bearing components | every threshold of every game n = 2..20,000 certified by bounds; the earlier 5 undecided settled | certified per game; open in general |

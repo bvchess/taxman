@@ -4,6 +4,11 @@ Purpose: measure, on this machine, how the Rust solver's cost grows around and b
 (n = 1231), so that what a 192-core cloud machine could reach can be predicted.  Not an attempt to push the
 frontier.
 
+This is the curve of the matching path, the search before the GF(2) bound.  The search with the GF(2) bound (the
+default since 2026-10) changes it: a chain from 1300 reached 2175 in 92 minutes on 2 threads, with no growth a fit
+resolves; its curve and projections are in [docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#the-gf2-bound-in-the-search-2026-10)
+and its data in `bench/gf2/`.
+
 * Machine: Apple M1 Max (8 performance + 2 efficiency cores), 8 search threads for every main run.
 * Build: master at e710d16, `cargo build --release --examples`; binaries not rebuilt during the runs.
 * Tactics: strict, no unproven tactic (`reuse_prev=off`, `revise_freedoms=off`); everything else at the build's

@@ -60,7 +60,17 @@ Nothing is taken from `optimal.json` (it is only compared with, to n = 1300), so
 `verify.sh`), and the production chain can instead start from it, as section 5 says, so that only the games above 1300
 are new.  The solver is the same code as on a laptop; the machine only changes how long it takes.
 
-Cost grows by a factor of 10 for every 55 to 70 in n past 1200 ([bench/curve/README.md](../../bench/curve/README.md)).
+**With the GF(2) bound** (the default since 2026-10;
+[docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#the-gf2-bound-in-the-search-2026-10)): a chain from `optimal.json`'s game of 1300 reached 2175 in 92 minutes of game time on 2 threads of the M1 Max, the
+dearest game 2170 at 290 s, its cost in waves (bands of 25 n from 11 s to 850 s) that follow the root's GF(2) gap,
+with no growth a fit over 1301-2175 resolves.  Taking the 192-core machine as 43 to 86 times those 2 threads (an
+assumption), a day reaches the end of the set widths, n = 4095, at every slope those data support, and even at the
+steepest any GF(2) measurement has shown (×10 per 413 n), a day reaches about 3200 and a week about 3600.  How a
+search of 10^5-10^6 nodes spreads over 192 threads has not been measured (to 4 threads: 2.9 times one).  What
+follows is the matching path's estimate (`--tactic gf2=off --tactic lagrange=on`, the default before), kept for
+comparison.
+
+Cost grew by a factor of 10 for every 55 to 70 in n past 1200 ([bench/curve/README.md](../../bench/curve/README.md)).
 From that file, the cost of extending the chain from 1231 to N on a 192-core machine, taking it to be 10 to 19 times
 the 8 M1 threads of the measurements (an assumption, not a measurement), and the prices it assumes ($3.33/h spot,
 $8.35/h on-demand for the 48xlarge; check the current ones).  Starting from the committed file, the part of the
@@ -388,9 +398,11 @@ htop                                          # all 192 cores near 100 %
 
 A healthy progress line at 192 threads: `eff` 95 % or more, `lock` under 1 %, `idle` small, `queue` a few hundred at most,
 `spilled 0`, `pauses N (x%)` with x under 1, `best` rising early and then still (the incumbent is often, not always,
-found long before the proof ends).  The node rate grows with the thread count: 100 to 130 thousand per thread on the M1 at
-n = 1200, so several tens of millions per second at 192 threads if the cores scale.  Estimate when a long game will end
-from the previous ones: the log has each game's seconds, and the curve moves by roughly 10 per 55 to 70 in n.
+found long before the proof ends).  The node rate grows with the thread count: with the GF(2) bound 7 to 9 thousand
+per thread on the M1 at n = 1200-1300 and about 3 thousand past 2000 (the matching path's was 100 to 130 thousand, in
+trees a hundred times larger), so about a million per second at 192 threads if the cores scale.  Estimate when a long
+game will end from the previous ones: the log has each game's seconds; past 1300 they come in waves of a few hundred
+n, not on a smooth curve.
 
 ### Surviving a spot interruption
 

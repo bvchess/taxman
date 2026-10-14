@@ -5,7 +5,7 @@
 
 mod common;
 
-use common::{options, TempDir};
+use common::{matching_options, options, TempDir};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -259,7 +259,7 @@ fn a_failure_after_the_search_keeps_the_checkpoint_and_records_the_game() {
         checkpoint_dir: Some(checkpoints.clone()),
         checkpoint_interval: Duration::from_secs(3600),
         node_limit: Some(1_000),
-        ..options(2)
+        ..matching_options(2)
     };
     // A limit stops the search: a checkpoint and an incomplete line.
     let summary = solver::solve_range_each_with(600, 600, &opts, Some(&results), &wrong, |_| {}).unwrap();
@@ -301,8 +301,12 @@ fn result_lines_carry_their_provenance() {
     let (results, _) = twelve_games(&dir);
     // Game 600, stopped by a limit, in the same file.
     let checkpoints = dir.join("ckpt");
-    let opts =
-        SolveOptions { checkpoint_dir: Some(checkpoints), node_limit: Some(200), force_search: true, ..options(1) };
+    let opts = SolveOptions {
+        checkpoint_dir: Some(checkpoints),
+        node_limit: Some(200),
+        force_search: true,
+        ..matching_options(1)
+    };
     let mut seen: Vec<GameResult> = Vec::new();
     solver::solve_range_each(600, 600, &opts, Some(&results), |r| seen.push(r.clone())).unwrap();
     assert!(!seen[0].completed, "600 needs more than 200 nodes");
@@ -360,7 +364,7 @@ fn a_resumed_game_counts_its_invocations_and_its_time() {
         checkpoint_interval: Duration::from_secs(3600),
         node_limit: Some(1_000),
         force_search: true,
-        ..options(2)
+        ..matching_options(2)
     };
     let mut runs = 0;
     let last = loop {

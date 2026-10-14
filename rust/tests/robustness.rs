@@ -403,10 +403,11 @@ fn a_locked_directory_is_refused() {
 // Checkpoints of Taxman searches
 // ------------------------------------------------------------------------------------------------------------
 
-/// Game `n` from the frame builder (at width 16), prepared with the default tactics.
+/// Game `n` from the frame builder (at width 16), prepared with the tactics of the matching path, whose search of
+/// 600 is long enough to stop.
 fn prepared_game(n: u32) -> (Board<16>, search::Prepared<16>) {
     let board = Board::<16>::for_n(n);
-    let prepared = board.prepare(SearchTactics::default()).unwrap();
+    let prepared = board.prepare(SearchTactics::matching()).unwrap();
     (board, prepared)
 }
 
@@ -481,8 +482,9 @@ fn a_checkpoint_whose_incumbent_does_not_fit_is_refused() {
     }
 }
 
+/// One thread, checkpoints in `dir`, and the tactics of the matching path, whose search of 600 is long enough to stop.
 fn options(dir: &Path) -> SolveOptions {
-    SolveOptions { threads: 1, checkpoint_dir: Some(dir.to_path_buf()), force_search: true, ..SolveOptions::default() }
+    SolveOptions { checkpoint_dir: Some(dir.to_path_buf()), force_search: true, ..common::matching_options(1) }
 }
 
 /// Games 140 and 141 have the same candidates and the same frame 0, but other frames: before checkpoints recorded the
@@ -525,8 +527,9 @@ fn a_checkpoint_made_with_other_tactics_names_them() {
     let mut other = opts.clone();
     other.tactics.set("nogoods=off").unwrap();
     other.tactics.set("match_refine=3").unwrap();
+    other.tactics.set("gf2=on").unwrap();
     let err = solver::solve_game(600, None, &other).unwrap_err();
-    for part in ["nogoods is on, not off", "match_refine is 1, not 3", "--tactic nogoods=on"] {
+    for part in ["nogoods is on, not off", "match_refine is 1, not 3", "gf2 is off, not on", "--tactic nogoods=on"] {
         assert!(err.contains(part), "{part}: {err}");
     }
 }

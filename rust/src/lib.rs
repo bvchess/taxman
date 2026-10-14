@@ -15,7 +15,8 @@
 //! model* (a restatement of the algorithm of the Java solver in `src/main/java`) splits the board into independent
 //! groups of numbers, the *hives*, stacks the ones that have numbers to spare into *frames*, and turns an optimal
 //! game into the promotion set with the largest sum that keeps every frame winnable.  A branch-and-bound over
-//! promotion sets, bounded by a matching relaxation and run on many threads, finds that set; a game of `n` is
+//! promotion sets, bounded by the heaviest set independent in two GF(2) matroids of the frames (or by a matching
+//! relaxation) and run on many threads, finds that set; a game of `n` is
 //! built from the game of `n − 1`, so a chain of games from `n = 1` proves each from the one before.  `README.md`
 //! (in the crate's directory) is the user guide and has the glossary; `DESIGN.md` explains the design;
 //! `docs/EXPERIMENTS.md` is the lab notebook of how it got there.
@@ -33,8 +34,8 @@
 //!        │
 //!        ▼
 //!       search::search ───────────────► engine::run: threads, shared deque with disk spill, checkpoints
-//!        │                               └ Stepper::step per node: matchbound → conflicts, forced
-//!        │                                 members, nogoods → Lagrangian bound → branch → child
+//!        │                               └ Stepper::step per node: gf2 (or matchbound) → conflicts,
+//!        │                                 forced members, nogoods → branch → child
 //!        ▼
 //!       promotions ──► hives::Apiary ──► the moves ──► game::replay ──► score, results line
 //! ```
@@ -59,6 +60,7 @@
 //! | | [`model`] | the search state: frames, winnability, promotion, conflicts, nogoods |
 //! | | [`accelerate`] | the prime shortcut (the game of a prime `n` from the game of `n − 1`); promotions → moves |
 //! | search | [`matchbound`] | the matching bound, the upper bound on a node's completions; the Lagrangian bound |
+//! | | [`gf2`] | the GF(2) bound, the default node bound: two frame matroids and their weighted intersection |
 //! | | [`search`] | the branch-and-bound searcher, its tactics, its setup and checkpoint header |
 //! | | [`bounds`] | the greedy incumbent and the limit on a node's further promotions |
 //! | engine | [`engine`] | the problem-independent parallel depth-first driver: threads, spill, checkpoints |
@@ -85,6 +87,7 @@ pub mod brute;
 pub mod engine;
 pub mod frames;
 pub mod game;
+pub mod gf2;
 pub mod hives;
 pub mod json;
 pub mod matchbound;

@@ -10,9 +10,10 @@
 # is the one to profile (with PGO the search is inlined into a few functions and a sampler sees little).
 # --no-train reuses the profile of the last run (target/pgo/merged.profdata).  Takes a few minutes.
 #
-# The training workload: the perf probe's fixtures (936 and 1215, every hot kernel and a search window), and a
-# short search on one thread of a game of every set width the solver dispatches to (each width is a separate
-# copy of the search's code, and code a profile never saw is optimized as cold).
+# The training workload: the perf probe's fixtures (936 and 1215, every hot kernel and a search window, on the
+# matching path and with the GF(2) bound), and a short search on one thread of a game of every set width the
+# solver dispatches to (each width is a separate copy of the search's code, and code a profile never saw is
+# optimized as cold).
 #
 # Needs an llvm-profdata of the same LLVM major version as rustc's (`rustc -vV`): $LLVM_PROFDATA if set, else
 # rustup's llvm-tools component, else Homebrew's llvm, else the PATH.
@@ -68,6 +69,8 @@ if [ "$TRAIN" = 1 ]; then
     BIN="$OUT/instrumented/release"
     echo "== training"
     "$BIN/examples/perf" --reps 1
+    # The probe's windows record the matching path's tactics; the GF(2) bound's kernels and windows as well.
+    "$BIN/examples/perf" --reps 1 --tactic gf2=on
     # A game of every width, from W = 8 to W = 64; the frontier's ones searched longer.
     for game in 480:2 700:2 936:4 1184:8 1300:8 1600:3 1900:3 2500:2 3500:2; do
         "$BIN/examples/ladder" --threads 1 --seconds "${game#*:}" --known "$CRATE/results/strict.jsonl" \
