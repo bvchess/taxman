@@ -236,7 +236,7 @@ pub(super) struct Strong<const W: usize> {
     pub(super) kept: bool,
 }
 
-/// The member of the conflict `k` to branch on by looking ahead (tactic `branching = conflict-strong`): the one
+/// The member of the conflict `k` to branch on by looking ahead (strong branching): the one
 /// whose removal from the candidates lowers the matching bound most (then the largest), which makes the node
 /// going on without it the likeliest to stop soon.  (The child that promotes it gains nothing to look at: the
 /// heaviest matching already promotes every member.)  `m`'s top level is the node, settled; it is left so, with

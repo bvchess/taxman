@@ -1,5 +1,5 @@
-//! Checks the hive, frame and acceleration code against the Java solver's results (`testdata/golden`,
-//! `testdata/golden_wide`, `testdata/accel_java.txt`, `testdata/games_java.txt`).
+//! Checks the hive, frame and prime shortcut code against the Java solver's results (`testdata/golden`,
+//! `testdata/golden_wide`, `testdata/games_java.txt`).
 //!
 //! The golden files hold, for each board size, what the Java produced for the stages these modules
 //! reimplement.  Every comparison is exact, including list orders.  Mismatches are collected over all the
@@ -12,12 +12,13 @@
 
 mod common;
 
-use common::{fnv1a64, golden_files, stored_games, testdata};
+use common::{fnv1a64, golden_files, testdata};
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::time::Instant;
-use taxman::accelerate::{prime_shortcut, reuse_prev, solution_for_promotions};
+use taxman::accelerate::{prime_shortcut, solution_for_promotions};
 use taxman::bits::Bits;
+use taxman::board::Board;
 use taxman::bounds::greedy;
 use taxman::frames::build_frames;
 use taxman::game::{replay, Optimal};
@@ -25,6 +26,7 @@ use taxman::hives::Apiary;
 use taxman::json::Json;
 use taxman::model::Model;
 use taxman::numtheory::Tables;
+use taxman::search::SearchTactics;
 use taxman::with_width;
 
 /// Wide enough for every file of `testdata/golden` (n <= 1023).
@@ -147,12 +149,6 @@ fn check_frames<const W: usize>(g: &Golden, bad: &mut Mismatches) -> usize {
         );
     }
     bad.check(n, "candidates", cols.candidates, set(g.field("allCandidates")));
-    bad.check(
-        n,
-        "estimateMaxPromotions",
-        u64::from(cols.estimate_max_promotions),
-        g.field("estimateMaxPromotions").as_u64().unwrap(),
-    );
     want_frames.len()
 }
 
@@ -240,47 +236,29 @@ fn wide_boards_match_the_java() {
 // ---------------------------------------------------------------------------------------------------------
 // Where the previous game gives the answer
 
-/// `FrameSolver.solveBasedOnPrev`: a prime takes the shortcut, anything else tries `reuse_prev`.
+/// `FrameSolver.solveBasedOnPrev` for a prime: the shortcut gives the game that the Java accelerated.
 #[test]
 fn acceleration_matches_java() {
-    let optimal = Optimal::load_default().unwrap();
+    let optimal = Optimal::built_in();
     let mut bad = Mismatches::default();
     let golden = load_golden();
-    let (mut primes, mut reused, mut searched) = (0, 0, 0);
-    for g in &golden {
+    let mut primes = 0;
+    for g in golden.iter().filter(|g| Tables::new(g.n).is_prime(g.n)) {
         let n = g.n;
-        let t = Tables::new(n);
         let prev: &[u32] = if n == 1 { &[] } else { optimal.moves(n - 1).expect("optimal.json has n-1") };
         let solve = g.field("solve");
-        let java_accelerated = solve.get("accelerated").and_then(Json::as_bool).unwrap();
-        let java_moves = ints(solve.get("moves").unwrap());
-
-        let (moves, promotions) = if t.is_prime(n) {
-            primes += 1;
-            (Some(prime_shortcut(n, prev)), None)
-        } else {
-            let found = reuse_prev(&t, &build_frames::<W>(&t), prev);
-            (found.as_ref().map(|a| a.moves.clone()), found.map(|a| a.promotions))
-        };
-        bad.check(n, "accelerated", moves.is_some(), java_accelerated);
-        if let Some(moves) = moves {
-            bad.check(n, "accelerated moves", moves, java_moves);
-            if let Some(promotions) = promotions {
-                reused += 1;
-                bad.check(n, "accelerated promotions", promotions, ints(solve.get("promotions").unwrap()));
-            }
-        } else {
-            searched += 1;
-        }
+        primes += 1;
+        bad.check(n, "accelerated", true, solve.get("accelerated").and_then(Json::as_bool).unwrap());
+        bad.check(n, "accelerated moves", prime_shortcut(n, prev), ints(solve.get("moves").unwrap()));
     }
-    println!("{primes} primes, {reused} reused, {searched} need a search");
-    assert!(primes > 50 && reused > 50 && searched > 50);
+    println!("{primes} primes");
+    assert!(primes > 50);
     bad.assert_none(golden.len());
 }
 
-/// Every how-many-th line of the two Java fixtures below the tests check.  All of them take 3.4 and 3.2 s (building
-/// the frames or the hives of 94 and 171 boards of 760 to 2049); half of them have the same power, as the lines are
-/// samples of the same few kinds.  Set to 1 to check them all.
+/// Every how-many-th line of the Java fixture below the test checks.  All of it takes 3.2 s (building the hives of 171
+/// boards of 760 to 2049); half of it has the same power, as the lines are samples of the same few kinds.  Set to 1
+/// to check them all.
 const FIXTURE_STRIDE: usize = 2;
 
 /// The data lines of a fixture of `testdata`: the lines that are not comments, split at `separator`.
@@ -288,54 +266,6 @@ fn fixture_lines(name: &str, separator: &str) -> Vec<Vec<String>> {
     let text = std::fs::read_to_string(testdata(name)).unwrap_or_else(|e| panic!("{name}: {e}"));
     let rows = text.lines().filter(|l| !l.starts_with('#') && !l.trim().is_empty());
     rows.map(|l| l.split(separator).map(|field| field.trim().to_owned()).collect()).collect()
-}
-
-/// The same decision for the boards past the golden data (761..1228, every fifth): `testdata/accel_java.txt` holds
-/// what the Java's acceleration did with the previous game (optimal.json's to n = 1000, and `results/default.jsonl`'s
-/// above, as fingerprinted in the file; the games optimal.json has past 1000 are the strict chain's, not those).  A
-/// game it accepts must be the same game, to the move.
-#[test]
-fn acceleration_matches_the_java_beyond_the_golden_data() {
-    let optimal = Optimal::load_default().unwrap();
-    let chain = stored_games("default.jsonl");
-    let rows = fixture_lines("accel_java.txt", " ");
-    assert!(rows.len() >= 90, "{} lines", rows.len());
-    let (mut accepted, mut rejected, mut primes) = (0, 0, 0);
-    for row in rows.iter().step_by(FIXTURE_STRIDE) {
-        let n: u32 = row[0].parse().unwrap();
-        let hex = |text: &str| u64::from_str_radix(text, 16).unwrap();
-        let (accel, sum, fingerprint, prev_fingerprint) =
-            (row[1] == "accel", row[2].parse::<u64>().unwrap(), hex(&row[3]), hex(&row[4]));
-        let prev: Vec<u32> =
-            if n - 1 <= 1000 { optimal.moves(n - 1).unwrap().to_vec() } else { chain[&(n - 1)].1.clone() };
-        assert_eq!(
-            fnv1a64(&prev),
-            prev_fingerprint,
-            "n={n}: the game {} is not the one the Java's decision was made with; regenerate testdata/accel_java.txt",
-            n - 1
-        );
-        let t = Tables::new(n);
-        let moves = if t.is_prime(n) {
-            primes += 1;
-            Some(prime_shortcut(n, &prev))
-        } else {
-            with_width!(n, W => reuse_prev(&t, &build_frames::<W>(&t), &prev)).map(|a| a.moves)
-        };
-        assert_eq!(moves.is_some(), accel, "n={n}: the Java {}, the Rust {}", row[1], moves.is_some());
-        match moves {
-            Some(moves) => {
-                accepted += 1;
-                assert_eq!(
-                    (moves.iter().map(|&m| u64::from(m)).sum::<u64>(), fnv1a64(&moves)),
-                    (sum, fingerprint),
-                    "n={n}"
-                );
-            }
-            None => rejected += 1,
-        }
-    }
-    println!("{accepted} accepted ({primes} primes), {rejected} rejected");
-    assert!(accepted * FIXTURE_STRIDE > 50 && rejected * FIXTURE_STRIDE > 10 && primes * FIXTURE_STRIDE > 5);
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -408,7 +338,7 @@ fn wide_boards_build() {
             assert!(frame.factors.len() as i32 >= frame.free_factor_count, "n={n} frame {i}");
             assert!(!frame.moves.is_empty(), "n={n} frame {i}");
         }
-        assert!(cols.estimate_max_promotions > 0 && cols.candidates.len() > cols.estimate_max_promotions);
+        assert!(!cols.candidates.is_empty(), "n={n}");
         // The frames are disjoint columns of numbers.
         let all: Bits<32> = cols.frames.iter().fold(Bits::EMPTY, |acc, f| acc | f.factors | f.moves);
         let counted: u32 = cols.frames.iter().map(|f| f.factors.len() + f.moves.len()).sum();
@@ -418,26 +348,24 @@ fn wide_boards_build() {
     }
 }
 
-/// The setup for one game of n = 1000 must be cheap next to the search it precedes.  Wall time depends on the
-/// machine and on the optimizer, so the 25-fold margin over the 20 ms of an optimized build is asserted only where
-/// the build is optimized (without debug assertions, as `cargo test --release`); the test profile still runs it.
+/// The setup for one game of n = 1000 (the board's frames, and the search's setup on them) must be cheap next to the
+/// search it precedes.  Wall time depends on the machine and on the optimizer, so the 25-fold margin over the 20 ms of
+/// an optimized build is asserted only where the build is optimized (without debug assertions, as `cargo test
+/// --release`); the test profile still runs it.
 #[test]
 fn setup_for_1000_is_fast() {
-    let optimal = Optimal::load_default().unwrap();
-    let t = Tables::new(1000);
-    let prev = optimal.moves(999).unwrap();
     let mut best = f64::MAX;
     for _ in 0..5 {
         let start = Instant::now();
-        let frames = build_frames::<W>(&t);
+        let board = Board::<W>::for_n(1000);
         let built = start.elapsed();
-        let reused = reuse_prev(&t, &frames, prev);
+        let prepared = board.prepare(SearchTactics::default()).unwrap();
         let total = start.elapsed();
         println!(
-            "n=1000: build_frames {:.2} ms, reuse_prev {:.2} ms ({})",
+            "n=1000: the board {:.2} ms, prepare {:.2} ms (max_total {})",
             built.as_secs_f64() * 1e3,
             (total - built).as_secs_f64() * 1e3,
-            if reused.is_some() { "accepted" } else { "rejected" }
+            prepared.max_total
         );
         best = best.min(total.as_secs_f64());
     }

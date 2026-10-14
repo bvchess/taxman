@@ -1,7 +1,7 @@
 //! The games whose search repeats an earlier game's (tactic `same_search`, DESIGN.md "Same search"), found from the
 //! setups alone, with no search: for each board size of a range that is neither prime nor trivial, the search
-//! problem of its strict setup (`revise_freedoms` off, so frame 0 as built), and the latest earlier board size of
-//! the range with the same problem.  A strict chain over the range concludes exactly these games without a search.
+//! problem of its setup, and the latest earlier board size of the range with the same problem.  A chain over the
+//! range concludes exactly these games without a search.
 //!
 //! ```text
 //! cargo run --release --example repeats -- FROM TO [--known FILE]
@@ -17,7 +17,7 @@ use std::fs;
 use std::time::Instant;
 use taxman::board::Board;
 use taxman::json::Json;
-use taxman::search::{Problem, Revise};
+use taxman::search::Problem;
 
 /// The search seconds of each completed game of a results file, by board size.
 fn search_seconds(path: &str) -> Result<BTreeMap<u32, f64>, String> {
@@ -59,7 +59,7 @@ fn run() -> Result<(), String> {
             if board.tables.is_prime(n) || board.is_trivial() {
                 continue;
             }
-            board.problem(Revise::Off)?
+            board.problem()?
         });
         setups += 1;
         let same = latest.entry(problem.digest()).or_default();

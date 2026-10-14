@@ -10,7 +10,6 @@ mod support;
 #[allow(unused_imports)]
 pub use support::{Rng, TempDir};
 
-use std::cell::OnceCell;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -18,15 +17,14 @@ use std::sync::Mutex;
 use std::time::Instant;
 use taxman::bits::Bits;
 use taxman::board::Board;
-use taxman::bounds::{Preclusions, RunnerUp};
 use taxman::engine::{self, EngineConfig, Start};
 use taxman::json::Json;
 use taxman::matchbound::MatchGraph;
 use taxman::model::{FrameSet, Model, Scratch};
 use taxman::numtheory::Tables;
-use taxman::results::Taint;
+use taxman::results::Assumptions;
 use taxman::search::lagrange::Refits;
-use taxman::search::{search, Branching, SearchSpace, SearchTactics, TaxSearcher, TaxUnit, NOGOOD_PERIOD};
+use taxman::search::{search, SearchSpace, SearchTactics, TaxSearcher, TaxUnit, NOGOOD_PERIOD};
 use taxman::solver::{Prev, PrevSource, SolveOptions};
 
 /// A committed file under `testdata/`.
@@ -86,30 +84,21 @@ pub fn stored_games(name: &str) -> StoredGames {
     games
 }
 
-/// The game `n − 1` of a committed strict results file as the previous game of `n`.  The strict games rest on
-/// nothing unproven (`results/README.md`), so the taint is empty; the proof only matters to the results lines.
+/// The game `n − 1` of a committed results file as the previous game of `n`.  The games of `results/strict.jsonl`
+/// assume nothing (`results/README.md`); the proof only matters to the results lines.
 pub fn prev_of(games: &StoredGames, n: u32) -> Prev {
     let (score, moves) = &games[&(n - 1)];
-    Prev { moves: moves.clone(), score: *score, source: PrevSource::Results, proof: None, taint: Taint::new() }
+    Prev { moves: moves.clone(), score: *score, source: PrevSource::Results, proof: None, assumes: Assumptions::new() }
 }
 
-/// The options `results/strict.jsonl` was made with (no unproven tactic): `reuse_prev` and `revise_freedoms` off.
-pub fn strict_options(threads: usize) -> SolveOptions {
-    let mut opts = SolveOptions { threads, ..SolveOptions::default() };
-    opts.tactics.set("reuse_prev=off").unwrap();
-    opts.tactics.set("revise_freedoms=off").unwrap();
-    opts
+/// The default options on `threads` threads, which `results/strict.jsonl` was made with.
+pub fn options(threads: usize) -> SolveOptions {
+    SolveOptions { threads, ..SolveOptions::default() }
 }
 
-/// The default search tactics but for `revise_freedoms`, which the committed strict results were made without.
-pub fn strict_tactics() -> SearchTactics {
-    SearchTactics { revise_freedoms: false, ..SearchTactics::default() }
-}
-
-/// The search tactics a differential test compares: the strict default and every sound variant that is cheap at
-/// n ~ 1100.
+/// The search tactics a differential test compares: the default and every sound variant that is cheap at n ~ 1100.
 pub fn variants() -> Vec<(&'static str, SearchTactics)> {
-    let d = strict_tactics();
+    let d = SearchTactics::default();
     vec![
         ("default", d),
         ("nogoods=off", SearchTactics { nogoods: false, ..d }),
@@ -117,8 +106,6 @@ pub fn variants() -> Vec<(&'static str, SearchTactics)> {
         ("forget_nogoods=off", SearchTactics { forget_nogoods: false, ..d }),
         ("match_refine=0", SearchTactics { match_refine: 0, ..d }),
         ("match_refine=3", SearchTactics { match_refine: 3, ..d }),
-        ("conflict-smallest", SearchTactics { branching: Branching::ConflictSmallest, ..d }),
-        ("conflict-largest", SearchTactics { branching: Branching::ConflictLargest, ..d }),
     ]
 }
 
@@ -135,7 +122,6 @@ pub struct Profile {
     pub greedy: Vec<u32>,
     pub max_total: u32,
     pub frame_zero_freedoms: i32,
-    pub revise: String,
     pub completed: bool,
     pub sum: u64,
     pub promotions: Vec<u32>,
@@ -146,7 +132,7 @@ pub struct Profile {
 /// search may stop early (and the profile then says `completed: false`).
 pub fn profile_at_width<const W: usize>(n: u32, tactics: SearchTactics, node_limit: Option<u64>) -> Profile {
     let board = Board::<W>::for_n(n);
-    let p = board.prepare(tactics, 1).unwrap();
+    let p = board.prepare(tactics).unwrap();
     let cfg = EngineConfig { node_limit, ..config(1) };
     let r = search(&p, &cfg, None, None, false).unwrap();
     Profile {
@@ -155,7 +141,6 @@ pub fn profile_at_width<const W: usize>(n: u32, tactics: SearchTactics, node_lim
         greedy: p.greedy.to_vec(),
         max_total: p.max_total,
         frame_zero_freedoms: p.root.frames().first().map_or(0, |f| f.freedoms),
-        revise: format!("{:?}", p.revise),
         completed: r.completed,
         sum: r.sum,
         promotions: r.promotions.to_vec(),
@@ -165,7 +150,7 @@ pub fn profile_at_width<const W: usize>(n: u32, tactics: SearchTactics, node_lim
 
 /// (promotion sum, nodes) of the whole search of game `n` from the frame builder at width `W`, on one thread.
 pub fn search_at_width<const W: usize>(n: u32, tactics: SearchTactics) -> (u64, u64) {
-    let p = Board::<W>::for_n(n).prepare(tactics, 1).unwrap();
+    let p = Board::<W>::for_n(n).prepare(tactics).unwrap();
     let r = search(&p, &config(1), None, None, false).unwrap();
     assert!(r.completed);
     (r.sum, r.stats.nodes)
@@ -177,7 +162,7 @@ pub fn random_subset<const W: usize>(rng: &mut Rng, set: &Bits<W>, percent: u64)
 }
 
 /// FNV-1a over the decimal text of the moves, each followed by a comma: the fingerprint of a game that the Java
-/// fixtures (`testdata/accel_java.txt`, `testdata/games_java.txt`) record.
+/// fixture `testdata/games_java.txt` records.
 pub fn fnv1a64(moves: &[u32]) -> u64 {
     let mut hash = 0xCBF2_9CE4_8422_2325u64;
     for m in moves {
@@ -196,16 +181,13 @@ pub fn fnv1a64(moves: &[u32]) -> u64 {
 /// nogoods, and how many threads there are.
 #[derive(Clone, Copy, Debug)]
 pub struct Config {
-    pub matching: bool,
     pub refine: u32,
-    pub branching: Branching,
     pub fix_forced: bool,
     pub nogoods: bool,
     /// After how many of its steps a searcher forgets its nogoods; `None` for never.
     pub period: Option<u64>,
     /// When a searcher refits the multipliers of its Lagrangian bound; `None` without that bound.
     pub refits: Option<Refits>,
-    pub preclusions: bool,
     pub threads: usize,
 }
 
@@ -217,14 +199,11 @@ impl Config {
 
     pub fn of(t: &SearchTactics) -> Config {
         Config {
-            matching: t.match_bound,
             refine: u32::from(t.match_refine),
-            branching: t.branching,
             fix_forced: t.fix_forced,
             nogoods: t.nogoods,
             period: t.forget_nogoods.then_some(NOGOOD_PERIOD),
-            refits: (t.match_bound && t.nogoods && t.lagrange).then_some(Refits::SEARCH),
-            preclusions: t.preclusions,
+            refits: (t.nogoods && t.lagrange).then_some(Refits::SEARCH),
             threads: 1,
         }
     }
@@ -251,7 +230,6 @@ pub struct Game<const W: usize> {
     pub candidates: Bits<W>,
     pub max_total: u32,
     graph: MatchGraph,
-    preclusions: OnceCell<Preclusions<W>>,
 }
 
 impl<const W: usize> Game<W> {
@@ -259,7 +237,7 @@ impl<const W: usize> Game<W> {
     pub fn new(model: Model, root: FrameSet<W>, candidates: Bits<W>) -> Self {
         let max_total = root.max_promotions_among(&candidates).max(0) as u32;
         let graph = MatchGraph::new(&model, &root);
-        Game { model, root, candidates, max_total, graph, preclusions: OnceCell::new() }
+        Game { model, root, candidates, max_total, graph }
     }
 
     /// The game with the frames `columns` (factors and moves per frame, bottom first), if every frame of the root is
@@ -279,12 +257,6 @@ impl<const W: usize> Game<W> {
         Game::from_columns(&board.tables, &board.frames.columns(), board.candidates())
     }
 
-    /// The same game with frame 0's freedoms set to `freedoms`, as `revise_freedoms` does (and the promotion cap
-    /// and the matching graph redone).
-    pub fn with_frame_zero_freedoms(&self, freedoms: i32) -> Self {
-        Game::new(self.model.clone(), self.root.with_frame_zero_freedoms(freedoms), self.candidates)
-    }
-
     /// The unit of the root: nothing promoted, all candidates to try.
     pub fn root_unit(&self) -> TaxUnit<W> {
         TaxUnit { promoted: Bits::EMPTY, cands: self.candidates }
@@ -300,24 +272,18 @@ impl<const W: usize> Game<W> {
         engine: Option<EngineConfig>,
         resume: Option<PathBuf>,
     ) -> Outcome<W> {
-        let preclusions = cfg
-            .preclusions
-            .then(|| self.preclusions.get_or_init(|| Preclusions::build(&self.model, &self.root, &self.candidates, 1)));
         let space = SearchSpace {
             model: &self.model,
             root: &self.root,
-            preclusions,
-            match_graph: cfg.matching.then_some(&self.graph),
+            match_graph: &self.graph,
             match_refine: cfg.refine,
-            conflict_branching: cfg.branching,
             fix_forced: cfg.fix_forced,
-            nogoods: cfg.nogoods && cfg.matching,
+            nogoods: cfg.nogoods,
             nogood_period: cfg.period,
-            lagrange: cfg.refits.filter(|_| cfg.nogoods && cfg.matching),
+            lagrange: cfg.refits.filter(|_| cfg.nogoods),
             candidates: self.candidates,
             root_max: self.root.frames().iter().filter_map(|f| (f.moves | f.factors).max()).max().unwrap_or(0),
             max_total: self.max_total,
-            rule: RunnerUp::Sound,
             cap: None,
             diagnostics: None,
             began: Instant::now(),
@@ -339,9 +305,7 @@ impl<const W: usize> Game<W> {
         }
     }
 
-    /// Whether `set` is made of candidates, worth `value`, and can be promoted all at once and one by one, leaving
-    /// no frame with negative freedoms (frame 0's may have been lowered, which the model's promotions do not
-    /// check: the search does, by narrowing its candidates).
+    /// Whether `set` is made of candidates, worth `value`, and can be promoted all at once and one by one.
     pub fn is_real(&self, set: &Bits<W>, value: u64) -> bool {
         let mut scratch = Scratch::new();
         let mut state = self.root;
@@ -349,7 +313,6 @@ impl<const W: usize> Game<W> {
             && set.is_subset(&self.candidates)
             && self.model.promote_all_using(&mut scratch, &self.root, set).is_some()
             && set.iter().all(|x| self.model.promote_in_place(&mut state, x))
-            && state.frames().iter().all(|f| f.freedoms >= 0)
     }
 
     /// The best completion of `state` among `cands`, found exhaustively (pruned by the sum and the freedoms'

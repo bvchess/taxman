@@ -1,33 +1,18 @@
-//! Games found without a search: the shortcuts from the game of `n − 1`, and the last step that turns a promotion
-//! set into a game.
+//! The prime shortcut, and the last step that turns a promotion set into a game.
 //!
 //! Where this fits ([`crate::solver`] has the whole pipeline): before it searches for the game of `n`, the solver
-//! tries two shortcuts that need the (optimal) game of `n − 1`.  Both are the Java's
-//! `FrameSolver.solveBasedOnPrev`, and `--force-search` turns both off.
+//! tries a shortcut that needs the (optimal) game of `n − 1`, the Java's `FrameSolver.solveBasedOnPrev` for a prime
+//! `n`, which `--force-search` turns off.
 //!
 //! * [`prime_shortcut`], for a prime `n`.  **Proven**: given an optimal game of `n − 1`, the game it returns is
 //!   optimal, with no assumption from the frame model.  The proof is the documentation of the function.
-//! * [`reuse_prev`], for other `n`.  **Unproven** (the tactic `reuse_prev`): it builds a game from the previous
-//!   game's moves and accepts it if it scores what the previous game *suggests* the best game scores.  Its
-//!   answers have always agreed with the Java's table, but nothing proves them, so a result found this way
-//!   carries the taint `reuse_prev` ([`crate::results`]).
 //!
 //! [`solution_for_promotions`] is not a shortcut: it is the last step of every path, the search's included, and
 //! turns the promotion set that the frame model works with into the moves of an actual game.
 
 use crate::bits::Bits;
-use crate::frames::FrameColumns;
 use crate::hives::Apiary;
 use crate::numtheory::Tables;
-
-/// A game found without searching, and the promotions it was built from.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Accelerated {
-    /// The game, in playing order.
-    pub moves: Vec<u32>,
-    /// The promoted numbers the game was built from, ascending.
-    pub promotions: Vec<u32>,
-}
 
 /// The game for a prime `n`: the game for `n − 1` with its first move replaced by `n`.  The game for 1 has no
 /// moves, so for `n = 2` the result is the single move `[2]`.
@@ -80,61 +65,6 @@ pub fn prime_shortcut(n: u32, prev_moves: &[u32]) -> Vec<u32> {
     moves
 }
 
-/// Tries to build the game for `t.n` from a game of `t.n − 1` (`prev_moves`; empty for `t.n = 1`) without a
-/// search.  `None` means the shortcut does not apply and the game needs a search.  **This is the unproven tactic
-/// `reuse_prev`.**
-///
-/// 1. If the board has no promotion candidates, the game with no promotions is the only one the frame model has,
-///    and needs no previous game.  (The solver finds this case itself first, from the frames' candidates, and
-///    never gets here with it; the two candidate sets, those of the unmerged hives here and those the frame
-///    builder collects level by level, are equal for every board `2 ≤ n ≤ 2000`.  The branch is the Java's.)
-/// 2. Otherwise promote every number that is both a candidate now and a move of the previous game, keeping at
-///    most as many (the largest ones) as the frames can absorb at all (`frames.estimate_max_promotions`).
-///    These are the previous game's promotions that are still candidates, and, on an even `n`, the former source
-///    `n/2`, which has just become a factor.
-/// 3. The *target* is the previous game's moves, plus the new number `n`, minus the previous moves that are
-///    impossible on the new board.  The game built from those promotions is accepted only if it scores exactly
-///    that.
-///
-/// # Why it is plausible, and why it is unproven
-///
-/// Any game of `n − 1` is also a game of `n`, and removing `n` from a game of `n` leaves a game of `n − 1`, so
-/// `opt(n) ≤ n + opt(n − 1)`: the ceiling that the search stops at.  The target is that ceiling lowered by the
-/// moves of the previous game that the new board has made impossible (the new source `n` competes for the factors
-/// of its hive, and the greedy test of [`crate::hives`] may now find a smaller source of that hive unmatchable).
-/// The tactic bets that the best game of `n` is the previous game with `n` added and those moves dropped, and so
-/// accepts a game that reaches the target.
-///
-/// (The "upper-delta" certificate of the Python heuristics (`heuristics/README.md`, "Certificates") is a similar
-/// prediction from the previous game, and this is the one place the Rust documentation defines the term: it
-/// expects `score(n − 1) + U*(n) − U*(n − 1)`, or that plus `n/2` for an even `n`, where `U*(k)` is the sum of the
-/// upper half of a game of `k` (its moves above `k/2`, the sources).  That the two predictions always agree has
-/// not been shown.)
-///
-/// When none of the previous moves became impossible the target *is* the ceiling and an accepted game is
-/// optimal, given that the previous one is.  Otherwise the target is a conjecture: nothing prevents a game of
-/// `n` that is unlike the previous one from scoring more.  It has held wherever it has been checked against a
-/// run that does not rely on it: a strict solve of 1 to 1000 reproduced every score of `optimal.json`, and the
-/// committed default and strict chains for 1001 to 1231 have equal scores (`results/README.md`).  (`taxman
-/// regress` compares with `optimal.json`, which the Java made with the same rule, so that alone is no
-/// independent witness.)  A run with the tactic off (`--tactic reuse_prev=off`, the *strict* runs) never relies
-/// on it.
-pub fn reuse_prev<const W: usize>(t: &Tables, frames: &FrameColumns<W>, prev_moves: &[u32]) -> Option<Accelerated> {
-    let plain = Apiary::<W>::new(t, Bits::EMPTY);
-    let candidates = plain.promotion_candidates();
-    if candidates.is_empty() {
-        return Some(Accelerated { moves: plain.solution(), promotions: Vec::new() });
-    }
-
-    let prev: Bits<W> = prev_moves.iter().copied().collect();
-    let promotions = (candidates & prev).largest(frames.estimate_max_promotions);
-    let target = (prev.with(t.n) - (plain.impossible() & prev)).sum();
-
-    let moves = Apiary::<W>::new(t, promotions).solution();
-    let score: u64 = moves.iter().map(|&m| u64::from(m)).sum();
-    (score == target).then(|| Accelerated { moves, promotions: promotions.to_vec() })
-}
-
 /// The game that plays the given promotions: the numbers in `promotions` become moves (they are treated as
 /// sources, see [`crate::hives`]), the hives are formed again around them, and the hives' games are concatenated,
 /// the hives downstream first.
@@ -144,7 +74,7 @@ pub fn reuse_prev<const W: usize>(t: &Tables, frames: &FrameColumns<W>, prev_mov
 /// the game scores `in_the_bag + Σ promotions`, where `in_the_bag` is what [`Apiary::solution`] scores with no
 /// promotions; the solver checks that identity of every game as a cross-check between the hive code and the frame
 /// model.  For a set that is not winnable the hives simply drop the moves they cannot fit, and the game scores
-/// less (which is how [`reuse_prev`] rejects its guesses).
+/// less.
 pub fn solution_for_promotions<const W: usize>(t: &Tables, promotions: Bits<W>) -> Vec<u32> {
     Apiary::<W>::new(t, promotions).solution()
 }

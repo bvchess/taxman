@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Where the time of a hard game goes (docs/IDEAS.md, section 2): solves game N of the strict chain for SECONDS on
+# Where the time of a hard game goes (docs/IDEAS.md, section 2): solves game N of the chain from 1 for SECONDS on
 # THREADS threads, as the chain solves it (its predecessor from a copy of results/strict.jsonl cut before N), samples
 # it with macOS `sample` every millisecond, and charges each sample to a kind of work and a purpose (attribute.py).
 #
@@ -31,7 +31,7 @@ with open(sys.argv[1]) as f, open(sys.argv[2], 'w') as g:
         if json.loads(line)['n'] < int(sys.argv[3]):
             g.write(line)
 " "$CRATE/results/strict.jsonl" "$DIR/prev.jsonl" "$N"
-"$BIN" solve "$N" --strict --threads "$THREADS" --out "$DIR/prev.jsonl" --checkpoint-dir "$DIR/ckpt" \
+"$BIN" solve "$N" --threads "$THREADS" --out "$DIR/prev.jsonl" --checkpoint-dir "$DIR/ckpt" \
     --time-limit "$SECS" --progress 30 > "$DIR/solve.txt" 2> "$DIR/progress.txt" &
 PID=$!
 sleep 5

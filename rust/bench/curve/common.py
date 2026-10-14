@@ -12,10 +12,8 @@ RUST = HERE.parents[1]
 TAXMAN = RUST / "target/release/taxman"
 LADDER = RUST / "target/release/examples/ladder"
 
-# Strict tactics: no unproven tactic.  `reuse_prev` is a solver tactic that the ladder (which only searches)
-# rejects, so the ladder gets `revise_freedoms=off` alone; the result is the same strict search.
-SOLVE_STRICT = ["--tactic", "reuse_prev=off", "--tactic", "revise_freedoms=off"]
-LADDER_STRICT = ["--tactic", "revise_freedoms=off"]
+# The study was made with `--tactic reuse_prev=off --tactic revise_freedoms=off` (no unproven tactic), for `solve`,
+# and `--tactic revise_freedoms=off` for the ladder; both tactics are gone, and the defaults are that search now.
 
 # The runs were made in sessions limited to 10 minutes per command, so a timed-out standalone game (search limit +
 # setup) has to fit in one: the search limit is 585 s rather than 600 s, and one invocation of a driver may run for

@@ -3,16 +3,15 @@
 //! The Java stopped at n = 1000, and the sets that hold the numbers of a board are 8 words wide up
 //! to n = 511, then 16, 20, 24, 28 and 32 words up to 1023, 1279, 1535, 1791 and 2047, and 64 up to 4095
 //! (`bits::WIDTHS`), so nothing above n = 1023 meets anything but these tests and the committed results
-//! (`results/strict.jsonl`, n = 1..1300, and `default.jsonl`, n = 1001..1231; `optimal.json` has the games of the
-//! first, but that is the solver's own answer and no check of it).  What is cheap to run here: the same
+//! (`results/strict.jsonl`, n = 1..1300; `optimal.json` has its games, but that is the solver's own answer and no
+//! check of it).  What is cheap to run here: the same
 //! small game at every width that holds it (a width-dependent bug changes the tree), games of 1100 to 1250 that need
 //! a few thousand nodes against the committed results, and boards of 2048 and more through their setup.
 
 mod common;
 
 use common::{
-    config, prev_of, profile_at_width, stored_games, strict_options, testdata, variants, Config, Game, Profile, Rng,
-    TempDir,
+    config, options, prev_of, profile_at_width, stored_games, testdata, variants, Config, Game, Profile, Rng, TempDir,
 };
 use std::time::Duration;
 use taxman::bits::Bits;
@@ -22,7 +21,7 @@ use taxman::matchbound::{match_bound, MatchBound, MatchGraph};
 use taxman::model::{Model, Scratch, MAX_FRAMES};
 use taxman::numtheory::Tables;
 use taxman::sacrifice::{sacrifice_bound, PuncturedOptions};
-use taxman::search::{Revise, SearchTactics, TaxUnit};
+use taxman::search::{SearchTactics, TaxUnit};
 use taxman::solver::{self, Method, Prev, PrevSource, SolveOptions};
 use taxman::with_width;
 
@@ -96,7 +95,7 @@ fn every_tactic_gives_the_recorded_score_at_w20() {
     let prev = prev_of(&games, 1133);
     for (name, tactics) in variants() {
         for threads in if name == "default" { vec![1, 2] } else { vec![1] } {
-            let mut opts = strict_options(threads);
+            let mut opts = options(threads);
             opts.tactics.search = tactics;
             let r = solver::solve_game(1133, Some(&prev), &opts).unwrap();
             assert!(r.completed && r.method == Method::Search, "{name}");
@@ -107,12 +106,12 @@ fn every_tactic_gives_the_recorded_score_at_w20() {
 }
 
 /// A slice of the chain (every game feeding the next, from game 1126 as the committed results have it) reproduces
-/// the committed results with today's defaults, which the file predates (nogoods, `fix_forced`, forgetting).  The
-/// games are handed on in memory; `tests/integrity.rs` covers the results file.
+/// the committed results' scores with the defaults they were made with (on two threads, not four).  The games are
+/// handed on in memory; `tests/integrity.rs` covers the results file.
 #[test]
-fn a_slice_of_the_strict_chain_reproduces_the_results() {
+fn a_slice_of_the_chain_reproduces_the_results() {
     let games = stored_games("strict.jsonl");
-    let opts = strict_options(2);
+    let opts = options(2);
     let mut prev = prev_of(&games, 1127);
     let mut searched = 0;
     for n in 1127..=1134 {
@@ -120,7 +119,7 @@ fn a_slice_of_the_strict_chain_reproduces_the_results() {
         assert!(r.completed, "n={n}");
         assert_eq!(r.score, games[&n].0, "n={n}");
         searched += usize::from(r.method == Method::Search);
-        prev = Prev { moves: r.moves, score: r.score, source: PrevSource::Run, proof: r.proof, taint: r.taint };
+        prev = Prev { moves: r.moves, score: r.score, source: PrevSource::Run, proof: r.proof, assumes: r.assumes };
     }
     assert!(searched >= 5, "{searched} of the 8 games were searched");
 }
@@ -191,23 +190,20 @@ fn the_sacrifice_bound_proves_a_w20_result() {
 // ---------------------------------------------------------------------------------------------------------
 // Resuming
 
-/// A checkpoint that an earlier build wrote (`testdata/n1133_after_1000_nodes.ckpt`: game 1133 at W = 32 with
-/// `reuse_prev` and `revise_freedoms` off, stopped after 1,023 nodes on one thread; search header format TXSH v3)
-/// still resumes and finishes with the committed score.  Every write/read test of the format uses the code's own
-/// constants, so a change of the layout that round-trips (the version, the byte order of a set, the order of the
-/// header's fields, the packing of the tactics) passes them and refuses this file.  This build gives game 1133
-/// W = 20, so the search also resumes at the width it was made with rather than the one a new search would get.
+/// A checkpoint that an earlier build wrote (`testdata/n1133_after_1000_nodes.ckpt`: game 1133 at W = 20 with
+/// the default tactics, stopped after 1,023 nodes on one thread; search header format TXSH v4) still resumes and
+/// finishes with the committed score.  Every write/read test of the format uses the code's own constants, so a
+/// change of the layout that round-trips (the version, the byte order of a set, the order of the header's fields,
+/// the packing of the tactics) passes them and refuses this file.
 ///
 /// A deliberate change of the format (a new header version, say, which refuses older checkpoints) fails this test.
-/// To make the file again with the new build:
-/// `taxman solve 1133 --threads 1 --tactic reuse_prev=off --tactic revise_freedoms=off --node-limit 1000
-///  --out R --checkpoint-dir D` with `R` holding only game 1132's line of `results/strict.jsonl`, then copy
-/// `D/n1133.ckpt` over the fixture.
+/// To make the file again with the new build: `taxman solve 1133 --use-prev --threads 1 --node-limit 1000 --out R
+/// --checkpoint-dir D` with a new file `R`, then copy `D/n1133.ckpt` over the fixture.
 #[test]
-fn a_committed_checkpoint_of_a_w32_game_resumes() {
+fn a_committed_checkpoint_resumes() {
     let games = stored_games("strict.jsonl");
     let dir = TempDir::new("committed-checkpoint");
-    let opts = SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), ..strict_options(1) };
+    let opts = SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), ..options(1) };
     let checkpoint = opts.checkpoint_file(1133).unwrap();
     std::fs::create_dir_all(checkpoint.parent().unwrap()).unwrap();
     std::fs::copy(testdata("n1133_after_1000_nodes.ckpt"), &checkpoint).unwrap();
@@ -216,8 +212,7 @@ fn a_committed_checkpoint_of_a_w32_game_resumes() {
     assert!(r.completed && r.method == Method::Search);
     assert_eq!(r.score, games[&1133].0);
     assert_eq!(r.invocations, 2, "the game was resumed, not started over");
-    assert_eq!(r.setup.map(|s| s.revise), Some(Revise::Off), "the checkpoint was made without the tactic");
-    assert!(r.taint.is_empty(), "{:?}", r.taint);
+    assert!(r.assumes.is_empty(), "{:?}", r.assumes);
     assert!(r.nodes > 1000, "{} nodes in all, 1,000 of them before the checkpoint", r.nodes);
     assert!(!checkpoint.exists(), "a finished game removes its checkpoint");
 }
@@ -231,7 +226,7 @@ fn a_w20_search_interrupted_and_resumed_gives_the_same_answer() {
     let prev = prev_of(&games, 1133);
     for (name, tactics) in variants().into_iter().take(2) {
         let dir = TempDir::new(&format!("resume-{}", name.replace('=', "-")));
-        let mut opts = strict_options(1);
+        let mut opts = options(1);
         opts.tactics.search = tactics;
         opts.checkpoint_dir = Some(dir.join("ckpt"));
         opts.node_limit = Some(700);
@@ -303,11 +298,11 @@ fn single_promotions_agree_with_the_peel_at_wide_widths() {
 // Deep in the tree of a large game
 
 /// The units a node-limited search of game 1215 leaves in its checkpoint (`testdata/n1215_deep_units.txt`; W = 32,
-/// strict tactics, 30,000 nodes, one thread, from game 1214 of `strict.jsonl`): the levels of its depth-first
+/// default tactics, 30,000 nodes, one thread, from game 1214 of `strict.jsonl`): the levels of its depth-first
 /// stack, from the root to 34 promotions deep.  Returns the checkpoint's incumbent and the units.
 ///
-/// To make such a file again, run `taxman solve 1215 --threads 1 --tactic reuse_prev=off --tactic
-/// revise_freedoms=off --node-limit 30000 --out R --checkpoint-dir D` (`R` holding game 1214's line) and list the
+/// To make such a file again, run `taxman solve 1215 --use-prev --threads 1 --node-limit 30000 --out R
+/// --checkpoint-dir D` (`R` a new file) and list the
 /// members of each unit of `D/n1215.ckpt` (a unit is its promoted set then its candidates, `W` little-endian words
 /// each; the engine's layout is described in `engine.rs`).
 fn deep_units() -> (u64, Vec<TaxUnit<32>>) {

@@ -14,14 +14,13 @@
 //! cargo run --release --example sacrifice -- validate [MAX]
 //!     every board {1..N} without one number h, N <= MAX (default 40): the frame model against the brute force.
 //! cargo run --release --example sacrifice -- range LO HI --out FILE [--threads T] [--games FILE]... [--direct]
-//!     [--target] [--time-limit S] [--select all|needs|reuse|search] [--tactic NAME=VALUE]...
+//!     [--target] [--time-limit S] [--select all|needs|search] [--tactic NAME=VALUE]...
 //!     the bound by the frame model for n = LO..=HI, one JSON line per game appended to FILE (games already in FILE
 //!     are skipped, so a run can be resumed).  Previous games and optima come from optimal.json and the --games
 //!     files (results files of `taxman solve`).  --direct also times solving n itself (force_search).  --target
 //!     only decides whether the bound proves the known optimum (each punctured game stops once it beats it).
 //!     --time-limit applies to each punctured game and to the direct solve.  --select picks the games that are
-//!     neither prime nor exact (needs), and of those the ones reuse_prev derives (reuse) or not (search).  Search
-//!     tactics default to the sound ones (revise_freedoms=off).
+//!     neither prime nor exact (needs), and of those the ones that are not trivial (search).
 //! cargo run --release --example sacrifice -- summary FILE...
 //!     statistics of range files.
 //! ```
@@ -31,16 +30,15 @@ use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
-use taxman::accelerate::reuse_prev;
 use taxman::bits::words_for;
 use taxman::board::Board;
 use taxman::brute::{self, Rule};
 use taxman::game::Optimal;
 use taxman::json::Json;
 use taxman::numtheory::Tables;
-use taxman::results::{Taint, OPTIMAL_JSON};
+use taxman::results::{assumed_optimal, Assumptions};
 use taxman::sacrifice::{bound_value, punctured, sacrifice_bound, PuncturedOptions};
-use taxman::solver::{solve_game_with, OptimalSource, Prev, PrevSource, SolveOptions};
+use taxman::solver::{solve_game_with, Prev, PrevSource, SolveOptions};
 use taxman::tactics::Tactics;
 
 fn main() {
@@ -64,7 +62,7 @@ fn main() {
 /// The known optimal games by n: optimal.json plus the completed games of the results files `extra`.
 fn load_games(extra: &[String]) -> Result<Optimal, String> {
     let paths: Vec<PathBuf> = extra.iter().map(PathBuf::from).collect();
-    SolveOptions::default().known_games(&paths)
+    Optimal::built_in().with_results_files(&paths)
 }
 
 fn secs(d: Duration) -> f64 {
@@ -214,9 +212,7 @@ enum Select {
     All,
     /// Neither prime nor exact: the games that need more than the prime shortcut or the cap.
     Needs,
-    /// Of those, the ones `reuse_prev` derives.
-    Reuse,
-    /// Of those, the ones it does not derive (which need a search).
+    /// Of those, the ones that are not trivial (which need a search).
     Search,
 }
 
@@ -237,9 +233,6 @@ struct RangeOptions {
 /// The `range` mode: parses the options, then computes one line per game `LO..=HI` ([`one_game`]) and appends it to
 /// the output file as soon as it is done, skipping the games the file already has.
 fn range(args: &[String]) -> Result<(), String> {
-    let mut tactics = Tactics::default();
-    tactics.set("reuse_prev=off")?;
-    tactics.set("revise_freedoms=off")?;
     let mut o = RangeOptions {
         lo: 0,
         hi: 0,
@@ -250,7 +243,7 @@ fn range(args: &[String]) -> Result<(), String> {
         target: false,
         time_limit: None,
         select: Select::All,
-        tactics,
+        tactics: Tactics::default(),
     };
     let mut bounds = Vec::new();
     let mut it = args.iter();
@@ -270,9 +263,8 @@ fn range(args: &[String]) -> Result<(), String> {
                 o.select = match value()?.as_str() {
                     "all" => Select::All,
                     "needs" => Select::Needs,
-                    "reuse" => Select::Reuse,
                     "search" => Select::Search,
-                    other => return Err(format!("--select: expected all, needs, reuse or search, got {other}")),
+                    other => return Err(format!("--select: expected all, needs or search, got {other}")),
                 }
             }
             "--tactic" => o.tactics.set(&value()?)?,
@@ -320,12 +312,7 @@ fn one_game<const W: usize>(n: u32, o: &RangeOptions, games: &Optimal) -> Result
     }
     let board = Board::<W>::for_n(n);
     let trivial = board.is_trivial();
-    let reuse = if trivial {
-        None
-    } else {
-        reuse_prev(&board.tables, &board.frames, prev_moves).map(|a| a.moves.iter().map(|&m| u64::from(m)).sum::<u64>())
-    };
-    if (o.select == Select::Reuse && reuse.is_none()) || (o.select == Select::Search && (reuse.is_some() || trivial)) {
+    if o.select == Select::Search && trivial {
         return Ok(None);
     }
 
@@ -353,16 +340,14 @@ fn one_game<const W: usize>(n: u32, o: &RangeOptions, games: &Optimal) -> Result
             tactics: o.tactics,
             threads: o.threads,
             force_search: true,
-            optimal: OptimalSource::None,
             time_limit: o.time_limit,
-            // The previous game is optimal.json's, and the answer is compared with the known optimum.
-            allow_tainted_prev: true,
             ..SolveOptions::default()
         };
-        let taint = Taint::from([OPTIMAL_JSON.to_owned()]);
+        // The previous game is optimal.json's (or a results file's past it): assumed optimal.
+        let assumes = Assumptions::from([assumed_optimal(n - 1)]);
         let prev =
-            Prev { moves: prev_moves.to_vec(), score: prev_score, source: PrevSource::Optimal, proof: None, taint };
-        let r = solve_game_with(n, Some(&prev), &opts, None)?;
+            Prev { moves: prev_moves.to_vec(), score: prev_score, source: PrevSource::Optimal, proof: None, assumes };
+        let r = solve_game_with(n, Some(&prev), &opts, Optimal::built_in())?;
         if r.completed && opt.is_some_and(|s| s != r.score) {
             return Err(format!("n={n}: the direct search scores {}, not {opt:?}", r.score));
         }
@@ -389,13 +374,12 @@ fn one_game<const W: usize>(n: u32, o: &RangeOptions, games: &Optimal) -> Result
         .map(|(h, (f, c))| format!("{f}:{c}{}", if h.exact { "" } else { "?" }))
         .collect();
     println!(
-        "n={n:4} opt {} bound {} tight {} {}{}{} costs [{}] bound {:.2} s{}",
+        "n={n:4} opt {} bound {} tight {} {}{} costs [{}] bound {:.2} s{}",
         opt.map_or("?".into(), |s| s.to_string()),
         bound.value,
         tight.map_or("?", |t| if t { "yes" } else { "NO" }),
         if prime { "prime " } else { "" },
         if opt == Some(prev_score + u64::from(n)) { "exact " } else { "" },
-        reuse.map_or(String::new(), |r| format!("reuse={r} ")),
         costs.join(" "),
         secs(bound.time()),
         match &direct {
@@ -409,7 +393,6 @@ fn one_game<const W: usize>(n: u32, o: &RangeOptions, games: &Optimal) -> Result
         ("prev_opt", Json::from(prev_score)),
         ("prime", Json::Bool(prime)),
         ("trivial", Json::Bool(trivial)),
-        ("reuse", reuse.map_or(Json::Null, Json::from)),
         ("target", target.map_or(Json::Null, Json::from)),
         ("bound", Json::from(bound.value)),
         ("proven", Json::Bool(bound.exact())),
@@ -483,7 +466,7 @@ fn pct(a: usize, b: usize) -> f64 {
 }
 
 /// The `summary` mode: reads range files and prints how often the bound is tight, split by kind of game (prime,
-/// exact, neither; of those trivial, derived by `reuse_prev`, or needing a search), with the time comparisons.
+/// exact, neither; of those trivial, or needing a search), with the time comparisons.
 fn summary(args: &[String]) -> Result<(), String> {
     let mut rows: BTreeMap<u32, Json> = BTreeMap::new();
     for path in args {
@@ -495,9 +478,9 @@ fn summary(args: &[String]) -> Result<(), String> {
         }
     }
     let (lo, hi) = (rows.keys().next().copied().unwrap_or(0), rows.keys().last().copied().unwrap_or(0));
-    let [mut all, mut prime, mut exact, mut trivial, mut needs, mut reuse, mut reuse_needs, mut searched] =
-        std::array::from_fn::<Tally, 8, _>(|_| Tally::default());
-    let (mut reuse_wrong, mut not_proven, mut zero_cost_holes, mut holes) = (0, 0, 0, 0);
+    let [mut all, mut prime, mut exact, mut trivial, mut needs, mut searched] =
+        std::array::from_fn::<Tally, 6, _>(|_| Tally::default());
+    let (mut not_proven, mut zero_cost_holes, mut holes) = (0, 0, 0);
     let mut gaps: Vec<u64> = Vec::new();
     for g in rows.values() {
         let get = |k: &str| g.get(k).and_then(Json::as_u64);
@@ -514,7 +497,6 @@ fn summary(args: &[String]) -> Result<(), String> {
             zero_cost_holes += usize::from(h.get("cost").and_then(Json::as_u64) == Some(0));
         }
         let is_exact = opt == prev + n;
-        let reused = get("reuse");
         if is("prime") {
             prime.add(g);
         } else if is_exact {
@@ -523,15 +505,9 @@ fn summary(args: &[String]) -> Result<(), String> {
             needs.add(g);
             if is("trivial") {
                 trivial.add(g);
-            } else if reused.is_some() {
-                reuse_needs.add(g);
             } else {
                 searched.add(g);
             }
-        }
-        if let Some(r) = reused {
-            reuse.add(g);
-            reuse_wrong += usize::from(r != opt);
         }
     }
     gaps.sort_unstable();
@@ -541,10 +517,7 @@ fn summary(args: &[String]) -> Result<(), String> {
     println!("{}", exact.line("exact (opt = n + opt(n-1)), not prime"));
     println!("{}", needs.line("neither prime nor exact"));
     println!("{}", trivial.line("  of which trivial (no candidates)"));
-    println!("{}", reuse_needs.line("  of which reuse_prev derives"));
     println!("{}", searched.line("  of which need a search"));
-    println!("{}", reuse.line("every game reuse_prev derives"));
-    println!("reuse_prev's score differs from the optimum on {reuse_wrong} games");
     println!("bound not exact (a punctured game stopped: a decision beaten, or a time limit) on {not_proven} games");
     println!("holes with c(f) = 0: {zero_cost_holes} of {holes}");
     let quantiles = |v: &[f64]| {
