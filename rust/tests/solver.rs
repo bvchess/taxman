@@ -3,7 +3,7 @@
 
 mod common;
 
-use common::{options, TempDir};
+use common::{matching_options, options, TempDir};
 use std::fs;
 use std::time::Duration;
 use taxman::bits::Bits;
@@ -42,23 +42,28 @@ fn a_range_reproduces_optimal_json() {
 #[test]
 fn every_tactic_gives_the_same_scores() {
     let optimal = Optimal::built_in();
-    // Each variant is a `--tactic` assignment.
-    let with = |assignment: &str| {
+    // Each variant is a list of `--tactic` assignments, in the order of the tactics (that of its description).
+    let with = |assignments: &str| {
         let mut opts = SolveOptions { force_search: true, ..options(1) };
-        opts.tactics.set(assignment).unwrap();
-        (assignment.to_owned(), opts)
+        for assignment in assignments.split(',') {
+            opts.tactics.set(assignment).unwrap();
+        }
+        (assignments.to_owned(), opts)
     };
     let default = ("default".to_owned(), SolveOptions { force_search: true, ..options(1) });
     let variants = [default].into_iter().chain(
         [
             "seed_incumbent=off",
             "prev_cap=off",
-            "match_refine=0",
-            "match_refine=3",
             "fix_forced=off",
             "nogoods=off",
             "forget_nogoods=off",
-            "lagrange=off",
+            "lagrange=on",
+            "gf2=off",
+            "lagrange=on,gf2=off",
+            "match_refine=0,lagrange=on,gf2=off",
+            "match_refine=3,gf2=off",
+            "fix_forced=off,lagrange=on,gf2=off",
         ]
         .map(with),
     );
@@ -103,7 +108,7 @@ fn an_interrupted_game_resumes_from_its_checkpoint() {
         node_limit: Some(1_000),
         queue_mem_cap: 4,
         force_search: true,
-        ..options(2)
+        ..matching_options(2)
     };
     let checkpoint = dir.0.join("n0600.ckpt");
     let mut pieces = 0;
@@ -125,9 +130,9 @@ fn an_interrupted_game_resumes_from_its_checkpoint() {
     assert!(left.is_empty(), "left behind: {left:?}");
 }
 
-/// Solves `n` (600 or 760, games with a search of a few thousand nodes) and `n + 1` (the prime after it, which takes
-/// `n` as its predecessor) from `base`, with no previous game to start from: a node limit stops the search of `n`,
-/// and a second run, without the limit, resumes it and goes on.  Returns the games of the second run and the lines
+/// Solves `n` (600 or 760, games with a search of a few thousand nodes on the matching path) and `n + 1` (the prime
+/// after it, which takes `n` as its predecessor) from `base`, with no previous game to start from: a node limit stops
+/// the search of `n`, and a second run, without the limit, resumes it and goes on.  Returns the games of the second run and the lines
 /// of the results file, which the verifier accepts.
 fn run_stopped_and_resumed(name: &str, base: SolveOptions, n: u32) -> (Vec<GameResult>, Vec<Json>) {
     let dir = TempDir::new(name);
@@ -158,7 +163,7 @@ fn assumptions(line: &Json) -> Vec<&str> {
 /// next game, built on it.
 #[test]
 fn a_game_resumed_from_its_checkpoint_assumes_nothing() {
-    let (games, lines) = run_stopped_and_resumed("resume", options(1), 600);
+    let (games, lines) = run_stopped_and_resumed("resume", matching_options(1), 600);
     let [resumed, next] = &games[..] else { panic!("{} games", games.len()) };
     assert_eq!((resumed.n, resumed.invocations), (600, 2), "600 was resumed, not started over");
     assert!(resumed.assumes.is_empty(), "{:?}", resumed.assumes);
@@ -175,15 +180,26 @@ fn a_game_resumed_from_its_checkpoint_assumes_nothing() {
 fn a_checkpoint_for_another_game_or_other_tactics_is_refused() {
     let optimal = Optimal::built_in();
     let dir = TempDir::new("refuse");
-    let opts =
-        SolveOptions { checkpoint_dir: Some(dir.0.clone()), node_limit: Some(2_000), force_search: true, ..options(1) };
+    let opts = SolveOptions {
+        checkpoint_dir: Some(dir.0.clone()),
+        node_limit: Some(2_000),
+        force_search: true,
+        ..matching_options(1)
+    };
     assert!(!solver::solve_game_with(600, None, &opts, optimal).unwrap().completed);
     let checkpoint = dir.0.join("n0600.ckpt");
 
-    // Other tactics: each of the five search tactics (a checkpoint records them all), the switches turned the other
+    // Other tactics: each of the six search tactics (a checkpoint records them all), the switches turned the other
     // way and `match_refine` changed.
-    let assignments =
-        ["fix_forced=off", "nogoods=off", "forget_nogoods=off", "lagrange=off", "match_refine=0", "match_refine=2"];
+    let assignments = [
+        "fix_forced=off",
+        "nogoods=off",
+        "forget_nogoods=off",
+        "lagrange=off",
+        "gf2=on",
+        "match_refine=0",
+        "match_refine=2",
+    ];
     for assignment in assignments {
         let mut other = opts.clone();
         other.tactics.set(assignment).unwrap();
@@ -213,8 +229,12 @@ fn a_range_stops_at_an_unfinished_game_and_picks_up_where_it_left_off() {
     let dir = TempDir::new("range");
     let results = dir.0.join("results.jsonl");
     let ckpt = dir.0.join("ckpt");
-    let limited =
-        SolveOptions { checkpoint_dir: Some(ckpt.clone()), node_limit: Some(200), force_search: true, ..options(1) };
+    let limited = SolveOptions {
+        checkpoint_dir: Some(ckpt.clone()),
+        node_limit: Some(200),
+        force_search: true,
+        ..matching_options(1)
+    };
     let mut seen = Vec::new();
     let summary =
         solver::solve_range_each(598, 602, &limited, Some(&results), |r| seen.push((r.n, r.completed))).unwrap();

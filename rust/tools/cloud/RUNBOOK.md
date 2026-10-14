@@ -28,7 +28,7 @@ about scaling beyond 8 threads or about Graviton5 has been measured (section 8).
    up to its 8 threads (section 3).
 3. The big instance, on-demand, for the checks: the large-machine tests, the sweep to 192 threads, the cost of a
    checkpoint pause, and a rehearsal of the whole chain to 1231 with forced interruptions (section 4).
-4. The production chain, from n = 1 or from the committed `results/strict.jsonl` (which holds it to 1300), in
+4. The production chain, from n = 1 or from the committed `results/strict.jsonl` (which holds it to 2175), in
    tmux, on spot or on-demand, with a deadline and a copy of the state kept off the machine (section 5).
 5. Verify, bring the results home, shut everything down (section 6).
 
@@ -55,16 +55,26 @@ checkpoints, `taxman.lock`), `logs/`, `chain.pid`, `deadline`.  Nothing is writt
 
 `chain.sh N` runs `taxman solve 1-N` into one results file: every game from n = 1, each built from the one before.
 Nothing is taken from `optimal.json` (it is only compared with, to n = 1300), so nothing assumes it.  The committed
-`results/strict.jsonl` is exactly such a file for n = 1 to 1300, made on a laptop
+`results/strict.jsonl` is exactly such a file for n = 1 to 2175, made on a laptop
 ([results/README.md](../../results/README.md)): a run from n = 1 reproduces its scores (the run is checked against it by
-`verify.sh`), and the production chain can instead start from it, as section 5 says, so that only the games above 1300
+`verify.sh`), and the production chain can instead start from it, as section 5 says, so that only the games above 2175
 are new.  The solver is the same code as on a laptop; the machine only changes how long it takes.
 
-Cost grows by a factor of 10 for every 55 to 70 in n past 1200 ([bench/curve/README.md](../../bench/curve/README.md)).
+**With the GF(2) bound** (the default since 2026-10;
+[docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#the-gf2-bound-in-the-search-2026-10)): a chain from `optimal.json`'s game of 1300 reached 2175 in 92 minutes of game time on 2 threads of the M1 Max, the
+dearest game 2170 at 290 s, its cost in waves (bands of 25 n from 11 s to 850 s) that follow the root's GF(2) gap,
+with no growth a fit over 1301-2175 resolves.  Taking the 192-core machine as 43 to 86 times those 2 threads (an
+assumption), a day reaches the end of the set widths, n = 4095, at every slope those data support, and even at the
+steepest any GF(2) measurement has shown (×10 per 413 n), a day reaches about 3200 and a week about 3600.  How a
+search of 10^5-10^6 nodes spreads over 192 threads has not been measured (to 4 threads: 2.9 times one).  What
+follows is the matching path's estimate (`--tactic gf2=off --tactic lagrange=on`, the default before), kept for
+comparison.
+
+Cost grew by a factor of 10 for every 55 to 70 in n past 1200 ([bench/curve/README.md](../../bench/curve/README.md)).
 From that file, the cost of extending the chain from 1231 to N on a 192-core machine, taking it to be 10 to 19 times
 the 8 M1 threads of the measurements (an assumption, not a measurement), and the prices it assumes ($3.33/h spot,
-$8.35/h on-demand for the 48xlarge; check the current ones).  Starting from the committed file, the part of the
-cost up to 1300 is already paid:
+$8.35/h on-demand for the 48xlarge; check the current ones).  Starting from a file that holds 1..1300 (the committed
+file did when this was written; it now holds 2175), the part of the cost up to 1300 is already paid:
 
 | N | time | spot | on-demand |
 |---|---|---|---|
@@ -347,19 +357,19 @@ optional) are documented at the top of the script: `THREADS`, `CHECKPOINT_INTERV
 `DEADLINE_HOURS`, `POWEROFF`, `MAX_FAILS`, `S3_DEST`, `SAVE_EVERY`.
 
 * **Where the chain starts.**  From an empty `~/taxman-work`, `chain.sh` solves from n = 1, which reproduces the
-  committed `rust/results/strict.jsonl` (n = 1 to 1300; the scores equal, the moves may differ) in minutes on the big
+  committed `rust/results/strict.jsonl` (n = 1 to 2175; the scores equal, the moves may differ) in minutes on the big
   machine, and `verify.sh` then checks the machine and the build against it.  To skip those games, copy the committed
   file in before the first run, once:
 
   ```
   mkdir -p ~/taxman-work/results && cp rust/results/strict.jsonl ~/taxman-work/results/strict.jsonl
-  rust/tools/cloud/chain.sh 1400                    # skips the 1300 games it holds and solves 1301 on
+  rust/tools/cloud/chain.sh 2300                    # skips the 2175 games it holds and solves 2176 on
   ```
 
   The file is checked when `chain.sh` opens it, assumes nothing (a chain from n = 1), and its lines
-  keep the build that made them (commit 271c817), as the lines added will keep the cloud's.  It was made in one
+  keep the build that made them (commit feba6d0), as the lines added will keep the cloud's.  It was made in one
   invocation and holds no incomplete line.  The comparison of `verify.sh` with the committed file is then
-  trivial for 1..1300, so the games above 1300 are checked by the referees alone (each game replayed, the chain
+  trivial for 1..2175, so the games above 2175 are checked by the referees alone (each game replayed, the chain
   bounds, Franklín–Moniot, the heuristic chain); a run from n = 1 is the cross-check of the machine and the build.  On
   a replacement machine, restore the saved state instead (below), never the committed file over it.
 
@@ -388,9 +398,11 @@ htop                                          # all 192 cores near 100 %
 
 A healthy progress line at 192 threads: `eff` 95 % or more, `lock` under 1 %, `idle` small, `queue` a few hundred at most,
 `spilled 0`, `pauses N (x%)` with x under 1, `best` rising early and then still (the incumbent is often, not always,
-found long before the proof ends).  The node rate grows with the thread count: 100 to 130 thousand per thread on the M1 at
-n = 1200, so several tens of millions per second at 192 threads if the cores scale.  Estimate when a long game will end
-from the previous ones: the log has each game's seconds, and the curve moves by roughly 10 per 55 to 70 in n.
+found long before the proof ends).  The node rate grows with the thread count: with the GF(2) bound 7 to 9 thousand
+per thread on the M1 at n = 1200-1300 and about 3 thousand past 2000 (the matching path's was 100 to 130 thousand, in
+trees a hundred times larger), so about a million per second at 192 threads if the cores scale.  Estimate when a long
+game will end from the previous ones: the log has each game's seconds; past 1300 they come in waves of a few hundred
+n, not on a smooth curve.
 
 ### Surviving a spot interruption
 

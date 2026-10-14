@@ -922,8 +922,8 @@ fn spill_dir(opts: &SolveOptions, n: u32) -> (PathBuf, bool) {
 // Repeats of earlier searches
 
 /// How far back a game looks for an earlier game whose search problem it repeats (tactic `same_search`): the board
-/// sizes `n − SAME_SEARCH_WINDOW` to `n − 1`.  A board's frames change a little with each number: each of the 545
-/// games of the strict chain 1..1300 whose problem an earlier game posed repeats the last board size before it that
+/// sizes `n − SAME_SEARCH_WINDOW` to `n − 1`.  A board's frames change a little with each number: each of the 914
+/// games of the strict chain 1..2175 whose problem an earlier game posed repeats the last board size before it that
 /// set a search up, `n − 1`, or `n − 2` when `n − 1` is prime (docs/EXPERIMENTS.md, "Same search").  The window
 /// keeps the setups a range starts with to a few, and makes the game repeated a function of the window's games alone.
 pub const SAME_SEARCH_WINDOW: u32 = 8;

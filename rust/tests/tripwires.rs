@@ -27,51 +27,78 @@ use taxman::search::SearchTactics;
 use taxman::tactics::Tactics;
 use taxman::with_width;
 
-/// (board, tactics as `--tactic` assignments, promotion sum, nodes): the game searched from the frame builder on one
-/// thread.  The Lagrangian bound (tactic `lagrange`) first fits its multipliers after 2,000 steps, so the games that
-/// take fewer (480, 640) do not see it; its rows `lagrange=off` are the trees of the build before it.
-const EXPECTED: [(u32, &str, u64, u64); 30] = [
-    // W = 8, the small end: every tactic's effect shows in a few hundred nodes.
-    (480, "default", 5350, 393),
-    (480, "nogoods=off", 5350, 417),
-    (480, "fix_forced=off", 5350, 503),
-    (480, "match_refine=0", 5350, 431),
-    (480, "match_refine=3", 5350, 254),
+/// (board, tactics, promotion sum, nodes): the game searched from the frame builder on one thread.  The tactics are
+/// `--tactic` assignments after the default or `matching`, the tactics of the matching path
+/// ([`SearchTactics::matching`], the default before the GF(2) bound).  The Lagrangian bound (tactic `lagrange`) first
+/// fits its multipliers after 2,000 steps, so the games that take fewer (480, 640) do not see it; the matching path's
+/// rows `lagrange=off` are the trees of the build before it.
+const EXPECTED: [(u32, &str, u64, u64); 49] = [
+    // The default, the GF(2) bound: trees of tens to thousands of nodes; `lagrange=on` (which refits after 2,000
+    // steps) changes none of them.
+    (480, "default", 5350, 72),
+    (600, "default", 8507, 768),
+    (600, "fix_forced=off", 8507, 716),
+    (600, "nogoods=off", 8507, 965),
+    (640, "default", 9220, 39),
+    (660, "default", 10242, 1098),
+    (660, "fix_forced=off", 10242, 1009),
+    (660, "nogoods=off", 10242, 1467),
+    (760, "default", 14170, 321),
+    (936, "default", 20507, 2201),
+    (936, "fix_forced=off", 20507, 1685),
+    (936, "nogoods=off", 20507, 2330),
+    (936, "lagrange=on", 20507, 2201),
+    (1000, "default", 24168, 5386),
+    (1000, "fix_forced=off", 24168, 4427),
+    (1000, "nogoods=off", 24168, 18410),
+    (1000, "lagrange=on", 24168, 5386),
+    (1133, "default", 28690, 93),
+    (1133, "nogoods=off", 28690, 117),
+    // The matching path.  W = 8, the small end: every tactic's effect shows in a few hundred nodes.
+    (480, "matching", 5350, 393),
+    (480, "matching,nogoods=off", 5350, 417),
+    (480, "matching,fix_forced=off", 5350, 503),
+    (480, "matching,match_refine=0", 5350, 431),
+    (480, "matching,match_refine=3", 5350, 254),
     // W = 16: games of a few hundred to ten thousand nodes.
-    (600, "default", 8507, 4558),
-    (600, "lagrange=off", 8507, 5877),
-    (600, "nogoods=off", 8507, 17740),
-    (600, "fix_forced=off", 8507, 7723),
-    (600, "match_refine=0", 8507, 4711),
-    (600, "match_refine=3", 8507, 3469),
-    (640, "default", 9220, 676),
-    (640, "nogoods=off", 9220, 1099),
-    (640, "fix_forced=off", 9220, 1569),
-    (660, "default", 10242, 8822),
-    (660, "lagrange=off", 10242, 10043),
-    (660, "nogoods=off", 10242, 14817),
-    (660, "fix_forced=off", 10242, 14657),
-    (760, "default", 14170, 2318),
-    (760, "lagrange=off", 14170, 2567),
-    (760, "nogoods=off", 14170, 3361),
-    (760, "fix_forced=off", 14170, 4317),
-    (760, "match_refine=3", 14170, 1643),
+    (600, "matching", 8507, 4558),
+    (600, "matching,lagrange=off", 8507, 5877),
+    (600, "matching,nogoods=off", 8507, 17740),
+    (600, "matching,fix_forced=off", 8507, 7723),
+    (600, "matching,match_refine=0", 8507, 4711),
+    (600, "matching,match_refine=3", 8507, 3469),
+    (640, "matching", 9220, 676),
+    (640, "matching,nogoods=off", 9220, 1099),
+    (640, "matching,fix_forced=off", 9220, 1569),
+    (660, "matching", 10242, 8822),
+    (660, "matching,lagrange=off", 10242, 10043),
+    (660, "matching,nogoods=off", 10242, 14817),
+    (660, "matching,fix_forced=off", 10242, 14657),
+    (760, "matching", 14170, 2318),
+    (760, "matching,lagrange=off", 14170, 2567),
+    (760, "matching,nogoods=off", 14170, 3361),
+    (760, "matching,fix_forced=off", 14170, 4317),
+    (760, "matching,match_refine=3", 14170, 1643),
     // W = 16, and without the Lagrangian bound a search of more than 50,000 steps, which forgets its nogoods once
     // (`forget_nogoods=off` as well: 56,990).
-    (936, "default", 20507, 41653),
-    (936, "lagrange=off", 20507, 59055),
+    (936, "matching", 20507, 41653),
+    (936, "matching,lagrange=off", 20507, 59055),
     // W = 20, the frontier's width.
-    (1133, "default", 28690, 2122),
-    (1133, "lagrange=off", 28690, 2386),
-    (1133, "nogoods=off", 28690, 5269),
-    (1133, "fix_forced=off", 28690, 4848),
-    (1133, "match_refine=0", 28690, 2156),
+    (1133, "matching", 28690, 2122),
+    (1133, "matching,lagrange=off", 28690, 2386),
+    (1133, "matching,nogoods=off", 28690, 5269),
+    (1133, "matching,fix_forced=off", 28690, 4848),
+    (1133, "matching,match_refine=0", 28690, 2156),
 ];
 
 fn tactics(assignments: &str) -> SearchTactics {
     let mut tactics = Tactics::default();
-    for assignment in assignments.split(',').filter(|a| *a != "default") {
-        tactics.set(assignment).unwrap();
+    for assignment in assignments.split(',') {
+        match assignment {
+            "default" => {}
+            "matching" => tactics.search = SearchTactics::matching(),
+            _ => tactics.set(assignment).unwrap(),
+        }
     }
     tactics.search
 }
@@ -96,7 +123,7 @@ fn check_trees(ns: &[u32]) {
 }
 
 /// The boards of [`EXPECTED`] in three tests, so that the test threads share the work; every board is in one.
-const GROUPS: [&[u32]; 3] = [&[480, 600, 640], &[660, 760], &[936, 1133]];
+const GROUPS: [&[u32]; 3] = [&[480, 600, 640], &[660, 760, 1000], &[936, 1133]];
 
 #[test]
 fn the_search_trees_of_480_600_and_640_have_not_changed() {
@@ -104,7 +131,7 @@ fn the_search_trees_of_480_600_and_640_have_not_changed() {
 }
 
 #[test]
-fn the_search_trees_of_660_and_760_have_not_changed() {
+fn the_search_trees_of_660_760_and_1000_have_not_changed() {
     check_trees(GROUPS[1]);
 }
 
@@ -116,6 +143,7 @@ fn the_search_trees_of_936_and_1133_have_not_changed() {
 #[test]
 fn every_board_of_the_table_is_checked() {
     let mut boards: Vec<u32> = EXPECTED.iter().map(|row| row.0).collect();
+    boards.sort_unstable();
     boards.dedup();
     let mut covered: Vec<u32> = GROUPS.concat();
     covered.sort_unstable();
@@ -126,14 +154,16 @@ fn every_board_of_the_table_is_checked() {
 /// search.
 #[test]
 fn a_search_on_one_thread_is_deterministic() {
-    let d = SearchTactics::default();
-    assert_eq!(search_at_width::<16>(760, d), search_at_width::<16>(760, d));
+    for (n, t) in [(1000, SearchTactics::default()), (760, SearchTactics::matching())] {
+        assert_eq!(search_at_width::<16>(n, t), search_at_width::<16>(n, t), "n={n}");
+    }
 }
 
 /// (game, nodes forgetting the nogoods every 500 steps, nodes never forgetting) for [`forgetting_search`].
 const FORGETTING: (u32, u64, u64) = (600, 5500, 4558);
 
-/// The tree below the root of a game, searched by one searcher that forgets its nogoods every `period` steps
+/// The tree below the root of a game, searched on the matching path (the GF(2) bound's trees of the small games
+/// are too small for forgetting to matter) by one searcher that forgets its nogoods every `period` steps
 /// (`None`: never), from the greedy incumbent; returns (best, nodes).  A search forgets for the first time after
 /// 50,000 steps (`NOGOOD_PERIOD`), so the games that finish sooner never meet what a long search meets all the
 /// time: conflicts that the table no longer holds, that only the propagation of the node's known conflicts into its
@@ -141,7 +171,7 @@ const FORGETTING: (u32, u64, u64) = (600, 5500, 4558);
 /// that propagation off: no count changes below 50,000 steps (600, 760, 936, 1133, 1140, 1150), but forgetting
 /// every 500 steps costs it 0.9 % at n = 600, and n = 992 (4.2M nodes) 22 %.
 fn forgetting_search(game: &Game<16>, period: Option<u64>) -> (u64, u64) {
-    let cfg = Config { period, ..Config::standard() };
+    let cfg = Config { period, ..Config::matching() };
     let start = greedy(&game.model, &game.root, &game.candidates).sum();
     let out = game.search(cfg, vec![game.root_unit()], start, None, None);
     assert!(out.completed && out.real);

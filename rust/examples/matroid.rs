@@ -1,7 +1,10 @@
-//! Matroid bounds for the promotions: the heaviest common independent set of the two GF(2) frame matroids
-//! (`common/meet.rs` has the matroids, the proof that every promotable set is independent in both, and the
-//! intersection algorithm), measured against the matching bound at the roots and at search nodes.  Research code:
-//! nothing in the solver calls it.  The study is in docs/EXPERIMENTS.md, "Matroid intersection bounds (2026-10)".
+//! Matroid bounds for the promotions: the heaviest common independent set of the two GF(2) frame matroids,
+//! measured against the matching bound at the roots and at search nodes, and the search's proofs with it.  The
+//! search's bound is the crate's `taxman::gf2` (tactic `gf2`), which `prove` runs; the other commands are the study
+//! that led to it and use its research implementation, `common/meet.rs` (the matroids built afresh at each node, a
+//! reference algorithm and a fast one), which stays as an independent check of the crate's (`nodes` asserts that the
+//! crate's contraction gives the matroids built at the node).  The studies are in docs/EXPERIMENTS.md, "Matroid
+//! intersection bounds (2026-10)" and "The GF(2) bound in the search (2026-10)".
 //!
 //! ```text
 //! cargo run --release --example matroid -- roots [--known FILE] [--opts FILE] N|A-B...
@@ -14,6 +17,8 @@
 //! cargo run --release --example matroid -- forced [--every K] FIXTURE...
 //! cargo run --release --example matroid -- cores N|A-B...
 //! cargo run --release --example matroid -- whole [--known FILE] N|A-B...
+//! cargo run --release --example matroid -- prove [--known FILE] [--tactic NAME=VALUE]... [--branching B]
+//!     [--prefilter] [--strong K] [--first-forced] [--threads T] [--seconds S] N|A-B...
 //! ```
 //!
 //! Games are set up as `taxman solve` sets them up (the default tactics, which are strict).  `P*` is the
@@ -39,6 +44,11 @@
 //! * **cores**: the cores that the GF(2) bound's heaviest set runs into at the root, and whether Lorea's matroid
 //!   sees them.
 //! * **whole**: the same bound for the whole game, with no frame model: an upper bound on `opt(n)` ([`whole`]).
+//! * **prove**: the search's proof that nothing beats `P*`, with the search tactics of `--tactic` (named as for
+//!   `taxman solve`) and the GF(2) bound's knobs, which are not tactics: `--branching` (`exact`, the default;
+//!   `split`, the member whose split bound is lowest; `largest`; `forced`, exact solves only to find forced
+//!   members), `--prefilter` (the matching bound as a first check), `--strong K` (solve at most K members of a
+//!   conflict) and `--first-forced` (stop solving at the first forced member) ([`prove`]).
 
 #[path = "common/meet.rs"]
 mod meet;
@@ -58,8 +68,11 @@ use taxman::json::Json;
 use taxman::matchbound::lagrange::SCALE;
 use taxman::matchbound::{MatchBound, MatchGraph};
 use taxman::model::{FrameSet, Model, Scratch};
-use taxman::search::{Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
+use taxman::search::{stat, Gf2Branching, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
+use taxman::tactics::Tactics;
 
+#[path = "common/counters.rs"]
+mod counters;
 #[path = "common/fixtures.rs"]
 #[allow(dead_code)] // the hex writer is the probe's
 mod fixtures;
@@ -307,6 +320,13 @@ struct Options {
     every: usize,
     exact: u64,
     lagrange: usize,
+    tactics: SearchTactics,
+    prefilter: bool,
+    branching: Gf2Branching,
+    strong: usize,
+    more_forced: bool,
+    threads: usize,
+    seconds: Option<u64>,
 }
 
 fn parse() -> Result<Options, String> {
@@ -324,6 +344,13 @@ fn parse() -> Result<Options, String> {
         every: 1,
         exact: 0,
         lagrange: 0,
+        tactics: SearchTactics::default(),
+        prefilter: false,
+        branching: Gf2Branching::Exact,
+        strong: usize::MAX,
+        more_forced: true,
+        threads: 1,
+        seconds: None,
     };
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -334,6 +361,32 @@ fn parse() -> Result<Options, String> {
             "--exact" => o.exact = args.next().ok_or("--exact needs seconds")?.parse().map_err(|e| format!("{e}"))?,
             "--lagrange" => {
                 o.lagrange = args.next().ok_or("--lagrange needs a value")?.parse().map_err(|e| format!("{e}"))?
+            }
+            "--tactic" => {
+                let spec = args.next().ok_or("--tactic needs NAME=VALUE")?;
+                let mut t = Tactics { search: o.tactics, ..Tactics::default() };
+                t.set(&spec)?;
+                o.tactics = t.search;
+            }
+            "--prefilter" => o.prefilter = true,
+            "--first-forced" => o.more_forced = false,
+            "--strong" => {
+                o.strong = args.next().ok_or("--strong needs a value")?.parse().map_err(|e| format!("{e}"))?
+            }
+            "--branching" => {
+                o.branching = match args.next().ok_or("--branching needs a value")?.as_str() {
+                    "largest" => Gf2Branching::Largest,
+                    "split" => Gf2Branching::Split,
+                    "exact" => Gf2Branching::Exact,
+                    "forced" => Gf2Branching::Forced,
+                    other => return Err(format!("unknown branching {other:?}")),
+                }
+            }
+            "--threads" => {
+                o.threads = args.next().ok_or("--threads needs a value")?.parse().map_err(|e| format!("{e}"))?
+            }
+            "--seconds" => {
+                o.seconds = Some(args.next().ok_or("--seconds needs a value")?.parse().map_err(|e| format!("{e}"))?)
             }
             "--bounds" => {
                 let list = args.next().ok_or("--bounds needs a list")?;
@@ -350,7 +403,7 @@ fn parse() -> Result<Options, String> {
             "--samples" => {
                 o.samples = args.next().ok_or("--samples needs a value")?.parse().map_err(|e| format!("{e}"))?
             }
-            file if o.command == "nodes" || o.command == "forced" => o.files.push(file.into()),
+            file if ["nodes", "forced"].contains(&o.command.as_str()) => o.files.push(file.into()),
             range => {
                 let parse_n = |t: &str| t.parse::<u32>().map_err(|e| format!("{range}: {e}"));
                 match range.split_once('-') {
@@ -387,6 +440,11 @@ fn main() {
             for path in &o.files {
                 let n = first_n(path);
                 taxman::with_width!(n, W => nodes::<W>(path, o.every, o.samples, o.lagrange, o.exact));
+            }
+        }
+        "prove" => {
+            for &n in &o.games {
+                taxman::with_width!(n, W => prove::<W>(n, &known, &o));
             }
         }
         "bnb" => {
@@ -1053,7 +1111,8 @@ fn cores<const W: usize>(n: u32) {
             !lorea_independent(&core_lists)
         ));
     }
-    println!("{{\"n\":{n},\"cores\":[{}]}}", found.join(","));
+    let ranks: Vec<String> = fm.ranks.iter().map(usize::to_string).collect();
+    println!("{{\"n\":{n},\"ranks\":[{}],\"cores\":[{}]}}", ranks.join(","), found.join(","));
 }
 
 /// Whether the lists (one per mover) are independent in Lorea's hypergraphic matroid, a ground factor added to
@@ -1145,4 +1204,69 @@ fn forced<const W: usize>(path: &Path, every: usize) {
             exact_time.as_secs_f64(),
         );
     }
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// prove
+
+/// The search's proof that nothing beats `P*` (its incumbent a value, `P*`, with no set behind it; no seed, no cap),
+/// with the search tactics of `--tactic` and the GF(2) knobs `--prefilter` and `--branching`: nodes (steps),
+/// seconds, the cycles and instructions of the process, and the GF(2) bound's counters.  On one thread (the
+/// default) the node counts are exact and repeatable, and compare with `examples/slope.rs`'s `prove` at δ = 0.
+fn prove<const W: usize>(n: u32, known: &Known, o: &Options) {
+    let board = Board::<W>::for_n(n);
+    if board.is_trivial() {
+        return;
+    }
+    let Some(opt) = known.opt(n, board.in_the_bag) else {
+        eprintln!("n={n}: no known optimum, skipped");
+        return;
+    };
+    let p = board.prepare(o.tactics).expect("prepare");
+    let graph = MatchGraph::new(&p.model, &p.root);
+    let space = SearchSpace {
+        gf2_prefilter: o.prefilter,
+        gf2_branching: o.branching,
+        gf2_strong_limit: o.strong,
+        gf2_more_forced: o.more_forced,
+        ..SearchSpace::new(&p, &graph, None)
+    };
+    let cfg = EngineConfig {
+        threads: o.threads,
+        time_limit: o.seconds.map(std::time::Duration::from_secs),
+        ..EngineConfig::default()
+    };
+    let start = Start::Fresh {
+        units: vec![TaxUnit { promoted: Bits::<W>::EMPTY, cands: p.candidates }],
+        best: opt,
+        payload: vec![0u8; 8 * W],
+    };
+    let before = counters::now();
+    let t0 = Instant::now();
+    let out = engine::run(&cfg, start, b"matroid-prove", |_| TaxSearcher::new(&space)).expect("search");
+    let time = t0.elapsed();
+    let after = counters::now();
+    let (instructions, cycles) = match (before, after) {
+        (Some((i0, c0)), Some((i1, c1))) => (i1 - i0, c1 - c0),
+        _ => (0, 0),
+    };
+    let x = out.stats.extra;
+    println!(
+        "{{\"n\":{n},\"opt\":{opt},\"tactics\":\"{}\",\"prefilter\":{},\"branching\":\"{:?}\",\"threads\":{},\
+         \"completed\":{},\"best\":{},\"nodes\":{},\"seconds\":{:.3},\"cycles\":{cycles},\"instructions\":{instructions},\
+         \"checks\":{},\"gf2_solves\":{},\"gf2_augmentations\":{},\"gf2_strong_solves\":{},\"gf2_strong_augmentations\":{}}}",
+        Tactics { search: o.tactics, ..Tactics::default() }.description(),
+        o.prefilter,
+        o.branching,
+        o.threads,
+        out.completed,
+        out.best,
+        out.stats.nodes,
+        time.as_secs_f64(),
+        x[stat::MATCH_BOUNDS],
+        x[stat::GF2_SOLVES],
+        x[stat::GF2_AUGMENTATIONS],
+        x[stat::GF2_STRONG_SOLVES],
+        x[stat::GF2_STRONG_AUGMENTATIONS],
+    );
 }

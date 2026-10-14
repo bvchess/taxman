@@ -18,13 +18,14 @@ use std::time::Instant;
 use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::engine::{self, EngineConfig, Start};
+use taxman::gf2::Gf2Graph;
 use taxman::json::Json;
 use taxman::matchbound::MatchGraph;
 use taxman::model::{FrameSet, Model, Scratch};
 use taxman::numtheory::Tables;
 use taxman::results::Assumptions;
 use taxman::search::lagrange::Refits;
-use taxman::search::{search, SearchSpace, SearchTactics, TaxSearcher, TaxUnit, NOGOOD_PERIOD};
+use taxman::search::{search, Gf2Branching, SearchSpace, SearchTactics, TaxSearcher, TaxUnit, NOGOOD_PERIOD};
 use taxman::solver::{Prev, PrevSource, SolveOptions};
 
 /// A committed file under `testdata/`.
@@ -91,21 +92,34 @@ pub fn prev_of(games: &StoredGames, n: u32) -> Prev {
     Prev { moves: moves.clone(), score: *score, source: PrevSource::Results, proof: None, assumes: Assumptions::new() }
 }
 
-/// The default options on `threads` threads, which `results/strict.jsonl` was made with.
+/// The default options on `threads` threads.
 pub fn options(threads: usize) -> SolveOptions {
     SolveOptions { threads, ..SolveOptions::default() }
 }
 
-/// The search tactics a differential test compares: the default and every sound variant that is cheap at n ~ 1100.
+/// [`options`] with the search tactics of the matching path ([`SearchTactics::matching`], which
+/// `results/strict.jsonl` was made with): for the tests that stop a search of a small game by a node limit.
+pub fn matching_options(threads: usize) -> SolveOptions {
+    let mut opts = options(threads);
+    opts.tactics.search = SearchTactics::matching();
+    opts
+}
+
+/// The search tactics a differential test compares: the default and every sound variant that is cheap at n ~ 1100,
+/// then the matching path ([`SearchTactics::matching`]) and its variants.
 pub fn variants() -> Vec<(&'static str, SearchTactics)> {
-    let d = SearchTactics::default();
+    let (d, m) = (SearchTactics::default(), SearchTactics::matching());
     vec![
         ("default", d),
         ("nogoods=off", SearchTactics { nogoods: false, ..d }),
         ("fix_forced=off", SearchTactics { fix_forced: false, ..d }),
         ("forget_nogoods=off", SearchTactics { forget_nogoods: false, ..d }),
-        ("match_refine=0", SearchTactics { match_refine: 0, ..d }),
-        ("match_refine=3", SearchTactics { match_refine: 3, ..d }),
+        ("lagrange=on", SearchTactics { lagrange: true, ..d }),
+        ("matching", m),
+        ("matching,nogoods=off", SearchTactics { nogoods: false, ..m }),
+        ("matching,fix_forced=off", SearchTactics { fix_forced: false, ..m }),
+        ("matching,match_refine=0", SearchTactics { match_refine: 0, ..m }),
+        ("matching,match_refine=3", SearchTactics { match_refine: 3, ..m }),
     ]
 }
 
@@ -189,12 +203,21 @@ pub struct Config {
     /// When a searcher refits the multipliers of its Lagrangian bound; `None` without that bound.
     pub refits: Option<Refits>,
     pub threads: usize,
+    /// The GF(2) bound (tactic `gf2`), and with it the matching bound as a first check and the branching.
+    pub gf2: bool,
+    pub gf2_prefilter: bool,
+    pub gf2_branching: Gf2Branching,
 }
 
 impl Config {
     /// The default tactics on one thread.
     pub fn standard() -> Config {
         Config::of(&SearchTactics::default())
+    }
+
+    /// The tactics of the matching path ([`SearchTactics::matching`]) on one thread.
+    pub fn matching() -> Config {
+        Config::of(&SearchTactics::matching())
     }
 
     pub fn of(t: &SearchTactics) -> Config {
@@ -205,6 +228,9 @@ impl Config {
             period: t.forget_nogoods.then_some(NOGOOD_PERIOD),
             refits: (t.nogoods && t.lagrange).then_some(Refits::SEARCH),
             threads: 1,
+            gf2: t.gf2,
+            gf2_prefilter: false,
+            gf2_branching: Gf2Branching::Exact,
         }
     }
 }
@@ -288,6 +314,11 @@ impl<const W: usize> Game<W> {
             diagnostics: None,
             began: Instant::now(),
             found: Mutex::new(None),
+            gf2: cfg.gf2.then(|| Gf2Graph::new(&self.model, &self.root, &self.candidates)),
+            gf2_prefilter: cfg.gf2_prefilter,
+            gf2_branching: cfg.gf2_branching,
+            gf2_strong_limit: usize::MAX,
+            gf2_more_forced: true,
         };
         let engine = engine.unwrap_or_else(|| config(cfg.threads));
         let start = match resume {

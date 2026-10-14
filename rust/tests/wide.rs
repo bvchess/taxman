@@ -3,15 +3,16 @@
 //! The Java stopped at n = 1000, and the sets that hold the numbers of a board are 8 words wide up
 //! to n = 511, then 16, 20, 24, 28 and 32 words up to 1023, 1279, 1535, 1791 and 2047, and 64 up to 4095
 //! (`bits::WIDTHS`), so nothing above n = 1023 meets anything but these tests and the committed results
-//! (`results/strict.jsonl`, n = 1..1300; `optimal.json` has its games, but that is the solver's own answer and no
-//! check of it).  What is cheap to run here: the same
+//! (`results/strict.jsonl`, n = 1..2175; `optimal.json` has its games to 1300, but that is the solver's own answer
+//! and no check of it).  What is cheap to run here: the same
 //! small game at every width that holds it (a width-dependent bug changes the tree), games of 1100 to 1250 that need
 //! a few thousand nodes against the committed results, and boards of 2048 and more through their setup.
 
 mod common;
 
 use common::{
-    config, options, prev_of, profile_at_width, stored_games, testdata, variants, Config, Game, Profile, Rng, TempDir,
+    config, matching_options, options, prev_of, profile_at_width, stored_games, testdata, variants, Config, Game,
+    Profile, Rng, TempDir,
 };
 use std::time::Duration;
 use taxman::bits::Bits;
@@ -51,18 +52,23 @@ fn the_search_does_not_depend_on_the_width() {
             assert_eq!(profile, at8, "n={n} at W={w}");
         }
     }
-    let at16 = profile_at_width::<16>(760, default, None);
-    assert!(at16.completed && at16.nodes > 1000, "{} nodes", at16.nodes);
-    assert_eq!(profile_at_width::<32>(760, default, None), at16, "n=760 at W=32");
-    assert_eq!(profile_at_width::<64>(760, default, None), at16, "n=760 at W=64");
+    // Boards that W = 16 holds, with trees of more than 1,000 nodes: on the matching path and with the GF(2) bound.
+    let matching = SearchTactics::matching();
+    for (n, tactics) in [(760, matching), (1000, default)] {
+        let at16 = profile_at_width::<16>(n, tactics, None);
+        assert!(at16.completed && at16.nodes > 1000, "n={n}: {} nodes", at16.nodes);
+        assert_eq!(profile_at_width::<32>(n, tactics, None), at16, "n={n} at W=32");
+        assert_eq!(profile_at_width::<64>(n, tactics, None), at16, "n={n} at W=64");
+    }
 
-    // A board that needs W = 20, under two of the tactic settings.
-    for (name, tactics) in variants().into_iter().take(2) {
-        let at20 = profile_at_width::<20>(1133, tactics, None);
-        assert!(at20.completed && at20.nodes > 500, "{name}: {} nodes", at20.nodes);
-        assert_eq!(profile_at_width::<24>(1133, tactics, None), at20, "{name}: n=1133 at W=24");
-        assert_eq!(profile_at_width::<32>(1133, tactics, None), at20, "{name}: n=1133 at W=32");
-        assert_eq!(profile_at_width::<64>(1133, tactics, None), at20, "{name}: n=1133 at W=64");
+    // Boards that need W = 20: 1133 on the matching path, and 1050 with the GF(2) bound (which searches 1133 in a
+    // hundred nodes).
+    for (n, name, tactics) in [(1133, "matching", matching), (1050, "default", default)] {
+        let at20 = profile_at_width::<20>(n, tactics, None);
+        assert!(at20.completed && at20.nodes > 500, "{name}: n={n}: {} nodes", at20.nodes);
+        assert_eq!(profile_at_width::<24>(n, tactics, None), at20, "{name}: n={n} at W=24");
+        assert_eq!(profile_at_width::<32>(n, tactics, None), at20, "{name}: n={n} at W=32");
+        assert_eq!(profile_at_width::<64>(n, tactics, None), at20, "{name}: n={n} at W=64");
     }
 }
 
@@ -191,19 +197,21 @@ fn the_sacrifice_bound_proves_a_w20_result() {
 // Resuming
 
 /// A checkpoint that an earlier build wrote (`testdata/n1133_after_1000_nodes.ckpt`: game 1133 at W = 20 with
-/// the default tactics, stopped after 1,023 nodes on one thread; search header format TXSH v4) still resumes and
+/// the default tactics of that build, now those of the matching path (`SearchTactics::matching`), stopped after
+/// 1,023 nodes on one thread; search header format TXSH v4) still resumes and
 /// finishes with the committed score.  Every write/read test of the format uses the code's own constants, so a
 /// change of the layout that round-trips (the version, the byte order of a set, the order of the header's fields,
 /// the packing of the tactics) passes them and refuses this file.
 ///
 /// A deliberate change of the format (a new header version, say, which refuses older checkpoints) fails this test.
 /// To make the file again with the new build: `taxman solve 1133 --use-prev --threads 1 --node-limit 1000 --out R
-/// --checkpoint-dir D` with a new file `R`, then copy `D/n1133.ckpt` over the fixture.
+/// --checkpoint-dir D --tactic gf2=off --tactic lagrange=on` with a new file `R`, then copy `D/n1133.ckpt` over the
+/// fixture.
 #[test]
 fn a_committed_checkpoint_resumes() {
     let games = stored_games("strict.jsonl");
     let dir = TempDir::new("committed-checkpoint");
-    let opts = SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), ..options(1) };
+    let opts = SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), ..matching_options(1) };
     let checkpoint = opts.checkpoint_file(1133).unwrap();
     std::fs::create_dir_all(checkpoint.parent().unwrap()).unwrap();
     std::fs::copy(testdata("n1133_after_1000_nodes.ckpt"), &checkpoint).unwrap();
@@ -217,15 +225,16 @@ fn a_committed_checkpoint_resumes() {
     assert!(!checkpoint.exists(), "a finished game removes its checkpoint");
 }
 
-/// A W = 20 search interrupted every few hundred nodes and resumed from its checkpoint, under several sets of
-/// tactics (the tactics are part of the checkpoint's header and must read back as written).  The unit tests resume
-/// only at W = 16.
+/// A W = 20 search interrupted every few hundred nodes and resumed from its checkpoint, under two sets of tactics
+/// of the matching path (the tactics are part of the checkpoint's header and must read back as written; the GF(2)
+/// bound's search of 1133 is too short to stop, and `tests/soundness.rs` resumes it on game 1000 at W = 20).  The
+/// unit tests resume only at W = 16.
 #[test]
 fn a_w20_search_interrupted_and_resumed_gives_the_same_answer() {
     let games = stored_games("strict.jsonl");
     let prev = prev_of(&games, 1133);
-    for (name, tactics) in variants().into_iter().take(2) {
-        let dir = TempDir::new(&format!("resume-{}", name.replace('=', "-")));
+    for (name, tactics) in variants().into_iter().filter(|(name, _)| name.starts_with("matching")).take(2) {
+        let dir = TempDir::new(&format!("resume-{}", name.replace(['=', ','], "-")));
         let mut opts = options(1);
         opts.tactics.search = tactics;
         opts.checkpoint_dir = Some(dir.join("ckpt"));

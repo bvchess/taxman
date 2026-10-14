@@ -26,7 +26,7 @@ measured.  Each term is defined where it first matters.
 ## 1. Goals and constraints
 
 * Find optimal games beyond n = 1000, where the Java solver's table of optimal games stopped, as far as the machines
-  at hand reach: today every n to 1300 on one laptop (Apple M1 Max, 10 cores, 32 GB RAM, fast SSD), and the same
+  at hand reach: today every n to 2175 on one laptop (Apple M1 Max, 10 cores, 32 GB RAM, fast SSD), and the same
   chain on a many-core cloud machine for what is beyond (`tools/cloud/RUNBOOK.md`).
 * Be right before being fast.  Every game is replayed by an independent referee before it counts, every result
   records how its optimality is established and what that proof takes as given, every tactic is proven or sound, and
@@ -97,7 +97,8 @@ sources).  A worked example, the board 1..=85, is in the
   the frame directly below.  They are validated by agreement with the Java's optimal.json for n ≤ 1000; by a
   model-free exact search (`evidence/`: the playability theorems, the Franklín–Moniot matching bound, the parity
   matroids' bound of THEORY.md's Theorem 10, the chain and prime relations, and nothing of hives or frames), which
-  confirms the optimum of every game of the committed chain, n ≤ 1300; by an independent brute force
+  confirms the optimum of every game of the committed chain to n = 1300 (its check of 1301–2175 is pending); by an
+  independent brute force
   (`heuristics/evaluation/certify.py`) for n ≤ 62; and by the Rust exact oracle `brute`, which checks frame-model
   games on small boards (up to 40 in the test suite, 52 in `examples/sacrifice validate`).  The greedy removal of
   impossible sources at the root, where it shapes the search space, is descending greedy on each upper-half
@@ -147,7 +148,7 @@ up:
 |---|---|---|
 | foundations | `game`, `numtheory`, `bits`, `json` | the rules as a referee and the table of optimal games; maximal factors and composites; fixed-width bitsets; a small JSON reader and writer |
 | frame model | `hives`, `frames`, `model`, `accelerate` | the board as hives and frames; the search state (frames, winnability, promotion, conflicts, nogoods); deriving a game from the previous one |
-| search | `matchbound`, `search`, `bounds` | the matching bound, and the Lagrangian bound over nogoods built on it; the branch-and-bound searcher with its setup and checkpoint header; the greedy incumbent and the count of promotions a node can still make |
+| search | `matchbound`, `gf2`, `search`, `bounds` | the matching bound, and the Lagrangian bound over nogoods built on it; the GF(2) bound, the default node bound; the branch-and-bound searcher with its setup and checkpoint header; the greedy incumbent and the count of promotions a node can still make |
 | engine | `engine` | the problem-independent parallel depth-first driver |
 | solving | `tactics`, `board`, `solver`, `results`, `paths` | the switchable tactics; a board prepared for a search; the per-game pipeline and the range driver; what a result records and the checks of a results file; the default files |
 | studies | `brute`, `sacrifice` | exhaustive search to certify small boards; the sacrifice bound and punctured games (not used by the solver) |
@@ -157,8 +158,8 @@ On the path of a solve are all the layers but the studies.  `examples/` holds th
 limits, thread scaling, diagnostics), the probe `perf` (the hot paths from fixtures, in cycles and instructions),
 the sacrifice study, `repeats` (the games whose search repeats an earlier game's, from the setups alone, and what
 a results file spent on them), `slope` (the gaps of a game's root, and proofs with every bound lowered by a
-margin) and `matroid` (the GF(2) frame matroids' intersection as a bound, measured at roots and nodes, not yet used
-by the search); `tests/` the integration tests (section 9); `tools/` the results referee in Python,
+margin) and `matroid` (the study of the GF(2) bound: at roots and nodes, as a plain branch and bound, and the
+search's proofs with it, `matroid prove`); `tests/` the integration tests (section 9); `tools/` the results referee in Python,
 the PGO build, the Java golden export and the cloud scripts.
 
 **Width dispatch.**  Everything that holds sets of game numbers is generic over `const W: usize`, the number of 64-bit
@@ -316,6 +317,48 @@ its number less the multipliers of the live nogoods it is in, plus `Σ λ_N (|N 
   step costs about half as much again, so a search whose time goes into finding the optimum late, as 992's does, is
   slower (EXPERIMENTS: "A Lagrangian bound over the nogoods").
 
+### The GF(2) bound
+
+The default node bound (tactic `gf2`) relaxes winnability less than matchability does.  In each frame, give the
+factors coordinates over GF(2), each mover (a move of the frame, or a number promoted into it) the vector of its
+maximal factors there, and each number promoted out of it its own unit vector: a winnable frame peels completely, and
+the peel's order makes these vectors linearly independent.  The moves of a frame are fixed, so its condition is a
+linear matroid on the candidates that touch it (contracted by the moves; its rank is the frame's freedoms).  A
+candidate of home `h` touches frames `h` and `h − 1`, one even and one odd, so the even frames' matroids are the
+blocks of a matroid `A` on the candidates and the odd frames' of a matroid `B`; every promotable set is independent
+in both, and the heaviest common independent set of at most `max_add` members (weighted matroid intersection,
+polynomial) bounds a node's completions.  [heuristics/THEORY.md](../heuristics/THEORY.md#the-frame-matroids-a-bound-on-the-promotions),
+Theorem 11, has the proof (the frame model's form of Theorem 10, the parity matroids' bound on the whole
+game, which the evidence crate's model-free search uses); the module comments of `src/gf2.rs` and `src/gf2/meet.rs` the algorithms.  It is never
+above the matching bound (independent vectors have a system of distinct representatives, which is a matching); what
+it misses are the *odd* cores of movers with three or more factors.  At the roots of 880–1300 its gap to the optimum
+is a tenth of the matching bound's (EXPERIMENTS: "Matroid intersection bounds").
+
+* **Kept along the path.**  `gf2::Gf2Graph` builds the root's matroids once per search; `gf2::Gf2Bound` keeps a level
+  per node of the searcher's path, a child's being its parent's contracted by what the child promoted (one pivot per
+  member and matroid) with the candidates it lost deleted.  The intersection (`gf2::meet`: Lawler's shortest
+  augmenting paths, over a tableau of bitset rows that a pivot updates per exchange) starts from the last of the sets
+  the parent's augmentations passed through that the changes keep (every one is the heaviest of its size and heavier
+  than all smaller ones); when that is the parent's optimum, the child inherits it with no solve.
+* **Forced members.**  The optimum's weight split (Frank: `w = w1 + w2` with the optimum heaviest in `A` for `w1` and
+  in `B` for `w2`, from difference constraints by Bellman–Ford) bounds the intersection without each member in one
+  pass, by weak duality; a member without which it is below `need` is forced, as the matching's are.
+* **Exact strong branching.**  The member of the conflict to branch on is the one without which the intersection
+  is lowest, solved exactly for each member (in the order of the split's bounds, warm-started from the level's
+  history, each solve stopped once it reaches both the lowest so far and `need`, a greedy lower bound tried first);
+  a member whose solve falls below `need` is forced too, and the chosen member's solved level is what the node goes
+  on with.  The cheaper choices (the split's bound alone, the largest member) take more nodes and more time
+  (EXPERIMENTS: "The GF(2) bound in the search").
+* **What it replaces.**  With `gf2` the matching bound is not computed (as a first check before the intersection it
+  costs more than the cuts it saves), so `match_refine` has no effect; the conflicts, nogoods, forced members and
+  exact sets are used as with the matching bound.  The Lagrangian bound over nogoods still applies after it when on,
+  but changes no tree of the GF(2) search measured and costs 2–4%, so `lagrange` is off by default.
+* **Open for other weights.**  `meet::Problem` takes any positive weights, but the start from the heaviest
+  uncontended elements and the greedy lower bound assume that weights do not decrease with an element's index (the
+  root's candidates by increasing number).  A bound that reweighs the candidates (a Lagrangian over nogoods or a
+  cover LP with this intersection as its inner problem, as the nogoods study suggests) needs its own element order,
+  or those two starts switched off; the levels, the contraction and the split do not depend on the order.
+
 ### The default step
 
 One step of a node's loop (`Stepper::step` in `src/search/searcher.rs`; the module comment of `src/search/mod.rs` says
@@ -324,38 +367,41 @@ which of its four phases takes which of the steps below), with the default tacti
 ```
 need = best + 1 − sum(promoted)                   # the loop goes on while the bound reaches this
 1. end the loop if cands is empty, or the max_add largest candidates sum below need
-2. look at the node's heaviest matching Q* (matchbound):
+2. look at the node's heaviest common independent set I* (gf2) of at most max_add members:
      value < need                                  -> end the loop (cut)
-     F = the forced members of Q* (those whose removal alone brings the bound below need)
-     the nogood table knows a conflict of Q* all of whose members are in F
+     F = the forced members of I* (by the weight split: those without which the bound is below need)
+     the nogood table knows a conflict of I* all of whose members are in F or promoted
                                                    -> end the loop (cut)
-     Q* can be promoted                            -> offer promoted ∪ Q* as incumbent; end the loop
-     otherwise: a conflict K ⊆ Q* (the nogood table's smallest, else computed and learned);
-                and if F is empty, refine it: bound the branches of K, match_refine levels deep
-       refined branches all < need                 -> end the loop (cut)
-     (with forced members the node's only child promotes them, and refining is left to it)
-     the Lagrangian bound over the nogoods < need  -> end the loop (cut)
-     F += the members of its heaviest matching without which it would be below need
+     I* can be promoted                            -> offer promoted ∪ I* as incumbent; end the loop
+     otherwise: a conflict K ⊆ I* (the nogood table's smallest, else computed and learned)
 3. if K ⊆ F: end the loop (every completion beating the incumbent promotes all of K, which cannot be)
-4. n = a member of F if there are forced members, else the member of K whose removal lowers the bound most
-5. remove n from cands; if F is non-empty the node has nothing left to try after this child
+4. if F is empty: solve the bound without each member of K (exact strong branching); a member without which it is
+   below need joins F; n = the member without which it is lowest
+5. n = a member of F if there are forced members; remove n from cands; if F is non-empty the node has nothing left
+   to try after this child
 6. child = the node with F (or n) promoted; if that fails, the step is over
 7. child cands = the rest, narrowed, minus the members that a known conflict or a nogood rules out
 8. cut the child if the max_next largest of its cands sum below its need (max_next: how many more promotions the
-   child can make among its remaining candidates, the child's own max_add), or its matching bound is below it,
-   or its heaviest matching is exact (offered as incumbent), or its Lagrangian bound is below it; a child that
-   stays open keeps this verdict, with its forced members, for its first step; a child with no candidates is not
-   pushed
+   child can make among its remaining candidates, the child's own max_add), or its GF(2) bound is below it, or its
+   heaviest set is exact (offered as incumbent); a child that stays open keeps this verdict, with its forced
+   members, for its first step; a child with no candidates is not pushed
 9. otherwise offer the child's own promotions as incumbent, and push it
 ```
 
-Exactness rests on four facts: the matching bound with refinement is an upper bound (above), and so is the Lagrangian
-bound, for any multipliers; every feasible completion leaves out a member of a conflict, so branching on a member and
-then going on without it explores every feasible set; forced members (the matching's and the Lagrangian bound's) are
-promoted by every completion that can beat the incumbent; and nogoods and known conflicts hold at every node they are
-applied to (subset closure).  A node is cut only when its bound is below `need` (a completion that merely ties the
-incumbent is of no use), and a unit rebuilt from a checkpoint is a node whose bound can only be tighter.
-`tests/soundness.rs` attacks each of these (section 9).
+With `gf2=off` (the matching path, `SearchTactics::matching`: the default before the GF(2) bound, with `lagrange` on)
+step 2 looks at the heaviest matching `Q*` instead: its forced members from the potentials, then, where none is
+forced, refinement of its conflict `match_refine` levels deep (a cut if every branch is below `need`), then the
+Lagrangian bound over the nogoods (a cut, or more forced members); step 4 chooses the member whose removal lowers
+the matching bound most; and step 8 checks the child's matching bound, refinement and Lagrangian bound.
+
+Exactness rests on four facts: the bound is an upper bound (the GF(2) bound by Theorem 11, the matching bound with
+refinement, and the Lagrangian bound for any multipliers); every feasible completion leaves out a member of a
+conflict, so branching on a member and then going on without it explores every feasible set; forced members (by
+weak duality, for the weight split and the potentials and the Lagrangian bound alike) are promoted by every
+completion that can beat the incumbent; and nogoods and known conflicts hold at every node they are applied to
+(subset closure).  A node is cut only when its bound is below `need` (a completion that merely ties the incumbent is
+of no use), and a unit rebuilt from a checkpoint is a node whose bound can only be tighter.  `tests/soundness.rs`
+attacks each of these (section 9).
 
 ### The starting incumbent, the cap and the seed
 
@@ -380,11 +426,12 @@ defaults.
 |---|---|---|---|
 | `prime_shortcut` | on | proven (model-free, given an optimal n−1 game: proof at `accelerate::prime_shortcut`) | prime n: replace the n−1 solution's first move with n |
 | `same_search` | on | proven (given the proof of the earlier game: section 8, "Same search") | a game whose search problem an earlier game of the chain posed and settled is that game's promotions on this board, with no search (method `repeat`, proof `same_search`); new in the Rust |
-| `match_refine` | 1 | sound (see `search::refine::Refiner`) | refine the matching bound by branching on conflicts this many levels deep, where it does not prune (0 = off, at most 7) |
+| `match_refine` | 1 | sound (see `search::refine::Refiner`) | refine the matching bound by branching on conflicts this many levels deep, where it does not prune (0 = off, at most 7); no effect with `gf2`, which does not use the matching bound |
 | `fix_forced` | on | sound (every completion that beats the incumbent promotes them) | a node's child promotes all its forced candidates; the node's loop ends after that child |
 | `nogoods` | on | sound (a nogood holds at every node; see `model::Nogoods`) | learn each conflict as a nogood of the root and use the table at every node, for the conflict to branch on and refine with and to rule candidates out of children |
 | `forget_nogoods` | on | sound (the table is a cache) | with `nogoods`, each searcher forgets every nogood it knows after each 50,000 of its steps |
-| `lagrange` | on | proven (weak duality, for any multipliers over valid nogoods; `matchbound::lagrange`) | with `nogoods`, where the matching bound and refinement leave a node open, bound it also by a Lagrangian relaxation of the searcher's nogoods kept along its path, and (with `fix_forced`) force the members without which that bound would cut; the multipliers are refitted at the root as the searcher learns (section 4) |
+| `lagrange` | off | proven (weak duality, for any multipliers over valid nogoods; `matchbound::lagrange`) | with `nogoods`, where the node bound leaves a node open, bound it also by a Lagrangian relaxation of the searcher's nogoods kept along its path (over the matching bound), and (with `fix_forced`) force the members without which that bound would cut; the multipliers are refitted at the root as the searcher learns (section 4).  On by default until `gf2`; with `gf2` it changes no tree and costs 2-4% |
+| `gf2` | on | proven (heuristics/THEORY.md, Theorem 11; weak duality for the forced members) | bound every node by the GF(2) bound (section 4) instead of the matching bound and its refinement, branch on the conflicts of its heaviest set by exact strong branching, and (with `fix_forced`) force the members without which it would cut; the Lagrangian bound over nogoods, if on, applies after it |
 | `prev_cap` | on | proven if opt(n−1) is optimal | stop as soon as the incumbent reaches n + opt(n−1) − in_the_bag (`FrameSolver.getMaxPromotionSum`) |
 | `seed_incumbent` | on | sound (any feasible promotion set is a valid incumbent) | start from the better of greedy and the n−1 solution's promotions that are still feasible |
 
@@ -401,7 +448,8 @@ sources inside hives (`Hive.removeImpossible`); mandatory moves (`Hive.unzip`); 
 below.  They define the search space and cannot be switched off inside this model.
 
 **Where tactics are recorded.**  A result line records the tactics it was produced with (`tactics`: the changes from
-the defaults, such as `match_refine=0,lagrange=off`; `tactic_switches`: every tactic's value).  A checkpoint records
+the defaults, such as `lagrange=on,gf2=off`; `tactic_switches`: every tactic's value; a line of a build before
+`gf2` has no such key, and ran the matching path).  A checkpoint records
 the search tactics and is refused when they differ (the error names each tactic that differs and the `--tactic`
 flags that resume it).
 
@@ -535,11 +583,11 @@ rebuild its units.  A resumed game rests on nothing a game that ran in one piece
 
 ### Same search
 
-Consecutive boards often pose exactly the same search problem with another cap: of the 1076 games of the strict chain
-1..1300 that need a search, 545 pose the problem of the game before them (or the one before that, past a prime).  The
-chain of commit bd9bb5d, which searched them, spent 953 of its 3359 s on those, 851 s of them in 1232–1300 (EXPERIMENTS,
-"Same search").  The tactic `same_search` (proven, on by default) concludes such a game from the earlier one with no
-search; the committed `results/strict.jsonl` was made with it.
+Consecutive boards often pose exactly the same search problem with another cap: of the 1836 games of the strict chain
+1..2175 that need a search, 914 pose the problem of the game before them (or the one before that, past a prime).  The
+chain of commit bd9bb5d, which searched the 545 of them in 1..1300, spent 953 of its 3359 s on those, 851 s of them in
+1232–1300 (EXPERIMENTS, "Same search").  The tactic `same_search` (proven, on by default) concludes such a game from the
+earlier one with no search; the committed `results/strict.jsonl` was made with it.
 
 *The problem.*  After setup (`search::prepare`) the searcher is given the model (the factor graph among the frames'
 numbers and each number's home frame), the root frame set (every frame's moves, factors and freedoms), the candidates
@@ -588,7 +636,7 @@ A game whose recorded digest differs is passed over; for one whose digest agrees
 its board size (milliseconds; `board::search_problem`) and compared with n's whole.  The first equal one is m.
 Setting m up again with this build stands for the problem m's own build searched, which the digest recorded by that
 build ties to it (a problem with the recorded digest is that problem, but for a 64-bit collision), and the problem
-set up again must also have the size its line records (frames, candidates, `max_total`).  Every repeat of 1..1300
+set up again must also have the size its line records (frames, candidates, `max_total`).  Every repeat of 1..2175
 repeats the last game before it that set a search up (n − 1, or n − 2 past a prime), so the window loses nothing
 there, keeps the setups a range starts with to eight, and makes m a function of the window's games.
 
@@ -627,24 +675,36 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   whose conflicts, carried down a path, must stay conflicts), and for the Lagrangian bound over nogoods of the root
   with fitted and random multipliers.  The incremental solvers agree with the reference min-cost flow (with the
   Lagrangian weights, live nogoods and constant worked out afresh, under random relaxations changed mid-walk) and
-  with a solver started afresh, and their levels pass the optimality certificate.  Conflicts and cores are checked
-  against promoting the sets.
+  with a solver started afresh, and their levels pass the optimality certificate.  The GF(2) bound (`src/gf2/tests.rs`,
+  `src/gf2/meet.rs`): the intersection against brute force under every size limit, from every set it reports as a
+  warm start, with members deleted, and its weight split's bounds without each member; on the boards up to 400 the
+  bound is never below the exhaustive best completion and the optimal promotions are independent in both matroids;
+  and along random paths of games 60–1000 (promotions, deletions, backtracking) every level equals the matroids built
+  afresh at its node, and every member it calls forced is (the bound without it, solved afresh, is below what the
+  node needs); at the 600 nodes of the probe's fixtures (936 and 1215), completions promoted in random orders are
+  independent in the node's matroids and no heavier than its bound, and the matching path's search started from the
+  bound finds nothing above it (`tests/soundness.rs`).  Conflicts and cores are checked against promoting the sets.
 * **Soundness harness** (`tests/soundness.rs`): the search is started with an incumbent worth 1 or 5 less than the
   optimum and an empty payload, so that any pruning that loses every best completion leaves the fake incumbent in place
-  (this tests the `<` and `<=` boundaries too): every game 2..=300 under each of 19 configurations (every tactic,
-  forgetting every step, every third, never; the Lagrangian bound refitted every few steps; one thread and two), and
-  games 301..=600 (every tenth, searches of hundreds to thousands of steps) with the Lagrangian bound refitted early
-  and often, where it cuts and forces thousands of times; the same for 500 perturbed frame sets (numbers
+  (this tests the `<` and `<=` boundaries too): every game 2..=300 under each of 30 configurations (19 of the matching
+  path: every tactic, forgetting every step, every third, never; the Lagrangian bound refitted every few steps; one
+  thread and two; and 11 of the GF(2) bound: every way of choosing the branch, the matching bound as a first check,
+  without forced members or nogoods, forgetting every step, two threads, the Lagrangian bound after it), and games
+  301..=600 (every tenth, searches of hundreds to thousands of steps) with the Lagrangian bound refitted early and
+  often, over either bound, where it cuts and forces thousands of times; the same for 500 perturbed frame sets (numbers
   dropped, role flipped, moved a frame) with the truth found exhaustively; promoting a set at once against one by one in random orders, conflicts and nogoods on perturbed
-  models; and searches interrupted every 1,000 nodes and resumed from a checkpoint with units spilling, one of them
-  with the Lagrangian bound refitted every four steps.  Units of real
-  boards at W = 20 to 64 (thinned so that the truth is found exhaustively) from a handicapped incumbent, and game 1133
-  resumed every 60 nodes at W = 20, 24 and 64, carry the harness past the widths of the Java's table (n ≤ 1000).
+  models; and searches interrupted every 1,000 nodes and resumed from a checkpoint with units spilling (game 600 on
+  the matching path, one of them with the Lagrangian bound refitted every four steps; game 1000 with the GF(2) bound,
+  whose search of 600 is too short to stop).  Units of real boards at W = 20 to 64 (thinned so that the truth is found
+  exhaustively) from a handicapped incumbent, and games 1133 (matching) and 1000 (GF(2)) resumed every 1,024 steps at
+  W = 20, 24 and 64, carry the harness past the widths of the Java's table (n ≤ 1000).
 * **Node-count tripwires** (`tests/tripwires.rs`): a pruning tactic that stops working changes no answer, so no
   assertion on answers sees it (a mutant that ignored the result of `Nogoods::ruled_out` costs 27 to 67 % more nodes).
   With one thread the tree is deterministic, so the exact node count of a fixed game under fixed tactics (n = 480 to
-  1133, every tactic off or changed in turn) is asserted, and the tree of game 600 with the searchers forgetting their
-  nogoods every 500 steps; the rows with `lagrange=off` are the trees of the build before that tactic.  **A change that alters the tree on purpose fails them.**  Run `cargo test --test tripwires
+  1133, every tactic off or changed in turn, with the GF(2) bound and on the matching path) is asserted, and the tree
+  of game 600 on the matching path with the searchers forgetting their nogoods every 500 steps; the matching path's
+  rows are the default's trees before the GF(2) bound, and its rows with `lagrange=off` those of the build before
+  that tactic.  **A change that alters the tree on purpose fails them.**  Run `cargo test --test tripwires
   -- --nocapture`: it prints the rows as observed, in the layout of the table at the top of the file; check that the
   promotion sums (the answers) have not moved, paste the rows in, and update any node counts quoted in the docs.
 * **Engine** (`tests/engine.rs`, `tests/robustness.rs`, `tests/stop_signal.rs`): a toy problem with a known optimum
@@ -712,10 +772,13 @@ on the machine moves wall times by up to 3×.  What measures what:
   proofs of 936 and 1215, every kernel over all of them (the rebuild of a node, the promotion of every candidate,
   conflicts, the matching from scratch and warm-started, bounds without each member, strong branching's exact solves,
   children, nogood lookups and rule-outs).  F2: the frame checks of those promotions.  F3: a checkpoint of each proof
-  with the default tactics (`perf make-window 936 4500`, `perf make-window 1215 600000`) resumed on one thread for
-  50,000 steps, one period of forgetting nogoods: the search itself, fingerprinted by its counters, with the tactics
-  its checkpoint records (`--tactic` changes them).  The probe's fingerprint is 7e8e724717d26545, and
-  5b83bbebf0bb2899 with `--tactic lagrange=off`.  (The windows were made again when the search's counters were
+  with the default tactics of the time, the matching path's (`perf make-window 936 4500`, `perf make-window 1215
+  600000`), resumed on one thread for 50,000 steps, one period of forgetting nogoods: the search itself,
+  fingerprinted by its counters, with the tactics its checkpoint records (`--tactic` changes them; a search that ends
+  inside the window is costed by the steps it took).  F4, with `--tactic gf2=on`: the GF(2) bound's kernels at the F1
+  nodes (the bound from scratch, with its weight split, and without each member of its heaviest set's conflict), and
+  the windows resumed with the GF(2) bound, which finish both searches.  The probe's fingerprint is
+  7e8e724717d26545, 5b83bbebf0bb2899 with `--tactic lagrange=off`, and 162e4e94a52a95c6 with `--tactic gf2=on`.  (The windows were made again when the search's counters were
   renumbered and the checkpoint header went to version 4, 2026-10; the fingerprints EXPERIMENTS quotes before then,
   36981d0eaeeae319 and 6197a47eae6cf8c8, are of the earlier windows, made before `lagrange`.)  About 5 s in all;
   `perf make-nodes` and `perf make-window` make the fixtures again, deterministically.
@@ -747,8 +810,22 @@ on the machine moves wall times by up to 3×.  What measures what:
 * **The cloud** (`tools/cloud`) has the scripts for a many-core machine: the sweep to 192 threads, the cost of a
   checkpoint pause, and the production chain (RUNBOOK.md).
 
-**Where it stands** (the notebook has the tables; these are the build of commit 4b6ef38, on the M1 Max): the proof of
-1215 takes 33 s on one thread (106 G cycles), and 1184 takes 3.2 G cycles.  The strict chain 1..1231 took 279 s of
+**Where it stands with the GF(2) bound** (the default since commit 7af8b0e; EXPERIMENTS, "The GF(2) bound in the
+search", has the tables; on the M1 Max): the proof of 1215 takes 10,371 nodes and 3.8 G cycles on one thread, against
+the matching path's 1.1 M nodes and 29 G; the 146 one-thread proofs of the slope study 76 s against 3,408 s; `taxman
+regress --to 1000` on 2 threads 21.6 s against 96.9 s; the chain 1..1300 on 2 threads 88 s, its games 1001–1300 60 s
+against the 988 s that the chain of commit 271c817 (the `results/strict.jsonl` before it; git has it) records on 4
+threads.  Where the time goes (the proof of 1287, one
+thread): the intersection's shortest paths 57%, the levels' own work (a solve's setup, the history, the weight split)
+22%, the tableau's pivots 8%, the peels 3%; strong branching makes 70% of the augmentations.  A step costs 9 to 13
+times as much as the matching path's (the probe's windows), in trees a hundred times smaller.  A chain from
+optimal.json's game of 1300 reached 2175 in 92 minutes of game time on 2 threads, and the committed chain from n = 1
+took 27 minutes on 8 ([results/README.md](results/README.md)); its cost comes in waves that
+follow the root's GF(2) gap, with no growth that a fit over 1301–2175 resolves, and a day on 192 cores would take
+it to the end of the set widths (4095) at every slope the data support (EXPERIMENTS has the projections).
+
+**The matching path** (the default before the GF(2) bound; these are the build of commit 4b6ef38, on the M1 Max):
+the proof of 1215 takes 33 s on one thread (106 G cycles), and 1184 takes 3.2 G cycles.  The strict chain 1..1231 took 279 s of
 game time on 8 threads, 145 s of it for 1201–1231, at that commit; the committed `bench/curve/chain.jsonl`
 (1001–1231), made by the build before it (e710d16), records 318 s, and 207 s for 1201–1231.  The cost of a game
 grows by a factor of ten for every 55 to 70 in n past 1200 ([bench/curve/README.md](bench/curve/README.md)).  The
@@ -768,15 +845,16 @@ strong branching 11%.
 
 ## 11. Status and what is left
 
-Every n to 1300 has a game proven within the frame model: `results/strict.jsonl` is a chain from n = 1 whose games
-to 1000 reproduce optimal.json's scores and whose games 1001–1300 go beyond it (and are now appended to optimal.json
-too, by `taxman extend-optimal`); `results/README.md` says what supports each score.  The production chain on a
-many-core machine can start from `strict.jsonl` (`tools/cloud/RUNBOOK.md`), and a chain from n = 1 reproduces its
-scores.  What is left to try: the incumbents of games like 992 and 1025, whose optimum the
-search reaches late (the Lagrangian bound makes 992 slower); fewer or cheaper Hungarian searches (over half the time,
-and large); whether refinement still pays with the Lagrangian bound (without it 19 proofs took 3% fewer cycles on
-average but from 21% fewer to 20% more, and the strict chain 1201–1231 as many, so `match_refine` stays 1 until a
-larger sample of the frontier decides); refits of the Lagrangian multipliers that keep the levels instead of solving
-them afresh; a warm-started unit rebuild; and, for the many-core machine, whatever its first sweep shows that a laptop
-cannot.  Nothing about scaling beyond 8 threads or
-about Graviton has been measured (`tools/cloud/RUNBOOK.md`, section 8).
+Every n to 2175 has a game proven within the frame model: `results/strict.jsonl` is a chain from n = 1 whose games to
+1000 reproduce optimal.json's scores, whose games 1001–1300 go beyond it (and are now appended to optimal.json too, by
+`taxman extend-optimal`) and whose games 1301–2175 are past the table; `results/README.md` says what supports each
+score.  The production chain on a many-core machine can start from `strict.jsonl` (`tools/cloud/RUNBOOK.md`), and a
+chain from n = 1 reproduces its scores.  With the GF(2) bound (section 4), the chain goes past 1300 on a laptop
+(EXPERIMENTS, "The GF(2) bound in the search" and "The committed chain to 2175").  What is left to try: strong
+branching's solves, 70% of the intersection's work, which restart far below their answer (canceling the negative cycles
+of the optimum less the member would start them next to it); the removal of the matching path's search machinery that
+the GF(2) bound leaves idle (refinement, the Lagrangian bound in the search; EXPERIMENTS has the list), once a
+production run has been made with it; a warm-started unit rebuild; and, for the many-core machine, whatever its first
+sweep shows that a laptop cannot: the GF(2) search's trees are a hundred times smaller, so how many threads a game can
+keep busy is open.  Nothing about scaling beyond 4 threads with the GF(2) bound, beyond 8 threads at all, or about
+Graviton has been measured (`tools/cloud/RUNBOOK.md`, section 8).

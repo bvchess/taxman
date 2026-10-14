@@ -382,19 +382,20 @@ fn solve_writes_its_results_skips_what_is_done_and_resumes_what_was_stopped() {
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     assert!(run.stdout.contains("promotions: ") && run.stdout.contains("moves: [7, 9, 6, 10, 8]"), "{}", run.stdout);
 
-    // A search stopped by a limit keeps its checkpoint, says so, and the same command finishes it.
+    // A search stopped by a limit keeps its checkpoint, says so, and the same command finishes it.  (The engine
+    // checks the limit every 1,024 steps of a searcher; on its own, the default searches game 1000 in about 5,000.)
     let ckpt = dir.join("ckpt");
     let limited =
-        ["solve", "600", "--force-search", "--threads", "1", "--progress", "0", "--checkpoint-dir", path(&ckpt)];
+        ["solve", "1000", "--force-search", "--threads", "1", "--progress", "0", "--checkpoint-dir", path(&ckpt)];
     let run = taxman(&[&limited[..], &["--node-limit", "1"]].concat());
     assert_eq!(run.code, Some(0), "{}", run.stderr);
-    assert!(run.stdout.contains("stopped: the search for n=600 hit a limit"), "{}", run.stdout);
+    assert!(run.stdout.contains("stopped: the search for n=1000 hit a limit"), "{}", run.stdout);
     assert!(run.stdout.contains("run the same command to resume it"), "{}", run.stdout);
-    assert!(ckpt.join("n0600.ckpt").exists());
+    assert!(ckpt.join("n1000.ckpt").exists());
     let run = taxman(&limited);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     assert!(run.stdout.contains("optimal ok") && !run.stdout.contains("stopped"), "{}", run.stdout);
-    assert!(!ckpt.join("n0600.ckpt").exists(), "a finished game removes its checkpoint");
+    assert!(!ckpt.join("n1000.ckpt").exists(), "a finished game removes its checkpoint");
 }
 
 /// A results file that another process has open (here this one, appending to it as a run does) is refused by
