@@ -90,8 +90,7 @@ impl<const W: usize> Refiner<'_, '_, W> {
         if self.forcing {
             // The members of the heaviest matching that every completion reaching `need` promotes, as far as the
             // potentials show (see `MatchBound::bound_excluding`).
-            let need = self.need;
-            self.forced = chosen.iter().filter(|&x| self.m.bound_excluding(x) < need).collect();
+            self.forced = self.m.forced(self.need);
         }
         let k = match self.find_conflict(&chosen, self.forced) {
             Lookup::Conflict(k) => k,
@@ -187,6 +186,9 @@ impl<const W: usize> Refiner<'_, '_, W> {
 
     /// Whether some branch of the conflict `k`, with `required` promoted, refined `depth − 1` levels deep, is at
     /// least `need`.
+    ///
+    /// The first branch with nothing required is the level without the smallest member, which strong branching
+    /// solves first too: it is kept for it ([`MatchBound::keep_solved`]).
     fn branches(&mut self, k: Bits<W>, required: Bits<W>, depth: u32) -> bool {
         let free = k - required;
         let last = free.max();
@@ -199,7 +201,11 @@ impl<const W: usize> Refiner<'_, '_, W> {
             reaches = self.m.bound_excluding(x) + required.sum() >= self.need && {
                 self.m.push_excluding(&Bits::EMPTY.with(x));
                 let reaches = self.reaches(required, depth - 1);
-                self.m.pop();
+                if required.is_empty() {
+                    self.m.keep_solved(x);
+                } else {
+                    self.m.pop();
+                }
                 reaches
             };
             if reaches || Some(x) == last {
@@ -238,7 +244,8 @@ pub(super) struct Strong<const W: usize> {
 ///
 /// Each member's bound is solved exactly ([`MatchBound::value_excluding`]), so this also finds the members whose
 /// removal brings the bound below `need`, the node's *forced* members: every completion that reaches `need`
-/// promotes them all.
+/// promotes them all.  The smallest member's level is usually solved already: it is refinement's first branch,
+/// which [`Refiner`] keeps for this ([`MatchBound::keep_solved`]).
 ///
 /// With `fix_forced` (that tactic promotes all the forced members, so that which of them is chosen hardly
 /// matters), when some member is forced the largest forced one is chosen and no level is kept (the node's loop

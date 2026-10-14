@@ -811,11 +811,17 @@ game time on 8 threads, 145 s of it for 1201–1231, at that commit; the committ
 grows by a factor of ten for every 55 to 70 in n past 1200 ([bench/curve/README.md](bench/curve/README.md)).  The
 strict chain 1..1300 of commit bd9bb5d (on 6 threads of an M1 Max shared with another CPU-heavy job; in git history,
 `results/strict.jsonl` being a later run, whose times [results/README.md](results/README.md) gives) records 3359 s of
-search, 2866 s of it for 1232–1300; its slowest game is 1232 at 439 s.  The Hungarian repairs of the matching are about
-46% of the time, the peels 24%, the bounds from the potentials 7%, the node's own work 7%, level copies 4% and nogood
-lookups 3%.  All of this is without the Lagrangian bound (tactic `lagrange`, section 4), which came later: with it the
-proof of 1215 takes 1.1 M nodes and 34 G cycles instead of 5.5 M and 108 G, 1184 1.6 G cycles, and the strict chain
-1201–1231 on four threads 117 s of game time instead of 283 s (EXPERIMENTS: "A Lagrangian bound over the nogoods").
+search, 2866 s of it for 1232–1300; its slowest game is 1232 at 439 s.  All of this is without the Lagrangian bound (tactic `lagrange`, section
+4), which came later: with it the proof of 1215 takes 1.1 M nodes and 34 G cycles instead of 5.5 M and 108 G, 1184
+1.6 G cycles, and the strict chain 1201–1231 on four threads 117 s of game time instead of 283 s (EXPERIMENTS: "A
+Lagrangian bound over the nogoods").  The round after it took about a tenth off the cycles with the same trees
+(commit 31b9c95: the proof of 1215 30 G cycles, 1184 1.5 G, the strict chain 1201–1231 on one thread 315 s instead
+of 345 s; a step of the probe's window of 1215 22.0k cycles, 14.6k with `lagrange=off`; EXPERIMENTS: "Faster nodes
+with the Lagrangian bound, same trees").  Where the time goes now (the
+proof of 1215, one thread): the Hungarian searches of the matching 33% and of the Lagrangian levels 19%, the peels
+19%, the node's own work 10%, the nogood table 4%, the refits of the multipliers 3%, the bounds from the potentials
+6%, level copies 4%; by purpose the Lagrangian bound a quarter, making children a quarter, refinement 14% and
+strong branching 11%.
 
 ## 11. Status and what is left
 
@@ -826,8 +832,10 @@ optimal.json too, by `taxman extend-optimal`); the cost-curve study's
 with unproven tactics on) is kept as a historical record (`results/README.md` says what supports each score).  The
 production chain on a many-core machine can start from `strict.jsonl` (`tools/cloud/RUNBOOK.md`), and a strict chain
 from n = 1 reproduces its scores.  What is left to try: the incumbents of games like 992 and 1025, whose optimum the
-search reaches late (the Lagrangian bound makes 992 slower); cheaper matching repairs (the largest cost); whether
-refinement still pays with the Lagrangian bound (four proofs took 0 to 26% fewer cycles without it); refits of the
-Lagrangian multipliers that keep the levels instead of solving them afresh; a warm-started unit rebuild; and, for the
-many-core machine, whatever its first sweep shows that a laptop cannot.  Nothing about scaling beyond 8 threads or
+search reaches late (the Lagrangian bound makes 992 slower); fewer or cheaper Hungarian searches (over half the time,
+and large); whether refinement still pays with the Lagrangian bound (without it 19 proofs took 3% fewer cycles on
+average but from 21% fewer to 20% more, and the strict chain 1201–1231 as many, so `match_refine` stays 1 until a
+larger sample of the frontier decides); refits of the Lagrangian multipliers that keep the levels instead of solving
+them afresh; a warm-started unit rebuild; and, for the many-core machine, whatever its first sweep shows that a laptop
+cannot.  Nothing about scaling beyond 8 threads or
 about Graviton has been measured (`tools/cloud/RUNBOOK.md`, section 8).

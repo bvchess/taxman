@@ -96,7 +96,9 @@ What follows for the ideas:
   after 45 s (1232 at 37005 of 37113, 1287 at 38936 of 38977).  The frontier's cost is mostly the proof.
 
 A fourth game, 1295 (25 s), gives the same split to within two points (repairs 58.1%, peels 20.8%; strong branching
-29.0%, making children 25.5%, refinement 19.8%).  `tools/profile/profile.sh N SECONDS THREADS OUTDIR` reproduces any
+29.0%, making children 25.5%, refinement 19.8%).  (This is the solver before the Lagrangian bound; with it, the
+profile of EXPERIMENTS.md, "Faster nodes with the Lagrangian bound, same trees", has the Lagrangian levels at a
+quarter of the time and strong branching at 11-20%.)  `tools/profile/profile.sh N SECONDS THREADS OUTDIR` reproduces any
 of them; the probe (`examples/perf.rs`) agrees on the hot kernels (a strong-branching exclusion costs 9-12 k cycles,
 a step 16-17 k).
 

@@ -295,11 +295,10 @@ impl<'g, const W: usize> LagrangeBound<'g, W> {
     /// The candidates of the heaviest matching of the last level evaluated (settled and feasible) without which
     /// the bound, from the potentials alone, is below `target` (scaled): every completion worth `target / SCALE`
     /// promotes them.  (The live nogoods' inequalities hold for every completion of the node, so the multipliers
-    /// and the constant stay as they are without a candidate.)
-    pub fn forced(&self, target: i64) -> Bits<W> {
+    /// and the constant stay as they are without a candidate.)  Those in `known` (forced already) are left out.
+    pub fn forced(&self, target: i64, known: &Bits<W>) -> Bits<W> {
         let level = &self.levels[self.depth - 1];
-        let constant = level.weighing.constant;
-        level.chosen.iter().filter(|&x| level.bound_excluding(self.graph, x) as i64 + constant < target).collect()
+        level.forced(self.graph, target, level.weighing.constant, known)
     }
 
     /// Pushes a level for the node with `promoted` and `cands`, solved from scratch at the next settle.
@@ -510,7 +509,7 @@ pub fn fit<const W: usize>(
 #[cfg(test)]
 mod tests {
     use super::super::match_bound_weighted;
-    use super::super::tests::{check_level, setup, walks};
+    use super::super::tests::{check_bounds_excluding, check_level, setup, walks};
     use super::*;
     use crate::model::test_support::*;
     use crate::model::{FrameSet, Model, Scratch};
@@ -593,6 +592,7 @@ mod tests {
             let what = format!("n={}, promoted {promoted:?}, cands {cands:?}", g.n);
             assert_eq!(value, reference(&model, state, promoted, cands, &nogoods, &lambda), "{what}");
             check_level(&graph, &lb.levels[lb.depth - 1]);
+            check_bounds_excluding(&graph, &lb.levels[lb.depth - 1]);
             if rng.chance(10) {
                 fresh.set_relaxation(Relaxation::new(&graph, &nogoods, &lambda));
                 assert_eq!(fresh.value(promoted, cands), value, "{what}: started afresh");
