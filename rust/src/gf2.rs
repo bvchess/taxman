@@ -259,6 +259,14 @@ impl Gf2Graph {
 // ---------------------------------------------------------------------------------------------------------
 // The bound along a search's path
 
+/// How far above `need` a member's split bound may be for [`Gf2Bound::evaluate`] to search whether it is forced
+/// after all ([`Levels::force_by_cycles`]).  The split's bound is often far above the exact one (half the members
+/// it leaves free that the search finds forced are within 15 of `need`, nine in ten within 53, at 1215), and the
+/// searches of the members it leaves free cost more than they save: over the quick set of one-thread proofs
+/// (936-1350) a window of 25 costs 20.6 G cycles, 40 18.2, 60 17.3, 80 16.9, 120 17.6, no window 18.0 (without
+/// the search 26.4; nodes 217,374 then 132,049, 108,856, 96,283, 89,751, 86,481, 85,349).
+pub const FORCE_WINDOW: i64 = 80;
+
 /// The most block words supported: ranks up to 192, which every board up to 4095 stays within (169 at 4094).
 pub const MAX_WORDS: usize = 3;
 
@@ -320,6 +328,8 @@ pub struct Gf2Stats {
     /// ([`Gf2Bound::certified_excluding`]), and children whose heaviest set their parent's certified.
     pub certified: u64,
     pub certified_children: u64,
+    /// Members found forced by [`Levels::force_by_cycles`] where the split left them free.
+    pub forced_by_cycles: u64,
 }
 
 impl<'g, const W: usize> Gf2Bound<'g, W> {
@@ -670,9 +680,47 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
                         forced.insert(x);
                     }
                 }
+                self.force_by_cycles(cap, need, &mut forced);
             }
         }
+        let level = &self.levels[d];
         Eval { value: level.value, chosen, forced }
+    }
+
+    /// More forced members of the top level's heaviest set (solved, of all sizes, its split found and its tableau
+    /// the workspace's), at `need`, added to `forced`: a member is forced when every set without it weighs less than
+    /// `need`, which holds when the sets of other sizes than the heaviest set's lose more than the slack `value −
+    /// need` and its exchange graph has no cycle through the member that short (see `meet`'s module docs).  Only the
+    /// members whose split bound is within [`FORCE_WINDOW`] of `need` are searched.
+    fn force_by_cycles(&mut self, cap: usize, need: u64, forced: &mut Bits<W>) {
+        let graph = self.graph;
+        let level = &mut self.levels[self.depth];
+        let size = level.history.last().map_or(0, |last| last.len() as usize);
+        let held = level.meet_solve == self.meet.solves;
+        if !(level.has_pot && level.settled && held && size <= cap && level.value >= need) {
+            return;
+        }
+        let slack = (level.value - need) as i64;
+        let problem = Problem {
+            block: [&graph.block[0], &graph.block[1]],
+            vector: [&level.vec[0], &level.vec[1]],
+            weight: &graph.weight,
+        };
+        let mut losses = Losses::of(level, &self.meet, cap > size);
+        if !losses.certify(slack + 1, &mut self.meet, &problem, &level.pot) {
+            return;
+        }
+        level.loss_floor = losses.smaller;
+        for &(x, bound) in &level.split {
+            let near = bound - (need as i64) < FORCE_WINDOW;
+            if near
+                && !forced.contains(x)
+                && !self.meet.has_cycle_within(&problem, &level.pot, graph.index[x as usize], slack)
+            {
+                forced.insert(x);
+                self.stats.forced_by_cycles += 1;
+            }
+        }
     }
 
     fn value_excluding(&mut self, x: u32, cap: usize, stop: u64) -> u64 {

@@ -997,6 +997,48 @@ impl<const R: usize> Meet<R> {
     /// within `limit` and shorter than the best found can pass.
     pub fn without(&mut self, p: &Problem<'_, R>, pot: &[i64], x: u32, limit: i64, banned: &[u32]) -> Option<i64> {
         self.withouts += 1;
+        let (length, end) = self.shortest_cycle(p, pot, x, limit, banned, false)?;
+        // The cycle's elements, and the set flipped along it checked common independent in the blocks it touches
+        // (the others hold the same members as before).
+        self.flip.clear();
+        self.flip.push(x);
+        let mut v = end;
+        while v != x && v != NONE && self.flip.len() <= self.pos.len() {
+            self.flip.push(v);
+            v = self.back[v as usize];
+        }
+        if v != x || !self.flipped_independent(p) {
+            debug_assert!(false, "the shortest cycle through a member flips into a dependent set");
+            return None;
+        }
+        self.withouts_exact += 1;
+        Some(self.value - length)
+    }
+
+    /// Whether the exchange graph of [`without`](Self::without) has a cycle through the member `x` at most `limit`
+    /// long (the search stops at the first it finds, and the set it flips to is not checked): if it has none, the
+    /// sets without `x` of the heaviest set's size lose more than `limit` against it.
+    /// Where the search cannot be made (no settled solve's tableau holding `x`, or a limit out of range), the answer
+    /// is yes, which claims nothing.
+    pub fn has_cycle_within(&mut self, p: &Problem<'_, R>, pot: &[i64], x: u32, limit: i64) -> bool {
+        let searchable = self.settled
+            && self.tableau == self.solves
+            && self.inside[x as usize]
+            && (0..i64::MAX / (2 * HOPS)).contains(&limit);
+        !searchable || self.shortest_cycle(p, pot, x, limit, &[], true).is_some()
+    }
+
+    /// The search of [`without`](Self::without): the shortest cycle's length and the element that closes it at `x`,
+    /// or with `first` the first cycle found within `limit`.
+    fn shortest_cycle(
+        &mut self,
+        p: &Problem<'_, R>,
+        pot: &[i64],
+        x: u32,
+        limit: i64,
+        banned: &[u32],
+        first: bool,
+    ) -> Option<(i64, u32)> {
         if !self.settled || self.tableau != self.solves || !self.inside[x as usize] {
             debug_assert!(false, "the bound without a member needs the tableau of a settled solve holding it");
             return None;
@@ -1063,7 +1105,7 @@ impl<const R: usize> Meet<R> {
         reach[x as usize] = 0;
         back[x as usize] = NONE;
         while let Some(Reverse((d, v))) = heap.pop() {
-            if d >= cycle.0 {
+            if d >= cycle.0 || (first && cycle.1 != NONE) {
                 break;
             }
             let v = if v == FREE_A {
@@ -1125,24 +1167,7 @@ impl<const R: usize> Meet<R> {
                 });
             }
         }
-        if cycle.1 == NONE {
-            return None;
-        }
-        // The cycle's elements, and the set flipped along it checked common independent in the blocks it touches
-        // (the others hold the same members as before).
-        self.flip.clear();
-        self.flip.push(x);
-        let mut v = cycle.1;
-        while v != x && v != NONE && self.flip.len() <= self.pos.len() {
-            self.flip.push(v);
-            v = self.back[v as usize];
-        }
-        if v != x || !self.flipped_independent(p) {
-            debug_assert!(false, "the shortest cycle through a member flips into a dependent set");
-            return None;
-        }
-        self.withouts_exact += 1;
-        Some(self.value - cycle.0.div_euclid(HOPS))
+        (cycle.1 != NONE).then(|| (cycle.0.div_euclid(HOPS), cycle.1))
     }
 
     /// After a [`solve`](Self::solve) that settled, with the workspace still holding it, and `pot` the weight split
