@@ -54,6 +54,7 @@ const INF: i64 = i64::MAX / 4;
 
 /// Two linear matroids over GF(2) on the elements 0..len: in class q, element e is the vector with ones at
 /// `coords[q][e]` (coordinates 0..dims[q]), or a coloop when that list is empty.
+#[derive(Clone)]
 pub struct Pair {
     pub dims: [usize; 2],
     pub coords: [Vec<Vec<u32>>; 2],
@@ -227,6 +228,16 @@ fn ones(words: &[u64]) -> impl Iterator<Item = usize> + '_ {
 
 /// What [`Meet::solve`] returns.
 #[derive(Clone, Debug)]
+pub enum Outcome {
+    /// The forced elements are dependent in one of the matroids: no set holds them all.
+    Infeasible,
+    /// The certificate failed (not expected; see [`MeetStats::uncertified`]): no bound is claimed.
+    Uncertified,
+    Bound(Bound),
+}
+
+/// A certified bound.
+#[derive(Clone, Debug)]
 pub struct Bound {
     /// The heaviest weight of a set independent in both matroids that holds every forced element and no barred
     /// one (for the parity matroids: an upper bound on every playable set with these roles).
@@ -259,8 +270,8 @@ pub struct MeetStats {
 /// those from every y with I + y independent in class 1 to every member x through hub `B`, each such pair of arcs
 /// counting as one.  The other arcs are the circuits': x → y for x in y's circuit of class 0, y → x for x in its
 /// circuit of class 1.
-pub struct Meet<'p> {
-    pair: &'p Pair,
+pub struct Meet {
+    pair: Pair,
     cw: usize,
     rref: [Rref; 2],
     cands: Vec<u32>,
@@ -303,15 +314,16 @@ fn relax(
     }
 }
 
-impl<'p> Meet<'p> {
-    pub fn new(pair: &'p Pair) -> Self {
+impl Meet {
+    pub fn new(pair: Pair) -> Self {
         let len = pair.len();
         let cw = len.div_ceil(64).max(1);
         let vw = pair.dims.iter().map(|d| d.div_ceil(64).max(1)).max().unwrap_or(1);
+        let rref = [Rref::new(pair.dims[0], cw), Rref::new(pair.dims[1], cw)];
         Meet {
             pair,
             cw,
-            rref: [Rref::new(pair.dims[0], cw), Rref::new(pair.dims[1], cw)],
+            rref,
             cands: Vec::new(),
             in_set: vec![false; len],
             pot: vec![0; len + 2],
@@ -361,14 +373,16 @@ impl<'p> Meet<'p> {
         }
     }
 
+    /// The matroids.
+    pub fn pair(&self) -> &Pair {
+        &self.pair
+    }
+
     /// The heaviest set independent in both matroids among those holding every element with role `Pick` and none
-    /// with role `Barred`, certified (module comment).  None if the forced elements are dependent in one of the
-    /// matroids (no such set exists), or, which is not expected, if the certificate fails
-    /// ([`MeetStats::uncertified`]).
-    pub fn solve(&mut self, roles: &[Role]) -> Option<Bound> {
-        let pair = self.pair;
-        let len = pair.len();
-        let w = &pair.weight;
+    /// with role `Barred`, certified (module comment).
+    pub fn solve(&mut self, roles: &[Role]) -> Outcome {
+        let len = self.pair.len();
+        let w = self.pair.weight.clone();
         let (ha, hb) = (len, len + 1);
         self.stats.solves += 1;
         for q in 0..2 {
@@ -378,7 +392,7 @@ impl<'p> Meet<'p> {
         let mut set: Vec<u32> = Vec::new();
         for e in (0..len).filter(|&e| roles[e] == Role::Pick) {
             if !(0..2).all(|q| self.reduce(q, e)) {
-                return None;
+                return Outcome::Infeasible;
             }
             self.add(e, false);
             forced_weight += w[e];
@@ -430,7 +444,7 @@ impl<'p> Meet<'p> {
             }
             self.stats.augmentations += 1;
         }
-        let without = self.certify()?;
+        let Some(without) = self.certify() else { return Outcome::Uncertified };
         let mut value = forced_weight;
         for &e in &self.cands {
             if self.in_set[e as usize] {
@@ -440,7 +454,7 @@ impl<'p> Meet<'p> {
         }
         set.sort_unstable();
         let without = without.into_iter().map(|(x, drop)| (x, value - drop)).collect();
-        Some(Bound { value, set, loops, without })
+        Outcome::Bound(Bound { value, set, loops, without })
     }
 
     /// The circuits of the candidates outside the set in both classes, and the circuit arcs x → y of class 0 by x.
@@ -619,7 +633,7 @@ impl<'p> Meet<'p> {
 
     /// One augmentation along a shortest path if it gains weight; false if none does.
     fn augment(&mut self) -> bool {
-        let w = &self.pair.weight;
+        let w = self.pair.weight.clone();
         let len = self.pair.len();
         let sources: Vec<(u32, i64)> = self
             .cands
@@ -691,7 +705,7 @@ impl<'p> Meet<'p> {
     /// (1)-(3) of the module comment in both classes.  Returns, for each member x of I, how much its barring takes
     /// off the bound at least; None if a condition fails.
     fn certify(&mut self) -> Option<Vec<(u32, i64)>> {
-        let w = &self.pair.weight;
+        let w = self.pair.weight.clone();
         let cw = self.cw;
         let sources: Vec<(u32, i64)> = self
             .cands
@@ -819,16 +833,19 @@ mod tests {
 
     fn check(pair: &Pair, roles: &[Role], meet: &mut Meet) {
         let want = brute(pair, roles);
-        let got = meet.solve(roles);
-        if meet.stats.uncertified > 0 {
-            let set: Vec<usize> = (0..pair.len()).filter(|&e| meet.in_set[e]).collect();
-            let value: i64 = set.iter().map(|&e| pair.weight[e]).sum();
-            panic!(
-                "uncertified: want {want:?}, the set {set:?} weighs {value} (+forced); negative arcs {}; roles {roles:?}\n\
-                 dims {:?} coords {:?} weights {:?}",
-                meet.stats.negative, pair.dims, pair.coords, pair.weight
-            );
-        }
+        let got = match meet.solve(roles) {
+            Outcome::Bound(b) => Some(b),
+            Outcome::Infeasible => None,
+            Outcome::Uncertified => {
+                let set: Vec<usize> = (0..pair.len()).filter(|&e| meet.in_set[e]).collect();
+                panic!(
+                    "uncertified: want {want:?}, the set {set:?}; negative arcs {}; roles {roles:?}\n\
+                     dims {:?} coords {:?} weights {:?}",
+                    meet.stats.negative, pair.dims, pair.coords, pair.weight
+                );
+            }
+        };
+        assert_eq!(meet.stats.negative, 0);
         assert_eq!(got.as_ref().map(|b| b.value), want, "roles {roles:?}");
         let Some(b) = got else { return };
         let set: Vec<usize> = b.set.iter().map(|&e| e as usize).collect();
@@ -873,7 +890,7 @@ mod tests {
                 .map(|_| if round % 3 == 0 { 1 + rng.below(4) as i64 } else { 1 + rng.below(100) as i64 })
                 .collect();
             let pair = Pair { dims, coords, weight };
-            let mut meet = Meet::new(&pair);
+            let mut meet = Meet::new(pair.clone());
             for _ in 0..4 {
                 let roles: Vec<Role> = (0..len)
                     .map(|_| match rng.below(7) {
@@ -899,7 +916,7 @@ mod tests {
             let board = Board::new(n, &spf);
             let weights: Vec<i64> = (0..=i64::from(n)).collect();
             let pair = Parity::pair(&board, &weights);
-            let mut meet = Meet::new(&pair);
+            let mut meet = Meet::new(pair.clone());
             let mut playable_sets: Vec<Vec<usize>> = Vec::new();
             for bits in 0u64..(1 << (n - 1)) {
                 let set: Vec<usize> = (2..=n as usize).filter(|&c| bits >> (c - 2) & 1 == 1).collect();
@@ -933,7 +950,7 @@ mod tests {
                     .max();
                 let got = meet.solve(&roles);
                 if let Some(best) = best_playable {
-                    assert!(got.as_ref().is_some_and(|b| b.value >= best), "n={n} roles={roles:?}");
+                    assert!(matches!(&got, Outcome::Bound(b) if b.value >= best), "n={n} roles={roles:?}");
                 }
                 if n <= 13 {
                     check(&pair, &roles, &mut meet);

@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 use taxman_evidence::game::{Board, Prover, Role};
 use taxman_evidence::jsonl::recorded_games;
-use taxman_evidence::parity::{Meet, Parity};
+use taxman_evidence::parity::{Meet, Outcome, Parity};
 use taxman_evidence::primes::smallest_prime_factors;
 
 fn main() {
@@ -21,18 +21,18 @@ fn main() {
         let board = Board::new(n, &spf);
         let weights: Vec<i64> = (0..=i64::from(n)).collect();
         let pair = Parity::pair(&board, &weights);
-        let mut meet = Meet::new(&pair);
+        let mut meet = Meet::new(pair);
         let mut roles = vec![Role::Free; n as usize + 1];
         roles[0] = Role::Barred;
         roles[1] = Role::Barred;
         let t0 = Instant::now();
-        let bound = meet.solve(&roles).expect("the root is certified");
+        let Outcome::Bound(bound) = meet.solve(&roles) else { panic!("n={n}: the root is not certified") };
         let secs = t0.elapsed().as_secs_f64();
         let matching = Prover::new(&board, *score, 1).root_bound();
         assert!(bound.value >= *score as i64, "n={n}: the parity bound {} is below {score}", bound.value);
         let mut with_game = roles.clone();
         moves.iter().for_each(|&c| with_game[c as usize] = Role::Pick);
-        let forced = meet.solve(&with_game).expect("the recorded game is independent in both matroids");
+        let Outcome::Bound(forced) = meet.solve(&with_game) else { panic!("n={n}: the recorded game is dependent") };
         let extra = forced.value - *score as i64;
         let forced_out = bound.without.iter().filter(|&&(_, v)| v <= *score as i64).count();
         println!(
