@@ -27,8 +27,9 @@ frontier.
 | `scaling.jsonl` | step 4, thread scaling of the proof of 1225 |
 | `recheck.jsonl` | four games repeated at the end, to see run-to-run and background-load noise |
 | `load.jsonl` | what the machine was doing apart from us, sampled before and after each invocation |
+| `slope_roots.jsonl`, `slope_proofs.jsonl`, `slope.py` | the later study of what drives the slope: `examples/slope.rs`'s root measurements of the non-prime games 880-1300 and of this study's games past 1300, its one-thread proofs (with margins), and the script that makes its tables ([docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#what-drives-the-slope-2026-10)) |
 
-Regenerate the tables with `./analysis.py > analysis_output.md`.
+Regenerate the tables with `./analysis.py > analysis_output.md` (and the slope study's with `./slope.py`).
 
 ## Method
 
@@ -250,7 +251,11 @@ still be better than this estimate.
 * **Extrapolation.**  The fits are used 50-650 n beyond their data (1352), assuming log-linear growth.  A change
   in the frame structure (a further frame, more candidates) could bend the curve; the data show a x18 step and
   x2 and x3 steps, so the single-step uncertainty is large.  Costs past ~1700 (years of 192-core time) are only an
-  order-of-magnitude statement.
+  order-of-magnitude statement.  A later study
+  ([docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#what-drives-the-slope-2026-10)) found that a proof's cost follows
+  the gap between the root's bound and the optimum, not n: for the proofs, the slope fitted here is the steep rise of
+  that gap over 1190-1300, which did not go on in the games sampled past 1300 (these bands; the standalone cost of
+  band 1350 is mostly finding its optimum).
 * **Ratio assumption.**  The chained cost is taken as 0.45 x standalone from games at 1150-1231 (10 big
   searches, 8 of them at n >= 1150); it will drift if the share of the search before the final incumbent (median
   43% in band 1200, 11% in 1250, 9% in 1300, 94% in 1350) changes with n.

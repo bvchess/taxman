@@ -74,7 +74,8 @@
 //! last.  `bounds` is two small functions that the Java solver has too (`max_additional` and the greedy
 //! incumbent), and `sacrifice` and `brute` are studies that a first read can skip.  `examples/` holds the ladder
 //! (searches of hard games with time limits and thread counts), the probe of the hot paths, the sacrifice study,
-//! and the list of games whose search repeats an earlier game's; `tests/` the integration tests.
+//! the list of games whose search repeats an earlier game's, and the slope study (the gaps of a game's root, and
+//! proofs with every bound lowered by a margin); `tests/` the integration tests.
 
 pub mod accelerate;
 pub mod bits;
