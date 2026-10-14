@@ -22,15 +22,16 @@ use taxman::search::lagrange::Refits;
 use taxman::search::Gf2Branching;
 use taxman::search::TaxUnit;
 
-/// Every tactic that acts inside the search, alone and in the combinations that matter, with the forgetting of
-/// nogoods at the production period, every step, every third, and never; on one thread and two; and the GF(2)
-/// bound (tactic `gf2`) with each way of choosing the branch, with and without the matching bound as a first check,
+/// Every tactic that acts inside the search, alone and in the combinations that matter: first the matching path
+/// ([`SearchTactics::matching`], 0 to 18), then the default, the GF(2) bound (19 to 29).  The matching path with the
+/// forgetting of nogoods at the production period, every step, every third, and never; on one thread and two; and
+/// the GF(2) bound with each way of choosing the branch, with and without the matching bound as a first check,
 /// forced members, nogoods and the Lagrangian bound's early refits.  The Lagrangian
 /// bound (tactic `lagrange`) refits its multipliers only after 2,000 steps, which most of these searches never
 /// take, so the last configurations refit them after the first few steps and every few steps after that (with and
 /// without forgetting at the same time, refinement, and a second thread), and one turns it off.
 fn configs() -> Vec<Config> {
-    let base = Config::standard();
+    let (base, g) = (Config::matching(), Config::standard());
     vec![
         base,
         Config { period: Some(1), ..base },
@@ -51,17 +52,17 @@ fn configs() -> Vec<Config> {
         Config { refits: Some(Refits { first: 1, every: 4 }), refine: 0, ..base },
         Config { refits: Some(Refits { first: 2, every: 5 }), threads: 2, ..base },
         Config { refits: None, ..base },
-        Config { gf2: true, ..base },
-        Config { gf2: true, gf2_branching: Gf2Branching::Split, ..base },
-        Config { gf2: true, gf2_branching: Gf2Branching::Largest, ..base },
-        Config { gf2: true, gf2_branching: Gf2Branching::Forced, ..base },
-        Config { gf2: true, gf2_prefilter: true, ..base },
-        Config { gf2: true, fix_forced: false, ..base },
-        Config { gf2: true, nogoods: false, ..base },
-        Config { gf2: true, period: Some(1), ..base },
-        Config { gf2: true, threads: 2, ..base },
-        Config { gf2: true, refits: Some(Refits { first: 1, every: 4 }), ..base },
-        Config { gf2: true, refits: Some(Refits { first: 2, every: 5 }), threads: 2, period: Some(3), ..base },
+        g,
+        Config { gf2_branching: Gf2Branching::Split, ..g },
+        Config { gf2_branching: Gf2Branching::Largest, ..g },
+        Config { gf2_branching: Gf2Branching::Forced, ..g },
+        Config { gf2_prefilter: true, ..g },
+        Config { fix_forced: false, ..g },
+        Config { nogoods: false, ..g },
+        Config { period: Some(1), ..g },
+        Config { threads: 2, ..g },
+        Config { refits: Some(Refits { first: 1, every: 4 }), ..g },
+        Config { refits: Some(Refits { first: 2, every: 5 }), threads: 2, period: Some(3), ..g },
     ]
 }
 
@@ -108,14 +109,17 @@ fn a_search_from_a_handicapped_incumbent_finds_the_optimum() {
 #[test]
 fn a_search_with_the_lagrangian_bound_from_a_handicapped_incumbent_finds_the_optimum() {
     let optimal = Optimal::built_in();
-    let base = Config::standard();
+    // Over the matching bound, and over the GF(2) bound.
+    let (base, g) = (Config::matching(), Config::standard());
     let configs = [
         Config { refits: Some(Refits { first: 10, every: 60 }), ..base },
         Config { refits: Some(Refits { first: 25, every: 100 }), period: Some(100), ..base },
         Config { refits: Some(Refits { first: 10, every: 60 }), threads: 2, ..base },
+        Config { refits: Some(Refits { first: 10, every: 60 }), ..g },
+        Config { refits: Some(Refits { first: 25, every: 100 }), period: Some(100), threads: 2, ..g },
     ];
     let runs = lagrangian_runs::<8>(optimal, 301..=511, &configs) + lagrangian_runs::<16>(optimal, 512..=600, &configs);
-    assert!(runs > 150, "{runs} runs");
+    assert!(runs > 250, "{runs} runs");
 }
 
 /// The searches of [`a_search_with_the_lagrangian_bound_from_a_handicapped_incumbent_finds_the_optimum`] of the
@@ -249,28 +253,40 @@ fn resumed_over_and_over<const W: usize>(
 fn a_search_resumed_over_and_over_finds_the_optimum() {
     let optimal = Optimal::built_in();
     let dir = TempDir::new("churn");
-    // Game 600 takes 7,000 to 17,000 nodes from an incumbent that far below the optimum (two threads: the count
-    // depends on timing), so a limit of 1,000 stops it at least six times in each of the three configurations: the
-    // default tactics, the searchers forgetting their nogoods every two steps, and their Lagrangian bounds refitted
-    // every four.  The bound below only checks that the resuming really happened; it leaves room for the smallest
-    // trees a loaded machine produces.
+    // On the matching path, game 600 takes 7,000 to 17,000 nodes from an incumbent that far below the optimum (two
+    // threads: the count depends on timing), so a limit of 1,000 stops it at least six times in each of the three
+    // configurations: the matching tactics, the searchers forgetting their nogoods every two steps, and their
+    // Lagrangian bounds refitted every four.  The bounds below only check that the resuming really happened; they
+    // leave room for the smallest trees a loaded machine produces.
     let truth = optimal_sum::<16>(optimal, 600).unwrap();
-    let resumes = resumed_over_and_over::<16>(600, truth, 30, 1000, &dir, &[0, 12, 14, 19, 26]);
+    let resumes = resumed_over_and_over::<16>(600, truth, 30, 1000, &dir, &[0, 12, 14]);
     assert!(resumes >= 10, "only {resumes} resumes");
+    // The GF(2) bound searches 600 in too few nodes to be stopped (the engine checks the limit every 1,024 steps of
+    // a searcher), and game 1000 in several thousand: the default, without forced members, forgetting every step,
+    // and refitting the Lagrangian bound.
+    let truth = optimal_sum::<16>(optimal, 1000).unwrap();
+    let resumes = resumed_over_and_over::<16>(1000, truth, 30, 1000, &dir, &[19, 24, 26, 29]);
+    assert!(resumes >= 8, "the GF(2) bound: only {resumes} resumes");
 }
 
-/// The same at W = 20, 24 and 64, on game 1133 (its truth from `results/strict.jsonl`) from an incumbent 400 below
-/// it, stopped every 60 nodes or so: the default tactics, forgetting the nogoods every two or three steps, and
-/// refitting the Lagrangian bound every four.
+/// The same at W = 20, 24 and 64: on the matching path, game 1133 (its truth from `results/strict.jsonl`) from an
+/// incumbent 400 below it, stopped every 60 nodes or so (the engine checks every 1,024 steps of a searcher): its
+/// tactics, forgetting the nogoods every two or three steps, and refitting the Lagrangian bound every four; with the
+/// GF(2) bound, whose search of 1133 is too short to stop, game 1000 at those widths.
 #[test]
 fn a_wide_search_resumed_over_and_over_finds_the_optimum() {
     let n = 1133;
     let truth = stored_games("strict.jsonl")[&n].0 - Board::<20>::for_n(n).in_the_bag;
     let dir = TempDir::new("churn-wide");
-    let resumes = resumed_over_and_over::<20>(n, truth, 400, 60, &dir, &[0, 12, 14, 19])
-        + resumed_over_and_over::<24>(n, truth, 400, 60, &dir, &[0, 19])
-        + resumed_over_and_over::<64>(n, truth, 400, 60, &dir, &[2, 19]);
+    let resumes = resumed_over_and_over::<20>(n, truth, 400, 60, &dir, &[0, 12, 14])
+        + resumed_over_and_over::<24>(n, truth, 400, 60, &dir, &[0])
+        + resumed_over_and_over::<64>(n, truth, 400, 60, &dir, &[2]);
     assert!(resumes > 10, "only {resumes} resumes");
+    let truth = optimal_sum::<16>(Optimal::built_in(), 1000).unwrap();
+    let resumes = resumed_over_and_over::<20>(1000, truth, 30, 60, &dir, &[19, 26])
+        + resumed_over_and_over::<24>(1000, truth, 30, 60, &dir, &[19])
+        + resumed_over_and_over::<64>(1000, truth, 30, 60, &dir, &[29]);
+    assert!(resumes > 6, "the GF(2) bound: only {resumes} resumes");
 }
 
 // ---------------------------------------------------------------------------------------------------------

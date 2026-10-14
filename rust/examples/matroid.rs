@@ -393,7 +393,7 @@ fn parse() -> Result<Options, String> {
             "--samples" => {
                 o.samples = args.next().ok_or("--samples needs a value")?.parse().map_err(|e| format!("{e}"))?
             }
-            file if ["nodes", "forced", "kernel"].contains(&o.command.as_str()) => o.files.push(file.into()),
+            file if ["nodes", "forced"].contains(&o.command.as_str()) => o.files.push(file.into()),
             range => {
                 let parse_n = |t: &str| t.parse::<u32>().map_err(|e| format!("{range}: {e}"));
                 match range.split_once('-') {
@@ -463,12 +463,6 @@ fn main() {
             for path in &o.files {
                 let n = first_n(path);
                 taxman::with_width!(n, W => forced::<W>(path, o.every));
-            }
-        }
-        "kernel" => {
-            for path in &o.files {
-                let n = first_n(path);
-                taxman::with_width!(n, W => kernel::<W>(path, o.every));
             }
         }
         other => {
@@ -1264,113 +1258,5 @@ fn prove<const W: usize>(n: u32, known: &Known, o: &Options) {
         x[stat::GF2_AUGMENTATIONS],
         x[stat::GF2_STRONG_SOLVES],
         x[stat::GF2_STRONG_AUGMENTATIONS],
-    );
-}
-
-// ---------------------------------------------------------------------------------------------------------
-// kernel
-
-/// The GF(2) bound's kernels at the nodes of a `.nodes` fixture, `reps` times each (the fastest kept), in cycles per
-/// operation, with a fingerprint of every value computed (an exact optimization must leave it unchanged): a node's
-/// level from the root (`reset`) and its bound from scratch; its forced members (the weight split); and the bound
-/// without each member of the conflict of its heaviest set (strong branching's solves, warm-started).
-fn kernel<const W: usize>(path: &Path, reps: usize) {
-    use taxman::gf2::{Gf2Bound, Gf2Graph};
-    let (n, incumbent, units) = fixtures::read_nodes::<W>(path).expect("a fixture");
-    let (_, p) = setup::<W>(n).expect("a game with candidates");
-    let model = &p.model;
-    let graph = Gf2Graph::new(model, &p.root, &p.candidates);
-    let mut scratch = Scratch::<W>::new();
-    let best = incumbent.sum();
-    struct Node<const W: usize> {
-        promoted: Bits<W>,
-        cands: Bits<W>,
-        cap: u32,
-        need: u64,
-        conflict: Bits<W>,
-    }
-    let mut nodes = Vec::new();
-    let mut bound = Gf2Bound::<W>::new(&graph);
-    for u in units.iter().filter(|u| !u.cands.is_empty()) {
-        let state = model.promote_all_using(&mut scratch, &p.root, &u.promoted).expect("a node");
-        let cap = (p.max_total - u.promoted.len()).min(state.max_promotions_among(&u.cands).max(0) as u32);
-        bound.reset(&u.promoted, &u.cands);
-        let chosen = bound.evaluate(cap, None).chosen;
-        let conflict = model.conflict_using(&mut scratch, &state, &chosen, true).unwrap_or(Bits::EMPTY);
-        let need = (best + 1).saturating_sub(u.promoted.sum());
-        nodes.push(Node { promoted: u.promoted, cands: u.cands, cap, need, conflict });
-    }
-    let run = |label: &str, mut f: Box<dyn FnMut(&mut Gf2Bound<W>, &Node<W>) -> (u64, u64)>| {
-        let mut fastest: Option<(u64, u64, f64)> = None;
-        let mut print = None;
-        for _ in 0..reps.max(1) {
-            let mut b = Gf2Bound::<W>::new(&graph);
-            let (mut fp, mut ops) = (0x243F_6A88_85A3_08D3u64, 0u64);
-            let before = counters::now();
-            let t0 = Instant::now();
-            let s0 = b.stats();
-            for x in &nodes {
-                let (value, count) = f(&mut b, x);
-                fp = (fp.rotate_left(5) ^ value).wrapping_mul(0x9E37_79B9_7F4A_7C15);
-                ops += count;
-            }
-            let wall = t0.elapsed().as_secs_f64();
-            let cycles = match (before, counters::now()) {
-                (Some((_, c0)), Some((_, c1))) => c1 - c0,
-                _ => 0,
-            };
-            let s = b.stats();
-            if fastest.is_none_or(|(c, _, w)| if cycles > 0 { cycles < c } else { wall < w }) {
-                fastest = Some((cycles, fp, wall));
-                print = Some((
-                    ops,
-                    s.solves - s0.solves,
-                    s.augmentations - s0.augmentations,
-                    s.rounds - s0.rounds,
-                    s.rebuilds - s0.rebuilds,
-                    (s.splits - s0.splits, s.split_rounds - s0.split_rounds),
-                ));
-            }
-        }
-        let (cycles, fp, wall) = fastest.expect("a run");
-        let (ops, solves, augs, rounds, rebuilds, splits) = print.expect("a run");
-        println!(
-            "  {label:<34} {ops:>7} ops {:>10.0} cyc/op {:>8.1} µs/op  solves {solves:>6} augs/solve {:>5.1} \
-             rounds/aug {:>4.2} rebuilds {rebuilds:>6} splits {:>5} rounds/split {:>5.1}  {fp:016x}",
-            cycles as f64 / ops.max(1) as f64,
-            1e6 * wall / ops.max(1) as f64,
-            augs as f64 / solves.max(1) as f64,
-            rounds as f64 / (augs + solves).max(1) as f64,
-            splits.0,
-            splits.1 as f64 / splits.0.max(1) as f64,
-        );
-    };
-    println!("n={n}: {} nodes", nodes.len());
-    run(
-        "reset + bound from scratch",
-        Box::new(|b, x| {
-            b.reset(&x.promoted, &x.cands);
-            (b.evaluate(x.cap, None).value, 1)
-        }),
-    );
-    run(
-        "reset + bound + forced (split)",
-        Box::new(|b, x| {
-            b.reset(&x.promoted, &x.cands);
-            let e = b.evaluate(x.cap, Some(x.need));
-            (e.value ^ e.forced.sum() << 20, 1)
-        }),
-    );
-    run(
-        "bound without each conflict member",
-        Box::new(|b, x| {
-            b.reset(&x.promoted, &x.cands);
-            b.evaluate(x.cap, None);
-            let mut h = 0u64;
-            for m in x.conflict.iter() {
-                h = h.wrapping_mul(31).wrapping_add(b.value_excluding(m, x.cap, u64::MAX));
-            }
-            (h, u64::from(x.conflict.len()))
-        }),
     );
 }

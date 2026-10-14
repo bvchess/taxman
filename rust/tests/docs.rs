@@ -261,7 +261,8 @@ fn keys_written() -> (BTreeSet<String>, BTreeSet<String>) {
     let opts = SolveOptions { threads: 1, ..SolveOptions::default() };
     let complete = keys(85, &opts);
     assert_eq!(keys(12, &opts), complete, "a game with no search has the keys of one with a search");
-    let stopped = keys(600, &SolveOptions { node_limit: Some(1), ..opts });
+    // On its own, the default searches 1000 in more than the 1,024 steps after which the engine checks a limit.
+    let stopped = keys(1000, &SolveOptions { node_limit: Some(1), ..opts });
     assert!(stopped.contains("best_so_far"), "a game that a limit stopped has best_so_far: {stopped:?}");
     (complete, stopped)
 }

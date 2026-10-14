@@ -371,17 +371,49 @@ fn resume_in_pieces(threads: usize, tactics: SearchTactics, min_pieces: usize) {
 
 #[test]
 fn checkpoint_and_resume_one_thread() {
-    resume_in_pieces(1, SearchTactics::default(), 3);
-    resume_in_pieces(1, SearchTactics { fix_forced: false, ..SearchTactics::default() }, 4);
+    resume_in_pieces(1, SearchTactics::matching(), 3);
+    resume_in_pieces(1, SearchTactics { fix_forced: false, ..SearchTactics::matching() }, 4);
 }
 
 #[test]
 fn checkpoint_and_resume_four_threads() {
-    // The default tactics search 760 in too few nodes (about 2,300) for four threads to reach the node limit
-    // before the end; without refinement, forced members and nogoods they take about 4,700, which some thread
+    // The matching search of 760 takes too few nodes (about 2,300) for four threads to reach the node limit
+    // before the end; without refinement, forced members and nogoods it takes about 4,700, which some thread
     // always meets the limit in.
-    let weak = SearchTactics { match_refine: 0, fix_forced: false, nogoods: false, ..SearchTactics::default() };
+    let weak = SearchTactics { match_refine: 0, fix_forced: false, nogoods: false, ..SearchTactics::matching() };
     resume_in_pieces(4, weak, 2);
+}
+
+/// The default search (tactic `gf2`) stopped every few hundred nodes and resumed from its checkpoint, on one thread
+/// and on two, until it finishes with game 1000's optimum: its searches of 760 are too short to interrupt (the
+/// engine checks the node limit every 1024 nodes).
+#[test]
+fn checkpoint_and_resume_with_the_gf2_bound() {
+    let n = 1000;
+    let board = crate::board::Board::<16>::for_n(n);
+    let p = board.prepare(SearchTactics::default()).unwrap();
+    let opt = crate::game::Optimal::built_in().score(n).unwrap() - board.in_the_bag;
+    for threads in [1, 2] {
+        let dir = TempDir::new(&format!("resume-gf2-{threads}"));
+        let ckpt = dir.0.join("ckpt.bin");
+        let cfg = EngineConfig {
+            checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))),
+            node_limit: Some(1500),
+            queue_mem_cap: 4,
+            spill_dir: Some(dir.0.join("spill")),
+            ..config(threads)
+        };
+        let mut result = search(&p, &cfg, None, None, false).unwrap();
+        let mut pieces = 1;
+        while !result.completed {
+            let resumed = board.prepare_for_resume(&ckpt).unwrap();
+            result = search(&resumed, &cfg, None, None, true).unwrap();
+            pieces += 1;
+            assert!(pieces < 200, "no progress");
+        }
+        assert!(pieces >= 2, "{threads} threads: only {pieces} pieces");
+        assert_eq!(result.sum, opt, "{threads} threads");
+    }
 }
 
 #[test]
@@ -389,7 +421,7 @@ fn a_checkpoint_of_another_game_is_refused() {
     let (a, b) = (load(760), load(720));
     let dir = TempDir::new("refuse");
     let ckpt = dir.0.join("ckpt.bin");
-    let pa = prepare_golden::<16>(&a, SearchTactics::default());
+    let pa = prepare_golden::<16>(&a, SearchTactics::matching());
     let cfg =
         EngineConfig { checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))), node_limit: Some(50), ..config(1) };
     assert!(!search(&pa, &cfg, None, None, false).unwrap().completed);
@@ -464,7 +496,7 @@ fn units_and_headers_round_trip() {
     assert!(other(|h| h.tactics.nogoods = !h.tactics.nogoods).contains("tactics"));
 
     // Every setting of the search tactics reads back as it was written: `match_refine` in bits 0 to 2, a bit for
-    // each switch that is on (the defaults: 0x79), and no higher bit is used.
+    // each switch that is on (the defaults: 0xB9), and no higher bit is used.
     for refine in [0, 1, 7] {
         for (on, off) in [(true, false), (false, true)] {
             let t = SearchTactics {
@@ -478,8 +510,8 @@ fn units_and_headers_round_trip() {
             assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
         }
     }
-    assert_eq!(SearchTactics::default().bits(), 0x79);
-    assert_eq!(SearchTactics::from_bits(0x79), Ok(SearchTactics::default()));
+    assert_eq!(SearchTactics::default().bits(), 0xB9);
+    assert_eq!(SearchTactics::from_bits(0xB9), Ok(SearchTactics::default()));
     assert!(SearchTactics::from_bits(1 << 8).unwrap_err().contains("unknown tactics"));
 }
 

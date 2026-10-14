@@ -56,6 +56,7 @@ use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::engine::{self, Ctx, EngineConfig, Searcher, Start};
 use taxman::game::Optimal;
+use taxman::gf2::{Gf2Bound, Gf2Graph};
 use taxman::matchbound::{MatchBound, MatchGraph};
 use taxman::model::{Lookup, Model, Nogoods, Scratch};
 use taxman::search::{search, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
@@ -383,6 +384,70 @@ fn kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> Resul
 }
 
 // ---------------------------------------------------------------------------------------------------------
+// F4: the GF(2) bound's kernels (with `--tactic gf2=on`)
+
+/// The GF(2) bound's kernels at the nodes of the F1 fixture `path` ([`taxman::gf2::Gf2Bound`]), each over all the
+/// nodes: a node's level from the root and its bound from scratch; the same with its forced members (the weight
+/// split); and the bound without each member of the conflict of its heaviest set (strong branching's solves,
+/// warm-started from the level's history, to the end).  Fingerprinted by the values.
+fn gf2_kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> Result<(), String> {
+    let (n, incumbent, units) = read_nodes::<W>(path)?;
+    let p = setup::<W>(n);
+    let model: &Model = &p.model;
+    let graph = Gf2Graph::new(model, &p.root, &p.candidates);
+    let mut scratch = Scratch::<W>::new();
+    let best = incumbent.sum();
+    // (promoted, candidates, max_add, need, the conflict of the heaviest set)
+    let mut nodes = Vec::new();
+    let mut bound = Gf2Bound::<W>::new(&graph);
+    for u in units.iter().filter(|u| !u.cands.is_empty()) {
+        let state = model.promote_all_using(&mut scratch, &p.root, &u.promoted).ok_or("a node of the game")?;
+        let cap = (p.max_total - u.promoted.len()).min(state.max_promotions_among(&u.cands).max(0) as u32);
+        bound.reset(&u.promoted, &u.cands);
+        let chosen = bound.evaluate(cap, None).chosen;
+        let conflict = model.conflict_using(&mut scratch, &state, &chosen, true).unwrap_or(Bits::EMPTY);
+        let need = (best + 1).saturating_sub(u.promoted.sum());
+        nodes.push((u.promoted, u.cands, cap, need, conflict));
+    }
+    let count = nodes.len() as u64;
+    let members: u64 = nodes.iter().map(|x| u64::from(x.4.len())).sum();
+    report.header(&format!(
+        "n={n} W={W}, the GF(2) bound: {} nodes, rank {:?} per frame, {:.1} members a conflict",
+        nodes.len(),
+        graph.ranks(),
+        members as f64 / count.max(1) as f64
+    ));
+    let mut b = Gf2Bound::<W>::new(&graph);
+    let (cost, fp) = measure(reps, |fp| {
+        for &(promoted, cands, cap, _, _) in &nodes {
+            b.reset(&promoted, &cands);
+            fp.add(b.evaluate(cap, None).value);
+        }
+    });
+    report.line("GF(2): reset + bound from scratch", count, cost, fp);
+    let (cost, fp) = measure(reps, |fp| {
+        for &(promoted, cands, cap, need, _) in &nodes {
+            b.reset(&promoted, &cands);
+            let e = b.evaluate(cap, Some(need));
+            fp.add(e.value);
+            fp.add(e.forced.sum());
+        }
+    });
+    report.line("GF(2): reset + bound + forced (split)", count, cost, fp);
+    let (cost, fp) = measure(reps, |fp| {
+        for &(promoted, cands, cap, _, conflict) in &nodes {
+            b.reset(&promoted, &cands);
+            b.evaluate(cap, None);
+            for x in conflict.iter() {
+                fp.add(b.value_excluding(x, cap, u64::MAX));
+            }
+        }
+    });
+    report.line("GF(2): bound without each conflict member", members, cost, fp);
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------------------------------------
 // F3: the search window
 
 /// The window of the checkpoint `path` of game `n`: `steps` steps, with the tactics the checkpoint records changed
@@ -409,14 +474,15 @@ fn window<const W: usize>(
     let graph = MatchGraph::new(&p.model, &p.root);
     let space = SearchSpace::new(&p, &graph, None);
     let header = engine::read_checkpoint_header(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let before = engine::read_checkpoint(path).map_err(|e| format!("{}: {e}", path.display()))?.stats.nodes;
     let cfg = EngineConfig { threads: 1, node_limit: Some(steps), progress: None, ..EngineConfig::default() };
     let mut failure = None;
-    let mut done = 0;
+    let (mut done, mut completed) = (0, false);
     let (cost, fp) = measure(reps.min(2), |fp| {
         // Without a checkpoint of its own the run leaves the file as it is.
         match engine::run(&cfg, Start::Resume(path.to_path_buf()), &header, |_| TaxSearcher::new(&space)) {
             Ok(o) => {
-                done = o.stats.nodes;
+                (done, completed) = (o.stats.nodes, o.completed);
                 for x in [o.stats.nodes, o.best].into_iter().chain(o.stats.extra) {
                     fp.add(x);
                 }
@@ -428,9 +494,12 @@ fn window<const W: usize>(
         return Err(format!("{}: {e}", path.display()));
     }
     let name = path.file_name().map_or("?".into(), |s| s.to_string_lossy().into_owned());
-    report.line(&format!("F3 window: {steps} steps from {name}"), steps, cost, fp);
+    // A search that ends inside the window (other tactics than the checkpoint's, say) is costed by the steps it took.
+    let ops = if completed { done - before } else { steps };
+    report.line(&format!("F3 window: {steps} steps from {name}"), ops, cost, fp);
     if !report.brief {
-        println!("    (the checkpoint's search had {done} nodes after the window)");
+        let end = if completed { ", finished" } else { "" };
+        println!("    (the checkpoint's search had {done} nodes after the window{end})");
     }
     Ok(())
 }
@@ -580,8 +649,12 @@ fn run() -> Result<(), String> {
                 if games.is_empty() { GAMES.to_vec() } else { games.iter().map(|&n| n as u32).collect() };
             let mut report = Report { brief, ..Report::default() };
             for n in games {
+                let gf2 = changes.iter().any(|c| c == "gf2=on");
                 taxman::with_width!(n, W => {
                     kernels::<W>(&fixture(&dir, n, "nodes"), reps, &mut report)?;
+                    if gf2 {
+                        gf2_kernels::<W>(&fixture(&dir, n, "nodes"), reps, &mut report)?;
+                    }
                     window::<W>(n, &fixture(&dir, n, "window.ckpt"), steps, &changes, reps, &mut report)?;
                 });
             }

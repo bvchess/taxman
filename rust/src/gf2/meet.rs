@@ -676,9 +676,7 @@ impl<const R: usize> Meet<R> {
                 }
             }
             // Members to outside.
-            for slots in &mut self.changed_slots {
-                *slots = [0; R];
-            }
+            self.changed_slots.fill([0; R]);
             let mut member_improved = false;
             for &x in &self.changed_in {
                 let xi = x as usize;
@@ -882,8 +880,25 @@ mod tests {
     use super::*;
     use crate::test_support::Rng;
 
+    /// What a [`Problem`] of one word borrows: the blocks and vectors of both matroids, and the weights.
+    struct Owned {
+        block: [Vec<u8>; 2],
+        vector: [Vec<Vector<1>>; 2],
+        weight: Vec<i64>,
+    }
+
+    impl Owned {
+        fn problem(&self) -> Problem<'_, 1> {
+            Problem {
+                block: [&self.block[0], &self.block[1]],
+                vector: [&self.vector[0], &self.vector[1]],
+                weight: &self.weight,
+            }
+        }
+    }
+
     /// A random problem of `n` elements with blocks of dimension at most `dim` (one word).
-    fn random(rng: &mut Rng, n: usize, dim: u64) -> (Vec<u8>, Vec<u8>, Vec<Vector<1>>, Vec<Vector<1>>, Vec<i64>) {
+    fn random(rng: &mut Rng, n: usize, dim: u64) -> Owned {
         let blocks = [1 + rng.below(3), 1 + rng.below(3)];
         let dims = [
             (0..blocks[0]).map(|_| 1 + rng.below(dim)).collect::<Vec<_>>(),
@@ -900,9 +915,7 @@ mod tests {
         }
         let mut weight: Vec<i64> = (0..n).map(|_| 1 + rng.below(30) as i64).collect();
         weight.sort_unstable();
-        let [ba, bb] = block;
-        let [va, vb] = vector;
-        (ba, bb, va, vb, weight)
+        Owned { block, vector, weight }
     }
 
     fn independent(block: &[u8], vector: &[Vector<1>], set: &[u32]) -> bool {
@@ -933,8 +946,9 @@ mod tests {
         let (mut warm, mut splits) = (0, 0);
         for trial in 0..3000 {
             let n = 1 + rng.below(11) as usize;
-            let (ba, bb, va, vb, weight) = random(&mut rng, n, 5);
-            let p = Problem { block: [&ba, &bb], vector: [&va, &vb], weight: &weight };
+            let owned = random(&mut rng, n, 5);
+            let p = owned.problem();
+            let ([ba, bb], [va, vb]) = (&owned.block, &owned.vector);
             let mut meet = Meet::<1>::new(n, [3, 3]);
             let live: Vec<u32> = (0..n as u32).collect();
             for cap in 0..=n {
@@ -942,8 +956,8 @@ mod tests {
                 meet.solve(&p, &live, &[], cap, i64::MAX, |set| reported.push(set.to_vec()));
                 assert_eq!(meet.value, brute(&p, &live, cap), "trial {trial} cap {cap}");
                 let chosen: Vec<u32> = live.iter().copied().filter(|&e| meet.contains(e)).collect();
-                assert!(chosen.len() <= cap && independent(&ba, &va, &chosen) && independent(&bb, &vb, &chosen));
-                assert_eq!(chosen.iter().map(|&e| weight[e as usize]).sum::<i64>(), meet.value);
+                assert!(chosen.len() <= cap && independent(ba, va, &chosen) && independent(bb, vb, &chosen));
+                assert_eq!(chosen.iter().map(|&e| p.weight[e as usize]).sum::<i64>(), meet.value);
                 let mut last = reported.last().cloned().unwrap_or_default();
                 last.sort_unstable();
                 assert_eq!(last, chosen, "trial {trial}: the last set reported is the heaviest");

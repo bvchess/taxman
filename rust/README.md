@@ -380,7 +380,7 @@ short, the fields regrouped and comments added, so it is not valid JSON as print
  "invocations":1, "threads":2,
  "tactics":"default",
  "tactic_switches":{"prime_shortcut":true,"same_search":true,"match_refine":1,"fix_forced":true,"nogoods":true,
-                    "forget_nogoods":true,"lagrange":true,"prev_cap":true,"seed_incumbent":true},
+                    "forget_nogoods":true,"lagrange":false,"gf2":true,"prev_cap":true,"seed_incumbent":true},
  "limits":{"seconds":null,"nodes":null},
  "options":{"force_search":false,"use_prev":false},
  "optimal_match":true, "build":{"commit":"8a6df9028f54...","dirty":true}}
@@ -403,7 +403,7 @@ Game 249 of that run repeated the search of 248; its line has `"method":"repeat"
 | `in_the_bag` | what the game with no promotions scores (null for prime shortcuts) |
 | `prev` | the game of n - 1 this one was built from: score, where it came from (`run`, `results`, `optimal`), a digest of its moves, its proof and what it assumes; null if there was none |
 | `same_search` | for a repeat, the earlier game of the file whose search it repeats: its board size, the digest of the search problem they share, the problem's best promotion sum, that game's proof and what it assumes; null otherwise |
-| `nodes`, `stats` | search steps over all invocations, and the searcher's counters (`match_bounds` is the number of matching bounds computed) |
+| `nodes`, `stats` | search steps over all invocations, and the searcher's counters (`match_bounds` is the number of node bounds computed, GF(2) or matching) |
 | `engine` | this invocation's splits, checkpoints written, units spilled, largest in-memory queue |
 | `setup` | null on a `trivial` or `prime` line, which set up no search; otherwise the frames and candidates found, `max_total` (cap on the number of promotions), the greedy start, `cap` (ceiling on the promotion sum, `n + score(n-1) - in_the_bag`; null on a repeat, which ran no search to stop), and `digest`, a digest of the search problem the setup poses (DESIGN.md, "Same search"), by which a later game finds this one to repeat |
 | `seconds` | per phase, this invocation (`search_all_runs`: the search over every invocation of a resumed game) |
@@ -495,9 +495,10 @@ second build's chain, what the games assume).
    |        search::search             starting incumbent = best of greedy / seed (n-1's promotions) / rounded root
    |                                   matching + local search; cap = n + score(n-1) - in_the_bag
    |          engine::run              worker threads; shared deque with disk spill; incumbent; checkpoints; signals
-   |            Stepper::step          per node (search/searcher.rs): check_node = matching bound (matchbound) ->
-   |                                   conflicts, forced members, nogoods (search::refine::Refiner, model::Nogoods)
-   |                                   -> Lagrangian bound over the nogoods (search::lagrange);
+   |            Stepper::step          per node (search/searcher.rs): check_node = GF(2) bound (gf2; with gf2=off
+   |                                   the matching bound, matchbound, and its refinement) -> conflicts, forced
+   |                                   members, nogoods (search::refine, model::Nogoods) -> with lagrange the
+   |                                   Lagrangian bound over the nogoods (search::lagrange);
    |                                   choose_branch (a candidate) -> make_child -> check_child
    |      promotions -> accelerate::solution_for_promotions   (Apiary with the promotions as sources) -> ordered moves
    |
@@ -590,9 +591,15 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
 * **node, step, unit** **(overloaded)**: a search node is a set of promotions made from the root plus the candidates
   left; a **unit** is a node as the engine passes it around, `(promoted, cands)`, from which the state is rebuilt; and
   the `nodes` that results and progress lines count are *steps*, one per candidate a node's loop tries.
-* **upper bound**: what no completion of a node can exceed: the **matching bound**, refined by conflicts and with
-  the Lagrangian bound beside it.  (**blameGame**, the Java's, was the starting point and is gone: DESIGN.md, section
-  2.)
+* **upper bound**: what no completion of a node can exceed: the **GF(2) bound** by default; with `gf2=off` the
+  **matching bound**, refined by conflicts and with the Lagrangian bound beside it.  (**blameGame**, the Java's, was
+  the starting point and is gone: DESIGN.md, section 2.)
+* **GF(2) bound** (`gf2`): every frame's movers get vectors over GF(2) (their maximal factors in the frame, and a
+  number promoted out of it its own), which a winnable frame keeps linearly independent; the even frames make one
+  matroid on the candidates and the odd frames another, and the heaviest set independent in both (**weighted matroid
+  intersection**) bounds a node's completions (heuristics/THEORY.md, Theorem 10).  Kept along the search path by
+  **contraction** by the promoted numbers (`gf2`).  **I\***: its heaviest set.  The **weight split** of `I*` gives the
+  bound without each member at once, which finds forced members.
 * **matching bound**: relax winnability to matchability: choose promotions maximising their sum such that every move
   and every promoted number gets a distinct maximal factor in its frame.  A maximum-weight bipartite matching, kept
   incrementally with dual **potentials** along the search path (`matchbound`).  **Q\***: the promotions of the
@@ -602,10 +609,11 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
 * **refinement** (`match_refine`): bound the branches of a conflict too (member k1 out; k1 in and k2 out; ...) to a few
   levels.
 * **branching**: which candidate a node promotes next.  **strong branching**, the only one: the member of the
-  conflict whose removal lowers the matching bound most.
-* **forced member** **(overloaded)**: in the search, a member of the heaviest matching whose removal alone brings the
-  matching bound (or the Lagrangian bound) below what the node needs, so every completion that beats the incumbent
-  promotes it (tactic `fix_forced`: the child promotes all of them together).  Also: a hive's *mandatory* move (`unzip`, "forced moves" in its docs), and a *forced pair*
+  conflict whose removal lowers the bound most (with `gf2`, solved exactly for each member: *exact strong
+  branching*).
+* **forced member** **(overloaded)**: in the search, a member of the heaviest set (`I*`, or the heaviest matching)
+  whose removal alone brings the bound (GF(2), matching or Lagrangian) below what the node needs, so every completion
+  that beats the incumbent promotes it (tactic `fix_forced`: the child promotes all of them together).  Also: a hive's *mandatory* move (`unzip`, "forced moves" in its docs), and a *forced pair*
   in `reduce`.  Three unrelated ideas.
 * **nogood**: a conflict of the *root* learned from a conflict found at a node; valid at every node, any thread, any
   path.  Each searcher keeps a table, scanned exactly over compact member indices, and forgets it every 50,000 of its
@@ -680,19 +688,23 @@ comment that is worth reading first; section 6 above is the map of how the piece
    prime shortcut), and the last step from promotions to moves.
 9. `src/matchbound.rs`: the matching bound; the module comment is the best explanation of it.  Its child
    `src/matchbound/lagrange.rs` is the Lagrangian bound over the nogoods, built on the same levels and repairs.
-10. `src/search/`: `mod.rs` explains the step and says what is where: `searcher.rs` (`TaxSearcher` and `Stepper::step`,
+10. `src/gf2.rs`: the GF(2) bound, the default node bound: the module comment explains the two frame matroids, how
+    a node's are kept by contraction along the search path, and the forced members; `src/gf2/meet.rs` is their
+    weighted intersection (the tableau, the augmenting paths, the weight split).  `heuristics/THEORY.md`, Theorem 10,
+    is the proof.
+11. `src/search/`: `mod.rs` explains the step and says what is where: `searcher.rs` (`TaxSearcher` and `Stepper::step`,
     whose phases are `check_node`, `choose_branch`, `make_child` and `check_child`), `refine.rs` (`Refiner`: conflicts,
     refinement; `strongest`), `lagrange.rs` (the Lagrangian bound in the search: where, forced members, refits),
     `setup.rs` (`prepare`), `tactics.rs`, `incumbent.rs`, and `header.rs` (the checkpoint header).  The
     `if let Some(p) = &mut self.probe` lines in `searcher.rs` are instrumentation
     (`diagnostics.rs`), which can be skipped.
-11. `src/bounds.rs`: two small functions the Java has too, the limit on a node's further promotions and the greedy
+12. `src/bounds.rs`: two small functions the Java has too, the limit on a node's further promotions and the greedy
     incumbent.
-12. `src/engine.rs`: the protocol in the module comment (conservation, splitting, checkpoint, termination).
-13. `src/tactics.rs`, `src/board.rs`, `src/solver.rs`, `src/results.rs`, `src/paths.rs`: the switchable tactics, a board
+13. `src/engine.rs`: the protocol in the module comment (conservation, splitting, checkpoint, termination).
+14. `src/tactics.rs`, `src/board.rs`, `src/solver.rs`, `src/results.rs`, `src/paths.rs`: the switchable tactics, a board
     prepared for a search, the per-game pipeline and the range driver, provenance and verification, the default files.
-14. `src/main.rs`, `src/cli.rs`, `src/commands.rs`: the command line.
-15. Studies, skipped on a first read: `src/brute.rs` (exhaustive search, the test oracle) and `src/sacrifice.rs` (the
+15. `src/main.rs`, `src/cli.rs`, `src/commands.rs`: the command line.
+16. Studies, skipped on a first read: `src/brute.rs` (exhaustive search, the test oracle) and `src/sacrifice.rs` (the
     sacrifice bound).
 
 | document | what it holds |

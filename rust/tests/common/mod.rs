@@ -92,21 +92,34 @@ pub fn prev_of(games: &StoredGames, n: u32) -> Prev {
     Prev { moves: moves.clone(), score: *score, source: PrevSource::Results, proof: None, assumes: Assumptions::new() }
 }
 
-/// The default options on `threads` threads, which `results/strict.jsonl` was made with.
+/// The default options on `threads` threads.
 pub fn options(threads: usize) -> SolveOptions {
     SolveOptions { threads, ..SolveOptions::default() }
 }
 
-/// The search tactics a differential test compares: the default and every sound variant that is cheap at n ~ 1100.
+/// [`options`] with the search tactics of the matching path ([`SearchTactics::matching`], which
+/// `results/strict.jsonl` was made with): for the tests that stop a search of a small game by a node limit.
+pub fn matching_options(threads: usize) -> SolveOptions {
+    let mut opts = options(threads);
+    opts.tactics.search = SearchTactics::matching();
+    opts
+}
+
+/// The search tactics a differential test compares: the default and every sound variant that is cheap at n ~ 1100,
+/// then the matching path ([`SearchTactics::matching`]) and its variants.
 pub fn variants() -> Vec<(&'static str, SearchTactics)> {
-    let d = SearchTactics::default();
+    let (d, m) = (SearchTactics::default(), SearchTactics::matching());
     vec![
         ("default", d),
         ("nogoods=off", SearchTactics { nogoods: false, ..d }),
         ("fix_forced=off", SearchTactics { fix_forced: false, ..d }),
         ("forget_nogoods=off", SearchTactics { forget_nogoods: false, ..d }),
-        ("match_refine=0", SearchTactics { match_refine: 0, ..d }),
-        ("match_refine=3", SearchTactics { match_refine: 3, ..d }),
+        ("lagrange=on", SearchTactics { lagrange: true, ..d }),
+        ("matching", m),
+        ("matching,nogoods=off", SearchTactics { nogoods: false, ..m }),
+        ("matching,fix_forced=off", SearchTactics { fix_forced: false, ..m }),
+        ("matching,match_refine=0", SearchTactics { match_refine: 0, ..m }),
+        ("matching,match_refine=3", SearchTactics { match_refine: 3, ..m }),
     ]
 }
 
@@ -200,6 +213,11 @@ impl Config {
     /// The default tactics on one thread.
     pub fn standard() -> Config {
         Config::of(&SearchTactics::default())
+    }
+
+    /// The tactics of the matching path ([`SearchTactics::matching`]) on one thread.
+    pub fn matching() -> Config {
+        Config::of(&SearchTactics::matching())
     }
 
     pub fn of(t: &SearchTactics) -> Config {

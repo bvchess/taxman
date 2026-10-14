@@ -48,8 +48,8 @@ impl Default for SearchTactics {
             fix_forced: true,
             nogoods: true,
             forget_nogoods: true,
-            lagrange: true,
-            gf2: false,
+            lagrange: false,
+            gf2: true,
         }
     }
 }
@@ -58,6 +58,14 @@ impl SearchTactics {
     /// The largest `match_refine`: the header of a checkpoint has room for no more, so a deeper setting could not
     /// be told from this one on resuming.
     pub const MAX_MATCH_REFINE: u8 = 7;
+
+    /// The tactics of the matching path, the default before `gf2`: the matching bound with its refinement, then the
+    /// Lagrangian bound over the nogoods.  Its trees are several times larger than the default's at a fraction of
+    /// the cost a node, so the tests of interrupted searches use it on the small games: the engine checks a node
+    /// limit only every 1,024 steps of a searcher, which the default's searches of those games do not reach.
+    pub fn matching() -> Self {
+        SearchTactics { gf2: false, lagrange: true, ..SearchTactics::default() }
+    }
 
     /// The tactics as the header of a checkpoint records them: `match_refine` in bits 0 to 2, then one bit for each
     /// switch that is on, `fix_forced` (bit 3), `nogoods` (4), `forget_nogoods` (5), `lagrange` (6) and `gf2` (7).
