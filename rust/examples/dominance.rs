@@ -1,186 +1,156 @@
-//! Dominance among promotion sets: how much of a proof's tree a node could be pruned for, because another
-//! promotion set does at least as well with every completion.  The study is in docs/EXPERIMENTS.md, "Dominance and
-//! symmetry (2026-10)".
+//! Dominance and symmetry among promotion sets: how much of a proof's tree could be pruned because another promotion
+//! set does at least as well with every completion.  Research code: nothing in the solver calls it.  The study is in
+//! docs/EXPERIMENTS.md, "Dominance and symmetry (2026-10)".
 //!
 //! ```text
-//! cargo run --release --example dominance -- nodes [--pairs] FIXTURE...
+//! cargo run --release --example dominance -- sample [--known FILE] [--count K] [--delta D] [--out DIR] N...
+//! cargo run --release --example dominance -- nodes [--pairs] [--samples K] [--delta D] FIXTURE...
+//! cargo run --release --example dominance -- symmetries N|A-B...
+//! cargo run --release --example dominance -- symcheck [--known FILE] [--samples K] N|A-B...
 //! ```
 //!
-//! **nodes**: at each node `(P, C)` of the probe's fixtures (`testdata/perf/*.nodes`), the exchanges `P → P'` =
-//! `P − B + A` (`A` among the candidates the node has excluded, `B ⊆ P`) whose state *covers* the node's for its
-//! candidates (see [`covers`]): then every completion of the node is a completion of `P'`, worth more if
-//! `sum(A) > sum(B)`, and the node can be pruned.  Kinds: `add` (`B` empty, one `a`), `swap` (one for one, `a >
-//! b`), and with `--pairs` two for one, one for two and two for two.
+//! Games are set up as `taxman solve` sets them up (the default tactics).  `P*` is the optimum promotion sum, the
+//! known optimal game's promotions; `--delta D` sets the incumbent's value to `P* + D` (every bound lowered by `D`,
+//! as `slope prove --deltas` does).  Each command prints one JSON object per line.
+//!
+//! * **sample**: nodes of the solver's own proof, uniformly over its steps (see [`sample_one`]), as a `.nodes`
+//!   fixture `nNNNN.nodes` in `--out` (default `.`).
+//! * **nodes**: at each node `(P, C)` of a fixture (`testdata/perf/*.nodes`, or `sample`'s), whether it is
+//!   dominated: some other promotion set `P'`, worth more, with which every completion of the node that could
+//!   beat the incumbent can still be promoted (then `P' ∪ S` beats `P ∪ S` for every such completion `S`, and the
+//!   node can be pruned; see "Soundness" below).  The candidates such a completion can use are the node's
+//!   *relevant* ones ([`relevant`]).  Tried: `P' = P + a` and `P' = P − b + a` with `a > b` (`a` a candidate the
+//!   node has excluded, `b ∈ P`), with `--pairs` two for one and two for two, each judged by the state cover of
+//!   [`covers`] (literally for all of `C` and for the relevant candidates, and with moves relabelled) and by
+//!   `--samples` random maximal completions (default 64; a cover must take them all, so this is an upper estimate of
+//!   what any cover proves); `P'` the image of `P` under a prime exchange ([`covers_mapped`]); classes of twins
+//!   among the candidates ([`twins`]); and the rule of the root's prime symmetries ([`symmetry_cut`]).
+//! * **symmetries**: the root's prime symmetries of each game (`common/symmetry.rs`).
+//! * **symcheck**: their checks ([`symcheck_one`]).
+//!
+//! **Soundness** of pruning a dominated node: the pruned completions `S` are those with `P' ∪ S` feasible and
+//! worth strictly more (or, for a two-for-two exchange of equal sums, larger in the order of sets as binary
+//! numbers), so a heaviest feasible set (the largest of them in that order) is never pruned.
 
 #[path = "common/fixtures.rs"]
 mod fixtures;
 #[path = "common/symmetry.rs"]
 mod symmetry;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
+use symmetry::{cofactors, map_set, primes_to, root_pairs, swap_primes};
 use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::engine::{self, Ctx, EngineConfig, Searcher, Start};
 use taxman::game::Optimal;
 use taxman::matchbound::{MatchBound, MatchGraph};
 use taxman::model::{FactorProvider, Frame, FrameSet, Model, Scratch};
-use symmetry::{cofactors, map_set, primes_to, root_pairs, swap_primes};
 use taxman::search::{Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
 
-/// The search tactics of the frontier's results (the defaults, all of them proven).
-fn tactics() -> SearchTactics {
-    SearchTactics::default()
+fn setup<const W: usize>(n: u32) -> Prepared<W> {
+    Board::<W>::for_n(n).prepare(SearchTactics::default()).expect("prepare")
 }
 
-fn setup<const W: usize>(n: u32) -> Prepared<W> {
-    Board::<W>::for_n(n).prepare(tactics()).expect("prepare")
+/// The command's options: `--known`, `--count`, `--samples`, `--delta`, `--out`, `--pairs`, and the games or files.
+struct Options {
+    known: Option<PathBuf>,
+    count: u64,
+    samples: usize,
+    delta: i64,
+    out: PathBuf,
+    pairs: bool,
+    rest: Vec<String>,
+}
+
+impl Options {
+    fn parse(args: &[String]) -> Options {
+        let mut o = Options {
+            known: None,
+            count: 60,
+            samples: 64,
+            delta: 0,
+            out: PathBuf::from("."),
+            pairs: false,
+            rest: Vec::new(),
+        };
+        let mut it = args.iter();
+        while let Some(arg) = it.next() {
+            let mut value = |name: &str| it.next().unwrap_or_else(|| panic!("{name} needs a value")).clone();
+            match arg.as_str() {
+                "--known" => o.known = Some(PathBuf::from(value("--known"))),
+                "--count" => o.count = value("--count").parse().expect("--count K"),
+                "--samples" => o.samples = value("--samples").parse().expect("--samples K"),
+                "--delta" => o.delta = value("--delta").parse().expect("--delta D"),
+                "--out" => o.out = PathBuf::from(value("--out")),
+                "--pairs" => o.pairs = true,
+                _ => o.rest.push(arg.clone()),
+            }
+        }
+        o
+    }
+
+    /// The games named by `rest`: board sizes and ranges `A-B`.
+    fn games(&self) -> Vec<u32> {
+        let mut games = Vec::new();
+        for arg in &self.rest {
+            match arg.split_once('-') {
+                Some((a, b)) => games.extend(a.parse::<u32>().expect("A")..=b.parse::<u32>().expect("B")),
+                None => games.push(arg.parse::<u32>().expect("a board size")),
+            }
+        }
+        games
+    }
+
+    fn optimal(&self) -> Optimal {
+        Optimal::built_in().with_results_files(self.known.as_slice()).expect("known games")
+    }
 }
 
 fn main() {
     let mut args = std::env::args().skip(1);
     let command = args.next().unwrap_or_default();
-    let rest: Vec<String> = args.collect();
+    let o = Options::parse(&args.collect::<Vec<_>>());
     match command.as_str() {
-        "nodes" => nodes(&rest),
-        "sample" => sample(&rest),
-        "symmetries" => symmetries(&rest),
-        "symcheck" => symcheck(&rest),
+        "sample" => {
+            let optimal = o.optimal();
+            for n in o.games() {
+                taxman::with_width!(n, W => sample_one::<W>(n, &optimal, &o));
+            }
+        }
+        "nodes" => {
+            for path in &o.rest {
+                let path = PathBuf::from(path);
+                let text = std::fs::read_to_string(&path).expect("fixture");
+                let n: u32 = text.lines().find_map(|l| l.strip_prefix("n ")).and_then(|v| v.trim().parse().ok()).expect("n");
+                taxman::with_width!(n, W => nodes_of::<W>(&path, &o));
+            }
+        }
+        "symmetries" => {
+            for n in o.games() {
+                taxman::with_width!(n, W => symmetries_of::<W>(n));
+            }
+        }
+        "symcheck" => {
+            let optimal = o.optimal();
+            for n in o.games() {
+                taxman::with_width!(n, W => symcheck_one::<W>(n, &optimal, o.samples));
+            }
+        }
         _ => {
-            eprintln!("usage: dominance nodes [--pairs] FIXTURE... | sample --known FILE --every K --out DIR N...");
+            eprintln!("usage: dominance sample|nodes|symmetries|symcheck ... (see the module docs)");
             std::process::exit(2);
         }
     }
 }
 
-// ---------------------------------------------------------------------------------------------------------
-// symmetries
-
-/// For each game: the pairs of primes whose exchange is a symmetry of the search problem at its root (see
-/// [`symmetry::root_pairs`]), and how many candidates they move.
-fn symmetries(args: &[String]) {
-    let mut games = Vec::new();
-    for arg in args {
-        match arg.split_once('-') {
-            Some((a, b)) => games.extend(a.parse::<u32>().expect("A")..=b.parse::<u32>().expect("B")),
-            None => games.push(arg.parse::<u32>().expect("N")),
-        }
-    }
-    for n in games {
-        taxman::with_width!(n, W => symmetries_of::<W>(n));
-    }
-}
-
-fn symmetries_of<const W: usize>(n: u32) {
-    let board = Board::<W>::for_n(n);
-    if board.is_trivial() {
-        return;
-    }
-    let p = board.prepare(tactics()).expect("prepare");
-    let pairs = root_pairs(&p);
-    let mut moved = Bits::<W>::EMPTY;
-    for &(a, b) in &pairs {
-        moved |= p.candidates.iter().filter(|&x| swap_primes(x, a, b) != x).collect::<Bits<W>>();
-    }
-    println!(
-        "{{\"n\":{n},\"candidates\":{},\"symmetric_pairs\":{},\"moved\":{},\"pairs\":\"{pairs:?}\"}}",
-        p.candidates.len(),
-        pairs.len(),
-        moved.len()
-    );
-}
-
-// ---------------------------------------------------------------------------------------------------------
-// symcheck
-
-/// Checks of the root's prime symmetries (`symmetry::root_pairs`), per game: for every pair `(a, b)`, the image of
-/// the optimal set and of `samples` random maximal promotable sets (and, on boards of at most 22 candidates, of every
-/// promotable set) can be promoted, and is worth `(b − a)(c_a − c_b)` more; on those small boards, the best set that
-/// keeps every pair's constraint `c_a ≤ c_b` is worth the optimum; and up to `n = 40`, the brute-force oracle
-/// (`taxman::brute`, no frame model) scores the known optimum.  Prints a line per game with pairs, and panics on a
-/// failure.
-fn symcheck(args: &[String]) {
-    let (mut known, mut samples_per_pair, mut games) = (None, 50usize, Vec::new());
-    let mut it = args.iter();
-    while let Some(arg) = it.next() {
-        match arg.as_str() {
-            "--known" => known = it.next().map(PathBuf::from),
-            "--samples" => samples_per_pair = it.next().and_then(|v| v.parse().ok()).expect("--samples K"),
-            g => match g.split_once('-') {
-                Some((a, b)) => games.extend(a.parse::<u32>().expect("A")..=b.parse::<u32>().expect("B")),
-                None => games.push(g.parse::<u32>().expect("N")),
-            },
-        }
-    }
-    let optimal = Optimal::built_in().with_results_files(known.as_slice()).expect("known games");
-    for n in games {
-        taxman::with_width!(n, W => symcheck_one::<W>(n, &optimal, samples_per_pair));
-    }
-}
-
-fn symcheck_one<const W: usize>(n: u32, optimal: &Optimal, samples_per_pair: usize) {
-    let board = Board::<W>::for_n(n);
-    if board.is_trivial() {
-        return;
-    }
-    let p = board.prepare(tactics()).expect("prepare");
-    let pairs = root_pairs(&p);
-    if n <= 40 {
-        let exact = taxman::brute::solve(n, &[], taxman::brute::Rule::Divisor).score;
-        assert_eq!(Some(exact), optimal.score(n), "n={n}: the oracle disagrees with the known optimum");
-    }
-    if pairs.is_empty() {
-        return;
-    }
-    let (model, root) = (&*p.model, &p.root);
-    let mut scratch = Scratch::new();
-    let opt = optimal.score(n).expect("a known game") - board.in_the_bag;
-    let best: Bits<W> = optimal.moves(n).expect("moves").iter().copied().filter(|&x| p.candidates.contains(x)).collect();
-    assert_eq!(best.sum(), opt);
-    let check = |set: &Bits<W>, scratch: &mut Scratch<W>| {
-        for &(a, b) in &pairs {
-            let image = map_set(set, &|x| swap_primes(x, a, b)).expect("in range");
-            assert!(model.promote_all_using(scratch, root, &image).is_some(), "n={n}: ({a}, {b}) of {set:?}");
-            let gain = i64::from(b - a) * (cofactors(set, a) as i64 - cofactors(set, b) as i64);
-            assert_eq!(image.sum() as i64 - set.sum() as i64, gain, "n={n}: the sum of the image of {set:?}");
-        }
-    };
-    check(&best, &mut scratch);
-    let mut rng = 0x5eed_u64 ^ u64::from(n);
-    for _ in 0..samples_per_pair {
-        let s = random_maximal(model, &mut scratch, root, &p.candidates, &mut rng);
-        check(&s, &mut scratch);
-    }
-    // Small boards: every promotable set, and the best that keeps the constraints.
-    let mut enumerated = 0u64;
-    let mut kept_best = None;
-    if p.candidates.len() <= 22 {
-        let cands = p.candidates.to_vec();
-        let mut stack = vec![(0usize, Bits::<W>::EMPTY, *root)];
-        while let Some((i, set, state)) = stack.pop() {
-            if i == cands.len() {
-                enumerated += 1;
-                check(&set, &mut scratch);
-                let keeps = pairs.iter().all(|&(a, b)| cofactors(&set, a) <= cofactors(&set, b));
-                if keeps {
-                    kept_best = kept_best.max(Some(set.sum()));
-                }
-                continue;
-            }
-            stack.push((i + 1, set, state));
-            if let Some(next) = model.promote(&state, cands[i]) {
-                stack.push((i + 1, set.with(cands[i]), next));
-            }
-        }
-        assert_eq!(kept_best, Some(opt), "n={n}: the sets that keep the constraints miss the optimum");
-    }
-    println!(
-        "{{\"n\":{n},\"pairs\":{},\"candidates\":{},\"enumerated\":{enumerated},\"kept_best\":{},\"opt\":{opt}}}",
-        pairs.len(),
-        p.candidates.len(),
-        kept_best.map_or("null".into(), |v: u64| v.to_string()),
-    );
+/// The optimal game's promotions, which must be a promotable set of the board's candidates.
+fn optimal_set<const W: usize>(p: &Prepared<W>, optimal: &Optimal) -> Bits<W> {
+    let moves = optimal.moves(p.n).unwrap_or_else(|| panic!("no known game for n={} (--known FILE?)", p.n));
+    let set: Bits<W> = moves.iter().copied().filter(|&x| p.candidates.contains(x)).collect();
+    assert!(p.model.promote_all_using(&mut Scratch::new(), &p.root, &set).is_some(), "the optimum");
+    set
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -199,48 +169,21 @@ impl<const W: usize> Searcher<TaxUnit<W>> for Recorder<'_, W> {
     }
 }
 
-/// Nodes of a proof sampled uniformly over its steps: the proof (one thread, strict tactics, the incumbent the
-/// optimum) in runs of `every` steps, each resuming the checkpoint of the last; the run stops in the middle of a
-/// node's loop, and the deepest unit the next run is handed is that node.  Written as a `.nodes` fixture.  (Each
-/// run starts a new searcher, which forgets its nogoods and multipliers, so the tree is that of a search that
-/// forgets every `every` steps: larger than the proof's for small `every`.)
-fn sample(args: &[String]) {
-    let (mut known, mut every, mut out, mut games, mut fresh) = (None, 2000u64, PathBuf::from("."), Vec::new(), 0);
-    let mut it = args.iter();
-    while let Some(arg) = it.next() {
-        match arg.as_str() {
-            "--known" => known = it.next().map(PathBuf::from),
-            "--every" => every = it.next().and_then(|v| v.parse().ok()).expect("--every K"),
-            "--fresh" => fresh = it.next().and_then(|v| v.parse().ok()).expect("--fresh K"),
-            "--out" => out = it.next().map(PathBuf::from).expect("--out DIR"),
-            n => games.push(n.parse::<u32>().expect("a board size")),
-        }
-    }
-    let optimal = Optimal::built_in().with_results_files(known.as_slice()).expect("known games");
-    for n in games {
-        if fresh > 0 {
-            taxman::with_width!(n, W => sample_fresh::<W>(n, &optimal, fresh, &out));
-        } else {
-            taxman::with_width!(n, W => sample_one::<W>(n, &optimal, every, &out));
-        }
-    }
-}
-
-/// The proof's own tree, sampled: the proof (one thread, strict tactics, the incumbent the optimum, so the tree is
-/// the same every time) run once to count its steps `T`, then `count` times from the start, stopped after `k·T /
-/// (count + 1)` steps for `k = 1..=count` (at the engine's next poll); the deepest unit each stopped run leaves is
-/// the node it stopped in.  Costs about `count / 2` proofs.
-fn sample_fresh<const W: usize>(n: u32, optimal: &Optimal, count: u64, out: &std::path::Path) {
+/// The proof's own tree, sampled: the search of game `n` (one thread, the incumbent worth `P* + delta`, so the tree
+/// is the same every time) run once to count its steps `T`, then `count` times from the start, stopped after `k·T
+/// / (count + 1)` steps for `k = 1..=count` (at the engine's next poll).  The stopped run's checkpoint holds the
+/// path it stopped on, and a run resumed from it is handed the deepest unit first: the node it stopped in.  Costs
+/// about `count / 2` proofs.
+fn sample_one<const W: usize>(n: u32, optimal: &Optimal, o: &Options) {
     let p = setup::<W>(n);
-    let moves = optimal.moves(n).unwrap_or_else(|| panic!("no known game for n={n}"));
-    let incumbent: Bits<W> = moves.iter().copied().filter(|&x| p.candidates.contains(x)).collect();
-    assert!(p.model.promote_all_using(&mut Scratch::new(), &p.root, &incumbent).is_some(), "the optimum");
+    let incumbent = optimal_set(&p, optimal);
     let graph = MatchGraph::new(&p.model, &p.root);
     let space = SearchSpace::new(&p, &graph, None);
     let payload: Vec<u8> = incumbent.as_words().iter().flat_map(|w| w.to_le_bytes()).collect();
+    let best = incumbent.sum().checked_add_signed(o.delta).expect("a margin above zero");
     let start = || Start::Fresh {
         units: vec![TaxUnit { promoted: Bits::<W>::EMPTY, cands: p.candidates }],
-        best: incumbent.sum() + delta(),
+        best,
         payload: payload.clone(),
     };
     let tmp = std::env::temp_dir().join(format!("taxman-dominance-{n}-{}.ckpt", std::process::id()));
@@ -249,104 +192,48 @@ fn sample_fresh<const W: usize>(n: u32, optimal: &Optimal, count: u64, out: &std
     let total = engine::run(&cfg, start(), b"dominance", |_| TaxSearcher::new(&space)).expect("search").stats.nodes;
     let log = Mutex::new(Vec::new());
     let mut samples = Vec::new();
-    for k in 1..=count {
+    for k in 1..=o.count {
         let cfg = EngineConfig {
             threads: 1,
             checkpoint: Some((tmp.clone(), Duration::from_secs(1 << 20))),
-            node_limit: Some(k * total / (count + 1)),
+            node_limit: Some(k * total / (o.count + 1)),
             progress: None,
             ..EngineConfig::default()
         };
-        let o = engine::run(&cfg, start(), b"dominance", |_| Recorder { inner: TaxSearcher::new(&space), log: &log })
-            .expect("search");
-        log.lock().expect("log").clear();
-        if o.completed {
+        let stopped = engine::run(&cfg, start(), b"dominance", |_| TaxSearcher::new(&space)).expect("search");
+        if stopped.completed {
             continue;
         }
-        // The stopped run's units are in its checkpoint; a resume would hand them over, deepest included.
-        let resume = EngineConfig { node_limit: Some(o.stats.nodes), ..cfg.clone() };
-        let _ = engine::run(&resume, Start::Resume(tmp.clone()), b"dominance", |_| Recorder {
-            inner: TaxSearcher::new(&space),
-            log: &log,
-        });
+        let resume = EngineConfig { node_limit: Some(stopped.stats.nodes), ..cfg.clone() };
+        let make = |_| Recorder { inner: TaxSearcher::new(&space), log: &log };
+        engine::run(&resume, Start::Resume(tmp.clone()), b"dominance", make).expect("resume");
         let handed = std::mem::take(&mut *log.lock().expect("log"));
         if let Some(deepest) = handed.iter().max_by_key(|u| u.promoted.len()) {
             samples.push(*deepest);
         }
     }
     let _ = std::fs::remove_file(&tmp);
-    let path = out.join(format!("n{n:04}.nodes"));
     let mut text = format!(
-        "# Search nodes of game {n} sampled by `dominance sample --fresh {count}`: the node the proof ({total} steps,\n\
-         # one thread) is in after k·{total}/{} steps, k = 1..{count} ({:.1} s).\n",
-        count + 1,
-        t0.elapsed().as_secs_f64()
+        "# Search nodes of game {n}, by `dominance sample --count {} --delta {}`: the node the proof ({total} steps,\n\
+         # one thread) is in after k·{total}/{} steps, k = 1..{}.\nn {n}\nincumbent {}\n",
+        o.count,
+        o.delta,
+        o.count + 1,
+        o.count,
+        fixtures::to_hex(&incumbent)
     );
-    text.push_str(&format!("n {n}\nincumbent {}\n", fixtures::to_hex(&incumbent)));
     for u in &samples {
         text.push_str(&format!("node {} {}\n", fixtures::to_hex(&u.promoted), fixtures::to_hex(&u.cands)));
     }
+    let path = o.out.join(format!("n{n:04}.nodes"));
     std::fs::write(&path, text).expect("write the samples");
-    eprintln!("n={n}: {} samples of {total} steps -> {} ({:.1} s)", samples.len(), path.display(), t0.elapsed().as_secs_f64());
-}
-
-fn sample_one<const W: usize>(n: u32, optimal: &Optimal, every: u64, out: &std::path::Path) {
-    let p = setup::<W>(n);
-    let moves = optimal.moves(n).unwrap_or_else(|| panic!("no known game for n={n}"));
-    let incumbent: Bits<W> = moves.iter().copied().filter(|&x| p.candidates.contains(x)).collect();
-    assert!(p.model.promote_all_using(&mut Scratch::new(), &p.root, &incumbent).is_some(), "the optimum");
-    let graph = MatchGraph::new(&p.model, &p.root);
-    let space = SearchSpace::new(&p, &graph, None);
-    let log = Mutex::new(Vec::new());
-    let tmp = std::env::temp_dir().join(format!("taxman-dominance-{n}-{}.ckpt", std::process::id()));
-    let payload = incumbent.as_words().iter().flat_map(|w| w.to_le_bytes()).collect();
-    let mut start =
-        Start::Fresh { units: vec![TaxUnit { promoted: Bits::EMPTY, cands: p.candidates }], best: incumbent.sum(), payload };
-    let cfg = EngineConfig {
-        threads: 1,
-        checkpoint: Some((tmp.clone(), Duration::from_secs(1 << 20))),
-        node_limit: Some(every),
-        progress: None,
-        ..EngineConfig::default()
-    };
-    let mut samples = Vec::new();
-    let t0 = Instant::now();
-    let total = loop {
-        let o = engine::run(&cfg, start, b"dominance", |_| Recorder { inner: TaxSearcher::new(&space), log: &log })
-            .expect("search");
-        let handed = std::mem::take(&mut *log.lock().expect("log"));
-        if !samples.is_empty() || handed.len() > 1 {
-            // The first unit a resumed run is handed is not necessarily the deepest; the deepest is the node the
-            // last run stopped in.
-            if let Some(deepest) = handed.iter().max_by_key(|u| u.promoted.len()) {
-                samples.push(*deepest);
-            }
-        }
-        if o.completed {
-            break o.stats.nodes;
-        }
-        start = Start::Resume(tmp.clone());
-    };
-    let _ = std::fs::remove_file(&tmp);
-    let path = out.join(format!("n{n:04}.nodes"));
-    let mut text = format!(
-        "# Search nodes of game {n} sampled by `dominance sample --every {every}`: the node each run of {every} steps\n\
-         # stopped in ({} runs, {total} steps in all, {:.1} s).\n",
-        samples.len(),
-        t0.elapsed().as_secs_f64()
-    );
-    text.push_str(&format!("n {n}\nincumbent {}\n", fixtures::to_hex(&incumbent)));
-    for u in &samples {
-        text.push_str(&format!("node {} {}\n", fixtures::to_hex(&u.promoted), fixtures::to_hex(&u.cands)));
-    }
-    std::fs::write(&path, text).expect("write the samples");
-    eprintln!("n={n}: {} samples of {total} steps -> {}", samples.len(), path.display());
+    eprintln!("n={n}: {} nodes of {total} steps -> {} ({:.1} s)", samples.len(), path.display(), t0.elapsed().as_secs_f64());
 }
 
 // ---------------------------------------------------------------------------------------------------------
 // Covering states
 
-/// The numbers adjacent to some member of `xs` as their maximal factors (restricted to the frames, as `g` is).
+/// The numbers that are maximal factors of some member of `xs` (within the frames, as `g` has them).
 fn factors_of<const W: usize>(g: &FactorProvider, xs: &Bits<W>) -> Bits<W> {
     let mut out = Bits::EMPTY;
     for x in xs.iter() {
@@ -364,8 +251,8 @@ fn used_by<const W: usize>(g: &FactorProvider, f: u32, xs: &Bits<W>, except: u32
 
 /// The *core* of the frame `moves -> factors` for edits that add moves from `cin` and remove factors from `cout`:
 /// moves that can always be taken last are dropped (a move with a factor outside `cout` that no other move and no
-/// member of `cin` has), and then factors that no remaining move nor member of `cin` has, outside `cout`, until
-/// nothing changes.  For every `G ⊆ cin`, `L ⊆ cout`, the frame with `G` added and `L` removed is winnable exactly
+/// member of `cin` has), and then the factors outside `cout` that no remaining move nor member of `cin` has, until
+/// nothing changes.  For every `G ⊆ cin` and `L ⊆ cout`, the frame with `G` added and `L` removed is winnable exactly
 /// when its core is: a dropped move goes last (its private factor is never taken, nor removed), and a dropped
 /// factor is never used.
 fn core<const W: usize>(g: &FactorProvider, frame: &Frame<W>, cin: &Bits<W>, cout: &Bits<W>) -> (Bits<W>, Bits<W>) {
@@ -394,17 +281,6 @@ fn core<const W: usize>(g: &FactorProvider, frame: &Frame<W>, cin: &Bits<W>, cou
     }
 }
 
-/// Why [`covers`] said no, for the tables (`None`: it covers).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Fails {
-    /// A candidate of the node is no longer a factor of its home frame in the other state.
-    Candidate,
-    /// The other state's core has a move the node's has not.
-    Move,
-    /// The other state's core lacks a factor the node's core needs.
-    Factor,
-}
-
 /// Whether `other` *covers* `state` for the candidates `cands`: every `S ⊆ cands` that can be promoted from `state`
 /// can be promoted from `other`.  Frame by frame, with `cin` the candidates that `S` could promote into the frame
 /// and `cout` those it could promote out of it (both as `state` has them): every member of `cout` must be a factor
@@ -418,126 +294,98 @@ enum Fails {
 /// `state`'s core standing in for one at most, provided it uses no factor that `other`'s core lacks: then
 /// `state`'s core with `G` and `L` winnable ⇒ the same with only the stand-ins and the common factors (the others
 /// unused) ⇒ the same graph with `other`'s moves ⇒ with `other`'s factors (more).
-fn covers<const W: usize>(
-    g: &FactorProvider,
-    other: &FrameSet<W>,
-    state: &FrameSet<W>,
-    cands: &Bits<W>,
-    relabel: bool,
-) -> Result<(), Fails> {
+fn covers<const W: usize>(g: &FactorProvider, other: &FrameSet<W>, state: &FrameSet<W>, cands: &Bits<W>, relabel: bool) -> bool {
     let (mine, theirs) = (state.frames(), other.frames());
     for h in 0..mine.len() {
         let cin = mine.get(h + 1).map_or(Bits::EMPTY, |above| above.factors & *cands);
         let cout = mine[h].factors & *cands;
         if !cout.is_subset(&theirs[h].factors) {
-            return Err(Fails::Candidate);
+            return false;
         }
         if mine[h] == theirs[h] {
             continue;
         }
         let (m1, f1) = core(g, &mine[h], &cin, &cout);
         let (m2, f2) = core(g, &theirs[h], &cin, &cout);
-        if relabel {
-            // The factors only `state`'s core has must be of no use to the moves that stand in for `other`'s, nor
-            // to `cin`; and each move of `other`'s core needs its own move of `state`'s core with the same live
-            // factors among the common ones.
-            if !(f1 & factors_of(g, &cin)).is_subset(&f2) {
-                return Err(Fails::Factor);
-            }
-            let common = f1 & f2;
-            let only_mine = f1 - f2;
-            let key = |x: u32| -> Vec<u16> {
-                g.factors(x).iter().copied().filter(|&q| common.contains(u32::from(q))).collect()
-            };
-            let mut spare: std::collections::HashMap<Vec<u16>, i32> = Default::default();
-            for x in m1.iter() {
-                if !g.factors(x).iter().any(|&q| only_mine.contains(u32::from(q))) {
-                    *spare.entry(key(x)).or_default() += 1;
-                }
-            }
-            for x in m2.iter() {
-                let slot = spare.entry(key(x)).or_default();
-                *slot -= 1;
-                if *slot < 0 {
-                    return Err(Fails::Move);
-                }
+        if !relabel {
+            if !m2.is_subset(&m1) || !(f1 & factors_of(g, &(m2 | cin))).is_subset(&f2) {
+                return false;
             }
             continue;
         }
-        if !m2.is_subset(&m1) {
-            return Err(Fails::Move);
+        if !(f1 & factors_of(g, &cin)).is_subset(&f2) {
+            return false;
         }
-        let usable = factors_of(g, &(m2 | cin));
-        if !(f1 & usable).is_subset(&f2) {
-            return Err(Fails::Factor);
+        let (common, only_mine) = (f1 & f2, f1 - f2);
+        let key = |x: u32| -> Vec<u16> { g.factors(x).iter().copied().filter(|&q| common.contains(u32::from(q))).collect() };
+        let mut spare: std::collections::HashMap<Vec<u16>, i32> = Default::default();
+        for x in m1.iter().filter(|&x| !g.factors(x).iter().any(|&q| only_mine.contains(u32::from(q)))) {
+            *spare.entry(key(x)).or_default() += 1;
+        }
+        for x in m2.iter() {
+            let slot = spare.entry(key(x)).or_default();
+            *slot -= 1;
+            if *slot < 0 {
+                return false;
+            }
         }
     }
-    Ok(())
+    true
 }
 
-/// [`covers`] up to the relabelling `pi` (an involution of the numbers): whether `other` covers `state` with
-/// every number of `state`'s cores renamed by `pi`, for the candidates `cands`, which `pi` must fix.  Frame by frame,
-/// `pi` must carry the factor graph between the moves of `state`'s core (and the members of `cands` that could be
-/// promoted into the frame) and the factors of its core onto the graph between their images: then the renamed core
-/// is the same game for every `G ⊆ cin`, `L ⊆ cout` (which `pi` fixes), and the literal test of [`covers`] applies to
-/// it.
+/// [`covers`] up to the renaming `pi` (an involution of the numbers that fixes every member of `cands`): whether
+/// `other` covers `state` with every number of `state`'s cores renamed by `pi`.  Frame by frame, `pi` must carry the
+/// factor graph between the moves of `state`'s core (and the members of `cands` that could be promoted into the
+/// frame) and the factors of its core onto the graph between their images: then the renamed core is the same game
+/// for every `G ⊆ cin`, `L ⊆ cout` (which `pi` fixes), and the literal test of [`covers`] applies to it.
 fn covers_mapped<const W: usize>(
     g: &FactorProvider,
     other: &FrameSet<W>,
     state: &FrameSet<W>,
     cands: &Bits<W>,
     pi: &impl Fn(u32) -> u32,
-) -> Result<(), Fails> {
+) -> bool {
     if cands.iter().any(|x| pi(x) != x) {
-        return Err(Fails::Candidate);
+        return false;
     }
     let (mine, theirs) = (state.frames(), other.frames());
     for h in 0..mine.len() {
         let cin = mine.get(h + 1).map_or(Bits::EMPTY, |above| above.factors & *cands);
         let cout = mine[h].factors & *cands;
         if !cout.is_subset(&theirs[h].factors) {
-            return Err(Fails::Candidate);
+            return false;
         }
         let (m1, f1) = core(g, &mine[h], &cin, &cout);
         let (m2, f2) = core(g, &theirs[h], &cin, &cout);
-        let (Some(pm1), Some(pf1)) = (map_set(&m1, pi), map_set(&f1, pi)) else {
-            return Err(Fails::Move);
-        };
-        // The renamed core's edges must be the images of the core's.
+        let (Some(pm1), Some(pf1)) = (map_set(&m1, pi), map_set(&f1, pi)) else { return false };
         for x in (m1 | cin).iter() {
             let live: Bits<W> = g.factors(x).iter().map(|&q| u32::from(q)).filter(|&q| f1.contains(q)).collect();
             let image: Bits<W> = g.factors(pi(x)).iter().map(|&q| u32::from(q)).filter(|&q| pf1.contains(q)).collect();
             if map_set(&live, pi) != Some(image) {
-                return Err(Fails::Move);
+                return false;
             }
         }
-        if !m2.is_subset(&pm1) {
-            return Err(Fails::Move);
-        }
-        let usable = factors_of(g, &(m2 | cin));
-        if !(pf1 & usable).is_subset(&f2) {
-            return Err(Fails::Factor);
+        if !m2.is_subset(&pm1) || !(pf1 & factors_of(g, &(m2 | cin))).is_subset(&f2) {
+            return false;
         }
     }
-    Ok(())
+    true
 }
-
 
 /// The classes of *twins* among `cands` in `state`: candidates of the same home frame `h` with the same live
 /// maximal factors in frame `h − 1` and the same users in frame `h` (the moves of the core of frame `h` for
-/// completions within `cands`, and the members of `cands` that could be promoted into it).  Swapping two twins is
-/// an automorphism of the node's problem restricted to `cands`, so a completion that promotes the smaller and not
-/// the larger can be traded for one that promotes the larger instead.  Classes of two or more, largest first.
-fn twins<const W: usize>(model: &Model, state: &FrameSet<W>, cands: &Bits<W>) -> Vec<Vec<u32>> {
+/// completions within `cands`, and the members of `cands` that could be promoted into it).  Exchanging two twins is
+/// an automorphism of the node's problem restricted to `cands`.  The members of the classes of two or more.
+fn twins<const W: usize>(model: &Model, state: &FrameSet<W>, cands: &Bits<W>) -> usize {
     let g = model.graph();
     let frames = state.frames();
-    let mut cores = Vec::with_capacity(frames.len());
-    for h in 0..frames.len() {
-        let cin = frames.get(h + 1).map_or(Bits::EMPTY, |above| above.factors & *cands);
-        let cout = frames[h].factors & *cands;
-        cores.push((core(g, &frames[h], &cin, &cout), cin));
-    }
-    let mut classes: std::collections::HashMap<(usize, Vec<u32>, Vec<u32>), Vec<u32>> = Default::default();
+    let users: Vec<Bits<W>> = (0..frames.len())
+        .map(|h| {
+            let cin = frames.get(h + 1).map_or(Bits::EMPTY, |above| above.factors & *cands);
+            core(g, &frames[h], &cin, &(frames[h].factors & *cands)).0 | cin
+        })
+        .collect();
+    let mut classes: std::collections::HashMap<(usize, Vec<u32>, Vec<u32>), usize> = Default::default();
     for x in cands.iter() {
         let h = model.home(x);
         if h == 0 || !frames[h].factors.contains(x) {
@@ -545,151 +393,18 @@ fn twins<const W: usize>(model: &Model, state: &FrameSet<W>, cands: &Bits<W>) ->
         }
         let below = frames[h - 1].factors;
         let down: Vec<u32> = g.factors(x).iter().map(|&q| u32::from(q)).filter(|&q| below.contains(q)).collect();
-        let ((moves, _), cin) = &cores[h];
-        let users = *moves | *cin;
-        let up: Vec<u32> = g.composites(x).iter().map(|&c| u32::from(c)).filter(|&c| users.contains(c)).collect();
-        classes.entry((h, down, up)).or_default().push(x);
+        let up: Vec<u32> = g.composites(x).iter().map(|&c| u32::from(c)).filter(|&c| users[h].contains(c)).collect();
+        *classes.entry((h, down, up)).or_default() += 1;
     }
-    let mut out: Vec<Vec<u32>> = classes.into_values().filter(|c| c.len() > 1).collect();
-    for c in &mut out {
-        c.sort_unstable_by(|a, b| b.cmp(a));
-    }
-    out.sort_unstable();
-    out
-}
-
-/// Prints, to stderr, an exchange from `promoted` to `set` that no sampled completion refutes and [`covers`] does
-/// not prove: per frame where the two states differ, the moves and factors of each core.
-fn explain_exchange<const W: usize>(
-    model: &Model,
-    state: &FrameSet<W>,
-    other: &FrameSet<W>,
-    promoted: &Bits<W>,
-    set: &Bits<W>,
-    cands: &Bits<W>,
-) {
-    let g = model.graph();
-    let (out, inn) = (*promoted - *set, *set - *promoted);
-    let homes = |s: &Bits<W>| s.iter().map(|x| format!("{x}@{}", model.home(x))).collect::<Vec<_>>().join(" ");
-    eprintln!("exchange: out [{}] in [{}]; reason {:?}", homes(&out), homes(&inn), covers(g, other, state, cands, true));
-    let (mine, theirs) = (state.frames(), other.frames());
-    for h in 0..mine.len() {
-        if mine[h] == theirs[h] {
-            continue;
-        }
-        let cin = mine.get(h + 1).map_or(Bits::EMPTY, |above| above.factors & *cands);
-        let cout = mine[h].factors & *cands;
-        let (m1, f1) = core(g, &mine[h], &cin, &cout);
-        let (m2, f2) = core(g, &theirs[h], &cin, &cout);
-        let show = |x: u32, f: &Bits<W>| {
-            let live: Vec<String> = g.factors(x).iter().map(|&q| u32::from(q)).filter(|&q| f.contains(q)).map(|q| {
-                let users = g.composites(q).iter().filter(|&&c| cin.contains(u32::from(c))).count();
-                format!("{q}{}{}", if cout.contains(q) { "*" } else { "" }, if users > 0 { format!("+{users}") } else { String::new() })
-            }).collect();
-            format!("{x}({})", live.join(","))
-        };
-        let only1: Vec<String> = (m1 - m2).iter().map(|x| show(x, &f1)).collect();
-        let only2: Vec<String> = (m2 - m1).iter().map(|x| show(x, &f2)).collect();
-        eprintln!(
-            "  frame {h}: core moves {} / {}, only the node's: {:?}; only the exchange's: {:?}; factors only the node's: {:?}; only the exchange's: {:?}",
-            m1.len(),
-            m2.len(),
-            only1,
-            only2,
-            (f1 - f2).to_vec(),
-            (f2 - f1).to_vec()
-        );
-    }
-}
-
-/// A margin over the optimum for the incumbent's value (`DOMINANCE_DELTA`, default 0): every bound lowered by it,
-/// as `slope prove --deltas` does.
-fn delta() -> u64 {
-    std::env::var("DOMINANCE_DELTA").ok().and_then(|v| v.parse().ok()).unwrap_or(0)
-}
-
-/// Random maximal sets drawn per question by [`random_maximal`].
-fn samples() -> usize {
-    std::env::var("DOMINANCE_SAMPLES").ok().and_then(|v| v.parse().ok()).unwrap_or(64)
-}
-
-/// A step of xorshift64*.
-fn next(rng: &mut u64) -> u64 {
-    *rng ^= *rng >> 12;
-    *rng ^= *rng << 25;
-    *rng ^= *rng >> 27;
-    rng.wrapping_mul(0x2545_f491_4f6c_dd1d)
-}
-
-/// A maximal subset of `cands` that can be promoted from `state`: the candidates in a random order, each kept if
-/// it can be promoted after those kept.
-fn random_maximal<const W: usize>(
-    model: &Model,
-    scratch: &mut Scratch<W>,
-    state: &FrameSet<W>,
-    cands: &Bits<W>,
-    rng: &mut u64,
-) -> Bits<W> {
-    let mut order: Vec<u32> = cands.iter().collect();
-    for i in (1..order.len()).rev() {
-        order.swap(i, (next(rng) % (i as u64 + 1)) as usize);
-    }
-    let mut now = *state;
-    let mut kept = Bits::EMPTY;
-    for x in order {
-        if model.promote_in_place_using(scratch, &mut now, x) {
-            kept.insert(x);
-        }
-    }
-    kept
+    classes.into_values().filter(|&c| c > 1).sum()
 }
 
 // ---------------------------------------------------------------------------------------------------------
 // nodes
 
-/// Counts of exchanges tried at a node, by outcome.
-#[derive(Clone, Copy, Debug, Default)]
-struct Tally {
-    tried: u64,
-    infeasible: u64,
-    candidate: u64,
-    moves: u64,
-    factors: u64,
-    covers: u64,
-}
-
-impl Tally {
-    fn add(&mut self, outcome: Option<Result<(), Fails>>) {
-        self.tried += 1;
-        match outcome {
-            None => self.infeasible += 1,
-            Some(Err(Fails::Candidate)) => self.candidate += 1,
-            Some(Err(Fails::Move)) => self.moves += 1,
-            Some(Err(Fails::Factor)) => self.factors += 1,
-            Some(Ok(())) => self.covers += 1,
-        }
-    }
-}
-
-fn nodes(args: &[String]) {
-    let pairs = args.iter().any(|a| a == "--pairs");
-    let explain = args.iter().any(|a| a == "--explain");
-    for path in args.iter().filter(|a| !a.starts_with("--")) {
-        let path = PathBuf::from(path);
-        let text = std::fs::read_to_string(&path).expect("fixture");
-        let n: u32 = text
-            .lines()
-            .find_map(|l| l.strip_prefix("n "))
-            .and_then(|v| v.trim().parse().ok())
-            .expect("a board size");
-        taxman::with_width!(n, W => nodes_of::<W>(&path, pairs, explain));
-    }
-}
-
-/// The candidates of the node `(promoted, cands)` that some completion adding `need` could promote, by the
-/// matching bound: `x` is left out when the bound with `x` promoted, plus `x`, is below `need` (or `x` cannot be
-/// promoted).  Every completion that beats the incumbent is a subset of what is left.  `None` if the node's own
-/// bound is below `need` (no completion beats the incumbent).
+/// The candidates of the node `(promoted, cands)` that a completion adding `need` could promote, by the matching
+/// bound: `x` is left out when it cannot be promoted, or the bound with `x` promoted, plus `x`, is below `need`.
+/// `None` if the node's own bound is below `need`.
 fn relevant<const W: usize>(
     m: &mut MatchBound<'_, W>,
     model: &Model,
@@ -705,10 +420,7 @@ fn relevant<const W: usize>(
     }
     let chosen = m.chosen();
     let mut out = chosen;
-    for x in (*cands - chosen).iter() {
-        if !model.can_promote_using(scratch, state, x) {
-            continue;
-        }
+    for x in (*cands - chosen).iter().filter(|&x| model.can_promote_using(scratch, state, x)) {
         m.push(x, &cands.without(x));
         if m.value() + u64::from(x) >= need {
             out.insert(x);
@@ -718,7 +430,86 @@ fn relevant<const W: usize>(
     Some(out)
 }
 
-fn nodes_of<const W: usize>(path: &PathBuf, pairs: bool, explain: bool) {
+/// A step of xorshift64*.
+fn next(rng: &mut u64) -> u64 {
+    *rng ^= *rng >> 12;
+    *rng ^= *rng << 25;
+    *rng ^= *rng >> 27;
+    rng.wrapping_mul(0x2545_f491_4f6c_dd1d)
+}
+
+/// A maximal subset of `cands` that can be promoted from `state`: the candidates in a random order, each kept if
+/// it can be promoted after those kept.
+fn random_maximal<const W: usize>(model: &Model, scratch: &mut Scratch<W>, state: &FrameSet<W>, cands: &Bits<W>, rng: &mut u64) -> Bits<W> {
+    let mut order: Vec<u32> = cands.iter().collect();
+    for i in (1..order.len()).rev() {
+        order.swap(i, (next(rng) % (i as u64 + 1)) as usize);
+    }
+    let mut now = *state;
+    order.into_iter().filter(|&x| model.promote_in_place_using(scratch, &mut now, x)).collect()
+}
+
+/// The rule of the root's prime symmetries at the node `(promoted, cands)` that needs `need`, with the matching
+/// bound: for a pair `(a, b)` (see `common/symmetry.rs`), a set worth beating the incumbent with `c_a > c_b` has
+/// an image worth more, so only completions `S` with `c_a(P ∪ S) ≤ c_b(P ∪ S)` count.  `Some(true)` if for some
+/// pair no completion can lift `c_b` to `c_a` (`hopeless`), `Some(false)` if the matching bound of the completions
+/// that keep some pair's constraint is below `need` (each subset `U` of the pair's multiples among `cands`, at most
+/// 12 of them, promoted if it can be and the others left out, the rest relaxed), `None` if neither.
+#[allow(clippy::too_many_arguments)]
+fn symmetry_cut<const W: usize>(
+    m: &mut MatchBound<'_, W>,
+    model: &Model,
+    scratch: &mut Scratch<W>,
+    state: &FrameSet<W>,
+    pairs: &[(u32, u32)],
+    promoted: &Bits<W>,
+    cands: &Bits<W>,
+    need: u64,
+) -> Option<bool> {
+    for &(a, b) in pairs {
+        let (ca, cb) = (cofactors(promoted, a) as i64, cofactors(promoted, b) as i64);
+        if ca > cb + cofactors(cands, b) as i64 {
+            return Some(true);
+        }
+    }
+    for &(a, b) in pairs {
+        let (ca, cb) = (cofactors(promoted, a) as i64, cofactors(promoted, b) as i64);
+        let family: Vec<u32> = cands.iter().filter(|x| x.is_multiple_of(a) || x.is_multiple_of(b)).collect();
+        if family.len() > 12 {
+            continue;
+        }
+        let rest = *cands - family.iter().copied().collect::<Bits<W>>();
+        let reaches = (0u32..1 << family.len()).any(|mask| {
+            let u: Bits<W> = family.iter().enumerate().filter(|(i, _)| mask >> i & 1 == 1).map(|(_, &x)| x).collect();
+            if ca + cofactors(&u, a) as i64 > cb + cofactors(&u, b) as i64 {
+                return false;
+            }
+            if model.promote_all_using(scratch, state, &u).is_none() {
+                return false; // no completion promotes U
+            }
+            m.reset(&(*promoted | u), &rest);
+            m.value() + u.sum() >= need
+        });
+        if !reaches {
+            return Some(false);
+        }
+    }
+    None
+}
+
+/// What [`nodes_of`] found at one node, per kind of exchange (add, swap, pairs): proved by a literal cover for all
+/// of `C`, for the relevant candidates, with moves relabelled; and not refuted by the sampled completions.
+#[derive(Default)]
+struct Found {
+    cover_all: [bool; 3],
+    cover_relevant: [bool; 3],
+    cover_relabelled: [bool; 3],
+    sampled: [bool; 3],
+    prime_cover: bool,
+    prime_sampled: bool,
+}
+
+fn nodes_of<const W: usize>(path: &Path, o: &Options) {
     let (n, incumbent, units) = fixtures::read_nodes::<W>(path).expect("fixture");
     let p = setup::<W>(n);
     let (model, root) = (&*p.model, &p.root);
@@ -726,48 +517,32 @@ fn nodes_of<const W: usize>(path: &PathBuf, pairs: bool, explain: bool) {
     let graph = MatchGraph::new(model, root);
     let mut m = MatchBound::new(&graph);
     let mut scratch = Scratch::new();
-    let best = incumbent.sum() + delta();
+    let best = incumbent.sum().checked_add_signed(o.delta).expect("a margin above zero");
     let primes = primes_to(n / 2);
-    let sym_pairs = root_pairs(&p);
+    let pairs = root_pairs(&p);
     let t0 = Instant::now();
-    // Per kind (add, swap, pairs) and candidate set (all, relevant): nodes dominated, and the tallies.
-    let mut dominated = [[0u64; 3]; 3];
-    let mut kinds = [[Tally::default(); 3]; 3];
-    let mut closed = 0;
     for unit in &units {
         let (promoted, cands) = (unit.promoted, unit.cands);
         let state = model.promote_all_using(&mut scratch, root, &promoted).expect("a node of the proof");
         let need = (best + 1).saturating_sub(promoted.sum());
         let Some(rel) = relevant(&mut m, model, &mut scratch, &state, &promoted, &cands, need) else {
-            closed += 1;
+            println!("{{\"n\":{n},\"promoted\":{},\"closed\":true}}", promoted.len());
             continue;
         };
         let excluded = p.candidates - promoted - cands;
-        let mut found = [[false; 3]; 3];
-        // Random maximal completions within the relevant candidates: an exchange whose state cannot take one of them
-        // does not cover the node (infeasibility only grows with the set, so maximal sets are the ones to try).
         let mut rng = 0x2545_f491_4f6c_dd1du64 ^ promoted.sum();
         let maximal: Vec<Bits<W>> =
-            (0..samples()).map(|_| random_maximal(model, &mut scratch, &state, &rel, &mut rng)).collect();
-        let mut semantic = [false; 3];
+            (0..o.samples).map(|_| random_maximal(model, &mut scratch, &state, &rel, &mut rng)).collect();
+        let mut f = Found::default();
         let mut check = |set: Bits<W>, kind: usize, scratch: &mut Scratch<W>| {
-            let Some(other) = model.promote_all_using(scratch, root, &set) else {
-                for tally in &mut kinds[kind] {
-                    tally.add(None);
-                }
-                return;
-            };
+            let Some(other) = model.promote_all_using(scratch, root, &set) else { return };
             let takes_all = maximal.iter().all(|s| model.promote_all_using(scratch, &other, s).is_some());
-            semantic[kind] |= takes_all;
-            if takes_all && explain && covers(g, &other, &state, &rel, true).is_err() {
-                explain_exchange(model, &state, &other, &promoted, &set, &rel);
-            }
-            for (j, (within, relabel)) in [(cands, false), (rel, false), (rel, true)].into_iter().enumerate() {
-                let outcome = covers(g, &other, &state, &within, relabel);
-                kinds[kind][j].add(Some(outcome));
-                found[kind][j] |= outcome.is_ok();
-                assert!(outcome.is_err() || takes_all, "a cover that does not take a completion: {set:?}");
-            }
+            let proved = [covers(g, &other, &state, &cands, false), covers(g, &other, &state, &rel, false), covers(g, &other, &state, &rel, true)];
+            assert!(takes_all || !proved.iter().any(|&c| c), "n={n}: a cover refuted by a completion: {set:?}");
+            f.sampled[kind] |= takes_all;
+            f.cover_all[kind] |= proved[0];
+            f.cover_relevant[kind] |= proved[1];
+            f.cover_relabelled[kind] |= proved[2];
         };
         for a in excluded.iter() {
             check(promoted.with(a), 0, &mut scratch);
@@ -777,22 +552,18 @@ fn nodes_of<const W: usize>(path: &PathBuf, pairs: bool, explain: bool) {
                 check(promoted.without(b).with(a), 1, &mut scratch);
             }
         }
-        if pairs {
-            let ex: Vec<u32> = excluded.iter().collect();
-            let pr: Vec<u32> = promoted.iter().collect();
+        if o.pairs {
+            let (ex, pr): (Vec<u32>, Vec<u32>) = (excluded.to_vec(), promoted.to_vec());
             for (i, &a1) in ex.iter().enumerate() {
                 for &a2 in &ex[i + 1..] {
                     let added = Bits::EMPTY.with(a1).with(a2);
-                    // two for one
                     for &b in pr.iter().filter(|&&b| u64::from(b) < added.sum()) {
                         check((promoted | added).without(b), 2, &mut scratch);
                     }
-                    // two for two
                     for (j, &b1) in pr.iter().enumerate() {
                         for &b2 in &pr[j + 1..] {
                             let taken = Bits::EMPTY.with(b1).with(b2);
-                            let more = added.sum() > taken.sum()
-                                || (added.sum() == taken.sum() && added.max() > taken.max());
+                            let more = added.sum() > taken.sum() || (added.sum() == taken.sum() && added.max() > taken.max());
                             if more {
                                 check((promoted - taken) | added, 2, &mut scratch);
                             }
@@ -801,115 +572,128 @@ fn nodes_of<const W: usize>(path: &PathBuf, pairs: bool, explain: bool) {
                 }
             }
         }
-        for (d, f) in dominated.iter_mut().zip(found) {
-            for j in 0..3 {
-                d[j] += u64::from(f[j]);
-            }
-        }
-        // The root's prime symmetries: no completion can bring the cofactors of q up to those of p.
-        let violated = |within: &Bits<W>| {
-            sym_pairs.iter().filter(|&&(a, b)| cofactors(&promoted, a) > cofactors(&promoted, b) + cofactors(within, b)).count()
-        };
-        let (sym_all, sym_rel) = (violated(&cands), violated(&rel));
-        // The matching bound of the completions that keep a symmetric pair's constraint, with the pair's multiples
-        // among the relevant candidates enumerated (each subset `U` promoted, the others left out) and the rest
-        // relaxed: below `need` for some pair, and every completion that could beat the incumbent breaks the
-        // constraint, so its image under the pair's exchange beats it by more.
-        let mut sym_cut = false;
-        for &(a, b) in &sym_pairs {
-            let delta = cofactors(&promoted, a) as i64 - cofactors(&promoted, b) as i64;
-            let family: Vec<u32> = rel.iter().filter(|x| x.is_multiple_of(a) || x.is_multiple_of(b)).collect();
-            if family.len() > 12 {
-                continue;
-            }
-            let fam: Bits<W> = family.iter().copied().collect();
-            let mut best_u = None;
-            for mask in 0u32..(1 << family.len()) {
-                let u: Bits<W> = family.iter().enumerate().filter(|(i, _)| mask >> i & 1 == 1).map(|(_, &x)| x).collect();
-                if delta + cofactors(&u, a) as i64 - cofactors(&u, b) as i64 > 0 {
-                    continue; // breaks the constraint
-                }
-                let Some(st) = model.promote_all_using(&mut scratch, &state, &u) else { continue };
-                let _ = st;
-                m.reset(&(promoted | u), &(rel - fam));
-                let value = m.value() + u.sum();
-                best_u = best_u.max(Some(value));
-            }
-            if best_u.is_none_or(|v| v < need) {
-                sym_cut = true;
-                break;
-            }
-        }
-        // Prime swaps: P' = P with the exponents of p and q exchanged, worth more.
-        let (mut prime_sem, mut prime_syn, mut prime_tried) = (false, false, 0u32);
-        let mut prime_pairs = Vec::new();
-        for (i, &pp) in primes.iter().enumerate() {
-            if !promoted.iter().any(|x| x.is_multiple_of(pp)) {
-                continue;
-            }
-            for &qq in &primes[i + 1..] {
-                let pi = |x: u32| swap_primes(x, pp, qq);
+        // Prime exchanges of P (any two primes, not only the root's symmetries), worth more.
+        for (i, &a) in primes.iter().enumerate().filter(|&(_, &a)| promoted.iter().any(|x| x.is_multiple_of(a))) {
+            for &b in &primes[i + 1..] {
+                let pi = |x: u32| swap_primes(x, a, b);
                 let Some(set) = map_set(&promoted, &pi) else { continue };
                 if set.sum() <= promoted.sum() || !set.is_subset(&p.candidates) || set.intersects(&rel) {
                     continue;
                 }
-                prime_tried += 1;
                 let Some(other) = model.promote_all_using(&mut scratch, root, &set) else { continue };
                 let takes_all = maximal.iter().all(|s| model.promote_all_using(&mut scratch, &other, s).is_some());
-                let syn = covers_mapped(g, &other, &state, &rel, &pi).is_ok();
-                assert!(!syn || takes_all, "a mapped cover that does not take a completion");
-                prime_sem |= takes_all;
-                prime_syn |= syn;
-                if takes_all {
-                    prime_pairs.push((pp, qq, syn));
-                }
+                let proved = covers_mapped(g, &other, &state, &rel, &pi);
+                assert!(takes_all || !proved, "n={n}: a mapped cover refuted by a completion");
+                f.prime_sampled |= takes_all;
+                f.prime_cover |= proved;
             }
         }
-        // The excluded candidates that can be promoted at the node, and how many of them no single relevant
-        // candidate blocks (an upper estimate of the "add" dominance, which needs no blocking set at all).
-        let mut addable = 0;
-        let mut unblocked = 0;
-        let mut unblocked_maximal = 0;
-        let mut rng = 0x9e37_79b9_7f4a_7c15u64 ^ u64::from(promoted.len());
-        for a in excluded.iter() {
-            let Some(with_a) = model.promote(&state, a) else { continue };
-            addable += 1;
-            let blocked = rel.iter().any(|x| !model.can_promote_using(&mut scratch, &with_a, x));
-            unblocked += u32::from(!blocked);
-            if !blocked {
-                // A set that blocks `a` stays blocking as it grows, so look at random maximal sets.
-                let blocked = (0..samples()).any(|_| {
-                    let s = random_maximal(model, &mut scratch, &state, &rel, &mut rng);
-                    !model.can_promote_all_using(&mut scratch, &with_a, &s)
-                });
-                unblocked_maximal += u32::from(!blocked);
-            }
-        }
-        let twins_all = twins(model, &state, &cands);
-        let twins_rel = twins(model, &state, &rel);
-        let members = |t: &Vec<Vec<u32>>| t.iter().map(Vec::len).sum::<usize>();
+        let symmetry = symmetry_cut(&mut m, model, &mut scratch, &state, &pairs, &promoted, &rel, need);
         println!(
-            "{{\"n\":{n},\"promoted\":{},\"cands\":{},\"relevant\":{},\"excluded\":{},\"found\":{:?},\"semantic\":{:?},\"sem_add\":{},\"sem_swap\":{},\"sem_pairs\":{},\
-             \"sym_all\":{sym_all},\"sym_rel\":{sym_rel},\"sym_cut\":{sym_cut},\"prime_tried\":{prime_tried},\"prime_sem\":{prime_sem},\"prime_syn\":{prime_syn},\"prime_pairs\":\"{prime_pairs:?}\",\
-             \"addable\":{addable},\"unblocked\":{unblocked},\"unblocked_maximal\":{unblocked_maximal},\"twins_all\":{},\"twins_rel\":{},\"classes_rel\":{:?}}}",
+            "{{\"n\":{n},\"promoted\":{},\"cands\":{},\"relevant\":{},\"excluded\":{},\"cover_all\":{:?},\
+             \"cover_relevant\":{:?},\"cover_relabelled\":{:?},\"sampled\":{:?},\"prime_cover\":{},\"prime_sampled\":{},\
+             \"twins\":{},\"twins_relevant\":{},\"symmetry_hopeless\":{},\"symmetry_bound\":{}}}",
             promoted.len(),
             cands.len(),
             rel.len(),
             excluded.len(),
-            found, semantic, semantic[0], semantic[1], semantic[2],
-            members(&twins_all),
-            members(&twins_rel),
-            twins_rel,
+            f.cover_all,
+            f.cover_relevant,
+            f.cover_relabelled,
+            f.sampled,
+            f.prime_cover,
+            f.prime_sampled,
+            twins(model, &state, &cands),
+            twins(model, &state, &rel),
+            symmetry == Some(true),
+            symmetry.is_some(),
         );
     }
-    eprintln!(
-        "n={n}: {} nodes ({closed} closed by the bound), dominated [add, swap, pairs] x [all, relevant, relevant relabelled] {:?} \
-         ({:.1} s)",
-        units.len(),
-        dominated,
-        t0.elapsed().as_secs_f64(),
-    );
-    for (kind, t) in ["add", "swap", "pairs"].iter().zip(kinds) {
-        eprintln!("  {kind}: all {:?}\n  {kind}: relevant {:?}\n  {kind}: relabelled {:?}", t[0], t[1], t[2]);
+    eprintln!("n={n}: {} nodes in {:.1} s", units.len(), t0.elapsed().as_secs_f64());
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// symmetries and their checks
+
+/// The pairs of primes whose exchange is a symmetry of the root of game `n` (see `common/symmetry.rs`), and how
+/// many candidates they move.
+fn symmetries_of<const W: usize>(n: u32) {
+    let board = Board::<W>::for_n(n);
+    if board.is_trivial() {
+        return;
     }
+    let p = board.prepare(SearchTactics::default()).expect("prepare");
+    let pairs = root_pairs(&p);
+    let moved: Bits<W> = p.candidates.iter().filter(|&x| pairs.iter().any(|&(a, b)| swap_primes(x, a, b) != x)).collect();
+    println!(
+        "{{\"n\":{n},\"candidates\":{},\"symmetric_pairs\":{},\"moved\":{},\"pairs\":\"{pairs:?}\"}}",
+        p.candidates.len(),
+        pairs.len(),
+        moved.len()
+    );
+}
+
+/// Checks of the root's prime symmetries of game `n`: for every pair `(a, b)`, the image of the optimal set and of
+/// `samples` random maximal promotable sets (and, on boards of at most 22 candidates, of every promotable set) can
+/// be promoted and is worth `(b − a)(c_a − c_b)` more; on those small boards, the best set that keeps every pair's
+/// constraint `c_a ≤ c_b` is worth the optimum; and up to `n = 40`, the brute-force oracle (`taxman::brute`, no
+/// frame model) scores the known optimum.  Panics on a failure; prints a line per game with pairs.
+fn symcheck_one<const W: usize>(n: u32, optimal: &Optimal, samples: usize) {
+    let board = Board::<W>::for_n(n);
+    if board.is_trivial() {
+        return;
+    }
+    if n <= 40 {
+        let exact = taxman::brute::solve(n, &[], taxman::brute::Rule::Divisor).score;
+        assert_eq!(Some(exact), optimal.score(n), "n={n}: the oracle disagrees with the known optimum");
+    }
+    let p = board.prepare(SearchTactics::default()).expect("prepare");
+    let pairs = root_pairs(&p);
+    if pairs.is_empty() {
+        return;
+    }
+    let (model, root) = (&*p.model, &p.root);
+    let mut scratch = Scratch::new();
+    let best = optimal_set(&p, optimal);
+    let opt = best.sum();
+    let check = |set: &Bits<W>, scratch: &mut Scratch<W>| {
+        for &(a, b) in &pairs {
+            let image = map_set(set, &|x| swap_primes(x, a, b)).expect("in range");
+            assert!(model.promote_all_using(scratch, root, &image).is_some(), "n={n}: ({a}, {b}) of {set:?}");
+            let gain = i64::from(b - a) * (cofactors(set, a) as i64 - cofactors(set, b) as i64);
+            assert_eq!(image.sum() as i64 - set.sum() as i64, gain, "n={n}: the sum of the image of {set:?}");
+        }
+    };
+    check(&best, &mut scratch);
+    let mut rng = 0x5eed_u64 ^ u64::from(n);
+    for _ in 0..samples {
+        let s = random_maximal(model, &mut scratch, root, &p.candidates, &mut rng);
+        check(&s, &mut scratch);
+    }
+    let (mut enumerated, mut kept_best) = (0u64, None);
+    if p.candidates.len() <= 22 {
+        let cands = p.candidates.to_vec();
+        let mut stack = vec![(0usize, Bits::<W>::EMPTY, *root)];
+        while let Some((i, set, state)) = stack.pop() {
+            if i == cands.len() {
+                enumerated += 1;
+                check(&set, &mut scratch);
+                if pairs.iter().all(|&(a, b)| cofactors(&set, a) <= cofactors(&set, b)) {
+                    kept_best = kept_best.max(Some(set.sum()));
+                }
+                continue;
+            }
+            stack.push((i + 1, set, state));
+            if let Some(next) = model.promote(&state, cands[i]) {
+                stack.push((i + 1, set.with(cands[i]), next));
+            }
+        }
+        assert_eq!(kept_best, Some(opt), "n={n}: the sets that keep the constraints miss the optimum");
+    }
+    println!(
+        "{{\"n\":{n},\"pairs\":{},\"candidates\":{},\"enumerated\":{enumerated},\"kept_best\":{},\"opt\":{opt}}}",
+        pairs.len(),
+        p.candidates.len(),
+        kept_best.map_or("null".into(), |v: u64| v.to_string()),
+    );
 }
