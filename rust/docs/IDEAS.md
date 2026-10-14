@@ -443,8 +443,10 @@ experiment.  "Pilot" refers to section 4.
   (more ways to be paid, but more taken), and a sound dominance needs a proof per pair; the symmetric case (two
   candidates with the same neighbourhoods) is rare, since a number's maximal factors determine it (up to those
   missing from the frame).  High cost, unknown payoff; not tried.  A first, cheap look would count pairs with
-  nested neighbourhoods in a frame.
-* *Symmetry breaking*: no symmetries found (as above).
+  nested neighbourhoods in a frame.  *Piloted later*: [EXPERIMENTS, "Dominance and symmetry"](EXPERIMENTS.md#dominance-and-symmetry-2026-10)
+  (no twins, literal dominance at a few percent of the nodes).
+* *Symmetry breaking*: none found here; there are symmetries after all, exchanges of primes that the frame builder
+  treats alike, and breaking them is a constant factor ([the same entry](EXPERIMENTS.md#dominance-and-symmetry-2026-10)).
 * *Nogood recording on restarts*: subsumed by the existing nogoods.
 
 **From #SAT and model counting**
