@@ -810,10 +810,10 @@ impl<'a, const W: usize> Stepper<'a, W> {
                 }
                 Gf2Branching::Exact | Gf2Branching::Forced => {
                     // The members by their split bounds, the likeliest to lower the bound most first; each solve
-                    // stops as soon as its value reaches the best so far (it cannot be chosen, nor forced, since
-                    // the best is at least `need` while nothing is forced), or `need` once a member is forced
-                    // (with `fix_forced` only which are forced still matters).  The chosen member's level is kept
-                    // for the node going on without it.
+                    // stops as soon as its value reaches both the best so far and `need` (then the member can be
+                    // neither chosen nor forced), or `need` once a member is forced (with `fix_forced` only which
+                    // are forced still matters).  The chosen member's level is kept for the node going on without
+                    // it.
                     let order = &mut self.order;
                     order.clear();
                     order.extend(k.iter().map(|x| (g.split_without(x).unwrap_or(i64::MAX), u32::MAX - x)));
@@ -825,7 +825,13 @@ impl<'a, const W: usize> Stepper<'a, W> {
                     }
                     for &(_, key) in order.iter() {
                         let x = u32::MAX - key;
-                        let stop = if to_need || (space.fix_forced && !forced.is_empty()) { need } else { best.0 };
+                        // A solve that stops has a value of at least `stop`, which is never below `need`: only a
+                        // solve that ran to the end can show a member forced.
+                        let stop = if to_need || (space.fix_forced && !forced.is_empty()) {
+                            need
+                        } else {
+                            best.0.max(need)
+                        };
                         let bound = g.value_excluding(x, node.max_add, stop);
                         if bound < need {
                             forced.insert(x);

@@ -19,10 +19,13 @@ use taxman::game::Optimal;
 use taxman::model::{FrameSet, Model, Scratch};
 use taxman::numtheory::Tables;
 use taxman::search::lagrange::Refits;
+use taxman::search::Gf2Branching;
 use taxman::search::TaxUnit;
 
 /// Every tactic that acts inside the search, alone and in the combinations that matter, with the forgetting of
-/// nogoods at the production period, every step, every third, and never; on one thread and two.  The Lagrangian
+/// nogoods at the production period, every step, every third, and never; on one thread and two; and the GF(2)
+/// bound (tactic `gf2`) with each way of choosing the branch, with and without the matching bound as a first check,
+/// forced members, nogoods and the Lagrangian bound's early refits.  The Lagrangian
 /// bound (tactic `lagrange`) refits its multipliers only after 2,000 steps, which most of these searches never
 /// take, so the last configurations refit them after the first few steps and every few steps after that (with and
 /// without forgetting at the same time, refinement, and a second thread), and one turns it off.
@@ -48,6 +51,17 @@ fn configs() -> Vec<Config> {
         Config { refits: Some(Refits { first: 1, every: 4 }), refine: 0, ..base },
         Config { refits: Some(Refits { first: 2, every: 5 }), threads: 2, ..base },
         Config { refits: None, ..base },
+        Config { gf2: true, ..base },
+        Config { gf2: true, gf2_branching: Gf2Branching::Split, ..base },
+        Config { gf2: true, gf2_branching: Gf2Branching::Largest, ..base },
+        Config { gf2: true, gf2_branching: Gf2Branching::Forced, ..base },
+        Config { gf2: true, gf2_prefilter: true, ..base },
+        Config { gf2: true, fix_forced: false, ..base },
+        Config { gf2: true, nogoods: false, ..base },
+        Config { gf2: true, period: Some(1), ..base },
+        Config { gf2: true, threads: 2, ..base },
+        Config { gf2: true, refits: Some(Refits { first: 1, every: 4 }), ..base },
+        Config { gf2: true, refits: Some(Refits { first: 2, every: 5 }), threads: 2, period: Some(3), ..base },
     ]
 }
 
@@ -241,7 +255,7 @@ fn a_search_resumed_over_and_over_finds_the_optimum() {
     // every four.  The bound below only checks that the resuming really happened; it leaves room for the smallest
     // trees a loaded machine produces.
     let truth = optimal_sum::<16>(optimal, 600).unwrap();
-    let resumes = resumed_over_and_over::<16>(600, truth, 30, 1000, &dir, &[0, 12, 14]);
+    let resumes = resumed_over_and_over::<16>(600, truth, 30, 1000, &dir, &[0, 12, 14, 19, 26]);
     assert!(resumes >= 10, "only {resumes} resumes");
 }
 
@@ -253,9 +267,9 @@ fn a_wide_search_resumed_over_and_over_finds_the_optimum() {
     let n = 1133;
     let truth = stored_games("strict.jsonl")[&n].0 - Board::<20>::for_n(n).in_the_bag;
     let dir = TempDir::new("churn-wide");
-    let resumes = resumed_over_and_over::<20>(n, truth, 400, 60, &dir, &[0, 12, 14])
-        + resumed_over_and_over::<24>(n, truth, 400, 60, &dir, &[0])
-        + resumed_over_and_over::<64>(n, truth, 400, 60, &dir, &[2]);
+    let resumes = resumed_over_and_over::<20>(n, truth, 400, 60, &dir, &[0, 12, 14, 19])
+        + resumed_over_and_over::<24>(n, truth, 400, 60, &dir, &[0, 19])
+        + resumed_over_and_over::<64>(n, truth, 400, 60, &dir, &[2, 19]);
     assert!(resumes > 10, "only {resumes} resumes");
 }
 

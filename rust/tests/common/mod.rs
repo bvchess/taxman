@@ -18,13 +18,14 @@ use std::time::Instant;
 use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::engine::{self, EngineConfig, Start};
+use taxman::gf2::Gf2Graph;
 use taxman::json::Json;
 use taxman::matchbound::MatchGraph;
 use taxman::model::{FrameSet, Model, Scratch};
 use taxman::numtheory::Tables;
 use taxman::results::Assumptions;
 use taxman::search::lagrange::Refits;
-use taxman::search::{search, SearchSpace, SearchTactics, TaxSearcher, TaxUnit, NOGOOD_PERIOD};
+use taxman::search::{search, Gf2Branching, SearchSpace, SearchTactics, TaxSearcher, TaxUnit, NOGOOD_PERIOD};
 use taxman::solver::{Prev, PrevSource, SolveOptions};
 
 /// A committed file under `testdata/`.
@@ -189,6 +190,10 @@ pub struct Config {
     /// When a searcher refits the multipliers of its Lagrangian bound; `None` without that bound.
     pub refits: Option<Refits>,
     pub threads: usize,
+    /// The GF(2) bound (tactic `gf2`), and with it the matching bound as a first check and the branching.
+    pub gf2: bool,
+    pub gf2_prefilter: bool,
+    pub gf2_branching: Gf2Branching,
 }
 
 impl Config {
@@ -205,6 +210,9 @@ impl Config {
             period: t.forget_nogoods.then_some(NOGOOD_PERIOD),
             refits: (t.nogoods && t.lagrange).then_some(Refits::SEARCH),
             threads: 1,
+            gf2: t.gf2,
+            gf2_prefilter: false,
+            gf2_branching: Gf2Branching::Exact,
         }
     }
 }
@@ -288,6 +296,9 @@ impl<const W: usize> Game<W> {
             diagnostics: None,
             began: Instant::now(),
             found: Mutex::new(None),
+            gf2: cfg.gf2.then(|| Gf2Graph::new(&self.model, &self.root, &self.candidates)),
+            gf2_prefilter: cfg.gf2_prefilter,
+            gf2_branching: cfg.gf2_branching,
         };
         let engine = engine.unwrap_or_else(|| config(cfg.threads));
         let start = match resume {
