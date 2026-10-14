@@ -25,15 +25,14 @@ use taxman::game::Optimal;
 use taxman::matchbound::{MatchBound, MatchGraph};
 use taxman::model::{FactorProvider, Frame, FrameSet, Model, Scratch};
 use taxman::search::{Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
-use taxman::solver::SolveOptions;
 
-/// The strict tactics (`revise_freedoms` off), which the frontier's results are made with.
+/// The search tactics of the frontier's results (the defaults, all of them proven).
 fn tactics() -> SearchTactics {
-    SearchTactics { revise_freedoms: false, ..SearchTactics::default() }
+    SearchTactics::default()
 }
 
 fn setup<const W: usize>(n: u32) -> Prepared<W> {
-    Board::<W>::for_n(n).prepare(tactics(), 1).expect("prepare")
+    Board::<W>::for_n(n).prepare(tactics()).expect("prepare")
 }
 
 fn main() {
@@ -97,7 +96,7 @@ fn symmetries_of<const W: usize>(n: u32) {
     if board.is_trivial() {
         return;
     }
-    let p = board.prepare(tactics(), 1).expect("prepare");
+    let p = board.prepare(tactics()).expect("prepare");
     let primes = primes_to(n / 2);
     let mut pairs = Vec::new();
     let mut moved = Bits::<W>::EMPTY;
@@ -154,7 +153,7 @@ fn sample(args: &[String]) {
             n => games.push(n.parse::<u32>().expect("a board size")),
         }
     }
-    let optimal = SolveOptions::default().known_games(known.as_slice()).expect("known games");
+    let optimal = Optimal::built_in().with_results_files(known.as_slice()).expect("known games");
     for n in games {
         if fresh > 0 {
             taxman::with_width!(n, W => sample_fresh::<W>(n, &optimal, fresh, &out));
@@ -174,7 +173,7 @@ fn sample_fresh<const W: usize>(n: u32, optimal: &Optimal, count: u64, out: &std
     let incumbent: Bits<W> = moves.iter().copied().filter(|&x| p.candidates.contains(x)).collect();
     assert!(p.model.promote_all_using(&mut Scratch::new(), &p.root, &incumbent).is_some(), "the optimum");
     let graph = MatchGraph::new(&p.model, &p.root);
-    let space = SearchSpace::new(&p, Some(&graph), None);
+    let space = SearchSpace::new(&p, &graph, None);
     let payload: Vec<u8> = incumbent.as_words().iter().flat_map(|w| w.to_le_bytes()).collect();
     let start = || Start::Fresh {
         units: vec![TaxUnit { promoted: Bits::<W>::EMPTY, cands: p.candidates }],
@@ -234,7 +233,7 @@ fn sample_one<const W: usize>(n: u32, optimal: &Optimal, every: u64, out: &std::
     let incumbent: Bits<W> = moves.iter().copied().filter(|&x| p.candidates.contains(x)).collect();
     assert!(p.model.promote_all_using(&mut Scratch::new(), &p.root, &incumbent).is_some(), "the optimum");
     let graph = MatchGraph::new(&p.model, &p.root);
-    let space = SearchSpace::new(&p, Some(&graph), None);
+    let space = SearchSpace::new(&p, &graph, None);
     let log = Mutex::new(Vec::new());
     let tmp = std::env::temp_dir().join(format!("taxman-dominance-{n}-{}.ckpt", std::process::id()));
     let payload = incumbent.as_words().iter().flat_map(|w| w.to_le_bytes()).collect();
