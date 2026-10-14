@@ -1,0 +1,10 @@
+{"t":10.021651,"max_rss":190775296,"ckpt_bytes":null,"spill_files":0}
+{"t":20.030953,"max_rss":272089088,"ckpt_bytes":849784,"spill_files":0}
+{"t":30.015821,"max_rss":300138496,"ckpt_bytes":1414156,"spill_files":0}
+{"t":40.031446,"max_rss":311771136,"ckpt_bytes":1793488,"spill_files":0}
+{"t":50.002299,"max_rss":316669952,"ckpt_bytes":1769844,"spill_files":0}
+{"t":60.022965,"max_rss":322420736,"ckpt_bytes":1643400,"spill_files":0}
+{"t":70.022568,"max_rss":325304320,"ckpt_bytes":1368924,"spill_files":0}
+{"t":80.025969,"max_rss":328220672,"ckpt_bytes":1293880,"spill_files":0}
+{"t":90.009171,"max_rss":333266944,"ckpt_bytes":1293880,"spill_files":0}
+{"n":2170,"opt":112062,"delta":0,"threads":64,"cores":1,"completed":false,"best":112062,"nodes":207356,"seconds":90.470035,"busy_s":5476.916238,"cycles":277447751154,"instructions":1125796751472,"promote_attempts":120250,"promotions":361299,"children":90461,"gf2_solves":224335,"gf2_augmentations":8940570,"gf2_strong_solves":166242,"gf2_strong_augmentations":6222037,"us_per_node":26413.107,"us_per_aug":612.591,"cycles_per_node":1338026.154,"pauses":8,"pause_total_s":10.432168,"pause_max_s":1.945950,"park_max_s":1.930305,"checkpoints":8,"max_queue":1705,"spilled_units":0,"runs":2241,"tiny_runs":43,"splits":5,"split_units":80,"steals":65,"spill_segments":0,"reloaded_segments":0,"ckpt_bytes":1364812,"max_rss":334413824}
