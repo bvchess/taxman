@@ -696,6 +696,75 @@ impl<'a> Fast<'a> {
     }
 }
 
+/// A weight split for a heaviest common independent set `chosen` of `a` and `b` (of any size, weights `w`):
+/// `w1` with `chosen` a heaviest independent set of `a` for `w1` and of `b` for `w2 = w − w1`.  Then for any
+/// elements left out, the heaviest independent set of `a` for `w1` plus that of `b` for `w2`, each found
+/// greedily, bounds the heaviest common independent set without them (`split_bound`): weak duality, since a
+/// common independent `J` weighs `w1(J) + w2(J)`.  With nothing left out the bound is `w(chosen)` itself.
+///
+/// The split is found from the local conditions of optimality in a matroid (members of non-negative weight; an
+/// element whose addition keeps the set independent of non-positive weight; no exchange gaining weight), which
+/// for `w1` on `a` and `w2` on `b` are difference constraints on `w1`, solved by Bellman–Ford.  `None` if they
+/// have no solution (Frank's weight-splitting theorem says they do when `chosen` is a heaviest set).
+pub fn split(a: &BlockMatroid, b: &BlockMatroid, w: &[i64], chosen: &[bool]) -> Option<Vec<i64>> {
+    let n = a.len();
+    let zero = n;
+    // (u, v, c): w1(v) − w1(u) ≤ c, an arc u → v of length c.
+    let mut arcs: Vec<(usize, usize, i64)> = Vec::new();
+    let mut spans = [Span::new(a), Span::new(b)];
+    for e in (0..n).filter(|&e| chosen[e]) {
+        spans[0].insert(a, e);
+        spans[1].insert(b, e);
+        arcs.push((e, zero, 0)); // w1(e) ≥ 0
+        arcs.push((zero, e, w[e])); // w1(e) ≤ w(e), i.e. w2(e) ≥ 0
+    }
+    for y in (0..n).filter(|&y| !chosen[y]) {
+        match spans[0].reduce(a, y) {
+            Reduced::Free => arcs.push((zero, y, 0)),                        // w1(y) ≤ 0
+            Reduced::Circuit(c) => arcs.extend(bits(&c).map(|x| (x, y, 0))), // w1(y) ≤ w1(x)
+        }
+        match spans[1].reduce(b, y) {
+            Reduced::Free => arcs.push((y, zero, -w[y])), // w1(y) ≥ w(y), i.e. w2(y) ≤ 0
+            Reduced::Circuit(c) => arcs.extend(bits(&c).map(|x| (y, x, w[x] - w[y]))), // w2(y) ≤ w2(x)
+        }
+    }
+    let mut dist = vec![0i64; n + 1];
+    for _ in 0..=n + 1 {
+        let mut changed = false;
+        for &(u, v, c) in &arcs {
+            if dist[u] + c < dist[v] {
+                dist[v] = dist[u] + c;
+                changed = true;
+            }
+        }
+        if !changed {
+            return Some((0..n).map(|e| dist[e] - dist[zero]).collect());
+        }
+    }
+    None
+}
+
+/// The heaviest independent set of `m` for the weights `w`, leaving out the elements `out`: its weight (greedy).
+pub fn greedy(m: &BlockMatroid, w: &[i64], out: &[bool]) -> i64 {
+    let mut order: Vec<usize> = (0..m.len()).filter(|&e| w[e] > 0 && !out[e]).collect();
+    order.sort_by_key(|&e| std::cmp::Reverse(w[e]));
+    let mut span = Span::new(m);
+    let mut total = 0;
+    for e in order {
+        if let Reduced::Free = span.reduce(m, e) {
+            span.insert(m, e);
+            total += w[e];
+        }
+    }
+    total
+}
+
+/// The bound of [`split`]'s comment for the common independent sets that leave out `out`.
+pub fn split_bound(a: &BlockMatroid, b: &BlockMatroid, w: &[i64], w1: &[i64], out: &[bool]) -> i64 {
+    let w2: Vec<i64> = w.iter().zip(w1).map(|(w, w1)| w - w1).collect();
+    greedy(a, w1, out) + greedy(b, &w2, out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -763,6 +832,18 @@ mod tests {
             }
             let heaviest = want.iter().flatten().copied().max().unwrap();
             assert_eq!(got.value, heaviest, "trial {trial}");
+            // The weight split: it exists, proves the optimum, and bounds every single deletion.
+            let w1 = split(&a, &b, &w, &got.chosen).unwrap_or_else(|| panic!("trial {trial}: no split"));
+            let none = vec![false; n];
+            assert_eq!(split_bound(&a, &b, &w, &w1, &none), heaviest, "trial {trial}: the split's bound");
+            for x in 0..n {
+                let mut out = none.clone();
+                out[x] = true;
+                let mut wx = w.clone();
+                wx[x] = 0;
+                let exact = intersect(&a, &b, &wx, n, false).value;
+                assert!(split_bound(&a, &b, &w, &w1, &out) >= exact, "trial {trial}: without {x}");
+            }
             // Warm starts: the optimum without one member, and random common independent sets.  When the start
             // passes the check, the result is the optimum.
             let opt: Vec<usize> = (0..n).filter(|&e| got.chosen[e]).collect();

@@ -4,41 +4,65 @@
 //! nothing in the solver calls it.  The study is in docs/EXPERIMENTS.md, "Matroid intersection bounds (2026-10)".
 //!
 //! ```text
-//! cargo run --release --example matroid -- roots [--known FILE] N|A-B...
-//! cargo run --release --example matroid -- nodes FIXTURE...
+//! cargo run --release --example matroid -- roots [--known FILE] [--opts FILE] N|A-B...
+//! cargo run --release --example matroid -- nodes [--every K] [--samples K] [--lagrange STEPS] [--exact SECONDS]
+//!     FIXTURE...
 //! cargo run --release --example matroid -- check [--known FILE] [--samples K] N|A-B...
+//! cargo run --release --example matroid -- bnb [--known FILE] [--opts FILE] [--bounds gf2,gf2warm,matching]
+//!     [--limit NODES] N|A-B...
+//! cargo run --release --example matroid -- lagrange [--known FILE] [--limit STEPS] N|A-B...
+//! cargo run --release --example matroid -- forced [--every K] FIXTURE...
+//! cargo run --release --example matroid -- cores N|A-B...
+//! cargo run --release --example matroid -- whole [--known FILE] N|A-B...
 //! ```
 //!
 //! Games are set up with the strict tactics (`revise_freedoms` off), as the frontier's searches are.  `P*` is the
-//! optimum promotion sum (the known score minus `in_the_bag`).
+//! optimum promotion sum (the known score minus `in_the_bag`, or the `opt` of the lines of `--opts`, as
+//! `bench/curve/slope_roots.jsonl` has them).  A range `A-B` stands for its games that are not prime.  Each command
+//! prints one JSON object per line.  `bench/matroid/matroid.py` makes the study's tables from them.
 //!
 //! * **roots**: per game, the root's matching bound and the GF(2) bound, capped at `max_total` promotions and not,
 //!   the size of the heaviest common independent set, and the time it took.
 //! * **nodes**: per node of a `.nodes` fixture of `testdata/perf` (the proof of the fixture's game, seeded with
-//!   the optimum), the node's matching bound and GF(2) bound (capped at the node's `max_add`) next to what a
-//!   completion must beat, `P* − sum(promoted)`.
-//! * **check**: validity.  At each root, the GF(2) bound is at least `P*`; every maximal promotable set found by
-//!   promoting the candidates in `--samples` random orders (default 200) is independent in both matroids; and
-//!   on boards with at most 22 candidates, the bound is at least the best promotable set found by enumerating
-//!   every one.
+//!   the optimum; every `--every`-th), the node's matching bound and GF(2) bound (capped at the node's `max_add`)
+//!   next to what a completion must beat, `P* − sum(promoted)`; `--samples` random completions checked
+//!   independent; with `--lagrange`, the Lagrangian bound over nogoods of the node's own fitted at the node
+//!   (`common/root_lagrange.rs`); with `--exact`, the node's best completion by the solver's search from it,
+//!   within that many seconds, which the GF(2) bound must not be below.
+//! * **check**: validity.  At each root, the GF(2) bound is at least `P*` (and the fast algorithm's equals the
+//!   reference's); the optimal game's promotions and every maximal promotable set found by promoting the
+//!   candidates in `--samples` random orders (default 200) are independent in both matroids; and on boards with at
+//!   most 22 candidates, the bound is at least the best promotable set found by enumerating every one.
+//! * **bnb**: a plain branch and bound with one bound, proving that nothing beats `P*` ([`bnb`]).
+//! * **lagrange**: the Lagrangian bound over nogoods with the intersection as its inner problem, at the root.
+//! * **forced**: forced members of the GF(2) bound at the nodes of a fixture, exactly and from a weight split.
+//! * **cores**: the cores that the GF(2) bound's heaviest set runs into at the root, and whether Lorea's matroid
+//!   sees them.
+//! * **whole**: the same bound for the whole game, with no frame model: an upper bound on `opt(n)` ([`whole`]).
 
 #[path = "common/meet.rs"]
 mod meet;
+#[path = "common/root_lagrange.rs"]
+mod root_lagrange;
 
-use meet::{intersect, intersect_fast, intersect_warm, BlockMatroid, Meet, Reduced, Span};
+use meet::{intersect, intersect_fast, intersect_warm, split, split_bound, BlockMatroid, Meet, Reduced, Span};
+use root_lagrange::{root_lagrange, CONFLICTS_PER_STEP, STALL};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 use taxman::bits::Bits;
 use taxman::board::Board;
+use taxman::engine::{self, EngineConfig, Start};
 use taxman::game::Optimal;
 use taxman::json::Json;
+use taxman::matchbound::lagrange::SCALE;
 use taxman::matchbound::{MatchBound, MatchGraph};
 use taxman::model::{FrameSet, Model, Scratch};
-use taxman::search::{Prepared, SearchTactics};
+use taxman::search::{Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
 use taxman::solver::SolveOptions;
 
 #[path = "common/fixtures.rs"]
+#[allow(dead_code)] // the hex writer is the probe's
 mod fixtures;
 
 // ---------------------------------------------------------------------------------------------------------
@@ -174,9 +198,8 @@ fn frame_matroids<const W: usize>(model: &Model, state: &FrameSet<W>, cands: &Bi
     let spaces: Vec<FrameSpace> =
         frames.iter().map(|f| FrameSpace::new(model, &f.factors, &f.moves, max).expect("a winnable frame")).collect();
     let words: Vec<usize> = spaces.iter().map(|s| s.rank.div_ceil(64).max(1)).collect();
-    let block_words = |parity: usize| -> Vec<usize> {
-        (0..frames.len()).filter(|h| h % 2 == parity).map(|h| words[h]).collect()
-    };
+    let block_words =
+        |parity: usize| -> Vec<usize> { (0..frames.len()).filter(|h| h % 2 == parity).map(|h| words[h]).collect() };
     let mut a = BlockMatroid { block: Vec::new(), vecs: Vec::new(), words: block_words(0) };
     let mut b = BlockMatroid { block: Vec::new(), vecs: Vec::new(), words: block_words(1) };
     let (mut elems, mut loops) = (Vec::new(), Vec::new());
@@ -284,6 +307,9 @@ struct Options {
     files: Vec<PathBuf>,
     bounds: Vec<BoundKind>,
     limit: u64,
+    every: usize,
+    exact: u64,
+    lagrange: usize,
 }
 
 fn parse() -> Result<Options, String> {
@@ -298,12 +324,20 @@ fn parse() -> Result<Options, String> {
         files: Vec::new(),
         bounds: vec![BoundKind::Gf2],
         limit: 1_000_000,
+        every: 1,
+        exact: 0,
+        lagrange: 0,
     };
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--known" => o.known.push(args.next().ok_or("--known needs a file")?.into()),
             "--opts" => o.opts = Some(args.next().ok_or("--opts needs a file")?.into()),
             "--limit" => o.limit = args.next().ok_or("--limit needs a value")?.parse().map_err(|e| format!("{e}"))?,
+            "--every" => o.every = args.next().ok_or("--every needs a value")?.parse().map_err(|e| format!("{e}"))?,
+            "--exact" => o.exact = args.next().ok_or("--exact needs seconds")?.parse().map_err(|e| format!("{e}"))?,
+            "--lagrange" => {
+                o.lagrange = args.next().ok_or("--lagrange needs a value")?.parse().map_err(|e| format!("{e}"))?
+            }
             "--bounds" => {
                 let list = args.next().ok_or("--bounds needs a list")?;
                 o.bounds = list
@@ -319,7 +353,7 @@ fn parse() -> Result<Options, String> {
             "--samples" => {
                 o.samples = args.next().ok_or("--samples needs a value")?.parse().map_err(|e| format!("{e}"))?
             }
-            game if o.command == "nodes" => o.files.push(game.into()),
+            file if o.command == "nodes" || o.command == "forced" => o.files.push(file.into()),
             range => {
                 let parse_n = |t: &str| t.parse::<u32>().map_err(|e| format!("{range}: {e}"));
                 match range.split_once('-') {
@@ -355,7 +389,7 @@ fn main() {
         "nodes" => {
             for path in &o.files {
                 let n = first_n(path);
-                taxman::with_width!(n, W => nodes::<W>(path));
+                taxman::with_width!(n, W => nodes::<W>(path, o.every, o.samples, o.lagrange, o.exact));
             }
         }
         "bnb" => {
@@ -368,6 +402,22 @@ fn main() {
         "lagrange" => {
             for &n in &o.games {
                 taxman::with_width!(n, W => lagrange::<W>(n, &known, o.limit as usize));
+            }
+        }
+        "whole" => {
+            for &n in &o.games {
+                whole(n, &known);
+            }
+        }
+        "cores" => {
+            for &n in &o.games {
+                taxman::with_width!(n, W => cores::<W>(n));
+            }
+        }
+        "forced" => {
+            for path in &o.files {
+                let n = first_n(path);
+                taxman::with_width!(n, W => forced::<W>(path, o.every));
             }
         }
         other => {
@@ -454,21 +504,26 @@ fn roots<const W: usize>(n: u32, known: &Known) {
 // ---------------------------------------------------------------------------------------------------------
 // nodes
 
-fn first_n(path: &PathBuf) -> u32 {
+fn first_n(path: &Path) -> u32 {
     let text = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
     let line = text.lines().find(|l| l.starts_with("n ")).expect("an n line");
     line[2..].trim().parse().expect("a board size")
 }
 
-fn nodes<const W: usize>(path: &PathBuf) {
+/// The nodes of the fixture `path` (every `every`-th): the bounds, and the validity checks of `check` at the node
+/// (`samples` completions in random orders, each independent in the node's matroids).  With `lagrange` steps, also
+/// the Lagrangian bound over the matching with nogoods of the node's own (`root_lagrange` with the node as the
+/// root): what the matching bound's Lagrangian makes of the node without a search.
+fn nodes<const W: usize>(path: &Path, every: usize, samples: usize, lagrange: usize, exact: u64) {
     let (n, incumbent, units) = fixtures::read_nodes::<W>(path).expect("a fixture");
     let (_, p) = setup::<W>(n).expect("a game with candidates");
     let model = &p.model;
     let graph = MatchGraph::new(model, &p.root);
     let mut mb = MatchBound::new(&graph);
     let mut scratch = Scratch::<W>::new();
+    let mut rng = Rng(0x2545_F491_4F6C_DD1D ^ u64::from(n));
     let best = incumbent.sum();
-    for u in units.iter().filter(|u| !u.cands.is_empty()) {
+    for u in units.iter().filter(|u| !u.cands.is_empty()).step_by(every.max(1)) {
         let state = model.promote_all_using(&mut scratch, &p.root, &u.promoted).expect("a node of the game");
         mb.reset(&u.promoted, &u.cands);
         let matching = mb.value();
@@ -478,15 +533,67 @@ fn nodes<const W: usize>(path: &PathBuf) {
         let capped = fm.bound(max_add.max(0) as usize);
         let time = t0.elapsed();
         let target = best as i64 - u.promoted.sum() as i64;
+        // Validity at the node: maximal completions in random orders are independent.
+        let cands: Vec<u32> = u.cands.iter().collect();
+        for _ in 0..samples {
+            let mut order = cands.clone();
+            for i in (1..order.len()).rev() {
+                order.swap(i, rng.below(i as u64 + 1) as usize);
+            }
+            let mut at = state;
+            let mut set = Bits::<W>::EMPTY;
+            for &x in &order {
+                if model.promote_in_place(&mut at, x) {
+                    set.insert(x);
+                }
+            }
+            fm.independent(&set).unwrap_or_else(|e| panic!("n={n}: a completion {set:?} of a node: {e}"));
+        }
+        let lagrange = (lagrange > 0).then(|| {
+            let node_graph = MatchGraph::new(model, &state);
+            let need = (target + 1).max(0) as u64;
+            let l = root_lagrange(&node_graph, model, &mut scratch, &state, &u.cands, Vec::new(), need, lagrange);
+            l.scaled.div_euclid(SCALE)
+        });
+        // The best completion of the node, by the solver's search from it (incumbent: no completion at all).
+        let exact = (exact > 0).then(|| {
+            let space = SearchSpace::new(&p, Some(&graph), None);
+            let cfg = EngineConfig {
+                threads: 1,
+                time_limit: Some(std::time::Duration::from_secs(exact)),
+                ..EngineConfig::default()
+            };
+            let payload = vec![0u8; 8 * W];
+            let start = Start::Fresh {
+                units: vec![TaxUnit { promoted: u.promoted, cands: u.cands }],
+                best: u.promoted.sum(),
+                payload,
+            };
+            let out = engine::run(&cfg, start, b"matroid", |_| TaxSearcher::new(&space)).expect("search");
+            let completion = out.best - u.promoted.sum();
+            if out.completed {
+                assert!(
+                    capped.value as u64 >= completion,
+                    "n={n}: the GF(2) bound {} is below the node's best completion {completion}",
+                    capped.value
+                );
+            }
+            (completion, out.completed)
+        });
         println!(
             "{{\"n\":{n},\"depth\":{},\"promoted_sum\":{},\"candidates\":{},\"elements\":{},\"max_add\":{max_add},\
-             \"target\":{target},\"matching\":{matching},\"gf2\":{},\"size\":{},\"augmentations\":{},\"rounds\":{},\
-             \"seconds\":{:.5}}}",
+             \"target\":{target},\"matching\":{matching},\"gf2\":{},\"lagrange\":{},\"exact\":{},\"size\":{},\
+             \"augmentations\":{},\"rounds\":{},\"seconds\":{:.5}}}",
             u.promoted.len(),
             u.promoted.sum(),
             u.cands.len(),
             fm.elems.len(),
             capped.value,
+            lagrange.map_or("null".into(), |l| l.to_string()),
+            match exact {
+                Some((c, true)) => c.to_string(),
+                _ => "null".into(),
+            },
             capped.chosen.iter().filter(|&&c| c).count(),
             capped.augmentations,
             capped.rounds,
@@ -686,13 +793,6 @@ fn bnb<const W: usize>(n: u32, known: &Known, kind: BoundKind, limit: u64) {
 // ---------------------------------------------------------------------------------------------------------
 // lagrange
 
-/// Weights and multipliers in units of `1/SCALE` of a promoted number (as `matchbound::lagrange`).
-const SCALE: i64 = 64;
-/// The damping of [`lagrange`]'s steps halves after this many steps without a lower bound.
-const STALL: usize = 80;
-/// Conflicts looked for at each step: of the optimum `Q`, then of `Q` without its largest member, and so on.
-const CONFLICTS_PER_STEP: usize = 12;
-
 /// A Lagrangian bound over nogoods with the GF(2) intersection as the inner problem, at the root: for multipliers
 /// `λ_N ≥ 0` on nogoods `N` (sets that cannot all be promoted, so every completion `F` has `|F ∩ N| ≤ |N| − 1`),
 /// the heaviest common independent set with each candidate weighing its number less the multipliers of the nogoods
@@ -794,4 +894,240 @@ fn lagrange<const W: usize>(n: u32, known: &Known, steps: usize) {
         list(&first),
         t0.elapsed().as_secs_f64(),
     );
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// whole
+
+/// The same bound for the whole game, with no frame model: an upper bound on `opt(n)` itself.
+///
+/// Give each number `s` of the board the vector `v(s)` with a 1 at each of its maximal factors (coordinates
+/// `1..=n/2`).  If `S` is playable, the vectors `{v(s) : s ∈ S} ∪ {e_s : s ∈ S, s ≤ n/2}` are independent: in a
+/// game's order each move pays with a maximal factor still in the pot (the lifting argument of Theorem 1), which
+/// is no maximal factor of an earlier move (that move would have taken it) and not in `S` (it is taken now), so
+/// the vectors restricted to the coordinates outside `S` are independent (the last-played member of a vanishing
+/// sum has a coordinate no other member has), which is the same as adding the unit vectors of `S`'s coordinates.
+/// A maximal factor of `s` has one prime factor fewer, so `v(s)` lies in the coordinates of the other parity of
+/// Ω than `s`, and `e_s` in those of `s`'s own: every number has one vector in the even coordinates and one in the
+/// odd (a number above `n/2` has none in its own parity, so it is free there).  The two halves make two linear
+/// matroids on `2..=n` in which every playable set is independent, and the heaviest common independent set bounds
+/// `opt(n)`.  The Franklín–Moniot matching bound is the same construction with Hall's condition for linear
+/// independence.  Checked: the bound is at least `opt(n)`, and the optimal game's moves are independent in both.
+fn whole(n: u32, known: &Known) {
+    let t0 = Instant::now();
+    let tables = taxman::numtheory::Tables::new(n);
+    let half = n as usize / 2;
+    let mut odd = vec![false; n as usize + 1]; // Ω(k) odd
+    for k in 2..=n as usize {
+        odd[k] = !odd[k / tables.spf[k] as usize];
+    }
+    let mut coord = vec![usize::MAX; half + 1];
+    let mut dims = [0usize; 2];
+    for (f, c) in coord.iter_mut().enumerate().skip(1) {
+        let q = usize::from(odd[f]);
+        *c = dims[q];
+        dims[q] += 1;
+    }
+    let words = [dims[0].div_ceil(64).max(1), dims[1].div_ceil(64).max(1)];
+    let mut ms = [0, 1].map(|q| BlockMatroid { block: Vec::new(), vecs: Vec::new(), words: vec![words[q]] });
+    let elems: Vec<u32> = (2..=n).collect();
+    for &s in &elems {
+        let own = usize::from(odd[s as usize]);
+        for (q, m) in ms.iter_mut().enumerate() {
+            let mut v = vec![0u64; words[q]];
+            if q != own {
+                for &f in &tables.max_factors[s as usize] {
+                    let c = coord[f as usize];
+                    v[c / 64] |= 1 << (c % 64);
+                }
+                m.block.push(0);
+                m.vecs.push(v);
+            } else if (s as usize) <= half {
+                let c = coord[s as usize];
+                v[c / 64] |= 1 << (c % 64);
+                m.block.push(0);
+                m.vecs.push(v);
+            } else {
+                m.words.push(1);
+                m.block.push(m.words.len() - 1);
+                m.vecs.push(vec![1]);
+            }
+        }
+    }
+    let w: Vec<i64> = elems.iter().map(|&s| i64::from(s)).collect();
+    let meet = intersect(&ms[0], &ms[1], &w, usize::MAX, false);
+    let opt = known.optimal.score(n);
+    if let Some(opt) = opt {
+        assert!(meet.value >= opt as i64, "n={n}: the whole-game bound {} is below opt {opt}", meet.value);
+    }
+    let independent = known.optimal.moves(n).map(|moves| {
+        let set: Vec<usize> = moves.iter().map(|&s| s as usize - 2).collect();
+        ms.iter().all(|m| {
+            let mut span = Span::new(m);
+            set.iter().all(|&e| {
+                let free = matches!(span.reduce(m, e), Reduced::Free);
+                if free {
+                    span.insert(m, e);
+                }
+                free
+            })
+        })
+    });
+    assert_ne!(independent, Some(false), "n={n}: the optimal game's moves are dependent");
+    println!(
+        "{{\"n\":{n},\"opt\":{},\"bound\":{},\"gap\":{},\"size\":{},\"moves\":{},\"seconds\":{:.3}}}",
+        opt.map_or("null".into(), |o| o.to_string()),
+        meet.value,
+        opt.map_or("null".into(), |o| (meet.value - o as i64).to_string()),
+        meet.chosen.iter().filter(|&&c| c).count(),
+        known.optimal.moves(n).map_or(0, <[u32]>::len),
+        t0.elapsed().as_secs_f64(),
+    );
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// cores
+
+/// What the GF(2) bound misses at the root: its heaviest set `Q` applied to the root's frames, the core of each
+/// frame that `Q` leaves unwinnable (the movers a peel cannot drop: each live factor of one is listed by
+/// another), how many of its movers have three or more live factors, and whether Lorea's hypergraphic matroid
+/// sees the core (some subset `Y` of it lists at most `|Y|` live factors, a ground factor added to a mover that
+/// lists one).  A core is independent over GF(2) here, since `Q` is.
+fn cores<const W: usize>(n: u32) {
+    let Some((_, p)) = setup::<W>(n) else { return };
+    let model = &p.model;
+    let g = model.graph();
+    let fm = frame_matroids(model, &p.root, &p.candidates);
+    let q: Bits<W> = fm.chosen(&fm.bound(p.max_total as usize));
+    let mut found = Vec::new();
+    for (h, f) in p.root.frames().iter().enumerate() {
+        let out: Bits<W> = q.iter().filter(|&x| model.home(x) == h).collect();
+        let live = f.factors - out;
+        let movers: Vec<u32> = f.moves.iter().chain(q.iter().filter(|&x| model.home(x) == h + 1)).collect();
+        let lists: Vec<Vec<u32>> = movers
+            .iter()
+            .map(|&u| g.factors(u).iter().map(|&y| u32::from(y)).filter(|&y| live.contains(y)).collect())
+            .collect();
+        let mut alive = vec![true; movers.len()];
+        loop {
+            let mut count: HashMap<u32, usize> = HashMap::new();
+            for (i, list) in lists.iter().enumerate().filter(|(i, _)| alive[*i]) {
+                let _ = i;
+                for &y in list {
+                    *count.entry(y).or_default() += 1;
+                }
+            }
+            let drop = (0..movers.len()).find(|&i| alive[i] && lists[i].iter().any(|y| count[y] == 1));
+            match drop {
+                Some(i) => alive[i] = false,
+                None => break,
+            }
+        }
+        let core: Vec<usize> = (0..movers.len()).filter(|&i| alive[i]).collect();
+        if core.is_empty() {
+            continue;
+        }
+        let wide = core.iter().filter(|&&i| lists[i].len() >= 3).count();
+        let promoted = core.iter().filter(|&&i| q.contains(movers[i])).count();
+        let core_lists: Vec<Vec<u32>> = core.iter().map(|&i| lists[i].clone()).collect();
+        let factors: std::collections::HashSet<u32> = core_lists.iter().flatten().copied().collect();
+        found.push(format!(
+            "{{\"frame\":{h},\"movers\":{},\"promoted\":{promoted},\"factors\":{},\"wide\":{wide},\"lorea\":{}}}",
+            core.len(),
+            factors.len(),
+            !lorea_independent(&core_lists)
+        ));
+    }
+    println!("{{\"n\":{n},\"cores\":[{}]}}", found.join(","));
+}
+
+/// Whether the lists (one per mover) are independent in Lorea's hypergraphic matroid, a ground factor added to
+/// each list of one: every nonempty subset `Y` lists at least `|Y| + 1` factors, which holds exactly when every
+/// mover, taken twice, still leaves a matching of the movers into their factors (Hall's condition with the + 1).
+fn lorea_independent(lists: &[Vec<u32>]) -> bool {
+    const GROUND: u32 = u32::MAX;
+    let lists: Vec<Vec<u32>> =
+        lists.iter().map(|l| if l.len() == 1 { vec![l[0], GROUND] } else { l.clone() }).collect();
+    (0..lists.len()).all(|twice| {
+        let movers: Vec<&Vec<u32>> = lists.iter().chain(std::iter::once(&lists[twice])).collect();
+        let mut mate: HashMap<u32, usize> = HashMap::new();
+        fn augment(
+            i: usize,
+            movers: &[&Vec<u32>],
+            mate: &mut HashMap<u32, usize>,
+            seen: &mut std::collections::HashSet<u32>,
+        ) -> bool {
+            for &y in movers[i] {
+                if seen.insert(y) {
+                    let free = match mate.get(&y) {
+                        None => true,
+                        Some(&j) => augment(j, movers, mate, seen),
+                    };
+                    if free {
+                        mate.insert(y, i);
+                        return true;
+                    }
+                }
+            }
+            false
+        }
+        (0..movers.len()).all(|i| augment(i, &movers, &mut mate, &mut std::collections::HashSet::new()))
+    })
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// forced
+
+/// Forced members at the nodes of a fixture (every `every`-th): the members `x` of the GF(2) bound's heaviest
+/// set without which the bound falls below what the node needs, found exactly (the intersection without `x`)
+/// and from a weight split of the heaviest set (`meet::split`: two greedy runs per member), with the split's
+/// looseness and cost.  The heaviest set is of any size here (the split is for that); the node's cap `max_add`
+/// is reported when it binds.
+fn forced<const W: usize>(path: &Path, every: usize) {
+    let (n, incumbent, units) = fixtures::read_nodes::<W>(path).expect("a fixture");
+    let (_, p) = setup::<W>(n).expect("a game with candidates");
+    let model = &p.model;
+    let mut scratch = Scratch::<W>::new();
+    let best = incumbent.sum();
+    for u in units.iter().filter(|u| !u.cands.is_empty()).step_by(every.max(1)) {
+        let state = model.promote_all_using(&mut scratch, &p.root, &u.promoted).expect("a node of the game");
+        let max_add = (p.max_total as i32 - u.promoted.len() as i32).min(state.max_promotions_among(&u.cands));
+        let fm = frame_matroids(model, &state, &u.cands);
+        let w: Vec<i64> = fm.elems.iter().map(|&x| i64::from(x)).collect();
+        let m = fm.solve(&w, usize::MAX);
+        let size = m.chosen.iter().filter(|&&c| c).count();
+        let need = (best + 1) as i64 - u.promoted.sum() as i64;
+        let t0 = Instant::now();
+        let w1 = split(&fm.a, &fm.b, &w, &m.chosen).expect("a split of the heaviest set");
+        let mut out = vec![false; w.len()];
+        let mut by_split = Vec::new();
+        for i in (0..w.len()).filter(|&i| m.chosen[i]) {
+            out[i] = true;
+            by_split.push((i, split_bound(&fm.a, &fm.b, &w, &w1, &out)));
+            out[i] = false;
+        }
+        let split_time = t0.elapsed();
+        let t1 = Instant::now();
+        let mut exact = Vec::new();
+        for &(i, _) in &by_split {
+            let mut wi = w.clone();
+            wi[i] = 0;
+            exact.push(fm.solve(&wi, usize::MAX).value);
+        }
+        let exact_time = t1.elapsed();
+        let forced_exact = exact.iter().filter(|&&v| v < need).count();
+        let forced_split = by_split.iter().filter(|&&(_, v)| v < need).count();
+        let loose: i64 = by_split.iter().zip(&exact).map(|(&(_, s), &e)| s - e).sum();
+        assert!(by_split.iter().zip(&exact).all(|(&(_, s), &e)| s >= e), "n={n}: the split's bound is below");
+        println!(
+            "{{\"n\":{n},\"depth\":{},\"value\":{},\"need\":{need},\"size\":{size},\"max_add\":{max_add},\
+             \"forced_exact\":{forced_exact},\"forced_split\":{forced_split},\"mean_looseness\":{:.1},\
+             \"split_s\":{:.6},\"exact_s\":{:.6}}}",
+            u.promoted.len(),
+            m.value,
+            loose as f64 / by_split.len().max(1) as f64,
+            split_time.as_secs_f64(),
+            exact_time.as_secs_f64(),
+        );
+    }
 }
