@@ -434,6 +434,7 @@ fn gf2_kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> R
         }
     });
     report.line("GF(2): reset + bound + forced (split)", count, cost, fp);
+    let before = b.stats();
     let (cost, fp) = measure(reps, |fp| {
         for &(promoted, cands, cap, _, conflict) in &nodes {
             b.reset(&promoted, &cands);
@@ -444,6 +445,16 @@ fn gf2_kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> R
         }
     });
     report.line("GF(2): bound without each conflict member", members, cost, fp);
+    if !report.brief {
+        let after = b.stats();
+        let (solves, augmentations) = (after.solves - before.solves, after.augmentations - before.augmentations);
+        let rounds = after.rounds - before.rounds;
+        println!(
+            "    (in this kernel {:.1} augmentations a solve, {:.2} Bellman-Ford rounds an augmentation)",
+            augmentations as f64 / solves.max(1) as f64,
+            rounds as f64 / augmentations.max(1) as f64
+        );
+    }
     Ok(())
 }
 
