@@ -1,9 +1,9 @@
-//! End-to-end tests of the per-game pipeline: whole ranges against `optimal.json` and the Java's own counts,
-//! tactic invariance, checkpoint and resume through the solver, and boards beyond `optimal.json`.
+//! End-to-end tests of the per-game pipeline: whole ranges against `optimal.json`, tactic invariance, checkpoint and
+//! resume through the solver, and boards beyond `optimal.json`.
 
 mod common;
 
-use common::TempDir;
+use common::{options, TempDir};
 use std::fs;
 use std::time::Duration;
 use taxman::bits::Bits;
@@ -11,19 +11,8 @@ use taxman::game::Optimal;
 use taxman::hives::Apiary;
 use taxman::json::Json;
 use taxman::numtheory::Tables;
-use taxman::results::{verify_files, Proof, Taint};
-use taxman::search::Revise;
+use taxman::results::{verify_files, Proof};
 use taxman::solver::{self, GameResult, Method, OptimalSource, SolveOptions};
-
-fn options(threads: usize) -> SolveOptions {
-    SolveOptions { threads, ..SolveOptions::default() }
-}
-
-/// Whether the Java derived game `n` without a search (`solve.accelerated` in the golden data).
-fn java_accelerated(n: u32) -> bool {
-    let json = common::golden(n);
-    json.get("solve").and_then(|s| s.get("accelerated")).and_then(Json::as_bool).expect("solve.accelerated")
-}
 
 fn solve_all(lo: u32, hi: u32, opts: &SolveOptions) -> Vec<GameResult> {
     let results = solver::solve_range(lo, hi, opts, None).unwrap_or_else(|e| panic!("{e}"));
@@ -32,7 +21,7 @@ fn solve_all(lo: u32, hi: u32, opts: &SolveOptions) -> Vec<GameResult> {
 }
 
 #[test]
-fn a_range_reproduces_optimal_json_and_the_javas_counts() {
+fn a_range_reproduces_optimal_json() {
     let optimal = Optimal::load_default().unwrap();
     let results = solve_all(1, 300, &options(2));
     for r in &results {
@@ -40,12 +29,6 @@ fn a_range_reproduces_optimal_json_and_the_javas_counts() {
         assert_eq!(Some(r.score), optimal.score(r.n), "n={}", r.n);
         assert_eq!(r.optimal_match, Some(true), "n={}", r.n);
         assert_eq!(r.prev_source.is_some(), r.n > 1, "n={}", r.n);
-    }
-    // The same games are derived without search as in the Java (146 of the first 200).
-    let derived = |r: &&GameResult| r.method.is_derived();
-    assert_eq!(results.iter().take(200).filter(derived).count(), 146);
-    for r in results.iter().take(200) {
-        assert_eq!(r.method.is_derived(), java_accelerated(r.n), "n={} ({})", r.n, r.method.as_str());
     }
     // A promotion is exactly a candidate that the game plays, however the game was found.
     for r in &results {
@@ -68,7 +51,6 @@ fn every_tactic_gives_the_same_scores() {
     let default = ("default".to_owned(), SolveOptions { force_search: true, ..options(1) });
     let variants = [default].into_iter().chain(
         [
-            "revise_freedoms=off",
             "seed_incumbent=off",
             "prev_cap=off",
             "match_refine=0",
@@ -85,7 +67,6 @@ fn every_tactic_gives_the_same_scores() {
             assert!(r.completed, "{name}: n={}", r.n);
             assert_eq!(Some(r.score), optimal.score(r.n), "{name}: n={}", r.n);
             assert_ne!(r.method, Method::Prime, "{name}: force_search skips the shortcuts (n={})", r.n);
-            assert_ne!(r.method, Method::Reuse, "{name}: force_search skips the shortcuts (n={})", r.n);
             assert_ne!(r.method, Method::Repeat, "{name}: force_search skips the shortcuts (n={})", r.n);
             assert_eq!(r.tactics.description(), name, "n={}", r.n);
         }
@@ -101,7 +82,6 @@ fn derivations_can_be_switched_off() {
             tactics: {
                 let mut t = taxman::tactics::Tactics::default();
                 t.set("prime_shortcut=off").unwrap();
-                t.set("reuse_prev=off").unwrap();
                 t.set("same_search=off").unwrap();
                 t
             },
@@ -158,7 +138,6 @@ fn run_stopped_and_resumed(name: &str, base: SolveOptions, n: u32) -> (Vec<GameR
         optimal: OptimalSource::None,
         ..base
     };
-    assert!(!limited.allow_tainted_prev);
     let summary = solver::solve_range_each(n, n + 1, &limited, Some(&results), |_| {}).unwrap();
     assert_eq!(summary.stopped_at, Some(n), "the node limit stops the search of {n}");
     assert!(limited.checkpoint_file(n).unwrap().exists());
@@ -175,62 +154,26 @@ fn run_stopped_and_resumed(name: &str, base: SolveOptions, n: u32) -> (Vec<GameR
     (games, text.lines().map(|line| Json::parse(line).unwrap()).collect())
 }
 
-/// What a results line says of the game's taint and of how frame 0's freedoms were set.
-fn taint_and_revise(line: &Json) -> (Vec<&str>, Option<&str>) {
-    let taint = line.get("taint").and_then(Json::as_arr).expect("taint").iter().filter_map(Json::as_str).collect();
-    (taint, line.get("setup").and_then(|s| s.get("revise")).and_then(Json::as_str))
+/// What a results line says of the game's taint.
+fn taint(line: &Json) -> Vec<&str> {
+    line.get("taint").and_then(Json::as_arr).expect("taint").iter().filter_map(Json::as_str).collect()
 }
 
-/// A strict run (`revise_freedoms` and `reuse_prev` off) rests on nothing unproven, whether its search ran in one
-/// piece or was stopped and resumed; so the next game builds on it with no `--allow-tainted-prev`.
+/// A game rests on nothing unproven whether its search ran in one piece or was stopped and resumed, and so does the
+/// next game, built on it.
 #[test]
-fn a_strict_game_resumed_from_its_checkpoint_rests_on_nothing_unproven() {
-    let (games, lines) = run_stopped_and_resumed("strict-resume", common::strict_options(1), 600);
+fn a_game_resumed_from_its_checkpoint_rests_on_nothing_unproven() {
+    let (games, lines) = run_stopped_and_resumed("resume", options(1), 600);
     let [resumed, next] = &games[..] else { panic!("{} games", games.len()) };
     assert_eq!((resumed.n, resumed.invocations), (600, 2), "600 was resumed, not started over");
-    assert_eq!(resumed.setup.map(|s| s.revise), Some(Revise::Off));
     assert!(resumed.taint.is_empty(), "{:?}", resumed.taint);
-    // 601 takes 600 as its predecessor, which a run with no unproven tactic on refuses if it rests on one.
+    // 601 takes 600 as its predecessor, and its proof rests on it.
     assert!(next.completed && next.proof == Some(Proof::PrimeFormula) && next.taint.is_empty(), "{next:?}");
 
     let [stopped, finished, prime] = &lines[..] else { panic!("{} lines", lines.len()) };
     assert_eq!(stopped.get("completed").and_then(Json::as_bool), Some(false));
     assert_eq!(finished.get("invocations").and_then(Json::as_u32), Some(2));
-    assert_eq!(taint_and_revise(finished), (vec![], Some("Off")));
-    assert_eq!(taint_and_revise(prime).0, Vec::<&str>::new());
-}
-
-/// With `revise_freedoms` on, a checkpoint's frame 0 may have revised freedoms, fewer than the built ones, and the
-/// checkpoint does not say how revising set them: 760's two-frame search lowers them, so the resumed game rests on
-/// the tactic, and so does the prime game built on it.
-#[test]
-fn a_game_resumed_with_revised_freedoms_rests_on_revise_freedoms() {
-    let (games, lines) = run_stopped_and_resumed("default-resume-revised", options(1), 760);
-    let [resumed, next] = &games[..] else { panic!("{} games", games.len()) };
-    assert_eq!((resumed.n, resumed.invocations), (760, 2), "760 was resumed, not started over");
-    assert_eq!(resumed.setup.map(|s| s.revise), Some(Revise::FromCheckpoint));
-    assert_eq!(resumed.taint, Taint::from(["revise_freedoms".to_owned()]));
-    assert_eq!(next.taint, resumed.taint, "761 rests on 760");
-
-    let [_, finished, prime] = &lines[..] else { panic!("{} lines", lines.len()) };
-    assert_eq!(taint_and_revise(finished), (vec!["revise_freedoms"], Some("FromCheckpoint")));
-    assert_eq!(taint_and_revise(prime).0, ["revise_freedoms"]);
-}
-
-/// With `revise_freedoms` on, a checkpoint whose frame 0 has the freedoms it was built with (600's revision changes
-/// nothing) holds a search that does not rest on the tactic, whatever revising did: the resumed game rests on
-/// nothing unproven, as one that ran in one piece.
-#[test]
-fn a_game_resumed_with_the_built_freedoms_rests_on_nothing_unproven() {
-    let (games, lines) = run_stopped_and_resumed("default-resume-built", options(1), 600);
-    let [resumed, next] = &games[..] else { panic!("{} games", games.len()) };
-    assert_eq!((resumed.n, resumed.invocations), (600, 2), "600 was resumed, not started over");
-    assert_eq!(resumed.setup.map(|s| s.revise), Some(Revise::ResumedAsBuilt));
-    assert!(resumed.taint.is_empty() && next.taint.is_empty(), "{:?} {:?}", resumed.taint, next.taint);
-
-    let [_, finished, prime] = &lines[..] else { panic!("{} lines", lines.len()) };
-    assert_eq!(taint_and_revise(finished), (vec![], Some("ResumedAsBuilt")));
-    assert_eq!(taint_and_revise(prime).0, Vec::<&str>::new());
+    assert!(taint(finished).is_empty() && taint(prime).is_empty());
 }
 
 #[test]
@@ -242,17 +185,10 @@ fn a_checkpoint_for_another_game_or_other_tactics_is_refused() {
     assert!(!solver::solve_game_with(600, None, &opts, Some(&optimal)).unwrap().completed);
     let checkpoint = dir.0.join("n0600.ckpt");
 
-    // Other tactics: each of the six search tactics (a checkpoint records them all), the switches turned the other
+    // Other tactics: each of the five search tactics (a checkpoint records them all), the switches turned the other
     // way and `match_refine` changed.
-    let assignments = [
-        "revise_freedoms=off",
-        "fix_forced=off",
-        "nogoods=off",
-        "forget_nogoods=off",
-        "lagrange=off",
-        "match_refine=0",
-        "match_refine=2",
-    ];
+    let assignments =
+        ["fix_forced=off", "nogoods=off", "forget_nogoods=off", "lagrange=off", "match_refine=0", "match_refine=2"];
     for assignment in assignments {
         let mut other = opts.clone();
         other.tactics.set(assignment).unwrap();

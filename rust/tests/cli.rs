@@ -51,10 +51,11 @@ fn help_lists_the_commands_and_every_tactic() {
             "extend-optimal RESULTS --out FILE",
             "tables N K...",
             "--history FILE",
-            "--strict",
-            "--tactic reuse_prev=off --tactic revise_freedoms=off",
         ] {
             assert!(run.stdout.contains(text), "{args:?}: no {text:?}");
+        }
+        for gone in ["--strict", "--allow-tainted-prev"] {
+            assert!(!run.stdout.contains(gone), "{args:?}: the help still has {gone:?}");
         }
         for name in taxman::tactics::Tactics::names() {
             assert!(run.stdout.contains(name), "{args:?}: the help does not name the tactic {name}");
@@ -74,6 +75,10 @@ fn bad_command_lines_are_usage_errors() {
     assert_usage_error(&["solve", "12", "--tactic", "sparkle=on"], "unknown tactic");
     assert_usage_error(&["solve", "12", "--threads", "0"], "--threads must be at least 1");
     assert_usage_error(&["solve", "12", "--nope"], "unknown option --nope");
+    assert_usage_error(&["solve", "12", "--strict"], "unknown option --strict");
+    assert_usage_error(&["solve", "12", "--allow-tainted-prev"], "unknown option --allow-tainted-prev");
+    assert_usage_error(&["regress", "--strict"], "unknown option --strict");
+    assert_usage_error(&["bench", "--strict"], "unknown option --strict");
     assert_usage_error(&["solve", "12", "--time-limit", "-1"], "not a number of seconds");
     assert_usage_error(&["solve", "12", "--node-limit", "many"], "cannot read");
     assert_usage_error(&["regress", "12"], "regress takes no positional arguments");
@@ -89,7 +94,6 @@ fn bad_command_lines_are_usage_errors() {
     assert_usage_error(&["extend-optimal", "a", "b", "--out", "c"], "usage: extend-optimal RESULTS --out FILE");
     assert_usage_error(&["extend-optimal", "a"], "extend-optimal needs --out FILE");
     assert_usage_error(&["extend-optimal", "a", "--out", "b", "--optimal", "none"], "--optimal none makes no sense");
-    assert_usage_error(&["extend-optimal", "a", "--out", "b", "--strict"], "unknown option --strict");
 }
 
 #[test]
@@ -160,11 +164,11 @@ fn write_table(dir: &Path, name: &str, count: usize) -> String {
 }
 
 /// Solves `range` into the results file `name` in `dir` with no table (so that every game is chained from the
-/// one before, or standalone) and returns the file's path; `tactics` are added to the command line.
-fn solve_into(dir: &Path, name: &str, range: &str, tactics: &[&str]) -> String {
+/// one before, or standalone) and returns the file's path.
+fn solve_into(dir: &Path, name: &str, range: &str) -> String {
     let file = dir.join(name);
     let args = ["solve", range, "--threads", "1", "--progress", "0", "--optimal", "none", "--out", path(&file)];
-    let run = taxman(&[&args[..], tactics].concat());
+    let run = taxman(&args);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     path(&file).to_owned()
 }
@@ -208,7 +212,7 @@ fn extended_text(kept: &str, results: &str, first: u32, last: u32) -> String {
 #[test]
 fn extend_optimal_with_nothing_to_add_writes_the_table_back_byte_for_byte() {
     let dir = TempDir::new("extend-nothing");
-    let results = solve_into(&dir, "r.jsonl", "1-12", &["--strict"]);
+    let results = solve_into(&dir, "r.jsonl", "1-12");
     let out = dir.join("out.json");
     let run = taxman(&["extend-optimal", &results, "--out", path(&out)]);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
@@ -230,7 +234,7 @@ fn extend_optimal_with_nothing_to_add_writes_the_table_back_byte_for_byte() {
 fn extend_optimal_appends_the_games_that_continue_the_table() {
     let dir = TempDir::new("extend-appends");
     let table = write_table(&dir, "mini.json", 12);
-    let results = solve_into(&dir, "r.jsonl", "1-20", &["--strict"]);
+    let results = solve_into(&dir, "r.jsonl", "1-20");
     let out = dir.join("out.json");
     let run = taxman(&["extend-optimal", &results, "--optimal", &table, "--out", path(&out)]);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
@@ -259,7 +263,7 @@ fn extend_optimal_appends_the_games_that_continue_the_table() {
 fn extend_optimal_writes_over_the_table_only_when_asked_to_by_name() {
     let dir = TempDir::new("extend-in-place");
     let table = write_table(&dir, "table.json", 12);
-    let results = solve_into(&dir, "r.jsonl", "1-14", &["--strict"]);
+    let results = solve_into(&dir, "r.jsonl", "1-14");
     let run = taxman(&["extend-optimal", &results, "--optimal", &table, "--out", &table]);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     assert_eq!(fs::read_to_string(&table).unwrap(), extended_text(&table_text(12), &results, 13, 14));
@@ -284,22 +288,25 @@ fn extend_optimal_stops_at_the_first_game_that_is_not_proven_or_not_there() {
     };
     let kept = table_text(12);
 
-    // A game that rests on an unproven tactic: with the defaults, 18 is derived by reuse_prev.
-    let tainted = solve_into(&dir, "tainted.jsonl", "1-20", &[]);
-    let run = extend(&tainted);
+    // A game that rests on something unproven: 33 is built on optimal.json's game of 32, and reaches its cap.
+    let table32 = write_table(&dir, "table32.json", 32);
+    let tainted = dir.join("tainted.jsonl");
+    let run = taxman(&["solve", "33-40", "--threads", "1", "--progress", "0", "--out", path(&tainted)]);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
-    assert!(run.stdout.contains("added 5 games (n = 13..=17)"), "{}", run.stdout);
+    let run = taxman(&["extend-optimal", path(&tainted), "--optimal", &table32, "--out", path(&out)]);
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    assert!(run.stdout.contains("added no games"), "{}", run.stdout);
     assert!(
-        run.stdout.contains("stopped at n = 18: its proof rests on something unproven (reuse_prev)"),
+        run.stdout.contains("stopped at n = 33: its proof rests on something unproven (optimal.json)"),
         "{}",
         run.stdout
     );
-    assert_eq!(fs::read_to_string(&out).unwrap(), extended_text(&kept, &tainted, 13, 17));
+    assert_eq!(fs::read_to_string(&out).unwrap(), table_text(32));
 
     // A search that a limit stopped: the file ends with one of 16 ...
-    let strict = solve_into(&dir, "strict.jsonl", "1-20", &["--strict"]);
+    let chain = solve_into(&dir, "strict.jsonl", "1-20");
     let unfinished = dir.join("unfinished.jsonl");
-    fs::write(&unfinished, results_cut_after(&strict, 15, &[incomplete_line(16)])).unwrap();
+    fs::write(&unfinished, results_cut_after(&chain, 15, &[incomplete_line(16)])).unwrap();
     let run = extend(path(&unfinished));
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     assert!(run.stdout.contains("added 3 games (n = 13..=15)"), "{}", run.stdout);
@@ -308,10 +315,10 @@ fn extend_optimal_stops_at_the_first_game_that_is_not_proven_or_not_there() {
         "{}",
         run.stdout
     );
-    assert_eq!(fs::read_to_string(&out).unwrap(), extended_text(&kept, &strict, 13, 15));
+    assert_eq!(fs::read_to_string(&out).unwrap(), extended_text(&kept, &chain, 13, 15));
 
     // ... and the same file after the run was resumed: the completed game of 16 is the game.
-    let text = fs::read_to_string(&strict).unwrap();
+    let text = fs::read_to_string(&chain).unwrap();
     let lines: Vec<&str> = text.lines().collect();
     let resumed = dir.join("resumed.jsonl");
     let resumed_text = [&lines[..15], &[&incomplete_line(16).to_string()], &lines[15..]].concat().join("\n");
@@ -319,10 +326,10 @@ fn extend_optimal_stops_at_the_first_game_that_is_not_proven_or_not_there() {
     let run = extend(path(&resumed));
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     assert!(run.stdout.contains("added 8 games (n = 13..=20)"), "{}", run.stdout);
-    assert_eq!(fs::read_to_string(&out).unwrap(), extended_text(&kept, &strict, 13, 20));
+    assert_eq!(fs::read_to_string(&out).unwrap(), extended_text(&kept, &chain, 13, 20));
 
     // A gap: the file has a game of 20 solved on its own, and nothing between 12 and it.
-    let gap = solve_into(&dir, "gap.jsonl", "20", &["--strict"]);
+    let gap = solve_into(&dir, "gap.jsonl", "20");
     let run = extend(&gap);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     assert!(run.stdout.contains("added no games"), "{}", run.stdout);
@@ -334,7 +341,7 @@ fn extend_optimal_stops_at_the_first_game_that_is_not_proven_or_not_there() {
 #[test]
 fn extend_optimal_refuses_what_it_cannot_trust() {
     let dir = TempDir::new("extend-refuses");
-    let results = solve_into(&dir, "r.jsonl", "1-20", &["--strict"]);
+    let results = solve_into(&dir, "r.jsonl", "1-20");
     let out = dir.join("out.json");
 
     // Results that score a board size differently from the table: not the same game, or one of them is wrong.
@@ -429,9 +436,10 @@ fn regress_checks_scores_against_optimal_json() {
     assert!(run.stdout.contains("solved 1..=40 (1 threads, tactics default)"), "{}", run.stdout);
     assert!(run.stdout.contains("40 games match optimal.json, 0 do not, 0 are not in it"), "{}", run.stdout);
 
-    let run = taxman(&["regress", "--from", "30", "--to", "34", "--threads", "1", "--tactic", "reuse_prev=off"]);
+    let run = taxman(&["regress", "--from", "30", "--to", "34", "--threads", "1", "--tactic", "match_refine=0"]);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
-    assert!(run.stdout.contains("solved 30..=34 (1 threads, tactics reuse_prev=off)"), "{}", run.stdout);
+    assert!(run.stdout.contains("solved 30..=34 (1 threads, tactics match_refine=0)"), "{}", run.stdout);
+    assert!(run.stdout.contains("by method: trivial "), "{}", run.stdout);
 
     // A score that differs is reported with its board size, and the exit code says so.
     let dir = TempDir::new("regress");
@@ -442,36 +450,6 @@ fn regress_checks_scores_against_optimal_json() {
     assert!(run.stdout.contains("MISMATCH n=10: scored 40 but optimal.json says 41"), "{}", run.stdout);
     assert!(run.stdout.contains("11 games match optimal.json, 1 do not"), "{}", run.stdout);
     assert!(run.stderr.contains("1 scores differ from optimal.json"), "{}", run.stderr);
-}
-
-#[test]
-fn strict_stands_for_the_two_tactic_flags() {
-    let strict = ["reuse_prev=off", "revise_freedoms=off"];
-    let tactics = ["--tactic", strict[0], "--tactic", strict[1]];
-    let run = taxman(&["regress", "--from", "30", "--to", "34", "--threads", "1", "--strict"]);
-    assert_eq!(run.code, Some(0), "{}", run.stderr);
-    assert!(
-        run.stdout.contains("solved 30..=34 (1 threads, tactics reuse_prev=off,revise_freedoms=off)"),
-        "{}",
-        run.stdout
-    );
-    // The same results lines as with the two flags, tactics and all.
-    let dir = TempDir::new("strict");
-    let (short, long) = (dir.join("strict.jsonl"), dir.join("flags.jsonl"));
-    let args = |out: &Path, tactics: &[&str]| {
-        let mut args = vec!["solve", "1-12", "--threads", "1", "--out", path(out)];
-        args.extend_from_slice(tactics);
-        taxman(&args)
-    };
-    assert_eq!(args(&short, &["--strict"]).code, Some(0));
-    assert_eq!(args(&long, &tactics).code, Some(0));
-    let tactics_of = |file: &Path| -> Vec<(String, String)> {
-        let text = fs::read_to_string(file).unwrap();
-        let lines = text.lines().map(|line| Json::parse(line).unwrap());
-        lines.map(|j| (j.get("tactics").unwrap().to_string(), j.get("tactic_switches").unwrap().to_string())).collect()
-    };
-    assert_eq!(tactics_of(&short), tactics_of(&long));
-    assert!(tactics_of(&short).iter().all(|(description, _)| description == "\"reuse_prev=off,revise_freedoms=off\""));
 }
 
 #[test]

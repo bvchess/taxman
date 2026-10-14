@@ -20,7 +20,7 @@ use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::engine::{self, Ctx, EngineConfig, Poll, Searcher, Start, Unit};
 use taxman::json::Json;
-use taxman::search::{self, Revise, SearchTactics, TaxUnit};
+use taxman::search::{self, SearchTactics, TaxUnit};
 use taxman::solver::{self, OptimalSource, SolveOptions};
 
 // ------------------------------------------------------------------------------------------------------------
@@ -406,7 +406,7 @@ fn a_locked_directory_is_refused() {
 /// Game `n` from the frame builder (at width 16), prepared with the default tactics.
 fn prepared_game(n: u32) -> (Board<16>, search::Prepared<16>) {
     let board = Board::<16>::for_n(n);
-    let prepared = board.prepare(SearchTactics::default(), 1).unwrap();
+    let prepared = board.prepare(SearchTactics::default()).unwrap();
     (board, prepared)
 }
 
@@ -432,7 +432,7 @@ fn a_resumed_search_already_at_its_cap_finishes_at_once() {
     for keep in [false, true] {
         let (board, cfg) = stopped_search(&ckpt);
         let head = engine::read_checkpoint(&ckpt).unwrap();
-        let resumed = board.prepare_for_resume(&ckpt, 1).unwrap();
+        let resumed = board.prepare_for_resume(&ckpt).unwrap();
         let cfg = EngineConfig { keep_completed_checkpoint: keep, ..cfg };
         let r = search::search(&resumed, &cfg, None, Some(head.best), true).unwrap();
         assert!(r.completed && r.reached_cap && r.sum >= head.best, "keep {keep}: {r:?}");
@@ -461,7 +461,7 @@ fn a_checkpoint_whose_incumbent_does_not_fit_is_refused() {
     let (board, cfg) = stopped_search(&ckpt);
     let header = engine::read_checkpoint_header(&ckpt).unwrap();
     let real = engine::read_checkpoint(&ckpt).unwrap();
-    let resumed = board.prepare_for_resume(&ckpt, 1).unwrap();
+    let resumed = board.prepare_for_resume(&ckpt).unwrap();
     let words = |set: Bits<16>| set.as_words().iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>();
     let not_a_candidate = (1..600).find(|&x| !board.candidates().contains(x)).unwrap();
     let cases = [
@@ -485,13 +485,12 @@ fn options(dir: &Path) -> SolveOptions {
     SolveOptions { threads: 1, checkpoint_dir: Some(dir.to_path_buf()), force_search: true, ..SolveOptions::default() }
 }
 
-/// Games 140 and 141 have the same candidates and (without `revise_freedoms`) the same frame 0, but other
-/// frames: before checkpoints recorded the board size and the frames, 140's was resumed as 141's.
+/// Games 140 and 141 have the same candidates and the same frame 0, but other frames: before checkpoints recorded the
+/// board size and the frames, 140's was resumed as 141's.
 #[test]
 fn a_checkpoint_renamed_to_another_game_is_refused() {
     let dir = TempDir::new("renamed");
-    let mut opts = SolveOptions { time_limit: Some(Duration::ZERO), optimal: OptimalSource::None, ..options(&dir.0) };
-    opts.tactics.set("revise_freedoms=off").unwrap();
+    let opts = SolveOptions { time_limit: Some(Duration::ZERO), optimal: OptimalSource::None, ..options(&dir.0) };
     assert!(!solver::solve_game(140, None, &opts).unwrap().completed);
     fs::copy(dir.join("n0140.ckpt"), dir.join("n0141.ckpt")).unwrap();
     let err = solver::solve_game(141, None, &opts).unwrap_err();
@@ -518,42 +517,33 @@ fn forge_header(path: &Path, edit: impl FnOnce(&mut [u8])) {
     fs::write(path, bytes).unwrap();
 }
 
-/// Changes the search's header in the checkpoint `path` to say that frame 0 has `freedoms` and the search
-/// `max_total` promotions at most: a forgery that only the check of frame 0 against the frames can see.
-fn forge_frame_zero(path: &Path, freedoms: i32, max_total: u32) {
+/// Changes the search's header in the checkpoint `path` to say that frame 0 has `freedoms`: a forgery that only the
+/// check of frame 0 against the frames can see.
+fn forge_frame_zero(path: &Path, freedoms: i32) {
     forge_header(path, |header| {
-        // Frame 0's freedoms are at 33, after a byte that says there is a frame 0, and max_total at 37.
+        // Frame 0's freedoms are at 33, after a byte that says there is a frame 0.
         assert_eq!(header[32], 1);
         header[33..37].copy_from_slice(&freedoms.to_le_bytes());
-        header[37..41].copy_from_slice(&max_total.to_le_bytes());
     });
 }
 
-/// A checkpoint whose frame 0 has freedoms its search cannot have had is refused, naming frame 0: other than the
-/// built ones with `revise_freedoms` off, since nothing else changes them; more than the built ones, or fewer than
-/// 0, with it on, since revising sets them to a number of promotions into frame 0.  (Resuming with forged ones
-/// once finished a strict game as exhausted, clean, and with a score below the optimum.)
+/// A checkpoint whose frame 0 has other freedoms than the built ones is refused, naming frame 0: nothing changes
+/// them, so its search cannot have had them.  (Resuming with forged ones once finished a game as exhausted, clean,
+/// and with a score below the optimum.)
 #[test]
 fn a_checkpoint_whose_frame_zero_its_search_cannot_have_had_is_refused() {
     let n = 300;
     let board = Board::<8>::for_n(n);
     let dir = TempDir::new("frame0");
-    let default = SolveOptions { time_limit: Some(Duration::ZERO), optimal: OptimalSource::None, ..options(&dir.0) };
-    let mut strict = default.clone();
-    strict.tactics.set("revise_freedoms=off").unwrap();
+    let opts = SolveOptions { time_limit: Some(Duration::ZERO), optimal: OptimalSource::None, ..options(&dir.0) };
     let checkpoint = dir.join("n0300.ckpt");
-    for opts in [&strict, &default] {
-        let built = board.prepare(opts.tactics.search, 1).unwrap().unrevised;
-        let f0 = built.frames()[0].freedoms;
-        let forgeries = if opts.tactics.search.revise_freedoms { [f0 + 1, f0 + 1000, -1] } else { [f0 - 1, f0 + 1, 0] };
-        for forged in forgeries {
-            assert!(!solver::solve_game(n, None, opts).unwrap().completed);
-            let max_total = built.with_frame_zero_freedoms(forged).max_promotions_among(&board.candidates());
-            forge_frame_zero(&checkpoint, forged, max_total.max(0) as u32);
-            let err = solver::solve_game(n, None, opts).unwrap_err();
-            assert!(err.contains(&format!("frame 0's freedoms are {forged}, not the {f0} ")), "{err}");
-            fs::remove_file(&checkpoint).unwrap();
-        }
+    let f0 = board.prepare(opts.tactics.search).unwrap().root.frames()[0].freedoms;
+    for forged in [f0 - 1, f0 + 1, 0] {
+        assert!(!solver::solve_game(n, None, &opts).unwrap().completed);
+        forge_frame_zero(&checkpoint, forged);
+        let err = solver::solve_game(n, None, &opts).unwrap_err();
+        assert!(err.contains(&format!("frame 0's freedoms are {forged}, not the {f0} ")), "{err}");
+        fs::remove_file(&checkpoint).unwrap();
     }
 }
 
@@ -585,19 +575,6 @@ fn a_checkpoint_made_with_a_removed_tactic_is_refused() {
         assert!(err.contains(part), "{part}: {err}");
     }
     assert!(checkpoint.exists(), "a refused checkpoint is left alone");
-}
-
-/// Game 1225's `revise_freedoms` searches a two-frame game of about 4300 nodes: a node limit stops that search,
-/// and the game stops before its own search, with nothing to resume from.
-#[test]
-fn a_limit_also_stops_the_search_of_revise_freedoms() {
-    let dir = TempDir::new("revise");
-    let opts = SolveOptions { node_limit: Some(1), optimal: OptimalSource::None, ..options(&dir.0) };
-    let r = solver::solve_game(1225, None, &opts).unwrap();
-    assert!(!r.completed && r.score > 0);
-    let setup = r.setup.expect("a searched game has a setup");
-    assert!(matches!(setup.revise, Revise::Stopped { nodes } if nodes < 4000), "{setup:?}");
-    assert!(!dir.join("n1225.ckpt").exists());
 }
 
 // ------------------------------------------------------------------------------------------------------------

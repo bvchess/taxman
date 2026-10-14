@@ -11,7 +11,7 @@ import argparse
 import subprocess
 import time
 
-from common import CHAIN, HERE, INVOCATION_BUDGET, SOLVE_STRICT, TAXMAN, Budget, load_jsonl, log_load
+from common import CHAIN, HERE, INVOCATION_BUDGET, TAXMAN, Budget, load_jsonl, log_load
 
 
 def main():
@@ -26,11 +26,10 @@ def main():
 
     budget = Budget(args.budget)
     log_load(f"chain start (budget {args.budget} s)")
-    # The chain starts from optimal.json's game of 1000, which rests on unproven tactics; the games whose proofs
-    # rest on it are marked so in their lines.
+    # The chain starts from optimal.json's game of 1000; the games whose proofs rest on it say so in their lines.
     cmd = [
-        str(TAXMAN), "solve", f"{args.first}-{args.last}", "--threads", str(args.threads), *SOLVE_STRICT,
-        "--allow-tainted-prev", "--out", args.out, "--checkpoint-dir", args.checkpoint_dir, "--progress", "0",
+        str(TAXMAN), "solve", f"{args.first}-{args.last}", "--threads", str(args.threads),
+        "--out", args.out, "--checkpoint-dir", args.checkpoint_dir, "--progress", "0",
     ]
     proc = subprocess.Popen(cmd)
     while proc.poll() is None and budget.left() > 3:

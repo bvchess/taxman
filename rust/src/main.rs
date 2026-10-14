@@ -25,8 +25,6 @@ commands:
       --threads K             worker threads (default: all cores)
       --tactic NAME=VALUE      set a tactic (repeatable).  A switch is on or off, match_refine is 0-{max_refine}.
                                Names: {tactics}
-      --strict                 no unproven tactic: the same as {strict}
-                               (a --tactic given as well is applied after it)
       --out FILE              append each result as a JSON line; games already completed in FILE are skipped
       --checkpoint-dir DIR     keep a resumable checkpoint nNNNN.ckpt per game in DIR
       --checkpoint-interval S  seconds between checkpoints (default 60)
@@ -37,15 +35,13 @@ commands:
                                a second one kills the process.  One process at a time uses a checkpoint DIR.
       --mem-cap UNITS          search units kept in memory before spilling to disk
       --force-search           search even where the previous game or an earlier search gives the answer
-      --allow-tainted-prev     with no unproven tactic on, still build on a previous game whose proof rests on
-                               something unproven (optimal.json's games do); the results that rest on it say so
       --optimal FILE           optimal.json to compare with and to take previous games from (none: no file);
                                by default $TAXMAN_OPTIMAL, else src/main/resources/optimal.json of the repository,
                                found from the working directory or from this program
       --show                   print each game's promotions and moves
-  regress [--from A] [--to N] [--threads K] [--tactic ...] [--strict]
+  regress [--from A] [--to N] [--threads K] [--tactic ...]
                           solve A..N (default 1..400) in memory and check every score against optimal.json
-  bench [--threads K] [--tactic ...] [--strict] [--history FILE] [--known FILE] [N ...]
+  bench [--threads K] [--tactic ...] [--history FILE] [--known FILE] [N ...]
                           time the benchmark games (default 936 1050 1100 1133 1170 1184), each on its own
                           with the previous game from optimal.json or past it from the results file --known
                           (default rust/results/strict.jsonl), and no derivation; appends the run to
@@ -65,11 +61,8 @@ commands:
 /// [`USAGE`] with the tactics' names and values, which the solver defines.
 fn usage() -> String {
     let rows: Vec<String> = Tactics::names().chunks(4).map(|row| row.join(", ")).collect();
-    let off: Vec<String> = Tactics::default().unproven_on().iter().map(|name| format!("--tactic {name}=off")).collect();
-    let strict_flags = off.join(" ");
     USAGE
         .replace("{tactics}", &rows.join(&format!(",\n{:31}", "")))
-        .replace("{strict}", &strict_flags)
         .replace("{max_refine}", &SearchTactics::MAX_MATCH_REFINE.to_string())
 }
 

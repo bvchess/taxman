@@ -1,17 +1,14 @@
 //! The tactics: every piece of the algorithm that can be switched, with its name, value and default.
 //!
 //! A *tactic* is one choice the solver makes that has a measurable effect on the answers' proof or on the time
-//! they take: a shortcut (`prime_shortcut`, `reuse_prev`, `same_search`), or a way to bound or prune the search
-//! (`match_refine`, `nogoods`, `lagrange`, ...).  DESIGN.md's table of tactics ("Tactics") grades each as proven,
-//! sound, unproven or unsound and says what it does; this module is the one place in the code that knows their
-//! names.  The ones that act inside the search are [`SearchTactics`]; the others are only used by the per-game
-//! pipeline ([`crate::solver`]).
+//! they take: a shortcut (`prime_shortcut`, `same_search`), or a way to bound or prune the search
+//! (`match_refine`, `nogoods`, `lagrange`, ...).  DESIGN.md's table of tactics ("Tactics") grades each as proven or
+//! sound and says what it does; this module is the one place in the code that knows their names.  The ones that act
+//! inside the search are [`SearchTactics`]; the others are only used by the per-game pipeline ([`crate::solver`]).
 //!
 //! A tactic has a value: an on/off switch, or the depth of `match_refine` ([`Setting`]).  [`Tactics::set`]
 //! reads `name=value` (what `--tactic` takes), [`Tactics::description`] writes the changes from the defaults in
-//! the same form, and a result line records both that and every value ([`Tactics::to_json`]).  A run is *strict*
-//! when no *unproven* tactic is on ([`Tactics::unproven_on`]): then its answers rest on nothing unproven but the
-//! frame model.
+//! the same form, and a result line records both that and every value ([`Tactics::to_json`]).
 
 use crate::json::Json;
 use crate::search::SearchTactics;
@@ -24,9 +21,6 @@ pub struct Tactics {
     pub search: SearchTactics,
     /// A prime `n` plays the game of `n − 1` with its first move replaced by `n` (proven).
     pub prime_shortcut: bool,
-    /// Accept the game made of the previous game's promotions without a search, if it scores what the previous
-    /// game suggests (unproven).
-    pub reuse_prev: bool,
     /// Conclude a game whose search problem an earlier game of the chain already solved with that game's
     /// promotions, without a search (proven, given the earlier game's proof; see `crate::solver`).
     pub same_search: bool,
@@ -42,7 +36,6 @@ impl Default for Tactics {
         Tactics {
             search: SearchTactics::default(),
             prime_shortcut: true,
-            reuse_prev: true,
             same_search: true,
             prev_cap: true,
             seed_incumbent: true,
@@ -50,12 +43,8 @@ impl Default for Tactics {
     }
 }
 
-/// The tactics whose answers are not proven to equal the true optimum (`reuse_prev` and `revise_freedoms` are
-/// conjecture-grade).  Every other tactic, `match_refine` among them, is sound or proven.
-pub const UNPROVEN: [&str; 2] = ["reuse_prev", "revise_freedoms"];
-
 /// The number of tactics.
-pub const TACTIC_COUNT: usize = 11;
+pub const TACTIC_COUNT: usize = 9;
 
 /// The value of a tactic: an on/off switch, or the depth of `match_refine`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -124,9 +113,7 @@ impl Tactics {
     fn slots_mut(&mut self) -> [(&'static str, Slot<'_>); TACTIC_COUNT] {
         [
             ("prime_shortcut", Slot::Switch(&mut self.prime_shortcut)),
-            ("reuse_prev", Slot::Switch(&mut self.reuse_prev)),
             ("same_search", Slot::Switch(&mut self.same_search)),
-            ("revise_freedoms", Slot::Switch(&mut self.search.revise_freedoms)),
             ("match_refine", Slot::MatchRefine(&mut self.search.match_refine)),
             ("fix_forced", Slot::Switch(&mut self.search.fix_forced)),
             ("nogoods", Slot::Switch(&mut self.search.nogoods)),
@@ -174,22 +161,6 @@ impl Tactics {
         }
     }
 
-    /// These tactics with every unproven one ([`UNPROVEN`]) turned off: the tactics of a *strict* run, what
-    /// `--strict` asks for.
-    #[must_use]
-    pub fn strict(mut self) -> Self {
-        for name in UNPROVEN {
-            self.set(&format!("{name}=off")).expect("UNPROVEN names switches");
-        }
-        self
-    }
-
-    /// The unproven switches that are on (see [`UNPROVEN`]); a run with none of them on is *strict*.
-    pub fn unproven_on(&self) -> Vec<&'static str> {
-        let on = |name: &str, value: Setting| value == Setting::Switch(true) && UNPROVEN.contains(&name);
-        self.settings().into_iter().filter(|&(name, value)| on(name, value)).map(|(name, _)| name).collect()
-    }
-
     /// All tactics, by name, as a JSON object: booleans for the switches and a number for `match_refine`.
     pub fn to_json(&self) -> Json {
         Json::object(self.settings().map(|(name, value)| (name, value.to_json())))
@@ -204,14 +175,11 @@ mod tests {
     fn tactics_defaults_and_settings() {
         let t = Tactics::default();
         assert_eq!(t.description(), "default");
-        assert!(t.unproven_on().eq(&["reuse_prev", "revise_freedoms"]));
         assert_eq!(
             Tactics::names(),
             [
                 "prime_shortcut",
-                "reuse_prev",
                 "same_search",
-                "revise_freedoms",
                 "match_refine",
                 "fix_forced",
                 "nogoods",
@@ -222,26 +190,10 @@ mod tests {
             ]
         );
         let values: Vec<String> = t.settings().iter().map(|s| s.1.to_string()).collect();
-        let expected = ["on", "on", "on", "on", "1", "on", "on", "on", "on", "on", "on"];
+        let expected = ["on", "on", "1", "on", "on", "on", "on", "on", "on"];
         assert_eq!(values, expected);
         // The values of the search tactics are those of `SearchTactics::default()`, not copies of them.
         assert_eq!(t.search, SearchTactics::default());
-    }
-
-    #[test]
-    fn strict_turns_off_exactly_the_unproven_tactics() {
-        let strict = Tactics::default().strict();
-        assert!(strict.unproven_on().is_empty());
-        assert_eq!(strict.description(), "reuse_prev=off,revise_freedoms=off");
-        // The two flags it stands for give the same tactics, and it leaves the sound ones as they are.
-        let mut by_hand = Tactics::default();
-        by_hand.set("reuse_prev=off").unwrap();
-        by_hand.set("revise_freedoms=off").unwrap();
-        assert_eq!(strict, by_hand);
-        let mut other = Tactics::default();
-        other.set("match_refine=0").unwrap();
-        other.set("nogoods=off").unwrap();
-        assert_eq!(other.strict().description(), "reuse_prev=off,revise_freedoms=off,match_refine=0,nogoods=off");
     }
 
     #[test]
@@ -252,10 +204,6 @@ mod tests {
         t.set("prev_cap=off").unwrap();
         assert!(!t.search.nogoods && !t.search.lagrange && !t.prev_cap);
         assert_eq!(t.description(), "nogoods=off,lagrange=off,prev_cap=off");
-        assert!(t.unproven_on().eq(&["reuse_prev", "revise_freedoms"]));
-        t.set("reuse_prev=off").unwrap();
-        t.set("revise_freedoms=off").unwrap();
-        assert!(t.unproven_on().is_empty());
         assert!(t.set("nogood=off").unwrap_err().contains("unknown tactic"));
         assert!(t.set("nogoods=maybe").unwrap_err().contains("on or off"));
         assert!(t.set("nogoods").unwrap_err().contains("name=value"));
@@ -270,8 +218,6 @@ mod tests {
         t.set("match_refine=0").unwrap();
         assert_eq!(t.search.match_refine, 0);
         assert_eq!(t.description(), "match_refine=0");
-        // It is sound, so it is never reported as unproven.
-        assert_eq!(t.unproven_on(), ["reuse_prev", "revise_freedoms"]);
         let json = t.to_json();
         assert_eq!(json.get("match_refine").and_then(Json::as_u32), Some(0));
         assert_eq!(json.get("prev_cap").and_then(Json::as_bool), Some(true));
@@ -298,7 +244,7 @@ mod tests {
             assert_eq!(t, Tactics::default(), "{assignment} changed something");
         }
         let err = t.set("match_refines=1").unwrap_err();
-        assert!(err.contains("unknown tactic") && err.contains("revise_freedoms, match_refine"), "{err}");
+        assert!(err.contains("unknown tactic") && err.contains("same_search, match_refine"), "{err}");
     }
 
     #[test]
@@ -313,7 +259,6 @@ mod tests {
         }
         all.push(Tactics {
             search: SearchTactics {
-                revise_freedoms: false,
                 match_refine: 5,
                 fix_forced: false,
                 nogoods: false,
@@ -321,7 +266,6 @@ mod tests {
                 lagrange: false,
             },
             prime_shortcut: false,
-            reuse_prev: false,
             same_search: false,
             prev_cap: false,
             seed_incumbent: false,

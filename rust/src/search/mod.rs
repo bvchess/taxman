@@ -35,7 +35,7 @@
 //!
 //! * The sum of the `max_add` largest candidates bounds every completion by itself, not as a shortcut for the
 //!   matching bound: no completion has more promotions than the freedoms allow (see [`crate::model::FrameSet`]),
-//!   nor larger ones.  With frame 0's freedoms revised, that count rests on `revise_freedoms`.
+//!   nor larger ones.
 //! * The matching bound: [`crate::matchbound`].  Conflicts:
 //!   [`Model::conflict_using`](crate::model::Model::conflict_using); nogoods: [`crate::model::Nogoods`];
 //!   refinement and forced members: `refine::Refiner` and `refine::strongest`; the rule-outs of children:
@@ -49,8 +49,7 @@
 //! # What is where
 //!
 //! * `tactics`: [`SearchTactics`], and how a checkpoint records them.
-//! * `setup`: [`prepare`]: the root, the greedy incumbent, `revise_freedoms`, `max_total`; the [`Problem`] a setup
-//!   poses.
+//! * `setup`: [`prepare`]: the root, the greedy incumbent, `max_total`; the [`Problem`] a setup poses.
 //! * `incumbent`: the starting incumbent (seed, dive, local search).
 //! * `searcher`: [`TaxSearcher`], its stack and its steps; [`SearchSpace`], [`TaxUnit`], the counters [`stat`].
 //! * `refine`: the matching check (`Refiner`) and strong branching (`strongest`).
@@ -72,9 +71,7 @@ pub use diagnostics::{cut, Diagnostics, GAP_BUCKETS};
 pub use header::checkpoint_width;
 pub use incumbent::Neighbourhood;
 pub use searcher::{stat, Found, SearchSpace, TaxSearcher, TaxUnit};
-pub use setup::{
-    prepare, prepare_for_resume, prepare_within, problem_of, PrepareTimings, Prepared, Problem, ProblemSize, Revise,
-};
+pub use setup::{prepare, prepare_for_resume, problem_of, PrepareTimings, Prepared, Problem, ProblemSize};
 pub use tactics::SearchTactics;
 
 use crate::bits::Bits;
@@ -127,8 +124,7 @@ pub struct SearchResult<const W: usize> {
 /// on the sum; reaching it ends the search, also before it starts.  With `resume`, the search continues from
 /// the checkpoint configured in `cfg` (the `prepared` game must have been set up by [`prepare_for_resume`] or
 /// identically): its header must be this game's, and its incumbent a promotable set of candidates worth what
-/// the checkpoint says.  Otherwise it starts fresh, unless `prepared` is [`Revise::Stopped`]: then it stops at
-/// once, incomplete, without a checkpoint.
+/// the checkpoint says.  Otherwise it starts fresh.
 ///
 /// # Errors
 ///
@@ -195,18 +191,16 @@ fn search_forgetting<const W: usize>(
         Some((kept, head)) => (if kept.sum() >= incumbent.sum() { *kept } else { incumbent }, head.stats, head.elapsed),
         None => (incumbent, Stats::default(), Duration::ZERO),
     };
-    let reached_cap = cap.is_some_and(|cap| best.sum() >= cap);
-    let stopped = !resume && matches!(prepared.revise, Revise::Stopped { .. });
-    if reached_cap || stopped {
+    if cap.is_some_and(|cap| best.sum() >= cap) {
         // A resumed search that reaches the cap at once is finished like any other.
-        if let (true, Some(path)) = (reached_cap && resume && !cfg.keep_completed_checkpoint, checkpoint) {
+        if let (true, Some(path)) = (resume && !cfg.keep_completed_checkpoint, checkpoint) {
             engine::remove_finished_checkpoint(path);
         }
         return Ok(SearchResult {
             promotions: best,
             sum: best.sum(),
-            completed: reached_cap,
-            reached_cap,
+            completed: true,
+            reached_cap: true,
             stats: before,
             counters: Counters::default(),
             time: t0.elapsed(),

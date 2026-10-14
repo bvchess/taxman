@@ -7,7 +7,7 @@
 //! it should not (or a bound that gets weaker, or a changed order) moves it too.
 //!
 //! The counts are those of the code at the time of writing.  A change that alters the tree deliberately (a new
-//! bound, another order, a different incumbent to start from, the frame builder or the revision of the freedoms)
+//! bound, another order, a different incumbent to start from, or the frame builder)
 //! fails these tests; that is what they are for.  To update them, run
 //!
 //! ```text
@@ -28,10 +28,8 @@ use taxman::tactics::Tactics;
 use taxman::with_width;
 
 /// (board, tactics as `--tactic` assignments, promotion sum, nodes): the game searched from the frame builder on one
-/// thread, with the revision of frame 0's freedoms where the tactics have it on.  The 1133 rows have it off, like
-/// the committed strict results.  The Lagrangian bound (tactic `lagrange`) first fits its multipliers after 2,000
-/// steps, so the games that take fewer (480, 640) do not see it; its rows `lagrange=off` are the trees of the build
-/// before it.
+/// thread.  The Lagrangian bound (tactic `lagrange`) first fits its multipliers after 2,000 steps, so the games that
+/// take fewer (480, 640) do not see it; its rows `lagrange=off` are the trees of the build before it.
 const EXPECTED: [(u32, &str, u64, u64); 30] = [
     // W = 8, the small end: every tactic's effect shows in a few hundred nodes.
     (480, "default", 5350, 393),
@@ -63,11 +61,11 @@ const EXPECTED: [(u32, &str, u64, u64); 30] = [
     (936, "default", 20507, 41653),
     (936, "lagrange=off", 20507, 59055),
     // W = 20, the frontier's width.
-    (1133, "revise_freedoms=off", 28690, 2122),
-    (1133, "revise_freedoms=off,lagrange=off", 28690, 2386),
-    (1133, "revise_freedoms=off,nogoods=off", 28690, 5269),
-    (1133, "revise_freedoms=off,fix_forced=off", 28690, 4848),
-    (1133, "revise_freedoms=off,match_refine=0", 28690, 2156),
+    (1133, "default", 28690, 2122),
+    (1133, "lagrange=off", 28690, 2386),
+    (1133, "nogoods=off", 28690, 5269),
+    (1133, "fix_forced=off", 28690, 4848),
+    (1133, "match_refine=0", 28690, 2156),
 ];
 
 fn tactics(assignments: &str) -> SearchTactics {

@@ -45,13 +45,12 @@ const SOLVE_FLAGS: [&str; 7] =
 /// `solve N|A-B [options]`: solves one board size or a range, each from the one before (`solver::solve_range_each`).
 pub fn solve(args: &[String]) -> CliResult {
     let usage = || CliError::Usage("usage: solve N|A-B [options]".into());
-    let args = Args::parse(args, &flags_with(&SOLVE_FLAGS), &["--force-search", "--show", "--allow-tainted-prev"])?;
+    let args = Args::parse(args, &flags_with(&SOLVE_FLAGS), &["--force-search", "--show"])?;
     let [range] = args.positional() else { return Err(usage()) };
     let (lo, hi) = parse_range(range)?;
 
     let mut opts = solver_options(&args)?;
     opts.force_search = args.has("--force-search");
-    opts.allow_tainted_prev = args.has("--allow-tainted-prev");
     opts.checkpoint_dir = args.value("--checkpoint-dir").map(PathBuf::from);
     if let Some(interval) = args.positive_seconds("--checkpoint-interval")? {
         opts.checkpoint_interval = interval;
@@ -122,10 +121,8 @@ pub fn regress(args: &[String]) -> CliResult {
     let Some(optimal) = opts.load_optimal().map_err(failed)? else {
         return Err(CliError::Usage("regress compares with optimal.json, so --optimal none makes no sense".into()));
     };
-    // Report every mismatch instead of stopping at the first.  The comparison is with optimal.json and nothing is
-    // recorded, so a first game built on optimal.json's is fine whatever the tactics.
+    // Report every mismatch instead of stopping at the first.
     opts.allow_optimal_mismatch = true;
-    opts.allow_tainted_prev = true;
 
     let start = Instant::now();
     let mut results: Vec<GameResult> = Vec::new();
@@ -149,11 +146,6 @@ pub fn regress(args: &[String]) -> CliResult {
         .map(|&m| format!("{} {}", m.as_str(), results.iter().filter(|r| r.method == m).count()))
         .collect();
     outln!("by method: {}", counts.join(", "));
-    // The Java's own test counts the games it derives without search in 1..200.
-    if from <= 1 && to >= 200 {
-        let derived = results.iter().filter(|r| r.n <= 200 && r.method.is_derived()).count();
-        outln!("games 1..=200 derived without search: {derived}");
-    }
     let unchecked = results.iter().filter(|r| r.optimal_match.is_none()).count();
     let mismatches: Vec<&GameResult> = results.iter().filter(|r| r.optimal_match == Some(false)).collect();
     for r in &mismatches {
@@ -207,36 +199,27 @@ pub fn bench(args: &[String]) -> CliResult {
             "bench takes the previous games from optimal.json, so --optimal none makes no sense".into(),
         ));
     }
-    // Every game on its own: the previous game from optimal.json or, past it, from the committed strict results
-    // (whatever the tactics: a benchmark records no result), and no derivation.
+    // Every game on its own: the previous game from optimal.json or, past it, from the committed strict results, and
+    // no derivation.
     opts.force_search = true;
-    opts.allow_tainted_prev = true;
     let known = opts.known_games(&[results]).map_err(failed)?;
 
     outln!("{} threads, tactics {}", opts.threads, opts.tactics.description());
-    let [n, nodes, greedy, revise, search, total] = ["n", "nodes", "greedy s", "revise s", "search s", "total s"];
-    outln!("{n:>5} {nodes:>13} {greedy:>9} {revise:>9} {search:>9} {total:>9}");
+    let [n, nodes, greedy, search, total] = ["n", "nodes", "greedy s", "search s", "total s"];
+    outln!("{n:>5} {nodes:>13} {greedy:>9} {search:>9} {total:>9}");
     let mut results = Vec::new();
     for &n in &ns {
         let prev = n.checked_sub(1).and_then(|before| Prev::from_optimal(&known, before));
         let result = solver::solve_game_with(n, prev.as_ref(), &opts, Some(&known)).map_err(failed)?;
         let p = &result.phases;
         let secs = |d: Duration| d.as_secs_f64();
-        outln!(
-            "{:>5} {:>13} {:>9.3} {:>9.3} {:>9.3} {:>9.3}",
-            n,
-            result.nodes,
-            secs(p.greedy),
-            secs(p.revise),
-            secs(p.search),
-            secs(p.total)
-        );
+        outln!("{:>5} {:>13} {:>9.3} {:>9.3} {:>9.3}", n, result.nodes, secs(p.greedy), secs(p.search), secs(p.total));
         let _ = std::io::stdout().flush();
         results.push(result);
     }
     let total: f64 = results.iter().map(|r| r.phases.total.as_secs_f64()).sum();
     let nodes: u64 = results.iter().map(|r| r.nodes).sum();
-    outln!("{:>5} {:>13} {:>39.3}", "all", nodes, total);
+    outln!("{:>5} {:>13} {:>29.3}", "all", nodes, total);
 
     let record = history_record(&opts, &results);
     append_history(&history, &record).map_err(|e| failed(format!("{}: {e}", history.display())))?;

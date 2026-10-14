@@ -31,7 +31,7 @@ fn golden_sum(g: &Golden) -> u64 {
 }
 
 fn prepare_golden<const W: usize>(g: &Golden, tactics: SearchTactics) -> Prepared<W> {
-    prepare::<W>(&Tables::new(g.n), &g.columns, &Bits::from_slice(&g.candidates), tactics, 2).unwrap()
+    prepare::<W>(&Tables::new(g.n), &g.columns, &Bits::from_slice(&g.candidates), tactics).unwrap()
 }
 
 /// Searches and checks that the result is complete, made of candidates, and feasible.
@@ -46,11 +46,12 @@ fn search_checked<const W: usize>(p: &Prepared<W>, threads: usize, what: &str) -
 
 fn check_against_java<const W: usize>(g: &Golden) {
     let p = prepare_golden::<W>(g, SearchTactics::default());
-    let manager = g.json.get("searchManager").expect("searchManager");
-    let frame0 = manager.get("revisedFrame0Freedoms").and_then(Json::as_i64);
+    // The Java's frame set and promotion cap before its revision of frame 0, which this build does not have.
+    let frames = g.json.get("frameSet").and_then(Json::as_arr).expect("frameSet");
+    let frame0 = frames.first().and_then(|frame| frame.get("freedoms")).and_then(Json::as_i64);
     assert_eq!(p.root.frames().first().map(|f| i64::from(f.freedoms)), frame0, "n={} frame 0 freedoms", g.n);
-    let max_total = manager.get("maxTotalPromotions").and_then(Json::as_i64).expect("maxTotalPromotions");
-    assert_eq!(i64::from(p.max_total), max_total, "n={} max_total ({:?})", g.n, p.revise);
+    let max_total = g.json.get("maxPromotionsUnrevised").and_then(Json::as_i64).expect("maxPromotionsUnrevised");
+    assert_eq!(i64::from(p.max_total), max_total, "n={} max_total", g.n);
     for threads in [1, 4] {
         let r = search_checked(&p, threads, &format!("n={} with {threads} threads", g.n));
         assert_eq!(r.sum, golden_sum(g), "n={} with {threads} threads: {:?}", g.n, r.promotions);
@@ -289,7 +290,6 @@ fn sums_by_tactics<const W: usize>(g: &Golden) -> Vec<(SearchTactics, u64)> {
     let default = SearchTactics::default();
     let variants = [
         default,
-        SearchTactics { revise_freedoms: false, ..default },
         SearchTactics { match_refine: 3, ..default },
         SearchTactics { fix_forced: false, ..default },
         SearchTactics { fix_forced: false, match_refine: 0, ..default },
@@ -339,16 +339,8 @@ fn resume_in_pieces(threads: usize, tactics: SearchTactics, min_pieces: usize) {
     let g = load(760);
     let tables = Tables::new(g.n);
     let cands = Bits::<16>::from_slice(&g.candidates);
-    let whole = prepare::<16>(&tables, &g.columns, &cands, tactics, 2).unwrap();
+    let whole = prepare::<16>(&tables, &g.columns, &cands, tactics).unwrap();
     let nodes = search_checked(&whole, 1, "uninterrupted").stats.nodes;
-    // A checkpoint's frame 0 counts as revised only if the tactic was on and it is not the built one (760's
-    // two-frame search lowers it).
-    let from_checkpoint = match (tactics.revise_freedoms, whole.root == whole.unrevised) {
-        (false, _) => Revise::Off,
-        (true, true) => Revise::ResumedAsBuilt,
-        (true, false) => Revise::FromCheckpoint,
-    };
-    assert_eq!(from_checkpoint == Revise::Off, whole.root == whole.unrevised, "760's frame 0 is revised");
 
     let dir = TempDir::new(&format!("resume{threads}-{}", tactics.bits()));
     let ckpt = dir.0.join("ckpt.bin");
@@ -363,8 +355,7 @@ fn resume_in_pieces(threads: usize, tactics: SearchTactics, min_pieces: usize) {
     let mut pieces = 1;
     while !result.completed {
         assert!(ckpt.exists(), "a stopped run leaves a checkpoint");
-        let resumed = prepare_for_resume::<16>(&tables, &g.columns, &cands, &ckpt, 2).unwrap();
-        assert_eq!(resumed.revise, from_checkpoint);
+        let resumed = prepare_for_resume::<16>(&tables, &g.columns, &cands, &ckpt).unwrap();
         assert_eq!(resumed.root, whole.root);
         result = search(&resumed, &cfg, None, None, true).unwrap();
         pieces += 1;
@@ -382,7 +373,6 @@ fn resume_in_pieces(threads: usize, tactics: SearchTactics, min_pieces: usize) {
 fn checkpoint_and_resume_one_thread() {
     resume_in_pieces(1, SearchTactics::default(), 3);
     resume_in_pieces(1, SearchTactics { fix_forced: false, ..SearchTactics::default() }, 4);
-    resume_in_pieces(1, SearchTactics { revise_freedoms: false, ..SearchTactics::default() }, 3);
 }
 
 #[test]
@@ -404,9 +394,9 @@ fn a_checkpoint_of_another_game_is_refused() {
         EngineConfig { checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))), node_limit: Some(50), ..config(1) };
     assert!(!search(&pa, &cfg, None, None, false).unwrap().completed);
     let cands = Bits::<16>::from_slice(&b.candidates);
-    assert!(prepare_for_resume::<16>(&Tables::new(b.n), &b.columns, &cands, &ckpt, 1).is_err());
+    assert!(prepare_for_resume::<16>(&Tables::new(b.n), &b.columns, &cands, &ckpt).is_err());
     let cands = Bits::<32>::from_slice(&a.candidates);
-    assert!(prepare_for_resume::<32>(&Tables::new(a.n), &a.columns, &cands, &ckpt, 1).is_err());
+    assert!(prepare_for_resume::<32>(&Tables::new(a.n), &a.columns, &cands, &ckpt).is_err());
 }
 
 #[test]
@@ -429,45 +419,6 @@ fn seeds_and_caps() {
     // A worse seed changes nothing.
     let worse = search(&p, &config(1), Some(&Bits::EMPTY), None, false).unwrap();
     assert_eq!(worse.sum, optimum.sum);
-}
-
-/// What revising did reads back from the form a results line records it in, and nothing else reads as a value.
-#[test]
-fn revise_values_read_back_from_their_results_form() {
-    let values = [
-        Revise::Off,
-        Revise::NotNeeded,
-        Revise::GreedyIsMax(0),
-        Revise::GreedyIsMax(u32::MAX),
-        Revise::Unchanged,
-        Revise::Searched { size: 12, nodes: 8 },
-        Revise::Searched { size: u32::MAX, nodes: u64::MAX },
-        Revise::Stopped { nodes: 4321 },
-        Revise::FromCheckpoint,
-        Revise::ResumedAsBuilt,
-    ];
-    for value in values {
-        assert_eq!(Revise::parse(&format!("{value:?}")), Some(value));
-    }
-    let taints: Vec<bool> = values.iter().map(|v| v.sets_frame_zero()).collect();
-    assert_eq!(taints, [false, false, true, true, false, true, true, false, true, false]);
-    let near_misses = [
-        "",
-        "off",
-        "Off ",
-        "GreedyIsMax(+4)",
-        "GreedyIsMax(04)",
-        "GreedyIsMax(4294967296)",
-        "GreedyIsMax()",
-        "Searched { size: 12 }",
-        "Searched { nodes: 8, size: 12 }",
-        "Searched{ size: 12, nodes: 8 }",
-        "Stopped { nodes: -1 }",
-        "FromCheckpoint(3)",
-    ];
-    for text in near_misses {
-        assert_eq!(Revise::parse(text), None, "{text:?}");
-    }
 }
 
 #[test]
@@ -513,39 +464,37 @@ fn units_and_headers_round_trip() {
     assert!(other(|h| h.tactics.nogoods = !h.tactics.nogoods).contains("tactics"));
 
     // Every setting of the search tactics reads back as it was written, and the default tactics of a checkpoint
-    // made before `fix_forced`, `nogoods`, `forget_nogoods` and `lagrange` existed (0x19c) read back with them on,
-    // as they are now.  Bit 11 is `forget_nogoods` off, bit 12 `lagrange` off, and no higher bit is used.
+    // made before `fix_forced`, `nogoods`, `forget_nogoods` and `lagrange` existed (0x198, with `revise_freedoms`
+    // off) read back with them on, as they are now.  Bit 11 is `forget_nogoods` off, bit 12 `lagrange` off, and no
+    // higher bit is used.
     let default = SearchTactics::default();
     for refine in [0, 1, 7] {
         for (on, off) in [(true, false), (false, true)] {
-            let t = SearchTactics {
-                revise_freedoms: on,
-                match_refine: refine,
-                fix_forced: on,
-                nogoods: off,
-                forget_nogoods: on,
-                lagrange: off,
-            };
+            let t =
+                SearchTactics { match_refine: refine, fix_forced: on, nogoods: off, forget_nogoods: on, lagrange: off };
             assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
         }
     }
-    assert_eq!(default.bits(), 0x19c);
-    assert_eq!(SearchTactics::from_bits(0x19c), Ok(default));
-    assert_eq!(SearchTactics::from_bits(0x19c | 1 << 11), Ok(SearchTactics { forget_nogoods: false, ..default }));
-    assert_eq!(SearchTactics::from_bits(0x19c | 1 << 12), Ok(SearchTactics { lagrange: false, ..default }));
+    assert_eq!(default.bits(), 0x198);
+    assert_eq!(SearchTactics::from_bits(0x198), Ok(default));
+    assert_eq!(SearchTactics::from_bits(0x198 | 1 << 11), Ok(SearchTactics { forget_nogoods: false, ..default }));
+    assert_eq!(SearchTactics::from_bits(0x198 | 1 << 12), Ok(SearchTactics { lagrange: false, ..default }));
     assert!(SearchTactics::from_bits(1 << 13).is_err());
 
     // A checkpoint made with a tactic that this build no longer has is refused, naming it: the preclusion table
-    // (bit 0), the Java's runner-up (bit 1), a search without the matching bound (bit 3 clear), and the branchings
-    // other than the strong one (bits 7 and 8 other than 3).
+    // (bit 0), the Java's runner-up (bit 1), the revision of frame 0's freedoms (bit 2, set in the checkpoints of
+    // runs that had it on, as they did by default), a search without the matching bound (bit 3 clear), and the
+    // branchings other than the strong one (bits 7 and 8 other than 3).
     for (bits, named) in [
-        (0x19d, "preclusions=on"),
-        (0x19e, "legacy_bound=on"),
-        (0x194, "match_bound=off"),
-        (0x01c, "branching=largest"),
-        (0x09c, "branching=conflict-smallest"),
-        (0x11c, "branching=conflict-largest"),
-        (0x19f, "preclusions=on, legacy_bound=on"),
+        (0x199, "preclusions=on"),
+        (0x19a, "legacy_bound=on"),
+        (0x19c, "revise_freedoms=on"),
+        (0x190, "match_bound=off"),
+        (0x018, "branching=largest"),
+        (0x098, "branching=conflict-smallest"),
+        (0x118, "branching=conflict-largest"),
+        (0x19b, "preclusions=on, legacy_bound=on"),
+        (0x19f, "preclusions=on, legacy_bound=on, revise_freedoms=on"),
     ] {
         let err = SearchTactics::from_bits(bits).unwrap_err();
         assert!(err.contains(named) && err.contains("no longer has"), "{bits:#x}: {err}");
@@ -559,15 +508,14 @@ fn bench_game<const W: usize>(n: u32, columns: &[Vec<u32>], cands: &Bits<W>, jav
     let tables = Tables::new(n);
     for (threads, java_secs) in [(1, java.0), (10, java.1)] {
         let t0 = Instant::now();
-        let p = prepare::<W>(&tables, columns, cands, SearchTactics::default(), threads).unwrap();
+        let p = prepare::<W>(&tables, columns, cands, SearchTactics::default()).unwrap();
         let r = search(&p, &config(threads), None, None, false).unwrap();
         let total = t0.elapsed().as_secs_f64();
         let t = &p.timings;
-        let revise_nodes = if let Revise::Searched { nodes, .. } = p.revise { nodes } else { 0 };
         eprintln!(
-            "n={n:4} threads={threads:2}: total {total:7.3} s (Java {java_secs:5.1} s) | revise {:.3} \
-             ({revise_nodes} nodes) search {:.3} | nodes {} | sum {} | extra {:?}",
-            t.revise.as_secs_f64(),
+            "n={n:4} threads={threads:2}: total {total:7.3} s (Java {java_secs:5.1} s) | greedy {:.3} search {:.3} \
+             | nodes {} | sum {} | extra {:?}",
+            t.greedy.as_secs_f64(),
             r.time.as_secs_f64(),
             r.stats.nodes,
             r.sum,
@@ -594,7 +542,7 @@ fn bench_search_one() {
         let frames = build_frames::<16>(&tables);
         (frames.frames.iter().flat_map(|f| [f.factors.to_vec(), f.moves.to_vec()]).collect(), frames.candidates)
     };
-    let p = prepare::<16>(&tables, &columns, &cands, tactics, threads).unwrap();
+    let p = prepare::<16>(&tables, &columns, &cands, tactics).unwrap();
     let cfg = EngineConfig {
         progress: Some(Duration::from_secs(10)),
         time_limit: seconds.map(Duration::from_secs),

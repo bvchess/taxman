@@ -1,11 +1,12 @@
 //! The integrity of results: what the solver checks before it builds on a previous game, the tripwires that
-//! catch one that is not optimal, how taint travels down a chain, what a results file must pass when it is
-//! opened, what survives a failure after a search, and the provenance every line carries.  Small boards, one or
-//! two threads.
+//! catch one that is not optimal, how taint travels down a chain from `optimal.json`, what a results file must pass
+//! when it is opened, what survives a failure after a search, and the provenance every line carries.  Small boards,
+//! one or two threads.
 
 mod common;
 
-use common::TempDir;
+use common::{options, TempDir};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -16,18 +17,6 @@ use taxman::json::Json;
 use taxman::numtheory::Tables;
 use taxman::results::{moves_digest, rejected_path, Proof, ResultsFile, Taint, OPTIMAL_JSON, SCHEMA};
 use taxman::solver::{self, GameResult, OptimalSource, Prev, PrevSource, SolveOptions};
-
-fn options(threads: usize) -> SolveOptions {
-    SolveOptions { threads, ..SolveOptions::default() }
-}
-
-/// No unproven tactic on.
-fn strict(threads: usize) -> SolveOptions {
-    let mut opts = options(threads);
-    opts.tactics.set("reuse_prev=off").unwrap();
-    opts.tactics.set("revise_freedoms=off").unwrap();
-    opts
-}
 
 fn lines(path: &Path) -> Vec<Json> {
     fs::read_to_string(path).unwrap().lines().map(|line| Json::parse(line).unwrap()).collect()
@@ -71,7 +60,7 @@ fn finished_but_worse_game_of_80() -> (Vec<u32>, u64) {
 
 #[test]
 fn a_previous_game_that_cannot_be_optimal_is_refused() {
-    let opts = SolveOptions { optimal: OptimalSource::None, ..strict(1) };
+    let opts = SolveOptions { optimal: OptimalSource::None, ..options(1) };
     let optimal = Optimal::load_default().unwrap();
     // Not over: optimal.json's game of 80 without its last move.
     let mut moves = optimal.moves(80).unwrap().to_vec();
@@ -101,7 +90,7 @@ fn a_previous_game_that_cannot_be_optimal_is_refused() {
 #[test]
 fn a_previous_game_that_is_not_optimal_trips_the_ceiling() {
     let (moves, score) = finished_but_worse_game_of_80();
-    let opts = SolveOptions { optimal: OptimalSource::None, ..strict(1) };
+    let opts = SolveOptions { optimal: OptimalSource::None, ..options(1) };
     let err = solver::solve_game(81, Some(&prev(moves, score)), &opts).unwrap_err();
     assert!(err.contains("exceed the cap") && err.contains("not optimal"), "{err}");
     // The error keeps the promotions that were found.
@@ -121,7 +110,7 @@ fn a_ceiling_tripped_in_a_range_is_recorded_as_rejected() {
     ])]);
     let optimal = dir.join("optimal.json");
     fs::write(&optimal, fake.to_string()).unwrap();
-    let opts = SolveOptions { optimal: OptimalSource::File(optimal), allow_tainted_prev: true, ..strict(1) };
+    let opts = SolveOptions { optimal: OptimalSource::File(optimal), ..options(1) };
     let err = solver::solve_range(81, 82, &opts, Some(&results)).unwrap_err();
     assert!(err.contains("not optimal") && err.contains("r.rejected.jsonl"), "{err}");
     assert!(lines(&results).is_empty(), "nothing is recorded as a result");
@@ -135,68 +124,46 @@ fn a_ceiling_tripped_in_a_range_is_recorded_as_rejected() {
 // ---------------------------------------------------------------------------------------------------------
 // Taint
 
+/// A run builds on a game of optimal.json, which has the taint `optimal.json` whichever game it is, and each result
+/// carries that taint exactly where its proof rests on it: a proof by the cap or the prime formula on the game before,
+/// a repeat on the game it repeats, and an exhausted search on no game.
 #[test]
-fn a_strict_run_does_not_build_on_a_tainted_game_unless_told_to() {
+fn the_results_built_on_a_game_of_optimal_json_carry_its_taint_as_far_as_their_proofs_rest_on_it() {
     let dir = TempDir::new("taint");
     let results = dir.join("r.jsonl");
-    // With the default tactics, 22 is derived by reuse_prev, and 23 (a prime) rests on it.
-    solver::solve_range(1, 22, &options(1), Some(&results)).unwrap();
-    let line = completed_line(&results, 22);
-    assert_eq!(line.get("proof").and_then(Json::as_str), Some("reuse_prev"));
-    assert_eq!(taint_of_line(&line), Taint::from(["reuse_prev".to_owned()]));
-
-    let err = solver::solve_range(1, 26, &strict(1), Some(&results)).unwrap_err();
-    assert!(
-        err.contains("n=23") && err.contains("rests on reuse_prev") && err.contains("--allow-tainted-prev"),
-        "{err}"
-    );
-
-    // Told to go on, the strict games inherit the taint exactly where their proofs rest on the game before.
-    let allowed = SolveOptions { allow_tainted_prev: true, ..strict(1) };
-    let games = solver::solve_range(1, 26, &allowed, Some(&results)).unwrap();
-    assert_eq!(games.iter().map(|g| g.n).collect::<Vec<_>>(), [23, 24, 25, 26]);
-    let mut before = taint_of_line(&line);
+    // 33 reaches its cap and 34 repeats it, 35 is an exhausted search; 37 is a prime built on 36, an exhausted search.
+    let games = solver::solve_range(33, 50, &options(1), Some(&results)).unwrap();
+    let first = &games[0];
+    assert_eq!(first.prev.as_ref().map(|p| (p.n, p.source, p.proof)), Some((32, PrevSource::Optimal, None)));
+    let optimal_json = Taint::from([OPTIMAL_JSON.to_owned()]);
+    let mut taints: BTreeMap<u32, Taint> = BTreeMap::new();
+    taints.insert(32, optimal_json.clone());
     for game in &games {
         let proof = game.proof.unwrap();
-        let expected = if proof.rests_on_prev() { before.clone() } else { Taint::new() };
+        let rests_on = match &game.same_search {
+            Some(same) => same.n,
+            None => game.n - 1,
+        };
+        let expected = if proof.rests_on_another_game() { taints[&rests_on].clone() } else { Taint::new() };
         assert_eq!(game.taint, expected, "n={} ({})", game.n, proof.as_str());
-        assert!(game.allow_tainted_prev);
-        before = game.taint.clone();
+        taints.insert(game.n, game.taint.clone());
     }
-    assert_eq!(games[0].proof, Some(Proof::PrimeFormula));
-    assert_eq!(games[0].taint, Taint::from(["reuse_prev".to_owned()]));
-    // The file reads back with the same taints.
+    assert_eq!((first.proof, &first.taint), (Some(Proof::Cap), &optimal_json));
+    assert_eq!((games[1].proof, &games[1].taint), (Some(Proof::SameSearch), &optimal_json));
+    assert_eq!((games[2].proof, games[2].taint.is_empty()), (Some(Proof::Exhausted), true));
+    assert_eq!((games[4].proof, games[4].taint.is_empty()), (Some(Proof::PrimeFormula), true));
+    // The file reads back with the same taints, and the lines carry them.
     let reread = ResultsFile::open(&results, None).unwrap();
     assert!(games.iter().all(|g| reread.completed(g.n).unwrap().taint == g.taint));
+    assert_eq!(taint_of_line(&completed_line(&results, 34)), optimal_json);
+    assert!(taint_of_line(&completed_line(&results, 35)).is_empty());
 }
 
+/// A chain from n = 1 rests on nothing unproven.
 #[test]
-fn a_game_made_with_unproven_tactics_on_but_not_used_is_clean() {
-    let dir = TempDir::new("clean");
-    let results = dir.join("r.jsonl");
-    // 30 is searched to exhaustion with the default tactics, and revise_freedoms does nothing there.
-    solver::solve_range(1, 30, &options(1), Some(&results)).unwrap();
-    let line = completed_line(&results, 30);
-    assert_eq!(line.get("proof").and_then(Json::as_str), Some("exhausted"));
-    assert!(taint_of_line(&line).is_empty());
-    let games = solver::solve_range(1, 34, &strict(1), Some(&results)).unwrap();
-    assert_eq!(games.len(), 4);
-    assert!(games.iter().all(|g| g.taint.is_empty()), "{:?}", games.iter().map(|g| &g.taint).collect::<Vec<_>>());
-}
-
-#[test]
-fn a_strict_run_from_optimal_json_needs_the_override() {
-    let err = solver::solve_range(50, 52, &strict(1), None).unwrap_err();
-    assert!(err.contains("n=50") && err.contains("rests on optimal.json"), "{err}");
-    let allowed = SolveOptions { allow_tainted_prev: true, ..strict(1) };
-    let games = solver::solve_range(50, 52, &allowed, None).unwrap();
-    let first = &games[0];
-    assert_eq!(first.prev.as_ref().map(|p| (p.n, p.source, p.proof)), Some((49, PrevSource::Optimal, None)));
-    let expected =
-        if first.proof.unwrap().rests_on_prev() { Taint::from([OPTIMAL_JSON.to_owned()]) } else { Taint::new() };
-    assert_eq!(first.taint, expected);
-    // With the default tactics (unproven ones on) there is nothing to refuse.
-    assert!(solver::solve_range(50, 52, &options(1), None).is_ok());
+fn a_chain_from_one_rests_on_nothing_unproven() {
+    let games = solver::solve_range(1, 120, &options(1), None).unwrap();
+    assert!(games.iter().all(|g| g.taint.is_empty()), "{:?}", games.iter().find(|g| !g.taint.is_empty()));
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -251,7 +218,7 @@ fn a_torn_last_line_is_cut_off_and_a_bad_one_is_an_error() {
     assert_eq!(more.iter().map(|g| g.n).collect::<Vec<_>>(), [13]);
     assert_eq!(lines(&results).len(), 13);
     // A last line that is JSON but not a result is not torn: it is an error, and the file is left alone.
-    let bad = format!("{good}{{\"n\":13}}\n");
+    let bad = format!("{good}{{\"schema\":{SCHEMA},\"n\":13}}\n");
     fs::write(&results, &bad).unwrap();
     let err = solver::solve_range(1, 13, &options(1), Some(&results)).unwrap_err();
     assert!(err.contains("line 13: missing \"completed\""), "{err}");
@@ -362,7 +329,8 @@ fn result_lines_carry_their_provenance() {
     assert_eq!((limits.get("nodes"), limits.get("seconds")), (Some(&Json::Null), Some(&Json::Null)));
     let options = done.get("options").unwrap();
     assert_eq!(options.get("force_search"), Some(&Json::Bool(false)));
-    assert_eq!(options.get("allow_tainted_prev"), Some(&Json::Bool(false)));
+    assert!(options.get("allow_tainted_prev").is_none() && done.get("unproven_tactics_on").is_none());
+    assert!(seconds.get("revise").is_none() && seconds.get("greedy").is_some());
     assert_eq!(options.get("optimal_file").and_then(Json::as_str), Some("default"));
     // The previous game, identified by its moves.
     let before = &all[10];

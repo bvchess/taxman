@@ -16,20 +16,18 @@
 //!    replaced by `n` (method `prime`).
 //! 3. The board's frames ([`Board`]).  With no promotion candidates the game with no promotions is the only one
 //!    (method `trivial`).
-//! 4. `reuse_prev` (an unproven tactic): keep the previous game's promotions that are still possible and accept
-//!    the game they make if it scores what the previous game suggests (method `reuse`).
-//! 5. Otherwise the search (method `search`): [`Board::prepare`] (or [`Board::prepare_for_resume`]), then
+//! 4. Otherwise the search (method `search`): [`Board::prepare`] (or [`Board::prepare_for_resume`]), then
 //!    [`search::search`] for the promotion set with the largest sum.  It starts from the better of the greedy set
 //!    and the previous game's promotions that are candidates here (`seed_incumbent`, [`Board::seed`]) and stops
 //!    as soon as it reaches `n + opt(n − 1) − in_the_bag` (`prev_cap`, [`Board::promotion_cap`]).  The promotions
 //!    become a game through the hives ([`solution_for_promotions`]).  Between the setup and the search, the
 //!    tactic `same_search` may find that an earlier game already settled this search (method `repeat`, below).
-//! 6. `conclude`: the game is checked before it counts, and given its proof and taint.
-//! 7. Recording (a range only): the result is appended to the results file and synced, and only then is the
+//! 5. `conclude`: the game is checked before it counts, and given its proof and taint.
+//! 6. Recording (a range only): the result is appended to the results file and synced, and only then is the
 //!    game's checkpoint deleted.
 //!
-//! Steps 2 and 4, and the repeat of step 5, are skipped by `force_search`, and when a checkpoint of the game
-//! exists: a search that was interrupted is resumed, never replaced by a derivation.
+//! Step 2 and the repeat of step 4 are skipped by `force_search`, and when a checkpoint of the game exists: a search
+//! that was interrupted is resumed, never replaced by a derivation.
 //!
 //! # Repeats of earlier searches
 //!
@@ -38,14 +36,12 @@
 //! `same_search` (proven, on by default), a game whose problem an earlier game `m` of the range or of the results
 //! file posed, within the [`SAME_SEARCH_WINDOW`] board sizes before it, and whose proof settles that problem's best
 //! promotion sum ([`Proof::settles_search`]), is `m`'s promotions played on its own board, with no search: method
-//! `repeat`, proof `same_search`, resting on `m`'s proof and taint and on the game's own setup (`revise_freedoms`, if
-//! it revised frame 0).  The game is found by the problem's digest and confirmed by setting `m`'s problem up again
-//! and comparing the two; it then goes through `conclude` like any game.  DESIGN.md, "Same search", has why it is
-//! optimal.
+//! `repeat`, proof `same_search`, resting on `m`'s proof and taint.  The game is found by the problem's digest and
+//! confirmed by setting `m`'s problem up again and comparing the two; it then goes through `conclude` like any game.
+//! DESIGN.md, "Same search", has why it is optimal.
 //!
 //! The previous game is checked before anything uses it: it must replay legally to its recorded score, be over
-//! (no legal move left) and open with the largest prime, as every optimal game does.  A run with no unproven
-//! tactic on refuses a previous game whose own proof rests on something unproven unless `allow_tainted_prev`.
+//! (no legal move left) and open with the largest prime, as every optimal game does.
 //!
 //! `conclude` checks that the game replays legally ([`replay`]); that a completed game is also over and opens with
 //! the largest prime; that a game from the frame model scores `in_the_bag` plus its promotions; that no game
@@ -65,7 +61,7 @@
 //! stopped is recorded as incomplete, keeps its checkpoint, and ends the range.  The games a game of the range may
 //! repeat the search of are the file's and the range's own (a single game solved with [`solve_game`] has none).
 
-use crate::accelerate::{prime_shortcut, reuse_prev, solution_for_promotions};
+use crate::accelerate::{prime_shortcut, solution_for_promotions};
 use crate::bits::{width_for, words_for, Bits};
 use crate::board::{search_problem, Board};
 use crate::engine::{self, Counters, EngineConfig, Stats};
@@ -74,10 +70,8 @@ use crate::hives::Apiary;
 use crate::json::Json;
 use crate::numtheory::Tables;
 use crate::paths;
-use crate::results::{
-    build_json, moves_digest, own_taint, taint_json, taint_of, Proof, ResultsFile, Taint, OPTIMAL_JSON, SCHEMA,
-};
-use crate::search::{self, stat, Problem, ProblemSize, Revise, SearchTactics};
+use crate::results::{build_json, moves_digest, taint_json, taint_of, Proof, ResultsFile, Taint, OPTIMAL_JSON, SCHEMA};
+use crate::search::{self, stat, Problem, ProblemSize, SearchTactics};
 use crate::tactics::Tactics;
 use std::collections::BTreeMap;
 use std::fs;
@@ -123,16 +117,13 @@ pub struct SolveOptions {
     pub queue_mem_cap: usize,
     /// Where queued units spill to; by default `spill` in the checkpoint directory, else a temporary directory.
     pub spill_dir: Option<PathBuf>,
-    /// Search even where the previous game or an earlier search would give the answer (skips `prime_shortcut`,
-    /// `reuse_prev` and `same_search`).
+    /// Search even where the previous game or an earlier search would give the answer (skips `prime_shortcut` and
+    /// `same_search`).
     pub force_search: bool,
     /// The table to compare scores with and to take previous games from.
     pub optimal: OptimalSource,
     /// Record a score that differs from `optimal.json` (as `optimal_match: false`) instead of failing.
     pub allow_optimal_mismatch: bool,
-    /// Let a run with no unproven tactic on build on a previous game whose proof rests on something unproven;
-    /// the results whose proofs rest on that game inherit its taint.
-    pub allow_tainted_prev: bool,
 }
 
 impl Default for SolveOptions {
@@ -151,7 +142,6 @@ impl Default for SolveOptions {
             force_search: false,
             optimal: OptimalSource::default(),
             allow_optimal_mismatch: false,
-            allow_tainted_prev: false,
         }
     }
 }
@@ -325,8 +315,6 @@ pub enum Method {
     Trivial,
     /// The prime shortcut.
     Prime,
-    /// `reuse_prev`.
-    Reuse,
     /// `same_search`: an earlier game's promotions, which settled the same search problem.
     Repeat,
     /// The branch-and-bound search.
@@ -334,13 +322,12 @@ pub enum Method {
 }
 
 impl Method {
-    pub const ALL: [Method; 5] = [Method::Trivial, Method::Prime, Method::Reuse, Method::Repeat, Method::Search];
+    pub const ALL: [Method; 4] = [Method::Trivial, Method::Prime, Method::Repeat, Method::Search];
 
     pub fn as_str(self) -> &'static str {
         match self {
             Method::Trivial => "trivial",
             Method::Prime => "prime",
-            Method::Reuse => "reuse",
             Method::Repeat => "repeat",
             Method::Search => "search",
         }
@@ -349,12 +336,6 @@ impl Method {
     /// The method [`as_str`](Self::as_str) names.
     pub fn parse(name: &str) -> Option<Method> {
         Method::ALL.into_iter().find(|method| method.as_str() == name)
-    }
-
-    /// What the Java calls an accelerated game: the board needed no search, or the game of `n − 1` gave the answer.
-    /// Neither a search nor a repeat of an earlier one (which the Java searched) is.
-    pub fn is_derived(self) -> bool {
-        matches!(self, Method::Trivial | Method::Prime | Method::Reuse)
     }
 
     /// Whether the game set a search up (and its result line has a `setup`): a search, and a repeat, which set one
@@ -408,8 +389,6 @@ pub struct Phases {
     /// Hives, frames, and the search model.
     pub frames: Duration,
     pub greedy: Duration,
-    /// Revising frame 0's freedoms, including its own search.
-    pub revise: Duration,
     /// The branch and bound (this invocation only).
     pub search: Duration,
     /// The branch and bound over every invocation of a resumed search (see `SearchResult::time_all_runs`).
@@ -424,7 +403,6 @@ impl Phases {
         Json::object([
             ("frames", secs(self.frames)),
             ("greedy", secs(self.greedy)),
-            ("revise", secs(self.revise)),
             ("search", secs(self.search)),
             ("search_all_runs", secs(self.search_all_runs)),
             ("total", secs(self.total)),
@@ -441,7 +419,6 @@ pub struct SearchSetup {
     pub greedy_sum: u64,
     /// The `prev_cap` ceiling on the promotion sum; `None` for a repeat, which runs no search to stop.
     pub cap: Option<u64>,
-    pub revise: Revise,
     /// [`Problem::digest`](crate::search::Problem::digest) of the search problem the setup poses.
     pub digest: u64,
 }
@@ -479,7 +456,7 @@ pub struct GameResult {
     pub proof: Option<Proof>,
     /// The search stopped because its incumbent reached the `prev_cap` ceiling.
     pub reached_cap: bool,
-    /// The unproven things the proof rests on, here or in the games of `n − 1` it rests on (see
+    /// The unproven things the proof rests on, in the game it rests on and in the games that one rests on (see
     /// [`crate::results`]); empty when incomplete.
     pub taint: Taint,
     /// What the game with no promotions scores, for the games that come from the frame model (not prime ones).
@@ -502,7 +479,6 @@ pub struct GameResult {
     pub time_limit: Option<Duration>,
     pub node_limit: Option<u64>,
     pub force_search: bool,
-    pub allow_tainted_prev: bool,
     pub allow_optimal_mismatch: bool,
     /// The table of optimal games, if one was used: `default` for the repository's ([`OptimalSource::Repository`]),
     /// else the path given.
@@ -545,7 +521,6 @@ impl GameResult {
             time_limit: opts.time_limit,
             node_limit: opts.node_limit,
             force_search: opts.force_search,
-            allow_tainted_prev: opts.allow_tainted_prev,
             allow_optimal_mismatch: opts.allow_optimal_mismatch,
             optimal_file,
             optimal_match: None,
@@ -576,7 +551,6 @@ impl GameResult {
                 ("max_total", Json::from(s.max_total)),
                 ("greedy_sum", Json::from(s.greedy_sum)),
                 ("cap", s.cap.map_or(Json::Null, Json::from)),
-                ("revise", Json::from(format!("{:?}", s.revise))),
                 ("digest", Json::from(digest_text(s.digest))),
             ])
         });
@@ -592,7 +566,6 @@ impl GameResult {
         ]);
         let options = Json::object([
             ("force_search", Json::Bool(self.force_search)),
-            ("allow_tainted_prev", Json::Bool(self.allow_tainted_prev)),
             ("allow_optimal_mismatch", Json::Bool(self.allow_optimal_mismatch)),
             ("optimal_file", self.optimal_file.as_deref().map_or(Json::Null, Json::from)),
         ]);
@@ -619,7 +592,6 @@ impl GameResult {
                 ("threads", Json::from(self.threads)),
                 ("tactics", Json::from(self.tactics.description())),
                 ("tactic_switches", self.tactics.to_json()),
-                ("unproven_tactics_on", Json::array(self.tactics.unproven_on())),
                 ("limits", limits),
                 ("options", options),
                 ("optimal_match", self.optimal_match.map_or(Json::Null, Json::Bool)),
@@ -751,7 +723,7 @@ fn solve_with_width<const W: usize>(
     let start = Instant::now();
     let tactics = opts.tactics;
     if let Some(prev) = prev {
-        // The derivations and the cap trust the previous game, so make sure it is what it says it is.
+        // The prime shortcut and the cap trust the previous game, so make sure it is what it says it is.
         prev.check(n)?;
     }
     let tables = Tables::new(n);
@@ -766,7 +738,6 @@ fn solve_with_width<const W: usize>(
 
     if derive && tactics.prime_shortcut && tables.is_prime(n) {
         if let Some(prev) = prev {
-            trust(prev, opts)?;
             let moves = prime_shortcut(n, &prev.moves);
             let candidates = Apiary::<W>::new(&tables, Bits::EMPTY).promotion_candidates();
             let promotions = candidates & moves.iter().copied().collect::<Bits<W>>();
@@ -783,16 +754,6 @@ fn solve_with_width<const W: usize>(
         return conclude(result, board.plain, Vec::new(), context);
     }
 
-    if let Some(prev) = prev.filter(|_| tactics.prev_cap) {
-        trust(prev, opts)?;
-    }
-    if derive && tactics.reuse_prev {
-        if let Some(derived) = prev.and_then(|p| reuse_prev(&board.tables, &board.frames, &p.moves)) {
-            result.method = Method::Reuse;
-            return conclude(result, derived.moves, derived.promotions, context);
-        }
-    }
-
     let promotions = search_game(&board, prev, opts, checkpoint, earlier_runs, earlier, &mut result)?;
     let moves = solution_for_promotions::<W>(&board.tables, promotions);
     conclude(result, moves, promotions.to_vec(), context)
@@ -805,29 +766,6 @@ struct Context<'a> {
     opts: &'a SolveOptions,
     optimal: Option<&'a Optimal>,
     start: Instant,
-}
-
-/// Refuses, in a run with no unproven tactic on, a previous game whose proof rests on something unproven, as
-/// the game about to be solved could rest on it; `allow_tainted_prev` lets it through (the results whose proofs
-/// rest on it then inherit its taint).
-fn trust(prev: &Prev, opts: &SolveOptions) -> Result<(), Failure> {
-    if builds_on(&prev.taint, opts) {
-        return Ok(());
-    }
-    let taint: Vec<&str> = prev.taint.iter().map(String::as_str).collect();
-    Err(Failure::Error(format!(
-        "the previous game (from {}) rests on {}, which is not proven, and a run with no unproven tactic on does \
-         not build on it.  Start from a game that rests on nothing unproven (a run from n = 1 with these tactics \
-         does), or pass --allow-tainted-prev to go on and mark the results that rest on it",
-        prev.source.whence(),
-        taint.join(", ")
-    )))
-}
-
-/// Whether a run with `opts` builds on a game whose proof rests on `taint`: always if the taint is empty, if an
-/// unproven tactic is on (the run's games may rest on them anyway), or with `allow_tainted_prev`.
-fn builds_on(taint: &Taint, opts: &SolveOptions) -> bool {
-    taint.is_empty() || !opts.tactics.unproven_on().is_empty() || opts.allow_tainted_prev
 }
 
 /// Checks the game (see the module documentation), compares it with `optimal.json`, and completes the result
@@ -904,7 +842,6 @@ fn conclude(
             return reject(result, format!("scored {score} but optimal.json says {expected}"));
         }
     }
-    let own = own_taint(result.method, result.setup.map(|s| s.revise));
     let proof = Proof::of(result.method, true, result.reached_cap).expect("a completed game has a proof");
     result.proof = Some(proof);
     // What the proof rests on besides the game: the game a repeat repeats, else the game of n − 1.
@@ -912,7 +849,7 @@ fn conclude(
         Some(same) => Some(&same.taint),
         None => context.prev.map(|p| &p.taint),
     };
-    result.taint = taint_of(own, proof, basis);
+    result.taint = taint_of(proof, basis);
     Ok(result)
 }
 
@@ -921,8 +858,7 @@ fn conclude(
 ///
 /// Before it searches, the tactic `same_search` looks in `earlier` for a game whose search problem is this one's
 /// and whose proof settles it: then the game is that game's promotions (method `repeat`), with no search.  Not for a
-/// search that a checkpoint resumes (resumed, never replaced), with `force_search`, or when revising frame 0 was
-/// stopped (then the game is not set up).
+/// search that a checkpoint resumes (resumed, never replaced), or with `force_search`.
 fn search_game<const W: usize>(
     board: &Board<W>,
     prev: Option<&Prev>,
@@ -937,7 +873,7 @@ fn search_game<const W: usize>(
     let resuming = checkpoint.is_some();
     let prepared = match &checkpoint {
         Some(path) => {
-            let p = board.prepare_for_resume(path, opts.threads).map_err(|e| {
+            let p = board.prepare_for_resume(path).map_err(|e| {
                 format!("cannot resume from {}: {e} (delete the file to start the game over)", path.display())
             })?;
             if p.tactics != tactics.search {
@@ -945,20 +881,10 @@ fn search_game<const W: usize>(
             }
             p
         }
-        None => {
-            // The two-frame search of `revise_freedoms` stays within this invocation's limits too.
-            let limits = EngineConfig {
-                threads: opts.threads,
-                time_limit: opts.time_limit,
-                node_limit: opts.node_limit,
-                ..EngineConfig::default()
-            };
-            board.prepare_within(tactics.search, &limits)?
-        }
+        None => board.prepare(tactics.search)?,
     };
     result.phases.frames += prepared.timings.build;
     result.phases.greedy = prepared.timings.greedy;
-    result.phases.revise = prepared.timings.revise;
 
     let problem = prepared.problem();
     let mut setup = SearchSetup {
@@ -967,12 +893,10 @@ fn search_game<const W: usize>(
         max_total: prepared.max_total,
         greedy_sum: prepared.greedy.sum(),
         cap: None,
-        revise: prepared.revise,
         digest: problem.digest(),
     };
-    let stopped = matches!(prepared.revise, Revise::Stopped { .. });
-    let repeats = tactics.same_search && !resuming && !opts.force_search && !stopped;
-    if let Some((same, promotions)) = earlier.filter(|_| repeats).and_then(|e| e.find(n, &problem, opts)) {
+    let repeats = tactics.same_search && !resuming && !opts.force_search;
+    if let Some((same, promotions)) = earlier.filter(|_| repeats).and_then(|e| e.find(n, &problem)) {
         result.method = Method::Repeat;
         result.setup = Some(setup);
         result.same_search = Some(same);
@@ -1067,20 +991,16 @@ fn spill_dir(opts: &SolveOptions, n: u32) -> (PathBuf, bool) {
 /// sizes `n − SAME_SEARCH_WINDOW` to `n − 1`.  A board's frames change a little with each number: each of the 545
 /// games of the strict chain 1..1300 whose problem an earlier game posed repeats the last board size before it that
 /// set a search up, `n − 1`, or `n − 2` when `n − 1` is prime (docs/EXPERIMENTS.md, "Same search").  The window
-/// keeps the setups a range starts with to a few, for lines that do not record their problem's digest (schema 3 and
-/// older), and makes the game repeated a function of the window's games alone, whether their lines record digests or
-/// not.
+/// keeps the setups a range starts with to a few, and makes the game repeated a function of the window's games alone.
 pub const SAME_SEARCH_WINDOW: u32 = 8;
 
 /// An earlier completed game, as much of it as a repeat of its search needs.
 #[derive(Clone, Debug)]
 struct Searched {
-    /// What revising frame 0 did in its setup (its line's `setup.revise`), from which its problem is set up again.
-    revise: Revise,
     /// The size of its problem as its setup recorded it, which the problem set up again must have.
     size: ProblemSize,
-    /// The digest of its search problem: recorded by its line or by this run, else found when first needed.
-    digest: Option<u64>,
+    /// The digest of its search problem, as its setup recorded it.
+    digest: u64,
     promotions: Vec<u32>,
     proof: Proof,
     taint: Taint,
@@ -1098,9 +1018,9 @@ impl Earlier {
     fn of_file(file: &ResultsFile) -> Earlier {
         let mut earlier = Earlier::default();
         for game in file.games().filter(|game| game.proof.settles_search()) {
-            if let Some((revise, size)) = game.revise.zip(game.size) {
+            if let Some((size, digest)) = game.size.zip(game.digest) {
                 let (promotions, proof, taint) = (game.promotions.clone(), game.proof, game.taint.clone());
-                let searched = Searched { revise, size, digest: game.digest, promotions, proof, taint };
+                let searched = Searched { size, digest, promotions, proof, taint };
                 earlier.games.insert(game.n, searched);
             }
         }
@@ -1112,33 +1032,30 @@ impl Earlier {
         if let (true, Some(proof), Some(setup)) = (result.completed, result.proof, result.setup) {
             if proof.settles_search() {
                 let (promotions, taint) = (result.promotions.clone(), result.taint.clone());
-                let (revise, size, digest) = (setup.revise, setup.size(), Some(setup.digest));
-                self.games.insert(result.n, Searched { revise, size, digest, promotions, proof, taint });
+                let (size, digest) = (setup.size(), setup.digest);
+                self.games.insert(result.n, Searched { size, digest, promotions, proof, taint });
             }
         }
     }
 
-    /// The latest game of the window before `n` ([`SAME_SEARCH_WINDOW`]) whose search problem is `problem` and that
-    /// a run with `opts` builds on ([`builds_on`]: a strict run, one with no unproven tactic on, only on a game that
-    /// rests on nothing unproven, unless `allow_tainted_prev`), as the record a repeat of it keeps, and its
-    /// promotions.  A game whose digest is not `problem`'s is passed over; for one whose digest is, or is not known,
-    /// the problem is set up again from its board size and `setup.revise` ([`search_problem`]) and compared with
-    /// `problem` itself, so that the answer never rests on two digests alone.  A game whose problem cannot be set up
-    /// again (its frame 0 came from a checkpoint), or is not as large as its line says (a line made by a build whose
-    /// frame builder posed another problem), is dropped: a verifier would refuse it too.
-    fn find(&mut self, n: u32, problem: &Problem, opts: &SolveOptions) -> Option<(SameSearch, Vec<u32>)> {
+    /// The latest game of the window before `n` ([`SAME_SEARCH_WINDOW`]) whose search problem is `problem`, as the
+    /// record a repeat of it keeps, and its promotions.  A game whose digest is not `problem`'s is passed over; for
+    /// one whose digest is, the problem is set up again from its board size ([`search_problem`]) and compared with
+    /// `problem` itself, so that the answer never rests on two digests alone.  A game whose problem is not as large
+    /// as its line says (a line made by a build whose frame builder posed another problem) is dropped: a verifier
+    /// would refuse it too.
+    fn find(&mut self, n: u32, problem: &Problem) -> Option<(SameSearch, Vec<u32>)> {
         let digest = problem.digest();
         for m in (n.saturating_sub(SAME_SEARCH_WINDOW)..n).rev() {
-            let Some(game) = self.games.get_mut(&m) else { continue };
-            if !builds_on(&game.taint, opts) || game.digest.is_some_and(|theirs| theirs != digest) {
+            let Some(game) = self.games.get(&m) else { continue };
+            if game.digest != digest {
                 continue;
             }
-            let theirs = search_problem(m, game.revise).ok().filter(|(theirs, _)| theirs.size() == game.size);
+            let theirs = search_problem(m).ok().filter(|(theirs, _)| theirs.size() == game.size);
             let Some((theirs, _)) = theirs else {
                 self.games.remove(&m);
                 continue;
             };
-            game.digest = Some(theirs.digest());
             if theirs == *problem {
                 let promotion_sum = game.promotions.iter().map(|&p| u64::from(p)).sum();
                 let same = SameSearch { n: m, digest, promotion_sum, proof: game.proof, taint: game.taint.clone() };
@@ -1295,7 +1212,6 @@ mod tests {
         assert_eq!(json.get("optimal_match").and_then(Json::as_bool), Some(true));
         assert_eq!(json.get("tactics").and_then(Json::as_str), Some("default"));
         assert_eq!(json.get("prev_source"), Some(&Json::Null));
-        assert_eq!(json.get("unproven_tactics_on").and_then(Json::as_arr).map(<[_]>::len), Some(2));
         let contents = crate::results::read_results(&format!("{json}\n"), None).unwrap();
         let stored = &contents.games[&10];
         assert_eq!((stored.score, &stored.moves, stored.proof), (r.score, &r.moves, Proof::Trivial));

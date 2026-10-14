@@ -7,9 +7,6 @@
 /// The tactics of DESIGN.md, section 5, that act inside the search.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SearchTactics {
-    /// Lower frame 0's freedoms after solving the two-frame game of frames 0 and 1 (unproven: "the max-sum
-    /// promotion set also has the max count"), which can lower `max_total`.
-    pub revise_freedoms: bool,
     /// Refine the matching bound by the branches of its conflict, this many levels deep, where it does not
     /// prune (0: off; sound, see `search::refine::Refiner`).  At most [`Self::MAX_MATCH_REFINE`].
     /// What it prunes can depend on the conflicts already known along the path, which work units do not
@@ -40,14 +37,7 @@ pub struct SearchTactics {
 
 impl Default for SearchTactics {
     fn default() -> Self {
-        SearchTactics {
-            revise_freedoms: true,
-            match_refine: 1,
-            fix_forced: true,
-            nogoods: true,
-            forget_nogoods: true,
-            lagrange: true,
-        }
+        SearchTactics { match_refine: 1, fix_forced: true, nogoods: true, forget_nogoods: true, lagrange: true }
     }
 }
 
@@ -57,11 +47,12 @@ impl SearchTactics {
     pub const MAX_MATCH_REFINE: u8 = 7;
 
     /// The bits of a checkpoint's header that earlier builds used for tactics this one no longer has: bit 0
-    /// `preclusions`, bit 1 `legacy_bound`, bit 3 `match_bound`, bits 7 and 8 `branching`.
-    const REMOVED_BITS: u16 = 0b11 | 1 << 3 | 3 << 7;
+    /// `preclusions`, bit 1 `legacy_bound`, bit 2 `revise_freedoms`, bit 3 `match_bound`, bits 7 and 8 `branching`.
+    const REMOVED_BITS: u16 = 0b111 | 1 << 3 | 3 << 7;
 
     /// What those bits hold when a search runs as every search now does: `match_bound` on (bit 3), `branching` as
-    /// `conflict-strong` (3 in bits 7 and 8), `preclusions` and `legacy_bound` off (bits 0 and 1 clear).
+    /// `conflict-strong` (3 in bits 7 and 8), `preclusions`, `legacy_bound` and `revise_freedoms` off (bits 0 to 2
+    /// clear).
     const REMOVED_BITS_AS_RUN: u16 = 1 << 3 | 3 << 7;
 
     /// The tactics as the header of a checkpoint records them.  Tactics added later are recorded by the bits of
@@ -71,7 +62,6 @@ impl SearchTactics {
     /// build no longer has are written as the search now runs.
     pub(super) fn bits(self) -> u16 {
         Self::REMOVED_BITS_AS_RUN
-            | u16::from(self.revise_freedoms) << 2
             | u16::from(self.match_refine.min(Self::MAX_MATCH_REFINE)) << 4
             | u16::from(!self.fix_forced) << 9
             | u16::from(!self.nogoods) << 10
@@ -80,8 +70,8 @@ impl SearchTactics {
     }
 
     /// The tactics [`bits`](Self::bits) recorded, or an error if the checkpoint was made with a tactic that this
-    /// build no longer has (`preclusions`, `legacy_bound`, `match_bound` off, or a `branching` other than
-    /// `conflict-strong`), or with one it does not know.
+    /// build no longer has (`preclusions`, `legacy_bound`, `revise_freedoms`, `match_bound` off, or a `branching`
+    /// other than `conflict-strong`), or with one it does not know.
     pub(super) fn from_bits(bits: u16) -> Result<Self, String> {
         if bits >> 13 != 0 {
             return Err(format!("unknown tactics {bits:#x}"));
@@ -94,7 +84,6 @@ impl SearchTactics {
             ));
         }
         Ok(SearchTactics {
-            revise_freedoms: bits & 4 != 0,
             match_refine: (bits >> 4 & 7) as u8,
             fix_forced: bits & 1 << 9 == 0,
             nogoods: bits & 1 << 10 == 0,
@@ -112,6 +101,9 @@ impl SearchTactics {
         }
         if bits & 2 != 0 {
             settings.push("legacy_bound=on".to_owned());
+        }
+        if bits & 4 != 0 {
+            settings.push("revise_freedoms=on".to_owned());
         }
         if bits & 1 << 3 == 0 {
             settings.push("match_bound=off".to_owned());

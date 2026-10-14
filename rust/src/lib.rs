@@ -29,7 +29,7 @@
 //!       board::Board                   hives::Apiary → frames::build_frames: the frames (0 = bottom) and the
 //!        │                              promotion candidates; in_the_bag = the score with no promotions
 //!        ▼
-//!       search::prepare                model::Model: the root state; greedy incumbent; revised frame 0
+//!       search::prepare                model::Model: the root state; greedy incumbent
 //!        │
 //!        ▼
 //!       search::search ───────────────► engine::run: threads, shared deque with disk spill, checkpoints
@@ -57,7 +57,7 @@
 //! | frame model | [`hives`] | sources, factors and hives; what a board's hives can play and spare |
 //! | | [`frames`] | hives stacked into frames, and the promotion candidates |
 //! | | [`model`] | the search state: frames, winnability, promotion, conflicts, nogoods |
-//! | | [`accelerate`] | deriving the game of `n` from the game of `n − 1` without a search; promotions → moves |
+//! | | [`accelerate`] | the prime shortcut (the game of a prime `n` from the game of `n − 1`); promotions → moves |
 //! | search | [`matchbound`] | the matching bound, the upper bound on a node's completions; the Lagrangian bound |
 //! | | [`search`] | the branch-and-bound searcher, its tactics, its setup and checkpoint header |
 //! | | [`bounds`] | the greedy incumbent and the limit on a node's further promotions |

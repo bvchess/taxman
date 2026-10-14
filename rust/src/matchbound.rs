@@ -23,10 +23,10 @@
 //! one, so the graph is bipartite, and the bound is a maximum-weight bipartite matching in which every move must
 //! be matched and an edge whose mover is a candidate weighs that candidate.
 //!
-//! The bound ignores the frames' freedoms (frame 0's can be revised to fewer than matching allows) and the limit
-//! on the number of promotions (`max_total`, a node's `max_add`).  Both only remove completions, so it remains
-//! an upper bound.  The Java's `blameGame` bound does respect them, and the smaller of the two would be a bound
-//! too; but it never pruned where the matching bound did not, so the search does not compute it.
+//! The bound ignores the frames' freedoms and the limit on the number of promotions (`max_total`, a node's
+//! `max_add`).  Both only remove completions, so it remains an upper bound.  The Java's `blameGame` bound does
+//! respect them, and the smaller of the two would be a bound too; but it never pruned where the matching bound did
+//! not, so the search does not compute it.
 //!
 //! # Two solvers
 //!
@@ -1738,7 +1738,7 @@ mod tests {
             let (model, ..) = setup::<4>(&g);
             walks::<4>(&g, u64::from(n) << 8, 6, 80, &mut |mb, state, promoted, cands| {
                 let bound = mb.value();
-                // No feasible completion exceeds the count the freedoms allow (they are not revised here), and
+                // No feasible completion exceeds the count the freedoms allow, and
                 // the limit makes the exhaustive search much faster.
                 let most = state.max_promotions_among(cands).max(0) as u32;
                 let best = best_completion(&model, state, cands, most);

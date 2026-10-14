@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# The production run: the strict chain of optimal games from n = 1 to N, resumable, with logging.
+# The production run: the chain of optimal games from n = 1 to N, resumable, with logging.
 #
 #   rust/tools/cloud/chain.sh N
 #
 # It runs
 #
-#   taxman solve 1-N --strict [--threads $THREADS] \
+#   taxman solve 1-N [--threads $THREADS] \
 #       --out $RESULTS --checkpoint-dir $CKPT --checkpoint-interval 60 --progress 60
 #
-# in a loop.  Strict from n = 1, so that no proof rests on anything unproven.  Safe to run again at any time, after
+# in a loop.  From n = 1, so that no proof rests on anything beyond the frame model.  Safe to run again at any time, after
 # a crash, a reboot, a spot interruption or a SIGTERM: the solver skips the games the results file has completed and
 # resumes the game whose checkpoint it finds, losing at most one checkpoint interval.  A second chain.sh while one
 # runs is refused.
@@ -182,7 +182,7 @@ while :; do
     log "starting the solver (games done so far: ${games:-0})"
     # EXTRA_ARGS is a list of words on purpose.
     # shellcheck disable=SC2086
-    ${wrap[@]+"${wrap[@]}"} "$TAXMAN_BIN" solve "1-$to" "${STRICT_ARGS[@]}" ${thread_args[@]+"${thread_args[@]}"} --out "$RESULTS" \
+    ${wrap[@]+"${wrap[@]}"} "$TAXMAN_BIN" solve "1-$to" ${thread_args[@]+"${thread_args[@]}"} --out "$RESULTS" \
         --checkpoint-dir "$CKPT" --checkpoint-interval "$CHECKPOINT_INTERVAL" --progress "$PROGRESS" ${EXTRA_ARGS:-} \
         </dev/null >>"$LOGS/chain.out" 2>>"$LOGS/chain.err" &
     child=$!

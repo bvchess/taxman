@@ -13,7 +13,7 @@
 //! The fixtures, in `testdata/perf/` unless `--fixtures` says otherwise (games 936 and 1215 by default: W = 16,
 //! and the frontier):
 //!
-//! * `nNNNN.nodes` (F1, search nodes): nodes of the proof of game N (one thread, the strict tactics, seeded with
+//! * `nNNNN.nodes` (F1, search nodes): nodes of the proof of game N (one thread, the default tactics, seeded with
 //!   the optimum), each its promotions and candidates.  Each kernel replays all of them: the rebuild of a node's
 //!   state (`promote_all_using`), the promotion of every candidate (`promote_in_place_using`, the peel) and
 //!   `can_promote_using`, the minimal conflict and the core of the heaviest matching, the matching from scratch
@@ -68,11 +68,6 @@ const GAMES: [u32; 2] = [936, 1215];
 /// The fixture of game `n` of this kind in `dir`.
 fn fixture(dir: &Path, n: u32, kind: &str) -> PathBuf {
     dir.join(format!("n{n:04}.{kind}"))
-}
-
-/// The strict tactics (`revise_freedoms` off), which the frontier's results are made with.
-fn tactics() -> SearchTactics {
-    SearchTactics { revise_freedoms: false, ..SearchTactics::default() }
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -171,9 +166,9 @@ impl Report {
 // ---------------------------------------------------------------------------------------------------------
 // Games and fixtures
 
-/// A game set up as the frontier's searches are: from the frame builder, with the strict tactics.
+/// A game set up as the frontier's searches are: from the frame builder, with the default tactics.
 fn setup<const W: usize>(n: u32) -> Prepared<W> {
-    Board::<W>::for_n(n).prepare(tactics(), 1).expect("prepare")
+    Board::<W>::for_n(n).prepare(SearchTactics::default()).expect("prepare")
 }
 
 /// The optimum's promotions that can be promoted from the root, one by one from the largest down.
@@ -402,7 +397,7 @@ fn window<const W: usize>(
     report: &mut Report,
 ) -> Result<(), String> {
     let mut p = Board::<W>::for_n(n)
-        .prepare_for_resume(path, 1)
+        .prepare_for_resume(path)
         .map_err(|e| format!("{}: {e} (make it again with `perf make-window`)", path.display()))?;
     let mut tactics = Tactics { search: p.tactics, ..Tactics::default() };
     for change in changes {
@@ -499,7 +494,7 @@ fn make_nodes<const W: usize>(dir: &Path, n: u32, optimal: &Optimal, every: u64,
     let path = fixture(dir, n, "nodes");
     let mut text = format!(
         "# Search nodes of game {n} for examples/perf.rs (F1), made by\n\
-         # `perf make-nodes {n} --every {every} --keep {keep}`: its proof (one thread, strict tactics, seeded with\n\
+         # `perf make-nodes {n} --every {every} --keep {keep}`: its proof (one thread, default tactics, seeded with\n\
          # the optimum) in {runs} runs of {every} nodes, each resuming the last one's checkpoint ({total} nodes in\n\
          # all), handed the searcher {} distinct units; these {} are evenly spaced among them.  Sets in hex, digit k\n\
          # holding the numbers 4k..4k+3, lowest bit first.\n",

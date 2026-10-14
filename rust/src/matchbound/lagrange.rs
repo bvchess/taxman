@@ -666,7 +666,7 @@ mod tests {
         use crate::search::SearchTactics;
         use std::hint::black_box;
         let board = Board::<20>::for_n(1215);
-        let p = board.prepare(SearchTactics { revise_freedoms: false, ..SearchTactics::default() }, 1).unwrap();
+        let p = board.prepare(SearchTactics::default()).unwrap();
         let (model, root, cands) = (&*p.model, &p.root, p.candidates);
         let graph = MatchGraph::new(model, root);
         let mut rng = Rng(1215);

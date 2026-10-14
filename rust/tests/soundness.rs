@@ -19,7 +19,7 @@ use taxman::game::Optimal;
 use taxman::model::{FrameSet, Model, Scratch};
 use taxman::numtheory::Tables;
 use taxman::search::lagrange::Refits;
-use taxman::search::{prepare, SearchTactics, TaxUnit};
+use taxman::search::TaxUnit;
 
 /// Every tactic that acts inside the search, alone and in the combinations that matter, with the forgetting of
 /// nogoods at the production period, every step, every third, and never; on one thread and two.  The Lagrangian
@@ -266,7 +266,7 @@ fn a_wide_search_resumed_over_and_over_finds_the_optimum() {
 /// A game that the frame builder never makes: a real game's frames with numbers dropped, made moves instead of
 /// factors (or the other way round) and moved a frame up or down, or random columns; kept only if every frame of
 /// the root is winnable, with at most 36 candidates (mostly those that can be promoted from the root).
-fn perturbed(rng: &mut Rng, n: u32, frames: u64, density: u64) -> Option<Perturbed> {
+fn perturbed(rng: &mut Rng, n: u32, frames: u64, density: u64) -> Option<Game<4>> {
     let tables = Tables::new(n);
     let mut columns = vec![Vec::new(); 2 * frames as usize];
     if rng.chance(70) {
@@ -310,30 +310,7 @@ fn perturbed(rng: &mut Rng, n: u32, frames: u64, density: u64) -> Option<Perturb
     if rng.chance(70) {
         candidates = candidates.iter().filter(|&x| model.can_promote(&root, x)).collect();
     }
-    (!candidates.is_empty() && candidates.len() <= 36).then(|| Perturbed {
-        tables,
-        columns,
-        game: Game::new(model, root, candidates),
-    })
-}
-
-/// A perturbed game with what is needed to set it up again.
-struct Perturbed {
-    tables: Tables,
-    columns: Vec<Vec<u32>>,
-    game: Game<4>,
-}
-
-impl Perturbed {
-    /// The game as `prepare` sets it up with the default tactics: frame 0's freedoms revised, if they change.
-    /// (Lowering them to any value would not do: the exact completions of the matching bound and the like rely on
-    /// the revised freedoms being ones that the best set meets anyway, which the nested search of
-    /// `revise_freedoms` finds.)
-    fn revised(&self) -> Game<4> {
-        let p = prepare::<4>(&self.tables, &self.columns, &self.game.candidates, SearchTactics::default(), 1);
-        let p = p.unwrap();
-        Game::new((*p.model).clone(), p.root, p.candidates)
-    }
+    (!candidates.is_empty() && candidates.len() <= 36).then(|| Game::new(model, root, candidates))
 }
 
 /// The units of a random path down the tree of `game`: (promoted, candidates, state) at the root and after up to
@@ -359,34 +336,20 @@ fn path<const W: usize>(rng: &mut Rng, game: &Game<W>) -> Vec<(Bits<W>, Bits<W>,
 }
 
 /// Perturbed games, their roots and some units below them, with the truth found exhaustively, under random
-/// tactics, from an incumbent worth `k` less.  Half of the games are set up as `prepare` does, with frame 0's
-/// freedoms revised (where that changes them), so that the frame set binds where the frame builder's never does.
-/// The search treats the revised freedoms as what they are in a real game, a fact about the best set (the
-/// conjecture of `revise_freedoms`: the set with the largest sum also has the largest count out of frame 1), and
-/// is exact only where that holds.  A perturbed game does not have to be a real game, so those whose revision
-/// changes the best sum are left out: the search of such a game (once in about 1,300) may return a set that the
-/// revised freedoms forbid and is worth more.
+/// tactics, from an incumbent worth `k` less.
 #[test]
 fn perturbed_frame_sets_are_searched_exactly() {
     let mut rng = Rng(0x5EED_0001_C0DE_F00D);
     let configs = configs();
-    let (mut games, mut runs, mut revised, mut conjecture_fails) = (0, 0, 0, 0);
+    let (mut games, mut runs) = (0, 0);
     while games < 500 {
         let n = 30 + rng.below(220) as u32;
         let (frames, density) = (2 + rng.below(6), 94 + rng.below(7));
-        let Some(model) = perturbed(&mut rng, n, frames, density) else { continue };
-        let (unrevised, unrevised_truth) =
-            (model.game.root, model.game.exhaustive(&model.game.root, &model.game.candidates, 2_000_000));
-        let game = if rng.chance(50) { model.revised() } else { model.game };
+        let Some(game) = perturbed(&mut rng, n, frames, density) else { continue };
         let truth = game.exhaustive(&game.root, &game.candidates, 2_000_000);
-        if truth != unrevised_truth {
-            conjecture_fails += 1;
-            continue;
-        }
         if truth.is_none_or(|truth| truth == 0) {
             continue;
         }
-        revised += usize::from(game.root != unrevised);
         games += 1;
         for (promoted, cands, state) in path(&mut rng, &game) {
             let Some(rest) = game.exhaustive(&state, &cands, 2_000_000) else { continue };
@@ -409,8 +372,7 @@ fn perturbed_frame_sets_are_searched_exactly() {
             }
         }
     }
-    assert!(runs > 8000 && revised > 25, "{runs} runs, {revised} games with revised freedoms");
-    assert!(conjecture_fails < 5, "{conjecture_fails} perturbed games break the conjecture of revise_freedoms");
+    assert!(runs > 8000, "{runs} runs");
 }
 
 /// On perturbed games: promoting a set at once is promoting it one by one in any order (success and the state it
@@ -425,9 +387,9 @@ fn promotion_order_conflicts_and_nogoods_on_perturbed_frame_sets() {
     while games < 40 {
         let n = 30 + rng.below(220) as u32;
         let (frames, density) = (2 + rng.below(6), 94 + rng.below(7));
-        let Some(perturbed) = perturbed(&mut rng, n, frames, density) else { continue };
+        let Some(game) = perturbed(&mut rng, n, frames, density) else { continue };
         games += 1;
-        let (model, root) = (&perturbed.game.model, perturbed.game.root);
+        let (model, root) = (&game.model, game.root);
         let all: Bits<4> = root.frames()[1..].iter().fold(Bits::EMPTY, |all, f| all | f.factors);
         for _ in 0..20 {
             // A random state to start from, and a random set to promote there.
@@ -467,12 +429,12 @@ fn promotion_order_conflicts_and_nogoods_on_perturbed_frame_sets() {
     assert!(orders > 1500 && feasible > 50 && conflicts > 100, "{orders} orders, {feasible} feasible, {conflicts}");
 }
 
-/// The conjecture `revise_freedoms` rests on, that the promotion set with the largest sum also has the most
-/// promotions, is false for the whole frame game of n = 833, the first board whose optimal game is not a longest
-/// one (`evidence/README.md`, section 8): the optimal set promotes 48 numbers, as many as `max_total` allows less
-/// one, and a set the model accepts promotes 49, four heavy promotions of the optimal set exchanged for five
-/// light ones; both games are over, the second one move longer and 29 points lighter.  The tactic applies the
-/// conjecture only to the two-frame game of frames 0 and 1, which this does not decide.
+/// The conjecture that the promotion set with the largest sum also has the most promotions is false for the whole
+/// frame game of n = 833, the first board whose optimal game is not a longest one (`evidence/README.md`, section 8):
+/// the optimal set promotes 48 numbers, as many as `max_total` allows less one, and a set the model accepts promotes
+/// 49, four heavy promotions of the optimal set exchanged for five light ones; both games are over, the second one
+/// move longer and 29 points lighter.  (The Java's `reviseFreedoms` assumed the conjecture of the two-frame game of
+/// frames 0 and 1, which this does not decide.)
 #[test]
 fn the_heaviest_promotion_set_of_833_is_not_the_largest() {
     const W: usize = 16;

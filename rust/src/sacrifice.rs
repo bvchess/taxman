@@ -5,11 +5,12 @@
 //! **This is study code.  The solver does not use it.**  It is kept because it holds a theorem (proved below) and
 //! a measured negative result, and because the tests use it as an independent check.
 //!
-//! * *The question.*  The tactic `reuse_prev` accepts a derived game unproven.  Could an upper bound on `opt(n)`
-//!   computed from games of `n − 1` prove those games optimal, or settle other games faster than searching them?
+//! * *The question.*  The tactic `reuse_prev` (since removed, docs/EXPERIMENTS.md, "Which tactics earn their keep")
+//!   accepted a derived game unproven.  Could an upper bound on `opt(n)` computed from games of `n − 1` prove those
+//!   games optimal, or settle other games faster than searching them?
 //! * *The answer is no.*  The bound is a theorem, and the frame model computes it correctly (checked against
 //!   exhaustive search, [`crate::brute`]), but it is tight on too few of the games that matter, and computing it
-//!   costs about as much as solving the game: it is no replacement for `reuse_prev`, and putting it into the
+//!   costs about as much as solving the game: it is no replacement for the tactic, and putting it into the
 //!   pipeline slowed the games it was tried on (numbers under "Findings"; `examples/sacrifice.rs` made them).
 //! * *What stays in use.*  `tests/wide.rs` uses [`sacrifice_bound`] as an upper bound that does not come from the
 //!   search under test, to prove one result at `W = 20` (game 1133), beyond what the Java can check.  The support
@@ -105,19 +106,20 @@
 //!
 //! # Findings (the negative result)
 //!
-//! Measured with `examples/sacrifice.rs` (2026-10; 2 threads, sound tactics):
+//! Measured with `examples/sacrifice.rs` (2026-10; 2 threads; its selection of the games `reuse_prev` derived went
+//! with the tactic):
 //!
 //! * By exhaustive search, no frame model, `n = 2..66`: the theorem holds for every `n` and `f`.  The bound is
 //!   tight on 61 of the 65 games (58 with the rules' `opt(B_f)`), and on 20 of the 24 that are neither prime nor
 //!   exact (`opt(n) ≠ n + opt(n − 1)`); the misses, 21, 39, 51 and 57, are all `3p`.
 //! * By the frame model, `n = 2..800`: never below `optimal.json`; tight on 638 of 799 games, 229 of the 390 that
-//!   are neither prime nor exact, and only 57 of the 152 of those that `reuse_prev` derives.  The misses are
+//!   are neither prime nor exact, and only 57 of the 152 of those that `reuse_prev` derived.  The misses are
 //!   mostly semiprimes `pq` (96 of 161), whose two ban costs are often equal; 146 of the 152 `reuse_prev` games
-//!   are semiprimes.
+//!   were semiprimes.
 //! * A punctured game is about as hard as game `n` itself (for `pq` the two searches nearly copy the direct one),
 //!   so on the games it proves the bound costs 1.1–8.7 times the direct search (median 2.0, 1001–1199).  Putting
 //!   it between the cap and the search (prime → cap → bound → search) made 93 games of 1001–1199 73% slower than
-//!   prime → cap → search.  It is no sound replacement for `reuse_prev`: it proves too few of its games, and
+//!   prime → cap → search.  It is no sound replacement for `reuse_prev`: it proved too few of its games, and
 //!   searching proves all of them sooner.
 
 use crate::accelerate::solution_for_promotions;
@@ -250,7 +252,7 @@ fn punctured_with_width<const W: usize>(
         });
     }
 
-    let prepared = board.prepare(opts.tactics, opts.threads)?;
+    let prepared = board.prepare(opts.tactics)?;
     // The ceiling is the unpunctured board's score (or the decision's target, if lower), not `n + opt(n − 1)`, so
     // `Board::promotion_cap` does not apply.  The seed is the game's moves that are candidates here; the hole is
     // in no hive, so it is never one.

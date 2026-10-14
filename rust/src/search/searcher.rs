@@ -71,7 +71,7 @@ pub(super) fn get_bits<const W: usize>(bytes: &[u8]) -> Bits<W> {
 /// What every searcher of one search shares, read-only.
 pub struct SearchSpace<'a, const W: usize> {
     pub model: &'a Model,
-    /// The starting state (frame 0's freedoms revised if that tactic is on).
+    /// The starting state: the frames as built.
     pub root: &'a FrameSet<W>,
     /// The root's matching graph, which bounds every node.
     pub match_graph: &'a MatchGraph,

@@ -21,7 +21,7 @@
 //!   solver's for 1 to 1000, then the games of the strict chain `results/strict.jsonl`, which `taxman
 //!   extend-optimal` appends).  The solver compares its answers with it and takes the previous game from it when
 //!   it solves the board just past a game the table has.  It is a table, not a proof: the Java made its part with
-//!   `reuse_prev` and `revise_freedoms` on, and the file does not say which games are whose
+//!   the conjectures `reuse_prev` and `revise_freedoms`, and the file does not say which games are whose
 //!   ([`crate::results`] calls this the taint `optimal.json`).
 
 use crate::json::Json;

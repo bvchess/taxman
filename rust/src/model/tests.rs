@@ -191,14 +191,8 @@ fn frame_set_helpers() {
     assert_eq!((model.home(42), model.home(40), model.home(9), model.home(84), model.home(999)), (1, 2, 0, 0, 0));
     assert!(model.contains_factor(&fs, 42) && !model.contains_factor(&fs, 84) && !model.contains_factor(&fs, 999));
     assert!(!model.can_promote(&fs, 9) && model.promote(&fs, 9).is_none(), "frame 0 cannot promote");
-    let pair = fs.front_pair();
-    assert_eq!(pair.frames(), &fs.frames()[..2]);
-    assert!(model.contains_factor(&pair, 42) && !model.contains_factor(&pair, 40));
-    let revised = fs.with_frame_zero_freedoms(1);
-    assert_eq!(revised.frames()[0].freedoms, 1);
-    assert_eq!(&revised.frames()[1..], &fs.frames()[1..]);
-    assert_ne!(revised, fs);
-    let mut copy = pair;
+    let mut copy = model.promote(&fs, 42).expect("promotable");
+    assert_ne!(copy, fs);
     copy.assign(&fs);
     assert_eq!(copy, fs);
     let mut failed = fs;

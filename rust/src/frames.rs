@@ -76,9 +76,6 @@ pub struct FrameColumns<const W: usize> {
     /// hive below could take on as a source ([`Apiary::hive_promotion_candidates`]), collected level by level
     /// before the level is merged.
     pub candidates: Bits<W>,
-    /// An upper bound on how many promotions there can be, from the frames' freedoms alone (the Java's
-    /// `estimateMaxPromotions`; `reuse_prev` is its only user here).
-    pub estimate_max_promotions: u32,
 }
 
 impl<const W: usize> FrameColumns<W> {
@@ -123,8 +120,7 @@ pub fn build_frames<const W: usize>(t: &Tables) -> FrameColumns<W> {
             }
         })
         .collect();
-    let estimate_max_promotions = max_promotions_by_freedoms(&frames);
-    FrameColumns { frames, candidates, estimate_max_promotions }
+    FrameColumns { frames, candidates }
 }
 
 /// The levels of hives that still have free factors, bottom first, each hive named by its smallest factor.
@@ -161,26 +157,6 @@ fn levels_of_free_hives<const W: usize>(apiary: &Apiary<W>) -> Vec<Vec<u32>> {
     levels
 }
 
-/// How many promotions there can be at most, given only the frames' freedoms (the Java's `estimateMaxPromotions`),
-/// working from the top frame down.
-///
-/// A promotion from frame `h` to frame `h − 1` uses one freedom of each.  The top frame has nothing above it to
-/// absorb, so all its freedoms are on offer to the frame below.  Each lower frame absorbs as many of the offered
-/// promotions as it has freedoms (each absorbed one counts once, in the total) and offers what is left of its
-/// freedoms to the frame below it; frame 0 offers to no one.  Taking promotions as early as possible is the best
-/// use of a freedom, since an absorbed promotion costs the frame above only a freedom it could not use otherwise.
-///
-/// [`crate::model::FrameSet::max_promotions`] computes the same number from the bottom up, from the search state.
-fn max_promotions_by_freedoms<const W: usize>(frames: &[FrameColumn<W>]) -> u32 {
-    let (mut total, mut offer) = (0i32, 0i32);
-    for frame in frames.iter().rev() {
-        let taken = frame.free_factor_count.min(offer);
-        total += taken;
-        offer = frame.free_factor_count - taken;
-    }
-    u32::try_from(total).expect("frames have free factors")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -209,12 +185,12 @@ mod tests {
     fn no_frames_when_every_hive_is_closed() {
         for n in [1u32, 2, 10] {
             let cols = build_frames::<1>(&Tables::new(n));
-            assert!(cols.frames.is_empty() && cols.candidates.is_empty() && cols.estimate_max_promotions == 0, "n={n}");
+            assert!(cols.frames.is_empty() && cols.candidates.is_empty(), "n={n}");
         }
     }
 
-    /// `reuse_prev` takes its candidates from the unmerged apiary, the frame builder collects them level by level
-    /// while merging; the documentation of `reuse_prev` says they are the same set on every board up to 2000
+    /// The solver takes a prime game's promotions from the unmerged apiary's candidates (the prime shortcut), the
+    /// frame builder collects them level by level while merging; they are the same set on every board up to 2000
     /// (checked once; this guards the small boards).
     #[test]
     fn the_frames_candidates_are_the_plain_apiarys() {
@@ -223,21 +199,5 @@ mod tests {
             let plain = Apiary::<5>::new(&t, Bits::EMPTY).promotion_candidates();
             assert_eq!(build_frames::<5>(&t).candidates, plain, "n={n}");
         }
-    }
-
-    #[test]
-    fn estimate_works_down_from_the_top() {
-        let frame = |free| FrameColumn::<1> {
-            name: String::new(),
-            factors: Bits::EMPTY,
-            moves: Bits::EMPTY,
-            free_factor_count: free,
-        };
-        // The top frame (last) absorbs nothing and can promote 2 into the middle one.  The middle one has 1
-        // free factor, so absorbs only 1 and has none left to promote further; or it has 5, absorbs 2 and can
-        // promote 3 into the bottom one, which has room for all of them.
-        assert_eq!(max_promotions_by_freedoms(&[frame(4), frame(1), frame(2)]), 1);
-        assert_eq!(max_promotions_by_freedoms(&[frame(4), frame(5), frame(2)]), 5);
-        assert_eq!(max_promotions_by_freedoms::<1>(&[]), 0);
     }
 }

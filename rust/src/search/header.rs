@@ -10,11 +10,11 @@ use crate::model::FrameSet;
 use std::path::Path;
 
 /// What a checkpoint records about the search it belongs to, so that a resumed run can check it is the same
-/// search (the same game, frames, candidates and tactics) and skip revising frame 0 again.
+/// search (the same game, frames, candidates and tactics).
 ///
 /// Encoded (little-endian) as the magic `TXSH`, the format [`Header::VERSION`] (u32), the width `W` (u32),
 /// `n` (u32), the digests of the candidates and of the frames (u64 each), whether there is a frame 0 (u8) and
-/// its revised freedoms (i32), `max_total` (u32) and the tactics' bits (u16).  Version 2 (magic `TXS2`, made
+/// its freedoms (i32), `max_total` (u32) and the tactics' bits (u16).  Version 2 (magic `TXS2`, made
 /// before 2026-10-12) recorded neither `n` nor the frames, so a checkpoint of another game with the same
 /// candidates passed for this one; it is refused.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -22,10 +22,10 @@ pub(super) struct Header<const W: usize> {
     pub(super) n: u32,
     /// [`Header::digest_candidates`] of the root candidates.
     pub(super) candidates: u64,
-    /// [`Header::digest_frames`] of the frames as built (before revising frame 0).
+    /// [`Header::digest_frames`] of the frames as built.
     pub(super) frames: u64,
-    /// Frame 0's freedoms in the search's root (`None` without frames): the ones it was built with, or with
-    /// `revise_freedoms` on, revised ones.  Resuming checks them against the frames (`setup::resumed_root`).
+    /// Frame 0's freedoms in the search's root (`None` without frames).  They are the ones it was built with,
+    /// which resuming requires: builds that had the tactic `revise_freedoms` could lower them.
     pub(super) frame0_freedoms: Option<i32>,
     pub(super) max_total: u32,
     pub(super) tactics: SearchTactics,
@@ -40,7 +40,7 @@ impl<const W: usize> Header<W> {
         Header {
             n: prepared.n,
             candidates: Self::digest_candidates(&prepared.candidates),
-            frames: Self::digest_frames(&prepared.unrevised),
+            frames: Self::digest_frames(&prepared.root),
             frame0_freedoms: prepared.root.frames().first().map(|f| f.freedoms),
             max_total: prepared.max_total,
             tactics: prepared.tactics,
@@ -120,7 +120,12 @@ impl<const W: usize> Header<W> {
         } else if self.frames != expected.frames {
             "other frames (made by a build with another frame builder?)".into()
         } else if self.frame0_freedoms != expected.frame0_freedoms {
-            format!("frame 0's freedoms {:?}, not {:?}", self.frame0_freedoms, expected.frame0_freedoms)
+            let freedoms = |f: Option<i32>| f.map_or_else(|| "none".to_owned(), |f| f.to_string());
+            format!(
+                "a search whose frame 0's freedoms are {}, not the {} frame 0 is built with (nothing changes them)",
+                freedoms(self.frame0_freedoms),
+                freedoms(expected.frame0_freedoms)
+            )
         } else if self.max_total != expected.max_total {
             format!("max_total {}, not {}", self.max_total, expected.max_total)
         } else if self.tactics != expected.tactics {

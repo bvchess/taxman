@@ -40,7 +40,7 @@ use std::time::{Duration, Instant};
 use taxman::board::Board;
 use taxman::engine::{Counters, EngineConfig};
 use taxman::game::Optimal;
-use taxman::search::{cut, search_with, Diagnostics, Revise, SearchTactics};
+use taxman::search::{cut, search_with, Diagnostics, SearchTactics};
 use taxman::solver::SolveOptions;
 use taxman::tactics::Tactics;
 
@@ -230,19 +230,13 @@ fn secs(d: Duration) -> f64 {
 fn run<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Vec<Row> {
     let t0 = Instant::now();
     let board = Board::<W>::for_n(n);
-    let most = o.threads.iter().copied().max().unwrap_or(1);
-    let p = board.prepare(o.tactics, most).expect("prepare");
+    let p = board.prepare(o.tactics).expect("prepare");
     let opt = optimal.score(n).map(|s| s - board.in_the_bag);
     let prev_cap = optimal.score(n - 1).and_then(|s| board.promotion_cap(s));
     let seed_game = if o.seed_opt { optimal.moves(n) } else { optimal.moves(n - 1).filter(|_| o.seed) };
     let seed = seed_game.map(|moves| board.seed(moves));
     let cap = prev_cap.filter(|_| o.cap);
     let prep = t0.elapsed();
-    let t = &p.timings;
-    let revise = match p.revise {
-        Revise::Searched { nodes, .. } => format!("searched {nodes} nodes"),
-        other => format!("{other:?}"),
-    };
     let mut rows = Vec::new();
     for &threads in &o.threads {
         let cfg = EngineConfig {
@@ -267,7 +261,7 @@ fn run<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Vec<Row> {
         };
         println!(
             "n={n:4} T={threads} {status:6} search {:7.2} s nodes {:11} ({:6.0} k/s) best {} opt {} greedy {} cap {} \
-             | {found} | prep {:.2} s (revise {:.2} {revise}) max_total {} | {}",
+             | {found} | prep {:.2} s max_total {} | {}",
             secs(r.time),
             r.stats.nodes,
             r.stats.nodes as f64 / secs(r.time).max(1e-9) / 1e3,
@@ -276,7 +270,6 @@ fn run<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Vec<Row> {
             p.greedy.sum(),
             prev_cap.map_or("?".into(), |v| v.to_string()),
             secs(prep),
-            secs(t.revise),
             p.max_total,
             r.counters.summary(),
         );
