@@ -314,6 +314,7 @@ struct Options {
     prefilter: bool,
     branching: Gf2Branching,
     strong: usize,
+    more_forced: bool,
     threads: usize,
     seconds: Option<u64>,
 }
@@ -337,6 +338,7 @@ fn parse() -> Result<Options, String> {
         prefilter: false,
         branching: Gf2Branching::Exact,
         strong: usize::MAX,
+        more_forced: true,
         threads: 1,
         seconds: None,
     };
@@ -357,6 +359,7 @@ fn parse() -> Result<Options, String> {
                 o.tactics = t.search;
             }
             "--prefilter" => o.prefilter = true,
+            "--first-forced" => o.more_forced = false,
             "--strong" => {
                 o.strong = args.next().ok_or("--strong needs a value")?.parse().map_err(|e| format!("{e}"))?
             }
@@ -1221,6 +1224,7 @@ fn prove<const W: usize>(n: u32, known: &Known, o: &Options) {
         gf2_prefilter: o.prefilter,
         gf2_branching: o.branching,
         gf2_strong_limit: o.strong,
+        gf2_more_forced: o.more_forced,
         ..SearchSpace::new(&p, &graph, None)
     };
     let cfg = EngineConfig {
@@ -1246,7 +1250,7 @@ fn prove<const W: usize>(n: u32, known: &Known, o: &Options) {
     println!(
         "{{\"n\":{n},\"opt\":{opt},\"tactics\":\"{}\",\"prefilter\":{},\"branching\":\"{:?}\",\"threads\":{},\
          \"completed\":{},\"best\":{},\"nodes\":{},\"seconds\":{:.3},\"cycles\":{cycles},\"instructions\":{instructions},\
-         \"checks\":{},\"gf2_solves\":{},\"gf2_augmentations\":{},\"gf2_inherited\":{},\"gf2_splits\":{}}}",
+         \"checks\":{},\"gf2_solves\":{},\"gf2_augmentations\":{},\"gf2_strong_solves\":{},\"gf2_strong_augmentations\":{}}}",
         Tactics { search: o.tactics, ..Tactics::default() }.description(),
         o.prefilter,
         o.branching,
@@ -1258,8 +1262,8 @@ fn prove<const W: usize>(n: u32, known: &Known, o: &Options) {
         x[stat::MATCH_BOUNDS],
         x[stat::GF2_SOLVES],
         x[stat::GF2_AUGMENTATIONS],
-        x[stat::GF2_INHERITED],
-        x[stat::GF2_SPLITS],
+        x[stat::GF2_STRONG_SOLVES],
+        x[stat::GF2_STRONG_AUGMENTATIONS],
     );
 }
 

@@ -468,12 +468,15 @@ impl<const R: usize> Meet<R> {
         self.next_slot[m][b] += 1;
         let mut my = self.mask[m][yi];
         my[s / 64] |= 1 << (s % 64);
+        // Branchless: the bit selects all ones or all zeros, which the row and the mask are anded with.
         let (mask, res) = (&mut self.mask[m], &mut self.res[m]);
+        let (word, shift) = (p / 64, p % 64);
         for &z in &self.block_live[m][b] {
             let z = z as usize;
-            if bit(&res[z], p) {
-                xor(&mut res[z], &ry);
-                xor(&mut mask[z], &my);
+            let select = 0u64.wrapping_sub(res[z][word] >> shift & 1);
+            for k in 0..R {
+                res[z][k] ^= ry[k] & select;
+                mask[z][k] ^= my[k] & select;
             }
         }
         // y itself: its residue cleared by its own row, its mask now just its slot.
@@ -495,10 +498,12 @@ impl<const R: usize> Meet<R> {
         let mut d = self.mask[m][yi];
         d[s / 64] ^= 1 << (s % 64);
         let mask = &mut self.mask[m];
+        let (word, shift) = (s / 64, s % 64);
         for &z in &self.block_live[m][b] {
             let z = z as usize;
-            if bit(&mask[z], s) {
-                xor(&mut mask[z], &d);
+            let select = 0u64.wrapping_sub(mask[z][word] >> shift & 1);
+            for k in 0..R {
+                mask[z][k] ^= d[k] & select;
             }
         }
         // y was in the loop (its mask holds s): it is now just its slot, and x the circuit y had.
@@ -799,18 +804,30 @@ impl<const R: usize> Meet<R> {
         }
         // In each matroid the members of positive weight there, B_m, are a heaviest basis of the elements of
         // positive weight; without a member x of B_m the heaviest independent set is B_m − x plus the heaviest
-        // positive element whose circuit with respect to B_m holds x (one exchange), if any.  (Circuits with
-        // respect to all of I* would miss the replacements through members of weight 0.)
+        // positive element whose circuit with respect to B_m holds x (one exchange), if any.  In a block where
+        // every member has positive weight, B_m is I* there and the circuits are the tableau's masks; in a block
+        // with a member of weight 0 the circuits with respect to I* would miss the replacements through it, so
+        // B_m's span there is built and the elements reduced by it.
         for m in 0..2 {
             let weight_in = |i: usize, pot: &[i64]| if m == 0 { pot[i] } else { w[i] - pot[i] };
-            for span in &mut self.spans[m] {
-                span.clear();
-            }
+            let mut has_zero = [false; 8];
             for &e in live {
                 let i = e as usize;
                 self.repl[m][i] = 0;
-                if self.inside[i] && weight_in(i, &self.pot) > 0 {
-                    let inserted = self.spans[m][usize::from(p.block[m][i])].insert(p.vector[m][i], e);
+                if self.inside[i] && weight_in(i, &self.pot) <= 0 {
+                    has_zero[usize::from(p.block[m][i])] = true;
+                }
+            }
+            for (b, span) in self.spans[m].iter_mut().enumerate() {
+                if has_zero[b] {
+                    span.clear();
+                }
+            }
+            for &e in live {
+                let i = e as usize;
+                let b = usize::from(p.block[m][i]);
+                if has_zero[b] && self.inside[i] && weight_in(i, &self.pot) > 0 {
+                    let inserted = self.spans[m][b].insert(p.vector[m][i], e);
                     debug_assert!(inserted, "a member of a common independent set is dependent");
                 }
             }
@@ -820,15 +837,25 @@ impl<const R: usize> Meet<R> {
                 if wy <= 0 || self.inside[i] {
                     continue;
                 }
-                let span = &self.spans[m][usize::from(p.block[m][i])];
-                let (r, c) = span.reduce(p.vector[m][i]);
-                // A positive element independent of B_m would make B_m + y heavier: the split rules it out.
-                debug_assert!(is_zero(&r), "an element of positive weight is free of a heaviest basis");
+                let b = usize::from(p.block[m][i]);
                 let repl = &mut self.repl[m];
-                each_bit(&c, |slot| {
-                    let x = span.elem[slot] as usize;
-                    repl[x] = repl[x].max(wy);
-                });
+                if has_zero[b] {
+                    let span = &self.spans[m][b];
+                    let (r, c) = span.reduce(p.vector[m][i]);
+                    // A positive element independent of B_m would make B_m + y heavier: the split rules it out.
+                    debug_assert!(is_zero(&r), "an element of positive weight is free of a heaviest basis");
+                    each_bit(&c, |slot| {
+                        let x = span.elem[slot] as usize;
+                        repl[x] = repl[x].max(wy);
+                    });
+                } else {
+                    debug_assert!(is_zero(&self.res[m][i]), "an element of positive weight is free of I*");
+                    let elems = &self.slot_elem[m][b];
+                    each_bit(&self.mask[m][i], |s| {
+                        let x = elems[s] as usize;
+                        repl[x] = repl[x].max(wy);
+                    });
+                }
             }
         }
         for &e in live {

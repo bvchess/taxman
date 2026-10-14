@@ -300,6 +300,7 @@ impl<const W: usize> Game<W> {
             gf2_prefilter: cfg.gf2_prefilter,
             gf2_branching: cfg.gf2_branching,
             gf2_strong_limit: usize::MAX,
+            gf2_more_forced: true,
         };
         let engine = engine.unwrap_or_else(|| config(cfg.threads));
         let start = match resume {

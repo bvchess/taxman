@@ -313,8 +313,9 @@ pub struct Gf2Stats {
     /// Of the solves and augmentations, those of [`Gf2Bound::value_excluding`] (strong branching).
     pub excluded_solves: u64,
     pub excluded_augmentations: u64,
-    /// Of those, the ones a greedy lower bound settled with no solve.
+    /// Of those, the ones a greedy lower bound settled with no solve, and the ones whose solve stopped early.
     pub greedy_stops: u64,
+    pub excluded_stopped: u64,
 }
 
 impl<'g, const W: usize> Gf2Bound<'g, W> {
@@ -373,7 +374,10 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
     /// The weight split's bound on the top level without its member `x`, if the last evaluation asked for forced
     /// members and the level has a split.
     pub fn split_without(&mut self, x: u32) -> Option<i64> {
-        dispatch!(self, l => l.levels[l.depth].split.as_ref().and_then(|s| s.iter().find(|p| p.0 == x).map(|p| p.1)))
+        dispatch!(self, l => {
+            let level = &l.levels[l.depth];
+            level.has_split.then(|| level.split.iter().find(|p| p.0 == x).map(|p| p.1)).flatten()
+        })
     }
 
     pub fn stats(&self) -> Gf2Stats {
@@ -402,7 +406,8 @@ struct Level<const W: usize, const R: usize> {
     settled: bool,
     value: u64,
     /// The bounds without each member of the heaviest set, from the weight split, once asked for.
-    split: Option<Vec<(u32, i64)>>,
+    split: Vec<(u32, i64)>,
+    has_split: bool,
     /// The workspace's solve count when this level was last solved, unchanged since (0 for none): if the workspace
     /// has made no solve since, it still holds the level's tableau.
     meet_solve: u64,
@@ -418,7 +423,8 @@ impl<const W: usize, const R: usize> Level<W, R> {
             cap: 0,
             settled: false,
             value: 0,
-            split: None,
+            split: Vec::new(),
+            has_split: false,
             meet_solve: 0,
         }
     }
@@ -431,7 +437,7 @@ impl<const W: usize, const R: usize> Level<W, R> {
         self.history.clear();
         self.solved = false;
         self.settled = false;
-        self.split = None;
+        self.has_split = false;
         self.meet_solve = 0;
     }
 }
@@ -499,7 +505,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         level.history.clear();
         level.solved = false;
         level.settled = false;
-        level.split = None;
+        level.has_split = false;
         level.meet_solve = 0;
         for x in promoted.iter() {
             contract(self.graph, level, x);
@@ -563,7 +569,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             level.settled = false;
         }
         // Deleting a candidate outside the heaviest set leaves it the heaviest: the history still ends with it.
-        level.split = None;
+        level.has_split = false;
         level.meet_solve = 0;
     }
 
@@ -582,11 +588,11 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         let chosen = level.history.last().copied().unwrap_or(Bits::EMPTY);
         let mut forced = Bits::EMPTY;
         if let Some(need) = need {
-            if level.split.is_none() && level.settled {
-                level.split = Some(split(self.graph, level, &mut self.meet, &mut self.live_idx, &mut self.stats));
+            if !level.has_split && level.settled {
+                split(self.graph, level, &mut self.meet, &mut self.live_idx, &mut self.start_idx, &mut self.stats);
             }
-            if let Some(split) = &level.split {
-                for &(x, bound) in split {
+            if level.has_split {
+                for &(x, bound) in &level.split {
                     if bound < need as i64 {
                         forced.insert(x);
                     }
@@ -630,6 +636,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         solve(self.graph, s, meet, live_idx, start_idx, cap, stop, &mut self.stats);
         self.stats.excluded_solves += 1;
         self.stats.excluded_augmentations += self.stats.augmentations - before;
+        self.stats.excluded_stopped += u64::from(!self.scratch.solved);
         self.scratch_for = self.scratch.solved.then_some(x);
         self.scratch.value
     }
@@ -716,7 +723,7 @@ fn solve<const W: usize, const R: usize>(
     level.meet_solve = meet.solves;
     level.cap = cap;
     level.value = meet.value as u64;
-    level.split = None;
+    level.has_split = false;
 }
 
 /// The bounds without each member of `level`'s heaviest set (settled), from a weight split.  Unless the workspace
@@ -724,31 +731,34 @@ fn solve<const W: usize, const R: usize>(
 /// and one shortest path, no augmentation).
 fn split<const W: usize, const R: usize>(
     graph: &Gf2Graph,
-    level: &Level<W, R>,
+    level: &mut Level<W, R>,
     meet: &mut Meet<R>,
     live_idx: &mut Vec<u32>,
+    start_idx: &mut Vec<u32>,
     stats: &mut Gf2Stats,
-) -> Vec<(u32, i64)> {
+) {
     let chosen = level.history.last().copied().unwrap_or(Bits::EMPTY);
     live_idx.clear();
     live_idx.extend(level.live.iter().map(|x| graph.index[x as usize]));
-    let start: Vec<u32> = chosen.iter().map(|x| graph.index[x as usize]).collect();
+    start_idx.clear();
+    start_idx.extend(chosen.iter().map(|x| graph.index[x as usize]));
     let problem = Problem {
         block: [&graph.block[0], &graph.block[1]],
         vector: [&level.vec[0], &level.vec[1]],
         weight: &graph.weight,
     };
     if level.meet_solve != meet.solves {
-        meet.solve(&problem, live_idx, &start, usize::MAX, i64::MAX, |_| {});
+        meet.solve(&problem, live_idx, start_idx, usize::MAX, i64::MAX, |_| {});
         debug_assert_eq!(meet.value as u64, level.value, "the heaviest set solved again changed");
     }
     stats.splits += 1;
-    let mut out = Vec::with_capacity(start.len());
+    let out = &mut level.split;
+    out.clear();
     if meet.settled {
         meet.split_bounds(&problem, live_idx, |e, bound| out.push((graph.elems[e as usize], bound)));
     }
     stats.split_rounds = meet.split_rounds;
-    out
+    level.has_split = true;
 }
 
 #[cfg(test)]

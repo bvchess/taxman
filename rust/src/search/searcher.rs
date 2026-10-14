@@ -111,6 +111,9 @@ pub struct SearchSpace<'a, const W: usize> {
     /// With [`Gf2Branching::Exact`]: how many members of a conflict (the most promising by their split bounds) are
     /// solved exactly; the others are not tried.
     pub gf2_strong_limit: usize,
+    /// With [`Gf2Branching::Exact`] and `fix_forced`: once a member is found forced, whether the others are still
+    /// solved (as far as the need) to find more forced members.
+    pub gf2_more_forced: bool,
 }
 
 /// How a node chooses the member of its conflict to branch on with the tactic `gf2` (strong branching asks what each
@@ -154,6 +157,7 @@ impl<'a, const W: usize> SearchSpace<'a, W> {
             gf2_prefilter: false,
             gf2_branching: Gf2Branching::Exact,
             gf2_strong_limit: usize::MAX,
+            gf2_more_forced: true,
         }
     }
 }
@@ -183,12 +187,12 @@ pub mod stat {
     pub const CHILDREN: usize = 2;
     /// Matching bounds computed (checks of nodes and children).
     pub const MATCH_BOUNDS: usize = 3;
-    /// With the tactic `gf2`: levels solved (augmentations run), augmentations, levels whose heaviest set followed
-    /// from the parent's with none, and weight splits (see [`Gf2Stats`]).  Not in the results lines.
+    /// With the tactic `gf2`: the GF(2) bound's solves and augmentations, and of those the ones of strong
+    /// branching (the bound without a member; see [`Gf2Stats`]).  Not in the results lines.
     pub const GF2_SOLVES: usize = 4;
     pub const GF2_AUGMENTATIONS: usize = 5;
-    pub const GF2_INHERITED: usize = 6;
-    pub const GF2_SPLITS: usize = 7;
+    pub const GF2_STRONG_SOLVES: usize = 6;
+    pub const GF2_STRONG_AUGMENTATIONS: usize = 7;
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -828,6 +832,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
                         best.1 = u32::MAX - order[0].1;
                     }
                     for &(_, key) in order.iter().take(space.gf2_strong_limit.max(1)) {
+                        if !space.gf2_more_forced && space.fix_forced && !forced.is_empty() {
+                            break;
+                        }
                         let x = u32::MAX - key;
                         // A solve that stops has a value of at least `stop`, which is never below `need`: only a
                         // solve that ran to the end can show a member forced.
@@ -943,8 +950,8 @@ impl<'a, const W: usize> Stepper<'a, W> {
             let (now, before) = (g.stats(), self.gf2_flushed);
             stats.extra[stat::GF2_SOLVES] += now.solves - before.solves;
             stats.extra[stat::GF2_AUGMENTATIONS] += now.augmentations - before.augmentations;
-            stats.extra[stat::GF2_INHERITED] += now.inherited - before.inherited;
-            stats.extra[stat::GF2_SPLITS] += now.excluded_augmentations - before.excluded_augmentations;
+            stats.extra[stat::GF2_STRONG_SOLVES] += now.excluded_solves - before.excluded_solves;
+            stats.extra[stat::GF2_STRONG_AUGMENTATIONS] += now.excluded_augmentations - before.excluded_augmentations;
             self.gf2_flushed = now;
         }
         if let Some(p) = &mut self.probe {
