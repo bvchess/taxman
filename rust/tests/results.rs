@@ -8,7 +8,9 @@
 mod common;
 
 use common::TempDir;
+use std::collections::BTreeSet;
 use std::fs;
+use std::ops::RangeInclusive;
 use std::path::PathBuf;
 use std::process::Command;
 use taxman::game::Optimal;
@@ -136,7 +138,7 @@ fn lines_whose_fields_contradict_each_other_are_refused_by_both_verifiers() {
         // Only schema 5 is read.
         (exhausted, vec![("schema", Json::from(4u32))], "older than the schema 5"),
         (exhausted, vec![("schema", Json::Null)], "bad \"schema\""),
-        // A proof by the cap passed off as an exhausted search, which would not inherit what n − 1 assumes.
+        // A proof by `cap` passed off as an exhausted search, which would not inherit what n − 1 assumes.
         (capped, vec![("reached_cap", Json::Bool(false)), ("proof", s("exhausted"))], "records not reaching"),
         (prime, vec![("setup", some_setup)], "a prime game with a \"setup\""),
         (prime, vec![("in_the_bag", Json::from(0u64))], "a prime game with \"in_the_bag\""),
@@ -150,9 +152,9 @@ fn lines_whose_fields_contradict_each_other_are_refused_by_both_verifiers() {
 }
 
 /// A proof assumes what the game it rests on assumes, and nothing else.  Games 33 to 50, the first built on
-/// `optimal.json`'s game of 32 (`--use-prev`): 33 reaches its cap and 34 repeats 33, so both assume that game
+/// `optimal.json`'s game of 32 (`--use-prev`): 33 reaches its ceiling and 34 repeats 33, so both assume that game
 /// optimal; 35 exhausts its search, which rests on no game, so it and the games after it that rest on it assume
-/// nothing.  Both verifiers refuse a line that records a proof by the cap without the assumption, an exhausted search
+/// nothing.  Both verifiers refuse a line that records a proof by `cap` without the assumption, an exhausted search
 /// with it, or a prime game built on a game that assumes nothing with it.
 #[test]
 fn a_proof_assumes_what_the_game_it_rests_on_assumes_and_nothing_else() {
@@ -313,7 +315,7 @@ fn forged_repeats_are_refused_by_both_verifiers() {
     let twinned: Vec<Json> = lines[..i].iter().cloned().chain([twinned]).collect();
     cases.push((twinned, Verdict::Refused { line: 65, n: 65, expected: "its search problem's digest is" }));
     // A repeat assumes what the game it repeats assumes: 34 repeats 33, which, built on optimal.json's 32, reaches
-    // its cap and so assumes that game optimal.
+    // its ceiling and so assumes that game optimal.
     let use_prev = SolveOptions { use_prev: true, ..common::options(1) };
     let assuming: Vec<Json> =
         solver::solve_range(33, 34, &use_prev, None).unwrap().iter().map(GameResult::to_json).collect();
@@ -374,9 +376,9 @@ fn forged_repeats_are_refused_by_both_verifiers() {
     assert_eq!(run.status.code(), Some(0), "{}", String::from_utf8_lossy(&run.stdout));
 }
 
-/// How many games of the report have the proof, the certificate, or no assumption.
-fn proofs(file: &FileReport, proof: Proof) -> usize {
-    file.contents.games.values().filter(|g| g.proof == proof).count()
+/// How many games of the report in the board sizes `range` have the proof, the certificate, or no assumption.
+fn proofs(file: &FileReport, range: RangeInclusive<u32>, proof: Proof) -> usize {
+    file.contents.games.range(range).filter(|(_, g)| g.proof == proof).count()
 }
 
 fn certificates(file: &FileReport, certificate: Certificate) -> usize {
@@ -386,6 +388,10 @@ fn certificates(file: &FileReport, certificate: Certificate) -> usize {
 fn clean(file: &FileReport) -> usize {
     file.contents.games.values().filter(|g| g.assumes.is_empty()).count()
 }
+
+/// The last board size of the committed results, and of `optimal.json`, which they reproduce.
+const LAST: u32 = 2175;
+const LAST_OF_TABLE: u32 = 1300;
 
 #[test]
 fn the_committed_results_pass_the_verifier() {
@@ -404,36 +410,61 @@ fn the_committed_results_pass_the_verifier() {
     let [strict] = &report.files[..] else { panic!("one file") };
     // strict.jsonl is a chain from n = 1 made in one invocation: it holds no line of a stopped search.
     let games = &strict.contents.games;
-    assert!(games.keys().copied().eq(1..=1300), "{}: not the games 1..=1300", strict.path.display());
+    assert!(games.keys().copied().eq(1..=LAST), "{}: not the games 1..={LAST}", strict.path.display());
     assert_eq!((strict.contents.incomplete_lines, strict.contents.torn), (0, false), "{}", strict.path.display());
     assert!(strict.contents.runs.is_empty(), "{}: a game left unfinished", strict.path.display());
-    // The chain from n = 1 reproduces optimal.json: its scores to 1000 are the Java's.
-    for n in 1..=1000 {
+    assert_eq!(games[&LAST].score, 1_492_209);
+    // Every line records the one clean build that made the file, a single invocation, and the verdict on
+    // optimal.json, which has the games to 1300 and none beyond: `optimal_match` is true where it has the game and
+    // null where it has not.
+    let text = fs::read_to_string(&paths[0]).unwrap();
+    let mut builds = BTreeSet::new();
+    for (k, line) in text.lines().enumerate() {
+        let (n, line) = (k as u32 + 1, Json::parse(line).unwrap_or_else(|e| panic!("line {}: {e:?}", k + 1)));
+        let build = line.get("build").unwrap_or_else(|| panic!("n={n}: no build"));
+        assert_eq!(build.get("dirty"), Some(&Json::Bool(false)), "n={n}");
+        builds.insert(build.get("commit").and_then(Json::as_str).unwrap().to_owned());
+        assert_eq!(line.get("invocations").and_then(Json::as_u32), Some(1), "n={n}");
+        let matched = if n <= LAST_OF_TABLE { Json::Bool(true) } else { Json::Null };
+        assert_eq!(line.get("optimal_match"), Some(&matched), "n={n}");
+    }
+    assert!(builds.len() == 1 && builds.iter().all(|commit| commit.starts_with("feba6d0")), "{builds:?}");
+    // The chain from n = 1 reproduces optimal.json: its scores are the table's, which are the Java's to 1000 and
+    // those of an earlier chain of this solver from 1001 to 1300.
+    for n in 1..=LAST_OF_TABLE {
         assert_eq!(Some(strict.contents.games[&n].score), optimal.score(n), "n={n}");
     }
-    // And its sets of moves are the table's (the Java's) but at 684 to 687, where the chain found another of the
-    // several optimal sets (evidence/README.md, "Is the optimal set unique?").
+    // And its sets of moves are the table's but at six games, 539, 770 to 773 and 1215, where the chain found another
+    // of the several optimal sets (prover/README.md, "Is the optimal set unique?" lists the exchanges of the
+    // first five; it enumerates the sets only to 989).  The previous chain differed from the table at 684 to 687
+    // instead.
     let sorted = |moves: &[u32]| {
         let mut moves = moves.to_vec();
         moves.sort_unstable();
         moves
     };
-    let other_set: Vec<u32> =
-        (1..=1000).filter(|&n| sorted(&strict.contents.games[&n].moves) != sorted(optimal.moves(n).unwrap())).collect();
-    assert_eq!(other_set, [684, 685, 686, 687]);
-    // The games the table holds past 1000 were copied from it (`taxman extend-optimal`), move for move.
-    for (n, score, moves) in optimal.games().filter(|&(n, _, _)| n > 1000) {
+    let other_set: Vec<u32> = (1..=LAST_OF_TABLE)
+        .filter(|&n| sorted(&strict.contents.games[&n].moves) != sorted(optimal.moves(n).unwrap()))
+        .collect();
+    assert_eq!(other_set, [539, 770, 771, 772, 773, 1215]);
+    // The games the table holds past 1000 were copied from that earlier chain (`taxman extend-optimal`), and this
+    // one has them move for move but at 1215.
+    for (n, score, moves) in optimal.games().filter(|&(n, _, _)| n > 1000 && n != 1215) {
         let game =
             strict.contents.games.get(&n).unwrap_or_else(|| panic!("optimal.json has a game of {n}, strict.jsonl not"));
         assert_eq!((score, moves, game.assumes.is_empty()), (game.score, &game.moves[..], true), "n={n}");
     }
 
-    // A chain from n = 1 assumes nothing.
-    let counts = [Proof::Trivial, Proof::PrimeFormula, Proof::Cap, Proof::Exhausted, Proof::SameSearch]
-        .map(|p| proofs(strict, p));
-    assert_eq!(counts, [13, 211, 115, 416, 545]);
-    assert_eq!(clean(strict), 1300);
+    // A chain from n = 1 assumes nothing.  Its proofs, in the order trivial, prime formula, `cap`, exhausted, same
+    // search: in all, in the board sizes of the table (where the previous chain, of commit 271c817, had every one
+    // of them), and past it.
+    let kinds = [Proof::Trivial, Proof::PrimeFormula, Proof::Cap, Proof::Exhausted, Proof::SameSearch];
+    let by = |range: RangeInclusive<u32>| kinds.map(|p| proofs(strict, range.clone(), p));
+    assert_eq!(by(1..=LAST), [13, 326, 192, 730, 914]);
+    assert_eq!(by(1..=LAST_OF_TABLE), [13, 211, 115, 416, 545]);
+    assert_eq!(by(LAST_OF_TABLE + 1..=LAST), [0, 115, 77, 314, 369]);
+    assert_eq!(clean(strict), LAST as usize);
     // Scores at a proven ceiling given the game of n − 1 (what certifies a game whatever found it).
     let ceilings = [Certificate::NPlusPrev, Certificate::PrimeFormula].map(|c| certificates(strict, c));
-    assert_eq!(ceilings, [424, 210]);
+    assert_eq!(ceilings, [694, 325]);
 }

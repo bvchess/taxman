@@ -2,8 +2,8 @@
 //!
 //! `Bits<W>` is a set of `u32` values in `0..64·W`, stored inline as `[u64; W]`: it is `Copy`, never
 //! allocates, and every operation is a short loop over the words that the optimizer can unroll and
-//! vectorize.  The hives, the frames, the search state and the nogood tables all hold their sets of numbers as
-//! `Bits`, which is why the whole solver is generic over the width `W`.
+//! vectorize.  The frames (as setup forms them and as the search takes them), the search state and the nogood tables
+//! all hold their sets of numbers as `Bits`, which is why the whole solver is generic over the width `W`.
 //!
 //! # Choosing the width
 //!

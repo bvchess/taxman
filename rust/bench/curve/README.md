@@ -1,17 +1,18 @@
 # How the cost of solving Taxman grows with n (the curve near the wall)
 
-Purpose: measure, on this machine, how the Rust solver's cost grows around and beyond the contiguous frontier
-(n = 1231), so that what a 192-core cloud machine could reach can be predicted.  Not an attempt to push the
-frontier.
+Purpose: measure, on this machine, how the solver's cost grows around and beyond the end of the chain
+(n = 1231), so that what a 192-CPU cloud machine could reach can be predicted.  Not an attempt to extend the
+chain.
 
 This is the curve of the matching path, the search before the GF(2) bound.  The search with the GF(2) bound (the
 default since 2026-10) changes it: a chain from 1300 reached 2175 in 92 minutes on 2 threads, with no growth a fit
 resolves; its curve and projections are in [docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#the-gf2-bound-in-the-search-2026-10)
-and its data in `bench/gf2/`.
+and its data in `bench/gf2/`.  The committed `results/strict.jsonl` is a chain from n = 1 to 2175 made with it, in 27
+minutes on 8 threads ([results/README.md](../../results/README.md)).
 
-* Machine: Apple M1 Max (8 performance + 2 efficiency cores), 8 search threads for every main run.
+* Machine: Apple M1 Max (8 performance + 2 efficiency CPUs), 8 search threads for every main run.
 * Build: master at e710d16, `cargo build --release --examples`; binaries not rebuilt during the runs.
-* Tactics: strict, no unproven tactic (`reuse_prev=off`, `revise_freedoms=off`); everything else at the build's
+* Tactics: no unproven tactic (`reuse_prev=off`, `revise_freedoms=off`); everything else at the build's
   defaults (match bound, conflict-strong branching, `match_refine=1`, `fix_forced`, `nogoods`,
   `forget_nogoods` every 50,000 steps, `preclusions` off).  The ladder only searches and rejects solver tactics,
   so it gets `--tactic revise_freedoms=off` alone (`reuse_prev` does not exist there).
@@ -28,7 +29,7 @@ and its data in `bench/gf2/`.
 | `analysis_output.md` | the output of `./analysis.py` (all tables, including the ones left out below) |
 | `chain.jsonl` | step 1, the chain 1001-1231 as `taxman solve --out` writes it (with the moves) |
 | `calib.jsonl` | step 2, standalone ladder runs of the 197 non-primes in 1001-1231 |
-| `bands.jsonl` | step 3, standalone runs beyond the frontier: bands at 1250, 1300, 1350 (3 games) |
+| `bands.jsonl` | step 3, standalone runs beyond the end of the chain: bands at 1250, 1300, 1350 (3 games) |
 | `scaling.jsonl` | step 4, thread scaling of the proof of 1225 |
 | `recheck.jsonl` | four games repeated at the end, to see run-to-run and background-load noise |
 | `load.jsonl` | what the machine was doing apart from us, sampled before and after each invocation |
@@ -39,20 +40,20 @@ Regenerate the tables with `./analysis.py > analysis_output.md` (and the slope s
 ## Method
 
 1. **Chain baseline.**  `taxman solve 1001-1231 --threads 8 --tactic reuse_prev=off --tactic revise_freedoms=off
-   --checkpoint-dir ... --progress 0`: each game starts from the previous game (seed and the n + opt(n-1) cap), so
+   --checkpoint-dir ... --progress 0`: each game starts from the previous game (seed and the n + opt(n-1) ceiling), so
    a game's time is its *chained* cost.  Every score equals `results/strict.jsonl` (1001-1219, as it was then) and
    `results/default.jsonl` (1001-1231).  (`strict.jsonl` then ended at 1219, not 1231; the chain file written here is
-   the strict file through 1231 and is what `--known` used wherever a game past 1219 was needed.  `strict.jsonl` has
-   since been regenerated as a strict chain 1-1300, and its games 1001-1231 are this file's, move for move but for
-   1221-1224, which have at least two optimal sets; see `results/README.md`.)
+   the chain through 1231 and is what `--known` used wherever a game past 1219 was needed.  `strict.jsonl` has
+   since been regenerated as a chain 1-2175, and its games 1001-1231 are this file's, move for move but for
+   1215 and 1221-1224, which have at least two optimal sets; see `results/README.md`.)
 2. **Calibration.**  `ladder --threads 8 --no-seed --no-cap --tactic revise_freedoms=off` on every non-prime in
    1001-1231, one process per game.  Each standalone result was checked against the chain's optimum (all 197
    agree).  Compared per game with step 1.
-3. **Beyond the frontier.**  Bands = the first 8 non-primes from the band start, standalone, 8 threads.
+3. **Beyond the end of the chain.**  Bands = the first 8 non-primes from the band start, standalone, 8 threads.
 4. **Thread scaling.**  The proof of 1225 (`--seed-opt --known chain.jsonl`) on 1, 2, 4 and 8 threads.
 5. **Analysis.**  `analysis.py`.
 
-**Where the runs departed from the plan** (each forced by the environment or decided during the run):
+**Where the runs departed from the plan** (each imposed by the environment or decided during the run):
 
 * The search limit is **585 s, not 600 s**.  The runs were made in sessions limited to 10 minutes per command, a
   timed-out game must fit one command together with its setup, and runs are resumable only between games (the ladder has
@@ -74,9 +75,10 @@ Regenerate the tables with `./analysis.py > analysis_output.md` (and the slope s
 ### Chain baseline (step 1)
 
 231 games in **318 s** on 8 threads (149 s for 1001-1217, which [docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md) gives
-as 164 s for an earlier build, and 169 s for 1218-1231).  34 primes cost 0.43 s together, 70 non-primes reach the cap
-with their seed (0 nodes; 6.9 s in all, i.e. setup), 117 small searches take 110 s, and 10 big ones (chain >= 5 s) take
-200 s.  The slowest: 1230 (91.5 s, 29% of the whole chain), 1227 (19.7 s), 1220 (19.6 s), 1025 (18.0 s), 1225 (17.0 s).
+as 164 s for an earlier build, and 169 s for 1218-1231).  34 primes cost 0.43 s together, 70 non-primes reach the
+ceiling with their seed (0 nodes; 6.9 s in all, i.e. setup), 117 small searches take 110 s, and 10 big ones (chain >= 5
+s) take 200 s.  The slowest: 1230 (91.5 s, 29% of the whole chain), 1227 (19.7 s), 1220 (19.6 s), 1025 (18.0 s), 1225
+(17.0 s).
 
 ### Calibration: standalone against chained (step 2)
 
@@ -100,7 +102,7 @@ with their seed (0 nodes; 6.9 s in all, i.e. setup), 117 small searches take 110
   nearly all search for the optimum; a chain gets that for free only when n - 1 has the same optimum (1351 after
   1350) and not when n opens a new class of frames.  The ratio of 0.45 was measured at 1150-1231 and assumed beyond.
 
-### Standalone cost per band (step 3), 8 threads, no seed, no cap, limit 585 s
+### Standalone cost per band (step 3), 8 threads, no seed, no ceiling, limit 585 s
 
 Bands starting at 1001-1200 are the calibration runs, grouped the same way.  Times are search seconds.
 
@@ -151,8 +153,8 @@ log10).  A fit with 3-5 points and a residual of x1.7-2.3 (one sd) is a rough gu
 ### Projection: cumulative cost of extending the chain from 1231 to N
 
 Cost of the chain per non-prime n = 0.45 x 10^(a + b n) for the mean fit from 1200 (a = -17.65, b = 0.01512),
-summed over the non-primes in 1232..N; the 192-core machine at 19x (optimistic: 192 cores at 0.8 of an M1
-performance core each, linear scaling) or 10x (pessimistic) this machine's 8 threads; spot $3.33/h and
+summed over the non-primes in 1232..N; the 192-CPU machine at 19x (optimistic: 192 CPUs at 0.8 of an M1
+performance CPU each, linear scaling) or 10x (pessimistic) this machine's 8 threads; spot $3.33/h and
 on-demand $8.35/h for c9g.48xlarge.  The median and max fits from 1200 give cumulative times within 8% (median)
 and 16% (max) of these up to 1500, and within 25% up to 1600 (see `analysis_output.md`).
 
@@ -188,7 +190,7 @@ How far the chain gets on a budget (largest N; range = slope +1 s.e. to -1 s.e.)
 | $10,000 on-demand | 1623 (1581-1674) | 1603 (1564-1651) | 1536 (1507-1575) |
 
 In words: every factor of 10 in time or money buys +66 n.  A 19x machine therefore gains log10(19)/0.0151 = 85 n
-over this one for the same time (1 day: 1423 to 1509), a 10x machine 66 n.  A day on 192 cores (about $80 spot)
+over this one for the same time (1 day: 1423 to 1509), a 10x machine 66 n.  A day on 192 CPUs (about $80 spot)
 reaches about N = 1510, a week (about $560 spot, $1,400 on-demand) about 1565 (1530-1610), a month ($2,400 spot)
 about 1605, a year ($29,000 spot) about 1680, and $100,000 of spot time about 1710 (1660-1780).  The data show a
 steep exponential (x10 per ~66 n) and no knee; it is the same curve, not a wall at one n.  What varies sharply is
@@ -209,7 +211,7 @@ nodes; each thread's nogood tables are emptied every 50,000 of its steps, so the
 the node rate itself scales 6.5x on 8 threads (80 to 65 k nodes/s per thread, -19%).  The earlier engine measurement
 for 1215 (65.0, 28.3, 17.7, 11.4 s on 1, 2, 4, 8 threads: speed-ups 2.3, 3.7, 5.7) gives a lower
 figure, so 5.7-8.4x on 8 threads is the range seen on this machine.  Nothing was measured above 8 threads
-(the 10-thread point, with its 2 efficiency cores, was not run), so the 10x / 19x assumptions for 192 cores
+(the 10-thread point, with its 2 efficiency CPUs, was not run), so the 10x / 19x assumptions for 192 CPUs
 rest on the engine design, not on data here.
 
 ### Repeats, and what else was running
@@ -224,10 +226,10 @@ rest on the engine design, not on data here.
 The machine was not idle.  `load.jsonl` (a one-second `top` sample before and after each invocation, with no
 search running) shows 11% of the 10 logical CPUs busy during the chain (WindowServer, kernel_task), 11-23% during
 the calibration (daemons, and another session compiling and running tests in a worktree: `rustc` and a test
-binary at ~70% of a core each around 12:22), 4-16% around band 1250, and **21-36% from 12:32 on, when a Zoom call
-was running** (Zoom ~0.5 core, WindowServer ~0.4, kernel_task ~0.25, audio helpers ~0.2, more in short bursts):
-roughly 1-2.5 cores' worth by the process list, 2-3.5 by the idle share, some of it on the efficiency cores at low
-clocks, the rest on the performance cores that the 8 search threads use.  The chain, the calibration and band 1250
+binary at ~70% of a CPU each around 12:22), 4-16% around band 1250, and **21-36% from 12:32 on, when a Zoom call
+was running** (Zoom ~0.5 CPU, WindowServer ~0.4, kernel_task ~0.25, audio helpers ~0.2, more in short bursts):
+roughly 1-2.5 CPUs' worth by the process list, 2-3.5 by the idle share, some of it on the efficiency CPUs at low
+clocks, the rest on the performance CPUs that the 8 search threads use.  The chain, the calibration and band 1250
 ran mostly before Zoom showed up in the samples (12:32); the rest of band 1300, band 1350 and the repeats and the
 scaling run ran with it.
 
@@ -255,7 +257,7 @@ still be better than this estimate.
   mean.
 * **Extrapolation.**  The fits are used 50-650 n beyond their data (1352), assuming log-linear growth.  A change
   in the frame structure (a further frame, more candidates) could bend the curve; the data show a x18 step and
-  x2 and x3 steps, so the single-step uncertainty is large.  Costs past ~1700 (years of 192-core time) are only an
+  x2 and x3 steps, so the single-step uncertainty is large.  Costs past ~1700 (years of 192-CPU time) are only an
   order-of-magnitude statement.  A later study
   ([docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#what-drives-the-slope-2026-10)) found that a proof's cost follows
   the gap between the root's bound and the optimum, not n: for the proofs, the slope fitted here is the steep rise of
@@ -268,9 +270,9 @@ still be better than this estimate.
   over 1 thread, and a falling node rate per thread (-19% at 8); no data above 8 threads, none for Graviton5.  The
   ramp-up and tail of a 192-thread run are negligible for games of minutes (all workers are busy within 3 ms,
   [docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md)), but the cheap games of a chain, each a second or less, cannot use
-  192 cores.
+  192 CPUs.
 * **Limit 585 s** instead of 600 s (see above); no run hit it, so it does not affect the data.
 * **Background load**, see above.  The timing of single multi-thread runs varies by +-10-25% from the search
   alone.
-* Only strict tactics were measured.  `reuse_prev` and `revise_freedoms` would make the chain cheaper, but their
+* Only proven tactics were measured.  `reuse_prev` and `revise_freedoms` would make the chain cheaper, but their
   answers are unproven.

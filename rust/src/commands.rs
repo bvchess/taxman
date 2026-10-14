@@ -154,7 +154,7 @@ pub fn regress(args: &[String]) -> CliResult {
 // ---------------------------------------------------------------------------------------------------------
 // bench
 
-/// The benchmark games: the last W = 16 game of the fast set and the W = 20 ones near the frontier, each a
+/// The benchmark games: the last W = 16 game of the fast set and the W = 20 ones near the end of the chain, each a
 /// search of a second or so on one thread (DESIGN.md, "Performance").
 const BENCH_GAMES: [u32; 6] = [936, 1050, 1100, 1133, 1170, 1184];
 

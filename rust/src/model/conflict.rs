@@ -6,7 +6,7 @@
 //! bound on that ([`crate::search`]): when the heaviest matching's candidates cannot all be promoted, a small
 //! conflict among them says which ones to try leaving out.
 //!
-//! A conflict is found in a frame that fails, from its *core* (the moves a peel cannot drop, see
+//! A conflict is found in a frame that fails, from its *residual* (the moves a peel cannot drop, see
 //! [`super::peel`]), and made minimal ([`Model::conflict_using`]).  A conflict of a node is relative to the
 //! node's promotions; [`Model::nogood`] turns it into a conflict of the root, a *nogood*, which holds at every
 //! node ([`super::nogoods`]).
@@ -21,16 +21,16 @@ impl Model {
     /// [`winnable`](Self::winnable)), every set that can be promoted leaves out some member of a conflict.
     ///
     /// The conflict is small: a single member if one is not a factor of a home frame `h ≥ 1`; else, for a frame
-    /// that is not winnable with `set` promoted, the members that its core (the moves a peel cannot drop) needs:
-    /// the ones promoted into the frame that are core moves, and the ones promoted out of it that are factors of
-    /// core moves.  With only those promoted, the core is still there (its moves, and the same live factors), so
-    /// the frame is still unwinnable.
+    /// that is not winnable with `set` promoted, the members that its residual (the moves a peel cannot drop)
+    /// needs: the ones promoted into the frame that are residual moves, and the ones promoted out of it that are
+    /// factors of residual moves.  With only those promoted, the residual is still there (its moves, and the same
+    /// live factors), so the frame is still unwinnable.
     ///
     /// With `minimal`, that set is then reduced to a minimal one that keeps the frame unwinnable, by trying to
     /// leave out each member, from the smallest up (so the larger members tend to stay).  Each try peels only
-    /// the moves of the current core: with fewer members promoted the frame has fewer moves and more factors,
-    /// so a core it has is a set of moves that is stuck (each live factor shared within the set) with the
-    /// current members too, and the current core contains every such set.  Of the frames that fail, the one
+    /// the moves of the current residual: with fewer members promoted the frame has fewer moves and more factors,
+    /// so a residual it has is a set of moves that is stuck (each live factor shared within the set) with the
+    /// current members too, and the current residual contains every such set.  Of the frames that fail, the one
     /// giving the smallest conflict is used (the first of them, if several are as small).
     pub fn conflict_using<const W: usize>(
         &self,
@@ -129,7 +129,7 @@ impl Model {
         minimal: bool,
     ) -> Option<Bits<W>> {
         let g = &self.graph;
-        // The factors of the frame that the moves of `core` can pay with, live or promoted out.
+        // The factors of the frame that the moves of the residual (`core`) can pay with, live or promoted out.
         let near = |core: &Bits<W>| -> Bits<W> {
             let mut out = Bits::EMPTY;
             for m in core.iter() {

@@ -1,10 +1,10 @@
 //! Prints the jam P at a rejection threshold: `inspect N X` lists P's members with their factorizations, greedy's
 //! decisions, the bounds, and how P splits into the components just above x and the new members.
 
-use taxman_evidence::bounds::{lorea_rank, matching_number, with_ground};
-use taxman_evidence::instance::Instance;
-use taxman_evidence::peel::{component_of, components, greedy, Peeler};
-use taxman_evidence::primes::{distinct_primes, smallest_prime_factors};
+use taxman_prover::bounds::{lorea_rank, matching_number, with_ground};
+use taxman_prover::instance::Instance;
+use taxman_prover::peel::{component_of, components, greedy, Peeler};
+use taxman_prover::primes::{distinct_primes, smallest_prime_factors};
 
 fn factorize(mut c: u64, spf: &[u32]) -> String {
     let mut parts = Vec::new();

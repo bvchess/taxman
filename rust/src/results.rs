@@ -40,16 +40,17 @@
 //! * its score is `optimal.json`'s, where the table ([`Optimal::built_in`], or another a test gives) has the game;
 //! * the fields the proof and the assumptions are derived from agree with each other, as the solver writes them: a
 //!   searched or repeat game, and only such a game, has a `setup`; every game but a prime one records
-//!   `in_the_bag`; only a search reaches a cap; a prime game's `n` is prime; a trivial game promotes nothing; a
-//!   repeat, and only a repeat, records the game it repeats, and its `setup` has no cap (it ran no search to stop);
+//!   `in_the_bag`; only a search reaches its ceiling (`reached_cap`); a prime game's `n` is prime; a trivial game
+//!   promotes nothing; a repeat, and only a repeat, records the game it repeats, and its `setup` has no `cap` (it
+//!   ran no search to stop);
 //! * against the game of `n − 1` (from the file, else from `optimal.json`):
 //!   `score(n − 1) ≤ score(n) ≤ n + score(n − 1)`.  Both are theorems for optimal games, so a violation proves one
 //!   of the two games is not optimal;
-//! * the arithmetic of the line: a searched game scores `in_the_bag` plus its promotions; the cap is
-//!   `n + score(n − 1) − in_the_bag` and the promotions do not exceed it; a game records reaching the cap exactly
-//!   when its promotions sum to it, where the search stops (so a proof by the cap cannot pass for an exhausted
-//!   search, which does not rest on the game of `n − 1`); a prime game scores `n + score(n − 1) − P`, `P` the
-//!   largest prime below `n`;
+//! * the arithmetic of the line: a searched game scores `in_the_bag` plus its promotions; the ceiling on the
+//!   promotion sum (`setup`'s `cap`) is `n + score(n − 1) − in_the_bag` and the promotions do not exceed it; a
+//!   game records reaching it exactly when its promotions sum to it, where the search stops (so a proof by `cap`
+//!   cannot pass for an exhausted search, which does not rest on the game of `n − 1`); a prime game scores
+//!   `n + score(n − 1) − P`, `P` the largest prime below `n`;
 //! * the predecessor the line names is the game the file (or `optimal.json`) holds for `n − 1`: same score,
 //!   same moves (by digest, [`moves_digest`]), same proof and assumptions;
 //! * a repeat: the game `m` it names is a completed game of the file, on an earlier line, whose proof settles its
@@ -169,8 +170,8 @@ impl Proof {
 
     /// Whether the proof settles the best promotion sum of the game's search problem, so that a later game that
     /// poses the same problem can repeat it (tactic `same_search`): an exhausted search directly; a search that
-    /// reached its cap because every promotion set of the model is a game, which scores at most the cap; a repeat
-    /// by induction (DESIGN.md, "Same search").  A trivial or prime game settles no search.
+    /// reached its ceiling because every promotion set of the model is a game, which scores at most the ceiling; a
+    /// repeat by induction (DESIGN.md, "Same search").  A trivial or prime game settles no search.
     pub fn settles_search(self) -> bool {
         matches!(self, Proof::Exhausted | Proof::Cap | Proof::SameSearch)
     }
@@ -786,12 +787,12 @@ fn check_entry(
                 "the promotions' {sum} exceed the cap {cap}, so the game of n − 1 is not optimal"
             )));
         }
-        // in_the_bag is the score less the promotions, and the cap is n + score(n − 1) − in_the_bag.
+        // in_the_bag is the score less the promotions, and the ceiling `cap` is n + score(n − 1) − in_the_bag.
         if prev_score.is_some_and(|before| before + u64::from(n) + sum != cap + e.score) {
             return Err(fail(format!("the cap {cap} is not n + score(n − 1) − in_the_bag")));
         }
     }
-    // The search stops as soon as its incumbent reaches the cap, and only then.
+    // The search stops as soon as its incumbent reaches the ceiling, and only then.
     if e.reached_cap && cap != Some(sum) {
         return Err(fail(format!("it records reaching the cap, but its promotions' {sum} are not the cap {cap:?}")));
     }

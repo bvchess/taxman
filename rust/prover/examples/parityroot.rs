@@ -1,14 +1,14 @@
 //! The parity bound at the root of each game (`parityroot A B [STEP]`): the heaviest common independent set of the
 //! two parity matroids, against the recorded optimum (optimal.json, then `../results/strict.jsonl`), with the
-//! matching bound beside it, its cost, and checks: the bound is at least the optimum and the recorded game's moves
-//! are independent in both matroids (the bound with every recorded move forced is still at least the optimum).
+//! Franklín–Moniot bound beside it, its cost, and checks: the bound is at least the optimum and the recorded game's
+//! moves are independent in both matroids (the bound with every recorded move forced is still at least the optimum).
 
 use std::path::PathBuf;
 use std::time::Instant;
-use taxman_evidence::game::{Board, Prover, Role};
-use taxman_evidence::jsonl::recorded_games;
-use taxman_evidence::parity::{Meet, Outcome, Parity};
-use taxman_evidence::primes::smallest_prime_factors;
+use taxman_prover::game::{Board, Prover, Role};
+use taxman_prover::jsonl::recorded_games;
+use taxman_prover::parity::{Meet, Outcome, Parity};
+use taxman_prover::primes::smallest_prime_factors;
 
 fn main() {
     let args: Vec<u32> = std::env::args().skip(1).map(|a| a.parse().unwrap()).collect();

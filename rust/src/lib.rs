@@ -1,4 +1,4 @@
-//! An exact solver for the game of Taxman, and the `taxman` command that runs it.
+//! A solver for the game of Taxman, and the `taxman` command that runs it.
 //!
 //! # The game
 //!
@@ -13,8 +13,9 @@
 //! It finds optimal games.  Every number above `n/2` is never tax and is played (unless it turns out to be
 //! impossible), so a game is chosen by which of the other numbers to *promote* to a move as well.  The *frame
 //! model* (a restatement of the algorithm of the Java solver in `src/main/java`) splits the board into independent
-//! groups of numbers, the *hives*, stacks the ones that have numbers to spare into *frames*, and turns an optimal
-//! game into the promotion set with the largest sum that keeps every frame winnable.  A branch-and-bound over
+//! *frames*, each a group of sources with the factors they compete for, numbers the ones that have freedoms from
+//! the front (0 is played first) and merges those with the same number, and turns an optimal game into the
+//! promotion set with the largest sum that keeps every frame winnable.  A branch-and-bound over
 //! promotion sets, bounded by the heaviest set independent in two GF(2) matroids of the frames (or by a matching
 //! relaxation) and run on many threads, finds that set; a game of `n` is
 //! built from the game of `n − 1`, so a chain of games from `n = 1` proves each from the one before.  `README.md`
@@ -27,7 +28,7 @@
 //! n ──► numtheory::Tables               maximal factors and composites of 1..=n
 //!        │
 //!        ▼
-//!       board::Board                   hives::Apiary → frames::build_frames: the frames (0 = bottom) and the
+//!       board::Board                   hives::Apiary → frames::build_frames: the frames (0 = front) and the
 //!        │                              promotion candidates; in_the_bag = the score with no promotions
 //!        ▼
 //!       search::prepare                model::Model: the root state; greedy incumbent
@@ -55,8 +56,8 @@
 //! | | [`numtheory`] | maximal factors and composites, primes, divisors of the numbers on a board |
 //! | | [`bits`] | fixed-width bitsets `Bits<W>` for sets of game numbers; the set widths, dispatched |
 //! | | [`json`] | a small JSON reader and writer (the table of optimal games, golden data, results lines) |
-//! | frame model | [`hives`] | sources, factors and hives; what a board's hives can play and spare |
-//! | | [`frames`] | hives stacked into frames, and the promotion candidates |
+//! | frame model | [`hives`] | sources, factors and the frames as setup forms them; what they can play and spare |
+//! | | [`frames`] | the frames numbered from the front and merged, and the promotion candidates |
 //! | | [`model`] | the search state: frames, winnability, promotion, conflicts, nogoods |
 //! | | [`accelerate`] | the prime shortcut (the game of a prime `n` from the game of `n − 1`); promotions → moves |
 //! | search | [`matchbound`] | the matching bound, the upper bound on a node's completions; the Lagrangian bound |
@@ -65,7 +66,7 @@
 //! | | [`bounds`] | the greedy incumbent and the limit on a node's further promotions |
 //! | engine | [`engine`] | the problem-independent parallel depth-first driver: threads, spill, checkpoints |
 //! | solving | [`tactics`] | the switchable pieces of the algorithm, by name and value |
-//! | | [`board`] | a board analysed and prepared for a search: tables, frames, cap and seed |
+//! | | [`board`] | a board analysed and prepared for a search: tables, frames, ceiling and seed |
 //! | | [`solver`] | the per-game pipeline, the options, the range driver |
 //! | | [`results`] | what a result line records about its proof, and the checks a results file passes |
 //! | | [`paths`] | where the default files are, found at run time |

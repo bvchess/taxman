@@ -196,7 +196,7 @@ fn handicapped_units<const W: usize>(n: u32, rng: &mut Rng, units: usize, config
     runs
 }
 
-/// Units of real games at W = 20 to 64, the widths of the frontier and beyond, from a handicapped incumbent under
+/// Units of real games at W = 20 to 64, the widths of the hardest games and beyond, from a handicapped incumbent under
 /// every configuration: the game tests above stop at W = 8, the perturbed games below at W = 4.
 #[test]
 fn units_of_wide_games_from_a_handicapped_incumbent_find_the_optimum() {
@@ -294,7 +294,7 @@ fn a_wide_search_resumed_over_and_over_finds_the_optimum() {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// The GF(2) bound at nodes of the frontier
+// The GF(2) bound at nodes of the hardest games
 
 /// At the nodes of the probe's fixtures (`testdata/perf/`: 300 nodes each of the proofs of 936 and 1215, from the root
 /// to 30 promotions deep), with the oracles that do not use the bound: every completion made by promoting the node's
@@ -520,7 +520,7 @@ fn promotion_order_conflicts_and_nogoods_on_perturbed_frame_sets() {
 }
 
 /// The conjecture that the promotion set with the largest sum also has the most promotions is false for the whole
-/// frame game of n = 833, the first board whose optimal game is not a longest one (`evidence/README.md`, section 8):
+/// frame game of n = 833, the first board whose optimal game is not a longest one (`prover/README.md`, section 6):
 /// the optimal set promotes 48 numbers, as many as `max_total` allows less one, and a set the model accepts promotes
 /// 49, four heavy promotions of the optimal set exchanged for five light ones; both games are over, the second one
 /// move longer and 29 points lighter.  (The Java's `reviseFreedoms` assumed the conjecture of the two-frame game of

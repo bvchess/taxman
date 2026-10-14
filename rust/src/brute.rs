@@ -1,5 +1,5 @@
 //! Exact Taxman on small boards, with holes, by exhaustive search over pot states: **a test oracle**.  It makes
-//! no model assumption of any kind (no hives, no frames, no maximal-factor lifting, no greedy choices), so its
+//! no model assumption of any kind (no frames, no maximal-factor lifting, no greedy choices), so its
 //! answers are the ground truth that the frame model's can be checked against on boards small enough to search.
 //!
 //! *Status:* the solver never calls this module.  It is compiled into the library (so that the sacrifice study's
@@ -17,7 +17,7 @@
 //! # How the tests use it
 //!
 //! * Here: it reproduces `optimal.json` for every board up to 40; it agrees with a naive solver on random sparse
-//!   boards all the way up to 127 (which exercises the upper half of the `u128`); the two rules agree on boards
+//!   boards all the way up to 127 (which exercises the high 64 bits of the `u128`); the two rules agree on boards
 //!   without holes; and the hole semantics are pinned on small cases.
 //! * [`crate::sacrifice`]'s tests check the frame model on every board `1..=n` minus one number, `n ≤ 36`
 //!   (`punctured` against `solve` under the maximal-factor rule), and the sacrifice bound itself.
@@ -262,7 +262,7 @@ mod tests {
     }
 
     /// The other tests stop below 65, the low half of the pot's `u128`.  Sparse boards that reach 127 (the numbers
-    /// above 64 are in bits of the upper half) are cheap, and checked against a naive solver under both rules.
+    /// above 64 are in the high 64 bits) are cheap, and checked against a naive solver under both rules.
     #[test]
     fn sparse_boards_up_to_the_top_of_the_u128_match_a_naive_solver() {
         let mut rng = Rng(0x1234_5678_9ABC_DEF1);

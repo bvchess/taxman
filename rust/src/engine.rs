@@ -254,7 +254,7 @@ pub struct EngineConfig {
     pub node_limit: Option<u64>,
     /// Prefix for progress lines.
     pub label: String,
-    /// Emulation of many workers on few cores, for measuring what a larger machine would do in counts (nodes,
+    /// Emulation of many workers on few CPUs, for measuring what a larger machine would do in counts (nodes,
     /// lookups), not time: at most this many of the `threads` workers search at once, taking turns every
     /// `POLL_BATCH` polls in the order they ask (a panic in a worker gives its turn up).  `None`: no limit, and
     /// the check costs nothing but one test every `POLL_BATCH` polls.  The workers' busy time includes their
@@ -1207,7 +1207,7 @@ impl<U: Unit> Shared<U> {
 
     // --- the deque and its spill ---------------------------------------------------------------------------
 
-    /// Spill blocks from the front of the in-memory deque while it is over the cap.
+    /// Spill blocks from the front of the in-memory deque while it is over `queue_mem_cap`.
     fn spill_excess(&self, st: &mut State<U>) -> io::Result<()> {
         st.counters.max_queue = st.counters.max_queue.max(st.mem.len() as u64);
         if st.mem.len() <= self.cap || st.spill.dir.is_none() || st.error.is_some() {

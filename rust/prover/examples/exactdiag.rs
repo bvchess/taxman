@@ -1,12 +1,12 @@
-//! Diagnostics of the model-free search: `exactdiag N TARGET [--budget NODES] [--warmup NODES] [--show K]
+//! Diagnostics of the prover's search: `exactdiag N TARGET [--budget NODES] [--warmup NODES] [--show K]
 //! [--parity 1] [--warm 0] [--iterations I]` runs it and prints its counters.  With a warm-up a first search of
 //! that many nodes collects nogoods, the Lagrangian bound is fitted to them (I subgradient steps, default 200), and
 //! the search is run again with both bounds.  `--parity 1` turns on the parity bound (`Prover::with_parity`), `--warm 0`
 //! solves it from scratch at every node (`Prover::parity_cold`).
 
 use std::time::Instant;
-use taxman_evidence::game::{Board, Prover};
-use taxman_evidence::primes::smallest_prime_factors;
+use taxman_prover::game::{Board, Prover};
+use taxman_prover::primes::smallest_prime_factors;
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();

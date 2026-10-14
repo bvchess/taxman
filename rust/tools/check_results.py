@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independent referee for the Rust solver's results files (`taxman solve --out`, one JSON object per line).
+"""Independent referee for the solver's results files (`taxman solve --out`, one JSON object per line).
 
 Standard library only, and it shares no code with the Rust crate: the rules, the bounds and the provenance rules
 are written out again here, so that a bug in the solver cannot vouch for itself.
@@ -13,18 +13,19 @@ For every completed game:
   promoted    the promotions are moves, in ascending order
   fields      the fields the proof and the assumptions come from agree with each other, as the solver writes them: a
               searched or repeat game, and only such a game, has a setup, which records the digest of its search
-              problem; every game but a prime one records in_the_bag; only a search reaches a cap; a prime game's n
-              is prime; a trivial game promotes nothing; a repeat, and only a repeat, records the game it repeats
-              (same_search), and its setup has no cap
+              problem; every game but a prime one records in_the_bag; only a search reaches its ceiling; a prime
+              game's n is prime; a trivial game promotes nothing; a repeat, and only a repeat, records the game it
+              repeats (same_search), and its setup has no `cap`
   optimal     the score is optimal.json's, where the table has the game
   chain       score(n-1) <= score(n) <= n + score(n-1), with n-1 from the same file, else from optimal.json
               (both are theorems about optimal games: a game of n-1 is a game of n, and deleting the move n from
               a game of n leaves a game of n-1)
   bound       score <= the Franklin-Moniot upper bound (heuristics/results/fm_bound_2000.json)
   heuristic   score >= the best-known heuristic chain (heuristics/results/chain_1001_2000.json)
-  arithmetic  a searched game: in_the_bag + promotions = score, the cap is n + score(n-1) - in_the_bag, the
-              promotions do not exceed it, and a game records reaching the cap exactly when its promotions sum to it
-              (where the search stops); a prime game scores n + score(n-1) - P, P the largest prime below n
+  arithmetic  a searched game: in_the_bag + promotions = score, the ceiling (`setup.cap`) is
+              n + score(n-1) - in_the_bag, the promotions do not exceed it, and a game records reaching the ceiling
+              exactly when its promotions sum to it (where the search stops); a prime game scores n + score(n-1) - P,
+              P the largest prime below n
   provenance  the game of n-1 a line names (prev) is the file's game of n-1 (source run or results) or optimal.json's
               (source optimal), and the line's record of it matches that game (score, FNV-1a digest of the moves,
               proof, assumptions); the recorded proof and assumptions are the ones the rules below give
@@ -42,10 +43,10 @@ that they agree and that the two games are consistent with sharing one problem, 
 both problems up again and compares them.
 
 Proof kinds (rust/src/results.rs explains them): trivial, exhausted, cap, prime_formula, same_search.  The assumptions
-of a game are what its proof takes as given beyond the frame model: a proof by the cap or by the prime formula rests on
-the game of n-1, so it assumes what that game's proof assumes, and for a game of n-1 taken from optimal.json, that
-"the game of n-1 in optimal.json is optimal"; a repeat assumes what the game it repeats assumes; other proofs assume
-nothing.  A line of another schema than this referee reads is a problem.
+of a game are what its proof takes as given beyond the frame model: a proof by the ceiling (`cap`) or by the prime
+formula rests on the game of n-1, so it assumes what that game's proof assumes, and for a game of n-1 taken from
+optimal.json, that "the game of n-1 in optimal.json is optimal"; a repeat assumes what the game it repeats assumes;
+other proofs assume nothing.  A line of another schema than this referee reads is a problem.
 
 The report counts games by proof kind and by assumption, and the arithmetic certificates: scores equal to
 n + score(n-1) or to the prime formula, which certify a game whatever found it, given that the game of n-1 is optimal.

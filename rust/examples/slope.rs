@@ -39,14 +39,14 @@
 //! * `start`: the incumbent the chain's search of the game starts from (the best of the greedy set, the previous
 //!   game's promotions that survive, the matching dive, improved by local search: `search::search` stopped
 //!   before its first node), seeded from the known game of `n − 1` if there is one (`seeded`); `cap`: the
-//!   promotion cap from that game.
+//!   ceiling on the promotion sum from that game.
 //!
 //! **prove**: for each `--deltas` margin `δ` (default 0), a search of the game whose incumbent starts at the value
-//! `P* + δ`, with no set behind it (the engine's incumbent is a value), no seed and no cap.  With `δ ≥ 0` nothing
-//! beats it, so the search proves that nothing does, and every cut it makes is the cut it would make with every
-//! bound (matching, refined, Lagrangian, forced members) lowered by `δ`: the tree of a uniformly tighter bound,
-//! and `δ = 0` is the proof of the optimum (`ladder --seed-opt`).  With `δ < 0` the search must also find a set
-//! better than `P* + δ`, as a search seeded below the optimum does.  One thread (the default) gives exact,
+//! `P* + δ`, with no set behind it (the engine's incumbent is a value), no seed and no ceiling.  With `δ ≥ 0`
+//! nothing beats it, so the search proves that nothing does, and every cut it makes is the cut it would make with
+//! every bound (matching, refined, Lagrangian, forced members) lowered by `δ`: the tree of a uniformly tighter
+//! bound, and `δ = 0` is the proof of the optimum (`ladder --seed-opt`).  With `δ < 0` the search must also find a
+//! set better than `P* + δ`, as a search seeded below the optimum does.  One thread (the default) gives exact,
 //! repeatable node counts.  `--diag` collects the search's diagnostics (slower) and reports its steps by the
 //! number of promotions of the node taking them.
 

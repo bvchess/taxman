@@ -10,11 +10,11 @@
 //! whichever is taken first takes two factors and leaves one for the other two.
 //!
 //! Promoting a set `Q` of candidates from a state succeeds exactly when every frame is winnable with all of `Q`
-//! promoted at once (see [`Model::winnable`]).  So for a feasible `Q` there is an assignment that gives every
+//! promoted at once (see [`Model::winnable`]).  So for a promotable `Q` there is an assignment that gives every
 //! move of every frame `i` a distinct maximal factor among frame `i`'s factors and every `x ∈ Q` a distinct
 //! maximal factor among the factors of frame `home(x) − 1`, using no member of `Q` as a factor.  The *matching
 //! bound* is the largest `sum(Q)` over the `Q ⊆ cands` that have such an assignment: at least the sum of the best
-//! feasible completion.
+//! promotable completion.
 //!
 //! The frames hold distinct numbers, so the assignment is a matching in the graph whose vertices are the numbers
 //! and whose edges join each possible mover `u` (a move, or a candidate) to its maximal factors `u/p` in the
@@ -55,9 +55,9 @@
 //! * *factor*: every other factor, which can only pay for a mover above it.
 //!
 //! An edge counts when its upper end is required or a candidate and its lower end is not required.  The frames
-//! of a state reached by promotions are the root's minus the forced pairs (a move left with a single factor
-//! takes it, see [`Model`]); the graph keeps those pairs, but every matching that matches the required vertices
-//! pairs them up just as the reduction did, so the optimum is the same.
+//! of a state reached by promotions are the root's minus the pairs a reduction drops (a move left with a single
+//! factor takes it, see [`Model`]); the graph keeps those pairs, but every matching that matches the required
+//! vertices pairs them up just as the reduction did, so the optimum is the same.
 //!
 //! # The incremental solver
 //!
@@ -90,7 +90,7 @@ use std::collections::VecDeque;
 // Reference solver
 
 /// The matching bound of `state` with the candidates `cands`, computed from scratch (see the module docs).
-/// Candidates that are not factors of a frame above frame 0 cannot be promoted and are ignored.  Returns 0 when
+/// Candidates that are not factors of a frame behind frame 0 cannot be promoted and are ignored.  Returns 0 when
 /// the moves of `state` cannot all be matched, since then nothing can be promoted from it.
 ///
 /// This is the reference for [`MatchBound`]: a min-cost flow, solved by successive shortest paths with
@@ -275,7 +275,7 @@ pub struct MatchGraph {
 
 impl MatchGraph {
     /// The graph of `root`: its moves and factors, each move joined to its maximal factors in its frame, and each
-    /// factor of a frame above frame 0 to its maximal factors in the frame below.
+    /// factor of a frame behind frame 0 to its maximal factors in the frame in front of it.
     pub fn new<const W: usize>(model: &Model, root: &FrameSet<W>) -> Self {
         let frames = root.frames();
         let mut num: Vec<u32> = frames.iter().flat_map(|f| f.moves.iter().chain(f.factors.iter())).collect();
@@ -507,7 +507,7 @@ impl<const W: usize, K: Weighing> Level<W, K> {
             // Then the slack of every edge is its factor's potential: 0 for a factor, its weight for a candidate.
             self.y[v] = self.weight(g, v);
         }
-        // Largest movers first, take a free factor over a tight edge.
+        // Largest movers first, take an unmatched factor over a tight edge.
         for v in (0..g.len()).rev() {
             if self.role[v] == Role::Factor {
                 continue;
@@ -1738,7 +1738,7 @@ mod tests {
             let (model, ..) = setup::<4>(&g);
             walks::<4>(&g, u64::from(n) << 8, 6, 80, &mut |mb, state, promoted, cands| {
                 let bound = mb.value();
-                // No feasible completion exceeds the count the freedoms allow, and
+                // No promotable completion exceeds the count the freedoms allow, and
                 // the limit makes the exhaustive search much faster.
                 let most = state.max_promotions_among(cands).max(0) as u32;
                 let best = best_completion(&model, state, cands, most);

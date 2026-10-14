@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "taxman-evidence"
+name = "taxman-prover"
 version = "0.1.0"

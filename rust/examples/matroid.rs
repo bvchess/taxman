@@ -21,7 +21,7 @@
 //!     [--prefilter] [--strong K] [--first-forced] [--threads T] [--seconds S] N|A-B...
 //! ```
 //!
-//! Games are set up as `taxman solve` sets them up (the default tactics, which are strict).  `P*` is the
+//! Games are set up as `taxman solve` sets them up (the default tactics, all of them proven or sound).  `P*` is the
 //! optimum promotion sum (the known score minus `in_the_bag`, or the `opt` of the lines of `--opts`, as
 //! `bench/curve/slope_roots.jsonl` has them).  A range `A-B` stands for its games that are not prime.  Each command
 //! prints one JSON object per line.  `bench/matroid/matroid.py` makes the study's tables from them.
@@ -41,8 +41,8 @@
 //! * **bnb**: a plain branch and bound with one bound, proving that nothing beats `P*` ([`bnb`]).
 //! * **lagrange**: the Lagrangian bound over nogoods with the intersection as its inner problem, at the root.
 //! * **forced**: forced members of the GF(2) bound at the nodes of a fixture, exactly and from a weight split.
-//! * **cores**: the cores that the GF(2) bound's heaviest set runs into at the root, and whether Lorea's matroid
-//!   sees them.
+//! * **cores**: the residuals that the GF(2) bound's heaviest set runs into at the root, and whether Lorea's
+//!   matroid sees them.
 //! * **whole**: the same bound for the whole game, with no frame model: an upper bound on `opt(n)` ([`whole`]).
 //! * **prove**: the search's proof that nothing beats `P*`, with the search tactics of `--tactic` (named as for
 //!   `taxman solve`) and the GF(2) bound's knobs, which are not tactics: `--branching` (`exact`, the default;
@@ -1061,11 +1061,11 @@ fn whole(n: u32, known: &Known) {
 // ---------------------------------------------------------------------------------------------------------
 // cores
 
-/// What the GF(2) bound misses at the root: its heaviest set `Q` applied to the root's frames, the core of each
+/// What the GF(2) bound misses at the root: its heaviest set `Q` applied to the root's frames, the residual of each
 /// frame that `Q` leaves unwinnable (the movers a peel cannot drop: each live factor of one is listed by
 /// another), how many of its movers have three or more live factors, and whether Lorea's hypergraphic matroid
-/// sees the core (some subset `Y` of it lists at most `|Y|` live factors, a ground factor added to a mover that
-/// lists one).  A core is independent over GF(2) here, since `Q` is.
+/// sees the residual (some subset `Y` of it lists at most `|Y|` live factors, a ground factor added to a mover that
+/// lists one).  A residual is independent over GF(2) here, since `Q` is.
 fn cores<const W: usize>(n: u32) {
     let Some((_, p)) = setup::<W>(n) else { return };
     let model = &p.model;
@@ -1155,7 +1155,7 @@ fn lorea_independent(lists: &[Vec<u32>]) -> bool {
 /// Forced members at the nodes of a fixture (every `every`-th): the members `x` of the GF(2) bound's heaviest
 /// set without which the bound falls below what the node needs, found exactly (the intersection without `x`)
 /// and from a weight split of the heaviest set (`meet::split`: two greedy runs per member), with the split's
-/// looseness and cost.  The heaviest set is of any size here (the split is for that); the node's cap `max_add`
+/// looseness and cost.  The heaviest set is of any size here (the split is for that); the node's limit `max_add`
 /// is reported when it binds.
 fn forced<const W: usize>(path: &Path, every: usize) {
     let (n, incumbent, units) = fixtures::read_nodes::<W>(path).expect("a fixture");
@@ -1209,9 +1209,9 @@ fn forced<const W: usize>(path: &Path, every: usize) {
 // ---------------------------------------------------------------------------------------------------------
 // prove
 
-/// The search's proof that nothing beats `P*` (its incumbent a value, `P*`, with no set behind it; no seed, no cap),
-/// with the search tactics of `--tactic` and the GF(2) knobs `--prefilter` and `--branching`: nodes (steps),
-/// seconds, the cycles and instructions of the process, and the GF(2) bound's counters.  On one thread (the
+/// The search's proof that nothing beats `P*` (its incumbent a value, `P*`, with no set behind it; no seed, no
+/// ceiling), with the search tactics of `--tactic` and the GF(2) knobs `--prefilter` and `--branching`: nodes
+/// (steps), seconds, the cycles and instructions of the process, and the GF(2) bound's counters.  On one thread (the
 /// default) the node counts are exact and repeatable, and compare with `examples/slope.rs`'s `prove` at δ = 0.
 fn prove<const W: usize>(n: u32, known: &Known, o: &Options) {
     let board = Board::<W>::for_n(n);

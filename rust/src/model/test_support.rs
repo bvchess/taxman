@@ -29,7 +29,7 @@ impl Draws for Rng {
 /// One golden file: the Java's intermediate results for game `n`.
 pub(crate) struct Golden {
     pub n: u32,
-    /// Factors and moves per frame, bottom first: the columns the Java builds its `FrameSet` from.
+    /// Factors and moves per frame, front first: the columns the Java builds its `FrameSet` from.
     pub columns: Vec<Vec<u32>>,
     pub candidates: Vec<u32>,
     pub json: Json,

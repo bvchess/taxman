@@ -1,5 +1,5 @@
 //! Robustness of the engine, the checkpoints and the command line: no unit of work lost or doubled under random
-//! configurations, any checkpoint interval, absurd limits, checkpoints that belong to their game, a cap reached
+//! configurations, any checkpoint interval, absurd limits, checkpoints that belong to their game, a ceiling reached
 //! on resuming, a closed stdout or stderr, stop signals, leftover spill segments, and a checkpoint directory that
 //! two processes would share.
 //!
@@ -425,7 +425,7 @@ fn stopped_search(ckpt: &Path) -> (Board<16>, EngineConfig) {
     (board, EngineConfig { node_limit: None, ..cfg })
 }
 
-/// A search resumed with an incumbent that already reaches the cap is finished at once.
+/// A search resumed with an incumbent that already reaches the ceiling is finished at once.
 #[test]
 fn a_resumed_search_already_at_its_cap_finishes_at_once() {
     let dir = TempDir::new("cap");
