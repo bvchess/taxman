@@ -299,8 +299,11 @@ struct Stepper<'a, const W: usize> {
     matching_on: bool,
     /// The GF(2) bound along the path, level for level with the stack (tactic `gf2`).
     gf2: Option<Gf2Bound<'a, W>>,
-    /// Scratch for strong branching with `gf2`: the members of a conflict in the order they are tried.
+    /// Scratch for strong branching with `gf2`: the members of a conflict by their split bounds, those tried in
+    /// that order, and their bounds where the heaviest set's exchange graph certifies them.
     order: Vec<(i64, u32)>,
+    tried: Vec<u32>,
+    certified: Vec<Option<u64>>,
     /// Conflicts known for the node being worked on (see [`Refiner`]); `stack[d].known_end` of them hold for
     /// the node at depth `d`.
     known: Vec<Bits<W>>,
@@ -330,6 +333,8 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 matching_on: space.gf2.is_none() || space.gf2_prefilter,
                 gf2: space.gf2.as_ref().map(Gf2Bound::new),
                 order: Vec::new(),
+                tried: Vec::new(),
+                certified: Vec::new(),
                 known: Vec::new(),
                 conflict_cache: ConflictCache::default(),
                 nogoods: space.nogoods.then(|| Nogoods::new(space.root_max, NOGOOD_CAPACITY)),
@@ -817,37 +822,54 @@ impl<'a, const W: usize> Stepper<'a, W> {
                     Some(best.1)
                 }
                 Gf2Branching::Exact | Gf2Branching::Forced => {
-                    // The members by their split bounds, the likeliest to lower the bound most first; each solve
+                    // The members by their split bounds, the likeliest to lower the bound most first.  The bound
+                    // without each is read off the exchange graph of the heaviest set where that certifies it (no
+                    // solve, before any solve spoils the workspace's tableau), and solved where not: each solve
                     // stops as soon as its value reaches both the best so far and `need` (then the member can be
                     // neither chosen nor forced), or `need` once a member is forced (with `fix_forced` only which
-                    // are forced still matters).  The chosen member's level is kept for the node going on without
-                    // it.
+                    // are forced still matters).  The exact value of a certified bound leads to the same choices as
+                    // a solve stopped at any `stop` would.
                     let order = &mut self.order;
                     order.clear();
                     order.extend(k.iter().map(|x| (g.split_without(x).unwrap_or(i64::MAX), u32::MAX - x)));
                     order.sort_unstable();
+                    let tried = order.len().min(space.gf2_strong_limit.max(1));
+                    self.tried.clear();
+                    self.tried.extend(order[..tried].iter().map(|&(_, key)| u32::MAX - key));
+                    g.certified_excluding(&self.tried, node.max_add, &mut self.certified);
                     let mut best = (u64::MAX, 0);
                     let to_need = space.gf2_branching == Gf2Branching::Forced;
                     if to_need {
-                        best.1 = u32::MAX - order[0].1;
+                        best.1 = self.tried[0];
                     }
-                    for &(_, key) in order.iter().take(space.gf2_strong_limit.max(1)) {
+                    // Whether the level without the best member so far was kept from its solve.
+                    let mut kept = false;
+                    for (&x, &certified) in self.tried.iter().zip(&self.certified) {
                         if !space.gf2_more_forced && space.fix_forced && !forced.is_empty() {
                             break;
                         }
-                        let x = u32::MAX - key;
                         // A solve that stops has a value of at least `stop`, which is never below `need`: only a
                         // solve that ran to the end can show a member forced.
                         let stop =
                             if to_need || (space.fix_forced && !forced.is_empty()) { need } else { best.0.max(need) };
-                        let bound = g.value_excluding(x, node.max_add, stop);
+                        let bound = certified.unwrap_or_else(|| g.value_excluding(x, node.max_add, stop));
                         if bound < need {
                             forced.insert(x);
                         }
                         if bound < best.0 && !to_need {
-                            g.keep_excluded();
+                            kept = certified.is_none();
+                            if kept {
+                                g.keep_excluded();
+                            }
                             best = (bound, x);
                         }
+                    }
+                    // Unless forced members end the node's loop, it goes on without the chosen member, from that
+                    // member's level solved to the end (kept for it, the same level whichever way its bound was
+                    // found).
+                    if !to_need && !kept && !(space.fix_forced && !forced.is_empty()) {
+                        g.value_excluding(best.1, node.max_add, u64::MAX);
+                        g.keep_excluded();
                     }
                     if space.fix_forced { forced.max() } else { None }.or(Some(best.1))
                 }

@@ -316,6 +316,9 @@ pub struct Gf2Stats {
     /// Of those, the ones a greedy lower bound settled with no solve, and the ones whose solve stopped early.
     pub greedy_stops: u64,
     pub excluded_stopped: u64,
+    /// Bounds without a member that the heaviest set's exchange graph certified, with no solve
+    /// ([`Gf2Bound::certified_excluding`]).
+    pub certified: u64,
 }
 
 impl<'g, const W: usize> Gf2Bound<'g, W> {
@@ -362,6 +365,15 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
     /// there); the top level is unchanged.
     pub fn value_excluding(&mut self, x: u32, cap: u32, stop: u64) -> u64 {
         dispatch!(self, l => l.value_excluding(x, cap as usize, stop))
+    }
+
+    /// The bounds of the top level without each candidate of `xs` (members of its heaviest set), with at most `cap`
+    /// promotions, read off the exchange graph of its heaviest set where it certifies them, with no solve
+    /// ([`meet::Meet::without`]): `out[i]` is the bound without `xs[i]`, or `None` where it is not certified (and
+    /// for every one, unless the level is solved and its heaviest set is of all sizes, within `cap`).  Each is what
+    /// [`value_excluding`](Self::value_excluding) with no `stop` would return.  The top level is unchanged.
+    pub fn certified_excluding(&mut self, xs: &[u32], cap: u32, out: &mut Vec<Option<u64>>) {
+        dispatch!(self, l => l.certified_excluding(xs, cap as usize, out))
     }
 
     /// Keeps the level that the last [`value_excluding`](Self::value_excluding) solved (to the end, not stopped), so
@@ -641,6 +653,30 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         self.scratch.value
     }
 
+    fn certified_excluding(&mut self, xs: &[u32], cap: usize, out: &mut Vec<Option<u64>>) {
+        out.clear();
+        let graph = self.graph;
+        let level = &mut self.levels[self.depth];
+        let qualifies = level.solved && level.settled && level.history.last().is_some_and(|last| last.len() as usize <= cap);
+        if !qualifies {
+            out.extend(xs.iter().map(|_| None));
+            return;
+        }
+        if level.meet_solve != self.meet.solves {
+            // The workspace holds another solve: the level's heaviest set solved again from itself (its tableau
+            // built and one shortest path, no augmentation).
+            resolve(graph, level, &mut self.meet, &mut self.live_idx, &mut self.start_idx);
+        }
+        let problem = Problem {
+            block: [&graph.block[0], &graph.block[1]],
+            vector: [&level.vec[0], &level.vec[1]],
+            weight: &graph.weight,
+        };
+        let before = self.meet.withouts_exact;
+        out.extend(xs.iter().map(|&x| self.meet.without(&problem, graph.index[x as usize], cap).map(|v| v as u64)));
+        self.stats.certified += self.meet.withouts_exact - before;
+    }
+
     fn keep_excluded(&mut self) {
         if let Some(x) = self.scratch_for.take() {
             std::mem::swap(&mut self.scratch, &mut self.kept);
@@ -726,16 +762,14 @@ fn solve<const W: usize, const R: usize>(
     level.has_split = false;
 }
 
-/// The bounds without each member of `level`'s heaviest set (settled), from a weight split.  Unless the workspace
-/// still holds the level's last solve, the level's heaviest set is solved again from itself first (the tableau built
-/// and one shortest path, no augmentation).
-fn split<const W: usize, const R: usize>(
+/// Solves `level` (solved and settled) again from its heaviest set, so that the workspace holds its tableau: the
+/// tableau built and one shortest path, no augmentation.  `live_idx` is left holding the level's live elements.
+fn resolve<const W: usize, const R: usize>(
     graph: &Gf2Graph,
     level: &mut Level<W, R>,
     meet: &mut Meet<R>,
     live_idx: &mut Vec<u32>,
     start_idx: &mut Vec<u32>,
-    stats: &mut Gf2Stats,
 ) {
     let chosen = level.history.last().copied().unwrap_or(Bits::EMPTY);
     live_idx.clear();
@@ -747,10 +781,32 @@ fn split<const W: usize, const R: usize>(
         vector: [&level.vec[0], &level.vec[1]],
         weight: &graph.weight,
     };
+    meet.solve(&problem, live_idx, start_idx, usize::MAX, i64::MAX, |_| {});
+    debug_assert_eq!(meet.value as u64, level.value, "the heaviest set solved again changed");
+    level.meet_solve = meet.solves;
+}
+
+/// The bounds without each member of `level`'s heaviest set (settled), from a weight split.  Unless the workspace
+/// still holds the level's last solve, the level's heaviest set is solved again from itself first ([`resolve`]).
+fn split<const W: usize, const R: usize>(
+    graph: &Gf2Graph,
+    level: &mut Level<W, R>,
+    meet: &mut Meet<R>,
+    live_idx: &mut Vec<u32>,
+    start_idx: &mut Vec<u32>,
+    stats: &mut Gf2Stats,
+) {
     if level.meet_solve != meet.solves {
-        meet.solve(&problem, live_idx, start_idx, usize::MAX, i64::MAX, |_| {});
-        debug_assert_eq!(meet.value as u64, level.value, "the heaviest set solved again changed");
+        resolve(graph, level, meet, live_idx, start_idx);
+    } else {
+        live_idx.clear();
+        live_idx.extend(level.live.iter().map(|x| graph.index[x as usize]));
     }
+    let problem = Problem {
+        block: [&graph.block[0], &graph.block[1]],
+        vector: [&level.vec[0], &level.vec[1]],
+        weight: &graph.weight,
+    };
     stats.splits += 1;
     let out = &mut level.split;
     out.clear();
