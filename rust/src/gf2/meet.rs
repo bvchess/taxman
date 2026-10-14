@@ -262,8 +262,9 @@ pub struct Meet<const R: usize> {
     repl: [Vec<i64>; 2],
     /// [`without`](Self::without)'s scratch: its search's distances, predecessors (towards the member searched
     /// from), settled stamps and heap; the elements outside the set in the span of A by the slots of their circuits
-    /// (`columns`, per block of A 64·R slots) and those free in A by decreasing `w1`, both built for the tableau
-    /// `columns_for`; and the elements of the cycle found.
+    /// (`columns`, per block of A 64·R slots) and those free in A, both built for the tableau `columns_for` (and
+    /// shared with the split), the latter by decreasing `w1` for the tableau `free_sorted_for`; and the elements of
+    /// the cycle found.
     reach: Vec<Dist>,
     back: Vec<u32>,
     settled_at: Vec<u32>,
@@ -271,6 +272,7 @@ pub struct Meet<const R: usize> {
     columns: Vec<Vec<u32>>,
     columns_for: u64,
     free_a: Vec<u32>,
+    free_sorted_for: u64,
     flip: Vec<u32>,
     /// Counters of [`without`](Self::without): calls, and those it certified.
     pub withouts: u64,
@@ -320,6 +322,7 @@ impl<const R: usize> Meet<R> {
             columns: vec![Vec::new(); blocks[0] * 64 * R],
             columns_for: 0,
             free_a: Vec::with_capacity(n),
+            free_sorted_for: 0,
             flip: Vec::with_capacity(n),
             withouts: 0,
             withouts_exact: 0,
@@ -818,55 +821,82 @@ impl<const R: usize> Meet<R> {
     pub fn split_bounds(&mut self, p: &Problem<'_, R>, live: &[u32], mut f: impl FnMut(u32, i64)) -> bool {
         debug_assert!(self.settled);
         let w = p.weight;
-        // Potentials for the constraints w1(v) − w1(u) ≤ c, as arcs u → v of length c; the zero node is `zero`.
+        // Potentials for the constraints w1(v) − w1(u) ≤ c, as arcs u → v of length c, from potentials all zero:
+        // Bellman–Ford from a virtual source with an arc of length 0 to every vertex, whose distances are the same
+        // whatever the order of the relaxations.  The zero node is `zero`; its arcs: to every member (w1(x) ≤ w(x))
+        // and every element free in A (w1(y) ≤ 0), and from every member (w1(x) ≥ 0) and every element free in B
+        // (w1(y) ≥ w(y)).  A member's other arcs go to the elements whose A-circuit holds it (w1(y) ≤ w1(x)), an
+        // element's in the span of B to the members of its B-circuit (w2(y) ≤ w2(x)).  Each round relaxes the arcs
+        // out of the vertices whose potential fell in the round before (every vertex in the first).
+        if self.columns_for != self.tableau {
+            self.build_columns();
+        }
         let zero = self.pot.len() - 1;
         for &e in live {
             self.pot[e as usize] = 0;
         }
         self.pot[zero] = 0;
+        self.changed_in.clear();
+        self.changed_in.extend_from_slice(live);
+        self.changed_in.push(zero as u32);
         let limit = live.len() + 3;
-        let mut settled = false;
-        for _ in 0..limit {
+        let mut rounds = 0;
+        while !self.changed_in.is_empty() {
+            rounds += 1;
             self.split_rounds += 1;
-            let mut changed = false;
-            let pot = &mut self.pot;
-            let mut relax = |u: usize, v: usize, c: i64| {
-                if pot[u] + c < pot[v] {
-                    pot[v] = pot[u] + c;
-                    changed = true;
-                }
-            };
-            for &e in live {
-                let i = e as usize;
-                if self.inside[i] {
-                    relax(i, zero, 0); // w1(x) ≥ 0
-                    relax(zero, i, w[i]); // w1(x) ≤ w(x)
-                    continue;
-                }
-                if !is_zero(&self.res[0][i]) {
-                    relax(zero, i, 0); // w1(y) ≤ 0
+            if rounds > limit {
+                return false;
+            }
+            self.generation = self.generation.wrapping_add(1);
+            let generation = self.generation;
+            self.changed_out.clear();
+            let (pot, seen, next) = (&mut self.pot, &mut self.seen, &mut self.changed_out);
+            let mut zero_fell = false;
+            // Offers the potential `d` to `v`.
+            macro_rules! relax {
+                ($v:expr, $d:expr) => {{
+                    let (v, d): (usize, i64) = ($v, $d);
+                    if d < pot[v] {
+                        pot[v] = d;
+                        if v == zero {
+                            zero_fell = true;
+                        } else if seen[v] != generation {
+                            seen[v] = generation;
+                            next.push(v as u32);
+                        }
+                    }
+                }};
+            }
+            for &u in &self.changed_in {
+                let u = u as usize;
+                let pu = pot[u];
+                if u == zero {
+                    for &x in &self.members {
+                        relax!(x as usize, pu + w[x as usize]);
+                    }
+                    for &y in &self.free_a {
+                        relax!(y as usize, pu);
+                    }
+                } else if self.inside[u] {
+                    relax!(zero, pu);
+                    let column = usize::from(p.block[0][u]) * 64 * R + usize::from(self.slot[0][u]);
+                    for &y in &self.columns[column] {
+                        relax!(y as usize, pu);
+                    }
+                } else if !is_zero(&self.res[1][u]) {
+                    relax!(zero, pu - w[u]);
                 } else {
-                    let elems = &self.slot_elem[0][usize::from(p.block[0][i])];
-                    each_bit(&self.mask[0][i], |s| relax(elems[s] as usize, i, 0));
-                    // w1(y) ≤ w1(x)
-                }
-                if !is_zero(&self.res[1][i]) {
-                    relax(i, zero, -w[i]); // w1(y) ≥ w(y)
-                } else {
-                    let elems = &self.slot_elem[1][usize::from(p.block[1][i])];
-                    each_bit(&self.mask[1][i], |s| {
+                    let elems = &self.slot_elem[1][usize::from(p.block[1][u])];
+                    each_bit(&self.mask[1][u], |s| {
                         let x = elems[s] as usize;
-                        relax(i, x, w[x] - w[i]); // w2(y) ≤ w2(x)
+                        relax!(x, pu + w[x] - w[u]);
                     });
                 }
             }
-            if !changed {
-                settled = true;
-                break;
+            if zero_fell {
+                next.push(zero as u32);
             }
-        }
-        if !settled {
-            return false;
+            std::mem::swap(&mut self.changed_in, &mut self.changed_out);
         }
         // The split: w1 = pot − pot[zero], w2 = w − w1.  Members have 0 ≤ w1, w2 ≤ w.
         let base = self.pot[zero];
@@ -972,7 +1002,11 @@ impl<const R: usize> Meet<R> {
             return None;
         }
         if self.columns_for != self.tableau {
-            self.build_columns(pot);
+            self.build_columns();
+        }
+        if self.free_sorted_for != self.tableau {
+            self.free_a.sort_unstable_by_key(|&y| (Reverse(pot[y as usize]), y));
+            self.free_sorted_for = self.tableau;
         }
         let w = p.weight;
         let w1 = |e: u32| pot[e as usize];
@@ -1104,9 +1138,10 @@ impl<const R: usize> Meet<R> {
         Some(self.value - cycle.0.div_euclid(HOPS))
     }
 
-    /// For [`without`](Self::without) on the current tableau: the elements outside the set in the span of A by the
-    /// slots of their circuits (each has an arc from those members), and those free in A by decreasing `w1`.
-    fn build_columns(&mut self, pot: &[i64]) {
+    /// For [`split_bounds`](Self::split_bounds) and [`without`](Self::without) on the current tableau: the elements
+    /// outside the set in the span of A by the slots of their circuits (each has an arc from those members), and
+    /// those free in A.
+    fn build_columns(&mut self) {
         for column in &mut self.columns {
             column.clear();
         }
@@ -1122,7 +1157,6 @@ impl<const R: usize> Meet<R> {
                 }
             }
         }
-        self.free_a.sort_unstable_by_key(|&y| (Reverse(pot[y as usize]), y));
         self.columns_for = self.tableau;
     }
 
