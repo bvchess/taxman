@@ -485,6 +485,37 @@ fn a_start_at_the_ceiling_is_neither_dived_nor_improved() {
     assert_eq!((r.start, r.promotions), (p.greedy, p.greedy));
 }
 
+/// The start is offered to the control as it is made, before the engine runs: a search that ends at its start, as a
+/// ceiling that the start reaches ends it, leaves the control with that start, whether it is the greedy set, the
+/// seed's survivors, the dive or the local search that made it.
+#[test]
+fn the_start_is_offered_to_the_control_as_it_is_made() {
+    let n = 930;
+    let board = crate::board::Board::<16>::for_n(n);
+    let p = board.prepare(SearchTactics::default()).unwrap();
+    let graph = MatchGraph::new(&p.model, &p.root);
+    let hood = Neighbourhood { model: &p.model, root: &p.root, candidates: &p.candidates };
+    let dived = dive(&p.model, &p.root, &graph, &p.candidates);
+    let improved = hood.improve(&mut Scratch::new(), &dived, true);
+    let seed = board.seed(crate::game::Optimal::built_in().moves(n - 1).unwrap());
+    let kept = surviving(&p, &seed);
+    assert!(p.greedy.sum() < dived.sum() && dived.sum() < improved.sum(), "each step of the start improves it");
+    assert!(p.greedy.sum() < kept.sum(), "the seed's survivors beat the greedy set");
+
+    // Each ceiling is the sum of one step: the search ends there, and the control has that step.
+    let steps = [("the greedy set", None, p.greedy), ("the dive", None, dived), ("the local search", None, improved)];
+    let seeded = [("the seed", Some(&seed), kept)];
+    for (what, seed, step) in steps.into_iter().chain(seeded) {
+        let control = Control::new();
+        let cfg = EngineConfig { control: Some(Arc::clone(&control)), ..config(1) };
+        assert_eq!(best_so_far::<16>(&control), None);
+        let r = search(&p, &cfg, seed, Some(step.sum()), false).unwrap();
+        assert!(r.completed && r.reached_cap && r.stats.nodes == 0, "{what}");
+        assert_eq!((r.start, r.promotions), (step, step), "{what}: the start");
+        assert_eq!(best_so_far::<16>(&control), Some(step), "{what}: the control's best");
+    }
+}
+
 /// The start of a search does not depend on its threads: the local search on several of them finds what one does,
 /// with and without a seed, in the search of a game as a whole.
 #[test]

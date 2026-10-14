@@ -285,6 +285,7 @@ counts them.
 | flag | meaning |
 |---|---|
 | `--threads K` | worker threads (default: all CPUs; honours affinity masks and cgroup limits) |
+| `--window K` | games of a range in flight at once (also for `regress`): game n + 1 is set up, and searched from n's best game so far, while n searches, and the threads move to the searches that keep them busy; games are still concluded and recorded in order, with the scores and proofs of a window of 1 (default 1: one game after another; always 1 with one thread) |
 | `--tactic NAME=VALUE` | set a tactic, repeatable |
 | `--out FILE` | append result lines; skip games the file completed; the predecessor of the first game comes from it |
 | `--checkpoint-dir DIR`, `--checkpoint-interval S` | checkpoints (default every 60 s) |
@@ -501,11 +502,12 @@ second build's chain, what the games assume).
 
 ```
  taxman solve A-B --out FILE --checkpoint-dir DIR
-   |  solver::solve_range_each        n = A..B in order; the game of n-1 comes from this run, FILE or (--use-prev)
-   |                                  optimal.json,
+   |  solver::solve_range_each        n = A..B, concluded in order (with --window K up to K games in flight, each set
+   |                                  up and searched on threads of its own: solver/window.rs); the game of n-1 comes
+   |                                  from this run, FILE or (--use-prev) optimal.json,
    |                                  and is checked (legal, over, opens with the largest prime) before anything uses it
    v
- solver::solve_game(n) -> solve_with_width::<W>      W = 8 to 64 words of 64 bits (bits::WIDTHS), by n
+ solver::set_up(n) -> set_up_with_width::<W>      W = 8 to 64 words of 64 bits (bits::WIDTHS), by n
    |
    |  [1] numtheory::Tables            maximal factors and maximal composites of 1..=n; the set width W
    |  [2] n prime ............ accelerate::prime_shortcut   the game of n-1 with its first move replaced by n
@@ -697,7 +699,8 @@ comment that is worth reading first; section 6 above is the map of how the piece
     incumbent.
 13. `src/engine.rs`: the protocol in the module comment (conservation, splitting, checkpoint, termination).
 14. `src/tactics.rs`, `src/board.rs`, `src/solver.rs`, `src/results.rs`, `src/paths.rs`: the switchable tactics, a board
-    prepared for a search, the per-game pipeline and the range driver, provenance and verification, the default files.
+    prepared for a search, the per-game pipeline, provenance and verification, the default files.  The range driver is
+    `src/solver/window.rs`, the window of games in flight, and its child `window/allot.rs` how they share the threads.
 15. `src/main.rs`, `src/cli.rs`, `src/commands.rs`: the command line.
 16. Studies, skipped on a first read: `src/brute.rs` (exhaustive search, the test oracle) and `src/sacrifice.rs` (the
     sacrifice bound).

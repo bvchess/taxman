@@ -442,7 +442,10 @@ or two members and refill, until nothing improves).  The *ceiling* on the promot
 seed's survivors already reach it, the dive is skipped, and the local search when the incumbent after the dive does:
 nothing can beat a set at the ceiling, so neither would change it, and the result is the same.  The local search runs
 on the search's threads, the refills of a pass in parallel, and keeps the first improvement in the order of the
-sequential pass, so its answer does not depend on the thread count.  Board/search setup is in
+sequential pass, so its answer does not depend on the thread count; it reads the ceiling before each pass, so one given
+while it runs (the control's) ends it as soon as its set reaches it.  The start is offered to the run's control as it is
+made (after the greedy set and the seed, the dive and the local search), so whoever steers the search sees the best so
+far before the engine starts, and the engine's start is unchanged.  Board/search setup is in
 `board::Board`: it is the one place that knows the tables → frames → prepare → ceiling and seed path.
 
 ## 5. Tactics

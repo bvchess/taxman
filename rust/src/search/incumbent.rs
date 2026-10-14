@@ -3,8 +3,9 @@
 //! [`dive`] (with the matching bound), improved by a local search ([`Neighbourhood::improve`]).  Every one of them
 //! is a set of candidates that can be promoted, so any of them is a valid incumbent; a good one only makes the
 //! search prune sooner.  The local search also runs on several threads ([`Neighbourhood::improve_on`]), with the
-//! answer of the sequential one.
+//! answer of the sequential one, and ends early when its set reaches a ceiling.
 
+use super::reaches;
 use super::setup::Prepared;
 use crate::bits::Bits;
 use crate::matchbound::{MatchBound, MatchGraph};
@@ -73,10 +74,24 @@ impl<const W: usize> Neighbourhood<'_, W> {
     /// the lowest number is the one the sequential pass would have kept.  With one thread it is `improve`.  The
     /// number of threads is read at the start of each pass, so a caller whose number changes meanwhile (a run's
     /// workers) has the new one from the next pass; the answer does not depend on it.
-    pub fn improve_on(&self, threads: impl Fn() -> usize, start: &Bits<W>, pairs: bool) -> Bits<W> {
+    ///
+    /// `ceiling` is a proven upper bound on the sum, if one is known, read before each pass (so a caller that is given
+    /// one meanwhile has it from the next pass).  The search ends at once when its set reaches it, with that set: no
+    /// promotable set is heavier than a proven ceiling, and a pass keeps only a heavier one, so no later pass could
+    /// change it, and the answer is the same as without the ceiling.
+    pub fn improve_on(
+        &self,
+        threads: impl Fn() -> usize,
+        ceiling: impl Fn() -> Option<u64>,
+        start: &Bits<W>,
+        pairs: bool,
+    ) -> Bits<W> {
         let mut scratch = Scratch::new();
         let mut best = self.fill(&mut scratch, start, &Bits::EMPTY);
         loop {
+            if reaches(&best, ceiling()) {
+                return best;
+            }
             let threads = threads();
             let better = if threads <= 1 {
                 self.first_improvement(&mut scratch, &best, pairs)
@@ -267,21 +282,41 @@ mod tests {
                 assert!(expected.sum() >= start.sum());
                 improved += usize::from(expected.sum() > start.sum());
                 for threads in 0..=4 {
-                    let got = hood.improve_on(|| threads, &start, pairs);
+                    let got = hood.improve_on(|| threads, || None, &start, pairs);
                     assert_eq!(got, expected, "n={n} from the {what} set, pairs={pairs}, {threads} threads");
+                    // A ceiling equal to the answer (a proof cannot give a lower one if the answer is optimal) changes
+                    // nothing: the same set.
+                    let got = hood.improve_on(|| threads, || Some(expected.sum()), &start, pairs);
+                    assert_eq!(got, expected, "n={n} from the {what} set, pairs={pairs}, {threads} threads, ceiling");
                 }
-                // A number that changes from pass to pass (read once per pass) changes nothing either.
-                let reads = Cell::new(0);
+                // A number that changes from pass to pass (read once per pass) changes nothing either, nor does a
+                // ceiling that is never reached, which is read before each pass as the number of threads is.
+                let (reads, ceiling_reads) = (Cell::new(0), Cell::new(0));
                 let got = hood.improve_on(
                     || {
                         reads.set(reads.get() + 1);
                         reads.get() % 5
+                    },
+                    || {
+                        ceiling_reads.set(ceiling_reads.get() + 1);
+                        None
                     },
                     &start,
                     pairs,
                 );
                 assert_eq!(got, expected, "n={n} from the {what} set, pairs={pairs}, a changing number of threads");
                 assert!(reads.get() > 0, "the number of threads is read at the start of each pass");
+                assert_eq!(ceiling_reads.get(), reads.get(), "the ceiling is read before each pass");
+                // A ceiling that the first fill reaches ends the search before its first pass.  A proven ceiling is
+                // never below the answer; this one is where the passes improve the fill, which shows that they stop.
+                let filled = hood.fill(&mut Scratch::new(), &start, &Bits::EMPTY);
+                let reads = Cell::new(0);
+                let ceiling = || {
+                    reads.set(reads.get() + 1);
+                    Some(filled.sum())
+                };
+                let got = hood.improve_on(|| 4, ceiling, &start, pairs);
+                assert_eq!((got, reads.get()), (filled, 1), "n={n} from the {what} set, pairs={pairs}, at once");
             }
         }
         improved

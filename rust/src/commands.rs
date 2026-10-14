@@ -1,11 +1,11 @@
 //! The subcommands: `solve`, `regress`, `bench`, `verify-optimal`, `verify-results`, `extend-optimal` and `tables`.
 //!
-//! The ones that solve games read their flags with [`Args`], build [`SolveOptions`] from them ([`solver_options`])
-//! and call the library's pipeline ([`taxman::solver`]); what they add is output, and the policies of a command-line
-//! run:
+//! The ones that solve games read their flags with [`Args`], build [`SolveOptions`] from them ([`solver_options`],
+//! or [`range_options`] for those that solve a range) and call the library's pipeline ([`taxman::solver`]); what
+//! they add is output, and the policies of a command-line run:
 //!
 //! * `solve` stops on SIGINT and SIGTERM with a final checkpoint, locks its checkpoint directory and (when it opens
-//!   it, `results::ResultsFile`) its results file, and prints one summary line per game as it finishes;
+//!   it, `results::ResultsFile`) its results file, and prints one summary line per game as it is concluded;
 //! * `regress` solves in memory and compares every score with `optimal.json`;
 //! * `bench` solves a fixed set of hard games standalone and appends the run to a history file, so that
 //!   performance can be followed from commit to commit.  Its files are found in the repository
@@ -17,7 +17,9 @@
 //! meets a score of a board size `optimal.json` has checks it against the table built into the binary
 //! ([`Optimal::built_in`]): no flag turns that off or points at another file.
 
-use crate::cli::{errln, outln, parse_range, solver_options, Args, CliError, CliResult, SOLVER_FLAGS};
+use crate::cli::{
+    errln, outln, parse_range, range_options, solver_options, Args, CliError, CliResult, SOLVER_FLAGS, WINDOW_FLAG,
+};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -41,8 +43,16 @@ fn flags_with(own: &[&'static str]) -> Vec<&'static str> {
 // ---------------------------------------------------------------------------------------------------------
 // solve
 
-const SOLVE_FLAGS: [&str; 7] =
-    ["--out", "--checkpoint-dir", "--checkpoint-interval", "--progress", "--time-limit", "--node-limit", "--mem-cap"];
+const SOLVE_FLAGS: [&str; 8] = [
+    "--out",
+    "--checkpoint-dir",
+    "--checkpoint-interval",
+    "--progress",
+    "--time-limit",
+    "--node-limit",
+    "--mem-cap",
+    WINDOW_FLAG,
+];
 
 /// `solve N|A-B [options]`: solves one board size or a range, each from the one before (`solver::solve_range_each`).
 pub fn solve(args: &[String]) -> CliResult {
@@ -51,7 +61,7 @@ pub fn solve(args: &[String]) -> CliResult {
     let [range] = args.positional() else { return Err(usage()) };
     let (lo, hi) = parse_range(range)?;
 
-    let mut opts = solver_options(&args)?;
+    let mut opts = range_options(&args)?;
     opts.force_search = args.has("--force-search");
     opts.use_prev = args.has("--use-prev");
     opts.checkpoint_dir = args.value("--checkpoint-dir").map(PathBuf::from);
@@ -112,16 +122,16 @@ pub fn solve(args: &[String]) -> CliResult {
 // ---------------------------------------------------------------------------------------------------------
 // regress
 
-/// `regress [--from A] [--to N] [--use-prev]`: solves A..N in memory and checks every score against optimal.json
-/// (the first that differs is an error, as in any run).
+/// `regress [--from A] [--to N] [--window K] [--use-prev]`: solves A..N in memory and checks every score against
+/// optimal.json (the first that differs is an error, as in any run).
 pub fn regress(args: &[String]) -> CliResult {
-    let args = Args::parse(args, &flags_with(&["--to", "--from"]), &["--use-prev"])?;
+    let args = Args::parse(args, &flags_with(&["--to", "--from", WINDOW_FLAG]), &["--use-prev"])?;
     if !args.positional().is_empty() {
         return Err(CliError::Usage("regress takes no positional arguments".into()));
     }
     let from = args.parsed::<u32>("--from")?.unwrap_or(1);
     let to = args.parsed::<u32>("--to")?.unwrap_or(400);
-    let mut opts: SolveOptions = solver_options(&args)?;
+    let mut opts: SolveOptions = range_options(&args)?;
     opts.use_prev = args.has("--use-prev");
 
     let start = Instant::now();
