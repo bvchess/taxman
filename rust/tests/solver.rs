@@ -59,8 +59,7 @@ fn a_range_reproduces_optimal_json_and_the_javas_counts() {
 #[test]
 fn every_tactic_gives_the_same_scores() {
     let optimal = Optimal::load_default().unwrap();
-    // Each variant is a `--tactic` assignment; the soundness of the ones that are not on/off settings is argued in
-    // DESIGN.md's "Conflicts of the matching bound".  `branching=largest` is the Java's order.
+    // Each variant is a `--tactic` assignment.
     let with = |assignment: &str| {
         let mut opts = SolveOptions { force_search: true, ..options(1) };
         opts.tactics.set(assignment).unwrap();
@@ -69,14 +68,9 @@ fn every_tactic_gives_the_same_scores() {
     let default = ("default".to_owned(), SolveOptions { force_search: true, ..options(1) });
     let variants = [default].into_iter().chain(
         [
-            "match_bound=off",
-            "preclusions=on",
             "revise_freedoms=off",
             "seed_incumbent=off",
             "prev_cap=off",
-            "branching=largest",
-            "branching=conflict-smallest",
-            "branching=conflict-largest",
             "match_refine=0",
             "match_refine=3",
             "fix_forced=off",
@@ -248,18 +242,14 @@ fn a_checkpoint_for_another_game_or_other_tactics_is_refused() {
     assert!(!solver::solve_game_with(600, None, &opts, Some(&optimal)).unwrap().completed);
     let checkpoint = dir.0.join("n0600.ckpt");
 
-    // Other tactics: each of the ten search tactics (a checkpoint records them all), the switches turned the other
-    // way and the two settings that are not switches changed.
+    // Other tactics: each of the six search tactics (a checkpoint records them all), the switches turned the other
+    // way and `match_refine` changed.
     let assignments = [
-        "preclusions=on",
-        "legacy_bound=on",
         "revise_freedoms=off",
-        "match_bound=off",
         "fix_forced=off",
         "nogoods=off",
         "forget_nogoods=off",
         "lagrange=off",
-        "branching=largest",
         "match_refine=0",
         "match_refine=2",
     ];

@@ -193,17 +193,14 @@ impl Proof {
 
 /// The unproven tactics a game used itself: `reuse_prev` if it derived the game; for a searched or repeat game,
 /// `revise_freedoms` if frame 0's freedoms came from it (`revise` is `setup.revise`, see
-/// [`Revise::sets_frame_zero`]); and for a searched game `legacy_bound` if it was on.
-pub fn own_taint(method: Method, revise: Option<Revise>, legacy_bound: bool) -> Taint {
+/// [`Revise::sets_frame_zero`]).
+pub fn own_taint(method: Method, revise: Option<Revise>) -> Taint {
     let mut taint = Taint::new();
     if method == Method::Reuse {
         taint.insert("reuse_prev".to_owned());
     }
     if method.sets_up() && revise.is_some_and(Revise::sets_frame_zero) {
         taint.insert("revise_freedoms".to_owned());
-    }
-    if method == Method::Search && legacy_bound {
-        taint.insert("legacy_bound".to_owned());
     }
     taint
 }
@@ -382,9 +379,8 @@ struct Entry {
     promotions: Vec<u32>,
     method: Method,
     setup: Option<Setup>,
-    /// What `tactic_switches` says of `revise_freedoms` and `legacy_bound`.
+    /// What `tactic_switches` says of `revise_freedoms`.
     revise_freedoms: bool,
-    legacy_bound: bool,
     reached_cap: bool,
     in_the_bag: Option<u64>,
     named: Option<Named>,
@@ -537,7 +533,6 @@ fn parse_line(json: &Json, line: usize) -> Result<Line, String> {
         method,
         setup,
         revise_freedoms: switches.bool("revise_freedoms")?,
-        legacy_bound: switches.bool("legacy_bound")?,
         reached_cap: setup.and_then(|s| s.cap).is_some_and(|cap| sum >= cap),
         in_the_bag: None,
         named: source.map(|source| Named { source, record: None }),
@@ -908,7 +903,7 @@ fn check_entry(
         Some(record) => Some(check_repeat(&e, record, games, problems).map_err(fail)?),
         None => None,
     };
-    let own = own_taint(e.method, e.setup.map(|s| s.revise), e.legacy_bound);
+    let own = own_taint(e.method, e.setup.map(|s| s.revise));
     let basis = match repeated {
         Some(earlier) => Some(&earlier.taint),
         None => pred.as_ref().map(|p| &p.taint),
@@ -1284,27 +1279,26 @@ mod tests {
         assert_eq!(Proof::of(Method::Reuse, true, false), Some(Proof::ReusePrev));
         assert!(Proof::ALL.iter().all(|&p| Proof::parse(p.as_str()) == Some(p)));
         let names = |taint: Taint| taint.into_iter().collect::<Vec<_>>();
-        assert_eq!(names(own_taint(Method::Reuse, None, false)), ["reuse_prev"]);
+        assert_eq!(names(own_taint(Method::Reuse, None)), ["reuse_prev"]);
         let searched = Revise::Searched { size: 3, nodes: 9 };
-        assert_eq!(names(own_taint(Method::Search, Some(searched), true)), ["legacy_bound", "revise_freedoms"]);
-        for revise in [Revise::GreedyIsMax(4), Revise::FromCheckpoint] {
-            assert_eq!(names(own_taint(Method::Search, Some(revise), false)), ["revise_freedoms"], "{revise:?}");
+        for revise in [searched, Revise::GreedyIsMax(4), Revise::FromCheckpoint] {
+            assert_eq!(names(own_taint(Method::Search, Some(revise))), ["revise_freedoms"], "{revise:?}");
         }
         let stopped = Revise::Stopped { nodes: 1 };
         for revise in [Revise::Off, Revise::NotNeeded, Revise::Unchanged, stopped, Revise::ResumedAsBuilt] {
-            assert!(own_taint(Method::Search, Some(revise), false).is_empty(), "{revise:?}");
+            assert!(own_taint(Method::Search, Some(revise)).is_empty(), "{revise:?}");
         }
-        assert!(own_taint(Method::Prime, None, true).is_empty());
+        assert!(own_taint(Method::Prime, None).is_empty());
         // Inherited only by a proof that rests on the game of n − 1.
         let prev = Taint::from([OPTIMAL_JSON.to_owned()]);
         assert_eq!(names(taint_of(Taint::new(), Proof::Cap, Some(&prev))), [OPTIMAL_JSON]);
         assert!(taint_of(Taint::new(), Proof::Exhausted, Some(&prev)).is_empty());
         // A proof by the cap rests on nothing the game used itself (before schema 3 it counted it too); any other
         // proof does.
-        let own = own_taint(Method::Search, Some(searched), true);
+        let own = own_taint(Method::Search, Some(searched));
         assert_eq!(names(taint_of(own.clone(), Proof::Cap, Some(&prev))), [OPTIMAL_JSON]);
         let before = taint_by_schema(2, own.clone(), Proof::Cap, Some(&prev));
-        assert_eq!(names(before), ["legacy_bound", OPTIMAL_JSON, "revise_freedoms"]);
+        assert_eq!(names(before), [OPTIMAL_JSON, "revise_freedoms"]);
         assert_eq!(taint_of(own.clone(), Proof::Exhausted, Some(&prev)), own);
         // A repeat rests on the game it repeats and on its own setup, which may have revised frame 0; it searched
         // nothing, so no bound of its own.
@@ -1312,7 +1306,7 @@ mod tests {
         let settled: Vec<Proof> = Proof::ALL.into_iter().filter(|p| p.settles_search()).collect();
         assert_eq!(settled, [Proof::Cap, Proof::Exhausted, Proof::SameSearch]);
         assert!(!Proof::SameSearch.rests_on_prev() && Proof::SameSearch.rests_on_another_game());
-        let repeat = own_taint(Method::Repeat, Some(searched), true);
+        let repeat = own_taint(Method::Repeat, Some(searched));
         assert_eq!(names(repeat.clone()), ["revise_freedoms"]);
         assert_eq!(names(taint_of(repeat, Proof::SameSearch, Some(&prev))), [OPTIMAL_JSON, "revise_freedoms"]);
         assert_eq!(names(taint_of(Taint::new(), Proof::SameSearch, Some(&prev))), [OPTIMAL_JSON]);

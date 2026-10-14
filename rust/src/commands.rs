@@ -214,9 +214,8 @@ pub fn bench(args: &[String]) -> CliResult {
     let known = opts.known_games(&[results]).map_err(failed)?;
 
     outln!("{} threads, tactics {}", opts.threads, opts.tactics.description());
-    let [n, nodes, precl, greedy, revise, search, total] =
-        ["n", "nodes", "precl s", "greedy s", "revise s", "search s", "total s"];
-    outln!("{n:>5} {nodes:>13} {precl:>9} {greedy:>9} {revise:>9} {search:>9} {total:>9}");
+    let [n, nodes, greedy, revise, search, total] = ["n", "nodes", "greedy s", "revise s", "search s", "total s"];
+    outln!("{n:>5} {nodes:>13} {greedy:>9} {revise:>9} {search:>9} {total:>9}");
     let mut results = Vec::new();
     for &n in &ns {
         let prev = n.checked_sub(1).and_then(|before| Prev::from_optimal(&known, before));
@@ -224,10 +223,9 @@ pub fn bench(args: &[String]) -> CliResult {
         let p = &result.phases;
         let secs = |d: Duration| d.as_secs_f64();
         outln!(
-            "{:>5} {:>13} {:>9.3} {:>9.3} {:>9.3} {:>9.3} {:>9.3}",
+            "{:>5} {:>13} {:>9.3} {:>9.3} {:>9.3} {:>9.3}",
             n,
             result.nodes,
-            secs(p.preclusions),
             secs(p.greedy),
             secs(p.revise),
             secs(p.search),
@@ -238,7 +236,7 @@ pub fn bench(args: &[String]) -> CliResult {
     }
     let total: f64 = results.iter().map(|r| r.phases.total.as_secs_f64()).sum();
     let nodes: u64 = results.iter().map(|r| r.nodes).sum();
-    outln!("{:>5} {:>13} {:>49.3}", "all", nodes, total);
+    outln!("{:>5} {:>13} {:>39.3}", "all", nodes, total);
 
     let record = history_record(&opts, &results);
     append_history(&history, &record).map_err(|e| failed(format!("{}: {e}", history.display())))?;

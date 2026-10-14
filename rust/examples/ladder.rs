@@ -16,9 +16,9 @@
 //! completed, its time and nodes, the incumbent against the known optimum, when the final incumbent was found,
 //! and the engine's activity ([`Counters::summary`]: effective parallelism, idle and lock-wait time, splits,
 //! steals, time to full occupancy).  `--diag` collects [`Diagnostics`] (slower) and prints a summary.
-//! `--tactic` sets a search tactic with the names and values of `taxman solve --tactic` (`preclusions=off`,
-//! `branching=largest`, `match_refine=0`, ...).  `--node-limit N` stops each search after N nodes (steps), for
-//! measuring a prefix of a search too long to finish.
+//! `--tactic` sets a search tactic with the names and values of `taxman solve --tactic` (`nogoods=off`,
+//! `match_refine=0`, ...).  `--node-limit N` stops each search after N nodes (steps), for measuring a prefix of a
+//! search too long to finish.
 //!
 //! Scaling: `--threads` takes a list of thread counts, and `--scaling` is 1, 2, 4, ... up to the available
 //! parallelism (which is included).  Each game is searched with each count in turn, and a table per game (and
@@ -267,7 +267,7 @@ fn run<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Vec<Row> {
         };
         println!(
             "n={n:4} T={threads} {status:6} search {:7.2} s nodes {:11} ({:6.0} k/s) best {} opt {} greedy {} cap {} \
-             | {found} | prep {:.2} s (prec {:.2}, revise {:.2} {revise}) max_total {} | {}",
+             | {found} | prep {:.2} s (revise {:.2} {revise}) max_total {} | {}",
             secs(r.time),
             r.stats.nodes,
             r.stats.nodes as f64 / secs(r.time).max(1e-9) / 1e3,
@@ -276,7 +276,6 @@ fn run<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Vec<Row> {
             p.greedy.sum(),
             prev_cap.map_or("?".into(), |v| v.to_string()),
             secs(prep),
-            secs(t.preclusions),
             secs(t.revise),
             p.max_total,
             r.counters.summary(),
@@ -303,19 +302,17 @@ fn print_diagnostics(d: &Diagnostics, nodes: u64, found_steps: Option<u64>) {
     };
     println!("    node loops ended: {}", named(&d.loop_ends));
     println!("    children cut: {}; promotions failed {}", named(&d.child_cuts), d.failed_promotions);
-    for (label, counts) in [("bound", &d.gaps), ("blame", &d.blame_gaps), ("match", &d.match_gaps)] {
-        let q = |x| Diagnostics::quantile(counts, x).map_or("-".into(), |v| v.to_string());
-        let count: u64 = counts.iter().sum();
-        println!(
-            "    gap {label:5} over need at open node checks ({count}): p10 {} p25 {} p50 {} p75 {} p90 {} p99 {}",
-            q(0.1),
-            q(0.25),
-            q(0.5),
-            q(0.75),
-            q(0.9),
-            q(0.99)
-        );
-    }
+    let q = |x| Diagnostics::quantile(&d.gaps, x).map_or("-".into(), |v| v.to_string());
+    let count: u64 = d.gaps.iter().sum();
+    println!(
+        "    gap of the bound over need at open node checks ({count}): p10 {} p25 {} p50 {} p75 {} p90 {} p99 {}",
+        q(0.1),
+        q(0.25),
+        q(0.5),
+        q(0.75),
+        q(0.9),
+        q(0.99)
+    );
     if d.match_open > 0 {
         println!(
             "    matching bounds that did not prune: {}, heaviest matching feasible at {:.1}%; one level of \

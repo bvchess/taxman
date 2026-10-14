@@ -1,7 +1,7 @@
 use super::header::Header;
 use super::refine::{strongest, Learning, Refiner, Verdict};
 use super::*;
-use crate::bounds::{self, max_additional, Preclusions};
+use crate::bounds::max_additional;
 use crate::engine::Unit;
 use crate::frames::build_frames;
 use crate::json::Json;
@@ -74,7 +74,6 @@ fn refinement_soundness<const W: usize>(g: &Golden, rng: &mut Rng) -> [u64; 3] {
     let (model, root) = Model::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
     let all = Bits::<W>::from_slice(&g.candidates);
     let max_total = root.max_promotions_among(&all).max(0) as u32;
-    let preclusions = Preclusions::build(&model, &root, &all, 2);
     let graph = MatchGraph::new(&model, &root);
     let mut m = MatchBound::new(&graph);
     let mut scratch = Scratch::new();
@@ -141,9 +140,7 @@ fn refinement_soundness<const W: usize>(g: &Golden, rng: &mut Rng) -> [u64; 3] {
             }) else {
                 break;
             };
-            let rest = cands.without(n);
-            let max_next = max_additional(max_total, &next, &promoted.with(n), &rest);
-            cands = bounds::new_candidate_list(&model, Some(&preclusions), n, max_next, &next, &rest, &promoted);
+            cands = next.narrow_candidates(&cands.without(n));
             (state, promoted) = (next, promoted.with(n));
         }
     }
@@ -174,7 +171,6 @@ fn forced_soundness<const W: usize>(g: &Golden, rng: &mut Rng) -> [u64; 2] {
     let (model, root) = Model::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
     let all = Bits::<W>::from_slice(&g.candidates);
     let max_total = root.max_promotions_among(&all).max(0) as u32;
-    let preclusions = Preclusions::build(&model, &root, &all, 2);
     let graph = MatchGraph::new(&model, &root);
     let mut m = MatchBound::new(&graph);
     let mut scratch = Scratch::new();
@@ -233,9 +229,7 @@ fn forced_soundness<const W: usize>(g: &Golden, rng: &mut Rng) -> [u64; 2] {
             }) else {
                 break;
             };
-            let rest = cands.without(n);
-            let max_next = max_additional(max_total, &next, &promoted.with(n), &rest);
-            cands = bounds::new_candidate_list(&model, Some(&preclusions), n, max_next, &next, &rest, &promoted);
+            cands = next.narrow_candidates(&cands.without(n));
             (state, promoted) = (next, promoted.with(n));
         }
     }
@@ -295,22 +289,16 @@ fn sums_by_tactics<const W: usize>(g: &Golden) -> Vec<(SearchTactics, u64)> {
     let default = SearchTactics::default();
     let variants = [
         default,
-        SearchTactics { preclusions: true, ..default },
-        SearchTactics { legacy_bound: true, ..default },
         SearchTactics { revise_freedoms: false, ..default },
-        SearchTactics { match_bound: false, ..default },
-        SearchTactics { branching: Branching::Largest, match_refine: 0, ..default },
-        SearchTactics { branching: Branching::ConflictSmallest, match_refine: 0, ..default },
-        SearchTactics { branching: Branching::ConflictLargest, match_refine: 2, ..default },
-        SearchTactics { branching: Branching::ConflictLargest, ..default },
-        SearchTactics { branching: Branching::Largest, match_refine: 3, ..default },
+        SearchTactics { match_refine: 3, ..default },
         SearchTactics { fix_forced: false, ..default },
         SearchTactics { fix_forced: false, match_refine: 0, ..default },
+        SearchTactics { fix_forced: false, match_refine: 2, ..default },
         SearchTactics { nogoods: false, ..default },
         SearchTactics { nogoods: false, match_refine: 0, ..default },
         SearchTactics { forget_nogoods: false, ..default },
+        SearchTactics { lagrange: false, ..default },
         SearchTactics { match_refine: 0, ..default },
-        SearchTactics { branching: Branching::ConflictSmallest, match_refine: 2, ..default },
     ];
     variants.iter().map(|&t| (t, search_checked(&prepare_golden::<W>(g, t), 1, "tactics").sum)).collect()
 }
@@ -399,9 +387,11 @@ fn checkpoint_and_resume_one_thread() {
 
 #[test]
 fn checkpoint_and_resume_four_threads() {
-    // The default tactics search 760 in too few nodes for four threads to reach the node limit before the
-    // end; the Java's branching takes many more.
-    resume_in_pieces(4, SearchTactics { branching: Branching::Largest, ..SearchTactics::default() }, 2);
+    // The default tactics search 760 in too few nodes (about 2,300) for four threads to reach the node limit
+    // before the end; without refinement, forced members and nogoods they take about 4,700, which some thread
+    // always meets the limit in.
+    let weak = SearchTactics { match_refine: 0, fix_forced: false, nogoods: false, ..SearchTactics::default() };
+    resume_in_pieces(4, weak, 2);
 }
 
 #[test]
@@ -488,7 +478,7 @@ fn units_and_headers_round_trip() {
     assert_eq!(bytes.len(), 48);
     assert_eq!(TaxUnit::<3>::decode(&bytes), unit);
 
-    let p = prepare_golden::<8>(&load(300), SearchTactics { legacy_bound: true, ..SearchTactics::default() });
+    let p = prepare_golden::<8>(&load(300), SearchTactics { match_refine: 3, ..SearchTactics::default() });
     let header = Header::of(&p);
     let bytes = header.encode();
     assert_eq!(bytes.len(), Header::<8>::LEN);
@@ -523,80 +513,77 @@ fn units_and_headers_round_trip() {
     assert!(other(|h| h.tactics.nogoods = !h.tactics.nogoods).contains("tactics"));
 
     // Every setting of the search tactics reads back as it was written, and the default tactics of a checkpoint
-    // made before `fix_forced`, `nogoods`, `forget_nogoods` and `lagrange` existed (0x19d) read back with them on,
-    // as they are now; so do those of one made before `forget_nogoods` (0x19c, the preclusions off).  Bit 11 is
-    // `forget_nogoods` off, bit 12 `lagrange` off, and no higher bit is used.
+    // made before `fix_forced`, `nogoods`, `forget_nogoods` and `lagrange` existed (0x19c) read back with them on,
+    // as they are now.  Bit 11 is `forget_nogoods` off, bit 12 `lagrange` off, and no higher bit is used.
     let default = SearchTactics::default();
     for refine in [0, 1, 7] {
-        for branching in Branching::ALL {
-            for (on, off) in [(true, false), (false, true)] {
-                let t = SearchTactics {
-                    preclusions: on,
-                    legacy_bound: off,
-                    revise_freedoms: on,
-                    match_bound: off,
-                    match_refine: refine,
-                    branching,
-                    fix_forced: on,
-                    nogoods: off,
-                    forget_nogoods: on,
-                    lagrange: off,
-                };
-                assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
-            }
+        for (on, off) in [(true, false), (false, true)] {
+            let t = SearchTactics {
+                revise_freedoms: on,
+                match_refine: refine,
+                fix_forced: on,
+                nogoods: off,
+                forget_nogoods: on,
+                lagrange: off,
+            };
+            assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
         }
     }
-    assert_eq!(SearchTactics::from_bits(0x19d), Ok(SearchTactics { preclusions: true, ..default }));
+    assert_eq!(default.bits(), 0x19c);
     assert_eq!(SearchTactics::from_bits(0x19c), Ok(default));
     assert_eq!(SearchTactics::from_bits(0x19c | 1 << 11), Ok(SearchTactics { forget_nogoods: false, ..default }));
     assert_eq!(SearchTactics::from_bits(0x19c | 1 << 12), Ok(SearchTactics { lagrange: false, ..default }));
     assert!(SearchTactics::from_bits(1 << 13).is_err());
+
+    // A checkpoint made with a tactic that this build no longer has is refused, naming it: the preclusion table
+    // (bit 0), the Java's runner-up (bit 1), a search without the matching bound (bit 3 clear), and the branchings
+    // other than the strong one (bits 7 and 8 other than 3).
+    for (bits, named) in [
+        (0x19d, "preclusions=on"),
+        (0x19e, "legacy_bound=on"),
+        (0x194, "match_bound=off"),
+        (0x01c, "branching=largest"),
+        (0x09c, "branching=conflict-smallest"),
+        (0x11c, "branching=conflict-largest"),
+        (0x19f, "preclusions=on, legacy_bound=on"),
+    ] {
+        let err = SearchTactics::from_bits(bits).unwrap_err();
+        assert!(err.contains(named) && err.contains("no longer has"), "{bits:#x}: {err}");
+    }
 }
 
 // ---- benchmark: cargo test --release bench_search -- --ignored --nocapture --test-threads=1 ----
 
-/// Prepares and searches one game with each thread count and both settings of `match_bound` (`TAXMAN_BENCH_MATCH`
-/// = `on` or `off` restricts it to one), printing one line each.
+/// Prepares and searches one game with each thread count, printing one line each.
 fn bench_game<const W: usize>(n: u32, columns: &[Vec<u32>], cands: &Bits<W>, java: (f64, f64)) {
     let tables = Tables::new(n);
-    let only = std::env::var("TAXMAN_BENCH_MATCH").ok();
-    let settings = [true, false].into_iter().filter(|&on| only.as_deref().is_none_or(|s| (s == "on") == on));
-    for match_bound in settings {
-        for (threads, java_secs) in [(1, java.0), (10, java.1)] {
-            let tactics = SearchTactics { match_bound, ..SearchTactics::default() };
-            let t0 = Instant::now();
-            let p = prepare::<W>(&tables, columns, cands, tactics, threads).unwrap();
-            let r = search(&p, &config(threads), None, None, false).unwrap();
-            let total = t0.elapsed().as_secs_f64();
-            let t = &p.timings;
-            let revise_nodes = if let Revise::Searched { nodes, .. } = p.revise { nodes } else { 0 };
-            eprintln!(
-                "n={n:4} match={:3} threads={threads:2}: total {total:7.3} s (Java {java_secs:5.1} s) | prec {:.3} \
-                 revise {:.3} ({revise_nodes} nodes) search {:.3} | nodes {} | sum {} | extra {:?}",
-                if match_bound { "on" } else { "off" },
-                t.preclusions.as_secs_f64(),
-                t.revise.as_secs_f64(),
-                r.time.as_secs_f64(),
-                r.stats.nodes,
-                r.sum,
-                r.stats.extra,
-            );
-        }
+    for (threads, java_secs) in [(1, java.0), (10, java.1)] {
+        let t0 = Instant::now();
+        let p = prepare::<W>(&tables, columns, cands, SearchTactics::default(), threads).unwrap();
+        let r = search(&p, &config(threads), None, None, false).unwrap();
+        let total = t0.elapsed().as_secs_f64();
+        let t = &p.timings;
+        let revise_nodes = if let Revise::Searched { nodes, .. } = p.revise { nodes } else { 0 };
+        eprintln!(
+            "n={n:4} threads={threads:2}: total {total:7.3} s (Java {java_secs:5.1} s) | revise {:.3} \
+             ({revise_nodes} nodes) search {:.3} | nodes {} | sum {} | extra {:?}",
+            t.revise.as_secs_f64(),
+            r.time.as_secs_f64(),
+            r.stats.nodes,
+            r.sum,
+            r.stats.extra,
+        );
     }
 }
 
-/// One game (`TAXMAN_BENCH_N`, default 700; `TAXMAN_BENCH_THREADS`, default 1; tactics changed by
-/// `TAXMAN_BENCH_MATCH=off`, `TAXMAN_BENCH_NO_PRECLUSIONS`, and `TAXMAN_BENCH_LEGACY` for the
-/// legacy bound), with progress lines, for profiling.
+/// One game (`TAXMAN_BENCH_N`, default 700; `TAXMAN_BENCH_THREADS`, default 1), with progress lines, for
+/// profiling.
 #[test]
 #[ignore]
 fn bench_search_one() {
     let n = std::env::var("TAXMAN_BENCH_N").ok().and_then(|s| s.parse().ok()).unwrap_or(700);
     let threads = std::env::var("TAXMAN_BENCH_THREADS").ok().and_then(|s| s.parse().ok()).unwrap_or(1);
-    let legacy_bound = std::env::var_os("TAXMAN_BENCH_LEGACY").is_some();
-    let match_bound = std::env::var("TAXMAN_BENCH_MATCH").map_or(true, |s| s == "on");
-    let preclusions = std::env::var_os("TAXMAN_BENCH_NO_PRECLUSIONS").is_none();
-    let tactics = SearchTactics { legacy_bound, match_bound, preclusions, ..SearchTactics::default() };
+    let tactics = SearchTactics::default();
     let seconds = std::env::var("TAXMAN_BENCH_SECONDS").ok().and_then(|s| s.parse().ok());
     let tables = Tables::new(n);
     // The golden columns if there are any, else the frame builder's.

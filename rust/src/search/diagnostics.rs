@@ -1,5 +1,5 @@
 //! Measurements of a search for tuning ([`Diagnostics`], collected by [`search_with`](super::search_with)): how
-//! steps and loops end, how far the bounds are above what was needed, conflict sizes, the matching's work.
+//! steps and loops end, how far the bound is above what was needed, conflict sizes, the matching's work.
 //!
 //! A searcher collects them only when its [`SearchSpace`](super::SearchSpace) has somewhere to put them; then it
 //! computes extra bounds at every step, so a search that collects them is slower and its times mean little.
@@ -9,9 +9,8 @@
 
 use super::searcher::{Counts, Node};
 use crate::bits::Bits;
-use crate::bounds::Bounds;
 use crate::matchbound::MatchBound;
-use crate::model::{FrameSet, Model};
+use crate::model::{FrameSet, Model, Scratch};
 use std::sync::{Mutex, PoisonError};
 
 /// Why a node's loop ended or a promoted child was not explored, for [`Diagnostics`].
@@ -20,21 +19,19 @@ pub mod cut {
     pub const EMPTY: usize = 0;
     /// The sum of the `max_add` largest candidates is too small.
     pub const LARGEST: usize = 1;
-    /// The `blameGame` bound (only without the tactic `match_bound`).
-    pub const BLAME: usize = 2;
     /// The matching bound.
-    pub const MATCH: usize = 3;
+    pub const MATCH: usize = 2;
     /// The matching bound refined by conflicts, or a known conflict all of whose members are forced.
-    pub const REFINED: usize = 4;
+    pub const REFINED: usize = 3;
     /// The heaviest matching can be promoted: the best completion is known (and offered as the incumbent).
-    pub const EXACT: usize = 5;
+    pub const EXACT: usize = 4;
     /// Forced members (tactic `fix_forced`): a node's loop, because they include all of its conflict; a child,
     /// because they cannot all be promoted.
-    pub const FORCED: usize = 6;
+    pub const FORCED: usize = 5;
     /// The Lagrangian bound over nogoods (where the matching bound and its refinement did not cut).
-    pub const LAGRANGE: usize = 7;
-    pub const COUNT: usize = 8;
-    pub const NAMES: [&str; COUNT] = ["empty", "largest", "blame", "match", "refined", "exact", "forced", "lagrange"];
+    pub const LAGRANGE: usize = 6;
+    pub const COUNT: usize = 7;
+    pub const NAMES: [&str; COUNT] = ["empty", "largest", "match", "refined", "exact", "forced", "lagrange"];
 }
 
 /// Buckets of [`Diagnostics::gaps`]: excesses `0..GAP_BUCKETS − 1`, and the last for everything above.
@@ -55,12 +52,9 @@ pub struct Diagnostics {
     pub child_cuts: [u64; cut::COUNT],
     /// Candidates whose promotion failed.
     pub failed_promotions: u64,
-    /// At the node-loop checks that let the loop go on: how far the bound (the smaller of `blameGame` and,
-    /// with that tactic, matching) was above what the loop needed, as a histogram (see [`GAP_BUCKETS`]).
+    /// At the node-loop checks that let the loop go on: how far the matching bound was above what the loop
+    /// needed, as a histogram (see [`GAP_BUCKETS`]).
     pub gaps: Vec<u64>,
-    /// The same for `blameGame` alone and for the matching bound alone (only with the `match_bound` tactic).
-    pub blame_gaps: Vec<u64>,
-    pub match_gaps: Vec<u64>,
     /// Matching bounds that did not prune, and how many of those had a heaviest matching whose candidates can
     /// all be promoted together (with at most the node's `max_add` of them), which makes the bound exact.
     pub match_open: u64,
@@ -112,8 +106,6 @@ impl Diagnostics {
         }
         self.failed_promotions += other.failed_promotions;
         add_all(&mut self.gaps, &other.gaps);
-        add_all(&mut self.blame_gaps, &other.blame_gaps);
-        add_all(&mut self.match_gaps, &other.match_gaps);
         self.match_open += other.match_open;
         self.match_open_feasible += other.match_open_feasible;
         add_all(&mut self.core_sizes, &other.core_sizes);
@@ -193,29 +185,21 @@ impl<'a> Probe<'a> {
     /// whether the matching bound is exact there.
     pub(super) fn open<const W: usize>(
         &mut self,
-        bounds: &mut Bounds<'_, W>,
-        matching: &mut Option<MatchBound<'_, W>>,
+        scratch: &mut Scratch<W>,
+        m: &mut MatchBound<'_, W>,
         model: &Model,
         node: &Node<W>,
         need: u64,
     ) {
-        let blame = bounds.upper_bound(&node.state, &node.cands, node.max_add);
-        let mut bound = blame;
-        Diagnostics::gap(&mut self.local.blame_gaps, blame.saturating_sub(need));
-        if let Some(m) = matching {
-            let value = m.value();
-            Diagnostics::gap(&mut self.local.match_gaps, value.saturating_sub(need));
-            bound = bound.min(value);
-            self.matching_open(bounds, m, model, &node.state, node.max_add, need);
-        }
-        Diagnostics::gap(&mut self.local.gaps, bound.saturating_sub(need));
+        Diagnostics::gap(&mut self.local.gaps, m.value().saturating_sub(need));
+        self.matching_open(scratch, m, model, &node.state, node.max_add, need);
     }
 
     /// A matching bound that did not prune (it is at least `need`): is its heaviest matching a feasible
     /// completion, and what would one level of conflict refinement do?
     pub(super) fn matching_open<const W: usize>(
         &mut self,
-        bounds: &mut Bounds<'_, W>,
+        scratch: &mut Scratch<W>,
         m: &mut MatchBound<'_, W>,
         model: &Model,
         state: &FrameSet<W>,
@@ -225,7 +209,6 @@ impl<'a> Probe<'a> {
         let chosen = m.chosen();
         let value = m.value();
         self.local.match_open += 1;
-        let scratch = bounds.scratch();
         let feasible = chosen.len() <= max_add && model.can_promote_all_using(scratch, state, &chosen);
         self.local.match_open_feasible += u64::from(feasible);
         if let Some(core) = model.conflict_using(scratch, state, &chosen, false) {
@@ -245,17 +228,15 @@ impl<'a> Probe<'a> {
 
     /// Adds the searcher's counts of refinement and the matching solver's work since the last flush, and merges
     /// everything into the search's diagnostics.
-    pub(super) fn flush<const W: usize>(&mut self, counts: &Counts, matching: Option<&MatchBound<'_, W>>) {
+    pub(super) fn flush<const W: usize>(&mut self, counts: &Counts, matching: &MatchBound<'_, W>) {
         self.local.refinements += counts.refinements;
         self.local.refine_evaluations += counts.evaluations;
         self.local.refine_conflicts += counts.conflicts;
-        if let Some(m) = matching {
-            let s = m.stats();
-            let now = [s.evaluations, s.searches, s.scanned];
-            for ((total, seen), now) in self.local.matching.iter_mut().zip(&mut self.match_seen).zip(now) {
-                *total += now - *seen;
-                *seen = now;
-            }
+        let s = matching.stats();
+        let now = [s.evaluations, s.searches, s.scanned];
+        for ((total, seen), now) in self.local.matching.iter_mut().zip(&mut self.match_seen).zip(now) {
+            *total += now - *seen;
+            *seen = now;
         }
         let mut shared = self.shared.lock().unwrap_or_else(PoisonError::into_inner);
         shared.merge(&self.local);

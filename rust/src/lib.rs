@@ -58,9 +58,9 @@
 //! | | [`frames`] | hives stacked into frames, and the promotion candidates |
 //! | | [`model`] | the search state: frames, winnability, promotion, conflicts, nogoods |
 //! | | [`accelerate`] | deriving the game of `n` from the game of `n − 1` without a search; promotions → moves |
-//! | search | [`matchbound`] | the matching bound, the default upper bound on a node's completions; the Lagrangian bound |
+//! | search | [`matchbound`] | the matching bound, the upper bound on a node's completions; the Lagrangian bound |
 //! | | [`search`] | the branch-and-bound searcher, its tactics, its setup and checkpoint header |
-//! | | [`bounds`] | the Java solver's bound (`blameGame`), preclusions, the greedy incumbent, candidate lists |
+//! | | [`bounds`] | the greedy incumbent and the limit on a node's further promotions |
 //! | engine | [`engine`] | the problem-independent parallel depth-first driver: threads, spill, checkpoints |
 //! | solving | [`tactics`] | the switchable pieces of the algorithm, by name and value |
 //! | | [`board`] | a board analysed and prepared for a search: tables, frames, cap and seed |
@@ -71,12 +71,10 @@
 //! | | [`sacrifice`] | the sacrifice bound and punctured games; not used by the solver |
 //!
 //! The command-line front end (`main.rs`, `cli.rs`, `commands.rs`) is the binary's, not the library's, and is read
-//! last.  `bounds` is mostly the Java-parity layer: the default search takes from it only `max_additional`, the
-//! greedy incumbent, the narrowing of the children's candidates and the scratch space of its peels (the module
-//! comment lists them), and `sacrifice` and `brute` are studies; a first read can skip those two and read `bounds`
-//! for that list only.  `examples/` holds the ladder (searches of hard games with time limits and thread counts), the
-//! probe of the hot paths, the sacrifice study, and the list of games whose search repeats an earlier game's;
-//! `tests/` the integration tests.
+//! last.  `bounds` is two small functions that the Java solver has too (`max_additional` and the greedy
+//! incumbent), and `sacrifice` and `brute` are studies that a first read can skip.  `examples/` holds the ladder
+//! (searches of hard games with time limits and thread counts), the probe of the hot paths, the sacrifice study,
+//! and the list of games whose search repeats an earlier game's; `tests/` the integration tests.
 
 pub mod accelerate;
 pub mod bits;

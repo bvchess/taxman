@@ -379,17 +379,15 @@ cut short, the fields regrouped and comments added, so it is not valid JSON as p
  "in_the_bag":18320,                      # score = in_the_bag + sum(promotions): 18320 + 1213 = 19533
  "prev":{"n":249,"score":19382,"source":"run","moves_digest":"44877b44d9bbf51a","proof":"same_search","taint":[]},
  "same_search":null,                      # a repeat names the game it repeats here
- "nodes":34, "stats":{"promote_attempts":20,"promotions":36,"upper_bounds":0,"can_promotes":0,"children":13,
-                      "precluded":0,"certificates":0,"match_bounds":28},
+ "nodes":34, "stats":{"promote_attempts":20,"promotions":36,"children":13,"match_bounds":28},
  "engine":{"splits":0,"checkpoints":0,"spilled_units":0,"max_queue":1},
  "setup":{"frames":4,"candidates":48,"max_total":11,"greedy_sum":1194,"cap":1312,"revise":"Off",
           "digest":"fe5e05eb67406e98"},
- "seconds":{"frames":0.0005,"preclusions":0.0,"greedy":0.00002,"revise":0.0,"search":0.0015,"search_all_runs":0.0015,"total":0.0029},
+ "seconds":{"frames":0.0005,"greedy":0.00002,"revise":0.0,"search":0.0015,"search_all_runs":0.0015,"total":0.0029},
  "invocations":1, "threads":2,
  "tactics":"reuse_prev=off,revise_freedoms=off",
  "tactic_switches":{"prime_shortcut":true,"reuse_prev":false,"same_search":true,"revise_freedoms":false,
-                    "preclusions":false,"match_bound":true,"branching":"conflict-strong","match_refine":1,
-                    "fix_forced":true,"nogoods":true,"forget_nogoods":true,"lagrange":true,"legacy_bound":false,
+                    "match_refine":1,"fix_forced":true,"nogoods":true,"forget_nogoods":true,"lagrange":true,
                     "prev_cap":true,"seed_incumbent":true},
  "unproven_tactics_on":[], "limits":{"seconds":null,"nodes":null},
  "options":{"force_search":false,"allow_tainted_prev":false,"allow_optimal_mismatch":false,"optimal_file":"default"},
@@ -447,10 +445,9 @@ Each completed game records how its optimality is established (`proof`):
 ### Taint
 
 The *taint* of a game is the set of unproven things its proof rests on: the unproven tactics it used itself
-(`reuse_prev` if it derived the game; `revise_freedoms` if frame 0's freedoms came from it; `legacy_bound`, which is
-known to be unsound), plus, if its proof rests on the game of n - 1, that game's taint, and so on down the chain; a
-repeat rests on the game it repeats instead, and has its taint.  A
-proof by the cap rests on nothing the game used itself: the game replays to `n + score(n-1)`, the ceiling, whatever
+(`reuse_prev` if it derived the game; `revise_freedoms` if frame 0's freedoms came from it), plus, if its proof rests
+on the game of n - 1, that game's taint, and so on down the chain; a repeat rests on the game it repeats instead, and
+has its taint.  A proof by the cap rests on nothing the game used itself: the game replays to `n + score(n-1)`, the ceiling, whatever
 found it, so its taint is only that of the game of n - 1 (schema 2 lines counted its own tactics too).  A game taken
 from `optimal.json` has the taint `optimal.json`, whichever game it is: the file records nothing about where a game
 came from, and the Java made its games 1 to 1000 with both unproven tactics on, without recording which games used
@@ -595,8 +592,8 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
   of the model is `in_the_bag` plus the sum of its promotions.
 * **max_total** (`maxTotalPromotions`): a cap on the *number* of promotions, from the frames' freedoms.
 * **cap, prev_cap** **(overloaded)**: (1) the ceiling on the promotion *sum*: `n + score(n-1) - in_the_bag`; reaching
-  it ends the search (tactic `prev_cap`, proof `cap`); (2) `max_total`, "the cap on the number of promotions"; (3) the
-  per-frame caps inside the Java bound (`largest_that_fit`); (4) `queue_mem_cap` and `NOGOOD_CAPACITY`, sizes.
+  it ends the search (tactic `prev_cap`, proof `cap`); (2) `max_total`, "the cap on the number of promotions"; (3)
+  `queue_mem_cap` and `NOGOOD_CAPACITY`, sizes.
 * **model assumptions**: see section 1.  `model::Model` is the immutable factor graph and home frames, not "the
   model".
 * **prime shortcut**: for a prime n, the game of n - 1 with its first move replaced by n.  **sacrifice**: study code
@@ -614,9 +611,9 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
 * **node, step, unit** **(overloaded)**: a search node is a set of promotions made from the root plus the candidates
   left; a **unit** is a node as the engine passes it around, `(promoted, cands)`, from which the state is rebuilt; and
   the `nodes` that results and progress lines count are *steps*, one per candidate a node's loop tries.
-* **upper bound**: what no completion of a node can exceed.  **blameGame** is the Java's (`bounds::Bounds::upper_bound`:
-  a bid of the largest candidates that fit the frames' limits, with the first failing member swapped for a runner-up;
-  DESIGN.md, section 4), kept for parity; the default is the **matching bound**.
+* **upper bound**: what no completion of a node can exceed: the **matching bound**, refined by conflicts and with
+  the Lagrangian bound beside it.  (**blameGame**, the Java's, was the starting point and is gone: DESIGN.md, section
+  2.)
 * **matching bound**: relax winnability to matchability: choose promotions maximising their sum such that every move
   and every promoted number gets a distinct maximal factor in its frame.  A maximum-weight bipartite matching, kept
   incrementally with dual **potentials** along the search path (`matchbound`).  **Q\***: the promotions of the
@@ -625,8 +622,8 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
   one of its members.  **core**: the moves of an unwinnable frame that a peel cannot drop; a conflict is built from it.
 * **refinement** (`match_refine`): bound the branches of a conflict too (member k1 out; k1 in and k2 out; ...) to a few
   levels.
-* **branching**: which candidate a node promotes next.  **strong branching** (`conflict-strong`, the default): pick
-  the member of the conflict whose removal lowers the matching bound most.
+* **branching**: which candidate a node promotes next.  **strong branching**, the only one: the member of the
+  conflict whose removal lowers the matching bound most.
 * **forced member** **(overloaded)**: in the search, a member of the heaviest matching whose removal alone brings the
   matching bound (or the Lagrangian bound) below what the node needs, so every completion that beats the incumbent
   promotes it (tactic `fix_forced`: the child promotes all of them together).  Also: a hive's *mandatory* move (`unzip`, "forced moves" in its docs), and a *forced pair*
@@ -639,9 +636,7 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
   bound; kept along the path the same way, and its potentials find forced members too.  A nogood is **live** at a node
   when its members outside the node's promotions are all still candidates; a **refit** fits the multipliers again (at
   the root, to the nogoods learned), after 2,000 steps and with each forgetting (DESIGN.md, section 4).
-* **preclusion**: a depth-2 table that rules candidates out (tactic `preclusions`, off by default).
-* **certificate** **(overloaded)**: `model::Certificate` is a winning order that answers most single-edit winnability
-  questions without a peel; `results::Certificate` is a score that equals a proven ceiling; the Python heuristics'
+* **certificate** **(overloaded)**: `results::Certificate` is a score that equals a proven ceiling; the Python heuristics'
   "upper-delta certificate" is a similar prediction from the previous game's score, defined once, in the comment of
   `reuse_prev` in `src/accelerate.rs`; `certify.py` is the brute-force certification of small boards.
 * **revise freedoms** (`revise_freedoms`): lower frame 0's freedoms, hence `max_total`, by solving the two-frame game of
@@ -713,9 +708,8 @@ comment that is worth reading first; section 6 above is the map of how the piece
     `setup.rs` (`prepare`), `tactics.rs`, `incumbent.rs`, and `header.rs` (the checkpoint header).  The
     `if let Some(p) = &mut self.probe` lines in `searcher.rs` are instrumentation
     (`diagnostics.rs`), which can be skipped.
-11. `src/bounds.rs`: the Java's `blameGame` bound and preclusions, mostly off the default path.  The default step does
-    use three of its functions (`max_additional`, `greedy`, `new_candidate_list_after`) and the peel scratch space its
-    `Bounds` owns; the module comment lists them, and the rest can wait.
+11. `src/bounds.rs`: two small functions the Java has too, the limit on a node's further promotions and the greedy
+    incumbent.
 12. `src/engine.rs`: the protocol in the module comment (conservation, splitting, checkpoint, termination).
 13. `src/tactics.rs`, `src/board.rs`, `src/solver.rs`, `src/results.rs`, `src/paths.rs`: the switchable tactics, a board
     prepared for a search, the per-game pipeline and the range driver, provenance and verification, the default files.

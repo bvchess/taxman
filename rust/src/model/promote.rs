@@ -22,7 +22,7 @@
 //! about sets of promotions rests on this: conflicts and nogoods ([`super::conflict`], [`super::nogoods`]), the
 //! matching bound's relaxation ([`crate::matchbound`]), and a search node rebuilt from its promotions alone.
 
-use super::peel::{reduce_from, Certificate, Scratch, Worklist};
+use super::peel::{reduce_from, Scratch, Worklist};
 use super::{Frame, FrameSet, Model, MAX_FRAMES};
 use crate::bits::Bits;
 
@@ -40,55 +40,6 @@ impl Model {
     #[inline]
     pub fn winnable_using<const W: usize>(&self, scratch: &mut Scratch<W>, moves: &Bits<W>, factors: &Bits<W>) -> bool {
         scratch.winnable(moves, factors, &self.graph)
-    }
-
-    /// Records a winning order of `frame` in `cert` (see [`Certificate`]).  False if the frame is not winnable,
-    /// and then `cert` means nothing.
-    pub fn certify_using<const W: usize>(
-        &self,
-        scratch: &mut Scratch<W>,
-        frame: &Frame<W>,
-        cert: &mut Certificate<W>,
-    ) -> bool {
-        scratch.certify(&frame.moves, &frame.factors, &self.graph, cert)
-    }
-
-    /// Whether `frame`, certified by `cert`, stays winnable with the move `x` added: from the certificate when it
-    /// can tell, else by a peel of the moves from the step it gets stuck at.
-    pub fn winnable_with_move_using<const W: usize>(
-        &self,
-        scratch: &mut Scratch<W>,
-        frame: &Frame<W>,
-        cert: &Certificate<W>,
-        x: u32,
-    ) -> bool {
-        let live = || self.graph.factors(x).iter().map(|&q| u32::from(q)).filter(|&q| frame.factors.contains(q));
-        let Some(first) = live().map(|q| cert.last(q)).min() else {
-            return false; // a move with no factor can never be taken
-        };
-        if first < 0 || usize::from(cert.freed_at(first)) > live().filter(|&q| cert.last(q) == first).count() {
-            return true;
-        }
-        scratch.winnable(&cert.moves_from_step(&frame.moves, first).with(x), &frame.factors, &self.graph)
-    }
-
-    /// Whether `frame`, certified by `cert`, stays winnable without its factor `y`: from the certificate when it
-    /// can tell, else by a peel of the moves from the step that frees `y`.
-    pub fn winnable_without_factor_using<const W: usize>(
-        &self,
-        scratch: &mut Scratch<W>,
-        frame: &Frame<W>,
-        cert: &Certificate<W>,
-        y: u32,
-    ) -> bool {
-        if !frame.factors.contains(y) {
-            return true;
-        }
-        let step = cert.last(y);
-        if step < 0 || cert.freed_at(step) >= 2 {
-            return true;
-        }
-        scratch.winnable(&cert.moves_from_step(&frame.moves, step), &frame.factors.without(y), &self.graph)
     }
 
     /// Whether `n` can be promoted: it is a factor of its home frame `h ≥ 1`, and frames `h − 1` (gaining the

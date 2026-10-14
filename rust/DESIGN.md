@@ -123,15 +123,16 @@ generations of the same frame idea layered on each other, so the Rust is a reimp
 designed for clarity and speed, not a translation of the classes.  What must match the Java is *results*: the
 setup (hives, frames, candidates, the greedy incumbent, revised freedoms) defines the search space, and reproduces
 the Java's values exactly (its golden data in `testdata/golden/` is the check); every final score equals
-optimal.json.  The search itself is new.  Its baseline is the Java's loop (`branching=largest`, `match_bound=off`,
-`blameGame` as the bound); everything the default search does beyond that is a tactic that is measured and
-switchable.  Not ported: `oldsearch/` (the 2021 disk-queue search), `frame.GreedySolver`, `util.Memo`,
+optimal.json.  The search itself is new.  It started as the Java's loop (its `blameGame` bound, its depth-2
+preclusion table and the promotability checks of its candidate lists, branching on the largest candidate), and each
+of those was replaced by something measured to be faster, then removed (the notebook has the rounds, and
+[which tactics earn their keep](docs/EXPERIMENTS.md#which-tactics-earn-their-keep-2026-10) the last measurements of
+what was removed).  Not ported: `oldsearch/` (the 2021 disk-queue search), `frame.GreedySolver`, `util.Memo`,
 `WorkingFrame.fancyFit/fits`, the picklers and compressor.
 
-One defect of the Java's bound was found and fixed in the port: `UpperBoundEstimator.getRunnerUp` replaces the
-failing number with the next candidate below the smallest bid member, and a skipped candidate from the failing
-number's frame can be larger, so the Java bound can be too low (at the root of n = 114: 358 against the best
-completion's 360).  The sound runner-up is the default; `legacy_bound` reproduces the Java's ([the
+One defect of the Java's bound was found in the port: `UpperBoundEstimator.getRunnerUp` replaces the failing number
+with the next candidate below the smallest bid member, and a skipped candidate from the failing number's frame can be
+larger, so the Java bound can be too low (at the root of n = 114: 358 against the best completion's 360; [the
 story](docs/EXPERIMENTS.md#the-port-and-its-first-improvements)).
 
 ## 3. Architecture
@@ -144,15 +145,13 @@ up:
 |---|---|---|
 | foundations | `game`, `numtheory`, `bits`, `json` | the rules as a referee and the table of optimal games; maximal factors and composites; fixed-width bitsets; a small JSON reader and writer |
 | frame model | `hives`, `frames`, `model`, `accelerate` | the board as hives and frames; the search state (frames, winnability, promotion, conflicts, nogoods); deriving a game from the previous one |
-| search | `matchbound`, `search`, `bounds` | the matching bound, and the Lagrangian bound over nogoods built on it; the branch-and-bound searcher with its setup and checkpoint header; the Java's bound, preclusions, greedy incumbent and candidate lists |
+| search | `matchbound`, `search`, `bounds` | the matching bound, and the Lagrangian bound over nogoods built on it; the branch-and-bound searcher with its setup and checkpoint header; the greedy incumbent and the count of promotions a node can still make |
 | engine | `engine` | the problem-independent parallel depth-first driver |
 | solving | `tactics`, `board`, `solver`, `results`, `paths` | the switchable tactics; a board prepared for a search; the per-game pipeline and the range driver; what a result records and the checks of a results file; the default files |
 | studies | `brute`, `sacrifice` | exhaustive search to certify small boards; the sacrifice bound and punctured games (not used by the solver) |
 | front end | `main.rs`, `cli.rs`, `commands.rs` | `solve`, `regress`, `bench`, `verify-optimal`, `verify-results`, `extend-optimal`, `tables` |
 
-On the default path of a solve are all the layers but the studies and most of the Java-parity module `bounds` (of
-which the default search uses only the greedy incumbent, `max_additional`, the narrowing of the candidate lists and
-the peel scratch space its `Bounds` owns).  `examples/` holds the ladder (standalone searches of hard games with time
+On the path of a solve are all the layers but the studies.  `examples/` holds the ladder (standalone searches of hard games with time
 limits, thread scaling, diagnostics), the probe `perf` (the hot paths from fixtures, in cycles and instructions),
 the sacrifice study and `repeats` (the games whose search repeats an earlier game's, from the setups alone, and what
 a results file spent on them); `tests/` the integration tests (section 9); `tools/` the results referee in Python,
@@ -184,28 +183,12 @@ exploring it depth-first before going on; the search keeps an explicit stack tha
 recursion, no allocation per node).  The unit of work counted everywhere (`nodes` in the output) is one *step* of a
 node's loop, one candidate attempt, not one tree node.
 
-The Java's loop, the baseline (`BranchExplorer.explore`, made lazy so that children are explored as they are made
-rather than all generated first):
-
-```
-loop while cands non-empty:
-    if blame_bound(state, cands, max_add) + sum(promoted) <= best: break
-    n = cands.max()                               # the Java's branching
-    cands.remove(n)
-    new_state = state.promote(n) else continue
-    child_cands = new_candidate_list(n, ...)      # narrow, remove preclusions, can_promote filter
-    if sum(promoted) + n + blame_bound(new_state, child_cands, ...) > best: push the child
-```
-
-`blame_bound` is the Java's `blameGame` upper bound (`bounds::Bounds::upper_bound`), cheap and loose.  It bids the
-`max_add` largest candidates that fit the frames' per-frame limits (which follow from the freedoms), finds the first
-member of the bid, from the top, that cannot be promoted after the ones above it, assumes it is the only failure and
-replaces it with the best runner-up candidate; `bounds.rs` has the argument that this is an upper bound.  The matching
-bound below replaces it by default.
-
-The default search keeps this skeleton and changes what bounds a node, which candidate to branch on, and what the
-child promotes; the next sections build it up, and "The default step" below puts it together.  A bound equal to
-`best` cannot lead to a better incumbent, so loops break then (the Java breaks only below).
+The loop is the Java's (`BranchExplorer.explore`, made lazy so that children are explored as they are made rather
+than all generated first): end the loop when a bound on the node's completions cannot beat the incumbent, else take
+a candidate out of the loop, promote it in a child, narrow the child's candidates, and explore the child if its own
+bound can.  What bounds a node, which candidate it branches on and what the child promotes are this solver's own;
+the next sections build them up, and "The default step" below puts them together.  A bound equal to `best` cannot
+lead to a better incumbent, so loops break then (the Java breaks only below).
 
 ### The matching bound
 
@@ -228,9 +211,9 @@ depth-first path are small, so an evaluation costs 0.7–2.4 µs where a solve f
 (`bound_excluding`): lowering that candidate's potential and its partner's as far as their remaining edges allow.  The
 module comment of `matchbound.rs` is the best explanation of all this.
 
-With the matching bound as the node bound, `blameGame` is not computed at all: it never pruned where the matching
-bound did not (diagnostics: zero at every check).  The bound is an upper bound on `sum(promoted) +` completions, so
-a node whose matching value is below `need = best + 1 − sum(promoted)` is cut.
+The Java's `blameGame` bound, which it replaced, never pruned where the matching bound did not (diagnostics: zero at
+every check).  The bound is an upper bound on `sum(promoted) +` completions, so a node whose matching value is below
+`need = best + 1 − sum(promoted)` is cut.
 
 ### Conflicts of the matching bound
 
@@ -249,11 +232,12 @@ only help a frame), so **every feasible completion leaves out some member of a c
   in `F`, `k_j` not", and the best completion is at most the largest of the branches' matching bounds (the matching
   with `k_j` no longer a candidate and `k₁ … k_{j−1}` required).  Each branch is refined the same way, one level
   less deep.  By induction the refined bound is never below the best completion (`search::refine::Refiner`).
-* **Conflict branching** (`branching`, default `conflict-strong`).  A node branches on a member of the conflict
-  instead of its largest candidate: the child promotes it, and the node goes on without it, so that neither can
-  reproduce the heaviest matching.  `conflict-strong` picks the member whose removal lowers the matching bound
-  most (one bound without each member; with `bound_excluding` most are settled by the potentials alone).  The
-  alternatives are the smallest member, the largest, and the Java's order.
+* **Strong branching on the conflict.**  A node branches on a member of the conflict instead of its largest
+  candidate: the child promotes it, and the node goes on without it, so that neither can reproduce the heaviest
+  matching.  The member is the one whose removal lowers the matching bound most (one bound without each member; with
+  `bound_excluding` most are settled by the potentials alone).  A node with no conflict among its candidates
+  branches on its largest.  (The smallest member, the largest, and the Java's largest candidate were once tactics; at
+  the frontier they took 6 to more than 17 times as long, and were removed.)
 * **Exact matchings.**  A heaviest matching that can be promoted is the node's best completion: it is offered as the
   incumbent and the node is done.
 * **Propagation into children.**  A conflict known at the node, of which a child promotes all but one member, rules
@@ -392,12 +376,11 @@ two-frame game of frames 0 and 1, where it is neither proven nor refuted.
 ## 5. Tactics
 
 Each row is a tactic in `tactics::Tactics`, set from the CLI with `--tactic name=value` (`on` or `off`; `match_refine`
-`0`…`7`; `branching` `largest`, `conflict-smallest`, `conflict-largest` or `conflict-strong`).  The ones that act inside
-the search are the fields of `search::SearchTactics`; `examples/ladder.rs` takes the same names for them.  Status words:
-*proven* (a theorem, given a premise), *sound* (never prunes a feasible optimum), *unproven* (a conjecture that the test
-games bear out), *unsound* (known to give wrong answers).  A test (`tests/docs.rs`) checks that this table lists the
-tactics of `tactics::Tactics`, in order, with their defaults, and grades exactly `reuse_prev`, `revise_freedoms` and
-`legacy_bound` as unproven or unsound.
+`0`…`7`).  The ones that act inside the search are the fields of `search::SearchTactics`; `examples/ladder.rs` takes
+the same names for them.  Status words: *proven* (a theorem, given a premise), *sound* (never prunes a feasible
+optimum), *unproven* (a conjecture that the test games bear out).  A test (`tests/docs.rs`) checks that this table
+lists the tactics of `tactics::Tactics`, in order, with their defaults, and grades exactly `reuse_prev` and
+`revise_freedoms` as unproven.
 
 | tactic | default | status | effect |
 |---|---|---|---|
@@ -405,22 +388,17 @@ tactics of `tactics::Tactics`, in order, with their defaults, and grades exactly
 | `reuse_prev` | on | unproven (a conjecture: the best game of n is the previous game plus n, less the moves the new board made impossible; `accelerate::reuse_prev`; with several optimal games of n − 1 it depends on which one was recorded, section 2) | `FrameSolver.reusePrev`; keeps the previous game's promotions that are still possible and accepts the game they make, with no search, if it scores what the previous game suggests |
 | `same_search` | on | proven (given the proof of the earlier game: section 8, "Same search") | a game whose search problem an earlier game of the chain posed and settled is that game's promotions on this board, with no search (method `repeat`, proof `same_search`); new in the Rust |
 | `revise_freedoms` | on | unproven ("max-sum promotion set also has max count") | `UpperBoundEstimator.reviseFreedoms`; can shrink frame 0's freedoms |
-| `preclusions` | off | sound (promotion failure is monotone: more moves or fewer factors never make a frame winnable) | depth-2 preclusion table; prunes candidates (off since 2026-10: with nogoods it no longer pays for its setup) |
-| `match_bound` | on | sound (matchability relaxes winnability) | node bound = the matching relaxation instead of `blameGame`, and the children's candidate lists without the Java's promotability checks (the conflicts find those candidates); a heaviest matching that can be promoted is the node's best completion |
-| `branching` | conflict-strong | sound (any order explores every promotion set) | which candidate a node promotes next: `largest` (the Java's order), or a member of a conflict of the heaviest matching (these need `match_bound`): the smallest, the largest, or the one whose removal lowers the matching bound most |
-| `match_refine` | 1 | sound (see `search::refine::Refiner`) | refine the matching bound by branching on conflicts this many levels deep, where it does not prune (0 = off, at most 7; needs `match_bound`) |
-| `fix_forced` | on | sound (every completion that beats the incumbent promotes them) | with `conflict-strong` branching, a node's child promotes all its forced candidates; the node's loop ends after that child |
-| `nogoods` | on | sound (a nogood holds at every node; see `model::Nogoods`) | learn each conflict as a nogood of the root and use the table at every node, for the conflict to branch on and refine with and to rule candidates out of children (needs `match_bound`) |
+| `match_refine` | 1 | sound (see `search::refine::Refiner`) | refine the matching bound by branching on conflicts this many levels deep, where it does not prune (0 = off, at most 7) |
+| `fix_forced` | on | sound (every completion that beats the incumbent promotes them) | a node's child promotes all its forced candidates; the node's loop ends after that child |
+| `nogoods` | on | sound (a nogood holds at every node; see `model::Nogoods`) | learn each conflict as a nogood of the root and use the table at every node, for the conflict to branch on and refine with and to rule candidates out of children |
 | `forget_nogoods` | on | sound (the table is a cache) | with `nogoods`, each searcher forgets every nogood it knows after each 50,000 of its steps |
 | `lagrange` | on | proven (weak duality, for any multipliers over valid nogoods; `matchbound::lagrange`) | with `nogoods`, where the matching bound and refinement leave a node open, bound it also by a Lagrangian relaxation of the searcher's nogoods kept along its path, and (with `fix_forced`) force the members without which that bound would cut; the multipliers are refitted at the root as the searcher learns (section 4) |
-| `legacy_bound` | off | unsound (the runner-up defect) | reproduce the Java bound exactly |
 | `prev_cap` | on | proven if opt(n−1) is optimal | stop as soon as the incumbent reaches n + opt(n−1) − in_the_bag (`FrameSolver.getMaxPromotionSum`) |
 | `seed_incumbent` | on | sound (any feasible promotion set is a valid incumbent) | start from the better of greedy and the n−1 solution's promotions that are still feasible |
 
-The tactics that need `match_bound` do nothing without it (`branching` falls back to `largest`, and the others are
-ignored); the result file still records the values as given.  A *strict* run turns `reuse_prev` and
-`revise_freedoms` off; `legacy_bound` is never on in a run that means to be right.  What each tactic was worth, and
-the order they were found in, is in [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md).
+A *strict* run turns `reuse_prev` and `revise_freedoms` off.  What each tactic was worth, and the order they were
+found in, is in [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md); so are the tactics that lost and were removed (the
+Java's `blameGame` bound and its runner-up, its preclusion table, and the branchings other than strong branching).
 
 **Model assumptions** (unproven, inherent to the frame model, validated as in section 2): greedy removal of impossible
 sources inside hives (`Hive.removeImpossible`); mandatory moves (`Hive.unzip`); `freeFactorCount = factors − sources`
@@ -428,11 +406,12 @@ sources inside hives (`Hive.removeImpossible`); mandatory moves (`Hive.unzip`); 
 below.  They define the search space and cannot be switched off inside this model.
 
 **Where tactics are recorded.**  A result line records the tactics it was produced with (`tactics`: the changes from
-the defaults, such as `branching=largest,match_refine=0`; `tactic_switches`: every tactic's value), whether any
+the defaults, such as `match_refine=0,lagrange=off`; `tactic_switches`: every tactic's value), whether any
 unproven tactic was on, and which ones the game's proof actually rests on (`taint`, section 8).  A checkpoint
-records the ten search tactics and is refused when they differ (the error names each tactic that differs and the
+records the six search tactics and is refused when they differ (the error names each tactic that differs and the
 `--tactic` flags that resume it); one made before a sound search tactic existed (`fix_forced`, `nogoods`,
-`forget_nogoods`, `lagrange`) reads back with it at its default.
+`forget_nogoods`, `lagrange`) reads back with it at its default, and one made with a tactic that has since been
+removed is refused, naming it.
 
 ## 6. Engine
 
@@ -582,7 +561,7 @@ earlier one with no search; the committed `results/strict.jsonl` was made with i
 *The problem.*  After setup (`search::prepare`) the searcher is given the model (the factor graph among the frames'
 numbers and each number's home frame), the root frame set (every frame's moves, factors and freedoms, frame 0's
 revised by `revise_freedoms` if it was on), the candidates and `max_total`, besides the tactics, the cap and the seed;
-the greedy set, the preclusion table and the matching graph are functions of those.  Call Π = (model, root,
+the greedy set and the matching graph are functions of those.  Call Π = (model, root,
 candidates, `max_total`) the game's *search problem*, and P\*(Π) the largest sum of a *feasible* set of Π: a set of
 candidates that can be promoted from the root, keeping every frame winnable and its freedoms at least 0, with at
 most `max_total` members.  Which sets are feasible depends on the frames and on the graph's edges among their
@@ -593,8 +572,8 @@ each its freedoms, moves and factors; the candidates; `max_total`; and for every
 and the lists of maximal factors and maximal composites the model's graph keeps for it, which name some numbers
 that reduction removed and the search never sees, erring on the side of telling problems apart.  Equal forms are
 equal problems, with the same feasible sets and the same P\*.  The tactics, the cap and the seed are not in it: a
-sound tactic, the cap and the seed change how the search runs, not what it finds (section 4); `legacy_bound` and
-`revise_freedoms` are accounted for in the taint, the latter through frame 0's freedoms, which are in Π.  A results
+sound tactic, the cap and the seed change how the search runs, not what it finds (section 4); `revise_freedoms` is
+accounted for in the taint, through frame 0's freedoms, which are in Π.  A results
 line records the form's 64-bit digest (`setup.digest`); nothing rests on the digest alone (below).
 
 *Which proofs settle P\*.*  A game m whose proof is
@@ -683,7 +662,7 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   against promoting the sets.
 * **Soundness harness** (`tests/soundness.rs`): the search is started with an incumbent worth 1 or 5 less than the
   optimum and an empty payload, so that any pruning that loses every best completion leaves the fake incumbent in place
-  (this tests the `<` and `<=` boundaries too): every game 2..=300 under each of 25 configurations (every tactic,
+  (this tests the `<` and `<=` boundaries too): every game 2..=300 under each of 19 configurations (every tactic,
   forgetting every step, every third, never; the Lagrangian bound refitted every few steps; one thread and two), and
   games 301..=600 (every tenth, searches of hundreds to thousands of steps) with the Lagrangian bound refitted early
   and often, where it cuts and forces thousands of times; the same for 500 perturbed frame sets (numbers

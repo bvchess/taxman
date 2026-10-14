@@ -11,7 +11,7 @@ mod commands;
 use cli::{errln, outln, CliError, CliResult};
 use std::process::ExitCode;
 use taxman::engine;
-use taxman::search::{Branching, SearchTactics};
+use taxman::search::SearchTactics;
 use taxman::tactics::Tactics;
 
 /// The usage text with its `{...}` parts to fill in by [`usage`].
@@ -23,8 +23,7 @@ commands:
                           of A-1 in --out FILE or optimal.json (with neither it is solved standalone, which
                           costs more: no seed from the game before and no ceiling)
       --threads K             worker threads (default: all cores)
-      --tactic NAME=VALUE      set a tactic (repeatable).  A switch is on or off, match_refine is 0-{max_refine},
-                               branching is {branchings}.
+      --tactic NAME=VALUE      set a tactic (repeatable).  A switch is on or off, match_refine is 0-{max_refine}.
                                Names: {tactics}
       --strict                 no unproven tactic: the same as {strict}
                                (a --tactic given as well is applied after it)
@@ -71,7 +70,6 @@ fn usage() -> String {
     USAGE
         .replace("{tactics}", &rows.join(&format!(",\n{:31}", "")))
         .replace("{strict}", &strict_flags)
-        .replace("{branchings}", &Branching::ALL.map(Branching::name).join(", "))
         .replace("{max_refine}", &SearchTactics::MAX_MATCH_REFINE.to_string())
 }
 

@@ -663,7 +663,6 @@ mod tests {
     #[ignore]
     fn bench_lagrange_1215() {
         use crate::board::Board;
-        use crate::bounds::{max_additional, new_candidate_list};
         use crate::search::SearchTactics;
         use std::hint::black_box;
         let board = Board::<20>::for_n(1215);
@@ -686,10 +685,7 @@ mod tests {
         for n in cands.iter_desc() {
             let before = left;
             left.remove(n);
-            let child = model.promote(root, n).map(|next| {
-                let max_next = max_additional(p.max_total, &next, &Bits::EMPTY.with(n), &left);
-                new_candidate_list(model, None, n, max_next, &next, &left, &Bits::EMPTY)
-            });
+            let child = model.promote(root, n).map(|next| next.narrow_candidates(&left));
             steps.push((n, before, child));
         }
         let mut mb = super::super::MatchBound::new(&graph);

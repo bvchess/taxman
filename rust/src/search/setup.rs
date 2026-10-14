@@ -1,7 +1,7 @@
 //! Setting a game up for the search ([`prepare`], the Java's `SearchManager.create`): the model and the root
-//! frame set, the preclusion table (tactic `preclusions`), the greedy incumbent, and (tactic `revise_freedoms`)
-//! frame 0's revised freedoms, which can lower `max_total`.  [`prepare_for_resume`] does the same for a search
-//! that a checkpoint will resume, taking frame 0's freedoms from it.
+//! frame set, the greedy incumbent, and (tactic `revise_freedoms`) frame 0's revised freedoms, which can lower
+//! `max_total`.  [`prepare_for_resume`] does the same for a search that a checkpoint will resume, taking frame 0's
+//! freedoms from it.
 //!
 //! The search problem a setup poses, in a canonical form that two games can be compared by, is a [`Problem`]
 //! ([`Prepared::problem`]); [`problem_of`] rebuilds it from what a results line records, without preparing a search.
@@ -9,7 +9,7 @@
 use super::header::Header;
 use super::tactics::SearchTactics;
 use crate::bits::Bits;
-use crate::bounds::{self, Preclusions};
+use crate::bounds;
 use crate::engine::{self, EngineConfig};
 use crate::model::{FrameSet, Model};
 use crate::numtheory::Tables;
@@ -110,7 +110,6 @@ impl Revise {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PrepareTimings {
     pub build: Duration,
-    pub preclusions: Duration,
     pub greedy: Duration,
     /// Including the two-frame game's own setup and search.
     pub revise: Duration,
@@ -127,8 +126,6 @@ pub struct Prepared<const W: usize> {
     pub root: FrameSet<W>,
     pub candidates: Bits<W>,
     pub tactics: SearchTactics,
-    /// Present when the `preclusions` tactic is on.
-    pub preclusions: Option<Preclusions<W>>,
     /// The greedy incumbent.
     pub greedy: Bits<W>,
     /// The most promotions a promotion set can have (`maxTotalPromotions`):
@@ -150,9 +147,9 @@ impl<const W: usize> Prepared<W> {
 /// promotion sum (DESIGN.md, "Same search").
 ///
 /// The search is given the model (the factor graph and each number's home frame), the root frame set, the
-/// candidates and `max_total`, besides the tactics, the cap and the seed; the matching graph, the greedy set and
-/// the preclusion table are functions of those.  The feasible promotion sets are the sets of candidates that can be
-/// promoted from the root, keeping every frame's freedoms, with at most `max_total` members; which they are depends
+/// candidates and `max_total`, besides the tactics, the cap and the seed; the matching graph and the greedy set are
+/// functions of those.  The feasible promotion sets are the sets of candidates that can be promoted from the root,
+/// keeping every frame's freedoms, with at most `max_total` members; which they are depends
 /// on the frames and on the graph's edges among their numbers, not on `n`.  So the form records, as a list of
 /// `u32`: the number of frames; for each frame, bottom first, its freedoms (as the bits of an `i32`) and its moves
 /// and its factors (each list as its length and then its numbers, ascending); the candidates; `max_total`; and for
@@ -234,7 +231,7 @@ fn max_total<const W: usize>(root: &FrameSet<W>, candidates: &Bits<W>) -> u32 {
 /// The search problem ([`Problem`]) that [`prepare`] poses for the game whose frames are `columns`, when revising
 /// frame 0 did what `revise` (a results line's `setup.revise`) says: the model and the root are built again, frame
 /// 0's freedoms set as `revise` says ([`Revise::frame_zero`]), and `max_total` follows; nothing is searched (no
-/// greedy set, no preclusions, no revising).
+/// greedy set, no revising).
 ///
 /// # Errors
 ///
@@ -260,8 +257,8 @@ pub fn problem_of<const W: usize>(
 }
 
 /// Sets up the search for the game whose frames are `columns` (factors and moves per frame, bottom first) and
-/// whose promotion candidates are `candidates`.  `threads` is used for the preclusion table and for the
-/// two-frame search of `revise_freedoms`, which has no limits (see [`prepare_within`]).
+/// whose promotion candidates are `candidates`.  `threads` is used for the two-frame search of
+/// `revise_freedoms`, which has no limits (see [`prepare_within`]).
 pub fn prepare<const W: usize>(
     tables: &Tables,
     columns: &[Vec<u32>],
@@ -292,8 +289,9 @@ pub fn prepare_within<const W: usize>(
 /// [`prepare`] for resuming the search checkpointed in `checkpoint`: frame 0's freedoms come from the
 /// checkpoint's header instead of being revised again (which can take a search of its own), and the tactics
 /// are the checkpoint's.  Fails, saying what differs, if the checkpoint was made for another board size,
-/// width, candidates or frames, or by a build whose checkpoint headers had another format, or if its frame 0
-/// has freedoms its search cannot have had (see `resumed_root`).
+/// width, candidates or frames, or by a build whose checkpoint headers had another format, or with a search
+/// tactic that this build no longer has, or if its frame 0 has freedoms its search cannot have had (see
+/// `resumed_root`).
 pub fn prepare_for_resume<const W: usize>(
     tables: &Tables,
     columns: &[Vec<u32>],
@@ -388,10 +386,6 @@ fn prepare_state<const W: usize>(
 ) -> Result<Prepared<W>, String> {
     let mut timings = PrepareTimings::default();
     let t0 = Instant::now();
-    let threads = engine.threads;
-    let preclusions = tactics.preclusions.then(|| Preclusions::build(&model, &root, &candidates, threads));
-    timings.preclusions = t0.elapsed();
-    let t0 = Instant::now();
     let greedy = bounds::greedy(&model, &root, &candidates);
     timings.greedy = t0.elapsed();
     let t0 = Instant::now();
@@ -402,19 +396,7 @@ fn prepare_state<const W: usize>(
     };
     timings.revise = t0.elapsed();
     let max_total = max_total(&revised, &candidates);
-    Ok(Prepared {
-        n,
-        model,
-        unrevised: root,
-        root: revised,
-        candidates,
-        tactics,
-        preclusions,
-        greedy,
-        max_total,
-        revise,
-        timings,
-    })
+    Ok(Prepared { n, model, unrevised: root, root: revised, candidates, tactics, greedy, max_total, revise, timings })
 }
 
 /// The Java's `UpperBoundEstimator.reviseFreedoms` (see [`Revise`] for what it rests on).  When the greedy

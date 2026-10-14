@@ -76,7 +76,7 @@ impl<const W: usize> Board<W> {
     }
 
     /// Sets the search up: the frame set, greedy incumbent and (tactic `revise_freedoms`) revised frame 0, see
-    /// [`search::prepare`].  `threads` serve the preclusion table and the revision's own search.
+    /// [`search::prepare`].  `threads` serve the revision's own search.
     ///
     /// # Errors
     ///

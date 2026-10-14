@@ -499,25 +499,34 @@ fn a_checkpoint_renamed_to_another_game_is_refused() {
     assert!(dir.join("n0141.ckpt").exists(), "a refused checkpoint is left alone");
 }
 
-/// Rewrites the search's header in the checkpoint `path` to say that frame 0 has `freedoms` and the search
-/// `max_total` promotions at most, and the file's checksum to match: a forgery that only the check of frame 0
-/// against the frames can see.
-fn forge_frame_zero(path: &Path, freedoms: i32, max_total: u32) {
+/// Changes the search's header in the checkpoint `path` by `edit`, which gets the file's bytes from the header's
+/// magic on (`search::header`), and rewrites the file's checksum to match: a forgery that only the checks of the
+/// header can see.
+fn forge_header(path: &Path, edit: impl FnOnce(&mut [u8])) {
     let mut bytes = fs::read(path).unwrap();
     let len = bytes.len();
     // The engine's file ends with a marker and the checksum of everything before it.
     assert_eq!(&bytes[len - 16..len - 8], b"TXCKEND1");
     let checksum = |bytes: &[u8]| engine::checksum(&bytes[..len - 16]).to_le_bytes();
     assert_eq!(bytes[len - 8..], checksum(&bytes), "the checksum is of what precedes the marker");
-    // The search's header follows the engine's 20 bytes: frame 0's freedoms at 33, after a byte that says there is
-    // a frame 0, and max_total at 37 (`search::header`).
+    // The search's header follows the engine's 20 bytes.
     let at = 20;
-    assert_eq!((&bytes[at..at + 4], bytes[at + 32]), (&b"TXSH"[..], 1));
-    bytes[at + 33..at + 37].copy_from_slice(&freedoms.to_le_bytes());
-    bytes[at + 37..at + 41].copy_from_slice(&max_total.to_le_bytes());
+    assert_eq!(&bytes[at..at + 4], b"TXSH");
+    edit(&mut bytes[at..]);
     let sum = checksum(&bytes);
     bytes[len - 8..].copy_from_slice(&sum);
     fs::write(path, bytes).unwrap();
+}
+
+/// Changes the search's header in the checkpoint `path` to say that frame 0 has `freedoms` and the search
+/// `max_total` promotions at most: a forgery that only the check of frame 0 against the frames can see.
+fn forge_frame_zero(path: &Path, freedoms: i32, max_total: u32) {
+    forge_header(path, |header| {
+        // Frame 0's freedoms are at 33, after a byte that says there is a frame 0, and max_total at 37.
+        assert_eq!(header[32], 1);
+        header[33..37].copy_from_slice(&freedoms.to_le_bytes());
+        header[37..41].copy_from_slice(&max_total.to_le_bytes());
+    });
 }
 
 /// A checkpoint whose frame 0 has freedoms its search cannot have had is refused, naming frame 0: other than the
@@ -554,12 +563,28 @@ fn a_checkpoint_made_with_other_tactics_names_them() {
     let opts = SolveOptions { node_limit: Some(1500), ..options(&dir.0) };
     assert!(!solver::solve_game(600, None, &opts).unwrap().completed);
     let mut other = opts.clone();
-    other.tactics.set("preclusions=on").unwrap();
+    other.tactics.set("nogoods=off").unwrap();
     other.tactics.set("match_refine=3").unwrap();
     let err = solver::solve_game(600, None, &other).unwrap_err();
-    for part in ["preclusions is off, not on", "match_refine is 1, not 3", "--tactic preclusions=off"] {
+    for part in ["nogoods is on, not off", "match_refine is 1, not 3", "--tactic nogoods=on"] {
         assert!(err.contains(part), "{part}: {err}");
     }
+}
+
+/// A checkpoint made by a build that had search tactics which this one does not (the preclusion table, bit 0 of the
+/// header's tactics, at byte 41) is refused, naming the tactic, and left alone.
+#[test]
+fn a_checkpoint_made_with_a_removed_tactic_is_refused() {
+    let dir = TempDir::new("removed");
+    let opts = SolveOptions { node_limit: Some(1500), ..options(&dir.0) };
+    assert!(!solver::solve_game(600, None, &opts).unwrap().completed);
+    let checkpoint = dir.join("n0600.ckpt");
+    forge_header(&checkpoint, |header| header[41] |= 1);
+    let err = solver::solve_game(600, None, &opts).unwrap_err();
+    for part in ["n0600.ckpt", "preclusions=on", "no longer has"] {
+        assert!(err.contains(part), "{part}: {err}");
+    }
+    assert!(checkpoint.exists(), "a refused checkpoint is left alone");
 }
 
 /// Game 1225's `revise_freedoms` searches a two-frame game of about 4300 nodes: a node limit stops that search,

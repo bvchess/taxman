@@ -413,7 +413,7 @@ fn window<const W: usize>(
     }
     p.tactics = tactics.search;
     let graph = MatchGraph::new(&p.model, &p.root);
-    let space = SearchSpace::new(&p, Some(&graph), None);
+    let space = SearchSpace::new(&p, &graph, None);
     let header = engine::read_checkpoint_header(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let cfg = EngineConfig { threads: 1, node_limit: Some(steps), progress: None, ..EngineConfig::default() };
     let mut failure = None;
@@ -461,7 +461,7 @@ fn make_nodes<const W: usize>(dir: &Path, n: u32, optimal: &Optimal, every: u64,
     let p = setup::<W>(n);
     let incumbent = seed(&p, optimal);
     let graph = MatchGraph::new(&p.model, &p.root);
-    let space = SearchSpace::new(&p, Some(&graph), None);
+    let space = SearchSpace::new(&p, &graph, None);
     let log = Mutex::new(Vec::new());
     let tmp = std::env::temp_dir().join(format!("taxman-perf-{n}-{}.ckpt", std::process::id()));
     let payload = incumbent.as_words().iter().flat_map(|w| w.to_le_bytes()).collect();

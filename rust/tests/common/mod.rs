@@ -10,7 +10,6 @@ mod support;
 #[allow(unused_imports)]
 pub use support::{Rng, TempDir};
 
-use std::cell::OnceCell;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -18,7 +17,6 @@ use std::sync::Mutex;
 use std::time::Instant;
 use taxman::bits::Bits;
 use taxman::board::Board;
-use taxman::bounds::{Preclusions, RunnerUp};
 use taxman::engine::{self, EngineConfig, Start};
 use taxman::json::Json;
 use taxman::matchbound::MatchGraph;
@@ -26,7 +24,7 @@ use taxman::model::{FrameSet, Model, Scratch};
 use taxman::numtheory::Tables;
 use taxman::results::Taint;
 use taxman::search::lagrange::Refits;
-use taxman::search::{search, Branching, SearchSpace, SearchTactics, TaxSearcher, TaxUnit, NOGOOD_PERIOD};
+use taxman::search::{search, SearchSpace, SearchTactics, TaxSearcher, TaxUnit, NOGOOD_PERIOD};
 use taxman::solver::{Prev, PrevSource, SolveOptions};
 
 /// A committed file under `testdata/`.
@@ -117,8 +115,6 @@ pub fn variants() -> Vec<(&'static str, SearchTactics)> {
         ("forget_nogoods=off", SearchTactics { forget_nogoods: false, ..d }),
         ("match_refine=0", SearchTactics { match_refine: 0, ..d }),
         ("match_refine=3", SearchTactics { match_refine: 3, ..d }),
-        ("conflict-smallest", SearchTactics { branching: Branching::ConflictSmallest, ..d }),
-        ("conflict-largest", SearchTactics { branching: Branching::ConflictLargest, ..d }),
     ]
 }
 
@@ -196,16 +192,13 @@ pub fn fnv1a64(moves: &[u32]) -> u64 {
 /// nogoods, and how many threads there are.
 #[derive(Clone, Copy, Debug)]
 pub struct Config {
-    pub matching: bool,
     pub refine: u32,
-    pub branching: Branching,
     pub fix_forced: bool,
     pub nogoods: bool,
     /// After how many of its steps a searcher forgets its nogoods; `None` for never.
     pub period: Option<u64>,
     /// When a searcher refits the multipliers of its Lagrangian bound; `None` without that bound.
     pub refits: Option<Refits>,
-    pub preclusions: bool,
     pub threads: usize,
 }
 
@@ -217,14 +210,11 @@ impl Config {
 
     pub fn of(t: &SearchTactics) -> Config {
         Config {
-            matching: t.match_bound,
             refine: u32::from(t.match_refine),
-            branching: t.branching,
             fix_forced: t.fix_forced,
             nogoods: t.nogoods,
             period: t.forget_nogoods.then_some(NOGOOD_PERIOD),
-            refits: (t.match_bound && t.nogoods && t.lagrange).then_some(Refits::SEARCH),
-            preclusions: t.preclusions,
+            refits: (t.nogoods && t.lagrange).then_some(Refits::SEARCH),
             threads: 1,
         }
     }
@@ -251,7 +241,6 @@ pub struct Game<const W: usize> {
     pub candidates: Bits<W>,
     pub max_total: u32,
     graph: MatchGraph,
-    preclusions: OnceCell<Preclusions<W>>,
 }
 
 impl<const W: usize> Game<W> {
@@ -259,7 +248,7 @@ impl<const W: usize> Game<W> {
     pub fn new(model: Model, root: FrameSet<W>, candidates: Bits<W>) -> Self {
         let max_total = root.max_promotions_among(&candidates).max(0) as u32;
         let graph = MatchGraph::new(&model, &root);
-        Game { model, root, candidates, max_total, graph, preclusions: OnceCell::new() }
+        Game { model, root, candidates, max_total, graph }
     }
 
     /// The game with the frames `columns` (factors and moves per frame, bottom first), if every frame of the root is
@@ -300,24 +289,18 @@ impl<const W: usize> Game<W> {
         engine: Option<EngineConfig>,
         resume: Option<PathBuf>,
     ) -> Outcome<W> {
-        let preclusions = cfg
-            .preclusions
-            .then(|| self.preclusions.get_or_init(|| Preclusions::build(&self.model, &self.root, &self.candidates, 1)));
         let space = SearchSpace {
             model: &self.model,
             root: &self.root,
-            preclusions,
-            match_graph: cfg.matching.then_some(&self.graph),
+            match_graph: &self.graph,
             match_refine: cfg.refine,
-            conflict_branching: cfg.branching,
             fix_forced: cfg.fix_forced,
-            nogoods: cfg.nogoods && cfg.matching,
+            nogoods: cfg.nogoods,
             nogood_period: cfg.period,
-            lagrange: cfg.refits.filter(|_| cfg.nogoods && cfg.matching),
+            lagrange: cfg.refits.filter(|_| cfg.nogoods),
             candidates: self.candidates,
             root_max: self.root.frames().iter().filter_map(|f| (f.moves | f.factors).max()).max().unwrap_or(0),
             max_total: self.max_total,
-            rule: RunnerUp::Sound,
             cap: None,
             diagnostics: None,
             began: Instant::now(),

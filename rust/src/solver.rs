@@ -407,7 +407,6 @@ pub fn parse_digest(text: &str) -> Option<u64> {
 pub struct Phases {
     /// Hives, frames, and the search model.
     pub frames: Duration,
-    pub preclusions: Duration,
     pub greedy: Duration,
     /// Revising frame 0's freedoms, including its own search.
     pub revise: Duration,
@@ -424,7 +423,6 @@ impl Phases {
         let secs = |d: Duration| Json::Num(d.as_secs_f64());
         Json::object([
             ("frames", secs(self.frames)),
-            ("preclusions", secs(self.preclusions)),
             ("greedy", secs(self.greedy)),
             ("revise", secs(self.revise)),
             ("search", secs(self.search)),
@@ -456,14 +454,10 @@ impl SearchSetup {
 }
 
 /// The names of [`Stats::extra`], by the index [`search::stat`] gives each.
-const STAT_NAMES: [(&str, usize); 8] = [
+const STAT_NAMES: [(&str, usize); 4] = [
     ("promote_attempts", stat::PROMOTE_ATTEMPTS),
     ("promotions", stat::PROMOTIONS),
-    ("upper_bounds", stat::UPPER_BOUNDS),
-    ("can_promotes", stat::CAN_PROMOTES),
     ("children", stat::CHILDREN),
-    ("precluded", stat::PRECLUDED),
-    ("certificates", stat::CERTIFICATES),
     ("match_bounds", stat::MATCH_BOUNDS),
 ];
 
@@ -910,7 +904,7 @@ fn conclude(
             return reject(result, format!("scored {score} but optimal.json says {expected}"));
         }
     }
-    let own = own_taint(result.method, result.setup.map(|s| s.revise), result.tactics.search.legacy_bound);
+    let own = own_taint(result.method, result.setup.map(|s| s.revise));
     let proof = Proof::of(result.method, true, result.reached_cap).expect("a completed game has a proof");
     result.proof = Some(proof);
     // What the proof rests on besides the game: the game a repeat repeats, else the game of n − 1.
@@ -963,7 +957,6 @@ fn search_game<const W: usize>(
         }
     };
     result.phases.frames += prepared.timings.build;
-    result.phases.preclusions = prepared.timings.preclusions;
     result.phases.greedy = prepared.timings.greedy;
     result.phases.revise = prepared.timings.revise;
 

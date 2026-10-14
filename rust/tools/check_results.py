@@ -50,7 +50,7 @@ both problems up again and compares them.
 Proof kinds (rust/src/results.rs explains them): trivial, exhausted, cap, prime_formula, reuse_prev, same_search; a
 line without a "schema" field (schema 1) proves by the cap when its promotions sum to setup.cap.  The taint is what a
 proof rests on that is unproven: reuse_prev for a game it derived; revise_freedoms for a searched or repeat game
-whose setup.revise is GreedyIsMax, Searched or FromCheckpoint; legacy_bound for a searched game with it on; for a
+whose setup.revise is GreedyIsMax, Searched or FromCheckpoint; for a
 proof by the cap, the prime formula or reuse_prev, the taint of the game of n-1 ("optimal.json" for a game taken
 from that file); and for same_search, the taint of the game it repeats.  From schema 3 on, a proof by the cap rests
 on nothing the game used itself (its game replays to n + score(n-1), the ceiling, whatever found it), so its taint
@@ -176,8 +176,6 @@ def own_taint(row):
         taint.add("reuse_prev")
     if row["method"] in SETS_UP and revise_kind((row.get("setup") or {}).get("revise")) in REVISED:
         taint.add("revise_freedoms")
-    if row["method"] == "search" and row["tactic_switches"].get("legacy_bound"):
-        taint.add("legacy_bound")
     return taint
 
 

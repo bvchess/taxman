@@ -19,7 +19,7 @@ use taxman::game::Optimal;
 use taxman::model::{FrameSet, Model, Scratch};
 use taxman::numtheory::Tables;
 use taxman::search::lagrange::Refits;
-use taxman::search::{prepare, Branching, SearchTactics, TaxUnit};
+use taxman::search::{prepare, SearchTactics, TaxUnit};
 
 /// Every tactic that acts inside the search, alone and in the combinations that matter, with the forgetting of
 /// nogoods at the production period, every step, every third, and never; on one thread and two.  The Lagrangian
@@ -40,12 +40,6 @@ fn configs() -> Vec<Config> {
         Config { fix_forced: false, refine: 0, ..base },
         Config { nogoods: false, ..base },
         Config { nogoods: false, refine: 0, ..base },
-        Config { branching: Branching::ConflictSmallest, ..base },
-        Config { branching: Branching::ConflictLargest, refine: 2, ..base },
-        Config { branching: Branching::Largest, ..base },
-        Config { branching: Branching::Largest, refine: 0, ..base },
-        Config { preclusions: true, ..base },
-        Config { matching: false, branching: Branching::Largest, refine: 0, nogoods: false, ..base },
         Config { threads: 2, ..base },
         Config { threads: 2, period: Some(2), ..base },
         Config { threads: 2, refine: 0, ..base },
@@ -182,11 +176,10 @@ fn handicapped_units<const W: usize>(n: u32, rng: &mut Rng, units: usize, config
 }
 
 /// Units of real games at W = 20 to 64, the widths of the frontier and beyond, from a handicapped incumbent under
-/// every configuration but the preclusion table's (whose setup takes minutes on boards this large): the game tests
-/// above stop at W = 8, the perturbed games below at W = 4.
+/// every configuration: the game tests above stop at W = 8, the perturbed games below at W = 4.
 #[test]
 fn units_of_wide_games_from_a_handicapped_incumbent_find_the_optimum() {
-    let configs: Vec<Config> = configs().into_iter().filter(|c| !c.preclusions).collect();
+    let configs = configs();
     let mut rng = Rng(0x3D1D_E000_0000_0077);
     let runs = handicapped_units::<20>(1100, &mut rng, 40, &configs)
         + handicapped_units::<20>(1250, &mut rng, 40, &configs)
@@ -249,7 +242,7 @@ fn a_search_resumed_over_and_over_finds_the_optimum() {
     // every four.  The bound below only checks that the resuming really happened; it leaves room for the smallest
     // trees a loaded machine produces.
     let truth = optimal_sum::<16>(&optimal, 600).unwrap();
-    let resumes = resumed_over_and_over::<16>(600, truth, 30, 1000, &dir, &[0, 18, 20]);
+    let resumes = resumed_over_and_over::<16>(600, truth, 30, 1000, &dir, &[0, 12, 14]);
     assert!(resumes >= 10, "only {resumes} resumes");
 }
 
@@ -261,7 +254,7 @@ fn a_wide_search_resumed_over_and_over_finds_the_optimum() {
     let n = 1133;
     let truth = stored_games("strict.jsonl")[&n].0 - Board::<20>::for_n(n).in_the_bag;
     let dir = TempDir::new("churn-wide");
-    let resumes = resumed_over_and_over::<20>(n, truth, 400, 60, &dir, &[0, 18, 20])
+    let resumes = resumed_over_and_over::<20>(n, truth, 400, 60, &dir, &[0, 12, 14])
         + resumed_over_and_over::<24>(n, truth, 400, 60, &dir, &[0])
         + resumed_over_and_over::<64>(n, truth, 400, 60, &dir, &[2]);
     assert!(resumes > 10, "only {resumes} resumes");

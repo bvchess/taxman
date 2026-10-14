@@ -315,18 +315,6 @@ fn random_agreement<const W: usize>(g: &Golden, rng: &mut Rng, stats: &mut PeelS
             for (i, frame) in state.frames().iter().enumerate() {
                 let (move_universe, factor_universe) = universes[i];
                 assert!(check_frame(frame.moves, frame.factors, &model.graph, &math, stats));
-                // Single edits answered with a certificate agree with peeling.
-                let mut scratch = Scratch::new();
-                let mut cert = Certificate::default();
-                assert!(model.certify_using(&mut scratch, frame, &mut cert));
-                for x in (move_universe - frame.moves).iter() {
-                    let with = model.winnable_with_move_using(&mut scratch, frame, &cert, x);
-                    assert_eq!(with, winnable(&frame.moves.with(x), &frame.factors, &math), "with move {x}");
-                }
-                for y in frame.factors.iter() {
-                    let without = model.winnable_without_factor_using(&mut scratch, frame, &cert, y);
-                    assert_eq!(without, winnable(&frame.moves, &frame.factors.without(y), &math), "without {y}");
-                }
                 let extra: Vec<u32> = (move_universe - frame.moves).to_vec();
                 let present: Vec<u32> = frame.factors.to_vec();
                 for _ in 0..4 {

@@ -32,14 +32,13 @@ use taxman::with_width;
 /// the committed strict results.  The Lagrangian bound (tactic `lagrange`) first fits its multipliers after 2,000
 /// steps, so the games that take fewer (480, 640) do not see it; its rows `lagrange=off` are the trees of the build
 /// before it.
-const EXPECTED: [(u32, &str, u64, u64); 33] = [
+const EXPECTED: [(u32, &str, u64, u64); 30] = [
     // W = 8, the small end: every tactic's effect shows in a few hundred nodes.
     (480, "default", 5350, 393),
     (480, "nogoods=off", 5350, 417),
     (480, "fix_forced=off", 5350, 503),
     (480, "match_refine=0", 5350, 431),
     (480, "match_refine=3", 5350, 254),
-    (480, "preclusions=on", 5350, 391),
     // W = 16: games of a few hundred to ten thousand nodes.
     (600, "default", 8507, 4558),
     (600, "lagrange=off", 8507, 5877),
@@ -47,8 +46,6 @@ const EXPECTED: [(u32, &str, u64, u64); 33] = [
     (600, "fix_forced=off", 8507, 7723),
     (600, "match_refine=0", 8507, 4711),
     (600, "match_refine=3", 8507, 3469),
-    (600, "branching=conflict-smallest", 8507, 23696),
-    (600, "branching=conflict-largest", 8507, 9311),
     (640, "default", 9220, 676),
     (640, "nogoods=off", 9220, 1099),
     (640, "fix_forced=off", 9220, 1569),

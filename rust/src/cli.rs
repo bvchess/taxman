@@ -204,14 +204,14 @@ mod tests {
     #[test]
     fn flags_and_positionals() {
         let given =
-            strings(&["480", "--threads", "4", "--tactic=match_bound=off", "--tactic", "prev_cap=off", "--show"]);
+            strings(&["480", "--threads", "4", "--tactic=match_refine=0", "--tactic", "prev_cap=off", "--show"]);
         let args = Args::parse(&given, &SOLVER_FLAGS, &["--show"]).unwrap();
         assert_eq!(args.positional(), ["480"]);
         assert!(args.has("--show") && !args.has("--force-search"));
-        assert_eq!(args.values("--tactic"), ["match_bound=off", "prev_cap=off"]);
+        assert_eq!(args.values("--tactic"), ["match_refine=0", "prev_cap=off"]);
         let opts = solver_options(&args).unwrap();
         assert_eq!(opts.threads, 4);
-        assert_eq!(opts.tactics.description(), "match_bound=off,prev_cap=off");
+        assert_eq!(opts.tactics.description(), "match_refine=0,prev_cap=off");
     }
 
     #[test]
@@ -225,7 +225,7 @@ mod tests {
         assert_eq!(options(&["--strict"]).description(), "reuse_prev=off,revise_freedoms=off");
         // A `--tactic` is applied after `--strict`, wherever it is on the command line.
         assert_eq!(options(&["--tactic", "reuse_prev=on", "--strict"]).description(), "revise_freedoms=off");
-        assert_eq!(options(&["--strict", "--tactic", "branching=largest"]).unproven_on(), Vec::<&str>::new());
+        assert_eq!(options(&["--strict", "--tactic", "match_refine=0"]).unproven_on(), Vec::<&str>::new());
         // A command that takes no solver flags does not take the switch either.
         let args = Args::parse(&strings(&["--strict"]), &["--optimal"], &[]);
         assert!(usage(args.unwrap_err()).contains("unknown option --strict"));
@@ -238,11 +238,11 @@ mod tests {
             let args = Args::parse(&strings(&given), &SOLVER_FLAGS, &[]).unwrap();
             solver_options(&args).map(|opts| opts.tactics).map_err(usage)
         };
-        let t = options(&["branching=largest", "match_refine=0"]).unwrap();
-        assert_eq!(t.description(), "branching=largest,match_refine=0");
+        let t = options(&["match_refine=2", "nogoods=off"]).unwrap();
+        assert_eq!(t.description(), "match_refine=2,nogoods=off");
         // The last assignment of a tactic wins, as for the switches.
         assert_eq!(options(&["match_refine=3", "match_refine=1"]).unwrap().description(), "default");
-        for bad in ["branching=sideways", "match_refine=9", "match_refine=two", "match_refine=-1"] {
+        for bad in ["match_refine=9", "match_refine=two", "match_refine=-1"] {
             let message = options(&[bad]).unwrap_err();
             assert!(message.starts_with(&format!("tactic {}: expected ", bad.split('=').next().unwrap())), "{message}");
         }

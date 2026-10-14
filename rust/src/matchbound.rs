@@ -1,6 +1,5 @@
 //! The matching bound: an upper bound on the sum of the promotions a search state can still make, from relaxing
-//! winnability to matchability.  With the tactic `match_bound` (on by default) it is the bound of every node of
-//! the search ([`crate::search`]).
+//! winnability to matchability.  It is the bound of every node of the search ([`crate::search`]).
 //!
 //! # The relaxation
 //!
@@ -26,10 +25,8 @@
 //!
 //! The bound ignores the frames' freedoms (frame 0's can be revised to fewer than matching allows) and the limit
 //! on the number of promotions (`max_total`, a node's `max_add`).  Both only remove completions, so it remains
-//! an upper bound.  The Java's `blameGame` bound ([`crate::bounds::upper_bound`]) does respect them, and the
-//! smaller of the two would be a bound too; the search does not take it.  With `match_bound` on, the matching
-//! bound replaces `blameGame`, which is then not computed at all (it never pruned where the matching bound did
-//! not); with it off, the search uses `blameGame` alone.
+//! an upper bound.  The Java's `blameGame` bound does respect them, and the smaller of the two would be a bound
+//! too; but it never pruned where the matching bound did not, so the search does not compute it.
 //!
 //! # Two solvers
 //!
@@ -1308,14 +1305,12 @@ pub fn match_bound_once<const W: usize>(model: &Model, state: &FrameSet<W>, cand
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bounds::{max_additional, new_candidate_list, upper_bound, Preclusions, RunnerUp};
-    use crate::json::Json;
     use crate::model::test_support::*;
     use crate::numtheory::Tables;
     use std::cmp::Reverse;
     use std::collections::{BinaryHeap, HashMap, HashSet};
     use std::hint::black_box;
-    use std::time::{Duration, Instant};
+    use std::time::Instant;
 
     pub(super) fn setup<const W: usize>(g: &Golden) -> (Model, FrameSet<W>, Bits<W>) {
         let (model, root) = Model::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
@@ -1446,8 +1441,6 @@ mod tests {
     /// candidates shrunk.  Evaluations are random too, so changes pile up between them.
     struct Walk<'a, const W: usize> {
         model: &'a Model,
-        preclusions: Option<&'a Preclusions<W>>,
-        max_total: u32,
         rng: Rng,
         /// Loop iterations left.
         budget: usize,
@@ -1517,27 +1510,15 @@ mod tests {
                 if self.rng.chance(40) {
                     if let Some(mut next) = self.model.promote(state, n) {
                         let mut next_promoted = promoted.with(n);
-                        let max_next = max_additional(self.max_total, &next, &next_promoted, &cands);
-                        let mut child =
-                            new_candidate_list(self.model, self.preclusions, n, max_next, &next, &cands, &promoted);
+                        let mut child = next.narrow_candidates(&cands);
                         // Sometimes the child promotes another candidate too, as the search's forced ones.
                         let mut added = Bits::EMPTY.with(n);
                         if let Some(m) = child.max().filter(|_| self.rng.chance(30)) {
                             if self.model.promote_in_place(&mut next, m) {
                                 child.remove(m);
-                                let before = next_promoted;
                                 next_promoted.insert(m);
                                 added.insert(m);
-                                let max_next = max_additional(self.max_total, &next, &next_promoted, &child);
-                                child = new_candidate_list(
-                                    self.model,
-                                    self.preclusions,
-                                    m,
-                                    max_next,
-                                    &next,
-                                    &child,
-                                    &before,
-                                );
+                                child = next.narrow_candidates(&child);
                             }
                         }
                         let depth = mb.depth();
@@ -1566,11 +1547,9 @@ mod tests {
     /// Runs `paths` walks of `budget` loop iterations each from the root of `g`.
     pub(super) fn walks<const W: usize>(g: &Golden, seed: u64, paths: usize, budget: usize, visit: &mut Visit<'_, W>) {
         let (model, root, all) = setup::<W>(g);
-        let max_total = root.max_promotions_among(&all).max(0) as u32;
-        let preclusions = Preclusions::build(&model, &root, &all, 4);
         let graph = MatchGraph::new(&model, &root);
         let mut mb = MatchBound::new(&graph);
-        let mut walk = Walk { model: &model, preclusions: Some(&preclusions), max_total, rng: Rng(seed), budget: 0 };
+        let mut walk = Walk { model: &model, rng: Rng(seed), budget: 0 };
         for _ in 0..paths {
             mb.reset(&Bits::EMPTY, &all);
             walk.budget = budget;
@@ -1811,16 +1790,11 @@ mod tests {
         eprintln!("  match_bound_once (graph + solve):     {:9.1} µs", ns / 1e3);
 
         // The root's expansion loop: the children's candidate lists, worked out beforehand.
-        let max_total = root.max_promotions_among(&cands).max(0) as u32;
-        let preclusions = Preclusions::build(&model, &root, &cands, 8);
         let mut left = cands;
         let mut steps: Vec<(u32, Option<Bits<W>>)> = Vec::new();
         for n in cands.iter_desc() {
             left.remove(n);
-            let child = model.promote(&root, n).map(|next| {
-                let max_next = max_additional(max_total, &next, &Bits::EMPTY.with(n), &left);
-                new_candidate_list(&model, Some(&preclusions), n, max_next, &next, &left, &Bits::EMPTY)
-            });
+            let child = model.promote(&root, n).map(|next| next.narrow_candidates(&left));
             steps.push((n, child));
         }
         let children = steps.iter().filter(|s| s.1.is_some()).count();
@@ -1883,192 +1857,5 @@ mod tests {
     #[ignore]
     fn bench_matchbound_760() {
         bench::<12>(&load(760));
-    }
-
-    // ---- how much the matching bound prunes: cargo test --release matchbound_pruning -- --ignored --nocapture ----
-
-    /// A depth-first branch and bound over promotions, with the Java's loop (the `match_bound=off` baseline in the
-    /// module docs of [`crate::search`]), started with the optimum as its incumbent, so that it visits exactly the
-    /// nodes its bound cannot rule out.
-    /// The bound is the `blameGame` bound alone, or with the matching bound evaluated wherever the first fails
-    /// to prune.  A node is pruned when its bound cannot beat the incumbent.
-    struct Dfs<'a, const W: usize> {
-        model: &'a Model,
-        preclusions: &'a Preclusions<W>,
-        max_total: u32,
-        best: u64,
-        use_match: bool,
-        limit: u64,
-        nodes: u64,
-        /// Matching bounds evaluated, pruned by them, and lower than the `blameGame` bound.
-        evaluations: u64,
-        pruned: u64,
-        lower: u64,
-        /// Over the evaluations: the sums of how far each bound is above the incumbent.
-        blame_excess: u64,
-        match_excess: u64,
-        /// Evaluations where the heaviest matching promotes more candidates than the node may add, and those of
-        /// them where the matching bound is not lower than the `blameGame` bound.
-        over_cap: u64,
-        over_cap_not_lower: u64,
-        match_time: Duration,
-    }
-
-    impl<const W: usize> Dfs<'_, W> {
-        fn run(&mut self, mb: &mut MatchBound<'_, W>, state: &FrameSet<W>, promoted: Bits<W>, mut cands: Bits<W>) {
-            let sum = promoted.sum();
-            while let Some(n) = cands.max() {
-                if self.nodes >= self.limit {
-                    return;
-                }
-                let max_add = max_additional(self.max_total, state, &promoted, &cands);
-                let blame = sum + upper_bound(self.model, state, &cands, max_add, RunnerUp::Sound);
-                if blame <= self.best || (self.use_match && self.matching_prunes(mb, sum, blame, max_add)) {
-                    break;
-                }
-                cands.remove(n);
-                if self.use_match {
-                    mb.remove_candidate(n);
-                }
-                let Some(next) = self.model.promote(state, n) else { continue };
-                let next_promoted = promoted.with(n);
-                let max_next = max_additional(self.max_total, &next, &next_promoted, &cands);
-                let child =
-                    new_candidate_list(self.model, Some(self.preclusions), n, max_next, &next, &cands, &promoted);
-                let child_sum = sum + u64::from(n);
-                let blame = child_sum + upper_bound(self.model, &next, &child, max_next, RunnerUp::Sound);
-                if blame <= self.best {
-                    continue;
-                }
-                if self.use_match {
-                    let start = Instant::now();
-                    mb.push(n, &child);
-                    self.match_time += start.elapsed();
-                    if !self.matching_prunes(mb, child_sum, blame, max_next) {
-                        self.nodes += 1;
-                        self.run(mb, &next, next_promoted, child);
-                    }
-                    mb.pop();
-                } else {
-                    self.nodes += 1;
-                    self.run(mb, &next, next_promoted, child);
-                }
-            }
-        }
-
-        fn matching_prunes(&mut self, mb: &mut MatchBound<'_, W>, sum: u64, blame: u64, max_add: u32) -> bool {
-            let start = Instant::now();
-            let bound = sum + mb.value();
-            self.match_time += start.elapsed();
-            self.evaluations += 1;
-            self.lower += u64::from(bound < blame);
-            if mb.chosen().len() > max_add {
-                self.over_cap += 1;
-                self.over_cap_not_lower += u64::from(bound >= blame);
-            }
-            self.blame_excess += blame - self.best;
-            self.match_excess += bound.saturating_sub(self.best);
-            let prunes = bound <= self.best;
-            self.pruned += u64::from(prunes);
-            prunes
-        }
-    }
-
-    fn pruning<const W: usize>(g: &Golden, limit: u64) {
-        let (model, unrevised, all) = setup::<W>(g);
-        // The search's starting point, as the Java's SearchManager makes it.
-        let manager = g.json.get("searchManager").expect("a game that needs search");
-        let field = |key: &str| manager.get(key).and_then(Json::as_i64).unwrap_or_else(|| panic!("{key}"));
-        let root = unrevised.with_frame_zero_freedoms(field("revisedFrame0Freedoms") as i32);
-        let max_total = field("maxTotalPromotions") as u32;
-        let cands = root.narrow_candidates(&all);
-        let best = u32s(g.json.get("solve").unwrap(), "promotions").iter().map(|&x| u64::from(x)).sum::<u64>();
-        let threads = std::thread::available_parallelism().map_or(4, |p| p.get());
-        let preclusions = Preclusions::build(&model, &root, &cands, threads);
-        let graph = MatchGraph::new(&model, &root);
-        let mut mb = MatchBound::new(&graph);
-        mb.reset(&Bits::EMPTY, &cands);
-        let blame = upper_bound(&model, &root, &cands, max_total, RunnerUp::Sound);
-        eprintln!(
-            "n={}: optimum {best}; at the root blameGame {blame} (+{}), matching {} (+{})",
-            g.n,
-            blame - best,
-            mb.value(),
-            mb.value() - best
-        );
-        let mut results = Vec::new();
-        for use_match in [false, true] {
-            let mut dfs = Dfs {
-                model: &model,
-                preclusions: &preclusions,
-                max_total,
-                best,
-                use_match,
-                limit,
-                nodes: 0,
-                evaluations: 0,
-                pruned: 0,
-                lower: 0,
-                blame_excess: 0,
-                match_excess: 0,
-                over_cap: 0,
-                over_cap_not_lower: 0,
-                match_time: Duration::ZERO,
-            };
-            mb.reset(&Bits::EMPTY, &cands);
-            let start = Instant::now();
-            dfs.run(&mut mb, &root, Bits::EMPTY, cands);
-            let secs = start.elapsed().as_secs_f64();
-            let capped = if dfs.nodes >= limit { " (node limit)" } else { "" };
-            let label = if use_match { "blameGame + matching" } else { "blameGame alone    " };
-            eprintln!("  {label}: {:9} nodes{capped} in {secs:7.2} s", dfs.nodes);
-            if use_match {
-                let e = dfs.evaluations.max(1) as f64;
-                eprintln!(
-                    "    {} matching evaluations ({:.2} µs each, {:.2} s in all, {:.2} searches each): \
-                     lower than blameGame at {:.1}%, pruning at {:.1}%; mean excess over the optimum: \
-                     blameGame {:.1}, matching {:.1}",
-                    dfs.evaluations,
-                    dfs.match_time.as_secs_f64() * 1e6 / e,
-                    dfs.match_time.as_secs_f64(),
-                    mb.stats().searches as f64 / e,
-                    100.0 * dfs.lower as f64 / e,
-                    100.0 * dfs.pruned as f64 / e,
-                    dfs.blame_excess as f64 / e,
-                    dfs.match_excess as f64 / e
-                );
-                eprintln!(
-                    "    the heaviest matching promotes more than the node may add at {:.1}% (not lower than \
-                     blameGame at {:.1}% of those)",
-                    100.0 * dfs.over_cap as f64 / e,
-                    100.0 * dfs.over_cap_not_lower as f64 / dfs.over_cap.max(1) as f64
-                );
-            }
-            results.push((dfs.nodes, secs));
-        }
-        let (plain, combined) = (results[0], results[1]);
-        eprintln!(
-            "  nodes {:.1}x fewer, time {:.2}x",
-            plain.0 as f64 / combined.0.max(1) as f64,
-            plain.1 / combined.1.max(1e-9)
-        );
-    }
-
-    #[test]
-    #[ignore]
-    fn matchbound_pruning() {
-        let limit = std::env::var("NODE_LIMIT").ok().and_then(|s| s.parse().ok()).unwrap_or(3_000_000);
-        let ns: Vec<u32> = match std::env::var("GAMES") {
-            Ok(list) => list.split(',').map(|s| s.trim().parse().expect("GAMES: comma-separated sizes")).collect(),
-            Err(_) => vec![480, 500, 600, 640, 660, 700, 720, 760],
-        };
-        for n in ns {
-            let g = load(n);
-            if n < 512 {
-                pruning::<8>(&g, limit);
-            } else {
-                pruning::<12>(&g, limit);
-            }
-        }
     }
 }

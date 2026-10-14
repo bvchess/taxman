@@ -16,8 +16,8 @@
 //! What is where:
 //!
 //! * [`FactorProvider`] (`provider`): who can pay for whom, restricted to the frames each number belongs to.
-//! * `peel`: winnability of one frame (the *peel*), the *core* of an unwinnable frame, [`Certificate`]s, and
-//!   reduction, on a reusable [`Scratch`].
+//! * `peel`: winnability of one frame (the *peel*), the *core* of an unwinnable frame, and reduction, on a
+//!   reusable [`Scratch`].
 //! * [`Frame`], [`FrameSet`] (`frame`): one frame, and a game's frames (`Copy`, no heap); narrowing the candidates
 //!   and counting the promotions left from the freedoms.
 //! * [`Model`] (here): what every state of one game's search shares, the factor graph and each number's home
@@ -44,7 +44,7 @@ mod provider;
 pub use conflict::ConflictCache;
 pub use frame::{Frame, FrameSet};
 pub use nogoods::{Lookup, Nogoods};
-pub use peel::{Certificate, Scratch};
+pub use peel::Scratch;
 pub use promote::Edits;
 pub use provider::FactorProvider;
 

@@ -31,12 +31,6 @@
 //! finds (`lagrange::Lagrangian::check`).  The tactics that switch these pieces are the fields of
 //! [`SearchTactics`].
 //!
-//! The matching bound replaces the Java's `blameGame` ([`crate::bounds`]); the two are not combined.  With the
-//! tactic `match_bound` on (the default) `blameGame` is not computed at all: it never pruned where the matching
-//! bound did not.  With it off, the steps are the Java's loop (DESIGN.md, "Search state and order"): `blameGame`
-//! bounds every node and child, the children's candidate lists keep the Java's promotability checks, and a node
-//! branches on its largest candidate.
-//!
 //! # Where the arguments are
 //!
 //! * The sum of the `max_add` largest candidates bounds every completion by itself, not as a shortcut for the
@@ -54,7 +48,7 @@
 //!
 //! # What is where
 //!
-//! * `tactics`: [`SearchTactics`] and [`Branching`], and how a checkpoint records them.
+//! * `tactics`: [`SearchTactics`], and how a checkpoint records them.
 //! * `setup`: [`prepare`]: the root, the greedy incumbent, `revise_freedoms`, `max_total`; the [`Problem`] a setup
 //!   poses.
 //! * `incumbent`: the starting incumbent (seed, dive, local search).
@@ -81,7 +75,7 @@ pub use searcher::{stat, Found, SearchSpace, TaxSearcher, TaxUnit};
 pub use setup::{
     prepare, prepare_for_resume, prepare_within, problem_of, PrepareTimings, Prepared, Problem, ProblemSize, Revise,
 };
-pub use tactics::{Branching, SearchTactics};
+pub use tactics::SearchTactics;
 
 use crate::bits::Bits;
 use crate::engine::{self, Counters, EngineConfig, Start, Stats};
@@ -120,16 +114,16 @@ pub struct SearchResult<const W: usize> {
     pub time_all_runs: Duration,
     /// When this call found its best incumbent (`None` if it found none better than the starting one).
     pub found: Option<Found>,
-    /// The incumbent the search started from: the best of the greedy set, the seed and (with `match_bound`) the
-    /// matching dive, improved by the local search.
+    /// The incumbent the search started from: the best of the greedy set, the seed and the matching dive, improved
+    /// by the local search.
     pub start: Bits<W>,
 }
 
 /// Searches for the promotion set with the largest sum.
 ///
 /// The incumbent starts as the best of the greedy set, what survives of `seed` (its candidates that can still
-/// be promoted, from the largest down) and, with `match_bound`, the dive (the root's matching rounded to a set
-/// that can be promoted), improved by a local search ([`Neighbourhood::improve`]).  `cap` is a proven ceiling
+/// be promoted, from the largest down) and the dive (the root's matching rounded to a set that can be
+/// promoted), improved by a local search ([`Neighbourhood::improve`]).  `cap` is a proven ceiling
 /// on the sum; reaching it ends the search, also before it starts.  With `resume`, the search continues from
 /// the checkpoint configured in `cfg` (the `prepared` game must have been set up by [`prepare_for_resume`] or
 /// identically): its header must be this game's, and its incumbent a promotable set of candidates worth what
@@ -174,7 +168,7 @@ fn search_forgetting<const W: usize>(
     nogood_period: Option<u64>,
 ) -> io::Result<SearchResult<W>> {
     let t0 = Instant::now();
-    let match_graph = prepared.tactics.match_bound.then(|| MatchGraph::new(&prepared.model, &prepared.root));
+    let match_graph = MatchGraph::new(&prepared.model, &prepared.root);
     let mut incumbent = prepared.greedy;
     if let Some(seed) = seed {
         let kept = surviving(prepared, seed);
@@ -182,11 +176,9 @@ fn search_forgetting<const W: usize>(
             incumbent = kept;
         }
     }
-    if let Some(graph) = &match_graph {
-        let dived = dive(&prepared.model, &prepared.root, graph, &prepared.candidates);
-        if dived.sum() > incumbent.sum() {
-            incumbent = dived;
-        }
+    let dived = dive(&prepared.model, &prepared.root, &match_graph, &prepared.candidates);
+    if dived.sum() > incumbent.sum() {
+        incumbent = dived;
     }
     let hood = Neighbourhood { model: &prepared.model, root: &prepared.root, candidates: &prepared.candidates };
     incumbent = hood.improve(&mut Scratch::new(), &incumbent, true);
@@ -224,8 +216,7 @@ fn search_forgetting<const W: usize>(
         });
     }
 
-    let space =
-        SearchSpace { nogood_period, diagnostics, began: t0, ..SearchSpace::new(prepared, match_graph.as_ref(), cap) };
+    let space = SearchSpace { nogood_period, diagnostics, began: t0, ..SearchSpace::new(prepared, &match_graph, cap) };
     let start = match checkpoint.filter(|_| resume) {
         Some(path) => Start::Resume(path.to_path_buf()),
         None => {
