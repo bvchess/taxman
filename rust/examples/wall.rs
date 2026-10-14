@@ -5,11 +5,12 @@
 //! (2026-10)".
 //!
 //! ```text
-//! cargo run --release --example wall -- setup [--known FILE] [--repeat R] N|A-B...
+//! cargo run --release --example wall -- setup [--known FILE] [--repeat R] [--width W] N|A-B...
 //! cargo run --release --example wall -- nodes [--known FILE] [--nodes K] [--seconds S] [--mode start|opt] [--delta D]
 //!     [--width W] [--no-seed] [--tactic NAME=VALUE]... [--ckpt-dir DIR --every SECONDS] N...
 //! cargo run --release --example wall -- grow [--known FILE] [--delta D] [--nodes K] [--seconds S] [--progress S]
-//!     [--ckpt-dir DIR --every SECONDS] [--threads T] [--cores C] [--mem-cap UNITS] N
+//!     [--tactic NAME=VALUE]... [--ckpt-dir DIR --every SECONDS] [--threads T] [--cores C] [--mem-cap UNITS] N
+//! cargo run --release --example wall -- start [--known FILE] N|A-B...
 //! cargo run --release --example wall -- frames N|A-B...
 //! ```
 //!
@@ -18,8 +19,8 @@
 //! `{"n":N,"trivial":true}` and is skipped.  `--known FILE` (every command but `frames`) is a results file, such as
 //! `results/strict.jsonl`, whose completed games extend the known games beyond optimal.json (as the ladder's
 //! `--known` does), which is how a game gets its optimum, and the game of `n - 1` for its seed and ceiling.  A range
-//! `A-B` stands for every `n` in it, none filtered out (`setup` and `frames`).  Each command prints one JSON object
-//! per line on stdout; a mistake in the arguments is an error on stderr and exit status 2.
+//! `A-B` stands for every `n` in it, none filtered out (`setup`, `start` and `frames`).  Each command prints one JSON
+//! object per line on stdout; a mistake in the arguments is an error on stderr and exit status 2.
 //!
 //! * **setup**: what a game of the chain costs besides its search, piece by piece, each timed `--repeat` times
 //!   (default 1) and reported as the fastest, for every `n` (primes too, `prime` says which).  The pieces: the
@@ -35,7 +36,9 @@
 //!   (below); `moves_s` and `replay_s`, the promotions made a game and the referee's replay of it (`replay_ok`);
 //!   and `prime_path_s`, the prime shortcut's own work besides its replays.  Then the sizes (below), `opt` (the
 //!   known optimum promotion sum, or null), `start`, `root_bound`, the gaps `gap_start` and `gap_opt` of the root's
-//!   bound over `start` and over `opt`, and `max_rss` (the process's peak resident set, bytes).
+//!   bound over `start` and over `opt`, and `max_rss` (the process's peak resident set, bytes).  `--width W` sets the
+//!   game up at that set width instead of the one `with_width!` picks, as for `nodes`, to show what the width costs the
+//!   setup.
 //! * **nodes**: a one-thread search of each game, stopped after `--nodes K` steps (default 5000) or `--seconds S`,
 //!   for the cost per node at the root-sized part of a tree.  `--mode start` (the default) is the solver's own
 //!   search from its start incumbent (greedy set, seed from the game of `n - 1`, dive, local search; `--no-seed`
@@ -52,18 +55,31 @@
 //! * **grow**: the emulation of a large tree.  A search whose incumbent starts `--delta D` below a known optimum
 //!   (`D <= 0` usually) behaves like a search with a larger gap, so it makes a much larger tree on a known game:
 //!   the proof of `nodes --mode opt` with the incumbent at `opt + D`, on `--threads T` threads (default 1; `--cores
-//!   C` lets at most C of them search at once), until it completes or `--nodes K` or `--seconds S` stops it.  The
-//!   engine prints its progress lines to stderr every `--progress S` seconds (default 2), and a monitor thread
-//!   prints on stdout at the same pace `{"t":SECONDS,"max_rss":BYTES,"ckpt_bytes":SIZE,"spill_files":COUNT}` for
-//!   the memory, the checkpoint and the spill directory.  With `--ckpt-dir DIR` the run checkpoints to
-//!   `DIR/grow_n<N>.ckpt` every `--every` seconds and spills its queue to `DIR/spill` beyond `--mem-cap` units.  One
-//!   summary line closes the run, with all the engine's counters.
+//!   C` lets at most C of them search at once), until it completes or `--nodes K` or `--seconds S` stops it.
+//!   `--tactic` sets search tactics as for `nodes`; `gf2=off,lagrange=on` (the matching path, whose nodes are ten times
+//!   cheaper and whose trees a hundred times larger) makes trees of ten million nodes in minutes, for what the engine
+//!   and the nogood tables do in a large tree.  The engine prints its progress lines to stderr every `--progress S`
+//!   seconds (default 2), and a monitor thread prints on stdout at the same pace
+//!   `{"t":SECONDS,"max_rss":BYTES,"ckpt_bytes":SIZE,"spill_files":COUNT}` for the memory, the checkpoint and the spill
+//!   directory.  With `--ckpt-dir DIR` the run checkpoints to `DIR/grow_n<N>.ckpt` every `--every` seconds and spills
+//!   its queue to `DIR/spill` beyond `--mem-cap` units.  One summary line closes the run, with all the engine's
+//!   counters.
+//! * **start**: what the search's starting incumbent costs and gains, piece by piece, for each `n` that has a known
+//!   game of `n - 1` (any other has the line `{"n":N,"no_previous":true}`).  `greedy` is the sum of the greedy set;
+//!   `seed_kept` the sum of the seed that survives (the promotions of the game of `n - 1` that are candidates here,
+//!   promoted one by one from the largest down, skipping the ones that fail) and `seed_kept_s` the time that took;
+//!   `base` the sum of the better of the two, with `members` the number of promotions in it (the solver also tries a
+//!   matching dive, which is private to the library and not reproduced here).  `ceiling` is the ceiling on the
+//!   promotion sum that the game of `n - 1` gives, and `at_ceiling` says whether `base` already reaches it.  Then the
+//!   local search from `base`: `singles` is the sum it finds when it takes out one member at a time, `pairs` the sum
+//!   when it takes out two as well (the solver's call), each with its time in `singles_s` and `pairs_s`.  `opt` is the
+//!   known optimum promotion sum, or null, and `max_rss` the process's peak resident set.
 //! * **frames**: for boards beyond the widest set the solver supports (up to 8191, at 128 words): the frames the
 //!   board builder makes (before `Model::build` reduces them, which keeps every frame's freedoms), the time it
 //!   took, and the sizes the later stages would need: per frame the factors, moves and freedoms, `max_freedoms`
 //!   and the `block_words` of the GF(2) bound's vectors it needs (`max_freedoms.div_ceil(64)`).
 //!
-//! **The sizes** (every command that sets a game up): `frames` (the root's frame count), `candidates`, `max_total`
+//! **The sizes** (`setup`, `nodes` and `frames`): `frames` (the root's frame count), `candidates`, `max_total`
 //! (the most promotions a set can have), `members` (the distinct numbers in the moves and factors of the root's
 //! frames and in the candidates), `root_max` (the largest of them), `words_n` (`words_for(n)`), `width` (the words
 //! per set the game ran at), `words_members`, `words_candidates` and `words_root_max` (the words a set of that
@@ -100,19 +116,19 @@ use taxman::tactics::Tactics;
 // ---------------------------------------------------------------------------------------------------------
 // Arguments
 
-const COMMANDS: [&str; 4] = ["setup", "nodes", "grow", "frames"];
+const COMMANDS: [&str; 5] = ["setup", "nodes", "grow", "start", "frames"];
 
 /// The options, with the commands each applies to (an option given to another command is an error).
 const OPTIONS: [(&str, &[&str]); 15] = [
-    ("--known", &["setup", "nodes", "grow"]),
+    ("--known", &["setup", "nodes", "grow", "start"]),
     ("--repeat", &["setup"]),
     ("--nodes", &["nodes", "grow"]),
     ("--seconds", &["nodes", "grow"]),
     ("--mode", &["nodes"]),
     ("--delta", &["nodes", "grow"]),
-    ("--width", &["nodes"]),
+    ("--width", &["setup", "nodes"]),
     ("--no-seed", &["nodes"]),
-    ("--tactic", &["nodes"]),
+    ("--tactic", &["nodes", "grow"]),
     ("--ckpt-dir", &["nodes", "grow"]),
     ("--every", &["nodes", "grow"]),
     ("--progress", &["grow"]),
@@ -175,9 +191,9 @@ fn duration(name: &str, text: String) -> Result<Duration, String> {
     Duration::try_from_secs_f64(seconds).map_err(|e| format!("{name} {seconds}: {e}"))
 }
 
-/// The board sizes of the arguments: numbers, and for `setup` and `frames` also ranges `A-B`.
+/// The board sizes of the arguments: numbers, and for `setup`, `start` and `frames` also ranges `A-B`.
 fn games(command: &str, texts: &[String]) -> Result<Vec<u32>, String> {
-    let ranges = matches!(command, "setup" | "frames");
+    let ranges = matches!(command, "setup" | "start" | "frames");
     let mut games = Vec::new();
     for text in texts {
         let number = |part: &str| part.parse::<u32>().map_err(|e| format!("{text}: {e}"));
@@ -203,7 +219,7 @@ fn games(command: &str, texts: &[String]) -> Result<Vec<u32>, String> {
 
 fn parse() -> Result<Options, String> {
     let mut args = std::env::args().skip(1);
-    let command = args.next().ok_or("expected a command: setup, nodes, grow or frames")?;
+    let command = args.next().ok_or_else(|| format!("expected a command: {}", COMMANDS.join(", ")))?;
     if !COMMANDS.contains(&command.as_str()) {
         return Err(format!("unknown command {command:?}: {}", COMMANDS.join(", ")));
     }
@@ -297,14 +313,41 @@ fn beyond(n: u32) -> String {
     format!("n={n} is beyond the widest set the solver is built for")
 }
 
+/// The arms of a match on the set width `$width`: `$run::<w>($n, $o, $optimal)` for each listed width `w`, and an
+/// error naming the widths for any other.
+macro_rules! match_width {
+    ($width:expr, $run:ident, $n:expr, $o:expr, $optimal:expr; $($w:literal)*) => {
+        match $width {
+            $($w => $run::<$w>($n, $o, $optimal),)*
+            width => Err(format!("--width {width}: the widths are {:?}", [$($w),*])),
+        }
+    };
+}
+
+/// `$run` for game `$n` at the set width `--width` (`$o.width`) if it is given, and otherwise at the width that
+/// `with_width!` picks for `$n`.  The widths `--width` may name are listed here, once, for `setup` and `nodes` alike.
+macro_rules! at_width {
+    ($run:ident, $n:expr, $o:expr, $optimal:expr) => {{
+        let (n, o, optimal) = ($n, $o, $optimal);
+        match o.width {
+            None => taxman::with_width!(n, W => $run::<W>(n, o, optimal), else Err(beyond(n))),
+            Some(width) if width < words_for(n) => {
+                Err(format!("--width {width} is below the {} words that n={n} needs", words_for(n)))
+            }
+            Some(width) => match_width!(width, $run, n, o, optimal; 8 16 20 24 28 32 36 40 44 48 56 64),
+        }
+    }};
+}
+
 fn main() {
     let o = parse().unwrap_or_else(|e| fail(&e));
     let optimal = Optimal::built_in().with_results_files(o.known.as_slice()).unwrap_or_else(|e| fail(&e));
     for &n in &o.games {
         let done = match o.command.as_str() {
-            "setup" => taxman::with_width!(n, W => setup::<W>(n, &o, &optimal), else Err(beyond(n))),
-            "nodes" => nodes_at_width(n, &o, &optimal),
+            "setup" => at_width!(setup, n, &o, &optimal),
+            "nodes" => at_width!(nodes, n, &o, &optimal),
             "grow" => taxman::with_width!(n, W => grow::<W>(n, &o, &optimal), else Err(beyond(n))),
+            "start" => taxman::with_width!(n, W => start::<W>(n, &o, &optimal), else Err(beyond(n))),
             _ => frames_at_width(n),
         };
         done.unwrap_or_else(|e| fail(&e));
@@ -665,26 +708,6 @@ fn setup<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Result<(), S
 // ---------------------------------------------------------------------------------------------------------
 // nodes
 
-/// `nodes` for game `n` at the set width `--width`, or the one the solver picks for it.
-fn nodes_at_width(n: u32, o: &Options, optimal: &Optimal) -> Result<(), String> {
-    // One list of widths for the arms and for the message.
-    macro_rules! at_widths {
-        ($width:expr; $($w:literal)*) => {
-            match $width {
-                $($w => nodes::<$w>(n, o, optimal),)*
-                width => Err(format!("--width {width}: the widths are {:?}", [$($w),*])),
-            }
-        };
-    }
-    let Some(width) = o.width else {
-        return taxman::with_width!(n, W => nodes::<W>(n, o, optimal), else Err(beyond(n)));
-    };
-    if width < words_for(n) {
-        return Err(format!("--width {width} is below the {} words that n={n} needs", words_for(n)));
-    }
-    at_widths!(width; 8 16 20 24 28 32 36 40 44 48 56 64)
-}
-
 fn nodes<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Result<(), String> {
     let Some(game) = Game::<W>::new(n, o.tactics, optimal, !o.no_seed) else { return Ok(()) };
     let Game { p, opt, seed, ceiling, .. } = &game;
@@ -803,6 +826,59 @@ fn grow<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Result<(), St
         .field("spill_segments", c.spill_segments)
         .field("reloaded_segments", c.reloaded_segments)
         .maybe("ckpt_bytes", ckpt_bytes)
+        .maybe("max_rss", counters::max_rss());
+    line.print();
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// start
+
+/// The promotions of `seed` that are candidates and still promote one by one from the largest down, skipping the
+/// ones that fail: what `search::incumbent::surviving` (private to the library) keeps of the solver's seed.
+fn surviving_seed<const W: usize>(p: &Prepared<W>, seed: &Bits<W>) -> Bits<W> {
+    let mut state = p.root;
+    let mut kept = Bits::EMPTY;
+    for x in (*seed & p.candidates).iter_desc() {
+        if p.model.promote_in_place(&mut state, x) {
+            kept.insert(x);
+        }
+    }
+    kept
+}
+
+fn start<const W: usize>(n: u32, _: &Options, optimal: &Optimal) -> Result<(), String> {
+    let Some(game) = Game::<W>::new(n, SearchTactics::default(), optimal, true) else { return Ok(()) };
+    let Game { p, opt, seed, ceiling, .. } = &game;
+    let Some(seed) = seed else {
+        Line::of(n).field("no_previous", true).print();
+        return Ok(());
+    };
+
+    // The two incumbents the solver starts from, and the better of them (it also tries a matching dive, not here).
+    let greedy = p.greedy.sum();
+    let (seed_kept_s, kept) = fastest(1, || surviving_seed(p, seed));
+    let base = if kept.sum() > greedy { kept } else { p.greedy };
+    let base_sum = base.sum();
+
+    // The local search from it, as the solver calls it (with pairs), and without them.
+    let hood = Neighbourhood { model: &p.model, root: &p.root, candidates: &p.candidates };
+    let (singles_s, singles) = fastest(1, || hood.improve(&mut Scratch::new(), &base, false).sum());
+    let (pairs_s, pairs) = fastest(1, || hood.improve(&mut Scratch::new(), &base, true).sum());
+
+    let mut line = Line::of(n);
+    line.field("greedy", greedy)
+        .field("seed_kept", kept.sum())
+        .seconds("seed_kept_s", seed_kept_s)
+        .field("base", base_sum)
+        .field("members", base.len())
+        .maybe("ceiling", *ceiling)
+        .maybe("at_ceiling", ceiling.map(|ceiling| base_sum >= ceiling))
+        .seconds("singles_s", singles_s)
+        .field("singles", singles)
+        .seconds("pairs_s", pairs_s)
+        .field("pairs", pairs)
+        .maybe("opt", *opt)
         .maybe("max_rss", counters::max_rss());
     line.print();
     Ok(())
