@@ -1,31 +1,28 @@
-//! Where the files the solver reads and writes by default are, found when the program runs.
+//! Where the files `taxman bench` reads and writes by default are, found when the program runs.
 //!
 //! Nothing here is a path fixed at compile time, so a binary works wherever it is as long as it can find the
 //! repository: the nearest directory above the working directory, and failing that above the directory of the
-//! executable, that holds the table of optimal games, `src/main/resources/optimal.json`.  The
-//! defaults are relative to that directory:
+//! executable, that holds the table of optimal games, `src/main/resources/optimal.json`.  (The solver itself needs no
+//! file: the table is built into the binary, [`crate::game::Optimal::built_in`].)  The defaults are relative to that
+//! directory:
 //!
-//! | file | default | flag, then variable |
+//! | file | default | flag |
 //! |---|---|---|
-//! | the table of optimal games | `src/main/resources/optimal.json` | `--optimal FILE`, then `TAXMAN_OPTIMAL` |
 //! | the benchmark history (`taxman bench`) | `rust/bench/history.jsonl` | `--history FILE` |
 //! | the results `taxman bench` takes games past `optimal.json` from | `rust/results/strict.jsonl` | `--known FILE` |
 //!
-//! A flag wins over a variable, and a variable over the repository.  When the repository cannot be found the
-//! error says where it looked and what to give instead.
+//! A flag wins over the repository.  When the repository cannot be found the error says where it looked and what to
+//! give instead.
 
 use std::path::{Path, PathBuf};
 
 /// The table of optimal games, relative to the repository; its presence is what makes a directory the repository.
 pub const OPTIMAL_JSON_IN_REPOSITORY: &str = "src/main/resources/optimal.json";
 
-/// The environment variable that names the table of optimal games, for programs that have no `--optimal` flag.
-pub const OPTIMAL_VARIABLE: &str = "TAXMAN_OPTIMAL";
-
 /// The benchmark history, relative to the repository.
 pub const BENCH_HISTORY_IN_REPOSITORY: &str = "rust/bench/history.jsonl";
 
-/// The committed strict results, relative to the repository.
+/// The committed results of the chain from n = 1, relative to the repository.
 pub const STRICT_RESULTS_IN_REPOSITORY: &str = "rust/results/strict.jsonl";
 
 /// The nearest directory at or above one of `starts`, tried in order, that contains `marker`.
@@ -56,30 +53,6 @@ pub fn repository_root() -> Result<PathBuf, String> {
             if looked.is_empty() { "the working directory".to_owned() } else { looked.join(" or in ") }
         )
     })
-}
-
-/// The table of optimal games: the file `$TAXMAN_OPTIMAL` names, else the one in the repository.
-///
-/// # Errors
-///
-/// If the variable names a file that is not there, or there is no repository (the message says to give
-/// `--optimal FILE`, or `--optimal none` to compare with nothing, or to set the variable).
-pub fn optimal_json() -> Result<PathBuf, String> {
-    if let Some(path) = std::env::var_os(OPTIMAL_VARIABLE).filter(|value| !value.is_empty()) {
-        let path = PathBuf::from(path);
-        return if path.is_file() {
-            Ok(path)
-        } else {
-            Err(format!("{OPTIMAL_VARIABLE} names {}, which is not a file", path.display()))
-        };
-    }
-    let root = repository_root().map_err(|e| {
-        format!(
-            "{e}.  Run taxman in a checkout of the repository, or give --optimal FILE (--optimal none to compare \
-             with nothing), or set {OPTIMAL_VARIABLE}"
-        )
-    })?;
-    Ok(root.join(OPTIMAL_JSON_IN_REPOSITORY))
 }
 
 /// `relative` in the repository, for the defaults of `taxman bench`; `flag` is what to give instead of finding it.

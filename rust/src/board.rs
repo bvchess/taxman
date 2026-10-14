@@ -21,10 +21,9 @@
 
 use crate::accelerate::solution_for_promotions;
 use crate::bits::Bits;
-use crate::engine::EngineConfig;
 use crate::frames::{build_frames, FrameColumns};
 use crate::numtheory::Tables;
-use crate::search::{self, Prepared, Problem, Revise, SearchTactics};
+use crate::search::{self, Prepared, Problem, SearchTactics};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
@@ -75,34 +74,23 @@ impl<const W: usize> Board<W> {
         self.frames.candidates.is_empty()
     }
 
-    /// Sets the search up: the frame set, greedy incumbent and (tactic `revise_freedoms`) revised frame 0, see
-    /// [`search::prepare`].  `threads` serve the preclusion table and the revision's own search.
+    /// Sets the search up: the frame set and the greedy incumbent, see [`search::prepare`].
     ///
     /// # Errors
     ///
     /// If the frames cannot be built into a model (more frames than a frame set holds).
-    pub fn prepare(&self, tactics: SearchTactics, threads: usize) -> Result<Prepared<W>, String> {
-        search::prepare(&self.tables, &self.frames.columns(), &self.frames.candidates, tactics, threads)
+    pub fn prepare(&self, tactics: SearchTactics) -> Result<Prepared<W>, String> {
+        search::prepare(&self.tables, &self.frames.columns(), &self.frames.candidates, tactics)
     }
 
-    /// [`prepare`](Self::prepare) with `engine`'s limits also bounding the revision's search, see
-    /// [`search::prepare_within`].
-    ///
-    /// # Errors
-    ///
-    /// As [`prepare`](Self::prepare).
-    pub fn prepare_within(&self, tactics: SearchTactics, engine: &EngineConfig) -> Result<Prepared<W>, String> {
-        search::prepare_within(&self.tables, &self.frames.columns(), &self.frames.candidates, tactics, engine)
-    }
-
-    /// Sets the search up to resume the checkpoint at `checkpoint`, with its tactics and frame 0's freedoms, see
+    /// Sets the search up to resume the checkpoint at `checkpoint`, with its tactics, see
     /// [`search::prepare_for_resume`].
     ///
     /// # Errors
     ///
     /// If the checkpoint does not belong to this board, or cannot be read.
-    pub fn prepare_for_resume(&self, checkpoint: &Path, threads: usize) -> Result<Prepared<W>, String> {
-        search::prepare_for_resume(&self.tables, &self.frames.columns(), &self.frames.candidates, checkpoint, threads)
+    pub fn prepare_for_resume(&self, checkpoint: &Path) -> Result<Prepared<W>, String> {
+        search::prepare_for_resume(&self.tables, &self.frames.columns(), &self.frames.candidates, checkpoint)
     }
 
     /// The ceiling on the promotion sum, given that the game of `n − 1` scores `prev_score` and is optimal:
@@ -117,29 +105,28 @@ impl<const W: usize> Board<W> {
         moves.iter().copied().collect::<Bits<W>>() & self.frames.candidates
     }
 
-    /// The search problem that [`prepare`](Self::prepare) poses when revising frame 0 did what `revise` says, built
-    /// again without a search, see [`search::problem_of`].
+    /// The search problem that [`prepare`](Self::prepare) poses, built again without a search, see
+    /// [`search::problem_of`].
     ///
     /// # Errors
     ///
     /// As [`search::problem_of`].
-    pub fn problem(&self, revise: Revise) -> Result<Problem, String> {
-        search::problem_of(&self.tables, &self.frames.columns(), &self.frames.candidates, revise)
+    pub fn problem(&self) -> Result<Problem, String> {
+        search::problem_of(&self.tables, &self.frames.columns(), &self.frames.candidates)
     }
 }
 
-/// The search problem of game `n` set up as `revise` (a results line's `setup.revise`) says ([`Board::problem`], at
-/// the set width `with_width!` picks for `n`), and the board's `in_the_bag`: what `taxman verify-results` and the
-/// solver compare when a game repeats an earlier game's search.
+/// The search problem of game `n` ([`Board::problem`], at the set width `with_width!` picks for `n`), and the board's
+/// `in_the_bag`: what `taxman verify-results` and the solver compare when a game repeats an earlier game's search.
 ///
 /// # Errors
 ///
 /// As [`search::problem_of`], and if `n` is beyond the widest set.
-pub fn search_problem(n: u32, revise: Revise) -> Result<(Problem, u64), String> {
+pub fn search_problem(n: u32) -> Result<(Problem, u64), String> {
     let beyond = || Err(format!("n={n} is beyond the largest supported board"));
     crate::with_width!(n, W => {
         let board = Board::<W>::for_n(n);
-        board.problem(revise).map(|problem| (problem, board.in_the_bag))
+        board.problem().map(|problem| (problem, board.in_the_bag))
     }, else beyond())
 }
 
@@ -162,12 +149,12 @@ mod tests {
         // A board without candidates has one game, which is the one with no promotions.
         let trivial = Board::<8>::for_n(10);
         assert!(trivial.is_trivial());
-        assert_eq!(Some(trivial.in_the_bag), Optimal::load_default().unwrap().score(10));
+        assert_eq!(Some(trivial.in_the_bag), Optimal::built_in().score(10));
     }
 
     #[test]
     fn the_cap_and_the_seed_are_derived_from_the_previous_game() {
-        let optimal = Optimal::load_default().unwrap();
+        let optimal = Optimal::built_in();
         let board = Board::<8>::for_n(85);
         let (prev_score, prev_moves) = (optimal.score(84).unwrap(), optimal.moves(84).unwrap());
         // No game of 85 scores above 85 + opt(84), and every game scores in_the_bag + its promotions.
@@ -179,43 +166,34 @@ mod tests {
         assert!(seed.is_subset(&board.candidates()) && seed.iter().all(|x| prev_moves.contains(&x)));
     }
 
-    /// What `taxman verify-results` and `same_search` set up again from a results line (the board size and what
-    /// revising did) is the problem the setup posed, with `revise_freedoms` on or off, at any set width.
+    /// What `taxman verify-results` and `same_search` set up again from a results line (the board size) is the
+    /// problem the setup posed, at any set width.
     #[test]
     fn the_problem_set_up_again_is_the_one_the_setup_posed() {
-        let mut revised = 0;
         for n in 2..=120 {
             let board = Board::<8>::for_n(n);
             if board.is_trivial() {
                 continue;
             }
-            for tactics in [SearchTactics::default(), SearchTactics { revise_freedoms: false, ..Default::default() }] {
-                let prepared = board.prepare(tactics, 1).unwrap();
-                let problem = prepared.problem();
-                assert_eq!(board.problem(prepared.revise).unwrap(), problem, "n={n}");
-                let frames = board.frames.frames.len() as u32;
-                let size = ProblemSize { frames, candidates: board.candidates().len(), max_total: prepared.max_total };
-                assert_eq!(problem.size(), size, "n={n}");
-                revised += usize::from(prepared.revise.sets_frame_zero());
-            }
-            let (narrow, wide) =
-                (board.problem(Revise::Off).unwrap(), Board::<16>::for_n(n).problem(Revise::Off).unwrap());
+            let prepared = board.prepare(SearchTactics::default()).unwrap();
+            let problem = prepared.problem();
+            assert_eq!(board.problem().unwrap(), problem, "n={n}");
+            let frames = board.frames.frames.len() as u32;
+            let size = ProblemSize { frames, candidates: board.candidates().len(), max_total: prepared.max_total };
+            assert_eq!(problem.size(), size, "n={n}");
+            let (narrow, wide) = (board.problem().unwrap(), Board::<16>::for_n(n).problem().unwrap());
             assert_eq!((narrow.digest(), &narrow), (wide.digest(), &wide), "n={n}");
         }
-        assert!(revised > 0, "no board with frame 0 revised");
-        // A checkpoint's freedoms are not recorded, and revising never raises them.
         let board = Board::<8>::for_n(85);
-        assert!(board.problem(Revise::FromCheckpoint).unwrap_err().contains("checkpoint"));
-        assert!(board.problem(Revise::GreedyIsMax(1000)).unwrap_err().contains("built with"));
-        assert_eq!(search_problem(85, Revise::Off).unwrap(), (board.problem(Revise::Off).unwrap(), board.in_the_bag));
+        assert_eq!(search_problem(85).unwrap(), (board.problem().unwrap(), board.in_the_bag));
     }
 
     #[test]
     fn prepare_sets_the_search_up_as_the_search_module_does() {
         let board = Board::<8>::for_n(300);
         let tactics = SearchTactics::default();
-        let prepared = board.prepare(tactics, 1).unwrap();
-        let direct = search::prepare::<8>(&board.tables, &board.frames.columns(), &board.candidates(), tactics, 1);
+        let prepared = board.prepare(tactics).unwrap();
+        let direct = search::prepare::<8>(&board.tables, &board.frames.columns(), &board.candidates(), tactics);
         let direct = direct.unwrap();
         assert_eq!((prepared.n, prepared.max_total, prepared.greedy), (direct.n, direct.max_total, direct.greedy));
         assert_eq!(prepared.candidates, board.candidates());

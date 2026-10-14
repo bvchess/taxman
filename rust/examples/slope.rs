@@ -67,7 +67,6 @@ use taxman::matchbound::lagrange::{LagrangeBound, Relaxation, SCALE};
 use taxman::matchbound::{MatchBound, MatchGraph};
 use taxman::model::{FrameSet, Model, Scratch};
 use taxman::search::{search, Diagnostics, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
-use taxman::solver::SolveOptions;
 use taxman::tactics::Tactics;
 
 struct Options {
@@ -178,7 +177,7 @@ struct Known {
 
 impl Known {
     fn load(o: &Options) -> Result<Known, String> {
-        let optimal = SolveOptions::default().known_games(o.known.as_slice())?;
+        let optimal = Optimal::built_in().with_results_files(o.known.as_slice())?;
         let mut sums = HashMap::new();
         if let Some(path) = &o.sums {
             let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -211,7 +210,7 @@ fn setup<const W: usize>(n: u32, o: &Options, known: &Known) -> Option<(Board<W>
     if board.is_trivial() {
         return None;
     }
-    let p = board.prepare(o.tactics, 1).expect("prepare");
+    let p = board.prepare(o.tactics).expect("prepare");
     let opt = known.opt(n, board.in_the_bag);
     Some((board, p, opt))
 }
@@ -412,7 +411,7 @@ fn prove<const W: usize>(n: u32, o: &Options, known: &Known) {
     for &delta in &o.deltas {
         let best = opt.checked_add_signed(delta).expect("a margin below zero");
         let diag = o.diag.then(|| Mutex::new(Diagnostics::default()));
-        let space = SearchSpace { diagnostics: diag.as_ref(), ..SearchSpace::new(&p, Some(&graph), None) };
+        let space = SearchSpace { diagnostics: diag.as_ref(), ..SearchSpace::new(&p, &graph, None) };
         let cfg = EngineConfig {
             threads: o.threads,
             time_limit: o.seconds.map(Duration::from_secs),

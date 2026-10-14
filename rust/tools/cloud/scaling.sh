@@ -13,7 +13,7 @@
 #   GAMES          games to sweep, default "1215 1225" (proofs that take about 1 and 2.5 minutes on one M1 core)
 #   THREADS        a comma list such as 1,8,64,192, default: 1, 2, 4, ... and the number of CPUs
 #   SECONDS_LIMIT  per game and thread count, default 1800; a search that hits it is marked with * in the tables
-#   KNOWN          the results file the ladder takes games from, default rust/bench/curve/chain.jsonl
+#   KNOWN          the results file the ladder takes games from, default rust/results/strict.jsonl
 #   ENGINE_THREADS, ENGINE_ITEMS, ENGINE_DEPTH   the engine benchmark's sizes (see tests/engine.rs)
 #   PAUSE_GAME     the game of --pauses, default 1230; PAUSE_THREADS its threads, default all CPUs
 
@@ -43,7 +43,7 @@ done
 GAMES="${GAMES:-1215 1225}"
 [ "$quick" = 1 ] && GAMES="${GAMES_QUICK:-1184}"
 SECONDS_LIMIT="${SECONDS_LIMIT:-1800}"
-KNOWN="${KNOWN:-$CRATE/bench/curve/chain.jsonl}"
+KNOWN="${KNOWN:-$CRATE/results/strict.jsonl}"
 [ -r "$KNOWN" ] || die "$KNOWN is not readable"
 
 mkdir -p "$LOGS"
@@ -54,7 +54,7 @@ echo "== machine and build"
 env_report
 echo "load:       $(uptime | sed 's/.*load average/load average/')"
 echo
-echo "== the ladder: the proof of each game, seeded with its optimum (--seed-opt), strict tactics for the search"
+echo "== the ladder: the proof of each game, seeded with its optimum (--seed-opt)"
 thread_args=(--scaling)
 [ -n "${THREADS:-}" ] && thread_args=(--threads "$THREADS")
 # GNU time reports the peak memory of the whole sweep; BSD time and a missing one just run the command.
@@ -64,7 +64,7 @@ if [ -x /usr/bin/time ] && /usr/bin/time -v true >/dev/null 2>&1; then
 fi
 # $GAMES is a list of words on purpose.
 # shellcheck disable=SC2086
-${timer[@]+"${timer[@]}"} "$LADDER_BIN" "${thread_args[@]}" --seed-opt --known "$KNOWN" --tactic revise_freedoms=off \
+${timer[@]+"${timer[@]}"} "$LADDER_BIN" "${thread_args[@]}" --seed-opt --known "$KNOWN" \
     --seconds "$SECONDS_LIMIT" $GAMES
 
 if [ "$run_engine" = 1 ]; then
@@ -105,7 +105,7 @@ with open(source) as src, open(target, "w") as dst:
         if line.strip() and json.loads(line)["n"] < game:
             dst.write(line)
 PY
-    "$TAXMAN_BIN" solve "$game" "${STRICT_ARGS[@]}" ${pause_threads[@]+"${pause_threads[@]}"} --out "$scratch/results.jsonl" \
+    "$TAXMAN_BIN" solve "$game" ${pause_threads[@]+"${pause_threads[@]}"} --out "$scratch/results.jsonl" \
         --checkpoint-dir "$scratch/ckpt" --checkpoint-interval 0.5 --progress 5
     rm -r "${scratch:?}"
 fi

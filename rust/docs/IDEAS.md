@@ -227,12 +227,12 @@ chain of commit bd9bb5d recorded for each game:
   (64 s), 1263 and 1261 repeat 1260 (51 s and 48 s), ...; the others reached the cap at once.
 * 1201-1231: 46 s of 276 s (16.6%).
 
-Soundness: the search space is a function of the root frames, the candidates and `max_total` (the model's graph is
-the maximal-factor relation restricted to those numbers), so its best promotion sum is the same for both games; the
-earlier game's proof (exhausted, or the cap) establishes that sum, and the later game's score is its own
-`in_the_bag` plus it, replayed by the referee as always.  It needs a proof kind ("same search as game m", resting
-on m's proof and taint), the digest in the result line or recomputed when the range starts, and the two verifiers.
-The payoff is a constant fraction of the chain, at no risk, and it multiplies with everything else here.
+Soundness: the search space is a function of the root frames, the candidates and `max_total` (the model's graph is the
+maximal-factor relation restricted to those numbers), so its best promotion sum is the same for both games; the earlier
+game's proof (exhausted, or the cap) establishes that sum, and the later game's score is its own `in_the_bag` plus it,
+replayed by the referee as always.  It needs a proof kind ("same search as game m", resting on m's proof and what it
+assumes), the digest in the result line or recomputed when the range starts, and the two verifiers.  The payoff is a
+constant fraction of the chain, at no risk, and it multiplies with everything else here.
 Implemented as the tactic and proof kind `same_search`
 ([EXPERIMENTS, "Same search"](EXPERIMENTS.md#same-search-2026-10)).
 
@@ -295,7 +295,7 @@ or free, so that the existing Hungarian repair restores optimality).  So: (a) bu
 node on the proofs above, and accept if nodes × cycles drops; (b) choose the nogood source for production: the
 nogoods of game n − 1 (they survive into game n almost all, EXPERIMENTS "Carrying nogoods over") or a warm-up;
 (c) refit: at every clearing of the table (fold the nogoods about to be forgotten into the multipliers instead), or
-at unit starts.  A tactic only once (a) pays; it is sound, so it would not taint.
+at unit starts.  A tactic only once (a) pays; it is sound, so it would add no assumption.
 
 *Status.*  The pilot's code was taken over by the follow-up experiment (section 6).
 

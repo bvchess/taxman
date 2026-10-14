@@ -16,7 +16,7 @@
 //! cargo run --release --example matroid -- whole [--known FILE] N|A-B...
 //! ```
 //!
-//! Games are set up with the strict tactics (`revise_freedoms` off), as the frontier's searches are.  `P*` is the
+//! Games are set up as `taxman solve` sets them up (the default tactics, which are strict).  `P*` is the
 //! optimum promotion sum (the known score minus `in_the_bag`, or the `opt` of the lines of `--opts`, as
 //! `bench/curve/slope_roots.jsonl` has them).  A range `A-B` stands for its games that are not prime.  Each command
 //! prints one JSON object per line.  `bench/matroid/matroid.py` makes the study's tables from them.
@@ -59,7 +59,6 @@ use taxman::matchbound::lagrange::SCALE;
 use taxman::matchbound::{MatchBound, MatchGraph};
 use taxman::model::{FrameSet, Model, Scratch};
 use taxman::search::{Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
-use taxman::solver::SolveOptions;
 
 #[path = "common/fixtures.rs"]
 #[allow(dead_code)] // the hex writer is the probe's
@@ -281,16 +280,14 @@ impl FrameMatroids {
 // ---------------------------------------------------------------------------------------------------------
 // Setup
 
-fn tactics() -> SearchTactics {
-    SearchTactics { revise_freedoms: false, ..SearchTactics::default() }
-}
-
+/// The board of `n` set up for a search as `taxman solve` sets it up (the default tactics); `None` for a board with
+/// no candidates.
 fn setup<const W: usize>(n: u32) -> Option<(Board<W>, Prepared<W>)> {
     let board = Board::<W>::for_n(n);
     if board.is_trivial() {
         return None;
     }
-    let p = board.prepare(tactics(), 1).expect("prepare");
+    let p = board.prepare(SearchTactics::default()).expect("prepare");
     Some((board, p))
 }
 
@@ -436,7 +433,7 @@ struct Known {
 
 impl Known {
     fn load(o: &Options) -> Result<Known, String> {
-        let optimal = SolveOptions::default().known_games(&o.known)?;
+        let optimal = Optimal::built_in().with_results_files(&o.known)?;
         let mut sums = HashMap::new();
         if let Some(path) = &o.opts {
             let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -575,7 +572,7 @@ fn nodes<const W: usize>(path: &Path, every: usize, samples: usize, lagrange: us
         });
         // The best completion of the node, by the solver's search from it (incumbent: no completion at all).
         let exact = (exact > 0).then(|| {
-            let space = SearchSpace::new(&p, Some(&graph), None);
+            let space = SearchSpace::new(&p, &graph, None);
             let cfg = EngineConfig {
                 threads: 1,
                 time_limit: Some(std::time::Duration::from_secs(exact)),

@@ -2,19 +2,17 @@
 //! the flags describe, and output that survives a closed stdout or stderr.
 //!
 //! There is no parser crate.  A command line is positional arguments and flags; a flag is `--name VALUE` or
-//! `--name=VALUE` if it takes a value and `--name` if it is a switch, each command says which of its flags are
-//! which ([`Args::parse`]), and any other `--flag` is a usage error.  The flags every solving command takes
-//! ([`SOLVER_FLAGS`]: `--threads`, `--tactic`, `--optimal`; and the switch [`SOLVER_SWITCHES`]: `--strict`) are
-//! turned into [`SolveOptions`] by [`solver_options`]; the others (`--out`, `--time-limit`, ...) are each command's
-//! own.  A usage error makes `main` print the usage and exit with status 2; a command that ran and failed exits
-//! with status 1 ([`CliError`]).
+//! `--name=VALUE` if it takes a value and `--name` if it is a switch, each command says which of its flags are which
+//! ([`Args::parse`]), and any other `--flag` is a usage error.  The flags every solving command takes
+//! ([`SOLVER_FLAGS`]: `--threads`, `--tactic`) are turned into [`SolveOptions`] by [`solver_options`]; the others
+//! (`--out`, `--time-limit`, `--use-prev`, ...) are each command's own.  A usage error makes `main` print the usage and
+//! exit with status 2; a command that ran and failed exits with status 1 ([`CliError`]).
 
 use std::fmt;
 use std::io::Write;
-use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
-use taxman::solver::{OptimalSource, SolveOptions};
+use taxman::solver::SolveOptions;
 
 /// Write one line, ignoring write errors: a closed pipe (EPIPE, say a `head` or a `tee` that has exited) must
 /// not kill a run whose results and checkpoints are safe on disk.  (`println!` panics on it, and release
@@ -54,12 +52,7 @@ pub enum CliError {
 pub type CliResult = Result<(), CliError>;
 
 /// Flags every solving command takes (each followed by a value).
-pub const SOLVER_FLAGS: [&str; 3] = ["--threads", "--tactic", "--optimal"];
-
-/// Switches (flags with no value) that go with [`SOLVER_FLAGS`]: a command that takes those takes these too, so
-/// [`Args::parse`] accepts them without being told.  `--strict` stands for `--tactic NAME=off` for every unproven
-/// tactic ([`taxman::tactics::Tactics::strict`]); a `--tactic` given as well is applied after it.
-pub const SOLVER_SWITCHES: [&str; 1] = ["--strict"];
+pub const SOLVER_FLAGS: [&str; 2] = ["--threads", "--tactic"];
 
 /// The command line after the subcommand name: flags with their values, and positional arguments.
 #[derive(Debug)]
@@ -70,11 +63,8 @@ pub struct Args {
 
 impl Args {
     /// Splits `args` into flags and positionals.  `with_value` lists the flags that take a value (`--flag VALUE`
-    /// or `--flag=VALUE`) and `switches` the ones that do not; any other `--flag` is an error.  A command whose
-    /// `with_value` holds all of [`SOLVER_FLAGS`] also takes the [`SOLVER_SWITCHES`].
+    /// or `--flag=VALUE`) and `switches` the ones that do not; any other `--flag` is an error.
     pub fn parse(args: &[String], with_value: &[&str], switches: &[&str]) -> Result<Args, CliError> {
-        let takes_solver_flags = SOLVER_FLAGS.iter().all(|flag| with_value.contains(flag));
-        let solver_switches: &[&str] = if takes_solver_flags { &SOLVER_SWITCHES } else { &[] };
         let mut parsed = Args { named: Vec::new(), positional: Vec::new() };
         let mut rest = args.iter();
         while let Some(arg) = rest.next() {
@@ -86,7 +76,7 @@ impl Args {
                 Some((name, value)) => (name, Some(value.to_owned())),
                 None => (arg.as_str(), None),
             };
-            if switches.contains(&name) || solver_switches.contains(&name) {
+            if switches.contains(&name) {
                 if inline.is_some() {
                     return Err(CliError::Usage(format!("{name} takes no value")));
                 }
@@ -148,7 +138,7 @@ impl Args {
     }
 }
 
-/// The solver options the flags of [`SOLVER_FLAGS`] and [`SOLVER_SWITCHES`] describe, on top of the defaults.
+/// The solver options the flags of [`SOLVER_FLAGS`] describe, on top of the defaults.
 pub fn solver_options(args: &Args) -> Result<SolveOptions, CliError> {
     let mut opts = SolveOptions::default();
     if let Some(threads) = args.parsed::<usize>("--threads")? {
@@ -157,15 +147,8 @@ pub fn solver_options(args: &Args) -> Result<SolveOptions, CliError> {
         }
         opts.threads = threads;
     }
-    // `--strict` first, so that a `--tactic` given as well can still change what it set.
-    if args.has("--strict") {
-        opts.tactics = opts.tactics.strict();
-    }
     for assignment in args.values("--tactic") {
         opts.tactics.set(assignment).map_err(CliError::Usage)?;
-    }
-    if let Some(path) = args.value("--optimal") {
-        opts.optimal = if path == "none" { OptimalSource::None } else { OptimalSource::File(PathBuf::from(path)) };
     }
     Ok(opts)
 }
@@ -204,31 +187,14 @@ mod tests {
     #[test]
     fn flags_and_positionals() {
         let given =
-            strings(&["480", "--threads", "4", "--tactic=match_bound=off", "--tactic", "prev_cap=off", "--show"]);
+            strings(&["480", "--threads", "4", "--tactic=match_refine=0", "--tactic", "prev_cap=off", "--show"]);
         let args = Args::parse(&given, &SOLVER_FLAGS, &["--show"]).unwrap();
         assert_eq!(args.positional(), ["480"]);
         assert!(args.has("--show") && !args.has("--force-search"));
-        assert_eq!(args.values("--tactic"), ["match_bound=off", "prev_cap=off"]);
+        assert_eq!(args.values("--tactic"), ["match_refine=0", "prev_cap=off"]);
         let opts = solver_options(&args).unwrap();
         assert_eq!(opts.threads, 4);
-        assert_eq!(opts.tactics.description(), "match_bound=off,prev_cap=off");
-    }
-
-    #[test]
-    fn strict_is_the_two_tactic_flags() {
-        let options = |given: &[&str]| {
-            let args = Args::parse(&strings(given), &SOLVER_FLAGS, &[]).unwrap();
-            solver_options(&args).unwrap().tactics
-        };
-        let by_hand = options(&["--tactic", "reuse_prev=off", "--tactic", "revise_freedoms=off"]);
-        assert_eq!(options(&["--strict"]), by_hand);
-        assert_eq!(options(&["--strict"]).description(), "reuse_prev=off,revise_freedoms=off");
-        // A `--tactic` is applied after `--strict`, wherever it is on the command line.
-        assert_eq!(options(&["--tactic", "reuse_prev=on", "--strict"]).description(), "revise_freedoms=off");
-        assert_eq!(options(&["--strict", "--tactic", "branching=largest"]).unproven_on(), Vec::<&str>::new());
-        // A command that takes no solver flags does not take the switch either.
-        let args = Args::parse(&strings(&["--strict"]), &["--optimal"], &[]);
-        assert!(usage(args.unwrap_err()).contains("unknown option --strict"));
+        assert_eq!(opts.tactics.description(), "match_refine=0,prev_cap=off");
     }
 
     #[test]
@@ -238,11 +204,11 @@ mod tests {
             let args = Args::parse(&strings(&given), &SOLVER_FLAGS, &[]).unwrap();
             solver_options(&args).map(|opts| opts.tactics).map_err(usage)
         };
-        let t = options(&["branching=largest", "match_refine=0"]).unwrap();
-        assert_eq!(t.description(), "branching=largest,match_refine=0");
+        let t = options(&["match_refine=2", "nogoods=off"]).unwrap();
+        assert_eq!(t.description(), "match_refine=2,nogoods=off");
         // The last assignment of a tactic wins, as for the switches.
         assert_eq!(options(&["match_refine=3", "match_refine=1"]).unwrap().description(), "default");
-        for bad in ["branching=sideways", "match_refine=9", "match_refine=two", "match_refine=-1"] {
+        for bad in ["match_refine=9", "match_refine=two", "match_refine=-1"] {
             let message = options(&[bad]).unwrap_err();
             assert!(message.starts_with(&format!("tactic {}: expected ", bad.split('=').next().unwrap())), "{message}");
         }
@@ -264,23 +230,16 @@ mod tests {
     }
 
     #[test]
-    fn seconds_and_optimal() {
-        let args =
-            Args::parse(&strings(&["--progress", "0.5", "--optimal", "none"]), &["--progress", "--optimal"], &[]);
-        let args = args.unwrap();
+    fn seconds() {
+        let args = Args::parse(&strings(&["--progress", "0.5"]), &["--progress"], &[]).unwrap();
         assert_eq!(args.seconds("--progress").unwrap(), Some(Duration::from_millis(500)));
         assert_eq!(args.seconds("--time-limit").unwrap(), None);
         assert!(Args::parse(&strings(&["--progress", "-1"]), &["--progress"], &[])
             .unwrap()
             .seconds("--progress")
             .is_err());
-        let optimal = |given: &[&str]| {
-            let args = Args::parse(&strings(given), &SOLVER_FLAGS, &[]).unwrap();
-            solver_options(&args).unwrap().optimal
-        };
-        assert_eq!(optimal(&[]), OptimalSource::Repository);
-        assert_eq!(optimal(&["--optimal", "none"]), OptimalSource::None);
-        assert_eq!(optimal(&["--optimal", "t.json"]), OptimalSource::File(PathBuf::from("t.json")));
+        let solver = Args::parse(&strings(&["--optimal", "t.json"]), &SOLVER_FLAGS, &[]).map(|_| ()).map_err(usage);
+        assert!(solver.unwrap_err().contains("unknown option --optimal"));
     }
 
     #[test]

@@ -71,7 +71,7 @@ if [ "$TRAIN" = 1 ]; then
     # A game of every width, from W = 8 to W = 64; the frontier's ones searched longer.
     for game in 480:2 700:2 936:4 1184:8 1300:8 1600:3 1900:3 2500:2 3500:2; do
         "$BIN/examples/ladder" --threads 1 --seconds "${game#*:}" --known "$CRATE/results/strict.jsonl" \
-            --tactic revise_freedoms=off "${game%:*}" | cut -c1-100
+            "${game%:*}" | cut -c1-100
     done
     "$PROFDATA" merge -o "$OUT/merged.profdata" "$OUT/raw"
 fi

@@ -16,9 +16,9 @@
 //! completed, its time and nodes, the incumbent against the known optimum, when the final incumbent was found,
 //! and the engine's activity ([`Counters::summary`]: effective parallelism, idle and lock-wait time, splits,
 //! steals, time to full occupancy).  `--diag` collects [`Diagnostics`] (slower) and prints a summary.
-//! `--tactic` sets a search tactic with the names and values of `taxman solve --tactic` (`preclusions=off`,
-//! `branching=largest`, `match_refine=0`, ...).  `--node-limit N` stops each search after N nodes (steps), for
-//! measuring a prefix of a search too long to finish.
+//! `--tactic` sets a search tactic with the names and values of `taxman solve --tactic` (`nogoods=off`,
+//! `match_refine=0`, ...).  `--node-limit N` stops each search after N nodes (steps), for measuring a prefix of a
+//! search too long to finish.
 //!
 //! Scaling: `--threads` takes a list of thread counts, and `--scaling` is 1, 2, 4, ... up to the available
 //! parallelism (which is included).  Each game is searched with each count in turn, and a table per game (and
@@ -40,8 +40,7 @@ use std::time::{Duration, Instant};
 use taxman::board::Board;
 use taxman::engine::{Counters, EngineConfig};
 use taxman::game::Optimal;
-use taxman::search::{cut, search_with, Diagnostics, Revise, SearchTactics};
-use taxman::solver::SolveOptions;
+use taxman::search::{cut, search_with, Diagnostics, SearchTactics};
 use taxman::tactics::Tactics;
 
 struct Options {
@@ -130,7 +129,7 @@ fn main() {
             std::process::exit(2);
         }
     };
-    let optimal = match SolveOptions::default().known_games(o.known.as_slice()) {
+    let optimal = match Optimal::built_in().with_results_files(o.known.as_slice()) {
         Ok(optimal) => optimal,
         Err(e) => {
             eprintln!("error: {e}");
@@ -230,19 +229,13 @@ fn secs(d: Duration) -> f64 {
 fn run<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Vec<Row> {
     let t0 = Instant::now();
     let board = Board::<W>::for_n(n);
-    let most = o.threads.iter().copied().max().unwrap_or(1);
-    let p = board.prepare(o.tactics, most).expect("prepare");
+    let p = board.prepare(o.tactics).expect("prepare");
     let opt = optimal.score(n).map(|s| s - board.in_the_bag);
     let prev_cap = optimal.score(n - 1).and_then(|s| board.promotion_cap(s));
     let seed_game = if o.seed_opt { optimal.moves(n) } else { optimal.moves(n - 1).filter(|_| o.seed) };
     let seed = seed_game.map(|moves| board.seed(moves));
     let cap = prev_cap.filter(|_| o.cap);
     let prep = t0.elapsed();
-    let t = &p.timings;
-    let revise = match p.revise {
-        Revise::Searched { nodes, .. } => format!("searched {nodes} nodes"),
-        other => format!("{other:?}"),
-    };
     let mut rows = Vec::new();
     for &threads in &o.threads {
         let cfg = EngineConfig {
@@ -267,7 +260,7 @@ fn run<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Vec<Row> {
         };
         println!(
             "n={n:4} T={threads} {status:6} search {:7.2} s nodes {:11} ({:6.0} k/s) best {} opt {} greedy {} cap {} \
-             | {found} | prep {:.2} s (prec {:.2}, revise {:.2} {revise}) max_total {} | {}",
+             | {found} | prep {:.2} s max_total {} | {}",
             secs(r.time),
             r.stats.nodes,
             r.stats.nodes as f64 / secs(r.time).max(1e-9) / 1e3,
@@ -276,8 +269,6 @@ fn run<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Vec<Row> {
             p.greedy.sum(),
             prev_cap.map_or("?".into(), |v| v.to_string()),
             secs(prep),
-            secs(t.preclusions),
-            secs(t.revise),
             p.max_total,
             r.counters.summary(),
         );
@@ -303,19 +294,17 @@ fn print_diagnostics(d: &Diagnostics, nodes: u64, found_steps: Option<u64>) {
     };
     println!("    node loops ended: {}", named(&d.loop_ends));
     println!("    children cut: {}; promotions failed {}", named(&d.child_cuts), d.failed_promotions);
-    for (label, counts) in [("bound", &d.gaps), ("blame", &d.blame_gaps), ("match", &d.match_gaps)] {
-        let q = |x| Diagnostics::quantile(counts, x).map_or("-".into(), |v| v.to_string());
-        let count: u64 = counts.iter().sum();
-        println!(
-            "    gap {label:5} over need at open node checks ({count}): p10 {} p25 {} p50 {} p75 {} p90 {} p99 {}",
-            q(0.1),
-            q(0.25),
-            q(0.5),
-            q(0.75),
-            q(0.9),
-            q(0.99)
-        );
-    }
+    let q = |x| Diagnostics::quantile(&d.gaps, x).map_or("-".into(), |v| v.to_string());
+    let count: u64 = d.gaps.iter().sum();
+    println!(
+        "    gap of the bound over need at open node checks ({count}): p10 {} p25 {} p50 {} p75 {} p90 {} p99 {}",
+        q(0.1),
+        q(0.25),
+        q(0.5),
+        q(0.75),
+        q(0.9),
+        q(0.99)
+    );
     if d.match_open > 0 {
         println!(
             "    matching bounds that did not prune: {}, heaviest matching feasible at {:.1}%; one level of \

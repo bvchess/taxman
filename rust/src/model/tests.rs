@@ -191,14 +191,8 @@ fn frame_set_helpers() {
     assert_eq!((model.home(42), model.home(40), model.home(9), model.home(84), model.home(999)), (1, 2, 0, 0, 0));
     assert!(model.contains_factor(&fs, 42) && !model.contains_factor(&fs, 84) && !model.contains_factor(&fs, 999));
     assert!(!model.can_promote(&fs, 9) && model.promote(&fs, 9).is_none(), "frame 0 cannot promote");
-    let pair = fs.front_pair();
-    assert_eq!(pair.frames(), &fs.frames()[..2]);
-    assert!(model.contains_factor(&pair, 42) && !model.contains_factor(&pair, 40));
-    let revised = fs.with_frame_zero_freedoms(1);
-    assert_eq!(revised.frames()[0].freedoms, 1);
-    assert_eq!(&revised.frames()[1..], &fs.frames()[1..]);
-    assert_ne!(revised, fs);
-    let mut copy = pair;
+    let mut copy = model.promote(&fs, 42).expect("promotable");
+    assert_ne!(copy, fs);
     copy.assign(&fs);
     assert_eq!(copy, fs);
     let mut failed = fs;
@@ -315,18 +309,6 @@ fn random_agreement<const W: usize>(g: &Golden, rng: &mut Rng, stats: &mut PeelS
             for (i, frame) in state.frames().iter().enumerate() {
                 let (move_universe, factor_universe) = universes[i];
                 assert!(check_frame(frame.moves, frame.factors, &model.graph, &math, stats));
-                // Single edits answered with a certificate agree with peeling.
-                let mut scratch = Scratch::new();
-                let mut cert = Certificate::default();
-                assert!(model.certify_using(&mut scratch, frame, &mut cert));
-                for x in (move_universe - frame.moves).iter() {
-                    let with = model.winnable_with_move_using(&mut scratch, frame, &cert, x);
-                    assert_eq!(with, winnable(&frame.moves.with(x), &frame.factors, &math), "with move {x}");
-                }
-                for y in frame.factors.iter() {
-                    let without = model.winnable_without_factor_using(&mut scratch, frame, &cert, y);
-                    assert_eq!(without, winnable(&frame.moves, &frame.factors.without(y), &math), "without {y}");
-                }
                 let extra: Vec<u32> = (move_universe - frame.moves).to_vec();
                 let present: Vec<u32> = frame.factors.to_vec();
                 for _ in 0..4 {

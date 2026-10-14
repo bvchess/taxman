@@ -18,14 +18,14 @@ import subprocess
 import sys
 import time
 
-from common import (INVOCATION_BUDGET, LADDER, LADDER_STRICT, SEARCH_LIMIT, Budget, CHAIN, append_jsonl, is_prime,
+from common import (INVOCATION_BUDGET, LADDER, SEARCH_LIMIT, Budget, CHAIN, append_jsonl, is_prime,
                     load_jsonl, log_load, non_primes_from)
 
 LINE = re.compile(
     r"n=\s*(?P<n>\d+) T=(?P<threads>\d+) (?P<status>\w+)\s+search\s+(?P<search_s>[\d.]+) s "
     r"nodes\s+(?P<nodes>\d+) \(\s*(?P<knps>[\d.]+) k/s\) best (?P<best>\d+) opt (?P<opt>\S+) greedy (?P<greedy>\d+) "
-    r"cap (?P<cap>\S+) \| (?P<found>.*?) \| prep (?P<prep_s>[\d.]+) s \(prec (?P<prec_s>[\d.]+), "
-    r"revise (?P<revise_s>[\d.]+) (?P<revise>.*?)\) max_total (?P<max_total>\d+) \| (?P<counters>.*)$"
+    r"cap (?P<cap>\S+) \| (?P<found>.*?) \| prep (?P<prep_s>[\d.]+) s max_total (?P<max_total>\d+) "
+    r"\| (?P<counters>.*)$"
 )
 
 
@@ -68,7 +68,7 @@ def expand(tokens, non_primes_only, band_size):
 
 
 def run_one(n, args, seconds):
-    cmd = [str(LADDER), "--threads", str(args.threads), "--seconds", str(seconds), *LADDER_STRICT]
+    cmd = [str(LADDER), "--threads", str(args.threads), "--seconds", str(seconds)]
     if args.known:
         cmd += ["--known", args.known]
     if args.seed_opt:

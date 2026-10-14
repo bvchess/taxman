@@ -17,13 +17,12 @@ use super::diagnostics::{cut, Probe};
 use super::lagrange::{Lagrangian, Refits};
 use super::refine::{strongest, Learning, Refiner, Verdict};
 use super::setup::Prepared;
-use super::tactics::Branching;
 use super::{Diagnostics, NOGOOD_PERIOD};
 use crate::bits::Bits;
-use crate::bounds::{max_additional, Bounds, Preclusions, RunnerUp};
+use crate::bounds::max_additional;
 use crate::engine::{Ctx, Poll, Searcher, Stats, Unit};
 use crate::matchbound::{MatchBound, MatchGraph};
-use crate::model::{ConflictCache, FrameSet, Model, Nogoods};
+use crate::model::{ConflictCache, FrameSet, Model, Nogoods, Scratch};
 use std::sync::{Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
@@ -72,25 +71,20 @@ pub(super) fn get_bits<const W: usize>(bytes: &[u8]) -> Bits<W> {
 /// What every searcher of one search shares, read-only.
 pub struct SearchSpace<'a, const W: usize> {
     pub model: &'a Model,
-    /// The starting state (frame 0's freedoms revised if that tactic is on).
+    /// The starting state: the frames as built.
     pub root: &'a FrameSet<W>,
-    /// The preclusion table, if that tactic is on.
-    pub preclusions: Option<&'a Preclusions<W>>,
-    /// The root's matching graph, if the `match_bound` tactic is on; without it, nodes are bounded by
-    /// `blameGame` ([`Bounds::reaches`]).
-    pub match_graph: Option<&'a MatchGraph>,
+    /// The root's matching graph, which bounds every node.
+    pub match_graph: &'a MatchGraph,
     /// How deep to refine the matching bound by conflicts (tactic `match_refine`).
     pub match_refine: u32,
-    /// How to branch (tactic `branching`; [`Branching::Largest`] without `match_bound`).
-    pub conflict_branching: Branching,
-    /// Tactics `fix_forced` and `nogoods` (the latter only with `match_bound`).
+    /// Tactics `fix_forced` and `nogoods`.
     pub fix_forced: bool,
     pub nogoods: bool,
     /// After how many of its steps a searcher forgets the nogoods it knows (tactic `forget_nogoods`: every
     /// [`NOGOOD_PERIOD`]), if ever.
     pub nogood_period: Option<u64>,
-    /// With the Lagrangian bound over the nogoods (tactic `lagrange`, with `match_bound` and `nogoods`), when each
-    /// searcher refits its multipliers ([`Refits::SEARCH`]).
+    /// With the Lagrangian bound over the nogoods (tactic `lagrange`, with `nogoods`), when each searcher refits
+    /// its multipliers ([`Refits::SEARCH`]).
     pub lagrange: Option<Refits>,
     /// The root's candidates (where the Lagrangian bound's multipliers are fitted).
     pub candidates: Bits<W>,
@@ -98,8 +92,6 @@ pub struct SearchSpace<'a, const W: usize> {
     pub root_max: u32,
     /// The most promotions a promotion set can have (`maxTotalPromotions`; see [`Prepared::max_total`]).
     pub max_total: u32,
-    /// How `blameGame` replaces the first failure of its bid (tactic `legacy_bound`; only without `match_bound`).
-    pub rule: RunnerUp,
     /// A proven ceiling on the promotion sum (`n + opt(n − 1) − in_the_bag`): an incumbent that reaches it ends
     /// the search.  (The ceiling, called the cap in the tactic `prev_cap`; not `max_total`, which limits the
     /// number of promotions.)
@@ -113,26 +105,22 @@ pub struct SearchSpace<'a, const W: usize> {
 
 impl<'a, const W: usize> SearchSpace<'a, W> {
     /// The space [`search`](super::search) searches `prepared` in: its tactics, with `graph` the root's matching
-    /// graph (`MatchGraph::new(&prepared.model, &prepared.root)`, needed with the tactic `match_bound`), the
-    /// ceiling `cap`, no diagnostics, and the searchers forgetting their nogoods as the tactic `forget_nogoods`
-    /// says.
-    pub fn new(prepared: &'a Prepared<W>, graph: Option<&'a MatchGraph>, cap: Option<u64>) -> Self {
+    /// graph (`MatchGraph::new(&prepared.model, &prepared.root)`), the ceiling `cap`, no diagnostics, and the
+    /// searchers forgetting their nogoods as the tactic `forget_nogoods` says.
+    pub fn new(prepared: &'a Prepared<W>, graph: &'a MatchGraph, cap: Option<u64>) -> Self {
         let tactics = prepared.tactics;
         SearchSpace {
             model: &prepared.model,
             root: &prepared.root,
-            preclusions: prepared.preclusions.as_ref(),
-            match_graph: graph.filter(|_| tactics.match_bound),
+            match_graph: graph,
             match_refine: u32::from(tactics.match_refine),
-            conflict_branching: if tactics.match_bound { tactics.branching } else { Branching::Largest },
             fix_forced: tactics.fix_forced,
-            nogoods: tactics.match_bound && tactics.nogoods,
+            nogoods: tactics.nogoods,
             nogood_period: tactics.forget_nogoods.then_some(NOGOOD_PERIOD),
-            lagrange: (tactics.match_bound && tactics.nogoods && tactics.lagrange).then_some(Refits::SEARCH),
+            lagrange: (tactics.nogoods && tactics.lagrange).then_some(Refits::SEARCH),
             candidates: prepared.candidates,
             root_max: prepared.root.frames().iter().filter_map(|f| (f.moves | f.factors).max()).max().unwrap_or(0),
             max_total: prepared.max_total,
-            rule: tactics.rule(),
             cap,
             diagnostics: None,
             began: Instant::now(),
@@ -162,18 +150,10 @@ pub mod stat {
     pub const PROMOTE_ATTEMPTS: usize = 0;
     /// Candidates promoted in children that were made (several for a child that promotes forced members).
     pub const PROMOTIONS: usize = 1;
-    /// `blameGame` bounds computed (only without the tactic `match_bound`).
-    pub const UPPER_BOUNDS: usize = 2;
-    /// Promotability checks made while building candidate lists (only without the tactic `match_bound`).
-    pub const CAN_PROMOTES: usize = 3;
     /// Children pushed on the stack (explored).
-    pub const CHILDREN: usize = 4;
-    /// Candidates the preclusion table ruled out.
-    pub const PRECLUDED: usize = 5;
-    /// Frame certificates made for the promotability checks.
-    pub const CERTIFICATES: usize = 6;
-    /// Matching bounds computed (checks of nodes and children with the tactic `match_bound`).
-    pub const MATCH_BOUNDS: usize = 7;
+    pub const CHILDREN: usize = 2;
+    /// Matching bounds computed (checks of nodes and children).
+    pub const MATCH_BOUNDS: usize = 3;
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -220,8 +200,7 @@ struct Open<const W: usize> {
 }
 
 impl<const W: usize> Open<W> {
-    /// No conflict looked for, nothing forced: the verdict without the matching bound, or without refinement
-    /// and a conflict to branch on.
+    /// No conflict looked for, nothing forced: the verdict of a child's check without refinement.
     const NONE: Self = Open { conflict: None, forced: Bits::EMPTY };
 }
 
@@ -273,11 +252,10 @@ pub struct TaxSearcher<'a, const W: usize> {
 /// Everything a step works with besides the stack.
 struct Stepper<'a, const W: usize> {
     space: &'a SearchSpace<'a, W>,
-    /// The Java-parity bound and candidate lists (`blameGame` only without `match_bound`), with the scratch space
-    /// of every peel the searcher makes.
-    bounds: Bounds<'a, W>,
-    /// The matching bound along the path (tactic `match_bound`), level for level with the stack.
-    matching: Option<MatchBound<'a, W>>,
+    /// The scratch space of every peel the searcher makes.
+    scratch: Scratch<W>,
+    /// The matching bound along the path, level for level with the stack.
+    matching: MatchBound<'a, W>,
     /// Conflicts known for the node being worked on (see [`Refiner`]); `stack[d].known_end` of them hold for
     /// the node at depth `d`.
     known: Vec<Bits<W>>,
@@ -300,14 +278,13 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             stack: Vec::new(),
             stepper: Stepper {
                 space,
-                bounds: Bounds::new(space.model, space.preclusions, space.rule)
-                    .with_promotability_checks(space.match_graph.is_none()),
-                matching: space.match_graph.map(MatchBound::new),
+                scratch: Scratch::new(),
+                matching: MatchBound::new(space.match_graph),
                 known: Vec::new(),
                 conflict_cache: ConflictCache::default(),
                 nogoods: space.nogoods.then(|| Nogoods::new(space.root_max, NOGOOD_CAPACITY)),
                 steps_since_clear: 0,
-                lagrange: space.lagrange.zip(space.match_graph).map(|(refits, graph)| Lagrangian::new(graph, refits)),
+                lagrange: space.lagrange.map(|refits| Lagrangian::new(space.match_graph, refits)),
                 counts: Counts::default(),
                 payload: Vec::with_capacity(8 * W),
                 probe: space.diagnostics.map(Probe::new),
@@ -320,7 +297,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         let space = self.stepper.space;
         let state = space
             .model
-            .promote_all_using(self.stepper.bounds.scratch(), space.root, &unit.promoted)
+            .promote_all_using(&mut self.stepper.scratch, space.root, &unit.promoted)
             .unwrap_or_else(|| panic!("a unit's promotions {:?} cannot be promoted from the root", unit.promoted));
         let max_add = max_additional(space.max_total, &state, &unit.promoted, &unit.cands);
         let sum = unit.promoted.sum();
@@ -332,9 +309,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         } else {
             self.stack[0] = node;
         }
-        if let Some(matching) = &mut self.stepper.matching {
-            matching.reset(&unit.promoted, &unit.cands);
-        }
+        self.stepper.matching.reset(&unit.promoted, &unit.cands);
         if let Some(lagrange) = &mut self.stepper.lagrange {
             lagrange.start();
         }
@@ -387,9 +362,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
     #[inline]
     fn step(&mut self, node: &mut Node<W>, child: &mut Node<W>, pushed: bool, ctx: &mut Ctx<'_, TaxUnit<W>>) -> Next {
         self.known.truncate(node.known_end); // forget the conflicts of the child last considered
-        if let Some(m) = &mut self.matching {
-            m.take_kept(); // the node without the candidate it last branched on, if strong branching kept it
-        }
+        self.matching.take_kept(); // the node without the candidate it last branched on, if strong branching kept it
         if let Some(p) = &mut self.probe {
             p.step(node.promoted.len());
         }
@@ -401,7 +374,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
             Err(reason) => return self.end_loop(reason, &node.promoted, pushed),
         };
         if let Some(p) = &mut self.probe {
-            p.open(&mut self.bounds, &mut self.matching, self.space.model, node, need);
+            p.open(&mut self.scratch, &mut self.matching, self.space.model, node, need);
         }
         let Some(branch) = self.choose_branch(node, open, need) else {
             return self.end_loop(cut::FORCED, &node.promoted, pushed);
@@ -439,8 +412,8 @@ impl<'a, const W: usize> Stepper<'a, W> {
     /// the matching check found for choosing the branch.
     ///
     /// Cheapest first: candidates left; the sum of the `max_add` largest (no completion has more promotions, nor
-    /// larger ones: a bound of its own); `blameGame` without `match_bound`; then the matching check, unless the
-    /// node kept its verdict from when it was made at this `need`.
+    /// larger ones: a bound of its own); then the matching check, unless the node kept its verdict from when it
+    /// was made at this `need`.
     #[inline]
     fn check_node(&mut self, node: &mut Node<W>, need: u64, ctx: &mut Ctx<'_, TaxUnit<W>>) -> Result<Open<W>, usize> {
         let checked = node.checked.take();
@@ -450,16 +423,12 @@ impl<'a, const W: usize> Stepper<'a, W> {
         if node.cands.sum_largest(node.max_add) < need {
             return Err(cut::LARGEST);
         }
-        if self.space.match_graph.is_none() && !self.bounds.reaches(&node.state, &node.cands, node.max_add, need) {
-            return Err(cut::BLAME);
-        }
         if let Some(checked) = checked.filter(|checked| checked.need == need) {
             // The node was checked when it was made, at the same need and with the same matching (this is its
             // first step): the verdict is the same, and so are the conflict and the forced members.
             return Ok(Open { conflict: Some(checked.conflict), forced: checked.forced });
         }
-        let wants_conflict = self.space.conflict_branching != Branching::Largest;
-        let open = self.check(&node.state, &node.promoted, &node.cands, need, wants_conflict, ctx);
+        let open = self.check(&node.state, &node.promoted, &node.cands, need, true, ctx);
         node.known_end = self.known.len(); // the conflicts the check found hold for the node and its subtree
         open
     }
@@ -467,29 +436,27 @@ impl<'a, const W: usize> Stepper<'a, W> {
     /// Phase 2: the candidate `node` branches on, taken out of its loop, and what the child promotes; `None` if
     /// every member of the conflict is forced (no completion reaches `need`, and the loop ends).
     ///
-    /// With a conflict, the branch is one of its members (tactic `branching`): every completion leaves out one of
-    /// them, so neither the child nor the node going on can find the same heaviest matching again.  With forced
-    /// members (tactic `fix_forced`), the child promotes all of them and the node's loop ends after it: every
-    /// completion of the node that reaches `need` promotes them all, and so is a completion of that child.
+    /// With a conflict, the branch is one of its members, the one that looks best one step ahead (see
+    /// `refine::strongest`): every completion leaves out one of them, so neither the child nor the node going on
+    /// can find the same heaviest matching again.  With forced members (tactic `fix_forced`), the child promotes
+    /// all of them and the node's loop ends after it: every completion of the node that reaches `need` promotes
+    /// them all, and so is a completion of that child.  Without a conflict, the branch is the largest candidate.
     #[inline]
     fn choose_branch(&mut self, node: &mut Node<W>, open: Open<W>, need: u64) -> Option<Branch<W>> {
         let space = self.space;
         let conflict = open.conflict.map(|k| k & node.cands).filter(|k| !k.is_empty());
         let mut forced = open.forced & node.cands;
         let mut kept = false; // whether the matching level without n is kept for the node
-        let n = match (space.conflict_branching, conflict) {
-            (Branching::ConflictSmallest, Some(k)) => k.min(),
-            (Branching::ConflictLargest, Some(k)) => k.max(),
+        let n = match conflict {
             // With forced members known, the child promotes them all and the node's loop ends there.
-            (Branching::ConflictStrong, Some(_)) if !forced.is_empty() => forced.max(),
-            (Branching::ConflictStrong, Some(k)) if k.len() > 1 => {
-                let m = self.matching.as_mut().expect("conflicts come from the matching");
-                let strong = strongest(m, &k, need, space.fix_forced);
+            Some(_) if !forced.is_empty() => forced.max(),
+            Some(k) if k.len() > 1 => {
+                let strong = strongest(&mut self.matching, &k, need, space.fix_forced);
                 (forced, kept) = (strong.forced, strong.kept);
                 Some(strong.member)
             }
-            (Branching::ConflictStrong, Some(k)) => k.max(),
-            _ => node.cands.max(),
+            Some(k) => k.max(),
+            None => node.cands.max(),
         }
         .expect("not empty");
         if conflict.is_some_and(|k| k.is_subset(&forced)) {
@@ -502,10 +469,8 @@ impl<'a, const W: usize> Stepper<'a, W> {
             // Every completion that reaches `need` promotes the forced members, so all of them are the child's (or
             // none, if it fails): the node's loop has nothing left after it.
             node.cands = Bits::EMPTY;
-        } else if let Some(m) = &mut self.matching {
-            if !kept {
-                m.remove_candidate(n);
-            }
+        } else if !kept {
+            self.matching.remove_candidate(n);
         }
         let added = if space.fix_forced && forced.len() > 1 { forced } else { Bits::EMPTY.with(n) };
         Some(Branch { n, added, left })
@@ -513,13 +478,13 @@ impl<'a, const W: usize> Stepper<'a, W> {
 
     /// Phase 3: makes in `child` the child of `node` that promotes `branch.added`: its state, promotions and
     /// candidates.  Returns how many more promotions the child can make among `branch.left` ([`max_additional`],
-    /// which the child's check uses, as the Java's loop does), or `None` if the promotion fails.
+    /// which the child's check uses), or `None` if the promotion fails.
     ///
-    /// The child's candidates are the node's others, narrowed to the frames that still have freedoms (and with
-    /// the tactic `preclusions`, the table's); then a candidate is ruled out if promoting it would complete a
-    /// conflict known for the node (or above it), or a nogood: the child's state is the node's with more
-    /// promotions, so promoting the last member would promote the whole conflict there.  (The heaviest matching
-    /// of the node promotes the branch already, so without this the child's matching bound would not drop.)
+    /// The child's candidates are the node's others, narrowed to the frames that still have freedoms; then a
+    /// candidate is ruled out if promoting it would complete a conflict known for the node (or above it), or a
+    /// nogood: the child's state is the node's with more promotions, so promoting the last member would promote
+    /// the whole conflict there.  (The heaviest matching of the node promotes the branch already, so without this
+    /// the child's matching bound would not drop.)
     #[inline]
     fn make_child(&mut self, node: &Node<W>, child: &mut Node<W>, branch: &Branch<W>) -> Option<u32> {
         let space = self.space;
@@ -532,9 +497,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
         // they touch ends with negative freedoms.
         let promoted = if added.len() == 1 {
             child.state.assign(&node.state);
-            model.promote_in_place_using(self.bounds.scratch(), &mut child.state, branch.n)
+            model.promote_in_place_using(&mut self.scratch, &mut child.state, branch.n)
         } else {
-            match model.promote_all_using(self.bounds.scratch(), &node.state, &added) {
+            match model.promote_all_using(&mut self.scratch, &node.state, &added) {
                 Some(state) => {
                     child.state.assign(&state);
                     added.iter().all(|x| {
@@ -554,7 +519,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
         child.sum = node.sum + added.sum();
         let rest = branch.left - added;
         let max_next = max_additional(space.max_total, &child.state, &child.promoted, &rest);
-        let mut cands = self.bounds.new_candidate_list_after(&added, max_next, &child.state, &rest, &node.promoted);
+        let mut cands = child.state.narrow_candidates(&rest);
         // Usually the child promotes one number, and a membership test is cheaper than a set intersection.
         let touched = |k: &Bits<W>| if added.len() == 1 { k.contains(branch.n) } else { k.intersects(&added) };
         for k in self.known.iter().filter(|k| touched(k)) {
@@ -575,9 +540,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
     /// completion of it can beat the incumbent, or if its best completion is known (then offered).
     ///
     /// The checks are the node's (see [`check_node`](Self::check_node)), without asking for a conflict to
-    /// branch on.  With the matching bound the child is pushed on the matching stack for its check and stays
-    /// there if it passes, with its verdict kept for its first step.  A child with no candidates passes without
-    /// a check: it has nothing to bound, and is offered but not explored.
+    /// branch on.  The child is pushed on the matching stack for its check and stays there if it passes, with
+    /// its verdict kept for its first step.  A child with no candidates passes without a check: it has nothing
+    /// to bound, and is offered but not explored.
     #[inline]
     fn check_child(
         &mut self,
@@ -592,27 +557,27 @@ impl<'a, const W: usize> Stepper<'a, W> {
         if cands.sum_largest(max_next) < need {
             return Err(cut::LARGEST);
         }
-        if self.space.match_graph.is_none() && !self.bounds.reaches(&child.state, &cands, max_next, need) {
-            return Err(cut::BLAME);
-        }
         if cands.is_empty() {
             return Ok(());
         }
-        if let Some(m) = &mut self.matching {
-            m.push_all(added, &cands);
-        }
+        self.matching.push_all(added, &cands);
         match self.check(&child.state, &child.promoted, &cands, need, false, ctx) {
             Ok(open) => {
                 child.checked = open.conflict.map(|conflict| Checked { need, conflict, forced: open.forced });
-                if let (Some(p), Some(m)) = (&mut self.probe, &mut self.matching) {
-                    p.matching_open(&mut self.bounds, m, self.space.model, &child.state, max_next, need);
+                if let Some(p) = &mut self.probe {
+                    p.matching_open(
+                        &mut self.scratch,
+                        &mut self.matching,
+                        self.space.model,
+                        &child.state,
+                        max_next,
+                        need,
+                    );
                 }
                 Ok(())
             }
             Err(reason) => {
-                if let Some(m) = &mut self.matching {
-                    m.pop();
-                }
+                self.matching.pop();
                 if let Some(l) = &mut self.lagrange {
                     l.leave(&child.promoted);
                 }
@@ -627,8 +592,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
     /// matching can be promoted ([`cut::EXACT`], the best completion, offered), or with the tactic `lagrange` the
     /// Lagrangian bound is below `need` ([`cut::LAGRANGE`]).  Else the conflict to branch on (when
     /// `wants_conflict`, or found by refining) and the forced members (of the matching and of the Lagrangian
-    /// bound).  A promotable completion that refining finds is offered too.  Without the `match_bound` tactic the
-    /// node goes on (`blameGame` has decided).
+    /// bound).  A promotable completion that refining finds is offered too.
     fn check(
         &mut self,
         state: &FrameSet<W>,
@@ -639,9 +603,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
         ctx: &mut Ctx<'_, TaxUnit<W>>,
     ) -> Result<Open<W>, usize> {
         let space = self.space;
-        let Some(m) = self.matching.as_mut() else {
-            return Ok(Open::NONE);
-        };
+        let m = &mut self.matching;
         self.counts.match_bounds += 1;
         if m.value() < need {
             return Err(cut::MATCH);
@@ -654,11 +616,10 @@ impl<'a, const W: usize> Stepper<'a, W> {
         }
         let promoted = *promoted;
         let learning = self.nogoods.as_mut().map(|table| Learning { table, root: space.root, promoted });
-        let forcing = space.fix_forced && space.conflict_branching == Branching::ConflictStrong;
         let mut refiner = Refiner {
             m,
             model: space.model,
-            scratch: self.bounds.scratch(),
+            scratch: &mut self.scratch,
             state,
             need,
             known: &mut self.known,
@@ -667,7 +628,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
             computed: 0,
             exact: Bits::EMPTY,
             learning,
-            forcing,
+            forcing: space.fix_forced,
             forced: Bits::EMPTY,
         };
         let verdict = refiner.top(depth, wants_conflict);
@@ -686,7 +647,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
             }
             Verdict::Open(conflict) => match &mut self.lagrange {
                 None => Ok(Open { conflict, forced }),
-                Some(l) => match l.check(&promoted, cands, need, forcing, &forced) {
+                Some(l) => match l.check(&promoted, cands, need, space.fix_forced, &forced) {
                     None => Err(cut::LAGRANGE),
                     Some(more) => Ok(Open { conflict, forced: forced | more }),
                 },
@@ -702,9 +663,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
             p.loop_end(reason);
         }
         if pushed {
-            if let Some(m) = &mut self.matching {
-                m.pop();
-            }
+            self.matching.pop();
         }
         if let Some(l) = &mut self.lagrange {
             l.leave(promoted);
@@ -752,23 +711,18 @@ impl<'a, const W: usize> Stepper<'a, W> {
 
     /// Adds this searcher's counts to the worker's statistics (and diagnostics) and resets them.
     fn flush(&mut self, stats: &mut Stats) {
-        let b = std::mem::take(&mut self.bounds.counts);
         let counts = std::mem::take(&mut self.counts);
         let extra = [
             (stat::PROMOTE_ATTEMPTS, counts.attempts),
             (stat::PROMOTIONS, counts.promotions),
-            (stat::UPPER_BOUNDS, b.upper_bounds),
-            (stat::CAN_PROMOTES, b.can_promotes),
             (stat::CHILDREN, counts.children),
-            (stat::PRECLUDED, b.precluded),
-            (stat::CERTIFICATES, b.certificates),
             (stat::MATCH_BOUNDS, counts.match_bounds),
         ];
         for (i, count) in extra {
             stats.extra[i] += count;
         }
         if let Some(p) = &mut self.probe {
-            p.flush(&counts, self.matching.as_ref());
+            p.flush(&counts, &self.matching);
         }
     }
 }

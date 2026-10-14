@@ -27,12 +27,8 @@ TAXMAN_BIN="${TAXMAN_BIN:-$CRATE/target/release/taxman}"
 LADDER_BIN="${LADDER_BIN:-$CRATE/target/release/examples/ladder}"
 CLOUD_DIR="$_cloud_dir"
 
-# The settings of the committed strict chain: no unproven tactic on (--tactic reuse_prev=off --tactic
-# revise_freedoms=off, which is all --strict stands for).
-STRICT_ARGS=(--strict)
-
-# The results files committed with the code, which a production run must agree with where they overlap.
-COMMITTED_RESULTS=("$CRATE/results/default.jsonl" "$CRATE/results/strict.jsonl" "$CRATE/bench/curve/chain.jsonl")
+# The results file committed with the code, which a production run must agree with where they overlap.
+COMMITTED_RESULTS=("$CRATE/results/strict.jsonl")
 
 : "${RUSTFLAGS=-C target-cpu=native}"
 export RUSTFLAGS
