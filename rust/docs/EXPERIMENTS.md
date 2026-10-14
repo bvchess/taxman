@@ -794,6 +794,15 @@ use them).
   longer exercised the frontier's hot paths; the Java took 2.0–65.6 s for those on one thread and 1.4–12.4 s on ten.
   The set is now 936, 1050, 1100, 1133, 1170 and 1184, about a second each on one thread.  A window of a long proof is
   not a game the solver can run, so it is in the probe.
+* **The Java's best run, for comparison** (the owner's notes of 2022-09-09): the chain 1..1000 on an EC2 r6a.metal
+  (192 vCPUs, 1,536 GB, $3.60 an hour), with `reuse_prev` and `revise_freedoms` on.  Its ten slowest games took
+  29,766 s together, over 8 hours: 990 15,858 s, 987 3,896, 996 3,624, 992 3,519, 988 1,559, 999 516, 1000 314,
+  833 188, 969 175, 984 119.  The committed `results/strict.jsonl` (commit 243af9b, 2026-10-13, nothing unproven)
+  took 58.7 s of game time for the whole of 1..1000 on 4 threads of the laptop; its times for those ten games are
+  4.9, 0.84, 11.2, 12.9, 2.7, 3.6, 1.3, 0.09, 0.63 and 0.21 s (140 to 4,600 times less wall time on 4 threads
+  against 192).  The same cluster, 987-999, holds the hardest games of both.  On this laptop's single thread, against
+  the Java's on the same machine (2026-10-12): 700 18.0 s against 0.030 s, 720 23.1 s against 0.026 s, 760 65.6 s
+  against 0.047 s, each from `optimal.json`'s game of n − 1.
 * **The probe** (`examples/perf.rs`), about 5 s in all: F1, 300 search nodes of each of the proofs of 936 and 1215
   with every kernel over all of them; F2, the frame checks of those promotions; F3, a checkpoint of each proof
   (1215 after 1.5M nodes) resumed on one thread for 50,000 steps, one period of forgetting nogoods.  Cycles and
