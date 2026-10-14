@@ -126,6 +126,7 @@ def parse_chain(machine: str, directory: Path) -> list:
                 "total_s": g["seconds"]["total"],
                 "nodes": g["nodes"],
                 "threads": g["threads"],
+                "completed": g["completed"],  # the game a stop interrupted is the file's last line, not completed
                 "proof": g["proof"],
                 "invocations": g["invocations"],
             }

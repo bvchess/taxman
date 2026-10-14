@@ -158,27 +158,36 @@ def memory(machines):
 def chain(machines, strict):
     print("### The chain (games added to a copy of the committed file)\n")
     committed = {g["n"]: g for g in strict}
+    body = []
     for m, rows in machines.items():
-        games = pick(rows, kind="chain-game")
+        games = pick(rows, kind="chain-game", completed=True)
         runs = pick(rows, kind="chain")
-        if not games:
-            continue
         for first in sorted({g["chain_from"] for g in games}):
             sel = sorted((g for g in games if g["chain_from"] == first), key=lambda g: g["game"])
             run = [r for r in runs if r.get("game") == first]
             wall = run[0]["wall_s"] if run else None
             search = sum(g["search_s"] for g in sel)
-            line = f"{m}: from {first}: {len(sel)} games ({sel[0]['game']}..{sel[-1]['game']}), {sel[0]['threads']} threads, "
-            line += f"search {search:.1f} s"
-            if wall:
-                line += f", wall {wall:.1f} s ({3600 * len(sel) / wall:.0f} games/hour)"
+            total = sum(g["total_s"] for g in sel)
             known = [g for g in sel if g["game"] in committed]
+            body.append([
+                m, f"{sel[0]['game']}..{sel[-1]['game']}", len(sel), sel[0]["threads"], f"{search:.1f}", f"{total:.1f}",
+                fmt(wall, 1), f"{3600 * len(sel) / total:.0f}", f"{3600 * len(sel) / wall:.0f}" if wall else "-",
+                "-" if not known else (
+                    "none" if all(g["score"] == committed[g["game"]]["score"] for g in known)
+                    else [g["game"] for g in known if g["score"] != committed[g["game"]]["score"]]
+                ),
+            ])
             if known:
-                ref_search = sum(committed[g["game"]]["seconds"]["search"] for g in known)
-                wrong = [g["game"] for g in known if g["score"] != committed[g["game"]]["score"]]
-                line += f"; committed file (the reference, {committed[known[0]['game']]['threads']} threads): {ref_search:.1f} s over the same games "
-                line += f"(ratio {ref_search / search:.2f}); scores differing: {wrong or 'none'}"
-            print(line + "\n")
+                ref = [committed[g["game"]] for g in known]
+                ref_total = sum(r["seconds"]["total"] for r in ref)
+                body.append([
+                    f"(committed file, same games, {ref[0]['threads']} threads)", f"{ref[0]['n']}..{ref[-1]['n']}", len(ref),
+                    ref[0]["threads"], f"{sum(r['seconds']['search'] for r in ref):.1f}", f"{ref_total:.1f}", "-",
+                    f"{3600 * len(ref) / ref_total:.0f}", "-", "-",
+                ])
+    table(["machine", "games", "n", "threads", "search s", "sum of games' total s", "run wall s", "games/hour (total s)",
+           "games/hour (wall)", "scores differing"], body)
+
 
 
 def main() -> None:
