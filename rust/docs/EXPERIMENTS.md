@@ -4233,13 +4233,14 @@ search:
 | after | 0.021 | 0.010 | 0.022 | 0.021 | 119.0 | 129.3 |
 
 The start-up (the run less its games) went from 59 s to 10 s, and the exhausted searches' own seconds fell 4.5%,
-with the same nodes (sets of 36 words, the board's share of the search's setup, and the noise of a busy machine).  The results check of those 2,225 games:
-55.7 s before, 9.8 s after on one thread (the boards set up again cost a fourteenth), 3.9 s on 4 threads.  The local
-search on 4 threads: the search's setup and first nodes of 4000 (standalone, `--threads 4 --node-limit 1`) 6.8 s
-before and 2.2 s after.  By the study's model, the fixed costs of the games 2200..4095 go from 1.48 hours of one thread
-to 0.69 (one thread), 0.20 (4 threads) and 0.04 (64, if the refills scale), the local search on games below their
-ceiling all but 0.02 hours of it; a game at 4000 costs 0.04 s (prime), 0.07 (repeat), 0.07 (searched, at its ceiling)
-and 0.07 plus the local search on the run's threads (searched).
+with the same nodes (sets of 36 words, the board's share of the search's setup, and the noise of a busy machine).
+The results check of those 2,225 games: 55.7 s before, 9.8 s after on one thread (the boards set up again cost a
+fourteenth), 3.9 s on 4 threads.  The local search on 4 threads: the search's setup and first nodes of 4000
+(standalone, `--threads 4 --node-limit 1`) 6.8 s before and 2.2 s after.  By the study's model, the fixed costs of
+the games 2200..4095 go from 1.48 hours of one thread to 0.69 (one thread), 0.20 (4 threads) and 0.04 (64, if the
+refills scale), the local search on games below their ceiling all but 0.02 hours of it; a game at 4000 costs 0.04 s
+(prime), 0.07 (repeat), 0.07 (searched, at its ceiling) and 0.07 plus the local search on the run's threads
+(searched).
 
 *What is left.*  The local search's refills (5 s of one thread a searched game at 4000; on many threads a share of a
 second, though a pass of a few moves on 192 threads pays more to spawn them than it saves), the start-up's check (10 s
@@ -4248,6 +4249,6 @@ at 2225 games on one thread, a few on many), and the serial order of the games, 
 *To measure again on the cloud machine.*  The chain's games an hour on 64 threads past 2175 (the calibration's 473 an
 hour in game seconds and 43 s of start-up at 2125 games, before this round and the inner loop's); the start-up at 64
 threads; the local search's speedup at 64 and 192 threads (`improve_on`, against one thread, at 2200-4000); the fixed
-costs on Graviton (`wall setup`, bench/wall/README.md, "For a cloud machine", 1); the checkpoint's pause at the new 300 s
-(item 3 there); an S3 save's CPU under `nice` (item 6); and a profile-guided build (`tools/pgo.sh` now trains a game of
-every width).
+costs on Graviton (`wall setup`, bench/wall/README.md, "For a cloud machine", 1); the checkpoint's pause at the new
+300 s (item 3 there); an S3 save's CPU under `nice` (item 6); and a profile-guided build (`tools/pgo.sh` now trains a
+game of every width).
