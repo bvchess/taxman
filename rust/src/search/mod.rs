@@ -56,6 +56,7 @@
 //! * [`lagrange`]: the Lagrangian bound in the search: where it is tried, its forced members, its refits.
 //! * `header`: the checkpoint's header.
 //! * `diagnostics`: [`Diagnostics`], for tuning.
+//! * [`symmetry`]: the root's prime exchanges (symmetric pairs of primes) and the rule they give the search.
 //! * here: [`search`], which starts or resumes the engine on a prepared game.
 
 mod diagnostics;
@@ -65,6 +66,7 @@ pub mod lagrange;
 mod refine;
 mod searcher;
 mod setup;
+pub mod symmetry;
 mod tactics;
 
 pub use diagnostics::{cut, Diagnostics, GAP_BUCKETS};

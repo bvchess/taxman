@@ -842,6 +842,94 @@ bound in the search"); the search's forced members rest on weak
 duality for a weight split, as Theorem 10's certificate does
 (`gf2::meet`).
 
+## Prime exchanges: symmetries of the promotions
+
+Exchanging two primes in every number is an automorphism of
+divisibility.  Where it maps the frame model's root onto itself, it
+maps promotion sets to promotion sets, and no optimal set is improved
+by it, which orders the two primes' shares in every optimal set at
+once.  This is the solver's tactic `symmetry` (rust/DESIGN.md,
+section 4, "Prime exchanges"; rust/docs/EXPERIMENTS.md, "Dominance
+and symmetry", found the exchanges and measured them).
+
+For primes p < q let π = π_{p,q} send p^a q^b m (m prime to pq) to
+p^b q^a m.  For a set S of numbers and a prime r let
+c_r(S) = Σ { x/r : x ∈ S, r | x }, the sum of S's cofactors of r.
+
+**Theorem 13 (prime exchanges).**  Suppose that π maps the moves of
+every frame of the root onto themselves, the factors of every frame
+onto themselves, and the candidates onto themselves.  Then:
+
+1. a set S of candidates is promotable exactly when π(S) is;
+2. Σ π(S) − Σ S = Σ_{x∈S} (π(x) − x), which is
+   (q − p)(c_p(S) − c_q(S)) when no candidate is divisible by pq, p²
+   or q²;
+3. every heaviest promotion set S\* has c_p(S\*) ≤ c_q(S\*), for all
+   the pairs (p, q) that meet these conditions at once.
+
+*Proof.*  (1) π is multiplicative and a bijection of the positive
+integers that sends primes to primes, so y = x/r with r prime exactly
+when π(y) = π(x)/π(r): π preserves the maximal-factor relation.
+Promoting S succeeds exactly when every member of S is a factor of its
+home frame h ≥ 1 and every frame is winnable with all of S applied at
+once, its moves plus S's members promoted into it and its factors less
+S's members promoted out of it (rust/src/model/promote.rs, from the
+peel); a promotion set also leaves no frame with negative freedoms and
+has at most max_total members.  π maps each frame's factors onto
+themselves, so π(x) has the home frame of x, and π maps frame h with S
+applied onto frame h with π(S) applied: moves to moves, factors to
+factors, and each mover's maximal factors in the frame to its image's.
+The two are the same game of Taxman Mini, winnable together; the
+freedoms a frame loses are the members promoted into and out of it,
+counts that π keeps, as it keeps the size of S.  π is an involution,
+so the converse is the same argument for π(S).
+(2) The first form is the definition of the sums.  Under the
+condition, a member x of S is divisible by at most one of p and q, and
+by it once: π(x) = xq/p, a gain of (q − p)·x/p, if p | x; π(x) = xp/q,
+a loss of (q − p)·x/q, if q | x; and π(x) = x otherwise.
+(3) π(S\*) is a promotion set by (1), so Σ π(S\*) ≤ Σ S\*, which by
+(2) is c_p(S\*) ≤ c_q(S\*).  The argument for one pair uses no other,
+so every heaviest set keeps every pair's inequality.  ∎
+
+Within a class of primes any two of which are such a pair (the
+exchanges compose: π_{p,r} = π_{p,q} π_{q,r} π_{p,q}), (3) says that
+every optimal set gives the larger primes the larger cofactor sums,
+the order in which the rearrangement inequality puts the class's
+arrangements at their heaviest.  No sorting argument is needed,
+though, nor any condition across classes: a set that breaks one
+pair's inequality is beaten by its image under that pair's exchange
+alone, whatever its members' other primes.
+
+*Pruning with the inequalities.*  A branch and bound for a heaviest
+promotion set may discard every node whose completions F all leave
+P ∪ F (P the node's promotions) breaking some pair's inequality.  If
+the incumbent is not optimal, every heaviest set beats it and keeps
+every inequality, so such a node holds none of them; and the other
+prunings (bounds above every completion, members that every
+completion beating the incumbent promotes, sets that cannot be
+promoted) hold for the completions that keep the inequalities as for
+all completions.  With C the node's candidates, every completion has
+c_p(P ∪ F) ≥ c_p(P) and c_q(P ∪ F) ≤ c_q(P) + c_q(C).  So a node with
+c_p(P) > c_q(P) + c_q(C) has no completion that keeps the pair's
+inequality (it is *hopeless*), and a candidate x = mp with
+c_p(P) + m > c_q(P) + c_q(C) is in none.  And for any μ ≥ 0, a
+completion that keeps the inequality has
+
+    Σ F ≤ Σ F + μ (c_q(P ∪ F) − c_p(P ∪ F))
+        = Σ_{x∈F} w_μ(x) + μ (c_q(P) − c_p(P)),
+
+with w_μ(mp) = m(p − μ), w_μ(mq) = m(q + μ) and w_μ(x) = x for the
+other candidates.  By Theorem 11, F is common independent in the
+node's contracted matroids, so their heaviest common independent set
+under w_μ (of members of positive weight, and no more than the node
+can still promote), plus μ (c_q(P) − c_p(P)), bounds every such
+completion: a Lagrangian relaxation of the inequality (weak duality,
+as for Theorem 11's weight split).
+
+These hold for the search of the root's problem, whose subtrees all
+are; a search of one node's completions for their own best (as some
+tests run) finds the best of those that keep the inequalities.
+
 ## Relation to Franklín and Moniot
 
 A. F. Franklín and R. K. Moniot, "The difficulty of beating the

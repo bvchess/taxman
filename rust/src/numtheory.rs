@@ -43,25 +43,32 @@ pub struct Tables {
     primes: Vec<u32>,
 }
 
+/// A sieve of Eratosthenes up to `n`: the smallest prime factor of each `k <= n` (0 for `k < 2`), and the primes
+/// `<= n`, ascending.  [`Tables::new`] is built on it, and so is the factoring of the root's numbers in
+/// [`crate::search::symmetry`], which has no use for the rest of the tables.
+pub fn sieve(n: u32) -> (Vec<u32>, Vec<u32>) {
+    let size = n as usize + 1;
+    let mut spf = vec![0u32; size];
+    let mut primes = Vec::new();
+    for p in 2..size {
+        if spf[p] == 0 {
+            spf[p] = p as u32;
+            primes.push(p as u32);
+            for multiple in (p * p..size).step_by(p) {
+                if spf[multiple] == 0 {
+                    spf[multiple] = p as u32;
+                }
+            }
+        }
+    }
+    (spf, primes)
+}
+
 impl Tables {
     /// Builds all tables in `O(n log n)` time (the divisor lists dominate; the rest is near-linear).
     pub fn new(n: u32) -> Self {
         let size = n as usize + 1;
-
-        // Sieve of Eratosthenes recording the smallest prime factor.
-        let mut spf = vec![0u32; size];
-        let mut primes = Vec::new();
-        for p in 2..size {
-            if spf[p] == 0 {
-                spf[p] = p as u32;
-                primes.push(p as u32);
-                for multiple in (p * p..size).step_by(p) {
-                    if spf[multiple] == 0 {
-                        spf[multiple] = p as u32;
-                    }
-                }
-            }
-        }
+        let (spf, primes) = sieve(n);
 
         // Maximal factors: factor c with the sieve, taking c/p once per distinct prime p.  Primes come out
         // ascending, so c/p comes out descending; reverse at the end.

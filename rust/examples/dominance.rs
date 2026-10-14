@@ -25,7 +25,8 @@
 //!   `--samples` random maximal completions (default 64; a cover must take them all, so this is an upper estimate of
 //!   what any cover proves); `P'` the image of `P` under a prime exchange ([`covers_mapped`]); classes of twins
 //!   among the candidates ([`twins`]); and the rule of the root's prime symmetries ([`symmetry_cut`]).
-//! * **symmetries**: the root's prime symmetries of each game (`common/symmetry.rs`).
+//! * **symmetries**: the root's prime symmetries of each game (`taxman::search::symmetry`), and the wall time of
+//!   finding them.
 //! * **symcheck**: their checks ([`symcheck_one`]).
 //!
 //! **Soundness** of pruning a dominated node: the pruned completions `S` are those with `P' ∪ S` promotable and
@@ -34,23 +35,39 @@
 
 #[path = "common/fixtures.rs"]
 mod fixtures;
-#[path = "common/symmetry.rs"]
-mod symmetry;
 
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use symmetry::{cofactors, map_set, primes_to, root_pairs, swap_primes};
 use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::engine::{self, Ctx, EngineConfig, Searcher, Start};
 use taxman::game::Optimal;
 use taxman::matchbound::{MatchBound, MatchGraph};
 use taxman::model::{FactorProvider, Frame, FrameSet, Model, Scratch};
+use taxman::search::symmetry::{cofactors, root_pairs, swap_primes};
 use taxman::search::{Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
 
 fn setup<const W: usize>(n: u32) -> Prepared<W> {
     Board::<W>::for_n(n).prepare(SearchTactics::default()).expect("prepare")
+}
+
+/// `set` mapped by `pi`, or `None` if an image is beyond `Bits<W>`.
+fn map_set<const W: usize>(set: &Bits<W>, pi: &impl Fn(u32) -> u32) -> Option<Bits<W>> {
+    let mut out = Bits::EMPTY;
+    for x in set.iter() {
+        let y = pi(x);
+        if y > Bits::<W>::MAX_VALUE {
+            return None;
+        }
+        out.insert(y);
+    }
+    Some(out)
+}
+
+/// The primes up to `n`.
+fn primes_to(n: u32) -> Vec<u32> {
+    (2..=n).filter(|&k| (2..).take_while(|d| d * d <= k).all(|d| !k.is_multiple_of(d))).collect()
 }
 
 /// The command's options: `--known`, `--count`, `--samples`, `--delta`, `--out`, `--pairs`, and the games or files.
@@ -469,7 +486,7 @@ fn random_maximal<const W: usize>(
 }
 
 /// The rule of the root's prime symmetries at the node `(promoted, cands)` that needs `need`, with the matching
-/// bound: for a pair `(a, b)` (see `common/symmetry.rs`), a set worth beating the incumbent with `c_a > c_b` has
+/// bound: for a pair `(a, b)` (see `taxman::search::symmetry`), a set worth beating the incumbent with `c_a > c_b` has
 /// an image worth more, so only completions `S` with `c_a(P ∪ S) ≤ c_b(P ∪ S)` count.  `Some(true)` if for some
 /// pair no completion can lift `c_b` to `c_a` (`hopeless`), `Some(false)` if the matching bound of the completions
 /// that keep some pair's constraint is below `need` (each subset `U` of the pair's multiples among `cands`, at most
@@ -538,7 +555,7 @@ fn nodes_of<const W: usize>(path: &Path, o: &Options) {
     let mut scratch = Scratch::new();
     let best = incumbent.sum().checked_add_signed(o.delta).expect("a margin above zero");
     let primes = primes_to(n / 2);
-    let pairs = root_pairs(&p);
+    let pairs = root_pairs(model, root, &p.candidates);
     let t0 = Instant::now();
     for unit in &units {
         let (promoted, cands) = (unit.promoted, unit.cands);
@@ -639,19 +656,22 @@ fn nodes_of<const W: usize>(path: &Path, o: &Options) {
 // ---------------------------------------------------------------------------------------------------------
 // symmetries and their checks
 
-/// The pairs of primes whose exchange is a symmetry of the root of game `n` (see `common/symmetry.rs`), and how
-/// many candidates they move.
+/// The pairs of primes whose exchange is a symmetry of the root of game `n` (see `taxman::search::symmetry`), how
+/// many candidates they move, and the wall time of finding the pairs alone, in seconds.
 fn symmetries_of<const W: usize>(n: u32) {
     let board = Board::<W>::for_n(n);
     if board.is_trivial() {
         return;
     }
     let p = board.prepare(SearchTactics::default()).expect("prepare");
-    let pairs = root_pairs(&p);
+    let t0 = Instant::now();
+    let pairs = root_pairs(&p.model, &p.root, &p.candidates);
+    let seconds = t0.elapsed().as_secs_f64();
     let moved: Bits<W> =
         p.candidates.iter().filter(|&x| pairs.iter().any(|&(a, b)| swap_primes(x, a, b) != x)).collect();
     println!(
-        "{{\"n\":{n},\"candidates\":{},\"symmetric_pairs\":{},\"moved\":{},\"pairs\":\"{pairs:?}\"}}",
+        "{{\"n\":{n},\"candidates\":{},\"symmetric_pairs\":{},\"moved\":{},\"seconds\":{seconds:.6},\
+         \"pairs\":\"{pairs:?}\"}}",
         p.candidates.len(),
         pairs.len(),
         moved.len()
@@ -673,7 +693,7 @@ fn symcheck_one<const W: usize>(n: u32, optimal: &Optimal, samples: usize) {
         assert_eq!(Some(exact), optimal.score(n), "n={n}: the oracle disagrees with the known optimum");
     }
     let p = board.prepare(SearchTactics::default()).expect("prepare");
-    let pairs = root_pairs(&p);
+    let pairs = root_pairs(&p.model, &p.root, &p.candidates);
     if pairs.is_empty() {
         return;
     }
