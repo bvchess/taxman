@@ -1053,7 +1053,8 @@ fn cores<const W: usize>(n: u32) {
             !lorea_independent(&core_lists)
         ));
     }
-    println!("{{\"n\":{n},\"cores\":[{}]}}", found.join(","));
+    let ranks: Vec<String> = fm.ranks.iter().map(usize::to_string).collect();
+    println!("{{\"n\":{n},\"ranks\":[{}],\"cores\":[{}]}}", ranks.join(","), found.join(","));
 }
 
 /// Whether the lists (one per mover) are independent in Lorea's hypergraphic matroid, a ground factor added to

@@ -83,6 +83,7 @@ pub mod board;
 pub mod bounds;
 pub mod brute;
 pub mod engine;
+pub mod gf2;
 pub mod frames;
 pub mod game;
 pub mod hives;
