@@ -25,6 +25,7 @@ use taxman::model::{FrameSet, Model, Scratch};
 use taxman::numtheory::Tables;
 use taxman::results::Assumptions;
 use taxman::search::lagrange::Refits;
+use taxman::search::symmetry::{cofactors, Symmetries};
 use taxman::search::{search, Gf2Branching, SearchSpace, SearchTactics, TaxSearcher, TaxUnit, NOGOOD_PERIOD};
 use taxman::solver::{Prev, PrevSource, SolveOptions};
 
@@ -106,7 +107,7 @@ pub fn matching_options(threads: usize) -> SolveOptions {
 }
 
 /// The search tactics a differential test compares: the default and every sound variant that is cheap at n ~ 1100,
-/// then the matching path ([`SearchTactics::matching`]) and its variants.
+/// then the matching path ([`SearchTactics::matching`], which is without the rule of `symmetry`) and its variants.
 pub fn variants() -> Vec<(&'static str, SearchTactics)> {
     let (d, m) = (SearchTactics::default(), SearchTactics::matching());
     vec![
@@ -115,11 +116,13 @@ pub fn variants() -> Vec<(&'static str, SearchTactics)> {
         ("fix_forced=off", SearchTactics { fix_forced: false, ..d }),
         ("forget_nogoods=off", SearchTactics { forget_nogoods: false, ..d }),
         ("lagrange=on", SearchTactics { lagrange: true, ..d }),
+        ("symmetry=off", SearchTactics { symmetry: false, ..d }),
         ("matching", m),
         ("matching,nogoods=off", SearchTactics { nogoods: false, ..m }),
         ("matching,fix_forced=off", SearchTactics { fix_forced: false, ..m }),
         ("matching,match_refine=0", SearchTactics { match_refine: 0, ..m }),
         ("matching,match_refine=3", SearchTactics { match_refine: 3, ..m }),
+        ("matching,symmetry=on", SearchTactics { symmetry: true, ..m }),
     ]
 }
 
@@ -207,6 +210,8 @@ pub struct Config {
     pub gf2: bool,
     pub gf2_prefilter: bool,
     pub gf2_branching: Gf2Branching,
+    /// The rule of the root's symmetric pairs (tactic `symmetry`).
+    pub symmetry: bool,
 }
 
 impl Config {
@@ -231,6 +236,7 @@ impl Config {
             gf2: t.gf2,
             gf2_prefilter: false,
             gf2_branching: Gf2Branching::Exact,
+            symmetry: t.symmetry,
         }
     }
 }
@@ -319,6 +325,7 @@ impl<const W: usize> Game<W> {
             gf2_branching: cfg.gf2_branching,
             gf2_strong_limit: usize::MAX,
             gf2_more_forced: true,
+            symmetry: cfg.symmetry.then(|| self.symmetries()).filter(|pairs| !pairs.is_empty()),
         };
         let engine = engine.unwrap_or_else(|| config(cfg.threads));
         let start = match resume {
@@ -346,45 +353,105 @@ impl<const W: usize> Game<W> {
             && set.iter().all(|x| self.model.promote_in_place(&mut state, x))
     }
 
+    /// The root's symmetric pairs, as the search's rule uses them (empty if there are none).
+    pub fn symmetries(&self) -> Symmetries {
+        Symmetries::of(&self.model, &self.root, &self.candidates)
+    }
+
     /// The best completion of `state` among `cands`, found exhaustively (pruned by the sum and the freedoms'
     /// count; a number is tried only where both its frames have freedoms left, as the search narrows its
-    /// candidates), or `None` past `budget` nodes.
-    pub fn exhaustive(&self, state: &FrameSet<W>, cands: &Bits<W>, budget: u64) -> Option<u64> {
-        fn dfs<const W: usize>(
-            model: &Model,
-            state: &FrameSet<W>,
-            list: &[u32],
-            sum: u64,
-            best: &mut u64,
-            nodes: &mut u64,
+    /// candidates), as its sum and its set (the first of the best ones that the search finds), or `None` past
+    /// `budget` nodes.
+    pub fn exhaustive(&self, state: &FrameSet<W>, cands: &Bits<W>, budget: u64) -> Option<(u64, Bits<W>)> {
+        let best = self.best_completion(state, cands, budget, &|_| true, &|_, _| true);
+        best.map(|best| best.expect("the empty completion is accepted"))
+    }
+
+    /// [`exhaustive`](Self::exhaustive) over the completions that keep the symmetric pairs' inequalities, for the
+    /// node with the promotions `promoted` and the state `state` they reach: those completions `F` for which
+    /// `promoted ∪ F` keeps every pair of `sym` ([`Symmetries::keeps`]).  `None` past `budget` nodes, else
+    /// `Some(best)`, with `best` the largest sum of such an `F` (not counting `promoted`) and the set `F`, or `None`
+    /// if no completion keeps them, the empty one included.
+    ///
+    /// Until it has found a completion that keeps them the search has no sum to prune by, and where none does it
+    /// would take the whole tree, so it also cuts a node where no completion can, by the inequality itself: a pair
+    /// `(p, q)` has `c_p(P ∪ F) ≥ c_p(P)` and `c_q(P ∪ F) ≤ c_q(P) + c_q(C)` for every `F` among the candidates `C`
+    /// that are left, with `P` the node's promotions (`promoted` and the completion so far; `heuristics/THEORY.md`,
+    /// "Pruning with the inequalities"), so `c_p(P) > c_q(P) + c_q(C)` leaves no `F` that keeps `c_p ≤ c_q`.  That is
+    /// the cofactor arithmetic alone, not the search's rule ([`Symmetries::hopeless`]).
+    pub fn exhaustive_keeping(
+        &self,
+        state: &FrameSet<W>,
+        promoted: &Bits<W>,
+        cands: &Bits<W>,
+        budget: u64,
+        sym: &Symmetries,
+    ) -> Option<Option<(u64, Bits<W>)>> {
+        let keeps = |completion: &Bits<W>| sym.keeps(&(*promoted | *completion));
+        let possible = |completion: &Bits<W>, left: &Bits<W>| {
+            let made = *promoted | *completion;
+            sym.pairs().iter().all(|&(p, q)| cofactors(&made, p) <= cofactors(&made, q) + cofactors(left, q))
+        };
+        self.best_completion(state, cands, budget, &keeps, &possible)
+    }
+
+    /// The depth-first search of [`exhaustive`](Self::exhaustive): the largest sum of a completion of `state`
+    /// among `cands` that `accepts` (the completion as a set), with that completion, `Some(None)` if it accepts
+    /// none, `None` past `budget` nodes.  The sum bounds every completion below a node, accepted or not, so it
+    /// prunes as before.  A node is cut, with all that it holds, where `possible` says no (given the completion
+    /// so far and the candidates left to add to it) that an extension could be accepted.
+    fn best_completion(
+        &self,
+        state: &FrameSet<W>,
+        cands: &Bits<W>,
+        budget: u64,
+        accepts: &dyn Fn(&Bits<W>) -> bool,
+        possible: &dyn Fn(&Bits<W>, &Bits<W>) -> bool,
+    ) -> Option<Option<(u64, Bits<W>)>> {
+        struct Dfs<'a, const W: usize> {
+            model: &'a Model,
             budget: u64,
-        ) -> bool {
-            *nodes += 1;
-            if *nodes > budget {
-                return false;
-            }
-            *best = (*best).max(sum);
-            let left: Bits<W> = list.iter().copied().collect();
-            let cap = state.max_promotions_among(&left).max(0) as usize;
-            let open = state.narrow_candidates(&left);
-            for i in 0..list.len() {
-                let optimistic: u64 = sum + list[i..].iter().take(cap).map(|&x| u64::from(x)).sum::<u64>();
-                if optimistic <= *best {
-                    return true;
-                }
-                let mut next = *state;
-                if open.contains(list[i])
-                    && model.promote_in_place(&mut next, list[i])
-                    && !dfs(model, &next, &list[i + 1..], sum + u64::from(list[i]), best, nodes, budget)
-                {
+            accepts: &'a dyn Fn(&Bits<W>) -> bool,
+            possible: &'a dyn Fn(&Bits<W>, &Bits<W>) -> bool,
+            best: Option<(u64, Bits<W>)>,
+            nodes: u64,
+        }
+        impl<const W: usize> Dfs<'_, W> {
+            /// Explores the completions that extend `chosen` (worth `sum`) from `state` with a subset of `list`;
+            /// false once the budget is spent.
+            fn explore(&mut self, state: &FrameSet<W>, list: &[u32], chosen: Bits<W>, sum: u64) -> bool {
+                self.nodes += 1;
+                if self.nodes > self.budget {
                     return false;
                 }
+                let left: Bits<W> = list.iter().copied().collect();
+                if !(self.possible)(&chosen, &left) {
+                    return true;
+                }
+                if (self.accepts)(&chosen) && self.best.is_none_or(|(best, _)| sum > best) {
+                    self.best = Some((sum, chosen));
+                }
+                let cap = state.max_promotions_among(&left).max(0) as usize;
+                let open = state.narrow_candidates(&left);
+                for i in 0..list.len() {
+                    let optimistic: u64 = sum + list[i..].iter().take(cap).map(|&x| u64::from(x)).sum::<u64>();
+                    if self.best.is_some_and(|(best, _)| optimistic <= best) {
+                        return true;
+                    }
+                    let mut next = *state;
+                    if open.contains(list[i])
+                        && self.model.promote_in_place(&mut next, list[i])
+                        && !self.explore(&next, &list[i + 1..], chosen.with(list[i]), sum + u64::from(list[i]))
+                    {
+                        return false;
+                    }
+                }
+                true
             }
-            true
         }
         let list: Vec<u32> = cands.iter_desc().collect();
-        let (mut best, mut nodes) = (0, 0);
-        dfs(&self.model, state, &list, 0, &mut best, &mut nodes, budget).then_some(best)
+        let mut dfs = Dfs { model: &self.model, budget, accepts, possible, best: None, nodes: 0 };
+        dfs.explore(state, &list, Bits::EMPTY, 0).then_some(dfs.best)
     }
 }
 

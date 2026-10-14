@@ -340,9 +340,9 @@ impl<const R: usize> Meet<R> {
     /// `self.value` and its members marked ([`contains`](Self::contains)).  The augmentations start from the larger
     /// of `start` (which must be a dominant common independent set of live elements, see the module docs; it may
     /// be empty) and the heaviest uncontended elements.  `report` is called with the start set and then with each
-    /// set an augmentation reaches (all dominant), as the members of the set in ascending order.  The augmentations
-    /// stop as soon as the set weighs `stop` or more ([`stopped`](Self::stopped)): the heaviest set weighs at least
-    /// that much, since every augmentation gains.
+    /// set an augmentation reaches (all dominant), as the members of the set in no particular order.  The
+    /// augmentations stop as soon as the set weighs `stop` or more ([`stopped`](Self::stopped)): the heaviest set
+    /// weighs at least that much, since every augmentation gains.
     pub fn solve(
         &mut self,
         p: &Problem<'_, R>,

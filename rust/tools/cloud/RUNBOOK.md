@@ -117,8 +117,8 @@ with no growth a fit over 1301-2175 resolves.  Taking the 192-CPU machine as 43 
 assumption), a day reaches the end of the set widths, n = 4095, at every slope those data support, and even at the
 steepest any GF(2) measurement has shown (×10 per 413 n), a day reaches about 3200 and a week about 3600.  How a
 search of 10^5-10^6 nodes spreads over 192 threads has not been measured (to 4 threads: 2.9 times one).  What
-follows is the matching path's estimate (`--tactic gf2=off --tactic lagrange=on`, the default before), kept for
-comparison.
+follows is the matching path's estimate (`--tactic gf2=off --tactic lagrange=on --tactic symmetry=off`, the default
+before), kept for comparison.
 
 Cost grew by a factor of 10 for every 55 to 70 in n past 1200 ([bench/curve/README.md](../../bench/curve/README.md)).
 From that file, the cost of extending the chain from 1231 to N on a 192-CPU machine, taking it to be 10 to 19 times

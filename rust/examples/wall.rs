@@ -56,10 +56,10 @@
 //!   (`D <= 0` usually) behaves like a search with a larger gap, so it makes a much larger tree on a known game:
 //!   the proof of `nodes --mode opt` with the incumbent at `opt + D`, on `--threads T` threads (default 1; `--cores
 //!   C` lets at most C of them search at once), until it completes or `--nodes K` or `--seconds S` stops it.
-//!   `--tactic` sets search tactics as for `nodes`; `gf2=off,lagrange=on` (the matching path, whose nodes are ten times
-//!   cheaper and whose trees a hundred times larger) makes trees of ten million nodes in minutes, for what the engine
-//!   and the nogood tables do in a large tree.  The engine prints its progress lines to stderr every `--progress S`
-//!   seconds (default 2), and a monitor thread prints on stdout at the same pace
+//!   `--tactic` sets search tactics as for `nodes`; `gf2=off,lagrange=on,symmetry=off` (the matching path, whose nodes
+//!   are ten times cheaper and whose trees a hundred times larger) makes trees of ten million nodes in minutes, for
+//!   what the engine and the nogood tables do in a large tree.  The engine prints its progress lines to stderr every
+//!   `--progress S` seconds (default 2), and a monitor thread prints on stdout at the same pace
 //!   `{"t":SECONDS,"max_rss":BYTES,"ckpt_bytes":SIZE,"spill_files":COUNT}` for the memory, the checkpoint and the spill
 //!   directory.  With `--ckpt-dir DIR` the run checkpoints to `DIR/grow_n<N>.ckpt` every `--every` seconds and spills
 //!   its queue to `DIR/spill` beyond `--mem-cap` units.  One summary line closes the run, with all the engine's
