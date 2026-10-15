@@ -781,7 +781,7 @@ aws s3api create-bucket --bucket taxman-013764204840-us-east-1 --region us-east-
 aws iam create-role --role-name taxman-ec2 --assume-role-policy-document \
     '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},
       "Action":"sts:AssumeRole"}]}'
-aws iam put-role-policy --role-name taxman-ec2 --policy-name taxman-bucket --policy-document \
+aws iam put-role-policy --role-name taxman-ec2 --policy-name taxman-s3-bucket --policy-document \
     '{"Version":"2012-10-17","Statement":[
       {"Effect":"Allow","Action":"s3:ListBucket","Resource":"arn:aws:s3:::taxman-013764204840-us-east-1"},
       {"Effect":"Allow","Action":["s3:GetObject","s3:PutObject","s3:DeleteObject"],
@@ -805,7 +805,7 @@ sg=$(aws ec2 create-security-group --group-name taxman-prover-$(date +%Y%m%d) --
     --query GroupId --output text)
 aws ec2 run-instances --instance-type c8g.4xlarge --placement AvailabilityZone=us-east-1b \
     --image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64 \
-    --security-group-ids $sg --iam-instance-profile Name=taxman-ec2 \
+    --security-group-ids $sg --iam-instance-profile Name=taxman-ec2 --metadata-options HttpTokens=required \
     --block-device-mappings 'DeviceName=/dev/xvda,Ebs={VolumeSize=20,VolumeType=gp3,DeleteOnTermination=true}' \
     --instance-initiated-shutdown-behavior terminate --user-data $'#!/bin/bash\nshutdown -h +2220' \
     --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=taxman-prover},$tags]" \
