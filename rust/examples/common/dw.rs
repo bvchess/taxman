@@ -47,6 +47,18 @@
 //! ends.  With separation, after each bracket the cores that the master's columns run into (`cores::cores_of`) are
 //! merged into core-derived signings (first fit, at most `per_frame` a frame), and the master is rebuilt for the
 //! changed family from its columns (but those holding a new loop) and its inequalities (ranks taken again).
+//!
+//! In [`FitMode::Search`] the exact checks are never run: a family's generation ends when nothing prices out and no
+//! cheap inequality is violated, a separation round that places no core ends the computation, and `LB` stays 0.
+//!
+//! # Warm states and the node methods
+//!
+//! A fitted state ([`Warm`]: frozen signings, multipliers, the master's columns and inequalities, all by candidate
+//! number) passes from a node to its children ([`Warm::child`]) and from a root fit to a file ([`Fit`]).  At a node,
+//! [`tier1`] evaluates `L` at the inherited multipliers; [`refit_r1`] takes deflected Polyak steps from them, and
+//! [`refit_r2`] runs the column generation of [`bound`] from the inherited master in search mode, with one separation
+//! round for node-local signings.  Each returns the lowest `⌊L⌋` it evaluated, which is valid at any multipliers and
+//! signings (Theorems 14 and 15, at a node by (2)); the master and the steps only propose multipliers.
 
 use crate::cores::{cores_of, merge, Core};
 use crate::frames::FrameMatroids;
@@ -54,8 +66,9 @@ use crate::gf3::{seed, Basis3, Default3, Matroid3, Signing};
 use crate::lp::{Lp, RowKind, Status};
 use crate::meet::intersect;
 use std::collections::{HashMap, HashSet};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use taxman::gf2::meet::{Meet, Problem};
+use taxman::json::Json;
 use taxman::model::{FrameGraph, FrameSet};
 
 /// The grid of the multipliers: weights are `x·SCALE`, multipliers whole multiples of `1/SCALE`.
@@ -94,6 +107,17 @@ const POOL: usize = 400;
 const PERTURB: f64 = 1e-6;
 /// The salt of the seeds of the core-derived signings' default values.
 pub const SALT_CORES: u64 = 2;
+/// The default of [`Settings::check_every`], and the cross-check of the evaluations of [`tier1`] and [`refit_r1`].
+pub const CHECK_EVERY: u64 = 50;
+/// The most master columns an [`Outcome`] (so a [`Warm`] state) keeps.
+pub const WARM_COLUMNS: usize = 300;
+/// The most node-local signings of a frame along a path (design S3.3).
+pub const LOCAL_PER_FRAME: usize = 8;
+/// The most cores a node's separation takes from one frame of one column (design S3.3).
+pub const LOCAL_CORES_PER_FRAME: usize = 2;
+/// Where the indices of the seeds of node-local signings' defaults start: past those of a root's core-derived
+/// signings at the default cap of 8 a frame.
+pub const LOCAL_SEEDS: usize = 8;
 /// No row, no position.
 const NONE: u32 = u32::MAX;
 
@@ -178,9 +202,18 @@ impl<'a, const W: usize> Ctx<'a, W> {
     }
 }
 
+/// What a computation is for: the study's measurement, with a certified lower bound on the LP (the exact checks),
+/// or a search, which needs only the bound (design S3.6).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FitMode {
+    Certified,
+    Search,
+}
+
 /// The budgets and knobs of a bound computation.
 #[derive(Clone, Debug)]
 pub struct Settings {
+    pub mode: FitMode,
     pub seconds: f64,
     /// The most evaluations of `L` (GF(2) pricings).
     pub pricings: usize,
@@ -205,6 +238,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Settings {
+            mode: FitMode::Certified,
             seconds: 120.0,
             pricings: 3000,
             rounds: 40,
@@ -212,7 +246,7 @@ impl Default for Settings {
             cores_per_frame: 4,
             random_defaults: true,
             polyak: 100,
-            check_every: 50,
+            check_every: CHECK_EVERY,
             close: CLOSE,
             close_gap: CLOSE_GAP,
         }
@@ -333,7 +367,57 @@ pub struct Stats {
     pub max_rows: usize,
     pub max_s: usize,
     pub ms_mi: f64,
+    /// Time in the greedies of the evaluations.
+    pub ms_greedy: f64,
     pub ms_simplex: f64,
+}
+
+impl Stats {
+    /// Adds `other`'s counts and times (the largest of the maxima).
+    pub fn add(&mut self, other: &Stats) {
+        let Stats {
+            pricings_mi,
+            pricings_greedy,
+            checks,
+            pivots,
+            degenerate,
+            solves,
+            repairs,
+            purged,
+            restarts,
+            checks_capped,
+            cuts_cheap,
+            cuts_exact,
+            checks_exact,
+            pivots_exact,
+            masters,
+            max_rows,
+            max_s,
+            ms_mi,
+            ms_greedy,
+            ms_simplex,
+        } = *other;
+        self.pricings_mi += pricings_mi;
+        self.pricings_greedy += pricings_greedy;
+        self.checks += checks;
+        self.pivots += pivots;
+        self.degenerate += degenerate;
+        self.solves += solves;
+        self.repairs += repairs;
+        self.purged += purged;
+        self.restarts += restarts;
+        self.checks_capped += checks_capped;
+        self.cuts_cheap += cuts_cheap;
+        self.cuts_exact += cuts_exact;
+        self.checks_exact += checks_exact;
+        self.pivots_exact += pivots_exact;
+        self.masters += masters;
+        self.max_rows = self.max_rows.max(max_rows);
+        self.max_s = self.max_s.max(max_s);
+        self.ms_mi += ms_mi;
+        self.ms_greedy += ms_greedy;
+        self.ms_simplex += ms_simplex;
+    }
 }
 
 /// The multipliers on the grid: `max(0, round(λ·S))`.
@@ -388,12 +472,14 @@ pub fn evaluate_grid<const W: usize>(
     q.sort_unstable();
     let mut value = mi;
     let mut sets = Vec::with_capacity(fam.extras.len());
+    let t = Instant::now();
     for (ex, l) in fam.extras.iter().zip(lhat) {
         let (g, kept) = ex.m.greedy(l);
         value += g;
         sets.push(kept.into_iter().map(|i| ex.elem[i]).collect::<Vec<_>>());
         stats.pricings_greedy += 1;
     }
+    stats.ms_greedy += t.elapsed().as_secs_f64() * 1e3;
     for s in &mut sets {
         s.sort_unstable();
     }
@@ -428,10 +514,21 @@ fn intersection<const W: usize, const R: usize>(ctx: &Ctx<'_, W>, order: &[usize
 // ---------------------------------------------------------------------------------------------------------
 // Ranks and the polytopes of the extra matroids
 
+/// The rank in an extra matroid of its elements at the positions `positions`.
+fn rank_at(ex: &Extra, positions: impl Iterator<Item = usize>) -> usize {
+    let mut basis = Basis3::new(ex.m.rank);
+    positions.filter(|&i| basis.try_insert(ex.m.vecs[i].clone())).count()
+}
+
 /// The rank in an extra matroid of the GF(2) elements `set` (its loops and the elements it does not have count 0).
 fn rank(ex: &Extra, set: &[usize]) -> usize {
-    let mut basis = Basis3::new(ex.m.rank);
-    set.iter().filter_map(|&e| ex.position(e)).filter(|&i| basis.try_insert(ex.m.vecs[i].clone())).count()
+    rank_at(ex, set.iter().filter_map(|&e| ex.position(e)))
+}
+
+/// The rank in `fam`'s extra matroid `k` of the candidates `set` (members that are not its elements count 0).
+pub fn cut_rank(fam: &Family, k: usize, set: &[u32]) -> usize {
+    let ex = &fam.extras[k];
+    rank_at(ex, set.iter().filter_map(|&x| ex.m.index(x)))
 }
 
 /// The prefixes of `order` (GF(2) elements) whose rank inequalities `z(S) ≤ r(S)` in `ex` are violated by more
@@ -890,7 +987,8 @@ pub struct Found {
 /// Why a computation stopped.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Stop {
-    /// The bracket closed (certified) and separation (if on) found nothing new.
+    /// The bracket closed (certified; in search mode, nothing priced out and no cheap cut was violated) and
+    /// separation (if on) found nothing new.
     Converged,
     /// The bound reached the target (a node, cut).
     Target,
@@ -925,10 +1023,477 @@ pub struct Outcome {
     pub stop: Stop,
     /// The master's support at the end: (value, set as candidate numbers).
     pub support: Vec<(f64, Vec<u32>)>,
+    /// The final master's columns as candidate numbers (ascending each): the support first, by decreasing value,
+    /// then its other nonempty columns in its order; at most [`WARM_COLUMNS`].
+    pub master_columns: Vec<Vec<u32>>,
+    /// The final master's rank inequalities: (extra matroid, set as candidate numbers ascending, rank).
+    pub master_cuts: Vec<(usize, Vec<u32>, usize)>,
     pub columns: usize,
     pub cuts: usize,
     pub stats: Stats,
     pub seconds: f64,
+}
+
+/// The multipliers of `maps` (per extra matroid, by candidate number; zero where absent, and for the extras past
+/// them), one vector per extra matroid of `fam`, indexed like its elements.
+fn by_number(fam: &Family, maps: &[HashMap<u32, f64>]) -> Vec<Vec<f64>> {
+    fam.extras
+        .iter()
+        .enumerate()
+        .map(|(k, ex)| ex.m.elems.iter().map(|x| maps.get(k).and_then(|m| m.get(x)).copied().unwrap_or(0.0)).collect())
+        .collect()
+}
+
+/// The positive multipliers of `lam` (one vector per extra matroid of `fam`) by candidate number.
+fn to_numbers(fam: &Family, lam: &[Vec<f64>]) -> Vec<HashMap<u32, f64>> {
+    fam.extras
+        .iter()
+        .zip(lam)
+        .map(|(ex, l)| ex.m.elems.iter().copied().zip(l.iter().copied()).filter(|&(_, v)| v > 0.0).collect())
+        .collect()
+}
+
+/// The subgradient of `L` at the evaluation `ev`, `g_{k,x} = [x ∈ I_k] − [x ∈ Q]` (one vector per extra matroid,
+/// indexed like its elements), and its squared norm.
+fn subgradient(fam: &Family, ev: &Eval) -> (Vec<Vec<f64>>, f64) {
+    let mut g: Vec<Vec<f64>> = fam.zeros();
+    let mut norm = 0.0;
+    for (k, ex) in fam.extras.iter().enumerate() {
+        for &e in &ev.sets[k] {
+            g[k][ex.position(e).expect("an element")] += 1.0;
+        }
+        for &e in &ev.q {
+            if let Some(i) = ex.position(e) {
+                g[k][i] -= 1.0;
+            }
+        }
+        norm += g[k].iter().map(|v| v * v).sum::<f64>();
+    }
+    (g, norm)
+}
+
+/// `λ ← max(0, λ − step · d)`.
+fn descend(lam: &mut [Vec<f64>], step: f64, d: &[Vec<f64>]) {
+    for (l, d) in lam.iter_mut().zip(d) {
+        for (v, d) in l.iter_mut().zip(d) {
+            *v = (*v - step * d).max(0.0);
+        }
+    }
+}
+
+/// The inner product of two multiplier-shaped vectors.
+fn dot(a: &[Vec<f64>], b: &[Vec<f64>]) -> f64 {
+    a.iter().zip(b).map(|(a, b)| a.iter().zip(b).map(|(a, b)| a * b).sum::<f64>()).sum()
+}
+
+/// A signing as a search keeps it: nothing merges into it (`mergeable` false, no cores), so its matroid stays.
+pub fn frozen(s: &Signing) -> Signing {
+    Signing { mergeable: false, cores: Vec::new(), ..s.clone() }
+}
+
+/// One computation's state, which [`bound`] and [`refit_r2`] drive through the same phases: the family and its
+/// master, the lowest `L` of all and of the family with its multipliers, the cores found, the budgets, the stop.
+struct Fitter<'r, 'a, const W: usize> {
+    ctx: &'r Ctx<'a, W>,
+    settings: &'r Settings,
+    stats: &'r mut Stats,
+    fam: Family,
+    master: Master,
+    /// The lowest `L` of all (scaled), of the current family, and the family's multipliers there.
+    best_scaled: i64,
+    fam_best: i64,
+    lam_best: Vec<Vec<f64>>,
+    found: Vec<Found>,
+    known: HashMap<Core, usize>,
+    repeated: usize,
+    rounds: usize,
+    /// The current family's last certified lower bound (0 if none).
+    lb: f64,
+    /// The exact checks' perturbations' generator.
+    rng: u64,
+    /// The bracket aimed at: `close`, or a share of the root's GF(2) gap if larger (the study counts a root whose
+    /// bracket is within 1% of its gap as converged).
+    close: f64,
+    t0: Instant,
+    deadline: Instant,
+    /// The pricings allowed, counted from `stats.pricings_mi` at `from`.
+    budget: usize,
+    from: u64,
+    stop: Option<Stop>,
+    /// The lowest `⌊L⌋` after each evaluation, if kept (a refit's trace).
+    trace: Option<Vec<i64>>,
+}
+
+impl<'r, 'a, const W: usize> Fitter<'r, 'a, W> {
+    /// A computation over `fam` from the multipliers `start` (indexed like each extra's elements), with a master of
+    /// the columns `columns` and the rank inequalities `cuts` (GF(2) elements; ranks taken in `fam`), started at
+    /// `t0`.  Its pricing budget, `settings.pricings`, counts from here.
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        ctx: &'r Ctx<'a, W>,
+        fam: Family,
+        start: Vec<Vec<f64>>,
+        columns: &[Vec<usize>],
+        cuts: &[(usize, Vec<usize>)],
+        settings: &'r Settings,
+        stats: &'r mut Stats,
+        t0: Instant,
+    ) -> Self {
+        let master = Master::new(ctx, &fam, columns, cuts);
+        stats.masters += 1;
+        Fitter {
+            ctx,
+            settings,
+            fam,
+            master,
+            best_scaled: i64::MAX,
+            fam_best: i64::MAX,
+            lam_best: start,
+            found: Vec::new(),
+            known: HashMap::new(),
+            repeated: 0,
+            rounds: 0,
+            lb: 0.0,
+            rng: u64::from(ctx.n).wrapping_mul(0xD1B5_4A32_D192_ED03) | 1,
+            close: ctx.gap.map_or(settings.close, |g| settings.close.max(settings.close_gap * g as f64)),
+            t0,
+            deadline: t0 + Duration::from_secs_f64(settings.seconds),
+            budget: settings.pricings,
+            from: stats.pricings_mi,
+            stop: None,
+            trace: None,
+            stats,
+        }
+    }
+
+    /// The pricings made since the budget started.
+    fn spent(&self) -> usize {
+        (self.stats.pricings_mi - self.from) as usize
+    }
+
+    /// Starts a budget of `budget` pricings from here.
+    fn restart_budget(&mut self, budget: usize) {
+        self.from = self.stats.pricings_mi;
+        self.budget = budget;
+    }
+
+    /// `L` at `at` for the current family (the cross-check every `check_every`-th evaluation by the cumulative count).
+    fn eval_at(&mut self, at: &[Vec<f64>]) -> Eval {
+        evaluate(self.ctx, &self.fam, at, self.stats, self.settings.check_every)
+    }
+
+    /// Records the value of an evaluation at `at`: the lowest `L` of all, the trace, the target (a stop when the
+    /// context stops there), and the family's lowest with its multipliers.  Whether it is the family's lowest.
+    fn note(&mut self, value: i64, at: &[Vec<f64>]) -> bool {
+        self.best_scaled = self.best_scaled.min(value);
+        if let Some(trace) = &mut self.trace {
+            trace.push(self.best_scaled.div_euclid(SCALE));
+        }
+        if self.ctx.stop_at_target && self.best_scaled.div_euclid(SCALE) <= self.ctx.target {
+            self.stop = Some(Stop::Target);
+        }
+        let lower = value < self.fam_best;
+        if lower {
+            self.fam_best = value;
+            self.lam_best = at.to_vec();
+        }
+        lower
+    }
+
+    /// Records an evaluation at `at` ([`note`](Self::note)), its greedy sets kept in the extras' pools.
+    fn record(&mut self, ev: &Eval, at: &[Vec<f64>]) -> bool {
+        for (ex, set) in self.fam.extras.iter_mut().zip(&ev.sets) {
+            ex.remember(set);
+        }
+        self.note(ev.value, at)
+    }
+
+    /// Polyak steps from the start towards the target (`settings.polyak`; one without extra matroids), every
+    /// intersection they produce a column of the master.
+    fn polyak(&mut self) {
+        let steps = if self.fam.extras.is_empty() { 1 } else { self.settings.polyak.max(1) };
+        let mut lam = self.lam_best.clone();
+        let (mut theta, mut stall) = (1.0f64, 0usize);
+        for _ in 0..steps {
+            let ev = self.eval_at(&lam);
+            if self.record(&ev, &lam) {
+                stall = 0;
+            } else {
+                stall += 1;
+                if stall >= 10 {
+                    theta /= 2.0;
+                    stall = 0;
+                }
+            }
+            self.master.add_mi(self.ctx, ev.q.clone());
+            if self.stop.is_some() {
+                break;
+            }
+            // A step lowers λ where the subgradient is positive.
+            let (g, norm) = subgradient(&self.fam, &ev);
+            let excess = ev.value as f64 / SCALE as f64 - self.ctx.target as f64;
+            if norm == 0.0 || excess <= 0.0 {
+                break;
+            }
+            descend(&mut lam, theta * excess / norm, &g);
+        }
+    }
+
+    /// The current family's column and cut generation, until no column prices out and no cut is found (with the
+    /// exact checks if `certify`), or a stop (seconds, the pricing budget, the target), which is left in `stop`.
+    /// Whether the family's point was certified.
+    fn generate(&mut self, certify: bool) -> bool {
+        let ctx = self.ctx;
+        loop {
+            if Instant::now() >= self.deadline {
+                self.stop = Some(Stop::Seconds);
+                return false;
+            }
+            if self.spent() >= self.budget {
+                self.stop = Some(Stop::Pricings);
+                return false;
+            }
+            if !self.master.solve(self.deadline, self.stats) {
+                self.stop = Some(Stop::Seconds);
+                return false;
+            }
+            if self.master.mi.len() > 2 * KEEP {
+                self.stats.purged += self.master.purge(ctx, KEEP) as u64;
+            }
+            let value = self.master.lp.value();
+            let mut added = false;
+            if self.fam_best as f64 / SCALE as f64 - value > self.close {
+                let lam_master = self.master.multipliers(&self.fam);
+                let smoothed: Vec<Vec<f64>> = self
+                    .lam_best
+                    .iter()
+                    .zip(&lam_master)
+                    .map(|(b, m)| b.iter().zip(m).map(|(b, m)| 0.5 * b + 0.5 * m).collect())
+                    .collect();
+                for at in [smoothed, lam_master] {
+                    if self.spent() >= self.budget {
+                        self.stop = Some(Stop::Pricings);
+                        return false;
+                    }
+                    let ev = self.eval_at(&at);
+                    self.record(&ev, &at);
+                    if self.stop.is_some() {
+                        return false;
+                    }
+                    if self.master.reduced_cost(ctx, &ev.q) > ENTER && self.master.add_mi(ctx, ev.q).is_some() {
+                        added = true;
+                        break;
+                    }
+                }
+            }
+            if added {
+                continue;
+            }
+            // No column prices out (or the bracket against the master is closed): the master's point must lie in
+            // every extra matroid's polytope.  Cheap cuts first, then the exact check.
+            let z = self.master.point(ctx);
+            let support = self.master.support();
+            let mut new_cuts = 0;
+            for (k, set) in violated_cuts(&self.fam, &z, &support) {
+                new_cuts += usize::from(self.master.add_cut(&self.fam, k, set));
+            }
+            self.stats.cuts_cheap += new_cuts as u64;
+            if new_cuts > 0 {
+                continue;
+            }
+            if !certify {
+                return false;
+            }
+            let mut zhat = z.clone();
+            let mut found_cuts = Vec::new();
+            let mut capped = false;
+            for (k, ex) in self.fam.extras.iter_mut().enumerate() {
+                let c = check(ex, &z, &support, self.deadline, &mut self.rng);
+                self.stats.checks_exact += 1;
+                self.stats.pivots_exact += c.pivots;
+                self.stats.checks_capped += u64::from(c.capped);
+                capped |= c.capped;
+                for (e, y) in c.y {
+                    zhat[e] = zhat[e].min(y);
+                }
+                found_cuts.extend(c.cuts.into_iter().map(|set| (k, set)));
+                if Instant::now() >= self.deadline {
+                    self.stop = Some(Stop::Seconds);
+                    return false;
+                }
+            }
+            for (k, set) in found_cuts {
+                new_cuts += usize::from(self.master.add_cut(&self.fam, k, set));
+            }
+            self.stats.cuts_exact += new_cuts as u64;
+            if new_cuts > 0 {
+                continue;
+            }
+            // The point less what the checks could not certify lies in every polytope: a certified lower bound.
+            self.lb = zhat.iter().zip(&ctx.fm.elems).map(|(z, &x)| z * f64::from(x)).sum();
+            if capped && self.fam_best as f64 / SCALE as f64 - self.lb > self.close {
+                // A check stopped at its column limit left the certificate short: check again, from the pools.
+                continue;
+            }
+            return true;
+        }
+    }
+
+    /// One separation round: the cores of the master's support columns, placed in core-derived signings (at most
+    /// `per_frame(h)` mergeable signings of frame `h`, those opened seeded from index `seed_offset`); if any was
+    /// placed, the family and the master rebuilt.  The cores placed and the signings opened.
+    fn separate(&mut self, per_frame: &dyn Fn(usize) -> usize, seed_offset: usize) -> (usize, usize) {
+        let ctx = self.ctx;
+        self.rounds += 1;
+        let mut changed = vec![false; self.fam.extras.len()];
+        let mut opened: Vec<Signing> = Vec::new();
+        let mut placed = 0;
+        for (_, set) in self.master.support() {
+            let q: Vec<u32> = set.iter().map(|&e| ctx.fm.elems[e]).collect();
+            for core in cores_of(ctx.model, ctx.state, &q, self.settings.cores_per_frame) {
+                if let Some(&id) = self.known.get(&core) {
+                    if self.found[id].assigned.is_some() {
+                        self.repeated += 1;
+                        continue;
+                    }
+                }
+                let found = &mut self.found;
+                let id = *self.known.entry(core.clone()).or_insert_with(|| {
+                    found.push(Found { core: core.clone(), assigned: None });
+                    found.len() - 1
+                });
+                if let Some(k) = self.place(&mut opened, id, per_frame, seed_offset) {
+                    if k < changed.len() {
+                        changed[k] = true;
+                    }
+                    self.found[id].assigned = Some(k);
+                    placed += 1;
+                }
+            }
+        }
+        let count = opened.len();
+        if placed > 0 {
+            self.rebuild(&changed, opened);
+        }
+        (placed, count)
+    }
+
+    /// Puts the core `found[id]` into a core-derived signing of its frame: the first of the family's (then of those
+    /// opened this round) that `merge` accepts, else a new one if the frame has fewer than `per_frame(h)` (its
+    /// default seeded by index `seed_offset` plus that count).  Returns the signing's index in the family (an index
+    /// past the family's for one opened this round), or `None`.
+    fn place(
+        &mut self,
+        opened: &mut Vec<Signing>,
+        id: usize,
+        per_frame: &dyn Fn(usize) -> usize,
+        seed_offset: usize,
+    ) -> Option<usize> {
+        let core = &self.found[id].core;
+        let h = core.frame;
+        let existing = self.fam.extras.len();
+        let signings = self.fam.extras.iter_mut().map(|ex| &mut ex.signing).chain(opened.iter_mut());
+        let mut count = 0;
+        for (k, s) in signings.enumerate() {
+            if !s.mergeable || s.frame != h {
+                continue;
+            }
+            count += 1;
+            let others: Vec<&Core> = s.cores.iter().map(|&c| &self.found[c].core).collect();
+            if merge(s, core, &others) {
+                s.cores.push(id);
+                return Some(k);
+            }
+        }
+        if count >= per_frame(h) {
+            return None;
+        }
+        let default = if self.settings.random_defaults {
+            Default3::Random(seed(self.ctx.n, h, seed_offset + count, SALT_CORES))
+        } else {
+            Default3::Ones
+        };
+        let mut s = Signing::for_cores(h, default);
+        assert!(merge(&mut s, core, &[]), "a core always merges into a signing of its own");
+        s.cores.push(id);
+        opened.push(s);
+        Some(existing + opened.len() - 1)
+    }
+
+    /// The family changed (the signings `changed` took cores, `opened` are new): rebuild the changed matroids and
+    /// add the new ones; keep the master's columns (but those with a new loop) and its rank inequalities (their
+    /// ranks taken again in the changed matroids); the lowest `L` of the new family starts at the old multipliers.
+    fn rebuild(&mut self, changed: &[bool], opened: Vec<Signing>) {
+        let ctx = self.ctx;
+        let old_lam_best = std::mem::take(&mut self.lam_best);
+        for (k, ex) in self.fam.extras.iter_mut().enumerate() {
+            if changed[k] {
+                let by_elem: HashMap<usize, f64> =
+                    ex.elem.iter().copied().zip(old_lam_best[k].iter().copied()).collect();
+                let signing = std::mem::replace(&mut ex.signing, Signing::ones(0));
+                *ex = Extra::new(ctx, signing);
+                self.lam_best.push(ex.elem.iter().map(|e| by_elem.get(e).copied().unwrap_or(0.0)).collect());
+            } else {
+                self.lam_best.push(old_lam_best[k].clone());
+            }
+        }
+        for signing in opened {
+            let ex = Extra::new(ctx, signing);
+            self.lam_best.push(vec![0.0; ex.elem.len()]);
+            self.fam.extras.push(ex);
+        }
+        self.fam.ban(ctx);
+        let keep_mi: Vec<Vec<usize>> =
+            self.master.mi.iter().map(|c| c.set.clone()).filter(|s| s.iter().all(|&e| !self.fam.banned[e])).collect();
+        let keep_cuts: Vec<(usize, Vec<usize>)> = self.master.cuts.iter().map(|c| (c.k, c.set.clone())).collect();
+        self.master = Master::new(ctx, &self.fam, &keep_mi, &keep_cuts);
+        self.stats.masters += 1;
+        let at = self.lam_best.clone();
+        let ev = self.eval_at(&at);
+        self.fam_best = i64::MAX;
+        self.note(ev.value, &at);
+        self.master.add_mi(ctx, ev.q);
+        self.lb = 0.0;
+    }
+
+    /// The outcome.
+    fn finish(self) -> Outcome {
+        let ctx = self.ctx;
+        // The GF(2) elements ascend with their candidate numbers, so the sets stay ascending.
+        let numbers = |set: &[usize]| -> Vec<u32> { set.iter().map(|&e| ctx.fm.elems[e]).collect() };
+        let support = self.master.support();
+        let others = self
+            .master
+            .mi
+            .iter()
+            .filter(|c| !c.set.is_empty() && self.master.lp.primal(c.lp) <= SUPPORT)
+            .map(|c| &c.set);
+        let master_columns =
+            support.iter().map(|(_, s)| s).chain(others).take(WARM_COLUMNS).map(|s| numbers(s)).collect();
+        let master_cuts = self.master.cuts.iter().map(|c| (c.k, numbers(&c.set), c.rank)).collect();
+        Outcome {
+            bound: self.best_scaled.div_euclid(SCALE),
+            best_scaled: self.best_scaled,
+            l_best: self.fam_best as f64 / SCALE as f64,
+            lb: self.lb,
+            master: self.master.lp.value(),
+            lambda: to_numbers(&self.fam, &self.lam_best),
+            cores_assigned: self.found.iter().filter(|f| f.assigned.is_some()).count(),
+            cores_unplaced: self.found.iter().filter(|f| f.assigned.is_none()).count(),
+            cores_repeated: self.repeated,
+            rounds: self.rounds,
+            stop: self.stop.unwrap_or(Stop::Converged),
+            support: support.into_iter().map(|(a, s)| (a, numbers(&s))).collect(),
+            master_columns,
+            master_cuts,
+            columns: self.master.lp.columns(),
+            cuts: self.master.cuts.len(),
+            stats: *self.stats,
+            seconds: self.t0.elapsed().as_secs_f64(),
+            cores: self.found,
+            family: self.fam,
+        }
+    }
 }
 
 /// The bound at a state with the extra matroids of `signings` (and, with `separate`, the core-derived signings the
@@ -941,338 +1506,448 @@ pub fn bound<const W: usize>(
     settings: &Settings,
 ) -> Outcome {
     let t0 = Instant::now();
-    let deadline = t0 + std::time::Duration::from_secs_f64(settings.seconds);
     let mut stats = Stats::default();
-    let mut fam = Family::new(ctx, signings);
-    let check_every = settings.check_every;
-
-    // The multipliers: the start, by candidate number, or zero.
-    let mut lam = fam.zeros();
-    if let Some(start) = start {
-        for ((l, ex), st) in lam.iter_mut().zip(&fam.extras).zip(start) {
-            for (v, &x) in l.iter_mut().zip(&ex.m.elems) {
-                *v = st.get(&x).copied().unwrap_or(0.0);
-            }
-        }
-    }
-
-    // The lowest L of all, and of the current family with its multipliers.
-    let mut best_scaled = i64::MAX;
-    let mut fam_best = i64::MAX;
-    let mut lam_best = lam.clone();
-    let mut stop = None;
-    let reached = |v: i64| ctx.stop_at_target && v.div_euclid(SCALE) <= ctx.target;
-
-    // Polyak steps towards the target, every intersection they produce kept as a column.
-    let mut mi_cols: Vec<Vec<usize>> = Vec::new();
-    let steps = if fam.extras.is_empty() { 1 } else { settings.polyak.max(1) };
-    let (mut theta, mut stall) = (1.0f64, 0usize);
-    for _ in 0..steps {
-        let ev = evaluate(ctx, &fam, &lam, &mut stats, check_every);
-        best_scaled = best_scaled.min(ev.value);
-        if ev.value < fam_best {
-            fam_best = ev.value;
-            lam_best.clone_from(&lam);
-            stall = 0;
-        } else {
-            stall += 1;
-            if stall >= 10 {
-                theta /= 2.0;
-                stall = 0;
-            }
-        }
-        mi_cols.push(ev.q.clone());
-        for (ex, set) in fam.extras.iter_mut().zip(&ev.sets) {
-            ex.remember(set);
-        }
-        if reached(best_scaled) {
-            stop = Some(Stop::Target);
-            break;
-        }
-        // The subgradient g_{k,x} = [x ∈ I_k] − [x ∈ Q]; a step lowers λ where g is positive.
-        let mut g: Vec<Vec<f64>> = fam.zeros();
-        let mut norm = 0.0;
-        for (k, ex) in fam.extras.iter().enumerate() {
-            for &e in &ev.sets[k] {
-                g[k][ex.position(e).expect("an element")] += 1.0;
-            }
-            for &e in &ev.q {
-                if let Some(i) = ex.position(e) {
-                    g[k][i] -= 1.0;
-                }
-            }
-            norm += g[k].iter().map(|v| v * v).sum::<f64>();
-        }
-        let excess = ev.value as f64 / SCALE as f64 - ctx.target as f64;
-        if norm == 0.0 || excess <= 0.0 {
-            break;
-        }
-        let step = theta * excess / norm;
-        for (l, g) in lam.iter_mut().zip(&g) {
-            for (v, g) in l.iter_mut().zip(g) {
-                *v = (*v - step * g).max(0.0);
-            }
-        }
-    }
-
-    let mut master = Master::new(ctx, &fam, &mi_cols, &[]);
-    stats.masters += 1;
-    let mut found: Vec<Found> = Vec::new();
-    let mut known: HashMap<Core, usize> = HashMap::new();
-    let (mut repeated, mut rounds) = (0, 0);
-    let mut lb = 0.0;
-    let mut rng = u64::from(ctx.n).wrapping_mul(0xD1B5_4A32_D192_ED03) | 1;
-
-    // The bracket aimed at: `close`, or a share of the root's GF(2) gap if larger (the study counts a root whose
-    // bracket is within 1% of its gap as converged).
-    let close = ctx.gap.map_or(settings.close, |g| settings.close.max(settings.close_gap * g as f64));
+    let fam = Family::new(ctx, signings);
+    let lam = by_number(&fam, start.unwrap_or_default());
+    let mut f = Fitter::new(ctx, fam, lam, &[], &[], settings, &mut stats, t0);
+    f.polyak();
+    let search = settings.mode == FitMode::Search;
     // Whether the current family's point is to be certified: from the start without separation, else once a
-    // separation round has found no new core (and a certified family whose separation finds none is the end).
-    let mut certify = !separate;
-    let mut certified = false;
-    'rounds: while stop.is_none() {
-        // Column and cut generation for the current family, until no column prices out and no cut is found (with
-        // the exact checks when certifying).
-        loop {
-            if Instant::now() >= deadline {
-                stop = Some(Stop::Seconds);
-                break 'rounds;
-            }
-            if stats.pricings_mi as usize >= settings.pricings {
-                stop = Some(Stop::Pricings);
-                break 'rounds;
-            }
-            if !master.solve(deadline, &mut stats) {
-                stop = Some(Stop::Seconds);
-                break 'rounds;
-            }
-            if master.mi.len() > 2 * KEEP {
-                stats.purged += master.purge(ctx, KEEP) as u64;
-            }
-            let value = master.lp.value();
-            let mut added = 0;
-            if fam_best as f64 / SCALE as f64 - value > close {
-                let lam_master = master.multipliers(&fam);
-                let smoothed: Vec<Vec<f64>> = lam_best
-                    .iter()
-                    .zip(&lam_master)
-                    .map(|(b, m)| b.iter().zip(m).map(|(b, m)| 0.5 * b + 0.5 * m).collect())
-                    .collect();
-                for at in [smoothed, lam_master] {
-                    let ev = evaluate(ctx, &fam, &at, &mut stats, check_every);
-                    for (ex, set) in fam.extras.iter_mut().zip(&ev.sets) {
-                        ex.remember(set);
-                    }
-                    best_scaled = best_scaled.min(ev.value);
-                    if ev.value < fam_best {
-                        fam_best = ev.value;
-                        lam_best = at;
-                    }
-                    if reached(best_scaled) {
-                        stop = Some(Stop::Target);
-                        break 'rounds;
-                    }
-                    if master.reduced_cost(ctx, &ev.q) > ENTER && master.add_mi(ctx, ev.q).is_some() {
-                        added += 1;
-                        break;
-                    }
-                }
-            }
-            if added > 0 {
-                continue;
-            }
-            // No column prices out (or the bracket against the master is closed): the master's point must lie in
-            // every extra matroid's polytope.  Cheap cuts first, then the exact check.
-            let z = master.point(ctx);
-            let support = master.support();
-            let mut new_cuts = 0;
-            for (k, set) in violated_cuts(&fam, &z, &support) {
-                new_cuts += usize::from(master.add_cut(&fam, k, set));
-            }
-            stats.cuts_cheap += new_cuts as u64;
-            if new_cuts > 0 {
-                continue;
-            }
-            if !certify {
-                break;
-            }
-            let mut zhat = z.clone();
-            let mut found_cuts = Vec::new();
-            let mut capped = false;
-            for (k, ex) in fam.extras.iter_mut().enumerate() {
-                let c = check(ex, &z, &support, deadline, &mut rng);
-                stats.checks_exact += 1;
-                stats.pivots_exact += c.pivots;
-                stats.checks_capped += u64::from(c.capped);
-                capped |= c.capped;
-                for (e, y) in c.y {
-                    zhat[e] = zhat[e].min(y);
-                }
-                found_cuts.extend(c.cuts.into_iter().map(|set| (k, set)));
-                if Instant::now() >= deadline {
-                    stop = Some(Stop::Seconds);
-                    break 'rounds;
-                }
-            }
-            for (k, set) in found_cuts {
-                new_cuts += usize::from(master.add_cut(&fam, k, set));
-            }
-            stats.cuts_exact += new_cuts as u64;
-            if new_cuts > 0 {
-                continue;
-            }
-            // The point less what the checks could not certify lies in every polytope: a certified lower bound.
-            lb = zhat.iter().zip(&ctx.fm.elems).map(|(z, &x)| z * f64::from(x)).sum();
-            if capped && fam_best as f64 / SCALE as f64 - lb > close {
-                // A check stopped at its column limit left the certificate short: check again, from the pools.
-                continue;
-            }
-            certified = true;
+    // separation round has found no new core (and a certified family whose separation finds none is the end).  In
+    // search mode never: a round that finds nothing new is the end.
+    let mut certify = !search && !separate;
+    while f.stop.is_none() {
+        let certified = f.generate(certify);
+        if f.stop.is_some() || !separate {
             break;
         }
-        if !separate {
+        if f.rounds >= settings.rounds {
+            f.stop = Some(Stop::Rounds);
             break;
         }
-        if rounds >= settings.rounds {
-            stop = Some(Stop::Rounds);
+        let (placed, _) = f.separate(&|_| settings.per_frame, 0);
+        if placed > 0 {
+            certify = false;
+        } else if certified || search {
             break;
-        }
-        // Separation: the cores of the support's sets, merged into the core-derived signings.
-        rounds += 1;
-        let mut changed = vec![false; fam.extras.len()];
-        let mut opened: Vec<Signing> = Vec::new();
-        let mut new = 0;
-        for (_, set) in master.support() {
-            let q: Vec<u32> = set.iter().map(|&e| ctx.fm.elems[e]).collect();
-            for core in cores_of(ctx.model, ctx.state, &q, settings.cores_per_frame) {
-                if let Some(&id) = known.get(&core) {
-                    if found[id].assigned.is_some() {
-                        repeated += 1;
-                        continue;
-                    }
-                }
-                let id = *known.entry(core.clone()).or_insert_with(|| {
-                    found.push(Found { core: core.clone(), assigned: None });
-                    found.len() - 1
-                });
-                if let Some(k) = place(ctx, &mut fam, &mut opened, &found, id, settings) {
-                    if k < changed.len() {
-                        changed[k] = true;
-                    }
-                    found[id].assigned = Some(k);
-                    new += 1;
-                }
-            }
-        }
-        if new == 0 {
-            if certified {
-                break;
-            }
+        } else {
             certify = true;
-            continue;
-        }
-        // The family changed: rebuild the changed matroids and add the new ones; keep the columns (but those with a
-        // new loop) and the rank inequalities (their ranks taken again in the changed matroids).
-        let old_lam_best = std::mem::take(&mut lam_best);
-        for (k, ex) in fam.extras.iter_mut().enumerate() {
-            if changed[k] {
-                let by_elem: HashMap<usize, f64> =
-                    ex.elem.iter().copied().zip(old_lam_best[k].iter().copied()).collect();
-                let signing = std::mem::replace(&mut ex.signing, Signing::ones(0));
-                *ex = Extra::new(ctx, signing);
-                lam_best.push(ex.elem.iter().map(|e| by_elem.get(e).copied().unwrap_or(0.0)).collect());
-            } else {
-                lam_best.push(old_lam_best[k].clone());
-            }
-        }
-        for signing in opened {
-            let ex = Extra::new(ctx, signing);
-            lam_best.push(vec![0.0; ex.elem.len()]);
-            fam.extras.push(ex);
-        }
-        fam.ban(ctx);
-        let keep_mi: Vec<Vec<usize>> =
-            master.mi.iter().map(|c| c.set.clone()).filter(|s| s.iter().all(|&e| !fam.banned[e])).collect();
-        let keep_cuts: Vec<(usize, Vec<usize>)> = master.cuts.iter().map(|c| (c.k, c.set.clone())).collect();
-        master = Master::new(ctx, &fam, &keep_mi, &keep_cuts);
-        stats.masters += 1;
-        // The lowest L of the new family starts at the old multipliers.
-        let ev = evaluate(ctx, &fam, &lam_best, &mut stats, check_every);
-        best_scaled = best_scaled.min(ev.value);
-        fam_best = ev.value;
-        master.add_mi(ctx, ev.q);
-        lb = 0.0;
-        (certify, certified) = (false, false);
-        if reached(best_scaled) {
-            stop = Some(Stop::Target);
         }
     }
-    let stop = stop.unwrap_or(Stop::Converged);
-    let lambda = fam
-        .extras
-        .iter()
-        .zip(&lam_best)
-        .map(|(ex, l)| ex.m.elems.iter().copied().zip(l.iter().copied()).filter(|&(_, v)| v > 0.0).collect())
-        .collect();
-    let support =
-        master.support().into_iter().map(|(a, s)| (a, s.iter().map(|&e| ctx.fm.elems[e]).collect())).collect();
-    Outcome {
-        bound: best_scaled.div_euclid(SCALE),
-        best_scaled,
-        l_best: fam_best as f64 / SCALE as f64,
-        lb,
-        master: master.lp.value(),
-        family: fam,
-        lambda,
-        cores_assigned: found.iter().filter(|f| f.assigned.is_some()).count(),
-        cores_unplaced: found.iter().filter(|f| f.assigned.is_none()).count(),
-        cores: found,
-        cores_repeated: repeated,
-        rounds,
-        stop,
-        support,
-        columns: master.lp.columns(),
-        cuts: master.cuts.len(),
-        stats,
-        seconds: t0.elapsed().as_secs_f64(),
+    f.finish()
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Warm states and fits
+
+/// A fitted state at a node: the frozen signings (the root's, then the node-local ones), the multipliers, the
+/// master's columns and cuts.  All by candidate number, so that a child can take them over.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Warm {
+    pub signings: Vec<Signing>,
+    /// How many of `signings`, the last ones, are node-local (made below the root).
+    pub local: usize,
+    /// Per signing, its positive multipliers by candidate number.
+    pub lambda: Vec<HashMap<u32, f64>>,
+    /// Common independent sets of the GF(2) matroids (candidate numbers, ascending), the master's columns.
+    pub columns: Vec<Vec<u32>>,
+    /// Rank inequalities (signing index, candidate numbers ascending); ranks are taken again where they are used.
+    pub cuts: Vec<(usize, Vec<u32>)>,
+}
+
+impl Warm {
+    /// The state of a computation's outcome: its family's signings frozen (`mergeable: false`, `cores` emptied, so
+    /// that nothing merges into them during a search), its multipliers (`Outcome::lambda`), master columns and cuts.
+    /// None of its signings is node-local.
+    pub fn from_outcome(r: &Outcome) -> Warm {
+        Warm {
+            signings: r.family.extras.iter().map(|ex| frozen(&ex.signing)).collect(),
+            local: 0,
+            lambda: r.lambda.clone(),
+            columns: r.master_columns.clone(),
+            cuts: r.master_cuts.iter().map(|(k, set, _)| (*k, set.clone())).collect(),
+        }
+    }
+
+    /// The state a child starts from: columns holding every candidate in `promoted_now` and none in `removed`, those
+    /// taken out, members not in `live` (the child's GF(2) elements, ascending) dropped, columns with more than
+    /// `max_add` members or none dropped, duplicates dropped; cuts with `promoted_now`, `removed` and members not in
+    /// `live` taken out, empty ones and duplicates dropped; the multipliers restricted to `live`; signings and
+    /// `local` unchanged.
+    pub fn child(&self, promoted_now: &[u32], removed: &[u32], live: &[u32], max_add: usize) -> Warm {
+        let kept = |x: &u32| !promoted_now.contains(x) && !removed.contains(x) && live.binary_search(x).is_ok();
+        let mut seen = HashSet::new();
+        let columns = self
+            .columns
+            .iter()
+            .filter(|c| promoted_now.iter().all(|x| c.contains(x)) && !removed.iter().any(|x| c.contains(x)))
+            .map(|c| c.iter().copied().filter(kept).collect::<Vec<u32>>())
+            .filter(|c| !c.is_empty() && c.len() <= max_add && seen.insert(c.clone()))
+            .collect();
+        let mut seen = HashSet::new();
+        let cuts = self
+            .cuts
+            .iter()
+            .map(|(k, set)| (*k, set.iter().copied().filter(kept).collect::<Vec<u32>>()))
+            .filter(|cut| !cut.1.is_empty() && seen.insert(cut.clone()))
+            .collect();
+        let lambda = self
+            .lambda
+            .iter()
+            .map(|m| m.iter().filter(|(x, _)| live.binary_search(x).is_ok()).map(|(&x, &v)| (x, v)).collect())
+            .collect();
+        Warm { signings: self.signings.clone(), local: self.local, lambda, columns, cuts }
+    }
+
+    /// The local signings of frame `h`.
+    pub fn local_in(&self, h: usize) -> usize {
+        self.signings[self.signings.len() - self.local..].iter().filter(|s| s.frame == h).count()
+    }
+
+    /// The state as a JSON object (the fields of the fit file, cuts without ranks).
+    pub fn to_json(&self) -> Json {
+        Json::object(self.pairs(None))
+    }
+
+    /// The state's fields of the fit file (design S5.1): `signings`, `local`, `lambda`, `columns`, `cuts` (each
+    /// `[signing, [candidates]]`, with its rank appended when `ranks` are given).
+    fn pairs(&self, ranks: Option<&[usize]>) -> Vec<(&'static str, Json)> {
+        let lambda = self.lambda.iter().map(|m| {
+            let mut entries: Vec<(u32, f64)> = m.iter().map(|(&x, &v)| (x, v)).collect();
+            entries.sort_by_key(|&(x, _)| x);
+            Json::Arr(entries.into_iter().map(|(x, v)| Json::Arr(vec![x.into(), Json::Num(v)])).collect())
+        });
+        let cuts = self.cuts.iter().enumerate().map(|(i, (k, set))| {
+            let mut cut = vec![Json::from(*k), Json::array(set.iter().copied())];
+            cut.extend(ranks.map(|r| Json::from(r[i])));
+            Json::Arr(cut)
+        });
+        vec![
+            ("signings", Json::Arr(self.signings.iter().map(signing_to_json).collect())),
+            ("local", self.local.into()),
+            ("lambda", Json::Arr(lambda.collect())),
+            ("columns", Json::Arr(self.columns.iter().map(|c| Json::array(c.iter().copied())).collect())),
+            ("cuts", Json::Arr(cuts.collect())),
+        ]
+    }
+
+    /// The state of a JSON object with the fields of [`to_json`](Self::to_json) (a cut's rank, if there, ignored).
+    pub fn from_json(j: &Json) -> Result<Warm, String> {
+        let signings = field(j, "signings")?
+            .as_arr()
+            .ok_or("signings: not an array")?
+            .iter()
+            .map(signing_from_json)
+            .collect::<Result<Vec<Signing>, String>>()?;
+        let local = field(j, "local")?.as_u64().ok_or("local: not a count")? as usize;
+        if local > signings.len() {
+            return Err(format!("local: {local} of {} signings", signings.len()));
+        }
+        let lambda = field(j, "lambda")?
+            .as_arr()
+            .ok_or("lambda: not an array")?
+            .iter()
+            .map(|m| {
+                m.as_arr()
+                    .ok_or("lambda: a signing's multipliers are not an array")?
+                    .iter()
+                    .map(|p| match p.as_arr() {
+                        Some([x, v]) => {
+                            Ok((x.as_u32().ok_or("lambda: a bad candidate")?, v.as_f64().ok_or("lambda: a bad value")?))
+                        }
+                        _ => Err("lambda: not an [x, value] pair"),
+                    })
+                    .collect::<Result<HashMap<u32, f64>, &str>>()
+            })
+            .collect::<Result<Vec<_>, &str>>()?;
+        if lambda.len() != signings.len() {
+            return Err(format!("lambda: {} lists for {} signings", lambda.len(), signings.len()));
+        }
+        let columns = field(j, "columns")?
+            .as_arr()
+            .ok_or("columns: not an array")?
+            .iter()
+            .map(|c| c.as_u32_vec().ok_or("columns: not a list of candidates"))
+            .collect::<Result<Vec<_>, &str>>()?;
+        let cuts = cuts_of(j)?
+            .into_iter()
+            .map(|(k, set, _)| if k < signings.len() { Ok((k, set)) } else { Err(format!("cuts: signing {k}")) })
+            .collect::<Result<Vec<_>, String>>()?;
+        Ok(Warm { signings, local, lambda, columns, cuts })
     }
 }
 
-/// Puts the core `found[id]` into a core-derived signing of its frame: the first of the family's (then of those
-/// opened this round) that `merge` accepts, else a new one if the frame has fewer than `per_frame`.  Returns the
-/// signing's index in the family (an index past the family's for one opened this round), or `None`.
-fn place<const W: usize>(
+/// The field `name` of a JSON object.
+fn field<'j>(j: &'j Json, name: &str) -> Result<&'j Json, String> {
+    j.get(name).ok_or(format!("no field {name:?}"))
+}
+
+/// A cut as a fit file has it: signing, candidates, rank if given.
+type FileCut = (usize, Vec<u32>, Option<usize>);
+
+/// The cuts of a fit file's object.
+fn cuts_of(j: &Json) -> Result<Vec<FileCut>, String> {
+    let cuts = field(j, "cuts")?.as_arr().ok_or("cuts: not an array")?;
+    cuts.iter()
+        .map(|c| {
+            let parts = c.as_arr().filter(|p| p.len() == 2 || p.len() == 3).ok_or("cuts: not [signing, set, rank]")?;
+            let k = parts[0].as_u64().ok_or("cuts: a bad signing")? as usize;
+            let set = parts[1].as_u32_vec().ok_or("cuts: a bad set")?;
+            let rank = parts.get(2).map(|r| r.as_u64().map(|r| r as usize).ok_or("cuts: a bad rank")).transpose()?;
+            Ok((k, set, rank))
+        })
+        .collect()
+}
+
+/// A signing as the fit file has it: `frame`, `default` (`ones`, or `random` with its `seed` as a decimal string, a
+/// u64 not fitting JSON's numbers), `fixed` as `[u, f, v]` sorted by `(u, f)`, `mergeable`.  Its cores are not kept.
+fn signing_to_json(s: &Signing) -> Json {
+    let mut pairs = vec![("frame", Json::from(s.frame))];
+    match s.default {
+        Default3::Ones => pairs.push(("default", "ones".into())),
+        Default3::Random(seed) => {
+            pairs.push(("default", "random".into()));
+            pairs.push(("seed", seed.to_string().into()));
+        }
+    }
+    let mut fixed: Vec<(u32, u32, u8)> = s.fixed.iter().map(|(&(u, f), &v)| (u, f, v)).collect();
+    fixed.sort_unstable();
+    pairs.push(("fixed", Json::Arr(fixed.into_iter().map(|(u, f, v)| Json::array([u, f, u32::from(v)])).collect())));
+    pairs.push(("mergeable", s.mergeable.into()));
+    Json::object(pairs)
+}
+
+/// The signing of [`signing_to_json`]'s object (no cores).
+fn signing_from_json(j: &Json) -> Result<Signing, String> {
+    let frame = field(j, "frame")?.as_u64().ok_or("a signing's frame is not a number")? as usize;
+    let default = match field(j, "default")?.as_str() {
+        Some("ones") => Default3::Ones,
+        Some("random") => {
+            let seed = field(j, "seed")?.as_str().ok_or("a signing's seed is not a string")?;
+            Default3::Random(seed.parse().map_err(|e| format!("a signing's seed {seed:?}: {e}"))?)
+        }
+        _ => return Err("a signing's default is neither \"ones\" nor \"random\"".into()),
+    };
+    let mut fixed = HashMap::new();
+    for t in field(j, "fixed")?.as_arr().ok_or("a signing's fixed values are not an array")? {
+        match t.as_u32_vec().as_deref() {
+            Some(&[u, f, v]) if v == 1 || v == 2 => fixed.insert((u, f), v as u8),
+            _ => return Err(format!("a signing's fixed value {t} is not [u, f, 1 or 2]")),
+        };
+    }
+    let mergeable = field(j, "mergeable")?.as_bool().ok_or("a signing's mergeable is not a boolean")?;
+    Ok(Signing { frame, default, fixed, cores: Vec::new(), mergeable })
+}
+
+/// A root fit, as a file (design S5.1): the game, the bounds, the state.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Fit {
+    pub n: u32,
+    pub opt: i64,
+    pub gf2: i64,
+    pub bound: i64,
+    pub l_best: f64,
+    pub warm: Warm,
+    /// The ranks of `warm.cuts` at the root (written for reference; never trusted when read).
+    pub ranks: Vec<usize>,
+}
+
+impl Fit {
+    pub fn from_outcome(n: u32, opt: i64, gf2: i64, r: &Outcome) -> Fit {
+        Fit {
+            n,
+            opt,
+            gf2,
+            bound: r.bound,
+            l_best: r.l_best,
+            warm: Warm::from_outcome(r),
+            ranks: r.master_cuts.iter().map(|&(_, _, rank)| rank).collect(),
+        }
+    }
+
+    /// The fit file's one line: `n`, `opt`, `gf2`, `bound`, `l_best`, then the state's fields, cuts with ranks.
+    pub fn to_json(&self) -> String {
+        let head =
+            [("n", self.n.into()), ("opt", self.opt.into()), ("gf2", self.gf2.into()), ("bound", self.bound.into())];
+        let pairs =
+            head.into_iter().chain([("l_best", Json::Num(self.l_best))]).chain(self.warm.pairs(Some(&self.ranks)));
+        Json::object(pairs).to_string()
+    }
+}
+
+/// The fit of a fit file's line.
+pub fn fit_from_json(text: &str) -> Result<Fit, String> {
+    let j = Json::parse(text).map_err(|e| e.to_string())?;
+    let int = |name: &str| field(&j, name)?.as_i64().ok_or(format!("{name}: not an integer"));
+    let warm = Warm::from_json(&j)?;
+    let ranks = cuts_of(&j)?
+        .into_iter()
+        .map(|(_, _, rank)| rank.ok_or("cuts: a fit's cut without its rank"))
+        .collect::<Result<Vec<_>, &str>>()?;
+    Ok(Fit {
+        n: u32::try_from(int("n")?).map_err(|e| format!("n: {e}"))?,
+        opt: int("opt")?,
+        gf2: int("gf2")?,
+        bound: int("bound")?,
+        l_best: field(&j, "l_best")?.as_f64().ok_or("l_best: not a number")?,
+        warm,
+        ranks,
+    })
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// The node methods
+
+/// The bound after each pricing of a refit, for the audit and the logs.
+#[derive(Clone, Debug, Default)]
+pub struct Trace {
+    /// `after[0]`: ⌊L⌋ at the inherited multipliers (Tier 1); `after[i]`: the lowest ⌊L⌋ after `i` refit pricings.
+    pub after: Vec<i64>,
+    /// Refit pricings (evaluations of L after Tier 1).
+    pub pricings: usize,
+    /// Node-local signings opened.
+    pub new_signings: usize,
+    pub stop: Option<Stop>,
+}
+
+/// Tier 1: one evaluation of L at `warm`'s multipliers, `fam` being built from `warm.signings` in their order at the
+/// node's state.  Returns ⌊L⌋ and the evaluation (its sets start a refit).
+pub fn tier1<const W: usize>(ctx: &Ctx<'_, W>, fam: &Family, warm: &Warm, stats: &mut Stats) -> (i64, Eval) {
+    assert_eq!(fam.extras.len(), warm.signings.len(), "a family of the warm state's signings");
+    let ev = evaluate(ctx, fam, &by_number(fam, &warm.lambda), stats, CHECK_EVERY);
+    (ev.value.div_euclid(SCALE), ev)
+}
+
+/// R1, deflected Polyak toward the target (design S3.2), from `warm`'s multipliers whose evaluation is `first`, at
+/// most `k` steps: subgradient `g_{k,x} = [x ∈ I_k] − [x ∈ Q]`, direction `d = g + β d_prev` with `β = 1.5 · max(0,
+/// −g·d_prev) / ‖d_prev‖²` (Camerini, Fratta and Maffioli; `d = g` the first time), step `θ (L − t + ½) / ‖d‖²` toward
+/// the target `t`, `λ` clamped at 0, `θ` from 1 halved after 3 steps without a new lowest `L`; it stops at the target,
+/// at `k` steps, at `‖d‖ = 0` or at `θ < 1/64`.  No LP.  Returns the lowest ⌊L⌋ (with Tier 1's), the state with the
+/// multipliers of the lowest L (columns and cuts passed through unchanged) and the trace.
+pub fn refit_r1<const W: usize>(
     ctx: &Ctx<'_, W>,
-    fam: &mut Family,
-    opened: &mut Vec<Signing>,
-    found: &[Found],
-    id: usize,
+    fam: &Family,
+    warm: &Warm,
+    first: &Eval,
+    k: usize,
+    stats: &mut Stats,
+) -> (i64, Warm, Trace) {
+    let pricings = stats.pricings_mi;
+    let mut lam = by_number(fam, &warm.lambda);
+    let mut lam_best = lam.clone();
+    let mut best = first.value;
+    let mut after = vec![best.div_euclid(SCALE)];
+    let (mut theta, mut since, mut steps) = (1.0f64, 0usize, 0usize);
+    let mut last: Option<Eval> = None;
+    let mut previous: Option<Vec<Vec<f64>>> = None;
+    let stop = loop {
+        if best.div_euclid(SCALE) <= ctx.target {
+            break Stop::Target;
+        }
+        if theta < 1.0 / 64.0 {
+            break Stop::Converged;
+        }
+        if steps == k {
+            break Stop::Pricings;
+        }
+        let ev = last.as_ref().unwrap_or(first);
+        let (mut d, _) = subgradient(fam, ev);
+        if let Some(p) = &previous {
+            let beta = 1.5 * (-dot(&d, p)).max(0.0) / dot(p, p);
+            for (d, p) in d.iter_mut().zip(p) {
+                for (d, p) in d.iter_mut().zip(p) {
+                    *d += beta * p;
+                }
+            }
+        }
+        let norm = dot(&d, &d);
+        if norm == 0.0 {
+            break Stop::Converged;
+        }
+        let excess = ev.value as f64 / SCALE as f64 - ctx.target as f64 + 0.5;
+        descend(&mut lam, theta * excess / norm, &d);
+        let next = evaluate(ctx, fam, &lam, stats, CHECK_EVERY);
+        steps += 1;
+        if next.value < best {
+            best = next.value;
+            lam_best.clone_from(&lam);
+            since = 0;
+        } else {
+            since += 1;
+            if since == 3 {
+                theta /= 2.0;
+                since = 0;
+            }
+        }
+        after.push(best.div_euclid(SCALE));
+        last = Some(next);
+        previous = Some(d);
+    };
+    let state = Warm { lambda: to_numbers(fam, &lam_best), ..warm.clone() };
+    let pricings = (stats.pricings_mi - pricings) as usize;
+    (best.div_euclid(SCALE), state, Trace { after, pricings, new_signings: 0, stop: Some(stop) })
+}
+
+/// R2, the warm master (design S3.2): the column generation of [`bound`] over `fam` (built from `warm.signings` at
+/// the node) from `warm`'s multipliers, whose evaluation `first` is recorded first (not a refit pricing), with a
+/// master of `warm`'s columns and `first.q` and of `warm`'s rank inequalities (ranks taken in `fam`), in search mode,
+/// at most `k` pricings after Tier 1, stopping at the target (if the context stops there), the budget,
+/// `settings.seconds`, or when nothing prices out and no cheap cut is violated.  With `local > 0`, after it stops
+/// without reaching the target, one separation round at the node ([`LOCAL_CORES_PER_FRAME`] cores a frame and
+/// column; at most `min(local, LOCAL_PER_FRAME − warm.local_in(h))` new signings of frame `h`, their defaults
+/// seeded from index `LOCAL_SEEDS + warm.local`) and, if it opened any, at most `k / 2` more pricings for the new
+/// family.  Returns the lowest ⌊L⌋ (with Tier 1's), the final state (the new signings last and node-local) and the
+/// trace.
+#[allow(clippy::too_many_arguments)]
+pub fn refit_r2<const W: usize>(
+    ctx: &Ctx<'_, W>,
+    fam: Family,
+    warm: &Warm,
+    first: Eval,
+    k: usize,
+    local: usize,
     settings: &Settings,
-) -> Option<usize> {
-    let core = &found[id].core;
-    let h = core.frame;
-    let existing = fam.extras.len();
-    let signings = fam.extras.iter_mut().map(|ex| &mut ex.signing).chain(opened.iter_mut());
-    let mut count = 0;
-    for (k, s) in signings.enumerate() {
-        if !s.mergeable || s.frame != h {
-            continue;
-        }
-        count += 1;
-        let others: Vec<&Core> = s.cores.iter().map(|&c| &found[c].core).collect();
-        if merge(s, core, &others) {
-            s.cores.push(id);
-            return Some(k);
+    stats: &mut Stats,
+) -> (i64, Warm, Trace) {
+    assert_eq!(fam.extras.len(), warm.signings.len(), "a family of the warm state's signings");
+    let t0 = Instant::now();
+    let pricings = stats.pricings_mi;
+    let elements = |set: &[u32]| -> Vec<usize> { set.iter().filter_map(|&x| ctx.element(x)).collect() };
+    // Columns with a loop of the node's family are no common independent set of the intersection's.
+    let mut columns: Vec<Vec<usize>> =
+        warm.columns.iter().map(|c| elements(c)).filter(|c| c.iter().all(|&e| !fam.banned[e])).collect();
+    columns.push(first.q.clone());
+    // A rank inequality is over its matroid's elements; one whose rank is its size holds at every master point.
+    let cuts: Vec<(usize, Vec<usize>)> = warm
+        .cuts
+        .iter()
+        .map(|(j, set)| (*j, elements(set).into_iter().filter(|&e| fam.extras[*j].position(e).is_some()).collect()))
+        .filter(|(j, set): &(usize, Vec<usize>)| rank(&fam.extras[*j], set) < set.len())
+        .collect();
+    let start = by_number(&fam, &warm.lambda);
+    let settings =
+        Settings { mode: FitMode::Search, pricings: k, cores_per_frame: LOCAL_CORES_PER_FRAME, ..settings.clone() };
+    let mut f = Fitter::new(ctx, fam, start.clone(), &columns, &cuts, &settings, stats, t0);
+    f.trace = Some(Vec::new());
+    f.record(&first, &start);
+    if f.stop.is_none() {
+        f.generate(false);
+    }
+    let mut new = 0;
+    if local > 0 && k / 2 > 0 && !matches!(f.stop, Some(Stop::Target | Stop::Seconds)) {
+        let stopped = f.stop.take();
+        f.restart_budget(k / 2);
+        let per_frame = |h: usize| local.min(LOCAL_PER_FRAME.saturating_sub(warm.local_in(h)));
+        (_, new) = f.separate(&per_frame, LOCAL_SEEDS + warm.local);
+        if new == 0 {
+            f.stop = stopped;
+        } else if f.stop.is_none() {
+            f.generate(false);
         }
     }
-    if count >= settings.per_frame {
-        return None;
-    }
-    let default =
-        if settings.random_defaults { Default3::Random(seed(ctx.n, h, count, SALT_CORES)) } else { Default3::Ones };
-    let mut s = Signing::for_cores(h, default);
-    assert!(merge(&mut s, core, &[]), "a core always merges into a signing of its own");
-    s.cores.push(id);
-    opened.push(s);
-    Some(existing + opened.len() - 1)
+    let after = f.trace.take().unwrap_or_default();
+    let r = f.finish();
+    let state = Warm { local: warm.local + new, ..Warm::from_outcome(&r) };
+    let pricings = (stats.pricings_mi - pricings) as usize;
+    (r.bound, state, Trace { after, pricings, new_signings: new, stop: Some(r.stop) })
 }

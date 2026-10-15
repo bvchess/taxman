@@ -279,7 +279,7 @@ pub fn seed(n: u32, frame: usize, index: usize, salt: u64) -> u64 {
 pub type CoreId = usize;
 
 /// A signing of one frame: values on incidences (mover, factor), a default for the others.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Signing {
     /// The frame it signs.
     pub frame: usize,

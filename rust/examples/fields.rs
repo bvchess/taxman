@@ -7,9 +7,11 @@
 //! ```text
 //! cargo run --release --example fields -- roots --known results/strict.jsonl [--arms gf2,f1,f1r1,f1r3,cores,f1cores]
 //!     [--rounds 40] [--per-frame 8] [--cores-per-frame 4] [--pricings 3000] [--seconds 120] [--fixed-seconds 30]
-//!     [--frames 1,2,3] [--defaults random|ones] [--out FILE] [--census FILE] N|A-B|A-B/STEP...
+//!     [--frames 1,2,3] [--defaults random|ones] [--fit-mode certified|search] [--out FILE] [--census FILE]
+//!     N|A-B|A-B/STEP...
 //! cargo run --release --example fields -- nodes --known results/strict.jsonl [--modes root,node] [--seconds 10]
-//!     [--root-seconds 120] [--exact bench/matroid/nodes_exact.jsonl] [--out FILE] FIXTURE...
+//!     [--root-seconds 120] [--fit-mode certified|search] [--exact bench/matroid/nodes_exact.jsonl] [--out FILE]
+//!     FIXTURE...
 //! cargo run --release --example fields -- check [--known FILE] [--samples 100] N|A-B...
 //! ```
 //!
@@ -29,6 +31,11 @@
 //!   node), each the lower of it and the node's GF(2) bound.  `--exact` gives best completions to check against.
 //! * **check**: Theorems 14 and 15 and the column-sum signings at scale (the tests 3, 4 and 6 of the study on any
 //!   boards).
+//!
+//! `--fit-mode` (of `roots` and `nodes`, every computation of the run): `certified` (the default) brackets each LP
+//! with a certified lower bound (the exact checks); `search` fits the multipliers as a search would, without the
+//! exact checks (a family's generation ends when nothing prices out and no cheap inequality is violated, a
+//! separation round that places no core ends the computation), and reports `lb` 0, so `converged` false.
 //!
 //! Every run asserts that the bound is at least `P*` (at nodes, at least the best completion where known), that the
 //! optimal game's promotions are independent in every final matroid, and checks the crate's intersection against
@@ -57,7 +64,7 @@ mod lp;
 mod meet;
 
 use cores::{core_of, cores_of, frame_with, merge, primes, residual, sees, zero_one, Core};
-use dw::{bound, evaluate, Ctx, Family, Outcome, Settings, Stats};
+use dw::{bound, evaluate, Ctx, Family, FitMode, Outcome, Settings, Stats};
 use frames::{frame_matroids, is_prime, setup, Known, Rng};
 use gf3::{seed, Default3, Matroid3, Signing};
 use std::collections::{HashMap, HashSet};
@@ -139,6 +146,13 @@ fn parse() -> Result<Options, String> {
                     "random" => true,
                     "ones" => false,
                     other => return Err(format!("unknown defaults {other:?}")),
+                }
+            }
+            "--fit-mode" => {
+                o.settings.mode = match value("--fit-mode")?.as_str() {
+                    "certified" => FitMode::Certified,
+                    "search" => FitMode::Search,
+                    other => return Err(format!("unknown fit mode {other:?}")),
                 }
             }
             "--out" => o.out = Some(value("--out")?.into()),
@@ -554,10 +568,7 @@ fn nodes<const W: usize>(path: &Path, known: &Known, o: &Options, exact: &Exact,
                 "node" => {
                     // The root's signings stay as they are (their cores are the root's); the node's separation adds
                     // signings of its own.
-                    let frozen = final_signings
-                        .iter()
-                        .map(|s| Signing { mergeable: false, cores: Vec::new(), ..s.clone() })
-                        .collect();
+                    let frozen = final_signings.iter().map(dw::frozen).collect();
                     let r = bound(&ctxn, frozen, Some(&root.lambda), true, &o.settings);
                     (r.bound, r.stats.pricings_mi)
                 }
@@ -709,6 +720,7 @@ fn check<const W: usize>(n: u32, known: &Known, samples: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dw::{cut_rank, fit_from_json, refit_r1, refit_r2, tier1, Fit, Trace, Warm};
     use crate::lp::{Lp, RowKind, Status};
     use crate::meet::{Reduced, Span};
 
@@ -1028,5 +1040,185 @@ mod tests {
         for n in [300u32, 360, 420, 480] {
             taxman::with_width!(n, W => roots::<W>(n, &known, &o, &mut out, None));
         }
+    }
+
+    /// Runs `f` at the root of `n`, set up as `roots` sets it up (target `P*`, not stopping there), with the main
+    /// arm's fit in search mode within `seconds` and the GF(2) bound.
+    fn with_root_fit<const W: usize>(
+        n: u32,
+        seconds: f64,
+        f: impl FnOnce(&taxman::search::Prepared<W>, &Ctx<'_, W>, &Outcome, i64),
+    ) {
+        let known = Known::load(&[], None).expect("the built-in optimum table");
+        let (board, p) = setup::<W>(n).expect("a board with candidates");
+        let opt = known.opt(n, board.in_the_bag).expect("a built-in optimum") as i64;
+        let fm = frame_matroids(&p.model, &p.root, &p.candidates);
+        let cap = p.max_total as usize;
+        let gf2 = fm.bound(cap).value;
+        let mut ctx = Ctx::new(n, &p.model, &p.root, &fm, cap, opt, false);
+        ctx.gap = Some(gf2 - opt);
+        let (signings, separate) = arm("f1cores", n, p.root.len(), &[1, 2, 3]);
+        let settings = Settings { mode: FitMode::Search, seconds, ..Settings::default() };
+        let r = bound(&ctx, signings, None, separate, &settings);
+        assert!(r.bound >= opt, "n={n}: the bound {} below P* = {opt}", r.bound);
+        assert_eq!(r.lb, 0.0, "n={n}: search mode certifies nothing");
+        f(&p, &ctx, &r, gf2);
+    }
+
+    /// The design's S5.2 test 6: at the roots of 600 and 900, the main arm's fit in search mode, written as a fit
+    /// file's line and read back, is the same fit, and Tier 1 at the root from the fit read (a family of its
+    /// signings) gives exactly its `l_best`, which is at least the bound.
+    #[test]
+    fn fit_round_trip() {
+        for n in [600u32, 900] {
+            taxman::with_width!(n, W => with_root_fit::<W>(n, 10.0, |_, ctx, r, gf2| {
+                let fit = Fit::from_outcome(n, ctx.target, gf2, r);
+                let line = fit.to_json();
+                assert!(!line.contains('\n'), "n={n}: a fit is one line");
+                let read = fit_from_json(&line).unwrap_or_else(|e| panic!("n={n}: {e}"));
+                assert_eq!(read, fit, "n={n}: the fit read differs from the fit written");
+                let fam = Family::new(ctx, read.warm.signings.clone());
+                let (value, ev) = tier1(ctx, &fam, &read.warm, &mut Stats::default());
+                assert_eq!(ev.value, (read.l_best * dw::SCALE as f64).round() as i64, "n={n}: L at the fit");
+                assert_eq!(value, read.l_best.floor() as i64, "n={n}");
+                assert!(value >= read.bound, "n={n}: {value} below the bound {}", read.bound);
+                eprintln!(
+                    "n={n}: bound {}, l_best {}, {} signings, {} columns, {} cuts, {} bytes",
+                    read.bound,
+                    read.l_best,
+                    read.warm.signings.len(),
+                    read.warm.columns.len(),
+                    read.warm.cuts.len(),
+                    line.len()
+                );
+            }));
+        }
+    }
+
+    /// Asserts what a refit's results must satisfy: its trace starts at Tier 1's bound `tier`, never falls below
+    /// `P*` and never rises, has an entry per pricing after Tier 1's, and ends at the bound returned, which the
+    /// returned state's multipliers give again exactly.
+    fn assert_refit<const W: usize>(ctx: &Ctx<'_, W>, what: &str, tier: i64, r: &(i64, Warm, Trace)) {
+        let (value, state, trace) = r;
+        let after = &trace.after;
+        assert_eq!(after.first(), Some(&tier), "{what}: the trace starts at Tier 1");
+        assert!(after.iter().all(|&a| a >= ctx.target), "{what}: below P* = {}: {after:?}", ctx.target);
+        assert!(after.windows(2).all(|w| w[1] <= w[0]), "{what}: the trace rises: {after:?}");
+        assert_eq!(after.len(), trace.pricings + 1, "{what}: a trace entry per pricing");
+        assert_eq!(after.last(), Some(value), "{what}: the bound returned is the trace's last");
+        let fam = Family::new(ctx, state.signings.clone());
+        let (again, _) = tier1(ctx, &fam, state, &mut Stats::default());
+        assert_eq!(again, *value, "{what}: the state returned gives another bound");
+    }
+
+    /// R1 and R2 (local 0 and 2) with `k = 20` at the roots of the non-prime boards 300-700 every 40th, from the main
+    /// arm's search-mode fit (3 s) with every multiplier halved: valid traces and states (`assert_refit`).
+    #[test]
+    fn refits_are_valid() {
+        let (mut lowered, mut pricings, mut opened) = (0, 0, 0);
+        for n in (300..=700u32).step_by(40).filter(|&n| !is_prime(n)) {
+            taxman::with_width!(n, W => with_root_fit::<W>(n, 3.0, |_, ctx, r, _| {
+                let mut warm = Warm::from_outcome(r);
+                for m in &mut warm.lambda {
+                    m.values_mut().for_each(|v| *v /= 2.0);
+                }
+                let mut stats = Stats::default();
+                let fam = || Family::new(ctx, warm.signings.clone());
+                let settings = Settings { seconds: 10.0, ..Settings::default() };
+                let f = fam();
+                let (tier, first) = tier1(ctx, &f, &warm, &mut stats);
+                let r1 = refit_r1(ctx, &f, &warm, &first, 20, &mut stats);
+                assert_refit(ctx, &format!("n={n} r1"), tier, &r1);
+                assert_eq!((r1.2.new_signings, &r1.1.columns, &r1.1.cuts), (0, &warm.columns, &warm.cuts));
+                let mut line = format!("n={n}: tier 1 {tier}, r1 {} ({} pricings)", r1.0, r1.2.pricings);
+                for local in [0, 2] {
+                    let f = fam();
+                    let (_, first) = tier1(ctx, &f, &warm, &mut stats);
+                    let r2 = refit_r2(ctx, f, &warm, first, 20, local, &settings, &mut stats);
+                    let what = format!("n={n} r2 local {local}");
+                    assert_refit(ctx, &what, tier, &r2);
+                    let (state, trace) = (&r2.1, &r2.2);
+                    assert!(trace.new_signings <= 2 * ctx.state.len() * local, "{what}");
+                    assert_eq!(state.local, warm.local + trace.new_signings, "{what}");
+                    assert_eq!(state.signings.len(), warm.signings.len() + trace.new_signings, "{what}");
+                    assert!(state.signings.iter().all(|s| !s.mergeable && s.cores.is_empty()), "{what}: frozen");
+                    line += &format!(
+                        ", r2/{local} {} ({} pricings, {} signings, {:?})",
+                        r2.0, trace.pricings, trace.new_signings, trace.stop
+                    );
+                    lowered += usize::from(r2.0 < tier);
+                    pricings += trace.pricings;
+                    opened += trace.new_signings;
+                }
+                lowered += usize::from(r1.0 < tier);
+                pricings += r1.2.pricings;
+                eprintln!("{line}");
+            }));
+        }
+        eprintln!("refits: {lowered} lowered the bound, {pricings} pricings, {opened} local signings");
+        assert!(lowered > 0 && opened > 0, "the refits had nothing to do");
+    }
+
+    /// At the roots of 300-700 every 50th, each child of the root as `examples/matroid.rs`'s `bnb` makes them (the
+    /// GF(2) heaviest set's conflict `k₁ < … < k_r`: child `j` promotes `k₁ … k_{j−1}` and leaves out `k_j`) takes
+    /// over the root fit's state (`Warm::child`): every column is common independent in the child's GF(2) matroids
+    /// and within its `max_add`; every cut is within its elements and, with its rank taken in the child's signed
+    /// matroid, holds for 20 random maximal promotable sets of the child.
+    #[test]
+    fn child_keeps_valid_columns() {
+        let (mut children, mut columns, mut cuts) = (0, 0, 0);
+        for n in (300..=700u32).step_by(50) {
+            taxman::with_width!(n, W => with_root_fit::<W>(n, 3.0, |p, _, r, _| {
+                let warm = Warm::from_outcome(r);
+                let model = &p.model;
+                let mut scratch = Scratch::<W>::new();
+                let mut rng = Rng(0x2545_F491_4F6C_DD1D ^ u64::from(n));
+                let max_add = |state: &FrameSet<W>, promoted: u32, cands: &Bits<W>| {
+                    (p.max_total as i32 - promoted as i32).min(state.max_promotions_among(cands)).max(0) as usize
+                };
+                let cands = p.root.narrow_candidates(&p.candidates);
+                let fm = frame_matroids(model, &p.root, &cands);
+                let chosen = fm.chosen::<W>(&fm.bound(max_add(&p.root, 0, &cands)));
+                let Some(k) = model.conflict_using(&mut scratch, &p.root, &chosen, true) else { return };
+                let (mut required, mut rest, mut at) = (Vec::new(), cands, p.root);
+                for x in k.iter() {
+                    rest.remove(x);
+                    let live_cands = at.narrow_candidates(&rest);
+                    let limit = max_add(&at, required.len() as u32, &live_cands);
+                    let fmc = frame_matroids(model, &at, &live_cands);
+                    let child = warm.child(&required, &[x], &fmc.elems, limit);
+                    for c in &child.columns {
+                        fmc.independent(&Bits::<W>::from_slice(c))
+                            .unwrap_or_else(|e| panic!("n={n}, child {}: {c:?}: {e}", required.len()));
+                        assert!(c.len() <= limit, "n={n}: a column of {} members, max_add {limit}", c.len());
+                    }
+                    let ctxc = Ctx::new(n, model, &at, &fmc, limit, 0, false);
+                    let famc = Family::new(&ctxc, child.signings.clone());
+                    let live: Vec<u32> = live_cands.iter().collect();
+                    let completions: Vec<Vec<u32>> =
+                        (0..20).map(|_| random_promotable(model, &at, &live, &mut rng).iter().collect()).collect();
+                    for (j, set) in &child.cuts {
+                        assert!(set.iter().all(|x| fmc.elems.binary_search(x).is_ok()), "n={n}: a cut's member");
+                        let rank = cut_rank(&famc, *j, set);
+                        for c in &completions {
+                            let common = set.iter().filter(|x| c.binary_search(x).is_ok()).count();
+                            assert!(common <= rank, "n={n}: {common} of a cut of rank {rank} in a promotable set");
+                        }
+                    }
+                    children += 1;
+                    columns += child.columns.len();
+                    cuts += child.cuts.len();
+                    match model.promote_all_using(&mut scratch, &at, &Bits::EMPTY.with(x)) {
+                        Some(next) => {
+                            at = next;
+                            required.push(x);
+                        }
+                        None => break,
+                    }
+                }
+            }));
+        }
+        eprintln!("child_keeps_valid_columns: {children} children, {columns} columns and {cuts} cuts checked");
+        assert!(children > 0 && columns > 0 && cuts > 0);
     }
 }
