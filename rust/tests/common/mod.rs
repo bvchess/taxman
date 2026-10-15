@@ -212,6 +212,9 @@ pub struct Config {
     pub gf2_branching: Gf2Branching,
     /// The rule of the root's symmetric pairs (tactic `symmetry`).
     pub symmetry: bool,
+    /// The GF(2) graph padded to that many block words ([`Gf2Graph::padded`]), to run the engines of more words than
+    /// the board needs; `None` for the words it needs.
+    pub gf2_words: Option<usize>,
 }
 
 impl Config {
@@ -237,6 +240,7 @@ impl Config {
             gf2_prefilter: false,
             gf2_branching: Gf2Branching::Exact,
             symmetry: t.symmetry,
+            gf2_words: None,
         }
     }
 }
@@ -319,7 +323,13 @@ impl<const W: usize> Game<W> {
             diagnostics: None,
             began: Instant::now(),
             found: Mutex::new(None),
-            gf2: cfg.gf2.then(|| Gf2Graph::new(&self.model, &self.root, &self.candidates)),
+            gf2: cfg.gf2.then(|| {
+                let graph = Gf2Graph::new(&self.model, &self.root, &self.candidates);
+                match cfg.gf2_words {
+                    Some(words) => graph.padded(words),
+                    None => graph,
+                }
+            }),
             gf2_prefilter: cfg.gf2_prefilter,
             gf2_branching: cfg.gf2_branching,
             gf2_strong_limit: usize::MAX,

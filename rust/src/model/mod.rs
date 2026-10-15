@@ -52,11 +52,11 @@ pub use provider::FactorProvider;
 use crate::bits::Bits;
 use crate::numtheory::Tables;
 
-/// Most frames a [`FrameSet`] can hold.  The frame builder gives every board up to 4095, the largest supported,
-/// at most 8 frames (all of them were checked in 2026-10: 6 frames from n = 512, 7 from 1024, 8 from 2048), and
-/// frame sets and per-frame arrays are copied whole, so they have no room to spare.  [`FrameGraph::build`] refuses
-/// more (`tests/wide.rs` builds the boards where the count steps up, and the largest).
-pub const MAX_FRAMES: usize = 8;
+/// Most frames a [`FrameSet`] can hold.  The frame builder gives every board up to 8191, the largest supported, at
+/// most 9 frames (all of them were checked in 2026-10: 6 frames from n = 512, 7 from 1024, 8 from 2048, 9 from 4096),
+/// and frame sets and per-frame arrays are copied whole, so they have no room to spare.  [`FrameGraph::build`]
+/// refuses more (`tests/wide.rs` builds the boards where the count steps up, and the largest).
+pub const MAX_FRAMES: usize = 9;
 
 /// What every state of one game's search shares: the factor graph and each number's home frame.  Immutable
 /// and `Sync`, so search threads can share one.  The states are [`FrameSet`]s, and this is what interprets them.

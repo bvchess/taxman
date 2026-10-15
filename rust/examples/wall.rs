@@ -74,7 +74,7 @@
 //!   local search from `base`: `singles` is the sum it finds when it takes out one member at a time, `pairs` the sum
 //!   when it takes out two as well (the solver's call), each with its time in `singles_s` and `pairs_s`.  `opt` is the
 //!   known optimum promotion sum, or null, and `max_rss` the process's peak resident set.
-//! * **frames**: for boards beyond the widest set the solver supports (up to 8191, at 128 words): the frames the
+//! * **frames**: the frames of any board the solver supports (up to 8191), at the width it picks: the frames the
 //!   board builder makes (before `FrameGraph::build` reduces them, which keeps every frame's freedoms), the time it
 //!   took, and the sizes the later stages would need: per frame the factors, moves and freedoms, `max_freedoms`
 //!   and the `block_words` of the GF(2) bound's vectors it needs (`max_freedoms.div_ceil(64)`).
@@ -119,6 +119,7 @@ use taxman::matchbound::MatchGraph;
 use taxman::model::Scratch;
 use taxman::numtheory::Tables;
 use taxman::search::{search, stat, Neighbourhood, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
+use taxman::solver::MAX_N;
 use taxman::tactics::Tactics;
 
 // ---------------------------------------------------------------------------------------------------------
@@ -342,7 +343,7 @@ macro_rules! at_width {
             Some(width) if width < words_for(n) => {
                 Err(format!("--width {width} is below the {} words that n={n} needs", words_for(n)))
             }
-            Some(width) => match_width!(width, $run, n, o, optimal; 8 16 20 24 28 32 36 40 44 48 56 64),
+            Some(width) => match_width!(width, $run, n, o, optimal; 8 16 20 24 28 32 36 40 44 48 56 64 128),
         }
     }};
 }
@@ -905,12 +906,12 @@ fn start<const W: usize>(n: u32, _: &Options, optimal: &Optimal) -> Result<(), S
 // ---------------------------------------------------------------------------------------------------------
 // frames
 
-/// `frames` for board `n`, at the set width the solver picks for it, or at 128 words beyond the widest.
+/// `frames` for board `n`, at the set width the solver picks for it.
 fn frames_at_width(n: u32) -> Result<(), String> {
-    if n > Bits::<128>::MAX_VALUE {
-        return Err(format!("n={n}: frames goes up to {}", Bits::<128>::MAX_VALUE));
+    if n > MAX_N {
+        return Err(format!("n={n}: frames goes up to {MAX_N}"));
     }
-    taxman::with_width!(n, W => frames::<W>(n), else frames::<128>(n));
+    taxman::with_width!(n, W => frames::<W>(n), else unreachable!("n={n} is within {MAX_N}"));
     Ok(())
 }
 

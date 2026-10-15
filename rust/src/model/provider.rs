@@ -6,7 +6,7 @@
 //! factors are in, so [`FrameGraph::build`](super::FrameGraph::build) keeps only the pairs whose roles can meet: `y` a
 //! factor of frame `i`, `x` a move of frame `i` or a factor of frame `i + 1` (promoted into frame `i`).  That keeps
 //! every live neighbour a peel or a reduction can see and drops the rest.  Numbers are stored as `u16`, which
-//! bounds boards at 65535 (the solver stops at 4095).
+//! bounds boards at 65535 (the solver stops at [`crate::solver::MAX_N`]).
 
 use crate::numtheory::Tables;
 

@@ -100,8 +100,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-/// The largest board the set widths cover (`W = 64`, the widest of [`crate::bits::WIDTHS`]).
-pub const MAX_N: u32 = 64 * 64 - 1;
+/// The largest board the set widths cover: 8191, at the widest of [`crate::bits::WIDTHS`] (128 words).
+pub const MAX_N: u32 = 64 * crate::bits::WIDTHS[crate::bits::WIDTHS.len() - 1] as u32 - 1;
 
 // ---------------------------------------------------------------------------------------------------------
 // Options and results

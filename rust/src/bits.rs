@@ -17,7 +17,7 @@
 //! * `W = 8`: up to 511; `W = 16`: 512 to 1023;
 //! * `W = 20`: 1024 to 1279; `W = 24`: 1280 to 1535; `W = 28`: 1536 to 1791; `W = 32`: 1792 to 2047;
 //! * `W = 36`: 2048 to 2303; `W = 40`: 2304 to 2559; `W = 48`: 2560 to 3071; `W = 56`: 3072 to 3583;
-//! * `W = 64`: 3584 to 4095, the largest board the solver supports.
+//! * `W = 64`: 3584 to 4095; `W = 128`: 4096 to 8191, the largest board the solver supports.
 //!
 //! # Out-of-range values
 //!
@@ -39,10 +39,12 @@ pub const fn words_for(n: u32) -> usize {
 /// The set widths the solver is built for, ascending: each is a separate copy of the search's code, and a board
 /// gets the narrowest that holds it ([`width_for`]), since every set operation costs a loop over all its words.
 /// Widths of 8 and 16 words, then steps of 4 words from 20 to 32 (boards 1024 to 2047, where the games the
-/// solver works on today are), 36, 40, 48 and 56 (boards 2048 to 3583, where the chain goes next), and 64 beyond,
-/// to board 4095.  The arms of [`with_words!`](crate::with_words) repeat these numbers, because a macro arm needs
-/// literals; the test `the_width_dispatch_follows_the_widths` fails if they drift apart.
-pub const WIDTHS: [usize; 11] = [8, 16, 20, 24, 28, 32, 36, 40, 48, 56, 64];
+/// solver works on today are), 36, 40, 48 and 56 (boards 2048 to 3583, where the chain goes next), 64 to board 4095,
+/// and 128 beyond, to board 8191 (no width between 64 and 128: past 4095 the width costs a node about 1% and the
+/// board layer little, docs/EXPERIMENTS.md, "Boards past 4095").  The arms of [`with_words!`](crate::with_words)
+/// repeat these numbers, because a macro arm needs literals; the test `the_width_dispatch_follows_the_widths` fails
+/// if they drift apart.
+pub const WIDTHS: [usize; 12] = [8, 16, 20, 24, 28, 32, 36, 40, 48, 56, 64, 128];
 
 /// The narrowest of [`WIDTHS`] with at least `words` words, if any.
 pub const fn width_for(words: usize) -> Option<usize> {
@@ -122,6 +124,10 @@ macro_rules! with_words {
             }
             57..=64 => {
                 const $w: usize = 64;
+                $body
+            }
+            65..=128 => {
+                const $w: usize = 128;
                 $body
             }
             _ => $beyond,
@@ -720,7 +726,7 @@ mod tests {
         random_agreement::<8>(0xDEAD_BEEF_CAFE_F00D);
     }
 
-    /// The widths the solver picks for boards from 512 up (16, 32, 36, 40, 48, 56 and 64 words, a sample of its
+    /// The widths the solver picks for boards from 512 up (16, 32, 36, 40, 48, 56, 64 and 128 words, a sample of its
     /// widths), which no other unit test reaches: a loop that stops at a fixed word (a `len` that sums only the first
     /// 32, say) passes everything below.
     #[test]
@@ -732,6 +738,7 @@ mod tests {
         random_agreement_rounds::<48>(0x0F1E_2D3C_4B5A_6978, 20);
         random_agreement_rounds::<56>(0x8796_A5B4_C3D2_E1F0, 15);
         random_agreement_rounds::<64>(0xA5A5_5A5A_C3C3_3C3C, 15);
+        random_agreement_rounds::<128>(0x3C3C_A5A5_5A5A_C3C3, 8);
     }
 
     /// Every word holds numbers, including its first and last bit: the sums, counts, extremes and neighbours across
@@ -776,6 +783,7 @@ mod tests {
         every_word_is_used::<48>();
         every_word_is_used::<56>();
         every_word_is_used::<64>();
+        every_word_is_used::<128>();
     }
 
     #[test]
@@ -810,15 +818,15 @@ mod tests {
         assert_eq!(words_for(512), 9);
         assert_eq!(words_for(1000), 16);
         // The largest value n must itself fit.
-        for n in [0u32, 1, 62, 63, 64, 65, 127, 128, 511, 512, 1000, 4095] {
+        for n in [0u32, 1, 62, 63, 64, 65, 127, 128, 511, 512, 1000, 4095, 4096, 8191] {
             assert!(n < 64 * words_for(n) as u32);
         }
     }
 
     #[test]
     fn the_width_dispatch_follows_the_widths() {
-        assert!(WIDTHS.is_sorted() && WIDTHS[WIDTHS.len() - 1] == 64);
-        for words in 0..=70 {
+        assert!(WIDTHS.is_sorted() && WIDTHS[WIDTHS.len() - 1] == 128);
+        for words in 0..=140 {
             let picked = crate::with_words!(words, W => Some(W), else None);
             assert_eq!(picked, width_for(words), "{words} words");
             assert!(picked.is_none_or(|w| w >= words && WIDTHS.contains(&w)), "{words} words");
@@ -826,12 +834,12 @@ mod tests {
         // The last board of each width, and the first of the next.
         let edges = [(1, 8), (511, 8), (512, 16), (1023, 16), (1024, 20), (1279, 20), (1280, 24), (1535, 24)];
         let more = [(1536, 28), (1791, 28), (1792, 32), (2047, 32), (2048, 36), (2303, 36), (2304, 40), (2559, 40)];
-        let most = [(2560, 48), (3071, 48), (3072, 56), (3583, 56), (3584, 64), (4095, 64)];
+        let most = [(2560, 48), (3071, 48), (3072, 56), (3583, 56), (3584, 64), (4095, 64), (4096, 128), (8191, 128)];
         for (n, width) in edges.into_iter().chain(more).chain(most) {
             assert_eq!(crate::with_width!(n, W => W), width, "n={n}");
             assert_eq!(width_for(words_for(n)), Some(width), "n={n}");
         }
-        assert_eq!(crate::with_width!(4096, W => Some(W), else None), None);
+        assert_eq!(crate::with_width!(8192, W => Some(W), else None), None);
     }
 
     #[test]

@@ -2,30 +2,32 @@
 //!
 //! The Java stopped at n = 1000, and the sets that hold the numbers of a board are 8 words wide up
 //! to n = 511, then 16, 20, 24, 28, 32, 36, 40, 48 and 56 words up to 1023, 1279, 1535, 1791, 2047, 2303, 2559, 3071
-//! and 3583, and 64 up to 4095 (`bits::WIDTHS`), so nothing above n = 1023 meets anything but these tests and the
-//! committed results (`results/strict.jsonl`, n = 1..2175; `optimal.json` has its games to 1300, but that is the
-//! solver's own answer and no check of it).  What is cheap to run here: the same small game at every width that holds
-//! it (a width-dependent bug changes the tree), games of 1100 to 1250 that need a few thousand nodes against the
-//! committed results, and boards of 2048 and more through their setup.
+//! and 3583, 64 up to 4095 and 128 up to 8191 (`bits::WIDTHS`), so nothing above n = 1023 meets anything but these
+//! tests and the committed results (`results/strict.jsonl`, n = 1..2175; `optimal.json` has its games to 1300, but
+//! that is the solver's own answer and no check of it).  What is cheap to run here: the same small game at every
+//! width that holds it (a width-dependent bug changes the tree), games of 1100 to 1250 that need a few thousand
+//! nodes against the committed results, boards of 2048 and more through their setup, and the boards past 4095
+//! (128 words, and the GF(2) bound's engines of four and five block words) through theirs.
 
 mod common;
 
 use common::{
-    config, matching_options, options, prev_of, profile_at_width, stored_games, testdata, variants, Config, Game,
-    Profile, Rng, TempDir,
+    config, matching_options, options, prev_of, profile_at_width, random_subset, stored_games, testdata, variants,
+    Config, Game, Profile, Rng, TempDir,
 };
 use std::time::Duration;
 use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::engine::EngineConfig;
 use taxman::frames::build_frames;
+use taxman::gf2::{Gf2Bound, Gf2Graph, MAX_WORDS};
 use taxman::matchbound::{match_bound, MatchBound, MatchGraph};
 use taxman::model::{FrameGraph, Scratch, MAX_FRAMES};
 use taxman::numtheory::Tables;
 use taxman::sacrifice::{sacrifice_bound, PuncturedOptions};
 use taxman::search::{SearchTactics, TaxUnit};
 use taxman::solver::{self, Method, Prev, PrevSource, SolveOptions};
-use taxman::with_width;
+use taxman::{accelerate, game, with_width};
 
 // ---------------------------------------------------------------------------------------------------------
 // The width does not matter
@@ -52,6 +54,7 @@ fn the_search_does_not_depend_on_the_width() {
             (48, profile_at_width::<48>(n, default, None)),
             (56, profile_at_width::<56>(n, default, None)),
             (64, profile_at_width::<64>(n, default, None)),
+            (128, profile_at_width::<128>(n, default, None)),
         ];
         for (w, profile) in others {
             assert_eq!(profile, at8, "n={n} at W={w}");
@@ -64,6 +67,7 @@ fn the_search_does_not_depend_on_the_width() {
         assert!(at16.completed && at16.nodes > 1000, "n={n}: {} nodes", at16.nodes);
         assert_eq!(profile_at_width::<32>(n, tactics, None), at16, "n={n} at W=32");
         assert_eq!(profile_at_width::<64>(n, tactics, None), at16, "n={n} at W=64");
+        assert_eq!(profile_at_width::<128>(n, tactics, None), at16, "n={n} at W=128");
     }
 
     // Boards that need W = 20: 1133 on the matching path, and 1050 with the GF(2) bound (which searches 1133 in a
@@ -74,6 +78,7 @@ fn the_search_does_not_depend_on_the_width() {
         assert_eq!(profile_at_width::<24>(n, tactics, None), at20, "{name}: n={n} at W=24");
         assert_eq!(profile_at_width::<32>(n, tactics, None), at20, "{name}: n={n} at W=32");
         assert_eq!(profile_at_width::<64>(n, tactics, None), at20, "{name}: n={n} at W=64");
+        assert_eq!(profile_at_width::<128>(n, tactics, None), at20, "{name}: n={n} at W=128");
     }
 }
 
@@ -99,10 +104,10 @@ fn setup_at_width<const W: usize>(n: u32) -> Setup {
     }
 }
 
-/// The last board a width holds (511, 1023, 1279, 1535, 1791, 2047, 2303, 2559, 3071, 3583) fills the top bit of its
-/// set: the start of every search (frames, candidates, greedy set, `max_total`; up to 2047 also the first nodes) is
-/// the same at the width the board dispatches to and at the next one.  (The boards just above 511, 1023 and 2047 are
-/// in `testdata/golden_wide` at their own widths.)
+/// The last board a width holds (511, 1023, 1279, 1535, 1791, 2047, 2303, 2559, 3071, 3583, 4095) fills the top bit
+/// of its set: the start of every search (frames, candidates, greedy set, `max_total`; up to 2047 also the first
+/// nodes) is the same at the width the board dispatches to and at the next one.  (The boards just above 511, 1023 and
+/// 2047 are in `testdata/golden_wide` at their own widths.)
 #[test]
 fn the_edges_of_the_widths_hold() {
     let default = SearchTactics::default();
@@ -119,15 +124,17 @@ fn the_edges_of_the_widths_hold() {
     check_setup([setup_at_width::<40>(2559), setup_at_width::<48>(2559)], 2559);
     check_setup([setup_at_width::<48>(3071), setup_at_width::<56>(3071)], 3071);
     check_setup([setup_at_width::<56>(3583), setup_at_width::<64>(3583)], 3583);
+    check_setup([setup_at_width::<64>(4095), setup_at_width::<128>(4095)], 4095);
 }
 
 /// A board at each of the widths of 36, 40, 48 and 56 words (2050, 2400, 2800 and 3100 here; the boards 2048 to 3583
 /// dispatch to them) gives the same frames, candidates, greedy set, `max_total` and the same node-limited search on
 /// one thread (its nodes, best and promotions) at its own width and at 64, the width all of them had before the four
-/// were added.  The trees of these boards are far larger than the limit.  (The root's exact solves make the first
-/// 1,023 nodes of a search cost 0.6 s at 2050, 3 s at 3100 and 7 s at 3300, so the boards stay low in their widths.)
+/// were added; 2050 also at 128, the widest.  The trees of these boards are far larger than the limit.  (The root's
+/// exact solves make the first 1,023 nodes of a search cost 0.6 s at 2050, 3 s at 3100 and 7 s at 3300, so the boards
+/// stay low in their widths, and only the cheapest is searched at 128 too.)
 #[test]
-fn boards_past_2047_give_the_same_search_at_their_width_and_at_64() {
+fn boards_past_2047_give_the_same_search_at_their_width_at_64_and_at_128() {
     let default = SearchTactics::default();
     let limit = Some(2000);
     for (n, width) in [(2050, 36), (2400, 40), (2800, 48), (3100, 56)] {
@@ -136,6 +143,9 @@ fn boards_past_2047_give_the_same_search_at_their_width_and_at_64() {
         assert!(!at_its_width.completed && at_its_width.nodes >= 2000, "n={n}: {} nodes", at_its_width.nodes);
         assert!(at_its_width.candidates.len() > 500 && at_its_width.sum > 0, "n={n}: {at_its_width:?}");
         assert_eq!(profile_at_width::<64>(n, default, limit), at_its_width, "n={n} at W=64 and W={width}");
+        if n == 2050 {
+            assert_eq!(profile_at_width::<128>(n, default, limit), at_its_width, "n={n} at W=128 and W={width}");
+        }
     }
 }
 
@@ -183,31 +193,28 @@ fn a_slice_of_the_chain_reproduces_the_results() {
 // ---------------------------------------------------------------------------------------------------------
 // Boards of 2048 and more
 
-/// A frame set holds `MAX_FRAMES` = 8 frames, which the largest boards have (every board up to 4095, the largest
-/// supported, was checked when it came down from 12: 6 frames from n = 512, 7 from 1024, 8 from 2048).  The boards
-/// at the steps, and the largest.
+/// A frame set holds `MAX_FRAMES` = 9 frames, which the largest boards have (every board up to 8191, the largest
+/// supported, was checked: 6 frames from n = 512, 7 from 1024, 8 from 2048, 9 from 4096).  The boards at the steps,
+/// and the largest.
 #[test]
 fn the_largest_boards_fit_in_a_frame_set() {
-    assert_eq!(MAX_FRAMES, 8);
-    for (n, frames) in [(511, 5), (512, 6), (1023, 6), (1024, 7), (2047, 7), (2048, 8), (4095, 8)] {
+    assert_eq!(MAX_FRAMES, 9);
+    for (n, frames) in [(511, 5), (512, 6), (1023, 6), (1024, 7), (2047, 7), (2048, 8), (4095, 8), (4096, 9), (8191, 9)]
+    {
         let built = with_width!(n, W => build_frames::<W>(&Tables::new(n)).frames.len());
         assert_eq!(built, frames, "n={n}");
     }
 }
 
-/// The first board with a number above 2047 is n = 2048 (dispatched to more than 32 words whether or not a frame
-/// holds one); n = 2050 has such numbers in its frames.  Its frames, model, matching bound, conflicts, greedy set,
-/// setup and a short search, built at W = 64 although it dispatches to 36: the widest set, which only the boards from
-/// 3584 up dispatch to, runs here on a board the tests can afford (`tests/solver.rs` runs the pipeline's own
-/// dispatch on a board of 3600).
-#[test]
-fn a_board_past_2047_builds_bounds_and_searches_at_w64() {
-    let n = 2050;
+/// Board `n`'s frames, model, matching bound, conflicts, greedy set and a short search, built at width `W`, for a
+/// board with numbers above `above` in its frames (so the numbers that the width before `W` could not hold are in
+/// the model, the matching graph and the search).
+fn builds_bounds_and_searches<const W: usize>(n: u32, above: u32) {
     let tables = Tables::new(n);
-    let frames = build_frames::<64>(&tables);
-    let (model, root) = FrameGraph::build::<64>(&tables, &frames.columns()).unwrap();
+    let frames = build_frames::<W>(&tables);
+    let (model, root) = FrameGraph::build::<W>(&tables, &frames.columns()).unwrap();
     assert!(frames.candidates.len() > 500);
-    assert!(frames.frames.iter().any(|f| (f.moves | f.factors).max().is_some_and(|m| m > 2047)));
+    assert!(frames.frames.iter().any(|f| (f.moves | f.factors).max().is_some_and(|m| m > above)));
 
     let graph = MatchGraph::new(&model, &root);
     let mut m = MatchBound::new(&graph);
@@ -222,12 +229,30 @@ fn a_board_past_2047_builds_bounds_and_searches_at_w64() {
     assert!(model.can_promote_all_using(&mut scratch, &root, &greedy) && greedy.sum() <= m.value());
 
     // A short search from the root, which the engine's node limit stops: the unit, the incumbent and the payload of
-    // a W = 64 search.  (`tests/solver.rs` runs the whole pipeline's setup and first nodes for this board.)
-    let game = Game::<64>::new(model, root, frames.candidates);
+    // a search at this width.  (`tests/solver.rs` runs the whole pipeline's setup and first nodes for boards of
+    // 3600 and 4100.)
+    let game = Game::<W>::new(model, root, frames.candidates);
     let engine = EngineConfig { node_limit: Some(1), ..config(1) };
     let out = game.search(Config::standard(), vec![game.root_unit()], greedy.sum(), Some(engine), None);
     assert!(!out.completed && out.nodes > 0 && out.best >= greedy.sum());
     assert!(out.best == greedy.sum() || out.real, "{out:?}");
+}
+
+/// The first board with a number above 2047 is n = 2048 (dispatched to more than 32 words whether or not a frame
+/// holds one); n = 2050 has such numbers in its frames.  Its frames, model, matching bound, conflicts, greedy set,
+/// setup and a short search, built at W = 64 although it dispatches to 36: the widest set up to board 4095, which
+/// only the boards from 3584 to 4095 dispatch to, runs here on a board the tests can afford (`tests/solver.rs` runs
+/// the pipeline's own dispatch on a board of 3600).
+#[test]
+fn a_board_past_2047_builds_bounds_and_searches_at_w64() {
+    builds_bounds_and_searches::<64>(2050, 2047);
+}
+
+/// The same for n = 4100 at W = 128, the set width of every board from 4096 up: a board with numbers above 4095 in
+/// its frames, which no narrower set holds.
+#[test]
+fn a_board_past_4095_builds_bounds_and_searches_at_w128() {
+    builds_bounds_and_searches::<128>(4100, 4095);
 }
 
 /// At W = 20 the sacrifice bound (a search of punctured boards, which is the theorem that the optimum of `n` is at
@@ -243,6 +268,88 @@ fn the_sacrifice_bound_proves_a_w20_result() {
     let score = games[&n].0;
     assert!(bound.exact(), "n={n}: some punctured game is not exact");
     assert_eq!(bound.value, score, "n={n}: the bound {} should be the recorded optimum", bound.value);
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Boards past 4095
+
+/// The search of `game` from its root, with the default tactics on one thread and the GF(2) graph padded to `words`
+/// block words (if any), started from the greedy sum: how it ends (best, the set that reaches it, whether it
+/// completed) and the nodes of its tree.
+fn root_search<const W: usize>(game: &Game<W>, words: Option<usize>) -> (u64, Vec<u32>, bool, u64) {
+    let greedy = taxman::bounds::greedy(&game.model, &game.root, &game.candidates).sum();
+    let config = Config { gf2_words: words, ..Config::standard() };
+    let out = game.search(config, vec![game.root_unit()], greedy, None, None);
+    assert!(out.best == greedy || out.real, "{out:?}");
+    (out.best, out.set.to_vec(), out.completed, out.nodes)
+}
+
+/// The GF(2) bound's engines of four and five words search the same tree as the engine a board needs.  The engines of
+/// four and five words are only for the boards of 4740 and more, which no test can search; game 1000 (frames of one
+/// block word, a tree of thousands of nodes) is searched from its root with its graph padded to four and to five
+/// words at W = 128 (the only width that has them), and must end with the same best, set and nodes as at W = 16 and
+/// as at W = 128 with its own one word.
+#[test]
+fn the_gf2_engines_of_four_and_five_words_search_the_same_tree() {
+    assert!(Config::standard().gf2);
+    let expected = root_search(&Game::<16>::of_board(1000).unwrap(), None);
+    assert!(expected.2 && expected.3 > 1000, "{} nodes", expected.3);
+    let wide = Game::<128>::of_board(1000).unwrap();
+    for words in [None, Some(4), Some(5)] {
+        assert_eq!(root_search(&wide, words), expected, "at W=128 with {words:?} words");
+    }
+}
+
+/// Boards past 4095 are set up at 128 words, the widest, and agree with the board layer's own invariants, at the
+/// first boards, where the frames need three block words of GF(2) vectors, at 4740 and 6000 (four) and from 6392
+/// (five), and the largest.  The board has nine frames, whose numbers are all on it; the game with no promotions is
+/// legal and finished and scores what the board says; the setup succeeds, every root frame has as many freedoms as
+/// factors beyond its moves, and the greedy set is made of candidates and can be promoted.  The greedy set and random
+/// subsets of it (which can be promoted too) turn into games that are legal, finished, open with the largest prime and
+/// score the plain game's score plus the promotions' sum.  The root's GF(2) bound is at least the greedy sum and at
+/// most the matching bound, and an engine of five words gives the same as the one the board needs.  (The setup's
+/// local search is left out: this is the board layer's invariants, not the solver's.)
+#[test]
+fn boards_past_4095_are_set_up_at_128_words() {
+    let mut rng = Rng(0x4096_8191_0000_0001);
+    for (n, words) in [(4096, 3), (4100, 3), (4740, 4), (6000, 4), (6392, 5), (8191, 5)] {
+        assert_eq!(with_width!(n, W => W), 128, "n={n}");
+        let board = Board::<128>::for_n(n);
+        let columns = board.frames.columns();
+        assert_eq!(columns.len() / 2, 9, "n={n}: frames");
+        assert!(!board.candidates().is_empty(), "n={n}: no candidates");
+        assert!(columns.iter().flatten().all(|x| (1..=n).contains(x)), "n={n}: a number off the board");
+        assert_eq!(game::replay_finished(n, &board.plain), Ok(board.in_the_bag), "n={n}: the plain game");
+
+        let p = board.prepare(SearchTactics::default()).unwrap();
+        assert_eq!(p.root.len(), 9, "n={n}");
+        for frame in p.root.frames() {
+            assert_eq!(frame.freedoms, frame.factors.len() as i32 - frame.moves.len() as i32, "n={n}: {frame:?}");
+            assert!(frame.freedoms >= 0, "n={n}: {frame:?}");
+        }
+        assert!(p.greedy.is_subset(&p.candidates), "n={n}: the greedy set is not made of candidates");
+        let greedy = p.greedy.sum();
+        assert!(greedy > 0, "n={n}");
+        let mut scratch = Scratch::<128>::new();
+        let subsets = [random_subset(&mut rng, &p.greedy, 50), random_subset(&mut rng, &p.greedy, 10)];
+        for set in std::iter::once(p.greedy).chain(subsets) {
+            assert!(p.model.can_promote_all_using(&mut scratch, &p.root, &set), "n={n}: {set:?} cannot be promoted");
+            let moves = accelerate::solution_for_promotions::<128>(&board.tables, set);
+            assert_eq!(game::replay_finished(n, &moves), Ok(board.in_the_bag + set.sum()), "n={n}: {set:?}");
+            assert_eq!(moves.first().copied(), game::largest_prime_at_most(n), "n={n}: {set:?}");
+        }
+
+        let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates);
+        assert_eq!(graph.words(), words, "n={n}: the largest frame rank is {:?}", graph.ranks().iter().max());
+        let root_bound = |mut bound: Gf2Bound<128>| {
+            bound.reset(&Bits::EMPTY, &p.candidates);
+            bound.evaluate(p.max_total, None).value
+        };
+        let value = root_bound(Gf2Bound::new(&graph));
+        let matching = match_bound(&p.model, &p.root, &p.candidates);
+        assert!(greedy <= value && value <= matching, "n={n}: {greedy} <= {value} <= {matching}");
+        assert_eq!(root_bound(Gf2Bound::with_words(&graph, MAX_WORDS)), value, "n={n}: with {MAX_WORDS} words");
+    }
 }
 
 // ---------------------------------------------------------------------------------------------------------

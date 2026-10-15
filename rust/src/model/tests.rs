@@ -733,6 +733,24 @@ fn worklist_pops_in_descending_order() {
     assert_eq!(popped, vec![191, 100, 64, 63, 7, 5, 0]);
 }
 
+/// At 128 words the summary has two words (words 0 to 63 of the set in the first, 64 to 127 in the second): members on
+/// both sides of the boundary (4095 and 4096) and at both ends pop in descending order, and a worklist whose second
+/// summary word has emptied still pops from the first.
+#[test]
+fn worklist_pops_across_both_summary_words() {
+    let members = [0, 5, 4095, 4096, 4100, 6000, 8191];
+    let mut w = Worklist::<128>::of(&Bits::<128>::from_slice(&members));
+    w.insert(63);
+    w.insert(4097);
+    let mut popped = Vec::new();
+    while let Some(x) = w.pop() {
+        popped.push(x);
+    }
+    assert_eq!(popped, vec![8191, 6000, 4100, 4097, 4096, 4095, 63, 5, 0]);
+    w.insert(300);
+    assert_eq!((w.pop(), w.pop()), (Some(300), None));
+}
+
 #[test]
 fn provider_lists_match_the_java() {
     let t = Tables::new(100);
