@@ -188,7 +188,10 @@ those of the page the row points to; a game is named by its board size, and time
 | The root's GF(2) gap past 2175, and the trees of the c8g chain's dear games | [wall regime](#the-wall-regime-2026-10) | measured | over the unseeded start +57 per 100 n, 1,300 to 2,600 at 3100-4095 (upper bounds; the start is 0 to 403 below the optimum where known); the dear games past 2175 have 2170's gaps (636 to 887) and 4 to 18 times its tree |
 | A looser start incumbent (the optimum less 200 to 2,000) to make large GF(2) trees on known games | [wall regime](#the-wall-regime-2026-10) | not kept | 1215: 10,371 steps become 37,709 and 47,757, and no more: the search finds the optimum early |
 | The root gaps of every exhausted search of the c8g chain 2176-2276, against the fit of 1301-2175's trees on their gaps (log10 nodes ≈ 3.24 + G/255) | [agenda 7.1](AGENDA.md#71-the-root-gaps-of-the-c8g-chain) | measured | mean residual +0.08 ± 0.08 decades over the 39 (sd 0.50): the trees past 2175 follow their gaps, and the wall regime's 4 to 18 times came from the dear games alone; the gaps rise (mean 672 against 516 at 2101-2175); residuals in runs (2250-2275 +0.35 to +1.09) |
-| Other fields and signings beside GF(2): is the parity bound's heaviest set at the root dependent over GF(3), GF(5), GF(7) or the rationals, with 0/1 entries or Koszul signs (its peel residual's rank) | [agenda 7.2](AGENDA.md#72-other-fields-at-the-roots-of-the-whole-game) | measured; open as a bound ([agenda A1](AGENDA.md#a1-a-bound-over-several-fields-and-signings-a-change-of-slope-if-its-share-holds)) | of the 1,055 games of 78-1300 whose parity bound exceeds opt(n), 566 dependent in some field or signing (GF(3) with 0/1 entries 412), rising from 49% at 300-599 to 73% at 1100-1300; none over the rationals; 54% of the 658 square residuals have determinant ±1 under both entries |
+| Other fields and signings beside GF(2): is the parity bound's heaviest set at the root dependent over GF(3), GF(5), GF(7) or the rationals, with 0/1 entries or Koszul signs (its peel residual's rank) | [agenda 7.2](AGENDA.md#72-other-fields-at-the-roots-of-the-whole-game) | measured; as a bound, [the fields study](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) (next row) | of the 1,055 games of 78-1300 whose parity bound exceeds opt(n), 566 dependent in some field or signing (GF(3) with 0/1 entries 412), rising from 49% at 300-599 to 73% at 1100-1300; none over the rationals; 54% of the 658 square residuals have determinant ±1 under both entries |
+| A bound over the GF(2) frame matroids and GF(3) signed frame matroids (plain, random, and signings built from the cores of the LP's own columns, merged), coupled by Lagrangian multipliers fitted by column generation with a certified bracket (A1's E1, `examples/fields.rs`) | [fields](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) | measured: passes its kill criteria strongly; instrument kept, no solver change | the core-derived arm closes 0.62 of the root's GF(2) gap at n ≥ 1700 (18 converged roots), slope +1.0 ± 2.6 points per 100 n over 54 converged roots of 900-2175; fixed signings 2-9%; at the probe's nodes, with node-fitted multipliers, 86% (1215) and 98% (936) of the nodes GF(2) leaves open cut, the root's multipliers 0.37 of that; 36 s a root, 0.1-0.6 s a node |
+| The fields study's first master: GF(2) and independent-set columns tied by link rows `Σ α [x ∈ Q] − Σ β [x ∈ I] ≤ ε` (the design's), dense revised simplex | [fields](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) | not kept: replaced by rank inequalities with an exact certificate | 71% of the pivots steps of the perturbation's size; 1000 unconverged in 60 s (master 18,893 against L 24,382); the rank-inequality master converges there in 4-8 s |
+| A dual simplex for the fields master's violated rows (instead of elastic rows) | [fields](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) | not kept | looped: 10 million pivots in a 73-row LP within one 120 s root |
 | Does the root's GF(2) heaviest set have the optimum's size? (`bench/gf2/roots.jsonl`'s `size` against `strict.jsonl`'s promotions, 1301-2175) | [agenda C4](AGENDA.md#4-conjectures) | measured | 758 of the 760 searched and repeated games; at 1320 and 1322 the heaviest set has 77 members and the optimum 78 (`max_total`) |
 | Barring each member of U\* in the parity bound at the root, against opt(n) (a certificate that every optimal set holds it) | [agenda 7.3](AGENDA.md#73-barred-bounds-on-the-upper-part) | measured; open ([agenda A2](AGENDA.md#a2-certify-the-frame-model-then-prove-with-its-facts-a-change-of-slope-for-the-proven-wall)) | certifies 207 of 224 (600), 339 of 377 (1000), 472 of 490 (1300); the open ones within the root's gap, the largest prime among them |
 
@@ -377,6 +380,7 @@ single-sacrifice route) have their row above.
 | [The wiki's open questions](#the-wikis-open-questions-2026-10) | must a move of an optimal game ever pay three numbers of tax, and which games can be adapted from the game of n − 1? | three: possible (from 40; the committed games from 1250), only for a move with three distinct primes (a theorem), never forced to 2175; the page's procedure: 45% of 2..1000, the 70% being the Java's reuse; optimal exactly when it skips a move worth δ(n); proven always at primes and 2p, never when δ(n) is coprime to a composite n | the entry (no solver change) |
 | [Round B: the chain on many threads](#round-b-the-chain-on-many-threads-2026-10) | can the chain keep 64 to 192 threads busy: games in flight with the threads moved between their searches, and what does a thread lose at many threads? | a window of games in flight with the proofs of a range solved in order (line for line with one thread); on 4 threads 1..1300 16% faster and 2226..2249 no slower, after speculation that cost 50% was made subordinate (reclaims, suspension, hints, deferring); the engine reports the units' starts, ramp and tail: on 4 threads a step 7% dearer, none of it in the units' starts; 64 and 192 threads are commands | 00d4b68, 9ca2c13, 8462d2c, af545ac, 3815e82, 13804bb, e4bfc4e and the entry |
 | [Scaling to 192 threads](#scaling-to-192-threads-2026-10) | where does a thread's time go at 64 and 192 threads on Graviton4, what does the window do there, and should the chain run on a `c8g.48xlarge` rather than a `c8g.16xlarge`? | at 64 threads the step costs what it does on one, the loss the units' first nodes and the ramp and tail; at 192 the second socket makes the step 7-10% dearer, lock 0.00-0.02%; a window of 16 makes the games past 2225 20-32% slower on 64 threads, 4 is the best measured; the 48xlarge 1.9-2.7 times as fast at 1.1-1.9 times the cost a game: the 16xlarge stays; $1.83 spent | 55287ff (no solver change) and the entry |
+| [A bound over GF(2) and GF(3) signed frame matroids](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) | does the LP over the GF(2) frame matroids and GF(3) signed frame matroids (signings made for the cores its columns meet) close a share of the root's GF(2) gap that holds with n (A1's E1, with E1n at the probe's nodes)? | yes: 0.62 of the gap at n ≥ 1700, no trend in n (+1.0 ± 2.6 points per 100 n), passing its kill criteria strongly; fixed signings close little; 86-98% of the probe's nodes GF(2) leaves open cut with node-fitted multipliers; Theorems 14-15 in THEORY.md | 7666072 to 1e12c77 and the entry (no solver change) |
 
 ## The port and its first improvements
 
@@ -4904,3 +4908,186 @@ price did not move), **$1.83**, with the 30 GB root volume and the S3 copies add
 interruption for want of capacity at 04:33:49, the two-minute notice, as the last run was ending (04:34:33, its
 outputs copied to S3); the terminate call came first, and nothing was lost.  Afterwards no instance, volume, spot
 request or security group of the run was left.
+
+## A bound over GF(2) and GF(3) signed frame matroids (2026-10)
+
+*Question.*  Avenue A1 of the
+[agenda](AGENDA.md#a1-a-bound-over-several-fields-and-signings-a-change-of-slope-if-its-share-holds) and its conjecture
+C1: does the LP over the two GF(2) frame matroids and a family of GF(3) *signed* frame matroids (the plain signing,
+random signings, and signings built from the cores the LP's own columns run into) close a share of the root's GF(2) gap
+that holds with n?  This is the advisor's experiment E1 (with E0, its validation, E1-lite, a quick look, and E1n, the
+probe's nodes), whose kill criteria were fixed before any run: on the main arm (`f1cores`), counting only the roots
+whose bracket is within 1% of their GF(2) gap, **K1** the mean share over n ≥ 1700 below 0.25, **K2** a slope of the
+share in n of −2 points per 100 n or worse with t ≤ −2, **K3** fewer than half of the 1215 probe's nodes that GF(2)
+leaves open cut with node-fitted multipliers; inconclusive if more than a fifth of the roots do not converge; "passes
+strongly" at a mean share of 0.5 or more for n ≥ 1700 and a slope above −1 point per 100 n.
+
+*What was kept.*  The study's code, as an instrument (as the matroid study's was): `examples/fields.rs` (commands
+`roots`, `nodes`, `check`, and the tests), `examples/common/gf3.rs` (GF(3) vectors and bases, signings, the signed frame
+matroids and their greedy), `common/cores.rs` (a frame's cores with a set applied, minimal cores, column-sum signings
+and their merging), `common/dw.rs` (the bound and its multipliers), `common/lp.rs` (the master's simplex), and
+`common/frames.rs` (the GF(2) frame matroids and the game setup, moved out of `examples/matroid.rs`, which prints the
+same lines as before); the data and the tables in [bench/fields](../bench/fields/README.md).  Theorems 14 and 15 of
+[THEORY.md](../../heuristics/THEORY.md#signed-frame-matroids-the-frame-bound-over-other-fields) prove what the bound
+rests on.  No solver change.
+
+*The bound.*  A *signing* σ of frame h over a field gives each incidence (mover, maximal factor) a nonzero value, each
+mover the vector of its values, and the frame the linear matroid N_h^σ on the candidates of homes h and h + 1 with the
+moves contracted (a candidate of home h + 1 its vector, one of home h its unit vector).  Every promotable set is
+independent in every such matroid, over every field (Theorem 14: a winnable frame's movers are triangular with a nonzero
+diagonal under any values), so for a family N_1, …, N_K and any multipliers λ_k, `L(λ) = MI_cap(w − Σ λ_k) + Σ_k
+G_k(λ_k)` bounds every promotion set (Theorem 15), MI the GF(2) intersection of at most `cap` elements and G_k the
+greedy maximum in N_k.  The bound reported is ⌊L⌋ evaluated in integers (weights x·2^16, multipliers rounded to the
+grid; the crate's `gf2::meet::Meet`, checked against `common/meet.rs`'s `intersect` at every 50th evaluation), so its
+validity never rests on the floating-point LP that proposes λ.  Its least value is the LP over the matroids' polytopes.
+Arms: `gf2` (no extra matroid), `f1` (the plain signing, all values 1, of frames 1, 2, 3), `f1r1`, `f1r3` (that and one
+or three random signings a frame, a value per incidence), `cores` (core-derived signings alone), `f1cores` (the main
+arm: plain and core-derived).
+
+*Core-derived signings.*  After the master's LP of a family is bracketed, every column of value above 10⁻⁶ is applied to
+the root's frames and peeled; each frame left with a residual gives up to 4 minimal self-covering subsets (cores), the
+next one found after un-applying the lightest of the previous core's *breaking* candidates (its promoted members, or a
+promoted-out factor that only one member lists).  A core is satisfied by a signing whose values sum to 0 over GF(3) on
+each of its pool factors, which makes its set dependent (THEORY.md, after Theorem 14); it is merged first fit into the
+frame's core-derived signings (per factor, the values of every assigned core listing it: kept if they satisfy all the
+sums, else the column-sum construction where no other core lists the factor, else a search over at most 2^12
+assignments), or opens a new signing (seeded random values elsewhere), at most 8 a frame.  The loop stops when a round
+assigns no core, after 40 rounds, or at the budget.
+
+*The multipliers, and what the design's master became.*  The design specified a Dantzig-Wolfe master with a column per
+GF(2) set and per independent set of each N_k, tied by a *link row* per (k, x) (`Σ α [x ∈ Q] − Σ β_k [x ∈ I] ≤ ε`),
+solved by a dense revised simplex.  It was built (commit 77c989f) and passed the tests of the time, but its simplex
+spent its pivots in steps of the perturbation's size: at the root of 360 (arm `cores`) 55,754 pivots for 274 pricings,
+71% of them steps of order ε = 10⁻⁷ and 4% zero; at 1000 in 60 s 232,000 pivots for 150 pricings, the master at 18,893
+against L = 24,382 (larger ε: 10⁻⁵ 292,000 pivots, 10⁻³ 16,000 but a looser master; ε = 0 a singular basis).  The master
+now describes each P(N_k) from outside, by its rank inequalities `z(S) ≤ r_k(S)` (Edmonds), added as the master's point
+`z = Σ α_j 1_{Q_j}` violates them: in each matroid the most violated level set of z and each dependent support set,
+closed within z's support (a closed set is at least as violated), and when none is found, an *exact check*: for each
+matroid the largest `y ≤ z` in its polytope, by a small column generation over its independent sets (a packing LP whose
+value is `min_S r(S) + z(T − S)`; less than z(T) exactly when z is outside, and then a level set of its final duals is
+violated).  When every check passes, `ẑ = min(z, y_1, …)` lies in every polytope (all are down-closed): its weight is a
+*certified* lower bound LB, and with the lowest L it brackets the LP.  An inequality's dual μ_{k,S} gives `λ_{k,x} =
+Σ_{S ∋ x} μ_{k,S}` (and `G_k(λ_k) ≤ Σ μ r(S)`), so the pricing is the same L.  Before the master, 100 Polyak steps from
+λ = 0 towards P*; then Wentges-stabilized pricing at ½ λ_best + ½ λ_master, or at λ_master when that prices nothing out;
+the exact checks only once a separation round has found no new core (intermediate families stop when no column prices
+out and no cheap inequality is violated); a family's generation stops when the lowest L is within `max(0.25, 0.005 ×
+gap)` of the master's value (half the convergence criterion).  The simplex (`lp.rs`, a partitioned basis inverse: only
+the block of the rows whose slack is not basic is kept, dense) gained partial Dantzig pricing, *elastic* rows (a
+violated inequality enters with an artificial column at penalty 10⁵ in place of its slack, so the basis stays feasible),
+a return to the empty set's basis when a refactorization finds the basis singular (108 times in E1) or a solve exceeds
+50,000 pivots (12 times), purging of nonbasic columns beyond 300, and right-hand sides perturbed by up to 10⁻⁶ (10⁻⁸
+left rounding ties to decide pivots); the exact checks drop the coloops of the matroid restricted to z's support, start
+from the support's independent parts and a pool, and stop at 300 columns (then repeat from the pool while the
+certificate is short).  A dual simplex for the violated rows was tried (a subagent's, kept in no commit): it looped (10
+million pivots in a 73-row LP), and the elastic rows replaced it.
+
+*Validity (E0).*  `cargo t --example fields`, 35 tests, all pass: GF(3) arithmetic and bases against scalar and dense
+elimination, the greedy against brute force on 3,000 random matroids, `det3` against integer determinants; the peel's
+residual against `winnable_using` on 10,650 frames; Lemmas 5-6 on 2,000 unpromotable sets of boards 60-400 (14,602
+cores, each one's column-sum signing makes its set dependent) and merging (11,217 cores into first-fit signings, every
+assigned core's sums still 0); the study's **test 3**, every promotable set of every board with ≤ 22 candidates and the
+optimal and 100 random maximal promotion sets of every non-prime board of 137-400 independent in every frame's matroid
+for the plain and five random signings (334 boards, 6.4 million pairs); **test 6**, 20 random multipliers at each of 309
+non-prime roots of 2-400 never below P* and L at zero multipliers the GF(2) bound; **test 7**, the exact LP (every
+common independent set and every independent set of each extra matroid a column) against the column generation on 124
+instances (boards with 4-16 candidates, and boards of 300-700 restricted to ≤ 12 candidates around the GF(2) set's
+cores, 65 of them with the LP below the GF(2) bound): the certified bound and the lowest L bracket it, within 10⁻⁵
+relative; **test 8**, the reweighted intersection equal to the reference's at 60 evaluations on 20 boards of 300-2175;
+the simplex against an enumeration reference on 3,000 random LPs and in stages, kills, degenerate and large LPs.
+`fields check` at every 25th board of 400-2175 (`check.jsonl`, 54 s): 14,472 promotion sets (200 random maximal ones and
+the optimal one a board) independent in 4,320 signed matroids (all frames, plain, five random and 20 column-sum signings
+a board), 302,623 cores of 14,400 random unpromotable sets each making its set dependent, 1,440 random multiplier
+vectors never below P*.  Every run asserted that the bound is at least P* (330 extra-matroid runs at 66 roots and the 13
+of E1-lite), that the optimal promotions are independent in every final matroid, and at the probe's nodes that the bound
+is at least the best completion recorded in `bench/matroid/nodes_exact.jsonl`.
+
+*E1-lite* (`lite.jsonl`, the code of b8d8256, 11 minutes): the main arm at every 100th game of 900-2100; 8 of 13
+converged (not 1400, 1500, 1700, 1800, 2000), the 3 converged with n ≥ 1500 at a mean share of 0.64: no early kill.  The
+stalled master solves and short certificates it showed were fixed before E1 (1051560).
+
+**E1: the main arm passes strongly.**  66 roots (every 25th game of 900-2175, the 9 others of the per-frame and slope
+studies, and 1430, 1472, 1521, 2170, 2172: the design's 67 count 1475 twice), six arms, 120 s a root for the core arms
+and 30 s for the others (`roots.jsonl`; 1.26 hours of one thread in all).  Share of the GF(2) gap closed, mean over the
+converged roots (converged of roots):
+
+| n | roots | f1 | f1r1 | f1r3 | cores | f1cores |
+|---|---|---|---|---|---|---|
+| 900-1099 | 11 | 0.05 (11/11) | 0.12 (11/11) | 0.19 (11/11) | 0.68 (11/11) | 0.68 (11/11) |
+| 1100-1299 | 14 | 0.08 (14/14) | 0.10 (14/14) | 0.16 (14/14) | 0.61 (14/14) | 0.66 (14/14) |
+| 1300-1499 | 10 | 0.02 (10/10) | 0.05 (10/10) | 0.12 (10/10) | 0.45 (6/10) | 0.47 (4/10) |
+| 1500-1699 | 9 | 0.09 (9/9) | 0.13 (9/9) | 0.17 (9/9) | 0.51 (7/9) | 0.57 (7/9) |
+| 1700-1899 | 8 | 0.02 (8/8) | 0.04 (8/8) | 0.10 (8/8) | 0.59 (8/8) | 0.59 (8/8) |
+| 1900-2175 | 14 | 0.02 (14/14) | 0.05 (14/14) | 0.08 (14/14) | 0.64 (10/14) | 0.65 (10/14) |
+
+The kill criteria on `f1cores`: 12 of 66 roots unconverged (18%, under the 20% that makes the run inconclusive; 1350,
+1400, 1425, 1430, 1472, 1475, 1500, 1521, 2000, 2050, 2125, 2170, each stopped at 120 s with its bracket wider than 1%
+of its gap); **K1**: mean share 0.619 over the 18 converged roots with n ≥ 1700 (killed below 0.25); **K2**: slope +1.00
+± 2.61 points per 100 n, t = +0.4 (killed at ≤ −2 with t ≤ −2); so **passes strongly**.  Over all 66 roots, converged or
+not (the bound is valid either way, and an unconverged root's share is at most its LP's): 0.620 for n ≥ 1700, slope
++0.52 ± 2.30.  The `cores` arm alone: 0.618 and +0.78 ± 2.45 (10 unconverged).  The fixed arms close little and less at
+large n: the plain signing 2% for n ≥ 1700, with three random signings a frame 9%, 0.16 of the main arm's share (the
+design asked whether F1 + R3 reaches 80% of it: no).  So the search cannot do without tracking cores: what sees the
+residual is the signings made for the cores it meets.
+
+Against the per-frame study's 19 roots (200 subgradient steps, mean 0.59): the converged main arm closes more at 950,
+992, 1000, 1150, 1184, 1225, 1250, 1254 and 1300 (where that study's subgradient had stalled: its LP is at least as
+tight as A1's by the design's Lemma 8, so there the stall was its method), less at the other ten; mean 0.62.
+
+*Signings, the support, the cores.*  Every root filled the cap of 8 core-derived signings on some frame (6.4 a frame
+used, 3.2 cores a signing, rising from 2.7 at 900-999 to 5.4 at 2100-2175), and 59 of the 123 distinct cores a root
+found could not be placed: the family is fragmented, which predicts that deep nodes meet cores the root's signings do
+not see.  The LP's support has 5-30 columns (13 on average), and 95% of its mass is on sets that cannot be promoted: far
+from integral where it binds.  No GF(3) loop occurred.  The census (`census.jsonl`, 8,129 cores of the main arm): 34
+members on average (25 at 900-999, 40 at 2100-2175), hardly ever square (0.3%) and never of three primes, so C2's
+hole-free three-prime case is not where these cores live; the plain signing sees 0.7% of them and the three random
+signings of `f1r3` 1.3%.
+
+*Cost.*  The main arm averages 36 s a root (1-120 s): 0.3 s in 563 GF(2) intersections (0.15 ms each at 900, 0.96 at
+2175), 10.6 s in the master's simplex, most of the rest in the exact checks (1.25 million pivots a root on average). The
+fixed arms converge in 0.01-1.4 s.
+
+**E1n: the probe's nodes** (`nodes.jsonl`, 3.5 minutes): the main arm at the fixture's root (120 s; 936 closed at 20555,
+1215 at 35168), then at each of the 300 nodes of each fixture either one evaluation at the root's final signings and
+multipliers (`root`) or the node's own master and separation from them (`node`, 10 s a node; the root's signings fixed,
+new ones the node's), each the lower of it and the node's GF(2) bound:
+
+| n | GF(2) | `root` mode | `node` mode | all conflicts (recorded) | per-frame, every 10th (recorded) | ms a node (`root`, `node`) |
+|---|---|---|---|---|---|---|
+| 936 | 163 of 300 | 212 (49 of the 137 open) | 297 (134 of 137) | 278 | 25-29 of 30 | 2.8, 106 |
+| 1215 | 167 of 300 | 209 (42 of 133) | 281 (114 of 133) | 249 | 23-27 of 30 | 5.2, 577 |
+
+**K3** passes: 86% of the nodes GF(2) leaves open at 1215 are cut with node-fitted multipliers (98% at 936), more than
+the LP over all conflicts cut.  The root's multipliers alone cut 0.37 of what the node's do, under the design's half: E3
+should start with form (c), the node's own master warm-started from its parent's columns.
+
+*Conclusion.*  C1 holds at the roots measured: with signings made for the cores its own columns meet, the LP closes
+about 60% of the root's GF(2) gap from 900 to 2175, with no trend in n (+1.0 ± 2.6 points per 100 n), and at the probe's
+nodes it cuts nearly every node GF(2) leaves open when the node fits its own multipliers.  Fixed signings do not do it.
+The cost is the multipliers: tens of seconds a root, 0.1-0.6 s a node, two to three orders of magnitude over the GF(2)
+bound; the design's next steps are E2 (past 2175) and E3 (a branch and bound with the bound in its three forms, form (c)
+first), and THEORY.md now proves the bound (Theorems 14 and 15).
+
+*Questions for the advisor and deviations from the design* (each resolved as stated, all sound):
+
+1. The master's link rows stalled (above); the master by rank inequalities with an exact certificate replaced it.  The
+   LP, the bound and its validity are the design's; the certified lower bound is the weight of a point of the LP's
+   polytope instead of the master's value.
+2. The closing tolerance is `max(0.25, 0.005 × gap)`, and the exact checks run only once a separation round finds no new
+   core (intermediate families stop at the cheap inequalities): the design's 0.25 at every family did not fit the budget
+   past 1300.
+3. A GF(3) loop of any extra matroid is left out of the intersection (L at λ_{k,x} = w_x; Theorem 14 (3)); none
+   occurred.
+4. `Scratch::stuck` is private to the crate and the study may not change it: `cores.rs` has its own peel (the same rule,
+   checked against `winnable_using`).
+5. "Delete from R the lightest candidate of the cores found" was read as: after each core, un-apply the lightest of its
+   breaking candidates (cumulatively), so each next core is a different one; a core with no promoted member is broken by
+   a promoted-out factor listed once.
+6. `merge` uses the column-sum construction for a factor no assigned core lists (no limit on its listers), the 2^12
+   search only where assigned cores share the factor.
+7. At nodes (`node` mode) the root's signings are kept fixed (their cores are the root's) and the multipliers start at
+   the root's; each node bound is the lower of L and the node's GF(2) bound.
+8. Test 7 runs on boards of 300-700 restricted to ≤ 12 candidates (the boards with ≤ 16 candidates have GF(2) gap 0, so
+   no extra matroid can cut there), with a relative tolerance of 10⁻⁵ (the perturbations and the grid).  The design's
+   test 4 lives in `cores.rs`'s tests.
+9. 66 roots, not 67 (1475 is a multiple of 25).  The census reports `det0` for square cores and the rank deficiency over
+   GF(3) for all, and adds whether the plain signing sees each core.
