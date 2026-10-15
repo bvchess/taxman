@@ -19,10 +19,11 @@
 //!   ([`Ctx::stats`]).
 //!
 //! [`run`] takes an [`EngineConfig`] (threads, memory cap and spill directory, checkpoint file and interval, limits,
-//! progress), a [`Start`] (new units with an initial incumbent, or a checkpoint to resume), an opaque `header` that
-//! identifies the search (stored in every checkpoint and compared on resume), and a closure that makes one searcher per
-//! worker thread.  It returns an [`Outcome`]: whether the search completed, the best value and payload, the statistics,
-//! the time and the [`Counters`].  `tests/engine.rs` runs a toy problem (knapsack) through every feature.
+//! progress, and a [`Control`] to steer the run from outside), a [`Start`] (new units with an initial incumbent, or a
+//! checkpoint to resume), an opaque `header` that identifies the search (stored in every checkpoint and compared on
+//! resume), and a closure that makes one searcher per worker thread.  It returns an [`Outcome`]: whether the search
+//! completed, the best value and payload, the statistics, the time and the [`Counters`].  `tests/engine.rs` runs a toy
+//! problem (knapsack) through every feature.
 //!
 //! # Protocol
 //!
@@ -50,7 +51,7 @@
 //! A running worker claims one request by decrementing the count with a compare-and-swap, so each request has
 //! at most one claimant, and yields; it hands its units over and retires the claim (`requested -= 1`) in one
 //! critical section (`finish_run`), after which the demand is recomputed.  So as many workers split at once
-//! as there are idle workers to feed: from one unit, `threads` workers are busy after a few rounds of splits
+//! as there are idle workers to feed: from one unit, every worker is busy after a few rounds of splits
 //! in which every running worker splits, not after one split per idle worker; and splits in flight never
 //! outnumber the idle workers.  A worker answers only after `MIN_POLLS` polls of its current unit: a fresh
 //! unit (stolen, or the deepest one its last split left it) first goes deep enough to have something to give,
@@ -100,18 +101,19 @@
 //!
 //! The next periodic checkpoint is due one interval after a pause ends, but never sooner than that pause
 //! lasted, and its pause begins only once the released workers are all running again (`resuming` is clear:
-//! no held unit is left, and the deque is empty or every worker runs).  The coordinator waits for that
-//! without the lock, so with any interval, zero included, the workers make progress and pauses take at most
-//! about half of their time.
+//! no held unit is left, and the deque is empty or every live worker runs, as every one does when none is
+//! live).  The coordinator waits for that without the lock, so with any interval, zero included, the workers
+//! make progress and pauses take at most about half of their time.
 //!
 //! **Output.**  Progress lines and warnings go to stderr outside the lock, so a blocked stderr cannot stall
 //! the workers, and write errors are ignored, so a closed one (a dead `tee`, EPIPE) cannot kill them either.
 //!
 //! **Termination.**  The search is complete when a worker that needs work finds the deque and spill empty,
 //! `running == 0`, no held units and no pause; that worker sets `done` and `exit`.  (While paused, the
-//! coordinator makes the same check once the pause is complete.)  `declare_optimal` sets `exit` directly and
-//! all remaining work is discarded.  Every state change that can satisfy a waiter's condition is made under
-//! the mutex and followed by a notify, so no wakeup is lost.
+//! coordinator makes the same check once the pause is complete, and while no worker is live, at every look:
+//! see "Workers".)  `declare_optimal` sets `exit` directly and all remaining work is discarded.  Every state
+//! change that can satisfy a waiter's condition is made under the mutex and followed by a notify, so no
+//! wakeup is lost.
 //!
 //! **Panics.**  In a build that unwinds (tests), a guard in every worker and in the coordinator sets `exit`
 //! when its thread unwinds, so nobody waits forever and `std::thread::scope` re-raises the panic; no
@@ -132,27 +134,109 @@
 //! **Starting stopped.**  The coordinator is the only one who checks the deadline and the stop signal, and the
 //! workers run until it does, so a stop that begins while a run is under way takes effect when the coordinator
 //! next looks, and a search shorter than that completes first.  A stop that already holds when the run starts
-//! must not depend on that race: a deadline already past (a time limit of zero) or a stop signal already received
-//! does no search work, however the threads are scheduled.  [`run`] makes that check (`Plan::stop_due`, the very
-//! test the coordinator makes) before it starts a worker; if it holds, it asks for the stop (`request_stop`)
-//! and starts none, and the coordinator stops the run at its first check like any stop.  No unit was ever handed
-//! out, so the final checkpoint holds all of them (the starting units, or the checkpoint's), the incumbent and
-//! statistics are the ones the run started with, `completed` is false and `Counters::runs` is 0; a run resumed
-//! from that checkpoint while the stop still holds stops the same way and writes the same units again.  (A
-//! search with no units at all is complete, and says so.)  The node limit is not a stop of this kind: workers
+//! must not depend on that race: a deadline already past (a time limit of zero), a stop signal already received or
+//! a [`Control::stop`] given before the run does no search work, however the threads are scheduled.  [`run`] makes
+//! that check (`Plan::stop_due`, the very test the coordinator makes, and the control's stop, applied when it is
+//! attached) before it starts a worker; if it holds, it asks for the stop (`request_stop`) and starts none (`grow`
+//! starts no worker once a stop is asked for), and the coordinator stops the run at its first check like any stop.
+//! No unit was ever handed out, so the final checkpoint holds all of them (the starting units, or the checkpoint's),
+//! the incumbent and statistics are the ones the run started with, `completed` is false and `Counters::runs` is 0; a
+//! run resumed from that checkpoint while the stop still holds stops the same way and writes the same units again.
+//! (A search with no units at all is complete, and says so.)  The node limit is not a stop of this kind: workers
 //! enforce it when they publish their node counts, every `POLL_BATCH` polls, so a search shorter than that
 //! completes whatever the limit.
+//!
+//! # The control
+//!
+//! A [`Control`] (`EngineConfig::control`) steers a run from another thread: it gives the run a ceiling, offers it
+//! incumbents, stops it, changes its number of workers, and reports what it is doing.  Without one, nothing below
+//! happens: a run goes exactly as it would.
+//!
+//! **Attaching.**  [`run`] attaches its control (a weak reference to the run's shared state, behind the trait
+//! `Remote`, since the control does not know the unit type) before it starts a worker, and detaches it when the run
+//! ends, a panic unwinding included, leaving the run's incumbent with the control.  The control records every request
+//! it is given; a request made while a run is attached is also made of the run, and one made before is made of it when
+//! it attaches.  Both happen under the control's own mutex, which attaching and detaching take too, so each request
+//! reaches a run exactly once: when it is made, or when the run attaches.  Making one twice would change nothing
+//! anyway (the ceiling is the least given, the incumbent the best, a stop a flag, the workers the last number given).
+//! The control's mutex comes before the `state` lock and the payload's, and the run never takes it holding either.
+//!
+//! **Ceiling.**  A proven upper bound on the optimum: an incumbent that reaches it is optimal, and the run ends as if
+//! a searcher had called `declare_optimal`.  Two events can make that so, an offer that raises the incumbent and a
+//! ceiling that comes down to it, and each checks for the other: an offer stores the incumbent and then loads the
+//! ceiling, and `set_ceiling` stores the ceiling and then loads the incumbent, all four accesses `SeqCst`.  In their
+//! single total order one side's store comes before the other side's load (the store-buffering pattern of Dekker's
+//! algorithm), so at least one of the two loads sees the other side's store, and a reached ceiling always ends the
+//! run, whichever came first.  The state lock is taken only then, and the payload's is released first (a checkpoint
+//! takes them the other way round).  Attaching offers the control's incumbent and then gives its ceiling, so a run
+//! whose starting incumbent already reaches the ceiling sets `exit` before it starts a worker and does no search work.
+//!
+//! **Outside incumbents and stops.**  An offer through the control is `Ctx::offer`, and one made before the run
+//! raises its starting incumbent.  A stop through the control is a stop like a limit's (a final checkpoint); one given
+//! before the run is a stop that holds when it starts ("Starting stopped").
+//!
+//! **Workers.**  The run has a *target* number of workers (`EngineConfig::threads`, or the control's), and counts the
+//! *live* ones: started, and not yet retired or exited.  Every "all workers" of the protocol means the live ones: full
+//! occupancy and the end of `resuming` are `running == live`, and the demand counts live workers.  Each worker has a
+//! number, never reused, which indexes its `held` slot, statistics and clock; those lists only grow.
+//!
+//! *Growing.*  While fewer workers are live than the target, and neither `exit` nor a stop is set, the coordinator
+//! starts workers (`grow`): it reserves their slots under the lock, so that they count as live at once, and spawns
+//! their threads outside it.  A worker that cannot be started stops the run with the error, as one at the start does.
+//! A new worker takes work like any idle one; in a pause it parks like the others (it holds nothing, so the
+//! checkpoint has every unit without it).
+//!
+//! *Retiring.*  A worker leaves only holding no unit, so conservation is untouched.  An idle worker retires in
+//! `acquire` when, outside a pause, it has found no unit, the termination test has not ended the run, and more workers
+//! are live than the target; lowering the target wakes the idle workers to check.  A running worker beyond the target
+//! retires in `finish_run` if it has units to give and no pause is on: it hands all of them, its deepest too, to the
+//! deque in the critical section in which it stops running (a split that keeps nothing), and leaves; one with nothing
+//! to give goes to `acquire` like any worker that needs work.  To bring running workers back promptly, the demand of
+//! "Splitting" also counts the live workers beyond the target that are not idle (the idle ones retire by themselves),
+//! and it does not count as needing work the idle workers that will retire.  Without a control the target and the live
+//! workers are the configured threads from start to end, and no worker grows or retires.
+//!
+//! *Suspending.*  A target of 0 suspends the search (not a pause: no worker is parked, none is live): every worker
+//! retires as above, the idle ones at once and the running ones at their next answer, and the units wait in the deque
+//! and the spill until the target rises, when the coordinator starts workers as for any rise.  `EngineConfig::threads`
+//! is at least 1, so a run starts with workers unless its control was given 0 before it started.  The rest of the run
+//! goes on without workers: a pause finds none running at once, so a checkpoint, periodic or the final one of a stop,
+//! writes the queued units; a stop, a stop signal, a deadline and a ceiling given or reached end the run as ever; and
+//! `resuming` ends as soon as no worker is live, since then every live worker runs.
+//!
+//! *Conservation and termination as workers come and go.*  A worker leaves only holding no unit: a running one hands
+//! its units over in the critical section in which it stops running, and an idle one holds none, since a held unit is
+//! the first thing its worker takes after a pause and no worker retires in a pause.  So with no worker live every unit
+//! is in the deque or the spill, from which only workers take, and no unit moves until workers start again (the
+//! coordinator's checkpoints copy them).  The termination test is made by every worker that needs work and finds none,
+//! before it may retire, and by the coordinator after a pause and whenever no worker is live.  When the search's last
+//! run ends, its worker has nothing to hand over, needs work and makes the test (or, in a pause, the coordinator does),
+//! whatever the target, so a run whose last unit ends as it is suspended completes.  A run with no worker live is
+//! suspended, not complete: a retiring idle worker has just seen its test fail with nothing to take, outside a pause,
+//! so another worker runs or holds a unit and is live; the last worker to leave before the run ends is therefore a
+//! running one, which leaves its units in the deque.  The one exception, a run suspended from its start with no unit
+//! at all, is complete, and the coordinator's test ends it at its first look.  With a target of at least 1 a worker
+//! retires only while more are live than the target, so some worker is live until the run ends, and the units a
+//! retiring one leaves are taken: it wakes idle workers for them, and the running ones come back for work.  So the last
+//! worker to need work still makes the termination test.
 //!
 //! # Instrumentation
 //!
 //! Each worker's time is split into disjoint intervals, summed in [`Counters`]: *busy* (inside
 //! [`Searcher::run`]), *idle* (waiting for work outside pauses), *parked* (waiting in a pause) and *lock wait*
-//! (waiting for the `state` lock after a run); the rest of `wall × threads` is thread start-up and the engine's
-//! own bookkeeping.  The effective parallelism is busy time over `wall × threads`.  Also counted: splits and
-//! the units they gave, steals (units taken from the front by a worker that had waited), runs and tiny runs
-//! (at most one poll: units with nothing left), when all workers first ran at once, and the pauses.  The
-//! clocks are read only at unit boundaries and waits, never per poll.  [`Counters::summary`] is the compact
-//! form that ends every progress line.
+//! (waiting for the `state` lock after a run).  The rest of its lifetime (from the start of the workers, or its own
+//! start if it was added later, to its retirement or the end of the run) is thread start-up and the engine's own
+//! bookkeeping.  The lifetimes summed over workers are the *capacity*, which is `wall × threads` when the number of
+//! workers does not change; the effective parallelism is busy time over capacity.  Also counted: splits and the units
+//! they gave, steals (units taken from the front by a worker that had waited), runs and tiny runs (at most one poll:
+//! units with nothing left), when all workers first ran at once, the most workers alive at once and those added and
+//! retired, and the pauses.  Four times show where a parallel search loses time to its shape: the idle time before
+//! all workers first ran at once (the *ramp*) and after the last moment a worker finished a run while all ran (the
+//! *tail*, also measured in wall time), a run's time to its first poll (the searcher's *rebuild* of its state from the
+//! unit) and from its first poll to its second (its *first step*).  The clocks are read only at unit boundaries,
+//! waits and a run's first two polls (which `poll` finds by testing one byte of `Ctx`), never per poll; the state
+//! keeps a running total of the idle waits, so that the ramp's and the tail's idle times are snapshots of it.
+//! [`Counters::summary`] is the compact form that ends every progress line.
 //!
 //! # Platforms
 //!
@@ -174,7 +258,7 @@ use std::fs::{self, File, OpenOptions, TryLockError};
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
-use std::sync::{Condvar, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError, Weak};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -228,7 +312,7 @@ impl Stats {
 /// How to run the engine.
 #[derive(Clone, Debug)]
 pub struct EngineConfig {
-    /// Worker threads (at least 1).
+    /// Worker threads (at least 1); [`Control::set_workers`] changes their number, and can suspend the run with 0.
     pub threads: usize,
     /// Maximum number of units kept in memory in the shared deque; the rest are spilled (needs `spill_dir`).
     pub queue_mem_cap: usize,
@@ -260,6 +344,10 @@ pub struct EngineConfig {
     /// the check costs nothing but one test every `POLL_BATCH` polls.  The workers' busy time includes their
     /// waits for a turn, so the [`Counters`] times mean nothing with it.
     pub cores: Option<usize>,
+    /// A handle through which another thread steers the run while it goes (a ceiling, outside incumbents, a stop, the
+    /// number of workers) and watches it: see [`Control`] and "The control" in the module docs.  `None`, the default:
+    /// the run goes as configured.
+    pub control: Option<Arc<Control>>,
 }
 
 impl Default for EngineConfig {
@@ -275,8 +363,200 @@ impl Default for EngineConfig {
             node_limit: None,
             label: String::new(),
             cores: None,
+            control: None,
         }
     }
+}
+
+/// Steers a run from another thread while it goes, and watches it (see "The control" in the module docs).  Attach it
+/// to a run with [`EngineConfig::control`]; share it as `Arc<Control>`.  It remembers what it is told, so a request
+/// made before a run is applied when the run starts, and it keeps the run's incumbent when the run ends.  A control
+/// belongs to one search, a run and its resumes, since the incumbents and the ceiling it carries are that search's;
+/// it is attached to one run at a time, and a stop it was given holds for every run it is attached to later.
+pub struct Control {
+    state: Mutex<ControlState>,
+}
+
+/// What a [`Control`] has been told, and the run it is attached to.
+#[derive(Default)]
+struct ControlState {
+    /// The run, from before its first worker starts until it ends.
+    run: Option<Weak<dyn Remote>>,
+    /// The least ceiling given.
+    ceiling: Option<u64>,
+    /// The best incumbent offered while no run was attached, or the last run's incumbent (which is at least as good as
+    /// every one offered before, since that run started from them).
+    best: Option<(u64, Vec<u8>)>,
+    stop: bool,
+    /// The last number of workers given.
+    workers: Option<usize>,
+}
+
+impl Control {
+    /// A control that has been told nothing.
+    #[must_use]
+    pub fn new() -> Arc<Control> {
+        Arc::new(Control { state: Mutex::new(ControlState::default()) })
+    }
+
+    /// A ceiling: a value the incumbent can never exceed (a proven upper bound on the optimum).  Once the incumbent
+    /// reaches it, the incumbent is optimal and the run ends as if a searcher had called [`Ctx::declare_optimal`]
+    /// ([`Outcome::optimal_declared`]).  It can be given before the run or while it runs, any number of times; the
+    /// lowest value given counts.  A run whose incumbent already reaches it when the run starts does no search work
+    /// (no worker takes a unit, `Counters::runs == 0`, completed, optimal declared), and one whose incumbent reaches it
+    /// when it is given ends at once.  `u64::MAX`, which says nothing, is ignored by the run.
+    pub fn set_ceiling(&self, value: u64) {
+        let mut state = lock(&self.state);
+        state.ceiling = Some(state.ceiling.map_or(value, |ceiling| ceiling.min(value)));
+        if let Some(run) = Self::attached(&state) {
+            run.set_ceiling(value);
+        }
+    }
+
+    /// The lowest ceiling given, if any.
+    #[must_use]
+    pub fn ceiling(&self) -> Option<u64> {
+        lock(&self.state).ceiling
+    }
+
+    /// Offer an incumbent from outside, exactly as [`Ctx::offer`] does (the payload must be what the searchers would
+    /// offer); a run's incumbent that reaches the ceiling ends it.  Before the run starts the best offered is kept, and
+    /// the run starts from the better of it and its [`Start`]'s incumbent (fresh or from the checkpoint).  Returns
+    /// whether it became the run's incumbent, or, with no run attached, whether it is kept as the best so far.
+    pub fn offer(&self, value: u64, payload: &[u8]) -> bool {
+        let mut state = lock(&self.state);
+        if let Some(run) = Self::attached(&state) {
+            return run.offer(value, payload);
+        }
+        if state.best.as_ref().is_some_and(|(best, _)| value <= *best) {
+            return false;
+        }
+        state.best = Some((value, payload.to_vec()));
+        true
+    }
+
+    /// The incumbent's value and payload: the run's while it runs (and after it ended), else the best offered, if
+    /// any.
+    #[must_use]
+    pub fn best(&self) -> Option<(u64, Vec<u8>)> {
+        let state = lock(&self.state);
+        match Self::attached(&state) {
+            Some(run) => Some(run.incumbent()),
+            None => state.best.clone(),
+        }
+    }
+
+    /// Stop the run as a limit does (with a final checkpoint if one is configured, `completed == false`).  Given
+    /// before the run, the run starts stopped ("Starting stopped" in the module docs), and so does every later run
+    /// this control is attached to.
+    pub fn stop(&self) {
+        let mut state = lock(&self.state);
+        state.stop = true;
+        if let Some(run) = Self::attached(&state) {
+            run.stop();
+        }
+    }
+
+    /// The number of workers the run should have from now on.  While the run goes, it starts workers until it has that
+    /// many (each makes its own searcher with `make(i)`, `i` a new number) and retires workers that have no unit, or
+    /// have just handed theirs over, until it has no more.  0 suspends the search: the units wait in the run's deque
+    /// until the number is raised again, and the run is not over meanwhile ("Suspending" in the module docs).  Given
+    /// before the run, it replaces [`EngineConfig::threads`], 0 included.
+    pub fn set_workers(&self, workers: usize) {
+        let mut state = lock(&self.state);
+        state.workers = Some(workers);
+        if let Some(run) = Self::attached(&state) {
+            run.set_workers(workers);
+        }
+    }
+
+    /// The number set by [`set_workers`](Control::set_workers), if any.
+    #[must_use]
+    pub fn workers(&self) -> Option<usize> {
+        lock(&self.state).workers
+    }
+
+    /// What the run is doing now, if it is running (`None` before it starts and after it ends).
+    #[must_use]
+    pub fn status(&self) -> Option<Status> {
+        Self::attached(&lock(&self.state)).map(|run| run.status())
+    }
+
+    /// The run attached, if any.
+    fn attached(state: &ControlState) -> Option<Arc<dyn Remote>> {
+        state.run.as_ref().and_then(Weak::upgrade)
+    }
+
+    /// Attach `run`, making of it every request recorded so far (see "Attaching").
+    ///
+    /// # Errors
+    ///
+    /// `InvalidInput` if another run is attached.
+    fn attach<R: Remote + 'static>(&self, run: &Arc<R>) -> io::Result<()> {
+        let mut state = lock(&self.state);
+        if Self::attached(&state).is_some() {
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, "the control is attached to another run"));
+        }
+        // The incumbent before the ceiling, which the incumbent may reach.
+        if let Some((value, payload)) = &state.best {
+            run.offer(*value, payload);
+        }
+        if let Some(ceiling) = state.ceiling {
+            run.set_ceiling(ceiling);
+        }
+        if state.stop {
+            run.stop();
+        }
+        if let Some(workers) = state.workers {
+            run.set_workers(workers);
+        }
+        let run: Weak<R> = Arc::downgrade(run);
+        state.run = Some(run);
+        Ok(())
+    }
+
+    /// Detach `run`, whose workers have all exited, keeping its incumbent.  The incumbent is read under the control's
+    /// mutex, through which every outside offer goes, so it is the run's last.
+    fn detach(&self, run: &dyn Remote) {
+        let mut state = lock(&self.state);
+        state.run = None;
+        state.best = Some(run.incumbent());
+    }
+}
+
+/// By hand, because the attached run is not `Debug`: what the control has been told, and whether a run is attached.
+impl std::fmt::Debug for Control {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = lock(&self.state);
+        f.debug_struct("Control")
+            .field("attached", &Self::attached(&state).is_some())
+            .field("ceiling", &state.ceiling)
+            .field("best", &state.best.as_ref().map(|(value, _)| value))
+            .field("stop", &state.stop)
+            .field("workers", &state.workers)
+            .finish()
+    }
+}
+
+/// What a run is doing, from [`Control::status`].  The times are summed over workers, as in [`Counters`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Status {
+    /// Workers alive: started, and not yet retired or exited.
+    pub live: usize,
+    /// Workers inside [`Searcher::run`].
+    pub running: usize,
+    /// Workers waiting for work outside a pause.
+    pub idle: usize,
+    /// Units in the deque, in memory or spilled.
+    pub queued: usize,
+    /// Time spent waiting for work outside pauses so far, waits still going on included.
+    pub idle_time: Duration,
+    /// The workers' lifetimes so far (see [`Counters::capacity`]).
+    pub capacity: Duration,
+    /// The incumbent's value.
+    pub best: u64,
+    /// Nodes published in this invocation.
+    pub nodes: u64,
 }
 
 /// Where a run starts.
@@ -292,8 +572,15 @@ pub enum Start<U> {
 /// (see "Instrumentation" in the module docs).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Counters {
-    /// Worker threads.
+    /// The most workers alive at once: the configured threads, unless a [`Control`] changed their number (or the run
+    /// started none).
     pub threads: usize,
+    /// Workers started after the first ones, and workers retired (both through a [`Control`]).
+    pub spawned: u64,
+    pub retired: u64,
+    /// The workers' lifetimes summed: each from the start of the workers (or its own start, if it was added later) to
+    /// its retirement or the end of the run.  Exactly `wall × threads` when their number did not change.
+    pub capacity: Duration,
     /// Split requests answered.
     pub splits: u64,
     /// Units handed to the deque by split answers.
@@ -324,8 +611,21 @@ pub struct Counters {
     pub parked: Duration,
     /// Time workers spent waiting for the engine's lock after a run (contention on the shared deque).
     pub lock_wait: Duration,
-    /// From starting the workers until every worker was running a unit at the same time (`None`: never).
+    /// From starting the workers until every live worker was running a unit at the same time (`None`: never).
     pub full_occupancy: Option<Duration>,
+    /// Idle time before full occupancy was first reached (all of it if it never was).
+    pub ramp_idle: Duration,
+    /// The wall time from the last moment a worker finished a run while every live worker was running to the end of
+    /// the run, and the idle time after that moment (zero if that never happened).
+    pub tail: Duration,
+    pub tail_idle: Duration,
+    /// Summed over runs of units: the time from the start of [`Searcher::run`] to its first poll (for the Taxman
+    /// searcher, rebuilding its state from the unit).
+    pub rebuild: Duration,
+    /// Summed over runs that polled twice: the time from the first poll to the second (the unit's first node; for the
+    /// Taxman searcher, its bounds solved from scratch), and the number of those runs.
+    pub first_step: Duration,
+    pub first_steps: u64,
     /// Pauses (each checkpoint, and the final one of a stop).
     pub pauses: u64,
     /// Total and longest time from asking the workers to yield until releasing them (or exiting).
@@ -336,11 +636,14 @@ pub struct Counters {
 }
 
 impl Counters {
-    /// Add the counters of another run with as many threads, as if it had followed this one: counts and times
-    /// add up, the maxima take the larger, and full occupancy the later (never if either run never reached it).
+    /// Add the counters of another run, as if it had followed this one: counts and times add up, the maxima take the
+    /// larger, and full occupancy the later (never if either run never reached it).
     pub fn add(&mut self, other: &Counters) {
         self.threads = self.threads.max(other.threads);
         for (a, b) in [
+            (&mut self.spawned, other.spawned),
+            (&mut self.retired, other.retired),
+            (&mut self.first_steps, other.first_steps),
             (&mut self.splits, other.splits),
             (&mut self.split_units, other.split_units),
             (&mut self.steals, other.steals),
@@ -355,6 +658,12 @@ impl Counters {
             *a += b;
         }
         for (a, b) in [
+            (&mut self.capacity, other.capacity),
+            (&mut self.ramp_idle, other.ramp_idle),
+            (&mut self.tail, other.tail),
+            (&mut self.tail_idle, other.tail_idle),
+            (&mut self.rebuild, other.rebuild),
+            (&mut self.first_step, other.first_step),
             (&mut self.wall, other.wall),
             (&mut self.busy, other.busy),
             (&mut self.idle, other.idle),
@@ -370,16 +679,20 @@ impl Counters {
         self.full_occupancy = self.full_occupancy.zip(other.full_occupancy).map(|(a, b)| a.max(b));
     }
 
-    /// Effective parallelism: busy time over `wall × threads`, from 0 to 1.
+    /// Effective parallelism: busy time over the capacity, from 0 to 1.
     #[must_use]
     pub fn efficiency(&self) -> f64 {
         self.share(self.busy)
     }
 
-    /// `time` as a fraction of `wall × threads`.
+    /// `time` as a fraction of the capacity (of `wall × threads` for counters that have none, made by hand).
     #[must_use]
     pub fn share(&self, time: Duration) -> f64 {
-        let capacity = self.wall.as_secs_f64() * self.threads as f64;
+        let capacity = if self.capacity > Duration::ZERO {
+            self.capacity.as_secs_f64()
+        } else {
+            self.wall.as_secs_f64() * self.threads as f64
+        };
         if capacity > 0.0 {
             time.as_secs_f64() / capacity
         } else {
@@ -388,24 +701,33 @@ impl Counters {
     }
 
     /// One compact line: effective parallelism, the shares of idle and lock-wait time, splits, steals, time to
-    /// full occupancy, and (if any) the pauses with the share of parked time, the longest pause and the longest
-    /// wait for the workers to park.
+    /// full occupancy, the shares of the ramp's and the tail's idle time, of the rebuilds and of the first steps,
+    /// and (if any) the pauses with the share of parked time, the longest pause and the longest wait for the
+    /// workers to park.
     #[must_use]
     pub fn summary(&self) -> String {
         let full = self.full_occupancy.map_or_else(|| "never".to_owned(), fmt_short);
+        let percent = |time| 100.0 * self.share(time);
         let mut line = format!(
             "eff {:.1}% idle {:.1}% lock {:.1}% splits {} steals {} full {full}",
             100.0 * self.efficiency(),
-            100.0 * self.share(self.idle),
-            100.0 * self.share(self.lock_wait),
+            percent(self.idle),
+            percent(self.lock_wait),
             si(self.splits as f64),
             si(self.steals as f64),
+        );
+        line += &format!(
+            " ramp {:.1}% tail {:.1}% rebuild {:.1}% first {:.1}%",
+            percent(self.ramp_idle),
+            percent(self.tail_idle),
+            percent(self.rebuild),
+            percent(self.first_step),
         );
         if self.pauses > 0 {
             line += &format!(
                 " pauses {} ({:.1}%) max {} park {}",
                 self.pauses,
-                100.0 * self.share(self.parked),
+                percent(self.parked),
                 fmt_short(self.pause_max),
                 fmt_short(self.park_max)
             );
@@ -417,10 +739,10 @@ impl Counters {
 /// The result of [`run`].
 #[derive(Clone, Debug)]
 pub struct Outcome {
-    /// The whole tree was explored, or a searcher declared the incumbent optimal.  False when a limit or a
-    /// stop signal stopped the run (a final checkpoint was written if configured).
+    /// The whole tree was explored, or the incumbent was proven optimal (`optimal_declared`).  False when a limit,
+    /// a stop signal or a [`Control::stop`] stopped the run (a final checkpoint was written if configured).
     pub completed: bool,
-    /// A searcher called [`Ctx::declare_optimal`].
+    /// A searcher called [`Ctx::declare_optimal`], or the incumbent reached the ceiling of the run's [`Control`].
     pub optimal_declared: bool,
     pub best: u64,
     pub payload: Vec<u8>,
@@ -436,18 +758,20 @@ pub struct Outcome {
 /// reserved address space, committed as touched.
 pub const WORKER_STACK_SIZE: usize = 64 << 20;
 
-/// Run a search to completion, to a limit, until a stop signal (see [`stop_on_signals`]), or until a searcher
-/// declares the incumbent optimal.
+/// Run a search to completion, to a limit, until a stop signal (see [`stop_on_signals`]) or a [`Control::stop`],
+/// or until the incumbent is proven optimal (by a searcher, or by the control's ceiling).
 ///
 /// `header` is opaque caller data stored in every checkpoint (everything the caller needs to rebuild its
 /// searchers on resume); read it back with [`read_checkpoint_header`] or [`read_checkpoint`].  Worker `i` uses
-/// `make(i)`, called on its own thread.  When the run completes, the checkpoint file (if configured) is
-/// deleted unless `cfg.keep_completed_checkpoint`.
+/// `make(i)`, called on its own thread; the workers are numbered from 0, and those a control adds take the next
+/// numbers.  When the run completes, the checkpoint file (if configured) is deleted unless
+/// `cfg.keep_completed_checkpoint`.
 ///
 /// # Errors
 ///
 /// I/O failures while spilling, checkpointing or resuming (the last checkpoint written stays valid), a
-/// damaged checkpoint (`InvalidData`), and a checkpoint whose header differs from `header` (`InvalidInput`).
+/// damaged checkpoint (`InvalidData`), a checkpoint whose header differs from `header` (`InvalidInput`), a worker
+/// thread that cannot be started, and a control attached to another run (`InvalidInput`).
 ///
 /// # Panics
 ///
@@ -455,12 +779,11 @@ pub const WORKER_STACK_SIZE: usize = 64 << 20;
 /// unwinds; release builds abort).
 pub fn run<U, S, F>(cfg: &EngineConfig, start: Start<U>, header: &[u8], make: F) -> io::Result<Outcome>
 where
-    U: Unit,
+    U: Unit + 'static,
     S: Searcher<U>,
     F: Fn(usize) -> S + Sync,
 {
     let t0 = Instant::now();
-    let threads = cfg.threads.max(1);
     if let Some(dir) = &cfg.spill_dir {
         fs::create_dir_all(dir)?;
         remove_orphaned_segments(dir);
@@ -479,8 +802,17 @@ where
             (init, Vec::new(), Some(path))
         }
     };
-    let shared = Shared::new(cfg, threads, init, t0);
+    // In an `Arc`, of which an attached control holds a weak reference ("Attaching").
+    let arc = Arc::new(Shared::new(cfg, init, t0));
+    let shared: &Shared<U> = &arc;
     shared.load(fresh, resume.as_deref())?;
+    let attached = match &cfg.control {
+        Some(control) => {
+            control.attach(&arc)?;
+            Some(Attachment { control, shared })
+        }
+        None => None,
+    };
     // Limits, schedules and the instrumentation count from here, so a slow resume cannot use up the time limit.
     let began = Instant::now();
     shared.lock().began = began;
@@ -492,32 +824,40 @@ where
         label: &cfg.label,
         header,
     };
-    // See "Starting stopped": a stop that already holds is made before any worker exists to take a unit, and the
-    // coordinator carries it out as it does every stop.
-    let workers = if plan.stop_due() {
+    // See "Starting stopped": a stop that already holds is asked for before any worker exists to take a unit, so that
+    // none is started, and the coordinator carries it out as it does every stop.
+    if plan.stop_due() {
         shared.request_stop();
-        0
-    } else {
-        threads
-    };
+    }
+    let make = &make;
     thread::scope(|scope| {
-        for i in 0..workers {
-            let (shared, make) = (&shared, &make);
-            let spawned = thread::Builder::new()
+        let spawn = |i: usize| {
+            thread::Builder::new()
                 .name(format!("engine-{i}"))
                 .stack_size(WORKER_STACK_SIZE)
-                .spawn_scoped(scope, move || shared.worker(i, make));
-            if let Err(e) = spawned {
-                let mut st = shared.lock();
-                st.error.get_or_insert(e);
-                shared.set_exit(&mut st);
-                break;
-            }
-        }
-        shared.coordinate(&plan);
+                .spawn_scoped(scope, move || shared.worker(i, make))
+                .map(drop)
+        };
+        shared.grow(&spawn, true);
+        shared.coordinate(&plan, &spawn);
     });
+    // Detached before the outcome is taken, the incumbent is final: the control keeps the outcome's.
+    drop(attached);
     let finished = plan.checkpoint.map(|(path, _)| path).filter(|_| !cfg.keep_completed_checkpoint);
     shared.outcome(finished, Instant::now())
+}
+
+/// Detaches a run from its control when the run ends, however it ends (a panic unwinding included), leaving the run's
+/// incumbent with the control.
+struct Attachment<'r, U: Unit> {
+    control: &'r Control,
+    shared: &'r Shared<U>,
+}
+
+impl<U: Unit> Drop for Attachment<'_, U> {
+    fn drop(&mut self) {
+        self.control.detach(self.shared);
+    }
 }
 
 /// Read the caller's header from a checkpoint file (without verifying the rest of the file).
@@ -671,6 +1011,14 @@ pub struct Ctx<'a, U: Unit> {
     batches: u64,
     /// `polls()` when the current run began.
     run_start: u64,
+    /// The polls of the current run still to time: 2 when it begins, 0 after its second poll ("Instrumentation").
+    untimed: u8,
+    /// When the current run began, then when it first polled.
+    mark: Instant,
+    /// The rebuilds and first steps timed since the last `finish_run`, and the runs whose first step was.
+    rebuild: Duration,
+    first_step: Duration,
+    first_steps: u64,
     yielding: bool,
     split_claimed: bool,
     /// `stats.nodes` already added to `shared.nodes`.
@@ -687,6 +1035,11 @@ impl<'a, U: Unit> Ctx<'a, U> {
             countdown: POLL_BATCH,
             batches: 0,
             run_start: 0,
+            untimed: 0,
+            mark: shared.t0,
+            rebuild: Duration::ZERO,
+            first_step: Duration::ZERO,
+            first_steps: 0,
             yielding: false,
             split_claimed: false,
             published: 0,
@@ -695,10 +1048,14 @@ impl<'a, U: Unit> Ctx<'a, U> {
         }
     }
 
-    /// Whether to keep going.  Costs one decrement and one relaxed atomic load.
+    /// Whether to keep going.  Costs a test of a byte, one decrement and one relaxed atomic load (and a reading of
+    /// the clock at a run's first two polls).
     #[inline]
     #[must_use]
     pub fn poll(&mut self) -> Poll {
+        if self.untimed != 0 {
+            self.time_poll();
+        }
         self.countdown -= 1;
         if self.countdown == 0 || self.shared.signal.0.load(Ordering::Relaxed) != 0 {
             return self.poll_slow();
@@ -709,6 +1066,22 @@ impl<'a, U: Unit> Ctx<'a, U> {
     /// Polls made by this worker so far.
     fn polls(&self) -> u64 {
         self.batches * u64::from(POLL_BATCH) + u64::from(POLL_BATCH - self.countdown)
+    }
+
+    /// Time the rebuild (up to the run's first poll) or the first step (up to its second).
+    #[cold]
+    #[inline(never)]
+    fn time_poll(&mut self) {
+        let now = Instant::now();
+        let time = now.saturating_duration_since(self.mark);
+        if self.untimed == 2 {
+            self.rebuild += time;
+        } else {
+            self.first_step += time;
+            self.first_steps += 1;
+        }
+        self.mark = now;
+        self.untimed -= 1;
     }
 
     #[cold]
@@ -756,28 +1129,16 @@ impl<'a, U: Unit> Ctx<'a, U> {
     }
 
     /// Offer a solution: if `value` beats the incumbent, it becomes the incumbent together with `payload`
-    /// (stored atomically with the value) and `true` is returned.
+    /// (stored atomically with the value) and `true` is returned.  If it reaches the ceiling of the run's
+    /// [`Control`], the run ends as with [`declare_optimal`](Ctx::declare_optimal).
     pub fn offer(&mut self, value: u64, payload: &[u8]) -> bool {
-        let best = &self.shared.best.0;
-        if value <= best.load(Ordering::Relaxed) {
-            return false;
-        }
-        let mut stored = lock(&self.shared.payload);
-        if value <= best.load(Ordering::Relaxed) {
-            return false;
-        }
-        stored.clear();
-        stored.extend_from_slice(payload);
-        best.store(value, Ordering::Release);
-        true
+        self.shared.offer(value, payload)
     }
 
     /// The searcher has proven the incumbent optimal: discard all remaining work and complete the run.
     /// Every later `poll` (in every worker) returns `Yield`.
     pub fn declare_optimal(&mut self) {
-        let mut st = self.shared.lock();
-        st.optimal = true;
-        self.shared.set_exit(&mut st);
+        self.shared.declare_optimal();
         self.yielding = true;
     }
 
@@ -787,7 +1148,7 @@ impl<'a, U: Unit> Ctx<'a, U> {
         &mut self.stats
     }
 
-    /// This worker's index, `0..threads`.
+    /// This worker's number: `0..threads` for the first ones, the next numbers for those a [`Control`] adds.
     #[must_use]
     pub fn worker(&self) -> usize {
         self.worker
@@ -819,6 +1180,8 @@ const SIG_PAUSE: u64 = 2;
 const SIG_REQUEST: u64 = 4;
 /// How long a coordinator waits at most before it looks for a stop signal again (after [`stop_on_signals`]).
 const SIGNAL_POLL: Duration = Duration::from_millis(50);
+/// The value of `Shared::ceiling` when there is none.
+const NO_CEILING: u64 = u64::MAX;
 
 static RUN_SEQ: AtomicU64 = AtomicU64::new(0);
 /// The first stop signal received, 0 if none (see [`stop_on_signals`]).
@@ -868,6 +1231,8 @@ struct Shared<U: Unit> {
     best: Line<AtomicU64>,
     /// Nodes published by workers in this invocation.
     nodes: Line<AtomicU64>,
+    /// The control's ceiling ([`NO_CEILING`]: none), read when an offer raises `best` (see "Ceiling").
+    ceiling: AtomicU64,
     payload: Mutex<Vec<u8>>,
     state: Mutex<State<U>>,
     /// Idle and parked workers wait here.
@@ -935,12 +1300,17 @@ impl Drop for Turn<'_> {
 struct State<U> {
     mem: VecDeque<U>,
     spill: Spill,
-    /// Each worker's deepest unit while paused.
+    /// Each worker's deepest unit while paused.  This and the other lists by worker grow as workers are added (see
+    /// "Workers"), and a worker's number is never reused.
     held: Vec<Option<U>>,
     /// Units in `held`.
     held_units: usize,
     /// Each worker's statistics as of its last finished run.
     worker_stats: Vec<Stats>,
+    /// Workers alive: started (counted from the moment their slots are reserved), not yet retired or exited.
+    live: usize,
+    /// How many workers should be live (see "Workers"); 0 suspends the search.
+    target: usize,
     /// Workers inside `Searcher::run`.
     running: usize,
     /// Workers blocked on `work_cv`.
@@ -949,7 +1319,7 @@ struct State<U> {
     requested: usize,
     pause: bool,
     /// Since the start or the last release from a pause, until the workers all run again: no held unit left,
-    /// and the deque empty or every worker running.  No periodic checkpoint begins meanwhile.
+    /// and the deque empty or every live worker running.  No periodic checkpoint begins meanwhile.
     resuming: bool,
     exit: bool,
     done: bool,
@@ -960,6 +1330,11 @@ struct State<U> {
     counters: Counters,
     /// Each worker's time accounting.
     clocks: Vec<Clock>,
+    /// The idle waits completed so far, summed over workers: a running total, of which the ramp and the tail take
+    /// snapshots ("Instrumentation").
+    idle_done: Duration,
+    /// The last moment a worker finished a run while every live worker was running, and `idle_done` then.
+    tail_from: Option<(Instant, Duration)>,
     /// When the workers were started.
     began: Instant,
     /// When the current pause was asked for.
@@ -982,11 +1357,15 @@ impl<U> State<U> {
     }
 }
 
-/// Where a worker's time went (see "Instrumentation").
-#[derive(Clone, Copy, Default)]
+/// Where a worker's time went (see "Instrumentation"); its idle time is in `State::idle_done`.
+#[derive(Clone, Copy)]
 struct Clock {
+    /// When the worker began to count as alive: the start of the workers for the first ones, the reservation of its
+    /// slot for one added later.
+    born: Instant,
+    /// When it retired (`born` for one that could not be started); `None` for one alive until the end of the run.
+    gone: Option<Instant>,
     busy: Duration,
-    idle: Duration,
     parked: Duration,
     /// Waiting for the `state` lock after a run.
     lock_wait: Duration,
@@ -994,6 +1373,20 @@ struct Clock {
     running_since: Option<Instant>,
     /// Since when the worker has been waiting, and whether it waits in a pause.
     waiting_since: Option<(Instant, bool)>,
+}
+
+impl Clock {
+    fn new(born: Instant) -> Self {
+        Clock {
+            born,
+            gone: None,
+            busy: Duration::ZERO,
+            parked: Duration::ZERO,
+            lock_wait: Duration::ZERO,
+            running_since: None,
+            waiting_since: None,
+        }
+    }
 }
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -1026,19 +1419,23 @@ impl<U: Unit> Drop for PanicGuard<'_, U> {
 }
 
 impl<U: Unit> Shared<U> {
-    fn new(cfg: &EngineConfig, threads: usize, init: Init, t0: Instant) -> Self {
+    /// The state of a run with no worker yet, whose target is `cfg.threads` (`grow` starts the workers).
+    fn new(cfg: &EngineConfig, init: Init, t0: Instant) -> Self {
         let prefix = format!("txspill-{}-{}", std::process::id(), RUN_SEQ.fetch_add(1, Ordering::Relaxed));
         Shared {
             signal: Line(AtomicU64::new(0)),
             best: Line(AtomicU64::new(init.best)),
             nodes: Line(AtomicU64::new(0)),
+            ceiling: AtomicU64::new(NO_CEILING),
             payload: Mutex::new(init.payload),
             state: Mutex::new(State {
                 mem: VecDeque::new(),
                 spill: Spill { dir: cfg.spill_dir.clone(), prefix, seq: 0, segs: Vec::new(), units: 0 },
-                held: (0..threads).map(|_| None).collect(),
+                held: Vec::new(),
                 held_units: 0,
-                worker_stats: vec![Stats::default(); threads],
+                worker_stats: Vec::new(),
+                live: 0,
+                target: cfg.threads.max(1),
                 running: 0,
                 idle: 0,
                 requested: 0,
@@ -1050,8 +1447,10 @@ impl<U: Unit> Shared<U> {
                 stop_requested: false,
                 panicked: false,
                 error: None,
-                counters: Counters { threads, ..Counters::default() },
-                clocks: vec![Clock::default(); threads],
+                counters: Counters::default(),
+                clocks: Vec::new(),
+                idle_done: Duration::ZERO,
+                tail_from: None,
                 began: t0,
                 pause_began: None,
                 scratch: Vec::new(),
@@ -1108,6 +1507,14 @@ impl<U: Unit> Shared<U> {
         self.coord_cv.notify_all();
     }
 
+    /// The incumbent is optimal (a searcher proved it, or it reached the ceiling): discard all remaining work and
+    /// complete the run.
+    fn declare_optimal(&self) {
+        let mut st = self.lock();
+        st.optimal = true;
+        self.set_exit(&mut st);
+    }
+
     /// Pause the workers: for a stop (`urgent`) at their next poll, for a periodic checkpoint after `MIN_POLLS`
     /// polls of their units.  A stop asked for during a checkpoint's pause makes it urgent.
     fn begin_pause(&self, st: &mut State<U>, urgent: bool) {
@@ -1136,6 +1543,9 @@ impl<U: Unit> Shared<U> {
         st.resuming = true;
         self.signal.0.fetch_and(!(SIG_YIELD | SIG_PAUSE), Ordering::AcqRel);
         self.update_split(st);
+        // Every live worker is parked and some unit is left (else the run has ended), so this ends `resuming` only when
+        // no worker is live ("Suspending").
+        self.note_running(st, Instant::now());
         self.work_cv.notify_all();
     }
 
@@ -1163,7 +1573,12 @@ impl<U: Unit> Shared<U> {
         let demand = if st.pause || st.exit || st.running == 0 {
             0
         } else {
-            st.idle.saturating_sub(st.queued() + st.held_units)
+            // Beyond the target, idle workers retire rather than wait for work, and running ones are asked to come
+            // back to retire ("Workers"); without a control there is no surplus, and the demand is the idle workers
+            // that the queued and held units will not serve.
+            let surplus = st.live.saturating_sub(st.target);
+            let waiting = st.idle.saturating_sub(surplus);
+            waiting.saturating_sub(st.queued() + st.held_units) + surplus.saturating_sub(st.idle)
         };
         let signal = &self.signal.0;
         let mut current = signal.load(Ordering::Acquire);
@@ -1259,9 +1674,8 @@ impl<U: Unit> Shared<U> {
         let _guard = PanicGuard(self);
         let mut searcher = make(i);
         let mut ctx = Ctx::new(self, i);
-        let mut next = self.acquire(self.lock(), i);
+        let mut next = self.acquire(self.lock(), &mut ctx);
         while let Some(unit) = next {
-            ctx.run_start = ctx.polls();
             let turn = self.gate.as_ref().map(Gate::turn);
             searcher.run(unit, &mut ctx);
             drop(turn);
@@ -1269,29 +1683,44 @@ impl<U: Unit> Shared<U> {
         }
     }
 
-    /// Count worker `i` as running a unit from now on.
-    fn begin_run(&self, st: &mut State<U>, i: usize) {
+    /// Count the worker of `ctx` as running a unit from now on.
+    fn begin_run(&self, st: &mut State<U>, ctx: &mut Ctx<'_, U>) {
         let now = Instant::now();
+        ctx.run_start = ctx.polls();
+        ctx.untimed = 2;
+        ctx.mark = now;
         st.running += 1;
         st.counters.runs += 1;
-        st.clocks[i].running_since = Some(now);
-        if st.running == st.clocks.len() && st.counters.full_occupancy.is_none() {
-            st.counters.full_occupancy = Some(now.saturating_duration_since(st.began));
-        }
-        if st.resuming && st.held_units == 0 && (st.queue_empty() || st.running == st.clocks.len()) {
-            st.resuming = false;
-            self.coord_cv.notify_all();
-        }
+        st.clocks[ctx.worker].running_since = Some(now);
+        self.note_running(st, now);
         self.update_split(st);
     }
 
-    /// Wait for a unit to run (counting it in `running`), or return `None` when the worker must exit.
-    fn acquire(&self, mut guard: MutexGuard<'_, State<U>>, i: usize) -> Option<U> {
+    /// What follows when every live worker may have come to run (a run began, a worker retired, workers could not be
+    /// started, or none is live at the start or at a release): the first full occupancy, which ends the ramp, and the
+    /// end of `resuming` (see "Checkpoint"), which with no worker live is at once.
+    fn note_running(&self, st: &mut State<U>, now: Instant) {
+        let all = st.running == st.live;
+        if all && st.live > 0 && st.counters.full_occupancy.is_none() {
+            st.counters.full_occupancy = Some(now.saturating_duration_since(st.began));
+            // No live worker waits, so every idle wait so far is complete.
+            st.counters.ramp_idle = st.idle_done;
+        }
+        if st.resuming && st.held_units == 0 && (st.queue_empty() || all) {
+            st.resuming = false;
+            self.coord_cv.notify_all();
+        }
+    }
+
+    /// Wait for a unit to run (counting it in `running`), or return `None` when the worker must leave: the run is
+    /// over, or it retires (see "Workers").
+    fn acquire(&self, mut guard: MutexGuard<'_, State<U>>, ctx: &mut Ctx<'_, U>) -> Option<U> {
+        let i = ctx.worker;
         let mut starved = false;
         loop {
             let st = &mut *guard;
             if st.exit {
-                return None;
+                return self.leave(st, i);
             }
             if !st.pause {
                 let unit = match st.held[i].take() {
@@ -1302,13 +1731,17 @@ impl<U: Unit> Shared<U> {
                     None => self.pop(st, starved),
                 };
                 if let Some(unit) = unit {
-                    self.begin_run(st, i);
+                    self.begin_run(st, ctx);
                     return Some(unit);
                 }
                 if st.running == 0 && !st.has_work() {
                     st.done = true;
                     self.set_exit(st);
-                    return None;
+                    return self.leave(st, i);
+                }
+                // (A spill segment that cannot be read back pauses the run, and no worker retires in a pause.)
+                if !st.pause && st.live > st.target {
+                    return self.leave(st, i);
                 }
                 starved = true;
             }
@@ -1319,10 +1752,28 @@ impl<U: Unit> Shared<U> {
             guard = self.wait_work(guard);
             let st = &mut *guard;
             st.idle -= 1;
-            let clock = &mut st.clocks[i];
-            clock.waiting_since = None;
-            *(if paused { &mut clock.parked } else { &mut clock.idle }) += since.elapsed();
+            st.clocks[i].waiting_since = None;
+            let waited = since.elapsed();
+            if paused {
+                st.clocks[i].parked += waited;
+            } else {
+                st.idle_done += waited;
+            }
         }
+    }
+
+    /// Worker `i` leaves for good, holding no unit: at the end of the run (`exit` is set), or before it to retire
+    /// (see "Workers"), which ends its lifetime now and changes the demand and the occupancy.
+    fn leave(&self, st: &mut State<U>, i: usize) -> Option<U> {
+        st.live -= 1;
+        if !st.exit {
+            let now = Instant::now();
+            st.clocks[i].gone = Some(now);
+            st.counters.retired += 1;
+            self.update_split(st);
+            self.note_running(st, now);
+        }
+        None
     }
 
     /// Take over the units a searcher pushed and decide what this worker runs next.
@@ -1335,12 +1786,21 @@ impl<U: Unit> Shared<U> {
         let mut guard = self.lock();
         let st = &mut *guard;
         st.worker_stats[i] = ctx.stats;
+        if st.running == st.live && !st.exit {
+            // A drop from full occupancy: the tail begins here, unless the workers all run at once again later.  (Not
+            // once the run is over: the workers leaving one by one would each seem to drop from it.)
+            st.tail_from = Some((end, st.idle_done));
+        }
         st.running -= 1;
         let clock = &mut st.clocks[i];
         clock.lock_wait += end.elapsed();
         if let Some(since) = clock.running_since.take() {
             clock.busy += end.saturating_duration_since(since);
         }
+        let c = &mut st.counters;
+        c.rebuild += std::mem::take(&mut ctx.rebuild);
+        c.first_step += std::mem::take(&mut ctx.first_step);
+        c.first_steps += std::mem::take(&mut ctx.first_steps);
         if claimed {
             st.requested -= 1;
             st.counters.splits += 1;
@@ -1348,9 +1808,12 @@ impl<U: Unit> Shared<U> {
         st.counters.tiny_runs += u64::from(ctx.polls() - ctx.run_start <= 1);
         if st.exit {
             ctx.pushed.clear();
-            return None;
+            return self.leave(st, i);
         }
-        let keep = ctx.pushed.pop();
+        // A worker beyond the target hands all its units over, its deepest too, and retires; one with none comes back
+        // for work, and `acquire` retires it after the termination test (see "Workers").
+        let retire = !st.pause && st.live > st.target && !ctx.pushed.is_empty();
+        let keep = if retire { None } else { ctx.pushed.pop() };
         let gave = ctx.pushed.len();
         if gave > 0 {
             if claimed {
@@ -1358,38 +1821,94 @@ impl<U: Unit> Shared<U> {
             }
             self.push_units(st, &mut ctx.pushed);
         }
+        if retire {
+            self.leave(st, i);
+            let idle = st.idle;
+            drop(guard);
+            self.wake_idle(idle, gave);
+            return None;
+        }
         if st.pause {
             st.held_units += usize::from(keep.is_some());
             st.held[i] = keep;
             if st.running == 0 {
                 self.coord_cv.notify_all();
             }
-            return self.acquire(guard, i);
+            return self.acquire(guard, ctx);
         }
         match keep {
             Some(unit) => {
-                self.begin_run(st, i);
+                self.begin_run(st, ctx);
                 let idle = st.idle;
                 drop(guard);
                 self.wake_idle(idle, gave);
                 Some(unit)
             }
             // Nothing was pushed, so there is nobody to wake.
-            None => self.acquire(guard, i),
+            None => self.acquire(guard, ctx),
+        }
+    }
+
+    // --- the control ---------------------------------------------------------------------------------------
+
+    /// Start workers until as many are live as the target, unless the run is ending or stopping (see "Workers").  Their
+    /// slots are reserved under the lock, so that they count as live at once, and their threads spawned outside it.
+    /// The first workers (`initial`) count as alive from the start of the workers, later ones from now.  A worker that
+    /// cannot be started stops the run with the error.
+    fn grow(&self, spawn: &dyn Fn(usize) -> io::Result<()>, initial: bool) {
+        let (first, end, peak) = {
+            let mut guard = self.lock();
+            let st = &mut *guard;
+            if st.exit || st.stop_requested || st.live >= st.target {
+                return;
+            }
+            let born = if initial { st.began } else { Instant::now() };
+            let (first, end) = (st.clocks.len(), st.clocks.len() + st.target - st.live);
+            st.clocks.resize(end, Clock::new(born));
+            st.held.resize_with(end, || None);
+            st.worker_stats.resize(end, Stats::default());
+            st.live += end - first;
+            let peak = st.counters.threads;
+            st.counters.threads = peak.max(st.live);
+            if !initial {
+                st.counters.spawned += (end - first) as u64;
+            }
+            (first, end, peak)
+        };
+        for i in first..end {
+            if let Err(e) = spawn(i) {
+                let mut guard = self.lock();
+                let st = &mut *guard;
+                // The workers from `i` on never existed: they were alive for no time.
+                for clock in &mut st.clocks[i..end] {
+                    clock.gone = Some(clock.born);
+                }
+                st.live -= end - i;
+                st.counters.threads = peak.max(st.live);
+                if !initial {
+                    st.counters.spawned -= (end - i) as u64;
+                }
+                self.note_running(st, Instant::now());
+                self.fail(st, e);
+                return;
+            }
         }
     }
 
     // --- coordinator ---------------------------------------------------------------------------------------
 
-    /// Runs on the calling thread: checkpoints, limits, stop signals, progress lines.  Returns once `exit` is
-    /// set.  Times too far ahead to represent (absurd intervals or limits) are never reached.
-    fn coordinate(&self, plan: &Plan<'_>) {
+    /// Runs on the calling thread: checkpoints, limits, stop signals, progress lines, and the workers a control adds
+    /// (`spawn` starts worker `i`).  Returns once `exit` is set.  Times too far ahead to represent (absurd intervals or
+    /// limits) are never reached.
+    fn coordinate(&self, plan: &Plan<'_>, spawn: &dyn Fn(usize) -> io::Result<()>) {
         let _guard = PanicGuard(self);
         let mut next_checkpoint = plan.checkpoint.and_then(|(_, every)| plan.began.checked_add(every));
         let mut next_progress = plan.progress.and_then(|every| plan.began.checked_add(every));
         let mut last_report = (plan.began, 0);
         let stopping = |st: &State<U>| st.stop_requested || plan.stop_due();
         let mut guard = self.lock();
+        // With no worker live (a run suspended from its start), `resuming` ends at once ("Suspending").
+        self.note_running(&mut guard, Instant::now());
         loop {
             if guard.exit {
                 break;
@@ -1431,6 +1950,20 @@ impl<U: Unit> Shared<U> {
                 self.release(st);
                 // See "Checkpoint": never sooner than the pause took, and not before the workers run again.
                 next_checkpoint = plan.checkpoint.and_then(|(_, every)| Instant::now().checked_add(every.max(pause)));
+                continue;
+            }
+            // With no worker live, the coordinator makes the termination test, which only a run suspended from its
+            // start with no unit passes (see "Workers").
+            if guard.live == 0 && !guard.has_work() {
+                guard.done = true;
+                self.set_exit(&mut guard);
+                continue;
+            }
+            // The control raised the target ("Workers"); `grow` checks again under its own lock.
+            if guard.live < guard.target && !guard.stop_requested {
+                drop(guard);
+                self.grow(spawn, false);
+                guard = self.lock();
                 continue;
             }
             if let (Some(due), Some(every)) = (next_progress, plan.progress) {
@@ -1484,18 +2017,26 @@ impl<U: Unit> Shared<U> {
         )
     }
 
-    /// The counters with the workers' times summed up to `now` (also for runs and waits still going on).
+    /// The counters with the workers' times summed up to `now` (also for lifetimes, runs and waits still going on).
     fn counters_at(st: &State<U>, now: Instant) -> Counters {
         let mut c = st.counters;
         c.wall = now.saturating_duration_since(st.began);
+        c.idle = st.idle_done;
         for clock in &st.clocks {
+            c.capacity += clock.gone.unwrap_or(now).saturating_duration_since(clock.born);
             c.busy += clock.busy + clock.running_since.map_or(Duration::ZERO, |t| now.saturating_duration_since(t));
-            c.idle += clock.idle;
             c.parked += clock.parked;
             c.lock_wait += clock.lock_wait;
             if let Some((t, paused)) = clock.waiting_since {
                 *(if paused { &mut c.parked } else { &mut c.idle }) += now.saturating_duration_since(t);
             }
+        }
+        if c.full_occupancy.is_none() {
+            c.ramp_idle = c.idle;
+        }
+        if let Some((from, idle)) = st.tail_from {
+            c.tail = now.saturating_duration_since(from);
+            c.tail_idle = c.idle.saturating_sub(idle);
         }
         c
     }
@@ -1574,15 +2115,107 @@ impl<U: Unit> Shared<U> {
         if let (true, Some(path)) = (completed, finished) {
             remove_finished_checkpoint(path);
         }
+        let (best, payload) = self.incumbent();
         Ok(Outcome {
             completed,
             optimal_declared: st.optimal,
-            best: self.best.0.load(Ordering::Acquire),
-            payload: lock(&self.payload).clone(),
+            best,
+            payload,
             stats: self.total_stats(&st),
             elapsed,
             counters: Self::counters_at(&st, ended),
         })
+    }
+}
+
+/// What a [`Control`] asks of the run it is attached to: implemented by the run's shared state, whose unit type the
+/// control does not know (see "The control").
+trait Remote: Send + Sync {
+    /// Offer an incumbent, as a searcher does ([`Ctx::offer`]).
+    fn offer(&self, value: u64, payload: &[u8]) -> bool;
+    /// Lower the ceiling to `value`, and end the run if the incumbent reaches it.
+    fn set_ceiling(&self, value: u64);
+    /// The incumbent's value and payload, read together.
+    fn incumbent(&self) -> (u64, Vec<u8>);
+    /// Stop the run with a final checkpoint.
+    fn stop(&self);
+    /// Set the target number of workers (0 suspends the search).
+    fn set_workers(&self, workers: usize);
+    fn status(&self) -> Status;
+}
+
+/// Whether an incumbent worth `best` reaches `ceiling` ([`NO_CEILING`] is none).
+fn reaches(best: u64, ceiling: u64) -> bool {
+    ceiling != NO_CEILING && best >= ceiling
+}
+
+impl<U: Unit> Remote for Shared<U> {
+    fn offer(&self, value: u64, payload: &[u8]) -> bool {
+        let best = &self.best.0;
+        if value <= best.load(Ordering::Relaxed) {
+            return false;
+        }
+        {
+            let mut stored = lock(&self.payload);
+            if value <= best.load(Ordering::Relaxed) {
+                return false;
+            }
+            stored.clear();
+            stored.extend_from_slice(payload);
+            // Stored before the ceiling is loaded, both `SeqCst`: see "Ceiling".
+            best.store(value, Ordering::SeqCst);
+        }
+        // With the payload's lock released, since `declare_optimal` takes the state lock.
+        if reaches(value, self.ceiling.load(Ordering::SeqCst)) {
+            self.declare_optimal();
+        }
+        true
+    }
+
+    fn set_ceiling(&self, value: u64) {
+        // Stored before the incumbent is loaded, both `SeqCst`: see "Ceiling".
+        let ceiling = self.ceiling.fetch_min(value, Ordering::SeqCst).min(value);
+        if reaches(self.best.0.load(Ordering::SeqCst), ceiling) {
+            self.declare_optimal();
+        }
+    }
+
+    fn incumbent(&self) -> (u64, Vec<u8>) {
+        // `best` changes only while the payload is locked, so the two agree.
+        let payload = lock(&self.payload);
+        (self.best.0.load(Ordering::Relaxed), payload.clone())
+    }
+
+    fn stop(&self) {
+        self.request_stop();
+    }
+
+    fn set_workers(&self, workers: usize) {
+        let mut st = self.lock();
+        st.target = workers;
+        // Growing is the coordinator's, retiring the workers' own: wake whoever has to act.
+        if st.live < st.target {
+            self.coord_cv.notify_all();
+        }
+        if st.live > st.target {
+            self.work_cv.notify_all();
+        }
+        self.update_split(&mut st);
+    }
+
+    fn status(&self) -> Status {
+        let st = self.lock();
+        let c = Self::counters_at(&st, Instant::now());
+        Status {
+            live: st.live,
+            running: st.running,
+            idle: st.clocks.iter().filter(|clock| matches!(clock.waiting_since, Some((_, false)))).count(),
+            queued: st.queued(),
+            idle_time: c.idle,
+            capacity: c.capacity,
+            best: self.best.0.load(Ordering::Relaxed),
+            nodes: self.nodes.0.load(Ordering::Relaxed),
+        }
     }
 }
 

@@ -10,8 +10,8 @@
 //!
 //! The steps, in order (DESIGN.md, "Per-game pipeline", has the same steps with the Java classes they replace):
 //!
-//! 1. The tables of the board `1..=n`, and the set width `W` for it (`with_width!`, widened to the width of the
-//!    game's checkpoint if there is one).
+//! 1. The tables of the board `1..=n`, and the set width `W` for it (`with_width!`; a checkpoint made at another
+//!    width is refused).
 //! 2. The *prime shortcut* (tactic `prime_shortcut`): a prime `n` plays the game of `n − 1` with its first move
 //!    replaced by `n` (method `prime`).
 //! 3. The board's frames ([`Board`]).  With no promotion candidates the game with no promotions is the only one
@@ -28,6 +28,11 @@
 //!
 //! Step 2 and the repeat of step 4 are skipped by `force_search`, and when a checkpoint of the game exists: a search
 //! that was interrupted is resumed, never replaced by a derivation.
+//!
+//! The steps run in four phases, which the driver of a range (`window`) composes, a single game included: the
+//! *setup* (`set_up`: the checks of a previous game, steps 1 to 3, and the setup of step 4), on a thread of the
+//! game's own; the *repeat lookup* (the repeat of step 4, `Earlier::find`), the *search* (the rest of step 4, run
+//! through a width-free `Job`), and the *conclusion* (`conclude_game`: step 5, and step 6 for a range).
 //!
 //! # Repeats of earlier searches
 //!
@@ -55,19 +60,27 @@
 //!
 //! # A range
 //!
-//! [`solve_range_each`] solves the board sizes `lo..=hi` in order.  The previous game of each is the one just
-//! solved; for `lo` it is the results file's game of `lo − 1`, else, with [`SolveOptions::use_prev`],
+//! [`solve_range_each`] solves the board sizes `lo..=hi` and concludes them in order.  The previous game of each is
+//! the one before it; for `lo` it is the results file's game of `lo − 1`, else, with [`SolveOptions::use_prev`],
 //! `optimal.json`'s (assumed optimal, which the results that rest on it record), else there is none and the game is
 //! solved *standalone*, with no seed and no ceiling (and a note on stderr says so).  Every result is appended to
-//! the results file (one JSON object per line) as soon as it is done, so that a restarted run skips what is
+//! the results file (one JSON object per line) as soon as it is concluded, so that a restarted run skips what is
 //! finished; the file is checked when it is opened ([`ResultsFile::open`]).  A game whose search a limit or a signal
 //! stopped is recorded as incomplete, keeps its checkpoint, and ends the range.  The games a game of the range may
 //! repeat the search of are the file's and the range's own (a single game solved with [`solve_game`] has none).
+//!
+//! Up to [`SolveOptions::window`] consecutive games are in flight at once: game `n + 1` is set up while `n`
+//! searches, and searched from `n`'s best game so far, so that a machine of many threads is kept busy.  With a
+//! window of one, and always with one thread, the range is solved strictly in order, game after game.  The lines
+//! are the same either way but for what a multi-threaded search may vary (another optimal set of promotions, the
+//! nodes, the times): `window` has the driver and the argument.
+
+mod window;
 
 use crate::accelerate::{prime_shortcut, solution_for_promotions};
 use crate::bits::{words_for, Bits};
-use crate::board::{search_problem, Board};
-use crate::engine::{self, Counters, EngineConfig, Stats};
+use crate::board::{promotion_cap, search_problem, Board};
+use crate::engine::{self, Control, Counters, EngineConfig, Stats};
 use crate::game::{replay, replay_finished, Optimal};
 use crate::hives::Apiary;
 use crate::json::Json;
@@ -76,14 +89,15 @@ use crate::results::{
     assumed_optimal, assumptions_json, assumptions_of, build_json, moves_digest, Assumptions, Proof, ResultsFile,
     SCHEMA,
 };
-use crate::search::{self, stat, Problem, ProblemSize, SearchTactics};
+use crate::search::{self, stat, Prepared, Problem, ProblemSize, SearchTactics};
 use crate::tactics::Tactics;
 use std::borrow::Cow;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// The largest board the set widths cover (`W = 64`, the widest of [`crate::bits::WIDTHS`]).
@@ -117,6 +131,9 @@ pub struct SolveOptions {
     /// has it (`--use-prev`); the results whose proofs rest on it record that they assume it optimal.  Without it
     /// such a game is solved standalone.
     pub use_prev: bool,
+    /// The games of a range in flight at once (`--window`, at least 1; see `window`), which share the `threads`.
+    /// With one thread it is 1 whatever it says: there is no thread to run a second game on.
+    pub window: usize,
 }
 
 impl Default for SolveOptions {
@@ -134,6 +151,7 @@ impl Default for SolveOptions {
             spill_dir: None,
             force_search: false,
             use_prev: false,
+            window: 1,
         }
     }
 }
@@ -574,7 +592,7 @@ impl GameResult {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// One game
+// One game, in phases
 
 /// Why a game could not be solved.
 enum Failure {
@@ -605,6 +623,15 @@ fn reject(result: GameResult, reason: String) -> Result<GameResult, Failure> {
     Err(Failure::Rejected(Box::new(result), reason))
 }
 
+/// The failure of game `n`, saying which game it is.
+fn at(n: u32, failure: Failure) -> Failure {
+    let say = |message: String| format!("n={n}: {message}");
+    match failure {
+        Failure::Error(message) => Failure::Error(say(message)),
+        Failure::Rejected(result, message) => Failure::Rejected(result, say(message)),
+    }
+}
+
 /// Solves board size `n`.  `prev` is the solution of `n − 1` if known.  The score is confirmed against
 /// `optimal.json` ([`Optimal::built_in`]).
 pub fn solve_game(n: u32, prev: Option<&Prev>, opts: &SolveOptions) -> Result<GameResult, String> {
@@ -613,57 +640,217 @@ pub fn solve_game(n: u32, prev: Option<&Prev>, opts: &SolveOptions) -> Result<Ga
 
 /// [`solve_game`] with the score confirmed against the table `optimal` instead: for tests, and for `taxman bench`,
 /// whose known games extend the table.  The checkpoint of a completed game is deleted once the game has passed its
-/// checks.
+/// checks.  This is the driver of a range (`window`) over the one board size `n`, from `prev`, with no results file
+/// and no earlier games to repeat.
 pub fn solve_game_with(
     n: u32,
     prev: Option<&Prev>,
     opts: &SolveOptions,
     optimal: &Optimal,
 ) -> Result<GameResult, String> {
-    let result = solve_one(n, prev, opts, optimal, 0, None).map_err(Failure::message)?;
-    if result.completed {
-        discard_checkpoint(opts, n);
+    if n == 0 {
+        return Err("n must be at least 1".into());
     }
-    Ok(result)
+    let before = prev.cloned().map_or(Before::None, Before::Given);
+    let range = window::Range { lo: n, hi: n, before, optimal, results: None };
+    let mut solved = None;
+    window::solve(range, opts, &mut Earlier::default(), &mut |result| solved = Some(result.clone()))?;
+    Ok(solved.expect("a range of one game that does not fail concludes it"))
 }
 
-type SolveWithWidth =
-    fn(u32, Option<&Prev>, &SolveOptions, &Optimal, u32, Option<&mut Earlier>) -> Result<GameResult, Failure>;
+/// The game of `n − 1` as the setup of game `n` knows it.
+#[derive(Clone, Debug)]
+enum Before {
+    /// Not made by this run (the results file's, `optimal.json`'s or a caller's): known from the start, and checked
+    /// by the setup.
+    Given(Prev),
+    /// This run's: known once it is concluded, and refereed by `conclude` before that.
+    Run,
+    /// None: the game is solved standalone, with no seed and no ceiling.
+    None,
+}
 
-/// Solves board size `n` and leaves its checkpoint, if any, to the caller.  `earlier_runs` is the number of
-/// invocations a results file records for an unfinished search of `n`; `earlier` the games whose search `n` may
-/// repeat (tactic `same_search`).
-fn solve_one(
-    n: u32,
-    prev: Option<&Prev>,
-    opts: &SolveOptions,
-    optimal: &Optimal,
-    earlier_runs: u32,
-    earlier: Option<&mut Earlier>,
-) -> Result<GameResult, Failure> {
-    if n == 0 {
-        return Err(Failure::Error("n must be at least 1".into()));
+/// What the setup of a game (its first phase, [`set_up`]) made of it.
+enum SetUp {
+    /// A game concluded from its setup alone.
+    Derived(Derived),
+    /// A search problem, and the problem it poses, for the repeat lookup.
+    Search(SearchSetUp, Problem),
+}
+
+/// A game that needs no search.
+enum Derived {
+    /// The prime shortcut: the promotion candidates of the board with no promotions, ascending.  The game, the one of
+    /// `n − 1` with its first move replaced by `n`, is made when it is concluded.
+    Prime { candidates: Vec<u32> },
+    /// No promotion candidates: the game with no promotions.
+    Trivial { plain: Vec<u32>, in_the_bag: u64, frames: Duration },
+}
+
+/// A game set up for a search.
+struct SearchSetUp {
+    job: Arc<dyn Job>,
+    /// What the search was set up with; its ceiling (`cap`) is filled in when the game is concluded.
+    setup: SearchSetup,
+    in_the_bag: u64,
+    /// The setup's phases: forming the frames and the search model, and the greedy set.
+    frames: Duration,
+    greedy: Duration,
+}
+
+impl SearchSetUp {
+    /// Fills in what a result records of the setup, for a game searched or repeated.
+    fn fill(&self, result: &mut GameResult) {
+        result.in_the_bag = Some(self.in_the_bag);
+        result.phases.frames = self.frames;
+        result.phases.greedy = self.greedy;
     }
+}
+
+/// What the driver of a range tells a game's thread when its search may start.
+struct Go {
+    /// The game of `n − 1`, final or provisional, whose promotions seed the search: given when the search takes a
+    /// seed ([`Job::seeds`]) and the game has a previous game.
+    seed: Option<Vec<u32>>,
+    /// The ceiling on the promotion sum, given when the game of `n − 1` is concluded and `prev_cap` is on.
+    cap: Option<u64>,
+    /// The workers the search starts with.
+    threads: usize,
+}
+
+/// What came of a game's search, whatever its set width.
+struct Outcome {
+    /// The best promotion set found (the optimum when completed), ascending, and the game it makes.
+    promotions: Vec<u32>,
+    moves: Vec<u32>,
+    /// The search finished, or reached a ceiling it was given; false when a limit or a stop stopped it.
+    completed: bool,
+    stats: Stats,
+    counters: Counters,
+    /// Of this invocation, and over every invocation of a resumed search.
+    time: Duration,
+    time_all_runs: Duration,
+}
+
+/// A game set up for a search, whatever its set width: what the game's thread and the driver of the range need of it.
+/// The thread runs the search ([`search`](Job::search)); the driver, meanwhile, reads the best promotions so far for
+/// the games that follow, weighs what a seed would give the search, and gives the search its ceiling and seeds through
+/// its control.
+trait Job: Send + Sync {
+    /// The game that `promotions` (a promotable set of the board's candidates) make on the board.
+    fn moves_for(&self, promotions: &[u32]) -> Vec<u32>;
+    /// The search's best promotions so far, if it has any ([`search::best_so_far`]): its engine's incumbent while it
+    /// runs and after it ended, else the best offered to it.
+    fn best_so_far(&self) -> Option<Vec<u32>>;
+    /// Whether the game has a checkpoint, whose search is resumed, never replaced by a repeat.
+    fn resuming(&self) -> bool;
+    /// Whether the search starts from a seed: with `seed_incumbent`, unless it is resumed (a resumed search has its
+    /// incumbent in its checkpoint).
+    fn seeds(&self) -> bool;
+    /// Offers the search, if it takes a seed, the promotions of the game `moves` of `n − 1` that can still be promoted
+    /// here, as an incumbent ([`search::offer_seed`]).
+    fn hint(&self, moves: &[u32]);
+    /// The promotion sum of what survives here of the game `moves` of `n − 1` as a seed
+    /// ([`search::seed_survivors_sum`]): a search seeded with that game starts at least that high.
+    fn survivors(&self, moves: &[u32]) -> u64;
+    /// The control through which the driver steers the search ([`engine::Control`]).
+    fn control(&self) -> &Control;
+    /// The search, from the go (the game's third phase), and the game its promotions make.  The game's checkpoint is
+    /// left in place, for the caller to delete once the result is safe ([`discard_checkpoint`]).
+    fn search(&self, go: Go, opts: &SolveOptions) -> Result<Outcome, String>;
+}
+
+/// The [`Job`] of a board of set width `W`.
+struct SearchJob<const W: usize> {
+    board: Board<W>,
+    prepared: Prepared<W>,
+    control: Arc<Control>,
+    resuming: bool,
+    seeds: bool,
+}
+
+impl<const W: usize> Job for SearchJob<W> {
+    fn moves_for(&self, promotions: &[u32]) -> Vec<u32> {
+        solution_for_promotions::<W>(&self.board.tables, promotions.iter().copied().collect())
+    }
+
+    fn best_so_far(&self) -> Option<Vec<u32>> {
+        search::best_so_far::<W>(&self.control).map(|best| best.to_vec())
+    }
+
+    fn resuming(&self) -> bool {
+        self.resuming
+    }
+
+    fn seeds(&self) -> bool {
+        self.seeds
+    }
+
+    fn hint(&self, moves: &[u32]) {
+        if self.seeds {
+            search::offer_seed(&self.prepared, &self.control, &self.board.seed(moves));
+        }
+    }
+
+    fn survivors(&self, moves: &[u32]) -> u64 {
+        search::seed_survivors_sum(&self.prepared, &self.board.seed(moves))
+    }
+
+    fn control(&self) -> &Control {
+        &self.control
+    }
+
+    fn search(&self, go: Go, opts: &SolveOptions) -> Result<Outcome, String> {
+        let n = self.board.n();
+        let seed = go.seed.map(|moves| self.board.seed(&moves));
+        let (spill_dir, own) = spill_dir(opts, n);
+        let cfg = EngineConfig {
+            threads: go.threads,
+            queue_mem_cap: opts.queue_mem_cap,
+            spill_dir: Some(spill_dir.clone()),
+            checkpoint: opts.checkpoint_file(n).map(|path| (path, opts.checkpoint_interval)),
+            // Deleted only once the result is safe (`discard_checkpoint`).
+            keep_completed_checkpoint: true,
+            progress: opts.progress,
+            time_limit: opts.time_limit,
+            node_limit: opts.node_limit,
+            label: format!("n={n}"),
+            cores: None,
+            control: Some(Arc::clone(&self.control)),
+        };
+        let found = search::search(&self.prepared, &cfg, seed.as_ref(), go.cap, self.resuming);
+        if own {
+            // Only removes the directory if the engine left nothing in it.
+            let _ = fs::remove_dir(&spill_dir);
+        }
+        let found = found.map_err(|e| format!("search failed: {e}"))?;
+        Ok(Outcome {
+            promotions: found.promotions.to_vec(),
+            moves: solution_for_promotions::<W>(&self.board.tables, found.promotions),
+            completed: found.completed,
+            stats: found.stats,
+            counters: found.counters,
+            time: found.time,
+            time_all_runs: found.time_all_runs,
+        })
+    }
+}
+
+type SetUpWithWidth = fn(u32, &Before, &SolveOptions) -> Result<SetUp, Failure>;
+
+/// The setup of game `n` (its first phase, on the game's thread): the checks of a previous game not made by this run,
+/// the tables, and then the prime shortcut, the trivial game, or the search problem (steps 1 to 4 of the module
+/// documentation, up to the repeat), at the set width of the board size.
+fn set_up(n: u32, before: &Before, opts: &SolveOptions) -> Result<SetUp, Failure> {
     let words = words_for(n);
     let beyond = || Failure::Error(format!("n={n} is beyond the largest supported board, n={MAX_N}"));
-    let solve: SolveWithWidth = crate::with_words!(words, W => solve_with_width::<W>, else return Err(beyond()));
-    solve(n, prev, opts, optimal, earlier_runs, earlier).map_err(|failure| match failure {
-        Failure::Error(e) => Failure::Error(format!("n={n}: {e}")),
-        Failure::Rejected(result, e) => Failure::Rejected(result, format!("n={n}: {e}")),
-    })
+    let set_up: SetUpWithWidth = crate::with_words!(words, W => set_up_with_width::<W>, else return Err(beyond()));
+    set_up(n, before, opts).map_err(|failure| at(n, failure))
 }
 
-fn solve_with_width<const W: usize>(
-    n: u32,
-    prev: Option<&Prev>,
-    opts: &SolveOptions,
-    optimal: &Optimal,
-    earlier_runs: u32,
-    earlier: Option<&mut Earlier>,
-) -> Result<GameResult, Failure> {
-    let start = Instant::now();
+fn set_up_with_width<const W: usize>(n: u32, before: &Before, opts: &SolveOptions) -> Result<SetUp, Failure> {
     let tactics = opts.tactics;
-    if let Some(prev) = prev {
+    if let Before::Given(prev) = before {
         // The prime shortcut and the ceiling trust the previous game, so make sure it is what it says it is.  Not for
         // a game this run made: `conclude` has refereed those moves already, with the same `replay_finished` and to
         // the score the game is given as, before the game became the previous one.
@@ -672,33 +859,127 @@ fn solve_with_width<const W: usize>(
         }
     }
     let tables = Tables::new(n);
-    let mut result = GameResult::new(n, opts, prev);
-    let context = Context { prev, optimal, start };
     // A search that was interrupted is resumed, whatever else could have produced the game.
     let checkpoint = opts.checkpoint_file(n).filter(|path| path.exists());
     let derive = !opts.force_search && checkpoint.is_none();
 
-    if derive && tactics.prime_shortcut && tables.is_prime(n) {
-        if let Some(prev) = prev {
-            let moves = prime_shortcut(n, &prev.moves);
-            let candidates = Apiary::<W>::new(&tables, Bits::EMPTY).promotion_candidates();
-            let promotions = candidates & moves.iter().copied().collect::<Bits<W>>();
-            result.method = Method::Prime;
-            return conclude(result, moves, promotions.to_vec(), context);
-        }
+    if derive && tactics.prime_shortcut && tables.is_prime(n) && !matches!(before, Before::None) {
+        let candidates = Apiary::<W>::new(&tables, Bits::EMPTY).promotion_candidates();
+        return Ok(SetUp::Derived(Derived::Prime { candidates: candidates.to_vec() }));
     }
 
     let board = Board::<W>::new(tables);
-    result.phases.frames = board.frames_time;
-    result.in_the_bag = Some(board.in_the_bag);
     if board.is_trivial() {
-        result.method = Method::Trivial;
-        return conclude(result, board.plain, Vec::new(), context);
+        let (in_the_bag, frames) = (board.in_the_bag, board.frames_time);
+        return Ok(SetUp::Derived(Derived::Trivial { plain: board.plain, in_the_bag, frames }));
     }
 
-    let promotions = search_game(&board, prev, opts, checkpoint, earlier_runs, earlier, &mut result)?;
-    let moves = solution_for_promotions::<W>(&board.tables, promotions);
-    conclude(result, moves, promotions.to_vec(), context)
+    let prepared = match &checkpoint {
+        Some(path) => {
+            let p = board.prepare_for_resume(path).map_err(|e| {
+                format!("cannot resume from {}: {e} (delete the file to start the game over)", path.display())
+            })?;
+            if p.tactics != tactics.search {
+                return Err(Failure::Error(different_tactics(path, p.tactics, tactics)));
+            }
+            p
+        }
+        None => board.prepare(tactics.search)?,
+    };
+    let problem = prepared.problem();
+    let setup = SearchSetup {
+        frames: board.frames.frames.len(),
+        candidates: board.candidates().len(),
+        max_total: prepared.max_total,
+        greedy_sum: prepared.greedy.sum(),
+        cap: None,
+        digest: problem.digest(),
+    };
+    let (in_the_bag, frames, greedy) =
+        (board.in_the_bag, board.frames_time + prepared.timings.build, prepared.timings.greedy);
+    let resuming = checkpoint.is_some();
+    let seeds = tactics.seed_incumbent && !resuming;
+    let job = Arc::new(SearchJob { board, prepared, control: Control::new(), resuming, seeds });
+    Ok(SetUp::Search(SearchSetUp { job, setup, in_the_bag, frames, greedy }, problem))
+}
+
+/// The ceiling on the promotion sum of game `n`, whose `in_the_bag` is given, from the score of its previous game, if
+/// there is one and `prev_cap` is on ([`promotion_cap`]).
+fn ceiling(n: u32, in_the_bag: u64, prev_score: Option<u64>, opts: &SolveOptions) -> Option<u64> {
+    prev_score.filter(|_| opts.tactics.prev_cap).and_then(|score| promotion_cap(n, in_the_bag, score))
+}
+
+/// How a game was found, as its conclusion takes it.
+enum Found<'a> {
+    Derived(&'a Derived),
+    /// A repeat of the search of the game `m`, which settled the same problem.
+    Repeat(&'a SearchSetUp, u32),
+    Searched(&'a SearchSetUp, &'a Outcome),
+}
+
+/// The conclusion of game `n` (its last phase): its result, as the game was found, checked by [`conclude`], whose
+/// `context` has the previous game.  `earlier` has the game a repeat repeats, and `earlier_runs` is the number of
+/// invocations a results file records for an unfinished search of `n`.
+fn conclude_game(
+    n: u32,
+    found: Found<'_>,
+    earlier: &Earlier,
+    earlier_runs: u32,
+    opts: &SolveOptions,
+    context: Context<'_>,
+) -> Result<GameResult, Failure> {
+    let mut result = GameResult::new(n, opts, context.prev);
+    let concluded = match found {
+        Found::Derived(Derived::Prime { candidates }) => {
+            let prev = context.prev.expect("the prime shortcut is taken only with a previous game");
+            let moves = prime_shortcut(n, &prev.moves);
+            let played: BTreeSet<u32> = moves.iter().copied().collect();
+            let promotions = candidates.iter().copied().filter(|c| played.contains(c)).collect();
+            result.method = Method::Prime;
+            conclude(result, moves, promotions, context)
+        }
+        Found::Derived(Derived::Trivial { plain, in_the_bag, frames }) => {
+            result.method = Method::Trivial;
+            result.in_the_bag = Some(*in_the_bag);
+            result.phases.frames = *frames;
+            conclude(result, plain.clone(), Vec::new(), context)
+        }
+        Found::Repeat(set, m) => {
+            set.fill(&mut result);
+            let Some((same, promotions)) = earlier.same_search(m, set.setup.digest) else {
+                return Err(at(n, Failure::Error(format!("the game {m} whose search it repeats is not concluded"))));
+            };
+            result.method = Method::Repeat;
+            result.setup = Some(set.setup);
+            result.same_search = Some(same);
+            let moves = set.job.moves_for(&promotions);
+            conclude(result, moves, promotions, context)
+        }
+        Found::Searched(set, searched) => {
+            set.fill(&mut result);
+            let cap = ceiling(n, set.in_the_bag, context.prev.map(|prev| prev.score), opts);
+            let setup = SearchSetup { cap, ..set.setup };
+            result.setup = Some(setup);
+            let sum: u64 = searched.promotions.iter().map(|&p| u64::from(p)).sum();
+            // A search ends when its incumbent reaches its ceiling, which proves it optimal.  One that was started
+            // before the ceiling was known (the game of `n − 1` still in flight) may have gone on to the end of its
+            // tree, or been stopped by a limit or a signal, with its best set at the ceiling: it is proven by the
+            // ceiling all the same, as a search given the ceiling from the start would have stopped there.
+            result.reached_cap = setup.cap == Some(sum);
+            result.completed = searched.completed || result.reached_cap;
+            result.nodes = searched.stats.nodes;
+            result.stats = searched.stats;
+            result.counters = searched.counters;
+            result.phases.search = searched.time;
+            result.phases.search_all_runs = searched.time_all_runs;
+            if set.job.resuming() {
+                // At least one invocation made the checkpoint, even if it left no line in a results file.
+                result.invocations = earlier_runs.max(1) + 1;
+            }
+            conclude(result, searched.moves.clone(), searched.promotions.clone(), context)
+        }
+    };
+    concluded.map_err(|failure| at(n, failure))
 }
 
 /// What [`conclude`] checks a game against.
@@ -706,7 +987,11 @@ fn solve_with_width<const W: usize>(
 struct Context<'a> {
     prev: Option<&'a Prev>,
     optimal: &'a Optimal,
-    start: Instant,
+    /// The game's own time before its conclusion: its setup, its repeat lookup and its search, not the time it
+    /// waited in the window.
+    own: Duration,
+    /// When its conclusion began.
+    since: Instant,
 }
 
 /// Checks the game (see the module documentation), compares it with `optimal.json`, and completes the result
@@ -720,7 +1005,7 @@ fn conclude(
     let n = result.n;
     result.moves = moves;
     result.promotions = promotions;
-    result.phases.total = context.start.elapsed();
+    result.phases.total = context.own + context.since.elapsed();
     let method = result.method.as_str();
     // A completed game claims to be optimal, so it must be over and open with the largest prime.
     let refereed = if result.completed { replay_finished(n, &result.moves) } else { replay(n, &result.moves) };
@@ -794,102 +1079,6 @@ fn conclude(
     Ok(result)
 }
 
-/// The search path: prepares the game (or the checkpoint's game), searches, and fills `result` with what the
-/// search did.  Returns the best promotion set found.  The checkpoint is left in place (see [`solve_one`]).
-///
-/// Before it searches, the tactic `same_search` looks in `earlier` for a game whose search problem is this one's
-/// and whose proof settles it: then the game is that game's promotions (method `repeat`), with no search.  Not for a
-/// search that a checkpoint resumes (resumed, never replaced), or with `force_search`.  Either way the game's own
-/// problem is kept in `earlier`, for the games that follow to compare with.
-fn search_game<const W: usize>(
-    board: &Board<W>,
-    prev: Option<&Prev>,
-    opts: &SolveOptions,
-    checkpoint: Option<PathBuf>,
-    earlier_runs: u32,
-    mut earlier: Option<&mut Earlier>,
-    result: &mut GameResult,
-) -> Result<Bits<W>, Failure> {
-    let n = board.n();
-    let tactics = opts.tactics;
-    let resuming = checkpoint.is_some();
-    let prepared = match &checkpoint {
-        Some(path) => {
-            let p = board.prepare_for_resume(path).map_err(|e| {
-                format!("cannot resume from {}: {e} (delete the file to start the game over)", path.display())
-            })?;
-            if p.tactics != tactics.search {
-                return Err(Failure::Error(different_tactics(path, p.tactics, tactics)));
-            }
-            p
-        }
-        None => board.prepare(tactics.search)?,
-    };
-    result.phases.frames += prepared.timings.build;
-    result.phases.greedy = prepared.timings.greedy;
-
-    let problem = prepared.problem();
-    let mut setup = SearchSetup {
-        frames: board.frames.frames.len(),
-        candidates: board.candidates().len(),
-        max_total: prepared.max_total,
-        greedy_sum: prepared.greedy.sum(),
-        cap: None,
-        digest: problem.digest(),
-    };
-    let repeats = tactics.same_search && !resuming && !opts.force_search;
-    let repeated = earlier.as_deref_mut().filter(|_| repeats).and_then(|e| e.find(n, &problem));
-    // The games that follow compare their problems with this one from memory, whether this game repeats or searches.
-    if let Some(earlier) = earlier {
-        earlier.remember(n, problem);
-    }
-    if let Some((same, promotions)) = repeated {
-        result.method = Method::Repeat;
-        result.setup = Some(setup);
-        result.same_search = Some(same);
-        return Ok(promotions.into_iter().collect());
-    }
-
-    setup.cap = prev.filter(|_| tactics.prev_cap).and_then(|prev| board.promotion_cap(prev.score));
-    let cap = setup.cap;
-    // A resumed search has its incumbent in the checkpoint.
-    let seed = prev.filter(|_| tactics.seed_incumbent && !resuming).map(|prev| board.seed(&prev.moves));
-    result.setup = Some(setup);
-
-    let (spill_dir, ours) = spill_dir(opts, n);
-    let cfg = EngineConfig {
-        threads: opts.threads,
-        queue_mem_cap: opts.queue_mem_cap,
-        spill_dir: Some(spill_dir.clone()),
-        checkpoint: checkpoint.or_else(|| opts.checkpoint_file(n)).map(|path| (path, opts.checkpoint_interval)),
-        // Deleted only once the result is safe (`solve_game_with`, `solve_range_each`).
-        keep_completed_checkpoint: true,
-        progress: opts.progress,
-        time_limit: opts.time_limit,
-        node_limit: opts.node_limit,
-        label: format!("n={n}"),
-        cores: None,
-    };
-    let found = search::search(&prepared, &cfg, seed.as_ref(), cap, resuming);
-    if ours {
-        // Only removes the directory if the engine left nothing in it.
-        let _ = fs::remove_dir(&spill_dir);
-    }
-    let found = found.map_err(|e| format!("search failed: {e}"))?;
-    result.completed = found.completed;
-    result.reached_cap = found.reached_cap;
-    result.nodes = found.stats.nodes;
-    result.stats = found.stats;
-    result.counters = found.counters;
-    result.phases.search = found.time;
-    result.phases.search_all_runs = found.time_all_runs;
-    if resuming {
-        // At least one invocation made the checkpoint, even if it left no line in a results file.
-        result.invocations = earlier_runs.max(1) + 1;
-    }
-    Ok(found.promotions)
-}
-
 /// The error for a checkpoint made with other search tactics than this run's: what differs, and the flags that
 /// resume it.
 fn different_tactics(checkpoint: &Path, made: SearchTactics, now: Tactics) -> String {
@@ -916,18 +1105,27 @@ fn discard_checkpoint(opts: &SolveOptions, n: u32) {
     }
 }
 
-/// Where the engine spills to, and whether this function chose the directory (and so may remove it).  A
-/// temporary directory is the game's own: games solved at the same time (by threads of one process) do not share
-/// one, or one's removing it would fail the other's creating it.
+/// Where the engine spills to, and whether the directory is the game's own, which its search removes when it is done.
+/// A temporary directory is the game's own: games solved at the same time (by threads of one process) do not share
+/// one, or one's removing it would fail the other's creating it.  The spill directory of the checkpoint directory is
+/// shared by the games of a range, which may search side by side, so the range removes it when it ends
+/// ([`shared_spill_dir`]); one the options name is the caller's.
 fn spill_dir(opts: &SolveOptions, n: u32) -> (PathBuf, bool) {
     static TEMP_DIRS: AtomicU64 = AtomicU64::new(0);
-    if let Some(dir) = &opts.spill_dir {
-        (dir.clone(), false)
-    } else if let Some(dir) = &opts.checkpoint_dir {
-        (dir.join("spill"), true)
+    if let Some(dir) = opts.spill_dir.clone().or_else(|| shared_spill_dir(opts)) {
+        (dir, false)
     } else {
         let name = format!("taxman-spill-{}-{}-n{n}", std::process::id(), TEMP_DIRS.fetch_add(1, Ordering::Relaxed));
         (std::env::temp_dir().join(name), true)
+    }
+}
+
+/// The spill directory that the games of a range share, and that the range removes when it ends (if nothing is left
+/// in it): `spill` in the checkpoint directory, unless the options name a spill directory.
+fn shared_spill_dir(opts: &SolveOptions) -> Option<PathBuf> {
+    match (&opts.spill_dir, &opts.checkpoint_dir) {
+        (None, Some(dir)) => Some(dir.join("spill")),
+        _ => None,
     }
 }
 
@@ -954,7 +1152,8 @@ struct Searched {
 }
 
 /// The games a game of a range may repeat the search of (tactic `same_search`): the completed games of the results
-/// file and of this run that set a search up and whose proof settles it ([`Proof::settles_search`]).
+/// file and of this run that set a search up and whose proof settles it ([`Proof::settles_search`]), and the games
+/// of the range in flight that set a search up and are not concluded yet (`pending`, see [`find`](Self::find)).
 #[derive(Default)]
 struct Earlier {
     games: BTreeMap<u32, Searched>,
@@ -962,6 +1161,8 @@ struct Earlier {
     /// [`SAME_SEARCH_WINDOW`] board sizes: what a comparison with an earlier game needs, so that it need not set
     /// that game's board up again.
     setups: BTreeMap<u32, Problem>,
+    /// The boards this run set up whose games are not concluded yet.
+    pending: BTreeSet<u32>,
 }
 
 impl Earlier {
@@ -978,8 +1179,9 @@ impl Earlier {
         earlier
     }
 
-    /// Adds a game solved in this run.
+    /// Adds a game solved in this run, when it is concluded.
     fn add_result(&mut self, result: &GameResult) {
+        self.pending.remove(&result.n);
         if let (true, Some(proof), Some(setup)) = (result.completed, result.proof, result.setup) {
             if proof.settles_search() {
                 let (promotions, assumes) = (result.promotions.clone(), result.assumes.clone());
@@ -989,28 +1191,42 @@ impl Earlier {
         }
     }
 
-    /// Remembers the search problem that this run set board `n` up with (`search_game`), and forgets the problems of
-    /// the boards more than [`SAME_SEARCH_WINDOW`] sizes before the latest one remembered: no game that follows
-    /// looks that far back.
+    /// Remembers the search problem that this run set board `n` up with (at the repeat lookup of its game, in the
+    /// order of the board sizes), with the game pending until it is concluded, and forgets the problems of the boards
+    /// more than [`SAME_SEARCH_WINDOW`] sizes before the latest one remembered: no game that follows looks that far
+    /// back.
     ///
     /// The problem that this run's own setup of board `m` poses is the problem `search_problem(m)` builds
     /// ([`Board::problem`] is the problem [`Board::prepare`] poses, which a test in `board.rs` checks), so a
     /// comparison may use either.
     fn remember(&mut self, n: u32, problem: Problem) {
         self.setups.insert(n, problem);
+        self.pending.insert(n);
         let latest = self.setups.keys().next_back().copied().unwrap_or(n);
         self.setups.retain(|&m, _| latest - m <= SAME_SEARCH_WINDOW);
     }
 
-    /// The latest game of the window before `n` ([`SAME_SEARCH_WINDOW`]) whose search problem is `problem`, as the
-    /// record a repeat of it keeps, and its promotions.  A game whose digest is not `problem`'s is passed over; for
-    /// one whose digest is, its problem (the one this run set its board up with when it did, else set up again from
-    /// the board size, [`search_problem`]) is compared with `problem` itself, so that the answer never rests on two
-    /// digests alone.  A game whose problem is not as large as its line says (a line made by a build whose frame
-    /// builder posed another problem) is dropped: a verifier would refuse it too.
-    fn find(&mut self, n: u32, problem: &Problem) -> Option<(SameSearch, Vec<u32>)> {
+    /// The latest game of the window before `n` ([`SAME_SEARCH_WINDOW`]) whose search problem is `problem`: the game
+    /// whose search game `n` repeats.  A game whose digest is not `problem`'s is passed over; for one whose digest
+    /// is, its problem (the one this run set its board up with when it did, else set up again from the board size,
+    /// [`search_problem`]) is compared with `problem` itself, so that the answer never rests on two digests alone.  A
+    /// game whose problem is not as large as its line says (a line made by a build whose frame builder posed another
+    /// problem) is dropped: a verifier would refuse it too.
+    ///
+    /// A pending game counts as well, compared by the problem this run set it up with.  It is the game that a range
+    /// solved in order finds: there the pending game is concluded when `n` looks, and a game that set a search up
+    /// and completes settles its problem (a completed search is exhausted or reaches its ceiling, a repeat repeats
+    /// one that settles it), while one that does not complete ends the range, or fails it, before the line of `n`
+    /// could be written.  A repeat of a pending game is concluded after it ([`same_search`](Self::same_search)).
+    fn find(&mut self, n: u32, problem: &Problem) -> Option<u32> {
         let digest = problem.digest();
         for m in (n.saturating_sub(SAME_SEARCH_WINDOW)..n).rev() {
+            if self.pending.contains(&m) {
+                if self.setups.get(&m) == Some(problem) {
+                    return Some(m);
+                }
+                continue;
+            }
             let Some(game) = self.games.get(&m) else { continue };
             if game.digest != digest {
                 continue;
@@ -1021,12 +1237,24 @@ impl Earlier {
                 continue;
             };
             if *theirs == *problem {
-                let promotion_sum = game.promotions.iter().map(|&p| u64::from(p)).sum();
-                let same = SameSearch { n: m, digest, promotion_sum, proof: game.proof, assumes: game.assumes.clone() };
-                return Some((same, game.promotions.clone()));
+                return Some(m);
             }
         }
         None
+    }
+
+    /// The record that a repeat of the search of game `m` keeps, whose problem has the digest given, and `m`'s
+    /// promotions, once `m` is among the games ([`find`](Self::find) found it).
+    fn same_search(&self, m: u32, digest: u64) -> Option<(SameSearch, Vec<u32>)> {
+        let game = self.games.get(&m)?;
+        let promotion_sum = game.promotions.iter().map(|&p| u64::from(p)).sum();
+        let same = SameSearch { n: m, digest, promotion_sum, proof: game.proof, assumes: game.assumes.clone() };
+        Some((same, game.promotions.clone()))
+    }
+
+    /// The promotions of game `m`, if it is among the games.
+    fn promotions(&self, m: u32) -> Option<&[u32]> {
+        self.games.get(&m).map(|game| game.promotions.as_slice())
     }
 }
 
@@ -1102,13 +1330,14 @@ pub fn solve_range(
     Ok(results)
 }
 
-/// Solves the board sizes `lo..=hi` in order, each from the solution of the one before.  The solution of
-/// `lo − 1` comes from the results file, else, with [`SolveOptions::use_prev`], from `optimal.json`.  The results
-/// file is checked when it is opened ([`ResultsFile::open`]); games already completed in it are skipped (and a
-/// checkpoint left for one is deleted).  Every other result is appended to the file (if there is one), then given
-/// to `on_game`, and only then is its checkpoint deleted.  A game that fails a check after it was found goes to the
-/// file's [`rejected_path`](crate::results::rejected_path) instead, and the run fails.  The range stops at a game
-/// whose search did not complete.  Scores are confirmed against `optimal.json` ([`Optimal::built_in`]).
+/// Solves the board sizes `lo..=hi`, each from the solution of the one before, and concludes them in order (with
+/// up to [`SolveOptions::window`] games in flight, see `window`).  The solution of `lo − 1` comes from the results
+/// file, else, with [`SolveOptions::use_prev`], from `optimal.json`.  The results file is checked when it is opened
+/// ([`ResultsFile::open`]); games already completed in it are skipped (and a checkpoint left for one is deleted).
+/// Every other result is appended to the file (if there is one), then given to `on_game`, and only then is its
+/// checkpoint deleted.  A game that fails a check after it was found goes to the file's
+/// [`rejected_path`](crate::results::rejected_path) instead, and the run fails.  The range stops at a game whose
+/// search did not complete.  Scores are confirmed against `optimal.json` ([`Optimal::built_in`]).
 pub fn solve_range_each(
     lo: u32,
     hi: u32,
@@ -1140,43 +1369,14 @@ pub fn solve_range_each_with(
             }
         }
     }
-    let mut summary = RangeSummary::default();
-    let mut prev: Option<Prev> = None;
-    let mut earlier = results.as_ref().map(Earlier::of_file).unwrap_or_default();
-    for n in lo..=hi {
-        if let Some(stored) = results.as_ref().and_then(|r| stored_prev(r, n)) {
-            prev = Some(stored);
-            summary.skipped += 1;
-            continue;
-        }
-        let before = if n == lo { previous_game(n, results.as_ref(), optimal, opts.use_prev) } else { prev.take() };
-        if n == lo && n > 1 && before.is_none() {
-            note_standalone(n, optimal.score(n - 1).is_some());
-        }
-        let earlier_runs = results.as_ref().map_or(0, |r| r.earlier_runs(n));
-        let solved = solve_one(n, before.as_ref(), opts, optimal, earlier_runs, Some(&mut earlier));
-        let result = match (solved, &results) {
-            (Ok(result), _) => result,
-            (Err(Failure::Rejected(result, reason)), Some(file)) => {
-                let path = file.reject(&result, &reason)?;
-                return Err(format!("{reason}; the game is recorded in {}", path.display()));
-            }
-            (Err(failure), _) => return Err(failure.message()),
-        };
-        if let Some(results) = &mut results {
-            results.append(&result)?;
-        }
-        on_game(&result);
-        summary.solved += 1;
-        if !result.completed {
-            summary.stopped_at = Some(n);
-            break;
-        }
-        discard_checkpoint(opts, n);
-        earlier.add_result(&result);
-        prev = Some(Prev::from_result(&result));
+    let first = previous_game(lo, results.as_ref(), optimal, opts.use_prev);
+    if lo > 1 && first.is_none() && !results.as_ref().is_some_and(|file| file.completed(lo).is_some()) {
+        note_standalone(lo, optimal.score(lo - 1).is_some());
     }
-    Ok(summary)
+    let mut earlier = results.as_ref().map(Earlier::of_file).unwrap_or_default();
+    let before = first.map_or(Before::None, Before::Given);
+    let range = window::Range { lo, hi, before, optimal, results: results.as_mut() };
+    window::solve(range, opts, &mut earlier, &mut on_game)
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -1299,20 +1499,16 @@ mod tests {
         assert!(err.contains("does not stand up") && !err.contains("not a legal game of n=6"), "{err}");
     }
 
-    /// Solves the board sizes `lo..=hi` as a range does, in order, each from the one before (the first from
-    /// `optimal.json`'s game before it), with the `Earlier` that the run keeps; returns it and the results.
+    /// Solves the board sizes `lo..=hi` as a range does (its driver, [`window::solve`], on one thread, so one game
+    /// after the other), each from the one before (the first from `optimal.json`'s game before it), with the
+    /// `Earlier` that the run keeps; returns it and the results.
     fn solved_with_earlier(lo: u32, hi: u32) -> (Earlier, Vec<GameResult>) {
         let (opts, optimal) = (one_thread(), Optimal::built_in());
         let mut earlier = Earlier::default();
-        let mut prev = Prev::from_optimal(optimal, lo - 1);
+        let before = Prev::from_optimal(optimal, lo - 1).map_or(Before::None, Before::Given);
+        let range = window::Range { lo, hi, before, optimal, results: None };
         let mut results = Vec::new();
-        for n in lo..=hi {
-            let solved = solve_one(n, prev.as_ref(), &opts, optimal, 0, Some(&mut earlier));
-            let result = solved.map_err(Failure::message).unwrap();
-            earlier.add_result(&result);
-            prev = Some(Prev::from_result(&result));
-            results.push(result);
-        }
+        window::solve(range, &opts, &mut earlier, &mut |result| results.push(result.clone())).unwrap();
         (earlier, results)
     }
 
@@ -1323,26 +1519,49 @@ mod tests {
     fn a_problem_the_run_set_up_is_compared_as_the_one_set_up_again_is() {
         let (earlier, results) = solved_with_earlier(300, 301);
         assert_eq!((results[0].method, results[1].method), (Method::Search, Method::Repeat));
-        // The run kept the problem of each board it set up, repeats included.
+        // The run kept the problem of each board it set up, repeats included, and concluded both games.
         assert_eq!(earlier.setups.keys().copied().collect::<Vec<_>>(), [300, 301]);
+        assert!(earlier.pending.is_empty());
         let ours = search_problem(301).unwrap().0;
         assert_eq!(earlier.setups[&301], ours);
         assert_eq!(earlier.setups[&300], search_problem(300).unwrap().0);
 
         // The same games, with nothing remembered, find the same game.
-        let mut set_up_again = Earlier { games: earlier.games.clone(), setups: BTreeMap::new() };
-        let mut remembered = Earlier { games: earlier.games.clone(), setups: earlier.setups.clone() };
+        let mut set_up_again = Earlier { games: earlier.games.clone(), ..Earlier::default() };
+        let mut remembered =
+            Earlier { games: earlier.games.clone(), setups: earlier.setups.clone(), ..Earlier::default() };
         let found = remembered.find(301, &ours);
         assert_eq!(found, set_up_again.find(301, &ours));
-        let (same, promotions) = found.expect("301 repeats 300");
-        assert_eq!((same.n, &promotions), (300, &results[0].promotions));
+        assert_eq!(found, Some(300), "301 repeats 300");
+        let (same, promotions) = remembered.same_search(300, ours.digest()).unwrap();
+        assert_eq!(promotions, results[0].promotions);
         assert_eq!(Some(&same), results[1].same_search.as_ref());
 
         // What is remembered is what is compared: were another board's problem remembered for 300, 301 would not
         // repeat it, though the digest the game of 300 recorded is 301's.
-        let mut wrong = Earlier { games: earlier.games.clone(), setups: BTreeMap::new() };
-        wrong.remember(300, search_problem(310).unwrap().0);
+        let setups = BTreeMap::from([(300, search_problem(310).unwrap().0)]);
+        let mut wrong = Earlier { games: earlier.games.clone(), setups, ..Earlier::default() };
         assert!(wrong.find(301, &ours).is_none());
+    }
+
+    /// A game in flight that set a search up is found as it is once concluded, by the problem the run set it up with:
+    /// 301 repeats 300 while 300 is pending, and the record of the repeat is the one made once 300 is concluded.
+    #[test]
+    fn a_game_in_flight_is_found_as_the_concluded_game_is() {
+        let (concluded, results) = solved_with_earlier(300, 301);
+        let ours = search_problem(301).unwrap().0;
+        let mut in_flight = Earlier::default();
+        in_flight.remember(300, search_problem(300).unwrap().0);
+        assert_eq!(in_flight.find(301, &ours), Some(300));
+        assert!(in_flight.same_search(300, ours.digest()).is_none(), "no record while 300 is in flight");
+        in_flight.add_result(&results[0]);
+        assert!(in_flight.pending.is_empty());
+        assert_eq!(in_flight.find(301, &ours), Some(300));
+        assert_eq!(in_flight.same_search(300, ours.digest()), concluded.same_search(300, ours.digest()));
+        // Pending with another problem, it is passed over.
+        let mut other = Earlier::default();
+        other.remember(300, search_problem(310).unwrap().0);
+        assert_eq!(other.find(301, &ours), None);
     }
 
     #[test]

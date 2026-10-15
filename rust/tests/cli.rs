@@ -71,6 +71,10 @@ fn bad_command_lines_are_usage_errors() {
     assert_usage_error(&["solve", "12", "--tactic", "fix_forced"], "expected name=value");
     assert_usage_error(&["solve", "12", "--tactic", "sparkle=on"], "unknown tactic");
     assert_usage_error(&["solve", "12", "--threads", "0"], "--threads must be at least 1");
+    assert_usage_error(&["solve", "12", "--window", "0"], "--window must be at least 1");
+    assert_usage_error(&["solve", "12", "--window", "many"], "--window: cannot read");
+    assert_usage_error(&["regress", "--window", "0"], "--window must be at least 1");
+    assert_usage_error(&["bench", "--window", "2"], "unknown option --window");
     assert_usage_error(&["solve", "12", "--nope"], "unknown option --nope");
     assert_usage_error(&["solve", "12", "--time-limit", "-1"], "not a number of seconds");
     assert_usage_error(&["solve", "12", "--node-limit", "many"], "cannot read");
@@ -446,6 +450,11 @@ fn regress_checks_scores_against_optimal_json() {
     let run = taxman(&["regress", "--to", "40", "--threads", "1"]);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     assert!(run.stdout.contains("solved 1..=40 (1 threads, tactics default)"), "{}", run.stdout);
+    assert!(run.stdout.contains("40 games match optimal.json, 0 are not in it"), "{}", run.stdout);
+
+    // Games in flight, sharing two threads.
+    let run = taxman(&["regress", "--to", "40", "--threads", "2", "--window", "4"]);
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
     assert!(run.stdout.contains("40 games match optimal.json, 0 are not in it"), "{}", run.stdout);
 
     let run = taxman(&["regress", "--from", "30", "--to", "34", "--threads", "1", "--tactic", "match_refine=0"]);

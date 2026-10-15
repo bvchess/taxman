@@ -630,7 +630,7 @@ fn nodes<const W: usize>(path: &Path, every: usize, samples: usize, lagrange: us
         });
         // The best completion of the node, by the solver's search from it (incumbent: no completion at all).
         let exact = (exact > 0).then(|| {
-            let space = SearchSpace::new(&p, &graph, None);
+            let space = SearchSpace::new(&p, &graph);
             let cfg = EngineConfig {
                 threads: 1,
                 time_limit: Some(std::time::Duration::from_secs(exact)),
@@ -1229,7 +1229,7 @@ fn prove<const W: usize>(n: u32, known: &Known, o: &Options) {
         gf2_branching: o.branching,
         gf2_strong_limit: o.strong,
         gf2_more_forced: o.more_forced,
-        ..SearchSpace::new(&p, &graph, None)
+        ..SearchSpace::new(&p, &graph)
     };
     let cfg = EngineConfig {
         threads: o.threads,

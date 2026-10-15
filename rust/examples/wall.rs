@@ -51,7 +51,7 @@
 //!   final one, as a node limit stops the run) before deleting it.  Each line reports the sizes, the root's GF(2)
 //!   bound (computed after the search, apart from it), the outcome and the search's cost: wall seconds, the
 //!   engine's busy time, the cycles and instructions of the process, the promotion and GF(2) counters, the cost
-//!   per node and per augmentation, and the engine's counters for pauses, checkpoints and the queue.
+//!   per node and per augmentation, and the engine's counters (below).
 //! * **grow**: the emulation of a large tree.  A search whose incumbent starts `--delta D` below a known optimum
 //!   (`D <= 0` usually) behaves like a search with a larger gap, so it makes a much larger tree on a known game:
 //!   the proof of `nodes --mode opt` with the incumbent at `opt + D`, on `--threads T` threads (default 1; `--cores
@@ -90,6 +90,15 @@
 //! `elements`, per-frame `ranks` and `block_words`; the bound with no incumbent (`root_bound_s` for the reset and
 //! the evaluation, `root_bound`, `root_chosen` the size of its heaviest set, `root_augmentations`); and the same
 //! evaluation asked for the members forced by an incumbent of the start value (`root_split_s`, `root_forced`).
+//!
+//! **The engine's counters** (`nodes` and `grow`; each is defined at `engine::Counters`): the pauses, checkpoints and
+//! queue (`pauses`, `pause_total_s`, `pause_max_s`, `park_max_s`, `checkpoints`, `max_queue`, `spilled_units`); the
+//! units run (`runs`, `tiny_runs`); the workers started and retired after the first ones (`spawned`, `retired`) and
+//! the workers' lifetimes summed (`capacity_s`, which is `seconds` × threads when their number did not change); and
+//! how the time went besides the steps: the idle time before all workers first ran at once (`ramp_idle_s`), the wall
+//! time and the idle time after the last moment a worker finished a unit while all were running (`tail_s`,
+//! `tail_idle_s`), and the units' starts, the time to rebuild a unit's state (`rebuild_s`) and the time of the first
+//! node of the units that had one (`first_step_s`, over `first_steps` units).
 
 #[path = "common/counters.rs"]
 mod counters;
@@ -488,7 +497,7 @@ struct Run {
 /// it, with no seed and no ceiling.  Only the engine's run is timed, not the graphs it starts from.
 fn proof<const W: usize>(p: &Prepared<W>, cfg: &EngineConfig, best: u64) -> Run {
     let graph = MatchGraph::new(&p.model, &p.root);
-    let space = SearchSpace::new(p, &graph, None);
+    let space = SearchSpace::new(p, &graph);
     let units = vec![TaxUnit { promoted: Bits::<W>::EMPTY, cands: p.candidates }];
     // The incumbent is a value only: its payload, an empty set, is never read back here.
     let start = Start::Fresh { units, best, payload: vec![0u8; 8 * W] };
@@ -590,7 +599,8 @@ fn root_gf2<const W: usize>(line: &mut Line, p: &Prepared<W>, start: u64, opt: O
         .maybe("gap_opt", opt.map(gap));
 }
 
-/// The engine's counters for pausing, checkpointing and queueing.
+/// The engine's counters for pausing, checkpointing and queueing, for the workers' number and lifetimes, and for the
+/// ramp, the tail and the units' starts.
 fn engine_fields(line: &mut Line, c: &Counters) {
     line.field("pauses", c.pauses)
         .seconds("pause_total_s", c.pause_total.as_secs_f64())
@@ -600,7 +610,16 @@ fn engine_fields(line: &mut Line, c: &Counters) {
         .field("max_queue", c.max_queue)
         .field("spilled_units", c.spilled_units)
         .field("runs", c.runs)
-        .field("tiny_runs", c.tiny_runs);
+        .field("tiny_runs", c.tiny_runs)
+        .field("spawned", c.spawned)
+        .field("retired", c.retired)
+        .seconds("capacity_s", c.capacity.as_secs_f64())
+        .seconds("ramp_idle_s", c.ramp_idle.as_secs_f64())
+        .seconds("tail_s", c.tail.as_secs_f64())
+        .seconds("tail_idle_s", c.tail_idle.as_secs_f64())
+        .seconds("rebuild_s", c.rebuild.as_secs_f64())
+        .seconds("first_step_s", c.first_step.as_secs_f64())
+        .field("first_steps", c.first_steps);
 }
 
 /// What a search came to and cost: outcome, time, the promotion and GF(2) counters, the cost per node and per

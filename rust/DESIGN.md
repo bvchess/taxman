@@ -490,7 +490,10 @@ or two members and refill, until nothing improves).  The *ceiling* on the promot
 seed's survivors already reach it, the dive is skipped, and the local search when the incumbent after the dive does:
 nothing can beat a set at the ceiling, so neither would change it, and the result is the same.  The local search runs
 on the search's threads, the refills of a pass in parallel, and keeps the first improvement in the order of the
-sequential pass, so its answer does not depend on the thread count.  Board/search setup is in
+sequential pass, so its answer does not depend on the thread count; it reads the ceiling before each pass, so one given
+while it runs (the control's) ends it as soon as its set reaches it.  The start is offered to the run's control as it is
+made (after the greedy set and the seed, the dive and the local search), so whoever steers the search sees the best so
+far before the engine starts, and the engine's start is unchanged.  Board/search setup is in
 `board::Board`: it is the one place that knows the tables → frames → prepare → ceiling and seed path.
 
 ## 5. Tactics
@@ -559,7 +562,8 @@ design in outline.
   segment files in `spill_dir` and reloaded when memory runs dry.  Searchers keep only their stack plus bounded
   caches.
 * **Incumbent.**  An `AtomicU64` value plus a mutex-protected payload (the promotion set, encoded); offers only ever
-  raise it, and a searcher can declare it optimal (the ceiling), which ends the run.
+  raise it, and a searcher can declare it optimal, which ends the run, as an incumbent that reaches the ceiling given
+  through the control (below) does.
 * **Checkpoint.**  Every `checkpoint_interval` all workers yield and park, the engine writes the caller's header, the
   incumbent, statistics and every unit (memory and spilled) to `<checkpoint>.tmp`, fsyncs, renames it over the
   checkpoint and syncs the directory, and releases the workers.  Resuming loads the file and continues; nothing is lost
@@ -574,10 +578,17 @@ design in outline.
   deletes those of processes that no longer exist.  Progress lines and results on stdout ignore write errors, so a
   closed pipe cannot kill a run.  A panic in a release build aborts (`panic = "abort"`); the previous checkpoint stays
   valid, which is the property that matters.
+* **Control** (`engine::Control`): a handle through which another thread steers a run while it goes: a ceiling (a
+  proven upper bound, which ends the run once the incumbent reaches it), outside incumbents, a stop, and the number of
+  workers, which grows by starting workers and shrinks by retiring workers that hold no unit (a running one hands all
+  its units to the deque first); 0 suspends the search, its units waiting in the deque until the number rises again.
+  Requests made before the run apply when it starts (engine docs, "The control").
 * **Instrumentation** (`engine::Counters`, per invocation): each worker's time split into busy, idle, parked and lock
-  wait; the effective parallelism busy / (wall × threads); splits and the units they gave, steals, runs and tiny runs;
-  when all workers first ran at once; the pauses and the longest wait for the workers to park.  Every progress line ends
-  with them in short (README, "Reading the output").
+  wait; the effective parallelism busy / capacity (the workers' lifetimes summed, wall × threads when their number is
+  fixed); splits and the units they gave, steals, runs and tiny runs; when all workers first ran at once; the workers
+  added and retired; the idle time of the ramp and of the tail, the time to a unit's first step (the rebuild) and the
+  time in it; the pauses and the longest wait for the workers to park.  Every progress line ends with them in short
+  (README, "Reading the output").
 
 ## 7. Per-game pipeline (`solver`)
 
@@ -606,10 +617,52 @@ so far) and keeps its checkpoint; a range stops there.
 **Range runs** feed each game's solution to the next and resume from the results file, which is checked when it is
 opened (every game replayed, the chain from n − 1, each line's arithmetic and provenance; the search problems that the
 checks of repeats set up again are set up first, on the run's threads).  Games completed in it
-are skipped; each result is appended and synced as soon as it is done, and only then is the game's checkpoint deleted
-(a checkpoint left for a game the file has completed is deleted when a range starts).  The n − 1 solution comes
-from, in order: this run, the results file, and with `use_prev` (`--use-prev`) optimal.json; with none, the game is
-solved standalone, with no seed and no ceiling.
+are skipped; each result is appended and synced as soon as it is concluded, in the order of n, and only then is the
+game's checkpoint deleted (a checkpoint left for a game the file has completed is deleted when a range starts).  The
+n − 1 solution comes from, in order: this run, the results file, and with `use_prev` (`--use-prev`) optimal.json; with
+none, the game is solved standalone, with no seed and no ceiling.
+
+### The window: games in flight
+
+A game of the chain needs two things of the game before it: its moves, for the seed, and its score, for the ceiling.
+Everything else (its board, its frames, its search problem, whether an earlier game settled that problem) is its own,
+and the ceiling only stops a search early.  So a range keeps a *window* of K consecutive games in flight (`--window K`,
+`SolveOptions::window`; 1 by default, and always 1 with one thread; `tools/cloud/chain.sh` runs with 16): game n + 1 is
+set up while n searches, its search may start before n is proven (*speculatively*), seeded from n's best game so far
+and without a ceiling, and it takes n's ceiling and the seed of n's final game the moment n is concluded, through its
+engine's control (section 6).  `solver::window` is the driver.  With K = 1 it is the range solved in order, line for
+line: a game enters the window only once the game before it is concluded, so its search starts with the final seed and
+the ceiling, on every thread.
+
+* *Phases.*  A game is set up on a thread of its own (the prime shortcut, the trivial game, or the search problem); its
+  repeat is looked up on the driver's thread in the order of n (a game of the window that set a search up counts, see
+  section 8); its search runs on its thread; and it is concluded on the driver's thread when it is the oldest game of
+  the window and the game before it is concluded: the result is built and checked (`conclude`), appended and synced,
+  and only then is the next game told its ceiling.  A repeat waits for the game it repeats.
+* *Seeds.*  A speculative search starts once the game before it has a game to seed it with: concluded, or its search's
+  best so far (a search offers its start to its control as the start is made, section 4), or what that gives through a
+  repeat or the prime formula.  Every 5 ms it is offered the survivors of that game again whenever its score has
+  improved, and at the conclusion those of the final game.
+* *Deferring.*  A search whose seed's survivors reach the *provisional ceiling*, n + the score of the game before's best
+  so far − `in_the_bag`, waits for that game's conclusion: if that best is final, the ceiling settles the game at once,
+  and a speculative search of it would be wasted.
+* *Threads.*  `--threads T` is a budget the window shares (`solver::window::allot`, a pure policy, unit-tested): a setup
+  holds one thread, a search the workers of its engine, which takes on workers and retires them while it runs
+  (`Control::set_workers`; 0 suspends it, its units waiting in its deque).  Every 5 ms the driver samples each engine
+  and serves the claims oldest game first: a setup asks one thread; a search ready to start every free thread if it is
+  the only claim, else one; a busy search (idle under 5% of the last tick) asks to double; a search idle 25% or more
+  gives its idle workers back to another game's claim, unless it was given threads in the last 10 ms; and the oldest
+  search, if it is left short, reclaims threads from the younger ones, youngest first, suspending them if need be.  So
+  the game the chain waits for runs on every thread it keeps busy, speculative searches run on what it leaves, and the
+  threads of a search that ends or idles go to the oldest game that can use them.  The tree is not estimated: a search
+  earns threads by keeping them busy, the online form of a running estimate of what is left of it.
+* *Stops.*  A failure is reported, and an unfinished search ends the range, only when its game is the oldest, so a run
+  fails or stops at the game, and with the lines before it, where a range solved in order would.  The searches still
+  in flight are then stopped with a final checkpoint (the next run resumes them), and what they found is dropped.
+* *Trace.*  With `TAXMAN_WINDOW_TRACE` set, the driver prints its events on stderr: setups, the starts of searches with
+  their seeds and ceilings, workers given and taken back, hints, deferrals and conclusions.
+
+What it buys and what was tried on the way are in [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md#round-b-the-chain-on-many-threads-2026-10).
 
 **optimal.json** is built into the binary (`include_str!`, `game::Optimal::built_in`): the table as it was when the
 crate was compiled, which a rebuild picks up when the file changes.  Every completed game's score is confirmed against
@@ -663,6 +716,31 @@ tactics that are gone).  Resuming checks all of them and says which differs, and
 set of candidates that can be promoted from the root and is worth the stored value; so a checkpoint of another game, or
 of an older build whose frame builder differs, is refused instead of pruning with a foreign incumbent or failing to
 rebuild its units.  A resumed game rests on nothing a game that ran in one piece does not.
+
+### What a window changes in the results
+
+A range solved with a window of games in flight (section 7) records what the range solved in order records, but for
+what a multi-threaded search may vary:
+
+* A line is appended only after every line it rests on: that of n − 1 (its `prev`) and, for a repeat, that of the game
+  m it repeats.  Both are earlier lines, and lines are appended in the order of n.
+* `prev`, `same_search` and `assumes` are derived as in order, from concluded games.  A repeat names the same m: n looks
+  among the eight board sizes before it for the latest game whose problem is n's, counting a game of the window that
+  set a search up and is not concluded yet.  In order, that game is concluded when n looks, and every search or repeat
+  that completes settles its problem, while one that does not complete stops the range, or fails it, before n's line
+  could be written.
+* The proof kinds are those of the range solved in order.  A completed search's promotion sum is its problem's best,
+  P\*, and its proof is `cap` exactly when P\* reaches the ceiling, however the search ran.  A search started before
+  its ceiling was known may have explored its whole tree to an optimum at the ceiling: its line records `cap` and
+  `reached_cap`, the weaker of the two proofs it has, as the verifiers' rule wants (a line reaches the ceiling exactly
+  when its promotions sum to it).  One stopped by a signal or a limit with its best at the ceiling is complete by the
+  ceiling, as it would have stopped there given the ceiling from the start.
+* A seed from a provisional game, a hint offered while a search runs, a ceiling given late, a deferral and a
+  suspension change how a search runs, never what it proves: every set offered is promotable (the survivors of a
+  seed), a deferral only delays a search, a suspended search keeps every unit, and the ceiling is proven given the
+  game of n − 1 optimal, which a proof by `cap` records that it rests on, as before.
+* What may differ: the moves and promotions where a problem has several optimal sets (as between thread counts), and
+  with them the next line's `prev.moves_digest`; the nodes, the search's counters, the engine's, and the times.
 
 ### Same search
 
@@ -834,7 +912,23 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   stops it before any search, with every unit in its checkpoint; spill segments of dead processes are removed; a locked
   checkpoint directory or results file is refused; a checkpoint of another game, with other tactics or with an
   incumbent that does not fit is refused; and the binary rejects bad
-  times, survives a closed stdout and stderr, and stops on SIGINT and SIGTERM with a checkpoint it then resumes.
+  times, survives a closed stdout and stderr, and stops on SIGINT and SIGTERM with a checkpoint it then resumes.  The
+  control: a ceiling given before a run, or while it runs at the incumbent it has, ends it as optimal (with no search
+  work if the start reaches it); offers from outside raise the incumbent; a stop through it checkpoints a run that
+  resumes exactly; workers added, retired and down to none (suspended, then resumed, checkpointed, stopped, or ended by a
+  ceiling) give the exact optimum; and the conservation test runs with a controller that sets 0 to 4 workers every
+  millisecond or so while the run checkpoints, spills and resumes.  The counters: capacity is wall × threads when the
+  workers do not change, and a searcher that sleeps before its first and second polls shows in the rebuild and first-step
+  times.
+* **The window** (`tests/window.rs`; the policy's unit tests in `src/solver/window/allot.rs`): chains 1..600 with
+  windows of 1, 2, 4 and 8 on 4 threads have the scores, methods, proofs, ceilings, assumptions, repeats and previous
+  games of the committed chain, and pass `verify_files`; with one thread any window gives the lines of a window of one
+  but for the times and the build; a repeat of a game still in flight (301 of 300) names it, on a later line; a range
+  stopped by a node limit ends at its first unfinished game with the lines before it in order and completes when run
+  again; a score that is not the table's fails the range at that game, with the lines before it, as a window of one
+  does.  The policy: claims served oldest first, a lone ready search takes every free thread, a busy one doubles, idle
+  workers go back only to another claim and after the last grant has settled, the oldest search reclaims from the
+  youngest first and suspends them if need be, a suspended search claims one thread.
 * **Integrity of results** (`tests/integrity.rs`, `tests/results.rs`, `tests/solver.rs`): a previous game that is not
   what it says is refused; an assumption travels down a chain; a score that is not the table's is a hard error; a
   tampered results file, or one whose line contradicts itself or is of another schema, is refused naming the line, by
@@ -984,7 +1078,11 @@ chain from n = 1 reproduces its scores.  With the GF(2) bound (section 4), the c
 branching's solves, 70% of the intersection's work, which restart far below their answer (canceling the negative cycles
 of the optimum less the member would start them next to it); the removal of the matching path's search machinery that
 the GF(2) bound leaves idle (refinement, the Lagrangian bound in the search; EXPERIMENTS has the list), once a
-production run has been made with it; a warm-started unit rebuild; and, for the many-core machine, whatever its first
-sweep shows that a laptop cannot: the GF(2) search's trees are a hundred times smaller, so how many threads a game can
-keep busy is open.  Nothing about scaling beyond 4 threads with the GF(2) bound, beyond 8 threads at all, or about
-Graviton has been measured (`tools/cloud/RUNBOOK.md`, section 8).
+production run has been made with it; and, for the many-core machine, whatever its first sweep shows that a laptop
+cannot.  The chain keeps several games in flight (section 7, "The window") and the engine reports what a thread loses
+at many threads (the units' starts, the lock, the ramp and the tail); on 4 threads of the laptop a step costs 7% more
+than on one, none of it in the units' starts, and the window makes 1..1300 16% faster and the games past 2225 no
+slower.  The measurements at 64 and 192 threads are written as commands (`bench/wall/README.md`, "For a cloud machine",
+items 7 and 8); a unit that carries its GF(2) level, so that a rebuilt one is checked rather than solved, waits for
+them (EXPERIMENTS, "Round B").  Graviton's 64 threads are measured for one proof (58.5 times); the window, and anything
+at 192 threads, are not (`tools/cloud/RUNBOOK.md`, section 8).

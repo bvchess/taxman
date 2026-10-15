@@ -4,8 +4,9 @@
 //! There is no parser crate.  A command line is positional arguments and flags; a flag is `--name VALUE` or
 //! `--name=VALUE` if it takes a value and `--name` if it is a switch, each command says which of its flags are which
 //! ([`Args::parse`]), and any other `--flag` is a usage error.  The flags every solving command takes
-//! ([`SOLVER_FLAGS`]: `--threads`, `--tactic`) are turned into [`SolveOptions`] by [`solver_options`]; the others
-//! (`--out`, `--time-limit`, `--use-prev`, ...) are each command's own.  A usage error makes `main` print the usage and
+//! ([`SOLVER_FLAGS`]: `--threads`, `--tactic`) are turned into [`SolveOptions`] by [`solver_options`], and with the
+//! flag of the commands that solve a range ([`WINDOW_FLAG`]) by [`range_options`]; the others (`--out`,
+//! `--time-limit`, `--use-prev`, ...) are each command's own.  A usage error makes `main` print the usage and
 //! exit with status 2; a command that ran and failed exits with status 1 ([`CliError`]).
 
 use std::fmt;
@@ -138,19 +139,37 @@ impl Args {
     }
 }
 
+/// The flag of the commands that solve a range (`solve`, `regress`) besides [`SOLVER_FLAGS`]: the games in flight
+/// ([`SolveOptions::window`]), which [`range_options`] reads.
+pub const WINDOW_FLAG: &str = "--window";
+
 /// The solver options the flags of [`SOLVER_FLAGS`] describe, on top of the defaults.
 pub fn solver_options(args: &Args) -> Result<SolveOptions, CliError> {
     let mut opts = SolveOptions::default();
-    if let Some(threads) = args.parsed::<usize>("--threads")? {
-        if threads == 0 {
-            return Err(CliError::Usage("--threads must be at least 1".into()));
-        }
+    if let Some(threads) = count(args, "--threads")? {
         opts.threads = threads;
     }
     for assignment in args.values("--tactic") {
         opts.tactics.set(assignment).map_err(CliError::Usage)?;
     }
     Ok(opts)
+}
+
+/// [`solver_options`] with [`WINDOW_FLAG`], for a command that solves a range.
+pub fn range_options(args: &Args) -> Result<SolveOptions, CliError> {
+    let mut opts = solver_options(args)?;
+    if let Some(window) = count(args, WINDOW_FLAG)? {
+        opts.window = window;
+    }
+    Ok(opts)
+}
+
+/// The flag's value as a count, which must be at least 1.
+fn count(args: &Args, name: &str) -> Result<Option<usize>, CliError> {
+    match args.parsed::<usize>(name)? {
+        Some(0) => Err(CliError::Usage(format!("{name} must be at least 1"))),
+        count => Ok(count),
+    }
 }
 
 /// `N` or `A-B`.
@@ -227,6 +246,19 @@ mod tests {
         assert!(solver_options(&args).is_err());
         let args = Args::parse(&strings(&["--tactic", "nonsense=on"]), &SOLVER_FLAGS, &[]).unwrap();
         assert!(usage(solver_options(&args).unwrap_err()).contains("unknown tactic"));
+    }
+
+    #[test]
+    fn the_window_is_a_count_that_the_commands_of_a_range_read() {
+        let flags = [&SOLVER_FLAGS[..], &[WINDOW_FLAG]].concat();
+        let options = |items: &[&str]| range_options(&Args::parse(&strings(items), &flags, &[]).unwrap());
+        let opts = options(&["--window", "8", "--threads", "4"]).unwrap();
+        assert_eq!((opts.window, opts.threads), (8, 4));
+        assert_eq!(options(&[]).unwrap().window, 1);
+        assert!(usage(options(&["--window", "0"]).unwrap_err()).contains("--window must be at least 1"));
+        assert!(usage(options(&["--window", "x"]).unwrap_err()).contains("--window: cannot read"));
+        // A command that does not solve a range does not take it.
+        assert!(Args::parse(&strings(&["--window", "2"]), &SOLVER_FLAGS, &[]).is_err());
     }
 
     #[test]

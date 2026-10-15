@@ -10,6 +10,7 @@ use crate::model::test_support::*;
 use crate::model::{ConflictCache, Model, Nogoods, Scratch};
 use crate::numtheory::Tables;
 use crate::test_support::TempDir;
+use std::thread;
 
 fn config(threads: usize) -> EngineConfig {
     EngineConfig { threads, progress: None, ..EngineConfig::default() }
@@ -496,6 +497,37 @@ fn a_start_at_the_ceiling_is_neither_dived_nor_improved() {
     assert_eq!((r.start, r.promotions), (p.greedy, p.greedy));
 }
 
+/// The start is offered to the control as it is made, before the engine runs: a search that ends at its start, as a
+/// ceiling that the start reaches ends it, leaves the control with that start, whether it is the greedy set, the
+/// seed's survivors, the dive or the local search that made it.
+#[test]
+fn the_start_is_offered_to_the_control_as_it_is_made() {
+    let n = 930;
+    let board = crate::board::Board::<16>::for_n(n);
+    let p = board.prepare(SearchTactics::default()).unwrap();
+    let graph = MatchGraph::new(&p.model, &p.root);
+    let hood = Neighbourhood { model: &p.model, root: &p.root, candidates: &p.candidates };
+    let dived = dive(&p.model, &p.root, &graph, &p.candidates);
+    let improved = hood.improve(&mut Scratch::new(), &dived, true);
+    let seed = board.seed(crate::game::Optimal::built_in().moves(n - 1).unwrap());
+    let kept = surviving(&p, &seed);
+    assert!(p.greedy.sum() < dived.sum() && dived.sum() < improved.sum(), "each step of the start improves it");
+    assert!(p.greedy.sum() < kept.sum(), "the seed's survivors beat the greedy set");
+
+    // Each ceiling is the sum of one step: the search ends there, and the control has that step.
+    let steps = [("the greedy set", None, p.greedy), ("the dive", None, dived), ("the local search", None, improved)];
+    let seeded = [("the seed", Some(&seed), kept)];
+    for (what, seed, step) in steps.into_iter().chain(seeded) {
+        let control = Control::new();
+        let cfg = EngineConfig { control: Some(Arc::clone(&control)), ..config(1) };
+        assert_eq!(best_so_far::<16>(&control), None);
+        let r = search(&p, &cfg, seed, Some(step.sum()), false).unwrap();
+        assert!(r.completed && r.reached_cap && r.stats.nodes == 0, "{what}");
+        assert_eq!((r.start, r.promotions), (step, step), "{what}: the start");
+        assert_eq!(best_so_far::<16>(&control), Some(step), "{what}: the control's best");
+    }
+}
+
 /// The start of a search does not depend on its threads: the local search on several of them finds what one does,
 /// with and without a seed, in the search of a game as a whole.
 #[test]
@@ -515,6 +547,76 @@ fn the_start_is_the_same_on_every_number_of_threads() {
             }
         }
     }
+}
+
+/// A ceiling given to the control of a search ends it when the incumbent reaches it, whether it is given before the
+/// search starts, as `cap` is, or from another thread while the search runs.  Game 988 starts from an incumbent
+/// 155 below its optimum, which the search finds at its step 4,614 of 6,287, a third of a second after it starts
+/// (the other thread has that long to give the ceiling).
+#[test]
+fn a_ceiling_given_to_the_control_ends_the_search() {
+    let n = 988;
+    let board = crate::board::Board::<16>::for_n(n);
+    let p = board.prepare(SearchTactics::default()).unwrap();
+    let optimum = crate::game::Optimal::built_in().score(n).unwrap() - board.in_the_bag;
+    let whole = search(&p, &config(1), None, None, false).unwrap();
+    assert!(whole.completed && !whole.reached_cap && whole.sum == optimum);
+    assert!(whole.start.sum() < optimum, "the search has nothing to do from its start");
+
+    // Given before the search, in the control or as `cap`: the same search, which ends where it finds the optimum.
+    let control = Control::new();
+    control.set_ceiling(optimum);
+    let cfg = EngineConfig { control: Some(Arc::clone(&control)), ..config(1) };
+    let given = search(&p, &cfg, None, None, false).unwrap();
+    let capped = search(&p, &config(1), None, Some(optimum), false).unwrap();
+    assert!(given.completed && given.reached_cap && given.sum == optimum);
+    assert_eq!((given.sum, given.stats.nodes), (capped.sum, capped.stats.nodes));
+    assert!(given.stats.nodes < whole.stats.nodes, "{} steps, as many as without the ceiling", given.stats.nodes);
+
+    // Given from another thread once the run goes.
+    let control = Control::new();
+    let cfg = EngineConfig { control: Some(Arc::clone(&control)), ..config(1) };
+    let live = thread::scope(|scope| {
+        let run = scope.spawn(|| search(&p, &cfg, None, None, false).unwrap());
+        while control.status().is_none() && !run.is_finished() {
+            thread::yield_now();
+        }
+        control.set_ceiling(optimum);
+        run.join().unwrap()
+    });
+    assert!(live.completed && live.reached_cap && live.sum == optimum, "{live:?}");
+    assert!(live.stats.nodes < whole.stats.nodes, "{} steps, as many as without the ceiling", live.stats.nodes);
+    assert_eq!(best_so_far::<16>(&control), Some(live.promotions));
+    assert_eq!(control.ceiling(), Some(optimum));
+}
+
+/// The previous game's promotions offered to the control before the run raise its start as `seed` does: game 930
+/// starts from 20,469 on its own and from its optimum, 20,480, with the seed, and the search is the same either way.
+#[test]
+fn a_seed_offered_to_the_control_is_the_seed_of_the_search() {
+    let n = 930;
+    let board = crate::board::Board::<16>::for_n(n);
+    let p = board.prepare(SearchTactics::default()).unwrap();
+    let seed = board.seed(crate::game::Optimal::built_in().moves(n - 1).unwrap());
+    let seeded = search(&p, &config(1), Some(&seed), None, false).unwrap();
+    let unseeded = search(&p, &config(1), None, None, false).unwrap();
+    assert!(seeded.start.sum() > unseeded.start.sum() && seeded.found.is_none() && unseeded.found.is_some());
+
+    let control = Control::new();
+    let cfg = EngineConfig { control: Some(Arc::clone(&control)), ..config(1) };
+    assert_eq!(best_so_far::<16>(&control), None);
+    let kept = surviving(&p, &seed);
+    assert!(offer_seed(&p, &control, &seed));
+    assert_eq!(best_so_far::<16>(&control), Some(kept));
+    // What does not beat the incumbent is not taken.
+    assert!(!offer_seed(&p, &control, &Bits::EMPTY));
+    assert_eq!(best_so_far::<16>(&control), Some(kept));
+
+    let offered = search(&p, &cfg, None, None, false).unwrap();
+    assert!(offered.completed && offered.found.is_none());
+    assert_eq!((offered.sum, offered.promotions), (seeded.sum, seeded.promotions));
+    assert_eq!(offered.stats.nodes, seeded.stats.nodes);
+    assert_eq!(best_so_far::<16>(&control), Some(offered.promotions));
 }
 
 #[test]

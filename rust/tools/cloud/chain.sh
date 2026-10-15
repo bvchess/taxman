@@ -5,7 +5,7 @@
 #
 # It runs
 #
-#   taxman solve 1-N [--threads $THREADS] \
+#   taxman solve 1-N [--threads $THREADS] --window $WINDOW \
 #       --out $RESULTS --checkpoint-dir $CKPT --checkpoint-interval 300 --progress 60
 #
 # in a loop.  From n = 1, so that no proof rests on anything beyond the frame model.  Safe to run again at any time, after
@@ -29,6 +29,8 @@
 #
 # Environment (all optional):
 #   THREADS              worker threads, default all CPUs the solver may use
+#   WINDOW               the games in flight at once, default 16; 1 solves them one after the other; see
+#                        `taxman solve --window`
 #   CHECKPOINT_INTERVAL  seconds, default 300       PROGRESS  seconds between progress lines, default 60
 #                        (a checkpoint stops every worker for the slowest one's step, up to 0.4 s near n = 4000: 0.15%
 #                        of the machine at 300 s, 0.7% at 60 s; SIGTERM still writes a final one)
@@ -56,6 +58,7 @@ esac
 # Without THREADS the solver uses every CPU it is allowed (in a container, the cgroup quota).
 thread_args=()
 [ -n "${THREADS:-}" ] && thread_args=(--threads "$THREADS")
+WINDOW="${WINDOW:-16}"
 CHECKPOINT_INTERVAL="${CHECKPOINT_INTERVAL:-300}"
 PROGRESS="${PROGRESS:-60}"
 MAX_FAILS="${MAX_FAILS:-5}"
@@ -67,7 +70,7 @@ line_count() {
     if [ -r "$RESULTS" ]; then wc -l <"$RESULTS" | tr -d ' '; else echo 0; fi
 }
 
-log "chain 1-$to; threads: ${THREADS:-all available}; results $RESULTS; checkpoints $CKPT"
+log "chain 1-$to; threads: ${THREADS:-all available}; window $WINDOW; results $RESULTS; checkpoints $CKPT"
 env_report | tee -a "$LOGS/chain.log" >&2
 
 fails=0
@@ -84,8 +87,8 @@ while :; do
     # EXTRA_ARGS is a list of words on purpose.
     # shellcheck disable=SC2086
     run_child "$LOGS/chain.out" "$LOGS/chain.err" "$TAXMAN_BIN" solve "1-$to" ${thread_args[@]+"${thread_args[@]}"} \
-        --out "$RESULTS" --checkpoint-dir "$CKPT" --checkpoint-interval "$CHECKPOINT_INTERVAL" --progress "$PROGRESS" \
-        ${EXTRA_ARGS:-}
+        --window "$WINDOW" --out "$RESULTS" --checkpoint-dir "$CKPT" --checkpoint-interval "$CHECKPOINT_INTERVAL" \
+        --progress "$PROGRESS" ${EXTRA_ARGS:-}
     elapsed=$(($(date +%s) - started))
     log "the solver exited with status $status after ${elapsed}s"
 

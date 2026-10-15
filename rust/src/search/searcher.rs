@@ -94,10 +94,6 @@ pub struct SearchSpace<'a, const W: usize> {
     pub root_max: u32,
     /// The most promotions a promotion set can have (`maxTotalPromotions`; see [`Prepared::max_total`]).
     pub max_total: u32,
-    /// A proven ceiling on the promotion sum (`n + opt(n − 1) − in_the_bag`): an incumbent that reaches it ends
-    /// the search.  (The ceiling, called the cap in the tactic `prev_cap`; not `max_total`, which limits the
-    /// number of promotions.)
-    pub cap: Option<u64>,
     /// Where to collect [`Diagnostics`], if anywhere.
     pub diagnostics: Option<&'a Mutex<Diagnostics>>,
     /// When the search began, and the best incumbent the searchers found (see [`Found`]).
@@ -138,9 +134,9 @@ pub enum Gf2Branching {
 
 impl<'a, const W: usize> SearchSpace<'a, W> {
     /// The space [`search`](super::search) searches `prepared` in: its tactics, with `graph` the root's matching
-    /// graph (`MatchGraph::new(&prepared.model, &prepared.root)`), the ceiling `cap`, no diagnostics, and the
-    /// searchers forgetting their nogoods as the tactic `forget_nogoods` says.
-    pub fn new(prepared: &'a Prepared<W>, graph: &'a MatchGraph, cap: Option<u64>) -> Self {
+    /// graph (`MatchGraph::new(&prepared.model, &prepared.root)`), no diagnostics, and the searchers forgetting
+    /// their nogoods as the tactic `forget_nogoods` says.
+    pub fn new(prepared: &'a Prepared<W>, graph: &'a MatchGraph) -> Self {
         let tactics = prepared.tactics;
         SearchSpace {
             model: &prepared.model,
@@ -154,7 +150,6 @@ impl<'a, const W: usize> SearchSpace<'a, W> {
             candidates: prepared.candidates,
             root_max: prepared.root.frames().iter().filter_map(|f| (f.moves | f.factors).max()).max().unwrap_or(0),
             max_total: prepared.max_total,
-            cap,
             diagnostics: None,
             began: Instant::now(),
             found: Mutex::new(None),
@@ -997,7 +992,8 @@ impl<'a, const W: usize> Stepper<'a, W> {
         Next::Parent
     }
 
-    /// Offers `set` as the incumbent if it beats it, recording when, and ends the search if it reaches the cap.
+    /// Offers `set` as the incumbent if it beats it, recording when.  A proven ceiling on the sum is the run's, not
+    /// the space's: the engine ends the run when the incumbent reaches it ([`crate::engine::EngineConfig::control`]).
     fn offer(&mut self, ctx: &mut Ctx<'_, TaxUnit<W>>, set: &Bits<W>) {
         let value = set.sum();
         if value <= ctx.best() {
@@ -1011,10 +1007,6 @@ impl<'a, const W: usize> Stepper<'a, W> {
             let mut record = space.found.lock().unwrap_or_else(PoisonError::into_inner);
             if record.is_none_or(|r| r.value < found.value) {
                 *record = Some(found);
-            }
-            drop(record);
-            if space.cap.is_some_and(|cap| value >= cap) {
-                ctx.declare_optimal();
             }
         }
     }

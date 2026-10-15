@@ -24,6 +24,9 @@ commands:
                           standalone, which costs more: no seed from the game before and no ceiling).  Every
                           score is checked against optimal.json, which is built into this program
       --threads K              worker threads (default: all CPUs)
+      --window K               games of a range in flight at once, sharing the threads: game n+1 is set up, and
+                               searched from n's best game so far, while n searches (default 1: one game after
+                               another; always 1 with one thread).  Scores and proofs are those of a window of 1
       --tactic NAME=VALUE      set a tactic (repeatable).  A switch is on or off, match_refine is 0-{max_refine}.
                                Names: {tactics}
       --out FILE               append each result as a JSON line; games already completed in FILE are skipped
@@ -39,7 +42,7 @@ commands:
       --use-prev               take the game of A-1 from optimal.json if --out FILE lacks it; the results
                                whose proofs rest on it record that they assume it optimal
       --show                   print each game's promotions and moves
-  regress [--from A] [--to N] [--threads K] [--tactic ...] [--use-prev]
+  regress [--from A] [--to N] [--threads K] [--window K] [--tactic ...] [--use-prev]
                           solve A..N (default 1..400) in memory and check every score against optimal.json
   bench [--threads K] [--tactic ...] [--history FILE] [--known FILE] [N ...]
                           time the benchmark games (default 936 1050 1100 1133 1170 1184), each on its own

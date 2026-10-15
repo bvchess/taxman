@@ -23,12 +23,34 @@
 //! Scaling: `--threads` takes a list of thread counts, and `--scaling` is 1, 2, 4, ... up to the available
 //! parallelism (which is included).  Each game is searched with each count in turn, and a table per game (and
 //! one summed over the games) compares them: wall time, speedup over the first count (times that count, so
-//! with 1 first it is the usual speedup), nodes per second per thread, effective parallelism (time in the
-//! searcher over wall time × threads), idle and lock-wait time, splits and the units they gave, steals, runs
-//! and tiny runs (units with nothing left), and the time until all workers first ran at once.  With
-//! `--seed-opt` the search only proves the optimum, so its node count barely depends on the threads and the
-//! speedup measures the parallel search alone; seeded from n − 1 it also depends on when each run happens to
-//! find the optimum.
+//! with 1 first it is the usual speedup), nodes (steps) and nodes per second per thread (`k/s/thr`), the
+//! workers' busy time per step, shares of the workers' time (`Counters::share`: of their lifetimes summed, which
+//! is wall time × threads when their number does not change), splits and the units they gave, steals, runs and
+//! tiny runs (units with nothing left), and the time until all workers first ran at once.  With `--seed-opt` the
+//! search only proves the optimum, so its node count barely depends on the threads and the speedup measures the
+//! parallel search alone; seeded from n − 1 it also depends on when each run happens to find the optimum.
+//!
+//! Where the time of a step goes on many threads: for a search long against its own setup, `k/s/thr` is `eff %` over
+//! `µs/step` (times 10), so it falls when the workers do not step all the time (they wait for work or for the lock)
+//! or when a step takes longer.  The columns that tell which:
+//!
+//! * `µs/step`: the workers' busy time per step, in µs.
+//! * `µs/tree`: the same without the units' starts, `(busy − rebuild − first_step) / (steps − first_steps)` (the
+//!   `Counters` fields): the cost of a step inside a unit's tree, once its state is built and its first node is
+//!   solved.
+//! * `eff %`, `idle %`: the shares of the time in the searcher and of the time waiting for work.
+//! * `lock %`: the share spent waiting for the engine's lock after a run (the one shared deque).
+//! * `reb %`: the share spent in the units' rebuilds, from the start of a unit to its first poll, in which the
+//!   searcher rebuilds its state.
+//! * `1st %`: the share spent in the units' first steps, from a unit's first poll to its second: its first node,
+//!   whose GF(2) bound is solved from scratch.
+//! * `ramp %`: the share that was idle before all workers first ran at once.
+//! * `tail %`: the share that was idle after the last moment a worker finished a unit while all were running.
+//!
+//! The units' starts (`reb %` and `1st %`) are paid once a unit, and part of `µs/step`: more units on more threads
+//! make them dearer a step.  The lock, the ramp and the tail are time not stepping (`ramp %` and `tail %` are parts
+//! of `idle %`; a search too short for its threads shows them large).  What is left of the rise of `µs/step` is the
+//! step itself (`µs/tree`: caches, memory, nogoods learned by fewer steps a thread).
 //!
 //! Many workers on few CPUs: `--cores C` lets at most C of the threads search at once, taking turns
 //! (`EngineConfig::cores`), so that `--threads 64 --cores 4` measures in counts (nodes, lookups, splits) what 64
@@ -175,49 +197,80 @@ impl Row {
     }
 }
 
+/// The columns of the scaling table: the heading and the width of each.
+const COLUMNS: [(&str, usize); 20] = [
+    ("threads", 7),
+    ("search s", 10),
+    ("speedup", 7),
+    ("nodes", 11),
+    ("k/s/thr", 8),
+    ("µs/step", 8),
+    ("µs/tree", 8),
+    ("eff %", 6),
+    ("idle %", 6),
+    ("lock %", 6),
+    ("reb %", 6),
+    ("1st %", 6),
+    ("ramp %", 6),
+    ("tail %", 6),
+    ("splits", 7),
+    ("units", 8),
+    ("steals", 7),
+    ("runs", 8),
+    ("tiny", 7),
+    ("full s", 7),
+];
+
+/// One line of the scaling table: a cell for each column, aligned to the right.
+fn print_cells<S: AsRef<str>>(cells: [S; COLUMNS.len()]) {
+    let cells: Vec<String> =
+        cells.iter().zip(COLUMNS).map(|(cell, (_, width))| format!("{:>width$}", cell.as_ref())).collect();
+    println!("  {}", cells.join(" "));
+}
+
+/// `time` per step in µs, or `-` if there are no steps.
+fn micros_per_step(time: Duration, steps: u64) -> String {
+    if steps == 0 {
+        "-".into()
+    } else {
+        format!("{:.2}", time.as_secs_f64() * 1e6 / steps as f64)
+    }
+}
+
 /// A table of the searches of one game (or the sums over games) with each thread count.
 fn print_scaling(title: &str, rows: &[Row]) {
     let first = rows[0].threads;
     println!("scaling, {title} (speedup over {first} thread(s), times {first}; * = stopped by the time limit):");
-    println!(
-        "  {:>7} {:>10} {:>7} {:>11} {:>8} {:>6} {:>6} {:>6} {:>7} {:>8} {:>7} {:>8} {:>7} {:>7}",
-        "threads",
-        "search s",
-        "speedup",
-        "nodes",
-        "k/s/thr",
-        "eff %",
-        "idle %",
-        "lock %",
-        "splits",
-        "units",
-        "steals",
-        "runs",
-        "tiny",
-        "full s"
-    );
+    print_cells(COLUMNS.map(|(heading, _)| heading));
     let base = rows[0].time.as_secs_f64() * first as f64;
     for r in rows {
         let secs = r.time.as_secs_f64().max(1e-9);
         let c = &r.counters;
-        println!(
-            "  {:>7} {:>9.2}{} {:>7.2} {:>11} {:>8.1} {:>6.1} {:>6.1} {:>6.2} {:>7} {:>8} {:>7} {:>8} {:>7} {:>7}",
-            r.threads,
-            secs,
-            if r.completed { ' ' } else { '*' },
-            base / secs,
-            r.nodes,
-            r.nodes as f64 / secs / r.threads as f64 / 1e3,
-            100.0 * c.efficiency(),
-            100.0 * c.share(c.idle),
-            100.0 * c.share(c.lock_wait),
-            c.splits,
-            c.split_units,
-            c.steals,
-            c.runs,
-            c.tiny_runs,
+        let share = |time| format!("{:.1}", 100.0 * c.share(time));
+        // The step without its unit's start: the rebuild before it and the first node, which are paid once a unit.
+        let tree_time = c.busy.saturating_sub(c.rebuild + c.first_step);
+        print_cells([
+            r.threads.to_string(),
+            format!("{secs:>9.2}{}", if r.completed { ' ' } else { '*' }),
+            format!("{:.2}", base / secs),
+            r.nodes.to_string(),
+            format!("{:.1}", r.nodes as f64 / secs / r.threads as f64 / 1e3),
+            micros_per_step(c.busy, r.nodes),
+            micros_per_step(tree_time, r.nodes.saturating_sub(c.first_steps)),
+            format!("{:.1}", 100.0 * c.efficiency()),
+            share(c.idle),
+            format!("{:.2}", 100.0 * c.share(c.lock_wait)),
+            share(c.rebuild),
+            share(c.first_step),
+            share(c.ramp_idle),
+            share(c.tail_idle),
+            c.splits.to_string(),
+            c.split_units.to_string(),
+            c.steals.to_string(),
+            c.runs.to_string(),
+            c.tiny_runs.to_string(),
             c.full_occupancy.map_or("never".into(), |d| format!("{:.3}", d.as_secs_f64())),
-        );
+        ]);
     }
 }
 

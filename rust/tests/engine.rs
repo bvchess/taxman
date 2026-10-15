@@ -10,10 +10,11 @@ use common::{Rng, TempDir};
 use std::fs;
 use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
-
+use std::sync::{Arc, OnceLock};
+use std::thread;
 use std::time::{Duration, Instant};
 
-use taxman::engine::{self, Ctx, EngineConfig, Outcome, Poll, Searcher, Start, Unit};
+use taxman::engine::{self, Control, Ctx, EngineConfig, Outcome, Poll, Searcher, Start, Status, Unit};
 
 // ------------------------------------------------------------------------------------------------------------
 // The toy problem
@@ -272,6 +273,11 @@ fn big_instance() -> Instance {
     Instance::new(BIG_ITEMS, 10_000, 99)
 }
 
+/// A longer one (about 0.65 G nodes), far more than a run explores before a script on another thread has acted on it.
+fn long_instance() -> Instance {
+    Instance::new(64, 10_000, 99)
+}
+
 const HEADER: &[u8] = b"knapsack n=48 range=10000 seed=99";
 
 fn config(threads: usize) -> EngineConfig {
@@ -366,12 +372,23 @@ fn many_workers_on_few_cores_are_correct() {
 }
 
 /// The instrumentation is consistent: each worker's busy, idle, parked and lock-wait intervals are disjoint and
-/// inside the run, so together they take at most `wall × threads`; every pause that parked the workers ended later.
+/// inside its lifetime, so together they take at most the capacity, which is `wall × threads` when no worker was added
+/// or retired (and at most that otherwise); a run's rebuild and first step are parts of its busy time, and the ramp's
+/// and the tail's idle times parts of the idle time; every pause that parked the workers ended later.
 fn assert_accounting(c: &engine::Counters) {
-    let capacity = c.wall * u32::try_from(c.threads).unwrap();
-    assert!(c.busy + c.idle + c.parked + c.lock_wait <= capacity, "{c:?}");
+    let most = c.wall * u32::try_from(c.threads).unwrap();
+    if c.spawned == 0 && c.retired == 0 {
+        assert_eq!(c.capacity, most, "{c:?}");
+    }
+    assert!(c.capacity <= most, "{c:?}");
+    assert!(c.busy + c.idle + c.parked + c.lock_wait <= c.capacity, "{c:?}");
     assert!((0.0..=1.0).contains(&c.efficiency()), "{c:?}");
     assert!(c.full_occupancy.is_none_or(|t| t <= c.wall), "{c:?}");
+    assert!(c.rebuild + c.first_step <= c.busy && c.first_steps <= c.runs, "{c:?}");
+    assert!(c.ramp_idle <= c.idle && c.tail_idle <= c.idle && c.tail <= c.wall, "{c:?}");
+    if c.full_occupancy.is_none() {
+        assert!(c.ramp_idle == c.idle && c.tail == Duration::ZERO && c.tail_idle == Duration::ZERO, "{c:?}");
+    }
     assert!(c.pause_max <= c.pause_total && c.park_max <= c.pause_max, "{c:?}");
     assert!(c.runs >= c.steals, "{c:?}");
 }
@@ -802,6 +819,548 @@ fn stress() {
         assert!(!ckpt.exists(), "iteration {it}: checkpoint left behind");
         assert!(dir_is_empty(&spill), "iteration {it}: spill files left behind");
     }
+}
+
+// ------------------------------------------------------------------------------------------------------------
+// The control
+// ------------------------------------------------------------------------------------------------------------
+
+/// `cfg` with `control` attached.
+fn controlled(cfg: EngineConfig, control: &Arc<Control>) -> EngineConfig {
+    EngineConfig { control: Some(Arc::clone(control)), ..cfg }
+}
+
+/// The plain search of [`big_instance`], made once for all the tests that need it.
+fn big_raw() -> &'static RawEnv {
+    static RAW: OnceLock<RawEnv> = OnceLock::new();
+    RAW.get_or_init(|| raw_search(&big_instance()))
+}
+
+/// Runs `script` on another thread while this one runs `search`; returns what each returned.
+fn alongside<T: Send>(script: impl FnOnce() -> T + Send, search: impl FnOnce() -> Outcome) -> (Outcome, T) {
+    thread::scope(|scope| {
+        let script = scope.spawn(script);
+        let out = search();
+        (out, script.join().expect("the script"))
+    })
+}
+
+/// Waits until the run attached to `control` goes and `ready` holds of what it is doing; `None` if the run ended
+/// first, or nothing happened for a minute.
+fn wait_for(control: &Control, ready: impl Fn(&Status) -> bool) -> Option<Status> {
+    let (asked, mut seen) = (Instant::now(), false);
+    while asked.elapsed() < Duration::from_secs(60) {
+        match control.status() {
+            Some(status) if ready(&status) => return Some(status),
+            Some(_) => seen = true,
+            None if seen => return None,
+            None => {}
+        }
+        thread::sleep(Duration::from_micros(200));
+    }
+    None
+}
+
+/// A control attached but never used changes nothing: one thread explores exactly the tree of the plain search.  It
+/// keeps the run's incumbent, and says no run is going before the run and after it.
+#[test]
+fn an_untouched_control_changes_nothing() {
+    let inst = instance();
+    let raw = raw_search(&inst);
+    let control = Control::new();
+    assert!(control.status().is_none() && control.best().is_none() && control.ceiling().is_none());
+    let out = solve(&controlled(config(1), &control), fresh(), &inst);
+    assert!(out.completed && !out.optimal_declared);
+    assert_optimal(&out, &inst, raw.best);
+    assert_eq!((out.stats.nodes, &out.stats.extra[..2]), (raw.nodes, &raw.extra[..]));
+    let c = &out.counters;
+    assert_eq!((c.threads, c.spawned, c.retired, c.runs), (1, 0, 0, 1), "{c:?}");
+    assert_accounting(c);
+    assert_eq!(control.best(), Some((out.best, out.payload.clone())));
+    assert!(control.status().is_none());
+}
+
+/// The optimum given as the ceiling before the run ends it as soon as the incumbent reaches it; the lowest ceiling
+/// given counts.
+#[test]
+fn a_ceiling_given_before_the_run_ends_it_at_the_optimum() {
+    let inst = instance();
+    let raw = raw_search(&inst);
+    for threads in [1, 4] {
+        let control = Control::new();
+        for ceiling in [raw.best + 1000, raw.best, raw.best + 5] {
+            control.set_ceiling(ceiling);
+        }
+        assert_eq!(control.ceiling(), Some(raw.best));
+        let out = solve(&controlled(config(threads), &control), fresh(), &inst);
+        assert!(out.completed && out.optimal_declared, "{threads} threads");
+        assert_optimal(&out, &inst, raw.best);
+        assert_accounting(&out.counters);
+        if threads == 1 {
+            // The order of the plain search, cut short where it finds the optimum.
+            assert!(out.stats.nodes < raw.nodes, "{} of {} nodes", out.stats.nodes, raw.nodes);
+        }
+    }
+}
+
+/// A ceiling that the starting incumbent already reaches, fresh or from a checkpoint, ends the run before any search.
+#[test]
+fn a_ceiling_the_starting_incumbent_reaches_needs_no_search() {
+    let inst = instance();
+    for threads in [1, 4] {
+        for ceiling in [100, 60] {
+            let control = Control::new();
+            control.set_ceiling(ceiling);
+            let start = Start::Fresh { units: vec![Node::ROOT], best: 100, payload: b"seed".to_vec() };
+            let out = solve(&controlled(config(threads), &control), start, &inst);
+            let c = &out.counters;
+            assert!(out.completed && out.optimal_declared, "{c:?}");
+            assert_eq!((out.best, out.payload.as_slice(), out.stats.nodes), (100, &b"seed"[..], 0));
+            assert_eq!((c.runs, c.threads, c.capacity), (0, 0, Duration::ZERO), "{c:?}");
+            assert_accounting(c);
+        }
+    }
+    let dir = TempDir::new("ceiling-resume");
+    let ckpt = dir.join("ckpt.bin");
+    let cfg = EngineConfig {
+        checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))),
+        node_limit: Some(100_000),
+        ..config(2)
+    };
+    assert!(!solve(&cfg, fresh(), &inst).completed);
+    let head = engine::read_checkpoint(&ckpt).unwrap();
+    let control = Control::new();
+    control.set_ceiling(head.best);
+    let cfg = EngineConfig { node_limit: None, ..controlled(cfg, &control) };
+    let out = solve(&cfg, Start::Resume(ckpt.clone()), &inst);
+    assert!(out.completed && out.optimal_declared && out.counters.runs == 0, "{:?}", out.counters);
+    assert_eq!((out.best, out.stats), (head.best, head.stats));
+    assert!(!ckpt.exists(), "a completed run deletes its checkpoint");
+}
+
+/// A ceiling given while the run goes, at the incumbent the run has then, ends the run at once.
+#[test]
+fn a_ceiling_the_incumbent_has_reached_ends_the_run_at_once() {
+    let inst = long_instance();
+    let control = Control::new();
+    let cfg = controlled(config(2), &control);
+    let (out, ceiling) = alongside(
+        || {
+            wait_for(&control, |status| status.best > 0).expect("an incumbent");
+            let (best, _) = control.best().expect("the run's incumbent");
+            control.set_ceiling(best);
+            best
+        },
+        || solve(&cfg, fresh(), &inst),
+    );
+    assert!(out.completed && out.optimal_declared && out.best >= ceiling, "{:?}", out.counters);
+    assert!(out.stats.nodes < 300_000_000, "ended at once: {} nodes", out.stats.nodes);
+    let mask = u64::from_le_bytes(out.payload.as_slice().try_into().unwrap());
+    assert_eq!(inst.check(mask), Some(out.best), "the payload is the incumbent's");
+    assert_accounting(&out.counters);
+}
+
+/// The optimum given as the ceiling while the run goes ends the run when the search finds it; one thread explores no
+/// more nodes than the plain search.
+#[test]
+fn a_ceiling_given_while_the_run_goes_ends_it_when_reached() {
+    let inst = big_instance();
+    let raw = big_raw();
+    let control = Control::new();
+    let cfg = controlled(config(1), &control);
+    let (out, ()) = alongside(
+        || {
+            wait_for(&control, |status| status.nodes > 0).expect("the run going");
+            control.set_ceiling(raw.best);
+        },
+        || solve(&cfg, fresh(), &inst),
+    );
+    assert!(out.completed && out.optimal_declared, "{:?}", out.counters);
+    assert_optimal(&out, &inst, raw.best);
+    assert!(out.stats.nodes <= raw.nodes, "{} of {} nodes", out.stats.nodes, raw.nodes);
+}
+
+/// An incumbent offered from outside before the run is where the run starts from, and one offered while it goes joins
+/// it: the run's incumbent is at least as good, and is the one offered if the search finds nothing better.
+#[test]
+fn outside_incumbents_join_the_run() {
+    let inst = instance();
+    let raw = raw_search(&inst);
+    let solution = solve(&config(1), fresh(), &inst).payload;
+    // A poor one (the first item alone) is improved on.
+    let control = Control::new();
+    let poor = (inst.check(1).unwrap(), 1u64.to_le_bytes().to_vec());
+    assert!(control.offer(poor.0, &poor.1) && !control.offer(poor.0, b"no better"));
+    assert_eq!(control.best(), Some(poor));
+    let out = solve(&controlled(config(1), &control), fresh(), &inst);
+    assert!(out.completed);
+    assert_optimal(&out, &inst, raw.best);
+    // The optimum is kept, with its payload, and one thread explores no more than from nothing.
+    let control = Control::new();
+    assert!(control.offer(raw.best, &solution) && !control.offer(raw.best, b"no better"));
+    let out = solve(&controlled(config(1), &control), fresh(), &inst);
+    assert!(out.completed && !out.optimal_declared);
+    assert_eq!((out.best, &out.payload), (raw.best, &solution));
+    assert!(out.stats.nodes <= raw.nodes, "{} of {} nodes", out.stats.nodes, raw.nodes);
+    // With the optimum as the ceiling as well, there is nothing to search.
+    control.set_ceiling(raw.best);
+    let out = solve(&controlled(config(4), &control), fresh(), &inst);
+    assert!(out.optimal_declared && out.counters.runs == 0, "{:?}", out.counters);
+    assert_eq!((out.best, &out.payload), (raw.best, &solution));
+
+    // While the run goes.
+    let big = big_instance();
+    let opt = big_raw().best;
+    let solution = solve(&config(4), fresh(), &big).payload;
+    let control = Control::new();
+    let cfg = controlled(config(2), &control);
+    let (out, accepted) = alongside(
+        || {
+            wait_for(&control, |status| status.nodes > 0).expect("the run going");
+            control.offer(opt, &solution)
+        },
+        || solve(&cfg, fresh(), &big),
+    );
+    assert!(out.completed);
+    assert_optimal(&out, &big, opt);
+    if accepted {
+        assert_eq!(out.payload, solution, "nothing beats the optimum");
+    }
+}
+
+/// A stop from the control stops the run with a final checkpoint, from which the search resumes to the exact end; a
+/// control that was told to stop starts every later run stopped.
+#[test]
+fn a_stop_from_the_control_stops_the_run_with_a_checkpoint() {
+    let inst = big_instance();
+    let raw = big_raw();
+    let dir = TempDir::new("control-stop");
+    let ckpt = dir.join("ckpt.bin");
+    let cfg = EngineConfig { checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))), ..config(1) };
+    let control = Control::new();
+    let stopping = controlled(cfg.clone(), &control);
+    let (out, ()) = alongside(
+        || {
+            wait_for(&control, |status| status.nodes > 0).expect("the run going");
+            control.stop();
+        },
+        || solve(&stopping, fresh(), &inst),
+    );
+    assert!(!out.completed && ckpt.exists() && out.counters.checkpoints == 1, "{:?}", out.counters);
+    let again = solve(&stopping, Start::Resume(ckpt.clone()), &inst);
+    assert!(!again.completed && again.counters.runs == 0 && again.stats == out.stats, "{:?}", again.counters);
+    let rest = solve(&cfg, Start::Resume(ckpt.clone()), &inst);
+    assert!(rest.completed && !ckpt.exists());
+    assert_optimal(&rest, &inst, raw.best);
+    assert_eq!(rest.stats.nodes, raw.nodes, "one thread, stopped and resumed, explores the tree of the plain search");
+}
+
+/// A stop given before the run makes it start stopped ("Starting stopped" in the engine's docs): no unit is handed
+/// out, and the final checkpoint holds them all, however many times it is resumed under that stop.
+#[test]
+fn a_stop_given_before_the_run_starts_it_stopped() {
+    let inst = instance();
+    let dir = TempDir::new("control-stopped");
+    let ckpt = dir.join("ckpt.bin");
+    let control = Control::new();
+    control.stop();
+    let cfg =
+        EngineConfig { checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))), ..controlled(config(4), &control) };
+    let mut start = fresh();
+    for run in 0..20 {
+        let out = solve(&cfg, start, &inst);
+        let c = &out.counters;
+        assert_eq!((out.completed, out.stats.nodes, c.runs, c.checkpoints), (false, 0, 0, 1), "{run}: {c:?}");
+        start = Start::Resume(ckpt.clone());
+    }
+    let out = solve(&EngineConfig { control: None, ..cfg }, start, &inst);
+    assert!(out.completed);
+    assert_optimal(&out, &inst, inst.dp());
+}
+
+/// The number of workers given before the run replaces the configured threads; workers added while the run goes, and
+/// workers retired (running or idle) and added again, leave the answer exact, and the counters say what happened.
+#[test]
+fn workers_added_and_retired_while_the_run_goes() {
+    let control = Control::new();
+    control.set_workers(2);
+    let out = solve(&controlled(config(4), &control), fresh(), &instance());
+    let c = &out.counters;
+    assert_eq!((c.threads, c.spawned, c.retired), (2, 0, 0), "{c:?}");
+
+    let inst = big_instance();
+    let raw = big_raw();
+    // From one worker to four.
+    let control = Control::new();
+    let cfg = controlled(config(1), &control);
+    let (out, grown) = alongside(
+        || {
+            wait_for(&control, |status| status.running == 1)?;
+            control.set_workers(4);
+            wait_for(&control, |status| status.live == 4 && status.running == 4)
+        },
+        || solve(&cfg, fresh(), &inst),
+    );
+    assert!(grown.is_some(), "four workers running before the end: {:?}", out.counters);
+    assert!(out.completed);
+    assert_optimal(&out, &inst, raw.best);
+    let c = &out.counters;
+    assert_eq!((c.threads, c.spawned, c.retired), (4, 3, 0), "{c:?}");
+    assert!(c.capacity < c.wall * 4, "three workers came later: {c:?}");
+    assert_accounting(c);
+
+    // From four to one, which retires running workers, and back to three.
+    let control = Control::new();
+    let cfg = controlled(config(4), &control);
+    let (out, script) = alongside(
+        || {
+            wait_for(&control, |status| status.running == 4)?;
+            control.set_workers(1);
+            wait_for(&control, |status| status.live == 1)?;
+            control.set_workers(3);
+            wait_for(&control, |status| status.live == 3)
+        },
+        || solve(&cfg, fresh(), &inst),
+    );
+    assert!(script.is_some(), "the changes made before the end: {:?}", out.counters);
+    assert!(out.completed);
+    assert_optimal(&out, &inst, raw.best);
+    let c = &out.counters;
+    assert_eq!((c.threads, c.spawned, c.retired), (4, 2, 3), "{c:?}");
+    assert_accounting(c);
+    assert_eq!(control.workers(), Some(3));
+}
+
+/// Running workers beyond a lowered target hand all their units over and retire without waiting for their units to
+/// end: on a tree too deep ever to finish, whose units never end, the run goes from four workers to one, and the units
+/// the others had wait in the deque.
+#[test]
+fn running_workers_beyond_the_target_retire_promptly() {
+    let control = Control::new();
+    let cfg = controlled(config(4), &control);
+    let start = Start::Fresh { units: vec![Leafy(0)], best: 0, payload: Vec::new() };
+    let make = |_| Walker { depth: 62, stack: Vec::new(), out: Vec::new() };
+    let (out, lowered) = alongside(
+        || {
+            wait_for(&control, |status| status.running == 4)?;
+            control.set_workers(1);
+            let lowered = wait_for(&control, |status| status.live == 1);
+            control.stop();
+            lowered
+        },
+        || engine::run(&cfg, start, b"", make).unwrap(),
+    );
+    let lowered = lowered.unwrap_or_else(|| panic!("never down to one worker: {:?}", out.counters));
+    assert!(lowered.running == 1 && lowered.queued > 0, "{lowered:?}");
+    assert!(!out.completed, "stopped");
+    let c = &out.counters;
+    assert_eq!((c.threads, c.spawned, c.retired), (4, 0, 3), "{c:?}");
+    assert_accounting(c);
+}
+
+/// A run told to have no worker while it goes is suspended: every worker retires, the units wait in the deque, and
+/// nothing is searched until it is given workers again; then it ends at the exact optimum.
+#[test]
+fn a_run_suspended_while_it_goes_and_given_workers_again_is_exact() {
+    let inst = long_instance();
+    let control = Control::new();
+    let cfg = controlled(config(4), &control);
+    let (out, script) = alongside(
+        || {
+            wait_for(&control, |status| status.running == 4)?;
+            control.set_workers(0);
+            let suspended = wait_for(&control, |status| status.live == 0)?;
+            thread::sleep(Duration::from_millis(20));
+            let later = control.status()?;
+            control.set_workers(3);
+            wait_for(&control, |status| status.live == 3)?;
+            Some((suspended, later))
+        },
+        || solve(&cfg, fresh(), &inst),
+    );
+    let (suspended, later) = script.unwrap_or_else(|| panic!("not suspended and resumed: {:?}", out.counters));
+    assert!(suspended.running == 0 && suspended.idle == 0 && suspended.queued > 0, "{suspended:?}");
+    let nothing_moved = (later.live, later.nodes, later.queued) == (0, suspended.nodes, suspended.queued);
+    assert!(nothing_moved, "searched while suspended: {suspended:?} then {later:?}");
+    assert!(out.completed && !out.optimal_declared);
+    assert_optimal(&out, &inst, inst.dp());
+    let c = &out.counters;
+    assert_eq!((c.threads, c.spawned, c.retired), (4, 3, 4), "{c:?}");
+    assert_accounting(c);
+}
+
+/// A run suspended before it starts (its control told 0) starts no worker and waits for one; with no unit at all it is
+/// complete at once.
+#[test]
+fn a_run_suspended_before_it_starts_waits_for_workers() {
+    let inst = instance();
+    let control = Control::new();
+    control.set_workers(0);
+    let cfg = controlled(config(4), &control);
+    let (out, script) = alongside(
+        || {
+            let waiting = wait_for(&control, |_| true)?;
+            thread::sleep(Duration::from_millis(20));
+            let later = control.status()?;
+            control.set_workers(2);
+            Some((waiting, later))
+        },
+        || solve(&cfg, fresh(), &inst),
+    );
+    let (waiting, later) = script.unwrap_or_else(|| panic!("not seen suspended: {:?}", out.counters));
+    assert_eq!((waiting.live, waiting.queued, later.live, later.queued, later.nodes), (0, 1, 0, 1, 0), "{later:?}");
+    assert!(out.completed);
+    assert_optimal(&out, &inst, inst.dp());
+    let c = &out.counters;
+    assert_eq!((c.threads, c.spawned, c.retired), (2, 2, 0), "{c:?}");
+    assert_accounting(c);
+
+    let control = Control::new();
+    control.set_workers(0);
+    let start = Start::Fresh { units: Vec::new(), best: 17, payload: b"seed".to_vec() };
+    let out = solve(&controlled(config(4), &control), start, &inst);
+    assert!(out.completed && !out.optimal_declared);
+    assert_eq!((out.best, out.payload.as_slice(), out.counters.threads), (17, &b"seed"[..], 0));
+}
+
+/// A suspended run checkpoints as it goes and stops with a final checkpoint, from which the search resumes to the
+/// exact optimum.
+#[test]
+fn a_suspended_run_checkpoints_and_stops_and_resumes_exactly() {
+    let inst = long_instance();
+    let dir = TempDir::new("suspended-stop");
+    let ckpt = dir.join("ckpt.bin");
+    let control = Control::new();
+    let cfg =
+        EngineConfig { checkpoint: Some((ckpt.clone(), Duration::from_millis(5))), ..controlled(config(2), &control) };
+    let (out, script) = alongside(
+        || {
+            wait_for(&control, |status| status.running == 2)?;
+            control.set_workers(0);
+            wait_for(&control, |status| status.live == 0)?;
+            // A checkpoint written from now on is written while the run is suspended: it is later than any before.
+            let elapsed = || engine::read_checkpoint(&ckpt).map(|head| head.elapsed).ok();
+            let before = elapsed();
+            let asked = Instant::now();
+            while elapsed() <= before && asked.elapsed() < Duration::from_secs(60) {
+                thread::sleep(Duration::from_millis(1));
+            }
+            let still = control.status()?;
+            control.stop();
+            Some((elapsed() > before, still))
+        },
+        || solve(&cfg, fresh(), &inst),
+    );
+    let (periodic, still) = script.unwrap_or_else(|| panic!("not suspended: {:?}", out.counters));
+    assert!(periodic && still.live == 0, "no checkpoint while suspended: {still:?}, {:?}", out.counters);
+    assert!(!out.completed && ckpt.exists() && out.counters.checkpoints >= 2, "{:?}", out.counters);
+    assert_accounting(&out.counters);
+    let rest = solve(&EngineConfig { control: None, ..cfg }, Start::Resume(ckpt.clone()), &inst);
+    assert!(rest.completed && !ckpt.exists());
+    assert_optimal(&rest, &inst, inst.dp());
+}
+
+/// A suspended run given a ceiling that its incumbent reaches ends at once, as optimal.
+#[test]
+fn a_suspended_run_given_a_ceiling_its_incumbent_reaches_ends_as_optimal() {
+    let inst = long_instance();
+    let control = Control::new();
+    let cfg = controlled(config(2), &control);
+    let (out, ceiling) = alongside(
+        || {
+            wait_for(&control, |status| status.running == 2 && status.best > 0)?;
+            control.set_workers(0);
+            wait_for(&control, |status| status.live == 0)?;
+            let (best, _) = control.best()?;
+            control.set_ceiling(best);
+            Some(best)
+        },
+        || solve(&cfg, fresh(), &inst),
+    );
+    let ceiling = ceiling.unwrap_or_else(|| panic!("not suspended: {:?}", out.counters));
+    assert!(out.completed && out.optimal_declared && out.best == ceiling, "{:?}", out.counters);
+    let mask = u64::from_le_bytes(out.payload.as_slice().try_into().unwrap());
+    assert_eq!(inst.check(mask), Some(out.best), "the payload is the incumbent's");
+    let c = &out.counters;
+    assert_eq!((c.threads, c.spawned, c.retired), (2, 0, 2), "{c:?}");
+    assert_accounting(c);
+}
+
+/// A control steers one run at a time: a second run it is given is refused.
+#[test]
+fn a_control_is_attached_to_one_run_at_a_time() {
+    let inst = big_instance();
+    let control = Control::new();
+    let cfg = controlled(config(1), &control);
+    let (out, second) = alongside(
+        || {
+            wait_for(&control, |_| true).expect("the run going");
+            let make = |_| Knapsack { inst: &inst, stack: Vec::new(), target: None, panic_when: None };
+            let second = engine::run(&cfg, fresh(), HEADER, make).map(|out| out.completed);
+            control.stop();
+            second
+        },
+        || solve(&cfg, fresh(), &inst),
+    );
+    assert_eq!(second.unwrap_err().kind(), std::io::ErrorKind::InvalidInput);
+    assert!(!out.completed, "stopped");
+}
+
+/// The knapsack searcher, made to take `rebuild` before its first poll of a unit and `step` between its first poll and
+/// its second.
+struct SlowStart<'a> {
+    inner: Knapsack<'a>,
+    rebuild: Duration,
+    step: Duration,
+}
+
+impl Searcher<Node> for SlowStart<'_> {
+    fn run(&mut self, unit: Node, ctx: &mut Ctx<'_, Node>) {
+        thread::sleep(self.rebuild);
+        if ctx.poll() == Poll::Yield {
+            ctx.push(unit);
+            return;
+        }
+        thread::sleep(self.step);
+        self.inner.run(unit, ctx);
+    }
+}
+
+/// The time from a run's start to its first poll (the rebuild) and from its first poll to its second (the first step)
+/// is measured, and the ramp's and the tail's idle times are parts of the idle time.
+#[test]
+fn the_start_of_each_run_is_timed() {
+    let inst = Instance::new(40, 10_000, 7);
+    let (rebuild, step) = (Duration::from_millis(2), Duration::from_millis(3));
+    let make = |_| SlowStart {
+        inner: Knapsack { inst: &inst, stack: Vec::new(), target: None, panic_when: None },
+        rebuild,
+        step,
+    };
+    // One thread runs the root's two children, one after the other, and never waits.
+    let skip = Node { next: 1, ..Node::ROOT };
+    let take = Node { next: 1, mask: 1, weight: inst.w[0], value: inst.v[0] };
+    let start = Start::Fresh { units: vec![skip, take], best: 0, payload: Vec::new() };
+    let out = engine::run(&config(1), start, HEADER, make).unwrap();
+    assert!(out.completed);
+    assert_optimal(&out, &inst, inst.dp());
+    let c = &out.counters;
+    assert_eq!((c.runs, c.first_steps), (2, 2), "{c:?}");
+    assert!(c.rebuild >= rebuild * 2 && c.first_step >= step * 2, "{c:?}");
+    assert_eq!((c.idle, c.ramp_idle, c.tail_idle), (Duration::ZERO, Duration::ZERO, Duration::ZERO), "{c:?}");
+    assert_accounting(c);
+    // Four threads split the work: every run is timed.
+    let out = engine::run(&config(4), fresh(), HEADER, make).unwrap();
+    assert!(out.completed);
+    assert_optimal(&out, &inst, inst.dp());
+    let c = &out.counters;
+    let runs = u32::try_from(c.runs).unwrap();
+    // A run polls once and stops (a tiny run) only if its first poll says to yield.
+    assert!(c.runs > 1 && c.first_steps == c.runs - c.tiny_runs, "{c:?}");
+    assert!(c.rebuild >= rebuild * runs && c.first_step >= step * u32::try_from(c.first_steps).unwrap(), "{c:?}");
+    assert_accounting(c);
+    let summary = c.summary();
+    assert!(["ramp ", "tail ", "rebuild ", "first "].iter().all(|field| summary.contains(field)), "{summary}");
 }
 
 // ------------------------------------------------------------------------------------------------------------

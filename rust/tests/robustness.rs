@@ -1,24 +1,26 @@
 //! Robustness of the engine, the checkpoints and the command line: no unit of work lost or doubled under random
-//! configurations, any checkpoint interval, absurd limits, checkpoints that belong to their game, a ceiling reached
-//! on resuming, a closed stdout or stderr, stop signals, leftover spill segments, and a checkpoint directory that
-//! two processes would share.
+//! configurations and while workers come and go, any checkpoint interval, absurd limits, checkpoints that belong to
+//! their game, a ceiling reached on resuming, a closed stdout or stderr, stop signals, leftover spill segments, and a
+//! checkpoint directory that two processes would share.
 //!
-//! `TXENGINE_CONSERVATION=<iterations>` runs more random configurations of the conservation test.
+//! `TXENGINE_CONSERVATION=<iterations>` runs more random configurations of the conservation tests.
 
 mod common;
 
 use common::TempDir;
 use std::fs;
 use std::io::{BufRead, BufReader};
+use std::panic::{self, AssertUnwindSafe};
 use std::path::Path;
 use std::process::{Command, ExitStatus, Stdio};
-
-use std::sync::mpsc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{mpsc, Arc};
+use std::thread;
 use std::time::Duration;
 
 use taxman::bits::Bits;
 use taxman::board::Board;
-use taxman::engine::{self, Ctx, EngineConfig, Poll, Searcher, Start, Unit};
+use taxman::engine::{self, Control, Ctx, EngineConfig, Poll, Searcher, Start, Unit};
 use taxman::json::Json;
 use taxman::search::{self, SearchTactics, TaxUnit};
 use taxman::solver::{self, SolveOptions};
@@ -222,6 +224,76 @@ fn conservation_is_exact_under_random_configurations() {
         assert!(!ckpt.exists(), "{context}: checkpoint left behind");
         assert!(dir_is_empty(&spill), "{context}: spill segments left behind");
     }
+}
+
+/// The same with a control that sets a random number of workers, from 0 to 4, every millisecond or so, while the run
+/// checkpoints often, spills, stops at a node limit and resumes: workers are added, and retired while idle or while
+/// running, the search is suspended (0) and goes on again, through pauses and across resumes, and no unit is lost or
+/// explored twice.  The controller follows a 0 with a number of at least 1, so that no run stays suspended for good:
+/// it sets one at most a few milliseconds later, before as after a resume, until the last run has ended.  It sees the
+/// runs suspended: told 0, with no worker left and units queued.
+#[test]
+fn conservation_is_exact_while_workers_come_and_go() {
+    let iterations: u64 = std::env::var("TXENGINE_CONSERVATION").ok().and_then(|s| s.parse().ok()).unwrap_or(8);
+    let mut rng = 0x5eed_c0de_2468_ace1u64;
+    let mut next = || {
+        rng = mix(rng.wrapping_add(0x9e37_79b9_7f4a_7c15));
+        rng
+    };
+    let dir = TempDir::new("workers");
+    let (ckpt, spill) = (dir.join("ckpt"), dir.join("spill"));
+    // The fewest and most workers seen running, and the times a run was seen suspended.
+    let (mut fewest, mut most, mut suspensions) = (usize::MAX, 0, 0);
+    for it in 0..iterations {
+        let pick = |options: &[u64], r: u64| options[(r % options.len() as u64) as usize];
+        let tree = Tree { max_depth: pick(&[22, 24, 26], next()) as u32, salt: 1 + next() % 7 };
+        let (size, best) = tree.walk();
+        let control = Control::new();
+        let cfg = EngineConfig {
+            threads: 1 + (next() % 4) as usize,
+            queue_mem_cap: pick(&[1, 2, 5, 50], next()) as usize,
+            spill_dir: Some(spill.clone()),
+            checkpoint: Some((ckpt.clone(), Duration::from_millis(pick(&[1, 3, 20], next())))),
+            node_limit: (next() % 2 == 1).then_some(size / 3 + 1),
+            control: Some(Arc::clone(&control)),
+            ..EngineConfig::default()
+        };
+        let (drop_leaves, seed) = (next() % 2 == 1, next());
+        let done = AtomicBool::new(false);
+        let (result, (seen, suspended)) = thread::scope(|scope| {
+            let controller = scope.spawn(|| {
+                let (mut r, mut seen, mut workers, mut suspended) = (seed, (usize::MAX, 0), 1, 0);
+                while !done.load(Ordering::Relaxed) {
+                    // (Before the first worker starts, after the last one leaves and while suspended, none is live.)
+                    if let Some(status) = control.status() {
+                        if status.running > 0 {
+                            seen = (seen.0.min(status.live), seen.1.max(status.live));
+                        }
+                        // Told 0 a moment ago, with no worker left, after nodes were searched and with units queued.
+                        let gone = status.live == 0 && status.nodes > 0 && status.queued > 0;
+                        suspended += usize::from(workers == 0 && gone);
+                    }
+                    r = mix(r.wrapping_add(1));
+                    workers = if workers == 0 { 1 + (r % 4) as usize } else { (r % 5) as usize };
+                    control.set_workers(workers);
+                    thread::sleep(Duration::from_micros(500 + r % 1000));
+                }
+                (seen, suspended)
+            });
+            // The controller stops however the runs end.
+            let result = panic::catch_unwind(AssertUnwindSafe(|| run_through(&cfg, tree, drop_leaves)));
+            done.store(true, Ordering::Relaxed);
+            (result, controller.join().unwrap())
+        });
+        let (out, invocations) = result.unwrap_or_else(|e| panic::resume_unwind(e));
+        (fewest, most, suspensions) = (fewest.min(seen.0), most.max(seen.1), suspensions + suspended);
+        let context = format!("iteration {it}: {invocations} invocations, drop_leaves {drop_leaves}, {cfg:?}");
+        assert_eq!((out.stats.nodes, out.best), (size, best), "{context}");
+        assert!(!ckpt.exists(), "{context}: checkpoint left behind");
+        assert!(dir_is_empty(&spill), "{context}: spill segments left behind");
+    }
+    assert_eq!((fewest, most), (1, 4), "the workers the runs were seen with");
+    assert!(suspensions > 0, "no run was seen suspended");
 }
 
 /// With a checkpoint interval of zero the coordinator used to pause again at once after every release, without
