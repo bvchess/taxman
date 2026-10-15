@@ -6,7 +6,10 @@
 # It runs the example `hunt` (rust/examples/hunt.rs, which has the method and the line format): for the games with the
 # largest gap, and for each of their open sources u, a search of the board without u for a game that scores more than
 # the recorded optimum.  A hit is a counterexample to that optimum.  Pairs are searched JOBS at a time, each on
-# THREADS_PER threads, for MINUTES at most.
+# THREADS_PER threads, in decreasing margin (the barred parity bound's excess over the optimum), so that a run cut
+# short has done the informative ones.  A pair of margin up to PROBE_ABOVE runs to completion, for MINUTES at most; a
+# pair of larger margin will not finish, so it is a probe: the solver's start (greedy set, dive, local search) and a
+# search of PROBE_MINUTES, recorded as `probed`, never as `none`.
 #
 # Safe to run again at any time, after a crash, a reboot, a spot interruption or a SIGTERM: the hunt appends one line
 # per finished pair to the output and skips the pairs the output already holds.  It has no stop handler, so a stop or
@@ -23,8 +26,8 @@
 #   other    a crash (the OOM killer): run again after 10 s, MAX_FAILS in a row with no new line end the script
 #
 # The script exits 0 when complete, 2 for a counterexample, 143 when stopped, 3 for the deadline, 1 otherwise.
-# A verdict of "none" is evidence, not a proof (rust/examples/hunt.rs says what each verdict is worth), and "timeout"
-# says nothing.
+# A verdict of "none" is evidence, not a proof (rust/examples/hunt.rs says what each verdict is worth), "probed" is a
+# probe that found nothing, and "timeout" says nothing.
 #
 # Output: $OUT (default $TAXMAN_WORK/results/hunt.jsonl, one line per pair), logs in $LOGS: hunt.log (this script),
 # hunt.out (the hunt's summary, written when it ends), hunt.err (its progress, a line per pair).
@@ -32,12 +35,15 @@
 # Environment (all optional):
 #   GAMES           how many games, those with the largest gap, default 20
 #   PER_GAME        how many open sources of each, those of largest margin; default all
-#   MINUTES         the time limit of each pair's search, default 10
+#   MINUTES         the time limit of the search of each pair that is not a probe, default 10
+#   PROBE_ABOVE     the margin above which a pair is a probe, default 900
+#   PROBE_MINUTES   the time limit of a probe's search, default 3
 #   THREADS_PER     the engine threads of each pair, default 4
 #   JOBS            pairs at once, default the number of CPUs divided by THREADS_PER (at least 1)
 #   OUT             the output file
 #   HUNT_BIN        the hunt example, default rust/target/release/examples/hunt (built by setup.sh)
-#   EXTRA_ARGS      more flags for the hunt (for instance --list 3311:1771,3311:1749)
+#   EXTRA_ARGS      more flags for the hunt (for instance --list 3311:1771,3311:1749, or --results FILE, the solver's
+#                   results whose recorded games seed the start: rust/results/strict.jsonl has them to 2175)
 #   MAX_FAILS       default 5
 #   DEADLINE_HOURS, POWEROFF, S3_DEST, SAVE_EVERY: as in run.sh (POWEROFF=done powers off only when complete)
 
@@ -57,15 +63,18 @@ UPPER="$1"
 cpus="$(ncpu)"
 GAMES="${GAMES:-20}"
 MINUTES="${MINUTES:-10}"
+PROBE_ABOVE="${PROBE_ABOVE:-900}"
+PROBE_MINUTES="${PROBE_MINUTES:-3}"
 THREADS_PER="${THREADS_PER:-4}"
 JOBS="${JOBS:-$((cpus / THREADS_PER > 0 ? cpus / THREADS_PER : 1))}"
 OUT="${OUT:-$TAXMAN_WORK/results/hunt.jsonl}"
 MAX_FAILS="${MAX_FAILS:-5}"
-case "$GAMES$THREADS_PER$JOBS$MAX_FAILS${PER_GAME:-0}" in
-    "" | *[!0-9]*) die "GAMES, PER_GAME, THREADS_PER, JOBS and MAX_FAILS are whole numbers" ;;
+case "$GAMES$THREADS_PER$JOBS$MAX_FAILS$PROBE_ABOVE${PER_GAME:-0}" in
+    "" | *[!0-9]*) die "GAMES, PER_GAME, PROBE_ABOVE, THREADS_PER, JOBS and MAX_FAILS are whole numbers" ;;
 esac
 
-args=(--upper "$UPPER" --games "$GAMES" --minutes "$MINUTES" --threads "$THREADS_PER" --jobs "$JOBS" --out "$OUT")
+args=(--upper "$UPPER" --games "$GAMES" --minutes "$MINUTES" --probe-above "$PROBE_ABOVE"
+    --probe-minutes "$PROBE_MINUTES" --threads "$THREADS_PER" --jobs "$JOBS" --out "$OUT")
 if [ -n "${PER_GAME:-}" ]; then
     args+=(--per-game "$PER_GAME")
 fi
@@ -80,8 +89,8 @@ lines_done() {
     if [ -r "$OUT" ]; then wc -l <"$OUT" | tr -d ' '; else echo 0; fi
 }
 
-log "hunt $UPPER: $GAMES games, ${PER_GAME:-all} sources each, $MINUTES minutes each;" \
-    "$JOBS jobs of $THREADS_PER threads; output $OUT"
+log "hunt $UPPER: $GAMES games, ${PER_GAME:-all} sources each, $MINUTES minutes each, $PROBE_MINUTES for a margin" \
+    "above $PROBE_ABOVE; $JOBS jobs of $THREADS_PER threads; output $OUT"
 env_report | tee -a "$LOGS/hunt.log" >&2
 
 fails=0

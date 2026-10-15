@@ -663,6 +663,13 @@ the prover at 0.93 of an M1 Max core, a Graviton3 core at 0.75; Graviton5 was no
 that the cost of a node on Graviton4 grows with n (section 9.2).  The run was on a `c8g.4xlarge` on spot, launched on
 2026-10-14 as section 9.4 describes; section 9.6 is what to do with the results of a run.
 
+That run, and everything this section says of its cost, is of searches from the plain root.  `exact` now starts from
+the roles of Theorem B by default (`--fix-low 1`: still a proof, since every optimal set obeys them; it records
+`"fix_low":1` on every line and the check counts the proofs that rest on it), which took the same nodes within 5% and
+half the time a node over 2..999 ([the prover's README](../../prover/README.md#3-the-proofs-of-optn)), so a new run
+costs about half what is estimated here.  `EXTRA_ARGS='--fix-low 0' rust/tools/cloud/prover.sh 1301 2175` reproduces
+the run as it was; its checkpoints are `ckpt/exact_N.ckpt`, those of the default `ckpt/exact_N_low.ckpt`.
+
 ### 9.1 How `exact` uses the CPUs, and what the script does about it
 
 * **One game per thread.**  `exact` hands the games of a range to its worker threads one at a time; each game's search
@@ -673,7 +680,7 @@ that the cost of a node on Graviton4 grows with n (section 9.2).  The run was on
   laptop); the 8-thread run was bounded by its longest game (141 to 151 s), not by the threads
   ([EXPERIMENTS.md](../../docs/EXPERIMENTS.md#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10)).
 * **Passes, not a signal.**  A search that is still going when `--seconds` run out pauses: its open subtrees and learned
-  conflicts go to `ckpt/exact_N.ckpt`, and a rerun resumes it (the tree is the same: node counts are identical to an
+  conflicts go to `ckpt/exact_N_low.ckpt`, and a rerun resumes it (the tree is the same: node counts are identical to an
   uninterrupted run).  Checkpoints are written only then, and `exact` has no signal handler, so a kill or a SIGTERM
   loses the searches of the pass in progress back to their last checkpoint.  `prover.sh` therefore runs `exact` in
   passes of `PASS_SECONDS` (default 300) and starts it again until every game has a line: an interruption costs at
@@ -886,7 +893,7 @@ the check, in a work directory of its own, as a step of its own.  It replaces a 
 export TAXMAN_WORK=~/rehearsal THREADS=2 PASS_SECONDS=20
 rust/tools/cloud/prover.sh 1301 1310 &              # makes the order, then passes of 20 s
 sleep 40; kill -TERM $(cat ~/rehearsal/prover.pid)      # a stop in the middle: "ended: stopped", status 143
-wait $!; echo $?; ls ~/rehearsal/ckpt                   # 143 (a bare `wait` returns 0); exact_N.ckpt: searches paused
+wait $!; echo $?; ls ~/rehearsal/ckpt                   # 143 (a bare `wait` returns 0); exact_N_low.ckpt, paused
 rust/tools/cloud/prover.sh 1301 1310                  # resumes ("N searches paused"), finishes, runs the check
 OUT=~/rehearsal/results/exact_parity_1301_1310.jsonl rust/tools/cloud/prover.sh --verify 1301 1311   # must FAIL
 unset TAXMAN_WORK THREADS PASS_SECONDS; rm -rf ~/rehearsal
@@ -989,11 +996,11 @@ results come home as in 9.6.  E6 may run first; E9(a) is independent of it.
 ### 10.1 E6: does leaving the sources free cost the prover's search anything?
 
 *What.*  `exact` on 25 games of 1301-2175 with a root parity gap of 364 to 603 and a proof of 0.6 to 30 minutes in
-the run of section 9, twice: **B**, `--fix-low 1`, from the roles of Theorem B (the largest prime and U\*_2 forced,
-every other prime and number of layer 2 barred), the sources of layer 3 and up free, which is still a proof of
-opt(n); and **D**, `--fix-low 1 --fix-upper 1`, the whole upper part fixed to U\*, which is the frame model's problem
-on the whole board and proves nothing (its lines say `"search":"upper_fixed"`).  Each line also counts the nodes that
-branched on a source of layer 3 or up and those that barred a member of U\*_{≥3}.  The games, dearest first:
+the run of section 9, twice: **B**, the default `--fix-low 1`, from the roles of Theorem B (the largest prime and
+U\*_2 forced, every other prime and number of layer 2 barred), the sources of layer 3 and up free, which is still a
+proof of opt(n); and **D**, `--fix-upper 1`, the whole upper part fixed to U\* as well, which is the frame model's
+problem on the whole board and proves nothing (its lines say `"search":"upper_fixed"`).  Each line also counts the
+nodes that branched on a source of layer 3 or up and those that barred a member of U\*_{≥3}.  The games, dearest first:
 
 ```
 L=2159,2168,2166,2167,1800,2020,1537,1820,1504,1400,1551,2100,2160,2165,2163,1512,1482,1495,1547,1445,1573,1500,1480,1584,1575
@@ -1015,8 +1022,8 @@ of 25 is bounded by its dearest game, about 16 to 30 minutes on a `c8g.4xlarge` 
 ```
 export D=s3://taxman-013764204840-us-east-1/e6 W=/home/ec2-user/taxman-work/results
 cd ~/taxman && tmux new-session -d -s e6 "export DEADLINE_HOURS=3 S3_DEST=$D; \
-    OUT=$W/e6_low.jsonl EXTRA_ARGS='--fix-low 1' rust/tools/cloud/prover.sh --list $L; \
-    POWEROFF=always OUT=$W/e6_upper.jsonl EXTRA_ARGS='--fix-low 1 --fix-upper 1' rust/tools/cloud/prover.sh --list $L"
+    OUT=$W/e6_low.jsonl rust/tools/cloud/prover.sh --list $L; \
+    POWEROFF=always OUT=$W/e6_upper.jsonl EXTRA_ARGS='--fix-upper 1' rust/tools/cloud/prover.sh --list $L"
 tmux new-session -d -s sw 'rust/tools/cloud/spot-watch.sh'
 ```
 
@@ -1036,30 +1043,46 @@ python3 rust/prover/tools/summarize.py sources rust/prover/data/e6_low_25.jsonl 
 upper_2176_3314.jsonl`, from the copy of the EC2 chain's results of 2026-10-15: 3300, 3174-3176, 3104, 2346,
 3304, 3305, 3309, 2340, 3311, 3102, 3103, 3312, 3172, 3173, 3105, 3107, 3168, 3171, gaps 1257 to 1443) and each of
 their open sources u (those the barred parity bounds did not certify; 4,499 pairs), the frame solver on the board
-without u from an incumbent worth the recorded score V, so that it looks only for a game above V (`examples/hunt.rs`;
-`sacrifice::hunt`), at most 10 minutes on 4 threads a pair, 16 pairs at once.  A game of the board without u is a game
+without u, searched from an incumbent worth the recorded score V, so that it looks only for a game above V
+(`examples/hunt.rs`; `sacrifice::hunt`), 4 threads a pair, 16 pairs at once.  A game of the board without u is a game
 of n, so a hit is a game better than the chain's.
 
+*Policy* (the theory track's, program part III, section 15(a)).  A pair's margin is the barred parity bound's excess
+over V, and the pairs of largest margin matter most (a counterexample needs the punctured problem's own slack to be
+below the margin) but will not finish.  So the pairs run in **decreasing margin**, so that a run cut short has done the
+informative ones; those of **margin up to 900 run to completion** under a limit of 10 minutes (`MINUTES`), and those
+**above 900 are probes**: the solver's own start on the board without u (greedy set, dive, local search; the seed too
+if `EXTRA_ARGS='--results FILE'` gives the recorded games, which the repository has to 2175 only) and then 3 minutes of
+search (`PROBE_MINUTES`), recorded as `probed`, never as `none`.
+
 *Criterion.*  Any `found` line is a counterexample to U and to the chain's score at n: stop extending the chain,
-report it, and solve n again on the whole board (the theory track's program, part I, section 6).  No hit is
-evidence, recorded with the margins searched; a `timeout` says nothing.
+report it, and solve n again on the whole board (the theory track's program, part I, section 6).  A `none` is
+evidence, recorded with the margins searched, and a `probed` only says that the start and 3 minutes found no game
+(the line has `start_score`, how near V the start came, and `finished` if the search happened to end); a `timeout`,
+of a pair of margin up to 900 that outlasted 10 minutes, says nothing.
 
-*Cost.*  Calibrated on one laptop thread (`bench/hunt/`): a pair costs what its margin (the barred bound's excess over
-V) says, not what its game's gap does.  At 3311 (gap 1303) and 2346 (gap 1346) every pair of margin up to 781 ended in
-under 6 seconds, 835 and 896-899 in 51 to 182 seconds, and every one from 959 up (to 1215) ran out of 3 to 5 minutes.
-Of the 4,499 pairs 3,533 have a margin up to 800, 388 between 800 and 900 and 578 above 900; if every one of these
-uses its whole 40 thread-minutes, the hunt is about 400 vCPU-hours: **a `c8g.16xlarge` (64 vCPUs) for about 7 hours
-with the setup, about $5 at the spot price of 2026-10-14 ($0.68 an hour), $18 on demand.**  Expect a few hundred
-timeouts, the pairs of largest margin.  `MINUTES=5` halves the cost and loses the pairs between about 950 and 1050;
-`PER_GAME=K` keeps the K open sources of largest margin of each game.  `DEADLINE_HOURS=9` and a timer of 560 minutes
-bound it.
+*Cost.*  Calibrated on one laptop thread (`bench/hunt/recalibration.jsonl`, 2026-10-15, with the code of this policy on
+master): a pair costs what its margin (the barred bound's excess over V) says, not what its game's gap does.  At 3311
+(gap 1303) and 2346 (gap 1346) every pair of margin up to 781 ended in under 6 seconds, 835 in 53 and 896-899 in 121 to
+185, with the nodes of the first calibration to the node (numbering by layer changed no tree); every one from 959 up
+(to 1215) is a probe, which takes its 3 minutes and a start of 2 to 7 seconds, and ends `probed` (they were
+`timeout`), the start reaching 598 to 854 below V.  Of the 4,499 pairs 3,533 have a margin up to 800, 388 between 800
+and 900 and 578 above 900.  The probes cost their time whatever happens: 578 × 3.1 minutes × 4 threads is about **120
+vCPU-hours**; the 388 pairs of 800 to 900 about a minute and a half of one thread each, 10 to 15 vCPU-hours; the 3,533
+below 800 a few seconds each, 3 to 5.  So **about 140 vCPU-hours (the first estimate, which let every pair use its
+whole 10 minutes, was 400): a `c8g.16xlarge` (64 vCPUs) for about 2.2 hours, 2.6 with the setup, about $2 at the spot
+price of 2026-10-14 ($0.68 an hour), $7 on demand.**  The probes come first, so about the first 2 hours are the
+informative ones.  The four-thread speed-up of a pair was not measured (the calibration is one thread); were it nil,
+the two cheaper bands would cost four times as much, 190 vCPU-hours in all.  `PROBE_MINUTES=2` takes a third off the
+probes; `PER_GAME=K` keeps the K open sources of largest margin of each game.  `DEADLINE_HOURS=5` and a timer of 320
+minutes bound it at about $3.40 at spot.
 
-*Run* (the launch of 9.4 on a `c8g.16xlarge` with `Purpose=hunt` and `shutdown -h +560`; then the full `setup.sh`,
+*Run* (the launch of 9.4 on a `c8g.16xlarge` with `Purpose=hunt` and `shutdown -h +320`; then the full `setup.sh`,
 which builds the solver's examples, `hunt` among them):
 
 ```
 export D=s3://taxman-013764204840-us-east-1/hunt
-cd ~/taxman && tmux new-session -d -s hunt "DEADLINE_HOURS=9 POWEROFF=always S3_DEST=$D \
+cd ~/taxman && tmux new-session -d -s hunt "DEADLINE_HOURS=5 POWEROFF=always S3_DEST=$D \
     rust/tools/cloud/hunt.sh rust/prover/data/upper_2176_3314.jsonl"
 tmux new-session -d -s sw 'rust/tools/cloud/spot-watch.sh'
 ```

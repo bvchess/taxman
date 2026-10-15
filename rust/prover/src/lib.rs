@@ -8,7 +8,8 @@
 //!
 //! This crate shares no code with the solver (`../src`) or with the Python heuristics; it rests only on the
 //! theorems of `heuristics/THEORY.md` (playability = peel succeeds = no self-covering subset; residual
-//! confinement) and on elementary bounds.  The report is `README.md` next to this file.
+//! confinement; the parity matroids; and the bottom layers of every optimal set, Theorem B, which the proofs of `exact`
+//! start from by default) and on elementary bounds.  The report is `README.md` next to this file.
 //!
 //! * [`primes`]: the sieve.
 //! * [`instance`]: reduction instances (members, their maximal factors) and the upper-half instance of a game.
