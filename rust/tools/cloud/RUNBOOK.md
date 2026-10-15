@@ -1043,30 +1043,46 @@ python3 rust/prover/tools/summarize.py sources rust/prover/data/e6_low_25.jsonl 
 upper_2176_3314.jsonl`, from the copy of the EC2 chain's results of 2026-10-15: 3300, 3174-3176, 3104, 2346,
 3304, 3305, 3309, 2340, 3311, 3102, 3103, 3312, 3172, 3173, 3105, 3107, 3168, 3171, gaps 1257 to 1443) and each of
 their open sources u (those the barred parity bounds did not certify; 4,499 pairs), the frame solver on the board
-without u from an incumbent worth the recorded score V, so that it looks only for a game above V (`examples/hunt.rs`;
-`sacrifice::hunt`), at most 10 minutes on 4 threads a pair, 16 pairs at once.  A game of the board without u is a game
+without u, searched from an incumbent worth the recorded score V, so that it looks only for a game above V
+(`examples/hunt.rs`; `sacrifice::hunt`), 4 threads a pair, 16 pairs at once.  A game of the board without u is a game
 of n, so a hit is a game better than the chain's.
 
+*Policy* (the theory track's, program part III, section 15(a)).  A pair's margin is the barred parity bound's excess
+over V, and the pairs of largest margin matter most (a counterexample needs the punctured problem's own slack to be
+below the margin) but will not finish.  So the pairs run in **decreasing margin**, so that a run cut short has done the
+informative ones; those of **margin up to 900 run to completion** under a limit of 10 minutes (`MINUTES`), and those
+**above 900 are probes**: the solver's own start on the board without u (greedy set, dive, local search; the seed too
+if `EXTRA_ARGS='--results FILE'` gives the recorded games, which the repository has to 2175 only) and then 3 minutes of
+search (`PROBE_MINUTES`), recorded as `probed`, never as `none`.
+
 *Criterion.*  Any `found` line is a counterexample to U and to the chain's score at n: stop extending the chain,
-report it, and solve n again on the whole board (the theory track's program, part I, section 6).  No hit is
-evidence, recorded with the margins searched; a `timeout` says nothing.
+report it, and solve n again on the whole board (the theory track's program, part I, section 6).  A `none` is
+evidence, recorded with the margins searched, and a `probed` only says that the start and 3 minutes found no game
+(the line has `start_score`, how near V the start came, and `finished` if the search happened to end); a `timeout`,
+of a pair of margin up to 900 that outlasted 10 minutes, says nothing.
 
-*Cost.*  Calibrated on one laptop thread (`bench/hunt/`): a pair costs what its margin (the barred bound's excess over
-V) says, not what its game's gap does.  At 3311 (gap 1303) and 2346 (gap 1346) every pair of margin up to 781 ended in
-under 6 seconds, 835 and 896-899 in 51 to 182 seconds, and every one from 959 up (to 1215) ran out of 3 to 5 minutes.
-Of the 4,499 pairs 3,533 have a margin up to 800, 388 between 800 and 900 and 578 above 900; if every one of these
-uses its whole 40 thread-minutes, the hunt is about 400 vCPU-hours: **a `c8g.16xlarge` (64 vCPUs) for about 7 hours
-with the setup, about $5 at the spot price of 2026-10-14 ($0.68 an hour), $18 on demand.**  Expect a few hundred
-timeouts, the pairs of largest margin.  `MINUTES=5` halves the cost and loses the pairs between about 950 and 1050;
-`PER_GAME=K` keeps the K open sources of largest margin of each game.  `DEADLINE_HOURS=9` and a timer of 560 minutes
-bound it.
+*Cost.*  Calibrated on one laptop thread (`bench/hunt/recalibration.jsonl`, 2026-10-15, with the code of this policy on
+master): a pair costs what its margin (the barred bound's excess over V) says, not what its game's gap does.  At 3311
+(gap 1303) and 2346 (gap 1346) every pair of margin up to 781 ended in under 6 seconds, 835 in 53 and 896-899 in 121 to
+185, with the nodes of the first calibration to the node (numbering by layer changed no tree); every one from 959 up
+(to 1215) is a probe, which takes its 3 minutes and a start of 2 to 7 seconds, and ends `probed` (they were
+`timeout`), the start reaching 598 to 854 below V.  Of the 4,499 pairs 3,533 have a margin up to 800, 388 between 800
+and 900 and 578 above 900.  The probes cost their time whatever happens: 578 × 3.1 minutes × 4 threads is about **120
+vCPU-hours**; the 388 pairs of 800 to 900 about a minute and a half of one thread each, 10 to 15 vCPU-hours; the 3,533
+below 800 a few seconds each, 3 to 5.  So **about 140 vCPU-hours (the first estimate, which let every pair use its
+whole 10 minutes, was 400): a `c8g.16xlarge` (64 vCPUs) for about 2.2 hours, 2.6 with the setup, about $2 at the spot
+price of 2026-10-14 ($0.68 an hour), $7 on demand.**  The probes come first, so about the first 2 hours are the
+informative ones.  The four-thread speed-up of a pair was not measured (the calibration is one thread); were it nil,
+the two cheaper bands would cost four times as much, 190 vCPU-hours in all.  `PROBE_MINUTES=2` takes a third off the
+probes; `PER_GAME=K` keeps the K open sources of largest margin of each game.  `DEADLINE_HOURS=5` and a timer of 320
+minutes bound it at about $3.40 at spot.
 
-*Run* (the launch of 9.4 on a `c8g.16xlarge` with `Purpose=hunt` and `shutdown -h +560`; then the full `setup.sh`,
+*Run* (the launch of 9.4 on a `c8g.16xlarge` with `Purpose=hunt` and `shutdown -h +320`; then the full `setup.sh`,
 which builds the solver's examples, `hunt` among them):
 
 ```
 export D=s3://taxman-013764204840-us-east-1/hunt
-cd ~/taxman && tmux new-session -d -s hunt "DEADLINE_HOURS=9 POWEROFF=always S3_DEST=$D \
+cd ~/taxman && tmux new-session -d -s hunt "DEADLINE_HOURS=5 POWEROFF=always S3_DEST=$D \
     rust/tools/cloud/hunt.sh rust/prover/data/upper_2176_3314.jsonl"
 tmux new-session -d -s sw 'rust/tools/cloud/spot-watch.sh'
 ```
