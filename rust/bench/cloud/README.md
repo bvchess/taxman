@@ -23,7 +23,7 @@ This directory holds the scripts that made the measurements and the data they pr
 | `c8g.chain-2176.jsonl` | the results lines of the games 2176..2277 that `taxman solve 2176-4095 --threads 64` solved in 15 minutes on a copy of `results/strict.jsonl` (checked with `tools/check_results.py` beside it) |
 | `c8g.startup-and-fixed-cost.jsonl` | games 2126 and 2127 (repeats of 2125's search) solved at 1, 8 and 64 threads: the fixed cost of a game, and the start-up of a run |
 
-These are measurements, not results: nothing here replaces or extends `results/strict.jsonl`.  The runs used the binaries
-as built by `cargo build --release --bins --examples` and, in `rust/prover/`, `cargo build --release`, with
+These are measurements, not results: nothing here replaces or extends `results/strict.jsonl`.  The runs used the
+binaries as built by `cargo build --release --bins --examples` and, in `rust/prover/`, `cargo build --release`, with
 `RUSTFLAGS="-C target-cpu=native"` (what `tools/cloud/setup.sh` does), from `git archive` of the code of 407645f.  The
 cloud runs were made before the prover's directory was renamed; `calibrate.sh` has the new path.

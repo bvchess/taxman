@@ -1,9 +1,9 @@
-# Design: the solver for optimal Taxman
+# Design: the frame solver for optimal Taxman
 
-This is the design of the solver as it is now, written to be read from top to bottom: the goals, the game and the
-model of it that the solver searches, the architecture, the search and its tactics, the engine that runs it on many
-threads, the per-game pipeline, how results are recorded and trusted, how it is tested, and how performance is
-measured.  Each term is defined where it first matters.
+This is the design of the frame solver as it is now ("the solver" below), written to be read from top to bottom: the
+goals, the game and the model of it that the solver searches, the architecture, the search and its tactics, the engine
+that runs it on many threads, the per-game pipeline, how results are recorded and trusted, how it is tested, and how
+performance is measured.  Each term is defined where it first matters.
 
 * The [README](README.md) is the user guide (how to build, run and read the output) and has the glossary.
 * [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) is the lab notebook and the register of everything tried, kept or not:
@@ -63,18 +63,18 @@ Why maximal factors are enough, although a move takes every divisor of it: the l
 [README](README.md#how-the-solver-sees-the-game-the-frame-model).
 
 Sources and the factors they compete for fall into independent groups, the *frames*: sources that share a factor are in
-one frame (`hives` forms them).  Frame X is *in front of* frame Y (and Y *behind* X) when a number of Y has a maximal
-factor in X, that is, Y's numbers are multiples of X's; the frames in front are played first.  Simplifying a frame
-finds its mandatory moves (`unzip`: a source with one usable factor must take it), the sources that cannot be played
-together with the larger ones (`removeImpossible`), and its *freedoms*, factors minus sources: how many factors it can
-spare; a frame with none is *closed*.  The frames with freedoms are numbered from 0 at the front (`frames`): number 0
-is every one that has no other in front of it, number k + 1 every one directly behind number k.  Frames with the same
-number are merged into one, so that a promotion always has one frame to go to (the README's example shows where that
-happens).  A frame is a game of *Taxman Mini*: a set of moves and a set of factors, in which every move must still
-have one of its maximal factors in the frame when it is taken, and taking it removes all of its factors still in the
-frame (not only the one that pays for it).  A frame is *winnable* when some order takes every move; a frame is winnable
-exactly when repeatedly dropping a move that has a factor no other move has (a *peel*) drops them all, and `model`
-tests that with counters instead of searching orders.
+one frame (`frames::BoardFrames` forms them).  Frame X is *in front of* frame Y (and Y *behind* X) when a number of Y
+has a maximal factor in X, that is, Y's numbers are multiples of X's; the frames in front are played first.  Simplifying
+a frame finds its mandatory moves (`unzip`: a source with one usable factor must take it), the sources that cannot be
+played together with the larger ones (`removeImpossible`), and its *freedoms*, factors minus sources: how many factors
+it can spare; a frame with none is *closed*.  The frames with freedoms are numbered from 0 at the front
+(`frames::build_frames`): number 0 is every one that has no other in front of it, number k + 1 every one directly behind
+number k.  Frames with the same number are merged into one, so that a promotion always has one frame to go to (the
+README's example shows where that happens).  A frame is a game of *Taxman Mini*: a set of moves and a set of factors, in
+which every move must still have one of its maximal factors in the frame when it is taken, and taking it removes all of
+its factors still in the frame (not only the one that pays for it).  A frame is *winnable* when some order takes every
+move; a frame is winnable exactly when repeatedly dropping a move that has a factor no other move has (a *peel*) drops
+them all, and `model` tests that with counters instead of searching orders.
 
 ### Promotions and the score
 
@@ -88,7 +88,7 @@ out of it, and no frame may go below zero.
 
 The score of a game of the model is `in_the_bag` plus the sum of its promotions, where `in_the_bag` is what the game
 with no promotions scores (the Java's `inTheBag`).  So the solver looks for the promotion set with the largest sum; the
-moves of the game follow from the promotions (`hives::Apiary` with the promotions treated as sources).  A worked
+moves of the game follow from the promotions (`frames::BoardFrames` with the promotions treated as sources).  A worked
 example, the board 1..=21, is in the [README](README.md#how-the-solver-sees-the-game-the-frame-model).
 
 ### What "optimal" means
@@ -108,8 +108,8 @@ example, the board 1..=21, is in the [README](README.md#how-the-solver-sees-the-
   route (games on punctured boards); it proves game 1133 and disagrees with nothing.  [The prover's
   README](prover/README.md) has the details.
 * **Given the pruning is exact.**  Every tactic is proven or sound (section 5 grades each).  The Java used two
-  shortcuts that rest on conjectures (`reuse_prev` and `revise_freedoms`); the Rust had them as tactics for a while,
-  measured that they no longer paid, and removed them (EXPERIMENTS, "Which tactics earn their keep").
+  shortcuts that rest on conjectures (`reuse_prev` and `revise_freedoms`); the frame solver had them as tactics for a
+  while, measured that they no longer paid, and removed them (EXPERIMENTS, "Which tactics earn their keep").
 * **Given the previous game is optimal.**  The game of n is built from the game of n − 1: opt(n) ≤ n + opt(n − 1)
   (deleting the move n from an optimal game leaves a game of n − 1), and a prime n plays the game of n − 1 with
   its first move replaced by n.  A chain of games from n = 1 is therefore proven game by game (section 8).
@@ -119,25 +119,26 @@ example, the board 1..=21, is in the [README](README.md#how-the-solver-sees-the-
   685.  A chain step is decided by the complete list of n − 1's optimal sets, not by one of them
   ([the prover's README, section 5](prover/README.md#5-is-the-optimal-set-unique)).
 
-### The Java solver and this one
+### The Java solver and the frame solver
 
-The optimization strategy is the Java solver's (and the [wiki's](https://github.com/bvchess/taxman/wiki)): decompose
-the game into frames of Taxman Mini and search for the optimal promotion set.  The Java is research code, three
-generations of the same frame idea layered on each other, so the Rust is a reimplementation of the *algorithm*,
-designed for clarity and speed, not a translation of the classes.  What must match the Java is *results*: the
-setup (frames, candidates, the greedy incumbent) defines the search space, and reproduces
-the Java's values exactly (its golden data in `testdata/golden/` is the check); every final score equals
-optimal.json.  The search itself is new.  It started as the Java's loop (its `blameGame` bound, its depth-2
-preclusion table and the promotability checks of its candidate lists, branching on the largest candidate), and each
-of those was replaced by something measured to be faster, then removed (the notebook has the rounds, and
-[which tactics earn their keep](docs/EXPERIMENTS.md#which-tactics-earn-their-keep-2026-10) the last measurements of
-what was removed).  Not ported: `oldsearch/` (the 2021 disk-queue search), `frame.GreedySolver`, `util.Memo`,
-`WorkingFrame.fancyFit/fits`, the picklers and compressor.
+The optimization strategy is the Java solver's (and the [wiki's](https://github.com/bvchess/taxman/wiki)): decompose the
+game into frames of Taxman Mini and search for the optimal promotion set.  The Java is research code, three generations
+of the same frame idea layered on each other, so the frame solver is a reimplementation of the *algorithm*, designed for
+clarity and speed, not a translation of the classes.  What must match the Java is *results*: the setup (frames,
+candidates, the greedy incumbent) defines the search space, and reproduces the Java's values exactly (its golden data in
+`testdata/golden/` is the check); every final score equals optimal.json.  The search itself is new.  It started as the
+Java's loop (its `blameGame` bound, its depth-2 preclusion table and the promotability checks of its candidate lists,
+branching on the largest candidate), and each of those was replaced by something measured to be faster, then removed
+(the notebook has the rounds, and [which tactics earn their
+keep](docs/EXPERIMENTS.md#which-tactics-earn-their-keep-2026-10) the last measurements of what was removed).  Not
+ported: `oldsearch/` (the 2021 disk-queue search), `frame.GreedySolver`, `util.Memo`, `WorkingFrame.fancyFit/fits`, the
+picklers and compressor.
 
 The Java's and the wiki's words map onto this document's.  The Java's `Hive` is a frame during setup (before or after
-frames of one number are merged) and `Apiary` all the frames of a board in playing order; `FrameBuilder`'s levels are
-the frame numbers; `WorkingFrame` and `search.Frame` are a frame; `freeFactorCount` is the freedoms; `downstream` and
-`upstream` are in front of and behind; `fits` is promotable; `getMaxPromotionSum` is the ceiling as a promotion sum.
+frames of one number are merged: `frames::Frame`) and `Apiary` all the frames of a board in playing order
+(`frames::BoardFrames`); `FrameBuilder`'s levels are the frame numbers; `WorkingFrame` and `search.Frame` are a frame
+(as the search takes it, `model::Frame`); `freeFactorCount` is the freedoms; `downstream` and `upstream` are in front
+of and behind; `fits` is promotable; `getMaxPromotionSum` is the ceiling as a promotion sum.
 `isWinnable`, `inTheBag`, `maxTotalPromotions`, `promotionCandidates` and `mandatoryMoves` are used as they are.  The
 wiki's *selection* is a move, its *front* and *back* are the same, and its upper bound N + opt(N − 1) is the ceiling.
 
@@ -155,22 +156,22 @@ up:
 | layer | modules | responsibility |
 |---|---|---|
 | foundations | `game`, `numtheory`, `bits`, `json` | the rules as a referee and the table of optimal games; maximal factors and composites; fixed-width bitsets; a small JSON reader and writer |
-| frame model | `hives`, `frames`, `model`, `accelerate` | the board as frames (`hives` forms and simplifies them, `frames` numbers and merges them); the search state (frames, winnability, promotion, conflicts, nogoods); deriving a game from the previous one |
+| frame model | `frames`, `model`, `accelerate` | the board as frames (`frames` forms and simplifies them, numbers and merges them); the search state (frames, winnability, promotion, conflicts, nogoods); deriving a game from the previous one |
 | search | `matchbound`, `gf2`, `search`, `bounds` | the matching bound, and the Lagrangian bound over nogoods built on it; the GF(2) bound, the default node bound; the branch-and-bound searcher with its setup and checkpoint header; the greedy incumbent and the count of promotions a node can still make |
 | engine | `engine` | the problem-independent parallel depth-first driver |
 | solving | `tactics`, `board`, `solver`, `results`, `paths` | the switchable tactics; a board prepared for a search; the per-game pipeline and the range driver; what a result records and the checks of a results file; the default files |
 | studies | `brute`, `sacrifice` | exhaustive search to certify small boards; the sacrifice bound and punctured games (not used by the solver) |
 | front end | `main.rs`, `cli.rs`, `commands.rs` | `solve`, `regress`, `bench`, `verify-optimal`, `verify-results`, `extend-optimal`, `tables` |
 
-On the path of a solve are all the layers but the studies.  `examples/` holds the ladder (standalone searches of hard games with time
-limits, thread scaling, diagnostics), the probe `perf` (the hot paths from fixtures, in cycles and instructions),
-the sacrifice study, `repeats` (the games whose search repeats an earlier game's, from the setups alone, and what
-a results file spent on them), `slope` (the gaps of a game's root, and proofs with every bound lowered by a
-margin), `matroid` (the study of the GF(2) bound: at roots and nodes, as a plain branch and bound, and the
-search's proofs with it, `matroid prove`) and `wall` (what grows with n and with a tree: a game's fixed costs piece by
-piece, a node's cost at any set width, large trees with their memory and checkpoints, the frames past 4095);
-`tests/` the integration tests (section 9); `tools/` the results referee in Python,
-the PGO build, the Java golden export and the cloud scripts.
+On the path of a solve are all the layers but the studies.  `examples/` holds the ladder (standalone searches of hard
+games with time limits, thread scaling, diagnostics), the probe `perf` (the hot paths from fixtures, in cycles and
+instructions), the sacrifice study, `repeats` (the games whose search repeats an earlier game's, from the setups alone,
+and what a results file spent on them), `slope` (the gaps of a game's root, and proofs with every bound lowered by a
+margin), `matroid` (the study of the GF(2) bound: at roots and nodes, as a plain branch and bound, and the search's
+proofs with it, `matroid prove`) and `wall` (what grows with n and with a tree: a game's fixed costs piece by piece, a
+node's cost at any set width, large trees with their memory and checkpoints, the frames past 4095); `tests/` the
+integration tests (section 9); `tools/` the results referee in Python, the PGO build, the Java golden export and the
+cloud scripts.
 
 **Width dispatch.**  Everything that holds sets of game numbers is generic over `const W: usize`, the number of 64-bit
 words, and the macro `with_width!` (in `bits`, used by the solver, the examples and the tests) picks the narrowest of
@@ -216,8 +217,8 @@ maximal factor, and no member of `Q` is used as a factor.  Every edge `v → v/p
 by one, so the graph is bipartite and the *matching bound* — the largest sum of a candidate set that has such an
 assignment — is a maximum-weight bipartite matching (a min-cost flow), exactly solvable and an upper bound on the
 sum of the best promotable completion.  It ignores freedoms and `max_total`, the most promotions the freedoms allow,
-which only remove completions.  Measured at the root of all 94 golden games that need search, its mean gap to the optimum is
-31 against 76 for the Java's bound; on the former benchmark games (n = 480–760) 107–292 against 363–769.
+which only remove completions.  Measured at the root of all 94 golden games that need search, its mean gap to the
+optimum is 31 against 76 for the Java's bound; on the former benchmark games (n = 480–760) 107–292 against 363–769.
 
 It is used incrementally.  `matchbound::MatchGraph` is the root's graph, whose edges never change; every node's
 problem is that graph with each vertex in one of three roles (required: the root's moves and the promoted numbers;
@@ -246,10 +247,10 @@ The idea behind everything that follows: a subset of a promotable set is promota
 only help a frame), so **every promotable completion leaves out some member of a conflict**.
 
 * **Refinement** (`match_refine`, default 1).  Where the matching bound does not prune, bound the branches of the
-  conflict too: with members `k₁ < k₂ < … < k_r`, every promotable completion `F` is in exactly one branch "`k₁ … k_{j−1}`
-  in `F`, `k_j` not", and the best completion is at most the largest of the branches' matching bounds (the matching
-  with `k_j` no longer a candidate and `k₁ … k_{j−1}` required).  Each branch is refined the same way, one level
-  less deep.  By induction the refined bound is never below the best completion (`search::refine::Refiner`).
+  conflict too: with members `k₁ < k₂ < … < k_r`, every promotable completion `F` is in exactly one branch
+  "`k₁ … k_{j−1}` in `F`, `k_j` not", and the best completion is at most the largest of the branches' matching bounds
+  (the matching with `k_j` no longer a candidate and `k₁ … k_{j−1}` required).  Each branch is refined the same way, one
+  level less deep.  By induction the refined bound is never below the best completion (`search::refine::Refiner`).
 * **Strong branching on the conflict.**  A node branches on a member of the conflict instead of its largest
   candidate: the child promotes it, and the node goes on without it, so that neither can reproduce the heaviest
   matching.  The member is the one whose removal lowers the matching bound most (one bound without each member; with
@@ -339,12 +340,13 @@ linear matroid on the candidates that touch it (contracted by the moves; its ran
 candidate of home `h` touches frames `h` and `h − 1`, one even and one odd, so the even frames' matroids are the
 blocks of a matroid `A` on the candidates and the odd frames' of a matroid `B`; every promotable set is independent
 in both, and the heaviest common independent set of at most `max_add` members (weighted matroid intersection,
-polynomial) bounds a node's completions.  [heuristics/THEORY.md](../heuristics/THEORY.md#the-frame-matroids-a-bound-on-the-promotions),
-Theorem 11, has the proof (the frame model's form of Theorem 10, the parity matroids' bound on the whole
-game, which the prover uses); the module comments of `src/gf2.rs` and `src/gf2/meet.rs` the algorithms.  It is never
-above the matching bound (independent vectors have a system of distinct representatives, which is a matching); what
-it misses are the *odd* cores of movers with three or more factors.  At the roots of 880–1300 its gap to the optimum
-is a tenth of the matching bound's (EXPERIMENTS: "Matroid intersection bounds").
+polynomial) bounds a node's completions.
+[heuristics/THEORY.md](../heuristics/THEORY.md#the-frame-matroids-a-bound-on-the-promotions), Theorem 11, has the proof
+(the frame model's form of Theorem 10, the parity matroids' bound on the whole game, which the prover uses); the module
+comments of `src/gf2.rs` and `src/gf2/meet.rs` the algorithms.  It is never above the matching bound (independent
+vectors have a system of distinct representatives, which is a matching); what it misses are the *odd* cores of movers
+with three or more factors.  At the roots of 880–1300 its gap to the optimum is a tenth of the matching bound's
+(EXPERIMENTS: "Matroid intersection bounds").
 
 * **Kept along the path.**  `gf2::Gf2Graph` builds the root's matroids once per search; `gf2::Gf2Bound` keeps a level
   per node of the searcher's path, a child's being its parent's contracted by what the child promoted (one pivot per
@@ -527,9 +529,9 @@ heaviest promotion set also has the most members, which is false at n = 833), an
 ([which tactics earn their keep](docs/EXPERIMENTS.md#which-tactics-earn-their-keep-2026-10)).
 
 **Model assumptions** (unproven, inherent to the frame model, validated as in section 2): greedy removal of impossible
-sources inside frames (`Hive.removeImpossible`); mandatory moves (`Hive.unzip`); freedoms = factors − sources (the
-`freeFactorCount` of `Hive.finishSetup`); closed frames take no part in the search; a promoted number pays tax only from
-the frame one forward.  They define the search space and cannot be switched off inside this model.
+sources inside frames (the Java's `Hive.removeImpossible`); mandatory moves (its `Hive.unzip`); freedoms = factors −
+sources (its `freeFactorCount`, set by `Hive.finishSetup`); closed frames take no part in the search; a promoted number
+pays tax only from the frame one forward.  They define the search space and cannot be switched off inside this model.
 
 **Where tactics are recorded.**  A result line records the tactics it was produced with (`tactics`: the changes from
 the defaults, such as `lagrange=on,gf2=off`; `tactic_switches`: every tactic's value; a line of a build before
@@ -662,7 +664,8 @@ the ceiling, on every thread.
 * *Trace.*  With `TAXMAN_WINDOW_TRACE` set, the driver prints its events on stderr: setups, the starts of searches with
   their seeds and ceilings, workers given and taken back, hints, deferrals and conclusions.
 
-What it buys and what was tried on the way are in [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md#round-b-the-chain-on-many-threads-2026-10).
+What it buys and what was tried on the way are in
+[docs/EXPERIMENTS.md](docs/EXPERIMENTS.md#round-b-the-chain-on-many-threads-2026-10).
 
 **optimal.json** is built into the binary (`include_str!`, `game::Optimal::built_in`): the table as it was when the
 crate was compiled, which a rebuild picks up when the file changes.  Every completed game's score is confirmed against
@@ -745,36 +748,36 @@ what a multi-threaded search may vary:
 ### Same search
 
 Consecutive boards often pose exactly the same search problem with another ceiling: of the 1836 games of the committed
-chain 1..2175 that need a search, 914 pose the problem of the game before them (or the one before that, past a prime).  The
-chain of commit bd9bb5d, which searched the 545 of them in 1..1300, spent 953 of its 3359 s on those, 851 s of them in
-1232–1300 (EXPERIMENTS, "Same search").  The tactic `same_search` (proven, on by default) concludes such a game from the
-earlier one with no search; the committed `results/strict.jsonl` was made with it.
+chain 1..2175 that need a search, 914 pose the problem of the game before them (or the one before that, past a prime).
+The chain of commit bd9bb5d, which searched the 545 of them in 1..1300, spent 953 of its 3359 s on those, 851 s of them
+in 1232–1300 (EXPERIMENTS, "Same search").  The tactic `same_search` (proven, on by default) concludes such a game from
+the earlier one with no search; the committed `results/strict.jsonl` was made with it.
 
 *The problem.*  After setup (`search::prepare`) the searcher is given the model (the factor graph among the frames'
 numbers and each number's home frame), the root frame set (every frame's moves, factors and freedoms), the candidates
 and `max_total`, besides the tactics, the ceiling and the seed; the greedy set and the matching graph are functions of
-those.  Call Π = (model, root, candidates, `max_total`) the game's *search problem*, and P\*(Π) the largest sum of a *promotable* set of Π: a set of
-candidates that can be promoted from the root, keeping every frame winnable and its freedoms at least 0, with at
-most `max_total` members.  Which sets are promotable depends on the frames and on the graph's edges among their
-numbers, and on nothing else: promotion and reduction see only the numbers in the frames, and an edge is the
-maximal-factor relation (y = x/p, p prime), a property of the two numbers that does not depend on n.
-`search::Problem` writes Π out canonically, as numbers (so independently of the set width): the frames front first,
-each its freedoms, moves and factors; the candidates; `max_total`; and for every number of the frames its home frame
-and the lists of maximal factors and maximal composites the model's graph keeps for it, which name some numbers
-that reduction removed and the search never sees, erring on the side of telling problems apart.  Equal forms are
-equal problems, with the same promotable sets and the same P\*.  The tactics, the ceiling and the seed are not in it: they
-change how the search runs, not what it finds (section 4).  A results line records the form's 64-bit digest
-(`setup.digest`); nothing rests on the digest alone (below).
+those.  Call Π = (model, root, candidates, `max_total`) the game's *search problem*, and P\*(Π) the largest sum of a
+*promotable* set of Π: a set of candidates that can be promoted from the root, keeping every frame winnable and its
+freedoms at least 0, with at most `max_total` members.  Which sets are promotable depends on the frames and on the
+graph's edges among their numbers, and on nothing else: promotion and reduction see only the numbers in the frames, and
+an edge is the maximal-factor relation (y = x/p, p prime), a property of the two numbers that does not depend on n.
+`search::Problem` writes Π out canonically, as numbers (so independently of the set width): the frames front first, each
+its freedoms, moves and factors; the candidates; `max_total`; and for every number of the frames its home frame and the
+lists of maximal factors and maximal composites the model's graph keeps for it, which name some numbers that reduction
+removed and the search never sees, erring on the side of telling problems apart.  Equal forms are equal problems, with
+the same promotable sets and the same P\*.  The tactics, the ceiling and the seed are not in it: they change how the
+search runs, not what it finds (section 4).  A results line records the form's 64-bit digest (`setup.digest`); nothing
+rests on the digest alone (below).
 
 *Which proofs settle P\*.*  A game m whose proof is
 * `exhausted`: the search explored the whole tree of Π_m, so the sum of its promotions is P\*(Π_m), given that the
   pruning is exact, which every exhausted proof rests on;
 * `cap`: its promotions S are promotable and sum to ceiling(m) = m + score(m − 1) − in_the_bag(m), so P\*(Π_m) ≥
-  ceiling(m).  And every promotable set T of Π_m is a legal game of m scoring in_the_bag(m) + sum(T): this is the direction of the
-  frame model that every search relies on each time it offers an incumbent, and the referee replays every game built
-  from one (none has ever failed).  So in_the_bag(m) + P\*(Π_m) ≤ opt(m) ≤ m + opt(m − 1) = m + score(m − 1), given
-  that the game of m − 1 is optimal (which the proof by the ceiling rests on, and m's assumptions record), and P\*(Π_m) =
-  ceiling(m), the sum of m's promotions, whatever tactics shaped the search;
+  ceiling(m).  And every promotable set T of Π_m is a legal game of m scoring in_the_bag(m) + sum(T): this is the
+  direction of the frame model that every search relies on each time it offers an incumbent, and the referee replays
+  every game built from one (none has ever failed).  So in_the_bag(m) + P\*(Π_m) ≤ opt(m) ≤ m + opt(m − 1) = m + score(m
+  − 1), given that the game of m − 1 is optimal (which the proof by the ceiling rests on, and m's assumptions record),
+  and P\*(Π_m) = ceiling(m), the sum of m's promotions, whatever tactics shaped the search;
 * `same_search`: by induction, m repeats a game k with Π_k = Π_m whose proof settles P\*(Π_k), and m's promotions are
   k's.
 
@@ -836,18 +839,19 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
 * **Unit tests** per module, including the Java tests' cases (`FactorTableTest`, `FrameTest`, `FrameSetTest` for n =
   85). Helpers shared by the unit and integration tests (temporary directories, a random generator) are one file,
   `tests/common/support.rs`.
-* **Golden tests** (`tests/golden_hives.rs`, `tests/solver.rs`): every stage of the port against
+* **Golden tests** (`tests/golden_frames.rs`, `tests/solver.rs`): every stage of the port against
   `testdata/golden/n*.json` (exported from the Java by `tools/golden/export.sh`): the setup's frames (the data's
-  `apiary` and `hives`), the numbered and merged frames, candidates, reduced frame set, greedy incumbent, the prime shortcut, solve result.  The searched golden games (94, up to 760) give the
-  Java's promotion sums with the default tactics; the tactic variants give the same answers on those up to 400.  Past
-  760 the Java's structure is fixed in `testdata/golden_wide/` (n = 511, 512, 1000, 1001, 1023, 1024, 1025, 1100, 1231,
-  2047 and 2048, checked at the width `with_width!` picks) and `games_java.txt` (the Java's `Apiary` game, move for move, for
-  171 sets of promotions at 762–2049).
-* **The board layer against the chain** (`tests/board_layer.rs`): for every 25th searched game of
-  `results/strict.jsonl` (and the last, n = 2175), the moves that the game's promotions make and the digest of the
-  board's search problem are the line's, which the golden data (up to 2049) cannot say of the boards that matter.  The
-  unit tests of `hives` check what the frames remember (which numbers each can take on, which sources
-  `removeImpossible` has been through) against a fresh computation.
+  `apiary` and `hives`, the Java's keys for `BoardFrames` and its `Frame`s), the numbered and merged frames, candidates,
+  reduced frame set, greedy incumbent, the prime shortcut, solve result.  The searched golden games (94, up to 760) give
+  the Java's promotion sums with the default tactics; the tactic variants give the same answers on those up to 400.
+  Past 760 the Java's structure is fixed in `testdata/golden_wide/` (n = 511, 512, 1000, 1001, 1023, 1024, 1025, 1100,
+  1231, 2047 and 2048, checked at the width `with_width!` picks) and `games_java.txt` (the Java's game of the board's
+  frames, move for move, for 171 sets of promotions at 762–2049).
+* **The board layer against the chain** (`tests/board_layer.rs`): for every 25th searched game of `results/strict.jsonl`
+  (and the last, n = 2175), the moves that the game's promotions make and the digest of the board's search problem are
+  the line's, which the golden data (up to 2049) cannot say of the boards that matter.  The unit tests of `frames` check
+  what the frames remember (which numbers each can take on, which sources `removeImpossible` has been through) against a
+  fresh computation.
 * **Regression**: `taxman regress --to N` solves 1..N as one range and checks every score against optimal.json.
 * **Tactic invariance**: games 1..300 forced to search with each tactic off or changed must give identical scores,
   and a checkpoint is refused when any of the search tactics differs.
@@ -874,23 +878,22 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   optimum and an empty payload, so that any pruning that loses every best completion leaves the fake incumbent in place
   (this tests the `<` and `<=` boundaries too): every game 2..=300 under each of 34 configurations (19 of the matching
   path: every tactic, forgetting every step, every third, never; the Lagrangian bound refitted every few steps; one
-  thread and two; 11 of the default, the GF(2) bound with the rule of symmetric pairs: every way of choosing the
-  branch, the matching bound as a first check, without forced members or nogoods, forgetting every step, two threads,
-  the Lagrangian bound after it; the GF(2) bound without the rule on one thread, two, and forgetting every step; and
-  the matching path with the rule), every board 2..=600 with symmetric pairs with the rule over either bound (and the
-  oracle without the frame model to 40), units on the way to the optimum (an optimal set less 30 to 70% of its
-  members, boards 600..1000) with the rule, and games
-  301..=600 (every tenth, searches of hundreds to thousands of steps) with the Lagrangian bound refitted early and
-  often, over either bound, where it cuts and forces thousands of times; the same for 500 perturbed frame sets (numbers
-  dropped, role flipped, moved a frame) with the truth found exhaustively; promoting a set at once against one by one in random orders, conflicts and nogoods on perturbed
-  models; and searches interrupted every 1,000 nodes and resumed from a checkpoint with units spilling (game 600 on
-  the matching path, one of them with the Lagrangian bound refitted every four steps; game 1000 with the GF(2) bound,
-  whose search of 600 is too short to stop).  Units of real boards at W = 20 to 64 (thinned so that the truth is found
-  exhaustively) from a handicapped incumbent, and games 1133 (matching) and 1000 (GF(2)) resumed every 1,024 steps at
-  W = 20, 24 and 64, carry the harness past the widths of the Java's table (n ≤ 1000).  A search below the root with
-  the rule of symmetric pairs is held to the best completion that keeps their inequalities (an exhaustive oracle of
-  its own, which prunes by the same bound but shares no code with the rule), which it must reach; at the root that is
-  the optimum (Theorem 13).
+  thread and two; 11 of the default, the GF(2) bound with the rule of symmetric pairs: every way of choosing the branch,
+  the matching bound as a first check, without forced members or nogoods, forgetting every step, two threads, the
+  Lagrangian bound after it; the GF(2) bound without the rule on one thread, two, and forgetting every step; and the
+  matching path with the rule), every board 2..=600 with symmetric pairs with the rule over either bound (and the oracle
+  without the frame model to 40), units on the way to the optimum (an optimal set less 30 to 70% of its members, boards
+  600..1000) with the rule, and games 301..=600 (every tenth, searches of hundreds to thousands of steps) with the
+  Lagrangian bound refitted early and often, over either bound, where it cuts and forces thousands of times; the same
+  for 500 perturbed frame sets (numbers dropped, role flipped, moved a frame) with the truth found exhaustively;
+  promoting a set at once against one by one in random orders, conflicts and nogoods on perturbed models; and searches
+  interrupted every 1,000 nodes and resumed from a checkpoint with units spilling (game 600 on the matching path, one of
+  them with the Lagrangian bound refitted every four steps; game 1000 with the GF(2) bound, whose search of 600 is too
+  short to stop).  Units of real boards at W = 20 to 64 (thinned so that the truth is found exhaustively) from a
+  handicapped incumbent, and games 1133 (matching) and 1000 (GF(2)) resumed every 1,024 steps at W = 20, 24 and 64,
+  carry the harness past the widths of the Java's table (n ≤ 1000).  A search below the root with the rule of symmetric
+  pairs is held to the best completion that keeps their inequalities (an exhaustive oracle of its own, which prunes by
+  the same bound but shares no code with the rule), which it must reach; at the root that is the optimum (Theorem 13).
 * **Node-count tripwires** (`tests/tripwires.rs`): a pruning tactic that stops working changes no answer, so no
   assertion on answers sees it (a mutant that ignored the result of `Nogoods::ruled_out` costs 27 to 67 % more nodes).
   With one thread the tree is deterministic, so the exact node count of a fixed game under fixed tactics (n = 480 to
@@ -910,16 +913,15 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   explored twice shows (`TXENGINE_CONSERVATION=<n>` for more).  Robustness: an interval of zero finishes; limits too
   large for the clock are never reached; a deadline that has passed, or a stop signal received, before a run starts
   stops it before any search, with every unit in its checkpoint; spill segments of dead processes are removed; a locked
-  checkpoint directory or results file is refused; a checkpoint of another game, with other tactics or with an
-  incumbent that does not fit is refused; and the binary rejects bad
-  times, survives a closed stdout and stderr, and stops on SIGINT and SIGTERM with a checkpoint it then resumes.  The
-  control: a ceiling given before a run, or while it runs at the incumbent it has, ends it as optimal (with no search
-  work if the start reaches it); offers from outside raise the incumbent; a stop through it checkpoints a run that
-  resumes exactly; workers added, retired and down to none (suspended, then resumed, checkpointed, stopped, or ended by a
-  ceiling) give the exact optimum; and the conservation test runs with a controller that sets 0 to 4 workers every
-  millisecond or so while the run checkpoints, spills and resumes.  The counters: capacity is wall × threads when the
-  workers do not change, and a searcher that sleeps before its first and second polls shows in the rebuild and first-step
-  times.
+  checkpoint directory or results file is refused; a checkpoint of another game, with other tactics or with an incumbent
+  that does not fit is refused; and the binary rejects bad times, survives a closed stdout and stderr, and stops on
+  SIGINT and SIGTERM with a checkpoint it then resumes.  The control: a ceiling given before a run, or while it runs at
+  the incumbent it has, ends it as optimal (with no search work if the start reaches it); offers from outside raise the
+  incumbent; a stop through it checkpoints a run that resumes exactly; workers added, retired and down to none
+  (suspended, then resumed, checkpointed, stopped, or ended by a ceiling) give the exact optimum; and the conservation
+  test runs with a controller that sets 0 to 4 workers every millisecond or so while the run checkpoints, spills and
+  resumes.  The counters: capacity is wall × threads when the workers do not change, and a searcher that sleeps before
+  its first and second polls shows in the rebuild and first-step times.
 * **The window** (`tests/window.rs`; the policy's unit tests in `src/solver/window/allot.rs`): chains 1..600 with
   windows of 1, 2, 4 and 8 on 4 threads have the scores, methods, proofs, ceilings, assumptions, repeats and previous
   games of the committed chain, and pass `verify_files`; with one thread any window gives the lines of a window of one
@@ -1048,24 +1050,23 @@ took 27 minutes on 8 ([results/README.md](results/README.md)); its cost comes in
 follow the root's GF(2) gap, with no growth that a fit over 1301–2175 resolves, and a day on 192 CPUs would take
 it to the end of the set widths (4095) at every slope the data support (EXPERIMENTS has the projections).
 
-**The matching path** (the default before the GF(2) bound; these are the build of commit 4b6ef38, on the M1 Max):
-the proof of 1215 takes 33 s on one thread (106 G cycles), and 1184 takes 3.2 G cycles.  The chain 1..1231 took 279 s of
-game time on 8 threads, 145 s of it for 1201–1231, at that commit; the committed `bench/curve/chain.jsonl`
-(1001–1231), made by the build before it (e710d16), records 318 s, and 207 s for 1201–1231.  The cost of a game
-grows by a factor of ten for every 55 to 70 in n past 1200 ([bench/curve/README.md](bench/curve/README.md)).  The
-chain 1..1300 of commit bd9bb5d (on 6 threads of an M1 Max shared with another CPU-heavy job; in git history,
-`results/strict.jsonl` being a later run, whose times [results/README.md](results/README.md) gives) records 3359 s of
-search, 2866 s of it for 1232–1300; its slowest game is 1232 at 439 s.  All of this is without the Lagrangian bound (tactic `lagrange`, section
-4), which came later: with it the proof of 1215 takes 1.1 M nodes and 34 G cycles instead of 5.5 M and 108 G, 1184
-1.6 G cycles, and the chain 1201–1231 on four threads 117 s of game time instead of 283 s (EXPERIMENTS: "A
-Lagrangian bound over the nogoods").  The round after it took about a tenth off the cycles with the same trees
-(commit 31b9c95: the proof of 1215 30 G cycles, 1184 1.5 G, the chain 1201–1231 on one thread 315 s instead
-of 345 s; a step of the probe's window of 1215 22.0k cycles, 14.6k with `lagrange=off`; EXPERIMENTS: "Faster nodes
-with the Lagrangian bound, same trees").  Where the time goes now (the
-proof of 1215, one thread): the Hungarian searches of the matching 33% and of the Lagrangian levels 19%, the peels
-19%, the node's own work 10%, the nogood table 4%, the refits of the multipliers 3%, the bounds from the potentials
-6%, level copies 4%; by purpose the Lagrangian bound a quarter, making children a quarter, refinement 14% and
-strong branching 11%.
+**The matching path** (the default before the GF(2) bound; these are the build of commit 4b6ef38, on the M1 Max): the
+proof of 1215 takes 33 s on one thread (106 G cycles), and 1184 takes 3.2 G cycles.  The chain 1..1231 took 279 s of
+game time on 8 threads, 145 s of it for 1201–1231, at that commit; the committed `bench/curve/chain.jsonl` (1001–1231),
+made by the build before it (e710d16), records 318 s, and 207 s for 1201–1231.  The cost of a game grows by a factor of
+ten for every 55 to 70 in n past 1200 ([bench/curve/README.md](bench/curve/README.md)).  The chain 1..1300 of commit
+bd9bb5d (on 6 threads of an M1 Max shared with another CPU-heavy job; in git history, `results/strict.jsonl` being a
+later run, whose times [results/README.md](results/README.md) gives) records 3359 s of search, 2866 s of it for
+1232–1300; its slowest game is 1232 at 439 s.  All of this is without the Lagrangian bound (tactic `lagrange`, section
+4), which came later: with it the proof of 1215 takes 1.1 M nodes and 34 G cycles instead of 5.5 M and 108 G, 1184 1.6 G
+cycles, and the chain 1201–1231 on four threads 117 s of game time instead of 283 s (EXPERIMENTS: "A Lagrangian bound
+over the nogoods").  The round after it took about a tenth off the cycles with the same trees (commit 31b9c95: the proof
+of 1215 30 G cycles, 1184 1.5 G, the chain 1201–1231 on one thread 315 s instead of 345 s; a step of the probe's window
+of 1215 22.0k cycles, 14.6k with `lagrange=off`; EXPERIMENTS: "Faster nodes with the Lagrangian bound, same trees").
+Where the time goes now (the proof of 1215, one thread): the Hungarian searches of the matching 33% and of the
+Lagrangian levels 19%, the peels 19%, the node's own work 10%, the nogood table 4%, the refits of the multipliers 3%,
+the bounds from the potentials 6%, level copies 4%; by purpose the Lagrangian bound a quarter, making children a
+quarter, refinement 14% and strong branching 11%.
 
 ## 11. Status and what is left
 

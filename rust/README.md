@@ -1,13 +1,13 @@
-# Taxman: the solver in Rust
+# Taxman: the frame solver in Rust
 
-`rust/` is a Cargo crate (a library and one binary, `taxman`; no third-party dependencies) that finds optimal games of
-Taxman.  It reimplements the algorithm of the Java solver in the repository root (`src/main/java`) with a search built
-for speed and for many threads, and it has found optimal games for every n up to 2175 (the Java solver got to 1000).
-A second program, the prover ([prover/](prover/README.md)), checks its answers on the whole board, without the frame
-model.
+`rust/` is a Cargo crate (a library and one binary, `taxman`; no third-party dependencies): the *frame solver*, which
+finds optimal games of Taxman.  It reimplements the algorithm of the Java solver in the repository root
+(`src/main/java`) with a search built for speed and for many threads, and it has found optimal games for every n up to
+2175 (the Java solver got to 1000).  A second program, the prover ([prover/](prover/README.md)), checks the frame
+solver's answers on the whole board, without the frame model.  Below, "the solver" is the frame solver.
 
-This page is the user guide: what the solver computes and what "optimal" means here, how to build and run it, how to
-read its output, why its answers can be trusted (and what they assume), the project's vocabulary,
+This page is the user guide: what the frame solver computes and what "optimal" means here, how to build and run it, how
+to read its output, why its answers can be trusted (and what they assume), the project's vocabulary,
 and where to start reading the code.  The design is in [DESIGN.md](DESIGN.md) and the measurements behind it in
 [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md); this page links there instead of repeating them.
 
@@ -30,9 +30,9 @@ when no number in the pot has a divisor left in the pot; the taxman sweeps whate
 scores the most.  The best score for each n is the Taxman sequence ([OEIS A019312](https://oeis.org/A019312)).  For
 n = 4 the optimal game is 3, 4 (the taxman takes 1, then 2) and scores 7.
 
-Finding an optimal game is a search over an enormous tree.  The solver's results are the optimal games, as sequences of
-moves with their scores, for every n from 1 to 2175: `results/strict.jsonl` is a chain from n = 1 (section 3),
-whose games 1 to 1000 reproduce the Java's table, whose games 1001 to 1300 go beyond it (the table `optimal.json`
+Finding an optimal game is a search over an enormous tree.  The frame solver's results are the optimal games, as
+sequences of moves with their scores, for every n from 1 to 2175: `results/strict.jsonl` is a chain from n = 1 (section
+3), whose games 1 to 1000 reproduce the Java's table, whose games 1001 to 1300 go beyond it (the table `optimal.json`
 has them now too, see `extend-optimal` in section 3) and whose games 1301 to 2175 are past the table.  The code can
 attempt any larger n up to 4095, the largest board the set widths cover.  With the GF(2) bound (the default since
 2026-10), a chain from `optimal.json`'s game of 1300 reached 2175 in 92 minutes on two threads of a laptop, and the
@@ -66,9 +66,9 @@ cost of a game grew by a factor of ten for every 55 to 70 in n past 1200
    would pay for it, are in the frames directly in front of its frame, and the numbering puts those with freedoms in
    frame h-1 (that nothing further forward is needed is an assumption of the model, see "What optimal means" below).
    Both frames must stay winnable.
-5. The score of a game is `in_the_bag` (what the game with no promotions scores) plus the sum of its promotions.  So
-   the solver searches for the *promotion set* with the largest sum, with a branch-and-bound over which candidates to
-   promote; the moves of the game follow from the promotions (`hives::Apiary`, see the pipeline below).
+5. The score of a game is `in_the_bag` (what the game with no promotions scores) plus the sum of its promotions.  So the
+   frame solver searches for the *promotion set* with the largest sum, with a branch-and-bound over which candidates to
+   promote; the moves of the game follow from the promotions (`frames::BoardFrames`, see the pipeline below).
 
 A small example, the board 1..=21 (the Java's golden data, `testdata/golden/n0021.json`; the wiki's [walkthrough for
 n = 21](https://github.com/bvchess/taxman/wiki/Walkthrough-for-N=21) shows it in pictures):
@@ -177,10 +177,10 @@ n=480   score=73120     search  nodes=68              0.009 s  optimal ok  proof
   moves: [479, 361, 437, 299, 403, 341, 473, 301, 469, 335, 445, 267, 471, 314, 478, 466, 458, 454, 446, ...]
 ```
 
-`--use-prev` takes the game of n - 1 from `optimal.json` (n - 1 <= 1300), which seeds the search and gives it a ceiling; a result
-whose proof rests on that game records that it assumes it optimal (section 5).  Without `--use-prev` a single game has
-no predecessor and is solved standalone (below).  The node count of a multi-threaded search varies a little from run to
-run.  "optimal ok" means the score equals the table's, not that it is proven (section 5).
+`--use-prev` takes the game of n - 1 from `optimal.json` (n - 1 <= 1300), which seeds the search and gives it a ceiling;
+a result whose proof rests on that game records that it assumes it optimal (section 5).  Without `--use-prev` a single
+game has no predecessor and is solved standalone (below).  The node count of a multi-threaded search varies a little
+from run to run.  "optimal ok" means the score equals the table's, not that it is proven (section 5).
 
 ### Solve a range
 
@@ -268,13 +268,13 @@ With `--checkpoint-dir DIR`, a game's search writes `DIR/nNNNN.ckpt` every `--ch
 atomically and synced, and on any stop.  The same command resumes it:
 
 ```
-$ taxman solve 992 --use-prev --threads 2 --time-limit 3 --progress 1 --out r992.jsonl --checkpoint-dir c992
-n=992 3.0s nodes 576381 (stopped) best 24144 queue 30 spilled 0 | eff 99.5% ... pauses 1 (0.4%) max 13.1ms park 0.1ms
-n=992   score=310644    search  nodes=576381          3.097 s  incomplete
+$ taxman solve 992 --use-prev --threads 1 --node-limit 4000 --progress 1 --out r992.jsonl --checkpoint-dir c992
+n=992 0.2s nodes 4095 (stopped) best 24175 queue 15 spilled 0 | eff 93.3% ... pauses 1 (6.7%) max 14.8ms park 0.0ms
+n=992   score=310675    search  nodes=4095            0.262 s  incomplete
 stopped: the search for n=992 hit a limit before it finished; run the same command to resume it
-$ taxman solve 992 --use-prev --threads 2 --out r992.jsonl --checkpoint-dir c992   # resumes (a SIGTERM stopped it again)
-$ taxman solve 992 --use-prev --threads 2 --out r992.jsonl --checkpoint-dir c992   # resumes and finishes
-n=992   score=310690    search  nodes=6175330        30.925 s  optimal ok  proof=exhausted
+$ taxman solve 992 --use-prev --threads 1 --node-limit 4000 --out r992.jsonl --checkpoint-dir c992   # resumes, stops again
+$ taxman solve 992 --use-prev --threads 1 --out r992.jsonl --checkpoint-dir c992   # resumes and finishes
+n=992   score=310690    search  nodes=15581           0.479 s  optimal ok  proof=exhausted
 ```
 
 The last line is the third invocation of the game: its `nodes` cover all three, its seconds only the last.  The
@@ -531,7 +531,8 @@ second build's chain, what the games assume).
    |  [1] numtheory::Tables            maximal factors and maximal composites of 1..=n; the set width W
    |  [2] n prime ............ accelerate::prime_shortcut   the game of n-1 with its first move replaced by n
    |                                                         method=prime        proof=prime_formula
-   |  [3] board::Board::new            hives::Apiary: sources (never tax) + factors -> frames; unzip, removeImpossible
+   |  [3] board::Board::new            frames::BoardFrames: sources (never tax) + factors -> frames; unzip,
+   |                                   removeImpossible
    |                                   frames::build_frames: frames with freedoms numbered from the front (0 = front)
    |                                   and merged; candidates; in_the_bag
    |      no candidates ...... the game with no promotions   method=trivial      proof=trivial
@@ -541,7 +542,7 @@ second build's chain, what the games assume).
    |        same_search ...... one of the 8 games before it posed the same problem and settled it: its promotions
    |                                                         method=repeat       proof=same_search
    |        search::search             starting incumbent = best of greedy / seed (n-1's promotions) / rounded root
-   |                                   matching + local search; cap = n + score(n-1) - in_the_bag
+   |                                   matching + local search; ceiling = n + score(n-1) - in_the_bag
    |          engine::run              worker threads; shared deque with disk spill; incumbent; checkpoints; signals
    |            Stepper::step          per node (search/searcher.rs): check_node = the rule of symmetric pairs
    |                                   (symmetry, search::symmetry) -> GF(2) bound (gf2; with gf2=off
@@ -549,7 +550,8 @@ second build's chain, what the games assume).
    |                                   members, nogoods (search::refine, model::Nogoods) -> with lagrange the
    |                                   Lagrangian bound over the nogoods (search::lagrange);
    |                                   choose_branch (a candidate) -> make_child -> check_child
-   |      promotions -> accelerate::solution_for_promotions   (hives::Apiary with the promotions as sources) -> ordered moves
+   |      promotions -> accelerate::solution_for_promotions   (frames::BoardFrames with the promotions as sources)
+   |                                                         -> ordered moves
    |
    |  [2] and same_search are skipped by --force-search and when the game has a checkpoint (a search is resumed,
    |  never replaced)
@@ -568,11 +570,11 @@ replaces, and of the module comment of `src/solver.rs`, which gives the checks o
 
 Words that mean more than one thing in this code base are marked **(overloaded)**, with each meaning.  Words used
 inside one part of the code are defined where they are used, not here: the setup's (`unzip`, mandatory moves, claimed
-factors) in the module comment of `src/hives.rs`; the peel, `reduce` and the home frame in `src/model/`; the
+factors) in the module comment of `src/frames/mod.rs`; the peel, `reduce` and the home frame in `src/model/`; the
 bounds' internals (potentials, weight splits, contraction, refinement, refits) in [DESIGN.md, section
 4](DESIGN.md#4-the-search); the engine's (units, splits, steals, spills, pauses) in [section
 6](DESIGN.md#6-engine) and the module comment of `src/engine.rs`; the fields of the progress line in section 4 above;
-the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#the-java-solver-and-this-one).
+the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#the-java-solver-and-the-frame-solver).
 
 ### The game
 
@@ -593,9 +595,9 @@ the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#t
 * **frame**: a connected group of sources together with all the factors they compete for (sources that share a factor
   are in one frame).  Setup simplifies the frames, numbers the ones that have freedoms from the front (0 is played
   first) and merges those with the same number, so that a promotion always has one frame to go to; the search works
-  on the merged frames.  In the code the setup's frames are the types `Hive` and `Apiary` (all of a board's) of
-  `src/hives.rs` and, as the search takes them, `FrameColumn` of `src/frames.rs`; the Java's golden data keeps its keys
-  `apiary`, `hives` and `freeFactorCount`.
+  on the merged frames.  In the code a frame is `frames::Frame` as setup forms it (`frames::BoardFrames` holds all of a
+  board's) and `model::Frame` as the search takes it (`frames::SearchFrames` holds those).  The Java calls the first
+  `Hive` and `Apiary`, and its golden data keeps those keys (`apiary`, `hives`, `freeFactorCount`).
 * **front, back**: frame X is in front of frame Y (and Y behind X) when a number of Y has a maximal factor in X, that
   is, when Y's numbers are multiples of X's.  Frames in front are played first, so frame 0 is the front, and a
   promotion moves a factor of frame h to a move of frame h - 1, one frame forward.
@@ -609,10 +611,10 @@ the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#t
   2](DESIGN.md#2-the-game-and-the-frame-model)).
 * **promotion, promote**: play a factor as a move: take it out of its frame's factors and make it a move of the frame
   in front of it.  Legal when both frames stay winnable.
-* **candidate** **(overloaded)**: (1) a number setup says could be promoted (`FrameColumns::candidates`,
-  `Apiary::promotion_candidates`); (2) `cands` in a search node: the candidates the node's loop still has to try; (3) a
-  vertex role in the matching graph: a number that may be matched as a promoted mover, may pay for one behind it, or
-  stay free.
+* **candidate** **(overloaded)**: (1) a number setup says could be promoted (`SearchFrames::candidates`,
+  `BoardFrames::promotion_candidates`); (2) `cands` in a search node: the candidates the node's loop still has to try;
+  (3) a vertex role in the matching graph: a number that may be matched as a promoted mover, may pay for one behind it,
+  or stay free.
 * **promotion set, promotable**: a set of candidates that can be promoted together from the root, keeping every frame
   winnable and its freedoms at least 0.  The score of a game of the model is `in_the_bag` plus the sum of its promotion
   set.
@@ -686,11 +688,13 @@ the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#t
 
 ### Other programs and bounds
 
-* **the Java solver** (`src/main/java`): the original, whose algorithm the solver reimplements.  **optimal.json**: the
-  table of optimal games, n <= 1300 (the Java's games 1 to 1000, then those of the chain from n = 1, appended by
-  `taxman extend-optimal`), built into the binary.
+* **the frame solver** (this crate, the binary `taxman`; "the solver" for short): a branch and bound over promotions
+  within the frame model, which finds the games.  **the Java solver** (`src/main/java`): the original, whose algorithm
+  the frame solver reimplements.  **optimal.json**: the table of optimal games, n <= 1300 (the Java's games 1 to 1000,
+  then those of the chain from n = 1, appended by `taxman extend-optimal`), built into the binary.
 * **the prover** ([prover/](prover/README.md)): a branch and bound over sets of moves on the whole board, which decides
-  playability by peel and uses only proven bounds; it proves that no set of moves beats a recorded score.
+  playability by peel and uses only proven bounds; it proves that no set of moves beats a recorded score, with none of
+  the frame solver's code.
   **Franklín–Moniot bound**: the maximum-weight matching relaxation of the whole game, an upper bound on opt(n);
   `tools/check_results.py` compares scores with it.  **parity bound**: the prover's sharper bound, from two matroids
   over GF(2) split by the parity of Ω (heuristics/THEORY.md, Theorem 10).
@@ -708,32 +712,33 @@ comment that is worth reading first; section 6 above is the map of how the piece
 3. `src/bits.rs`: `Bits<W>`, the fixed-width bitsets of game numbers that everything below is generic over, and the
    set widths.  The module comment is enough at first.
 4. `src/json.rs`: the small JSON reader and writer.  Skim; it matters once you read results lines.
-5. `src/hives.rs`: sources, factors, the setup's frames, unzip, impossible moves, freedoms.
-6. `src/frames.rs`: the frames numbered from the front and merged; the candidates.
-7. `src/model/`: `mod.rs` says what is where: `Frame`, `FrameSet` (`frame.rs`), `FrameGraph`, winnability and reduction
+5. `src/frames/`: forming and simplifying the frames, numbering and merging them.  The module comment of `mod.rs` is
+   the story (sources, factors, unzip, impossible moves, freedoms, numbering, merging) and builds `SearchFrames`;
+   `board_frames.rs` has `Frame` and `BoardFrames`.
+6. `src/model/`: `mod.rs` says what is where: `Frame`, `FrameSet` (`frame.rs`), `FrameGraph`, winnability and reduction
    (`peel.rs`), promotion (`promote.rs`), then conflicts (`conflict.rs`) and nogoods (`nogoods.rs`).
-8. `src/accelerate.rs`: the shortcuts from the game of n - 1 (read the comment of `prime_shortcut` for the proof of the
+7. `src/accelerate.rs`: the shortcuts from the game of n - 1 (read the comment of `prime_shortcut` for the proof of the
    prime shortcut), and the last step from promotions to moves.
-9. `src/matchbound.rs`: the matching bound; the module comment is the best explanation of it.  Its child
+8. `src/matchbound.rs`: the matching bound; the module comment is the best explanation of it.  Its child
    `src/matchbound/lagrange.rs` is the Lagrangian bound over the nogoods, built on the same levels and repairs.
-10. `src/gf2.rs`: the GF(2) bound, the default node bound: the module comment explains the two frame matroids, how
+9. `src/gf2.rs`: the GF(2) bound, the default node bound: the module comment explains the two frame matroids, how
     a node's are kept by contraction along the search path, and the forced members; `src/gf2/meet.rs` is their
     weighted intersection (the tableau, the augmenting paths, the weight split).  `heuristics/THEORY.md`, Theorem 11,
     is the proof.
-11. `src/search/`: `mod.rs` explains the step and says what is where: `searcher.rs` (`TaxSearcher` and `Stepper::step`,
+10. `src/search/`: `mod.rs` explains the step and says what is where: `searcher.rs` (`TaxSearcher` and `Stepper::step`,
     whose phases are `check_node`, `choose_branch`, `make_child` and `check_child`), `refine.rs` (`Refiner`: conflicts,
     refinement; `strongest`), `lagrange.rs` (the Lagrangian bound in the search: where, forced members, refits),
     `setup.rs` (`prepare`), `tactics.rs`, `incumbent.rs`, and `header.rs` (the checkpoint header).  The
     `if let Some(p) = &mut self.probe` lines in `searcher.rs` are instrumentation
     (`diagnostics.rs`), which can be skipped.
-12. `src/bounds.rs`: two small functions the Java has too, the limit on a node's further promotions and the greedy
+11. `src/bounds.rs`: two small functions the Java has too, the limit on a node's further promotions and the greedy
     incumbent.
-13. `src/engine.rs`: the protocol in the module comment (conservation, splitting, checkpoint, termination).
-14. `src/tactics.rs`, `src/board.rs`, `src/solver.rs`, `src/results.rs`, `src/paths.rs`: the switchable tactics, a board
+12. `src/engine.rs`: the protocol in the module comment (conservation, splitting, checkpoint, termination).
+13. `src/tactics.rs`, `src/board.rs`, `src/solver.rs`, `src/results.rs`, `src/paths.rs`: the switchable tactics, a board
     prepared for a search, the per-game pipeline, provenance and verification, the default files.  The range driver is
     `src/solver/window.rs`, the window of games in flight, and its child `window/allot.rs` how they share the threads.
-15. `src/main.rs`, `src/cli.rs`, `src/commands.rs`: the command line.
-16. Studies, skipped on a first read: `src/brute.rs` (exhaustive search, the test oracle) and `src/sacrifice.rs` (the
+14. `src/main.rs`, `src/cli.rs`, `src/commands.rs`: the command line.
+15. Studies, skipped on a first read: `src/brute.rs` (exhaustive search, the test oracle) and `src/sacrifice.rs` (the
     sacrifice bound).
 
 | document | what it holds |
@@ -745,7 +750,7 @@ comment that is worth reading first; section 6 above is the map of how the piece
 | [docs/AGENDA.md](docs/AGENDA.md) | the research agenda (2026-10): what limits the end of the chain, the avenues ranked, conjectures, and what the cloud runs should measure |
 | [results/README.md](results/README.md) | the committed results files and what supports their scores |
 | [bench/curve/README.md](bench/curve/README.md) | how the cost grows with n beyond the end of the chain, and projections for a larger machine |
-| [prover/README.md](prover/README.md) | the prover: independent proofs and checks of the solver's results on the whole board, and the conjecture checks |
+| [prover/README.md](prover/README.md) | the prover: independent proofs and checks of the frame solver's results on the whole board, and the conjecture checks |
 | [tools/cloud/RUNBOOK.md](tools/cloud/RUNBOOK.md) | running the solver, and the prover's proofs, on a many-core cloud machine |
 | [../heuristics/THEORY.md](../heuristics/THEORY.md) | the theory (maximal factors, playable sets) the model rests on |
 | the [wiki](https://github.com/bvchess/taxman/wiki) | the Java solver's algorithm and definitions |

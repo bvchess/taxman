@@ -6,16 +6,19 @@ chain.
 
 This is the curve of the matching path, the search before the GF(2) bound.  The search with the GF(2) bound (the
 default since 2026-10) changes it: a chain from 1300 reached 2175 in 92 minutes on 2 threads, with no growth a fit
-resolves; its curve and projections are in [docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#the-gf2-bound-in-the-search-2026-10)
-and its data in `bench/gf2/`.  The committed `results/strict.jsonl` is a chain from n = 1 to 2175 made with it, in 27
-minutes on 8 threads ([results/README.md](../../results/README.md)).
+resolves; its curve and projections are in
+[docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#the-gf2-bound-in-the-search-2026-10) and its data in `bench/gf2/`.  The
+committed `results/strict.jsonl` is a chain from n = 1 to 2175 made with it, in 27 minutes on 8 threads
+([results/README.md](../../results/README.md)).
 
 * Machine: Apple M1 Max (8 performance + 2 efficiency CPUs), 8 search threads for every main run.
 * Build: master at e710d16, `cargo build --release --examples`; binaries not rebuilt during the runs.
 * Tactics: no unproven tactic (`reuse_prev=off`, `revise_freedoms=off`); everything else at the build's
   defaults (match bound, conflict-strong branching, `match_refine=1`, `fix_forced`, `nogoods`,
   `forget_nogoods` every 50,000 steps, `preclusions` off).  The ladder only searches and rejects solver tactics,
-  so it gets `--tactic revise_freedoms=off` alone (`reuse_prev` does not exist there).
+  so it gets `--tactic revise_freedoms=off` alone (`reuse_prev` does not exist there).  The unproven tactics
+  (`reuse_prev`, `revise_freedoms`) and `preclusions` have since been removed, with the flags that switched them: the
+  commands quoted below need no `--tactic` for them today, and the solver runs only proven or sound tactics.
 * Everything here was produced by the scripts in this directory from the raw JSONL files in this directory.
 
 ## Files

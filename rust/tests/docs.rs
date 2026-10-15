@@ -386,8 +386,8 @@ const RETIRED_EVERYWHERE: &[Retired] = &[
     retired("model-free", "the prover's (proofs, search), or: on the whole board"),
     retired("evidence crate", "the prover"),
     retired("evidence solver", "the prover"),
-    retired("exact solver", "the solver"),
-    retired("main solver", "the solver"),
+    retired("exact solver", "the frame solver"),
+    retired("main solver", "the frame solver"),
     retired("chain relation", "the ceiling"),
     retired("chain game", "a game at its ceiling"),
     retired("prime relation", "the prime formula"),
@@ -411,7 +411,7 @@ const RETIRED_IN_THE_SOLVER: &[Retired] = &[
     retired("strict run", "the committed chain"),
     retired("strict runs", "the committed chain"),
     retired("strict chain", "the committed chain"),
-    retired("rust solver", "the solver"),
+    retired("rust solver", "the frame solver"),
     retired("forced pair", "(a move left with one live factor is paid by it; no name)"),
     retired("forced pairs", "(a move left with one live factor is paid by it; no name)"),
     retired("many cores", "many CPUs or threads"),
@@ -434,6 +434,11 @@ const RETIRED_NAMES: &[Retired] = &[
     retired("evidence_only", "PROVER_ONLY"),
     retired("taxman_evidence", "taxman_prover"),
     retired("taxman-evidence", "taxman-prover"),
+    retired("src/hives.rs", "src/frames/"),
+    retired("golden_hives", "golden_frames"),
+    retired("framecolumn", "SearchFrames (the search's frames are model::Frame)"),
+    retired("free_factor_count", "freedoms"),
+    retired("has_free_factors", "is_closed"),
 ];
 
 /// Phrases that contain a retired word and stay: the heuristics' and the matroids' own meanings, and plain English
