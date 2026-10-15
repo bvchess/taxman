@@ -1390,6 +1390,22 @@ mod tests {
         ])
     }
 
+    /// A line's board size is checked against `MAX_N`, the largest board the solver supports (8191): the incomplete
+    /// line of a search stopped by a limit is read for the first board past 4095 and for the last, and is refused,
+    /// naming the range, for board 0 and for the first board past the last.
+    #[test]
+    fn a_lines_board_size_must_be_a_board_the_solver_supports() {
+        assert_eq!(MAX_N, 8191);
+        for n in [1, 4095, 4096, 8191] {
+            let contents = read_results(&text(&[incomplete_line(n)]), Optimal::built_in(), 1).unwrap();
+            assert_eq!((contents.runs.get(&n), contents.incomplete_lines), (Some(&1), 1), "n={n}");
+        }
+        for n in [0, 8192] {
+            let err = read_results(&text(&[incomplete_line(n)]), Optimal::built_in(), 1).unwrap_err();
+            assert_eq!(err, format!("line 1: n={n} is not a board size from 1 to 8191"));
+        }
+    }
+
     #[test]
     fn the_table_is_extended_by_the_games_that_follow_it() {
         let contents = read_results(&text(&lines_1_to_12()), Optimal::built_in(), 1).unwrap();

@@ -8,7 +8,7 @@ use std::fs;
 use std::time::Duration;
 use taxman::bits::Bits;
 use taxman::frames::BoardFrames;
-use taxman::game::Optimal;
+use taxman::game::{largest_prime_at_most, replay_finished, Optimal};
 use taxman::json::Json;
 use taxman::numtheory::Tables;
 use taxman::results::{verify_files, Proof};
@@ -267,12 +267,14 @@ fn a_range_stops_at_an_unfinished_game_and_picks_up_where_it_left_off() {
     assert_eq!(lines.len(), 5 + 1);
 }
 
-/// 1500 gets `W = 24`, 2050 `W = 36` (the first board with a number above 2047 in its frames) and 3600 `W = 64` (the
-/// widest set, which the boards from 3584 up get); `tests/wide.rs` goes further into the second and compares the
-/// widths from 36 to 56 with 64.  The setup's cost is mostly the local search for a better first incumbent.
+/// 1500 gets `W = 24`, 2050 `W = 36` (the first board with a number above 2047 in its frames), 3600 `W = 64` (the
+/// widest set up to board 4095, which the boards from 3584 up get) and 4100 `W = 128`, the widest, which the boards
+/// from 4096 up get; `tests/wide.rs` goes further into the second and compares the widths from 36 to 56 with 64, and
+/// the boards past 4095 with the board layer's invariants.  The setup's cost is mostly the local search for a better
+/// first incumbent.
 #[test]
 fn big_boards_get_through_setup() {
-    for n in [1500, 2050, 3600] {
+    for n in [1500, 2050, 3600, 4100] {
         // Setup is the cost here, mostly the starting incumbent's local search, which runs on one thread.
         let opts = SolveOptions { node_limit: Some(1), force_search: true, ..options(2) };
         let r = solver::solve_game(n, None, &opts).unwrap_or_else(|e| panic!("{e}"));
@@ -285,6 +287,8 @@ fn big_boards_get_through_setup() {
         let setup = r.setup.expect("a searched game has a setup");
         assert!(setup.frames > 0 && setup.candidates > 0 && setup.greedy_sum > 0, "n={n}: {setup:?}");
         assert!(r.score > 0 && !r.moves.is_empty(), "n={n}");
+        assert_eq!(r.moves.first().copied(), largest_prime_at_most(n), "n={n}: the game opens with the largest prime");
+        assert_eq!(replay_finished(n, &r.moves), Ok(r.score), "n={n}: the game is legal, over, and scores as claimed");
         let json = r.to_json();
         assert_eq!(json.get("completed").and_then(Json::as_bool), Some(false));
         assert_eq!(json.get("optimal_match"), Some(&Json::Null));

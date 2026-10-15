@@ -47,20 +47,23 @@
 use super::FactorProvider;
 use crate::bits::Bits;
 
-/// A set of pending numbers that pops its largest member in constant time: the words of a bitset plus a summary
-/// word with bit `i` set when word `i` is non-empty.  Needs `W <= 64`, that is boards up to 4095.
+/// A set of pending numbers that pops its largest member in constant time: the words of a bitset plus summary words,
+/// bit `i % 64` of summary word `i / 64` set when word `i` is non-empty.  Two summary words, so `W <= 128`, boards up
+/// to 8191; at `W <= 64` only the first is ever used, which the compiler knows (`TOP`).
 pub(super) struct Worklist<const W: usize> {
     words: [u64; W],
-    summary: u64,
+    summary: [u64; 2],
 }
 
 impl<const W: usize> Worklist<W> {
-    const FITS: () = assert!(W <= 64, "a worklist summarizes at most 64 words");
+    const FITS: () = assert!(W <= 128, "a worklist summarizes at most 128 words");
+    /// The last summary word in use.
+    const TOP: usize = (W - 1) / 64;
 
     #[inline]
     pub(super) fn new() -> Self {
         let () = Self::FITS;
-        Worklist { words: [0; W], summary: 0 }
+        Worklist { words: [0; W], summary: [0; 2] }
     }
 
     #[inline]
@@ -68,7 +71,7 @@ impl<const W: usize> Worklist<W> {
         let mut out = Self::new();
         out.words = *set.as_words();
         for (i, &w) in out.words.iter().enumerate() {
-            out.summary |= u64::from(w != 0) << i;
+            out.summary[i >> 6] |= u64::from(w != 0) << (i & 63);
         }
         out
     }
@@ -77,16 +80,20 @@ impl<const W: usize> Worklist<W> {
     pub(super) fn insert(&mut self, x: u32) {
         let i = (x >> 6) as usize;
         self.words[i] |= 1 << (x & 63);
-        self.summary |= 1 << i;
+        self.summary[i >> 6] |= 1 << (i & 63);
     }
 
     /// Removes and returns the largest member.
     #[inline]
     pub(super) fn pop(&mut self) -> Option<u32> {
-        if self.summary == 0 {
-            return None;
+        let mut s = Self::TOP;
+        while self.summary[s] == 0 {
+            if s == 0 {
+                return None;
+            }
+            s -= 1;
         }
-        let i = 63 - self.summary.leading_zeros() as usize;
+        let i = 64 * s + 63 - self.summary[s].leading_zeros() as usize;
         let bit = 63 - self.words[i].leading_zeros();
         self.take(i, bit);
         Some(((i as u32) << 6) | bit)
@@ -97,7 +104,7 @@ impl<const W: usize> Worklist<W> {
         let rest = self.words[i] & !(1u64 << bit);
         self.words[i] = rest;
         if rest == 0 {
-            self.summary &= !(1u64 << i);
+            self.summary[i >> 6] &= !(1u64 << (i & 63));
         }
     }
 }

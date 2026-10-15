@@ -322,7 +322,8 @@ member read off the exchange graph would cut its strong branching.  *Experiment:
 * The intersection's shortest paths (69% of a node at 4000): the GF(2) inner loop has left the solves of strong
   branching mostly certified; what remains is the augmentations of a level, a few dozen a node.
 * Boards past 4095: a width of 128, `MAX_FRAMES` 9, the GF(2) vectors to 5 words
-  ([wall regime, 4](EXPERIMENTS.md#the-wall-regime-2026-10)).  Needed before the chain nears 4000.
+  ([wall regime, 4](EXPERIMENTS.md#the-wall-regime-2026-10)).  Built: the boards go to 8191
+  ([boards past 4095](EXPERIMENTS.md#boards-past-4095-2026-10)).
 * Proving runs of neighbours that share a gap in one search (19.8% of the proof nodes of 880-1300; the register's
   open row): a constant, and the run structure of section 2 says where it would pay.
 

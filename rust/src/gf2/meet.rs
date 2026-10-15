@@ -189,7 +189,7 @@ type Dist = i64;
 const HOPS: i64 = 1 << 16;
 const INF: Dist = i64::MAX;
 const NONE: u32 = u32::MAX;
-const NO_SLOT: u8 = u8::MAX;
+const NO_SLOT: u16 = u16::MAX;
 /// The heap entry of [`Meet::without`] that stands for the next element free in A.
 const FREE_A: u32 = u32::MAX - 1;
 
@@ -209,7 +209,7 @@ pub struct Meet<const R: usize> {
     mask: [Vec<Vector<R>>; 2],
     res: [Vec<Vector<R>>; 2],
     /// The slot of each member of the tableau's set, [`NO_SLOT`] for the others.
-    slot: [Vec<u8>; 2],
+    slot: [Vec<u16>; 2],
     /// Per block: the member in each slot, and the slots in use.
     slot_elem: [Vec<Vec<u32>>; 2],
     next_slot: [Vec<usize>; 2],
@@ -561,7 +561,7 @@ impl<const R: usize> Meet<R> {
         let mut own = [0; R];
         own[s / 64] |= 1 << (s % 64);
         self.mask[m][yi] = own;
-        self.slot[m][yi] = s as u8;
+        self.slot[m][yi] = s as u16;
         self.slot_elem[m][b][s] = y;
         true
     }
@@ -587,7 +587,7 @@ impl<const R: usize> Meet<R> {
         let mut own = [0; R];
         own[s / 64] |= 1 << (s % 64);
         self.mask[m][yi] = own;
-        self.slot[m][yi] = s as u8;
+        self.slot[m][yi] = s as u16;
         self.slot[m][xi] = NO_SLOT;
         self.slot_elem[m][b][s] = y;
     }
@@ -1346,25 +1346,30 @@ mod tests {
     use super::*;
     use crate::test_support::Rng;
 
-    /// What a [`Problem`] of one word borrows: the blocks and vectors of both matroids, and the weights.
-    struct Owned {
+    /// What a [`Problem`] of `R` words borrows: the blocks and vectors of both matroids, and the weights.
+    struct Owned<const R: usize> {
         block: [Vec<u8>; 2],
-        vector: [Vec<Vector<1>>; 2],
+        vector: [Vec<Vector<R>>; 2],
         weight: Vec<i64>,
     }
 
-    impl Owned {
-        fn problem(&self) -> Problem<'_, 1> {
+    impl<const R: usize> Owned<R> {
+        fn problem(&self) -> Problem<'_, R> {
             Problem {
                 block: [&self.block[0], &self.block[1]],
                 vector: [&self.vector[0], &self.vector[1]],
                 weight: &self.weight,
             }
         }
+
+        /// The number of blocks in each matroid.
+        fn blocks(&self) -> [usize; 2] {
+            self.block.each_ref().map(|block| block.iter().map(|&b| usize::from(b) + 1).max().unwrap_or(0))
+        }
     }
 
     /// A random problem of `n` elements with blocks of dimension at most `dim` (one word).
-    fn random(rng: &mut Rng, n: usize, dim: u64) -> Owned {
+    fn random(rng: &mut Rng, n: usize, dim: u64) -> Owned<1> {
         let blocks = [1 + rng.below(3), 1 + rng.below(3)];
         let dims = [
             (0..blocks[0]).map(|_| 1 + rng.below(dim)).collect::<Vec<_>>(),
@@ -1384,8 +1389,10 @@ mod tests {
         Owned { block, vector, weight }
     }
 
-    fn independent(block: &[u8], vector: &[Vector<1>], set: &[u32]) -> bool {
-        let mut spans = vec![BlockSpan::<1>::new(); 4];
+    /// Whether `set` is independent in the matroid with these blocks and vectors.
+    fn independent<const R: usize>(block: &[u8], vector: &[Vector<R>], set: &[u32]) -> bool {
+        let blocks = set.iter().map(|&e| usize::from(block[e as usize]) + 1).max().unwrap_or(0);
+        let mut spans = vec![BlockSpan::<R>::new(); blocks];
         set.iter().all(|&e| spans[usize::from(block[e as usize])].insert(vector[e as usize], e))
     }
 
@@ -1514,5 +1521,130 @@ mod tests {
         }
         assert!(exact_losses > 3000, "{exact_losses} exact losses");
         assert!(asked > 10_000 && certified > asked / 4, "{certified} of {asked} certified");
+    }
+
+    /// A random word that is not a linear function of the generator's state over GF(2).  The generator is xorshift, so
+    /// every vector made of its outputs lies in a space of at most 64 dimensions (all are linear in the 64 bits of its
+    /// state): random vectors of a larger dimension would never have a rank above 64.  The finalizer of splitmix64,
+    /// whose multiplications are not linear, breaks that.
+    fn scrambled(rng: &mut Rng) -> u64 {
+        let mut z = rng.next().wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        z = (z ^ z >> 30).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ z >> 27).wrapping_mul(0x94D0_49BB_1331_11EB);
+        z ^ z >> 31
+    }
+
+    /// A problem of `n` elements in which the matroid `free` is free (every element has a unit vector of its own, the
+    /// elements spread over two or more blocks of dimension at most `64·R`) and the other is one block of random
+    /// vectors of dimension `dim`, at most `64·R`.  The weights are positive and sorted, with ties.
+    fn one_matroid_free<const R: usize>(rng: &mut Rng, n: usize, dim: usize, free: usize) -> Owned<R> {
+        let blocks = n.div_ceil(64 * R).max(2);
+        let mut block = [Vec::new(), Vec::new()];
+        let mut vector = [Vec::new(), Vec::new()];
+        for e in 0..n {
+            let mut unit = [0; R];
+            unit[e / blocks / 64] |= 1 << (e / blocks % 64);
+            block[free].push((e % blocks) as u8);
+            vector[free].push(unit);
+            let mut random = [0; R];
+            for (i, word) in random.iter_mut().enumerate() {
+                let bits = dim.saturating_sub(64 * i).min(64) as u32;
+                *word = scrambled(rng).checked_shr(64 - bits).unwrap_or(0);
+            }
+            block[1 - free].push(0);
+            vector[1 - free].push(random);
+        }
+        let mut weight: Vec<i64> = (0..n).map(|_| 1 + rng.below(40) as i64).collect();
+        weight.sort_unstable();
+        Owned { block, vector, weight }
+    }
+
+    /// The matroid greedy algorithm on matroid `m` of `owned`: the elements of `live` (ascending) by decreasing weight,
+    /// each kept when independent of those kept so far, `skip` left out.  Its first `cap` picks are the heaviest
+    /// independent set of at most `cap` elements, whatever `cap` is, since the weights are positive.
+    fn greedy<const R: usize>(owned: &Owned<R>, m: usize, live: &[u32], skip: Option<u32>) -> Vec<u32> {
+        let mut spans = vec![BlockSpan::<R>::new(); owned.blocks()[m]];
+        let keep = |&e: &u32| {
+            Some(e) != skip && spans[usize::from(owned.block[m][e as usize])].insert(owned.vector[m][e as usize], e)
+        };
+        live.iter().rev().copied().filter(keep).collect()
+    }
+
+    /// The weight of the first `cap` of `picks`.
+    fn weigh<const R: usize>(owned: &Owned<R>, picks: &[u32], cap: usize) -> i64 {
+        picks.iter().take(cap).map(|&e| owned.weight[e as usize]).sum()
+    }
+
+    /// Blocks of more than 255 members, which the `u8` slots of the tableau could not number (255 was the mark of no
+    /// slot, and slot 256 would have wrapped to 0), at `R = 5`, against the greedy algorithm.  One matroid is free
+    /// (every element has a unit vector of its own, over a few blocks) and the other is one block of random vectors of
+    /// a dimension from 260 to 320, so every set independent in the second is common independent, and the heaviest
+    /// common independent set of at most `cap` members is the heaviest independent set of the second, which the
+    /// greedy algorithm finds.  Under four limits, the solve's value and its set (independent in both, within the
+    /// limit, of the weight asked) must match; with no limit, the weight split's bound without a member, and the
+    /// heaviest set without a member read off the exchange graph where it certifies one, must match the greedy
+    /// algorithm's set without that member.  Then with the roles of the matroids swapped.
+    #[test]
+    fn blocks_of_more_than_255_members_against_the_greedy_algorithm() {
+        const R: usize = 5;
+        let mut rng = Rng(0x1F2E_3D4C_5B6A_7988);
+        let mut widest = [0; 2];
+        let (mut split_checked, mut asked, mut certified) = (0, 0, 0);
+        for (random, largest) in widest.iter_mut().enumerate() {
+            for _ in 0..8 {
+                let dim = 260 + rng.below(61) as usize;
+                let n = dim + 20 + rng.below(41) as usize;
+                let owned = one_matroid_free::<R>(&mut rng, n, dim, 1 - random);
+                let p = owned.problem();
+                let live: Vec<u32> = (0..n as u32).collect();
+                assert!(independent(p.block[1 - random], p.vector[1 - random], &live), "the free matroid is not free");
+                let picks = greedy(&owned, random, &live, None);
+                assert!(picks.len() > 255, "the random matroid has rank {}", picks.len());
+                let mut meet = Meet::<R>::new(n, owned.blocks());
+                for cap in [n, dim, dim / 2, 7] {
+                    meet.solve(&p, &live, &[], cap, i64::MAX, |_| {});
+                    assert_eq!(meet.value, weigh(&owned, &picks, cap), "n={n} dim={dim} cap={cap}");
+                    let chosen: Vec<u32> = live.iter().copied().filter(|&e| meet.contains(e)).collect();
+                    assert_eq!(chosen.len(), picks.len().min(cap), "n={n} dim={dim} cap={cap}");
+                    assert!(independent(p.block[0], p.vector[0], &chosen), "cap={cap}: dependent in A");
+                    assert!(independent(p.block[1], p.vector[1], &chosen), "cap={cap}: dependent in B");
+                    assert_eq!(weigh(&owned, &chosen, cap), meet.value, "cap={cap}");
+                    *largest = (*largest).max(chosen.len());
+                    if cap < n {
+                        continue;
+                    }
+
+                    // No limit: the heaviest set of all sizes, its split, and the sets without a few of its members.
+                    let (value, size) = (meet.value, chosen.len());
+                    assert!(meet.settled, "n={n} dim={dim}: the solve without a limit did not settle");
+                    let mut bounds = Vec::new();
+                    assert!(meet.split_bounds(&p, &live, |x, b| bounds.push((x, b))), "n={n}: no split");
+                    assert_eq!(bounds.len(), size);
+                    let pot = meet.potentials().to_vec();
+                    let (loss, gap) = (meet.smaller_loss(&p, &pot), meet.gap);
+                    let sample: Vec<u32> = chosen.iter().copied().filter(|_| rng.chance(15)).collect();
+                    let rests: Vec<Vec<u32>> = sample.iter().map(|&x| greedy(&owned, random, &live, Some(x))).collect();
+                    for &(x, bound) in &bounds {
+                        assert!(bound <= value, "the split's bound without {x} is above the optimum");
+                        if let Some(i) = sample.iter().position(|&y| y == x) {
+                            assert!(bound >= weigh(&owned, &rests[i], n), "the split's bound without {x}");
+                            split_checked += 1;
+                        }
+                    }
+                    for (&x, rest) in sample.iter().zip(&rests) {
+                        for at_most in [size, n] {
+                            let limit = if at_most > size { loss.min(gap) } else { loss };
+                            asked += 1;
+                            if let Some(v) = meet.without(&p, &pot, x, limit, &[]) {
+                                certified += 1;
+                                assert_eq!(v, weigh(&owned, rest, at_most), "without {x}, at most {at_most}");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert!(widest.iter().all(|&w| w > 255), "the largest sets: {widest:?}");
+        assert!(split_checked > 20 && asked > 40 && certified > asked / 10, "{split_checked} {certified} of {asked}");
     }
 }

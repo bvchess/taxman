@@ -121,8 +121,8 @@ are new.  The solver is the same code as on a laptop; the machine only changes h
 game of 1300 reached 2175 in 92 minutes of game time on 2 threads of the M1 Max, the dearest game 2170 at 290 s, its
 cost in waves (bands of 25 n from 11 s to 850 s) that follow the root's GF(2) gap, with no growth a fit over 1301-2175
 resolves.  Taking the 192-CPU machine as 43 to 86 times those 2 threads (an assumption; the scaling run, below, puts it
-near 60 on long searches), a day reaches the end of the
-set widths, n = 4095, at every slope those data support, and even at the steepest any GF(2) measurement has shown (×10
+near 60 on long searches), a day reaches n = 4095 (the end of the set widths then; they go to 8191 now, section 5)
+at every slope those data support, and even at the steepest any GF(2) measurement has shown (×10
 per 413 n), a day reaches about 3200 and a week about 3600.  How a search spreads over threads is measured to 64: the
 proof of 2172 (1.4 million nodes in the calibration's build) ran 58.5 times as fast as on one thread on a
 `c8g.16xlarge`, and the same instance made the chain's games past 2175 at a rate and a price that the
@@ -499,6 +499,14 @@ the default changes.
   build).  The width of the sets is part of that: a checkpoint of a game of 2048 to 3583 made at 64, before the widths
   of 36, 40, 48 and 56 words were added, is refused by a build that has them.  Do not `git pull` in the middle of a
   long game without a reason.  Changing only code generation (PGO, `target-cpu`) is harmless.
+* **Past 4095.**  A build before commit 4316168 stops at n = 4095, the widest set it has; from that commit the
+  boards go to 8191 (`taxman::solver::MAX_N`), those from 4096 at sets of 128 words
+  ([EXPERIMENTS](../../docs/EXPERIMENTS.md#boards-past-4095-2026-10)).  To take a chain past 4095: stop it (or let
+  `chain.sh 4095` finish), build the new commit in the same checkout (`git pull`, then `setup.sh`, or `cargo build
+  --release` in `rust/`), and run `chain.sh N` again with N up to 8191 (or `CHAIN_TO=N`).  It skips the completed games,
+  and the checkpoint of a game below 4096 that the old build wrote resumes, since the game keeps its width, frames,
+  candidates and tactics (tried with checkpoints of 1133 and 3600 written by the build before).  A game past 8191 is
+  refused ("beyond the largest supported board"), which ends the script with an error.
 
 ### Monitoring
 
