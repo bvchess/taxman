@@ -1,9 +1,7 @@
 //! The frames as setup forms them: [`Frame`] and [`BoardFrames`], with the peel that decides what a frame can play.
 //!
 //! The module documentation of [`crate::frames`] says what they are, what simplifying them assumes, how they are
-//! numbered and merged, and why every loop below keeps the Java's order.  The Java's `bombus.Hive` is [`Frame`] and
-//! its `bombus.Apiary` is [`BoardFrames`]; the names of `unzip`, `removeImpossible`, `mandatory` and `claimed` are
-//! the Java's too.
+//! numbered and merged, and why every loop below keeps the Java's order.
 
 use crate::bits::Bits;
 use crate::numtheory::Tables;

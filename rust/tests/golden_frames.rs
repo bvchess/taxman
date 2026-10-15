@@ -93,8 +93,9 @@ impl Mismatches {
 // ---------------------------------------------------------------------------------------------------------
 // The structure of a board, at any width
 
-/// The board's frames as setup forms them, against the Java's `apiary` (a `BoardFrames`) and its `hives` (their
-/// `Frame`s; the Java's `freeFactorCount` is their `freedoms`).  The golden data keeps the Java's keys.
+/// The board's frames as setup forms them, against the golden data.  The data is the Java's export and keeps its
+/// names: its `apiary` is a `BoardFrames` (the board's frames in playing order), its `hives` the `Frame`s in it with a
+/// `freeFactorCount` (their `freedoms`), and its `frames` (see `check_search_frames`) the `SearchFrames`.
 fn check_board_frames<const W: usize>(g: &Golden, bad: &mut Mismatches) {
     let n = g.n;
     let t = Tables::new(n);

@@ -840,13 +840,12 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   85). Helpers shared by the unit and integration tests (temporary directories, a random generator) are one file,
   `tests/common/support.rs`.
 * **Golden tests** (`tests/golden_frames.rs`, `tests/solver.rs`): every stage of the port against
-  `testdata/golden/n*.json` (exported from the Java by `tools/golden/export.sh`): the setup's frames (the data's
-  `apiary` and `hives`, the Java's keys for `BoardFrames` and its `Frame`s), the numbered and merged frames, candidates,
-  reduced frame set, greedy incumbent, the prime shortcut, solve result.  The searched golden games (94, up to 760) give
-  the Java's promotion sums with the default tactics; the tactic variants give the same answers on those up to 400.
-  Past 760 the Java's structure is fixed in `testdata/golden_wide/` (n = 511, 512, 1000, 1001, 1023, 1024, 1025, 1100,
-  1231, 2047 and 2048, checked at the width `with_width!` picks) and `games_java.txt` (the Java's game of the board's
-  frames, move for move, for 171 sets of promotions at 762–2049).
+  `testdata/golden/n*.json` (exported from the Java by `tools/golden/export.sh`): the setup's frames, the numbered and
+  merged frames, candidates, reduced frame set, greedy incumbent, the prime shortcut, solve result.  The searched golden
+  games (94, up to 760) give the Java's promotion sums with the default tactics; the tactic variants give the same
+  answers on those up to 400.  Past 760 the Java's structure is fixed in `testdata/golden_wide/` (n = 511, 512, 1000,
+  1001, 1023, 1024, 1025, 1100, 1231, 2047 and 2048, checked at the width `with_width!` picks) and `games_java.txt` (the
+  Java's game of the board's frames, move for move, for 171 sets of promotions at 762–2049).
 * **The board layer against the chain** (`tests/board_layer.rs`): for every 25th searched game of `results/strict.jsonl`
   (and the last, n = 2175), the moves that the game's promotions make and the digest of the board's search problem are
   the line's, which the golden data (up to 2049) cannot say of the boards that matter.  The unit tests of `frames` check

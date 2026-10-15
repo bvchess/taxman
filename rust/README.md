@@ -596,8 +596,7 @@ the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#t
   are in one frame).  Setup simplifies the frames, numbers the ones that have freedoms from the front (0 is played
   first) and merges those with the same number, so that a promotion always has one frame to go to; the search works
   on the merged frames.  In the code a frame is `frames::Frame` as setup forms it (`frames::BoardFrames` holds all of a
-  board's) and `model::Frame` as the search takes it (`frames::SearchFrames` holds those).  The Java calls the first
-  `Hive` and `Apiary`, and its golden data keeps those keys (`apiary`, `hives`, `freeFactorCount`).
+  board's) and `model::Frame` as the search takes it (`frames::SearchFrames` holds those).
 * **front, back**: frame X is in front of frame Y (and Y behind X) when a number of Y has a maximal factor in X, that
   is, when Y's numbers are multiples of X's.  Frames in front are played first, so frame 0 is the front, and a
   promotion moves a factor of frame h to a move of frame h - 1, one frame forward.

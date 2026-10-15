@@ -18,12 +18,12 @@
 //! * [`SearchFrames`] is what the search takes of them: for each frame with freedoms, numbered from the front, its
 //!   moves and factors as a [`crate::model::Frame`], and the numbers that could be promoted.
 //!
-//! The Java has three names for one idea (`bombus.Hive` for [`Frame`], `frame.WorkingFrame` and `search.Frame` for a
-//! frame of the search; `bombus.Apiary` is [`BoardFrames`]); this module calls it a frame throughout.  [`Frame`]
-//! has the name of [`crate::model::Frame`], the search's copy of it (a `Copy` set of moves and factors that every
-//! promotion changes), and the two do not meet: no signature has both, and this module writes the search's as
-//! `model::Frame`.  A second word (`FrameDraft`) would only be one more name for what the wiki calls a frame.  The
-//! names of `unzip` and `removeImpossible`, and of the fields `mandatory` and `claimed`, are the Java's.
+//! The Java has several names for the one idea (DESIGN.md, "The Java solver and the frame solver", maps them); this
+//! module calls it a frame throughout.  [`Frame`] has the name of [`crate::model::Frame`], the search's copy of it (a
+//! `Copy` set of moves and factors that every promotion changes), and the two do not meet: no signature has both, and
+//! this module writes the search's as `model::Frame`.  A second word (`FrameDraft`) would only be one more name for
+//! what the wiki calls a frame.  The names of `unzip` and `removeImpossible`, and of the fields `mandatory` and
+//! `claimed`, are the Java's.
 //!
 //! # Sources, factors and frames
 //!
@@ -136,11 +136,9 @@
 //! deliberate: which source is declared impossible, or which pair is claimed first, can depend on the order.  The
 //! golden tests (`tests/golden_frames.rs`) compare every field of every frame as setup forms it of the 318 boards in
 //! `testdata/golden` (up to n = 760), and the frames before and after numbering and merging of the eleven wide
-//! boards of `testdata/golden_wide` (up to n = 2048), with what the Java produced.  (The golden data is the Java's
-//! export and keeps the Java's keys: `apiary` is the board's frames in playing order, its `hives` the frames as
-//! setup forms them, each with a `freeFactorCount` (its freedoms), and `frames` the frames after numbering and
-//! merging.)  Two details reproduce quirks of the Java on purpose: a frame that has not been simplified yet counts
-//! as having freedoms (`Frame::new`), and the stale-frame behaviour of `Home::MergedAway`.
+//! boards of `testdata/golden_wide` (up to n = 2048), with what the Java produced (the data keeps the Java's names,
+//! which the test maps).  Two details reproduce quirks of the Java on purpose: a frame that has not been simplified yet
+//! counts as having freedoms (`Frame::new`), and the stale-frame behaviour of `Home::MergedAway`.
 //!
 //! # What setup costs
 //!
