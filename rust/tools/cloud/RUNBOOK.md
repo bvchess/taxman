@@ -32,6 +32,7 @@ of a Graviton core and the scaling of the solver to 64 and 192 threads are measu
 * [7. When something goes wrong](#7-when-something-goes-wrong)
 * [8. What has not been measured](#8-what-has-not-been-measured)
 * [9. The prover's proofs of opt(n), 1301 to 2175](#9-the-provers-proofs-of-optn-1301-to-2175)
+* [10. The theory track's measurements: E6 and E9(a)](#10-the-theory-tracks-measurements-e6-and-e9a)
 
 ## Rules for every launch
 
@@ -97,8 +98,9 @@ The files in this directory:
 | `chain.sh N` | the production run: the chain 1..N in a loop, a window of games in flight (`WINDOW`), resumable, logged, optional deadline and power-off |
 | `verify.sh [FILE...]` | both referees on a results file, and against the committed results |
 | `save.sh` | copy results, logs and checkpoints to S3 (`--restore` on a fresh machine) |
-| `prover.sh A B` | the prover's proofs of opt(n) for n = A..B (section 9): resumable passes, all CPUs; `--verify` checks the output |
-| `spot-watch.sh` | on a spot interruption notice: stop `chain.sh` or `prover.sh` and save |
+| `prover.sh A B` | the prover's proofs of opt(n) for n = A..B (section 9): resumable passes, all CPUs; `--verify` checks the output; `--list N1,N2,...` runs `exact` on given games as a measurement (section 10.1) |
+| `hunt.sh UPPER_FILE` | the counterexample hunt of section 10.2: the frame solver on boards without one open source each, resumable |
+| `spot-watch.sh` | on a spot interruption notice: stop `chain.sh`, `prover.sh` or `hunt.sh` and save |
 | `Dockerfile`, `Dockerfile.dockerignore` | a Linux build-and-test image (section 2) |
 
 All state lives in one directory, `$TAXMAN_WORK` (default `~/taxman-work`): `results/strict.jsonl` (and
@@ -973,3 +975,95 @@ and `THEORY.md`), with the totals from the two commands above and the real milli
 n (the table of 9.2 is a prediction).  Then the end of the
 [rules for every launch](#rules-for-every-launch): terminate the instance (`POWEROFF=always` has shut it down, which
 terminates it) and confirm that nothing is left, the launch's security group included.
+
+## 10. The theory track's measurements: E6 and E9(a)
+
+Two measurements of the theory track (heuristics/THEORY.md, "The upper part"; the account is the entry
+["The upper part game by game"](../../docs/EXPERIMENTS.md#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10)),
+built, tested and calibrated on the laptop and **not run**: each waits for Brian's approval with the estimate below
+([rules for every launch](#rules-for-every-launch)).  Both launch as section 9.4 does (an instance profile, steps
+through SSM, `S3_DEST`, a timer, `spot-watch.sh` beside the run, a tmux session), from a checkout of a commit that has
+this section (pushed first: the instance clones it); only the instance, the setup and the command differ, and the
+results come home as in 9.6.  E6 may run first; E9(a) is independent of it.
+
+### 10.1 E6: does leaving the sources free cost the prover's search anything?
+
+*What.*  `exact` on 25 games of 1301-2175 with a root parity gap of 364 to 603 and a proof of 0.6 to 30 minutes in
+the run of section 9, twice: **B**, `--fix-low 1`, from the roles of Theorem B (the largest prime and U\*_2 forced,
+every other prime and number of layer 2 barred), the sources of layer 3 and up free, which is still a proof of
+opt(n); and **D**, `--fix-low 1 --fix-upper 1`, the whole upper part fixed to U\*, which is the frame model's problem
+on the whole board and proves nothing (its lines say `"search":"upper_fixed"`).  Each line also counts the nodes that
+branched on a source of layer 3 or up and those that barred a member of U\*_{≥3}.  The games, dearest first:
+
+```
+L=2159,2168,2166,2167,1800,2020,1537,1820,1504,1400,1551,2100,2160,2165,2163,1512,1482,1495,1547,1445,1573,1500,1480,1584,1575
+```
+
+*Criterion, fixed in advance* (`summarize.py sources` prints it part by part): B/D at most 1.2 on at least 90% of the
+games and never above 2, and B's nodes branching on a source of layer 3 or up at most 5% of all B's nodes → build the
+integrated search's stages 2 and 3; otherwise build its stage 1 only and measure stage 2 on two games first.
+
+*Cost.*  The 25 proofs took 4.8 thread-hours in the run of section 9, the dearest (2159) 30 minutes.  On the laptop,
+B at 1575 and 1584 had the plain proof's nodes within 2.1% and took half its time a node (Theorem B's roles leave the
+parity solves fewer free elements), and D had B's nodes; so B and D are about 2.5 thread-hours each, and each set
+of 25 is bounded by its dearest game, about 16 to 30 minutes on a `c8g.4xlarge` (16 threads).  With the setup (about
+10 minutes, `PROVER_ONLY=1`) and margin: **one to one and a half instance-hours, about $0.40 at the spot price of
+2026-10-14 ($0.24 an hour), $1 on demand.**  `DEADLINE_HOURS=3` and a timer of 200 minutes bound it.
+
+*Run* (the launch of 9.4 with `Purpose=e6` and the user data `shutdown -h +200`; then `PROVER_ONLY=1 setup.sh`):
+
+```
+export D=s3://taxman-013764204840-us-east-1/e6 W=/home/ec2-user/taxman-work/results
+cd ~/taxman && tmux new-session -d -s e6 "export DEADLINE_HOURS=3 S3_DEST=$D; \
+    OUT=$W/e6_low.jsonl EXTRA_ARGS='--fix-low 1' rust/tools/cloud/prover.sh --list $L; \
+    POWEROFF=always OUT=$W/e6_upper.jsonl EXTRA_ARGS='--fix-low 1 --fix-upper 1' rust/tools/cloud/prover.sh --list $L"
+tmux new-session -d -s sw 'rust/tools/cloud/spot-watch.sh'
+```
+
+The two runs share the deadline (it is fixed at the first start), the second powers the machine off, and each is
+resumable as in 9.5 (`prover.sh --list` skips the games its `OUT` has).  A stop with "a playable set worth X beats the
+recorded Y" in `prover.err` is a counterexample (9.5).  At home:
+
+```
+aws s3 cp $D/results/e6_low.jsonl rust/prover/data/e6_low_25.jsonl
+aws s3 cp $D/results/e6_upper.jsonl rust/prover/data/e6_upper_25.jsonl
+python3 rust/prover/tools/summarize.py sources rust/prover/data/e6_low_25.jsonl rust/prover/data/e6_upper_25.jsonl
+```
+
+### 10.2 E9(a): a counterexample hunt at the games of largest gap
+
+*What.*  For the 20 games of largest root gap past 2175 that rest on the frame model (`rust/prover/data/
+upper_2176_3314.jsonl`, from the copy of the EC2 chain's results of 2026-10-15: 3300, 3174-3176, 3104, 2346,
+3304, 3305, 3309, 2340, 3311, 3102, 3103, 3312, 3172, 3173, 3105, 3107, 3168, 3171, gaps 1257 to 1443) and each of
+their open sources u (those the barred parity bounds did not certify; 4,499 pairs), the frame solver on the board
+without u from an incumbent worth the recorded score V, so that it looks only for a game above V (`examples/hunt.rs`;
+`sacrifice::hunt`), at most 10 minutes on 4 threads a pair, 16 pairs at once.  A game of the board without u is a game
+of n, so a hit is a game better than the chain's.
+
+*Criterion.*  Any `found` line is a counterexample to U and to the chain's score at n: stop extending the chain,
+report it, and solve n again on the whole board (the theory track's program, part I, section 6).  No hit is
+evidence, recorded with the margins searched; a `timeout` says nothing.
+
+*Cost.*  Calibrated on one laptop thread (`bench/hunt/`): a pair costs what its margin (the barred bound's excess over
+V) says, not what its game's gap does.  At 3311 (gap 1303) and 2346 (gap 1346) every pair of margin up to 781 ended in
+under 6 seconds, 835 and 896-899 in 51 to 182 seconds, and every one from 959 up (to 1215) ran out of 3 to 5 minutes.
+Of the 4,499 pairs 3,533 have a margin up to 800, 388 between 800 and 900 and 578 above 900; if every one of these
+uses its whole 40 thread-minutes, the hunt is about 400 vCPU-hours: **a `c8g.16xlarge` (64 vCPUs) for about 7 hours
+with the setup, about $5 at the spot price of 2026-10-14 ($0.68 an hour), $18 on demand.**  Expect a few hundred
+timeouts, the pairs of largest margin.  `MINUTES=5` halves the cost and loses the pairs between about 950 and 1050;
+`PER_GAME=K` keeps the K open sources of largest margin of each game.  `DEADLINE_HOURS=9` and a timer of 560 minutes
+bound it.
+
+*Run* (the launch of 9.4 on a `c8g.16xlarge` with `Purpose=hunt` and `shutdown -h +560`; then the full `setup.sh`,
+which builds the solver's examples, `hunt` among them):
+
+```
+export D=s3://taxman-013764204840-us-east-1/hunt
+cd ~/taxman && tmux new-session -d -s hunt "DEADLINE_HOURS=9 POWEROFF=always S3_DEST=$D \
+    rust/tools/cloud/hunt.sh rust/prover/data/upper_2176_3314.jsonl"
+tmux new-session -d -s sw 'rust/tools/cloud/spot-watch.sh'
+```
+
+`hunt.sh` reruns the hunt after a crash and resumes it after a stop (finished pairs are in its output); exit status 2
+and "COUNTEREXAMPLE" lines in `hunt.log` are the finding to look for.  At home: `aws s3 cp $D/results/hunt.jsonl
+rust/bench/hunt/hunt_2176_3314.jsonl`, the summary from `hunt.out` beside it, and the README there brought up to date.

@@ -231,7 +231,12 @@ dear games.  (3) The remaining assumptions one at a time (the prover README's op
 to end): for each, a statement and either a proof or a counterexample on boards to 2000.  *Done (2026-10-15):* all
 of them are theorems (THEORY.md, Theorems B and M; the numbering by layer makes the numbering clean by construction),
 and the upper part is reduced to U, its members of three or more prime factors (docs/EXPERIMENTS.md, "The frame
-model on a proven footing").
+model on a proven footing").  *Done too:* (1), with layers 1 and 2 fixed by Theorem B, for every game of 1301-3314 that
+rests on the model: 7.5% of U\*_{≥3} open to 2175 and 14.9% past it, no game closed by the bounds alone, the open
+share following the root's gap ([EXPERIMENTS.md](EXPERIMENTS.md#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10));
+the search of the open members is the integrated search, whose premise E6 measures (prepared), and whose problem, the
+extended problem Π⁺(O), is built and proven exact (THEORY.md, Theorem M⁺; EXPERIMENTS.md, "The frame model by layer,
+and the extended problem").
 
 *Payoff.*  The verified wall moves with the solver's instead of falling behind tenfold per 1000 n; with a general proof
 of the model the prover becomes a cross-check that can lag.

@@ -23,7 +23,7 @@ Everything below supports three headline facts:
   the solver supports (Lemma Ω, Theorems L, B and M; "The frame
   model: what is proven and what remains").  That statement, U, is
   open in general and holds wherever the optimum has been proven on
-  the whole board (every n ≤ 1300).
+  the whole board (every n ≤ 2175).
 
 Empirical support for each claim is collected in the evidence table
 at the end.
@@ -1345,13 +1345,17 @@ or by the prime formula rests on the game before it, not on the model.
   says: some optimal game plays every source of four or more prime
   factors, and every source of layer 3 that greedy keeps.
 * The barred parity bounds (Theorem 10, with layers 1 and 2 fixed by
-  Theorem B and one member of U\*_{≥3} barred) certify most members of
-  U\*_{≥3} game by game: all but 4 of the 161 at 600, all but 12 of 281
-  at 1000, 3 of 371 at 1300, 69 of 587 at 2000 and 102 of 641 at 2175,
-  the open share growing with the root's gap.  A search on the whole
-  board of the rest closes U at every n tried to 1500.  (Measured for
-  the consultation behind this section, with scratch code; the
-  register of rust/docs/EXPERIMENTS.md has the row.)
+  Theorem B and one member u of U\*_{≥3} barred) certify most members of
+  U\*_{≥3} game by game: when the bound is at most the recorded score V,
+  every set beating V that obeys Theorem B plays u.  Every game leaves
+  some open: over the 490 games of 1301..2175 that rest on the frame
+  model, 7.5% of the members (1 to 102 a game, 84% to 99.7% certified),
+  and over the 635 of the EC2 chain's 2176..3314, 14.9% (15 to 317 a
+  game, 54% to 98% certified), the open share growing with the root's
+  gap by 2 to 3 points per 100.  The root's heaviest set plays all of
+  U\*_{≥3} in every one of these games.  (`rust/prover`, `bin/upper.rs`;
+  the data in `rust/prover/data/upper_*.jsonl` and the table in its
+  README, section 3.)
 
 *Where a proof stops.*  Take an optimal S without U\*_{≥3}, and d the
 largest source where S and U\* disagree, in layer k ≥ 3.  If d ∈ S ∖ U\*,
@@ -1491,6 +1495,129 @@ promotion set of Π⁺(U\* ∖ F) worth ΣS − in_the_bag⁺ > V − in_the_bag
 In a search for the optimum rather than a check of V, V can be the
 search's starting incumbent: members certified against it cover every
 set that beats it.
+
+## Signed frame matroids: the frame bound over other fields
+
+Theorem 11's argument never uses that its entries are 1 or that the
+field is GF(2): a winnable frame's movers have a triangular matrix
+with a nonzero diagonal under every choice of nonzero entries, over
+every field.  Each such choice gives a matroid per frame in which
+every promotable set is independent, and the GF(2) bound and any
+number of them combine by Lagrangian multipliers into one bound
+(the fields study, rust/docs/EXPERIMENTS.md, "A bound over GF(2) and
+GF(3) signed frame matroids", which measured it).
+
+Fix a state and a frame h of it, with factors F_h and moves M_h; its
+*movers* are its moves and the candidates of home h + 1, and the
+candidates *touching* it, supp_h, are those of homes h and h + 1.  A
+*signing* of h over a field K gives each incidence (u, f), u a mover
+and f one of u's maximal factors among F_h (the factor lists of
+`model::FactorProvider`), a value σ(u, f) in K − {0}.  Mover u has
+the vector v_σ(u) = Σ_f σ(u, f) e_f of K^{F_h}, and a factor y the
+unit vector e_y.
+
+**Theorem 14 (signed frame matroids).**  If a set Q of candidates can
+be promoted, then for every frame h and every signing σ of it, the
+vectors v_σ(m) of h's moves, v_σ(x) of Q's members of home h + 1 and
+e_y of Q's members of home h are linearly independent over K.  So,
+with the moves contracted (each vector taken modulo their span),
+Q ∩ supp_h is independent in the linear matroid N_h^σ that
+represents a candidate x of home h + 1 by the class of v_σ(x) and a
+candidate y of home h by the class of e_y.  Moreover:
+
+1. the signings of different frames, and their fields, are chosen
+   independently: every promotable set is independent in every such
+   matroid at once;
+2. at a node reached by promoting P, every completion F (P ∪ F
+   promotable from the root) has F ∩ supp_h independent in N_h^σ / P,
+   and this contraction is the matroid built with the same σ from
+   the node's own frame h (its moves M_h plus P's members of home
+   h + 1, its factors F_h less P's members of home h), whether or not
+   the node's frames were reduced;
+3. a candidate whose class is zero in some N_h^σ (a *loop*) is in no
+   promotable set.
+
+*Proof.*  Promoting Q succeeds exactly when every frame is winnable
+with all of Q applied at once: movers M_h plus Q's members of home
+h + 1, pool F_h less Q's members of home h (rust/src/model/promote.rs;
+the proof of Theorem 11).  A winnable frame peels completely
+(`model::peel`): list the movers u₁, …, u_k in the order the peel
+drops them, u_i with a pool factor f_i that no mover still there
+lists, so that f_i is listed by no u_j with j > i.  In the matrix of
+the movers' vectors restricted to the pool, rows in that order and
+columns f₁, …, f_k first, entry (u_i, f_i) is σ(u_i, f_i) ≠ 0 and
+entry (u_j, f_i) is 0 for j > i: the matrix is triangular with a
+nonzero diagonal, so the restricted rows are independent.  Now let a
+combination of the moves' vectors, of the v_σ(x) of Q's members of
+home h + 1 and of the e_y of Q's members of home h vanish.  Restricted
+to the pool it loses the e_y and leaves a vanishing combination of
+the movers' restricted vectors, whose coefficients are therefore 0;
+what is left is a vanishing combination of distinct unit vectors,
+whose coefficients are 0 too.  The moves alone are independent (Q
+empty), so the independence of the whole family is that of Q's part
+in the quotient by the moves' span, which is the claim.
+(1): each frame's condition is about that frame's vectors alone.
+(2): P ∪ F is promotable from the root, so it is independent in the
+root's N_h^σ, and F is independent in the contraction by P (P is
+independent).  Contracting the e_y of P's members of home h is
+quotienting K^{F_h} by their coordinates, which leaves K^{F_h − P}
+with each vector restricted, and contracting the v_σ(x) of P's
+members of home h + 1 adds them to the moves: the node's frame with
+the same values.  A reduction drops a move m whose only live factor
+is q together with q; m's vector is then σ(m, q) e_q on the frame's
+factors, and the quotient by it is the deletion of coordinate q, so
+the matroid is unchanged.
+(3): a promotable set holding x would have the class of x, zero, in
+an independent family.  ∎
+
+With σ ≡ 1 over GF(2), N_h^σ is Theorem 11's frame matroid, and the
+even frames' and odd frames' make A and B.  Over GF(3) the converse
+holds too, which the fields study uses to choose its signings and
+nothing below needs.  If frame h with Q applied is not winnable, its
+peel's residual C is self-covering on the pool (every pool factor a
+member of C lists is listed by two or more).  Give the listers of
+each such factor values that sum to 0 (pairs 1, 2 and, for an odd
+count, one triple 1, 1, 1).  Then Σ_{u∈C} v_σ(u) vanishes on the
+pool, so it is a combination of the e_y of Q's members of home h, and
+Q ∩ supp_h is dependent in N_h^σ: the relation has the coefficient 1
+on each member of Q among C's movers, and if there were none and every
+e_y's coefficient were 0, C's moves would have vectors summing to 0,
+against their independence.  So the GF(3) signed frame matroids of
+all signings are together exact for winnability (Hershkowitz and
+Schneider's theorem, in this setting).
+
+**Theorem 15 (the decomposition bound).**  Let A, B be Theorem 11's
+matroids of a state, N_1, …, N_K signed frame matroids of it (each of
+one frame h_k and one signing, on supp_{h_k}), cap the most members a
+completion can have, and w(x) = x.  For any real vectors λ_k on
+supp_{h_k}, every promotable set (at a node: every completion) Q with
+at most cap members satisfies
+
+    w(Q) ≤ MI_cap(w − Σ_k λ_k) + Σ_k G_k(λ_k) = L(λ),
+
+where MI_cap(c) is the heaviest common independent set of A and B of
+at most cap elements for the weights c, its elements of weight at
+most 0 left out, and G_k(μ) the heaviest independent set of N_k for
+the weights μ.  The same holds with the loops of the N_k (Theorem 14,
+(3)) left out of the intersection.
+
+*Proof.*  w(Q) = (w − Σ_k λ_k)(Q) + Σ_k λ_k(Q ∩ supp_{h_k}).  Q is
+common independent in A and B with at most cap members (Theorem 11),
+and so is its subset Q⁺ of positive reweighted weight, which weighs
+at least as much: the first term is at most MI_cap.  Q ∩ supp_{h_k}
+is independent in N_k (Theorem 14), so the k-th term is at most G_k.
+Q holds no loop (Theorem 14, (3)), so leaving the loops out changes
+no term.  At a node, the same with the node's matroids (Theorem 11
+and Theorem 14, (2)) and its completions.  ∎
+
+The bound is evaluated exactly in integers: weights x·S and
+multipliers that are multiples of 1/S (S = 2^16), the intersection by
+the crate's `gf2::meet` and the greedy algorithm over GF(3), so
+⌊L⌋ bounds every promotion sum whatever produced the multipliers.  Its
+least value over λ is the linear program over the polytopes of A, B
+(with the cap) and every N_k (Lagrangian decomposition with integral
+subproblems, by Edmonds' theorems); the study fits λ to it by column
+generation, which is interpretation, not part of the proof.
 
 ## Relation to Franklín and Moniot
 
@@ -1849,8 +1976,9 @@ and the adversarial experiments: `rust/prover/README.md`.
 | N: the numbering of the frames is clean; setup numbers them by layer, and the Java's breadth-first numbering is the same on every board the solver supports | N by construction (Lemma Ω); the two numberings equal on every board 2..8191 (the census, checks C and the numbering's fields: frame h is the frames with freedoms of layer 3 + h, 2 + h on 80 boards ≤ 186), and on every board to 400 and a sample to 8191 (the tests of `rust/src/frames/`); on boards with holes they differ (56 without 39; 32 without 4 has a number without frames) | proven (N); measured (the equality) |
 | U\* ∪ L is playable iff L is a promotion set of the frame solver's root problem, and weighs in_the_bag + ΣL (Theorem M) | every set of every board ≤ 100 both ways (11,635 sets; 101..120, 167,681, in an ignored test); random sets both ways on boards 60..1300 (and 2000..8191, ignored); no candidate lists a back claim's factor, none is in frame 0, every one has a home, U\* is an independent greedy's, on every board to 8191 (the census, checks D-G); the true near misses the candidate filter alone keeps out, 27 boards to 2000 (`rust/tests/model_exact.rs`) | proven |
 | With a set O of the sources of three or more prime factors left optional, a set S ⊇ U\* ∖ O is playable iff it is a promotion set (K, L) of the extended problem Π⁺(O), and weighs in_the_bag⁺ + ΣK + ΣL (Theorem M⁺); with O = ∅ its promotion sets are the frame model's | every set of every board ≤ 80 both ways for O = ∅ and three random O per board, ≤ 60 for O = U\*_{≥3} (6.4 million sets; 81..100 and 61..69, 24 million more, in ignored tests); random sets both ways for O of 20 random members, for O = U\*_{≥3} and for O = ∅ at 300..1300, at 741, 1100 and 1200 (where greedy rejects a source of layer 3) and, ignored, at 2000..4095; Π⁺(∅)'s frames, candidates, freedoms and promotion sets the frame model's on every board to 400 (to 100 for the sets); a chain 2..1300 searched on Π⁺(∅) gives every score of optimal.json (`rust/tests/model_extended.rs`, `rust/examples/extended.rs`) | proven |
-| U: some optimal set contains U\*_{≥3}; the frame solver's answer is opt(n) iff U holds at n (the corollary) | every n ≤ 2175 (the prover's proofs on the whole board); the strong form in every game enumerated; barred parity bounds certify 84-99% of U\*_{≥3} per game, searches close the rest at every n tried to 1500 | open; holds to 2175 |
+| U: some optimal set contains U\*_{≥3}; the frame solver's answer is opt(n) iff U holds at n (the corollary) | every n ≤ 2175 (the prover's proofs on the whole board); the strong form in every game enumerated; barred parity bounds certify 84-99.7% of U\*_{≥3} per game to 2175 and 54-98% on the EC2 chain's 2176..3314, and close no game alone (`rust/prover/data/upper_*.jsonl`) | open; holds to 2175 |
 | opt(n) equals the recorded score: the frame model's answer is the true optimum | the prover's exact searches on the whole board (playability theorems, the Franklín–Moniot and parity bounds, the ceiling and the prime formula; `rust/prover`, section 3): every n = 2..2175, the whole committed chain | verified (exact, on the whole board) to 2175 |
+| Promotable sets are independent in every signed frame matroid, over any field and any nonzero entries; with the GF(2) matroids they make a Lagrangian bound L(λ) valid for every λ | every promotable set of every board with ≤ 22 candidates, and the optimal and 100 random maximal promotion sets of every non-prime board of 137-400, independent for the plain and five random GF(3) signings of every frame (6.4 million pairs); 14,472 promotion sets at every 25th board of 400-2175 independent in 4,320 signed matroids, column-sum signings among them; L never below P* at 309 roots of 2-400 (6,180 random multipliers) and 72 of 400-2175 (1,440), and equal to the GF(2) bound at zero; every bound of the fields study at least P* (66 roots, 330 families) and at least the best completion at the probe's nodes where it is known | proven (Thms 14, 15) |
 | An optimal game has the most moves, M(n) | one move short at n = 833, 834 and 835, proven by the prover; a longest game for every other n ≤ 1300, 1,293 of them by the matching certificate (`rust/prover`, section 6) | **false** (n = 833); the gap is at most one to 1300, open beyond |
 | (★) on rejection-bearing components | every threshold of every game n = 2..20,000 certified by bounds; the earlier 5 undecided settled | certified per game; open in general |
 | (♦) and (★) under orders obeying the window law, adversarial or random, or its reverse | 1,981 instances, n = 2000..20,000, 0 failures (uniformly random orders: 16–50% fail; window law for a random prime ranking: 26–57%) | measured |

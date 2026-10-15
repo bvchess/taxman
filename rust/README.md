@@ -499,7 +499,7 @@ a game was found: a proof that rests on its game of n - 1 assumes "the game of n
 game that assumes nothing is proven within the frame model, given that the solver is right.  `taxman solve` prints
 what a game assumes in the summary line.  What a proof rests on through the frame model, the statement U at n
 (section 1, "What optimal means"), is not recorded: it concerns the games proven by an exhausted search, a trivial
-board or a repeat, and holds for every n <= 1300.
+board or a repeat, and holds for every n <= 2175 (the prover).
 
 ### The verifiers
 

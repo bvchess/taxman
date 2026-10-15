@@ -196,6 +196,10 @@ those of the page the row points to; a game is named by its board size, and time
 | The cost model refitted on one build, 1301-3312 (714 exhausted searches): the gap alone and scaled by a power of n, tested out of sample | [the gap past 2175](#the-gap-past-2175-2026-10), [agenda 2](AGENDA.md#2-the-diagnosis-of-the-wall) | measured | 2.67 + G/247 (R² 0.85, sd 0.47) and 2.30 + 0.0479 G/n^0.3 (R² 0.875, sd 0.44); a decade per 250 of gap as before; the gap alone overpredicts later stretches by 0.2-0.6 decades, p = 0.3 has the smallest worst bias (0.27) and 0 to 0.5 bracket it (the two chains disagree: 0-0.2 across 2175, 0.4-0.5 within 2176-3312) |
 | The cost of a game at 4000, 5000 and 6000 and the board that 24 hours on a `c8g.16xlarge` reach (Monte Carlo of the cost model, the gap's waves and the observed residuals) | [the gap past 2175](#the-gap-past-2175-2026-10), [agenda 2](AGENDA.md#2-the-diagnosis-of-the-wall) | measured; estimate | median searched game 3-6, 13-32 and 48-166 million nodes (90th percentile 40 times the median); a game costs ×10 per 1,050-1,250 n (830-1,500); a day reaches about 4,100 (3,700-4,850), 4000 in 13-20 hours past 3313, 5000 in 4-10 days; the old +57 regime would have reached 3,830-3,890 |
 | Other fields and signings beside GF(2): is the parity bound's heaviest set at the root dependent over GF(3), GF(5), GF(7) or the rationals, with 0/1 entries or Koszul signs (its peel residual's rank) | [agenda 7.2](AGENDA.md#72-other-fields-at-the-roots-of-the-whole-game) | measured; open as a bound ([agenda A1](AGENDA.md#a1-a-bound-over-several-fields-and-signings-a-change-of-slope-if-its-share-holds)) | of the 1,055 games of 78-1300 whose parity bound exceeds opt(n), 566 dependent in some field or signing (GF(3) with 0/1 entries 412), rising from 49% at 300-599 to 73% at 1100-1300; none over the rationals; 54% of the 658 square residuals have determinant ±1 under both entries |
+| Other fields and signings beside GF(2): is the parity bound's heaviest set at the root dependent over GF(3), GF(5), GF(7) or the rationals, with 0/1 entries or Koszul signs (its peel residual's rank) | [agenda 7.2](AGENDA.md#72-other-fields-at-the-roots-of-the-whole-game) | measured; as a bound, [the fields study](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) (next row) | of the 1,055 games of 78-1300 whose parity bound exceeds opt(n), 566 dependent in some field or signing (GF(3) with 0/1 entries 412), rising from 49% at 300-599 to 73% at 1100-1300; none over the rationals; 54% of the 658 square residuals have determinant ±1 under both entries |
+| A bound over the GF(2) frame matroids and GF(3) signed frame matroids (plain, random, and signings built from the cores of the LP's own columns, merged), coupled by Lagrangian multipliers fitted by column generation with a certified bracket (A1's E1, `examples/fields.rs`) | [fields](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) | measured: passes its kill criteria strongly; instrument kept, no solver change | the core-derived arm closes 0.62 of the root's GF(2) gap at n ≥ 1700 (18 converged roots), slope +1.0 ± 2.6 points per 100 n over 54 converged roots of 900-2175; fixed signings 2-9%; at the probe's nodes, with node-fitted multipliers, 86% (1215) and 98% (936) of the nodes GF(2) leaves open cut, the root's multipliers 0.37 of that; 36 s a root, 0.1-0.6 s a node |
+| The fields study's first master: GF(2) and independent-set columns tied by link rows `Σ α [x ∈ Q] − Σ β [x ∈ I] ≤ ε` (the design's), dense revised simplex | [fields](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) | not kept: replaced by rank inequalities with an exact certificate | 71% of the pivots steps of the perturbation's size; 1000 unconverged in 60 s (master 18,893 against L 24,382); the rank-inequality master converges there in 4-8 s |
+| A dual simplex for the fields master's violated rows (instead of elastic rows) | [fields](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) | not kept | looped: 10 million pivots in a 73-row LP within one 120 s root |
 | Does the root's GF(2) heaviest set have the optimum's size? (`bench/gf2/roots.jsonl`'s `size` against `strict.jsonl`'s promotions, 1301-2175) | [agenda C4](AGENDA.md#4-conjectures) | measured | 758 of the 760 searched and repeated games; at 1320 and 1322 the heaviest set has 77 members and the optimum 78 (`max_total`) |
 | Barring each member of U\* in the parity bound at the root, against opt(n) (a certificate that every optimal set holds it) | [agenda 7.3](AGENDA.md#73-barred-bounds-on-the-upper-part) | measured; open ([agenda A2](AGENDA.md#a2-certify-the-frame-model-then-prove-with-its-facts-a-change-of-slope-for-the-proven-wall)) | certifies 207 of 224 (600), 339 of 377 (1000), 472 of 490 (1300); the open ones within the root's gap, the largest prime among them |
 
@@ -340,7 +344,7 @@ The work of [the prover](../prover/README.md) and the proofs of [THEORY.md](../.
 | How the parity bound relates to Franklín and Moniot's Theorem 1 and bound | [THEORY: relation to Franklín and Moniot](../../heuristics/THEORY.md#relation-to-franklín-and-moniot) | kept (proven; evaluation/fm_relation.py) | playable / independent / matchable iff exactly one / an odd number / at least one payment scheme onto some payment set (Theorem 12); no odd core below board 45, so the parity bound is exact to 44; checked on every pick set of 2..22 and 18,200 dense sets on 30-120 |
 | Must a move of an optimal game ever pay three or more numbers of tax?  (The wiki's open question.)  Every move of `optimal.json` and the chain, an exhaustive search over every optimal game of 2..56, and a reordering of the games that pay three | [wiki questions](#the-wikis-open-questions-2026-10) | kept (proven in part; evaluation/wiki_questions.py) | some optimal game pays three at 40, 41 and 56, and 74 committed games do (1250..2159; none of the Java's to 1000); a move of an optimal game pays only maximal factors of it, or s/p and s/p² (a theorem), so three needs three distinct primes; every committed game reorders into one paying at most two by moving one move, so no n ≤ 2175 forces three; that every n has an optimal game paying at most two is a conjecture |
 | Which n does the wiki's procedure for reusing the game of n − 1 make optimal, and what predicts them?  (The wiki's open question.)  The procedure as the page has it on both files' games, n = 2..2175; the Java's set-level reuse emulated; an exhaustive search over every optimal game of n − 1 to 50 | [wiki questions](#the-wikis-open-questions-2026-10) | kept (proven in part; evaluation/wiki_questions.py) | 45% of 2..1000 (930 of 2..2175), not the page's 70%, which is the Java's reuse (690 of 2..1000 emulated); optimal exactly when the move it skips is δ(n) = n + opt(n − 1) − opt(n); always at the primes and at the even n whose half n − 1 does not play (so opt(2p) = 2p + opt(2p − 1)); never when δ(n) is coprime to a composite n (644 games, nearly every odd semiprime: δ(pq) = p′q′ at all 417 with p′q′ > pq/2); the games that adapt are nearly those the solver settles without a search |
-| The frame model's assumptions as theorems: frames are layers by Ω (Lemma Ω), playability splits by layer (Theorem L), every optimal set plays the largest prime and U\*_2 (Theorem B), and, given clean numbering (N), U\* ∪ L is playable iff L is a promotion set (Theorem M); what is left is U, some optimal set contains U\*_{≥3} | [proven footing](#the-frame-model-on-a-proven-footing-2026-10); [THEORY: the frame model](../../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains) | kept (proven) | the proofs of a consultation of 2026-10-15, written out; E1-E3 below found no exception; the frame solver's answer is opt(n) iff U holds at n, on every board the solver supports |
+| The frame model's assumptions as theorems: frames are layers by Ω (Lemma Ω), playability splits by layer (Theorem L), every optimal set plays the largest prime and U\*_2 (Theorem B), and, given clean numbering (N; by construction since 2A, below), U\* ∪ L is playable iff L is a promotion set (Theorem M); what is left is U, some optimal set contains U\*_{≥3} | [proven footing](#the-frame-model-on-a-proven-footing-2026-10); [THEORY: the frame model](../../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains) | kept (proven) | the proofs of a consultation of 2026-10-15, written out; E1-E3 below found no exception; the frame solver's answer is opt(n) iff U holds at n, on every board the solver supports |
 | E1: the census of every board's frames, 2..8191 (`examples/structure.rs`): layers, N, back claims against the candidates, candidates in frame 0, homes, U\* against an independent greedy | [proven footing](#the-frame-model-on-a-proven-footing-2026-10) | kept (`bench/structure/`) | no violation on any board; frame 0 is layer 3 on 8,100 boards and layer 2 on the 80 boards to 186 where layer 2 has freedoms, and the numbers follow the layers on every board; 156 s on four threads |
 | E2: Theorem M against the code, both ways (`tests/model_exact.rs`), with a playability oracle that shares no code with the frame solver | [proven footing](#the-frame-model-on-a-proven-footing-2026-10) | kept (tests) | every set of every board to 120 and random sets to 8191, no failure; the candidate filter alone keeps out a promotion the model would accept and the board refuses on 27 boards to 2000 (first n = 98) |
 | E3: Theorem B against every recorded and enumerated optimal set (`tests/bottom_layers.rs`) | [proven footing](#the-frame-model-on-a-proven-footing-2026-10) | kept (tests) | no exception in 3,574 recorded games, 1,044 enumerated sets and every optimal set of 2..54; numbers of layer 2 up to n/2 only on 76 boards, all ≤ 186 |
@@ -348,7 +352,11 @@ The work of [the prover](../prover/README.md) and the proofs of [THEORY.md](../.
 | 2A: number the frames by layer (ℓ − ℓ₀), the definition in place of the Java's breadth-first numbering, so that N holds by construction, on boards with holes too; a number without frames gives an empty frame | [by layer](#the-frame-model-by-layer-and-the-extended-problem-2026-10) | kept | the two numberings equal on every board to 8191 (the census reproduced line for line), so no tree changes: fingerprints, tripwires, regress, the chain 1..1300 line for line; Theorem M loses its hypothesis; `sacrifice validate 52` still exact, with the boards 32-34 that have an empty frame |
 | E8 stage 1: the extended problem Π⁺(O), a set O of the sources of three or more prime factors optional and nothing claimed (`frames::build_extended`), Theorem M⁺ (S ⊇ U\* ∖ O playable iff it is a promotion set) and its certificate of U, tested against the whole-board oracle (`tests/model_extended.rs`) | [by layer](#the-frame-model-by-layer-and-the-extended-problem-2026-10) | kept (proven; research code) | no mismatch on every set of every board to 80 (60 with every source open; 100 and 69 ignored), 30 million sets, nor on random sets to 4095, rejected sources included |
 | Search Π⁺(∅), the frame model without `unzip`'s claims, with the existing engine (`Board::prepare_extended`, `examples/extended.rs`) | [by layer](#the-frame-model-by-layer-and-the-extended-problem-2026-10) | measured | a chain 2..1300 searching every game gives every score of optimal.json; 2.5% more nodes and 11% more time than the default problem searched the same way (1201-1300: 0.9% and 9%), 31 games more than 10% above (at most 1.24); the claims are worth a few percent |
-| Certify U game by game: barred parity bounds with layers 1-2 fixed by Theorem B, then a search of the open members (or a search that treats the open sources as optional) | [THEORY: the upper part](../../heuristics/THEORY.md#the-upper-part) | open | the consultation's scratch measurements: the bounds leave 3-12 members of U\*_{≥3} open to 1300, 26-102 at 1500-2276; a search on the whole board closes the rest at every n tried to 1500.  The search that treats them as optional has its theory and setup (the extended problem, two rows above); the one-sided candidates in the search are next |
+| Certify U game by game: barred parity bounds with layers 1-2 fixed by Theorem B, then a search of the open members (or a search that treats the open sources as optional) | [THEORY: the upper part](../../heuristics/THEORY.md#the-upper-part) | open | the bounds close no game alone (E5, next row); the rest needs the integrated search, which leaves the open sources optional, and E6 measures what that costs the prover's search (prepared); its problem, the extended problem, has its theory and setup (the E8 row above), and the one-sided candidates in the search are next |
+| E5: barred parity bounds on every game of 1301-3314 that rests on the frame model (`prover/src/bin/upper.rs`): layers 1 and 2 fixed by Theorem B, each member of U\*_{≥3} barred in turn, certified when the bound is at most the recorded score | [upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | kept (`prover/data/upper_*.jsonl`) | 7.5% of the members open over 1301-2175 (1 to 102 a game), 14.9% over the EC2 chain's 2176-3314 (15 to 317); no game closed by the bounds alone; the open share follows the root's gap (+2 to 3 points per 100), not n; the root's heaviest set plays all of U\*_{≥3} in all 1,125 games; 26 minutes on one thread |
+| E6: the prover's search with the sources of layer 3 and up free (`exact --fix-low 1`) against the same with the upper part fixed to U\* (`--fix-upper 1`), with two counters, on 25 games of gap 364-603 | [upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | open: prepared, waiting for approval of the cloud run | criterion fixed in advance (B/D ≤ 1.2 on 90% of the games, never above 2, branching on those sources at ≤ 5% of the nodes); at 1575 and 1584 on the laptop B and D have the same nodes and neither counter fires; one `c8g.4xlarge` for one to one and a half hours, about $0.40 at spot ([RUNBOOK 10.1](../tools/cloud/RUNBOOK.md#101-e6-does-leaving-the-sources-free-cost-the-provers-search-anything)) |
+| Theorem B's roles in the prover's proofs (`exact --fix-low 1`: the largest prime and U\*_2 forced, the other numbers of layers 1 and 2 barred) | [upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | open: measured on two games | the plain proof's nodes within 2.1% and half the time a node at 1575 and 1584 (19.8 s against 36.1 s for 1575 on the laptop): the parity solves have fewer free elements; a candidate for the prover's next campaign, a proof as before since Theorem B is a theorem |
+| E9(a): a counterexample hunt for U at the 20 games of largest gap past 2175: the frame solver on the board without each open source, from an incumbent worth the recorded score (`examples/hunt.rs`, `sacrifice::hunt`) | [upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | open: prepared, waiting for approval of the cloud run | 4,499 pairs; a pair's cost follows its margin (under 6 s to 781, 1-3 minutes at 835-899, beyond 5 minutes from 959, one thread; `bench/hunt/`); about 400 vCPU-hours, a `c8g.16xlarge` for 7 hours, about $5 at spot ([RUNBOOK 10.2](../tools/cloud/RUNBOOK.md#102-e9a-a-counterexample-hunt-at-the-games-of-largest-gap)); a hit is a counterexample |
 
 ### The Python heuristics project
 
@@ -401,7 +409,9 @@ single-sacrifice route) have their row above.
 | [The gap past 2175](#the-gap-past-2175-2026-10) | what are the true root gaps of the EC2 chain's games, how do they grow, do they explain its trees (the 2340s, 3174-3176, 3300), what at the root is left, and what will 4000 to 6000 cost? | 509 gaps of 341 to 1,443 (mean 818), +37 per 100 n over 1301-3312 and G/n steady at 300: neither of the two regimes; the current build's trees are 0.29 times the committed chain's, a decade of nodes per 250 of gap, the gap counting in units of n^0.3 (0 to 0.5 bracket); the dear games are the games of high gap, nothing at the root explains the rest (A4 killed); a game costs ×10 per 1,050-1,250 n and a day on a `c8g.16xlarge` reaches about 4,100 | ee03872 (no solver change) and the entry |
 | [Boards past 4095](#boards-past-4095-2026-10) | what limits the boards to 4095, how far does one more width take them, and what does a board past 4095 cost? | built: boards to 8191 at 128 words, every board's frames and ranks scanned to bound the rest (9 frames, 5 block words); nothing changes to 4095; a node at 4100 1.1% dearer at 128 words than at 72, so no width between | 4316168 |
 | [The frame model on a proven footing](#the-frame-model-on-a-proven-footing-2026-10) | are the frame model's assumptions theorems, and what is left?  Steps E1-E4 of the consultation of 2026-10-15 | yes, given clean numbering, which holds on every board to 8191 and setup now checks: Lemma Ω and Theorems L, B and M in THEORY.md, the census and two test files with no exception; left: U, some optimal game plays U\*_{≥3} | 631e027, a122f43, de63aba, d7a322a, 5e44ac6 and the write-up after them |
-| [The frame model by layer, and the extended problem](#the-frame-model-by-layer-and-the-extended-problem-2026-10) | steps 2A and 3 of the second consultation: can the numbering by layer be the definition with no result changing, and is the extended problem Π⁺(O), with some sources optional, exact? | 2A: yes, no tree changes, N by construction, Theorem M with no hypothesis.  3: yes, Theorem M⁺ proven, no mismatch with the oracle in 30 million sets and random sets to 4095; Π⁺(∅) searched by the existing engine gives every score of 2..1300 at 2.5% more nodes | 40cf6d0 (2A) and the commit of the extended problem |
+| [A bound over GF(2) and GF(3) signed frame matroids](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) | does the LP over the GF(2) frame matroids and GF(3) signed frame matroids (signings made for the cores its columns meet) close a share of the root's GF(2) gap that holds with n (A1's E1, with E1n at the probe's nodes)? | yes: 0.62 of the gap at n ≥ 1700, no trend in n (+1.0 ± 2.6 points per 100 n), passing its kill criteria strongly; fixed signings close little; 86-98% of the probe's nodes GF(2) leaves open cut with node-fitted multipliers; Theorems 14-15 in THEORY.md | 7666072 to 1e12c77 and the entry (no solver change) |
+| [The upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | which members of U\*_{≥3} do barred parity bounds certify past 1300 (E5), and are the cloud measurements E6 (free sources in the prover) and E9(a) (a counterexample hunt) ready? | E5: 85-93% of the members certified, no game closed, the open share following the root's gap; E6 and E9(a) built, tested and calibrated, each under $1 or about $5 at spot, waiting for approval | abcfb18, 4076730, 8afefaa and the write-up |
+| [The frame model by layer, and the extended problem](#the-frame-model-by-layer-and-the-extended-problem-2026-10) | steps 2A and 3 of the second consultation: can the numbering by layer be the definition with no result changing, and is the extended problem Π⁺(O), with some sources optional, exact? | 2A: yes, no tree changes, N by construction, Theorem M with no hypothesis.  3: yes, Theorem M⁺ proven, no mismatch with the oracle in 30 million sets and random sets to 4095; Π⁺(∅) searched by the existing engine gives every score of 2..1300 at 2.5% more nodes | 40cf6d0 (2A), d2dde50 (3) |
 
 ## The port and its first improvements
 
@@ -4690,6 +4700,7 @@ at the primes and at the even n whose half the game of n − 1 does not play (so
 that adapt are, nearly, the games the solver settles without a search.
 
 *Open.*  (c); δ(pq) = p′q′ wherever p′q′ > pq/2; the 151 composite n of section 7 that are not settled.
+
 ## Round B: the chain on many threads (2026-10)
 
 *Question.*  Round A made the serial part of a game small (a repeat 0.02 s, a searched game's setup 0.02 s plus its
@@ -5338,6 +5349,7 @@ What it says, with its uncertainty stated:
 
 *Cost.*  The laptop only, one thread at a time: 9 minutes for the gaps, 3 for the conflicts and cores, 24 for the
 committed chain's games solved again.  Nothing was run on AWS.
+
 ## Boards past 4095 (2026-10)
 
 *Question.*  The chain on the cloud machine reached 3314 overnight and would stop at 4095, the end of the set widths,
@@ -5550,13 +5562,291 @@ disjoint union of its layer instances, and peel decides each.  The tests add abo
 
 *What it changes.*  The frame solver's claim is now: on every board it supports, its score for a game proven
 `exhausted`, `trivial` or `same_search` is opt(n) iff U holds at n, given that the code is right; `cap` and
-`prime_formula` games need nothing of the model.  U holds for every n ≤ 1300 (the prover).  The next steps of the
-consultation certify U game by game past 1300 (barred parity bounds with layers 1 and 2 fixed by Theorem B, then a
+`prime_formula` games need nothing of the model.  U holds for every n ≤ 2175 (the prover).  The next steps of the
+consultation certify U game by game past 2175 (barred parity bounds with layers 1 and 2 fixed by Theorem B, then a
 search of the members they leave open; the register's last theory row).
+
+## A bound over GF(2) and GF(3) signed frame matroids (2026-10)
+
+*Question.*  Avenue A1 of the
+[agenda](AGENDA.md#a1-a-bound-over-several-fields-and-signings-a-change-of-slope-if-its-share-holds) and its conjecture
+C1: does the LP over the two GF(2) frame matroids and a family of GF(3) *signed* frame matroids (the plain signing,
+random signings, and signings built from the cores the LP's own columns run into) close a share of the root's GF(2) gap
+that holds with n?  This is the advisor's experiment E1 (with E0, its validation, E1-lite, a quick look, and E1n, the
+probe's nodes), whose kill criteria were fixed before any run: on the main arm (`f1cores`), counting only the roots
+whose bracket is within 1% of their GF(2) gap, **K1** the mean share over n ≥ 1700 below 0.25, **K2** a slope of the
+share in n of −2 points per 100 n or worse with t ≤ −2, **K3** fewer than half of the 1215 probe's nodes that GF(2)
+leaves open cut with node-fitted multipliers; inconclusive if more than a fifth of the roots do not converge; "passes
+strongly" at a mean share of 0.5 or more for n ≥ 1700 and a slope above −1 point per 100 n.
+
+*What was kept.*  The study's code, as an instrument (as the matroid study's was): `examples/fields.rs` (commands
+`roots`, `nodes`, `check`, and the tests), `examples/common/gf3.rs` (GF(3) vectors and bases, signings, the signed frame
+matroids and their greedy), `common/cores.rs` (a frame's cores with a set applied, minimal cores, column-sum signings
+and their merging), `common/dw.rs` (the bound and its multipliers), `common/lp.rs` (the master's simplex), and
+`common/frames.rs` (the GF(2) frame matroids and the game setup, moved out of `examples/matroid.rs`, which prints the
+same lines as before); the data and the tables in [bench/fields](../bench/fields/README.md).  Theorems 14 and 15 of
+[THEORY.md](../../heuristics/THEORY.md#signed-frame-matroids-the-frame-bound-over-other-fields) prove what the bound
+rests on.  No solver change.
+
+*The bound.*  A *signing* σ of frame h over a field gives each incidence (mover, maximal factor) a nonzero value, each
+mover the vector of its values, and the frame the linear matroid N_h^σ on the candidates of homes h and h + 1 with the
+moves contracted (a candidate of home h + 1 its vector, one of home h its unit vector).  Every promotable set is
+independent in every such matroid, over every field (Theorem 14: a winnable frame's movers are triangular with a nonzero
+diagonal under any values), so for a family N_1, …, N_K and any multipliers λ_k, `L(λ) = MI_cap(w − Σ λ_k) + Σ_k
+G_k(λ_k)` bounds every promotion set (Theorem 15), MI the GF(2) intersection of at most `cap` elements and G_k the
+greedy maximum in N_k.  The bound reported is ⌊L⌋ evaluated in integers (weights x·2^16, multipliers rounded to the
+grid; the crate's `gf2::meet::Meet`, checked against `common/meet.rs`'s `intersect` at every 50th evaluation), so its
+validity never rests on the floating-point LP that proposes λ.  Its least value is the LP over the matroids' polytopes.
+Arms: `gf2` (no extra matroid), `f1` (the plain signing, all values 1, of frames 1, 2, 3), `f1r1`, `f1r3` (that and one
+or three random signings a frame, a value per incidence), `cores` (core-derived signings alone), `f1cores` (the main
+arm: plain and core-derived).
+
+*Core-derived signings.*  After the master's LP of a family is bracketed, every column of value above 10⁻⁶ is applied to
+the root's frames and peeled; each frame left with a residual gives up to 4 minimal self-covering subsets (cores), the
+next one found after un-applying the lightest of the previous core's *breaking* candidates (its promoted members, or a
+promoted-out factor that only one member lists).  A core is satisfied by a signing whose values sum to 0 over GF(3) on
+each of its pool factors, which makes its set dependent (THEORY.md, after Theorem 14); it is merged first fit into the
+frame's core-derived signings (per factor, the values of every assigned core listing it: kept if they satisfy all the
+sums, else the column-sum construction where no other core lists the factor, else a search over at most 2^12
+assignments), or opens a new signing (seeded random values elsewhere), at most 8 a frame.  The loop stops when a round
+assigns no core, after 40 rounds, or at the budget.
+
+*The multipliers, and what the design's master became.*  The design specified a Dantzig-Wolfe master with a column per
+GF(2) set and per independent set of each N_k, tied by a *link row* per (k, x) (`Σ α [x ∈ Q] − Σ β_k [x ∈ I] ≤ ε`),
+solved by a dense revised simplex.  It was built (commit 77c989f) and passed the tests of the time, but its simplex
+spent its pivots in steps of the perturbation's size: at the root of 360 (arm `cores`) 55,754 pivots for 274 pricings,
+71% of them steps of order ε = 10⁻⁷ and 4% zero; at 1000 in 60 s 232,000 pivots for 150 pricings, the master at 18,893
+against L = 24,382 (larger ε: 10⁻⁵ 292,000 pivots, 10⁻³ 16,000 but a looser master; ε = 0 a singular basis).  The master
+now describes each P(N_k) from outside, by its rank inequalities `z(S) ≤ r_k(S)` (Edmonds), added as the master's point
+`z = Σ α_j 1_{Q_j}` violates them: in each matroid the most violated level set of z and each dependent support set,
+closed within z's support (a closed set is at least as violated), and when none is found, an *exact check*: for each
+matroid the largest `y ≤ z` in its polytope, by a small column generation over its independent sets (a packing LP whose
+value is `min_S r(S) + z(T − S)`; less than z(T) exactly when z is outside, and then a level set of its final duals is
+violated).  When every check passes, `ẑ = min(z, y_1, …)` lies in every polytope (all are down-closed): its weight is a
+*certified* lower bound LB, and with the lowest L it brackets the LP.  An inequality's dual μ_{k,S} gives `λ_{k,x} =
+Σ_{S ∋ x} μ_{k,S}` (and `G_k(λ_k) ≤ Σ μ r(S)`), so the pricing is the same L.  Before the master, 100 Polyak steps from
+λ = 0 towards P*; then Wentges-stabilized pricing at ½ λ_best + ½ λ_master, or at λ_master when that prices nothing out;
+the exact checks only once a separation round has found no new core (intermediate families stop when no column prices
+out and no cheap inequality is violated); a family's generation stops when the lowest L is within `max(0.25, 0.005 ×
+gap)` of the master's value (half the convergence criterion).  The simplex (`lp.rs`, a partitioned basis inverse: only
+the block of the rows whose slack is not basic is kept, dense) gained partial Dantzig pricing, *elastic* rows (a
+violated inequality enters with an artificial column at penalty 10⁵ in place of its slack, so the basis stays feasible),
+a return to the empty set's basis when a refactorization finds the basis singular (108 times in E1) or a solve exceeds
+50,000 pivots (12 times), purging of nonbasic columns beyond 300, and right-hand sides perturbed by up to 10⁻⁶ (10⁻⁸
+left rounding ties to decide pivots); the exact checks drop the coloops of the matroid restricted to z's support, start
+from the support's independent parts and a pool, and stop at 300 columns (then repeat from the pool while the
+certificate is short).  A dual simplex for the violated rows was tried (kept in no commit): it looped (10 million
+pivots in a 73-row LP), and the elastic rows replaced it.
+
+*Validity (E0).*  `cargo t --example fields`, 35 tests, all pass: GF(3) arithmetic and bases against scalar and dense
+elimination, the greedy against brute force on 3,000 random matroids, `det3` against integer determinants; the peel's
+residual against `winnable_using` on 10,650 frames; Lemmas 5-6 on 2,000 unpromotable sets of boards 60-400 (14,602
+cores, each one's column-sum signing makes its set dependent) and merging (11,217 cores into first-fit signings, every
+assigned core's sums still 0); the study's **test 3**, every promotable set of every board with ≤ 22 candidates and the
+optimal and 100 random maximal promotion sets of every non-prime board of 137-400 independent in every frame's matroid
+for the plain and five random signings (334 boards, 6.4 million pairs); **test 6**, 20 random multipliers at each of 309
+non-prime roots of 2-400 never below P* and L at zero multipliers the GF(2) bound; **test 7**, the exact LP (every
+common independent set and every independent set of each extra matroid a column) against the column generation on 124
+instances (boards with 4-16 candidates, and boards of 300-700 restricted to ≤ 12 candidates around the GF(2) set's
+cores, 65 of them with the LP below the GF(2) bound): the certified bound and the lowest L bracket it, within 10⁻⁵
+relative; **test 8**, the reweighted intersection equal to the reference's at 60 evaluations on 20 boards of 300-2175;
+the simplex against an enumeration reference on 3,000 random LPs and in stages, kills, degenerate and large LPs.
+`fields check` at every 25th board of 400-2175 (`check.jsonl`, 54 s): 14,472 promotion sets (200 random maximal ones and
+the optimal one a board) independent in 4,320 signed matroids (all frames, plain, five random and 20 column-sum signings
+a board), 302,623 cores of 14,400 random unpromotable sets each making its set dependent, 1,440 random multiplier
+vectors never below P*.  Every run asserted that the bound is at least P* (330 extra-matroid runs at 66 roots and the 13
+of E1-lite), that the optimal promotions are independent in every final matroid, and at the probe's nodes that the bound
+is at least the best completion recorded in `bench/matroid/nodes_exact.jsonl`.
+
+*E1-lite* (`lite.jsonl`, the code of b8d8256, 11 minutes): the main arm at every 100th game of 900-2100; 8 of 13
+converged (not 1400, 1500, 1700, 1800, 2000), the 3 converged with n ≥ 1500 at a mean share of 0.64: no early kill.  The
+stalled master solves and short certificates it showed were fixed before E1 (1051560).
+
+**E1: the main arm passes strongly.**  66 roots (every 25th game of 900-2175, the 9 others of the per-frame and slope
+studies, and 1430, 1472, 1521, 2170, 2172: the design's 67 count 1475 twice), six arms, 120 s a root for the core arms
+and 30 s for the others (`roots.jsonl`; 1.26 hours of one thread in all).  Share of the GF(2) gap closed, mean over the
+converged roots (converged of roots):
+
+| n | roots | f1 | f1r1 | f1r3 | cores | f1cores |
+|---|---|---|---|---|---|---|
+| 900-1099 | 11 | 0.05 (11/11) | 0.12 (11/11) | 0.19 (11/11) | 0.68 (11/11) | 0.68 (11/11) |
+| 1100-1299 | 14 | 0.08 (14/14) | 0.10 (14/14) | 0.16 (14/14) | 0.61 (14/14) | 0.66 (14/14) |
+| 1300-1499 | 10 | 0.02 (10/10) | 0.05 (10/10) | 0.12 (10/10) | 0.45 (6/10) | 0.47 (4/10) |
+| 1500-1699 | 9 | 0.09 (9/9) | 0.13 (9/9) | 0.17 (9/9) | 0.51 (7/9) | 0.57 (7/9) |
+| 1700-1899 | 8 | 0.02 (8/8) | 0.04 (8/8) | 0.10 (8/8) | 0.59 (8/8) | 0.59 (8/8) |
+| 1900-2175 | 14 | 0.02 (14/14) | 0.05 (14/14) | 0.08 (14/14) | 0.64 (10/14) | 0.65 (10/14) |
+
+The kill criteria on `f1cores`: 12 of 66 roots unconverged (18%, under the 20% that makes the run inconclusive; 1350,
+1400, 1425, 1430, 1472, 1475, 1500, 1521, 2000, 2050, 2125, 2170, each stopped at 120 s with its bracket wider than 1%
+of its gap); **K1**: mean share 0.619 over the 18 converged roots with n ≥ 1700 (killed below 0.25); **K2**: slope +1.00
+± 2.61 points per 100 n, t = +0.4 (killed at ≤ −2 with t ≤ −2); so **passes strongly**.  Over all 66 roots, converged or
+not (the bound is valid either way, and an unconverged root's share is at most its LP's): 0.620 for n ≥ 1700, slope
++0.52 ± 2.30.  The `cores` arm alone: 0.618 and +0.78 ± 2.45 (10 unconverged).  The fixed arms close little and less at
+large n: the plain signing 2% for n ≥ 1700, with three random signings a frame 9%, 0.16 of the main arm's share (the
+design asked whether F1 + R3 reaches 80% of it: no).  So the search cannot do without tracking cores: what sees the
+residual is the signings made for the cores it meets.
+
+Against the per-frame study's 19 roots (200 subgradient steps, mean 0.59): the converged main arm closes more at 950,
+992, 1000, 1150, 1184, 1225, 1250, 1254 and 1300 (where that study's subgradient had stalled: its LP is at least as
+tight as A1's by the design's Lemma 8, so there the stall was its method), less at the other ten; mean 0.62.
+
+*Signings, the support, the cores.*  Every root filled the cap of 8 core-derived signings on some frame (6.4 a frame
+used, 3.2 cores a signing, rising from 2.7 at 900-999 to 5.4 at 2100-2175), and 59 of the 123 distinct cores a root
+found could not be placed: the family is fragmented, which predicts that deep nodes meet cores the root's signings do
+not see.  The LP's support has 5-30 columns (13 on average), and 95% of its mass is on sets that cannot be promoted: far
+from integral where it binds.  No GF(3) loop occurred.  The census (`census.jsonl`, 8,129 cores of the main arm): 34
+members on average (25 at 900-999, 40 at 2100-2175), hardly ever square (0.3%) and never of three primes, so C2's
+hole-free three-prime case is not where these cores live; the plain signing sees 0.7% of them and the three random
+signings of `f1r3` 1.3%.
+
+*Cost.*  The main arm averages 36 s a root (1-120 s): 0.3 s in 563 GF(2) intersections (0.15 ms each at 900, 0.96 at
+2175), 10.6 s in the master's simplex, most of the rest in the exact checks (1.25 million pivots a root on average). The
+fixed arms converge in 0.01-1.4 s.
+
+**E1n: the probe's nodes** (`nodes.jsonl`, 3.5 minutes): the main arm at the fixture's root (120 s; 936 closed at 20555,
+1215 at 35168), then at each of the 300 nodes of each fixture either one evaluation at the root's final signings and
+multipliers (`root`) or the node's own master and separation from them (`node`, 10 s a node; the root's signings fixed,
+new ones the node's), each the lower of it and the node's GF(2) bound:
+
+| n | GF(2) | `root` mode | `node` mode | all conflicts (recorded) | per-frame, every 10th (recorded) | ms a node (`root`, `node`) |
+|---|---|---|---|---|---|---|
+| 936 | 163 of 300 | 212 (49 of the 137 open) | 297 (134 of 137) | 278 | 25-29 of 30 | 2.8, 106 |
+| 1215 | 167 of 300 | 209 (42 of 133) | 281 (114 of 133) | 249 | 23-27 of 30 | 5.2, 577 |
+
+**K3** passes: 86% of the nodes GF(2) leaves open at 1215 are cut with node-fitted multipliers (98% at 936), more than
+the LP over all conflicts cut.  The root's multipliers alone cut 0.37 of what the node's do, under the design's half: E3
+should start with form (c), the node's own master warm-started from its parent's columns.
+
+*Conclusion.*  C1 holds at the roots measured: with signings made for the cores its own columns meet, the LP closes
+about 60% of the root's GF(2) gap from 900 to 2175, with no trend in n (+1.0 ± 2.6 points per 100 n), and at the probe's
+nodes it cuts nearly every node GF(2) leaves open when the node fits its own multipliers.  Fixed signings do not do it.
+The cost is the multipliers: tens of seconds a root, 0.1-0.6 s a node, two to three orders of magnitude over the GF(2)
+bound; the design's next steps are E2 (past 2175) and E3 (a branch and bound with the bound in its three forms, form (c)
+first), and THEORY.md now proves the bound (Theorems 14 and 15).
+
+*Questions for the advisor and deviations from the design* (each resolved as stated, all sound):
+
+1. The master's link rows stalled (above); the master by rank inequalities with an exact certificate replaced it.  The
+   LP, the bound and its validity are the design's; the certified lower bound is the weight of a point of the LP's
+   polytope instead of the master's value.
+2. The closing tolerance is `max(0.25, 0.005 × gap)`, and the exact checks run only once a separation round finds no new
+   core (intermediate families stop at the cheap inequalities): the design's 0.25 at every family did not fit the budget
+   past 1300.
+3. A GF(3) loop of any extra matroid is left out of the intersection (L at λ_{k,x} = w_x; Theorem 14 (3)); none
+   occurred.
+4. `Scratch::stuck` is private to the crate and the study may not change it: `cores.rs` has its own peel (the same rule,
+   checked against `winnable_using`).
+5. "Delete from R the lightest candidate of the cores found" was read as: after each core, un-apply the lightest of its
+   breaking candidates (cumulatively), so each next core is a different one; a core with no promoted member is broken by
+   a promoted-out factor listed once.
+6. `merge` uses the column-sum construction for a factor no assigned core lists (no limit on its listers), the 2^12
+   search only where assigned cores share the factor.
+7. At nodes (`node` mode) the root's signings are kept fixed (their cores are the root's) and the multipliers start at
+   the root's; each node bound is the lower of L and the node's GF(2) bound.
+8. Test 7 runs on boards of 300-700 restricted to ≤ 12 candidates (the boards with ≤ 16 candidates have GF(2) gap 0, so
+   no extra matroid can cut there), with a relative tolerance of 10⁻⁵ (the perturbations and the grid).  The design's
+   test 4 lives in `cores.rs`'s tests.
+9. 66 roots, not 67 (1475 is a multiple of 25).  The census reports `det0` for square cores and the rank deficiency over
+   GF(3) for all, and adds whether the plain signing sees each core.
+
+## The upper part game by game, and two cloud runs prepared (2026-10)
+
+*Question.*  Steps 2B to 2D of the theory track's second consultation (2026-10-15).  Since the entry above, the
+prover's proofs reach 2175, so U holds there; every game past 2175 that rests on the frame model rests on U.  (E5)
+For every game of 1301 to the end of the chain that rests on the model, which members of U\*_{≥3} do barred parity
+bounds certify, and how many stay open?  (E6) Does the prover's search cost more with the sources of layer 3 and up
+free than with the whole upper part fixed to U\*: is the integrated search, which leaves the open sources optional,
+worth building?  (E9(a)) Does the frame solver find a game above the recorded score on the board without an open
+source, at the games of largest gap past 2175?  E5 ran on the laptop; E6 and E9(a) are built, tested and calibrated on
+the laptop and wait for approval to run on EC2 ([RUNBOOK section
+10](../tools/cloud/RUNBOOK.md#10-the-theory-tracks-measurements-e6-and-e9a)).
+
+*E5* (commit abcfb18 and the data).  The prover's `upper` (`src/upper.rs`, `src/bin/upper.rs`): per game that rests on
+the model (neither at its ceiling nor given by the prime formula), the roles of Theorem B (the largest prime forced
+and every other prime barred, U\*_2 forced and every other source of layer 2 barred, and from 187 on, where it checks
+that U\*_2 spans every prime up to n/2, every number of layer 2 up to n/2 barred), then each member u of U\*_{≥3}
+barred in turn; u is certified when the parity bound is at most the recorded score V (every set beating V that obeys
+Theorem B plays u), open otherwise, with its margin.  Its tests: on boards to 60 every member certified against
+V − 1, V − 2 and V − 5 is in every playable set beating that claim (found by enumeration with the matching bound
+alone; 1,403 checks), Theorem B's roles hold for every optimal set there and every recorded game to 1300, and the
+figures at 600 are the consultation's.  It reproduces the consultation's scratch figures where they overlap (600, 1000,
+1300, 2000).  The committed chain's 1301-2175 (490 games need it, 300 s) and the copy of the EC2 chain's results of
+2026-10-15, 2176-3314 (635, 1,272 s), one thread on the laptop; the table by band is in [the prover's
+README](../prover/README.md#the-upper-part-game-by-game):
+
+| | 1301-2175 | 2176-3314 |
+|---|---|---|
+| games resting on the model | 490 | 635 |
+| members of U\*_{≥3} per game | 371 to 640 | 641 to 993 |
+| open, in all | 18,596 of 247,482 (7.5%) | 77,195 of 518,992 (14.9%) |
+| open per game | 1 (1305) to 102 (2172) | 15 (2610) to 317 (2346) |
+| certified per game | 84% to 99.7% (median 93%) | 54% to 98% (median 85%) |
+| the open share against the root's gap | +3.1 points per 100 (R² 0.73) | +2.0 points per 100 (R² 0.73) |
+| the open members' layers | 3: 52%, 5: 21%, 4: 19%, 6-10: 8% | 3: 58%, 5: 27%, 4: 9%, 6-11: 7% |
+
+No game is certified whole, and the open share follows the root's gap, not n (it falls with the gap at 2600-2699).
+The root's gap with layers 1 and 2 fixed is the solver's GF(2) gap at the root on all 400 games past 2175 that
+[the gap past 2175](#the-gap-past-2175-2026-10) measured, and the root's heaviest parity set plays all of U\*_{≥3} in
+every one of the 1,125 games, so no game is flagged.  The fixed set of the integrated search (U\* less a game's open
+members) is in these files.  THEORY.md's "What is known of U" now cites them; its scratch figures and the sentence on
+searches closing U to 1500, which the prover's proofs to 2175 supersede, are gone.
+
+*E6, prepared* (commit 4076730).  `exact --fix-low 1` searches from Theorem B's roles (still a proof: every optimal set
+obeys them) and `--fix-low 1 --fix-upper 1` from the roles that also fix the upper part to U\* (the frame model's
+problem on the whole board, written `"search":"upper_fixed"` so that no tool counts it as a proof); every searched line
+counts the nodes that branched on a source of layer 3 or up (`branched_on_sources`) and those whose roles bar a member
+of U\*_{≥3} (`barred_upper`), with `game::Prover::watch`, which changes no tree; checkpoints are kept apart by kind.
+`summarize.py sources B D` prints the table and the criterion fixed in advance (B/D ≤ 1.2 on at least 90% of the games
+and never above 2, and branching on those sources at most 5% of B's nodes: then build the integrated search's stages 2
+and 3; otherwise stage 1 only, and stage 2 on two games first); `prover.sh --list` runs `exact` on given games in its
+resumable passes, with no check at the end.  Tests: the counters change nothing (verdicts and nodes), Theorem B's roles
+keep every proof and every optimum of 187-700 that needs a search, and with the upper part fixed both counters are 0.
+A plain run of 1575 has the committed line's 16,801 nodes.  On the laptop, one thread:
+
+| n | gap | plain proof (section 3) | B: nodes, s | D: nodes, s | B's counters |
+|---|---|---|---|---|---|
+| 1575 | 364 | 16,801 nodes, 36.1 s (laptop) | 16,651, 19.8 | 16,651, 19.4 | 0, 0 |
+| 1584 | 400 | 25,981 nodes, 60 s (Graviton4) | 26,516, 30.8 | 26,510, 30.8 | 0, 0 |
+
+Two games say nothing about the criterion, but one thing is plain already: **Theorem B's roles halve the time of a
+node** at the same nodes within 2.1%, since the parity solves have the primes and the numbers of layer 2 settled.  The
+prover's next campaign can run with `--fix-low 1` and stay a proof.  Over 56 searched games of 187-700 (the test) B
+took 9,405 nodes and D 9,398, with 3 nodes branching on a source of layer 3 or up and 6 barring a member of
+U\*_{≥3}.  The cloud run: the 25 games of the design (gaps 364 to 603, proofs of 0.6 to 30 minutes, 4.8 thread-hours in
+the run of 1301-2175), B and D, on one `c8g.4xlarge`: one to one and a half hours, about $0.40 at spot, $1 on demand.
+
+*E9(a), prepared* (commit 8afefaa).  `sacrifice::hunt(n, hole, claim, ...)` searches the board without `hole` with
+the frame model from a handicapped incumbent worth claim − in_the_bag with an empty payload (the soundness tests'
+method), so it looks only for promotion sets beating the claim; a set found becomes a game, refereed on the punctured
+board, and `examples/hunt.rs` replays it on the whole board too (a source is nobody's factor, so a game without it is a
+game of n).  The search's payload helpers are public for it (`search::payload_of`, `set_of_payload`).  Tests: on 624
+pairs (every source of the boards 30, 37, ..., 149) the hunt finds a game at one below the punctured board's exact
+optimum and nothing at it, the game replaying on the whole board; on every board to 30 and every hole it agrees with
+the brute force.  `examples/hunt.rs` takes the 20 games of largest gap that need a certificate and each one's open
+members (`--per-game`, `--list` to choose otherwise), runs `--jobs` pairs at once on `--threads` each with a time
+limit, appends a line per pair, resumes, summarizes, and exits 2 on a counterexample; `tools/cloud/hunt.sh` runs it
+under `run.sh`'s deadline, saves and power-off, and `spot-watch.sh` now stops it too.  Calibration, one laptop thread
+(`bench/hunt/`): at 1302 the three open members end in milliseconds (U is proven there); at 3311 (gap 1303) and 2346
+(gap 1346) the cost of a pair follows its margin, not the gap: under 6 seconds to margin 781, 51 to 182 seconds at 835
+to 899, and every pair from 959 to 1215 out of its 3 to 5 minutes; no counterexample.  The 20 games (3300,
+3174-3176, 3104, 2346, 3304, 3305, 3309, 2340, 3311, 3102, 3103, 3312, 3172, 3173, 3105, 3107, 3168, 3171; gaps 1257 to
+1443) have 4,499 open members, 578 of margin above 900; at 4 threads and 10 minutes a pair, about 400 vCPU-hours: a
+`c8g.16xlarge` for about 7 hours, $5 at spot, $18 on demand, with a few hundred timeouts among the largest margins.
+The punctured boards are numbered by the present (breadth-first) numbering, which the census did not check on them;
+that can only hide games from the hunt, never invent one, since every game found is refereed.  (Since the next entry
+every board, a punctured one included, is numbered by layer, which is clean by construction, so the hunt's model on
+a punctured board is exact given the sources setup keeps there: THEORY.md, "Boards with holes".)
+
+*What it changes.*  The figures of U's certification are now committed data rather than scratch measurements, and they
+say that the barred bounds alone close no game: the certificate needs a search of the open sources, at 15 to 317 a game
+past 2175, which is what the integrated search (stage 1 next, after numbering by layer) is for.  E6 decides how far to
+build it and E9(a) is the cheap early warning if U fails; both wait for approval.  Theorem B's roles halve the
+prover's node at no cost to its proofs.
 
 ## The frame model by layer, and the extended problem (2026-10)
 
-*Question.*  The second consultation of 2026-10-15, after the entry above, set the goal: every game past 2175 that
+*Question.*  The second consultation of 2026-10-15, after "The frame model on a proven footing", set the goal (its
+steps 2B-2D are the entry above): every game past 2175 that
 rests on the frame model certified as a whole-board optimum, at a cost close to the solver's own.  Its first steps
 for the solver are (2A) to make the numbering by layer the definition, so that clean numbering (N), the one
 hypothesis of Theorem M, holds by construction and also on boards with holes, with no result changing; and (3, E8

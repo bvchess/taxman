@@ -111,12 +111,15 @@ example, the board 1..=21, is in the [README](README.md#how-the-solver-sees-the-
     three or more prime factors.  U is open in general; it holds for every n ≤ 2175, where the prover (a branch and
     bound over sets of moves on the whole board, from the playability theorems, the Franklín–Moniot bound, the parity
     bound of THEORY.md's Theorem 10, the ceiling and the prime formula, and nothing of frames) proves the optimum of
-    every game of the committed chain.  Past 2175, U can be certified game by game with the *extended problem*
-    Π⁺(O) (THEORY.md, Theorem M⁺; `frames::build_extended`, research code): the frame model with a set O of those
-    members optional, exact like Π_n, so that a search of it with the members it does not leave open certified (by
-    barred parity bounds, say) proves opt(n) on the whole board.  Its search with nothing open, Π⁺(∅), goes through
-    the engine as it is (`Board::prepare_extended`, `examples/extended.rs`); the open members are not in the search
-    yet.
+    every game of the committed chain.  Game by game, the prover's barred parity bounds certify 93% of those members
+    over 1301-2175 and 85% over the EC2 chain's 2176-3314, but close no game alone ([its
+    README](prover/README.md#the-upper-part-game-by-game)); what is left needs a search that leaves the open ones
+    optional, and `examples/hunt.rs` looks for a counterexample on the boards without each of them.  That search is
+    the search of the *extended problem* Π⁺(O) (THEORY.md, Theorem M⁺; `frames::build_extended`, research code): the
+    frame model with the set O of open members optional, exact like Π_n, so that a search of it that finds nothing
+    better, the other members certified, proves opt(n) on the whole board.  Its search with nothing open, Π⁺(∅), goes
+    through the engine as it is (`Board::prepare_extended`, `examples/extended.rs`); the open members are not in the
+    search yet.
 
   What each proof kind needs of this, beyond the code's correctness and the games before it:
 

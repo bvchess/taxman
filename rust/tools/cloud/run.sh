@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# What the long-run scripts (chain.sh, prover.sh) share: one run at a time, a log, a pid file, a deadline, periodic
-# copies to S3, a clean stop on a signal, and an optional power-off.  Source it after env.sh; do not run it.
+# What the long-run scripts (chain.sh, prover.sh, hunt.sh) share: one run at a time, a log, a pid file, a deadline,
+# periodic copies to S3, a clean stop on a signal, and an optional power-off.  Source it after env.sh; do not run it.
 #
-#   run_begin NAME DIR...        NAME is the run's name (chain, prover); DIR... are directories that must survive
+#   run_begin NAME DIR...        NAME is the run's name (chain, prover, hunt); DIR... are directories that must survive
 #                                 the instance (refused if on a memory filesystem).  Sets up everything below.
 #   run_child OUT ERR CMD...     run CMD in the background, its stdout and stderr appended to OUT and ERR, and wait
 #                                 for it; its exit status is left in $status.  Under a deadline the command runs under
@@ -26,7 +26,8 @@
 #
 # SIGTERM and SIGINT are forwarded, once, to the command: the solver of chain.sh writes a final checkpoint and exits
 # (a second stop signal would make it exit at once, without one), and exact of prover.sh has no handler, so the
-# games in its pass are lost back to their last checkpoint.
+# games in its pass are lost back to their last checkpoint.  The hunt of hunt.sh has none either: the pairs in progress
+# are lost, and the finished ones are in its output.
 
 : "${POWEROFF:=never}"
 : "${SAVE_EVERY:=600}"
