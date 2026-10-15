@@ -1480,6 +1480,24 @@ and the nogoods use nothing else.  The one-sided candidates are not
 in the search yet; a reference predicate (plain peels of the unreduced
 frames) decides the promotion sets of Π⁺(O) for the tests.
 
+*Theorem 11 for Π⁺.*  Give each one-sided candidate s, of frame h,
+the vector v_h(s) of its maximal factors among frame h's factors in
+the matroid of frame h (A or B, by the parity of h), and make it a
+coloop of the other matroid: a coordinate of its own, which no other
+element has.  Then every promotion set (K, L) of Π⁺(O) is independent
+in both matroids, and at a node reached by promoting P a completion is
+independent in their contractions by P.  *Proof.*  Theorem 11's, with
+the movers of frame h being its moves, the members of L promoted into
+it and the members of K of frame h: a winnable frame peels completely,
+so their vectors, with the unit vectors of the members of L promoted
+out of h, are independent.  A member of K touches no other frame, so
+in the other matroid it is constrained by nothing, which is what a
+coloop is: a set is independent with it exactly when it is without
+it.  Contraction by a member of K is contraction by its vector in its
+frame and by its own coordinate in the other matroid.  ∎  (In the code
+the coloops of each matroid are blocks of their own after the frames'
+blocks, `gf2`'s *free blocks*; nothing else of the bound changes.)
+
 **Corollary (a certificate of U).**  Let V be the score of a game of n
 and F a set with U\*_1 ∪ U\*_2 ⊆ F ⊆ U\*, each of whose members u of
 layer 3 or more is *certified*: no playable set that holds q alone in

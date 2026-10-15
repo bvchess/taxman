@@ -5948,3 +5948,19 @@ source of three or more prime factors open, on every board to 8191: 9 frames on 
 every board from 4096 (`bench/structure/`, every earlier field unchanged).  No tree changed: the fingerprints
 7e8e724717d26545 and f3deaac0dbdc030a, the tripwires, `regress --to 1000 --threads 1` in 9.2 s, the chain 1..1300
 line for line (290,503 nodes).
+
+*18.2, the GF(2) bound.*  `Gf2Graph::new` gives a one-sided candidate of frame j the vector of its maximal factors in
+frame j's matroid and makes it a coloop of the other: its own unit vector in a *free block* after that matroid's frame
+blocks, `64·words` to a block, so the vectors are no wider than the frames need (THEORY.md, Theorem 11 for Π⁺).
+Nothing reads a frame from a block index outside `Gf2Graph::new`, and contraction needs nothing new.  Tested: the
+intersection against brute force on 7,000 random problems with free blocks (coloops in the heaviest set of 6,400 of
+them, at the heavy end of the weights or anywhere), its warm starts, weight splits and bounds without a member; on
+every board 2..120 with U\*_{≥3} and three random subsets open, the 7.6 million promotion sets of the 230 problems of at
+most 22 candidates independent in both matroids and the root's bound above the heaviest of them and above the optimum;
+random paths of 13 boards from 60 to 1000 and of 1300 (four words) with U\*_{≥3} and a random half of it open, every
+level equal to the matroids built afresh at its node, the forced members forced, the certified and solved bounds
+without a member right (12,020 nodes, 3,396 one-sided promotions).  Two things to know: certified children are rarer
+than in the frame model (0.7% of the nodes against 4.2%), and opening sources raises the rank of their frame by one
+each, so that with every source of layer 3 or more open frame 0 has rank 186 at 1200 and 322 at 2200, beyond the
+three words the narrow set widths compile (rank 192) and the five of the widest (320).  No tree changed: the
+fingerprints, the tripwires, `regress --to 1000 --threads 1` in 9.1 s, the chain 1..1300 line for line.

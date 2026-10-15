@@ -21,6 +21,18 @@
 //! [`Gf2Graph`] builds the root's matroids once per search; [`Gf2Bound`] keeps one level per node on the search's
 //! path, like [`MatchBound`](crate::matchbound::MatchBound).
 //!
+//! # One-sided candidates
+//!
+//! In the extended problem ([`crate::frames::build_extended`]) a one-sided candidate `s` of frame `j` is a mover of
+//! frame `j` and touches no other frame (heuristics/THEORY.md, Theorem 11 for the extended problem).  So its element
+//! has the vector of its maximal factors in the matroid of frame `j`, and in the other matroid it is a *coloop*: it
+//! constrains nothing there.  The coloops of a matroid are put in *free blocks* after its frames' blocks, each element
+//! its own unit vector, at most `64·words` of them a block, so that a game with hundreds of one-sided candidates needs
+//! no wider vectors than its frames do.  A free block is no frame: nothing reads a frame from a block index (the frames'
+//! ranks are [`Gf2Graph::ranks`], the free blocks have none), and the intersection ([`meet`]) knows only blocks.
+//! Contracting by a coloop clears its own coordinate, which no other element has.  Without one-sided candidates there
+//! are no free blocks, and the matroids are those above.
+//!
 //! # Contraction along the path
 //!
 //! A state reached by promoting `x` has `x` among its moves: its matroids are the parent's contracted by `x` in both
@@ -79,7 +91,8 @@ pub struct Gf2Graph {
     index: Vec<u32>,
     /// Words of a block vector: the largest frame rank, in 64-bit words.
     words: usize,
-    /// Blocks in `A` (frames 0, 2, 4, …) and in `B` (frames 1, 3, 5, …).
+    /// Blocks in `A` (frames 0, 2, 4, …) and in `B` (frames 1, 3, 5, …), each followed by its free blocks (the
+    /// coloops of the one-sided candidates; none without them).
     blocks: [usize; 2],
     /// Each element's block in `A` and in `B`.
     block: [Vec<u8>; 2],
@@ -187,7 +200,10 @@ impl FrameSpace {
 impl Gf2Graph {
     /// The matroids of `state` (the root of a search, or any state: its frames must all be winnable) and its
     /// candidates `cands`.  Candidates that are not factors of their home frame, or are loops of either matroid
-    /// (no promotable set holds them), are left out.
+    /// (no promotable set holds them), are left out.  A one-sided candidate of the model (the extended problem's) is
+    /// an element whose vector in the matroid of its own frame is its maximal factors there, as for a number promoted
+    /// into that frame, and which is a coloop of the other matroid: its own coordinate in a *free block* of that
+    /// matroid, after the frames' blocks, each free block holding `64·words` of them (see the module docs).
     pub fn new<const W: usize>(model: &FrameGraph, state: &FrameSet<W>, cands: &Bits<W>) -> Self {
         let frames = state.frames();
         let max = frames.iter().flat_map(|f| f.factors.max().into_iter().chain(f.moves.max())).max().unwrap_or(0);
@@ -198,40 +214,61 @@ impl Gf2Graph {
             .collect();
         let ranks: Vec<usize> = spaces.iter().map(|s| s.rank).collect();
         let words = ranks.iter().copied().max().unwrap_or(0).div_ceil(64).max(1);
-        let blocks = [frames.len().div_ceil(2), frames.len() / 2];
+        // Frame f is block f / 2 of A (f even) or of B (f odd); the free blocks come after the frames' in each.
+        let frame_blocks = [frames.len().div_ceil(2), frames.len() / 2];
         let mut g = Gf2Graph {
             elems: Vec::new(),
             index: vec![NONE; max as usize + 1],
             words,
-            blocks,
+            blocks: frame_blocks,
             block: [Vec::new(), Vec::new()],
             vecs: [Vec::new(), Vec::new()],
-            block_elems: blocks.map(|b| vec![Vec::new(); b]),
+            block_elems: frame_blocks.map(|b| vec![Vec::new(); b]),
             weight: Vec::new(),
             ranks,
         };
+        let zero = |v: &[u64]| v.iter().all(|&w| w == 0);
+        let mut coloops = [0usize; 2];
         for x in cands.iter() {
-            let h = model.home(x);
-            if h == 0 || h >= frames.len() || !frames[h].factors.contains(x) {
-                continue;
-            }
-            let out = spaces[h].project(spaces[h].unit(x), words);
-            let into = spaces[h - 1].project(spaces[h - 1].vector(model, x), words);
-            if out.iter().all(|&w| w == 0) || into.iter().all(|&w| w == 0) {
-                continue;
-            }
-            // Frame f is block f / 2 of A (f even) or of B (f odd).
+            // The element's block and vector in each matroid, by matroid.
+            let parts = if let Some(j) = model.own(x) {
+                let into = spaces[j].project(spaces[j].vector(model, x), words);
+                if zero(&into) {
+                    continue;
+                }
+                let m = 1 - j % 2;
+                let (k, per_block) = (coloops[m], 64 * words);
+                coloops[m] += 1;
+                let mut unit = vec![0u64; words];
+                unit[k % per_block / 64] |= 1 << (k % 64);
+                let free = frame_blocks[m] + k / per_block;
+                if free == g.block_elems[m].len() {
+                    g.block_elems[m].push(Vec::new());
+                }
+                [(j % 2, j / 2, into), (m, free, unit)]
+            } else {
+                let h = model.home(x);
+                if h == 0 || h >= frames.len() || !frames[h].factors.contains(x) {
+                    continue;
+                }
+                let out = spaces[h].project(spaces[h].unit(x), words);
+                let into = spaces[h - 1].project(spaces[h - 1].vector(model, x), words);
+                if zero(&out) || zero(&into) {
+                    continue;
+                }
+                [(h % 2, h / 2, out), ((h - 1) % 2, (h - 1) / 2, into)]
+            };
             let e = g.elems.len() as u32;
-            for (f, v) in [(h, out), (h - 1, into)] {
-                let m = f % 2;
-                g.block[m].push((f / 2) as u8);
+            for (m, block, v) in parts {
+                g.block[m].push(u8::try_from(block).expect("at most 255 blocks"));
                 g.vecs[m].extend_from_slice(&v);
-                g.block_elems[m][f / 2].push(e);
+                g.block_elems[m][block].push(e);
             }
             g.index[x as usize] = e;
             g.elems.push(x);
             g.weight.push(i64::from(x));
         }
+        g.blocks = g.block_elems.each_ref().map(Vec::len);
         g
     }
 
