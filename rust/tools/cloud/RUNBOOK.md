@@ -568,6 +568,11 @@ with.
   behaviour of 192 CPUs sharing a chip.
 * **NUMA**, if the 48xlarge has more than one node.
 * **PGO.**  `tools/pgo.sh` exists and was run on the M1 only; no gain from profile-guided builds is claimed for Graviton.
+* **The window of games in flight** (`taxman solve --window`, `WINDOW` in `chain.sh`) was measured at 4 threads only:
+  1..1300 about 16% faster, the games past 2225 no slower.  Its policy's constants (a tick of 5 ms, busy below 5% idle,
+  giving back at 25% idle, 10 ms to settle) were not tuned for 64 or 192 threads, and where a step's time goes at those
+  thread counts (the units' starts, the lock, the ramp and the tail, now in the ladder's table) is not known:
+  `bench/wall/README.md`, "For a cloud machine", items 7 and 8, are the commands.
 * **The scripts on Linux and on EC2.**  See the status box.  The first run on the small instance is the test.
 
 ## 9. The prover's proofs of opt(n), 1301 to 2175

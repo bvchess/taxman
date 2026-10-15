@@ -244,6 +244,24 @@ that differs is a hard error), so no proof in the file assumes anything beyond t
 reproduces its scores.  A run that takes a game from `optimal.json` (`--use-prev`) records, in every result whose proof
 rests on it, that it assumes that game optimal.
 
+### Games in flight
+
+```
+$ taxman solve 1-2175 --threads 64 --window 16 --out strict.jsonl --checkpoint-dir ckpt
+```
+
+With `--window K` a range keeps up to K consecutive games in flight, so that a machine of many threads is kept busy
+where one game's search cannot use them all: game n + 1 is set up while n searches, its search starts from n's best
+game so far, without the ceiling, which it gets (with n's final game as a seed) the moment n is concluded, and the
+threads move between the searches while they run, to the oldest game that keeps them busy.  Games are still concluded,
+checked and recorded in order, and every line has the score, proof, repeat and assumptions that the range solved one
+game after another gives it; the moves may be another optimal set, and the nodes and times differ (DESIGN.md, "The
+window: games in flight" and "What a window changes in the results").  The default is 1, one game after another, and
+with one thread the window is always 1.  On 4 threads of the laptop a window of 16 makes 1..1300 about 16% faster and
+the games past 2225, whose searches already keep 4 threads busy, no slower (docs/EXPERIMENTS.md, round B);
+`tools/cloud/chain.sh` runs with 16.  With the environment variable `TAXMAN_WINDOW_TRACE` set, the run prints the
+window's events on stderr (games set up, searches started, threads moved, deferrals, hints, conclusions).
+
 ### Checkpoints, resuming, signals
 
 With `--checkpoint-dir DIR`, a game's search writes `DIR/nNNNN.ckpt` every `--checkpoint-interval` seconds (default 60),
@@ -427,7 +445,7 @@ Game 249 of that run repeated the search of 248; its line has `"method":"repeat"
 | `method` | `trivial`, `prime`, `repeat`, `search` (how the game was found) |
 | `completed` | false only if a limit or a signal stopped the search; such a line is an unfinished-search record, and its checkpoint is kept |
 | `proof` | how optimality is established: `trivial`, `prime_formula`, `cap`, `exhausted`, `same_search` (section 5); null if incomplete |
-| `reached_cap` | the search stopped because its incumbent reached `cap` |
+| `reached_cap` | the promotions reach `cap`, where the search stops (one started before its ceiling was known, in a window of games in flight, may have run to the end of its tree; DESIGN.md, "What a window changes in the results") |
 | `assumes` | what the proof assumes beyond the frame model, here or in the games it rests on (n - 1, or the game a repeat repeats): for a game of n - 1 taken from `optimal.json`, "the game of n - 1 in optimal.json is optimal"; `[]`: nothing |
 | `in_the_bag` | what the game with no promotions scores (null for prime shortcuts) |
 | `prev` | the game of n - 1 this one was built from: score, where it came from (`run`, `results`, `optimal`), a digest of its moves, its proof and what it assumes; null if there was none |
@@ -520,7 +538,7 @@ second build's chain, what the games assume).
    |  [4] search ............. method=search                 proof=exhausted | cap
    |        Board::prepare             search::prepare: model::Model::build -> the root FrameSet; greedy set;
    |                                   max_total; the search::Problem it poses, and its digest
-   |        same_search ...... an earlier game of the window posed the same problem and settled it: its promotions
+   |        same_search ...... one of the 8 games before it posed the same problem and settled it: its promotions
    |                                                         method=repeat       proof=same_search
    |        search::search             starting incumbent = best of greedy / seed (n-1's promotions) / rounded root
    |                                   matching + local search; cap = n + score(n-1) - in_the_bag
@@ -637,6 +655,12 @@ the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#t
 
 * **chain**: games each built from the one before (n = 1, 2, 3 ...): a game's search starts from the previous game's
   promotions and stops at its ceiling.  A game solved with no predecessor is *standalone*.
+* **window** **(overloaded)**: (1) the games of a range in flight at once (`--window K`, `solver::window`; section 3,
+  "Games in flight"): a search started before the game before it is proven is *speculative*, seeded from that game's
+  *provisional game* (its best so far), and a speculative search may be *deferred* (not started while the ceiling
+  that its provisional game gives would settle it) or *suspended* (its workers taken for the oldest game, its units
+  kept); (2) the eight board sizes before a game among which it looks for one whose search it repeats
+  (`SAME_SEARCH_WINDOW`); (3) the probe's windows, a checkpoint resumed for 50,000 steps (DESIGN.md, "Performance").
 * **ceiling**: `n + score(n-1)`, which no game of n can exceed; a score that reaches it needs no search to prove (it is
   recorded as a `results::Certificate`).  As a bound on the promotion *sum* it is `n + score(n-1) - in_the_bag`, which
   the results lines and the tactic call `cap` (proof `cap`, `reached_cap`, `setup.cap`, tactic `prev_cap`).

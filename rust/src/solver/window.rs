@@ -100,6 +100,14 @@
 //! checkpoint, the incomplete line a search started after the signal gives in the range solved in order, and the
 //! range ends there.  Time and node limits are each search's own, per game and invocation, as always.
 //!
+//! # Tracing
+//!
+//! With the environment variable `TAXMAN_WINDOW_TRACE` set, the driver prints a line on stderr for each of its events,
+//! the seconds since the range began first: a setup started and done, a repeat found, a search started (its threads,
+//! whether it has a seed, its ceiling), a search's workers changed (`workers n=N a->b`: given, given back, reclaimed,
+//! or suspended at 0), a hint, a deferral, a search done, a ceiling told, a game concluded.  It is how the policy's
+//! decisions were followed on the laptop, and how they are to be followed on a machine of many threads.
+//!
 //! [`Control::set_ceiling`]: crate::engine::Control::set_ceiling
 //! [`Control::stop`]: crate::engine::Control::stop
 
