@@ -551,7 +551,13 @@ fn nodes<const W: usize>(path: &Path, known: &Known, o: &Options, exact: &Exact,
                     (ev.value.div_euclid(dw::SCALE), 1)
                 }
                 "node" => {
-                    let r = bound(&ctxn, final_signings.clone(), Some(&root.lambda), true, &o.settings);
+                    // The root's signings stay as they are (their cores are the root's); the node's separation adds
+                    // signings of its own.
+                    let frozen = final_signings
+                        .iter()
+                        .map(|s| Signing { mergeable: false, cores: Vec::new(), ..s.clone() })
+                        .collect();
+                    let r = bound(&ctxn, frozen, Some(&root.lambda), true, &o.settings);
                     (r.bound, r.stats.pricings_mi)
                 }
                 other => panic!("unknown mode {other:?}"),
