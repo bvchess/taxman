@@ -344,8 +344,12 @@ and calls u *certified* when the bound is then at most V: every set that beats V
 opt(n) > V every optimal set plays every certified member.  The others are *open*, with the bound's margin over V.
 Certified members can be fixed in a search that leaves the open ones optional (the integrated search of the theory
 track), which is why the file is kept: U\* less a game's open members is that search's fixed set.  The tests check the
-certificates against every playable set beating V − 1, V − 2 and V − 5 on boards to 60, and Theorem B's roles
-against every optimal set there and every recorded game to 1300.  Only the games that rest on the frame model need it
+certificates, recomputed at each claim T of V − 1, V − 2 and V − 5 (a member certified against V says nothing of the
+sets worth V − 4), against every playable set that obeys Theorem B and is worth more than T, on boards to 60 (1,403
+checks); that a deliberately wrong rule, which certifies a member also when its bound is at most T + 10, is caught by
+the same check (12 false certifications over the boards and claims, 15 (set, member) misses on 12 boards), so that
+the test can see the failure it guards against; and Theorem B's roles against every optimal set there and every recorded game to 1300.  Only the games that
+rest on the frame model need it
 (`"needs":1`: neither at the ceiling nor given by the prime formula).
 
 Two files, one thread on the laptop: `data/upper_1301_2175.jsonl`, the committed chain (875 games, 490 of them

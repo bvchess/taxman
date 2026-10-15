@@ -220,7 +220,7 @@ mod tests {
     use crate::game::{relation, Prover, Relation, Verdict};
     use crate::jsonl::recorded_games;
     use crate::primes::smallest_prime_factors;
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
     use std::path::Path;
     use std::time::Instant;
 
@@ -232,41 +232,105 @@ mod tests {
     /// The boards the enumerating tests cover.
     const SMALL: std::ops::RangeInclusive<u64> = 2..=60;
 
-    /// Every claim V' below the recorded score V: the members certified at V' are certified at V, and every
-    /// playable set that obeys the roles of Theorem B and beats V' holds each of them.  The sets are enumerated by
-    /// the matching bound alone, so the check does not rest on the parity bound under test.  Boards 2..=60.
+    /// One board and one claim T below its recorded score V, for the tests of the certificates: the barred bounds
+    /// recomputed at T (a member certified against V says nothing of the sets worth V − 4), those at V, and every
+    /// playable set that obeys the roles of Theorem B and is worth more than T, enumerated by the matching bound alone
+    /// so that the check does not rest on the parity bound under test.
+    struct Case {
+        n: u64,
+        claim: u64,
+        at_claim: Barred,
+        at_v: Barred,
+        sets: Vec<Vec<u32>>,
+    }
+
+    /// The claims T of each board: V − 1, V − 2 and V − 5 (those that are at least 1).
+    fn claims(v: u64) -> impl Iterator<Item = u64> {
+        [1, 2, 5].into_iter().filter_map(move |drop| v.checked_sub(drop)).filter(|&t| t >= 1)
+    }
+
+    /// The cases of boards 2..=60, found once for the tests that use them.
+    fn cases() -> &'static [Case] {
+        static CASES: std::sync::OnceLock<Vec<Case>> = std::sync::OnceLock::new();
+        CASES.get_or_init(|| {
+            let (known, spf) = (optimal(), smallest_prime_factors(*SMALL.end() as usize));
+            let mut cases = Vec::new();
+            for n in SMALL {
+                let (v, moves) = &known[&n];
+                let board = Board::new(n as u32, &spf);
+                let ustar = played_sources(n, moves);
+                let roles = low_roles(n as u32, &spf, &ustar);
+                let at_v = barred_bounds(&board, &spf, *v, &ustar);
+                for claim in claims(*v) {
+                    let at_claim = barred_bounds(&board, &spf, claim, &ustar);
+                    let mut prover = Prover::new(&board, claim, u64::MAX).enumerate(usize::MAX);
+                    assert_eq!(prover.run_units(vec![roles.clone()]), Verdict::Proven, "n={n} claim={claim}");
+                    cases.push(Case { n, claim, at_claim, at_v: at_v.clone(), sets: prover.found });
+                }
+            }
+            cases
+        })
+    }
+
+    /// The (set, member) pairs of `case` in which a set worth more than the claim lacks one of `members`.
+    fn lacking(case: &Case, members: &[u32]) -> Vec<(Vec<u32>, u32)> {
+        let mut missing = Vec::new();
+        for set in &case.sets {
+            missing.extend(members.iter().filter(|u| !set.contains(u)).map(|&u| (set.clone(), u)));
+        }
+        missing
+    }
+
+    /// Every claim T below the recorded score V, with certification recomputed at T: the members certified at T are
+    /// certified at V, and every playable set that obeys the roles of Theorem B and is worth more than T holds each
+    /// of them.  Boards 2..=60.
     #[test]
     fn certified_members_are_held_by_every_set_beating_the_claim() {
-        let started = Instant::now();
-        let (known, spf) = (optimal(), smallest_prime_factors(*SMALL.end() as usize));
         let (mut checks, mut certified, mut open) = (0usize, 0usize, 0usize);
-        for n in SMALL {
-            let (v, moves) = &known[&n];
-            let board = Board::new(n as u32, &spf);
-            let ustar = played_sources(n, moves);
-            let roles = low_roles(n as u32, &spf, &ustar);
-            let at_v = barred_bounds(&board, &spf, *v, &ustar);
-            for claim in [v - 1, v.saturating_sub(2), v.saturating_sub(5)].into_iter().filter(|&c| c >= 1) {
-                let barred = barred_bounds(&board, &spf, claim, &ustar);
-                let cert = barred.certified_members();
-                assert!(cert.iter().all(|&u| at_v.certified(u)), "n={n} claim={claim}: a lower claim certifies more");
-                let mut prover = Prover::new(&board, claim, u64::MAX).enumerate(usize::MAX);
-                assert_eq!(prover.run_units(vec![roles.clone()]), Verdict::Proven, "n={n} claim={claim}");
-                for set in &prover.found {
-                    for &u in &cert {
-                        assert!(set.contains(&u), "n={n} claim={claim}: the set {set:?} lacks the certified {u}");
-                        checks += 1;
-                    }
-                }
-                certified += cert.len();
-                open += barred.open.len();
+        for case in cases() {
+            let Case { n, claim, at_claim, at_v, sets } = case;
+            let cert = at_claim.certified_members();
+            assert!(cert.iter().all(|&u| at_v.certified(u)), "n={n} claim={claim}: a lower claim certifies more");
+            if let Some((set, u)) = lacking(case, &cert).first() {
+                panic!("n={n} claim={claim}: the set {set:?} lacks the certified {u}");
+            }
+            checks += sets.len() * cert.len();
+            certified += cert.len();
+            open += at_claim.open.len();
+        }
+        eprintln!("{checks} (set, member) checks, {certified} members certified and {open} open");
+        assert!(checks > 0, "the test checked nothing");
+    }
+
+    /// The certification test has teeth: a deliberately wrong rule, which certifies a member also when its barred
+    /// bound is at most T + 10 (a member of margin up to 10 over the claim T), is caught by the same check on some
+    /// boards, a member it certifies falsely missing from some set worth more than T.  If it were caught nowhere, the
+    /// test above could not see the failure it guards against.  Boards 2..=60.
+    #[test]
+    fn a_rule_that_certifies_too_much_is_caught() {
+        const SLACK: u64 = 10;
+        let (mut false_certifications, mut caught, mut boards) = (0usize, 0usize, BTreeSet::new());
+        for case in cases() {
+            let falsely: Vec<u32> = (case.at_claim.open.iter())
+                .filter(|o| o.margin.is_some_and(|m| 0 < m && m as u64 <= SLACK))
+                .map(|o| o.u)
+                .collect();
+            let wrong: Vec<u32> = [case.at_claim.certified_members(), falsely.clone()].concat();
+            false_certifications += falsely.len();
+            let missing = lacking(case, &wrong);
+            if !missing.is_empty() {
+                // Only the falsely certified members can be missing: the honest rule was checked by the test above.
+                assert!(missing.iter().all(|(_, u)| falsely.contains(u)), "n={}: an honest member is missing", case.n);
+                caught += missing.len();
+                boards.insert(case.n);
             }
         }
         eprintln!(
-            "{checks} (set, member) checks, {certified} members certified and {open} open, {:.2?}",
-            started.elapsed()
+            "{false_certifications} false certifications, {caught} (set, member) misses on {} boards",
+            boards.len()
         );
-        assert!(checks > 0, "the test checked nothing");
+        assert!(false_certifications > 0, "the wrong rule certified nothing the right one does not");
+        assert!(caught > 0, "the wrong rule was caught on no board: the test cannot see an over-generous rule");
     }
 
     /// Every optimal set of a game obeys the roles of Theorem B, found by enumeration from the plain root (the
