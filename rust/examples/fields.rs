@@ -401,7 +401,7 @@ fn root_line<const W: usize>(
          \"cores_repeated\":{},\"gf3_loops\":{},\"rounds\":{},\"pricings_mi\":{},\"pricings_greedy\":{},\
          \"pivots\":{},\"degenerate\":{},\"repairs\":{},\"solves\":{},\"masters\":{},\"columns\":{},\"cuts\":{},\
          \"master\":{:.4},\"cuts_cheap\":{},\"cuts_exact\":{},\"checks_exact\":{},\"pivots_exact\":{},\"max_s\":{},\
-         \"support\":{},\
+         \"purged\":{},\"restarts\":{},\"checks_capped\":{},\"support\":{},\
          \"support_promotable\":{promotable},\"mass_unpromotable\":{unpromotable_mass:.5},\"checks\":{},\
          \"ms\":{:.0},\"ms_mi\":{:.0},\"ms_simplex\":{:.0}}}",
         r.bound,
@@ -431,6 +431,9 @@ fn root_line<const W: usize>(
         s.checks_exact,
         s.pivots_exact,
         s.max_s,
+        s.purged,
+        s.restarts,
+        s.checks_capped,
         r.support.len(),
         s.checks,
         r.seconds * 1e3,

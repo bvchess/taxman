@@ -78,13 +78,17 @@ const PACK_SCALE: f64 = (1u64 << 30) as f64;
 /// The cost of a master's artificial column, which takes up the violation of a rank inequality when it is added
 /// (`lp::Lp::add_row_elastic`): above every dual a rank inequality can have (at most the largest weight, a number of
 /// the board).
-const PENALTY: f64 = 1e7;
+const PENALTY: f64 = 1e5;
+/// Pivots after which a master solve is taken to stall.
+const STALL: u64 = 50_000;
+/// The most columns an exact check generates (then its point and cuts are what it has).
+const PACK_COLUMNS: usize = 300;
 /// The most violated rank inequalities an exact check returns.
 const CUTS_PER_CHECK: usize = 5;
 /// The nonbasic columns the master keeps when it purges, which it does when it has twice as many.
 const KEEP: usize = 300;
 /// The independent sets an extra matroid's pool keeps.
-const POOL: usize = 200;
+const POOL: usize = 400;
 /// The largest perturbation of a rank inequality's right-hand side in the master, and of a bound `y ≤ z` in the exact
 /// check, against degeneracy (uniform in `[0, PERTURB]`).
 const PERTURB: f64 = 1e-6;
@@ -316,6 +320,10 @@ pub struct Stats {
     pub repairs: u64,
     /// Columns the master purged.
     pub purged: u64,
+    /// Master solves that stalled and started again from the empty set.
+    pub restarts: u64,
+    /// Exact checks stopped at their column limit.
+    pub checks_capped: u64,
     /// Rank inequalities added by the cheap separation and by the exact checks, the checks made and their pivots.
     pub cuts_cheap: u64,
     pub cuts_exact: u64,
@@ -509,6 +517,8 @@ struct Check {
     y: Vec<(usize, f64)>,
     cuts: Vec<Vec<usize>>,
     pivots: u64,
+    /// Whether the column generation stopped at [`PACK_COLUMNS`].
+    capped: bool,
 }
 
 /// The exact check that the master's point `z` lies in the polytope of `ex`.  If the support `T` of `z` among its
@@ -529,7 +539,7 @@ fn check(ex: &mut Extra, z: &[f64], support: &[(f64, Vec<usize>)], deadline: Ins
     let parts: Vec<Vec<usize>> =
         support.iter().map(|(_, q)| q.iter().copied().filter(|&e| ex.position(e).is_some()).collect()).collect();
     if rank(ex, &t) == t.len() {
-        return Check { y: t.iter().map(|&e| (e, z[e])).collect(), cuts: Vec::new(), pivots: 0 };
+        return Check { y: t.iter().map(|&e| (e, z[e])).collect(), cuts: Vec::new(), pivots: 0, capped: false };
     }
     if parts.iter().all(|p| rank(ex, p) == p.len()) {
         let mut y: HashMap<usize, f64> = HashMap::new();
@@ -539,7 +549,7 @@ fn check(ex: &mut Extra, z: &[f64], support: &[(f64, Vec<usize>)], deadline: Ins
             }
         }
         let y = t.iter().map(|&e| (e, y.get(&e).copied().unwrap_or(0.0).min(z[e]))).collect();
-        return Check { y, cuts: Vec::new(), pivots: 0 };
+        return Check { y, cuts: Vec::new(), pivots: 0, capped: false };
     }
     // The coloops of the matroid restricted to T (elements in no circuit inside T) are a direct summand: the polytope
     // is the product of theirs, [0, 1] each, and the rest's, so the LP is over the rest.
@@ -575,6 +585,7 @@ fn check(ex: &mut Extra, z: &[f64], support: &[(f64, Vec<usize>)], deadline: Ins
         add(&mut lp, set.iter().copied().filter(|e| row_of.contains_key(e)).collect());
     }
     let mut mu: Vec<f64>;
+    let (mut generated, mut capped) = (0, false);
     loop {
         lp.solve(u64::MAX);
         let y = lp.duals();
@@ -587,6 +598,11 @@ fn check(ex: &mut Extra, z: &[f64], support: &[(f64, Vec<usize>)], deadline: Ins
         let set: Vec<usize> = kept.into_iter().map(|i| ex.elem[i]).collect();
         let gain: f64 = set.iter().map(|e| 1.0 - y[row_of[e]].max(0.0)).sum::<f64>() - y[conv];
         if gain <= ENTER || Instant::now() >= deadline || !add(&mut lp, set) {
+            break;
+        }
+        generated += 1;
+        if generated >= PACK_COLUMNS {
+            capped = true;
             break;
         }
     }
@@ -605,11 +621,16 @@ fn check(ex: &mut Extra, z: &[f64], support: &[(f64, Vec<usize>)], deadline: Ins
         .map(|&e| (e, y.get(&e).copied().unwrap_or(0.0).min(z[e])))
         .chain(free.iter().map(|&e| (e, z[e])))
         .collect();
-    for (_, set) in cols.into_iter().rev().take(64) {
-        ex.remember(&set);
+    // The pool keeps the decomposition found and the latest columns: a check of a similar point starts from them.
+    let used: Vec<bool> = cols.iter().map(|(j, _)| lp.primal(*j) > 0.0).collect();
+    let latest = cols.len().saturating_sub(32);
+    for (i, (_, set)) in cols.into_iter().enumerate() {
+        if used[i] || i >= latest {
+            ex.remember(&set);
+        }
     }
     if y[..t.len()].iter().map(|&(_, v)| v).sum::<f64>() >= total - VIOLATED {
-        return Check { y, cuts: Vec::new(), pivots };
+        return Check { y, cuts: Vec::new(), pivots, capped };
     }
     let mut order: Vec<usize> = (0..t.len()).filter(|&i| mu[i] > ZERO).collect();
     order.sort_by(|&a, &b| mu[b].total_cmp(&mu[a]).then(a.cmp(&b)));
@@ -623,7 +644,7 @@ fn check(ex: &mut Extra, z: &[f64], support: &[(f64, Vec<usize>)], deadline: Ins
             cuts.push(closed);
         }
     }
-    Check { y, cuts, pivots }
+    Check { y, cuts, pivots, capped }
 }
 
 /// A maximal independent subset of `set` in an extra matroid (its members in order, each kept if independent of
@@ -663,6 +684,8 @@ struct Cut {
 struct Master {
     lp: Lp,
     conv: usize,
+    /// The empty set's column: the master's starting basis, returned to when a solve stalls.
+    empty: usize,
     mi: Vec<Col>,
     seen_mi: HashSet<Vec<usize>>,
     cuts: Vec<Cut>,
@@ -684,6 +707,7 @@ impl Master {
         let mut m = Master {
             lp,
             conv,
+            empty,
             mi: Vec::new(),
             seen_mi: HashSet::from([Vec::new()]),
             cuts: Vec::new(),
@@ -813,12 +837,21 @@ impl Master {
     fn solve(&mut self, deadline: Instant, stats: &mut Stats) -> bool {
         let t = Instant::now();
         let before = self.lp.stats();
+        let mut since = 0;
         let optimal = loop {
             if self.lp.solve(500) == Status::Optimal {
                 break true;
             }
             if Instant::now() >= deadline {
                 break false;
+            }
+            // A solve that runs on is cycling in rounding (the objective does not move): start again from the empty
+            // set, which every inequality admits.
+            since += 500;
+            if since >= STALL {
+                self.lp.reset(&[self.empty]);
+                stats.restarts += 1;
+                since = 0;
             }
         };
         let after = self.lp.stats();
@@ -1065,10 +1098,13 @@ pub fn bound<const W: usize>(
             }
             let mut zhat = z.clone();
             let mut found_cuts = Vec::new();
+            let mut capped = false;
             for (k, ex) in fam.extras.iter_mut().enumerate() {
                 let c = check(ex, &z, &support, deadline, &mut rng);
                 stats.checks_exact += 1;
                 stats.pivots_exact += c.pivots;
+                stats.checks_capped += u64::from(c.capped);
+                capped |= c.capped;
                 for (e, y) in c.y {
                     zhat[e] = zhat[e].min(y);
                 }
@@ -1087,6 +1123,10 @@ pub fn bound<const W: usize>(
             }
             // The point less what the checks could not certify lies in every polytope: a certified lower bound.
             lb = zhat.iter().zip(&ctx.fm.elems).map(|(z, &x)| z * f64::from(x)).sum();
+            if capped && fam_best as f64 / SCALE as f64 - lb > close {
+                // A check stopped at its column limit left the certificate short: check again, from the pools.
+                continue;
+            }
             certified = true;
             break;
         }
