@@ -4691,6 +4691,7 @@ at the primes and at the even n whose half the game of n − 1 does not play (so
 that adapt are, nearly, the games the solver settles without a search.
 
 *Open.*  (c); δ(pq) = p′q′ wherever p′q′ > pq/2; the 151 composite n of section 7 that are not settled.
+
 ## Round B: the chain on many threads (2026-10)
 
 *Question.*  Round A made the serial part of a game small (a repeat 0.02 s, a searched game's setup 0.02 s plus its
@@ -5339,6 +5340,7 @@ What it says, with its uncertainty stated:
 
 *Cost.*  The laptop only, one thread at a time: 9 minutes for the gaps, 3 for the conflicts and cores, 24 for the
 committed chain's games solved again.  Nothing was run on AWS.
+
 ## Boards past 4095 (2026-10)
 
 *Question.*  The chain on the cloud machine reached 3314 overnight and would stop at 4095, the end of the set widths,
@@ -5551,9 +5553,10 @@ disjoint union of its layer instances, and peel decides each.  The tests add abo
 
 *What it changes.*  The frame solver's claim is now: on every board it supports, its score for a game proven
 `exhausted`, `trivial` or `same_search` is opt(n) iff U holds at n, given that the code is right; `cap` and
-`prime_formula` games need nothing of the model.  U holds for every n ≤ 1300 (the prover).  The next steps of the
-consultation certify U game by game past 1300 (barred parity bounds with layers 1 and 2 fixed by Theorem B, then a
+`prime_formula` games need nothing of the model.  U holds for every n ≤ 2175 (the prover).  The next steps of the
+consultation certify U game by game past 2175 (barred parity bounds with layers 1 and 2 fixed by Theorem B, then a
 search of the members they leave open; the register's last theory row).
+
 ## A bound over GF(2) and GF(3) signed frame matroids (2026-10)
 
 *Question.*  Avenue A1 of the

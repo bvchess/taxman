@@ -100,7 +100,7 @@ const NONE: u32 = u32::MAX;
 // ---------------------------------------------------------------------------------------------------------
 // The setting
 
-/// One bound computation's state: the frames, the GF(2) matroids, the cap and the target.
+/// One bound computation's state: the frames, the GF(2) matroids, the ceiling and the target.
 pub struct Ctx<'a, const W: usize> {
     pub n: u32,
     pub model: &'a FrameGraph,
