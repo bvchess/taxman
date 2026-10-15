@@ -38,7 +38,8 @@
 //!   reference's); the optimal game's promotions and every maximal promotable set found by promoting the
 //!   candidates in `--samples` random orders (default 200) are independent in both matroids; and on boards with at
 //!   most 22 candidates, the bound is at least the best promotable set found by enumerating every one.
-//! * **bnb**: a plain branch and bound with one bound, proving that nothing beats `P*` ([`bnb`]).
+//! * **bnb**: a plain branch and bound with one bound, proving that nothing beats `P*` ([`bnb`](mod@bnb), in
+//!   `common/bnb.rs`).
 //! * **lagrange**: the Lagrangian bound over nogoods with the intersection as its inner problem, at the root.
 //! * **forced**: forced members of the GF(2) bound at the nodes of a fixture, exactly and from a weight split.
 //! * **cores**: the residuals that the GF(2) bound's heaviest set runs into at the root, and whether Lorea's
@@ -50,6 +51,9 @@
 //!   members), `--prefilter` (the matching bound as a first check), `--strong K` (solve at most K members of a
 //!   conflict) and `--first-forced` (stop solving at the first forced member) ([`prove`]).
 
+#[allow(dead_code)] // the extra bound, the estimator and the node records are the fields study's
+#[path = "common/bnb.rs"]
+mod bnb;
 #[path = "common/frames.rs"]
 mod frames;
 #[path = "common/meet.rs"]
@@ -57,6 +61,7 @@ mod meet;
 #[path = "common/root_lagrange.rs"]
 mod root_lagrange;
 
+use bnb::{BoundKind, NoExtra, Search};
 use frames::{frame_matroids, is_prime, setup, Known, Rng};
 use meet::{intersect, split, split_bound, BlockMatroid, Reduced, Span};
 use root_lagrange::{root_lagrange, CONFLICTS_PER_STEP, STALL};
@@ -68,7 +73,7 @@ use taxman::board::Board;
 use taxman::engine::{self, EngineConfig, Start};
 use taxman::matchbound::lagrange::SCALE;
 use taxman::matchbound::{MatchBound, MatchGraph};
-use taxman::model::{FrameSet, Scratch};
+use taxman::model::Scratch;
 use taxman::search::{stat, Gf2Branching, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
 use taxman::tactics::Tactics;
 
@@ -485,111 +490,38 @@ fn check<const W: usize>(n: u32, known: &Known, samples: usize) {
 // ---------------------------------------------------------------------------------------------------------
 // bnb
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum BoundKind {
-    Gf2,
-    /// The GF(2) bound, started from the parent's heaviest set where that is extreme.
-    Gf2Warm,
-    Matching,
-}
-
-/// A plain branch and bound that proves that no promotion set beats `P*`, with one bound at every node: the
-/// node is cut when the `max_add` largest candidates, or the bound, fall below what it needs; otherwise the
-/// bound's heaviest set is promotable (a completion better than `P*`: counted, and impossible if the bound and
-/// `P*` are right) or has a conflict `k₁ < … < k_r`, and the node branches into "`k₁ … k_{j−1}` promoted, `k_j`
-/// not" for each `j` (every completion leaves out a member of the conflict).  No refinement, forced members,
-/// nogoods or strong branching: the same skeleton for either bound, so that their trees compare.
+/// The `bnb` command: the plain branch and bound of [`bnb`](mod@bnb) with the bound `kind` and no extra bound, on at
+/// most `limit` nodes; one line of the tree's counters.
 fn bnb<const W: usize>(n: u32, known: &Known, kind: BoundKind, limit: u64) {
     let Some((board, p)) = setup::<W>(n) else { return };
     let Some(opt) = known.opt(n, board.in_the_bag) else {
         eprintln!("n={n}: no known optimum, skipped");
         return;
     };
-    let model = &p.model;
-    let graph = MatchGraph::new(model, &p.root);
-    let mut mb = MatchBound::new(&graph);
-    let mut scratch = Scratch::<W>::new();
-    // Each node with the heaviest set of its parent's bound (a warm start for Gf2Warm).
-    let mut stack: Vec<(Bits<W>, FrameSet<W>, Bits<W>, Bits<W>)> =
-        vec![(Bits::EMPTY, p.root, p.candidates, Bits::EMPTY)];
-    let (mut nodes, mut cut_count, mut cut_bound, mut better, mut branches) = (0u64, 0u64, 0u64, 0u64, 0u64);
-    let (mut warm, mut cold, mut augmentations) = (0u64, 0u64, 0u64);
+    let graph = MatchGraph::new(&p.model, &p.root);
+    let mut s = Search::<W, ()>::new(&p, &graph, opt, kind);
     let t0 = Instant::now();
-    let mut bound_time = std::time::Duration::ZERO;
-    let mut build_time = std::time::Duration::ZERO;
-    while let Some((promoted, state, cands, parent)) = stack.pop() {
-        if nodes >= limit {
-            stack.push((promoted, state, cands, parent));
-            break;
-        }
-        nodes += 1;
-        let cands = state.narrow_candidates(&cands);
-        let need = (opt + 1).saturating_sub(promoted.sum());
-        let max_add = (p.max_total as i32 - promoted.len() as i32).min(state.max_promotions_among(&cands)).max(0);
-        if cands.sum_largest(max_add as u32) < need {
-            cut_count += 1;
-            continue;
-        }
-        let tb = Instant::now();
-        let (value, chosen) = match kind {
-            BoundKind::Gf2 | BoundKind::Gf2Warm => {
-                let fm = frame_matroids(model, &state, &cands);
-                build_time += tb.elapsed();
-                let start: Vec<bool> = fm.elems.iter().map(|&x| parent.contains(x)).collect();
-                let size = start.iter().filter(|&&s| s).count();
-                let warmed = (kind == BoundKind::Gf2Warm && size > 0 && size <= max_add as usize)
-                    .then(|| fm.warm(&start, max_add as usize))
-                    .flatten();
-                let m = match warmed {
-                    Some(m) => {
-                        warm += 1;
-                        m
-                    }
-                    None => {
-                        cold += 1;
-                        fm.bound(max_add as usize)
-                    }
-                };
-                augmentations += m.augmentations as u64;
-                (m.value as u64, fm.chosen::<W>(&m))
-            }
-            BoundKind::Matching => {
-                mb.reset(&promoted, &cands);
-                (mb.value(), mb.chosen())
-            }
-        };
-        bound_time += tb.elapsed();
-        if value < need {
-            cut_bound += 1;
-            continue;
-        }
-        let Some(k) = model.conflict_using(&mut scratch, &state, &chosen, true) else {
-            better += 1;
-            continue;
-        };
-        let (mut required, mut rest, mut at) = (Bits::<W>::EMPTY, cands, state);
-        for x in k.iter() {
-            rest.remove(x);
-            stack.push((promoted | required, at, rest, chosen - required));
-            branches += 1;
-            match model.promote_all_using(&mut scratch, &at, &Bits::EMPTY.with(x)) {
-                Some(next) => {
-                    at = next;
-                    required.insert(x);
-                }
-                None => break,
-            }
-        }
+    while !s.stack.is_empty() && s.tally.nodes < limit {
+        s.step(None::<&mut NoExtra>);
     }
+    let t = &s.tally;
     println!(
-        "{{\"n\":{n},\"bound\":\"{kind:?}\",\"opt\":{opt},\"completed\":{},\"nodes\":{nodes},\
-         \"cut_by_count\":{cut_count},\"cut_by_bound\":{cut_bound},\"branches\":{branches},\"better\":{better},\
-         \"warm\":{warm},\"cold\":{cold},\"augmentations\":{augmentations},\"seconds\":{:.3},\"bound_seconds\":{:.3},\
+        "{{\"n\":{n},\"bound\":\"{kind:?}\",\"opt\":{opt},\"completed\":{},\"nodes\":{},\
+         \"cut_by_count\":{},\"cut_by_bound\":{},\"branches\":{},\"better\":{},\
+         \"warm\":{},\"cold\":{},\"augmentations\":{},\"seconds\":{:.3},\"bound_seconds\":{:.3},\
          \"build_seconds\":{:.3}}}",
-        stack.is_empty(),
+        s.stack.is_empty(),
+        t.nodes,
+        t.cut_by_count,
+        t.cut_by_bound,
+        t.branches,
+        t.better,
+        t.warm,
+        t.cold,
+        t.augmentations,
         t0.elapsed().as_secs_f64(),
-        bound_time.as_secs_f64(),
-        build_time.as_secs_f64(),
+        t.bound_time.as_secs_f64(),
+        t.build_time.as_secs_f64(),
     );
 }
 
