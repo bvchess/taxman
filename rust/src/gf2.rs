@@ -13,9 +13,9 @@
 //! independent (Theorem 11: a winnable frame peels completely, each mover dropped with a live factor no mover still
 //! there has).  The moves of a frame are fixed, so the frame's condition is a linear matroid on the candidates that
 //! touch it: their vectors reduced modulo the span of the moves (contraction), in the quotient's coordinates, whose
-//! number is the frame's freedoms.  A candidate touches its home frame and the one in front of it, one of even index and one of
-//! odd, so the even frames' matroids are the blocks of one matroid `A` on the candidates and the odd frames' of
-//! another, `B`.  Every promotable set is independent in both, and the heaviest common independent set (weighted
+//! number is the frame's freedoms.  A candidate touches its home frame and the one in front of it, one of even index
+//! and one of odd, so the even frames' matroids are the blocks of one matroid `A` on the candidates and the odd frames'
+//! of another, `B`.  Every promotable set is independent in both, and the heaviest common independent set (weighted
 //! matroid intersection, [`meet`]) bounds the best completion, with at most `max_add` members.
 //!
 //! [`Gf2Graph`] builds the root's matroids once per search; [`Gf2Bound`] keeps one level per node on the search's

@@ -433,7 +433,8 @@ impl<'a, const W: usize> Stepper<'a, W> {
     fn step(&mut self, node: &mut Node<W>, child: &mut Node<W>, pushed: bool, ctx: &mut Ctx<'_, TaxUnit<W>>) -> Next {
         self.known.truncate(node.known_end); // forget the conflicts of the child last considered
         if self.matching_on {
-            self.matching.take_kept(); // the node without the candidate it last branched on, if strong branching kept it
+            // The node without the candidate it last branched on, if strong branching kept it.
+            self.matching.take_kept();
         }
         if let Some(p) = &mut self.probe {
             p.step(node.promoted.len());

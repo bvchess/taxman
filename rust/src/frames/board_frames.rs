@@ -32,8 +32,8 @@ pub struct Frame<const W: usize> {
     impossible: Bits<W>,
     /// The frame's freedoms, `|factors| − |sources|` once the frame has been simplified; see `Frame::new`.
     freedoms: i32,
-    /// What `BoardFrames::can_add_source` has answered for this frame, by number.  The answer depends on nothing but the
-    /// frame's `sources` and `factors`, so the memo is emptied when `sources` changes (`factors` never does).
+    /// What `BoardFrames::can_add_source` has answered for this frame, by number.  The answer depends on nothing but
+    /// the frame's `sources` and `factors`, so the memo is emptied when `sources` changes (`factors` never does).
     can_add: RefCell<HashMap<u32, bool>>,
     /// Whether `BoardFrames::remove_impossible` has been through the frame's remaining sources and factors as they are
     /// now.  Every remaining source was kept, so another pass over the same ones would keep them all again and find
@@ -44,8 +44,8 @@ pub struct Frame<const W: usize> {
 impl<const W: usize> Frame<W> {
     /// A frame that has only just been formed: nothing is mandatory or impossible, and every factor counts as
     /// spare.  The freedoms (`freedoms`) therefore start as `|factors|`, not `|factors| − |sources|`: they
-    /// are corrected when the frame is first simplified (`BoardFrames::finish_frame`), so until then the frame counts as
-    /// having freedoms, and a frame visited earlier in a round sees the frames not yet visited that way.  That is
+    /// are corrected when the frame is first simplified (`BoardFrames::finish_frame`), so until then the frame counts
+    /// as having freedoms, and a frame visited earlier in a round sees the frames not yet visited that way.  That is
     /// what the Java does, and the results can depend on it.
     fn new(sources: Bits<W>, factors: Bits<W>) -> Self {
         Frame {
@@ -144,9 +144,9 @@ enum Home {
 }
 
 /// All the frames of the board `1..=n` (the Java's `bombus.Apiary`), for a given set of promoted numbers,
-/// simplified and in playing order (see the documentation of [`crate::frames`] for what that means).  The lists `factors_of`
-/// and `composites_of` are the view of the divisibility relation that setup takes, with the promoted numbers and
-/// the sinks taken into account.
+/// simplified and in playing order (see the documentation of [`crate::frames`] for what that means).  The lists
+/// `factors_of` and `composites_of` are the view of the divisibility relation that setup takes, with the promoted
+/// numbers and the sinks taken into account.
 ///
 /// On a punctured board ([`Tables::punctured`]) the holes belong to no frame and to no factor or composite list,
 /// so they are never moves and never tax; a number whose maximal factor is a hole simply has one factor fewer.

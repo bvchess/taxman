@@ -261,7 +261,8 @@ pub struct StoredGame {
 pub enum CeilingProof {
     /// `score(n) = n + score(n − 1)`, the ceiling `opt(n) ≤ n + opt(n − 1)`.
     NPlusPrev,
-    /// A prime `n` with `score(n) = n + score(n − 1) − P`, `P` the largest prime below `n` (proof at `accelerate::prime_shortcut`).
+    /// A prime `n` with `score(n) = n + score(n − 1) − P`, `P` the largest prime below `n` (proof at
+    /// `accelerate::prime_shortcut`).
     PrimeFormula,
 }
 

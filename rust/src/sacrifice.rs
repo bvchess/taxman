@@ -93,16 +93,15 @@
 //!
 //! [`punctured`] computes `opt_M(B)` for `B = [n] ∖ {hole}` with the frame model on [`Tables::punctured`]: the
 //! hole is in no frame and no factor or composite list ([`BoardFrames`](crate::frames::BoardFrames), the board's
-//! frames), so the frame model plays exactly the maximal-factor rule.  Two things had to be right for that, both found by the
-//! brute force: the sources stay the numbers above `n/2` (a number whose only maximal composite is the hole is
-//! optional, not a source, which the model plays), and the frames are ordered through the hole (a number still
-//! sweeps divisors whose maximal-factor chain to it passes through the hole).  The frame model's own assumptions
-//! (greedy impossible sources, mandatory moves, closed frames, one-frame promotions; DESIGN.md §2 and §5, and
+//! frames), so the frame model plays exactly the maximal-factor rule.  Two things had to be right for that, both found
+//! by the brute force: the sources stay the numbers above `n/2` (a number whose only maximal composite is the hole is
+//! optional, not a source, which the model plays), and the frames are ordered through the hole (a number still sweeps
+//! divisors whose maximal-factor chain to it passes through the hole).  The frame model's own assumptions (greedy
+//! impossible sources, mandatory moves, closed frames, one-frame promotions; DESIGN.md §2 and §5, and
 //! [`crate::frames`]) apply to punctured boards as they do to `[n]`, and they are only validated, not proven: against
-//! the brute force
-//! ([`crate::brute`]) on every board `[N] ∖ {h}` with `N ≤ 52`.  A bound computed this way is as sound as the frame
-//! model, no more.  Each punctured game is warm-started from an optimal game of the unpunctured board, which is its
-//! ceiling: if that game replays on the punctured board, its score is the answer with no search.
+//! the brute force ([`crate::brute`]) on every board `[N] ∖ {h}` with `N ≤ 52`.  A bound computed this way is as sound
+//! as the frame model, no more.  Each punctured game is warm-started from an optimal game of the unpunctured board,
+//! which is its ceiling: if that game replays on the punctured board, its score is the answer with no search.
 //!
 //! # Findings (the negative result)
 //!

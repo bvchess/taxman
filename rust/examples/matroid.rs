@@ -853,9 +853,10 @@ fn bnb<const W: usize>(n: u32, known: &Known, kind: BoundKind, limit: u64) {
         }
     }
     println!(
-        "{{\"n\":{n},\"bound\":\"{kind:?}\",\"opt\":{opt},\"completed\":{},\"nodes\":{nodes},\"cut_by_count\":{cut_count},\
-         \"cut_by_bound\":{cut_bound},\"branches\":{branches},\"better\":{better},\"warm\":{warm},\"cold\":{cold},\
-         \"augmentations\":{augmentations},\"seconds\":{:.3},\"bound_seconds\":{:.3},\"build_seconds\":{:.3}}}",
+        "{{\"n\":{n},\"bound\":\"{kind:?}\",\"opt\":{opt},\"completed\":{},\"nodes\":{nodes},\
+         \"cut_by_count\":{cut_count},\"cut_by_bound\":{cut_bound},\"branches\":{branches},\"better\":{better},\
+         \"warm\":{warm},\"cold\":{cold},\"augmentations\":{augmentations},\"seconds\":{:.3},\"bound_seconds\":{:.3},\
+         \"build_seconds\":{:.3}}}",
         stack.is_empty(),
         t0.elapsed().as_secs_f64(),
         bound_time.as_secs_f64(),
@@ -958,8 +959,8 @@ fn lagrange<const W: usize>(n: u32, known: &Known, steps: usize) {
     let positive = best.iter().filter(|&&l| l > 0).count();
     let list = |v: &[u32]| v.iter().map(u32::to_string).collect::<Vec<_>>().join(",");
     println!(
-        "{{\"n\":{n},\"opt\":{opt},\"gf2\":{},\"lagrange_gf2\":{},\"scaled\":{lowest},\"nogoods\":{},\"positive\":{positive},\
-         \"steps\":{done},\"closed_at\":{},\"first_conflicts\":[{}],\"seconds\":{:.3}}}",
+        "{{\"n\":{n},\"opt\":{opt},\"gf2\":{},\"lagrange_gf2\":{},\"scaled\":{lowest},\"nogoods\":{},\
+         \"positive\":{positive},\"steps\":{done},\"closed_at\":{},\"first_conflicts\":[{}],\"seconds\":{:.3}}}",
         plain.value,
         lowest.div_euclid(SCALE),
         nogoods.len(),
@@ -1253,8 +1254,9 @@ fn prove<const W: usize>(n: u32, known: &Known, o: &Options) {
     let x = out.stats.extra;
     println!(
         "{{\"n\":{n},\"opt\":{opt},\"tactics\":\"{}\",\"prefilter\":{},\"branching\":\"{:?}\",\"threads\":{},\
-         \"completed\":{},\"best\":{},\"nodes\":{},\"seconds\":{:.3},\"cycles\":{cycles},\"instructions\":{instructions},\
-         \"checks\":{},\"gf2_solves\":{},\"gf2_augmentations\":{},\"gf2_strong_solves\":{},\"gf2_strong_augmentations\":{}}}",
+         \"completed\":{},\"best\":{},\"nodes\":{},\"seconds\":{:.3},\"cycles\":{cycles},\
+         \"instructions\":{instructions},\"checks\":{},\"gf2_solves\":{},\"gf2_augmentations\":{},\
+         \"gf2_strong_solves\":{},\"gf2_strong_augmentations\":{}}}",
         Tactics { search: o.tactics, ..Tactics::default() }.description(),
         o.prefilter,
         o.branching,

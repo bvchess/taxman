@@ -296,9 +296,9 @@ fn promotions_become_the_java_game() {
     bad.assert_none(checked);
 }
 
-/// The Java's game of the board's frames for sets of promotions that are not just the optimal ones (halves and random subsets of
-/// them, and sets at the edges of the set widths), for boards up to 2049: the same moves in the same order, which
-/// then score what the game with no promotions scores plus the promotions (the identity the search's incumbent
+/// The Java's game of the board's frames for sets of promotions that are not just the optimal ones (halves and random
+/// subsets of them, and sets at the edges of the set widths), for boards up to 2049: the same moves in the same order,
+/// which then score what the game with no promotions scores plus the promotions (the identity the search's incumbent
 /// value stands on).
 #[test]
 fn promotion_sets_become_the_java_game_beyond_the_golden_data() {

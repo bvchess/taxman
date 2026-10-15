@@ -447,9 +447,9 @@ impl<const R: usize> Meet<R> {
         }
     }
 
-    /// The weight and size of a common independent set of the elements `live` (ascending) found greedily: `base` (common
-    /// independent), then each other element by decreasing weight that keeps it so.  A lower bound on the heaviest
-    /// common independent set, for a few reductions per element.
+    /// The weight and size of a common independent set of the elements `live` (ascending) found greedily: `base`
+    /// (common independent), then each other element by decreasing weight that keeps it so.  A lower bound on the
+    /// heaviest common independent set, for a few reductions per element.
     pub fn greedy_from(&mut self, p: &Problem<'_, R>, live: &[u32], base: &[u32]) -> (i64, usize) {
         // The workspace no longer holds the last solve.
         self.solves += 1;

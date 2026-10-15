@@ -4,12 +4,14 @@
     parse.py MACHINE DIR > MACHINE.jsonl
 
 DIR holds, per run, LABEL.time (the report of GNU time -v or BSD time -l), LABEL.out and LABEL.status, and the prover's
-files under prover/ and the chain runs' results files chain-FROM.jsonl (with chain-FROM.from).  The label says what the run was:
+files under prover/ and the chain runs' results files chain-FROM.jsonl (with chain-FROM.from).  The label says what the
+run was:
 
     probe-default.rN, probe-gf2.rN        the probe (N-th repetition)
     ladder-GAME.tTHREADS                  the solver's proof of a game
     prover-GAME.t1                        the prover on a game
-    contention-solver-GAME.kK.cI          copy I of K at once (solver); contention-prover-GAME.kK.cI the same for the prover
+    contention-solver-GAME.kK.cI          copy I of K at once (solver)
+    contention-prover-GAME.kK.cI          the same for the prover
     chain-FROM.tTHREADS                   taxman solve from game FROM over a copy of results/strict.jsonl cut before it
 
 Standard library only.
@@ -109,7 +111,7 @@ def kernels(out: str) -> dict:
 
 
 def parse_chain(machine: str, directory: Path) -> list:
-    """The games each chain run added to its copy of results/strict.jsonl (those from the game in chain-FROM.from on)."""
+    """The games each chain run added to its copy of results/strict.jsonl (from the game in chain-FROM.from on)."""
     rows = []
     for marker in sorted(directory.glob("chain-*.from")):
         first = int(marker.read_text())

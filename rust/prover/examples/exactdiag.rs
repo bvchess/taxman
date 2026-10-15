@@ -1,8 +1,9 @@
-//! Diagnostics of the prover's search: `exactdiag N TARGET [--budget NODES] [--warmup NODES] [--show K]
-//! [--parity 1] [--warm 0] [--iterations I]` runs it and prints its counters.  With a warm-up a first search of
-//! that many nodes collects nogoods, the Lagrangian bound is fitted to them (I subgradient steps, default 200), and
-//! the search is run again with both bounds.  `--parity 1` turns on the parity bound (`Prover::with_parity`), `--warm 0`
-//! solves it from scratch at every node (`Prover::parity_cold`).
+//! Diagnostics of the prover's search:
+//! `exactdiag N TARGET [--budget NODES] [--warmup NODES] [--show K] [--parity 1] [--warm 0] [--iterations I]` runs it
+//! and prints its counters.  With a warm-up a first search of that many nodes collects nogoods, the Lagrangian bound is
+//! fitted to them (I subgradient steps, default 200), and the search is run again with both bounds.  `--parity 1` turns
+//! on the parity bound (`Prover::with_parity`), `--warm 0` solves it from scratch at every node
+//! (`Prover::parity_cold`).
 
 use std::time::Instant;
 use taxman_prover::game::{Board, Prover};
@@ -71,7 +72,8 @@ fn main() {
     );
     if let Some(s) = prover.parity_stats() {
         println!(
-            "  parity: {} solves, {:.1} augmentations and {:.0} arcs a solve, {uncertified} not certified, {} negative arcs",
+            "  parity: {} solves, {:.1} augmentations and {:.0} arcs a solve, {uncertified} not certified, \
+             {} negative arcs",
             s.solves,
             s.augmentations as f64 / s.solves.max(1) as f64,
             s.arcs as f64 / s.solves.max(1) as f64,

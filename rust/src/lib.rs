@@ -52,7 +52,7 @@
 //!
 //! | layer | module | what it is |
 //! |---|---|---|
-//! | foundations | [`game`] | the rules as a referee ([`game::replay`]), and the table of optimal games ([`game::Optimal`]) |
+//! | foundations | [`game`] | the rules as a referee ([`game::replay`]), and the table of optimal games |
 //! | | [`numtheory`] | maximal factors and composites, primes, divisors of the numbers on a board |
 //! | | [`bits`] | fixed-width bitsets `Bits<W>` for sets of game numbers; the set widths, dispatched |
 //! | | [`json`] | a small JSON reader and writer (the table of optimal games, golden data, results lines) |

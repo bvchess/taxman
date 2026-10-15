@@ -134,8 +134,8 @@ fn an_interrupted_game_resumes_from_its_checkpoint() {
 
 /// Solves `n` (600 or 760, games with a search of a few thousand nodes on the matching path) and `n + 1` (the prime
 /// after it, which takes `n` as its predecessor) from `base`, with no previous game to start from: a node limit stops
-/// the search of `n`, and a second run, without the limit, resumes it and goes on.  Returns the games of the second run and the lines
-/// of the results file, which the verifier accepts.
+/// the search of `n`, and a second run, without the limit, resumes it and goes on.  Returns the games of the second run
+/// and the lines of the results file, which the verifier accepts.
 fn run_stopped_and_resumed(name: &str, base: SolveOptions, n: u32) -> (Vec<GameResult>, Vec<Json>) {
     let dir = TempDir::new(name);
     let results = dir.join("results.jsonl");

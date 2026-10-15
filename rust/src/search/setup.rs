@@ -187,8 +187,8 @@ pub fn prepare_for_resume<const W: usize>(
 ///
 /// Every frame of the root is winnable (the frame builder makes it so), and the search relies on it: promoting a
 /// number that has a factor no move of the frame it is promoted into uses takes no peel (`FrameGraph::promote`), which
-/// is exact only if that frame is winnable, as every frame of every state reached from a winnable root is.  Debug builds check
-/// it here.
+/// is exact only if that frame is winnable, as every frame of every state reached from a winnable root is.  Debug
+/// builds check it here.
 fn build_root<const W: usize>(
     tables: &Tables,
     columns: &[Vec<u32>],

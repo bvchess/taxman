@@ -615,8 +615,8 @@ fn nodes_of<const W: usize>(path: &Path, o: &Options) {
         let symmetry = symmetry_cut(&mut m, model, &mut scratch, &state, &pairs, &promoted, &rel, need);
         println!(
             "{{\"n\":{n},\"promoted\":{},\"cands\":{},\"relevant\":{},\"excluded\":{},\"cover_all\":{:?},\
-             \"cover_relevant\":{:?},\"cover_relabelled\":{:?},\"sampled\":{:?},\"prime_cover\":{},\"prime_sampled\":{},\
-             \"twins\":{},\"twins_relevant\":{},\"symmetry_hopeless\":{},\"symmetry_bound\":{}}}",
+             \"cover_relevant\":{:?},\"cover_relabelled\":{:?},\"sampled\":{:?},\"prime_cover\":{},\
+             \"prime_sampled\":{},\"twins\":{},\"twins_relevant\":{},\"symmetry_hopeless\":{},\"symmetry_bound\":{}}}",
             promoted.len(),
             cands.len(),
             rel.len(),

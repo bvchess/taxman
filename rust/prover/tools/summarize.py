@@ -140,7 +140,8 @@ def exact_cost(paths, band=50):
     import statistics
     rows = sorted((r for r in lines(paths) if r.get("parity") and r["search"] == "proven"
                    and not r.get("matching_nodes")), key=lambda r: r["n"])
-    print(f"searches with the parity bound from scratch: {len(rows)}, total {sum(r['secs'] for r in rows) / 3600:.2f} h")
+    hours = sum(r['secs'] for r in rows) / 3600
+    print(f"searches with the parity bound from scratch: {len(rows)}, total {hours:.2f} h")
     print(f"{'n':>11} {'games':>5} {'gap':>6} {'median nodes':>12} {'max nodes':>10} {'median s':>9} {'max s':>8} "
           f"{'total s':>8}")
     for lo in range(rows[0]["n"] // band * band, rows[-1]["n"] + 1, band):
@@ -150,8 +151,9 @@ def exact_cost(paths, band=50):
         gaps = [r["parity_bound"] - r["score"] for r in sel]
         nodes = [r["nodes"] for r in sel]
         secs = [r["secs"] for r in sel]
-        print(f"{lo:>5}-{lo + band - 1:<5} {len(sel):>5} {statistics.mean(gaps):>6.0f} {statistics.median(nodes):>12.0f} "
-              f"{max(nodes):>10} {statistics.median(secs):>9.1f} {max(secs):>8.1f} {sum(secs):>8.0f}")
+        print(f"{lo:>5}-{lo + band - 1:<5} {len(sel):>5} {statistics.mean(gaps):>6.0f} "
+              f"{statistics.median(nodes):>12.0f} {max(nodes):>10} {statistics.median(secs):>9.1f} {max(secs):>8.1f} "
+              f"{sum(secs):>8.0f}")
 
     def slope(xs, ys):
         mx, my = statistics.mean(xs), statistics.mean(ys)

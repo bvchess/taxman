@@ -6,7 +6,7 @@
 # The phases are the measurements of "Graviton calibration (2026-10)" in rust/docs/EXPERIMENTS.md:
 #
 #   probe                    the solver's probe (examples/perf.rs), default and GF(2), three times each
-#   ladder [N...]            one-thread proof-only runs (ladder --threads 1 --seed-opt), default 1215 1232 1287 2170 2172
+#   ladder [N...]            one-thread proof-only runs (ladder --seed-opt), default 1215 1232 1287 2170 2172
 #   prover [N...]            one-thread runs of the prover (rust/prover, exact), default 1300 990
 #   contention-solver K...   K copies at once of the proof of $CONTENTION_GAME (default 1326), for each K given
 #   contention-prover K...   K copies at once of the prover on $CONTENTION_PROVER_GAME (default 990), for each K given
@@ -82,8 +82,9 @@ contention-solver)
 contention-prover)
     for k in "$@"; do
         say "contention: $k copies of the prover on $CONTENTION_PROVER_GAME"
+        label="contention-prover-$CONTENTION_PROVER_GAME"
         # shellcheck disable=SC2046
-        "$here/copies.sh" "$out" "contention-prover-$CONTENTION_PROVER_GAME" "$k" $(prove "$CONTENTION_PROVER_GAME" "contention-prover-$CONTENTION_PROVER_GAME.k$k.c@")
+        "$here/copies.sh" "$out" "$label" "$k" $(prove "$CONTENTION_PROVER_GAME" "$label.k$k.c@")
     done
     ;;
 scaling)
@@ -110,7 +111,8 @@ chain)
     head -n "$((from - 1))" "$KNOWN" > "$results"
     tail -n 1 "$results" | grep -q "\"n\":$((from - 1)),"
     echo "$from" > "$out/chain-$from.from"
-    say "chain: games $from-$to on $threads threads, at most $minutes minutes, from a copy of strict.jsonl to $((from - 1))"
+    say "chain: games $from-$to on $threads threads, at most $minutes minutes," \
+        "from a copy of strict.jsonl to $((from - 1))"
     # timeout stops the run with SIGTERM, which `taxman solve` answers by checkpointing and exiting; every finished game
     # is already in the file.
     "$here/timed.sh" "$out" "chain-$from.t$threads" timeout -s TERM "$((minutes * 60))" \

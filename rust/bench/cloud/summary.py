@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""The tables of the Graviton calibration, from the rows parse.py made: summary.py LAPTOP.jsonl MACHINE.jsonl... [-r STRICT]
+"""The tables of the Graviton calibration, from the rows parse.py made:
+summary.py LAPTOP.jsonl MACHINE.jsonl... [-r STRICT]
 
 The first file is the reference (the laptop); every table has a column per machine.  Speed is the reference's time over
 the machine's (above 1: faster than the reference's core).  The committed results file (-r, default
@@ -14,6 +15,9 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
+# The games whose one-thread proofs the speed table sums.
+PROOF_GAMES = (1215, 1232, 1287, 2170, 2172)
+
 
 def load(path: str) -> list:
     return [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
@@ -24,7 +28,7 @@ def pick(rows, **want):
 
 
 def solo(rows, game):
-    """The one-thread proof of a game that ran alone: a ladder run, or the single copy of the contention test's K = 1."""
+    """The one-thread proof of a game that ran alone: a ladder run, or the contention test's single copy (K = 1)."""
     return pick(rows, kind="ladder", game=game, threads=1) or pick(rows, kind="contention-solver", game=game, k=1)
 
 
@@ -55,7 +59,11 @@ def per_core(machines):
     names = [m for m in machines]
     print("### Per-core speed (one thread, nothing else running; the long proofs two at a time)\n")
     body = []
-    for label, kind, key in (("probe, default (s)", "probe-default", "probe_wall_s"), ("probe, GF(2) (s)", "probe-gf2", "probe_wall_s")):
+    probes = (
+        ("probe, default (s)", "probe-default", "probe_wall_s"),
+        ("probe, GF(2) (s)", "probe-gf2", "probe_wall_s"),
+    )
+    for label, kind, key in probes:
         body.append([label] + [fmt(best(pick(machines[m], kind=kind), key)) for m in names])
     games = (1215, 1232, 1287, 1326, 2170, 2172)
     for g in games:
@@ -82,8 +90,8 @@ def per_core(machines):
     for label, get in (
         ("probe, default", lambda rows: best(pick(rows, kind="probe-default"), "probe_wall_s")),
         ("probe, GF(2)", lambda rows: best(pick(rows, kind="probe-gf2"), "probe_wall_s")),
-        ("solver proofs, 5 frontier games, search s", lambda rows: total(rows, "ladder", (1215, 1232, 1287, 2170, 2172), "search_s")),
-        ("solver proofs, 5 frontier games, user s", lambda rows: total(rows, "ladder", (1215, 1232, 1287, 2170, 2172), "user_s")),
+        ("solver proofs, 5 frontier games, search s", lambda rows: total(rows, "ladder", PROOF_GAMES, "search_s")),
+        ("solver proofs, 5 frontier games, user s", lambda rows: total(rows, "ladder", PROOF_GAMES, "user_s")),
         ("prover, 1300 + 990", lambda rows: total(rows, "prover", (1300, 990), "prover_s")),
     ):
         base = get(ref)
@@ -106,7 +114,8 @@ def contention(machines):
                 base = pick(rows, kind=kind, k=1)
                 if copies and base:
                     mu = mean(r[key] for r in copies)
-                    row.append(f"{mu:.2f} ({mu / base[0][key]:.3f}x), max {max(r[key] for r in copies):.2f}, n={len(copies)}")
+                    top = max(r[key] for r in copies)
+                    row.append(f"{mu:.2f} ({mu / base[0][key]:.3f}x), max {top:.2f}, n={len(copies)}")
                 else:
                     row.append("-")
             body.append(row)
@@ -181,12 +190,16 @@ def chain(machines, strict):
                 ref = [committed[g["game"]] for g in known]
                 ref_total = sum(r["seconds"]["total"] for r in ref)
                 body.append([
-                    f"(committed file, same games, {ref[0]['threads']} threads)", f"{ref[0]['n']}..{ref[-1]['n']}", len(ref),
+                    f"(committed file, same games, {ref[0]['threads']} threads)",
+                    f"{ref[0]['n']}..{ref[-1]['n']}", len(ref),
                     ref[0]["threads"], f"{sum(r['seconds']['search'] for r in ref):.1f}", f"{ref_total:.1f}", "-",
                     f"{3600 * len(ref) / ref_total:.0f}", "-", "-",
                 ])
-    table(["machine", "games", "n", "threads", "search s", "sum of games' total s", "run wall s", "games/hour (total s)",
-           "games/hour (wall)", "scores differing"], body)
+    table(
+        ["machine", "games", "n", "threads", "search s", "sum of games' total s", "run wall s",
+         "games/hour (total s)", "games/hour (wall)", "scores differing"],
+        body,
+    )
 
 
 
