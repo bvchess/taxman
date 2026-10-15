@@ -5,8 +5,19 @@
 
 use crate::bits::Bits;
 use crate::numtheory::Tables;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, VecDeque};
+
+/// Which of the two loops of `unzip` settled a pair of a mandatory move and the factor it claims.  The names are those
+/// of the two moves of a peel (`heuristics/THEORY.md`, Theorem 3): a front move pairs a move with its only factor, a
+/// back move a factor with its only move.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ClaimKind {
+    /// A factor wanted by a single remaining source went to it (the first loop of `unzip`, over the factors).
+    Back,
+    /// A source with a single unclaimed factor took it (the second loop of `unzip`, over the sources).
+    Front,
+}
 
 /// A frame as setup forms it: a connected group of sources with the factors they compete for, plus what the
 /// simplification found (the Java's `bombus.Hive`; before frames with the same number are merged, though a merged
@@ -26,6 +37,10 @@ pub struct Frame<const W: usize> {
     mandatory: Bits<W>,
     /// The factors those mandatory moves use up.
     claimed: Bits<W>,
+    /// The pairs `unzip` settled in this frame, as (source, factor, kind), in the order made, across all its calls on
+    /// the frame.  The sources are exactly `mandatory` and the factors exactly `claimed`, each once.  Nothing in the
+    /// solver reads them; they are for the census of the frames' structure (`examples/structure.rs`).
+    claims: Vec<(u32, u32, ClaimKind)>,
     /// Sources that cannot be played together with the others.
     impossible: Bits<W>,
     /// The frame's freedoms, `|factors| − |sources|` once the frame has been simplified; see `Frame::new`.
@@ -52,6 +67,7 @@ impl<const W: usize> Frame<W> {
             factors,
             mandatory: Bits::EMPTY,
             claimed: Bits::EMPTY,
+            claims: Vec::new(),
             impossible: Bits::EMPTY,
             freedoms: factors.len() as i32,
             can_add: RefCell::default(),
@@ -101,6 +117,13 @@ impl<const W: usize> Frame<W> {
     /// Sources found impossible.
     pub fn impossible(&self) -> Bits<W> {
         self.impossible
+    }
+
+    /// The pairs `unzip` settled in the frame, as (source, factor, kind), in the order made.  The sources are exactly
+    /// the `mandatory` ones and the factors exactly the `claimed` ones, each once.  For the census of the frames'
+    /// structure (`examples/structure.rs`); nothing in the solver reads them.
+    pub fn claims(&self) -> &[(u32, u32, ClaimKind)] {
+        &self.claims
     }
 
     /// The frame's freedoms, `|factors| − |sources|`: how many factors are left over once every source has one.
@@ -172,6 +195,9 @@ pub struct BoardFrames<'t, const W: usize> {
     composites_of: Lists,
     /// The working storage of `count_freedoms`.
     peel: RefCell<Peel>,
+    /// How often `has_outside_move_using` met a composite homed in a merged-away frame ([`Home::MergedAway`]), and
+    /// how often, at such a composite, it answered yes (see [`merged_away_reach`](Self::merged_away_reach)).
+    merged_away: Cell<(u32, u32)>,
 }
 
 impl<'t, const W: usize> BoardFrames<'t, W> {
@@ -212,7 +238,8 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
 
         let (frames, home) = Self::form_frames(t, sources, &factors_of);
         let peel = RefCell::default();
-        let mut board_frames = BoardFrames { t, frames, home, factors_of, composites_of, peel };
+        let merged_away = Cell::default();
+        let mut board_frames = BoardFrames { t, frames, home, factors_of, composites_of, peel, merged_away };
         let order = board_frames.order_frames();
         board_frames.reorder(&order);
         board_frames.finish_setup();
@@ -578,6 +605,7 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
         let (sources, factors, impossible) =
             (self.frames[i].sources, self.frames[i].factors, self.frames[i].impossible);
         let (mut mandatory, mut claimed) = (self.frames[i].mandatory, self.frames[i].claimed);
+        let mut claims = Vec::new();
         let mut answers = Answers::default();
         let mut found = false;
         loop {
@@ -593,6 +621,7 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
                     if !self.factor_can_go_forward(f, &mut answers) && !self.has_outside_move_using(f, &mut answers) {
                         mandatory.insert(s);
                         claimed.insert(f);
+                        claims.push((s, f, ClaimKind::Back));
                         made_claim = true;
                     }
                 }
@@ -607,6 +636,7 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
                     if !self.has_outside_move_using(f, &mut answers) {
                         mandatory.insert(s);
                         claimed.insert(f);
+                        claims.push((s, f, ClaimKind::Front));
                         made_claim = true;
                         break;
                     }
@@ -621,6 +651,7 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
         let frame = &mut self.frames[i];
         frame.mandatory = mandatory;
         frame.claimed = claimed;
+        frame.claims.extend(claims);
         frame.swept &= !found;
         found
     }
@@ -647,12 +678,18 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
         }
         let f_frame = self.frame_of_factor(f);
         let answer = self.composites_of.of(f).iter().any(|&c| {
-            let c_frame_has_freedoms = match self.home[c as usize] {
+            let home = self.home[c as usize];
+            let c_frame_has_freedoms = match home {
                 Home::Live(p) => p as usize != f_frame && !self.frames[p as usize].is_closed(),
                 Home::MergedAway { had_freedoms } => had_freedoms,
                 Home::OffBoard => unreachable!("a hole is nobody's composite"),
             };
-            c_frame_has_freedoms && self.can_add_source(&self.frames[f_frame], c)
+            let uses_f = c_frame_has_freedoms && self.can_add_source(&self.frames[f_frame], c);
+            if matches!(home, Home::MergedAway { .. }) {
+                let (reached, answered_yes) = self.merged_away.get();
+                self.merged_away.set((reached + 1, answered_yes + u32::from(uses_f)));
+            }
+            uses_f
         });
         answers.outside.insert(f, answer);
         answer
@@ -773,6 +810,16 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
     /// merged frames are no longer listed by any frame.)
     pub fn impossible(&self) -> Bits<W> {
         self.frames.iter().fold(Bits::EMPTY, |acc, h| acc | h.impossible)
+    }
+
+    /// How far the quirk of [`Home::MergedAway`] reaches, as counted so far by this `BoardFrames`: how many times
+    /// `has_outside_move_using` met a composite homed in a merged-away frame, and how many times, at such a
+    /// composite, it found that the frame of the factor could take the composite on and the stale frame had freedoms
+    /// (so that the composite counted as an outside move).  Measured by the census of the frames' structure
+    /// (`examples/structure.rs`).  The quirk can only make `unzip` claim less: a composite homed in a merged-away
+    /// frame is an impossible source, which no frame can take on.
+    pub fn merged_away_reach(&self) -> (u32, u32) {
+        self.merged_away.get()
     }
 
     /// A legal order in which to play the sources of frame `i`: the peel of `count_freedoms`
@@ -1258,6 +1305,47 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// The claims of every frame: distinct sources, which are the frame's mandatory moves, and distinct factors, which
+    /// are the factors those moves use, each one a factor the source can use.
+    fn check_claims<const W: usize>(a: &BoardFrames<W>, what: &str) {
+        for frame in a.frames() {
+            let claims = frame.claims();
+            let sources: Bits<W> = claims.iter().map(|&(s, _, _)| s).collect();
+            let factors: Bits<W> = claims.iter().map(|&(_, f, _)| f).collect();
+            let name = &frame.name;
+            assert_eq!(sources.len() as usize, claims.len(), "{what}, frame {name}: a source claims twice");
+            assert_eq!(factors.len() as usize, claims.len(), "{what}, frame {name}: a factor is claimed twice");
+            assert_eq!(sources, frame.mandatory, "{what}, frame {name}: the sources of the claims");
+            assert_eq!(factors, frame.claimed, "{what}, frame {name}: the factors of the claims");
+            for &(s, f, _) in claims {
+                assert!(a.factors_of.of(s).contains(&f), "{what}, frame {name}: {s} cannot use {f}");
+            }
+        }
+    }
+
+    #[test]
+    fn the_claims_of_unzip_are_the_mandatory_moves_and_the_factors_they_use() {
+        let mut rng = Rng(0x5851_F42D_4C95_7F2D);
+        for n in 2..=300u32 {
+            let t = Tables::new(n);
+            let plain = BoardFrames::<5>::new(&t, Bits::EMPTY);
+            check_claims(&plain, &format!("n={n}"));
+            // Nothing has been merged, so no number has a stale home.
+            assert_eq!(plain.merged_away_reach(), (0, 0), "n={n}");
+            let promoted = subset(&mut rng, plain.promotion_candidates(), 50);
+            check_claims(&BoardFrames::<5>::new(&t, promoted), &format!("n={n} promoting {promoted:?}"));
+        }
+    }
+
+    /// README's example: on the board 1..=21 the move 15 must take the factor 5, a back move (5 is wanted by 15 alone).
+    #[test]
+    fn fifteen_must_take_five_on_the_board_of_21() {
+        let t = Tables::new(21);
+        let a = BoardFrames::<1>::new(&t, Bits::EMPTY);
+        let at = a.frame_index_of(15).expect("15 is on the board");
+        assert!(a.frames()[at].claims().contains(&(15, 5, ClaimKind::Back)), "{:?}", a.frames()[at].claims());
     }
 
     #[test]

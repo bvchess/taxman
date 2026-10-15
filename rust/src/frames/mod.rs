@@ -17,6 +17,9 @@
 //! * [`BoardFrames`] is all the frames of a board, in playing order.
 //! * [`SearchFrames`] is what the search takes of them: for each frame with freedoms, numbered from the front, its
 //!   moves and factors as a [`crate::model::Frame`], and the numbers that could be promoted.
+//! * [`Numbering`] is the board's frames as [`BoardFrames::new`] forms them, before any is merged, each as a
+//!   [`NumberedFrame`] with its number, the frames in front of it and the pairs `unzip` settled in it; it is for the
+//!   census of the structure of the frames (`examples/structure.rs`), and the solver does not use it.
 //!
 //! The Java has several names for the one idea (DESIGN.md, "The Java solver and the frame solver", maps them); this
 //! module calls it a frame throughout.  [`Frame`] has the name of [`crate::model::Frame`], the search's copy of it (a
@@ -94,6 +97,8 @@
 //! their smallest source.  The construction is the Java's and does not depend on it, but in every board up to 2000
 //! the numbering comes out clean: every frame with freedoms directly in front of a frame numbered `k > 0` is
 //! numbered `k − 1` (and there is at least one), and no two frames with the same number are neighbours.
+//! [`numbering`] exposes the numbers of the board's frames, for the census of the structure of the frames
+//! (`examples/structure.rs`).
 //!
 //! # Why frames are merged
 //!
@@ -157,7 +162,7 @@
 
 mod board_frames;
 
-pub use board_frames::{BoardFrames, Frame};
+pub use board_frames::{BoardFrames, ClaimKind, Frame};
 
 use crate::bits::Bits;
 use crate::model;
@@ -176,6 +181,10 @@ pub struct SearchFrames<const W: usize> {
     /// The names setup gave the merged frames (A, B, ...), joined with `+`, one for each of `frames`; for
     /// diagnostics only.
     pub names: Vec<String>,
+    /// For each of `frames`, the pairs `unzip` settled in the merged frame as the final `finish_setup` left it (the
+    /// [`Frame::claims`] of the frame that `frames` takes its remaining moves and factors from), in the order made.
+    /// For the census of the structure of the frames (`examples/structure.rs`); nothing in the solver reads them.
+    pub claims: Vec<Vec<(u32, u32, ClaimKind)>>,
     /// Every number that could be promoted, in any frame: for each frame with freedoms, the factors it could spare
     /// that a frame in front of it could take on as a source ([`BoardFrames::promotion_candidates_of`]), collected
     /// number by number before the frames with that number are merged.
@@ -190,14 +199,56 @@ impl<const W: usize> SearchFrames<W> {
     }
 }
 
+/// The board's frames as [`BoardFrames::new`] forms them with no promotions, before any merge, in playing order, with
+/// the numbers [`build_frames`] gives them.  See [`numbering`].
+#[derive(Clone, Debug)]
+pub struct Numbering<const W: usize> {
+    pub frames: Vec<NumberedFrame<W>>,
+    /// [`BoardFrames::merged_away_reach`] of the board's frames once `build_frames` has merged and simplified them.
+    pub merged_away_reach: (u32, u32),
+}
+
+/// One of the board's frames before any merge, as [`Numbering`] lists it.
+#[derive(Clone, Debug)]
+pub struct NumberedFrame<const W: usize> {
+    pub name: String,
+    /// The sources setup keeps (mandatory ones included), the impossible ones apart.
+    pub sources: Bits<W>,
+    pub impossible: Bits<W>,
+    pub factors: Bits<W>,
+    pub freedoms: i32,
+    pub closed: bool,
+    /// The pairs `unzip` settled before any merge.
+    pub claims: Vec<(u32, u32, ClaimKind)>,
+    /// The frame's number (0 = the front), `None` if it has none (closed).
+    pub number: Option<usize>,
+    /// `BoardFrames::frames_in_front` of the frame: positions in [`Numbering::frames`].
+    pub in_front: Vec<usize>,
+}
+
 /// Builds the frames of the board `1..=t.n` with no promotions.
 pub fn build_frames<const W: usize>(t: &Tables) -> SearchFrames<W> {
+    build(t, false).0
+}
+
+/// [`build_frames`], and with it the board's frames as they were before any was merged, with their numbers: what the
+/// census of the structure of the frames (`examples/structure.rs`) looks at.  The frames the search takes are built
+/// by the same function as the solver's, so the census sees exactly what the solver builds.
+pub fn numbering<const W: usize>(t: &Tables) -> (Numbering<W>, SearchFrames<W>) {
+    let (frames, listed) = build(t, true);
+    (listed.expect("a numbering was asked for"), frames)
+}
+
+/// The work of [`build_frames`] and [`numbering`]; the numbering is made only when `record` is set, so the solver's
+/// path pays nothing for it.
+fn build<const W: usize>(t: &Tables, record: bool) -> (SearchFrames<W>, Option<Numbering<W>>) {
     let mut board_frames = BoardFrames::<W>::new(t, Bits::EMPTY);
 
     // The frames with freedoms are numbered on the board's frames as they are, before anything is merged.  A frame
     // is named by its smallest factor, because merging changes the positions of the frames but not what they hold.
     // (A frame with freedoms has factors.)
-    let numbered = numbered_frames(&board_frames);
+    let Numbers { groups: numbered, number, in_front } = numbered_frames(&board_frames);
+    let pre_merge = record.then(|| describe_frames(&board_frames, &number, in_front));
     let mut candidates = Bits::EMPTY;
     for same_number in &numbered {
         let positions: Vec<usize> =
@@ -214,6 +265,7 @@ pub fn build_frames<const W: usize>(t: &Tables) -> SearchFrames<W> {
     board_frames.finish_setup();
 
     let (mut frames, mut names) = (Vec::with_capacity(numbered.len()), Vec::with_capacity(numbered.len()));
+    let mut claims = Vec::with_capacity(numbered.len());
     for same_number in &numbered {
         let at = board_frames.frame_index_of(same_number[0]).expect("a numbered frame is one of the board's frames");
         let frame = &board_frames.frames()[at];
@@ -221,37 +273,86 @@ pub fn build_frames<const W: usize>(t: &Tables) -> SearchFrames<W> {
         debug_assert_eq!(search_frame.freedoms, frame.freedoms(), "frame {}", frame.name());
         frames.push(search_frame);
         names.push(frame.name().to_owned());
+        claims.push(frame.claims().to_vec());
     }
-    SearchFrames { frames, names, candidates }
+    let listed = pre_merge.map(|frames| Numbering { frames, merged_away_reach: board_frames.merged_away_reach() });
+    (SearchFrames { frames, names, claims, candidates }, listed)
+}
+
+/// The board's frames as [`Numbering`] lists them: each with its number (`number`, by position among the frames) and
+/// the frames in front of it (`in_front`, as `numbered_frames` left them: those of a closed frame are found here).
+fn describe_frames<const W: usize>(
+    board_frames: &BoardFrames<W>,
+    number: &[Option<usize>],
+    in_front: Vec<Option<Vec<usize>>>,
+) -> Vec<NumberedFrame<W>> {
+    board_frames
+        .frames()
+        .iter()
+        .zip(number)
+        .zip(in_front)
+        .enumerate()
+        .map(|(i, ((frame, &number), in_front))| NumberedFrame {
+            name: frame.name().to_owned(),
+            sources: frame.sources(),
+            impossible: frame.impossible(),
+            factors: frame.factors(),
+            freedoms: frame.freedoms(),
+            closed: frame.is_closed(),
+            claims: frame.claims().to_vec(),
+            number,
+            in_front: in_front.unwrap_or_else(|| board_frames.frames_in_front(i)),
+        })
+        .collect()
+}
+
+/// What `numbered_frames` makes of the board's frames.
+struct Numbers {
+    /// One entry per number, in order, listing the frames that got it, each named by its smallest factor; the frames
+    /// of one entry are the ones to merge.
+    groups: Vec<Vec<u32>>,
+    /// The number of each of the board's frames, by position; `None` for a closed frame, and for a frame with
+    /// freedoms that no number reached (which cannot happen, the frames being a DAG).
+    number: Vec<Option<usize>>,
+    /// The frames in front of each frame with freedoms, which the numbering looked at (`BoardFrames::frames_in_front`),
+    /// kept so that nothing is found twice; `None` for a closed frame, which it does not look at.
+    in_front: Vec<Option<Vec<usize>>>,
 }
 
 /// Numbers the frames that have freedoms from the front (0 is played first) and groups them by number: one entry
 /// per number, in order, listing the frames that got it, each named by its smallest factor; the frames of one entry
 /// are the ones to merge.  Among the frames with one number, the order is that of their smallest source.  See the
-/// module documentation for how the numbers are formed.
-fn numbered_frames<const W: usize>(board_frames: &BoardFrames<W>) -> Vec<Vec<u32>> {
+/// module documentation for how the numbers are formed.  Besides the groups, the result has every frame's number and
+/// the frames in front of the frames with freedoms ([`Numbers`]).
+fn numbered_frames<const W: usize>(board_frames: &BoardFrames<W>) -> Numbers {
     let frames = board_frames.frames();
     let is_closed = |i: usize| frames[i].is_closed();
     let by_smallest_source = |i: &usize| frames[*i].sources().min();
 
-    let mut current: Vec<usize> = (0..frames.len())
-        .filter(|&i| !is_closed(i) && board_frames.frames_in_front(i).into_iter().all(is_closed))
-        .collect();
+    let mut in_front: Vec<Option<Vec<usize>>> = vec![None; frames.len()];
+    let mut current: Vec<usize> = Vec::new();
+    for i in (0..frames.len()).filter(|&i| !is_closed(i)) {
+        let in_front_of_i = board_frames.frames_in_front(i);
+        if in_front_of_i.iter().all(|&j| is_closed(j)) {
+            current.push(i);
+        }
+        in_front[i] = Some(in_front_of_i);
+    }
     current.sort_by_key(by_smallest_source);
 
-    let mut placed = vec![false; frames.len()];
-    let mut numbered = Vec::new();
+    let mut number: Vec<Option<usize>> = vec![None; frames.len()];
+    let mut groups = Vec::new();
     while !current.is_empty() {
-        numbered.push(
+        groups.push(
             current.iter().map(|&i| frames[i].factors().min().expect("a frame with freedoms has factors")).collect(),
         );
         for &i in &current {
-            placed[i] = true;
+            number[i] = Some(groups.len() - 1);
         }
         let mut next: Vec<usize> = Vec::new();
         for &i in &current {
             for behind in board_frames.frames_behind(i) {
-                if !placed[behind] && !is_closed(behind) && !next.contains(&behind) {
+                if number[behind].is_none() && !is_closed(behind) && !next.contains(&behind) {
                     next.push(behind);
                 }
             }
@@ -259,7 +360,7 @@ fn numbered_frames<const W: usize>(board_frames: &BoardFrames<W>) -> Vec<Vec<u32
         next.sort_by_key(by_smallest_source);
         current = next;
     }
-    numbered
+    Numbers { groups, number, in_front }
 }
 
 #[cfg(test)]
@@ -292,6 +393,83 @@ mod tests {
         for n in [1u32, 2, 10] {
             let found = build_frames::<1>(&Tables::new(n));
             assert!(found.frames.is_empty() && found.candidates.is_empty(), "n={n}");
+        }
+    }
+
+    /// The numbering that the census looks at is the one `build_frames` uses, on every board up to 400: `numbering`
+    /// builds the same search frames; the board's frames, grouped by number, are the groups that `build_frames`
+    /// merges; only the closed frames have no number; and the frames in front are those of `frames_in_front`.
+    #[test]
+    fn the_numbering_is_what_build_frames_uses() {
+        for n in 2..=400u32 {
+            let t = Tables::new(n);
+            let (numbered, found) = numbering::<8>(&t);
+            assert_eq!(found, build_frames::<8>(&t), "n={n}");
+
+            let board_frames = BoardFrames::<8>::new(&t, Bits::EMPTY);
+            assert_eq!(numbered.frames.len(), board_frames.frames().len(), "n={n}");
+            for (i, (listed, frame)) in numbered.frames.iter().zip(board_frames.frames()).enumerate() {
+                let at = format!("n={n} frame {}", frame.name());
+                assert_eq!(listed.name, frame.name(), "{at}");
+                assert_eq!(listed.sources, frame.sources(), "{at}");
+                assert_eq!(listed.impossible, frame.impossible(), "{at}");
+                assert_eq!(listed.factors, frame.factors(), "{at}");
+                assert_eq!((listed.freedoms, listed.closed), (frame.freedoms(), frame.is_closed()), "{at}");
+                assert_eq!(listed.claims, frame.claims(), "{at}");
+                assert_eq!(listed.number.is_none(), listed.closed, "{at}: only a closed frame has no number");
+                assert_eq!(listed.in_front, board_frames.frames_in_front(i), "{at}");
+            }
+
+            let count = numbered.frames.iter().filter_map(|f| f.number).max().map_or(0, |last| last + 1);
+            assert_eq!(count, found.frames.len(), "n={n}: the numbers");
+            assert_eq!((found.names.len(), found.claims.len()), (count, count), "n={n}: one entry per number");
+            for h in 0..count {
+                // The order of the merge: by smallest source.
+                let mut group: Vec<&NumberedFrame<8>> =
+                    numbered.frames.iter().filter(|f| f.number == Some(h)).collect();
+                assert!(!group.is_empty(), "n={n}: no frame has the number {h}");
+                group.sort_by_key(|f| f.sources.min());
+                let names: Vec<&str> = group.iter().map(|f| f.name.as_str()).collect();
+                assert_eq!(names.join("+"), found.names[h], "n={n} number {h}");
+
+                // The merged frame holds the parts' factors, those its mandatory moves claim among them, and no
+                // source the parts did not have.
+                let factors = group.iter().fold(Bits::EMPTY, |acc, f| acc | f.factors);
+                let sources = group.iter().fold(Bits::EMPTY, |acc, f| acc | f.sources);
+                let claimed: Bits<8> = found.claims[h].iter().map(|&(_, f, _)| f).collect();
+                let claiming: Bits<8> = found.claims[h].iter().map(|&(s, _, _)| s).collect();
+                assert_eq!(factors, found.frames[h].factors | claimed, "n={n} number {h}: factors");
+                assert!((found.frames[h].moves | claiming).is_subset(&sources), "n={n} number {h}: sources");
+            }
+        }
+    }
+
+    /// The module's examples: the board of 85 has three numbers; on the board of 20 the frames of 14 and of 15 are
+    /// both number 0 (and so merged), and the frame of 12, 18, 20 is number 1.
+    #[test]
+    fn the_numbers_of_the_examples() {
+        let (numbered, found) = numbering::<2>(&Tables::new(85));
+        let mut numbers: Vec<usize> = numbered.frames.iter().filter_map(|f| f.number).collect();
+        numbers.sort_unstable();
+        numbers.dedup();
+        assert_eq!((numbers, found.frames.len()), (vec![0, 1, 2], 3));
+
+        let (numbered, found) = numbering::<1>(&Tables::new(20));
+        let frame_of = |x: u32| numbered.frames.iter().position(|f| f.sources.contains(x)).expect("a source");
+        let number_of = |x: u32| numbered.frames[frame_of(x)].number;
+        assert_ne!(frame_of(14), frame_of(15));
+        assert_eq!((number_of(14), number_of(15), number_of(12)), (Some(0), Some(0), Some(1)));
+        assert_eq!(found.names[0].matches('+').count(), 1);
+    }
+
+    /// The quirk of `Home::MergedAway` is reached on the board of 114 and on no other board up to 400, twice, and
+    /// neither time does it make a factor wanted outside its frame (`BoardFrames::merged_away_reach`).
+    #[test]
+    fn the_reach_of_the_merged_away_quirk() {
+        for n in 2..=400u32 {
+            let (numbered, _) = numbering::<8>(&Tables::new(n));
+            let expected = if n == 114 { (2, 0) } else { (0, 0) };
+            assert_eq!(numbered.merged_away_reach, expected, "n={n}");
         }
     }
 
