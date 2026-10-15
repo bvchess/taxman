@@ -103,8 +103,7 @@ promotion from that frame needs one frame to go to.
   a promoted number paying tax only from the frame one forward ([DESIGN.md, Tactics](DESIGN.md#5-tactics)).  They
   were validated by agreement with the Java's `optimal.json` for n <= 1000, by exhaustive search (`src/brute.rs`,
   `heuristics/evaluation/certify.py`) for small boards (n <= 62), and by [the prover](prover/README.md), which proves
-  the optimum on the whole board, without the frame model, for every n <= 1300, the committed chain to there (its
-  proofs of 1301 to 2175 are pending).
+  the optimum on the whole board, without the frame model, for every n <= 2175, the committed chain.
 * **Given the pruning is exact.**  Every tactic is proven or sound: none prunes a promotion set that could win
   ([DESIGN.md, Tactics](DESIGN.md#5-tactics) grades each).  So a result rests on nothing but the frame model, the
   correctness of the code and, where its proof says so, the game it was built from.

@@ -18,7 +18,7 @@ Two primary approaches:
    aggregate.  Ground truth now exists out there: the solver in `rust/`
    has proven games to n=2175 (within its frame model), and the prover
    (`rust/prover`, a branch and bound over sets of moves on the whole
-   board) proves their scores optimal on the whole board to n=1300.
+   board) proves their scores optimal on the whole board to n=2175.
 
 This chart shows the player's share of the pot using different
 strategies. Solvent and continuation hug the optimal line tightly.
@@ -254,7 +254,7 @@ gap (the distance to the bound, which the true optimum also lives
 inside).  The ground truth to compare them with now exists: the solver
 in `rust/` has proven games to n=2175 (`rust/results/strict.jsonl`,
 within the frame model) and the prover proves their scores optimal on
-the whole board to n=1300.
+the whole board to n=2175.
 
 ### Certificates
 

@@ -99,7 +99,7 @@ example, the board 1..=21, is in the [README](README.md#how-the-solver-sees-the-
   forward.  They are validated by agreement with the Java's optimal.json for n ≤ 1000; by the prover (a branch and
   bound over sets of moves on the whole board, from the playability theorems, the Franklín–Moniot bound, the parity
   bound of THEORY.md's Theorem 10, the ceiling and the prime formula, and nothing of frames), which confirms the
-  optimum of every game of the committed chain to n = 1300 (its proofs of 1301–2175 are pending); by an independent
+  optimum of every game of the committed chain, to n = 2175; by an independent
   brute force (`heuristics/evaluation/certify.py`) for n ≤ 62; and by `brute`, the solver's own exhaustive search,
   which checks frame-model games on small boards (up to 40 in the test suite, 52 in `examples/sacrifice validate`).
   The greedy removal of impossible sources at the root, where it shapes the search space, is descending greedy on each

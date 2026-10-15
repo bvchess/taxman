@@ -170,10 +170,11 @@ What that evidence amounts to:
 5. **Assumptions.**  `strict.jsonl` assumes nothing beyond the frame model: it starts at n = 1, so no game of it is
    built from optimal.json (which is only compared with, up to 1300: a score that differs would be a hard error), and
    all 2175 games record that they assume nothing.
-6. **The prover's proofs.**  The prover proves every n up to 1300 optimal without the frame model (no frames or
+6. **The prover's proofs.**  The prover proves every n up to 2175 optimal without the frame model (no frames or
    promotions: [the prover's README](../prover/README.md); [THEORY.md](../../heuristics/THEORY.md),
-   Theorem 10), so `strict.jsonl`'s games to 1300 do not rest on the frame model either.  Its proofs of 1301–2175 are
-   pending.
+   Theorem 10), so `strict.jsonl`'s scores do not rest on the frame model either: all 2175 are the optimum on the
+   whole board (1301–2175 in the cloud run of 2026-10-14 and 15,
+   [EXPERIMENTS](../docs/EXPERIMENTS.md#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10)).
 
 The checks cannot catch a game that is legal, finished and within the chain bounds but not optimal when the game of
 n − 1 is not optimal either.  That is what the proof kinds and the assumptions track, and why the chain from n = 1 and

@@ -19,7 +19,7 @@ for the numbers fixed in at a node (the frame solver's *forced member* is the sa
 |---|---|---|---|
 | (★): descending greedy is maximum-cardinality on every component and truncation of the upper-half instance, hence U\* is the heaviest playable upper set (the upper-half conjecture) | 3,231 of 3,236 rejection-bearing components, n ≤ 1500 and 40 samples to 4000, plus n = 2873 and 9170; 5 undecided (n = 3103, 3872, 3936, 4000, 9170); scripts not kept | **every game n = 2 .. 100,000** (602,777,907 greedy rejections) and **902 games to 2,000,000** (60,183,674 more): every rejection a GF(2) linear dependency, which certifies (★) for the whole game; the five undecided components settled; no counterexample | certified per game (a bound met), open in general |
 | greedy removal of impossible sources in frames (`removeImpossible`) | agreement with optimal.json to 1000 | at the root (where it shapes the search space) it *is* descending greedy on each upper-half component, so it is certified with (★) for every n ≤ 100,000 | certified per game |
-| the frame model as a whole: `unzip`'s mandatory moves, freedoms, closed frames inert, promotions one frame forward, greedy removal | brute force over pot states to n = 62; agreement with the Java's optimal.json, made by the same model, to 1000 | **opt(n) proven equal to the recorded score, on the whole board, for every n = 2 .. 1300**, the whole committed chain (300 of them past the Java's 1000, the solver's own results) | verified (exact, on the whole board) |
+| the frame model as a whole: `unzip`'s mandatory moves, freedoms, closed frames inert, promotions one frame forward, greedy removal | brute force over pot states to n = 62; agreement with the Java's optimal.json, made by the same model, to 1000 | **opt(n) proven equal to the recorded score, on the whole board, for every n = 2 .. 2175**, the whole committed chain (1175 of them past the Java's 1000, the solver's own results) | verified (exact, on the whole board) |
 | uniqueness: one optimal set per game, and every optimal game's upper part U\* | the unique heaviest upper set by brute force to n = 62; one optimal game recorded per n | **U\* is the unique heaviest playable upper set wherever (★) holds** (Theorem 8), so to 100,000; every optimal set enumerated, on the whole board, in 954 of the games 2..989 (the other 34 with the upper half fixed): **the optimal set is unique for every n ≤ 424, not at 425**; 30 games have two or three; every optimal set found has upper part U\* | proven (upper half, given (★)); measured (whole game) |
 | the longest games: an optimal game plays the most moves a game of the board can (the wiki's open question; the Java's `reviseFreedoms` assumes it for a two-frame game) | open; believed true (the wiki), unproven (a comment in the Java) | **false**: at n = 833, 834 and 835 every optimal game is one move short of the longest; every other game to 1300 is a longest game, the gap never above one | refuted (on the whole board); measured to 1300 |
 
@@ -38,7 +38,7 @@ What the evidence is, in one paragraph each:
   optimum by a tenth of what the Franklín–Moniot bound does.  It branches on minimal unplayable sets found by peel,
   with forced picks from the duals and learned nogoods; with the proven ceiling opt(n) ≤ n + opt(n−1) and the prime
   formula (in the data, `relation: chain` is a game at its ceiling, V(n) = n + V(n−1), and `relation: prime` one given
-  by the prime formula), it proves the recorded optimum for every n ≤ 1300, the whole committed chain (the
+  by the prime formula), it proves the recorded optimum for every n ≤ 2175, the whole committed chain (the
   Franklín–Moniot bound alone had reached 989).
 * **Every optimal set.**  The same search, run in an enumeration mode one below the optimum, lists every optimal
   set of a game for about the cost of proving the optimum.  The optimal set is unique for every n ≤ 424; from 425
@@ -245,20 +245,70 @@ nodes grows 0.16 ± 0.04 and log10 seconds 0.23 ± 0.04 per 100 in n over 900–
 dominate), 0.33 and 0.34 from n = 78 on.  The search with the Franklín–Moniot bound alone had spent 50–70 million
 nodes on each of 990–996 without finishing; the parity bound proves them from scratch in 44,000–68,000.
 
-1300 is not the limit, and the recorded optima no longer stop the proofs there: the committed chain
-(`../results/strict.jsonl`) reaches 2175.  The extrapolation from the bands above (0.23 decades per 100 in n: to 2000
-about 57 hours of thread time, the hardest proofs about 3 hours) was made before there was anything to measure it
-against, and it is low.  Over 34 games of 1302–2124 that `exact` finished (and five dear ones stopped unfinished at
-1.1–2.2 million nodes), the nodes of the proof were 0.13 to 13 times the nodes of the solver's own search of the game,
-the ratio growing about tenfold per 1000 in n (the parity bound is the weaker one), and the root's parity gap, which
-tracks the cost over 900–1300, does not predict it past 1300.  With the solver's nodes (`tools/summarize.py order`) and
-the fitted ratio, 1301..2175 take about 200 million nodes, **about 140 thread-hours** (100 to 250) at 2.5 ms a node,
-the dearest games, 2170–2173, about 6 hours each, 1475, 1430, 1472 and 1521 about 1.5 hours; the games are independent
-and one thread each, so it is half a day on 16 CPUs
-([EXPERIMENTS.md](../docs/EXPERIMENTS.md#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) has the
-measurements; `../tools/cloud/prover.sh` runs it,
-[RUNBOOK section 9](../tools/cloud/RUNBOOK.md#9-the-provers-proofs-of-optn-1301-to-2175) the procedure).  Not yet
-run; the table at the top says 1300 until it is.
+The committed chain (`../results/strict.jsonl`) reaches 2175, and the next subsection is the run that proved it.  The
+extrapolation from the bands above (0.23 decades per 100 in n: to 2000 about 57 hours of thread time, the hardest
+proofs about 3 hours) was made before there was anything to measure it against, and it was low: 1301–1999 took 164
+hours, the hardest proof (1475) 4.9.
+
+### To 2175, on a cloud machine
+
+`data/exact_parity_1301_2175.jsonl`: `exact` over the 875 games of 1301–2175, each proven from scratch with the parity
+bound, on one `c8g.4xlarge` (Graviton4, 16 vCPUs, one game a thread) on spot in us-east-1b, run by
+`../tools/cloud/prover.sh` ([RUNBOOK section 9](../tools/cloud/RUNBOOK.md#9-the-provers-proofs-of-optn-1301-to-2175))
+from 2026-10-14 23:29 to 2026-10-15 15:22 UTC, the build of commit 4db7a14: 190 passes of 300 s, every one ending with
+status 0, no interruption; 15.9 hours of run, 16.0 instance-hours at $0.2402, **$3.84**.  The check
+(`../tools/cloud/prover.sh --verify 1301 2175`, on the instance and again at home on this file) prints `OK: opt(n) is
+proven equal to the recorded score for every n in 2..2175`: every game has a line with the recorded score, and no
+search found a set that beats it.  With `tools/summarize.py exact data/exact_parity_2_1300.jsonl
+data/exact_parity_1301_2175.jsonl`:
+
+| | games |
+|---|---|
+| Franklín–Moniot bound already equals V(n) | 45 |
+| parity bound at the root already equals V(n) | 199 |
+| proven by a search | 1,047 (557 to 1300, 490 from 1301) |
+| `chain`, at its ceiling V(n) = n + V(n−1), predecessor proven | 607 (337 and 270) |
+| `prime`, by the prime formula, predecessor proven | 276 (161 and 115) |
+| **every n in 2 .. 2175**, the whole committed chain | **2174** |
+
+Of the 875 games of 1301–2175, 490 needed a search, and every one ran to the end (the root's parity bound exceeds the
+recorded score in each, by 125 to 767, mean 384); the other 385 are at their ceiling or meet the prime formula, and
+took 83 seconds in all.  The searches took 309.2 million nodes and **226.0 thread-hours** (search seconds), 2.63 ms a
+node on average.  `tools/summarize.py cost --band 100 data/exact_parity_1301_2175.jsonl` gives the cost by band (the
+dearest game of each in brackets):
+
+| n | searches | the root's parity gap (mean) | median nodes | most nodes | nodes (millions) | thread-hours | ms a node |
+|---|---|---|---|---|---|---|---|
+| 1301–1399 | 60 | 297 | 53,346 | 2,639,109 (1393) | 31.6 | 22.7 | 2.58 |
+| 1400–1499 | 58 | 447 | 730,285 | 6,328,930 (1475) | 67.2 | 47.3 | 2.54 |
+| 1500–1599 | 58 | 458 | 335,164 | 2,889,122 (1520) | 30.9 | 19.9 | 2.32 |
+| 1600–1699 | 53 | 340 | 132,489 | 1,879,179 (1696) | 13.1 | 7.2 | 1.99 |
+| 1700–1799 | 55 | 313 | 110,480 | 633,344 (1700) | 9.8 | 5.6 | 2.03 |
+| 1800–1899 | 54 | 433 | 727,936 | 5,333,481 (1849) | 82.7 | 52.7 | 2.29 |
+| 1900–1999 | 52 | 294 | 92,155 | 1,898,240 (1995) | 11.7 | 9.1 | 2.79 |
+| 2000–2099 | 56 | 374 | 176,716 | 4,136,842 (2064) | 23.5 | 20.1 | 3.08 |
+| 2100–2175 | 44 | 527 | 262,534 | 6,868,466 (2172) | 38.7 | 41.5 | 3.86 |
+
+What the cost follows is the root's parity gap, not n: over the 490 searches log10 nodes grows 0.477 ± 0.017 per 100
+points of gap (tenfold per 210; R² 0.61, residual sd 0.45 decades; 900–1300 had tenfold per 84), and −0.009 ± 0.013
+per 100 in n (R² 0.00; log10 seconds 0.007 ± 0.013): the bands' means swing between 294 and 527 of gap with no steady
+rise.  The cost of a node does not grow steadily with n: 2.0–2.6 ms through 1899 (2.58 at 1301–1399, 1.99 at
+1600–1699; 2.12 ms for 1300 alone on one Graviton4 core, the calibration's, and 1.7 on two quiet laptop threads at
+1200–1300), then 2.8, 3.1 and 3.9 ms by the hundreds to 2175, 4.10 to 4.15 for 2170–2173.  The dear games are many: 77
+searches took a million nodes or more and 57 an hour or more, the ten dearest 24% of the thread-hours and the fifty
+dearest 59%.
+
+Against the projection of 2026-10 (the solver's nodes times a ratio fitted on 34 finished games, 2.5 ms a node; about
+200 million nodes, 150 to 300, and 140 thread-hours, 100 to 250, half a day on 16 CPUs): the run took 1.5 times the
+nodes (just above that range) and 1.6 times the thread-hours (inside it), 2.63 ms a node against 2.5, and 15.9 hours
+of wall time.  The dearest games, 2170–2173, came near it: 6.79 to 6.87 million nodes (the projection said 8, which is
+6 hours at 2.5 ms a node) and 7.7 to 7.9 hours each at 4.1 ms.  The next ones were dearer than projected: the
+projection gave 1475, 1430, 1472 and 1521 1.7 to 2.5 million nodes and 1.5 hours each, and they took 6.33, 2.88, 3.85
+and 0.89 million nodes, 4.9, 1.9, 3.0 and 0.6 hours; 1848–1851 took 5.33, 5.33, 4.51 and 4.50 million nodes, 3.0 to 3.6
+hours each, and 2060 and 2064 3.4 and 4.0 hours; 2160 and 1863, on the projection's list, took 0.2 and 0.6 hours.  The
+projection's order of the games put 12 of the 16 dearest among its first 16.
+[EXPERIMENTS.md](../docs/EXPERIMENTS.md#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) has the
+run's account and what it says about the projection's model.
 
 ## 4. Adversarial search: what protects greedy
 
@@ -567,7 +617,8 @@ bash tools/adversary_campaign.sh                                                
 ./target/release/optsets --list 798,799,800 --upper fixed --threads 1 --seconds 540 --out FIXED.jsonl
 ./target/release/moves --from 2 --to 1300 --seconds 540 --out OUT.jsonl         # one thread; ~7 minutes
 ../tools/cloud/prover.sh 1301 2175                # `exact` over a range in resumable passes, all CPUs, then the check
-tools/summarize.py check 1301 2175 data/exact_parity_2_1300.jsonl OUT.jsonl     # every n in 2..2175 proven, scores recorded
+tools/summarize.py check 1301 2175 data/exact_parity_2_1300.jsonl data/exact_parity_1301_2175.jsonl
+                                    # every n in 2..2175 proven, scores recorded
 tools/summarize.py span|star|exact|cost|adversary|optsets|moves FILE...
 tools/crosscheck_optsets.py data/optsets_2_989.jsonl --max 57 --budget 120     # theory-free, about 8 minutes
 tools/crosscheck_greedy.py data/span_2_100000.jsonl.gz --max 1000
@@ -585,10 +636,11 @@ gzipped where large (`gunzip -k` to resume into it).
   rejection of descending greedy on an upper-half instance is a GF(2) dependency of what it kept above — a
   statement about cores and closed surfaces mod 2 that the adversarial results tie to the window law with the
   real ranking of the primes.
-* The prover's proofs reach 1300; the committed chain now reaches 2175 and the check of 1301..2175 is prepared
-  (`../tools/cloud/prover.sh`; about 140 thread-hours, section 3), not run.  What the parity bound still misses are
-  the odd cores (THEORY.md, Theorem 10): its root gap, 130 points on average at 1000–1300, grows about 14 per 100 in
-  n, and the cost with it; the conflicts of its heaviest sets are large (20–45 members at 990).
+* The prover's proofs reach 2175, the end of the committed chain; 1301–2175 took 226 thread-hours (section 3), and a
+  longer chain will need more.  What the parity bound still misses are the odd cores (THEORY.md, Theorem 10): its
+  root gap, 130 points on average at 1000–1300 and 384 over the searched games of 1301–2175 (125 to 767, no steady
+  rise), and the cost with it (tenfold the nodes per 210 points); the conflicts of its heaviest sets are large (20–45
+  members at 990).
 * The optimal sets of 990–1300 are not enumerated.  The enumeration mode works with the parity bound (tested
   against brute force), so `optsets` with it would extend section 5 at about the cost of the proofs.
 * The frame model's individual assumptions other than the greedy removal are tested only end to end (through

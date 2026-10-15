@@ -9,7 +9,7 @@
     summarize.py exact FILE...    the proofs of optimal scores (a later file overrides)
     summarize.py check A B FILE...  FILEs prove every n in 2..B, with the recorded scores in A..B
     summarize.py order A B        the games A..B, dearest first by the solver's nodes (the order prover.sh runs them)
-    summarize.py cost FILE...     its cost curve: the searches made with the parity bound from scratch, by band
+    summarize.py cost [--band N] FILE...  its cost curve: the searches made with the parity bound from scratch, by band
     summarize.py optsets FILE...  every optimal pick set per game (bin/optsets.rs): tables, exchanges, canonical sets
     summarize.py moves FILE...    the longest games against the optimal ones (bin/moves.rs)
 """
@@ -133,17 +133,19 @@ def exact(paths):
             f"n={r['n']} +{r['nodes'] - r['matching_nodes']} nodes" for r in sorted(resumed, key=lambda r: r["n"])))
 
 
-def exact_cost(paths, band=50):
-    """The cost curve of the searches made with the parity bound from scratch (no nodes without it), by band of n:
-    how many, nodes and seconds, the root's parity gap; and the least-squares slopes of log10 nodes and seconds."""
+def exact_cost(args):
+    """cost [--band N] FILE...: the cost curve of the searches made with the parity bound from scratch (no nodes
+    without it), by band of n (50 wide unless N says): how many, nodes and seconds, milliseconds a node (total seconds
+    over total nodes), the root's parity gap; and the least-squares slopes of log10 nodes and seconds."""
     import math
     import statistics
+    band, paths = (int(args[1]), args[2:]) if args[:1] == ["--band"] else (50, args)
     rows = sorted((r for r in lines(paths) if r.get("parity") and r["search"] == "proven"
                    and not r.get("matching_nodes")), key=lambda r: r["n"])
     hours = sum(r['secs'] for r in rows) / 3600
     print(f"searches with the parity bound from scratch: {len(rows)}, total {hours:.2f} h")
     print(f"{'n':>11} {'games':>5} {'gap':>6} {'median nodes':>12} {'max nodes':>10} {'median s':>9} {'max s':>8} "
-          f"{'total s':>8}")
+          f"{'total nodes':>12} {'total s':>8} {'ms/node':>8}")
     for lo in range(rows[0]["n"] // band * band, rows[-1]["n"] + 1, band):
         sel = [r for r in rows if lo <= r["n"] < lo + band]
         if not sel:
@@ -153,7 +155,7 @@ def exact_cost(paths, band=50):
         secs = [r["secs"] for r in sel]
         print(f"{lo:>5}-{lo + band - 1:<5} {len(sel):>5} {statistics.mean(gaps):>6.0f} "
               f"{statistics.median(nodes):>12.0f} {max(nodes):>10} {statistics.median(secs):>9.1f} {max(secs):>8.1f} "
-              f"{sum(secs):>8.0f}")
+              f"{sum(nodes):>12} {sum(secs):>8.0f} {1000 * sum(secs) / max(sum(nodes), 1):>8.2f}")
 
     def slope(xs, ys):
         mx, my = statistics.mean(xs), statistics.mean(ys)

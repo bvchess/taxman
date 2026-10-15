@@ -12,8 +12,9 @@ sweep, `--engine`, `--pauses`); `setup.sh` through its build and checks; `verify
 macOS and in the Docker image (Linux, arm64) over a range, with a SIGTERM stop and a resume; `chain.sh` also ran in the
 image after the `run.sh` split.  On EC2 (Amazon Linux 2023, Graviton) the calibration
 ([bench/cloud/](../../bench/cloud/README.md)) ran the solver and the prover on a `c7g.16xlarge` and a `c8g.16xlarge`
-with its own scripts, and the prover's run of section 9 uses `setup.sh` (`PROVER_ONLY=1`), `prover.sh`, `save.sh` (with
-an instance role) and `spot-watch.sh`, all of which have run there; no spot interruption has yet tested `spot-watch.sh`.
+with its own scripts, and the prover's run of section 9 (2026-10-14 and 15, to the end) used `setup.sh`
+(`PROVER_ONLY=1`), `prover.sh`, `save.sh` (with an instance role) and `spot-watch.sh`, all of which have run there; no
+spot interruption has yet tested `spot-watch.sh`, and the run's 15.9 hours had none.
 The scaling run on a `c8g.48xlarge` ran `setup.sh` in full (without the tests) and `verify.sh` there.  Not run on EC2:
 `chain.sh` and `scaling.sh` (the calibration and the scaling run did by hand what they do), and nothing has run on
 Ubuntu.  Sections 2 and 3 exist to find the problems that a macOS run cannot, on a machine that costs cents.  The speed
@@ -649,14 +650,16 @@ on a Graviton4 core, and the chain's speed and cost a game on 64 and 192 threads
 ## 9. The prover's proofs of opt(n), 1301 to 2175
 
 The committed chain (`results/strict.jsonl`) reaches 2175, and the prover in `rust/prover` has proven opt(n) = V(n)
-without the frame model only to 1300 ([the prover's README, section 3](../../prover/README.md#3-the-proofs-of-optn)).
-`prover.sh` runs the same program, `exact`, over 1301..2175 on a cloud machine.  It is a small job next to the
-chain: about 140 thread-hours at the laptop's speed (100 to 250), half a day on 16 vCPUs, for a few dollars.  The
-estimate rests on measurements on a laptop and on the committed data of the 1..1300 proofs.  The
-[Graviton calibration](../../docs/EXPERIMENTS.md#graviton-calibration-2026-10) has since measured the CPU (a Graviton4
-core runs the prover at 0.93 of an M1 Max core, a Graviton3 core at 0.75; Graviton5 was not measured), and the run
-itself found that the cost of a node on Graviton4 grows with n (section 9.2).  The first run, on a `c8g.4xlarge` on
-spot, started on 2026-10-14 as section 9.4 describes; section 9.6 is what to do with its results.
+without the frame model for every n to there: 1301..2175 in the run of 2026-10-14 and 15 that this section describes
+([the prover's README](../../prover/README.md#to-2175-on-a-cloud-machine) has the results and their cost).
+`prover.sh` runs the same program, `exact`, over a range of games on a cloud machine.  It is a small job next to the
+chain: the run took 226 thread-hours, 15.9 hours on 16 vCPUs, for $3.84.  Section 9.2 keeps the estimate it was planned
+by, about 140 thread-hours at the laptop's speed (100 to 250), which rests on measurements on a laptop and on the
+committed data of the 1..1300 proofs.  The
+[Graviton calibration](../../docs/EXPERIMENTS.md#graviton-calibration-2026-10) measured the CPU (a Graviton4 core runs
+the prover at 0.93 of an M1 Max core, a Graviton3 core at 0.75; Graviton5 was not measured), and the run itself found
+that the cost of a node on Graviton4 grows with n (section 9.2).  The run was on a `c8g.4xlarge` on spot, launched on
+2026-10-14 as section 9.4 describes; section 9.6 is what to do with the results of a run.
 
 ### 9.1 How `exact` uses the CPUs, and what the script does about it
 
@@ -724,7 +727,10 @@ Vantage's Linux price in US East (`c8g`: $0.0399 per vCPU-hour at every size):
 
 From 16 vCPUs up the dearest games set the wall time, not the CPUs: 2170-2173 start at once and the longest of them
 decides (6 to 24 hours over the draws, at the laptop's speed; about 9 hours at Graviton4's cost per node for the
-model's 8 million nodes), and the idle CPUs are paid for.  The run's own totals replace this table (section 9.6).
+model's 8 million nodes), and the idle CPUs are paid for.  The run's own totals replace this table: 15.9 hours and $3.84
+on 16 vCPUs, inside the row's ranges; 2170-2173 took 7.7 to 7.9 hours each, and what set the wall time was the packing
+of the late starts, not those games
+([EXPERIMENTS](../../docs/EXPERIMENTS.md#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10)).
 
 ### 9.3 Which instance, and the quota
 
@@ -954,14 +960,16 @@ for every n in 2..2175`; anything else prints which n.  Then, on your machine:
 
 ```
 python3 rust/prover/tools/summarize.py exact rust/prover/data/exact_parity_2_1300.jsonl rust/prover/data/exact_parity_1301_2175.jsonl
-python3 rust/prover/tools/summarize.py cost rust/prover/data/exact_parity_1301_2175.jsonl      # the cost table by band
+python3 rust/prover/tools/summarize.py cost --band 100 rust/prover/data/exact_parity_1301_2175.jsonl   # cost by band
 ```
 
-Commit `rust/prover/data/exact_parity_1301_2175.jsonl` (about 200 KB, never overwritten by a later run: `OUT` names
-another file).  Do not commit the work directory, the checkpoints or the logs.  Then update the three places that say
-the prover's proofs stop at 1300 or are pending: the table and sections 3 and 8 of
-[../../prover/README.md](../../prover/README.md), the "pending" sentence of the entry "The committed chain to 2175" and
-the register row of [../../docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md), with the totals from the two commands above
-and the real milliseconds per node of a Graviton CPU by n (the table of 9.2 is a prediction).  Then the end of the
+Commit `rust/prover/data/exact_parity_1301_2175.jsonl` (152 KB, never overwritten by a later run: `OUT` names another
+file).  Do not commit the work directory, the checkpoints or the logs.  Then update the places that say how far the
+prover's proofs reach, found by searching the guides for the old range (after the run of 2026-10-14 and 15: the table
+and sections 3, 7 and 8 of [../../prover/README.md](../../prover/README.md); the entry on the proofs of 1301-2175, its
+register rows and the "pending" sentence of "The committed chain to 2175" in
+[../../docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md); the READMEs, `DESIGN.md`, `results/README.md`, `AGENDA.md`
+and `THEORY.md`), with the totals from the two commands above and the real milliseconds per node of a Graviton CPU by
+n (the table of 9.2 is a prediction).  Then the end of the
 [rules for every launch](#rules-for-every-launch): terminate the instance (`POWEROFF=always` has shut it down, which
 terminates it) and confirm that nothing is left, the launch's security group included.
