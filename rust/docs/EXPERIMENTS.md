@@ -201,6 +201,9 @@ those of the page the row points to; a game is named by its board size, and time
 | The fields study's first master: GF(2) and independent-set columns tied by link rows `Σ α [x ∈ Q] − Σ β [x ∈ I] ≤ ε` (the design's), dense revised simplex | [fields](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) | not kept: replaced by rank inequalities with an exact certificate | 71% of the pivots steps of the perturbation's size; 1000 unconverged in 60 s (master 18,893 against L 24,382); the rank-inequality master converges there in 4-8 s |
 | A dual simplex for the fields master's violated rows (instead of elastic rows) | [fields](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) | not kept | looped: 10 million pivots in a 73-row LP within one 120 s root |
 | A1: carry the fields bound's core-derived signings and multipliers from one searched game's root to the next (a pilot: a `carry` command of `examples/fields.rs`, fits of 120 s, refits of 12 s) | [carrying 7](#carrying-a-searchs-learning-to-the-next-game-2026-10) | measured (pilot); the carry worth building, inside A1's E3 | five pairs of 1800-2172: carried with no refit 0.59-0.94 of the next root's own share of the GF(2) gap closed (median 0.75), refitted for a tenth of the budget with separation 0.82-1.17 (median 1.08), above its own in four of five (43-63 signings against 26-33 from one root); below only at 2170→2172, whose first fit did not converge; sound with no check (Lemma S); step 2 (about 30 roots, then a chain of ten) decides it |
+| The fields bound past 2175: the main arm certified at 17 roots of 2200-3400, 600 s a root (A1's E2) | [E2](#e2-past-2175-2026-10) | measured: not killed (K1, K2), not a strong pass; the 17 root fits saved for E3 | 0.46 of the root's GF(2) gap (12 converged roots; 0.37-0.40 at the dearest games, gaps of 1,300-1,450), flat in n past 2200 but 0.15 below E1's 0.62; against the gap −3.8 ± 1.1 points per 100 of gap; over 900-3333 the slope is −1.00 ± 0.34 points per 100 n (t −2.9); 81 minutes of one thread |
+| Core-derived signings a frame: 16 against 8 (A1's E2) | [E2](#e2-past-2175-2026-10) | measured: the limit stays 8 | +0.047 of the gap at the 6 roots of gap ≤ 1,013, +0.006 at the 5 dear roots (the design asks 0.05): its rounds end in an exact check of twice as many matroids, so at the large gaps it completes 5-6 rounds in 600 s where 8 completes 12-14 |
+| Search mode for the fields bound (no exact checks, 60 s), and the main arm certified with a 60 s budget, against E1's certified bounds (A1's E2) | [E2](#e2-past-2175-2026-10) | search mode not kept; the certified fit with a budget is | search mode ends in under 4 s at 0.274 of the gap above E1's bound, within 5% of the gap at 0 of 54 roots (the cheap inequalities describe a relaxation of the LP); certified with 60 s: at 54 of 54, mean 0.002 of the gap; at the 17 roots past 2175, 0.038 of the gap above the 600 s run (worst 0.151) |
 | Does the root's GF(2) heaviest set have the optimum's size? (`bench/gf2/roots.jsonl`'s `size` against `strict.jsonl`'s promotions, 1301-2175) | [agenda C4](AGENDA.md#4-conjectures) | measured | 758 of the 760 searched and repeated games; at 1320 and 1322 the heaviest set has 77 members and the optimum 78 (`max_total`) |
 | Barring each member of U\* in the parity bound at the root, against opt(n) (a certificate that every optimal set holds it) | [agenda 7.3](AGENDA.md#73-barred-bounds-on-the-upper-part) | measured; open ([agenda A2](AGENDA.md#a2-certify-the-frame-model-then-prove-with-its-facts-a-change-of-slope-for-the-proven-wall)) | certifies 207 of 224 (600), 339 of 377 (1000), 472 of 490 (1300); the open ones within the root's gap, the largest prime among them |
 
@@ -423,7 +426,7 @@ single-sacrifice route) have their row above.
 | [The gap past 2175](#the-gap-past-2175-2026-10) | what are the true root gaps of the EC2 chain's games, how do they grow, do they explain its trees (the 2340s, 3174-3176, 3300), what at the root is left, and what will 4000 to 6000 cost? | 509 gaps of 341 to 1,443 (mean 818), +37 per 100 n over 1301-3312 and G/n steady at 300: neither of the two regimes; the current build's trees are 0.29 times the committed chain's, a decade of nodes per 250 of gap, the gap counting in units of n^0.3 (0 to 0.5 bracket); the dear games are the games of high gap, nothing at the root explains the rest (A4 killed); a game costs ×10 per 1,050-1,250 n and a day on a `c8g.16xlarge` reaches about 4,100 | ee03872 (no solver change) and the entry |
 | [Boards past 4095](#boards-past-4095-2026-10) | what limits the boards to 4095, how far does one more width take them, and what does a board past 4095 cost? | built: boards to 8191 at 128 words, every board's frames and ranks scanned to bound the rest (9 frames, 5 block words); nothing changes to 4095; a node at 4100 1.1% dearer at 128 words than at 72, so no width between | 4316168 |
 | [The frame model on a proven footing](#the-frame-model-on-a-proven-footing-2026-10) | are the frame model's assumptions theorems, and what is left?  Steps E1-E4 of the consultation of 2026-10-15 | yes, given clean numbering, which holds on every board to 8191 and setup now checks: Lemma Ω and Theorems L, B and M in THEORY.md, the census and two test files with no exception; left: U, some optimal game plays U\*_{≥3} | 631e027, a122f43, de63aba, d7a322a, 5e44ac6 and the write-up after them |
-| [A bound over GF(2) and GF(3) signed frame matroids](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) | does the LP over the GF(2) frame matroids and GF(3) signed frame matroids (signings made for the cores its columns meet) close a share of the root's GF(2) gap that holds with n (A1's E1, with E1n at the probe's nodes)? | yes: 0.62 of the gap at n ≥ 1700, no trend in n (+1.0 ± 2.6 points per 100 n), passing its kill criteria strongly; fixed signings close little; 86-98% of the probe's nodes GF(2) leaves open cut with node-fitted multipliers; Theorems 14-15 in THEORY.md | 7666072 to 1e12c77 and the entry (no solver change) |
+| [A bound over GF(2) and GF(3) signed frame matroids](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) | does the LP over the GF(2) frame matroids and GF(3) signed frame matroids (signings made for the cores its columns meet) close a share of the root's GF(2) gap that holds with n (A1's E1, with E1n at the probe's nodes)? | yes: 0.62 of the gap at n ≥ 1700, no trend in n (+1.0 ± 2.6 points per 100 n), passing its kill criteria strongly; fixed signings close little; 86-98% of the probe's nodes GF(2) leaves open cut with node-fitted multipliers; Theorems 14-15 in THEORY.md; E2 past 2175: 0.46 at 17 roots of 2200-3400 (0.37-0.40 at gaps of 1,300-1,450), not killed | 7666072 to 1e12c77, 32cccb3 (E2's instrument) and the entry (no solver change) |
 | [The upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | which members of U\*_{≥3} do barred parity bounds certify past 1300 (E5), and are the cloud measurements E6 (free sources in the prover) and E9(a) (a counterexample hunt) ready? | E5: 85-93% of the members certified, no game closed, the open share following the root's gap; E6 and E9(a) built, tested and calibrated, each under $1 or about $5 at spot, waiting for approval | abcfb18, 4076730, 8afefaa and the write-up |
 | [The frame model by layer, and the extended problem](#the-frame-model-by-layer-and-the-extended-problem-2026-10) | steps 2A and 3 of the second consultation: can the numbering by layer be the definition with no result changing, and is the extended problem Π⁺(O), with some sources optional, exact? | 2A: yes, no tree changes, N by construction, Theorem M with no hypothesis.  3: yes, Theorem M⁺ proven, no mismatch with the oracle in 30 million sets and random sets to 4095; Π⁺(∅) searched by the existing engine gives every score of 2..1300 at 2.5% more nodes | 40cf6d0 (2A), d2dde50 (3) |
 | [Theorem B by default in the prover, and the hunt's probes](#theorem-b-by-default-in-the-prover-and-the-hunts-probes-2026-10) | should the prover run from Theorem B's roles, what should E9(a) spend on a pair, and does 2B's test of the certificates see an over-generous rule? | yes: 4% fewer nodes and half the time a node over 2..999, the roles obeyed by every recorded game to 2175, closure decided per board; the hunt in decreasing margin with probes above 900, about 140 vCPU-hours instead of 400; the mutation is caught on 12 boards | 52fc685, 7d67ef5, c308c77 |
@@ -6436,3 +6439,145 @@ refitted for a tenth of the budget, at 1.08.
   preloaded table, with the ladder's three options (record, check a nogood file against a root and load it, prove at a
   value) and a script for the overlap.  With the hooks off every tree must be unchanged (the probe's fingerprints, the
   tripwires and the one-thread chain 1..1300 are the gates).
+### E2: past 2175 (2026-10)
+
+*Question.*  The advisor's second consultation (S4): does the main arm's share hold on the games past 2175, where the
+chain stops and the root gaps are 440 to 1,440?  The kill criteria were fixed before any run, on `f1cores` certified at
+600 s a root: **K1** the mean share over the roots from 2200 on that converge (a bracket within 1% of the gap) below
+0.25; **K2** a slope of the share against n over 900 to the last root of −2 points per 100 n or worse with t ≤ −2; and
+if more than 30% of the roots from 2200 on fail to converge in 600 s, the mean over all of them decides (their shares
+are lower bounds on their LPs').  The same runs decide the limit on core-derived signings a frame (16 against 8, adopted
+at a gain of 0.05 of the gap or more at the dear roots), whether *search mode* (a fit with no exact checks, 60 s)
+reaches E1's certified bound within 5% of the gap at 80% of E1's 54 converged roots, and they write the root fits that
+E3 starts from.
+
+*Roots and data.*  The optima past 2175 are those of the EC2 chain, from a snapshot of its results to board 3423 (not
+yet in `results/`: `--known` takes the snapshot after `results/strict.jsonl`, and [the README of
+bench/fields](../bench/fields/README.md) names it by its hash).  The roots: every 100th game of 2200-3400 (13) and the
+*dear* games, the searched games (proof `exhausted`) past 2175 with the largest root GF(2) gaps: 3300 (1443), 3333, 3335
+and 3336 (1427 each) and 3176 (1388): 17 distinct roots, 3300 being both.  3333, 3335 and 3336 are neighbours of one
+search with nearly one root, three roots of one family and not three independent ones.  Two games of proof `cap` have
+gaps as large (3303: 1443, 3339: 1427); they were not searched, and are not among the dear roots.
+
+*Instrument* (32cccb3; the bound, its validity and E1's results are as they were, see the reproduction below).
+`--fit-mode search` skips the exact checks: a family's generation ends when no column prices out at the master's duals
+and no cheap inequality is violated, the run when the separation then finds no new core (`Stop::Fitted`); `lb` is 0, so
+the root does not count as converged.  `--save-fit DIR` writes the fit of each `f1cores` run as `DIR/n{N}.json`:
+`common/fit.rs` (its module comment is the format) holds the signings, the multipliers, the final master's columns and
+its rank inequalities, reads a file back, and gives its bound again at the root, which every run asserts before it
+writes.  The fit is that of the *lowest L the run evaluated*, not of the final family: merging cores into a signing
+changes its matroid, which is not a restriction of the old one, and then the final family's LP can be the higher; a
+certified lower bound above the run's bound proves it, and happened at 3335 (the final family's lower bound 254732.7,
+the bound 254722) and in 17 of E1's 132 core-arm runs.  An arm `f1cores16` is the main arm with 16 core-derived signings
+a frame.  `common/dw.rs` already dispatched the intersection to `Meet<3>` for blocks of 129 to 192 coordinates (it
+asserts at most 192; the largest frame matroid has rank 137 at 3423, 128 at 3200 and 132 at 3300); a test compares it
+with the reference at 3200, 3300 and 3400, and every run checks it every 50th pricing as before.  A test reads
+`bench/fields/fits` back and checks each file's bound at its root.
+
+**The main arm certified, 600 s a root.**  Share of the GF(2) gap closed (`*`: not converged in 600 s, the share a lower
+bound on the LP's), seconds, and the share with a limit of 16 signings a frame where run:
+
+| n | gap | share | s | limit 16 | | n | gap | share | s | limit 16 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 2200 | 573 | 0.529 | 27 | 0.614 | | 3000 | 734 | 0.496 | 96 | 0.522 |
+| 2300 | 721 | 0.320 | 40 | | | 3100 | 1181 | 0.633* | 600 | |
+| 2400 | 740 | 0.428 | 152 | 0.469* | | 3176 | 1388 | 0.465* | 600 | 0.441* |
+| 2500 | 1048 | 0.467 | 248 | | | 3200 | 1013 | 0.519 | 277 | 0.571* |
+| 2600 | 439 | 0.392 | 32 | 0.419 | | 3300 | 1443 | 0.398* | 600 | 0.377* |
+| 2700 | 731 | 0.539 | 43 | | | 3333 | 1427 | 0.391 | 396 | 0.404* |
+| 2800 | 774 | 0.616 | 122 | 0.667 | | 3335 | 1427 | 0.371 | 345 | 0.379* |
+| 2900 | 662 | 0.495 | 71 | | | 3336 | 1427 | 0.367* | 600 | 0.423* |
+| | | | | | | 3400 | 1320 | 0.488* | 600 | 0.360* |
+
+Twelve of the 17 roots converged (5 did not, 29.4%: under the 30% at which the rule changes), so the criteria are
+computed on the converged roots.  **K1**: the mean share over them is **0.464** (0.466 over all 17; killed below 0.25).
+**K2**: over the converged roots of 900-3333, E1's 54 and E2's 12, the slope is **−1.00 ± 0.34 points per 100 n, t =
+−2.9** (killed at −2 or worse with t ≤ −2); over all 83 roots −0.84 ± 0.27, t = −3.1.  So E2 is **not killed**; it does
+not pass strongly either (E1's measure: a mean of 0.5 and a slope above −1 point).  Past 2200 alone the share is flat:
+by 200 n from 2200 the means are 0.43, 0.45, 0.47, 0.56, 0.53, 0.41, 0.49 (−0.02 ± 0.69 points per 100 n over the 12
+converged roots), at a mean of 0.464, 0.155 ± 0.046 below E1's 0.619 at 1700-2175 (t = 3.4): the share fell as the games
+went from E1's to E2's, and then stopped falling.
+
+*The fall is the gap's.*  After the fact (not one of the criteria), over E1's and E2's 83 roots of the main arm,
+converged or not: the share against the root's GF(2) gap is 0.725 at gaps of 0-199, 0.571 at 200-399, 0.544 at 400-599,
+0.467 at 600-799, 0.540 at 1000-1249 (3 roots) and 0.413 at 1250-1499 (6 roots), and a least-squares fit of the share on
+n and the gap gives +0.9 ± 0.6 points per 100 n and **−3.8 ± 1.1 points per 100 of gap**.  The chain's gaps grow with n
+(+37 per 100 n over 1301-3312), so the share seems a function of the gap, not of n, and at the gaps of the dearest
+games, 1,300 to 1,450, it is 0.4 (0.37-0.40 at 3300 and 3333-3336).  E1's draw of roots had gaps of 70-770; E2's are
+440-1,443.  (The standard errors take the roots as independent, which they are not quite.)
+
+*The unconverged roots are near their LPs.*  At the five roots that did not converge, the lowest L is within 6.2-9.9 of
+the master's value, an uncertified estimate of the LP (1% of their gaps is 12-14): what is missing is the certificate,
+whose exact checks and separation take three quarters of the time (3300: 535 s of 600 outside the intersections and the
+master's simplex, 15.7 million pivots in the checks), not a bound that is still falling.  Their shares are probably
+within about 0.01 of the LPs'.  At 3100 the share (0.633) is the highest of the 17.
+
+*The limit of 16.*  With 16 core-derived signings a frame the shares at the six roots of gap 1,013 or less are higher by
+0.086, 0.041, 0.027, 0.050, 0.026 and 0.051 of the gap (mean 0.047; 2200 converged, in 471 s against 27 s); at the five
+dear roots the gains are −0.024, −0.021, +0.013, +0.008 and +0.056 (mean **0.006**; the design asks for 0.05), and at
+3400 −0.128.  Over all 12 roots the mean gain is 0.015 and three are worse.  At the large gaps the 16-signing fit does
+not finish in 600 s (all five dear roots end at the budget, with certified lower bounds far below), because its rounds
+end in an exact check of about twice as many matroids (49-63 against 28-36): at 3333, 3335, 3336 and 3400 it completes 5
+or 6 rounds where the main arm completes 12 to 14, and finds fewer cores (3400: 128 against 648).  By the rule **the
+limit stays 8**; whether 16 would gain at the dear roots with more time is not measured (its gain at the roots that
+converge, 0.03-0.09, suggests it would, and that the limit of 8 binds: every root has 8 core-derived signings on at
+least one of frames 1-4, and 57% of the cores found cannot be placed).
+
+*Search mode does not serve; a short certified budget does.*  Search mode as specified ends in under 4 s (the 60 s
+are not used: the separation finds no new core after 23 to 480 pricings, where E1's runs at the same roots took 133 to
+1,082) with a bound above E1's certified one by **0.274 of the gap** on average (median 0.252, worst 0.640; 0.26 to 0.33
+in every band of 500 n), within 5% of the gap at **0 of E1's 54 converged roots** (80% needed).  Its master has only the
+cheap inequalities (the most violated level set of its point, and the support sets, closed), which describe a relaxation
+of the LP: the exact checks find rank inequalities that those miss, so what they add is bound, not only certificate.  By
+the design's rule the fit is then *certified mode with a longer budget*, and a budget alone does it: the main arm
+certified with **60 s**, cut off wherever it is, is within 5% of the gap of E1's bound at **54 of 54** of E1's roots
+(mean difference 0.002 of the gap, worst 0.044, at 1950 and 1975, which need 88 and 114 s to converge) and, at the 17
+roots past 2175, above the 600 s run's by 0.038 of the gap on average (median 0.025), within 5% at 12 of the 17 (the
+other five, 2500, 3176, 3200, 3300 and 3400, are above it by 0.088, 0.058, 0.117, 0.051 and 0.151).  A fit of 60 s thus
+costs under 0.05 of the gap where the gap is under 800 and up to 0.15 at the frontier's gaps, where the design's budget
+that grows with the gap is the right shape.  The runs of the 54 roots with the new code reproduce E1's lines exactly
+where both converged within 60 s (48 of 48 roots: bound, lowest L, lower bound, pricings, rounds, cores, columns and
+cuts all equal): the changes to `dw.rs` did not touch the fit.
+
+*Fits, signings and cost.*  The 17 fits are in `bench/fields/fits` (14 MB; the README there says what each holds).  The
+main arm took 81 minutes of one thread for the 17 roots (the design's 5 hours were for 600 s at every root), 27 to 600 s
+a root; the 12 roots of the limit of 16, 96 minutes.  A pricing (one intersection and the greedies) costs 1.2 ms at 2200
+and 2.9 ms at 3400 (0.15-0.96 ms at 900-2175), 640 to 2,660 of them a root; over the 17 roots the intersections are 1%
+of the time, the master's simplex 24% and the rest, 75%, the exact checks (millions of pivots a root) and the
+separation, converged roots and others alike.  The cores come from more frames than E1's: frame 4 holds core-derived
+signings at every root from 2700 on, with 8 at 6 of the 12 (E1 had them on frames 1-3), and frames 5 and 6 at four
+roots; a root finds 150 to 663 distinct cores, 57% of them unplaced (E1: 48%).  No GF(3) loop occurred.
+
+*Conclusion.*  E2 does not kill A1 at the frontier, and does not repeat E1's strong pass.  The main arm closes 0.46 of
+the root GF(2) gap at 17 roots of 2200-3400 (12 certified; the master's value puts the other five within about 0.01 of
+their LPs): flat past 2200 (−0.02 ± 0.69 points per 100 n) but 0.15 below E1's 0.62, a fall that goes with the gap (−3.8
+± 1.1 points per 100 of gap, +0.9 ± 0.6 per 100 n beside it) and leaves 0.37-0.40 at the dearest games, gaps of 1,300 to
+1,450.  The advisor's table S2 (second consultation) puts a share of 0.3 at +210 of affordable gap and 0.5 at +930 for a
+node 20 times as dear as GF(2)'s; 0.4 lies between.  The limit of 8 core-derived signings a frame stays (16 gains
+0.03-0.09 where it converges, nothing at the dear roots in 600 s), and the family stays fragmented: every root fills the
+limit on some frame, and 57% of the cores found go unplaced.  For E3 and E4 the root fit should be the certified arm
+with a budget that grows with the gap, not search mode (60 s costs under 0.05 of the gap below a gap of 800 and up to
+0.15 above it, and the 17 certified fits are in `bench/fields/fits`).
+
+*Questions for the advisor and deviations from the design* (each resolved as stated, all sound):
+
+1. 17 distinct roots, not 18: 3300 is a multiple of 100 and a dear root.  The dear roots are the literal five largest
+   gaps among the chain's exhausted searches; 3333, 3335 and 3336 are neighbours (one root family), so the verdict on
+   the limit at "the dear roots" rests on three families, 3300, 3176 and 3333-3336.  3303 and 3339 (proof `cap`) were
+   left out.
+2. The saved fit is the lowest L the run evaluated, not the final family's, so that the file's `bound` is the run's
+   bound and reproducible; the cuts of the final master are kept for the signings the fit has and their ranks are the
+   final family's (a reader takes the ranks again).  `support` (how many leading columns are the master's support) is an
+   addition to the design's format.
+3. Runs beyond the design: the main arm certified with 60 s at E1's 54 roots and at the 17 roots (the design's fallback
+   "certified mode with a longer budget" needed to know what a budget buys), and the roots reproduction above.  The
+   search-mode criterion is measured on the bound each run reached (E1's `bound` against the search run's), the lowest L
+   over all families, not E1's `l_best` of the final family.
+4. The kill criteria were applied as written: K2 over the converged roots of 900-3333 (E1's 54 and E2's 12); the slope
+   over all roots is also given.  Its t of −2.9 with a slope of −1.0 is a significant fall that the criterion, set at
+   −2, does not count; the gap fit above is an after-the-fact reading of it and not a test.
+5. The limit-of-16 fits (12 MB) were not kept in the repository; the budgets are wall-clock, and the runs shared the
+   laptop with other jobs (the 1-minute load was 4 to 10), so the five unconverged roots might converge on an idle one.
+   No run overlapped the owner's pause of the machine's low-priority jobs (14:00-14:40), which would have eaten its
+   budget.
+6. `--known` already took several files (E1's code: `Known::load` gets all of them); no change was needed.
