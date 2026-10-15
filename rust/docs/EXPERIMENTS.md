@@ -4978,8 +4978,8 @@ a return to the empty set's basis when a refactorization finds the basis singula
 50,000 pivots (12 times), purging of nonbasic columns beyond 300, and right-hand sides perturbed by up to 10⁻⁶ (10⁻⁸
 left rounding ties to decide pivots); the exact checks drop the coloops of the matroid restricted to z's support, start
 from the support's independent parts and a pool, and stop at 300 columns (then repeat from the pool while the
-certificate is short).  A dual simplex for the violated rows was tried (a subagent's, kept in no commit): it looped (10
-million pivots in a 73-row LP), and the elastic rows replaced it.
+certificate is short).  A dual simplex for the violated rows was tried (kept in no commit): it looped (10 million
+pivots in a 73-row LP), and the elastic rows replaced it.
 
 *Validity (E0).*  `cargo t --example fields`, 35 tests, all pass: GF(3) arithmetic and bases against scalar and dense
 elimination, the greedy against brute force on 3,000 random matroids, `det3` against integer determinants; the peel's
