@@ -4,9 +4,8 @@
 //!
 //! > Let U\* be the sources that setup keeps (the numbers above n/2 of the game with no promotions, `board.plain`), and
 //! > Π_n the root problem the search is given (`Board::prepare`: the model, the root frame set, the candidates and
-//! > `max_total`).  Provided the numbering of the frames is clean (every frame with freedoms directly in front of a
-//! > frame numbered h is numbered h − 1; checked on every board to 8191 by `examples/structure.rs`), for every set L of
-//! > numbers up to n/2: U\* ∪ L is playable (some order of it is a legal game) if and only if L is a promotion set of
+//! > `max_total`).  For every set L of numbers up to n/2 (the frames being numbered by layer, so that every frame with
+//! > freedoms directly in front of a frame numbered h is numbered h − 1): U\* ∪ L is playable (some order of it is a legal game) if and only if L is a promotion set of
 //! > Π_n (L ⊆ candidates, L can be promoted from the root, |L| ≤ `max_total`), and then the game the promotions make
 //! > (`accelerate::solution_for_promotions`) scores `in_the_bag` + ΣL.
 //!
@@ -28,7 +27,7 @@
 
 mod common;
 
-use common::{play_order, playable, Rng};
+use common::{kept_subsets, play_order, playable, shuffle, Rng};
 use std::collections::BTreeSet;
 use std::time::Instant;
 use taxman::accelerate::solution_for_promotions;
@@ -44,30 +43,6 @@ use taxman::with_width;
 
 // ---------------------------------------------------------------------------------------------------------
 // The oracle against the rules
-
-/// Every subset of `items` (ascending) that `keeps` accepts, found depth first: a set is extended by a larger item
-/// only while it is kept, so `keeps` must hold of every subset of a set it holds of.
-fn kept_subsets(items: &[u32], keeps: &mut dyn FnMut(&[u32]) -> bool) -> BTreeSet<Vec<u32>> {
-    fn extend(
-        items: &[u32],
-        from: usize,
-        set: &mut Vec<u32>,
-        keeps: &mut dyn FnMut(&[u32]) -> bool,
-        found: &mut BTreeSet<Vec<u32>>,
-    ) {
-        found.insert(set.clone());
-        for (i, &item) in items.iter().enumerate().skip(from) {
-            set.push(item);
-            if keeps(set) {
-                extend(items, i + 1, set, keeps, found);
-            }
-            set.pop();
-        }
-    }
-    let mut found = BTreeSet::new();
-    extend(items, 0, &mut Vec::new(), keeps, &mut found);
-    found
-}
 
 /// For every subset of `2..=n` (bit `i` of the index is the number `i + 2`), whether it is the set of moves of some
 /// legal game, from the rules alone: whatever the order, the pot after a set of moves is the board less the moves and
@@ -269,13 +244,6 @@ struct Tally {
 impl Tally {
     fn mean(members: usize, sets: usize) -> f64 {
         members as f64 / sets.max(1) as f64
-    }
-}
-
-/// Shuffles `items` with Fisher-Yates.
-fn shuffle(rng: &mut Rng, items: &mut [u32]) {
-    for i in (1..items.len()).rev() {
-        items.swap(i, rng.below(i as u64 + 1) as usize);
     }
 }
 

@@ -103,12 +103,16 @@
 //! optional, not a source, which the model plays), and the frames are ordered through the hole (a number still sweeps
 //! divisors whose maximal-factor chain to it passes through the hole).  The frame model's own rules (greedy
 //! impossible sources, mandatory moves, closed frames, one-frame promotions; DESIGN.md §2 and §5, and
-//! [`crate::frames`]) apply to punctured boards as they do to `[n]`.  On `[n]` they are proven, given that the
-//! numbering of the frames is clean (heuristics/THEORY.md, Theorem M), but a punctured board is not covered: the
-//! proof is for `[n]`, and the numbering of a punctured board need not be clean (56 without 39 is not).  There they
-//! are only validated: against the brute force ([`crate::brute`]) on every board `[N] ∖ {h}` with `N ≤ 52`.  A
-//! bound computed this way is as sound as the frame model on the punctured board, no more.  Each punctured game is warm-started from an optimal game of the unpunctured board,
-//! which is its ceiling: if that game replays on the punctured board, its score is the answer with no search.
+//! [`crate::frames`]) apply to punctured boards as they do to `[n]`, and so does their proof: the frames are numbered
+//! by layer, so the frame model is exact on a board with holes as on `[n]`, given the sources setup keeps
+//! (heuristics/THEORY.md, Theorem M and "Boards with holes": the heaviest promotion set gives the best game, under the
+//! maximal-factor rule, among those that play every source setup keeps on the punctured board).  What a bound computed
+//! this way rests on is therefore the upper part of each punctured board: that some best game of `B_f` plays every
+//! source setup keeps there.  That is open, as U is on `[n]` (where Theorem B settles the sources of one and two prime
+//! factors; it is not proven for punctured boards, so on them the statement takes in all the kept sources), and it is
+//! validated against the brute force ([`crate::brute`]) on every board `[N] ∖ {h}` with `N ≤ 52`.  Each punctured
+//! game is warm-started from an optimal game of the unpunctured board, which is its ceiling: if that game replays on
+//! the punctured board, its score is the answer with no search.
 //!
 //! # Findings (the negative result)
 //!

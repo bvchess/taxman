@@ -374,6 +374,11 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
         &self.frames
     }
 
+    /// The tables of the board these frames are formed on.
+    pub(crate) fn tables(&self) -> &'t Tables {
+        self.t
+    }
+
     /// The position in [`frames`](Self::frames) of the frame that holds `x`, unless `x` is an impossible source
     /// of a frame that has since been merged away (`Home::MergedAway`), or a hole.
     pub(crate) fn frame_index_of(&self, x: u32) -> Option<usize> {
@@ -513,7 +518,7 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
     /// step in sets of its own, so that the smallest members are the ones the plain scan would reach first.  The
     /// tests compare the result with the plain scan, the Java's recursion, on random inputs; it reads both lists, so
     /// they also show that the two are mirror images, which turning the edges round relies on.
-    fn count_freedoms(&self, moves: Bits<W>, factors: Bits<W>) -> Option<u32> {
+    pub(crate) fn count_freedoms(&self, moves: Bits<W>, factors: Bits<W>) -> Option<u32> {
         let (move_count, factor_count) = (moves.len(), factors.len());
         if move_count > factor_count {
             return None;

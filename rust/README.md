@@ -58,14 +58,16 @@ cost of a game grew by a factor of ten for every 55 to 70 in n past 1200
    played first.  Each frame is a small game, *Taxman Mini*: a set of moves and a set of factors, in which the moves
    must be playable in some order.  Setup drops a frame's *impossible* sources, settles the moves a source with one
    usable factor must make, and counts its *freedoms*, its factors minus its moves: how many factors it can spare.  A
-   frame with none is *closed* and takes no part in the search.  The others are numbered from the front: frame 0 is
-   every one that has no other in front of it, frame 1 every one directly behind those, and so on.  Frames with the
-   same number are merged into one, so that a promotion always has one frame to go to.
+   frame with none is *closed* and takes no part in the search.  The others are numbered from the front, by *layer*:
+   all the sources of a frame have the same number of prime factors, the frames in front of it have one fewer, and
+   frame 0 is the frames with freedoms whose sources have the fewest, frame 1 those with one more, and so on (so frame
+   0 is every one that has no other in front of it, frame 1 every one directly behind those, on every board the solver
+   supports).  Frames with the same
+   number are merged into one, so that a promotion always has one frame to go to.
 4. What a game can choose is which of the spare factors to *promote*: to play it as a move instead of leaving it as
    tax.  Promoting a factor of frame h makes it a move of frame h-1, one frame forward: its own maximal factors, which
    would pay for it, are in the frames directly in front of its frame, and the numbering puts those with freedoms in
-   frame h-1 (that nothing further forward is needed is proven, given that the numbering is clean: see "What optimal
-   means" below).
+   frame h-1 (that nothing further forward is needed is proven: see "What optimal means" below).
    Both frames must stay winnable.
 5. The score of a game is `in_the_bag` (what the game with no promotions scores) plus the sum of its promotions.  So the
    frame solver searches for the *promotion set* with the largest sum, with a branch-and-bound over which candidates to
@@ -108,9 +110,9 @@ promotion from that frame needs one frame to go to.
 
   > **U**: some optimal game plays every source with three or more prime factors that setup keeps (U\*).
 
-  Precisely: on a board whose numbering of the frames is *clean* (every frame with freedoms directly in front of
-  frame h is frame h - 1, which holds on every board to 8191, the largest the solver supports, and which setup
-  checks), the games that play every source setup keeps are exactly U\* with a promotion set added (Theorem M); every
+  Precisely: the games that play every source setup keeps are exactly U\* with a promotion set added (Theorem M,
+  which needs of the numbering that it is *clean*, every frame with freedoms directly in front of frame h being frame
+  h - 1, as the numbering by layer is by construction); every
   optimal game plays the sources setup keeps with one or two prime factors (Theorem B); so the heaviest promotion set
   gives opt(n) exactly when U holds at n.  U is open in general.  It holds for every n <= 2175, where [the
   prover](prover/README.md) proves the optimum on the whole board, without the frame model.  So a game proven above
@@ -497,7 +499,7 @@ a game was found: a proof that rests on its game of n - 1 assumes "the game of n
 game that assumes nothing is proven within the frame model, given that the solver is right.  `taxman solve` prints
 what a game assumes in the summary line.  What a proof rests on through the frame model, the statement U at n
 (section 1, "What optimal means"), is not recorded: it concerns the games proven by an exhausted search, a trivial
-board or a repeat, and holds for every n <= 1300.
+board or a repeat, and holds for every n <= 2175 (the prover).
 
 ### The verifiers
 
@@ -607,8 +609,8 @@ the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#t
 * **source**: a number with no maximal composite (every number above n/2): never tax, and played unless it is found
   impossible (below).  **factor**: any number that is not a source.
 * **frame**: a connected group of sources together with all the factors they compete for (sources that share a factor
-  are in one frame).  Setup simplifies the frames, numbers the ones that have freedoms from the front (0 is played
-  first) and merges those with the same number, so that a promotion always has one frame to go to; the search works
+  are in one frame).  Setup simplifies the frames, numbers the ones that have freedoms by layer, from the front (0 is
+  played first), and merges those with the same number, so that a promotion always has one frame to go to; the search works
   on the merged frames.  In the code a frame is `frames::Frame` as setup forms it (`frames::BoardFrames` holds all of a
   board's) and `model::Frame` as the search takes it (`frames::SearchFrames` holds those).
 * **front, back**: frame X is in front of frame Y (and Y behind X) when a number of Y has a maximal factor in X, that
@@ -633,11 +635,14 @@ the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#t
   set.
 * **in the bag** (`in_the_bag`, the Java's `inTheBag`): what the game with no promotions scores.
 * **max_total** (`maxTotalPromotions`): the most promotions the frames' freedoms allow.
-* **the frame model**: this decomposition (section 1), exact given that the numbering of the frames is clean and the
-  statement U holds (section 1, "What optimal means").  `model::FrameGraph` is the immutable factor graph and home
-  frames, not "the model".
-* **clean numbering** (N): every frame with freedoms directly in front of frame h is frame h - 1; the frames are then
-  numbered by layer (the number of prime factors of their sources).  True on every board to 8191, checked by setup.
+* **the frame model**: this decomposition (section 1), exact given that the statement U holds (section 1, "What
+  optimal means").  `model::FrameGraph` is the immutable factor graph and home frames, not "the model".
+* **layer**: the number of prime factors of a number, counted with multiplicity; a frame's layer is its sources'.  The
+  frames in front of a frame lie one layer lower, and frame h is the frames with freedoms of the lowest layer that has
+  some, plus h.
+* **clean numbering** (N): every frame with freedoms directly in front of frame h is frame h - 1.  The numbering by
+  layer is clean by construction, and on every board the solver supports it is the Java's numbering (breadth first
+  from the front).
 
 ### The search
 
