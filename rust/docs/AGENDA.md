@@ -117,9 +117,10 @@ the search relies on is proven and tested, as the project requires.
 *every* field and for *every* choice of nonzero entries ([THEORY.md](../../heuristics/THEORY.md#what-the-parity-bound-keeps-and-what-it-drops),
 the end of Theorem 12's discussion).  Each choice (a field, and signs or values on the edges) gives a pair of frame
 matroids, even and odd, in which every promotion set is independent.  GF(2) with 0/1 entries is one pair; GF(3) with 0/1
-entries and GF(3) with signs are others.  Alone, GF(3) is weaker than GF(2) (it misses the triangles {6, 10, 15}, whose
-determinant is ±2, which is why [the matroid study](EXPERIMENTS.md#matroid-intersection-bounds-2026-10) called GF(2) the
-field).  *Together* they are stronger than either: the LP over the intersection of the four matroid polytopes is a valid
+entries and GF(3) with signs are others.  Alone, each is weaker than GF(2): with 0/1 entries GF(3) misses the triangle
+{6, 10, 15} (determinant ±2), and with signs it sees only the orientable closed surfaces, where GF(2) sees all, which is
+why [the matroid study](EXPERIMENTS.md#matroid-intersection-bounds-2026-10) called GF(2) the field.  *Together* they are
+stronger than either: the LP over the intersection of the four matroid polytopes is a valid
 bound at least as tight as GF(2)'s, computable in polynomial time by Lagrangian decomposition into two weighted matroid
 intersections, one per field, with one multiplier per candidate.  The study's objection, that three matroids cannot be
 intersected in polynomial time, holds for the integer problem, not for this bound.
@@ -194,9 +195,9 @@ heaviest common independent set of *exactly* the size its completion needs: the 
 of every size on its way (the dominant sets the GF(2) levels already keep).  The sizes are a partition, so this is
 sound without any conjecture, and the root's bounds of each size prune most k at once.
 
-*Why it might work.*  At all 361 roots of 880-1300 the GF(2) heaviest set has exactly the optimum's size, and the
-optimal sets of every game enumerated have one size ([prover 5](../prover/README.md#5-is-the-optimal-set-unique)).  So
-only one or two k survive at the root, and at a node whose heaviest completion has the wrong size the exact-size bound
+*Why it might work.*  The GF(2) heaviest set at the root has the optimum's size at 1,119 of the 1,121 roots measured
+(C4), and the optimal sets of every game enumerated have one size ([prover 5](../prover/README.md#5-is-the-optimal-set-unique)).
+So only one or two k survive at the root, and at a node whose heaviest completion has the wrong size the exact-size bound
 is lower.  Unlike `revise_freedoms`, it assumes nothing about which size the optimum has.
 
 *Cheapest experiment.*  At the root and the probe's 600 nodes: the heaviest common independent set of each size, the
@@ -280,10 +281,14 @@ small searches.  *Evidence:* every game enumerated ([prover 5](../prover/README.
 of U\* certified at the root by one bound each (section 7.3).  *Attack:* the frontier argument of
 [prover 8](../prover/README.md#8-what-remains-open) for a proof; A2 for certificates.
 
-**C4 (one size).**  All optimal sets of a game have the size of the GF(2) bound's heaviest set at the root.
-*Evidence:* the 361 roots of 880-1300 ([anatomy](EXPERIMENTS.md#the-anatomy-of-the-gap-2026-10), 1) and every
-enumerated game's optimal sets (one size each).  *Why it matters:* with it, A3 searches one k.  Not needed for A3's
-soundness.  *Test:* the root sizes over 1301-2175 against the chain's promotions (seconds).
+**C4 (one size, near the relaxation's).**  All optimal sets of a game have one size, and it is within one of the size
+of the GF(2) bound's heaviest set at the root.  *Evidence:* every enumerated game's optimal sets have one size
+([prover 5](../prover/README.md#5-is-the-optimal-set-unique)); the heaviest set has the optimum's size at all 361 roots
+of 880-1300 ([anatomy](EXPERIMENTS.md#the-anatomy-of-the-gap-2026-10), 1) and at 758 of the 760 searched and repeated
+games of 1301-2175 (`bench/gf2/roots.jsonl`'s `size` against `strict.jsonl`'s promotions); at 1320 and 1322 it has 77
+members and the optimum 78, which is `max_total` (a tie of weights, or a heavier set of the wrong size: not known).  So
+the strict form, the same size, is false or rests on ties.  *Why it matters:* with it, A3 searches two values of k at
+most.  Not needed for A3's soundness.  *Test:* the heaviest set of each size at the roots of 1320 and 1322.
 
 **C5 (the gap law).**  The true root gap of the searched games grows linearly in n past 2175, at a rate between the
 two regimes of section 2; or, in the form the fit of 1301-2175 prefers, G/n stays bounded.  *Test:* section 6's root
