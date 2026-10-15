@@ -12,3 +12,7 @@ structure`, from `rust/`).
 
 To resume or extend the run into the file, `gunzip -k structure_2_8191.jsonl.gz` first: `--out` appends to a file and
 skips the boards it already has.
+
+Setup has numbered the frames by layer since (docs/EXPERIMENTS.md, "The frame model by layer, and the extended
+problem"); the census run again on that code (one thread) reproduces every line of the file but for `secs`, and the
+summary but for the seconds, so the data stand for both numberings, which are the same on every board here.

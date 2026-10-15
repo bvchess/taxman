@@ -67,9 +67,11 @@ one frame (`frames::BoardFrames` forms them).  Frame X is *in front of* frame Y 
 has a maximal factor in X, that is, Y's numbers are multiples of X's; the frames in front are played first.  Simplifying
 a frame finds its mandatory moves (`unzip`: a source with one usable factor must take it), the sources that cannot be
 played together with the larger ones (`removeImpossible`), and its *freedoms*, factors minus sources: how many factors
-it can spare; a frame with none is *closed*.  The frames with freedoms are numbered from 0 at the front
-(`frames::build_frames`): number 0 is every one that has no other in front of it, number k + 1 every one directly behind
-number k.  Frames with the same number are merged into one, so that a promotion always has one frame to go to (the
+it can spare; a frame with none is *closed*.  The frames with freedoms are numbered from 0 at the front, by *layer*
+(`frames::build_frames`): the layer of a frame is the number of prime factors of its sources, frames in front of it lie
+one layer lower, and a frame with freedoms gets its layer less the lowest layer of a frame with freedoms.  (The Java
+numbered them breadth first: number 0 every one that has no other in front of it, number k + 1 every one directly
+behind number k.  The two are the same on every board the solver supports.)  Frames with the same number are merged into one, so that a promotion always has one frame to go to (the
 README's example shows where that happens).  A frame is a game of *Taxman Mini*: a set of moves and a set of factors, in
 which every move must still have one of its maximal factors in the frame when it is taken, and taking it removes all of
 its factors still in the frame (not only the one that pays for it).  A frame is *winnable* when some order takes every
@@ -98,13 +100,12 @@ example, the board 1..=21, is in the [README](README.md#how-the-solver-sees-the-
   is, is proven in [THEORY.md, "The frame model: what is proven and what
   remains"](../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains):
   * the sources that setup keeps are U\*, descending greedy on each frame, and in_the_bag = ΣU\* (Theorem M, M1);
-  * **completeness and soundness** (Theorem M): if the numbering of the frames is clean (N: every frame with
-    freedoms directly in front of frame h is frame h − 1), a set U\* ∪ L with L up to n/2 is playable exactly when L
-    is a promotion set of Π_n, and then it scores in_the_bag + ΣL.  So `unzip`'s mandatory moves, freedoms =
-    factors − sources, closed frames taking no part, a promotion paying one frame forward, the numbering, the
-    candidate filter and the root's reduction lose no game that plays U\* and admit none that is not a game.  N holds
-    on every board to 8191 (the census `examples/structure.rs`, `bench/structure/`), and `frames::build_frames`
-    refuses a board where it would not;
+  * **completeness and soundness** (Theorem M): a set U\* ∪ L with L up to n/2 is playable exactly when L is a
+    promotion set of Π_n, and then it scores in_the_bag + ΣL.  So `unzip`'s mandatory moves, freedoms = factors −
+    sources, closed frames taking no part, a promotion paying one frame forward, the numbering, the candidate filter
+    and the root's reduction lose no game that plays U\* and admit none that is not a game.  What the proof needs of
+    the numbering is that it is *clean* (N: every frame with freedoms directly in front of frame h is frame h − 1),
+    which the numbering by layer is by construction;
   * every optimal game plays the members of U\* with one or two prime factors (Theorem B);
   * so in_the_bag + P\*(Π_n) = opt(n) exactly when **U** holds at n: some optimal game plays the members of U\* with
     three or more prime factors.  U is open in general; it holds for every n ≤ 2175, where the prover (a branch and
@@ -118,7 +119,7 @@ example, the board 1..=21, is in the [README](README.md#how-the-solver-sees-the-
   |---|---|
   | `prime_formula` | nothing of the model (proved at `accelerate::prime_shortcut`) |
   | `cap` | nothing of the model: the game is replayed, and reaches the ceiling n + score(n − 1) ≥ opt(n) given that score(n − 1) = opt(n − 1) |
-  | `exhausted`, `trivial` | completeness at n, so U at n (and N, which holds) |
+  | `exhausted`, `trivial` | completeness at n, so U at n |
   | `same_search` of an exhausted game m | U at n, and Π_n = Π_m (checked) |
   | `same_search` of a `cap` game m | U at n, Π_n = Π_m (checked), and soundness at m (Theorem M), which makes m's ceiling P\*(Π_m) |
 
@@ -127,8 +128,9 @@ example, the board 1..=21, is in the [README](README.md#how-the-solver-sees-the-
   `model`; `tests/bottom_layers.rs` checks Theorem B on every recorded and enumerated optimal set; and two exhaustive
   searches agree with the frame model's games on small boards: `brute`, the solver's own (to 40 in the test suite, 52
   in `examples/sacrifice validate`), and `heuristics/evaluation/certify.py` (to 62).  The sacrifice
-  bound (`sacrifice`) is an upper bound on opt(n) by a different route (games on punctured boards, where N can fail,
-  so it is not covered by Theorem M); it proves game 1133 and disagrees with nothing.  [The prover's
+  bound (`sacrifice`) is an upper bound on opt(n) by a different route (games on punctured boards, where Theorem M
+  holds too, but U and Theorem B are statements about the board 1..n, so the bound rests on the upper part of each
+  punctured board); it proves game 1133 and disagrees with nothing.  [The prover's
   README](prover/README.md) has the details of the prover.
 * **Given the pruning is exact.**  Every tactic is proven or sound (section 5 grades each).  The Java used two
   shortcuts that rest on conjectures (`reuse_prev` and `revise_freedoms`); the frame solver had them as tactics for a
@@ -809,7 +811,7 @@ rests on the digest alone (below).
   pruning is exact, which every exhausted proof rests on;
 * `cap`: its promotions S are promotable and sum to ceiling(m) = m + score(m − 1) − in_the_bag(m), so P\*(Π_m) ≥
   ceiling(m).  And every promotable set T of Π_m is a legal game of m scoring in_the_bag(m) + sum(T): this is the
-  soundness of the frame model (THEORY.md, Theorem M, which needs only the clean numbering that setup checks), the
+  soundness of the frame model (THEORY.md, Theorem M), the
   direction every search relies on each time it offers an incumbent, and the referee replays every game built from
   one (none has ever failed).  So in_the_bag(m) + P\*(Π_m) ≤ opt(m) ≤ m + opt(m − 1) = m + score(m
   − 1), given that the game of m − 1 is optimal (which the proof by the ceiling rests on, and m's assumptions record),
@@ -894,9 +896,10 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   of boards to 1300 (to 8191 ignored), and the near miss that only the candidate filter keeps out (n = 98);
   `tests/bottom_layers.rs` checks Theorem B on every game of optimal.json, the committed chain and the chain past it,
   every optimal set the prover enumerated, and every optimal set of the boards to 48; the unit tests of `frames`
-  check that `unzip`'s claims are its mandatory pairs, that `numbering` is what `build_frames` uses, and the check of
-  clean numbering, which `tests/wide.rs` runs on a sample of the boards to 8191.  The census of every board
-  (`examples/structure.rs`, data in `bench/structure/`) checks the hypotheses of Theorem M one board at a time.
+  check that `unzip`'s claims are its mandatory pairs, that `numbering` is what `build_frames` uses, that the frames
+  lie in layers (Lemma Ω, also on punctured boards), and that the numbering by layer is the Java's breadth-first
+  numbering on every board to 400 and a sample to 8191.  The census of every board (`examples/structure.rs`, data in
+  `bench/structure/`) checks what Theorem M's proof says of setup one board at a time.
 * **Regression**: `taxman regress --to N` solves 1..N as one range and checks every score against optimal.json.
 * **Tactic invariance**: games 1..300 forced to search with each tactic off or changed must give identical scores,
   and a checkpoint is refused when any of the search tactics differs.

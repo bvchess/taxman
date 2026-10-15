@@ -136,6 +136,17 @@ impl Tables {
         k >= 2 && self.spf[k as usize] == k
     }
 
+    /// The number of prime factors of `k` counted with multiplicity (Omega of `k`): 0 for 0 and 1, 1 for a prime,
+    /// 3 for 12.  Requires `k <= n`.
+    pub fn omega(&self, k: u32) -> u32 {
+        let (mut rest, mut count) = (k, 0);
+        while rest > 1 {
+            rest /= self.spf[rest as usize];
+            count += 1;
+        }
+        count
+    }
+
     /// All primes `<= n`, ascending.
     #[inline]
     pub fn primes(&self) -> &[u32] {
@@ -243,6 +254,23 @@ mod tests {
             for &m in &t.max_composites[c as usize] {
                 assert!(t.max_factors[m as usize].contains(&c), "{m} <- {c}");
             }
+        }
+    }
+
+    /// Omega counts prime factors with multiplicity: it agrees with trial division for every number up to 2000.
+    #[test]
+    fn omega_counts_prime_factors_with_multiplicity() {
+        let t = Tables::new(2000);
+        assert_eq!([0, 1, 2, 12, 64, 97, 49, 1024, 1155].map(|k| t.omega(k)), [0, 0, 1, 3, 6, 1, 2, 10, 4]);
+        for k in 0..=2000u32 {
+            let (mut rest, mut count) = (k, 0);
+            for d in 2..=k {
+                while rest % d == 0 {
+                    rest /= d;
+                    count += 1;
+                }
+            }
+            assert_eq!(t.omega(k), count, "omega of {k}");
         }
     }
 

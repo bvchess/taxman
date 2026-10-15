@@ -374,6 +374,11 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
         &self.frames
     }
 
+    /// The tables of the board these frames are formed on.
+    pub(crate) fn tables(&self) -> &'t Tables {
+        self.t
+    }
+
     /// The position in [`frames`](Self::frames) of the frame that holds `x`, unless `x` is an impossible source
     /// of a frame that has since been merged away (`Home::MergedAway`), or a hole.
     pub(crate) fn frame_index_of(&self, x: u32) -> Option<usize> {

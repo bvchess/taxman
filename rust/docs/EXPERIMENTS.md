@@ -344,7 +344,8 @@ The work of [the prover](../prover/README.md) and the proofs of [THEORY.md](../.
 | E1: the census of every board's frames, 2..8191 (`examples/structure.rs`): layers, N, back claims against the candidates, candidates in frame 0, homes, U\* against an independent greedy | [proven footing](#the-frame-model-on-a-proven-footing-2026-10) | kept (`bench/structure/`) | no violation on any board; frame 0 is layer 3 on 8,100 boards and layer 2 on the 80 boards to 186 where layer 2 has freedoms, and the numbers follow the layers on every board; 156 s on four threads |
 | E2: Theorem M against the code, both ways (`tests/model_exact.rs`), with a playability oracle that shares no code with the frame solver | [proven footing](#the-frame-model-on-a-proven-footing-2026-10) | kept (tests) | every set of every board to 120 and random sets to 8191, no failure; the candidate filter alone keeps out a promotion the model would accept and the board refuses on 27 boards to 2000 (first n = 98) |
 | E3: Theorem B against every recorded and enumerated optimal set (`tests/bottom_layers.rs`) | [proven footing](#the-frame-model-on-a-proven-footing-2026-10) | kept (tests) | no exception in 3,574 recorded games, 1,044 enumerated sets and every optimal set of 2..54; numbers of layer 2 up to n/2 only on 76 boards, all ≤ 186 |
-| N as a hard check of setup (`build_frames` refuses a board whose numbering is not clean) | [proven footing](#the-frame-model-on-a-proven-footing-2026-10) | kept | every supported board passes, so nothing changes (fingerprints, tripwires, regress, the chain 1..1300 line for line); punctured boards (the sacrifice study's) are not checked: 56 without 39 is not clean |
+| N as a hard check of setup (`build_frames` refuses a board whose numbering is not clean) | [proven footing](#the-frame-model-on-a-proven-footing-2026-10) | superseded by the numbering by layer (next row) | every supported board passed, so nothing changed (fingerprints, tripwires, regress, the chain 1..1300 line for line); punctured boards (the sacrifice study's) were not checked: 56 without 39 is not clean |
+| 2A: number the frames by layer (ℓ − ℓ₀), the definition in place of the Java's breadth-first numbering, so that N holds by construction, on boards with holes too; a number without frames gives an empty frame | [by layer](#the-frame-model-by-layer-and-the-extended-problem-2026-10) | kept | the two numberings equal on every board to 8191 (the census reproduced line for line), so no tree changes: fingerprints, tripwires, regress, the chain 1..1300 line for line; Theorem M loses its hypothesis; `sacrifice validate 52` still exact, with the boards 32-34 that have an empty frame |
 | Certify U game by game: barred parity bounds with layers 1-2 fixed by Theorem B, then a search of the open members (or a search that treats the open sources as optional) | [THEORY: the upper part](../../heuristics/THEORY.md#the-upper-part) | open | the consultation's scratch measurements: the bounds leave 3-12 members of U\*_{≥3} open to 1300, 26-102 at 1500-2276; a search on the whole board closes the rest at every n tried to 1500 |
 
 ### The Python heuristics project
@@ -398,6 +399,7 @@ single-sacrifice route) have their row above.
 | [The gap past 2175](#the-gap-past-2175-2026-10) | what are the true root gaps of the EC2 chain's games, how do they grow, do they explain its trees (the 2340s, 3174-3176, 3300), what at the root is left, and what will 4000 to 6000 cost? | 509 gaps of 341 to 1,443 (mean 818), +37 per 100 n over 1301-3312 and G/n steady at 300: neither of the two regimes; the current build's trees are 0.29 times the committed chain's, a decade of nodes per 250 of gap, the gap counting in units of n^0.3 (0 to 0.5 bracket); the dear games are the games of high gap, nothing at the root explains the rest (A4 killed); a game costs ×10 per 1,050-1,250 n and a day on a `c8g.16xlarge` reaches about 4,100 | ee03872 (no solver change) and the entry |
 | [Boards past 4095](#boards-past-4095-2026-10) | what limits the boards to 4095, how far does one more width take them, and what does a board past 4095 cost? | built: boards to 8191 at 128 words, every board's frames and ranks scanned to bound the rest (9 frames, 5 block words); nothing changes to 4095; a node at 4100 1.1% dearer at 128 words than at 72, so no width between | 4316168 |
 | [The frame model on a proven footing](#the-frame-model-on-a-proven-footing-2026-10) | are the frame model's assumptions theorems, and what is left?  Steps E1-E4 of the consultation of 2026-10-15 | yes, given clean numbering, which holds on every board to 8191 and setup now checks: Lemma Ω and Theorems L, B and M in THEORY.md, the census and two test files with no exception; left: U, some optimal game plays U\*_{≥3} | 631e027, a122f43, de63aba, d7a322a, 5e44ac6 and the write-up after them |
+| [The frame model by layer, and the extended problem](#the-frame-model-by-layer-and-the-extended-problem-2026-10) | steps 2A and 3 of the second consultation: can the numbering by layer be the definition with no result changing, and is the extended problem Π⁺(O), with some sources optional, exact? | 2A: yes, no tree changes, N by construction, Theorem M with no hypothesis | the entry's commits |
 
 ## The port and its first improvements
 
@@ -5549,3 +5551,35 @@ disjoint union of its layer instances, and peel decides each.  The tests add abo
 `prime_formula` games need nothing of the model.  U holds for every n ≤ 1300 (the prover).  The next steps of the
 consultation certify U game by game past 1300 (barred parity bounds with layers 1 and 2 fixed by Theorem B, then a
 search of the members they leave open; the register's last theory row).
+
+## The frame model by layer, and the extended problem (2026-10)
+
+*Question.*  The second consultation of 2026-10-15, after the entry above, set the goal: every game past 2175 that
+rests on the frame model certified as a whole-board optimum, at a cost close to the solver's own.  Its first steps
+for the solver are (2A) to make the numbering by layer the definition, so that clean numbering (N), the one
+hypothesis of Theorem M, holds by construction and also on boards with holes, with no result changing; and (3, E8
+stage 1) to build the *extended problem* Π⁺(O), the frame model with a set O of the sources of three or more prime
+factors left optional, prove it exact (Theorem M⁺), test it against the whole-board oracle, and search Π⁺(∅) with the
+existing engine through a chain.
+
+*2A, numbering by layer.*  `frames::numbered_frames` gives a frame with freedoms of layer ℓ the number ℓ − ℓ₀, ℓ₀
+the lowest layer of a frame with freedoms (`frames::layer_of`, `Tables::omega`); the frames of one number are merged
+in the order of their smallest source, as before.  The Java's breadth-first numbering is kept for the tests, which
+find the two equal frame by frame on every board to 400 and on a sample to 8191 (1.3 s).  The refusal of an unclean
+board is gone; in its place a debug assertion of Lemma Ω (every frame in one layer, its factors one lower, the frames in
+front one lower), which a test runs on every board to 400 and every board of up to 60 numbers with one hole.  A layer
+between ℓ₀ and the highest layer with freedoms that has none leaves its number without frames, and the search then
+has an empty frame (no moves, factors or freedoms).  No board 1..n has one; the boards with one hole to 127 that do are
+32, 33 and 34 without 4, 10, 14 or 15: on 32 without 4, the frame of 18, 20, 27, 28 and 30 (layer 3) splits into two
+closed frames, while layers 2 and 4 have freedoms.  The model and the search take the empty frame as it is (a test searches 32
+without 4 with the GF(2) bound and on the matching path against the brute force).  On 56 without 39 the breadth-first
+numbering was not clean; by layer it is.
+
+No tree changed: the probe's fingerprints 7e8e724717d26545 and f3deaac0dbdc030a (`gf2=on`), its cycles 4.732 G and
+5.770 G; `cargo test --release` with the tripwires; `taxman regress --to 1000 --threads 1` (9.2 s); the chain 1..1300
+on one thread line for line equal to the base commit's (290,503 nodes) but for times and the build; and the census
+`examples/structure.rs 2 8191` on one thread, every line equal to `bench/structure/`'s but for the seconds (605 s
+summed against 624).  `examples/sacrifice validate 52` is exact on all 1,378 punctured boards (40.7 s), the boards
+with an empty frame among them.  THEORY.md's "Clean numbering" is now "Numbering by layer"; Theorem M and its
+corollary lose the hypothesis; a paragraph covers boards with holes, where the model is exact given the sources setup
+keeps there, which is what the sacrifice bound rests on (its module comment says so).

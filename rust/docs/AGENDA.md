@@ -229,8 +229,8 @@ search of five games it has proven (1302-2100, from the cloud run's data) with t
 (`Role::Pick`) and the open ones free: nodes against the unforced proof.  *Kill:* fewer than 2 times fewer nodes on the
 dear games.  (3) The remaining assumptions one at a time (the prover README's open list says they are tested only end
 to end): for each, a statement and either a proof or a counterexample on boards to 2000.  *Done (2026-10-15):* all
-of them are theorems given clean numbering, a per-board fact true on every board to 8191 (THEORY.md, Theorems B and
-M), and the upper part is reduced to U, its members of three or more prime factors (docs/EXPERIMENTS.md, "The frame
+of them are theorems (THEORY.md, Theorems B and M; the numbering by layer makes the numbering clean by construction),
+and the upper part is reduced to U, its members of three or more prime factors (docs/EXPERIMENTS.md, "The frame
 model on a proven footing").
 
 *Payoff.*  The verified wall moves with the solver's instead of falling behind tenfold per 1000 n; with a general proof

@@ -4,9 +4,8 @@
 //!
 //! > Let U\* be the sources that setup keeps (the numbers above n/2 of the game with no promotions, `board.plain`), and
 //! > Π_n the root problem the search is given (`Board::prepare`: the model, the root frame set, the candidates and
-//! > `max_total`).  Provided the numbering of the frames is clean (every frame with freedoms directly in front of a
-//! > frame numbered h is numbered h − 1; checked on every board to 8191 by `examples/structure.rs`), for every set L of
-//! > numbers up to n/2: U\* ∪ L is playable (some order of it is a legal game) if and only if L is a promotion set of
+//! > `max_total`).  For every set L of numbers up to n/2 (the frames being numbered by layer, so that every frame with
+//! > freedoms directly in front of a frame numbered h is numbered h − 1): U\* ∪ L is playable (some order of it is a legal game) if and only if L is a promotion set of
 //! > Π_n (L ⊆ candidates, L can be promoted from the root, |L| ≤ `max_total`), and then the game the promotions make
 //! > (`accelerate::solution_for_promotions`) scores `in_the_bag` + ΣL.
 //!
