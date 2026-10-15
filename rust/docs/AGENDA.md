@@ -19,9 +19,12 @@ here gets its row there when it ends.
 
 **Known.**  Every n ≤ 2175 has a game proven optimal within the frame model, a chain from n = 1
 ([results/README.md](../results/README.md)); the prover, which knows nothing of frames, proves every n ≤ 1300 on the
-whole board, and its proofs of 1301-2175 are running on a cloud machine ([prover 3](../prover/README.md#3-the-proofs-of-optn)).
+whole board, and its proofs of 1301-2175 are running on a cloud machine
+([prover 3](../prover/README.md#3-the-proofs-of-optn)).
 A 64-thread chain reached 2276 in the Graviton calibration (`bench/cloud/c8g.chain-2176.jsonl`, benchmark data, not
-a committed result).  The frame model's assumptions are validated, not proven ([README](../README.md#what-optimal-means)).
+a committed result).  The frame model's assumptions are validated, not proven
+([README](../README.md#what-optimal-means)).  Outside the project the record stops at n = 1000 (OEIS A019312's table is
+this project's), and the literature has bounds and one asymptotic result, not optima (section 5).
 
 **The theory the search stands on.**  A set of moves is playable, independent over GF(2) in the parity matroids, or
 matchable exactly when some payment set has one, an odd number, or at least one payment scheme
@@ -65,8 +68,9 @@ root GF(2) gaps of `bench/gf2/roots.jsonl` (section 7.1):
     log10 nodes ≈ 3.24 + G / 255        (G the root's GF(2) gap; R² 0.50, residual sd 0.46 decades)
 
 Adding n to the fit gives n a *negative* coefficient (−0.09 decades per 100 n at a given gap, R² 0.63), and G/n fits
-as well as G (R² 0.61): at a given gap a larger board is no dearer, if anything cheaper.  The gap spans 0 to 900, three
-and a half decades of tree; the node's cost moves 0.4 decades from 1300 to 2200.  The gap is the cost.
+better than G within 1301-2175 (R² 0.61): at a given gap a larger board is no dearer, if anything cheaper.  But both of
+those extrapolate worse past 2175 than G alone (section 7.1), so G alone is the model to project with.  The gap spans 0
+to 900, three and a half decades of tree; the node's cost moves 0.4 decades from 1300 to 2200.  The gap is the cost.
 
 **Past 2175 the trees still follow their gaps, but the gaps rise.**  The wall regime found the dear games of the c8g
 chain 4 to 18 times larger than their gaps predict.  Those games were chosen for their trees.  With the root gaps of
@@ -114,8 +118,9 @@ the search relies on is proven and tested, as the project requires.
 ### A1. A bound over several fields and signings (a change of slope, if its share holds)
 
 *Idea.*  A playable set's payment matrix is unit triangular after its play order, so its rows are independent over
-*every* field and for *every* choice of nonzero entries ([THEORY.md](../../heuristics/THEORY.md#what-the-parity-bound-keeps-and-what-it-drops),
-the end of Theorem 12's discussion).  Each choice (a field, and signs or values on the edges) gives a pair of frame
+*every* field and for *every* choice of nonzero entries
+([THEORY.md](../../heuristics/THEORY.md#what-the-parity-bound-keeps-and-what-it-drops), the end of Theorem 12's
+discussion).  Each choice (a field, and signs or values on the edges) gives a pair of frame
 matroids, even and odd, in which every promotion set is independent.  GF(2) with 0/1 entries is one pair; GF(3) with 0/1
 entries and GF(3) with signs are others.  Alone, each is weaker than GF(2): with 0/1 entries GF(3) misses the triangle
 {6, 10, 15} (determinant ±2), and with signs it sees only the orientable closed surfaces, where GF(2) sees all, which is
@@ -126,7 +131,15 @@ intersections, one per field, with one multiplier per candidate.  The study's ob
 intersected in polynomial time, holds for the integer problem, not for this bound.
 
 *Why it might work.*  It sees odd cores, the whole of what GF(2) misses: a core is dependent over GF(p) exactly when p
-divides every maximal minor of its matrix, and the smallest odd core, {12, 18, 20, 30, 45}, has determinant 3.  Measured
+divides every maximal minor of its matrix, and the smallest odd core, {12, 18, 20, 30, 45}, has determinant 3.  And the
+signed family over GF(3) is complete: by Hershkowitz and Schneider (section 5), over any field of three or more
+elements a pattern has full row rank for *every* choice of nonzero entries exactly when it has a uniquely restricted
+matching of its rows, which for a set of moves is playability (Theorem 12).  The proof is constructive and fits a
+search: a self-covering set (every factor listed twice or more) becomes dependent, with all coefficients 1, under any
+signing whose sums vanish column by column over GF(3), which is possible for every column listed at least twice
+(1 + 2, 1 + 1 + 1, ...).  So every core the search meets yields a signing whose matroids see it, and all its other
+rank inequalities come with it (GF(2) is the exception: a column listed three times cannot vanish there, which is
+exactly how odd cores escape).  Measured
 (section 7.2): at the roots of the 1,055 games of 78-1300 whose parity bound exceeds opt(n), the bound's heaviest set is
 dependent over GF(3), GF(5) or GF(7), with 0/1 entries or Koszul signs, in 566 (54%), and the share *rises* with n: 0%
 below 300, 49% at 300-599, 57%, 55%, 73% at 1100-1300, as the residuals grow.  Every cut family tried so far closed a
@@ -136,7 +149,8 @@ rank inequalities of the other field's matroids at once, which the anatomy's sma
 *Cheapest experiment.*  At the roots of the frame model, 880-2175 every 25th game (`bench/gf2/roots.jsonl` has the
 GF(2) bounds and optima), the decomposition bound min over μ of [heaviest GF(2) common independent set for w − μ] +
 [heaviest GF(3) common independent set for μ], μ by a bundle or volume method from the GF(2) weight split (the
-subgradient stalled in the per-frame study), for GF(3) plain, GF(3) Koszul, both, and a few random signings.  Code: the
+subgradient stalled in the per-frame study), for GF(3) plain, GF(3) Koszul, a few random signings, and the signings
+built from the cores of the GF(2) heaviest sets met on the way (a matroid added per core, as a cut would be).  Code: the
 frame matroids of `examples/matroid.rs` and a GF(3) twin of `examples/common/meet.rs` (two bits an entry); research code
 in an example, as the matroid study was.  *Metric:* the share of the root GF(2) gap closed, by band, and its trend in n;
 then at the 600 probe nodes (`testdata/perf`), the share of the open nodes it cuts.  *Kill:* a mean share under 20%, or
@@ -150,12 +164,16 @@ cost goes from ×10 per 380 n to ×10 per about 600 n.  Below that, a constant f
 cores (the anatomy's lesson), and 54% of the square residuals have determinant ±1 under both entries tried (section
 7.2), invisible to every prime field with those entries.  At nodes the multipliers must be refitted to pay (the cuts
 study: ×4.2 in nodes with the node's multipliers, ×1.26 with the root's), and a GF(3) level kept along the path doubles
-the node's work.  Random signings catch any given core with a probability that grows with their number, at a linear
-cost in matroids.
+the node's work.  Random signings see small cores often and large ones rarely (the chance that a column listed k times
+sums to zero is 1/2 for k = 2 and 1/4 for k = 3), so the signings built from the cores met are what scales, at one
+matroid pair each.  The LP over three or more matroid polytopes is not integral (its gap can reach 2 for three, by
+Linhares, Olver, Swamy and Zenklusen), so the bound lies between GF(2)'s and the integer optimum over all the
+matroids, not at the latter.
 
 *Proven first.*  The lemma over any field and any nonzero entries, frame by frame (Theorem 11's proof with "nonzero" for
 "1"; the unit-triangular argument is already in THEORY.md), and weak duality for the decomposition (as for the weight
-split).  Both short.
+split).  Both short.  For THEORY.md, with proof in this setting: Hershkowitz and Schneider's theorem (playable exactly
+when independent under every GF(3) signing) and the column-sum signing of a self-covering set.
 
 ### A2. Certify the frame model, then prove with its facts (a change of slope for the proven wall)
 
@@ -196,9 +214,10 @@ of every size on its way (the dominant sets the GF(2) levels already keep).  The
 sound without any conjecture, and the root's bounds of each size prune most k at once.
 
 *Why it might work.*  The GF(2) heaviest set at the root has the optimum's size at 1,119 of the 1,121 roots measured
-(C4), and the optimal sets of every game enumerated have one size ([prover 5](../prover/README.md#5-is-the-optimal-set-unique)).
-So only one or two k survive at the root, and at a node whose heaviest completion has the wrong size the exact-size bound
-is lower.  Unlike `revise_freedoms`, it assumes nothing about which size the optimum has.
+(C4), and the optimal sets of every game enumerated have one size
+([prover 5](../prover/README.md#5-is-the-optimal-set-unique)).  So only one or two k survive at the root, and at a node
+whose heaviest completion has the wrong size the exact-size bound is lower.  Unlike `revise_freedoms`, it assumes
+nothing about which size the optimum has.
 
 *Cheapest experiment.*  At the root and the probe's 600 nodes: the heaviest common independent set of each size, the
 k that survive against the optimum, and at the nodes the drop from the unconstrained bound to the exact-size bound of
@@ -242,8 +261,8 @@ sit in adjacent frames (homes 1 and 2), as at the roots of 1251-1300, so that no
 
 ### A6. The prover's node (a constant factor that keeps verification in pace)
 
-A node of the prover costs 15 to 17 times the solver's because it solves the parity matroids at each node warm-started
-from its parent, where the solver keeps contracted matroids by pivots along the path
+A node of the prover costs 6 to 17 times the solver's (section 2) because it solves the parity matroids at each node
+warm-started from its parent, where the solver keeps contracted matroids by pivots along the path
 ([GF(2) search](EXPERIMENTS.md#the-gf2-bound-in-the-search-2026-10), item 5).  Reimplementing the technique in the
 prover (not sharing code, which is the point of the prover) would give it most of that factor, and the bound without a
 member read off the exchange graph would cut its strong branching.  *Experiment:* the prover's node profile on 1300 and
@@ -262,19 +281,21 @@ member read off the exchange graph would cut its strong branching.  *Experiment:
 
 ## 4. Conjectures
 
-**C1 (fields).**  The LP over the frame matroids of GF(2) and GF(3) (with 0/1 entries and with Koszul signs) closes a
-share of the root GF(2) gap that does not fall with n.  *Evidence:* the heaviest GF(2) set is dependent in another
-field or signing at 49-73% of the roots of 300-1300, rising (section 7.2).  *Test:* A1's root experiment.
+**C1 (fields).**  The LP over the frame matroids of GF(2) and of a few GF(3) signings (0/1 entries, Koszul signs, and
+the signings built from the cores met) closes a share of the root GF(2) gap that does not fall with n.  *Evidence:*
+the heaviest GF(2) set is dependent in another field or signing at 49-73% of the roots of 300-1300, rising (section
+7.2); the signed GF(3) family is complete (Hershkowitz and Schneider, section 5).  *Test:* A1's root experiment.
 
 **C2 (sign coherence of three-prime cores).**  On numbers p^a q^b r^c of three primes, movers of degree d + 1 over
 factors of degree d form the honeycomb graph of a triangular region, and a set's schemes onto one payment set are
 its lozenge tilings.  Conjecture: in a region without holes all of a core's schemes have the same sign, so its
 determinant is ± its number of schemes, and GF(p) sees it exactly when p divides that number.  The smallest odd core,
-{12, 18, 20, 30, 45} on the primes 2, 3, 5, has three schemes, all of one sign: determinant 3.  This is the combinatorics of the weak
-Lefschetz property of monomial ideals in characteristic p, where the multiplication map's determinant counts lozenge
-tilings.  *Why it matters:* it would say which fields to add for which cores, and why GF(3) sees so many.  *Test:*
-enumerate the minimal odd cores of three primes to 8 members (`heuristics/evaluation/fm_relation.py`'s `odd_cores`,
-restricted) and compare |determinant| with the count of schemes; then regions with holes.
+{12, 18, 20, 30, 45} on the primes 2, 3, 5, has three schemes, all of one sign: determinant 3.  This would be the
+combinatorics of the weak Lefschetz property of monomial ideals in characteristic p, where the multiplication map's
+determinant counts lozenge tilings (section 5; to check).  *Why it matters:* it would say which fields to add for
+which cores, and why GF(3) sees so many.  *Test:* enumerate the minimal odd cores of three primes to 8 members
+(`heuristics/evaluation/fm_relation.py`'s `odd_cores`, restricted) and compare |determinant| with the count of
+schemes; then regions with holes.
 
 **C3 (the upper part).**  Every optimal game plays U\*, and game by game this is certified by barred parity bounds and
 small searches.  *Evidence:* every game enumerated ([prover 5](../prover/README.md#5-is-the-optimal-set-unique)); 92-96%
@@ -303,44 +324,75 @@ above; it would prove the upper-half conjecture in general.  Certified to 100,00
 
 ## 5. Ideas from other domains
 
-Each with the piece that transfers.
+Each with the piece that transfers.  The sources were surveyed for this agenda; "read" marks those read in full or in
+the relevant pages, the others were seen in abstracts.
 
-* **Coding theory, the erasure channel.**  The frames' cores are *stopping sets* of a parity-check matrix whose
-  variable nodes are movers and check nodes factors (every check touching the set touches it twice or more); the even
-  cores are the supports of codewords; peeling is the erasure decoder, and its failure on a set with no codeword is
-  exactly an odd core.  *Transfers:* the algorithms that enumerate small stopping sets of a code by branch and bound,
-  to list a frame's odd cores for cuts or for A4's census; and the fact that a stopping set is caught by *redundant*
-  checks (sums of rows) is the mirror of A1: there the code is fixed and the decoder gains checks, here the game is
-  fixed and the relaxation gains fields.
-* **Random XORSAT and hypergraph 2-cores.**  Between the 2-core threshold and the satisfiability threshold, random
-  XORSAT has a non-empty 2-core of full rank: an odd core, as the typical case.  *Transfers:* a density-evolution
-  model of the frames (movers per factor, the share with three live factors) to predict how the cores, and so the
-  gap, grow with n (C5), from counts of numbers with three distinct primes in each frame's window.
-* **Matrix theory.**  A square zero-nonzero pattern is nonsingular for every choice of nonzero entries exactly when it
-  has one perfect matching (the sign-solvability literature); so playability (Theorem 12's per = 1) is independence
-  under *all* representations, and each representation a relaxation.  *Transfers:* random signings over GF(3): a core
-  with two schemes is singular for half the signings, one with three for a quarter, so k random signings see a given
-  core with probability 1 − (3/4)^k, at a cost linear in k (A1).
-* **Algebraic combinatorics.**  The weak Lefschetz property of monomial ideals in positive characteristic: the
-  multiplication map between degrees has a determinant that counts lozenge tilings, and it fails in characteristic p
-  when p divides the count.  *Transfers:* product formulas for those counts, to predict which primes see the
-  three-prime cores (C2).
-* **Polyhedral combinatorics.**  Edmonds' odd-set inequalities make the bipartite matching polytope the general one,
-  separable in polynomial time.  The analogue here is a family of "odd-core" inequalities separable in polynomial
-  time; a complete family cannot exist unless P = NP (Franklín and Moniot's hardness), but the rank inequalities of
-  other fields' matroids are such a family, separable by matroid polytope separation (A1).
-* **MIP decomposition.**  Lagrangian decomposition (one copy of the variables per subproblem, tied by multipliers)
-  with the volume algorithm or a proximal bundle method instead of plain subgradient steps, whose stalling ended the
-  per-frame study.  *Transfers:* the multiplier method for A1.
+* **Matrix theory: zero patterns over fields of three or more elements.**  D. Hershkowitz and H. Schneider, "Ranks of
+  zero patterns and sign patterns", Linear and Multilinear Algebra 34 (1993) 3-19 (read): over a field of at least three
+  elements, an r × n zero-nonzero pattern has independent rows for every choice of nonzero entries exactly when its
+  bipartite graph has a *constrained* r-matching (the only one between its vertex sets: a uniquely restricted
+  matching), and their Example 3.6 shows it fails over GF(2).  With Theorem 12, a set of moves is playable exactly when
+  it is independent under every GF(3) signing.  *Transfers:* the completeness of the signed GF(3) family, and its
+  constructive proof (column sums made to vanish), which turns each core the search meets into a matroid that sees it
+  (A1).  The minimum-rank literature (zero forcing bounds the maximum nullity over every field; minimum rank depends on
+  the field for some graphs) is the general setting.
+* **Integer linear algebra.**  A set's rows are independent over GF(p) exactly when p does not divide the gcd of its
+  maximal minors, the last determinantal divisor of its Smith normal form (R. P. Stanley, "Smith normal form in
+  combinatorics", JCTA 144 (2016), arXiv:1602.00166).  *Transfers:* which fixed fields to add (section 7.2's census of
+  determinants), and the fact that cores whose divisor is 1 escape every fixed-entry field, so signings are needed.
+* **Coding theory, the erasure channel.**  The cores are *stopping sets* of a parity-check matrix whose variable nodes
+  are movers and check nodes factors; the even cores are supports of codewords; peeling is the erasure decoder.
+  Stopping sets that contain no codeword support, the odd cores, have a name: *coverable* stopping sets (Yakimenka,
+  Skachek, Bocharova, Kudryashov, "Stopping redundancy hierarchy beyond the minimum distance", arXiv:1804.06770,
+  read in part), the ones redundant checks are added to remove (Schwartz and Vardy, IEEE Trans. Inf. Theory 52 (2006)).
+  Small stopping sets are enumerated by tree search (Rosnes and Ytrehus, IEEE Trans. Inf. Theory 55 (2009); Wang,
+  Kulkarni and Poor, IEEE Trans. Inf. Theory 55 (2009), all sets to size 13 at about 500 variables) and by integer
+  programming (Velasquez, Subramani and Drager, ISCO 2018, to size 48), and LP decoding on the erasure channel succeeds
+  exactly when peeling does (Feldman, Wainwright, Karger, IEEE Trans. Inf. Theory 51 (2005)).  *Transfers:* the
+  enumerators, to list a frame's odd cores for A4's census and for the signings of A1; and the mirror image of A1:
+  there the code is fixed and the decoder gains checks, here the game is fixed and the relaxation gains fields.
+* **Random XORSAT and hypergraph 2-cores.**  For random 3-XORSAT the 2-core appears at density about 0.818 and full
+  rank lasts to about 0.918 (Dubois and Mandler, FOCS 2002; Pittel and Sorkin, CPC 25 (2016)): in between, a non-empty
+  core of full GF(2) rank, an odd core, is the typical case.  *Transfers:* a density-evolution model of the frames
+  (movers per factor, the share with three live factors) to predict how the cores, and so the gap, grow with n (C5);
+  and the lesson that the odd-core gap is generic, not an accident of a few boards.
+* **Uniquely restricted matchings.**  The maximum uniquely restricted matching is NP-hard on bipartite graphs
+  (Golumbic, Hirst, Lewenstein, Algorithmica 31 (2001); Müller, Order 7 (1990)), not approximable within n^(1/3 − ε)
+  unless NP = ZPP (Mishra, 2011), and fixed-parameter tractable in treewidth in 2^O(tw²) n (Chaudhary, Sau, Zehavi,
+  arXiv:2508.12004, 2025).  No integer-programming formulation or polyhedral study of it was found.  *Transfers:* a
+  good polynomial bound must use the arithmetic, as GF(2) does; the core inequalities of A1 and the anatomy are new
+  ground; the treewidth recursion could close small residual components exactly after branching.
+* **Algebraic combinatorics.**  The weak Lefschetz property of monomial ideals in three variables: the multiplication
+  map between degrees has a determinant that counts lozenge tilings, and fails in characteristic p when p divides the
+  count.  *Transfers:* product formulas for those counts, to predict which primes see the three-prime cores (C2).
+  (Not surveyed; the statement to check before relying on it.)
+* **Matroid optimization.**  Lagrangian decomposition (Guignard and Kim, Math. Programming 39 (1987)) reaches the LP
+  over the intersection of the matroid polytopes with two-matroid subproblems; for three matroids that LP's integrality
+  gap is 2 (Linhares, Olver, Swamy, Zenklusen, Math. Programming 2020), so it is a bound, not the optimum.  The k best
+  common independent sets can be ranked (Camerini and Hamacher, SIAM J. Discrete Math. 2 (1989)), and intersection
+  under small changes of the matroids has fast algorithms (Blikstad, Mukhopadhyay, Nanongkai, Tu, STOC 2023).
+  *Transfers:* the decomposition for A1, with a volume or bundle method for the multipliers (the plain subgradient
+  stalled in the per-frame study); ranking for A3's sizes and for incumbents.
 * **AND/OR search** (graphical models).  Branch on a separator, solve the sides independently.  *Transfers:* the frame
   path's homes as separators (A5).
-* **Proof logging (SAT, pseudo-Boolean).**  Checkers that verify Gaussian elimination and cutting planes from a
-  solver's log.  *Transfers:* a log of the solver's tree with each leaf's certificate (a weight split, a conflict, a
-  symmetric pair), checked by a small program, would make the code's correctness checkable without the prover; it
-  does not touch the frame model's assumptions, which is why A2 ranks above it.
-* **Number theory.**  Landau's count of numbers with k prime factors, x (log log x)^(k−1) / ((k − 1)! log x), for
-  how fast the movers with three distinct primes, where all odd cores live, thicken in frames 1-3; a model of the gap
-  in those terms would forecast the wall and say which n are dear before running them.
+* **Proof logging.**  Gaussian elimination certified in pseudo-Boolean proofs (Gocht and Nordström, AAAI 2021), branch
+  and bound certified by aggregation and disjunction steps (VIPR: Cheung, Gleixner, Steffy, IPCO 2017), dominance and
+  symmetry breaking certified (Bogaerts, Gocht, McCreesh, Nordström).  No certificate format for matroid-intersection
+  duality exists; Frank's weight split with greedy-optimality certificates per matroid is the natural one, checkable
+  with XORs and comparisons.  *Transfers:* a log of the solver's tree with each leaf's certificate (a weight split, a
+  conflict, a symmetric pair), checked by a small program, would make the code's correctness checkable without the
+  prover.  It does not touch the frame model's assumptions, which is why A2 ranks above it.
+* **Number theory: the asymptotic constant.**  D. Hensley, "A winning strategy at Taxman", Fibonacci Quarterly 26
+  (1988) 262-270 (read): opt(n) / (n²/2) tends to a constant C with 1/2 < C ≤ 35/48, so the taxman keeps a fixed share
+  of the pot; and for every prime p, L_p ≤ C ≤ L_p + 2/p, where L_p is a sum over the p-smooth numbers j of the optimal
+  scores of the games on the p-smooth numbers up to j.  Nothing later improves it.  Franklín and Moniot (read) compute
+  no optimum themselves (their data are this project's, to 1000), prove that their born-free matching takes at least
+  1724/3375 of the pot asymptotically, and pose no open problems; nothing cites them yet.  *Transfers:* a new use for
+  exact solvers, proven bounds on C from games on smooth boards (about a thousand 7-smooth numbers below 10^6), a
+  result in its own right and a check of the asymptotic regime; and Hensley's blocks {kd : d p-smooth} (play in block k
+  never disturbs a larger block), a decomposition of the board by the rough part of each number.  For the gap's growth,
+  Landau's count of numbers with k prime factors, x (log log x)^(k−1) / ((k − 1)! log x), says how fast the movers with
+  three distinct primes, where all odd cores live, thicken in frames 1-3.
 
 ## 6. What the cloud runs should measure
 
@@ -355,8 +407,10 @@ their output files, analysed afterwards on one thread; what needs the machine is
 * **The prover's run**: per game, its nodes against the solver's (the ratio's trend past 2000), and where its tree
   branches (members above n/2 against below), which is A2's premise: the share of its nodes spent on U\*.
 * **The scaling at 192** (on the machine): effective parallelism, idle and lock time on a dear game, the nogood
-  period (IDEAS.md, section 3), the checkpoint pause at 300 s ([RUNBOOK 8](../tools/cloud/RUNBOOK.md#8-what-has-not-been-measured)).
-* **The fixed costs on Graviton** after round A ([bench/wall, "For a cloud machine"](../bench/wall/README.md#for-a-cloud-machine)).
+  period (IDEAS.md, section 3), the checkpoint pause at 300 s
+  ([RUNBOOK 8](../tools/cloud/RUNBOOK.md#8-what-has-not-been-measured)).
+* **The fixed costs on Graviton** after round A
+  ([bench/wall, "For a cloud machine"](../bench/wall/README.md#for-a-cloud-machine)).
 * **Keep every checkpoint of a dear game that does not finish**: a resumable tree past 2175 is the test bed for A1, A3
   and A4 at the size that matters.
 
@@ -380,8 +434,8 @@ c8g chain's nodes (64 threads, the build before the inner-loop round, as `strict
 | gap / n | 6.95 ± 0.31 per unit of 1000 G/n | 0.40 | 0.61 |
 
 The c8g chain's 39 searches: mean residual +0.08 ± 0.08 decades against the gap fit (sd 0.50), +0.45 against the fit
-with n; their own fit ×10 per 193 ± 40 of gap.  Largest residuals 2268 (+1.09), 2260 (+0.95), 2272 (+0.77); smallest
-2208 (−0.69), 2205 (−0.65).
+with n, +0.67 against the fit on G/n; their own fit ×10 per 193 ± 40 of gap.  Largest residuals 2268 (+1.09), 2260
+(+0.95), 2272 (+0.77); smallest 2208 (−0.69), 2205 (−0.65).
 
 ### 7.2 Other fields at the roots of the whole game
 
@@ -401,8 +455,9 @@ and with Koszul signs (the entry of s at s/p is (−1)^i, i the index of p among
 | 1100-1300 | 201 | 138 | 65 | 48% | 73% |
 
 In all, 412 over GF(3) with 0/1 entries, 30 over GF(5), 12 over GF(7); with signs 209, 39 and 27; none over the
-rationals; the rank deficiency is 1 but in six residuals (2, over GF(3)).  Of the 658 square residuals, the integer determinant with 0/1 entries is ±1 in
-408, divisible by 3 in 219, by 5 in 21, by 7 in 10; with signs ±1 in 572; ±1 under both in 358 (54%).
+rationals; the rank deficiency is 1 but in six residuals (2, over GF(3)).  Of the 658 square residuals, the integer
+determinant with 0/1 entries is ±1 in 408, divisible by 3 in 219, by 5 in 21, by 7 in 10; with signs ±1 in 572; ±1
+under both in 358 (54%).
 
 ### 7.3 Barred bounds on the upper part
 
