@@ -24,8 +24,10 @@ whole board, and its proofs of 1301-2175 are running on a cloud machine
 ([prover 3](../prover/README.md#3-the-proofs-of-optn)).
 A 64-thread chain reached 2276 in the Graviton calibration (`bench/cloud/c8g.chain-2176.jsonl`, benchmark data, not
 a committed result), and the EC2 chain, 64 threads on a `c8g.16xlarge`, 3314 in 6.4 hours (a snapshot of
-2026-10-15, not committed; its root gaps are section 7.4).  The frame model's assumptions are validated, not proven
-([README](../README.md#what-optimal-means)).  Outside the project the record stops at n = 1000 (OEIS A019312's table is
+2026-10-15, not committed; its root gaps are section 7.4).  The frame model's assumptions are proven (2026-10-15),
+but for one statement, U: some optimal game plays every source of three or more prime factors that setup keeps
+([README](../README.md#what-optimal-means);
+[THEORY.md](../../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains)).  Outside the project the record stops at n = 1000 (OEIS A019312's table is
 this project's), and the literature has bounds and one asymptotic result, not optima (section 5).
 
 **The theory the search stands on.**  A set of moves is playable, independent over GF(2) in the parity matroids, or
@@ -225,7 +227,10 @@ one thread; the prover's `Meet::solve` with `Role::Barred`): the share of U\* ce
 search of five games it has proven (1302-2100, from the cloud run's data) with the certified members forced
 (`Role::Pick`) and the open ones free: nodes against the unforced proof.  *Kill:* fewer than 2 times fewer nodes on the
 dear games.  (3) The remaining assumptions one at a time (the prover README's open list says they are tested only end
-to end): for each, a statement and either a proof or a counterexample on boards to 2000.
+to end): for each, a statement and either a proof or a counterexample on boards to 2000.  *Done (2026-10-15):* all
+of them are theorems given clean numbering, a per-board fact true on every board to 8191 (THEORY.md, Theorems B and
+M), and the upper part is reduced to U, its members of three or more prime factors (docs/EXPERIMENTS.md, "The frame
+model on a proven footing").
 
 *Payoff.*  The verified wall moves with the solver's instead of falling behind tenfold per 1000 n; with a general proof
 of the model the prover becomes a cross-check that can lag.

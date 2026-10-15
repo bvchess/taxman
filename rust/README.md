@@ -64,7 +64,8 @@ cost of a game grew by a factor of ten for every 55 to 70 in n past 1200
 4. What a game can choose is which of the spare factors to *promote*: to play it as a move instead of leaving it as
    tax.  Promoting a factor of frame h makes it a move of frame h-1, one frame forward: its own maximal factors, which
    would pay for it, are in the frames directly in front of its frame, and the numbering puts those with freedoms in
-   frame h-1 (that nothing further forward is needed is an assumption of the model, see "What optimal means" below).
+   frame h-1 (that nothing further forward is needed is proven, given that the numbering is clean: see "What optimal
+   means" below).
    Both frames must stay winnable.
 5. The score of a game is `in_the_bag` (what the game with no promotions scores) plus the sum of its promotions.  So the
    frame solver searches for the *promotion set* with the largest sum, with a branch-and-bound over which candidates to
@@ -97,17 +98,28 @@ promotion from that frame needs one frame to go to.
 
 ### What "optimal" means
 
-* **Within the frame model.**  The decomposition above rests on assumptions that are validated, not proven: the greedy
-  removal of impossible sources inside frames, the mandatory moves of `unzip` (a source with only one usable factor
-  must take it), freedoms = factors - sources, closed frames (those with no freedom) taking no part in the search, and
-  a promoted number paying tax only from the frame one forward ([DESIGN.md, Tactics](DESIGN.md#5-tactics)).  They
-  were validated by agreement with the Java's `optimal.json` for n <= 1000, by exhaustive search (`src/brute.rs`,
-  `heuristics/evaluation/certify.py`) for small boards (n <= 62), and by [the prover](prover/README.md), which proves
-  the optimum on the whole board, without the frame model, for every n <= 1300, the committed chain to there (its
-  proofs of 1301 to 2175 are pending).
+* **The frame model: proven, but for one statement.**  The decomposition above used to rest on five assumptions:
+  the greedy removal of impossible sources inside frames, the mandatory moves of `unzip` (a source with only one
+  usable factor must take it), freedoms = factors - sources, closed frames (those with no freedom) taking no part in
+  the search, and a promoted number paying tax only from the frame one forward.  They are now theorems
+  ([heuristics/THEORY.md, "The frame model: what is proven and what
+  remains"](../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains)), and what is left is one
+  statement about the game:
+
+  > **U**: some optimal game plays every source with three or more prime factors that setup keeps (U\*).
+
+  Precisely: on a board whose numbering of the frames is *clean* (every frame with freedoms directly in front of
+  frame h is frame h - 1, which holds on every board to 8191, the largest the solver supports, and which setup
+  checks), the games that play every source setup keeps are exactly U\* with a promotion set added (Theorem M); every
+  optimal game plays the sources setup keeps with one or two prime factors (Theorem B); so the heaviest promotion set
+  gives opt(n) exactly when U holds at n.  U is open in general.  It holds for every n <= 1300, where [the
+  prover](prover/README.md) proves the optimum on the whole board, without the frame model (its proofs of 1301 to
+  2175 are pending).  So a game proven above 1300 by an exhausted search, a trivial board or a repeat assumes U at n;
+  a game proven at its ceiling or by the prime formula does not (section 5).  The results lines do not record it.
+  [DESIGN.md](DESIGN.md#what-optimal-means) says what each proof kind needs of the model.
 * **Given the pruning is exact.**  Every tactic is proven or sound: none prunes a promotion set that could win
-  ([DESIGN.md, Tactics](DESIGN.md#5-tactics) grades each).  So a result rests on nothing but the frame model, the
-  correctness of the code and, where its proof says so, the game it was built from.
+  ([DESIGN.md, Tactics](DESIGN.md#5-tactics) grades each).  So a result rests on nothing but U (where its proof uses
+  the frame model), the correctness of the code and, where its proof says so, the game it was built from.
 * **Given the previous game is optimal.**  A game of n is built from the game of n - 1: its search starts from the
   previous game's promotions and stops as soon as it reaches the proven ceiling `n + score(n-1)`.  So a chain of
   games from n = 1 is proven game by game from the one before.  Section 5 describes how each result records what it
@@ -483,7 +495,9 @@ that game assumes, and so on down the chain; a repeat rests on the game it repea
 assumes.  A game taken from `optimal.json` (`--use-prev`) is assumed optimal, since the table records nothing about how
 a game was found: a proof that rests on its game of n - 1 assumes "the game of n - 1 in optimal.json is optimal".  A
 game that assumes nothing is proven within the frame model, given that the solver is right.  `taxman solve` prints
-what a game assumes in the summary line.
+what a game assumes in the summary line.  What a proof rests on through the frame model, the statement U at n
+(section 1, "What optimal means"), is not recorded: it concerns the games proven by an exhausted search, a trivial
+board or a repeat, and holds for every n <= 1300.
 
 ### The verifiers
 
@@ -619,8 +633,11 @@ the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#t
   set.
 * **in the bag** (`in_the_bag`, the Java's `inTheBag`): what the game with no promotions scores.
 * **max_total** (`maxTotalPromotions`): the most promotions the frames' freedoms allow.
-* **the frame model**: this decomposition and its assumptions (section 1).  `model::FrameGraph` is the immutable factor
-  graph and home frames, not "the model".
+* **the frame model**: this decomposition (section 1), exact given that the numbering of the frames is clean and the
+  statement U holds (section 1, "What optimal means").  `model::FrameGraph` is the immutable factor graph and home
+  frames, not "the model".
+* **clean numbering** (N): every frame with freedoms directly in front of frame h is frame h - 1; the frames are then
+  numbered by layer (the number of prime factors of their sources).  True on every board to 8191, checked by setup.
 
 ### The search
 
@@ -698,8 +715,11 @@ the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#t
   `tools/check_results.py` compares scores with it.  **parity bound**: the prover's sharper bound, from two matroids
   over GF(2) split by the parity of Ω (heuristics/THEORY.md, Theorem 10).
 * **brute force**: `src/brute.rs`, the exhaustive search that is the test oracle for small boards.  **U\***:
-  heuristics/THEORY.md's name for the heaviest playable set of sources, which the sources that setup keeps at the root
-  are wherever the upper-half conjecture holds ([prover/README.md, section 2](prover/README.md#2-conjecture--at-scale)).
+  the sources that setup keeps, by descending greedy on each frame; heuristics/THEORY.md's name for the heaviest
+  playable set of sources, which they are wherever the upper-half conjecture holds, so on every board to 100,000
+  ([prover/README.md, section 2](prover/README.md#2-conjecture--at-scale)).  **U**: the statement that some optimal
+  game plays every member of U\* with three or more prime factors, on which the frame solver's answers rest (section
+  1, "What optimal means").
 
 ## 8. Reading order and map of the documents
 

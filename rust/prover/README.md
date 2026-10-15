@@ -1,9 +1,12 @@
 # The prover: independent proofs and checks of the frame solver's results
 
 The prover is the second program of this repository.  The frame solver finds the optimal games (`rust/results`,
-`src/main/resources/optimal.json`) by searching promotions within the frame model, whose assumptions are validated,
-not proven ([DESIGN.md §2](../DESIGN.md#what-optimal-means)), and whose handling of the numbers above n/2 rests on an
-open conjecture, the upper-half optimality conjecture, equivalently conjecture (★)
+`src/main/resources/optimal.json`) by searching promotions within the frame model, whose answer is the optimum exactly
+when one open statement holds: that some optimal game plays every source with three or more prime factors that the
+frame solver's setup keeps (U; [THEORY.md, "The frame model: what is proven and what
+remains"](../../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains), where the model's former
+assumptions are proven; [DESIGN.md §2](../DESIGN.md#what-optimal-means)).  The sources it keeps are the heaviest
+playable set of them wherever the upper-half optimality conjecture, equivalently conjecture (★), holds
 ([THEORY.md](../../heuristics/THEORY.md#the-open-problem)).  The prover is a branch and bound over sets of moves on
 the whole board.  It decides playability by peel (THEORY.md, Theorem 1), uses only proven bounds, takes the recorded
 score as its target and proves that no set of moves beats it, so that the frame model's answers are checked without
@@ -591,8 +594,11 @@ gzipped where large (`gunzip -k` to resume into it).
   n, and the cost with it; the conflicts of its heaviest sets are large (20–45 members at 990).
 * The optimal sets of 990–1300 are not enumerated.  The enumeration mode works with the parity bound (tested
   against brute force), so `optsets` with it would extend section 5 at about the cost of the proofs.
-* The frame model's individual assumptions other than the greedy removal are tested only end to end (through
-  the optimum), not one by one.
+* The frame model's individual assumptions are no longer open: they are theorems given a per-board fact that holds
+  on every board to 8191 ([THEORY.md](../../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains),
+  Theorems B and M), and what the model's answers rest on is one statement, U: some optimal game plays every source of
+  three or more prime factors that setup keeps.  The prover's proofs establish U at every n ≤ 1300; certifying it
+  game by game beyond (barred parity bounds, then a search of the members they leave open) is the next step.
 * Whether every optimal game's upper part is U\*.  Theorem 8 settles the upper half alone; for the whole game, a
   frontier argument would start from an optimal S whose upper part S_U is not U\*: termwise domination puts the
   largest disagreement d in U\* ∖ S_U, and S + d is unplayable, so the question is whether some repair costs less

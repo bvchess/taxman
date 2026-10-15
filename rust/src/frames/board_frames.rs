@@ -153,12 +153,14 @@ enum Home {
     /// stale frame for such a number (`BoardFrames::has_outside_move_using`).  It is a quirk, not something the model
     /// needs, and it is reproduced for parity.
     ///
-    /// It is inert in practice.  Only [`frames::build_frames`](crate::frames::build_frames) merges frames, and
-    /// for every board `2 ≤ n ≤ 2000` the test that reads this variant is reached on a single board (n = 114,
-    /// twice), where it does not make the number an outside move; building the frames with the variant forced to
-    /// answer `false` gives identical frames, candidates and freedoms on every one of those boards.  (Measured
-    /// 2026-10; to repeat it, make that arm of `has_outside_move_using` return `false` and compare the frames of
-    /// all the boards with and without.)
+    /// It is inert, in principle and in practice.  In principle: it can only make `unzip` claim less, and the frame
+    /// model's exactness does not depend on how much `unzip` claims (heuristics/THEORY.md, lemma M5).  In practice:
+    /// only [`frames::build_frames`](crate::frames::build_frames) merges frames, and on every board `2 ≤ n ≤ 8191`
+    /// the test that reads this variant is reached on a single board (n = 114, twice), where it does not make the
+    /// number an outside move ([`BoardFrames::merged_away_reach`], counted by the census `examples/structure.rs`);
+    /// building the frames with the variant forced to answer `false` gives identical frames, candidates and
+    /// freedoms on every board to 2000.  (Measured 2026-10; to repeat it, make that arm of `has_outside_move_using`
+    /// return `false` and compare the frames of all the boards with and without.)
     MergedAway { had_freedoms: bool },
     /// None: the number is a hole of a punctured board ([`Tables::punctured`]).
     OffBoard,
@@ -575,8 +577,8 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
 
     /// Finds the mandatory moves of frame `i` until there are no more, recording each with the factor it claims;
     /// whether it found any.  (Earlier notes call these moves "forced", which this code avoids: the search has
-    /// forced members of its own that are unrelated.  The Java's field is `mandatoryMoves`.)  A model
-    /// assumption, see [`crate::frames`].
+    /// forced members of its own that are unrelated.  The Java's field is `mandatoryMoves`.)  That no game is lost
+    /// by them is heuristics/THEORY.md's lemma M5 (see [`crate::frames`]).
     ///
     /// Two kinds of move are mandatory, as long as the factor involved is of no use outside the frame, so that
     /// settling the pair now takes nothing from the search:
@@ -700,9 +702,10 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
     /// already kept (`count_freedoms` against the remaining factors).  Impossible sources
     /// leave the frame's `sources`.  Whether any new impossible source was found.
     ///
-    /// This greedy choice, largest first, is a model assumption: it decides which sources the whole model
-    /// gives up on, for good.  It keeps the heaviest playable set if the playable sets form a matroid, which is
-    /// not known.  (Sources that were mandatory are not reconsidered: they are not in the remaining sources.)
+    /// This greedy choice, largest first, decides which sources the whole model gives up on, for good: the first pass
+    /// over a frame keeps U\*, and the later passes keep everything (heuristics/THEORY.md, lemma M1; that an optimal
+    /// game plays U\* is the statement the frame model rests on, see [`crate::frames`]).  (Sources that were
+    /// mandatory are not reconsidered: they are not in the remaining sources.)
     ///
     /// It looks at nothing but the frame's own remaining sources and factors, and keeps every source that
     /// remains, so a second pass over the same ones would keep them all again.  The frame's `swept` flag records

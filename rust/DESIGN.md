@@ -93,20 +93,43 @@ example, the board 1..=21, is in the [README](README.md#how-the-solver-sees-the-
 
 ### What "optimal" means
 
-* **Within the frame model.**  The decomposition rests on assumptions that are validated, not proven: the greedy
-  removal of impossible sources inside frames, the mandatory moves of `unzip`, freedoms = factors − sources, closed
-  frames (those with no freedom) taking no part in the search, and a promoted number paying tax only from the frame one
-  forward.  They are validated by agreement with the Java's optimal.json for n ≤ 1000; by the prover (a branch and
-  bound over sets of moves on the whole board, from the playability theorems, the Franklín–Moniot bound, the parity
-  bound of THEORY.md's Theorem 10, the ceiling and the prime formula, and nothing of frames), which confirms the
-  optimum of every game of the committed chain to n = 1300 (its proofs of 1301–2175 are pending); by an independent
-  brute force (`heuristics/evaluation/certify.py`) for n ≤ 62; and by `brute`, the solver's own exhaustive search,
-  which checks frame-model games on small boards (up to 40 in the test suite, 52 in `examples/sacrifice validate`).
-  The greedy removal of impossible sources at the root, where it shapes the search space, is descending greedy on each
-  component of the sources' instance, which the prover certifies maximum-weight (for every weighting consistent with
-  the order) in every game n ≤ 100,000.  The sacrifice bound (`sacrifice`) is an upper bound on opt(n) by a different
-  route (games on punctured boards); it proves game 1133 and disagrees with nothing.  [The prover's
-  README](prover/README.md) has the details.
+* **Within the frame model.**  The search finds P\*(Π_n), the heaviest promotion set of the root problem Π_n (the
+  frames, the candidates, `max_total`; section 8, "Same search"), and the answer is in_the_bag + P\*(Π_n).  What that
+  is, is proven in [THEORY.md, "The frame model: what is proven and what
+  remains"](../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains):
+  * the sources that setup keeps are U\*, descending greedy on each frame, and in_the_bag = ΣU\* (Theorem M, M1);
+  * **completeness and soundness** (Theorem M): if the numbering of the frames is clean (N: every frame with
+    freedoms directly in front of frame h is frame h − 1), a set U\* ∪ L with L up to n/2 is playable exactly when L
+    is a promotion set of Π_n, and then it scores in_the_bag + ΣL.  So `unzip`'s mandatory moves, freedoms =
+    factors − sources, closed frames taking no part, a promotion paying one frame forward, the numbering, the
+    candidate filter and the root's reduction lose no game that plays U\* and admit none that is not a game.  N holds
+    on every board to 8191 (the census `examples/structure.rs`, `bench/structure/`), and `frames::build_frames`
+    refuses a board where it would not;
+  * every optimal game plays the members of U\* with one or two prime factors (Theorem B);
+  * so in_the_bag + P\*(Π_n) = opt(n) exactly when **U** holds at n: some optimal game plays the members of U\* with
+    three or more prime factors.  U is open in general; it holds for every n ≤ 1300, where the prover (a branch and
+    bound over sets of moves on the whole board, from the playability theorems, the Franklín–Moniot bound, the parity
+    bound of THEORY.md's Theorem 10, the ceiling and the prime formula, and nothing of frames) proves the optimum of
+    every game of the committed chain (its proofs of 1301–2175 are pending).
+
+  What each proof kind needs of this, beyond the code's correctness and the games before it:
+
+  | proof | needs |
+  |---|---|
+  | `prime_formula` | nothing of the model (proved at `accelerate::prime_shortcut`) |
+  | `cap` | nothing of the model: the game is replayed, and reaches the ceiling n + score(n − 1) ≥ opt(n) given that score(n − 1) = opt(n − 1) |
+  | `exhausted`, `trivial` | completeness at n, so U at n (and N, which holds) |
+  | `same_search` of an exhausted game m | U at n, and Π_n = Π_m (checked) |
+  | `same_search` of a `cap` game m | U at n, Π_n = Π_m (checked), and soundness at m (Theorem M), which makes m's ceiling P\*(Π_m) |
+
+  The tests tie the theorems to the code: `tests/model_exact.rs` checks Theorem M both ways, on every set of every
+  board to 100 and on random sets to 8191, against a playability oracle that shares no code with `frames` or
+  `model`; `tests/bottom_layers.rs` checks Theorem B on every recorded and enumerated optimal set; and two exhaustive
+  searches agree with the frame model's games on small boards: `brute`, the solver's own (to 40 in the test suite, 52
+  in `examples/sacrifice validate`), and `heuristics/evaluation/certify.py` (to 62).  The sacrifice
+  bound (`sacrifice`) is an upper bound on opt(n) by a different route (games on punctured boards, where N can fail,
+  so it is not covered by Theorem M); it proves game 1133 and disagrees with nothing.  [The prover's
+  README](prover/README.md) has the details of the prover.
 * **Given the pruning is exact.**  Every tactic is proven or sound (section 5 grades each).  The Java used two
   shortcuts that rest on conjectures (`reuse_prev` and `revise_freedoms`); the frame solver had them as tactics for a
   while, measured that they no longer paid, and removed them (EXPERIMENTS, "Which tactics earn their keep").
@@ -539,10 +562,11 @@ heaviest promotion set also has the most members, which is false at n = 833), an
 `blameGame` bound with its runner-up, its preclusion table, and the branchings other than strong branching
 ([which tactics earn their keep](docs/EXPERIMENTS.md#which-tactics-earn-their-keep-2026-10)).
 
-**Model assumptions** (unproven, inherent to the frame model, validated as in section 2): greedy removal of impossible
-sources inside frames (the Java's `Hive.removeImpossible`); mandatory moves (its `Hive.unzip`); freedoms = factors −
-sources (its `freeFactorCount`, set by `Hive.finishSetup`); closed frames take no part in the search; a promoted number
-pays tax only from the frame one forward.  They define the search space and cannot be switched off inside this model.
+**The frame model's own rules** are not tactics: greedy removal of impossible sources inside frames (the Java's
+`Hive.removeImpossible`); mandatory moves (its `Hive.unzip`); freedoms = factors − sources (its `freeFactorCount`, set
+by `Hive.finishSetup`); closed frames take no part in the search; a promoted number pays tax only from the frame one
+forward.  They define the search space and cannot be switched off inside this model.  They used to be its unproven
+assumptions; section 2 ("What optimal means") says what is now proven of them, and what remains (the statement U).
 
 **Where tactics are recorded.**  A result line records the tactics it was produced with (`tactics`: the changes from
 the defaults, such as `lagrange=on,gf2=off`; `tactic_switches`: every tactic's value; a line of a build before
@@ -785,8 +809,9 @@ rests on the digest alone (below).
   pruning is exact, which every exhausted proof rests on;
 * `cap`: its promotions S are promotable and sum to ceiling(m) = m + score(m − 1) − in_the_bag(m), so P\*(Π_m) ≥
   ceiling(m).  And every promotable set T of Π_m is a legal game of m scoring in_the_bag(m) + sum(T): this is the
-  direction of the frame model that every search relies on each time it offers an incumbent, and the referee replays
-  every game built from one (none has ever failed).  So in_the_bag(m) + P\*(Π_m) ≤ opt(m) ≤ m + opt(m − 1) = m + score(m
+  soundness of the frame model (THEORY.md, Theorem M, which needs only the clean numbering that setup checks), the
+  direction every search relies on each time it offers an incumbent, and the referee replays every game built from
+  one (none has ever failed).  So in_the_bag(m) + P\*(Π_m) ≤ opt(m) ≤ m + opt(m − 1) = m + score(m
   − 1), given that the game of m − 1 is optimal (which the proof by the ceiling rests on, and m's assumptions record),
   and P\*(Π_m) = ceiling(m), the sum of m's promotions, whatever tactics shaped the search;
 * `same_search`: by induction, m repeats a game k with Π_k = Π_m whose proof settles P\*(Π_k), and m's promotions are
@@ -800,8 +825,8 @@ nothing.
 promotions S, and S is promotable in Π_n.  The game of n is S played on the board of n (`solution_for_promotions`), and
 it goes through `conclude` like any game: it must replay legally, be over and open with the largest prime, score
 in_the_bag(n) + P, stay within `score(n − 1) ≤ score(n) ≤ n + score(n − 1)`, and match optimal.json where that has n.
-It is optimal on the premise of an exhausted proof of n, the frame model's (the best game of n scores in_the_bag(n) +
-P\*(Π_n)), with P\*(Π_n) established by m's proof instead of a search.  Its proof `same_search` rests on m, not on
+It is optimal on the premise of an exhausted proof of n (the best game of n scores in_the_bag(n) + P\*(Π_n), which is
+U at n, section 2), with P\*(Π_n) established by m's proof instead of a search.  Its proof `same_search` rests on m, not on
 the game of n − 1, and it assumes what m assumes.
 
 *Finding m.*  Before n's search (and only for a search that is not resumed from a checkpoint, and without
@@ -862,6 +887,16 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   the line's, which the golden data (up to 2049) cannot say of the boards that matter.  The unit tests of `frames` check
   what the frames remember (which numbers each can take on, which sources `removeImpossible` has been through) against a
   fresh computation.
+* **The frame model's exactness** (THEORY.md, Theorems B and M; section 2, "What optimal means"):
+  `tests/model_exact.rs` decides playability on the whole board with an oracle that shares no code with `frames` or
+  `model` (`tests/common/playable.rs`, the peel; itself checked against the rules on every subset of the boards to
+  20), and checks both directions of Theorem M on every set of every board to 100 (to 120 ignored) and on random sets
+  of boards to 1300 (to 8191 ignored), and the near miss that only the candidate filter keeps out (n = 98);
+  `tests/bottom_layers.rs` checks Theorem B on every game of optimal.json, the committed chain and the chain past it,
+  every optimal set the prover enumerated, and every optimal set of the boards to 48; the unit tests of `frames`
+  check that `unzip`'s claims are its mandatory pairs, that `numbering` is what `build_frames` uses, and the check of
+  clean numbering, which `tests/wide.rs` runs on a sample of the boards to 8191.  The census of every board
+  (`examples/structure.rs`, data in `bench/structure/`) checks the hypotheses of Theorem M one board at a time.
 * **Regression**: `taxman regress --to N` solves 1..N as one range and checks every score against optimal.json.
 * **Tactic invariance**: games 1..300 forced to search with each tactic off or changed must give identical scores,
   and a checkpoint is refused when any of the search tactics differs.

@@ -54,27 +54,33 @@
 //! # Simplifying a frame
 //!
 //! After the frames are formed, [`BoardFrames::new`] simplifies each one until nothing changes (`finish_setup`).
-//! Three things are decided frame by frame.  All three are part of the **frame model's assumptions**: they are
-//! validated (the Java's table of optimal games is reproduced to n = 1000, and small boards agree with
-//! exhaustive search) but not proven; README §1 and DESIGN.md (§2, "What optimal means", and §5, "Tactics") list
-//! them.
+//! Three things are decided frame by frame.  All three were assumptions of the frame model, validated but not proven;
+//! they are now theorems, given that the numbering of the frames is clean (below): heuristics/THEORY.md, "The frame
+//! model: what is proven and what remains" (Theorem M and its lemmas M1 to M6, which follow this code step by step),
+//! summed up in DESIGN.md §2, "What optimal means".  What remains is a statement about the game, not about this code:
+//! that some optimal game plays every source with three or more prime factors that setup keeps.
 //!
 //! * **unzip** finds the frame's *mandatory* moves, in two ways: a source with a single usable factor must take
 //!   it, and a factor wanted by a single source is given to that source.  A pair is settled only when the factor
 //!   cannot be put to better use outside the frame, as tax for a number promoted from another frame or (in the
 //!   second way) as a promoted number itself, a move of a frame in front of it.  Each settled pair of a move and
 //!   its *claimed* factor leaves the frame's *remaining* sources and factors, which are what the frame shows the
-//!   search.  The assumption: a frame plays all of its sources, so a source with one choice makes it.  (Earlier
-//!   notes call these moves "forced"; this code keeps that word out of the frames, since the search has forced
-//!   members of its own that are unrelated.)
+//!   search.  Every such pair is a move that any game playing the frame's sources must make, as the frame takes
+//!   them with whatever is promoted into it (THEORY.md, M5); a pair of the second kind needs that no promotion
+//!   candidate has the factor among its maximal factors, which the candidate filter makes so (`examples/structure.rs`
+//!   checks it on every board).  (Earlier notes call these moves "forced"; this code keeps that word out of the
+//!   frames, since the search has forced members of its own that are unrelated.)
 //! * **removeImpossible** drops, greedily from the largest source down, every source that cannot be played
 //!   together with the sources already kept.  They are the frame's *impossible* moves, which no game of the model
-//!   plays.  The assumption: that this greedy choice keeps the heaviest playable set of sources.  It would, if the
-//!   playable subsets of a frame's sources formed a matroid; nobody has shown that they do.
+//!   plays.  What the greedy keeps is U\* (THEORY.md, M1), the heaviest playable set of sources wherever the
+//!   upper-half conjecture holds (certified on every board to 100,000), although the playable subsets of a frame's
+//!   sources are not a matroid; that an optimal game plays all of U\* is proven for the sources with one or two prime
+//!   factors (THEORY.md, Theorem B) and is the open statement for the others.
 //! * The *freedoms* (the field `freedoms`) are `|factors| − |sources|`: how many factors the frame can
 //!   spare, each promotion out of or into the frame using one up.  A frame with none is *closed* and takes no part
-//!   in the search; one with some goes on to it.  The assumption: that this count is the frame's capacity.  (It is
-//!   only a count: the search still checks every single promotion for winnability.)
+//!   in the search; one with some goes on to it.  A closed frame's factors all pay its own sources in every game
+//!   that plays them (THEORY.md, M2), and the count is only a count: the search still checks every promotion for
+//!   winnability, which implies it.
 //!
 //! # Numbering the frames
 //!

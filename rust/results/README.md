@@ -107,9 +107,10 @@ differs from the table.
 
 ## What supports the scores
 
-"Optimal" here means optimal within the frame model, whose assumptions are listed in
-[DESIGN.md](../DESIGN.md#what-optimal-means) (the same holds for optimal.json beyond the brute-force certified
-n ≤ 62), and given that the solver is right.  Two verifiers, about 48 s and 1 s on the laptop:
+"Optimal" here means optimal within the frame model, which is opt(n) wherever one open statement about the game,
+U, holds ([DESIGN.md](../DESIGN.md#what-optimal-means); it holds for every n ≤ 1300, where the prover proves the
+optimum on the whole board, and a game proven at its ceiling or by the prime formula does not need it; the same holds
+for optimal.json), and given that the solver is right.  Two verifiers, about 48 s and 1 s on the laptop:
 
     taxman verify-results results/strict.jsonl
     python3 tools/check_results.py results/strict.jsonl
