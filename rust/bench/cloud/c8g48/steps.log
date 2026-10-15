@@ -1,0 +1,103 @@
+2026-10-15T03:55:36Z measure.sh starts; uptime 5 min; cpus 192; node 0 0-95; 64-thread set 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63; item 1 on 191
+    2183 /home/ec2-user/work/c2183.jsonl
+    2277 /home/ec2-user/work/known.jsonl
+    2225 /home/ec2-user/work/prefix.jsonl
+    6685 total
+2026-10-15T03:55:37Z start i7_ladder: /home/ec2-user/taxman/rust/target/release/examples/ladder --threads 1,16,64,96,192 --seed-opt --known /home/ec2-user/work/known.jsonl --seconds 3600 2170 2172
+2026-10-15T03:58:20Z end i7_ladder: status 0, wall 163.22 s
+2026-10-15T03:58:20Z start i7_ladder_rep: /home/ec2-user/taxman/rust/target/release/examples/ladder --threads 64,192,64,192 --seed-opt --known /home/ec2-user/work/known.jsonl --seconds 3600 2170 2172
+2026-10-15T03:58:28Z end i7_ladder_rep: status 0, wall 8.03 s
+2026-10-15T03:58:28Z start i7_ladder_node0: taskset -c 0-95 /home/ec2-user/taxman/rust/target/release/examples/ladder --threads 64,96 --seed-opt --known /home/ec2-user/work/known.jsonl --seconds 3600 2170 2172
+2026-10-15T03:58:33Z end i7_ladder_node0: status 0, wall 4.66 s
+2026-10-15T03:58:33Z start i7_ladder_2184: /home/ec2-user/taxman/rust/target/release/examples/ladder --threads 16,64,96,192 --seed-opt --known /home/ec2-user/work/known.jsonl --seconds 900 2184
+2026-10-15T03:59:30Z end i7_ladder_2184: status 0, wall 57.52 s
+2026-10-15T03:59:31Z start i1_setup (background, CPU 191)
+2026-10-15T03:59:31Z start i8a_T64_W1_r1: taskset -c 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63 /home/ec2-user/taxman/rust/target/release/taxman regress --to 1300 --threads 64 --window 1
+2026-10-15T03:59:42Z end i8a_T64_W1_r1: status 0, wall 11.04 s
+2026-10-15T03:59:42Z start i8a_T64_W4_r1: taskset -c 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63 /home/ec2-user/taxman/rust/target/release/taxman regress --to 1300 --threads 64 --window 4
+2026-10-15T03:59:50Z end i8a_T64_W4_r1: status 0, wall 7.72 s
+2026-10-15T03:59:50Z start i8a_T64_W8_r1: taskset -c 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63 /home/ec2-user/taxman/rust/target/release/taxman regress --to 1300 --threads 64 --window 8
+2026-10-15T03:59:56Z end i8a_T64_W8_r1: status 0, wall 6.29 s
+2026-10-15T03:59:56Z start i8a_T64_W16_r1: taskset -c 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63 /home/ec2-user/taxman/rust/target/release/taxman regress --to 1300 --threads 64 --window 16
+2026-10-15T04:00:02Z end i8a_T64_W16_r1: status 0, wall 5.76 s
+2026-10-15T04:00:02Z start i8a_T64_W32_r1: taskset -c 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63 /home/ec2-user/taxman/rust/target/release/taxman regress --to 1300 --threads 64 --window 32
+2026-10-15T04:00:07Z end i8a_T64_W32_r1: status 0, wall 5.71 s
+2026-10-15T04:00:07Z start i8a_T64_W1_r2: taskset -c 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63 /home/ec2-user/taxman/rust/target/release/taxman regress --to 1300 --threads 64 --window 1
+2026-10-15T04:00:18Z end i8a_T64_W1_r2: status 0, wall 11.04 s
+2026-10-15T04:00:18Z start i8a_T64_W4_r2: taskset -c 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63 /home/ec2-user/taxman/rust/target/release/taxman regress --to 1300 --threads 64 --window 4
+2026-10-15T04:00:26Z end i8a_T64_W4_r2: status 0, wall 7.76 s
+2026-10-15T04:00:26Z start i8a_T64_W8_r2: taskset -c 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63 /home/ec2-user/taxman/rust/target/release/taxman regress --to 1300 --threads 64 --window 8
+2026-10-15T04:00:33Z end i8a_T64_W8_r2: status 0, wall 6.43 s
+2026-10-15T04:00:33Z start i8a_T64_W16_r2: taskset -c 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63 /home/ec2-user/taxman/rust/target/release/taxman regress --to 1300 --threads 64 --window 16
+2026-10-15T04:00:39Z end i8a_T64_W16_r2: status 0, wall 5.92 s
+2026-10-15T04:00:39Z start i8a_T64_W32_r2: taskset -c 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63 /home/ec2-user/taxman/rust/target/release/taxman regress --to 1300 --threads 64 --window 32
+2026-10-15T04:00:44Z end i8a_T64_W32_r2: status 0, wall 5.74 s
+2026-10-15T04:00:45Z start i8b_T64_W1: taskset -c 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63 /home/ec2-user/taxman/rust/target/release/taxman solve 2226-2276 --threads 64 --window 1 --out /home/ec2-user/work/w64_1.jsonl --progress 0
+2026-10-15T04:01:42Z end i8b_T64_W1: status 0, wall 56.57 s
+2026-10-15T04:01:42Z start i8b_T64_W16: taskset -c 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63 /home/ec2-user/taxman/rust/target/release/taxman solve 2226-2276 --threads 64 --window 16 --out /home/ec2-user/work/w64_16.jsonl --progress 0
+2026-10-15T04:02:50Z end i8b_T64_W16: status 0, wall 68.16 s
+2026-10-15T04:02:50Z start v_w64_16: taskset -c 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63 tools/cloud/verify.sh /home/ec2-user/work/w64_16.jsonl
+2026-10-15T04:03:06Z end v_w64_16: status 0, wall 16.17 s
+2026-10-15T04:03:07Z waiting for item 1
+2026-10-15T04:10:23Z end i1_setup: status 0, wall 652 s
+2026-10-15T04:10:23Z start i8a_T192_W1_r1: /home/ec2-user/taxman/rust/target/release/taxman regress --to 1300 --threads 192 --window 1
+2026-10-15T04:10:40Z end i8a_T192_W1_r1: status 0, wall 16.13 s
+2026-10-15T04:10:40Z start i8a_T192_W4_r1: /home/ec2-user/taxman/rust/target/release/taxman regress --to 1300 --threads 192 --window 4
+2026-10-15T04:10:50Z end i8a_T192_W4_r1: status 0, wall 9.97 s
+2026-10-15T04:10:50Z start i8a_T192_W8_r1: /home/ec2-user/taxman/rust/target/release/taxman regress --to 1300 --threads 192 --window 8
+2026-10-15T04:10:57Z end i8a_T192_W8_r1: status 0, wall 7.03 s
+2026-10-15T04:10:57Z start i8a_T192_W16_r1: /home/ec2-user/taxman/rust/target/release/taxman regress --to 1300 --threads 192 --window 16
+2026-10-15T04:11:02Z end i8a_T192_W16_r1: status 0, wall 5.42 s
+2026-10-15T04:11:02Z start i8a_T192_W32_r1: /home/ec2-user/taxman/rust/target/release/taxman regress --to 1300 --threads 192 --window 32
+2026-10-15T04:11:08Z end i8a_T192_W32_r1: status 0, wall 5.56 s
+2026-10-15T04:11:08Z start i8a_T192_W1_r2: /home/ec2-user/taxman/rust/target/release/taxman regress --to 1300 --threads 192 --window 1
+2026-10-15T04:11:24Z end i8a_T192_W1_r2: status 0, wall 16.16 s
+2026-10-15T04:11:24Z start i8a_T192_W4_r2: /home/ec2-user/taxman/rust/target/release/taxman regress --to 1300 --threads 192 --window 4
+2026-10-15T04:11:34Z end i8a_T192_W4_r2: status 0, wall 10.05 s
+2026-10-15T04:11:34Z start i8a_T192_W8_r2: /home/ec2-user/taxman/rust/target/release/taxman regress --to 1300 --threads 192 --window 8
+2026-10-15T04:11:41Z end i8a_T192_W8_r2: status 0, wall 7.03 s
+2026-10-15T04:11:41Z start i8a_T192_W16_r2: /home/ec2-user/taxman/rust/target/release/taxman regress --to 1300 --threads 192 --window 16
+2026-10-15T04:11:46Z end i8a_T192_W16_r2: status 0, wall 5.55 s
+2026-10-15T04:11:46Z start i8a_T192_W32_r2: /home/ec2-user/taxman/rust/target/release/taxman regress --to 1300 --threads 192 --window 32
+2026-10-15T04:11:52Z end i8a_T192_W32_r2: status 0, wall 5.53 s
+2026-10-15T04:11:53Z start i8b_T192_W1: /home/ec2-user/taxman/rust/target/release/taxman solve 2226-2276 --threads 192 --window 1 --out /home/ec2-user/work/w192_1.jsonl --progress 0
+2026-10-15T04:12:25Z end i8b_T192_W1: status 0, wall 32.36 s
+2026-10-15T04:12:25Z start i8b_T192_W16: /home/ec2-user/taxman/rust/target/release/taxman solve 2226-2276 --threads 192 --window 16 --out /home/ec2-user/work/w192_16.jsonl --progress 0
+2026-10-15T04:12:59Z end i8b_T192_W16: status 0, wall 34.37 s
+2026-10-15T04:12:59Z start i8b_T192_W16_trace: env TAXMAN_WINDOW_TRACE=1 /home/ec2-user/taxman/rust/target/release/taxman solve 2226-2276 --threads 192 --window 16 --out /home/ec2-user/work/w192_16t.jsonl --progress 0
+2026-10-15T04:13:32Z end i8b_T192_W16_trace: status 0, wall 32.79 s
+2026-10-15T04:13:33Z start v_w192_16: tools/cloud/verify.sh /home/ec2-user/work/w192_16.jsonl
+2026-10-15T04:13:49Z end v_w192_16: status 0, wall 16.06 s
+2026-10-15T04:13:50Z start i3_ck1: /home/ec2-user/taxman/rust/target/release/taxman solve 2184 --threads 192 --out /home/ec2-user/work/i3_1.jsonl --checkpoint-dir /home/ec2-user/work/ck_i3_1 --checkpoint-interval 1 --progress 10 --time-limit 600
+2026-10-15T04:14:04Z end i3_ck1: status 0, wall 13.64 s
+2026-10-15T04:14:04Z start i3_ck300: /home/ec2-user/taxman/rust/target/release/taxman solve 2184 --threads 192 --out /home/ec2-user/work/i3_300.jsonl --checkpoint-dir /home/ec2-user/work/ck_i3_300 --checkpoint-interval 300 --progress 10 --time-limit 600
+2026-10-15T04:14:18Z end i3_ck300: status 0, wall 14.42 s
+2026-10-15T04:14:19Z start i4_4000: /home/ec2-user/taxman/rust/target/release/taxman solve 4000 --threads 192 --out /home/ec2-user/work/s4000.jsonl --checkpoint-dir /home/ec2-user/work/ck4000 --checkpoint-interval 300 --progress 10 --time-limit 600
+2026-10-15T04:15:02Z end i4_4000: status 0, wall 43.32 s
+2026-10-15T04:15:03Z start x8b_T192_W1_r2: /home/ec2-user/taxman/rust/target/release/taxman solve 2226-2276 --threads 192 --window 1 --out /home/ec2-user/work/x8b_T192_W1_r2.jsonl --progress 0
+2026-10-15T04:15:37Z end x8b_T192_W1_r2: status 0, wall 34.01 s
+2026-10-15T04:15:37Z start x8b_T192_W16_r2: /home/ec2-user/taxman/rust/target/release/taxman solve 2226-2276 --threads 192 --window 16 --out /home/ec2-user/work/x8b_T192_W16_r2.jsonl --progress 0
+2026-10-15T04:16:12Z end x8b_T192_W16_r2: status 0, wall 34.38 s
+2026-10-15T04:16:12Z start x8b_T192_W32: /home/ec2-user/taxman/rust/target/release/taxman solve 2226-2276 --threads 192 --window 32 --out /home/ec2-user/work/x8b_T192_W32.jsonl --progress 0
+2026-10-15T04:16:44Z end x8b_T192_W32: status 0, wall 31.98 s
+2026-10-15T04:16:45Z start x8b_T64_W16_r2: taskset -c 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63 /home/ec2-user/taxman/rust/target/release/taxman solve 2226-2276 --threads 64 --window 16 --out /home/ec2-user/work/x8b_T64_W16_r2.jsonl --progress 0
+2026-10-15T04:18:00Z end x8b_T64_W16_r2: status 0, wall 74.70 s
+2026-10-15T04:18:01Z start x8b_T64_W1_r2: taskset -c 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63 /home/ec2-user/taxman/rust/target/release/taxman solve 2226-2276 --threads 64 --window 1 --out /home/ec2-user/work/x8b_T64_W1_r2.jsonl --progress 0
+2026-10-15T04:18:57Z end x8b_T64_W1_r2: status 0, wall 56.52 s
+2026-10-15T04:18:58Z start x8b_T64_W32: taskset -c 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63 /home/ec2-user/taxman/rust/target/release/taxman solve 2226-2276 --threads 64 --window 32 --out /home/ec2-user/work/x8b_T64_W32.jsonl --progress 0
+2026-10-15T04:20:10Z end x8b_T64_W32: status 0, wall 72.55 s
+2026-10-15T04:20:11Z done; uptime 30 min; the machine shuts down (and terminates) in 20 minutes
+2026-10-15T04:20:14Z extras.sh starts (measure.sh's shutdown stays scheduled)
+2026-10-15T04:20:14Z start e_ladder_again: /home/ec2-user/taxman/rust/target/release/examples/ladder --threads 1,16,64,96,192 --seed-opt --known /home/ec2-user/work/known.jsonl --seconds 3600 2170 2172
+2026-10-15T04:22:58Z end e_ladder_again: status 0, wall 163.40 s
+2026-10-15T04:22:58Z start e8b_T192_W4: /home/ec2-user/taxman/rust/target/release/taxman solve 2226-2276 --threads 192 --window 4 --out /home/ec2-user/work/e8b_T192_W4.jsonl --progress 0
+2026-10-15T04:23:28Z end e8b_T192_W4: status 0, wall 29.56 s
+2026-10-15T04:23:29Z start e8b_T64_W4: taskset -c 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63 /home/ec2-user/taxman/rust/target/release/taxman solve 2226-2276 --threads 64 --window 4 --out /home/ec2-user/work/e8b_T64_W4.jsonl --progress 0
+2026-10-15T04:24:24Z end e8b_T64_W4: status 0, wall 54.97 s
+2026-10-15T04:24:24Z extras done
+2026-10-15T04:24:32Z extras2.sh starts; 940 s before the scheduled shutdown; 300 s a run
+2026-10-15T04:24:32Z start n2277_T192: timeout -s INT 300 /home/ec2-user/taxman/rust/target/release/taxman solve 2277-2400 --threads 192 --window 1 --out /home/ec2-user/work/n192.jsonl --progress 30
+2026-10-15T04:29:32Z end n2277_T192: status 124, wall 300.10 s
+2026-10-15T04:29:33Z start n2277_T64: timeout -s INT 300 taskset -c 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63 /home/ec2-user/taxman/rust/target/release/taxman solve 2277-2400 --threads 64 --window 1 --out /home/ec2-user/work/n64.jsonl --progress 30
+2026-10-15T04:34:33Z end n2277_T64: status 124, wall 300.08 s
+2026-10-15T04:34:33Z extras2 done

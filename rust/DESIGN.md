@@ -1082,7 +1082,8 @@ production run has been made with it; and, for the many-core machine, whatever i
 cannot.  The chain keeps several games in flight (section 7, "The window") and the engine reports what a thread loses
 at many threads (the units' starts, the lock, the ramp and the tail); on 4 threads of the laptop a step costs 7% more
 than on one, none of it in the units' starts, and the window makes 1..1300 16% faster and the games past 2225 no
-slower.  The measurements at 64 and 192 threads are written as commands (`bench/wall/README.md`, "For a cloud machine",
-items 7 and 8); a unit that carries its GF(2) level, so that a rebuilt one is checked rather than solved, waits for
-them (EXPERIMENTS, "Round B").  Graviton's 64 threads are measured for one proof (58.5 times); the window, and anything
-at 192 threads, are not (`tools/cloud/RUNBOOK.md`, section 8).
+slower.  On Graviton4 at 64 threads a step inside a unit's tree costs what it does on one thread, and the loss is the
+units' first nodes (1.4 to 4%) and the ramp and tail; at 192 threads, on two sockets, the step is 7 to 10% dearer; a
+window of 16 makes the games past 2225 a fifth slower on 64 threads, and 4 is the best measured (EXPERIMENTS, "Scaling
+to 192 threads").  A unit that carries its GF(2) level, so that a rebuilt one is checked rather than solved, would win
+at most the units' first nodes, and is not built; what is still unmeasured is in `tools/cloud/RUNBOOK.md`, section 8.

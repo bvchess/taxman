@@ -1,0 +1,124 @@
+## i7_ladder: /home/ec2-user/taxman/rust/target/release/examples/ladder --threads 1,16,64,96,192 --seed-opt --known /home/ec2-user/work/known.jsonl --seconds 3600 2170 2172
+n=2170 T=1 DONE   search   68.94 s nodes      440988 (     6 k/s) best 112062 opt 112062 greedy 109373 cap 112313 | start incumbent 112062 | prep 0.02 s max_total 130 | eff 100.0% idle 0.0% lock 0.0% splits 0 steals 0 full 0.3ms ramp 0.0% tail 0.0% rebuild 0.0% first 0.0%
+n=2170 T=16 DONE   search    4.70 s nodes      477721 (   102 k/s) best 112062 opt 112062 greedy 109373 cap 112313 | start incumbent 112062 | prep 0.02 s max_total 130 | eff 99.4% idle 0.6% lock 0.0% splits 72 steals 106 full 22.2ms ramp 0.4% tail 0.1% rebuild 0.1% first 1.1%
+n=2170 T=64 DONE   search    1.37 s nodes      518693 (   379 k/s) best 112062 opt 112062 greedy 109373 cap 112313 | start incumbent 112062 | prep 0.02 s max_total 130 | eff 96.4% idle 3.3% lock 0.0% splits 303 steals 484 full 44.2ms ramp 2.5% tail 0.8% rebuild 0.3% first 3.4%
+n=2170 T=96 DONE   search    0.96 s nodes      508343 (   532 k/s) best 112062 opt 112062 greedy 109373 cap 112313 | start incumbent 112062 | prep 0.02 s max_total 130 | eff 92.9% idle 6.5% lock 0.0% splits 434 steals 891 full 44.2ms ramp 3.6% tail 2.6% rebuild 0.3% first 4.3%
+n=2170 T=192 DONE   search    0.85 s nodes      518398 (   609 k/s) best 112062 opt 112062 greedy 109373 cap 112313 | start incumbent 112062 | prep 0.02 s max_total 130 | eff 90.5% idle 8.8% lock 0.0% splits 856 steals 956 full 81.2ms ramp 5.6% tail 2.8% rebuild 0.6% first 6.6%
+scaling, n=2170 (speedup over 1 thread(s), times 1; * = stopped by the time limit):
+  threads   search s speedup       nodes  k/s/thr  µs/step  µs/tree  eff % idle % lock %  reb %  1st % ramp % tail %  splits    units  steals     runs    tiny  full s
+        1     68.94     1.00      440988      6.4   155.42   155.41  100.0    0.0   0.00    0.0    0.0    0.0    0.0       0        0       0        1       0   0.000
+       16      4.70    14.67      477721      6.4   154.94   153.37   99.4    0.6   0.00    0.1    1.1    0.4    0.1      72      994     106     1067     225   0.022
+       64      1.37    50.42      518693      5.9   159.50   154.42   96.4    3.3   0.00    0.3    3.4    2.5    0.8     303     3495     484     3796     740   0.044
+       96      0.96    72.13      508343      5.5   163.51   156.67   92.9    6.5   0.00    0.3    4.3    3.6    2.6     434     4744     891     5172    1014   0.044
+      192      0.85    81.04      518398      3.2   275.40   257.39   90.5    8.8   0.01    0.6    6.6    5.6    2.8     856     8895     956     9740    1771   0.081
+n=2172 T=1 DONE   search   78.37 s nodes      510340 (     7 k/s) best 112074 opt 112074 greedy 109385 cap 113148 | start incumbent 112074 | prep 0.02 s max_total 130 | eff 100.0% idle 0.0% lock 0.0% splits 0 steals 0 full 0.2ms ramp 0.0% tail 0.0% rebuild 0.0% first 0.0%
+n=2172 T=16 DONE   search    4.62 s nodes      470255 (   102 k/s) best 112074 opt 112074 greedy 109385 cap 113148 | start incumbent 112074 | prep 0.02 s max_total 130 | eff 99.3% idle 0.7% lock 0.0% splits 84 steals 125 full 21.9ms ramp 0.4% tail 0.1% rebuild 0.1% first 1.4%
+n=2172 T=64 DONE   search    1.30 s nodes      484911 (   373 k/s) best 112074 opt 112074 greedy 109385 cap 113148 | start incumbent 112074 | prep 0.02 s max_total 130 | eff 95.5% idle 4.2% lock 0.0% splits 351 steals 544 full 44.0ms ramp 2.7% tail 1.6% rebuild 0.3% first 4.1%
+n=2172 T=96 DONE   search    0.95 s nodes      514987 (   542 k/s) best 112074 opt 112074 greedy 109385 cap 113148 | start incumbent 112074 | prep 0.02 s max_total 130 | eff 94.1% idle 5.5% lock 0.0% splits 447 steals 684 full 45.3ms ramp 4.0% tail 1.5% rebuild 0.3% first 4.4%
+n=2172 T=192 DONE   search    1.03 s nodes      591278 (   573 k/s) best 112074 opt 112074 greedy 109385 cap 113148 | start incumbent 112074 | prep 0.02 s max_total 130 | eff 91.0% idle 8.0% lock 0.0% splits 894 steals 822 full 68.6ms ramp 4.3% tail 3.3% rebuild 0.7% first 6.3%
+scaling, n=2172 (speedup over 1 thread(s), times 1; * = stopped by the time limit):
+  threads   search s speedup       nodes  k/s/thr  µs/step  µs/tree  eff % idle % lock %  reb %  1st % ramp % tail %  splits    units  steals     runs    tiny  full s
+        1     78.37     1.00      510340      6.5   152.78   152.78  100.0    0.0   0.00    0.0    0.0    0.0    0.0       0        0       0        1       0   0.000
+       16      4.62    16.97      470255      6.4   154.48   152.43   99.3    0.7   0.00    0.1    1.4    0.4    0.1      84     1289     125     1373     307   0.022
+       64      1.30    60.31      484911      5.8   160.51   154.23   95.5    4.2   0.00    0.3    4.1    2.7    1.6     351     4163     544     4510     846   0.044
+       96      0.95    82.48      514987      5.6   162.41   155.47   94.1    5.5   0.00    0.3    4.4    4.0    1.5     447     4790     684     5231     975   0.045
+      192      1.03    75.91      591278      3.0   296.46   277.57   91.0    8.0   0.00    0.7    6.3    4.3    3.3     894     9430     822    10309    1758   0.069
+scaling, all 2 games (speedup over 1 thread(s), times 1; * = stopped by the time limit):
+  threads   search s speedup       nodes  k/s/thr  µs/step  µs/tree  eff % idle % lock %  reb %  1st % ramp % tail %  splits    units  steals     runs    tiny  full s
+        1    147.31     1.00      951328      6.5   154.00   154.00  100.0    0.0   0.00    0.0    0.0    0.0    0.0       0        0       0        2       0   0.000
+       16      9.32    15.81      947976      6.4   154.72   152.91   99.3    0.6   0.00    0.1    1.3    0.4    0.1     156     2283     231     2440     532   0.022
+       64      2.67    55.24     1003604      5.9   159.99   154.33   96.0    3.8   0.00    0.3    3.7    2.6    1.2     654     7658    1028     8306    1586   0.044
+       96      1.91    77.29     1023330      5.6   162.96   156.06   93.5    6.0   0.00    0.3    4.3    3.8    2.1     881     9534    1575    10403    1989   0.045
+      192      1.88    78.22     1109676      3.1   286.62   268.15   90.8    8.4   0.01    0.6    6.5    4.9    3.1    1750    18325    1778    20049    3529   0.081
+
+## i7_ladder_rep: /home/ec2-user/taxman/rust/target/release/examples/ladder --threads 64,192,64,192 --seed-opt --known /home/ec2-user/work/known.jsonl --seconds 3600 2170 2172
+n=2170 T=64 DONE   search    1.38 s nodes      516917 (   376 k/s) best 112062 opt 112062 greedy 109373 cap 112313 | start incumbent 112062 | prep 0.02 s max_total 130 | eff 95.7% idle 3.9% lock 0.0% splits 310 steals 503 full 46.7ms ramp 2.5% tail 1.4% rebuild 0.3% first 3.5%
+n=2170 T=192 DONE   search    0.58 s nodes      524525 (   907 k/s) best 112062 opt 112062 greedy 109373 cap 112313 | start incumbent 112062 | prep 0.02 s max_total 130 | eff 88.2% idle 10.2% lock 0.0% splits 792 steals 1.3k full 58.8ms ramp 6.5% tail 3.5% rebuild 0.8% first 6.6%
+n=2170 T=64 DONE   search    1.31 s nodes      489690 (   375 k/s) best 112062 opt 112062 greedy 109373 cap 112313 | start incumbent 112062 | prep 0.02 s max_total 130 | eff 96.1% idle 3.7% lock 0.0% splits 335 steals 516 full 45.4ms ramp 2.7% tail 0.9% rebuild 0.3% first 3.9%
+n=2170 T=192 DONE   search    0.62 s nodes      554357 (   893 k/s) best 112062 opt 112062 greedy 109373 cap 112313 | start incumbent 112062 | prep 0.02 s max_total 130 | eff 87.0% idle 12.0% lock 0.0% splits 986 steals 979 full 56.3ms ramp 6.4% tail 5.1% rebuild 0.7% first 7.2%
+scaling, n=2170 (speedup over 64 thread(s), times 64; * = stopped by the time limit):
+  threads   search s speedup       nodes  k/s/thr  µs/step  µs/tree  eff % idle % lock %  reb %  1st % ramp % tail %  splits    units  steals     runs    tiny  full s
+       64      1.38    64.00      516917      5.9   159.79   154.39   95.7    3.9   0.00    0.3    3.5    2.5    1.4     310     3770     503     4079     783   0.047
+      192      0.58   152.30      524525      4.7   176.42   163.96   88.2   10.2   0.00    0.8    6.6    6.5    3.5     792     8292    1345     9079    1636   0.059
+       64      1.31    67.39      489690      5.9   160.73   154.72   96.1    3.7   0.00    0.3    3.9    2.7    0.9     335     3984     516     4314     882   0.045
+      192      0.62   141.84      554357      4.7   177.25   163.86   87.0   12.0   0.00    0.7    7.2    6.4    5.1     986    10266     979    11247    2039   0.056
+n=2172 T=64 DONE   search    1.33 s nodes      499614 (   376 k/s) best 112074 opt 112074 greedy 109385 cap 113148 | start incumbent 112074 | prep 0.02 s max_total 130 | eff 96.0% idle 3.7% lock 0.0% splits 304 steals 590 full 43.4ms ramp 2.5% tail 1.1% rebuild 0.3% first 3.7%
+n=2172 T=192 DONE   search    0.58 s nodes      531828 (   911 k/s) best 112074 opt 112074 greedy 109385 cap 113148 | start incumbent 112074 | prep 0.02 s max_total 130 | eff 88.4% idle 10.5% lock 0.0% splits 774 steals 647 full 64.6ms ramp 6.8% tail 3.3% rebuild 0.6% first 6.3%
+n=2172 T=64 DONE   search    1.43 s nodes      538933 (   377 k/s) best 112074 opt 112074 greedy 109385 cap 113148 | start incumbent 112074 | prep 0.02 s max_total 130 | eff 95.8% idle 4.0% lock 0.0% splits 359 steals 527 full 44.4ms ramp 2.4% tail 1.5% rebuild 0.3% first 3.8%
+n=2172 T=192 DONE   search    0.62 s nodes      563617 (   905 k/s) best 112074 opt 112074 greedy 109385 cap 113148 | start incumbent 112074 | prep 0.02 s max_total 130 | eff 87.6% idle 11.4% lock 0.0% splits 837 steals 888 full 59.0ms ramp 6.4% tail 4.6% rebuild 0.6% first 6.3%
+scaling, n=2172 (speedup over 64 thread(s), times 64; * = stopped by the time limit):
+  threads   search s speedup       nodes  k/s/thr  µs/step  µs/tree  eff % idle % lock %  reb %  1st % ramp % tail %  splits    units  steals     runs    tiny  full s
+       64      1.33    64.00      499614      5.9   159.84   154.28   96.0    3.7   0.00    0.3    3.7    2.5    1.1     304     3712     590     4016     710   0.043
+      192      0.58   145.48      531828      4.7   176.06   164.58   88.4   10.5   0.00    0.6    6.3    6.8    3.3     774     8131     647     8898    1533   0.065
+       64      1.43    59.35      538933      5.9   159.87   154.09   95.8    4.0   0.00    0.3    3.8    2.4    1.5     359     4172     527     4530     849   0.044
+      192      0.62   136.43      563617      4.7   176.39   164.83   87.6   11.4   0.02    0.6    6.3    6.4    4.6     837     8625     888     9451    1574   0.059
+scaling, all 2 games (speedup over 64 thread(s), times 64; * = stopped by the time limit):
+  threads   search s speedup       nodes  k/s/thr  µs/step  µs/tree  eff % idle % lock %  reb %  1st % ramp % tail %  splits    units  steals     runs    tiny  full s
+       64      2.70    64.00     1016531      5.9   159.82   154.34   95.9    3.8   0.00    0.3    3.6    2.5    1.3     614     7482    1093     8095    1493   0.047
+      192      1.16   148.87     1056353      4.7   176.24   164.27   88.3   10.4   0.00    0.7    6.4    6.6    3.4    1566    16423    1992    17977    3169   0.065
+       64      2.74    63.19     1028623      5.9   160.28   154.39   96.0    3.8   0.00    0.3    3.9    2.5    1.2     694     8156    1043     8844    1731   0.045
+      192      1.24   139.13     1117974      4.7   176.82   164.35   87.3   11.7   0.01    0.6    6.8    6.4    4.8    1823    18891    1867    20698    3613   0.059
+
+## i7_ladder_node0: taskset -c CPUS /home/ec2-user/taxman/rust/target/release/examples/ladder --threads 64,96 --seed-opt --known /home/ec2-user/work/known.jsonl --seconds 3600 2170 2172
+n=2170 T=64 DONE   search    1.34 s nodes      496563 (   371 k/s) best 112062 opt 112062 greedy 109373 cap 112313 | start incumbent 112062 | prep 0.02 s max_total 130 | eff 94.9% idle 4.9% lock 0.0% splits 318 steals 517 full 44.4ms ramp 2.6% tail 2.3% rebuild 0.3% first 3.7%
+n=2170 T=96 DONE   search    0.95 s nodes      511696 (   538 k/s) best 112062 opt 112062 greedy 109373 cap 112313 | start incumbent 112062 | prep 0.02 s max_total 130 | eff 94.5% idle 5.2% lock 0.0% splits 502 steals 846 full 44.5ms ramp 3.9% tail 1.1% rebuild 0.4% first 5.0%
+scaling, n=2170 (speedup over 64 thread(s), times 64; * = stopped by the time limit):
+  threads   search s speedup       nodes  k/s/thr  µs/step  µs/tree  eff % idle % lock %  reb %  1st % ramp % tail %  splits    units  steals     runs    tiny  full s
+       64      1.34    64.00      496563      5.8   160.29   154.67   94.9    4.9   0.00    0.3    3.7    2.6    2.3     318     3795     517     4110     828   0.044
+       96      0.95    89.93      511696      5.6   164.33   156.46   94.5    5.2   0.00    0.4    5.0    3.9    1.1     502     5518     846     6016    1184   0.045
+n=2172 T=64 DONE   search    1.22 s nodes      455396 (   372 k/s) best 112074 opt 112074 greedy 109385 cap 113148 | start incumbent 112074 | prep 0.02 s max_total 130 | eff 96.0% idle 3.9% lock 0.0% splits 312 steals 556 full 42.9ms ramp 2.8% tail 0.9% rebuild 0.3% first 3.9%
+n=2172 T=96 DONE   search    1.01 s nodes      556699 (   551 k/s) best 112074 opt 112074 greedy 109385 cap 113148 | start incumbent 112074 | prep 0.02 s max_total 130 | eff 94.5% idle 5.1% lock 0.0% splits 425 steals 700 full 50.1ms ramp 3.7% tail 1.4% rebuild 0.3% first 4.1%
+scaling, n=2172 (speedup over 64 thread(s), times 64; * = stopped by the time limit):
+  threads   search s speedup       nodes  k/s/thr  µs/step  µs/tree  eff % idle % lock %  reb %  1st % ramp % tail %  splits    units  steals     runs    tiny  full s
+       64      1.22    64.00      455396      5.8   161.58   155.63   96.0    3.9   0.00    0.3    3.9    2.8    0.9     312     3641     556     3947     738   0.043
+       96      1.01    77.51      556699      5.7   160.84   154.55   94.5    5.1   0.00    0.3    4.1    3.7    1.4     425     4788     700     5212     964   0.050
+scaling, all 2 games (speedup over 64 thread(s), times 64; * = stopped by the time limit):
+  threads   search s speedup       nodes  k/s/thr  µs/step  µs/tree  eff % idle % lock %  reb %  1st % ramp % tail %  splits    units  steals     runs    tiny  full s
+       64      2.56    64.00      951959      5.8   160.91   155.13   95.4    4.4   0.00    0.3    3.8    2.7    1.6     630     7436    1073     8057    1566   0.044
+       96      1.96    83.53     1068395      5.7   162.51   155.46   94.5    5.2   0.00    0.4    4.5    3.8    1.2     927    10306    1546    11228    2148   0.050
+
+## i7_ladder_2184: /home/ec2-user/taxman/rust/target/release/examples/ladder --threads 16,64,96,192 --seed-opt --known /home/ec2-user/work/known.jsonl --seconds 900 2184
+n=2184 T=16 DONE   search   37.61 s nodes     3666874 (    98 k/s) best 114773 opt 114773 greedy 110624 cap 115053 | start incumbent 114773 | prep 0.02 s max_total 130 | eff 99.9% idle 0.1% lock 0.0% splits 127 steals 154 full 38.4ms ramp 0.1% tail 0.0% rebuild 0.0% first 0.3%
+n=2184 T=64 DONE   search    9.92 s nodes     3783906 (   381 k/s) best 114773 opt 114773 greedy 110624 cap 115053 | start incumbent 114773 | prep 0.02 s max_total 130 | eff 99.3% idle 0.6% lock 0.0% splits 787 steals 1.0k full 55.8ms ramp 0.4% tail 0.2% rebuild 0.1% first 1.3%
+n=2184 T=96 DONE   search    6.07 s nodes     3375917 (   556 k/s) best 114773 opt 114773 greedy 110624 cap 115053 | start incumbent 114773 | prep 0.02 s max_total 130 | eff 99.0% idle 1.0% lock 0.0% splits 984 steals 1.3k full 57.6ms ramp 0.7% tail 0.2% rebuild 0.1% first 1.8%
+n=2184 T=192 DONE   search    3.76 s nodes     3752245 (   997 k/s) best 114773 opt 114773 greedy 110624 cap 115053 | start incumbent 114773 | prep 0.02 s max_total 130 | eff 97.0% idle 2.9% lock 0.0% splits 1.8k steals 1.4k full 111.5ms ramp 1.5% tail 1.0% rebuild 0.2% first 2.7%
+scaling, n=2184 (speedup over 16 thread(s), times 16; * = stopped by the time limit):
+  threads   search s speedup       nodes  k/s/thr  µs/step  µs/tree  eff % idle % lock %  reb %  1st % ramp % tail %  splits    units  steals     runs    tiny  full s
+       16     37.61    16.00     3666874      6.1   163.68   163.27   99.9    0.1   0.00    0.0    0.3    0.1    0.0     127     1729     154     1856     308   0.038
+       64      9.92    60.65     3783906      6.0   166.19   164.15   99.3    0.6   0.00    0.1    1.3    0.4    0.2     787     9460    1000    10244    1570   0.056
+       96      6.07    99.16     3375917      5.8   170.03   167.26   99.0    1.0   0.00    0.1    1.8    0.7    0.2     984    11939    1272    12911    2536   0.058
+      192      3.76   159.95     3752245      5.2   185.04   180.31   97.0    2.9   0.01    0.2    2.7    1.5    1.0    1832    21267    1439    23076    4255   0.112
+
+## e_ladder_again: /home/ec2-user/taxman/rust/target/release/examples/ladder --threads 1,16,64,96,192 --seed-opt --known /home/ec2-user/work/known.jsonl --seconds 3600 2170 2172
+n=2170 T=1 DONE   search   68.84 s nodes      440988 (     6 k/s) best 112062 opt 112062 greedy 109373 cap 112313 | start incumbent 112062 | prep 0.02 s max_total 130 | eff 100.0% idle 0.0% lock 0.0% splits 0 steals 0 full 0.3ms ramp 0.0% tail 0.0% rebuild 0.0% first 0.0%
+n=2170 T=16 DONE   search    4.66 s nodes      477509 (   102 k/s) best 112062 opt 112062 greedy 109373 cap 112313 | start incumbent 112062 | prep 0.02 s max_total 130 | eff 99.5% idle 0.5% lock 0.0% splits 75 steals 99 full 22.1ms ramp 0.4% tail 0.1% rebuild 0.1% first 1.2%
+n=2170 T=64 DONE   search    1.32 s nodes      477871 (   363 k/s) best 112062 opt 112062 greedy 109373 cap 112313 | start incumbent 112062 | prep 0.02 s max_total 130 | eff 95.2% idle 4.4% lock 0.0% splits 420 steals 616 full 44.6ms ramp 2.6% tail 1.8% rebuild 0.4% first 5.0%
+n=2170 T=96 DONE   search    0.98 s nodes      524236 (   536 k/s) best 112062 opt 112062 greedy 109373 cap 112313 | start incumbent 112062 | prep 0.02 s max_total 130 | eff 93.4% idle 6.1% lock 0.0% splits 445 steals 688 full 51.9ms ramp 3.9% tail 2.2% rebuild 0.4% first 4.6%
+n=2170 T=192 DONE   search    0.91 s nodes      497498 (   549 k/s) best 112062 opt 112062 greedy 109373 cap 112313 | start incumbent 112062 | prep 0.02 s max_total 130 | eff 89.6% idle 9.6% lock 0.0% splits 824 steals 890 full 78.7ms ramp 5.0% tail 4.1% rebuild 0.7% first 6.5%
+scaling, n=2170 (speedup over 1 thread(s), times 1; * = stopped by the time limit):
+  threads   search s speedup       nodes  k/s/thr  µs/step  µs/tree  eff % idle % lock %  reb %  1st % ramp % tail %  splits    units  steals     runs    tiny  full s
+        1     68.84     1.00      440988      6.4   155.19   155.19  100.0    0.0   0.00    0.0    0.0    0.0    0.0       0        0       0        1       0   0.000
+       16      4.66    14.76      477509      6.4   153.94   152.30   99.5    0.5   0.00    0.1    1.2    0.4    0.1      75      977      99     1051     176   0.022
+       64      1.32    52.33      477871      5.7   164.47   156.65   95.2    4.4   0.00    0.4    5.0    2.6    1.8     420     5111     616     5529    1109   0.045
+       96      0.98    70.44      524236      5.6   163.08   155.84   93.4    6.1   0.00    0.4    4.6    3.9    2.2     445     5139     688     5582    1060   0.052
+      192      0.91    75.99      497498      2.9   302.90   282.72   89.6    9.6   0.00    0.7    6.5    5.0    4.1     824     8510     890     9326    1741   0.079
+n=2172 T=1 DONE   search   78.48 s nodes      510340 (     7 k/s) best 112074 opt 112074 greedy 109385 cap 113148 | start incumbent 112074 | prep 0.02 s max_total 130 | eff 100.0% idle 0.0% lock 0.0% splits 0 steals 0 full 0.2ms ramp 0.0% tail 0.0% rebuild 0.0% first 0.0%
+n=2172 T=16 DONE   search    4.75 s nodes      485240 (   102 k/s) best 112074 opt 112074 greedy 109385 cap 113148 | start incumbent 112074 | prep 0.02 s max_total 130 | eff 99.3% idle 0.7% lock 0.0% splits 76 steals 114 full 22.1ms ramp 0.4% tail 0.2% rebuild 0.1% first 1.2%
+n=2172 T=64 DONE   search    1.31 s nodes      490423 (   374 k/s) best 112074 opt 112074 greedy 109385 cap 113148 | start incumbent 112074 | prep 0.02 s max_total 130 | eff 95.1% idle 4.6% lock 0.0% splits 299 steals 559 full 44.2ms ramp 2.6% tail 1.9% rebuild 0.3% first 3.6%
+n=2172 T=96 DONE   search    1.03 s nodes      566666 (   549 k/s) best 112074 opt 112074 greedy 109385 cap 113148 | start incumbent 112074 | prep 0.02 s max_total 130 | eff 93.9% idle 5.5% lock 0.0% splits 435 steals 786 full 45.6ms ramp 3.6% tail 1.9% rebuild 0.3% first 4.4%
+n=2172 T=192 DONE   search    0.98 s nodes      550619 (   562 k/s) best 112074 opt 112074 greedy 109385 cap 113148 | start incumbent 112074 | prep 0.02 s max_total 130 | eff 91.9% idle 7.4% lock 0.0% splits 786 steals 671 full 75.0ms ramp 4.7% tail 2.3% rebuild 0.7% first 6.1%
+scaling, n=2172 (speedup over 1 thread(s), times 1; * = stopped by the time limit):
+  threads   search s speedup       nodes  k/s/thr  µs/step  µs/tree  eff % idle % lock %  reb %  1st % ramp % tail %  splits    units  steals     runs    tiny  full s
+        1     78.48     1.00      510340      6.5   153.00   152.99  100.0    0.0   0.00    0.0    0.0    0.0    0.0       0        0       0        1       0   0.000
+       16      4.75    16.52      485240      6.4   154.09   152.44   99.3    0.7   0.00    0.1    1.2    0.4    0.2      76     1071     114     1146     254   0.022
+       64      1.31    59.86      490423      5.8   159.49   153.98   95.1    4.6   0.00    0.3    3.6    2.6    1.9     299     3625     559     3921     720   0.044
+       96      1.03    75.99      566666      5.7   160.49   153.60   93.9    5.5   0.00    0.3    4.4    3.6    1.9     435     5223     786     5657     990   0.046
+      192      0.98    80.06      550619      2.9   304.83   286.14   91.9    7.4   0.00    0.7    6.1    4.7    2.3     786     8613     671     9392    1719   0.075
+scaling, all 2 games (speedup over 1 thread(s), times 1; * = stopped by the time limit):
+  threads   search s speedup       nodes  k/s/thr  µs/step  µs/tree  eff % idle % lock %  reb %  1st % ramp % tail %  splits    units  steals     runs    tiny  full s
+        1    147.32     1.00      951328      6.5   154.01   154.01  100.0    0.0   0.00    0.0    0.0    0.0    0.0       0        0       0        2       0   0.000
+       16      9.41    15.65      962749      6.4   154.01   152.37   99.4    0.6   0.00    0.1    1.2    0.4    0.1     151     2048     213     2197     430   0.022
+       64      2.63    56.08      968294      5.8   161.95   155.30   95.2    4.5   0.00    0.3    4.3    2.6    1.8     719     8736    1175     9450    1829   0.045
+       96      2.01    73.29     1090902      5.7   161.74   154.68   93.7    5.8   0.00    0.4    4.5    3.7    2.0     880    10362    1474    11239    2050   0.052
+      192      1.89    78.11     1048117      2.9   303.91   284.52   90.8    8.5   0.00    0.7    6.3    4.8    3.2    1610    17123    1561    18718    3460   0.079
+

@@ -403,14 +403,17 @@ their output files, analysed afterwards on one thread; what needs the machine is
   1` over the results file, as in section 7.1): the gap's trend (C5, the two regimes of section 2) and the residuals
   of the cost model, with the thread count in the fit.
 * **The tree's growth with threads** (on the machine): the same three dear games at 1, 16, 64 and 192 threads, for
-  converting 192-thread trees to one-thread equivalents in that fit.
+  converting 192-thread trees to one-thread equivalents in that fit.  Measured for 2170 and 2172 (1 to 192 threads)
+  and 2184 (16 to 192): the trees differ by up to 18% with no trend in the threads
+  ([EXPERIMENTS](EXPERIMENTS.md#scaling-to-192-threads-2026-10)); proofs of a second or ten, not dear games.
 * **The prover's run**: per game, its nodes against the solver's (the ratio's trend past 2000), and where its tree
   branches (members above n/2 against below), which is A2's premise: the share of its nodes spent on U\*.
 * **The scaling at 192** (on the machine): effective parallelism, idle and lock time on a dear game, the nogood
   period (IDEAS.md, section 3), the checkpoint pause at 300 s
-  ([RUNBOOK 8](../tools/cloud/RUNBOOK.md#8-what-has-not-been-measured)).
+  ([RUNBOOK 8](../tools/cloud/RUNBOOK.md#8-what-has-not-been-measured)).  Measured but for the nogood period, on
+  searches of up to 85 s ([EXPERIMENTS](EXPERIMENTS.md#scaling-to-192-threads-2026-10)).
 * **The fixed costs on Graviton** after round A
-  ([bench/wall, "For a cloud machine"](../bench/wall/README.md#for-a-cloud-machine)).
+  ([bench/wall, "For a cloud machine"](../bench/wall/README.md#for-a-cloud-machine)): measured, the same entry.
 * **Keep every checkpoint of a dear game that does not finish**: a resumable tree past 2175 is the test bed for A1, A3
   and A4 at the size that matters.
 

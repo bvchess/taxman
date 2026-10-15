@@ -16,6 +16,7 @@ and instructions of the `nodes` lines are the process's, and those of the start 
 |---|---|---|
 | `setup.jsonl` | `wall setup K 1000 1300 1600 1900 2100 2175 2200 2500 2800 3100 3400 3700 4000 4095` | the fixed costs of a game piece by piece, the sizes, the root's GF(2) bound and the gap |
 | `setup_widths.jsonl` | `wall setup K --repeat 2 --width W N` for N = 2170 (W = 36, 48, 64) and 3000 (48, 64) | the same at other set widths |
+| `setup_c8g.jsonl` | `wall setup K $(seq 2200 25 4095)` on one thread of a `c8g.48xlarge` (Graviton4), the code of 55287ff: item 1 of the next section | the fixed costs of a game on Graviton, after round A ([docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#scaling-to-192-threads-2026-10)) |
 | `start.jsonl` | `wall start K 1301 1306 ... 2171` (every fifth board) | the starting incumbent's local search: singles against pairs |
 | `nodes_start_low.jsonl`, `nodes_opt_low.jsonl` | `wall nodes K --no-seed --nodes 5000 1300 1600 1900 2170`, and with `--mode opt` | the cost of a node from the start incumbent and in the proof of the optimum |
 | `nodes_start_high.jsonl` | `wall nodes --no-seed --nodes 5000 2200 2500 2800 3100 3400 3700 4000 4095` | the cost of a node past 2175 |
@@ -40,6 +41,11 @@ say `other`; the innermost functions are the useful part, as truncated symbols: 
 `model::peel::reduce_from` (`...11reduce_from`).
 
 ## For a cloud machine
+
+Items 1, 3, 4, 7 and 8 ran on a `c8g.48xlarge` on 2026-10-15, at 64 and 192 threads on the one machine: what they
+showed is the entry [Scaling to 192 threads](../../docs/EXPERIMENTS.md#scaling-to-192-threads-2026-10), their data and
+scripts are in [../cloud/](../cloud/README.md#scaling-to-192-threads-c8g48).  Items 2 and 6 have not run, and item 5
+only inside `tools/cloud/verify.sh` (its times are in `../cloud/c8g48/checks.txt`).
 
 What could not be run lightly on the laptop, as commands for an instance set up by `tools/cloud/setup.sh` (from
 `rust/`, `K` as above; `K2` = `--known KNOWN` with `KNOWN` the committed results followed by the c8g chain's lines,

@@ -1,0 +1,75 @@
+## the scores, proofs and same_search of 2226..2276 against bench/cloud/c8g.chain-2176.jsonl (compare.py)
+51 games after 2225 in /home/ec2-user/work/w64_1.jsonl differ from bench/cloud/c8g.chain-2176.jsonl at []
+51 games after 2225 in /home/ec2-user/work/w64_16.jsonl differ from bench/cloud/c8g.chain-2176.jsonl at []
+51 games after 2225 in /home/ec2-user/work/w192_1.jsonl differ from bench/cloud/c8g.chain-2176.jsonl at []
+51 games after 2225 in /home/ec2-user/work/w192_16.jsonl differ from bench/cloud/c8g.chain-2176.jsonl at []
+51 games after 2225 in /home/ec2-user/work/w192_16t.jsonl differ from bench/cloud/c8g.chain-2176.jsonl at []
+51 games after 2225 in /home/ec2-user/work/x8b_T192_W1_r2.jsonl differ from bench/cloud/c8g.chain-2176.jsonl at []
+51 games after 2225 in /home/ec2-user/work/x8b_T192_W16_r2.jsonl differ from bench/cloud/c8g.chain-2176.jsonl at []
+51 games after 2225 in /home/ec2-user/work/x8b_T192_W32.jsonl differ from bench/cloud/c8g.chain-2176.jsonl at []
+51 games after 2225 in /home/ec2-user/work/x8b_T64_W16_r2.jsonl differ from bench/cloud/c8g.chain-2176.jsonl at []
+51 games after 2225 in /home/ec2-user/work/x8b_T64_W1_r2.jsonl differ from bench/cloud/c8g.chain-2176.jsonl at []
+51 games after 2225 in /home/ec2-user/work/x8b_T64_W32.jsonl differ from bench/cloud/c8g.chain-2176.jsonl at []
+51 games after 2225 in /home/ec2-user/work/e8b_T192_W4.jsonl differ from bench/cloud/c8g.chain-2176.jsonl at []
+51 games after 2225 in /home/ec2-user/work/e8b_T64_W4.jsonl differ from bench/cloud/c8g.chain-2176.jsonl at []
+
+## the window's events at 192 threads, window 16 (window-trace.txt)
+suspensions 36
+defers 4
+grants 555
+hints 75
+reclaims 152
+
+## v_w64_16: taskset -c CPUS tools/cloud/verify.sh /home/ec2-user/work/w64_16.jsonl
+2026-10-15T04:02:50Z taxman verify-results
+2026-10-15T04:03:03Z tools/check_results.py
+2026-10-15T04:03:06Z both referees agree: no problem found
+/home/ec2-user/work/w64_16.jsonl: 2276 completed games, n = 1..=2276 (0 missing), 0 incomplete lines
+  proof: trivial 13, prime_formula 338, cap 198, exhausted 769, same_search 958
+  assumptions: none in 2276 of 2276 games
+  scores at a proven ceiling, given the game of n-1: n + score(n-1) 722, prime formula 337
+/home/ec2-user/taxman/rust/results/strict.jsonl: 2175 completed games, n = 1..=2175 (0 missing), 0 incomplete lines
+  proof: trivial 13, prime_formula 326, cap 192, exhausted 730, same_search 914
+  assumptions: none in 2175 of 2175 games
+  scores at a proven ceiling, given the game of n-1: n + score(n-1) 694, prime formula 325
+2175 board sizes are in more than one file, with equal scores in all
+checked in 12753.4 ms
+/home/ec2-user/work/w64_16.jsonl:
+  2276 completed games, n = 1..2276 (0 missing)
+  proof: cap 198, exhausted 769, prime_formula 338, same_search 958, trivial 13
+  assumed: (nothing) 2276
+  arithmetic certificates: n + score(n-1) 722, prime formula 337
+/home/ec2-user/taxman/rust/results/strict.jsonl:
+  2175 completed games, n = 1..2175 (0 missing)
+  proof: cap 192, exhausted 730, prime_formula 326, same_search 914, trivial 13
+  assumed: (nothing) 2175
+  arithmetic certificates: n + score(n-1) 694, prime formula 325
+2175 board sizes are in more than one file
+all checks passed
+
+## v_w192_16: tools/cloud/verify.sh /home/ec2-user/work/w192_16.jsonl
+2026-10-15T04:13:33Z taxman verify-results
+2026-10-15T04:13:45Z tools/check_results.py
+2026-10-15T04:13:49Z both referees agree: no problem found
+/home/ec2-user/work/w192_16.jsonl: 2276 completed games, n = 1..=2276 (0 missing), 0 incomplete lines
+  proof: trivial 13, prime_formula 338, cap 198, exhausted 769, same_search 958
+  assumptions: none in 2276 of 2276 games
+  scores at a proven ceiling, given the game of n-1: n + score(n-1) 722, prime formula 337
+/home/ec2-user/taxman/rust/results/strict.jsonl: 2175 completed games, n = 1..=2175 (0 missing), 0 incomplete lines
+  proof: trivial 13, prime_formula 326, cap 192, exhausted 730, same_search 914
+  assumptions: none in 2175 of 2175 games
+  scores at a proven ceiling, given the game of n-1: n + score(n-1) 694, prime formula 325
+2175 board sizes are in more than one file, with equal scores in all
+checked in 12634.6 ms
+/home/ec2-user/work/w192_16.jsonl:
+  2276 completed games, n = 1..2276 (0 missing)
+  proof: cap 198, exhausted 769, prime_formula 338, same_search 958, trivial 13
+  assumed: (nothing) 2276
+  arithmetic certificates: n + score(n-1) 722, prime formula 337
+/home/ec2-user/taxman/rust/results/strict.jsonl:
+  2175 completed games, n = 1..2175 (0 missing)
+  proof: cap 192, exhausted 730, prime_formula 326, same_search 914, trivial 13
+  assumed: (nothing) 2175
+  arithmetic certificates: n + score(n-1) 694, prime formula 325
+2175 board sizes are in more than one file
+all checks passed
