@@ -110,7 +110,10 @@ example, the board 1..=21, is in the [README](README.md#how-the-solver-sees-the-
     three or more prime factors.  U is open in general; it holds for every n ≤ 2175, where the prover (a branch and
     bound over sets of moves on the whole board, from the playability theorems, the Franklín–Moniot bound, the parity
     bound of THEORY.md's Theorem 10, the ceiling and the prime formula, and nothing of frames) proves the optimum of
-    every game of the committed chain.
+    every game of the committed chain.  Game by game, the prover's barred parity bounds certify 93% of those members
+    over 1301-2175 and 85% over the EC2 chain's 2176-3314, but close no game alone ([its
+    README](prover/README.md#the-upper-part-game-by-game)); what is left needs a search that leaves the open ones
+    optional, and `examples/hunt.rs` looks for a counterexample on the boards without each of them.
 
   What each proof kind needs of this, beyond the code's correctness and the games before it:
 
