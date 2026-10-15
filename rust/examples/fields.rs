@@ -13,6 +13,11 @@
 //!     [--root-seconds 120] [--fit-mode certified|search] [--exact bench/matroid/nodes_exact.jsonl] [--out FILE]
 //!     FIXTURE...
 //! cargo run --release --example fields -- check [--known FILE] [--samples 100] N|A-B...
+//! cargo run --release --example fields -- bnb --known results/strict.jsonl [--variants v0,v1,r1,r2,r2c] [--refit 20]
+//!     [--policy all|excess:E|tier1:F] [--fit PATH] [--fit-seconds 300] [--fit-mode certified|search]
+//!     [--seconds 7200] [--nodes 10000000] [--refit-seconds 30] [--audit EVERY] [--audit-seconds 10]
+//!     [--audit-out FILE] [--knuth DIVES] [--seed 1] [--ci 0.90] [--log DIR] [--checkpoint DIR]
+//!     [--checkpoint-minutes 10] [--out FILE] N|A-B|A-B/STEP...
 //! ```
 //!
 //! Games are set up as `taxman solve` sets them up; `P*`, the optimum promotion sum, is the known score less
@@ -31,16 +36,52 @@
 //!   node), each the lower of it and the node's GF(2) bound.  `--exact` gives best completions to check against.
 //! * **check**: Theorems 14 and 15 and the column-sum signings at scale (the tests 3, 4 and 6 of the study on any
 //!   boards).
+//! * **bnb** (design S5.2, experiment E3): the plain branch and bound of `common/bnb.rs` (the GF(2) bound and its
+//!   conflict branching), which proves that nothing beats `P*`, with the bound of `common/dw.rs` at the nodes the
+//!   GF(2) bound leaves open, per game and *variant*: `v0` none (the GF(2) bound alone); `v1` Tier 1 (one evaluation of
+//!   `L`) at the root fit's multipliers at every node; `r1`, `r2`, `r2c` Tier 1 at the state the parent hands down,
+//!   then, at the Tier-1-open nodes the policy selects, a refit of at most `--refit` pricings (R1, deflected Polyak;
+//!   R2, the warm master; R2c, R2 with node-local signings, `dw.rs`'s "Warm states and the node methods") whose final
+//!   state the children take over.  `--policy`: refit every such node (`all`), those whose GF(2) excess is at least
+//!   `E`, or those whose Tier-1 excess is at most `F` times their GF(2) excess.  The variants of a game start from the
+//!   same root fit, the main arm's (`--fit-seconds`, `--fit-mode`), read from `--fit` if it is there and written there
+//!   if not (`--fit` a directory, holding `n{N}.json`, unless it names a `.json` file, which serves its own game).
+//!   `--seconds` and `--nodes` are a run's budgets (the audit's time not counted), `--refit-seconds` a refit's.
+//!   One line a run, keyed by `n`, `variant`, `policy`, `k` (the `--refit`) and `mode` (`tree` or `knuth`): the root's
+//!   GF(2) gap `g`, `opt`, `gf2`, `fit` (Tier 1 at the root from the fit, as the search evaluates it) and `fit_bound`
+//!   (the fit's own bound), `completed`, the tally (`nodes`, the cuts by count, GF(2) bound, Tier 1 and refit,
+//!   `better`, `branches`), the extra bound's counters (`tier1_evals`, `refits`, `pricings_refit`, `signings_local`,
+//!   `refit_timeouts`, `audited`), the times in ms (`ms` the run's and `ms_extra` the extra bound's, both with the
+//!   audit's; `ms_gf2` the GF(2) bound's with `ms_gf2_build` its matroids'; `ms_builds`, `ms_tier1`, `ms_refit`,
+//!   `ms_audit` the extra bound's parts; `ms_mi`, `ms_greedy`, `ms_simplex` its evaluations' and masters') and
+//!   `checks` (intersections cross-checked).  The default is the exact tree; with `--knuth DIVES`, paired dives of
+//!   Knuth's estimator instead (dive `i`'s generator seeded by `--seed`, `n` and `i`, so that every variant follows
+//!   the same dives), and the line has `dives`, `seed`, `ci` and the means, medians and bootstrap intervals (level
+//!   `--ci`, 1,000 resamples) of the GF(2) tree's estimate (`gf2_*`), of the A1 tree's (`a1_*`) and of the ratio of
+//!   their means (`ratio*`).  `--log DIR`: per node of a tree, a line of `n{N}-{variant}-{policy}-k{K}.jsonl` (`id`,
+//!   `parent`, `depth`, `excess_gf2`, `excess_tier1`, `pricings`, `cut`, `subtree`, null for none; `cut` is `count`,
+//!   `gf2`, `tier1`, `refit`, `leaf` or `none`); per dive, a line of `n{N}-{variant}-{policy}-k{K}-knuth.jsonl`, which
+//!   a resumed run skips.  `--checkpoint DIR` (with `--fit`, so that a resumed run has the same root fit; for trees):
+//!   every `--checkpoint-minutes`, the tree's stack, warm states and counters in
+//!   `n{N}-{variant}-{policy}-k{K}.ckpt.json`, from which an interrupted run resumes to the same tree.  `--audit EVERY`
+//!   (to `--audit-out`): at each Tier-1-open node below the root whose hash is 0 modulo `EVERY`, from its inherited
+//!   state, the reference (`nodes`' node mode, `--audit-seconds`) and the traces of R1, R2 and R2c over 20 pricings,
+//!   a line keyed by `n`, `variant` and `node`.
 //!
-//! `--fit-mode` (of `roots` and `nodes`, every computation of the run): `certified` (the default) brackets each LP
-//! with a certified lower bound (the exact checks); `search` fits the multipliers as a search would, without the
-//! exact checks (a family's generation ends when nothing prices out and no cheap inequality is violated, a
-//! separation round that places no core ends the computation), and reports `lb` 0, so `converged` false.
+//! `--fit-mode` (of `roots` and `nodes`, every computation of the run; of `bnb`, the root fit): `certified` (the
+//! default) brackets each LP with a certified lower bound (the exact checks); `search` fits the multipliers as a
+//! search would, without the exact checks (a family's generation ends when nothing prices out and no cheap
+//! inequality is violated, a separation round that places no core ends the computation), and reports `lb` 0, so
+//! `converged` false.
 //!
 //! Every run asserts that the bound is at least `P*` (at nodes, at least the best completion where known), that the
 //! optimal game's promotions are independent in every final matroid, and checks the crate's intersection against
-//! the reference algorithm every 50th evaluation.
+//! the reference algorithm every 50th evaluation; `bnb` asserts that no completion beats `P*`, and that a node the
+//! extra bound cuts has no promotable GF(2) heaviest set.
 
+#[allow(dead_code)]
+#[path = "common/bnb.rs"]
+mod bnb;
 #[allow(dead_code)]
 #[path = "common/cores.rs"]
 mod cores;
@@ -63,17 +104,25 @@ mod lp;
 #[path = "common/meet.rs"]
 mod meet;
 
+use bnb::{BoundKind, ExtraBound, Fate, NodeLog, NodeRecord, NodeView, Pending, Search, Tally};
 use cores::{core_of, cores_of, frame_with, merge, primes, residual, sees, zero_one, Core};
-use dw::{bound, evaluate, Ctx, Family, FitMode, Outcome, Settings, Stats};
+use dw::{
+    bound, evaluate, fit_from_json, refit_r1, refit_r2, tier1, Ctx, Eval, Family, Fit, FitMode, Outcome, Settings,
+    Stats, Stop, Trace, Warm,
+};
 use frames::{frame_matroids, is_prime, setup, Known, Rng};
 use gf3::{seed, Default3, Matroid3, Signing};
 use std::collections::{HashMap, HashSet};
-use std::io::Write;
+use std::fs::{File, OpenOptions};
+use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
-use std::time::Instant;
+use std::rc::Rc;
+use std::time::{Duration, Instant};
 use taxman::bits::Bits;
 use taxman::json::Json;
+use taxman::matchbound::MatchGraph;
 use taxman::model::{FrameGraph, FrameSet, Scratch};
+use taxman::search::Prepared;
 
 /// The salt of the random arms' seeds.
 const SALT_RANDOM: u64 = 1;
@@ -96,11 +145,73 @@ struct Options {
     samples: usize,
     games: Vec<u32>,
     files: Vec<PathBuf>,
+    bnb: BnbOptions,
+}
+
+/// The options of `bnb` (see the module docs).
+struct BnbOptions {
+    variants: Vec<Variant>,
+    /// The most pricings of a refit (`--refit`).
+    k: usize,
+    policy: Policy,
+    /// Where the root fits are (`--fit`).
+    fit: Option<PathBuf>,
+    fit_seconds: f64,
+    /// A run's budgets: seconds (the audit's not counted) and nodes.
+    seconds: f64,
+    nodes: u64,
+    refit_seconds: f64,
+    /// Audit the nodes whose hash is 0 modulo this.
+    audit: Option<u64>,
+    audit_seconds: f64,
+    audit_out: Option<PathBuf>,
+    /// Dives of Knuth's estimator instead of the exact tree.
+    knuth: Option<usize>,
+    seed: u64,
+    ci: f64,
+    log: Option<PathBuf>,
+    checkpoint: Option<PathBuf>,
+    checkpoint_every: Every,
+    /// For the tests: the run stops, as if it were killed, once it has treated this many nodes.
+    halt_at: Option<u64>,
+}
+
+impl Default for BnbOptions {
+    fn default() -> Self {
+        BnbOptions {
+            variants: Variant::ALL.to_vec(),
+            k: 20,
+            policy: Policy::All,
+            fit: None,
+            fit_seconds: 300.0,
+            seconds: 7200.0,
+            nodes: 10_000_000,
+            refit_seconds: 30.0,
+            audit: None,
+            audit_seconds: 10.0,
+            audit_out: None,
+            knuth: None,
+            seed: 1,
+            ci: 0.90,
+            log: None,
+            checkpoint: None,
+            checkpoint_every: Every::Minutes(10.0),
+            halt_at: None,
+        }
+    }
+}
+
+impl BnbOptions {
+    /// Whether a run that has treated `nodes` nodes in `ms` ms, with the extra bound's `counters`, is within its
+    /// budgets (the audit's time not counted).
+    fn within(&self, nodes: u64, ms: f64, counters: &Counters) -> bool {
+        nodes < self.nodes && ms - counters.ms_audit < self.seconds * 1e3
+    }
 }
 
 fn parse() -> Result<Options, String> {
     let mut args = std::env::args().skip(1);
-    let command = args.next().ok_or("expected a command: roots, nodes or check")?;
+    let command = args.next().ok_or("expected a command: roots, nodes, check or bnb")?;
     let mut o = Options {
         command,
         known: Vec::new(),
@@ -116,6 +227,7 @@ fn parse() -> Result<Options, String> {
         samples: 100,
         games: Vec::new(),
         files: Vec::new(),
+        bnb: BnbOptions::default(),
     };
     let mut seconds = None;
     let list = |s: String| s.split(',').map(str::to_string).collect::<Vec<_>>();
@@ -158,12 +270,50 @@ fn parse() -> Result<Options, String> {
             "--out" => o.out = Some(value("--out")?.into()),
             "--census" => o.census = Some(value("--census")?.into()),
             "--exact" => o.exact = Some(value("--exact")?.into()),
+            "--variants" => {
+                o.bnb.variants =
+                    list(value("--variants")?).iter().map(|v| Variant::parse(v)).collect::<Result<_, _>>()?
+            }
+            "--refit" => o.bnb.k = num(value("--refit")?)? as usize,
+            "--policy" => o.bnb.policy = Policy::parse(&value("--policy")?)?,
+            "--fit" => o.bnb.fit = Some(value("--fit")?.into()),
+            "--fit-seconds" => o.bnb.fit_seconds = num(value("--fit-seconds")?)?,
+            "--nodes" => o.bnb.nodes = num(value("--nodes")?)? as u64,
+            "--refit-seconds" => o.bnb.refit_seconds = num(value("--refit-seconds")?)?,
+            "--audit" => match num(value("--audit")?)? as u64 {
+                0 => return Err("--audit needs a positive EVERY".into()),
+                every => o.bnb.audit = Some(every),
+            },
+            "--audit-seconds" => o.bnb.audit_seconds = num(value("--audit-seconds")?)?,
+            "--audit-out" => o.bnb.audit_out = Some(value("--audit-out")?.into()),
+            "--knuth" => o.bnb.knuth = Some(num(value("--knuth")?)? as usize),
+            "--seed" => {
+                let v = value("--seed")?;
+                o.bnb.seed = v.parse().map_err(|e| format!("{v}: {e}"))?
+            }
+            "--ci" => o.bnb.ci = num(value("--ci")?)?,
+            "--log" => o.bnb.log = Some(value("--log")?.into()),
+            "--checkpoint" => o.bnb.checkpoint = Some(value("--checkpoint")?.into()),
+            "--checkpoint-minutes" => o.bnb.checkpoint_every = Every::Minutes(num(value("--checkpoint-minutes")?)?),
             file if o.command == "nodes" => o.files.push(file.into()),
             range => o.games.extend(games(range)?),
         }
     }
-    let default_seconds = if o.command == "nodes" { 10.0 } else { 120.0 };
-    o.settings.seconds = seconds.unwrap_or(default_seconds);
+    if o.command == "bnb" {
+        o.bnb.seconds = seconds.unwrap_or(o.bnb.seconds);
+        if o.bnb.checkpoint.is_some() && o.bnb.fit.is_none() {
+            return Err("--checkpoint needs --fit: a resumed run must start from the same root fit".into());
+        }
+        if o.bnb.checkpoint.is_some() && o.bnb.knuth.is_some() {
+            return Err("--checkpoint is for exact trees: a Knuth run resumes from its dives under --log".into());
+        }
+        if !(o.bnb.ci > 0.0 && o.bnb.ci < 1.0) {
+            return Err(format!("--ci {} is not a level between 0 and 1", o.bnb.ci));
+        }
+    } else {
+        let default_seconds = if o.command == "nodes" { 10.0 } else { 120.0 };
+        o.settings.seconds = seconds.unwrap_or(default_seconds);
+    }
     Ok(o)
 }
 
@@ -258,6 +408,13 @@ fn main() {
                 taxman::with_width!(n, W => check::<W>(n, &known, o.samples));
             }
         }
+        "bnb" => {
+            let mut out = Output::open(o.out.as_deref(), &BNB_KEY);
+            let mut audit = o.bnb.audit.map(|_| Output::open(o.bnb.audit_out.as_deref(), &AUDIT_KEY));
+            for &n in &o.games {
+                taxman::with_width!(n, W => bnb::<W>(n, &known, &o, &mut out, audit.as_mut()));
+            }
+        }
         other => {
             eprintln!("error: unknown command {other:?}");
             std::process::exit(2);
@@ -326,6 +483,26 @@ fn assert_independent<const W: usize>(n: u32, fam: &Family, set: &Bits<W>, what:
     }
 }
 
+/// Runs `f` at the root of `n` set up as every root computation is: the GF(2) matroids of the candidates, the cap
+/// `max_total`, the target `P*` (not stopping there) and the GF(2) gap for the closing tolerance; `f` is given the
+/// context and the GF(2) bound.
+fn at_root<const W: usize, R>(n: u32, p: &Prepared<W>, opt: u64, f: impl FnOnce(&Ctx<'_, W>, i64) -> R) -> R {
+    let fm = frame_matroids(&p.model, &p.root, &p.candidates);
+    let cap = p.max_total as usize;
+    let gf2 = fm.bound(cap).value;
+    let mut ctx = Ctx::new(n, &p.model, &p.root, &fm, cap, opt as i64, false);
+    ctx.gap = Some(gf2 - opt as i64);
+    f(&ctx, gf2)
+}
+
+/// The main arm's bound at a root (the context of [`at_root`]), with `settings`; asserted at least `P*`.
+fn fit_outcome<const W: usize>(ctx: &Ctx<'_, W>, frames: &[usize], settings: &Settings) -> Outcome {
+    let (signings, separate) = arm("f1cores", ctx.n, ctx.state.len(), frames);
+    let r = bound(ctx, signings, None, separate, settings);
+    assert!(r.bound >= ctx.target, "n={}: the root's bound {} is below P* = {}", ctx.n, r.bound, ctx.target);
+    r
+}
+
 fn roots<const W: usize>(n: u32, known: &Known, o: &Options, out: &mut Output, census: Option<&mut Output>) {
     let Some((board, p)) = setup::<W>(n) else { return };
     let Some(opt) = known.opt(n, board.in_the_bag) else {
@@ -333,46 +510,43 @@ fn roots<const W: usize>(n: u32, known: &Known, o: &Options, out: &mut Output, c
         return;
     };
     let model = &p.model;
-    let fm = frame_matroids(model, &p.root, &p.candidates);
-    let cap = p.max_total as usize;
-    let gf2 = fm.bound(cap).value;
-    let mut ctx = Ctx::new(n, model, &p.root, &fm, cap, opt as i64, false);
-    ctx.gap = Some(gf2 - opt as i64);
     let optimal = optimal_promotions(n, known, &board, opt);
-    if let Some(set) = &optimal {
-        fm.independent(set).unwrap_or_else(|e| panic!("n={n}: the optimal promotions: {e}"));
-    }
     let mut census = census;
-    for name in &o.arms {
-        if out.done(&format!("{n}/{name}")) {
-            continue;
-        }
-        let (signings, separate) = arm(name, n, p.root.len(), &o.frames);
-        let seconds = if separate { o.settings.seconds } else { o.fixed_seconds };
-        let settings = Settings { seconds, ..o.settings.clone() };
-        let r = bound(&ctx, signings, None, separate, &settings);
-        assert!(r.bound >= opt as i64, "n={n}, arm {name}: the bound {} is below P* = {opt}", r.bound);
-        if name == "gf2" {
-            assert_eq!(r.bound, gf2, "n={n}: the gf2 arm differs from the GF(2) bound");
-        }
+    at_root(n, &p, opt, |ctx, gf2| {
         if let Some(set) = &optimal {
-            assert_independent(n, &r.family, set, "the optimal promotions");
+            ctx.fm.independent(set).unwrap_or_else(|e| panic!("n={n}: the optimal promotions: {e}"));
         }
-        out.write(&root_line(n, name, opt, gf2, &r, model, &p.root, p.root.len()));
-        if name == "f1cores" {
-            if let Some(c) = census.as_deref_mut() {
-                for (i, f) in r.cores.iter().enumerate() {
-                    if !c.done(&format!("{n}/{i}")) {
-                        c.write(&census_line(n, i, f.core.clone(), f.assigned));
+        for name in &o.arms {
+            if out.done(&format!("{n}/{name}")) {
+                continue;
+            }
+            let (signings, separate) = arm(name, n, p.root.len(), &o.frames);
+            let seconds = if separate { o.settings.seconds } else { o.fixed_seconds };
+            let settings = Settings { seconds, ..o.settings.clone() };
+            let r = bound(ctx, signings, None, separate, &settings);
+            assert!(r.bound >= opt as i64, "n={n}, arm {name}: the bound {} is below P* = {opt}", r.bound);
+            if name == "gf2" {
+                assert_eq!(r.bound, gf2, "n={n}: the gf2 arm differs from the GF(2) bound");
+            }
+            if let Some(set) = &optimal {
+                assert_independent(n, &r.family, set, "the optimal promotions");
+            }
+            out.write(&root_line(n, name, opt, gf2, &r, model, &p.root, p.root.len()));
+            if name == "f1cores" {
+                if let Some(c) = census.as_deref_mut() {
+                    for (i, f) in r.cores.iter().enumerate() {
+                        if !c.done(&format!("{n}/{i}")) {
+                            c.write(&census_line(n, i, f.core.clone(), f.assigned));
+                        }
                     }
                 }
             }
+            eprintln!(
+                "n={n} {name}: bound {} (gf2 {gf2}, P* {opt}), bracket [{:.2}, {:.2}], {:?}, {:.1} s",
+                r.bound, r.lb, r.l_best, r.stop, r.seconds
+            );
         }
-        eprintln!(
-            "n={n} {name}: bound {} (gf2 {gf2}, P* {opt}), bracket [{:.2}, {:.2}], {:?}, {:.1} s",
-            r.bound, r.lb, r.l_best, r.stop, r.seconds
-        );
-    }
+    });
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -522,13 +696,8 @@ fn nodes<const W: usize>(path: &Path, known: &Known, o: &Options, exact: &Exact,
     let (board, p) = setup::<W>(n).expect("a game with candidates");
     let opt = known.opt(n, board.in_the_bag).expect("a known optimum");
     let model = &p.model;
-    let fm = frame_matroids(model, &p.root, &p.candidates);
-    let mut ctx = Ctx::new(n, model, &p.root, &fm, p.max_total as usize, opt as i64, false);
-    ctx.gap = Some(fm.bound(p.max_total as usize).value - opt as i64);
-    let (signings, _) = arm("f1cores", n, p.root.len(), &o.frames);
     let root_settings = Settings { seconds: o.root_seconds, ..o.settings.clone() };
-    let root = bound(&ctx, signings, None, true, &root_settings);
-    assert!(root.bound >= opt as i64, "n={n}: the root's bound {} is below P* = {opt}", root.bound);
+    let root = at_root(n, &p, opt, |ctx, _| fit_outcome(ctx, &o.frames, &root_settings));
     let final_signings: Vec<Signing> = root.family.extras.iter().map(|ex| ex.signing.clone()).collect();
     eprintln!(
         "n={n}: P* {opt} (fixture incumbent {}), root bound {} in {:.1} s, {} signings",
@@ -715,12 +884,1005 @@ fn check<const W: usize>(n: u32, known: &Known, samples: usize) {
 }
 
 // ---------------------------------------------------------------------------------------------------------
+// bnb
+
+/// The fields that identify a run's line of `bnb`.
+const BNB_KEY: [&str; 5] = ["n", "variant", "policy", "k", "mode"];
+/// The fields that identify an audit's line.
+const AUDIT_KEY: [&str; 3] = ["n", "variant", "node"];
+/// The pricings of each method's trace in the audit (the design's horizon).
+const AUDIT_K: usize = 20;
+/// The resamples of a bootstrap interval.
+const RESAMPLES: usize = 1000;
+/// The columns of a line of the per-node log, in order (`-` for none).
+const NODE_COLUMNS: [&str; 7] = ["id", "parent", "depth", "excess_gf2", "excess_tier1", "pricings", "cut"];
+
+/// A variant of `bnb` (see the module docs).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Variant {
+    /// The GF(2) bound alone.
+    V0,
+    /// Tier 1 at the root fit's multipliers at every node, never refitted.
+    V1,
+    /// Tier 1 at the parent's state, then deflected Polyak.
+    R1,
+    /// Tier 1 at the parent's state, then the warm master.
+    R2,
+    /// R2 with node-local signings.
+    R2c,
+}
+
+/// How a variant refits.
+#[derive(Clone, Copy, Debug)]
+enum Method {
+    /// Deflected Polyak ([`refit_r1`]).
+    R1,
+    /// The warm master ([`refit_r2`]), with at most `local` node-local signings a frame.
+    R2 { local: usize },
+}
+
+impl Variant {
+    const ALL: [Variant; 5] = [Variant::V0, Variant::V1, Variant::R1, Variant::R2, Variant::R2c];
+
+    fn name(self) -> &'static str {
+        match self {
+            Variant::V0 => "v0",
+            Variant::V1 => "v1",
+            Variant::R1 => "r1",
+            Variant::R2 => "r2",
+            Variant::R2c => "r2c",
+        }
+    }
+
+    fn parse(name: &str) -> Result<Variant, String> {
+        Variant::ALL.into_iter().find(|v| v.name() == name).ok_or(format!("unknown variant {name:?}"))
+    }
+
+    /// How it refits, if it does.
+    fn method(self) -> Option<Method> {
+        match self {
+            Variant::V0 | Variant::V1 => None,
+            Variant::R1 => Some(Method::R1),
+            Variant::R2 => Some(Method::R2 { local: 0 }),
+            Variant::R2c => Some(Method::R2 { local: 2 }),
+        }
+    }
+}
+
+impl Method {
+    /// The refit at a node from `warm`, whose Tier-1 evaluation there is `first`, with at most `k` pricings: `fam` is
+    /// a family of `warm`'s signings at the node (R2 consumes it), `settings` R2's (its budget in seconds).
+    #[allow(clippy::too_many_arguments)]
+    fn refit<const W: usize>(
+        self,
+        ctx: &Ctx<'_, W>,
+        fam: Family,
+        warm: &Warm,
+        first: Eval,
+        k: usize,
+        settings: &Settings,
+        stats: &mut Stats,
+    ) -> (i64, Warm, Trace) {
+        match self {
+            Method::R1 => refit_r1(ctx, &fam, warm, &first, k, stats),
+            Method::R2 { local } => refit_r2(ctx, fam, warm, first, k, local, settings, stats),
+        }
+    }
+}
+
+/// Which Tier-1-open nodes a variant refits.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Policy {
+    /// Every one.
+    All,
+    /// Those whose GF(2) excess is at least this.
+    Excess(i64),
+    /// Those whose Tier-1 excess is at most this share of their GF(2) excess.
+    Tier1(f64),
+}
+
+impl Policy {
+    fn parse(text: &str) -> Result<Policy, String> {
+        let bad = |e: String| format!("policy {text:?}: {e}");
+        match text.split_once(':') {
+            None if text == "all" => Ok(Policy::All),
+            Some(("excess", e)) => e.parse().map(Policy::Excess).map_err(|e| bad(e.to_string())),
+            Some(("tier1", f)) => f.parse().map(Policy::Tier1).map_err(|e| bad(e.to_string())),
+            _ => Err(bad("not all, excess:E or tier1:F".into())),
+        }
+    }
+
+    fn name(self) -> String {
+        match self {
+            Policy::All => "all".into(),
+            Policy::Excess(e) => format!("excess:{e}"),
+            Policy::Tier1(f) => format!("tier1:{f}"),
+        }
+    }
+
+    /// Whether a Tier-1-open node with the GF(2) bound `gf2` and the Tier-1 bound `t1` is refitted (`target` its
+    /// `need − 1`).
+    fn refits(self, gf2: i64, t1: i64, target: i64) -> bool {
+        match self {
+            Policy::All => true,
+            Policy::Excess(e) => gf2 - target >= e,
+            Policy::Tier1(f) => (t1 - target) as f64 <= f * (gf2 - target) as f64,
+        }
+    }
+}
+
+/// When a tree's run writes its checkpoint.
+#[derive(Clone, Copy, Debug)]
+enum Every {
+    /// When this many minutes have passed since the last.
+    Minutes(f64),
+    /// After every this many nodes (for the tests, which alone make it).
+    #[cfg_attr(not(test), allow(dead_code))]
+    Nodes(u64),
+}
+
+/// The counters and times of an extra bound over a run.
+#[derive(Clone, Debug, Default)]
+struct Counters {
+    tier1_evals: u64,
+    refits: u64,
+    /// Pricings of the refits after Tier 1.
+    pricings_refit: u64,
+    /// Node-local signings the refits opened.
+    signings_local: u64,
+    /// Refits that ran out of seconds.
+    refit_timeouts: u64,
+    /// Nodes the audit selected.
+    audited: u64,
+    /// Times in ms: building the nodes' contexts and families, Tier 1, the refits, the audit.
+    ms_builds: f64,
+    ms_tier1: f64,
+    ms_refit: f64,
+    ms_audit: f64,
+}
+
+/// The audit of an extra bound: it selects the nodes whose hash is 0 modulo `every`, gives the reference `seconds`,
+/// and writes to `out`.
+struct Audit<'a> {
+    every: u64,
+    seconds: f64,
+    out: &'a mut Output,
+}
+
+/// The A1 bound in the branch and bound (design S5.2), as an extra bound: Tier 1 at the state inherited, the audit,
+/// and the variant's refit where the policy says (see [`ExtraBound::bound`] below).
+struct A1<'a, const W: usize> {
+    n: u32,
+    model: &'a FrameGraph,
+    variant: Variant,
+    /// The root fit's state.
+    root: Rc<Warm>,
+    /// The most pricings of a refit.
+    k: usize,
+    policy: Policy,
+    /// The refits' settings: their budget in seconds (`refit_r2` sets search mode, the pricings and the cores a frame
+    /// itself).
+    refit: Settings,
+    audit: Option<Audit<'a>>,
+    /// The statistics of the run's Tier 1 evaluations and refits (not the audit's).
+    stats: Stats,
+    counters: Counters,
+}
+
+impl<'a, const W: usize> A1<'a, W> {
+    fn new(
+        n: u32,
+        model: &'a FrameGraph,
+        variant: Variant,
+        root: Rc<Warm>,
+        o: &BnbOptions,
+        audit: Option<Audit<'a>>,
+    ) -> Self {
+        A1 {
+            n,
+            model,
+            variant,
+            root,
+            k: o.k,
+            policy: o.policy,
+            refit: Settings { seconds: o.refit_seconds, ..Settings::default() },
+            audit,
+            stats: Stats::default(),
+            counters: Counters::default(),
+        }
+    }
+
+    /// The extra bound to hand the search: none for `v0`.
+    fn extra(&mut self) -> Option<&mut Self> {
+        (self.variant != Variant::V0).then_some(self)
+    }
+
+    /// The audit of a Tier-1-open node below the root, if it is on and selects the node: from the same inherited
+    /// state `warm` and Tier-1 evaluation `ev` (bound `t1`), the reference (the node's own master with separation from
+    /// `warm`'s multipliers, certified, within the audit's seconds) and the trace of each method over [`AUDIT_K`]
+    /// pricings, each on its own family and statistics; their line to the audit's output, unless it is there.  It
+    /// changes nothing in the run.
+    fn audit_node(&mut self, ctx: &Ctx<'_, W>, v: &NodeView<'_, W>, warm: &Warm, ev: &Eval, t1: i64) {
+        let Some(audit) = &mut self.audit else { return };
+        let hash = node_hash(&v.promoted, &v.cands);
+        if !hash.is_multiple_of(audit.every) {
+            return;
+        }
+        self.counters.audited += 1;
+        let id = vec![
+            ("n", self.n.into()),
+            ("variant", self.variant.name().into()),
+            ("node", format!("{hash:016x}").into()),
+        ];
+        if audit.out.done(&Output::key_of(&Json::object(id.clone()), &AUDIT_KEY)) {
+            return;
+        }
+        let t0 = Instant::now();
+        let target = ctx.target;
+        let settings = Settings { seconds: audit.seconds, ..Settings::default() };
+        let r = bound(ctx, warm.signings.clone(), Some(&warm.lambda), true, &settings);
+        let reference = Json::object([
+            ("bound", r.bound.into()),
+            ("excess", (r.bound - target).into()),
+            ("cut", (r.bound <= target).into()),
+            ("pricings", r.stats.pricings_mi.into()),
+            ("stop", format!("{:?}", r.stop).into()),
+            ("ms", rounded(r.seconds * 1e3)),
+        ]);
+        let mut pairs = id;
+        pairs.extend([
+            ("depth", v.depth.into()),
+            ("target", target.into()),
+            ("gf2", v.gf2.into()),
+            ("excess_gf2", (v.gf2 - target).into()),
+            ("excess_tier1", (t1 - target).into()),
+            ("reference", reference),
+        ]);
+        for variant in [Variant::R1, Variant::R2, Variant::R2c] {
+            let method = variant.method().expect("a variant that refits");
+            let t = Instant::now();
+            let fam = Family::new(ctx, warm.signings.clone());
+            let (_, _, trace) = method.refit(ctx, fam, warm, ev.clone(), AUDIT_K, &self.refit, &mut Stats::default());
+            let last = *trace.after.last().expect("Tier 1's entry");
+            let after: Vec<i64> = (0..=AUDIT_K).map(|i| trace.after.get(i).copied().unwrap_or(last) - target).collect();
+            let cut_at = after.iter().position(|&e| e <= 0).map_or(Json::Null, Json::from);
+            let mut fields = vec![
+                ("after", Json::array(after)),
+                ("cut_at", cut_at),
+                ("pricings", trace.pricings.into()),
+                ("ms", rounded(ms(t))),
+            ];
+            if let Method::R2 { .. } = method {
+                fields.push(("new_signings", trace.new_signings.into()));
+            }
+            pairs.push((variant.name(), Json::object(fields)));
+        }
+        audit.out.write(&Json::object(pairs).to_string());
+        self.counters.ms_audit += ms(t0);
+    }
+}
+
+impl<const W: usize> ExtraBound<W> for A1<'_, W> {
+    type State = Rc<Warm>;
+
+    /// With `target = need − 1`: the state inherited (the root fit's at the root and for `v1`, else the parent's as
+    /// the node takes it over, `Warm::child`); Tier 1 there; the audit, at a Tier-1-open node below the root; then,
+    /// at such a node, the variant's refit if it has one and the policy selects the node.  The lower of the bounds
+    /// and the final state.
+    fn bound(&mut self, v: &NodeView<'_, W>, parent: Option<&Rc<Warm>>) -> (i64, Rc<Warm>, NodeLog) {
+        let target = v.need as i64 - 1;
+        let warm = match parent {
+            Some(state) if self.variant != Variant::V1 => {
+                Rc::new(state.child(&v.promoted_now.to_vec(), &v.removed.to_vec(), &v.fm.elems, v.max_add))
+            }
+            _ => Rc::clone(&self.root),
+        };
+        let t = Instant::now();
+        let ctx = Ctx::new(self.n, self.model, v.state, v.fm, v.max_add, target, true);
+        let fam = Family::new(&ctx, warm.signings.clone());
+        self.counters.ms_builds += ms(t);
+        let t = Instant::now();
+        let (t1, ev) = tier1(&ctx, &fam, &warm, &mut self.stats);
+        self.counters.ms_tier1 += ms(t);
+        self.counters.tier1_evals += 1;
+        let mut log = NodeLog { excess_tier1: Some(t1 - target), ..NodeLog::default() };
+        let open = t1 > target && parent.is_some();
+        if open {
+            self.audit_node(&ctx, v, &warm, &ev, t1);
+        }
+        let Some(method) = self.variant.method().filter(|_| open && self.policy.refits(v.gf2, t1, target)) else {
+            return (t1, warm, log);
+        };
+        let t = Instant::now();
+        let (refitted, state, trace) = method.refit(&ctx, fam, &warm, ev, self.k, &self.refit, &mut self.stats);
+        let c = &mut self.counters;
+        c.ms_refit += ms(t);
+        c.refits += 1;
+        c.pricings_refit += trace.pricings as u64;
+        c.signings_local += trace.new_signings as u64;
+        c.refit_timeouts += u64::from(trace.stop == Some(Stop::Seconds));
+        log.pricings = trace.pricings;
+        log.refit = true;
+        (t1.min(refitted), Rc::new(state), log)
+    }
+}
+
+/// The audit's hash of a node: splitmix64 folded over its promoted members and then its candidates as `gf3::seed`
+/// folds its arguments (`seed(x, part, 0, h)` for the member `x` of part 0 or 1 and the hash `h` so far), so that it
+/// depends on the node alone, not on when it is visited.
+fn node_hash<const W: usize>(promoted: &Bits<W>, cands: &Bits<W>) -> u64 {
+    [promoted, cands].into_iter().enumerate().fold(0, |h, (part, set)| set.iter().fold(h, |h, x| seed(x, part, 0, h)))
+}
+
+/// Milliseconds since `t`.
+fn ms(t: Instant) -> f64 {
+    t.elapsed().as_secs_f64() * 1e3
+}
+
+/// A time in ms as the lines have it, to 0.1 ms.
+fn rounded(ms: f64) -> Json {
+    Json::Num((ms * 10.0).round() / 10.0)
+}
+
+/// A game of `bnb`: its setup, the incumbent, the root fit, and Tier 1 at the root from it.
+struct Game<'g, const W: usize> {
+    n: u32,
+    p: &'g Prepared<W>,
+    graph: &'g MatchGraph,
+    /// What the search proves that nothing beats: `P*` (less a handicap in the tests).
+    opt: u64,
+    fit: &'g Fit,
+    /// Tier 1 at the root from the fit, as the search evaluates it (None when the GF(2) bound cuts the root).
+    fit_tier1: Option<i64>,
+}
+
+impl<'g, const W: usize> Game<'g, W> {
+    fn new(n: u32, p: &'g Prepared<W>, graph: &'g MatchGraph, opt: u64, fit: &'g Fit) -> Self {
+        let mut g = Game { n, p, graph, opt, fit, fit_tier1: None };
+        let mut root = g.a1(Variant::V1, &BnbOptions::default(), None);
+        let record = g.search().step(root.extra()).expect("the root");
+        g.fit_tier1 = record.log.excess_tier1.map(|e| e + opt as i64);
+        g
+    }
+
+    /// A search of the game from its root.
+    fn search(&self) -> Search<'g, W, Rc<Warm>> {
+        Search::new(self.p, self.graph, self.opt, BoundKind::Gf2)
+    }
+
+    /// The extra bound of `variant`, from the root fit, with the audit of `o` if it is on, to `audit`.
+    fn a1<'a>(&self, variant: Variant, o: &BnbOptions, audit: Option<&'a mut Output>) -> A1<'a, W>
+    where
+        'g: 'a,
+    {
+        let audit = o.audit.zip(audit).map(|(every, out)| Audit { every, seconds: o.audit_seconds, out });
+        A1::new(self.n, &self.p.model, variant, Rc::new(self.fit.warm.clone()), o, audit)
+    }
+
+    /// The name of a run's files: `n{N}-{variant}-{policy}-k{K}`.
+    fn stem(&self, variant: Variant, o: &BnbOptions) -> String {
+        format!("n{}-{}-{}-k{}", self.n, variant.name(), o.policy.name(), o.k)
+    }
+
+    /// The fields that open a run's line (and identify its checkpoint): its key, then the game's figures.
+    fn head(&self, variant: Variant, o: &BnbOptions, mode: &str) -> Vec<(&'static str, Json)> {
+        let mut pairs = run_id(self.n, variant, o, mode);
+        pairs.extend([
+            ("g", (self.fit.gf2 - self.opt as i64).into()),
+            ("opt", self.opt.into()),
+            ("gf2", self.fit.gf2.into()),
+            ("fit", self.fit_tier1.map_or(Json::Null, Json::from)),
+            ("fit_bound", self.fit.bound.into()),
+        ]);
+        pairs
+    }
+}
+
+/// The key fields of a run's line ([`BNB_KEY`]).
+fn run_id(n: u32, variant: Variant, o: &BnbOptions, mode: &str) -> Vec<(&'static str, Json)> {
+    vec![
+        ("n", n.into()),
+        ("variant", variant.name().into()),
+        ("policy", o.policy.name().into()),
+        ("k", o.k.into()),
+        ("mode", mode.into()),
+    ]
+}
+
+/// The counters and times of a run: the search's tally, the extra bound's counters and statistics, and the run's
+/// time (ms, with the audit's).
+#[derive(Clone, Default)]
+struct Totals {
+    ms: f64,
+    tally: Tally,
+    counters: Counters,
+    stats: Stats,
+}
+
+/// A counter or a time of [`Totals`].
+enum Slot<'t> {
+    Count(&'t mut u64),
+    /// A time in ms.
+    Ms(&'t mut f64),
+    Time(&'t mut Duration),
+}
+
+impl Totals {
+    /// Every counter and time with its name in the run's line and whether the line has it (the others only the
+    /// checkpoints): the one list that the lines, the checkpoints and the resumed runs go by.
+    fn slots(&mut self) -> Vec<(&'static str, bool, Slot<'_>)> {
+        let Totals { ms, tally: t, counters: c, stats: s } = self;
+        vec![
+            ("nodes", true, Slot::Count(&mut t.nodes)),
+            ("cut_count", true, Slot::Count(&mut t.cut_by_count)),
+            ("cut_gf2", true, Slot::Count(&mut t.cut_by_bound)),
+            ("cut_tier1", true, Slot::Count(&mut t.cut_tier1)),
+            ("cut_refit", true, Slot::Count(&mut t.cut_refit)),
+            ("better", true, Slot::Count(&mut t.better)),
+            ("branches", true, Slot::Count(&mut t.branches)),
+            ("tier1_evals", true, Slot::Count(&mut c.tier1_evals)),
+            ("refits", true, Slot::Count(&mut c.refits)),
+            ("pricings_refit", true, Slot::Count(&mut c.pricings_refit)),
+            ("signings_local", true, Slot::Count(&mut c.signings_local)),
+            ("refit_timeouts", true, Slot::Count(&mut c.refit_timeouts)),
+            ("audited", true, Slot::Count(&mut c.audited)),
+            ("ms", true, Slot::Ms(ms)),
+            ("ms_gf2", true, Slot::Time(&mut t.bound_time)),
+            ("ms_gf2_build", true, Slot::Time(&mut t.build_time)),
+            ("ms_extra", true, Slot::Time(&mut t.extra_time)),
+            ("ms_builds", true, Slot::Ms(&mut c.ms_builds)),
+            ("ms_tier1", true, Slot::Ms(&mut c.ms_tier1)),
+            ("ms_refit", true, Slot::Ms(&mut c.ms_refit)),
+            ("ms_audit", true, Slot::Ms(&mut c.ms_audit)),
+            ("ms_mi", true, Slot::Ms(&mut s.ms_mi)),
+            ("ms_greedy", true, Slot::Ms(&mut s.ms_greedy)),
+            ("ms_simplex", true, Slot::Ms(&mut s.ms_simplex)),
+            ("checks", true, Slot::Count(&mut s.checks)),
+            ("warm", false, Slot::Count(&mut t.warm)),
+            ("cold", false, Slot::Count(&mut t.cold)),
+            ("augmentations", false, Slot::Count(&mut t.augmentations)),
+            // The intersections' cross-checks fall on every 50th evaluation of the run.
+            ("pricings_mi", false, Slot::Count(&mut s.pricings_mi)),
+        ]
+    }
+
+    /// The counters and times as a line's fields: those of the line, or every one (`all`, for a checkpoint).
+    fn pairs(&self, all: bool) -> Vec<(&'static str, Json)> {
+        let mut copy = self.clone();
+        let slots = copy.slots();
+        slots
+            .into_iter()
+            .filter(|&(_, in_line, _)| all || in_line)
+            .map(|(name, _, slot)| match slot {
+                Slot::Count(v) => (name, Json::from(*v)),
+                Slot::Ms(v) => (name, rounded(*v)),
+                Slot::Time(d) => (name, rounded(d.as_secs_f64() * 1e3)),
+            })
+            .collect()
+    }
+
+    /// The totals of a checkpoint's object (every field of [`pairs`](Self::pairs)`(true)`).
+    fn read(j: &Json) -> Totals {
+        let mut totals = Totals::default();
+        for (name, _, slot) in totals.slots() {
+            let v = entry(j, name);
+            let x = v.as_f64().unwrap_or_else(|| panic!("a checkpoint's {name} is not a number"));
+            match slot {
+                Slot::Count(c) => *c = v.as_u64().unwrap_or_else(|| panic!("a checkpoint's {name} is not a count")),
+                Slot::Ms(m) => *m = x,
+                Slot::Time(d) => *d = Duration::from_secs_f64(x / 1e3),
+            }
+        }
+        totals
+    }
+}
+
+/// The field `name` of a checkpoint's object.
+fn entry<'j>(j: &'j Json, name: &str) -> &'j Json {
+    j.get(name).unwrap_or_else(|| panic!("a checkpoint without {name:?}"))
+}
+
+/// A tree's checkpoint: the run's head (which a resumed run must have), its totals, the lines of its per-node log,
+/// the distinct warm states on the stack and the stack (each entry with the index of its state).
+fn checkpoint_json<const W: usize>(
+    head: &[(&'static str, Json)],
+    totals: &Totals,
+    log_lines: Option<u64>,
+    stack: &[Pending<W, Rc<Warm>>],
+) -> Json {
+    let mut states = Vec::new();
+    let mut index: HashMap<*const Warm, usize> = HashMap::new();
+    let mut entries = Vec::with_capacity(stack.len());
+    let bits = |b: &Bits<W>| Json::array(b.iter());
+    for e in stack {
+        let state = e.extra.as_ref().map(|w| {
+            *index.entry(Rc::as_ptr(w)).or_insert_with(|| {
+                states.push(w.to_json());
+                states.len() - 1
+            })
+        });
+        entries.push(Json::object([
+            ("promoted", bits(&e.promoted)),
+            ("cands", bits(&e.cands)),
+            ("parent_chosen", bits(&e.parent_chosen)),
+            ("depth", e.depth.into()),
+            ("parent", e.parent.map_or(Json::Null, Json::from)),
+            ("promoted_now", bits(&e.promoted_now)),
+            ("removed", bits(&e.removed)),
+            ("order", Json::array(e.order.iter().copied())),
+            ("state", state.map_or(Json::Null, Json::from)),
+        ]));
+    }
+    Json::object([
+        ("head", Json::object(head.to_vec())),
+        ("log_lines", log_lines.map_or(Json::Null, Json::from)),
+        ("totals", Json::object(totals.pairs(true))),
+        ("states", Json::Arr(states)),
+        ("stack", Json::Arr(entries)),
+    ])
+}
+
+/// The stack of a checkpoint ([`checkpoint_json`]), each entry's state rebuilt from the root by promoting its path's
+/// members one at a time, as the search made it.
+fn restore_stack<const W: usize>(j: &Json, p: &Prepared<W>) -> Vec<Pending<W, Rc<Warm>>> {
+    let states: Vec<Rc<Warm>> = entry(j, "states")
+        .as_arr()
+        .expect("a checkpoint's states")
+        .iter()
+        .map(|s| Rc::new(Warm::from_json(s).unwrap_or_else(|e| panic!("a checkpoint's state: {e}"))))
+        .collect();
+    let mut scratch = Scratch::<W>::new();
+    let stack = entry(j, "stack").as_arr().expect("a checkpoint's stack");
+    stack
+        .iter()
+        .map(|e| {
+            let list = |name| entry(e, name).as_u32_vec().unwrap_or_else(|| panic!("{name}: not a list of numbers"));
+            let bits = |name| Bits::<W>::from_slice(&list(name));
+            let order = list("order");
+            let mut state = p.root;
+            for &x in &order {
+                state = p
+                    .model
+                    .promote_all_using(&mut scratch, &state, &Bits::EMPTY.with(x))
+                    .unwrap_or_else(|| panic!("{x} on a checkpoint's path cannot be promoted"));
+            }
+            let promoted = bits("promoted");
+            assert_eq!(Bits::<W>::from_slice(&order), promoted, "a checkpoint's path and promotions differ");
+            Pending {
+                promoted,
+                state,
+                cands: bits("cands"),
+                parent_chosen: bits("parent_chosen"),
+                depth: entry(e, "depth").as_u64().expect("a checkpoint's depth") as usize,
+                parent: entry(e, "parent").as_u64(),
+                promoted_now: bits("promoted_now"),
+                removed: bits("removed"),
+                order,
+                extra: entry(e, "state").as_u64().map(|i| Rc::clone(&states[i as usize])),
+            }
+        })
+        .collect()
+}
+
+/// `dir`, made if it is not there.
+fn make_dir(dir: &Path) -> &Path {
+    std::fs::create_dir_all(dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
+    dir
+}
+
+/// Writes `text` to `path` through a `.tmp` beside it, renamed: an interruption leaves the old file or the new.
+fn write_atomically(path: &Path, text: &str) {
+    let mut tmp = path.as_os_str().to_owned();
+    tmp.push(".tmp");
+    std::fs::write(&tmp, text).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    std::fs::rename(&tmp, path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+}
+
+/// What became of a node, as the per-node log has it.
+fn cut_name(fate: Fate) -> &'static str {
+    match fate {
+        Fate::Count => "count",
+        Fate::Bound => "gf2",
+        Fate::Tier1 => "tier1",
+        Fate::Refit => "refit",
+        Fate::Leaf => "leaf",
+        Fate::Branched => "none",
+    }
+}
+
+/// A tree's per-node log (`--log`): a text line a node ([`NODE_COLUMNS`]) in `{stem}.tmp` as the run goes, made
+/// into `{stem}.jsonl` with the subtree sizes at its end.
+struct NodeFile {
+    tmp: PathBuf,
+    jsonl: PathBuf,
+    file: BufWriter<File>,
+    /// The lines written.
+    lines: u64,
+}
+
+impl NodeFile {
+    /// The log of the run `stem` in `dir`, its `.tmp` cut to its first `lines` lines (those of the checkpoint a run
+    /// resumes from; none for a new run).
+    fn open(dir: &Path, stem: &str, lines: u64) -> NodeFile {
+        let tmp = make_dir(dir).join(format!("{stem}.tmp"));
+        let mut keep = 0;
+        if lines > 0 {
+            let mut reader = BufReader::new(File::open(&tmp).unwrap_or_else(|e| panic!("{}: {e}", tmp.display())));
+            let mut line = Vec::new();
+            for _ in 0..lines {
+                line.clear();
+                let read = reader.read_until(b'\n', &mut line).unwrap_or_else(|e| panic!("{}: {e}", tmp.display()));
+                assert!(line.ends_with(b"\n"), "{}: fewer lines than the checkpoint's {lines}", tmp.display());
+                keep += read as u64;
+            }
+        }
+        let file = OpenOptions::new().create(true).append(true).open(&tmp);
+        let file = file.unwrap_or_else(|e| panic!("{}: {e}", tmp.display()));
+        file.set_len(keep).unwrap_or_else(|e| panic!("{}: {e}", tmp.display()));
+        NodeFile { jsonl: dir.join(format!("{stem}.jsonl")), tmp, file: BufWriter::new(file), lines }
+    }
+
+    /// Appends the line of a node.
+    fn push<const W: usize>(&mut self, r: &NodeRecord<W>) {
+        let or_dash = |v: Option<i64>| v.map_or("-".to_string(), |x| x.to_string());
+        let columns = [
+            r.id.to_string(),
+            or_dash(r.parent.map(|q| q as i64)),
+            r.depth.to_string(),
+            or_dash(r.excess),
+            or_dash(r.log.excess_tier1),
+            or_dash(r.log.refit.then_some(r.log.pricings as i64)),
+            cut_name(r.fate).to_string(),
+        ];
+        writeln!(self.file, "{}", columns.join(" ")).unwrap_or_else(|e| panic!("{}: {e}", self.tmp.display()));
+        self.lines += 1;
+    }
+
+    fn flush(&mut self) {
+        self.file.flush().unwrap_or_else(|e| panic!("{}: {e}", self.tmp.display()));
+    }
+
+    /// Writes the `.jsonl` from the `.tmp`, each node with the size of its subtree (the ids run in the order visited
+    /// and a child's exceeds its parent's, so going down the ids adds each node's size to its parent's).  Returns
+    /// the `.tmp`, to be removed once the run's line is written.
+    fn finish(mut self) -> PathBuf {
+        self.flush();
+        let tmp = &self.tmp;
+        let lines = || {
+            let file = File::open(tmp).unwrap_or_else(|e| panic!("{}: {e}", tmp.display()));
+            BufReader::new(file).lines().map(|l| l.unwrap_or_else(|e| panic!("{}: {e}", tmp.display())))
+        };
+        let parents: Vec<Option<usize>> = lines()
+            .enumerate()
+            .map(|(i, line)| {
+                let mut words = line.split(' ');
+                assert_eq!(words.next(), Some(i.to_string().as_str()), "{}: ids in the order visited", tmp.display());
+                words.next().and_then(|q| q.parse().ok())
+            })
+            .collect();
+        let mut size = vec![1u64; parents.len()];
+        for i in (0..parents.len()).rev() {
+            if let Some(q) = parents[i] {
+                let below = size[i];
+                size[q] += below;
+            }
+        }
+        let file = File::create(&self.jsonl).unwrap_or_else(|e| panic!("{}: {e}", self.jsonl.display()));
+        let mut out = BufWriter::new(file);
+        for (line, size) in lines().zip(size) {
+            let value = |w: &str| match w {
+                "-" => Json::Null,
+                w => w.parse::<i64>().map_or_else(|_| Json::from(w), Json::Int),
+            };
+            let mut pairs: Vec<(&str, Json)> = NODE_COLUMNS.into_iter().zip(line.split(' ').map(value)).collect();
+            pairs.push(("subtree", size.into()));
+            writeln!(out, "{}", Json::object(pairs)).unwrap_or_else(|e| panic!("{}: {e}", self.jsonl.display()));
+        }
+        out.flush().unwrap_or_else(|e| panic!("{}: {e}", self.jsonl.display()));
+        self.tmp
+    }
+}
+
+/// The exact tree of `variant` (see the module docs): steps until the stack is empty or a budget ends, with the
+/// per-node log and the checkpoints of `o`, resuming from a checkpoint it finds; then its line to `out`, and its
+/// checkpoint and `.tmp` removed.  False if it was halted (`o.halt_at`) before its end.
+fn run_tree<const W: usize>(
+    g: &Game<'_, W>,
+    variant: Variant,
+    o: &BnbOptions,
+    audit: Option<&mut Output>,
+    out: &mut Output,
+) -> bool {
+    let stem = g.stem(variant, o);
+    let head = g.head(variant, o, "tree");
+    let mut extra = g.a1(variant, o, audit);
+    let mut s = g.search();
+    let checkpoint = o.checkpoint.as_deref().map(|dir| make_dir(dir).join(format!("{stem}.ckpt.json")));
+    // The run's time before the checkpoint it resumes from (ms), and the lines of its log then.
+    let (mut before, mut log_lines) = (0.0, None);
+    if let Some(text) = checkpoint.as_ref().and_then(|path| std::fs::read_to_string(path).ok()) {
+        let j = Json::parse(&text).unwrap_or_else(|e| panic!("{stem}.ckpt.json: {e}"));
+        assert_eq!(entry(&j, "head"), &Json::object(head.clone()), "{stem}.ckpt.json: a checkpoint of another run");
+        let totals = Totals::read(entry(&j, "totals"));
+        s.stack = restore_stack(&j, g.p);
+        (before, s.tally, extra.counters, extra.stats) = (totals.ms, totals.tally, totals.counters, totals.stats);
+        log_lines = entry(&j, "log_lines").as_u64();
+        assert_eq!(log_lines.is_some(), o.log.is_some(), "{stem}: a run resumes with the --log it began with");
+        eprintln!("n={} {}: resumed at {} nodes", g.n, variant.name(), s.tally.nodes);
+    }
+    let mut log = o.log.as_deref().map(|dir| NodeFile::open(dir, &stem, log_lines.unwrap_or(0)));
+    let (t0, mut saved) = (Instant::now(), Instant::now());
+    let totals = |s: &Search<'_, W, Rc<Warm>>, extra: &A1<'_, W>| Totals {
+        ms: before + ms(t0),
+        tally: s.tally.clone(),
+        counters: extra.counters.clone(),
+        stats: extra.stats,
+    };
+    while !s.stack.is_empty() && o.within(s.tally.nodes, before + ms(t0), &extra.counters) {
+        let record = s.step(extra.extra()).expect("a node on the stack");
+        if let Some(log) = &mut log {
+            log.push(&record);
+        }
+        if o.halt_at == Some(s.tally.nodes) {
+            return false;
+        }
+        let due = match o.checkpoint_every {
+            Every::Minutes(m) => saved.elapsed().as_secs_f64() >= 60.0 * m,
+            Every::Nodes(k) => s.tally.nodes.is_multiple_of(k),
+        };
+        if let Some(path) = checkpoint.as_ref().filter(|_| due) {
+            if let Some(log) = &mut log {
+                log.flush();
+            }
+            let j = checkpoint_json(&head, &totals(&s, &extra), log.as_ref().map(|l| l.lines), &s.stack);
+            write_atomically(path, &j.to_string());
+            saved = Instant::now();
+        }
+    }
+    let tmp = log.map(NodeFile::finish);
+    let mut pairs = head;
+    pairs.push(("completed", s.stack.is_empty().into()));
+    pairs.extend(totals(&s, &extra).pairs(false));
+    let line = Json::object(pairs).to_string();
+    out.write(&line);
+    for path in checkpoint.iter().chain(&tmp).filter(|path| path.exists()) {
+        std::fs::remove_file(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    }
+    assert_eq!(s.tally.better, 0, "a completion better than P*: {line}");
+    true
+}
+
+/// The generator of dive `i` of a Knuth run of `n` with the seed `s`: the same for every variant, so that the
+/// variants follow the same dives (a dive's path depends only on the GF(2) children).
+fn dive_rng(s: u64, n: u32, i: usize) -> Rng {
+    Rng(seed(n, 0, i, s) | 1)
+}
+
+/// The generator of the bootstrap of a Knuth run of `n` with the seed `s`.
+fn bootstrap_rng(s: u64, n: u32) -> Rng {
+    Rng(seed(n, 1, 0, s) | 1)
+}
+
+/// Knuth's estimator for `variant` (see the module docs): `dives` paired dives, or those a budget allows, each in the
+/// dives' log under `--log` as it ends (a resumed run skips the dives there), then the run's line.
+fn run_knuth<const W: usize>(
+    g: &Game<'_, W>,
+    variant: Variant,
+    o: &BnbOptions,
+    dives: usize,
+    audit: Option<&mut Output>,
+    out: &mut Output,
+) {
+    let mut extra = g.a1(variant, o, audit);
+    let mut s = g.search();
+    let path = o.log.as_deref().map(|dir| make_dir(dir).join(format!("{}-knuth.jsonl", g.stem(variant, o))));
+    let mut done: HashMap<usize, (f64, f64)> = HashMap::new();
+    let text = path.as_ref().and_then(|path| std::fs::read_to_string(path).ok()).unwrap_or_default();
+    for line in text.lines().filter(|l| !l.trim().is_empty()) {
+        let j = Json::parse(line).unwrap_or_else(|e| panic!("{}-knuth.jsonl: {e}", g.stem(variant, o)));
+        let number = |name| j.get(name).and_then(Json::as_f64).unwrap_or_else(|| panic!("a dive without {name}"));
+        done.insert(number("dive") as usize, (number("gf2"), number("a1")));
+    }
+    let mut log = path.as_deref().map(|path| Output::open(Some(path), &["dive"]));
+    let t0 = Instant::now();
+    for i in 0..dives {
+        if done.contains_key(&i) {
+            continue;
+        }
+        if !o.within(s.tally.nodes, ms(t0), &extra.counters) {
+            break;
+        }
+        let t = Instant::now();
+        let (gf2, a1) = s.dive(extra.extra(), &mut dive_rng(o.seed, g.n, i));
+        if let Some(log) = &mut log {
+            let dive = [("dive", i.into()), ("gf2", gf2.into()), ("a1", a1.into()), ("ms", rounded(ms(t)))];
+            log.write(&Json::object(dive).to_string());
+        }
+        done.insert(i, (gf2, a1));
+    }
+    let values: Vec<(f64, f64)> = (0..dives).filter_map(|i| done.get(&i).copied()).collect();
+    let estimate = Estimate::of(&values, o.ci, &mut bootstrap_rng(o.seed, g.n));
+    let totals = Totals { ms: ms(t0), tally: s.tally.clone(), counters: extra.counters.clone(), stats: extra.stats };
+    let mut pairs = g.head(variant, o, "knuth");
+    pairs.extend([("dives", values.len().into()), ("seed", o.seed.into()), ("ci", o.ci.into())]);
+    pairs.extend(estimate.pairs());
+    pairs.push(("completed", (values.len() == dives).into()));
+    pairs.extend(totals.pairs(false));
+    let line = Json::object(pairs).to_string();
+    out.write(&line);
+    assert_eq!(s.tally.better, 0, "a completion better than P*: {line}");
+}
+
+/// A sample's mean and median, and the bootstrap interval of its mean.
+struct Spread {
+    mean: f64,
+    median: f64,
+    lo: f64,
+    hi: f64,
+}
+
+/// Knuth's estimates from paired dives: of the GF(2) tree, of the A1 tree, and the ratio of their means.
+struct Estimate {
+    gf2: Spread,
+    a1: Spread,
+    ratio: f64,
+    ratio_lo: f64,
+    ratio_hi: f64,
+}
+
+impl Estimate {
+    /// The estimates of `values` (per dive, its GF(2) and its A1 estimate), with percentile intervals at level `ci`
+    /// from [`RESAMPLES`] resamples of the dives drawn by `rng` (a dive's two estimates together).
+    fn of(values: &[(f64, f64)], ci: f64, rng: &mut Rng) -> Estimate {
+        let m = values.len();
+        let mut boot: [Vec<f64>; 3] = Default::default();
+        if m > 0 {
+            for _ in 0..RESAMPLES {
+                let (mut a, mut b) = (0.0, 0.0);
+                for _ in 0..m {
+                    let (x, y) = values[rng.below(m as u64) as usize];
+                    a += x;
+                    b += y;
+                }
+                boot[0].push(a / m as f64);
+                boot[1].push(b / m as f64);
+                boot[2].push(a / b);
+            }
+        }
+        for b in &mut boot {
+            b.sort_by(f64::total_cmp);
+        }
+        let (lo, hi) = ((1.0 - ci) / 2.0, (1.0 + ci) / 2.0);
+        let spread = |part: fn(&(f64, f64)) -> f64, boot: &[f64]| {
+            let mut sorted: Vec<f64> = values.iter().map(part).collect();
+            sorted.sort_by(f64::total_cmp);
+            let mean = sorted.iter().sum::<f64>() / m as f64;
+            Spread { mean, median: quantile(&sorted, 0.5), lo: quantile(boot, lo), hi: quantile(boot, hi) }
+        };
+        let (gf2, a1) = (spread(|v| v.0, &boot[0]), spread(|v| v.1, &boot[1]));
+        Estimate {
+            ratio: gf2.mean / a1.mean,
+            ratio_lo: quantile(&boot[2], lo),
+            ratio_hi: quantile(&boot[2], hi),
+            gf2,
+            a1,
+        }
+    }
+
+    /// The estimates as a line's fields.
+    fn pairs(&self) -> Vec<(&'static str, Json)> {
+        let (g, a) = (&self.gf2, &self.a1);
+        [
+            ("gf2_mean", g.mean),
+            ("gf2_median", g.median),
+            ("gf2_lo", g.lo),
+            ("gf2_hi", g.hi),
+            ("a1_mean", a.mean),
+            ("a1_median", a.median),
+            ("a1_lo", a.lo),
+            ("a1_hi", a.hi),
+            ("ratio", self.ratio),
+            ("ratio_lo", self.ratio_lo),
+            ("ratio_hi", self.ratio_hi),
+        ]
+        .into_iter()
+        .map(|(name, x)| (name, Json::Num(x)))
+        .collect()
+    }
+}
+
+/// The `q`-quantile of `sorted` (linear between its order statistics); NaN if it is empty.
+fn quantile(sorted: &[f64], q: f64) -> f64 {
+    if sorted.is_empty() {
+        return f64::NAN;
+    }
+    let x = q * (sorted.len() - 1) as f64;
+    let i = x.floor() as usize;
+    let j = (i + 1).min(sorted.len() - 1);
+    sorted[i] + x.fract() * (sorted[j] - sorted[i])
+}
+
+/// The root fit of `n` for `bnb`: read from `path` if it is there (a directory holding `n{N}.json`, unless `path`
+/// names a `.json` file; its game asserted), else the main arm's fit with `settings`, written there if a path is
+/// given.
+fn root_fit<const W: usize>(
+    n: u32,
+    p: &Prepared<W>,
+    opt: u64,
+    path: Option<&Path>,
+    frames: &[usize],
+    settings: &Settings,
+) -> Fit {
+    let file = path.map(|f| {
+        if f.is_dir() || f.extension().is_none_or(|e| e != "json") {
+            f.join(format!("n{n}.json"))
+        } else {
+            f.to_path_buf()
+        }
+    });
+    at_root(n, p, opt, |ctx, gf2| {
+        if let Some((f, text)) = file.as_ref().and_then(|f| Some((f, std::fs::read_to_string(f).ok()?))) {
+            let fit = fit_from_json(text.trim()).unwrap_or_else(|e| panic!("{}: {e}", f.display()));
+            assert_eq!((fit.n, fit.opt, fit.gf2), (n, opt as i64, gf2), "{}: the fit of another game", f.display());
+            return fit;
+        }
+        let fit = Fit::from_outcome(n, opt as i64, gf2, &fit_outcome(ctx, frames, settings));
+        if let Some(f) = &file {
+            if let Some(dir) = f.parent().filter(|d| !d.as_os_str().is_empty()) {
+                make_dir(dir);
+            }
+            write_atomically(f, &(fit.to_json() + "\n"));
+        }
+        fit
+    })
+}
+
+/// The `bnb` command for the game `n`: the root fit (if a run is to be made), then each variant's run not in `out`.
+fn bnb<const W: usize>(n: u32, known: &Known, o: &Options, out: &mut Output, mut audit: Option<&mut Output>) {
+    let b = &o.bnb;
+    let Some((board, p)) = setup::<W>(n) else { return };
+    let Some(opt) = known.opt(n, board.in_the_bag) else {
+        eprintln!("n={n}: no known optimum, skipped");
+        return;
+    };
+    let mode = if b.knuth.is_some() { "knuth" } else { "tree" };
+    let done = |v: Variant| out.done(&Output::key_of(&Json::object(run_id(n, v, b, mode)), &BNB_KEY));
+    let todo: Vec<Variant> = b.variants.iter().copied().filter(|&v| !done(v)).collect();
+    if todo.is_empty() {
+        return;
+    }
+    let t = Instant::now();
+    let settings = Settings { seconds: b.fit_seconds, ..o.settings.clone() };
+    let fit = root_fit(n, &p, opt, b.fit.as_deref(), &o.frames, &settings);
+    let graph = MatchGraph::new(&p.model, &p.root);
+    let g = Game::new(n, &p, &graph, opt, &fit);
+    eprintln!(
+        "n={n}: P* {opt}, GF(2) {}, the root fit's bound {} and Tier 1 {:?}, {:.1} s",
+        fit.gf2,
+        fit.bound,
+        g.fit_tier1,
+        t.elapsed().as_secs_f64()
+    );
+    for variant in todo {
+        let t = Instant::now();
+        match b.knuth {
+            Some(dives) => run_knuth(&g, variant, b, dives, audit.as_deref_mut(), out),
+            None => {
+                run_tree(&g, variant, b, audit.as_deref_mut(), out);
+            }
+        }
+        eprintln!("n={n} {}: {:.1} s", variant.name(), t.elapsed().as_secs_f64());
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------
 // Tests
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dw::{cut_rank, fit_from_json, refit_r1, refit_r2, tier1, Fit, Trace, Warm};
+    use crate::dw::cut_rank;
+    use crate::frames::FrameMatroids;
     use crate::lp::{Lp, RowKind, Status};
     use crate::meet::{Reduced, Span};
 
@@ -989,12 +2151,15 @@ mod tests {
     #[test]
     fn the_intersection_matches_the_reference() {
         let mut checks = 0;
-        for i in 0..20u32 {
-            let n = 300 + i * (2175 - 300) / 19;
-            let n = if is_prime(n) { n + 1 } else { n };
+        for n in spread(300, 2175, 20) {
             checks += taxman::with_width!(n, W => reweighted::<W>(n));
         }
         eprintln!("test 8: {checks} checked intersections");
+    }
+
+    /// `count` games spread evenly over `lo..=hi`, each prime moved up by one (so none is prime).
+    fn spread(lo: u32, hi: u32, count: u32) -> impl Iterator<Item = u32> {
+        (0..count).map(move |i| lo + i * (hi - lo) / (count - 1)).map(|n| if is_prime(n) { n + 1 } else { n })
     }
 
     fn reweighted<const W: usize>(n: u32) -> u64 {
@@ -1036,33 +2201,29 @@ mod tests {
             samples: 0,
             games: Vec::new(),
             files: Vec::new(),
+            bnb: BnbOptions::default(),
         };
         for n in [300u32, 360, 420, 480] {
             taxman::with_width!(n, W => roots::<W>(n, &known, &o, &mut out, None));
         }
     }
 
-    /// Runs `f` at the root of `n`, set up as `roots` sets it up (target `P*`, not stopping there), with the main
-    /// arm's fit in search mode within `seconds` and the GF(2) bound.
-    fn with_root_fit<const W: usize>(
-        n: u32,
-        seconds: f64,
-        f: impl FnOnce(&taxman::search::Prepared<W>, &Ctx<'_, W>, &Outcome, i64),
-    ) {
+    /// The settings of the tests' root fits: search mode within `seconds`.
+    fn search_mode(seconds: f64) -> Settings {
+        Settings { mode: FitMode::Search, seconds, ..Settings::default() }
+    }
+
+    /// Runs `f` at the root of `n` ([`at_root`]), with the main arm's fit in search mode within `seconds` and the
+    /// GF(2) bound.
+    fn with_root_fit<const W: usize>(n: u32, seconds: f64, f: impl FnOnce(&Prepared<W>, &Ctx<'_, W>, &Outcome, i64)) {
         let known = Known::load(&[], None).expect("the built-in optimum table");
         let (board, p) = setup::<W>(n).expect("a board with candidates");
-        let opt = known.opt(n, board.in_the_bag).expect("a built-in optimum") as i64;
-        let fm = frame_matroids(&p.model, &p.root, &p.candidates);
-        let cap = p.max_total as usize;
-        let gf2 = fm.bound(cap).value;
-        let mut ctx = Ctx::new(n, &p.model, &p.root, &fm, cap, opt, false);
-        ctx.gap = Some(gf2 - opt);
-        let (signings, separate) = arm("f1cores", n, p.root.len(), &[1, 2, 3]);
-        let settings = Settings { mode: FitMode::Search, seconds, ..Settings::default() };
-        let r = bound(&ctx, signings, None, separate, &settings);
-        assert!(r.bound >= opt, "n={n}: the bound {} below P* = {opt}", r.bound);
-        assert_eq!(r.lb, 0.0, "n={n}: search mode certifies nothing");
-        f(&p, &ctx, &r, gf2);
+        let opt = known.opt(n, board.in_the_bag).expect("a built-in optimum");
+        at_root(n, &p, opt, |ctx, gf2| {
+            let r = fit_outcome(ctx, &[1, 2, 3], &search_mode(seconds));
+            assert_eq!(r.lb, 0.0, "n={n}: search mode certifies nothing");
+            f(&p, ctx, &r, gf2);
+        });
     }
 
     /// The design's S5.2 test 6: at the roots of 600 and 900, the main arm's fit in search mode, written as a fit
@@ -1161,9 +2322,7 @@ mod tests {
 
     /// At the roots of 300-700 every 50th, each child of the root as `examples/matroid.rs`'s `bnb` makes them (the
     /// GF(2) heaviest set's conflict `k₁ < … < k_r`: child `j` promotes `k₁ … k_{j−1}` and leaves out `k_j`) takes
-    /// over the root fit's state (`Warm::child`): every column is common independent in the child's GF(2) matroids
-    /// and within its `max_add`; every cut is within its elements and, with its rank taken in the child's signed
-    /// matroid, holds for 20 random maximal promotable sets of the child.
+    /// over the root fit's state (`Warm::child`), which is valid there ([`assert_state_valid`]).
     #[test]
     fn child_keeps_valid_columns() {
         let (mut children, mut columns, mut cuts) = (0, 0, 0);
@@ -1187,27 +2346,10 @@ mod tests {
                     let limit = max_add(&at, required.len() as u32, &live_cands);
                     let fmc = frame_matroids(model, &at, &live_cands);
                     let child = warm.child(&required, &[x], &fmc.elems, limit);
-                    for c in &child.columns {
-                        fmc.independent(&Bits::<W>::from_slice(c))
-                            .unwrap_or_else(|e| panic!("n={n}, child {}: {c:?}: {e}", required.len()));
-                        assert!(c.len() <= limit, "n={n}: a column of {} members, max_add {limit}", c.len());
-                    }
-                    let ctxc = Ctx::new(n, model, &at, &fmc, limit, 0, false);
-                    let famc = Family::new(&ctxc, child.signings.clone());
-                    let live: Vec<u32> = live_cands.iter().collect();
-                    let completions: Vec<Vec<u32>> =
-                        (0..20).map(|_| random_promotable(model, &at, &live, &mut rng).iter().collect()).collect();
-                    for (j, set) in &child.cuts {
-                        assert!(set.iter().all(|x| fmc.elems.binary_search(x).is_ok()), "n={n}: a cut's member");
-                        let rank = cut_rank(&famc, *j, set);
-                        for c in &completions {
-                            let common = set.iter().filter(|x| c.binary_search(x).is_ok()).count();
-                            assert!(common <= rank, "n={n}: {common} of a cut of rank {rank} in a promotable set");
-                        }
-                    }
+                    let checked = assert_state_valid(n, model, &at, &fmc, &live_cands, limit, &child, &mut rng);
                     children += 1;
-                    columns += child.columns.len();
-                    cuts += child.cuts.len();
+                    columns += checked.0;
+                    cuts += checked.1;
                     match model.promote_all_using(&mut scratch, &at, &Bits::EMPTY.with(x)) {
                         Some(next) => {
                             at = next;
@@ -1220,5 +2362,374 @@ mod tests {
         }
         eprintln!("child_keeps_valid_columns: {children} children, {columns} columns and {cuts} cuts checked");
         assert!(children > 0 && columns > 0 && cuts > 0);
+    }
+
+    /// Asserts that `warm`, the state that a node of `n` takes over (the node's `state`, its GF(2) matroids `fm` over
+    /// its candidates `cands`, at most `max_add` more members), is valid there: every column is within `max_add` and
+    /// common independent in `fm`; every cut is within `fm`'s elements and, with its rank taken in a family of
+    /// `warm`'s signings at the node, holds for 20 random maximal promotable sets of the candidates.  The columns and
+    /// the cuts checked.
+    #[allow(clippy::too_many_arguments)]
+    fn assert_state_valid<const W: usize>(
+        n: u32,
+        model: &FrameGraph,
+        state: &FrameSet<W>,
+        fm: &FrameMatroids,
+        cands: &Bits<W>,
+        max_add: usize,
+        warm: &Warm,
+        rng: &mut Rng,
+    ) -> (usize, usize) {
+        for c in &warm.columns {
+            fm.independent(&Bits::<W>::from_slice(c)).unwrap_or_else(|e| panic!("n={n}: a column {c:?}: {e}"));
+            assert!(c.len() <= max_add, "n={n}: a column of {} members, max_add {max_add}", c.len());
+        }
+        let ctx = Ctx::new(n, model, state, fm, max_add, 0, false);
+        let fam = Family::new(&ctx, warm.signings.clone());
+        let live: Vec<u32> = cands.iter().collect();
+        let completions: Vec<Vec<u32>> =
+            (0..20).map(|_| random_promotable(model, state, &live, rng).iter().collect()).collect();
+        for (j, set) in &warm.cuts {
+            assert!(set.iter().all(|x| fm.elems.binary_search(x).is_ok()), "n={n}: a cut's member is no element");
+            let rank = cut_rank(&fam, *j, set);
+            for c in &completions {
+                let common = set.iter().filter(|x| c.binary_search(x).is_ok()).count();
+                assert!(common <= rank, "n={n}: {common} of a cut of rank {rank} in a promotable set");
+            }
+        }
+        (warm.columns.len(), warm.cuts.len())
+    }
+
+    /// Runs `f` on the game `n` set up for `bnb`, with the incumbent `P* − handicap` and a root fit of the main arm
+    /// in search mode within `seconds`, and with the optimal game's promotions (if known); not if `P*` is below the
+    /// handicap.
+    fn with_game<const W: usize>(n: u32, seconds: f64, handicap: u64, f: impl FnOnce(&Game<'_, W>, Option<Bits<W>>)) {
+        let known = Known::load(&[], None).expect("the built-in optimum table");
+        let Some((board, p)) = setup::<W>(n) else { return };
+        let opt = known.opt(n, board.in_the_bag).expect("a built-in optimum");
+        let Some(incumbent) = opt.checked_sub(handicap) else { return };
+        let optimal = optimal_promotions(n, &known, &board, opt);
+        let fit = root_fit(n, &p, opt, None, &[1, 2, 3], &search_mode(seconds));
+        let graph = MatchGraph::new(&p.model, &p.root);
+        f(&Game::new(n, &p, &graph, incumbent, &fit), optimal);
+    }
+
+    /// An extra bound that hands every node to [`A1`] and shows `watch` the node, its parent's state and the bound.
+    struct Watched<'a, const W: usize, F> {
+        a1: A1<'a, W>,
+        watch: F,
+    }
+
+    impl<const W: usize, F: FnMut(&NodeView<'_, W>, Option<&Rc<Warm>>, i64)> ExtraBound<W> for Watched<'_, W, F> {
+        type State = Rc<Warm>;
+
+        fn bound(&mut self, v: &NodeView<'_, W>, parent: Option<&Rc<Warm>>) -> (i64, Rc<Warm>, NodeLog) {
+            let r = self.a1.bound(v, parent);
+            (self.watch)(v, parent, r.0);
+            r
+        }
+    }
+
+    /// [`A1`] watched by `watch`.
+    fn watched<'a, const W: usize, F: FnMut(&NodeView<'_, W>, Option<&Rc<Warm>>, i64)>(
+        a1: A1<'a, W>,
+        watch: F,
+    ) -> Watched<'a, W, F> {
+        Watched { a1, watch }
+    }
+
+    /// The design's S5.2 test 1: along 200 random dives of `r2` (10 at each of 20 non-prime games spread over
+    /// 300-700), the state that each node below the root takes over from its parent (`Warm::child`) is valid at the
+    /// node ([`assert_state_valid`]).
+    #[test]
+    fn warm_child_keeps_columns_and_cuts_valid() {
+        let (mut nodes, mut columns, mut cuts) = (0, 0, 0);
+        for n in spread(300, 700, 20) {
+            taxman::with_width!(n, W => with_game::<W>(n, 3.0, 0, |g, _| {
+                let mut rng = Rng(0x2545_F491_4F6C_DD1D ^ u64::from(n));
+                let mut completions = Rng(0x9E37_79B9_7F4A_7C15 ^ u64::from(n));
+                let watch = |v: &NodeView<'_, W>, parent: Option<&Rc<Warm>>, _| {
+                    let Some(parent) = parent else { return };
+                    let child = parent.child(&v.promoted_now.to_vec(), &v.removed.to_vec(), &v.fm.elems, v.max_add);
+                    let checked =
+                        assert_state_valid(n, &g.p.model, v.state, v.fm, &v.cands, v.max_add, &child, &mut completions);
+                    nodes += 1;
+                    columns += checked.0;
+                    cuts += checked.1;
+                };
+                let mut extra = watched(g.a1(Variant::R2, &BnbOptions::default(), None), watch);
+                let mut s = g.search();
+                for _ in 0..10 {
+                    s.dive(Some(&mut extra), &mut rng);
+                }
+            }));
+        }
+        eprintln!("test 1: {nodes} nodes, {columns} columns and {cuts} cuts checked");
+        assert!(nodes > 0 && columns > 0 && cuts > 0);
+    }
+
+    /// The design's S5.2 test 2: at the games 300, 350, …, 1300, with the incumbent `P* − 1` (so that no node on the
+    /// path of the optimal promotions `S*` is cut by a valid bound), a dive along `S*` (the child whose promotions
+    /// are in `S*` and whose member left out is not) for each of v1, r1, r2 and r2c: the extra bound at every node is
+    /// at least `w(S* − promoted)`, and the dive ends at a leaf, the GF(2) heaviest set promotable.
+    #[test]
+    fn bounds_hold_along_the_optimum() {
+        let mut nodes = 0;
+        for n in (300..=1300u32).step_by(50) {
+            taxman::with_width!(n, W => with_game::<W>(n, 3.0, 1, |g, optimal| {
+                let optimal = optimal.expect("the optimal promotions");
+                for variant in [Variant::V1, Variant::R1, Variant::R2, Variant::R2c] {
+                    let what = format!("n={n} {}", variant.name());
+                    let watch = |v: &NodeView<'_, W>, _: Option<&Rc<Warm>>, bound: i64| {
+                        assert!(v.promoted.is_subset(&optimal), "{what}: a node off the optimum's path");
+                        let rest = (optimal - v.promoted).sum() as i64;
+                        assert!(bound >= rest, "{what}: {bound} below w(S* − promoted) = {rest} at depth {}", v.depth);
+                        nodes += 1;
+                    };
+                    let mut extra = watched(g.a1(variant, &BnbOptions::default(), None), watch);
+                    let mut s = g.search();
+                    s.dive_by(Some(&mut extra), &mut |children| {
+                        let on_path = |c: &Pending<W, Rc<Warm>>| {
+                            c.promoted_now.is_subset(&optimal) && !c.removed.intersects(&optimal)
+                        };
+                        children.iter().position(on_path).expect("a child on the optimum's path")
+                    });
+                    let t = &s.tally;
+                    let cuts = (t.cut_by_count, t.cut_by_bound, t.cut_tier1, t.cut_refit);
+                    assert_eq!((t.better, cuts), (1, (0, 0, 0, 0)), "{what}: the dive ends at a leaf");
+                }
+            }));
+        }
+        eprintln!("test 2: {nodes} nodes on the optimum's paths");
+    }
+
+    /// The design's S5.2 test 3: at every non-prime game 30-600 with `P* > 0`, with the incumbent `P* − 1`, the
+    /// branch and bound of each variant finds a completion worth `P*` (a `better` one) within 200,000 nodes.
+    #[test]
+    fn handicapped_incumbent_is_found() {
+        let mut games = 0;
+        for n in (30..=600u32).filter(|&n| !is_prime(n)) {
+            taxman::with_width!(n, W => with_game::<W>(n, 2.0, 1, |g, _| {
+                for variant in Variant::ALL {
+                    let mut extra = g.a1(variant, &BnbOptions::default(), None);
+                    let mut s = g.search();
+                    while s.tally.better == 0 && s.tally.nodes < 200_000 && s.step(extra.extra()).is_some() {}
+                    let nodes = s.tally.nodes;
+                    assert!(s.tally.better >= 1, "n={n} {}: nothing worth P* in {nodes} nodes", variant.name());
+                }
+                games += 1;
+            }));
+        }
+        eprintln!("test 3: {games} games");
+        assert!(games > 400);
+    }
+
+    /// The records of `variant`'s whole tree in the order visited, which must be complete within 10⁶ nodes, find
+    /// nothing better than the incumbent, and have no two nodes alike (promotions, candidates).
+    fn tree_records<const W: usize>(g: &Game<'_, W>, variant: Variant) -> Vec<NodeRecord<W>> {
+        let mut extra = g.a1(variant, &BnbOptions::default(), None);
+        let mut s = g.search();
+        let mut records = Vec::new();
+        while let Some(r) = s.step(extra.extra()) {
+            records.push(r);
+            assert!(records.len() <= 1_000_000, "n={} {}: no complete tree in 10⁶ nodes", g.n, variant.name());
+        }
+        assert_eq!(s.tally.better, 0, "n={} {}: a completion better than P*", g.n, variant.name());
+        let nodes: HashSet<_> = records.iter().map(|r| (r.promoted, r.cands)).collect();
+        assert_eq!(nodes.len(), records.len(), "n={} {}: two nodes alike", g.n, variant.name());
+        records
+    }
+
+    /// The nodes (promotions, candidates) of `variant`'s whole tree ([`tree_records`]).
+    fn tree_nodes<const W: usize>(g: &Game<'_, W>, variant: Variant) -> HashSet<(Bits<W>, Bits<W>)> {
+        tree_records(g, variant).iter().map(|r| (r.promoted, r.cands)).collect()
+    }
+
+    /// The design's S5.2 test 4: on 20 non-prime games spread over 300-900, the nodes of the whole trees of r2 and
+    /// r2c are among those of v0's (the extra bound only cuts).
+    #[test]
+    fn extra_trees_are_subtrees() {
+        for n in spread(300, 900, 20) {
+            taxman::with_width!(n, W => with_game::<W>(n, 3.0, 0, |g, _| {
+                let v0 = tree_nodes(g, Variant::V0);
+                let mut sizes = vec![v0.len()];
+                for variant in [Variant::R2, Variant::R2c] {
+                    let nodes = tree_nodes(g, variant);
+                    assert!(nodes.is_subset(&v0), "n={n} {}: a node not in v0's tree", variant.name());
+                    sizes.push(nodes.len());
+                }
+                eprintln!("n={n}: v0, r2 and r2c trees of {sizes:?} nodes");
+            }));
+        }
+    }
+
+    /// A dive's outcome with its probability: (probability, GF(2) estimate, A1 estimate).
+    type DiveOutcome = (f64, f64, f64);
+
+    /// The exact joint distribution of the two estimates of a paired dive with v1 (`Search::dive`): one outcome per
+    /// root-to-leaf path of v0's tree (`v0`, its records in the order visited), with the path's probability (the
+    /// product of 1/m over its nodes of m children), its GF(2) estimate (the sum over its nodes of the product of the
+    /// numbers of children of the nodes above them) and its A1 estimate (the same sum up to and including the first
+    /// node v1 cuts, the nodes `cut` by promotions and candidates).  v1's Tier 1 at a node depends on the node alone,
+    /// its state being the root fit's, so the nodes it cuts in its own tree are those it cuts on any dive.
+    ///
+    /// Why: Knuth's estimator is unbiased but heavy-tailed.  The design's first criterion, each tree's node count
+    /// within the 99% bootstrap interval of the mean of 2,000 dives, failed at 1000 and 1215 although the dives follow
+    /// this distribution (rare paths carry most of the mean, and 2,000 dives seldom meet them), so the dives are
+    /// checked against the distribution itself.
+    fn exact_dives<const W: usize>(v0: &[NodeRecord<W>], cut: &HashSet<(Bits<W>, Bits<W>)>) -> Vec<DiveOutcome> {
+        let mut children = vec![Vec::new(); v0.len()];
+        for (i, r) in v0.iter().enumerate() {
+            assert_eq!((r.id, r.parent.is_none()), (i as u64, i == 0), "ids in the order visited, from the root");
+            if let Some(q) = r.parent {
+                children[q as usize].push(i);
+            }
+        }
+        for r in v0 {
+            assert_eq!(children[r.id as usize].len(), r.children, "a node's children are its records' children");
+        }
+        let mut out = Vec::new();
+        // (node, probability, product of the numbers of children above it, estimates so far, whether v1 has not cut)
+        let mut stack = vec![(0usize, 1.0, 1.0, 0.0, 0.0, true)];
+        while let Some((v, p, product, gf2, a1, alive)) = stack.pop() {
+            let (gf2, a1) = (gf2 + product, if alive { a1 + product } else { a1 });
+            let alive = alive && !cut.contains(&(v0[v].promoted, v0[v].cands));
+            let kids = &children[v];
+            if kids.is_empty() {
+                out.push((p, gf2, a1));
+                continue;
+            }
+            let m = kids.len() as f64;
+            stack.extend(kids.iter().map(|&c| (c, p / m, product * m, gf2, a1, alive)));
+        }
+        out
+    }
+
+    /// The Kolmogorov–Smirnov distance between the sample `xs` and the distribution of `(probability, value)` pairs:
+    /// the largest gap between their distribution functions, both steps continuous on the right, so taken at the
+    /// jumps.
+    fn ks_distance(xs: &[f64], dist: &[(f64, f64)]) -> f64 {
+        let mut xs = xs.to_vec();
+        xs.sort_by(f64::total_cmp);
+        let mut dist = dist.to_vec();
+        dist.sort_by(|a, b| a.1.total_cmp(&b.1));
+        let (mut i, mut j, mut cdf, mut ks) = (0, 0, 0.0, 0.0f64);
+        while i < dist.len() || j < xs.len() {
+            let t = dist.get(i).map_or(f64::INFINITY, |d| d.1).min(xs.get(j).copied().unwrap_or(f64::INFINITY));
+            while i < dist.len() && dist[i].1 <= t {
+                cdf += dist[i].0;
+                i += 1;
+            }
+            while j < xs.len() && xs[j] <= t {
+                j += 1;
+            }
+            ks = ks.max((cdf - j as f64 / xs.len() as f64).abs());
+        }
+        ks
+    }
+
+    /// The design's S5.2 test 5, made sound (run it explicitly; it takes minutes): at 1000, 1100, 1215 and 1300 (root
+    /// fits of 30 s), the exact distribution of a paired dive's estimates from the exact trees of v0 and v1
+    /// ([`exact_dives`], why there), whose means must be the trees' node counts, against 2,000 paired dives with v1:
+    /// the Kolmogorov–Smirnov distance of each estimate below the 1% critical value `1.63/√2000`.  Printed per game:
+    /// the counts, the dives' means with their 99% bootstrap intervals, the exact ratio of the counts against the
+    /// dives' ratio interval, the distances, and the exact standard deviation of one dive's estimates (the tail).
+    #[test]
+    #[ignore]
+    fn knuth_dives_follow_the_exact_distribution() {
+        const DIVES: usize = 2000;
+        let critical = 1.63 / (DIVES as f64).sqrt();
+        for n in [1000u32, 1100, 1215, 1300] {
+            taxman::with_width!(n, W => with_game::<W>(n, 30.0, 0, |g, _| {
+                let v0 = tree_records(g, Variant::V0);
+                let v1 = tree_records(g, Variant::V1);
+                let cut: HashSet<_> =
+                    v1.iter().filter(|r| r.fate == Fate::Tier1).map(|r| (r.promoted, r.cands)).collect();
+                let exact = exact_dives(&v0, &cut);
+                let moment = |part: fn(&DiveOutcome) -> f64, power: i32| -> f64 {
+                    exact.iter().map(|o| o.0 * part(o).powi(power)).sum()
+                };
+                let parts: [fn(&DiveOutcome) -> f64; 2] = [|o| o.1, |o| o.2];
+                let counts = [v0.len() as f64, v1.len() as f64];
+                let means = parts.map(|part| moment(part, 1));
+                for (mean, count) in means.iter().zip(counts) {
+                    assert!((mean - count).abs() <= 1e-6 * count, "n={n}: the exact mean {mean} of {count} nodes");
+                }
+                let sds = [0, 1].map(|k| (moment(parts[k], 2) - means[k] * means[k]).sqrt());
+                let mut extra = g.a1(Variant::V1, &BnbOptions::default(), None);
+                let mut s = g.search();
+                let values: Vec<(f64, f64)> =
+                    (0..DIVES).map(|i| s.dive(extra.extra(), &mut dive_rng(1, n, i))).collect();
+                let samples = [values.iter().map(|v| v.0).collect::<Vec<_>>(), values.iter().map(|v| v.1).collect()];
+                let ks = [0, 1].map(|k| {
+                    let marginal: Vec<(f64, f64)> = exact.iter().map(|o| (o.0, parts[k](o))).collect();
+                    ks_distance(&samples[k], &marginal)
+                });
+                let e = Estimate::of(&values, 0.99, &mut bootstrap_rng(1, n));
+                let ratio = counts[0] / counts[1];
+                for (name, k, spread) in [("v0", 0, &e.gf2), ("v1", 1, &e.a1)] {
+                    let (count, within) = (counts[k], spread.lo <= counts[k] && counts[k] <= spread.hi);
+                    eprintln!(
+                        "n={n} {name}: {count} nodes; dives' mean {:.0} in [{:.0}, {:.0}] at 99% (count within: \
+                         {within}); KS {:.4} (critical {critical:.4}); one dive's exact sd {:.0}",
+                        spread.mean, spread.lo, spread.hi, ks[k], sds[k]
+                    );
+                }
+                let within = e.ratio_lo <= ratio && ratio <= e.ratio_hi;
+                eprintln!(
+                    "n={n}: exact ratio {ratio:.4}, dives' {:.4} in [{:.4}, {:.4}] (exact within: {within})",
+                    e.ratio, e.ratio_lo, e.ratio_hi
+                );
+                for (name, k) in [("GF(2)", 0), ("A1", 1)] {
+                    assert!(ks[k] < critical, "n={n}: the {name} estimates' KS distance {} from the exact", ks[k]);
+                }
+            }));
+        }
+    }
+
+    /// The counters of a run's line (its fields but the times), from the line of `out`.
+    fn counters_of(out: &Path) -> Vec<(String, Json)> {
+        let text = std::fs::read_to_string(out).expect("a run's line");
+        let Json::Obj(pairs) = Json::parse(text.trim()).expect("one line") else { panic!("not an object") };
+        pairs.into_iter().filter(|(name, _)| !name.starts_with("ms")).collect()
+    }
+
+    /// The design's S5.2 test 6 (as this study specifies it): at 840 with r2, a run checkpointed every 50 nodes and
+    /// stopped as if killed at 200 nodes, then resumed from its checkpoint to the end, gives the same line (but the
+    /// times) and the same per-node log as a run straight through.
+    #[test]
+    fn resumed_run_is_the_same() {
+        let n = 840;
+        let dir = std::env::temp_dir().join(format!("fields-bnb-test-{}", std::process::id()));
+        taxman::with_width!(n, W => with_game::<W>(n, 3.0, 0, |g, _| {
+            let run = |name: &str, checkpoint: bool, halt_at: Option<u64>| {
+                let at = make_dir(&dir.join(name)).to_path_buf();
+                let o = BnbOptions {
+                    variants: vec![Variant::R2],
+                    log: Some(at.clone()),
+                    checkpoint: checkpoint.then(|| at.clone()),
+                    checkpoint_every: Every::Nodes(50),
+                    halt_at,
+                    ..BnbOptions::default()
+                };
+                let mut out = Output::open(Some(&at.join("bnb.jsonl")), &BNB_KEY);
+                run_tree(g, Variant::R2, &o, None, &mut out)
+            };
+            assert!(run("straight", false, None), "a run straight through ends");
+            assert!(!run("resumed", true, Some(200)), "the run is stopped at 200 nodes");
+            let stem = g.stem(Variant::R2, &BnbOptions::default());
+            assert!(dir.join("resumed").join(format!("{stem}.ckpt.json")).exists(), "a checkpoint");
+            assert!(run("resumed", true, None), "the resumed run ends");
+            let file = |name: &str, what: &str| dir.join(name).join(format!("{stem}{what}"));
+            assert!(!file("resumed", ".ckpt.json").exists() && !file("resumed", ".tmp").exists(), "left over");
+            let line = |name: &str| counters_of(&dir.join(name).join("bnb.jsonl"));
+            assert_eq!(line("resumed"), line("straight"), "the lines differ");
+            let log = |name: &str| std::fs::read_to_string(file(name, ".jsonl")).expect("a per-node log");
+            let (straight, resumed) = (log("straight"), log("resumed"));
+            assert!(straight.lines().count() > 200, "a tree of more than 200 nodes");
+            assert_eq!(resumed, straight, "the per-node logs differ");
+            eprintln!("test 6: the same tree of {} nodes", straight.lines().count());
+        }));
+        std::fs::remove_dir_all(&dir).expect("the test directory removed");
     }
 }

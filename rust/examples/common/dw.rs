@@ -333,6 +333,7 @@ impl Family {
 // Evaluation
 
 /// One evaluation of `L` at multipliers rounded to the grid.
+#[derive(Clone)]
 pub struct Eval {
     /// `L` scaled by [`SCALE`], exact.
     pub value: i64,

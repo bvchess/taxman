@@ -252,7 +252,17 @@ impl<'p, const W: usize, S: Clone> Search<'p, W, S> {
     /// without the extra bound and of the tree with it, from the same dive.  With no extra bound they are equal.  The
     /// dive does not touch the stack; it adds to the tally as `step` does, except that it also makes (and counts in
     /// `branches`) the children of the nodes that the extra bound cuts, which it goes on through for the first tree.
-    pub fn dive<E: ExtraBound<W, State = S>>(&mut self, mut extra: Option<&mut E>, rng: &mut Rng) -> (f64, f64) {
+    pub fn dive<E: ExtraBound<W, State = S>>(&mut self, extra: Option<&mut E>, rng: &mut Rng) -> (f64, f64) {
+        self.dive_by(extra, &mut |children| rng.below(children.len() as u64) as usize)
+    }
+
+    /// [`dive`](Self::dive) with the child chosen by `choose` (given the node's children, in the order `step` pushes
+    /// them, the index of the child to go on to) instead of uniformly.
+    pub fn dive_by<E: ExtraBound<W, State = S>>(
+        &mut self,
+        mut extra: Option<&mut E>,
+        choose: &mut dyn FnMut(&[Pending<W, S>]) -> usize,
+    ) -> (f64, f64) {
         let (mut gf2, mut with_extra, mut product) = (0.0, 0.0, 1.0);
         let mut alive = true;
         let mut node = self.root();
@@ -269,7 +279,7 @@ impl<'p, const W: usize, S: Clone> Search<'p, W, S> {
                 return (gf2, with_extra);
             }
             product *= children.len() as f64;
-            node = children.swap_remove(rng.below(children.len() as u64) as usize);
+            node = children.swap_remove(choose(&children));
         }
     }
 
