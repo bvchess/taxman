@@ -349,7 +349,11 @@ The work of [the prover](../prover/README.md) and the proofs of [THEORY.md](../.
 | E2: Theorem M against the code, both ways (`tests/model_exact.rs`), with a playability oracle that shares no code with the frame solver | [proven footing](#the-frame-model-on-a-proven-footing-2026-10) | kept (tests) | every set of every board to 120 and random sets to 8191, no failure; the candidate filter alone keeps out a promotion the model would accept and the board refuses on 27 boards to 2000 (first n = 98) |
 | E3: Theorem B against every recorded and enumerated optimal set (`tests/bottom_layers.rs`) | [proven footing](#the-frame-model-on-a-proven-footing-2026-10) | kept (tests) | no exception in 3,574 recorded games, 1,044 enumerated sets and every optimal set of 2..54; numbers of layer 2 up to n/2 only on 76 boards, all ≤ 186 |
 | N as a hard check of setup (`build_frames` refuses a board whose numbering is not clean) | [proven footing](#the-frame-model-on-a-proven-footing-2026-10) | kept | every supported board passes, so nothing changes (fingerprints, tripwires, regress, the chain 1..1300 line for line); punctured boards (the sacrifice study's) are not checked: 56 without 39 is not clean |
-| Certify U game by game: barred parity bounds with layers 1-2 fixed by Theorem B, then a search of the open members (or a search that treats the open sources as optional) | [THEORY: the upper part](../../heuristics/THEORY.md#the-upper-part) | open | the consultation's scratch measurements: the bounds leave 3-12 members of U\*_{≥3} open to 1300, 26-102 at 1500-2276; a search on the whole board closes the rest at every n tried to 1500 |
+| Certify U game by game: barred parity bounds with layers 1-2 fixed by Theorem B, then a search of the open members (or a search that treats the open sources as optional) | [THEORY: the upper part](../../heuristics/THEORY.md#the-upper-part) | open | the bounds close no game alone (E5, next row); the rest needs the integrated search, which leaves the open sources optional, and E6 measures what that costs the prover's search (prepared) |
+| E5: barred parity bounds on every game of 1301-3314 that rests on the frame model (`prover/src/bin/upper.rs`): layers 1 and 2 fixed by Theorem B, each member of U\*_{≥3} barred in turn, certified when the bound is at most the recorded score | [upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | kept (`prover/data/upper_*.jsonl`) | 7.5% of the members open over 1301-2175 (1 to 102 a game), 14.9% over the EC2 chain's 2176-3314 (15 to 317); no game closed by the bounds alone; the open share follows the root's gap (+2 to 3 points per 100), not n; the root's heaviest set plays all of U\*_{≥3} in all 1,125 games; 26 minutes on one thread |
+| E6: the prover's search with the sources of layer 3 and up free (`exact --fix-low 1`) against the same with the upper part fixed to U\* (`--fix-upper 1`), with two counters, on 25 games of gap 364-603 | [upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | open: prepared, waiting for approval of the cloud run | criterion fixed in advance (B/D ≤ 1.2 on 90% of the games, never above 2, branching on those sources at ≤ 5% of the nodes); at 1575 and 1584 on the laptop B and D have the same nodes and neither counter fires; one `c8g.4xlarge` for one to one and a half hours, about $0.40 at spot ([RUNBOOK 10.1](../tools/cloud/RUNBOOK.md#101-e6-does-leaving-the-sources-free-cost-the-provers-search-anything)) |
+| Theorem B's roles in the prover's proofs (`exact --fix-low 1`: the largest prime and U\*_2 forced, the other numbers of layers 1 and 2 barred) | [upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | open: measured on two games | the plain proof's nodes within 2.1% and half the time a node at 1575 and 1584 (19.8 s against 36.1 s for 1575 on the laptop): the parity solves have fewer free elements; a candidate for the prover's next campaign, a proof as before since Theorem B is a theorem |
+| E9(a): a counterexample hunt for U at the 20 games of largest gap past 2175: the frame solver on the board without each open source, from an incumbent worth the recorded score (`examples/hunt.rs`, `sacrifice::hunt`) | [upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | open: prepared, waiting for approval of the cloud run | 4,499 pairs; a pair's cost follows its margin (under 6 s to 781, 1-3 minutes at 835-899, beyond 5 minutes from 959, one thread; `bench/hunt/`); about 400 vCPU-hours, a `c8g.16xlarge` for 7 hours, about $5 at spot ([RUNBOOK 10.2](../tools/cloud/RUNBOOK.md#102-e9a-a-counterexample-hunt-at-the-games-of-largest-gap)); a hit is a counterexample |
 
 ### The Python heuristics project
 
@@ -403,6 +407,7 @@ single-sacrifice route) have their row above.
 | [Boards past 4095](#boards-past-4095-2026-10) | what limits the boards to 4095, how far does one more width take them, and what does a board past 4095 cost? | built: boards to 8191 at 128 words, every board's frames and ranks scanned to bound the rest (9 frames, 5 block words); nothing changes to 4095; a node at 4100 1.1% dearer at 128 words than at 72, so no width between | 4316168 |
 | [The frame model on a proven footing](#the-frame-model-on-a-proven-footing-2026-10) | are the frame model's assumptions theorems, and what is left?  Steps E1-E4 of the consultation of 2026-10-15 | yes, given clean numbering, which holds on every board to 8191 and setup now checks: Lemma Ω and Theorems L, B and M in THEORY.md, the census and two test files with no exception; left: U, some optimal game plays U\*_{≥3} | 631e027, a122f43, de63aba, d7a322a, 5e44ac6 and the write-up after them |
 | [A bound over GF(2) and GF(3) signed frame matroids](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) | does the LP over the GF(2) frame matroids and GF(3) signed frame matroids (signings made for the cores its columns meet) close a share of the root's GF(2) gap that holds with n (A1's E1, with E1n at the probe's nodes)? | yes: 0.62 of the gap at n ≥ 1700, no trend in n (+1.0 ± 2.6 points per 100 n), passing its kill criteria strongly; fixed signings close little; 86-98% of the probe's nodes GF(2) leaves open cut with node-fitted multipliers; Theorems 14-15 in THEORY.md | 7666072 to 1e12c77 and the entry (no solver change) |
+| [The upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | which members of U\*_{≥3} do barred parity bounds certify past 1300 (E5), and are the cloud measurements E6 (free sources in the prover) and E9(a) (a counterexample hunt) ready? | E5: 85-93% of the members certified, no game closed, the open share following the root's gap; E6 and E9(a) built, tested and calibrated, each under $1 or about $5 at spot, waiting for approval | abcfb18, 4076730, 8afefaa and the write-up |
 
 ## The port and its first improvements
 
@@ -5739,3 +5744,95 @@ first), and THEORY.md now proves the bound (Theorems 14 and 15).
    test 4 lives in `cores.rs`'s tests.
 9. 66 roots, not 67 (1475 is a multiple of 25).  The census reports `det0` for square cores and the rank deficiency over
    GF(3) for all, and adds whether the plain signing sees each core.
+
+## The upper part game by game, and two cloud runs prepared (2026-10)
+
+*Question.*  Steps 2B to 2D of the theory track's second consultation (2026-10-15).  Since the entry above, the
+prover's proofs reach 2175, so U holds there; every game past 2175 that rests on the frame model rests on U.  (E5)
+For every game of 1301 to the end of the chain that rests on the model, which members of U\*_{≥3} do barred parity
+bounds certify, and how many stay open?  (E6) Does the prover's search cost more with the sources of layer 3 and up
+free than with the whole upper part fixed to U\*: is the integrated search, which leaves the open sources optional,
+worth building?  (E9(a)) Does the frame solver find a game above the recorded score on the board without an open
+source, at the games of largest gap past 2175?  E5 ran on the laptop; E6 and E9(a) are built, tested and calibrated on
+the laptop and wait for approval to run on EC2 ([RUNBOOK section
+10](../tools/cloud/RUNBOOK.md#10-the-theory-tracks-measurements-e6-and-e9a)).
+
+*E5* (commit abcfb18 and the data).  The prover's `upper` (`src/upper.rs`, `src/bin/upper.rs`): per game that rests on
+the model (neither at its ceiling nor given by the prime formula), the roles of Theorem B (the largest prime forced
+and every other prime barred, U\*_2 forced and every other source of layer 2 barred, and from 187 on, where it checks
+that U\*_2 spans every prime up to n/2, every number of layer 2 up to n/2 barred), then each member u of U\*_{≥3}
+barred in turn; u is certified when the parity bound is at most the recorded score V (every set beating V that obeys
+Theorem B plays u), open otherwise, with its margin.  Its tests: on boards to 60 every member certified against
+V − 1, V − 2 and V − 5 is in every playable set beating that claim (found by enumeration with the matching bound
+alone; 1,403 checks), Theorem B's roles hold for every optimal set there and every recorded game to 1300, and the
+figures at 600 are the consultation's.  It reproduces the consultation's scratch figures where they overlap (600, 1000,
+1300, 2000).  The committed chain's 1301-2175 (490 games need it, 300 s) and the copy of the EC2 chain's results of
+2026-10-15, 2176-3314 (635, 1,272 s), one thread on the laptop; the table by band is in [the prover's
+README](../prover/README.md#the-upper-part-game-by-game):
+
+| | 1301-2175 | 2176-3314 |
+|---|---|---|
+| games resting on the model | 490 | 635 |
+| members of U\*_{≥3} per game | 371 to 640 | 641 to 993 |
+| open, in all | 18,596 of 247,482 (7.5%) | 77,195 of 518,992 (14.9%) |
+| open per game | 1 (1305) to 102 (2172) | 15 (2610) to 317 (2346) |
+| certified per game | 84% to 99.7% (median 93%) | 54% to 98% (median 85%) |
+| the open share against the root's gap | +3.1 points per 100 (R² 0.73) | +2.0 points per 100 (R² 0.73) |
+| the open members' layers | 3: 52%, 5: 21%, 4: 19%, 6-10: 8% | 3: 58%, 5: 27%, 4: 9%, 6-11: 7% |
+
+No game is certified whole, and the open share follows the root's gap, not n (it falls with the gap at 2600-2699).
+The root's gap with layers 1 and 2 fixed is the solver's GF(2) gap at the root on all 400 games past 2175 that
+[the gap past 2175](#the-gap-past-2175-2026-10) measured, and the root's heaviest parity set plays all of U\*_{≥3} in
+every one of the 1,125 games, so no game is flagged.  The fixed set of the integrated search (U\* less a game's open
+members) is in these files.  THEORY.md's "What is known of U" now cites them; its scratch figures and the sentence on
+searches closing U to 1500, which the prover's proofs to 2175 supersede, are gone.
+
+*E6, prepared* (commit 4076730).  `exact --fix-low 1` searches from Theorem B's roles (still a proof: every optimal set
+obeys them) and `--fix-low 1 --fix-upper 1` from the roles that also fix the upper part to U\* (the frame model's
+problem on the whole board, written `"search":"upper_fixed"` so that no tool counts it as a proof); every searched line
+counts the nodes that branched on a source of layer 3 or up (`branched_on_sources`) and those whose roles bar a member
+of U\*_{≥3} (`barred_upper`), with `game::Prover::watch`, which changes no tree; checkpoints are kept apart by kind.
+`summarize.py sources B D` prints the table and the criterion fixed in advance (B/D ≤ 1.2 on at least 90% of the games
+and never above 2, and branching on those sources at most 5% of B's nodes: then build the integrated search's stages 2
+and 3; otherwise stage 1 only, and stage 2 on two games first); `prover.sh --list` runs `exact` on given games in its
+resumable passes, with no check at the end.  Tests: the counters change nothing (verdicts and nodes), Theorem B's roles
+keep every proof and every optimum of 187-700 that needs a search, and with the upper part fixed both counters are 0.
+A plain run of 1575 has the committed line's 16,801 nodes.  On the laptop, one thread:
+
+| n | gap | plain proof (section 3) | B: nodes, s | D: nodes, s | B's counters |
+|---|---|---|---|---|---|
+| 1575 | 364 | 16,801 nodes, 36.1 s (laptop) | 16,651, 19.8 | 16,651, 19.4 | 0, 0 |
+| 1584 | 400 | 25,981 nodes, 60 s (Graviton4) | 26,516, 30.8 | 26,510, 30.8 | 0, 0 |
+
+Two games say nothing about the criterion, but one thing is plain already: **Theorem B's roles halve the time of a
+node** at the same nodes within 2.1%, since the parity solves have the primes and the numbers of layer 2 settled.  The
+prover's next campaign can run with `--fix-low 1` and stay a proof.  Over 56 searched games of 187-700 (the test) B
+took 9,405 nodes and D 9,398, with 3 nodes branching on a source of layer 3 or up and 6 barring a member of
+U\*_{≥3}.  The cloud run: the 25 games of the design (gaps 364 to 603, proofs of 0.6 to 30 minutes, 4.8 thread-hours in
+the run of 1301-2175), B and D, on one `c8g.4xlarge`: one to one and a half hours, about $0.40 at spot, $1 on demand.
+
+*E9(a), prepared* (commit 8afefaa).  `sacrifice::hunt(n, hole, claim, ...)` searches the board without `hole` with
+the frame model from a handicapped incumbent worth claim − in_the_bag with an empty payload (the soundness tests'
+method), so it looks only for promotion sets beating the claim; a set found becomes a game, refereed on the punctured
+board, and `examples/hunt.rs` replays it on the whole board too (a source is nobody's factor, so a game without it is a
+game of n).  The search's payload helpers are public for it (`search::payload_of`, `set_of_payload`).  Tests: on 624
+pairs (every source of the boards 30, 37, ..., 149) the hunt finds a game at one below the punctured board's exact
+optimum and nothing at it, the game replaying on the whole board; on every board to 30 and every hole it agrees with
+the brute force.  `examples/hunt.rs` takes the 20 games of largest gap that need a certificate and each one's open
+members (`--per-game`, `--list` to choose otherwise), runs `--jobs` pairs at once on `--threads` each with a time
+limit, appends a line per pair, resumes, summarizes, and exits 2 on a counterexample; `tools/cloud/hunt.sh` runs it
+under `run.sh`'s deadline, saves and power-off, and `spot-watch.sh` now stops it too.  Calibration, one laptop thread
+(`bench/hunt/`): at 1302 the three open members end in milliseconds (U is proven there); at 3311 (gap 1303) and 2346
+(gap 1346) the cost of a pair follows its margin, not the gap: under 6 seconds to margin 781, 51 to 182 seconds at 835
+to 899, and every pair from 959 to 1215 out of its 3 to 5 minutes; no counterexample.  The 20 games (3300,
+3174-3176, 3104, 2346, 3304, 3305, 3309, 2340, 3311, 3102, 3103, 3312, 3172, 3173, 3105, 3107, 3168, 3171; gaps 1257 to
+1443) have 4,499 open members, 578 of margin above 900; at 4 threads and 10 minutes a pair, about 400 vCPU-hours: a
+`c8g.16xlarge` for about 7 hours, $5 at spot, $18 on demand, with a few hundred timeouts among the largest margins.
+The punctured boards are numbered by the present (breadth-first) numbering, which the census did not check on them;
+that can only hide games from the hunt, never invent one, since every game found is refereed.
+
+*What it changes.*  The figures of U's certification are now committed data rather than scratch measurements, and they
+say that the barred bounds alone close no game: the certificate needs a search of the open sources, at 15 to 317 a game
+past 2175, which is what the integrated search (stage 1 next, after numbering by layer) is for.  E6 decides how far to
+build it and E9(a) is the cheap early warning if U fails; both wait for approval.  Theorem B's roles halve the
+prover's node at no cost to its proofs.

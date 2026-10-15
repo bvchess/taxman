@@ -284,7 +284,7 @@ fn search_forgetting<const W: usize>(
     let outcome = engine::run(cfg, start, &header, |_| TaxSearcher::new(&space))?;
     // The engine's elapsed time includes the runs before a resume; what it counts beyond this call is theirs.
     let earlier_runs = outcome.elapsed.saturating_sub(engine_start.elapsed());
-    let promotions = get_bits(&outcome.payload);
+    let promotions = set_of_payload(&outcome.payload);
     assert_eq!(promotions.sum(), outcome.best, "the incumbent's payload does not match its value");
     let time = t0.elapsed();
     Ok(SearchResult {
@@ -316,11 +316,18 @@ pub fn seed_survivors_sum<const W: usize>(prepared: &Prepared<W>, seed: &Bits<W>
     surviving(prepared, seed).sum()
 }
 
-/// `set` as the payload of an incumbent, which is how the searchers encode one ([`put_bits`]).
-fn payload_of<const W: usize>(set: &Bits<W>) -> Vec<u8> {
+/// `set` as the payload of an incumbent, which is how the searchers encode one ([`put_bits`]): a caller that starts the
+/// engine itself ([`engine::run`] with a [`TaxSearcher`]) gives its starting incumbent this payload.
+pub fn payload_of<const W: usize>(set: &Bits<W>) -> Vec<u8> {
     let mut payload = Vec::new();
     put_bits(&mut payload, set);
     payload
+}
+
+/// The promotion set that `payload` encodes, the inverse of [`payload_of`]: the incumbent of an engine's
+/// [`Outcome`](engine::Outcome).  The payload must be exactly `8·W` bytes, as every searcher's incumbent is.
+pub fn set_of_payload<const W: usize>(payload: &[u8]) -> Bits<W> {
+    get_bits(payload)
 }
 
 /// Offers `set` to `control` as an incumbent, worth its sum ([`Control::offer`]).
@@ -333,7 +340,7 @@ fn offer_set<const W: usize>(control: &Control, set: &Bits<W>) -> bool {
 /// soon as it is known ([`search`]).  The control must belong to a search of width `W`, whose payloads are promotion
 /// sets (as [`offer_seed`] makes them).
 pub fn best_so_far<const W: usize>(control: &Control) -> Option<Bits<W>> {
-    control.best().map(|(_, payload)| get_bits(&payload))
+    control.best().map(|(_, payload)| set_of_payload(&payload))
 }
 
 /// Whether `set` is worth `ceiling`, the ceiling on the promotion sum, or more, which proves it optimal.
@@ -357,7 +364,7 @@ fn resume_point<const W: usize>(
     if head.payload.len() != 8 * W {
         return Err(at(format!("its incumbent has {} bytes, not {}", head.payload.len(), 8 * W)));
     }
-    let kept = get_bits(&head.payload);
+    let kept = set_of_payload(&head.payload);
     let fits = kept.is_subset(&prepared.candidates)
         && prepared.model.promote_all_using(&mut Scratch::new(), &prepared.root, &kept).is_some();
     if !fits {

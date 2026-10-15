@@ -1311,13 +1311,17 @@ or by the prime formula rests on the game before it, not on the model.
   says: some optimal game plays every source of four or more prime
   factors, and every source of layer 3 that greedy keeps.
 * The barred parity bounds (Theorem 10, with layers 1 and 2 fixed by
-  Theorem B and one member of U\*_{≥3} barred) certify most members of
-  U\*_{≥3} game by game: all but 4 of the 161 at 600, all but 12 of 281
-  at 1000, 3 of 371 at 1300, 69 of 587 at 2000 and 102 of 641 at 2175,
-  the open share growing with the root's gap.  A search on the whole
-  board of the rest closes U at every n tried to 1500.  (Measured for
-  the consultation behind this section, with scratch code; the
-  register of rust/docs/EXPERIMENTS.md has the row.)
+  Theorem B and one member u of U\*_{≥3} barred) certify most members of
+  U\*_{≥3} game by game: when the bound is at most the recorded score V,
+  every set beating V that obeys Theorem B plays u.  Every game leaves
+  some open: over the 490 games of 1301..2175 that rest on the frame
+  model, 7.5% of the members (1 to 102 a game, 84% to 99.7% certified),
+  and over the 635 of the EC2 chain's 2176..3314, 14.9% (15 to 317 a
+  game, 54% to 98% certified), the open share growing with the root's
+  gap by 2 to 3 points per 100.  The root's heaviest set plays all of
+  U\*_{≥3} in every one of these games.  (`rust/prover`, `bin/upper.rs`;
+  the data in `rust/prover/data/upper_*.jsonl` and the table in its
+  README, section 3.)
 
 *Where a proof stops.*  Take an optimal S without U\*_{≥3}, and d the
 largest source where S and U\* disagree, in layer k ≥ 3.  If d ∈ S ∖ U\*,
@@ -1817,7 +1821,7 @@ and the adversarial experiments: `rust/prover/README.md`.
 | Every optimal set holds the largest prime alone in layer 1 and exactly U\*_2 among the sources of layer 2, and its numbers of layer 2 up to n/2 keep U\*_2 a forest (Theorem B) | every game of optimal.json (2..1300), `results/strict.jsonl` (2..2175) and the chain 2176..2276; every optimal set the prover enumerated (987 sets of 2..989, 57 of 798..1019 with the upper part fixed); every optimal set of 2..48 by exhaustive search; 0 exceptions; numbers of layer 2 up to n/2 only on 76 boards, all ≤ 186 (`rust/tests/bottom_layers.rs`) | proven |
 | N: the numbering of the frames is clean | every board 2..8191, every board the solver supports (the census, check C); frame h is the frames with freedoms of layer 3 + h (2 + h on 80 boards ≤ 186); setup refuses a board without it | checked per board, on all of them |
 | Given N, U\* ∪ L is playable iff L is a promotion set of the frame solver's root problem, and weighs in_the_bag + ΣL (Theorem M) | every set of every board ≤ 100 both ways (11,635 sets; 101..120, 167,681, in an ignored test); random sets both ways on boards 60..1300 (and 2000..8191, ignored); no candidate lists a back claim's factor, none is in frame 0, every one has a home, U\* is an independent greedy's, on every board to 8191 (the census, checks D-G); the true near misses the candidate filter alone keeps out, 27 boards to 2000 (`rust/tests/model_exact.rs`) | proven (given N) |
-| U: some optimal set contains U\*_{≥3}; with N, the frame solver's answer is opt(n) iff U holds at n (the corollary) | every n ≤ 2175 (the prover's proofs on the whole board); the strong form in every game enumerated; barred parity bounds certify 84-99% of U\*_{≥3} per game, searches close the rest at every n tried to 1500 | open; holds to 2175 |
+| U: some optimal set contains U\*_{≥3}; with N, the frame solver's answer is opt(n) iff U holds at n (the corollary) | every n ≤ 2175 (the prover's proofs on the whole board); the strong form in every game enumerated; barred parity bounds certify 84-99.7% of U\*_{≥3} per game to 2175 and 54-98% on the EC2 chain's 2176..3314, and close no game alone (`rust/prover/data/upper_*.jsonl`) | open; holds to 2175 |
 | opt(n) equals the recorded score: the frame model's answer is the true optimum | the prover's exact searches on the whole board (playability theorems, the Franklín–Moniot and parity bounds, the ceiling and the prime formula; `rust/prover`, section 3): every n = 2..2175, the whole committed chain | verified (exact, on the whole board) to 2175 |
 | Promotable sets are independent in every signed frame matroid, over any field and any nonzero entries; with the GF(2) matroids they make a Lagrangian bound L(λ) valid for every λ | every promotable set of every board with ≤ 22 candidates, and the optimal and 100 random maximal promotion sets of every non-prime board of 137-400, independent for the plain and five random GF(3) signings of every frame (6.4 million pairs); 14,472 promotion sets at every 25th board of 400-2175 independent in 4,320 signed matroids, column-sum signings among them; L never below P* at 309 roots of 2-400 (6,180 random multipliers) and 72 of 400-2175 (1,440), and equal to the GF(2) bound at zero; every bound of the fields study at least P* (66 roots, 330 families) and at least the best completion at the probe's nodes where it is known | proven (Thms 14, 15) |
 | opt(n) equals the recorded score: the frame model's answer is the true optimum | the prover's exact searches on the whole board (playability theorems, the Franklín–Moniot and parity bounds, the ceiling and the prime formula; `rust/prover`, section 3): every n = 2..1300, the committed chain to there (1301..2175 pending) | verified (exact, on the whole board) to 1300 |

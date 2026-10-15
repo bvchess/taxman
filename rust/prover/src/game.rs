@@ -603,6 +603,17 @@ pub enum Verdict {
     Paused,
 }
 
+/// Counters of the nodes that touch two sets of numbers (see [`Prover::watch`]); they change nothing in the search.
+#[derive(Clone, Debug, Default)]
+pub struct Watch {
+    branch: Vec<bool>,
+    barred: Vec<bool>,
+    /// Nodes that branched on a set holding a free number of the first set.
+    pub branching: u64,
+    /// Nodes whose roles, as the node received them, bar a number of the second set.
+    pub barring: u64,
+}
+
 /// The branch and bound.  Besides the bound and the conflict branching described at the top:
 ///
 /// * **Forced picks.**  For each free pick of the matching, the optimal dual bounds the matching with that pick
@@ -629,6 +640,11 @@ pub enum Verdict {
 ///   partitioned by the first free number on which they disagree with P, taking the numbers outside P first
 ///   (child j forces the j-th of them and bars those before it), then P's own (all outside P barred, child j bars
 ///   the j-th member of P and forces those before it: subsets of P, so lighter than P).
+/// * **Watching** (with [`watch`](Self::watch)).  Two counters that change nothing in the search, given two sets of
+///   numbers.  [`branching`](Watch::branching) counts the nodes that branched on a set holding a free number of the
+///   first set (the numbers its decisions are about: a conflict's free members, or in enumeration the split on the
+///   set found), and [`barring`](Watch::barring) the nodes whose roles, as the node received them from its parent
+///   or unit, bar a number of the second set.
 pub struct Prover<'a> {
     board: &'a Board,
     bound: MatchingBound,
@@ -658,6 +674,8 @@ pub struct Prover<'a> {
     limit: usize,
     /// Raise the target to each set found and go on (see [`optimize`](Self::optimize)).
     optimizing: bool,
+    /// The counters of [`watch`](Self::watch), if it is on.
+    pub watch: Option<Watch>,
 }
 
 /// The Lagrangian matching: weights scaled by `scale`, picks penalized by the multipliers of their *active*
@@ -741,7 +759,19 @@ impl<'a> Prover<'a> {
             found: Vec::new(),
             limit: 1,
             optimizing: false,
+            watch: None,
         }
+    }
+
+    /// Turns on the counters of [`Watch`], which change nothing in the search: `branch` and `barred` flag numbers
+    /// 0..=n.  [`branching`](Watch::branching) counts the nodes that branched on a set holding a free number
+    /// flagged in `branch`, and [`barring`](Watch::barring) those whose roles, as the node received them, bar a
+    /// number flagged in `barred`.  Read them from [`watch`](Self::watch).
+    pub fn watch(mut self, branch: Vec<bool>, barred: Vec<bool>) -> Self {
+        let size = self.board.n as usize + 1;
+        assert!(branch.len() == size && barred.len() == size, "one flag per number 0..=n");
+        self.watch = Some(Watch { branch, barred, branching: 0, barring: 0 });
+        self
     }
 
     /// Lists the playable sets beating the target instead of stopping at the first: the search stops at the
@@ -1008,6 +1038,10 @@ impl<'a> Prover<'a> {
         if self.nodes > self.budget {
             return Verdict::Budget;
         }
+        if let Some(w) = self.watch.as_mut() {
+            w.barring +=
+                u64::from(w.barred.iter().zip(&roles).any(|(&flagged, &role)| flagged && role == Role::Barred));
+        }
         if !self.propagate(&mut roles) {
             return Verdict::Proven;
         }
@@ -1159,6 +1193,9 @@ impl<'a> Prover<'a> {
                 decisions
             }
         };
+        if let Some(w) = self.watch.as_mut() {
+            w.branching += u64::from(decisions.iter().any(|&(c, _)| w.branch[c as usize]));
+        }
         if decisions.is_empty() {
             return Verdict::Proven;
         }

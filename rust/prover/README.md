@@ -313,6 +313,62 @@ projection's order of the games put 12 of the 16 dearest among its first 16.
 [EXPERIMENTS.md](../docs/EXPERIMENTS.md#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) has the
 run's account and what it says about the projection's model.
 
+### The upper part, game by game
+
+The frame solver's answer for a game that rests on its search is opt(n) exactly when U holds at n: some optimal set
+plays U\*_{≥3}, the members of U\* with three or more prime factors
+([THEORY.md](../../heuristics/THEORY.md#the-upper-part)).  `src/bin/upper.rs` (`src/upper.rs`) asks the parity bound
+which of those members every set beating the recorded score V must play.  It fixes layers 1 and 2 as Theorem B says
+every optimal set has them (the largest prime and no other; U\*_2 among the sources of layer 2; from 187 on, where
+U\*_2 spans every prime up to n/2, which it checks, no number of layer 2 up to n/2), bars one member u at a time, and
+calls u *certified* when the bound is then at most V: every set that beats V and obeys Theorem B plays u, so if
+opt(n) > V every optimal set plays every certified member.  The others are *open*, with the bound's margin over V.
+Certified members can be fixed in a search that leaves the open ones optional (the integrated search of the theory
+track), which is why the file is kept: U\* less a game's open members is that search's fixed set.  The tests check the
+certificates against every playable set beating V − 1, V − 2 and V − 5 on boards to 60, and Theorem B's roles
+against every optimal set there and every recorded game to 1300.  Only the games that rest on the frame model need it
+(`"needs":1`: neither at the ceiling nor given by the prime formula).
+
+Two files, one thread on the laptop: `data/upper_1301_2175.jsonl`, the committed chain (875 games, 490 of them
+needing it; 300 s), and `data/upper_2176_3314.jsonl`, the copy of the EC2 chain's results taken on 2026-10-15 that
+[the gap past 2175](../docs/EXPERIMENTS.md#the-gap-past-2175-2026-10) measured (1,139 games, 635 needing it; 1,272 s,
+4.1 s for the slowest game).  By band (the open members and the margins of each game; the share is of all members):
+
+| n | games | the root's gap (mean) | members of U\*_{≥3} | open (least, median, most) | open | margin (median, largest) |
+|---|---|---|---|---|---|---|
+| 1301-1399 | 60 | 297 | 371-400 | 1, 12, 47 | 4.5% | 86, 322 |
+| 1400-1499 | 58 | 447 | 401-432 | 19, 38, 59 | 9.2% | 110, 388 |
+| 1500-1599 | 58 | 458 | 433-467 | 4, 42, 65 | 8.8% | 127, 432 |
+| 1600-1699 | 53 | 340 | 467-496 | 14, 32, 58 | 6.5% | 77, 398 |
+| 1700-1799 | 55 | 313 | 497-525 | 5, 33, 62 | 5.9% | 66, 401 |
+| 1800-1899 | 54 | 433 | 525-556 | 11, 77, 86 | 11.6% | 155, 480 |
+| 1900-1999 | 52 | 294 | 558-587 | 9, 22, 68 | 4.4% | 68, 422 |
+| 2000-2099 | 56 | 374 | 587-619 | 11, 43, 69 | 6.3% | 102, 530 |
+| 2100-2175 | 44 | 527 | 620-640 | 30, 68, 102 | 10.3% | 144, 691 |
+| 2176-2299 | 73 | 724 | 641-681 | 59, 89, 152 | 14.1% | 221, 910 |
+| 2300-2399 | 56 | 936 | 681-710 | 88, 112, 317 | 20.8% | 298, 1270 |
+| 2400-2499 | 60 | 745 | 711-741 | 62, 109, 171 | 14.8% | 247, 1003 |
+| 2500-2599 | 58 | 793 | 741-774 | 78, 116, 163 | 14.9% | 262, 1004 |
+| 2600-2699 | 55 | 515 | 774-807 | 15, 69, 105 | 7.5% | 141, 645 |
+| 2700-2799 | 49 | 817 | 808-844 | 113, 129, 142 | 15.8% | 289, 796 |
+| 2800-2899 | 53 | 691 | 845-871 | 97, 110, 127 | 13.0% | 215, 708 |
+| 2900-2999 | 48 | 660 | 871-899 | 59, 115, 135 | 11.7% | 205, 774 |
+| 3000-3099 | 59 | 915 | 899-925 | 120, 134, 194 | 15.3% | 336, 1163 |
+| 3100-3199 | 58 | 1118 | 925-959 | 133, 170, 255 | 18.6% | 435, 1312 |
+| 3200-3314 | 66 | 1030 | 959-993 | 113, 150, 246 | 16.1% | 372, 1355 |
+
+* **No game is certified whole**: every one leaves members open, from 1 (1305) to 102 (2172) to 2175 and from 15
+  (2610) to 317 (2346) past it; 7.5% of the members in all to 2175 (18,596 of 247,482), 14.9% past it (77,195 of
+  518,992).
+* **The open share follows the root's gap, not n**: 3.1 points more per 100 of gap to 2175 and 2.0 past it (R² 0.73
+  in each file), and it falls back with the gap (2600-2699).  The root's gap is the one the solver's search costs by:
+  with layers 1 and 2 fixed it equals the solver's GF(2) gap at the root on all 400 games past 2175 that both
+  measured (`../bench/wall/gaps_chain.jsonl`).  The margins grow with it: the largest is close to the gap.
+* **The root's heaviest set plays all of U\*_{≥3} in every one of the 1,125 games**, as at every root measured
+  before; no game is flagged.
+* **The open members are mostly of layer 3** (52% and 58%), then layer 5 (21%, 27%) and 4 (19%, 9%), the rest in
+  layers 6 to 11.
+
 ## 4. Adversarial search: what protects greedy
 
 `src/adversary.rs` builds Taxman-shaped instances, each keeping one thing from the real game and varying
@@ -622,6 +678,12 @@ bash tools/adversary_campaign.sh                                                
 ../tools/cloud/prover.sh 1301 2175                # `exact` over a range in resumable passes, all CPUs, then the check
 tools/summarize.py check 1301 2175 data/exact_parity_2_1300.jsonl data/exact_parity_1301_2175.jsonl
                                     # every n in 2..2175 proven, scores recorded
+./target/release/upper --from 1301 --to 2175 --out data/upper_1301_2175.jsonl          # one thread, 5 minutes
+./target/release/upper --from 2176 --to 3314 --results ../results/strict.jsonl --results CHAIN.jsonl \
+    --out data/upper_2176_3314.jsonl          # CHAIN.jsonl: the EC2 chain's results (21 minutes)
+./target/release/exact --list 1575,1584 --fix-low 1 --out B.jsonl                 # E6: the sources of layer >= 3 free
+./target/release/exact --list 1575,1584 --fix-low 1 --fix-upper 1 --out D.jsonl   # ... and fixed to U*
+tools/summarize.py sources B.jsonl D.jsonl          # E6's table and criterion (RUNBOOK section 10 for the cloud run)
 tools/summarize.py span|star|exact|cost|adversary|optsets|moves FILE...
 tools/crosscheck_optsets.py data/optsets_2_989.jsonl --max 57 --budget 120     # theory-free, about 8 minutes
 tools/crosscheck_greedy.py data/span_2_100000.jsonl.gz --max 1000
@@ -649,8 +711,11 @@ gzipped where large (`gunzip -k` to resume into it).
 * The frame model's individual assumptions are no longer open: they are theorems given a per-board fact that holds
   on every board to 8191 ([THEORY.md](../../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains),
   Theorems B and M), and what the model's answers rest on is one statement, U: some optimal game plays every source of
-  three or more prime factors that setup keeps.  The prover's proofs establish U at every n ≤ 2175; certifying it
-  game by game beyond (barred parity bounds, then a search of the members they leave open) is the next step.
+  three or more prime factors that setup keeps.  The prover's proofs establish U at every n ≤ 2175.  Beyond, the
+  barred parity bounds certify 85% of those sources per game to 3314 but close no game alone
+  ([section 3](#the-upper-part-game-by-game)); the rest needs a search that leaves the open sources optional, whose
+  cost against the search with them fixed is the measurement E6 (`exact --fix-low 1` against `--fix-upper 1`,
+  prepared, [RUNBOOK section 10](../tools/cloud/RUNBOOK.md#10-the-theory-tracks-measurements-e6-and-e9a)).
 * Whether every optimal game's upper part is U\*.  Theorem 8 settles the upper half alone; for the whole game, a
   frontier argument would start from an optimal S whose upper part S_U is not U\*: termwise domination puts the
   largest disagreement d in U\* ∖ S_U, and S + d is unplayable, so the question is whether some repair costs less
