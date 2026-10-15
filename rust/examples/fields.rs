@@ -1,12 +1,14 @@
 //! The fields study: a bound on the promotions that adds GF(3) signed frame matroids to the two GF(2) frame matroids
-//! and couples them by Lagrangian decomposition (avenue A1 of `docs/AGENDA.md`, experiment E1; the record is
+//! and couples them by Lagrangian decomposition (avenue A1 of `docs/AGENDA.md`, experiments E1 and E2; the record is
 //! `docs/EXPERIMENTS.md`, "A bound over GF(2) and GF(3) signed frame matroids").  `common/dw.rs` has the bound and
 //! why it is valid (`heuristics/THEORY.md`, Theorems 14 and 15), `common/gf3.rs` the signed
-//! matroids, `common/cores.rs` the cores and their signings, `common/lp.rs` the master's simplex.
+//! matroids, `common/cores.rs` the cores and their signings, `common/lp.rs` the master's simplex, `common/fit.rs`
+//! the fits saved to disk.
 //!
 //! ```text
-//! cargo run --release --example fields -- roots --known results/strict.jsonl [--arms gf2,f1,f1r1,f1r3,cores,f1cores]
-//!     [--rounds 40] [--per-frame 8] [--cores-per-frame 4] [--pricings 3000] [--seconds 120] [--fixed-seconds 30]
+//! cargo run --release --example fields -- roots --known results/strict.jsonl [--known FILE...]
+//!     [--arms gf2,f1,f1r1,f1r3,cores,f1cores,f1cores16] [--rounds 40] [--per-frame 8] [--cores-per-frame 4]
+//!     [--pricings 3000] [--seconds 120] [--fixed-seconds 30] [--fit-mode certified|search] [--save-fit DIR]
 //!     [--frames 1,2,3] [--defaults random|ones] [--out FILE] [--census FILE] N|A-B|A-B/STEP...
 //! cargo run --release --example fields -- nodes --known results/strict.jsonl [--modes root,node] [--seconds 10]
 //!     [--root-seconds 120] [--exact bench/matroid/nodes_exact.jsonl] [--out FILE] FIXTURE...
@@ -14,15 +16,20 @@
 //! ```
 //!
 //! Games are set up as `taxman solve` sets them up; `P*`, the optimum promotion sum, is the known score less
-//! `in_the_bag` (`--known` adds results files to the built-in table, which ends at 1300).  `A-B` stands for its games
+//! `in_the_bag` (`--known` adds a results file to the built-in table, which ends at 1300, and may be given several
+//! times: the later files' games replace the earlier ones' and must score the same).  `A-B` stands for its games
 //! that are not prime, `A-B/STEP` for A, A + STEP, ... up to B.  Every command writes one JSON object per line, to
 //! `--out` (appended, and a game or node already there is skipped, so a run resumes) or to standard output.
 //!
 //! * **roots**: per game and *arm* (the family of extra matroids), the bound and its bracket (see `common/dw.rs`):
 //!   `gf2` none (the GF(2) bound); `f1` the plain signing (all values 1) of each frame of `--frames`; `f1r1`, `f1r3`
 //!   that and one or three random signings per frame; `cores` the core-derived signings that the separation adds
-//!   alone; `f1cores` (the main arm) the plain signings and the core-derived ones.  `--seconds` budgets the two core
-//!   arms, `--fixed-seconds` the others.  With `--census`, every core the main arm finds, with its census data.
+//!   alone; `f1cores` (the main arm) the plain signings and the core-derived ones, at most `--per-frame` core-derived
+//!   signings a frame, and `f1cores16` (any `f1cores` followed by a number) the same with that many.  `--seconds`
+//!   budgets the core arms, `--fixed-seconds` the others.  `--fit-mode search` skips the exact checks (a fit that is
+//!   not certified: `dw::FitMode`).  With `--census`, every core the main arm finds, with its census data.  With
+//!   `--save-fit DIR`, the fit of each `f1cores` arm goes to `DIR/n{N}.json` (`DIR/n{N}.{arm}.json` for the others;
+//!   the format is `common/fit.rs`'s).
 //! * **nodes**: per node of a `.nodes` fixture of `testdata/perf` (target `P* − sum(promoted)`, cut when the bound is
 //!   at most it), the bound in mode `root` (the main arm's final signings and multipliers at the root, one evaluation
 //!   at the node's matroids) and `node` (the node's own master and separation from those signings, `--seconds` a
@@ -41,6 +48,9 @@ mod cores;
 #[path = "common/dw.rs"]
 mod dw;
 #[allow(dead_code)]
+#[path = "common/fit.rs"]
+mod fit;
+#[allow(dead_code)]
 #[path = "common/fixtures.rs"]
 mod fixtures;
 #[allow(dead_code)]
@@ -57,7 +67,8 @@ mod lp;
 mod meet;
 
 use cores::{core_of, cores_of, frame_with, merge, primes, residual, sees, zero_one, Core};
-use dw::{bound, evaluate, Ctx, Family, Outcome, Settings, Stats};
+use dw::{bound, evaluate, Ctx, Family, FitMode, Outcome, Settings, Stats};
+use fit::SavedFit;
 use frames::{frame_matroids, is_prime, setup, Known, Rng};
 use gf3::{seed, Default3, Matroid3, Signing};
 use std::collections::{HashMap, HashSet};
@@ -85,6 +96,7 @@ struct Options {
     frames: Vec<usize>,
     out: Option<PathBuf>,
     census: Option<PathBuf>,
+    save_fit: Option<PathBuf>,
     exact: Option<PathBuf>,
     samples: usize,
     games: Vec<u32>,
@@ -105,6 +117,7 @@ fn parse() -> Result<Options, String> {
         frames: vec![1, 2, 3],
         out: None,
         census: None,
+        save_fit: None,
         exact: None,
         samples: 100,
         games: Vec::new(),
@@ -141,8 +154,16 @@ fn parse() -> Result<Options, String> {
                     other => return Err(format!("unknown defaults {other:?}")),
                 }
             }
+            "--fit-mode" => {
+                o.settings.mode = match value("--fit-mode")?.as_str() {
+                    "certified" => FitMode::Certified,
+                    "search" => FitMode::Search,
+                    other => return Err(format!("unknown fit mode {other:?}")),
+                }
+            }
             "--out" => o.out = Some(value("--out")?.into()),
             "--census" => o.census = Some(value("--census")?.into()),
+            "--save-fit" => o.save_fit = Some(value("--save-fit")?.into()),
             "--exact" => o.exact = Some(value("--exact")?.into()),
             file if o.command == "nodes" => o.files.push(file.into()),
             range => o.games.extend(games(range)?),
@@ -225,7 +246,7 @@ fn main() {
     });
     match o.command.as_str() {
         "roots" => {
-            let mut out = Output::open(o.out.as_deref(), &["n", "arm"]);
+            let mut out = Output::open(o.out.as_deref(), &["n", "arm", "mode"]);
             let mut census = o.census.as_deref().map(|p| Output::open(Some(p), &["n", "index"]));
             for &n in &o.games {
                 taxman::with_width!(n, W => roots::<W>(n, &known, &o, &mut out, census.as_mut()));
@@ -268,9 +289,14 @@ fn fixed_signings(n: u32, len: usize, frames: &[usize], plain: bool, random: usi
     out
 }
 
+/// The most core-derived signings a frame, if the arm's name gives it (`f1cores16`: 16).
+fn arm_cap(name: &str) -> Option<usize> {
+    name.strip_prefix("f1cores").and_then(|cap| cap.parse().ok())
+}
+
 /// The initial signings of `arm` and whether it separates.
 fn arm(name: &str, n: u32, len: usize, frames: &[usize]) -> (Vec<Signing>, bool) {
-    match name {
+    match if arm_cap(name).is_some() { "f1cores" } else { name } {
         "gf2" => (Vec::new(), false),
         "f1" => (fixed_signings(n, len, frames, true, 0), false),
         "f1r1" => (fixed_signings(n, len, frames, true, 1), false),
@@ -329,22 +355,33 @@ fn roots<const W: usize>(n: u32, known: &Known, o: &Options, out: &mut Output, c
         fm.independent(set).unwrap_or_else(|e| panic!("n={n}: the optimal promotions: {e}"));
     }
     let mut census = census;
+    let mode = o.settings.mode.name();
     for name in &o.arms {
-        if out.done(&format!("{n}/{name}")) {
+        if out.done(&format!("{n}/{name}/{mode}")) {
             continue;
         }
         let (signings, separate) = arm(name, n, p.root.len(), &o.frames);
         let seconds = if separate { o.settings.seconds } else { o.fixed_seconds };
-        let settings = Settings { seconds, ..o.settings.clone() };
+        let per_frame = arm_cap(name).unwrap_or(o.settings.per_frame);
+        let settings = Settings { seconds, per_frame, ..o.settings.clone() };
         let r = bound(&ctx, signings, None, separate, &settings);
         assert!(r.bound >= opt as i64, "n={n}, arm {name}: the bound {} is below P* = {opt}", r.bound);
         if name == "gf2" {
             assert_eq!(r.bound, gf2, "n={n}: the gf2 arm differs from the GF(2) bound");
         }
+        // The fit that gave the bound gives it again, and the optimal promotions are independent in its matroids.
+        let saved = SavedFit::of(n, opt, gf2, mode, &r);
+        assert_eq!(saved.bound(&ctx), r.bound, "n={n}, arm {name}: the fit does not give the bound");
         if let Some(set) = &optimal {
             assert_independent(n, &r.family, set, "the optimal promotions");
+            assert_independent(n, &Family::new(&ctx, saved.fit.signings.clone()), set, "the optimal promotions");
         }
-        out.write(&root_line(n, name, opt, gf2, &r, model, &p.root, p.root.len()));
+        if let Some(dir) = o.save_fit.as_ref().filter(|_| name.starts_with("f1cores")) {
+            let file = if name == "f1cores" { format!("n{n}.json") } else { format!("n{n}.{name}.json") };
+            saved.save(&dir.join(file)).unwrap_or_else(|e| panic!("{e}"));
+        }
+        let info = RootInfo { n, arm: name, opt, gf2, mode, per_frame, max_rank: fm.ranks.iter().copied().max() };
+        out.write(&root_line(&info, &r, model, &p.root));
         if name == "f1cores" {
             if let Some(c) = census.as_deref_mut() {
                 for (i, f) in r.cores.iter().enumerate() {
@@ -361,17 +398,23 @@ fn roots<const W: usize>(n: u32, known: &Known, o: &Options, out: &mut Output, c
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn root_line<const W: usize>(
+/// What a root's line says about the run besides its outcome.
+struct RootInfo<'a> {
     n: u32,
-    arm: &str,
+    arm: &'a str,
     opt: u64,
     gf2: i64,
-    r: &Outcome,
-    model: &FrameGraph,
-    root: &FrameSet<W>,
-    frames: usize,
-) -> String {
+    /// `certified` or `search` (`dw::FitMode`).
+    mode: &'a str,
+    /// The most core-derived signings a frame the arm was allowed.
+    per_frame: usize,
+    /// The largest rank of a frame's matroid (a block of more than 64 or 128 needs two or three words).
+    max_rank: Option<usize>,
+}
+
+fn root_line<const W: usize>(info: &RootInfo, r: &Outcome, model: &FrameGraph, root: &FrameSet<W>) -> String {
+    let RootInfo { n, arm, opt, gf2, mode, per_frame: cap, max_rank } = *info;
+    let frames = root.len();
     let gap = gf2 - opt as i64;
     let bracket = r.l_best - r.lb;
     let converged = gap > 0 && bracket <= 0.01 * gap as f64;
@@ -396,7 +439,8 @@ fn root_line<const W: usize>(
     }
     let s: &Stats = &r.stats;
     format!(
-        "{{\"n\":{n},\"arm\":\"{arm}\",\"opt\":{opt},\"gf2\":{gf2},\"bound\":{},\"lb\":{:.4},\"l_best\":{:.4},\
+        "{{\"n\":{n},\"arm\":\"{arm}\",\"mode\":\"{mode}\",\"cap\":{cap},\"max_rank\":{},\"opt\":{opt},\"gf2\":{gf2},\
+         \"bound\":{},\"lb\":{:.4},\"l_best\":{:.4},\
          \"bracket\":{bracket:.4},\"converged\":{converged},\"share\":{share},\"stop\":\"{:?}\",\"matroids\":[{}],\
          \"core_signings\":[{}],\"cores_found\":{},\"cores_assigned\":{},\"cores_skipped\":{},\
          \"cores_repeated\":{},\"gf3_loops\":{},\"rounds\":{},\"pricings_mi\":{},\"pricings_greedy\":{},\
@@ -405,6 +449,7 @@ fn root_line<const W: usize>(
          \"purged\":{},\"restarts\":{},\"checks_capped\":{},\"support\":{},\
          \"support_promotable\":{promotable},\"mass_unpromotable\":{unpromotable_mass:.5},\"checks\":{},\
          \"ms\":{:.0},\"ms_mi\":{:.0},\"ms_simplex\":{:.0}}}",
+        max_rank.map_or("null".into(), |m| m.to_string()),
         r.bound,
         r.lb,
         r.l_best,
@@ -541,12 +586,7 @@ fn nodes<const W: usize>(path: &Path, known: &Known, o: &Options, exact: &Exact,
             let (l_bound, pricings) = match mode.as_str() {
                 "root" => {
                     let fam = Family::new(&ctxn, final_signings.clone());
-                    let lam: Vec<Vec<f64>> = fam
-                        .extras
-                        .iter()
-                        .zip(&root.lambda)
-                        .map(|(ex, l)| ex.m.elems.iter().map(|x| l.get(x).copied().unwrap_or(0.0)).collect())
-                        .collect();
+                    let lam = fam.multipliers_of(&root.lambda);
                     let mut stats = Stats::default();
                     let ev = evaluate(&ctxn, &fam, &lam, &mut stats, 1);
                     (ev.value.div_euclid(dw::SCALE), 1)
@@ -980,13 +1020,27 @@ mod tests {
         for i in 0..20u32 {
             let n = 300 + i * (2175 - 300) / 19;
             let n = if is_prime(n) { n + 1 } else { n };
-            checks += taxman::with_width!(n, W => reweighted::<W>(n));
+            checks += taxman::with_width!(n, W => reweighted::<W>(n)).0;
         }
         eprintln!("test 8: {checks} checked intersections");
     }
 
-    fn reweighted<const W: usize>(n: u32) -> u64 {
-        let Some((_, p)) = setup::<W>(n) else { return 0 };
+    /// E2's check of the dispatch to `Meet<3>`: the same at the roots of 3200 (a frame of rank 128: two words), 3300
+    /// and 3400 (ranks above 128: three words), where the first is of a game past the table's.
+    #[test]
+    fn the_intersection_matches_the_reference_past_rank_128() {
+        let mut widest = 0;
+        for n in [3200u32, 3300, 3400] {
+            let (checks, rank) = taxman::with_width!(n, W => reweighted::<W>(n));
+            assert!(checks > 0, "n={n}: no intersection was checked");
+            widest = widest.max(rank);
+        }
+        assert!(widest > 128, "no board among them has a frame matroid of rank above 128");
+    }
+
+    /// The checked intersections of three reweightings at the root of `n`, and the largest rank of a frame's matroid.
+    fn reweighted<const W: usize>(n: u32) -> (u64, usize) {
+        let Some((_, p)) = setup::<W>(n) else { return (0, 0) };
         let fm = frame_matroids(&p.model, &p.root, &p.candidates);
         let ctx = Ctx::new(n, &p.model, &p.root, &fm, p.max_total as usize, 0, false);
         let fam = Family::new(&ctx, (1..4.min(p.root.len())).map(Signing::ones).collect());
@@ -1000,7 +1054,7 @@ mod tests {
                 .collect();
             evaluate(&ctx, &fam, &lam, &mut stats, 1);
         }
-        stats.checks
+        (stats.checks, fm.ranks.iter().copied().max().unwrap_or(0))
     }
 
     /// The bound on small boards with the main arm: valid, converged, the optimal promotions independent in every
@@ -1020,6 +1074,7 @@ mod tests {
             frames: vec![1, 2, 3],
             out: None,
             census: None,
+            save_fit: None,
             exact: None,
             samples: 0,
             games: Vec::new(),
@@ -1027,6 +1082,99 @@ mod tests {
         };
         for n in [300u32, 360, 420, 480] {
             taxman::with_width!(n, W => roots::<W>(n, &known, &o, &mut out, None));
+        }
+    }
+
+    /// E2's fit file: the fit of a root's run, written as text and read back (through a file as well), gives the
+    /// run's bound again at the root, with the same signings and the same text.
+    #[test]
+    fn a_saved_fit_gives_its_bound_again() {
+        let known = Known::load(&[], None).expect("the built-in optimum table");
+        let dir = std::env::temp_dir().join(format!("fields-test-{}", std::process::id()));
+        let mut core_signings = 0;
+        for n in [600u32, 750, 900] {
+            core_signings += taxman::with_width!(n, W => saved_fit::<W>(n, &known, &dir));
+        }
+        std::fs::remove_dir_all(&dir).ok();
+        assert!(core_signings > 0, "no board had a core-derived signing to save");
+    }
+
+    /// Fits the root of `n` (the main arm), saves and loads the fit, and checks what comes back; the number of
+    /// core-derived signings in it.
+    fn saved_fit<const W: usize>(n: u32, known: &Known, dir: &Path) -> usize {
+        let (board, p) = setup::<W>(n).expect("a game with candidates");
+        let opt = known.opt(n, board.in_the_bag).expect("a known optimum");
+        let fm = frame_matroids(&p.model, &p.root, &p.candidates);
+        let gf2 = fm.bound(p.max_total as usize).value;
+        let mut ctx = Ctx::new(n, &p.model, &p.root, &fm, p.max_total as usize, opt as i64, false);
+        ctx.gap = Some(gf2 - opt as i64);
+        let (signings, separate) = arm("f1cores", n, p.root.len(), &[1, 2, 3]);
+        let settings = Settings { seconds: 20.0, check_every: 1, ..Settings::default() };
+        let r = bound(&ctx, signings, None, separate, &settings);
+        assert_eq!(r.fit.bound(&ctx, &mut Stats::default()), r.bound, "n={n}: the run's fit does not give its bound");
+
+        let saved = SavedFit::of(n, opt, gf2, "certified", &r);
+        let text = saved.to_json().to_string();
+        let path = dir.join(format!("n{n}.json"));
+        saved.save(&path).expect("save");
+        for back in
+            [SavedFit::from_json(&Json::parse(&text).expect("JSON")).expect("a fit"), SavedFit::load(&path).unwrap()]
+        {
+            assert_eq!(back.bound(&ctx), r.bound, "n={n}: the loaded fit does not give the bound");
+            assert_eq!(back.to_json().to_string(), text, "n={n}: the fit does not write back as it was read");
+            assert_eq!((back.n, back.opt, back.gf2, back.bound), (n, opt, gf2, r.bound));
+            assert_eq!(back.fit.signings.len(), r.fit.signings.len());
+            for (a, b) in back.fit.signings.iter().zip(&r.fit.signings) {
+                assert_eq!((a.frame, a.default, &a.fixed), (b.frame, b.default, &b.fixed), "n={n}: a signing differs");
+                assert!(!a.mergeable && a.cores.is_empty(), "a loaded signing is frozen");
+            }
+            assert_eq!(back.fit.lambda, r.fit.lambda, "n={n}: the multipliers differ");
+            assert!(back.columns.len() <= dw::SAVED_COLUMNS && back.support <= back.columns.len());
+            for column in &back.columns {
+                fm.independent(&Bits::<W>::from_slice(column)).unwrap_or_else(|e| panic!("n={n}: a saved column: {e}"));
+            }
+            assert!(back.cuts.iter().all(|(k, _, _)| *k < back.fit.signings.len()));
+        }
+        r.fit.signings.iter().filter(|s| s.mergeable).count()
+    }
+
+    /// Search mode runs no exact check, certifies nothing, and gives a valid bound; the fixed arms have no
+    /// separation; `f1cores16` is the main arm with a cap of 16.
+    #[test]
+    fn search_mode_certifies_nothing() {
+        let known = Known::load(&[], None).expect("the built-in optimum table");
+        for n in [750u32, 900] {
+            taxman::with_width!(n, W => search_mode::<W>(n, &known));
+        }
+        assert_eq!(
+            (arm_cap("f1cores"), arm_cap("f1cores16"), arm_cap("f1"), arm_cap("cores")),
+            (None, Some(16), None, None)
+        );
+    }
+
+    fn search_mode<const W: usize>(n: u32, known: &Known) {
+        let (board, p) = setup::<W>(n).expect("a game with candidates");
+        let opt = known.opt(n, board.in_the_bag).expect("a known optimum");
+        let fm = frame_matroids(&p.model, &p.root, &p.candidates);
+        let mut ctx = Ctx::new(n, &p.model, &p.root, &fm, p.max_total as usize, opt as i64, false);
+        ctx.gap = Some(fm.bound(p.max_total as usize).value - opt as i64);
+        for name in ["f1cores", "f1"] {
+            let (signings, separate) = arm(name, n, p.root.len(), &[1, 2, 3]);
+            let settings = Settings { mode: FitMode::Search, seconds: 20.0, check_every: 1, ..Settings::default() };
+            let r = bound(&ctx, signings, None, separate, &settings);
+            assert_eq!((r.stats.checks_exact, r.lb), (0, 0.0), "n={n}, {name}: search mode certified");
+            assert!(r.bound >= opt as i64, "n={n}, {name}: the bound {} is below P* = {opt}", r.bound);
+            assert_eq!(
+                r.fit.bound(&ctx, &mut Stats::default()),
+                r.bound,
+                "n={n}, {name}: the fit does not give the bound"
+            );
+            if separate {
+                assert_eq!(r.stop, dw::Stop::Fitted, "n={n}, {name}");
+                assert!(r.family.extras.iter().any(|ex| ex.signing.mergeable), "n={n}: no core-derived signing");
+            } else {
+                assert_eq!(r.stop, dw::Stop::Converged, "n={n}, {name}");
+            }
         }
     }
 }
