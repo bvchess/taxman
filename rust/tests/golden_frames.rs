@@ -184,11 +184,11 @@ fn check_reduced<const W: usize>(g: &Golden, bad: &mut Mismatches) {
         g.field("maxPromotionsUnrevised").as_i64(),
     );
     bad.check(n, "greedy incumbent", greedy(&model, &root, &candidates).to_vec(), ints(g.field("greedy")));
-    // The root of the search never narrows its candidates, so each must be a factor of a frame above the first:
+    // The root of the search never narrows its candidates, so each must be a factor of a frame behind the first:
     // `FrameMapper.homeFrame` is never the default 0.
     for x in candidates.iter() {
         if !model.contains_factor(&root, x) || model.home(x) == 0 {
-            bad.0.push(format!("n={n}: candidate {x} is not a factor of a frame above the first"));
+            bad.0.push(format!("n={n}: candidate {x} is not a factor of a frame behind the first"));
         }
     }
 }

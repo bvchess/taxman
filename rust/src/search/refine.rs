@@ -1,4 +1,4 @@
-//! The matching check of a node ([`Refiner`]): its matching bound refined by conflicts, its forced members, the
+//! The matching path's check of a node ([`Refiner`]): its matching bound refined by conflicts, its forced members, the
 //! conflict to branch on and the exact completions; and strong branching ([`strongest`]).
 //!
 //! Both work on a [`MatchBound`] whose top level is the node: its candidates `C`, and a heaviest matching that

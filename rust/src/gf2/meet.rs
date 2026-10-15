@@ -228,7 +228,7 @@ pub struct Meet<const R: usize> {
     pred: Vec<u32>,
     /// The last augmenting path, from its source to its sink.
     path: Vec<u32>,
-    /// Bellman–Ford's frontier: the outside elements and the members whose distance changed in the last phase,
+    /// Bellman–Ford's worklist: the outside elements and the members whose distance changed in the last phase,
     /// the changed members' slots per block of each matroid, and the phase each vertex was last listed in.
     changed_out: Vec<u32>,
     changed_in: Vec<u32>,

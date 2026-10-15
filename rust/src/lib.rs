@@ -56,10 +56,10 @@
 //! | | [`numtheory`] | maximal factors and composites, primes, divisors of the numbers on a board |
 //! | | [`bits`] | fixed-width bitsets `Bits<W>` for sets of game numbers; the set widths, dispatched |
 //! | | [`json`] | a small JSON reader and writer (the table of optimal games, golden data, results lines) |
-//! | frame model | [`frames`] | the frames of a board: formed and simplified (what they can play and spare), numbered from the front and merged; the promotion candidates |
+//! | frame model | [`frames`] | the frames of a board: formed, simplified, numbered from the front and merged |
 //! | | [`model`] | the search state: frames, winnability, promotion, conflicts, nogoods |
 //! | | [`accelerate`] | the prime shortcut (the game of a prime `n` from the game of `n − 1`); promotions → moves |
-//! | search | [`matchbound`] | the matching bound, the upper bound on a node's completions; the Lagrangian bound |
+//! | search | [`matchbound`] | the matching bound, an upper bound on a node's completions; the Lagrangian bound |
 //! | | [`gf2`] | the GF(2) bound, the default node bound: two frame matroids and their weighted intersection |
 //! | | [`search`] | the branch-and-bound searcher, its tactics, its setup and checkpoint header |
 //! | | [`bounds`] | the greedy incumbent and the limit on a node's further promotions |

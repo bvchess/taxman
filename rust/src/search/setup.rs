@@ -52,18 +52,18 @@ impl<const W: usize> Prepared<W> {
 /// promotion sum (DESIGN.md, "Same search").
 ///
 /// The search is given the model (the factor graph and each number's home frame), the root frame set, the
-/// candidates and `max_total`, besides the tactics, the cap and the seed; the matching graph and the greedy set are
+/// candidates and `max_total`, besides the tactics, the ceiling and the seed; the matching graph and the greedy set are
 /// functions of those.  The promotable sets are the sets of candidates that can be promoted from the root,
 /// keeping every frame's freedoms, with at most `max_total` members; which they are depends
 /// on the frames and on the graph's edges among their numbers, not on `n`.  So the form records, as a list of
-/// `u32`: the number of frames; for each frame, bottom first, its freedoms (as the bits of an `i32`) and its moves
+/// `u32`: the number of frames; for each frame, front first, its freedoms (as the bits of an `i32`) and its moves
 /// and its factors (each list as its length and then its numbers, ascending); the candidates; `max_total`; and for
 /// each number of the frames (their moves and factors), ascending, the number, its home frame, the maximal factors
 /// that can pay for it and the maximal composites it can pay for, as the model's graph lists them.  The graph's
 /// lists for a number can name numbers no longer in a frame (reducing the frames drops some), which the search never
 /// sees; recording them anyway errs on the side of telling more problems apart.  The numbers are game numbers, so
-/// the form does not depend on the set width.  The tactics, the cap and the seed are not in it: the sound tactics,
-/// the cap and the seed change how the search runs, not its answer.
+/// the form does not depend on the set width.  The tactics, the ceiling and the seed are not in it: the sound tactics,
+/// the ceiling and the seed change how the search runs, not its answer.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Problem(Vec<u32>);
 
@@ -148,7 +148,7 @@ pub fn problem_of<const W: usize>(
     Ok(Problem::of(&model, &root, candidates, max_total(&root, candidates)))
 }
 
-/// Sets up the search for the game whose frames are `columns` (factors and moves per frame, bottom first) and
+/// Sets up the search for the game whose frames are `columns` (factors and moves per frame, front first) and
 /// whose promotion candidates are `candidates`.
 pub fn prepare<const W: usize>(
     tables: &Tables,
@@ -186,8 +186,8 @@ pub fn prepare_for_resume<const W: usize>(
 /// The model and the root frame set of the game whose frames are `columns`, and the time it took to build them.
 ///
 /// Every frame of the root is winnable (the frame builder makes it so), and the search relies on it: promoting a
-/// move that has a factor no move of the frame below uses takes no peel (`FrameGraph::promote`), which is exact only
-/// if that frame is winnable, as every frame of every state reached from a winnable root is.  Debug builds check
+/// number that has a factor no move of the frame it is promoted into uses takes no peel (`FrameGraph::promote`), which
+/// is exact only if that frame is winnable, as every frame of every state reached from a winnable root is.  Debug builds check
 /// it here.
 fn build_root<const W: usize>(
     tables: &Tables,

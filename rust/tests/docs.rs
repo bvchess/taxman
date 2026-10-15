@@ -441,9 +441,8 @@ const RETIRED_NAMES: &[Retired] = &[
 const STAYS: &[&str] =
     &["frontier argument", "frontier jam", "odd core", "odd cores", "memory cap", "mem-cap", "cap reached"];
 
-/// Files whose words move in the next stage, together with their identifiers (the modules `gf2` and `search`, and the
-/// golden test of the hives), and this file, which lists the words.
-const NOT_YET: &[&str] = &["src/gf2.rs", "src/gf2/", "src/search/", "tests/golden_hives.rs", "tests/docs.rs"];
+/// The files the check skips: this one, which lists the words.
+const SKIPPED: &[&str] = &["tests/docs.rs"];
 
 /// `line` with the targets of its links (`](target)`) taken out: a target names a file or an anchor, not a word.
 fn without_link_targets(line: &str) -> String {
@@ -558,7 +557,7 @@ fn vocabulary_files() -> Vec<(PathBuf, bool)> {
         found.extend(["README.md", "THEORY.md"].iter().map(|name| outside.join("heuristics").join(name)));
     }
     let shown = |path: &Path| path.strip_prefix(crate_dir()).unwrap_or(path).to_string_lossy().replace('\\', "/");
-    let checked = found.into_iter().filter(|path| !NOT_YET.iter().any(|skip| shown(path).starts_with(skip)));
+    let checked = found.into_iter().filter(|path| !SKIPPED.iter().any(|skip| shown(path).starts_with(skip)));
     checked.map(|path| (path.clone(), shown(&path).starts_with("prover/") || shown(&path).starts_with(".."))).collect()
 }
 

@@ -3,10 +3,10 @@
 //!
 //! The stack holds the path from the unit's node down to the node being worked on, plus one slot below it where
 //! that node's children are made; slots are reused, so a step allocates nothing.  Next to the stack, and
-//! mirroring it level by level, the searcher keeps the matching bound of every node on the path
-//! ([`MatchBound`]: level `d` is the node at depth `d`, and a child is pushed on it while it is checked and for
-//! as long as it is on the stack) and the conflicts known along the path (`known`: `stack[d].known_end` of them
-//! hold for the node at depth `d`).
+//! mirroring it level by level, the searcher keeps the bound of every node on the path (the GF(2) bound with the
+//! tactic `gf2`, the default; the matching bound without it: [`MatchBound`]; level `d` is the node at depth `d`, and
+//! a child is pushed on it while it is checked and for as long as it is on the stack) and the conflicts known along
+//! the path (`known`: `stack[d].known_end` of them hold for the node at depth `d`).
 //!
 //! A step ([`Stepper::step`]) is DESIGN.md's "The default step" in four phases (the module docs of
 //! [`crate::search`] map them): [`check_node`](Stepper::check_node), [`choose_branch`](Stepper::choose_branch),
@@ -217,12 +217,12 @@ pub(super) struct Node<const W: usize> {
     pub(super) max_add: u32,
     /// How many of the searcher's known conflicts hold for this node.
     pub(super) known_end: usize,
-    /// What the matching check of the node said when it was made, until its loop's first step takes it.
+    /// What the bound check of the node said when it was made, until its loop's first step takes it.
     pub(super) checked: Option<Checked<W>>,
 }
 
-/// The verdict of a child's matching check that let it through, kept for the first step of its loop: at the
-/// same `need` and with the same matching, the check would say the same.
+/// The verdict of a child's bound check that let it through, kept for the first step of its loop: at the
+/// same `need` and with the same heaviest set, the check would say the same.
 #[derive(Clone, Copy)]
 pub(super) struct Checked<const W: usize> {
     pub(super) need: u64,
@@ -274,7 +274,7 @@ pub(super) struct Counts {
     pub(super) attempts: u64,
     pub(super) promotions: u64,
     pub(super) children: u64,
-    /// Matching checks of nodes and children.
+    /// Bound checks of nodes and children (the GF(2) bound, or the matching bound without `gf2`).
     pub(super) match_bounds: u64,
     /// Refinements made (tactic `match_refine`), the matching evaluations they made, and the conflicts they
     /// had to compute (not known yet).
@@ -481,12 +481,12 @@ impl<'a, const W: usize> Stepper<'a, W> {
 
     /// Phase 1: whether `node`'s loop goes on, that is whether some completion can still add `need`.
     /// `Err(reason)` if not, or if its best completion is known (then offered): the [`cut`] reason.  Else what
-    /// the matching check found for choosing the branch.
+    /// the bound check found for choosing the branch.
     ///
     /// Cheapest first: candidates left; the sum of the `max_add` largest (no completion has more promotions, nor
     /// larger ones: a bound of its own); then, unless the node kept its verdict from when it was made at this
     /// `need`, the rule of the tactic `symmetry` (a function of the node's promotions and candidates alone, and
-    /// cheaper than the bounds), then the matching check.
+    /// cheaper than the bounds), then the bound check (the GF(2) bound; the matching bound without `gf2`).
     #[inline]
     fn check_node(&mut self, node: &mut Node<W>, need: u64, ctx: &mut Ctx<'_, TaxUnit<W>>) -> Result<Open<W>, usize> {
         let checked = node.checked.take();

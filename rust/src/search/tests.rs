@@ -47,7 +47,7 @@ fn search_checked<const W: usize>(p: &Prepared<W>, threads: usize, what: &str) -
 
 fn check_against_java<const W: usize>(g: &Golden) {
     let p = prepare_golden::<W>(g, SearchTactics::default());
-    // The Java's frame set and promotion cap before its revision of frame 0, which this build does not have.
+    // The Java's frame set and `max_total` before its revision of frame 0, which this build does not have.
     let frames = g.json.get("frameSet").and_then(Json::as_arr).expect("frameSet");
     let frame0 = frames.first().and_then(|frame| frame.get("freedoms")).and_then(Json::as_i64);
     assert_eq!(p.root.frames().first().map(|f| i64::from(f.freedoms)), frame0, "n={} frame 0 freedoms", g.n);
@@ -454,7 +454,7 @@ fn seeds_and_caps() {
     let seeded = search(&p, &config(1), Some(&seed), None, false).unwrap();
     assert_eq!((seeded.sum, seeded.promotions), (optimum.sum, optimum.promotions));
     assert!(seeded.stats.nodes <= optimum.stats.nodes);
-    // A cap the seed already reaches ends the search before it starts; a cap the search reaches ends it
+    // A ceiling the seed already reaches ends the search before it starts; one the search reaches ends it
     // there.
     let capped = search(&p, &config(1), Some(&seed), Some(optimum.sum), false).unwrap();
     assert!(capped.completed && capped.reached_cap && capped.stats.nodes == 0);
