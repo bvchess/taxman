@@ -1138,8 +1138,38 @@ mod tests {
         r.fit.signings.iter().filter(|s| s.mergeable).count()
     }
 
+    /// The fits that `bench/fields/fits` holds (E2's, for E3 to start from) are intact: each reads back, and at the
+    /// root of its game gives the bound it says, over the GF(2) bound it says.  Skipped where the directory is not.
+    #[test]
+    fn the_saved_fits_give_their_bounds() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("bench/fields/fits");
+        let Ok(entries) = std::fs::read_dir(&dir) else { return };
+        let mut files: Vec<PathBuf> = entries.map(|e| e.expect("a directory entry").path()).collect();
+        files.retain(|p| p.extension().is_some_and(|e| e == "json"));
+        files.sort();
+        for path in &files {
+            let saved = SavedFit::load(path).unwrap_or_else(|e| panic!("{e}"));
+            taxman::with_width!(saved.n, W => check_saved::<W>(&saved));
+        }
+        eprintln!("{} saved fits checked", files.len());
+    }
+
+    fn check_saved<const W: usize>(saved: &SavedFit) {
+        let n = saved.n;
+        let (_, p) = setup::<W>(n).expect("a game with candidates");
+        let fm = frame_matroids(&p.model, &p.root, &p.candidates);
+        let cap = p.max_total as usize;
+        assert_eq!(fm.bound(cap).value, saved.gf2, "n={n}: the GF(2) bound differs from the file's");
+        let ctx = Ctx::new(n, &p.model, &p.root, &fm, cap, saved.opt as i64, false);
+        assert_eq!(saved.bound(&ctx), saved.bound, "n={n}: the fit does not give its bound");
+        assert!(saved.bound >= saved.opt as i64 && saved.bound <= saved.gf2, "n={n}: the bound is out of range");
+        for column in &saved.columns {
+            fm.independent(&Bits::<W>::from_slice(column)).unwrap_or_else(|e| panic!("n={n}: a saved column: {e}"));
+        }
+    }
+
     /// Search mode runs no exact check, certifies nothing, and gives a valid bound; the fixed arms have no
-    /// separation; `f1cores16` is the main arm with a cap of 16.
+    /// separation; `f1cores16` is the main arm with a limit of 16 core-derived signings a frame.
     #[test]
     fn search_mode_certifies_nothing() {
         let known = Known::load(&[], None).expect("the built-in optimum table");

@@ -47,6 +47,13 @@
 //! ends.  With separation, after each bracket the cores that the master's columns run into (`cores::cores_of`) are
 //! merged into core-derived signings (first fit, at most `per_frame` a frame), and the master is rebuilt for the
 //! changed family from its columns (but those holding a new loop) and its inequalities (ranks taken again).
+//!
+//! In [`FitMode::Search`] the exact checks are not run: a family's generation ends when nothing prices out and no
+//! cheap inequality is violated, and the computation when the separation finds no new core.  The result is a fit
+//! ([`Fit`]: signings and multipliers) with a valid bound and no certified bracket.  [`Outcome::fit`] is the fit of
+//! the lowest `L` ever evaluated, which can be lower than the final family's lowest `L`: merging cores into a signing
+//! changes its matroid, which is not a restriction of the old one, so a later family's LP can be the higher.
+//! `common/fit.rs` writes a fit to disk.
 
 use crate::cores::{cores_of, merge, Core};
 use crate::frames::FrameMatroids;
