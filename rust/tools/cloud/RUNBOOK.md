@@ -422,7 +422,7 @@ DEADLINE_HOURS=30 POWEROFF=always S3_DEST=s3://YOUR-BUCKET/taxman-run1 rust/tool
 ```
 
 In a second window, if spot: `rust/tools/cloud/spot-watch.sh`.  `chain.sh N` is the whole command: the chain 1..N
-into `~/taxman-work/results/strict.jsonl`, all CPUs, eight games in flight at once, a checkpoint every 300 s and a
+into `~/taxman-work/results/strict.jsonl`, all CPUs, sixteen games in flight at once, a checkpoint every 300 s and a
 progress line every 60 s.  Its variables (all optional) are documented at the top of the script: `THREADS`, `WINDOW`,
 `CHECKPOINT_INTERVAL`, `PROGRESS`, `EXTRA_ARGS`, `DEADLINE_HOURS`, `POWEROFF`, `MAX_FAILS`, `S3_DEST`, `SAVE_EVERY`.
 `WINDOW` is the number of games in flight at once, which share the threads (`taxman solve --window`): 1 solves the

@@ -29,7 +29,7 @@
 #
 # Environment (all optional):
 #   THREADS              worker threads, default all CPUs the solver may use
-#   WINDOW               the games in flight at once, default 8; 1 solves them one after the other; see
+#   WINDOW               the games in flight at once, default 16; 1 solves them one after the other; see
 #                        `taxman solve --window`
 #   CHECKPOINT_INTERVAL  seconds, default 300       PROGRESS  seconds between progress lines, default 60
 #                        (a checkpoint stops every worker for the slowest one's step, up to 0.4 s near n = 4000: 0.15%
@@ -58,7 +58,7 @@ esac
 # Without THREADS the solver uses every CPU it is allowed (in a container, the cgroup quota).
 thread_args=()
 [ -n "${THREADS:-}" ] && thread_args=(--threads "$THREADS")
-WINDOW="${WINDOW:-8}"
+WINDOW="${WINDOW:-16}"
 CHECKPOINT_INTERVAL="${CHECKPOINT_INTERVAL:-300}"
 PROGRESS="${PROGRESS:-60}"
 MAX_FAILS="${MAX_FAILS:-5}"
