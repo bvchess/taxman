@@ -21,7 +21,7 @@
 
 use crate::accelerate::solution_for_promotions;
 use crate::bits::Bits;
-use crate::frames::{build_frames, SearchFrames};
+use crate::frames::{build_extended, build_frames, ExtendedFrames, SearchFrames};
 use crate::numtheory::Tables;
 use crate::search::{self, Prepared, Problem, SearchTactics};
 use std::path::Path;
@@ -82,6 +82,19 @@ impl<const W: usize> Board<W> {
     /// If the frames cannot be built into a model (more frames than a frame set holds).
     pub fn prepare(&self, tactics: SearchTactics) -> Result<Prepared<W>, String> {
         search::prepare(&self.tables, &self.frames.columns(), &self.frames.candidates, tactics)
+    }
+
+    /// Sets the search up for the extended problem Π⁺(∅) ([`build_extended`]): the frame model without the claims of
+    /// `unzip`, and the problem it poses.  Research code; the default path is [`prepare`](Self::prepare).  The search
+    /// does not take one-sided candidates yet, so no source is open.
+    ///
+    /// # Errors
+    ///
+    /// If the frames cannot be built into a model (more frames than a frame set holds).
+    pub fn prepare_extended(&self, tactics: SearchTactics) -> Result<(ExtendedFrames<W>, Prepared<W>), String> {
+        let extended = build_extended(&self.tables, &Bits::EMPTY)?;
+        let prepared = search::prepare(&self.tables, &extended.columns(), &extended.candidates, tactics)?;
+        Ok((extended, prepared))
     }
 
     /// Sets the search up to resume the checkpoint at `checkpoint`, with its tactics, see
@@ -194,6 +207,22 @@ mod tests {
         }
         let board = Board::<8>::for_n(85);
         assert_eq!(search_problem(85).unwrap(), (board.problem().unwrap(), board.in_the_bag));
+    }
+
+    /// The extended problem with no open source poses the search what the frame model does on every board to 300 that
+    /// has something to promote: the same `max_total` and candidates, and the same `in_the_bag`.
+    #[test]
+    fn the_extended_problem_without_open_sources_is_posed_as_the_frame_model_is() {
+        for n in 2..=300 {
+            let board = Board::<8>::for_n(n);
+            if board.is_trivial() {
+                continue;
+            }
+            let plain = board.prepare(SearchTactics::default()).unwrap();
+            let (extended, prepared) = board.prepare_extended(SearchTactics::default()).unwrap();
+            assert_eq!((prepared.max_total, prepared.candidates), (plain.max_total, plain.candidates), "n={n}");
+            assert_eq!(extended.in_the_bag, board.in_the_bag, "n={n}");
+        }
     }
 
     #[test]

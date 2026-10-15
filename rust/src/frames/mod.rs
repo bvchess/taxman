@@ -20,6 +20,9 @@
 //! * [`Numbering`] is the board's frames as [`BoardFrames::new`] forms them, before any is merged, each as a
 //!   [`NumberedFrame`] with its number, the frames in front of it and the pairs `unzip` settled in it; it is for the
 //!   census of the structure of the frames (`examples/structure.rs`), and the solver does not use it.
+//! * [`ExtendedFrames`] is the frames of the extended problem, in which some of the sources of three or more prime
+//!   factors are optional and `unzip` settles nothing ([`build_extended`]); research code, which the solver does not
+//!   use either.
 //!
 //! The Java has several names for the one idea (DESIGN.md, "The Java solver and the frame solver", maps them); this
 //! module calls it a frame throughout.  [`Frame`] has the name of [`crate::model::Frame`], the search's copy of it (a
@@ -178,8 +181,10 @@
 //! without 4: taking 4 off splits the frame of layer 3 into two closed frames, while layers 2 and 4 have freedoms).
 
 mod board_frames;
+mod extended;
 
 pub use board_frames::{BoardFrames, ClaimKind, Frame};
+pub use extended::{build_extended, ExtendedFrames};
 
 use crate::bits::Bits;
 use crate::model;
@@ -215,8 +220,14 @@ impl<const W: usize> SearchFrames<W> {
     /// The frames in the shape [`crate::model::FrameGraph::build`] takes: for each frame, front first, its factors
     /// and then its moves.
     pub fn columns(&self) -> Vec<Vec<u32>> {
-        self.frames.iter().flat_map(|f| [f.factors.to_vec(), f.moves.to_vec()]).collect()
+        columns_of(&self.frames)
     }
+}
+
+/// `frames` in the shape [`crate::model::FrameGraph::build`] takes: for each frame, front first, its factors and then
+/// its moves.
+fn columns_of<const W: usize>(frames: &[model::Frame<W>]) -> Vec<Vec<u32>> {
+    frames.iter().flat_map(|f| [f.factors.to_vec(), f.moves.to_vec()]).collect()
 }
 
 /// The board's frames as [`BoardFrames::new`] forms them with no promotions, before any merge, in playing order, with

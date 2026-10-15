@@ -14,7 +14,7 @@ pub use playable::{peel, play_order, playable};
 #[allow(unused_imports)]
 pub use support::{Rng, TempDir};
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -180,6 +180,46 @@ pub fn search_at_width<const W: usize>(n: u32, tactics: SearchTactics) -> (u64, 
 /// A random subset of `set`, each member kept with probability `percent`/100.
 pub fn random_subset<const W: usize>(rng: &mut Rng, set: &Bits<W>, percent: u64) -> Bits<W> {
     set.iter().filter(|_| rng.chance(percent)).collect()
+}
+
+/// Shuffles `items` with Fisher-Yates.
+pub fn shuffle<T>(rng: &mut Rng, items: &mut [T]) {
+    for i in (1..items.len()).rev() {
+        items.swap(i, rng.below(i as u64 + 1) as usize);
+    }
+}
+
+/// Calls `visit` on every subset of `items` (ascending) that `keeps` accepts, and on the empty set, found depth first:
+/// a set is extended by a larger item only while it is kept, so `keeps` must hold of every subset of a set it holds
+/// of.  A set is visited only after every prefix of it (in the order of `items`) was kept, and in memory there is
+/// the set being extended, so the sets can be many.
+pub fn for_each_kept_subset(items: &[u32], keeps: &mut dyn FnMut(&[u32]) -> bool, visit: &mut dyn FnMut(&[u32])) {
+    fn extend(
+        items: &[u32],
+        from: usize,
+        set: &mut Vec<u32>,
+        keeps: &mut dyn FnMut(&[u32]) -> bool,
+        visit: &mut dyn FnMut(&[u32]),
+    ) {
+        visit(set);
+        for (i, &item) in items.iter().enumerate().skip(from) {
+            set.push(item);
+            if keeps(set) {
+                extend(items, i + 1, set, keeps, visit);
+            }
+            set.pop();
+        }
+    }
+    extend(items, 0, &mut Vec::new(), keeps, visit);
+}
+
+/// Every subset of `items` (ascending) that `keeps` accepts, and the empty set: [`for_each_kept_subset`], collected.
+pub fn kept_subsets(items: &[u32], keeps: &mut dyn FnMut(&[u32]) -> bool) -> BTreeSet<Vec<u32>> {
+    let mut found = BTreeSet::new();
+    for_each_kept_subset(items, keeps, &mut |set| {
+        found.insert(set.to_vec());
+    });
+    found
 }
 
 /// FNV-1a over the decimal text of the moves, each followed by a comma: the fingerprint of a game that the Java

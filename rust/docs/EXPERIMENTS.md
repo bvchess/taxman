@@ -346,7 +346,9 @@ The work of [the prover](../prover/README.md) and the proofs of [THEORY.md](../.
 | E3: Theorem B against every recorded and enumerated optimal set (`tests/bottom_layers.rs`) | [proven footing](#the-frame-model-on-a-proven-footing-2026-10) | kept (tests) | no exception in 3,574 recorded games, 1,044 enumerated sets and every optimal set of 2..54; numbers of layer 2 up to n/2 only on 76 boards, all ≤ 186 |
 | N as a hard check of setup (`build_frames` refuses a board whose numbering is not clean) | [proven footing](#the-frame-model-on-a-proven-footing-2026-10) | superseded by the numbering by layer (next row) | every supported board passed, so nothing changed (fingerprints, tripwires, regress, the chain 1..1300 line for line); punctured boards (the sacrifice study's) were not checked: 56 without 39 is not clean |
 | 2A: number the frames by layer (ℓ − ℓ₀), the definition in place of the Java's breadth-first numbering, so that N holds by construction, on boards with holes too; a number without frames gives an empty frame | [by layer](#the-frame-model-by-layer-and-the-extended-problem-2026-10) | kept | the two numberings equal on every board to 8191 (the census reproduced line for line), so no tree changes: fingerprints, tripwires, regress, the chain 1..1300 line for line; Theorem M loses its hypothesis; `sacrifice validate 52` still exact, with the boards 32-34 that have an empty frame |
-| Certify U game by game: barred parity bounds with layers 1-2 fixed by Theorem B, then a search of the open members (or a search that treats the open sources as optional) | [THEORY: the upper part](../../heuristics/THEORY.md#the-upper-part) | open | the consultation's scratch measurements: the bounds leave 3-12 members of U\*_{≥3} open to 1300, 26-102 at 1500-2276; a search on the whole board closes the rest at every n tried to 1500 |
+| E8 stage 1: the extended problem Π⁺(O), a set O of the sources of three or more prime factors optional and nothing claimed (`frames::build_extended`), Theorem M⁺ (S ⊇ U\* ∖ O playable iff it is a promotion set) and its certificate of U, tested against the whole-board oracle (`tests/model_extended.rs`) | [by layer](#the-frame-model-by-layer-and-the-extended-problem-2026-10) | kept (proven; research code) | no mismatch on every set of every board to 80 (60 with every source open; 100 and 69 ignored), 30 million sets, nor on random sets to 4095, rejected sources included |
+| Search Π⁺(∅), the frame model without `unzip`'s claims, with the existing engine (`Board::prepare_extended`, `examples/extended.rs`) | [by layer](#the-frame-model-by-layer-and-the-extended-problem-2026-10) | measured | a chain 2..1300 searching every game gives every score of optimal.json; 2.5% more nodes and 11% more time than the default problem searched the same way (1201-1300: 0.9% and 9%), 31 games more than 10% above (at most 1.24); the claims are worth a few percent |
+| Certify U game by game: barred parity bounds with layers 1-2 fixed by Theorem B, then a search of the open members (or a search that treats the open sources as optional) | [THEORY: the upper part](../../heuristics/THEORY.md#the-upper-part) | open | the consultation's scratch measurements: the bounds leave 3-12 members of U\*_{≥3} open to 1300, 26-102 at 1500-2276; a search on the whole board closes the rest at every n tried to 1500.  The search that treats them as optional has its theory and setup (the extended problem, two rows above); the one-sided candidates in the search are next |
 
 ### The Python heuristics project
 
@@ -399,7 +401,7 @@ single-sacrifice route) have their row above.
 | [The gap past 2175](#the-gap-past-2175-2026-10) | what are the true root gaps of the EC2 chain's games, how do they grow, do they explain its trees (the 2340s, 3174-3176, 3300), what at the root is left, and what will 4000 to 6000 cost? | 509 gaps of 341 to 1,443 (mean 818), +37 per 100 n over 1301-3312 and G/n steady at 300: neither of the two regimes; the current build's trees are 0.29 times the committed chain's, a decade of nodes per 250 of gap, the gap counting in units of n^0.3 (0 to 0.5 bracket); the dear games are the games of high gap, nothing at the root explains the rest (A4 killed); a game costs ×10 per 1,050-1,250 n and a day on a `c8g.16xlarge` reaches about 4,100 | ee03872 (no solver change) and the entry |
 | [Boards past 4095](#boards-past-4095-2026-10) | what limits the boards to 4095, how far does one more width take them, and what does a board past 4095 cost? | built: boards to 8191 at 128 words, every board's frames and ranks scanned to bound the rest (9 frames, 5 block words); nothing changes to 4095; a node at 4100 1.1% dearer at 128 words than at 72, so no width between | 4316168 |
 | [The frame model on a proven footing](#the-frame-model-on-a-proven-footing-2026-10) | are the frame model's assumptions theorems, and what is left?  Steps E1-E4 of the consultation of 2026-10-15 | yes, given clean numbering, which holds on every board to 8191 and setup now checks: Lemma Ω and Theorems L, B and M in THEORY.md, the census and two test files with no exception; left: U, some optimal game plays U\*_{≥3} | 631e027, a122f43, de63aba, d7a322a, 5e44ac6 and the write-up after them |
-| [The frame model by layer, and the extended problem](#the-frame-model-by-layer-and-the-extended-problem-2026-10) | steps 2A and 3 of the second consultation: can the numbering by layer be the definition with no result changing, and is the extended problem Π⁺(O), with some sources optional, exact? | 2A: yes, no tree changes, N by construction, Theorem M with no hypothesis | the entry's commits |
+| [The frame model by layer, and the extended problem](#the-frame-model-by-layer-and-the-extended-problem-2026-10) | steps 2A and 3 of the second consultation: can the numbering by layer be the definition with no result changing, and is the extended problem Π⁺(O), with some sources optional, exact? | 2A: yes, no tree changes, N by construction, Theorem M with no hypothesis.  3: yes, Theorem M⁺ proven, no mismatch with the oracle in 30 million sets and random sets to 4095; Π⁺(∅) searched by the existing engine gives every score of 2..1300 at 2.5% more nodes | 40cf6d0 (2A) and the commit of the extended problem |
 
 ## The port and its first improvements
 
@@ -5583,3 +5585,50 @@ summed against 624).  `examples/sacrifice validate 52` is exact on all 1,378 pun
 with an empty frame among them.  THEORY.md's "Clean numbering" is now "Numbering by layer"; Theorem M and its
 corollary lose the hypothesis; a paragraph covers boards with holes, where the model is exact given the sources setup
 keeps there, which is what the sacrifice bound rests on (its module comment says so).
+
+*3, the extended problem (E8 stage 1).*  `frames::build_extended(t, open)` builds Π⁺(O) for a set O of members of
+U\*_{≥3}: the frames as setup forms them (the components), each with its fixed sources F = U\* ∖ O and all its factors;
+freedoms⁺ = factors − fixed sources; the frames with freedoms⁺ numbered by layer and united by number (no claims, no
+merge order to keep); the two-sided candidates by setup's two tests with F for the remaining sources; the one-sided
+candidates O ∪ R (R: the sources greedy rejected in the frames that hold a member of O), each with the frame of its
+layer; in_the_bag⁺ = ΣF.  `ExtendedFrames::promotable` is the reference predicate for a pair (K, L): plain peels of the
+unreduced frames with K and L applied (setup's own peel, `BoardFrames::count_freedoms`).  `Board::prepare_extended`
+hands Π⁺(∅) to `search::prepare` as it is; the one-sided candidates are not in the search (stage 2).  THEORY.md has
+Theorem M⁺ (S ⊇ F is playable iff (K, L) is a promotion set, and weighs in_the_bag⁺ + ΣK + ΣL), its proof (Theorem M's,
+without M5) and the certificate of U it gives, with the evidence row.
+
+`tests/model_extended.rs` checks Theorem M⁺ against the whole-board oracle of `tests/common/playable.rs`, both ways, on
+every set: every board 2..80 for O = ∅ and for three random O of 1-8 members each (2.2 million sets), every board 2..60
+for O = U\*_{≥3} (4.2 million), and, ignored, 81..100 (3.4 million) and 61..69 with every source open (20.9 million;
+the boards 70 and 71 have 62 million each, the count doubling every two boards); the heaviest set is optimal.json's on
+every board.  Random sets, 100 of each kind (promotion sets built in a random order, maximal playable sets built in a
+random order) for O a random 20 members of U\*_{≥3}, for O = U\*_{≥3} and for O = ∅ (where the frame model's random
+promotion sets are Π⁺(∅)'s and the reverse) at 300, 600, 1000 and 1300, and at 741, 1100 and 1200, the boards where
+greedy rejects a source of layer 3 (374, 578, 605; none on the boards to 740, nor at 1000 or 1300), so that sets with a
+rejected source are met (92-97 of 200 with every source open); ignored, 2000, 3000 and 4095 (R of 5 and 10 members at
+3000 and 4095).  No mismatch anywhere: 29 s for the default tests, 132 s for the ignored ones.  With O = ∅, Π⁺(∅)'s
+frames are the frame model's with the claimed pairs put back, and its candidates, freedoms and `in_the_bag` the same,
+on every board to 400; its promotion sets are those of Π_n and of the problem `prepare_extended` poses on every board
+to 100 (unit tests of `frames::extended` and `board`).
+
+`examples/extended.rs chain 2 1300 --compare` searches every game (primes included, no repeats) on one thread, seeded
+from the game before and capped at the ceiling, on Π⁺(∅) and on the default problem.  Every one of the 1,299 games
+scores optimal.json's, through a legal game of in_the_bag + its promotions.  What dropping the claims costs:
+
+| band | nodes, Π⁺(∅) | nodes, default | ratio | seconds, Π⁺(∅) | seconds, default |
+|---|---|---|---|---|---|
+| 2..900 | 36,387 | 34,812 | 1.045 | 5.7 | 5.0 |
+| 901..1000 | 118,770 | 117,783 | 1.008 | 9.5 | 8.9 |
+| 1001..1100 | 123,871 | 116,945 | 1.059 | 10.6 | 9.5 |
+| 1101..1200 | 16,899 | 16,529 | 1.022 | 5.6 | 4.6 |
+| 1201..1300 | 178,846 | 177,286 | 1.009 | 19.2 | 17.6 |
+| all | 474,773 | 463,355 | 1.025 | 50.7 | 45.6 |
+
+1,064 games take the same nodes; 31 take more than 10% more (the most 1.24, at 616; 19 of them in 601-700, the rest at
+432-433, 576-595, 832-865 and 1023-1029), 5 more than 10% fewer (940-943, 984-985; at least 0.88).  The probe's games:
+936 376 nodes against 394, 1215 10,012 against 9,979; the bench set 1050, 1100, 1133 and 1170 the same nodes, 1184 174
+against 170.  A node costs about 8% more (the claimed pairs stay in the frames the peels see).  So the claims are worth
+a few percent to the search, not more: the extended problem's search, with nothing open, costs what the default's does.
+
+The default mode is unchanged by all of it (the same gates as 2A: the fingerprints, the suite with the tripwires,
+`regress --to 1000 --threads 1` in 9.1 s, and the chain 1..1300 on one thread line for line).

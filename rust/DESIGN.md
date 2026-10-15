@@ -111,7 +111,12 @@ example, the board 1..=21, is in the [README](README.md#how-the-solver-sees-the-
     three or more prime factors.  U is open in general; it holds for every n ≤ 2175, where the prover (a branch and
     bound over sets of moves on the whole board, from the playability theorems, the Franklín–Moniot bound, the parity
     bound of THEORY.md's Theorem 10, the ceiling and the prime formula, and nothing of frames) proves the optimum of
-    every game of the committed chain.
+    every game of the committed chain.  Past 2175, U can be certified game by game with the *extended problem*
+    Π⁺(O) (THEORY.md, Theorem M⁺; `frames::build_extended`, research code): the frame model with a set O of those
+    members optional, exact like Π_n, so that a search of it with the members it does not leave open certified (by
+    barred parity bounds, say) proves opt(n) on the whole board.  Its search with nothing open, Π⁺(∅), goes through
+    the engine as it is (`Board::prepare_extended`, `examples/extended.rs`); the open members are not in the search
+    yet.
 
   What each proof kind needs of this, beyond the code's correctness and the games before it:
 
@@ -125,7 +130,8 @@ example, the board 1..=21, is in the [README](README.md#how-the-solver-sees-the-
 
   The tests tie the theorems to the code: `tests/model_exact.rs` checks Theorem M both ways, on every set of every
   board to 100 and on random sets to 8191, against a playability oracle that shares no code with `frames` or
-  `model`; `tests/bottom_layers.rs` checks Theorem B on every recorded and enumerated optimal set; and two exhaustive
+  `model`; `tests/model_extended.rs` checks Theorem M⁺ the same way, with sources open; `tests/bottom_layers.rs`
+  checks Theorem B on every recorded and enumerated optimal set; and two exhaustive
   searches agree with the frame model's games on small boards: `brute`, the solver's own (to 40 in the test suite, 52
   in `examples/sacrifice validate`), and `heuristics/evaluation/certify.py` (to 62).  The sacrifice
   bound (`sacrifice`) is an upper bound on opt(n) by a different route (games on punctured boards, where Theorem M
@@ -894,6 +900,9 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   `model` (`tests/common/playable.rs`, the peel; itself checked against the rules on every subset of the boards to
   20), and checks both directions of Theorem M on every set of every board to 100 (to 120 ignored) and on random sets
   of boards to 1300 (to 8191 ignored), and the near miss that only the candidate filter keeps out (n = 98);
+  `tests/model_extended.rs` checks Theorem M⁺ (the extended problem, with sources of three or more prime factors
+  optional) both ways on every set of every board to 80 (to 60 with every such source open) and on random sets to
+  1300 (to 4095 ignored), and that with none open its promotion sets are the frame model's;
   `tests/bottom_layers.rs` checks Theorem B on every game of optimal.json, the committed chain and the chain past it,
   every optimal set the prover enumerated, and every optimal set of the boards to 48; the unit tests of `frames`
   check that `unzip`'s claims are its mandatory pairs, that `numbering` is what `build_frames` uses, that the frames
