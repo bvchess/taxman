@@ -41,12 +41,12 @@ impl<const W: usize> Neighbourhood<'_, W> {
     fn fill(&self, scratch: &mut Scratch<W>, base: &Bits<W>, excluded: &Bits<W>) -> Bits<W> {
         let mut state = self.model.promote_all_using(scratch, self.root, base).expect("a promotable base");
         let mut out = *base;
-        let mut open = state.narrow_candidates(&(*self.candidates - *base - *excluded));
+        let mut open = self.model.narrow(&state, &(*self.candidates - *base - *excluded));
         let mut next = open.max();
         while let Some(n) = next {
             if self.model.promote_in_place_using(scratch, &mut state, n) {
                 out.insert(n);
-                open = state.narrow_candidates(&open);
+                open = self.model.narrow(&state, &open);
             }
             next = open.max_below(n);
         }

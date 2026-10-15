@@ -61,7 +61,10 @@
 //! `unzip`, asking whether a factor has a use outside its frame, met a number homed in a frame that has since been
 //! merged away, and how often that number counted as such a use.  `violations`: an object with a key for each failed
 //! check (`"A"`, `"C"`, `"D"`, `"E"`, `"F"`, `"G"`) whose value is the first 20 of its items, and `"A_count"`, ...
-//! with how many there are; `{}` when everything holds.
+//! with how many there are; `{}` when everything holds.  `extended_frames`, `[count, lowest, highest]`: the frames of
+//! the extended problem Π⁺(O) with every source of three or more prime factors open, the most frames any O gives
+//! (`taxman::frames::extended_frame_count`; heuristics/THEORY.md, "The extended problem"), and the layers they span
+//! (`[0, null, null]` when no frame has freedoms there); the search holds at most `MAX_FRAMES` = 9.
 //!
 //! **The summary** is computed from the lines of `FROM..=TO` (with `--out`, read again from FILE at the end, so a
 //! resumed run summarises everything; without it, from memory) and written as plain text to stdout (to stderr when the
@@ -71,7 +74,8 @@
 //! frames span several layers, and those whose `layer2_closed` is false; the totals of `claims_pre` and
 //! `claims_numbered`; the boards with back claims that have a composite among the factors; the boards where
 //! `merged_away` was reached, and the totals; the largest `frames`, `numbers`, `max_layer` and `candidates`; the
-//! seconds, summed over the boards.  The last line is `PASS` or `FAIL`.
+//! boards by the frame count of `extended_frames`, and those where it is above `MAX_FRAMES`; the seconds, summed over
+//! the boards.  The last line is `PASS` or `FAIL`.
 //!
 //! **Exit status**: 0 if every board of the range has a line and passes A, C, D, E, F and G; 1 if one does not, or a
 //! board could not be analysed (the message goes to stderr); 2 for a usage error.
@@ -86,9 +90,9 @@ use std::sync::mpsc;
 use std::time::Instant;
 use taxman::accelerate::solution_for_promotions;
 use taxman::bits::Bits;
-use taxman::frames::{numbering, ClaimKind, NumberedFrame, Numbering, SearchFrames};
+use taxman::frames::{extended_frame_count, numbering, ClaimKind, NumberedFrame, Numbering, SearchFrames};
 use taxman::json::Json;
-use taxman::model::FrameGraph;
+use taxman::model::{FrameGraph, MAX_FRAMES};
 use taxman::numtheory::Tables;
 use taxman::solver::MAX_N;
 
@@ -433,6 +437,15 @@ fn census<const W: usize>(n: u32) -> Result<Json, String> {
 
     let frame_count = |value: fn(&NumberedFrame<W>) -> i64| by_layer(&numbered, &layers, max_layer, value);
     let (reached, answered) = numbered.merged_away_reach;
+
+    // The extended problem with every source of three or more prime factors open.
+    let from_layer_3 = numbered.frames.iter().zip(&layers).filter(|&(_, &layer)| layer >= 3);
+    let open = from_layer_3.fold(Bits::<W>::EMPTY, |acc, (frame, _)| acc | frame.sources);
+    let (extended, span) = extended_frame_count::<W>(&t, &open)?;
+    let extended_frames = match span {
+        Some((lowest, highest)) => Json::array([extended as u64, u64::from(lowest), u64::from(highest)]),
+        None => Json::Arr(vec![Json::from(extended), Json::Null, Json::Null]),
+    };
     Ok(Json::object([
         ("n", Json::from(n)),
         ("w", Json::from(W)),
@@ -456,6 +469,7 @@ fn census<const W: usize>(n: u32) -> Result<Json, String> {
         ("back_with_composite", Json::Arr(back_with_composite.into_iter().take(ITEM_LIMIT).collect())),
         ("merged_away", Json::array([reached, answered])),
         ("violations", failed_checks(&violations)),
+        ("extended_frames", extended_frames),
     ]))
 }
 
@@ -610,6 +624,27 @@ fn summary(lines: &[Json], from: u32, to: u32) -> (String, bool) {
     };
     let sizes: Vec<String> = ["frames", "numbers", "max_layer", "candidates"].iter().map(|key| largest(key)).collect();
     rows.push(format!("largest: {}", sizes.join(", ")));
+
+    // The frames of the extended problem with every source of three or more prime factors open.
+    let extended_frames = |line: &Json| elements(line, "extended_frames").first().and_then(Json::as_u64).unwrap_or(0);
+    let mut by_count: BTreeMap<u64, Vec<u32>> = BTreeMap::new();
+    for line in lines {
+        by_count.entry(extended_frames(line)).or_default().push(number_of(line, "n") as u32);
+    }
+    let counts: Vec<String> = by_count
+        .iter()
+        .map(|(count, boards)| format!("{count}: {} boards (n={})", boards.len(), ranges(boards)))
+        .collect();
+    rows.push(format!(
+        "frames of the extended problem with every source of layer 3 or more open: {}",
+        counts.join("; ")
+    ));
+    let beyond = boards_where(lines, |line| extended_frames(line) > MAX_FRAMES as u64);
+    rows.push(format!(
+        "boards where it needs more than {MAX_FRAMES} frames ({}): first {}",
+        beyond.len(),
+        first(&beyond, 10)
+    ));
     let seconds: f64 = lines.iter().map(|line| line.get("secs").and_then(Json::as_f64).unwrap_or(0.0)).sum();
     rows.push(format!("seconds, summed over the boards: {seconds:.1}"));
     rows.push(if passes { "PASS" } else { "FAIL" }.to_owned());

@@ -5922,3 +5922,29 @@ a few percent to the search, not more: the extended problem's search, with nothi
 
 The default mode is unchanged by all of it (the same gates as 2A: the fingerprints, the suite with the tripwires,
 `regress --to 1000 --threads 1` in 9.1 s, and the chain 1..1300 on one thread line for line).
+
+## One-sided candidates in the search (2026-10)
+
+*Question.*  Stage 2 of E8 (the third consultation of 2026-10-15): can the frame solver search the extended problem
+Π⁺(O) with the open sources as one-sided candidates, so that `taxman certify` proves a recorded score on the whole
+board game by game (Theorem M⁺ and its corollary), with the default mode untouched?  Built in four parts, each with
+the default's gates (the probe's fingerprints, the suite with the tripwires, `regress --to 1000 --threads 1`, and a
+one-thread chain 1..1300 line for line equal to the base commit's, 2e8b851).
+
+*18.1, the model.*  `FrameGraph::build_extended(tables, columns, one_sided)` gives each one-sided candidate its own
+frame; its promotion adds it to that frame's moves (winnable, with the shortcut of an unused factor), takes no factor,
+spends one freedom of that frame; `edits` puts it in its frame's gains, so the frame-by-frame check of a set, the
+conflicts and the nogoods take it unchanged; `frames_touched` replaces the home frame where the searcher checks the
+freedoms of a child that promotes several forced members; `FrameGraph::narrow` and `max_promotions_among` (the
+freedoms' count plus the number of one-sided candidates, sound, not tight) replace the frame set's in the searcher, the
+greedy set, the local search and `max_total`.  Tested against the reference predicate of stage 1
+(`ExtendedFrames::promotable`) on every board 2..300 for O empty, U\*_{≥3} (to 120) and five random subsets: 415,000
+sets promoted at once and one by one in random orders (290,000 of them promotion sets, 264,000 with a one-sided member),
+their conflicts (660,000) and nogoods (330,000) unpromotable, `narrow` dropping no member of a promotion set that extends
+the state (and nothing promotable), the count never below a promotion set's size; eight deliberate bugs in a scratch copy
+(narrowing, the count, `edits`, the freedoms, the nogood) were all caught.  `build_extended` refuses more frames than
+a frame set holds (9), naming the board and the layers, and the census of the frames records the worst case, every
+source of three or more prime factors open, on every board to 8191: 9 frames on 2048..4095 (layers 3 to 11) and 10 on
+every board from 4096 (`bench/structure/`, every earlier field unchanged).  No tree changed: the fingerprints
+7e8e724717d26545 and f3deaac0dbdc030a, the tripwires, `regress --to 1000 --threads 1` in 9.2 s, the chain 1..1300
+line for line (290,503 nodes).

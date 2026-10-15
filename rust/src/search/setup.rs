@@ -35,7 +35,7 @@ pub struct Prepared<const W: usize> {
     /// The greedy incumbent.
     pub greedy: Bits<W>,
     /// The most promotions a promotion set can have (`maxTotalPromotions`):
-    /// `root.max_promotions_among(candidates)`, at least 0.  A count, not the ceiling on the promotion sum.
+    /// `model.max_promotions_among(&root, &candidates)`, at least 0.  A count, not the ceiling on the promotion sum.
     pub max_total: u32,
     pub timings: PrepareTimings,
 }
@@ -128,9 +128,10 @@ pub struct ProblemSize {
     pub max_total: u32,
 }
 
-/// The most promotions a promotion set of the root `root` can have among `candidates` (`maxTotalPromotions`).
-fn max_total<const W: usize>(root: &FrameSet<W>, candidates: &Bits<W>) -> u32 {
-    root.max_promotions_among(candidates).max(0) as u32
+/// The most promotions a promotion set of the root `root` of `model` can have among `candidates`
+/// (`maxTotalPromotions`).
+fn max_total<const W: usize>(model: &FrameGraph, root: &FrameSet<W>, candidates: &Bits<W>) -> u32 {
+    model.max_promotions_among(root, candidates).max(0) as u32
 }
 
 /// The search problem ([`Problem`]) that [`prepare`] poses for the game whose frames are `columns`: the model and the
@@ -145,7 +146,7 @@ pub fn problem_of<const W: usize>(
     candidates: &Bits<W>,
 ) -> Result<Problem, String> {
     let (model, root, _) = build_root::<W>(tables, columns)?;
-    Ok(Problem::of(&model, &root, candidates, max_total(&root, candidates)))
+    Ok(Problem::of(&model, &root, candidates, max_total(&model, &root, candidates)))
 }
 
 /// Sets up the search for the game whose frames are `columns` (factors and moves per frame, front first) and
@@ -160,7 +161,7 @@ pub fn prepare<const W: usize>(
     let t0 = Instant::now();
     let greedy = bounds::greedy(&model, &root, candidates);
     let timings = PrepareTimings { build, greedy: t0.elapsed() };
-    let max_total = max_total(&root, candidates);
+    let max_total = max_total(&model, &root, candidates);
     let n = tables.n;
     Ok(Prepared { n, model: Arc::new(model), root, candidates: *candidates, tactics, greedy, max_total, timings })
 }

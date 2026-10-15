@@ -86,7 +86,7 @@ fn refinement_soundness<const W: usize>(g: &Golden, rng: &mut Rng) -> [u64; 3] {
         let mut known = Vec::new();
         let mut cache = ConflictCache::default();
         loop {
-            let max_add = max_additional(max_total, &state, &promoted, &cands);
+            let max_add = max_additional(&model, max_total, &state, &promoted, &cands);
             let truth = best_completion(&model, &state, &cands, max_add);
             let what = format!("n={} promoted {promoted:?} cands {cands:?} best {truth}", g.n);
             for depth in [0, 1, 2, 4] {
@@ -180,7 +180,7 @@ fn forced_soundness<const W: usize>(g: &Golden, rng: &mut Rng) -> [u64; 2] {
     for _path in 0..2 {
         let (mut state, mut promoted, mut cands) = (root, Bits::<W>::EMPTY, all);
         loop {
-            let max_add = max_additional(max_total, &state, &promoted, &cands);
+            let max_add = max_additional(&model, max_total, &state, &promoted, &cands);
             let truth = best_completion(&model, &state, &cands, max_add);
             for need in [truth.saturating_sub(5), truth, truth + 1] {
                 m.reset(&promoted, &cands);
