@@ -63,3 +63,84 @@ calibration found no contention among 64 copies).
    results file once the chain has gone past 2500 (the model in the entry says 104 s at 2500 and 10 minutes at 4095).
 6. What an S3 save costs: with `S3_DEST` set, `/usr/bin/time -v rust/tools/cloud/save.sh` three times while a chain
    runs (user and system seconds per save; the entry estimates 1.5 s).
+7. The node rate a thread at 64 and 192 threads (the proof of 2172 scaled 58.5 times on 64 threads, with the node rate
+   a thread 93 to 94% of one thread's: this measures where that 6 or 7% of a step's time goes, and what it is at 192).
+   The ladder takes one known-games file, `KNOWN` of `K2`: `cat results/strict.jsonl
+   bench/cloud/c8g.chain-2176.jsonl > known.jsonl` (for these two games `K` would do; `K2` serves later games too).
+   On a 64-vCPU c8g.16xlarge, one process at a time:
+
+   ```
+   cargo run --release --example ladder -- --threads 1,16,64 --seed-opt --known known.jsonl --seconds 3600 2170 2172
+   ```
+
+   and on a 192-vCPU c8g.48xlarge the same with `--threads 1,64,192`.  What to read, in each game's table and the
+   table summed over both: `µs/step` against the 1-thread row's.  Of the difference, `reb %` and `1st %` are the
+   units' starts (the rebuild of the searcher's state, and the first node's GF(2) bound solved from scratch), which
+   are part of `µs/step`; `lock %`, `ramp %` and `tail %` are time not stepping (the lock after a run, the idle time
+   before all workers first ran at once, and after the last moment one finished a unit while all were running); and
+   what is left in `µs/tree`, which is `µs/step` without the units' starts, is the step itself (caches, memory,
+   nogoods learned by fewer steps a thread).  If the units' starts are the loss, the design to try is a unit that
+   carries its node's heaviest common independent set and weight split, so that a rebuilt GF(2) level is checked
+   rather than solved (see docs/EXPERIMENTS.md, round B).
+8. The window at 64 and 192 threads (`--window W`: W consecutive games in flight, sharing the threads).  On each
+   machine, one process at a time, with the thread count in the shell variable `T` (`T=64` on the c8g.16xlarge,
+   `T=192` on the c8g.48xlarge):
+   * (a) The short searches, the chain to 1300 with the window at 1, 4, 8, 16 and 32, twice each; the seconds of wall
+     time are in the line `solved 1..=1300 ... in X s`:
+
+     ```
+     for W in 1 4 8 16 32; do for run in 1 2; do
+         echo "W=$W run $run"; taxman regress --to 1300 --threads $T --window $W 2>/dev/null | grep '^solved'
+     done; done
+     ```
+
+   * (b) The chain past 2175.  A prefix of the committed results and the c8g chain's lines up to 2225 (each line
+     starts `{"schema":5,"n":2176,...`, so the first `"n":` of a line is the game's):
+
+     ```
+     head -n 2175 results/strict.jsonl > prefix.jsonl
+     awk -F'"n":' '{ if ($2 + 0 <= 2225) print }' bench/cloud/c8g.chain-2176.jsonl >> prefix.jsonl
+     ```
+
+     Then 51 games, 2226..2276, with the window at 1 and at 16:
+
+     ```
+     for W in 1 16; do
+         cp prefix.jsonl w$W.jsonl
+         time taxman solve 2226-2276 --threads $T --window $W --out w$W.jsonl --progress 0
+     done
+     ```
+
+     Games an hour = 51 x 3600 over the `real` seconds of each.  Once more with the trace of the window's events, to
+     see how the threads moved (`workers n=N a->b`: the threads of the search of N changed from a to b; a search
+     that loses threads to an older one has b below a, and one suspended has b = 0), which searches were deferred
+     (`defer`), and which were given the game before's best so far (`hint`):
+
+     ```
+     cp prefix.jsonl w16t.jsonl
+     TAXMAN_WINDOW_TRACE=1 taxman solve 2226-2276 --threads $T --window 16 --out w16t.jsonl --progress 0 2> trace.err
+     awk '$3 == "workers" { split($5, w, "->")
+                            count[w[2] == 0 ? "suspensions" : w[2] < w[1] ? "reclaims" : "grants"]++ }
+          $3 == "defer" || $3 == "hint" { count[$3 "s"]++ }
+          END { for (kind in count) print kind, count[kind] }' trace.err
+     ```
+
+     The results with the window are to be the same as without it: both referees on the file, `tools/cloud/verify.sh
+     w16.jsonl`, and the scores, proofs and `same_search` of its games against the c8g file's lines for the same games
+     (`w1.jsonl` too; it prints the games that differ, none expected):
+
+     ```
+     python3 -c '
+     import json, sys
+     load = lambda path: {r["n"]: r for r in map(json.loads, open(path))}
+     new, old = load(sys.argv[1]), load(sys.argv[2])
+     key = lambda r: (r["score"], r["proof"], r["same_search"])
+     games = [n for n in sorted(new) if n > 2225]
+     bad = [n for n in games if key(new[n]) != key(old[n])]
+     print(len(games), "games after 2225 in", sys.argv[1], "differ from", sys.argv[2], "at", bad)
+     ' w16.jsonl bench/cloud/c8g.chain-2176.jsonl
+     ```
+
+   * What to set `WINDOW` to in `tools/cloud/chain.sh` (default 8): the W with the most games an hour in (b) at the
+     thread count of the machine that will run the chain, if (a) points the same way; 1 if no W beats 1 by more than
+     the difference between the two runs of one W in (a); and if 16 is still gaining on 8, try 32 in (b) first.

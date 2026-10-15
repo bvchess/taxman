@@ -87,7 +87,7 @@ The files in this directory:
 | `run.sh` | what the long runs share (one at a time, log, pid, deadline, S3 saves, clean stop, power-off); sourced |
 | `setup.sh` | packages, Rust, the checkout, the builds (`target-cpu=native`; the solver and the prover), smoke checks and the tests; idempotent |
 | `scaling.sh` | the scaling sweep (`--engine`: the engine benchmark; `--pauses`: the cost of checkpoints; `--quick`) |
-| `chain.sh N` | the production run: the chain 1..N in a loop, resumable, logged, optional deadline and power-off |
+| `chain.sh N` | the production run: the chain 1..N in a loop, a window of games in flight (`WINDOW`), resumable, logged, optional deadline and power-off |
 | `verify.sh [FILE...]` | both referees on a results file, and against the committed results |
 | `save.sh` | copy results, logs and checkpoints to S3 (`--restore` on a fresh machine) |
 | `prover.sh A B` | the prover's proofs of opt(n) for n = A..B (section 9): resumable passes, all CPUs; `--verify` checks the output |
@@ -327,13 +327,14 @@ machine; the log (`~/taxman-work/logs/scaling-*.txt`) starts with the machine an
 
 ### 4.3 Reading the sweep
 
-A table (from an M1, two thread counts, n = 1184):
+A table (from an M1, three thread counts, `--seed-opt`, n = 1215, a search of a third of a second):
 
 ```
-scaling, n=1184 (speedup over 1 thread(s), times 1; * = stopped by the time limit):
-  threads   search s speedup       nodes  k/s/thr  eff % idle % lock %  splits    units  steals     runs    tiny  full s
-        1      1.33     1.00      167960    126.5  100.0    0.0   0.00       0        0       0        1       0   0.000
-        2      0.68     1.94      164282    120.3   99.8    0.2   0.00       6       91       6       98      12   0.002
+scaling, n=1215 (speedup over 1 thread(s), times 1; * = stopped by the time limit):
+  threads   search s speedup       nodes  k/s/thr  µs/step  µs/tree  eff % idle % lock %  reb %  1st % ramp % tail %  splits    units  steals     runs    tiny  full s
+        1      0.30     1.00        3647     12.3    63.64    63.48   99.9    0.0   0.00    0.0    0.3    0.0    0.0       0        0       0        1       0   0.000
+        2      0.16     1.80        3855     11.7    64.96    62.73   96.9    3.0   0.00    0.2    3.7    2.7    0.2       2       27       2       30       4   0.007
+        4      0.10     2.92        4493     11.0    66.02    62.87   91.2    8.5   0.00    0.3    4.9    6.5    0.3       4       43       8       48       4   0.007
 ```
 
 | column | meaning | what to look for |
@@ -341,10 +342,16 @@ scaling, n=1184 (speedup over 1 thread(s), times 1; * = stopped by the time limi
 | `search s` | wall time of the search; `*` if the time limit stopped it | a `*` makes that row useless; raise `SECONDS_LIMIT` |
 | `speedup` | time of the first row times its threads, over this time | close to the thread count for a long game; see the next paragraph |
 | `nodes` | steps taken, all threads | compare with the 1-thread row: tens of percent either way is normal (below) |
-| `k/s/thr` | thousands of nodes per second per thread | the engine's efficiency apart from the tree size: it falls a little with more threads (M1, the proof of 1225: 80 to 65 from 1 to 8 threads, 19 %; the rate depends on the game: the 1-thread row above is 126.5 at n = 1184); a step down at one thread count suggests memory, frequency or NUMA |
+| `k/s/thr` | thousands of nodes per second per thread | the engine's efficiency apart from the tree size: it falls a little with more threads (M1, the proof of 1225: 80 to 65 from 1 to 8 threads, 19 %; the rate depends on the game: the 1-thread row above is 12.3 at n = 1215); a step down at one thread count suggests memory, frequency or NUMA |
+| `µs/step` | the workers' busy time per step (busy time over `nodes`), in µs | `k/s/thr` is about 10 x `eff %` / `µs/step` for a search that is long against its own setup, so a fall of `k/s/thr` is a rise of `µs/step` (a step costs more) or a fall of `eff %` (the workers wait); compare the rows of a game |
+| `µs/tree` | the same without the units' starts: (busy time - rebuild - first nodes) over (`nodes` - units with a first node) | the cost of a step inside a unit's tree; if it stays level while `µs/step` rises, the units' starts are the loss (`reb %` and `1st %`), if it rises with `µs/step`, the step itself is dearer on more threads (caches, memory, fewer nogoods learned a thread) |
 | `eff %` | busy time / (wall x threads) | 99 to 100 up to 8 threads on the M1; below ~90 at 192 only means the game is too short, if `idle %` explains it |
 | `idle %` | time workers waited for work | ramp-up and tail: they matter when the whole search takes seconds; a long game should keep it small |
 | `lock %` | time waiting for the deque's lock | should stay near 0; if it reaches a few percent on long games at high counts, the engine's one shared deque is contended and per-worker deques are the next step (`src/engine.rs`, "Why one deque") |
+| `reb %` | time units spent rebuilding their state, from the start of a unit to its first step | part of `µs/step`, paid once a unit: it rises with the number of units, so with the threads (0.0, 0.2 and 0.3 % in the sample above) |
+| `1st %` | time units spent in their first node, whose GF(2) bound is solved from scratch | the same (0.3, 3.7 and 4.9 % above); if `reb %` and `1st %` together are most of the rise of `µs/step` from 1 thread, the units' starts are the loss |
+| `ramp %` | idle time before all workers first ran at once | a part of `idle %`: the start of the search, which a short game at many threads is mostly made of |
+| `tail %` | idle time after the last moment a worker finished a unit while every worker was running | a part of `idle %`: the end of the search, when the work runs out |
 | `splits`, `units` | times a worker handed work over, and the units those gave | grows with the thread count; the demand for work, not a defect |
 | `steals` | units taken from the front of the deque by workers that had waited | |
 | `runs`, `tiny` | units run, and those that polled once or never (nothing left in them) | compare the share with the rows of few threads; [docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md) ("The engine") records 13 of 227 at 2 threads |
@@ -415,9 +422,12 @@ DEADLINE_HOURS=30 POWEROFF=always S3_DEST=s3://YOUR-BUCKET/taxman-run1 rust/tool
 ```
 
 In a second window, if spot: `rust/tools/cloud/spot-watch.sh`.  `chain.sh N` is the whole command: the chain 1..N
-into `~/taxman-work/results/strict.jsonl`, all CPUs, a checkpoint every 300 s and a progress line every 60 s.  Its
-variables (all optional) are documented at the top of the script: `THREADS`, `CHECKPOINT_INTERVAL`, `PROGRESS`,
-`EXTRA_ARGS`, `DEADLINE_HOURS`, `POWEROFF`, `MAX_FAILS`, `S3_DEST`, `SAVE_EVERY`.
+into `~/taxman-work/results/strict.jsonl`, all CPUs, eight games in flight at once, a checkpoint every 300 s and a
+progress line every 60 s.  Its variables (all optional) are documented at the top of the script: `THREADS`, `WINDOW`,
+`CHECKPOINT_INTERVAL`, `PROGRESS`, `EXTRA_ARGS`, `DEADLINE_HOURS`, `POWEROFF`, `MAX_FAILS`, `S3_DEST`, `SAVE_EVERY`.
+`WINDOW` is the number of games in flight at once, which share the threads (`taxman solve --window`): 1 solves the
+games one after the other, and the scores and proofs are the same for every value; what to set it to on 64 or 192
+threads is measured in items 7 and 8 of [bench/wall/README.md](../../bench/wall/README.md#for-a-cloud-machine).
 
 * **Where the chain starts.**  From an empty `~/taxman-work`, `chain.sh` solves from n = 1, which reproduces the
   committed `rust/results/strict.jsonl` (n = 1 to 2175; the scores equal, the moves may differ) in minutes on the big
