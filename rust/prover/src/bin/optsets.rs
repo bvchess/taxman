@@ -34,9 +34,8 @@ use std::time::Instant;
 use taxman_prover::game::{
     derive_optimal_sets, relation, the_prime_of_every_optimal_set, Board, Prover, Relation, Role, Verdict,
 };
-use taxman_prover::instance::Instance;
 use taxman_prover::jsonl::{campaign, field_nums, field_str, field_u64, parse_items, recorded_games, Obj};
-use taxman_prover::peel::{greedy, Peeler};
+use taxman_prover::peel::u_star;
 use taxman_prover::primes::smallest_prime_factors;
 
 /// At most this many sets are written per line (besides the canonical one).
@@ -47,13 +46,6 @@ fn descending(set: &[u32]) -> Vec<u32> {
     let mut d = set.to_vec();
     d.sort_unstable_by(|a, b| b.cmp(a));
     d
-}
-
-/// U\* of game n, descending: descending greedy on the upper-half instance.
-fn u_star(n: u64, spf: &[u32]) -> Vec<u32> {
-    let inst = Instance::upper_half(n, spf);
-    let kept = greedy(&inst, &mut Peeler::new());
-    (0..inst.len()).filter(|&m| kept[m]).map(|m| inst.value[m] as u32).collect()
 }
 
 /// How a game's sets were found.

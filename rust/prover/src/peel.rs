@@ -179,6 +179,14 @@ pub fn greedy(inst: &Instance, peeler: &mut Peeler) -> Vec<bool> {
     kept
 }
 
+/// U\* of game n: descending greedy on the upper-half instance (the numbers above n/2), returned in descending order.
+/// `spf` must reach `n`.
+pub fn u_star(n: u64, spf: &[u32]) -> Vec<u32> {
+    let inst = Instance::upper_half(n, spf);
+    let kept = greedy(&inst, &mut Peeler::new());
+    (0..inst.len()).filter(|&m| kept[m]).map(|m| inst.value[m] as u32).collect()
+}
+
 /// Shrinks a self-covering set (a nonempty residual) to an inclusion-minimal one (a *minimal core*) by the
 /// deletion filter, trying members in the given order.
 pub fn minimal_core(inst: &Instance, peeler: &mut Peeler, core: &[u32]) -> Vec<u32> {
