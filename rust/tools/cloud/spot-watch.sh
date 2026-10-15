@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # On an EC2 Spot interruption notice (two minutes of warning), stop the run cleanly and save.
 #
-#   rust/tools/cloud/spot-watch.sh            run it next to chain.sh or prover.sh, in a second tmux window
+#   rust/tools/cloud/spot-watch.sh            run it next to chain.sh, prover.sh or hunt.sh, in a second tmux window
 #
 # It polls the instance metadata service (IMDSv2) every 5 seconds.  When the notice appears it sends SIGTERM to the
-# chain.sh or prover.sh whose pid is in $TAXMAN_WORK/chain.pid or prover.pid (the solver writes a final checkpoint
-# and chain.sh ends; prover.sh ends, and the searches of its pass go back to their last checkpoints), waits up to 90
-# seconds for it, then runs save.sh (which copies to S3 if S3_DEST is set).  It also logs a rebalance recommendation,
-# which comes earlier and is only a hint.  Without this script a spot interruption costs at most one checkpoint
-# interval (300 s) of the chain's work, or one pass (PASS_SECONDS) of prover.sh's; with it, nothing for the chain.
+# chain.sh, prover.sh or hunt.sh whose pid is in $TAXMAN_WORK/chain.pid, prover.pid or hunt.pid (the solver writes a
+# final checkpoint and chain.sh ends; prover.sh ends, and the searches of its pass go back to their last checkpoints;
+# hunt.sh ends, and the pairs in progress are lost), waits up to 90 seconds for it, then runs save.sh (which copies
+# to S3 if S3_DEST is set).  It also logs a rebalance recommendation, which comes earlier and is only a hint.  Without
+# this script a spot interruption costs at most one checkpoint interval (300 s) of the chain's work, or one pass
+# (PASS_SECONDS) of prover.sh's; with it, nothing for the chain.
 #
 # Not on EC2 (no metadata service) it says so and exits.
 
@@ -40,7 +41,7 @@ while :; do
     if [ "$(status_of "$t" spot/instance-action)" = 200 ]; then
         log "SPOT INTERRUPTION NOTICE: $(curl -s -m 2 -H "X-aws-ec2-metadata-token: $t" "$imds/meta-data/spot/instance-action")"
         stopped=""
-        for name in chain prover; do
+        for name in chain prover hunt; do
             pidfile="$TAXMAN_WORK/$name.pid"
             if [ -r "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
                 pid="$(cat "$pidfile")"
@@ -54,7 +55,7 @@ while :; do
                 stopped=1
             fi
         done
-        [ -n "$stopped" ] || log "no chain.sh or prover.sh is running"
+        [ -n "$stopped" ] || log "no chain.sh, prover.sh or hunt.sh is running"
         "$here/save.sh" || log "save.sh failed"
         log "done; the instance will be taken away"
         exit 0

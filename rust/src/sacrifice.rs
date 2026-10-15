@@ -14,8 +14,13 @@
 //!   pipeline slowed the games it was tried on (numbers under "Findings"; `examples/sacrifice.rs` made them).
 //! * *What stays in use.*  `tests/wide.rs` uses [`sacrifice_bound`] as an upper bound that does not come from the
 //!   search under test, to prove one result at `W = 20` (game 1133), beyond what the Java can check.  The support
-//!   for punctured boards (holes) exists for this study alone: [`crate::numtheory::Tables::punctured`],
-//!   [`crate::game::replay_punctured`], and the hole cases of [`crate::frames`].
+//!   for punctured boards (holes) exists for this study and for the hunt (next bullet):
+//!   [`crate::numtheory::Tables::punctured`], [`crate::game::replay_punctured`], and the hole cases of
+//!   [`crate::frames`].
+//! * *The hunt.*  The punctured boards also serve a search for a counterexample to a claimed optimum: [`hunt`] looks
+//!   on the board `[n] ∖ {u}` for a game that scores more than the claim, for a source `u` that the prover's bounds
+//!   could not show every better game must play (`examples/hunt.rs`).  A game of the punctured board is a game of
+//!   `[n]` with the same moves and score, since a source is nobody's factor.
 //! * *Not here.*  The proof that the prime shortcut is optimal, which the solver does rely on, is with the shortcut
 //!   ([`crate::accelerate::prime_shortcut`]); the "Prime `n`" remark below is its case in this setting.
 //!
@@ -124,11 +129,13 @@
 //!   searching proves all of them sooner.
 
 use crate::accelerate::solution_for_promotions;
+use crate::bits::Bits;
 use crate::board::Board;
-use crate::engine::EngineConfig;
+use crate::engine::{self, EngineConfig, Start};
 use crate::game::replay_punctured;
+use crate::matchbound::MatchGraph;
 use crate::numtheory::Tables;
-use crate::search::{self, SearchTactics};
+use crate::search::{self, payload_of, set_of_payload, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
 use std::time::{Duration, Instant};
 
 /// How [`punctured`] found its game.
@@ -239,9 +246,8 @@ fn punctured_with_width<const W: usize>(
     opts: &PuncturedOptions,
 ) -> Result<Punctured, String> {
     let board = Board::<W>::new(Tables::punctured(n, &[hole]));
-    let referee = |moves: &[u32]| replay_punctured(n, &[hole], moves).map_err(|e| format!("illegal game: {e}"));
     if board.is_trivial() {
-        let score = referee(&board.plain)?;
+        let score = referee(n, hole, &board.plain)?;
         return Ok(Punctured {
             hole,
             score,
@@ -267,14 +273,127 @@ fn punctured_with_width<const W: usize>(
         ..EngineConfig::default()
     };
     let found = search::search(&prepared, &cfg, Some(&seed), cap, false).map_err(|e| format!("search failed: {e}"))?;
-    let moves = solution_for_promotions::<W>(&board.tables, found.promotions);
-    let score = referee(&moves)?;
-    if score != board.in_the_bag + found.sum {
-        return Err(format!("the game scores {score}, not {} + the promotions' {}", board.in_the_bag, found.sum));
-    }
+    let (moves, score) = game_of(&board, hole, found.promotions)?;
     // Reaching the unpunctured optimum is proof; reaching a lower `stop_at` proves only that much.
     let exact = found.completed && (!found.reached_cap || score >= full_score);
     Ok(Punctured { hole, score, moves, how: How::Search, exact, nodes: found.stats.nodes, time: Duration::ZERO })
+}
+
+/// The score of `moves` as a game of `[n] ∖ {hole}` under the maximal-factor rule, or why it is not one.
+fn referee(n: u32, hole: u32, moves: &[u32]) -> Result<u64, String> {
+    replay_punctured(n, &[hole], moves).map_err(|e| format!("illegal game: {e}"))
+}
+
+/// The game of the punctured `board` (its one hole `hole`) that plays `promotions`, refereed there: its moves and
+/// score.  The score must be what the frame model says, `in_the_bag` plus the promotions' sum.
+fn game_of<const W: usize>(board: &Board<W>, hole: u32, promotions: Bits<W>) -> Result<(Vec<u32>, u64), String> {
+    let moves = solution_for_promotions::<W>(&board.tables, promotions);
+    let score = referee(board.n(), hole, &moves)?;
+    if score != board.in_the_bag + promotions.sum() {
+        let (in_the_bag, sum) = (board.in_the_bag, promotions.sum());
+        return Err(format!("the game scores {score}, not {in_the_bag} + the promotions' {sum}"));
+    }
+    Ok((moves, score))
+}
+
+/// What [`hunt`] concluded about the board `[n] ∖ {hole}`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Hunted {
+    /// A game of the punctured board beating the claim, refereed there: its score and moves.
+    Found { score: u64, moves: Vec<u32> },
+    /// The search finished: no promotion set of the punctured board's model beats the claim.
+    Nothing,
+    /// The time limit stopped the search first.
+    Timeout,
+}
+
+/// A hunt on one punctured board.
+#[derive(Clone, Debug)]
+pub struct Hunt {
+    /// The number taken off the board `[n]`.
+    pub hole: u32,
+    /// The score to beat.
+    pub claim: u64,
+    /// What the punctured board's game with no promotions scores: the part of every score that no promotion changes.
+    pub in_the_bag: u64,
+    /// What the hunt concluded.
+    pub outcome: Hunted,
+    /// The search's steps (0 when the claim was settled without one).
+    pub nodes: u64,
+    /// The whole call, board setup included.
+    pub time: Duration,
+}
+
+/// Whether some game of `[n] ∖ {hole}` (maximal-factor rule) scores more than `claim`, by the frame model on the
+/// punctured board.
+///
+/// For a source `hole` (a number above `n/2`: nobody's factor) a game of the punctured board is a game of `[n]` with
+/// the same moves and score, so a game there that beats a recorded optimum of `n` is a counterexample to it.  The
+/// search starts from a handicapped incumbent worth `claim − in_the_bag` with an empty payload
+/// (the method of `tests/soundness.rs`): it looks only for promotion sets that beat the claim, and if it finds one
+/// the engine's incumbent is a real set, which is turned into a game and refereed on the punctured board
+/// ([`replay_punctured`]), its score checked against `in_the_bag` plus the promotions' sum.  A claim below
+/// `in_the_bag` is beaten by the game with no promotions, with no search.
+///
+/// A found game is a real game.  "Nothing" is only as complete as the frame model on the punctured board: there it is
+/// validated against the brute force on small boards, not proven (see "Computing it" in the module documentation), so
+/// it is evidence, not a proof.  "Timeout" says nothing.
+///
+/// # Errors
+///
+/// If `hole` is not on the board, the board is beyond the widest set, the search cannot be set up or fails, or a game
+/// does not referee as the frame model says (a bug).
+pub fn hunt(n: u32, hole: u32, claim: u64, opts: &PuncturedOptions) -> Result<Hunt, String> {
+    let start = Instant::now();
+    if !(1..=n).contains(&hole) {
+        return Err(format!("n={n} without {hole}: the hole is not on the board"));
+    }
+    let result = crate::with_width!(n, W => hunt_with_width::<W>(n, hole, claim, opts),
+        else return Err(format!("n={n} is too large")));
+    let mut result = result.map_err(|e| format!("n={n} without {hole}: {e}"))?;
+    result.time = start.elapsed();
+    Ok(result)
+}
+
+/// [`hunt`] at the set width `W`.
+fn hunt_with_width<const W: usize>(n: u32, hole: u32, claim: u64, opts: &PuncturedOptions) -> Result<Hunt, String> {
+    let board = Board::<W>::new(Tables::punctured(n, &[hole]));
+    let in_the_bag = board.in_the_bag;
+    let hunted = |outcome: Hunted, nodes: u64| Hunt { hole, claim, in_the_bag, outcome, nodes, time: Duration::ZERO };
+    if in_the_bag > claim {
+        let (moves, score) = game_of(&board, hole, Bits::EMPTY)?;
+        return Ok(hunted(Hunted::Found { score, moves }, 0));
+    }
+    if board.is_trivial() {
+        return Ok(hunted(Hunted::Nothing, 0));
+    }
+
+    let prepared = board.prepare(opts.tactics)?;
+    let graph = MatchGraph::new(&prepared.model, &prepared.root);
+    let space = SearchSpace::new(&prepared, &graph);
+    let cfg = EngineConfig {
+        threads: opts.threads,
+        time_limit: opts.time_limit,
+        label: format!("hunt n={n}-{hole}"),
+        ..EngineConfig::default()
+    };
+    // The incumbent is worth the target and holds no set: the search keeps it unless a promotion set beats it, and
+    // then the incumbent it ends with is that set.
+    let target = claim - in_the_bag;
+    let root = TaxUnit { promoted: Bits::EMPTY, cands: prepared.candidates };
+    let start = Start::Fresh { units: vec![root], best: target, payload: payload_of(&Bits::<W>::EMPTY) };
+    let outcome =
+        engine::run(&cfg, start, b"hunt", |_| TaxSearcher::new(&space)).map_err(|e| format!("search failed: {e}"))?;
+    let nodes = outcome.stats.nodes;
+    if outcome.best > target {
+        let promotions = set_of_payload::<W>(&outcome.payload);
+        if promotions.sum() != outcome.best {
+            return Err(format!("the incumbent is worth {}, its set {}", outcome.best, promotions.sum()));
+        }
+        let (moves, score) = game_of(&board, hole, promotions)?;
+        return Ok(hunted(Hunted::Found { score, moves }, nodes));
+    }
+    Ok(hunted(if outcome.completed { Hunted::Nothing } else { Hunted::Timeout }, nodes))
 }
 
 /// The sacrifice bound of game `n`, with what it took.
@@ -396,7 +515,6 @@ fn without_one(m: u32, prev: &[u32], prev_score: u64) -> Result<Punctured, Strin
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bits::Bits;
     use crate::brute::{self, Rule};
     use crate::frames::BoardFrames;
     use crate::game::{replay, Optimal};
@@ -483,5 +601,95 @@ mod tests {
             tight += u32::from(b.value == opt);
         }
         assert!(tight > 100, "the bound is tight at {tight} boards");
+    }
+
+    /// The game that a hunt found, checked: it beats the claim, plays no hole, and referees on the punctured board to
+    /// the score the hunt says.  Returns the score and the moves.
+    fn found_game(n: u32, found: &Hunt) -> (u64, &[u32]) {
+        let hole = found.hole;
+        let Hunted::Found { score, moves } = &found.outcome else {
+            panic!("n={n} without {hole}: {:?}", found.outcome)
+        };
+        assert!(*score > found.claim && !moves.contains(&hole), "n={n} without {hole}: {moves:?}");
+        assert_eq!(replay_punctured(n, &[hole], moves), Ok(*score), "n={n} without {hole}");
+        (*score, moves)
+    }
+
+    /// Planted answers.  For each source `u` of the boards 30 to 150 (every 7th) the best game of `[n] ∖ {u}` is
+    /// known exactly ([`punctured`]), worth `s`: a hunt with the claim `s − 1` must find a game (the best one, which
+    /// replays on `[n]` to the same score), and a hunt with the claim `s` must find nothing.
+    #[test]
+    fn a_hunt_finds_the_best_game_of_a_punctured_board_and_nothing_above_it() {
+        let optimal = Optimal::built_in();
+        let opts = PuncturedOptions::default();
+        let (mut pairs, mut searched, mut proved_by_search) = (0, 0, 0);
+        for n in (30..=150u32).step_by(7) {
+            let (full, full_score) = (optimal.moves(n).unwrap(), optimal.score(n).unwrap());
+            let sources: Vec<u32> = Board::<8>::for_n(n).plain.into_iter().filter(|&u| 2 * u > n).collect();
+            assert!(!sources.is_empty(), "n={n}");
+            for u in sources {
+                let best = punctured(n, u, full, full_score, None, &opts).unwrap();
+                assert!(best.exact, "n={n} without {u}");
+                let s = best.score;
+
+                let beaten = hunt(n, u, s - 1, &opts).unwrap();
+                assert_eq!((beaten.hole, beaten.claim), (u, s - 1));
+                let (score, moves) = found_game(n, &beaten);
+                assert_eq!(score, s, "n={n} without {u}: the best game scores {s}");
+                assert_eq!(replay(n, moves), Ok(s), "n={n} without {u}: the game does not replay on the full board");
+
+                let settled = hunt(n, u, s, &opts).unwrap();
+                assert_eq!(settled.outcome, Hunted::Nothing, "n={n} without {u}: nothing beats {s}");
+
+                pairs += 1;
+                searched += usize::from(beaten.nodes > 0);
+                proved_by_search += usize::from(settled.nodes > 0);
+            }
+        }
+        // Most pairs take a search, to find the best game and to rule out a better one (a claim below the game with
+        // no promotions, or a board with no candidates, is settled without).
+        let most = pairs / 2;
+        assert!(
+            pairs > 500 && searched > most && proved_by_search > most,
+            "{pairs} pairs: {searched}, {proved_by_search}"
+        );
+    }
+
+    /// A hunt agrees with the brute force on every small punctured board, trivial ones included: nothing beats the best
+    /// score, and something beats one less.
+    #[test]
+    fn a_hunt_agrees_with_the_brute_force_on_small_boards() {
+        let opts = PuncturedOptions::default();
+        for n in 2..=30u32 {
+            for hole in 1..=n {
+                let exact = brute::solve(n, &[hole], Rule::MaximalFactor).score;
+                let settled = hunt(n, hole, exact, &opts).unwrap();
+                assert_eq!(settled.outcome, Hunted::Nothing, "n={n} without {hole}: nothing beats {exact}");
+                if exact > 0 {
+                    let beaten = hunt(n, hole, exact - 1, &opts).unwrap();
+                    assert_eq!(found_game(n, &beaten).0, exact, "n={n} without {hole}");
+                }
+            }
+        }
+    }
+
+    /// A claim below the score of the game with no promotions is beaten by that game, with no search.
+    #[test]
+    fn a_claim_below_the_game_with_no_promotions_is_beaten_at_once() {
+        let opts = PuncturedOptions::default();
+        let (n, hole) = (100, 61);
+        let plain = hunt(n, hole, 0, &opts).unwrap();
+        assert_eq!((plain.nodes, found_game(n, &plain).0), (0, plain.in_the_bag));
+        let just_below = hunt(n, hole, plain.in_the_bag - 1, &opts).unwrap();
+        assert_eq!((just_below.nodes, found_game(n, &just_below).0), (0, plain.in_the_bag));
+        // At the score itself it takes a search to tell: the board has candidates, and its best game scores more.
+        let at = hunt(n, hole, plain.in_the_bag, &opts).unwrap();
+        assert!(at.nodes > 0 && matches!(at.outcome, Hunted::Found { .. }), "{at:?}");
+    }
+
+    #[test]
+    fn a_hunt_refuses_a_hole_that_is_not_on_the_board() {
+        let opts = PuncturedOptions::default();
+        assert!(hunt(30, 0, 0, &opts).is_err() && hunt(30, 31, 0, &opts).is_err() && hunt(0, 1, 0, &opts).is_err());
     }
 }
