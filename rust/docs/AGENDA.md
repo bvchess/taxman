@@ -19,9 +19,9 @@ avenue started from here gets its row there when it ends.
 ## 1. Where we are
 
 **Known.**  Every n ≤ 2175 has a game proven optimal within the frame model, a chain from n = 1
-([results/README.md](../results/README.md)); the prover, which knows nothing of frames, proves every n ≤ 1300 on the
-whole board, and its proofs of 1301-2175 are running on a cloud machine
-([prover 3](../prover/README.md#3-the-proofs-of-optn)).
+([results/README.md](../results/README.md)); the prover, which knows nothing of frames, proves every n ≤ 2175 on the
+whole board, 1301-2175 in a cloud run of 226 thread-hours and $3.84
+([prover 3](../prover/README.md#to-2175-on-a-cloud-machine)).
 A 64-thread chain reached 2276 in the Graviton calibration (`bench/cloud/c8g.chain-2176.jsonl`, benchmark data, not
 a committed result), and the EC2 chain, 64 threads on a `c8g.16xlarge`, 3314 in 6.4 hours (a snapshot of
 2026-10-15, not committed; its root gaps are section 7.4).  The frame model's assumptions are validated, not proven
@@ -133,13 +133,14 @@ derivation are in the entry [The gap past 2175](EXPERIMENTS.md#the-gap-past-2175
 * *The node, the engine, the fixed costs.*  Constant factors: the intersection is 98% of a node, parallel scaling is
   58 times at 64 threads.  Needed, but they shift the wall by a few hundred, not by thousands.
 * *The frame model, for the proven wall.*  The solver's results rest on the model; the prover's check does not, but
-  its nodes per solver node grow tenfold per 1000 in n (0.9 at 1300-1400, 7 at 1975-2103) and its node costs 6 to 17
-  times the solver's (17 at 990-1300; 2.5 ms against 0.4 near 2170;
+  its nodes per solver node grow threefold per 1000 in n (2.5 at 1301-1499, 6.1 at 2060-2169) and its node costs 9 to
+  17 times the solver's (17 at 990-1300; 4.1 ms against 0.46 near 2170, both on Graviton4;
   [the prover's proofs of 1301-2175](EXPERIMENTS.md#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10)),
   against the committed chain's nodes; the present build's trees are 0.29 times as large, so against them the ratios
-  are 3.4 times higher.  At that trend the check costs about 60 times the solver's nodes near 3000 (200 against the
-  present build's): the wall of *verified* results will be the prover's, not the solver's, unless the model is proven
-  or the prover gets the model's reductions as proven facts (avenue A2).
+  are 3.4 times higher.  At that trend the check costs about 15 times the solver's nodes near 3000 (50 against the
+  present build's), the proofs of 1301-2175 having taken 226 thread-hours: the wall of *verified* results will be the
+  prover's, not the solver's, unless the model is proven or the prover gets the model's reductions as proven facts
+  (avenue A2).
 
 ## 3. Ranked avenues
 
@@ -308,7 +309,7 @@ sit in adjacent frames (homes 1 and 2), as at the roots of 1251-1300, so that no
 
 ### A6. The prover's node (a constant factor that keeps verification in pace)
 
-A node of the prover costs 6 to 17 times the solver's (section 2) because it solves the parity matroids at each node
+A node of the prover costs 9 to 17 times the solver's (section 2) because it solves the parity matroids at each node
 warm-started from its parent, where the solver keeps contracted matroids by pivots along the path
 ([GF(2) search](EXPERIMENTS.md#the-gf2-bound-in-the-search-2026-10), item 5).  Reimplementing the technique in the
 prover (not sharing code, which is the point of the prover) would give it most of that factor, and the bound without a
@@ -472,8 +473,10 @@ their output files, analysed afterwards on one thread; what needs the machine is
   ([EXPERIMENTS](EXPERIMENTS.md#scaling-to-192-threads-2026-10)); proofs of a second or ten, not dear games.  The
   window's speculation in the chain's own nodes, game by game against the scaling run's, is −0.04 ± 0.03 decades for a
   window of 1 or 4 (−0.11 over 2226-2276, where the dear games lay), and the threads' −0.02: the fit takes them off.
-* **The prover's run**: per game, its nodes against the solver's (the ratio's trend past 2000), and where its tree
-  branches (members above n/2 against below), which is A2's premise: the share of its nodes spent on U\*.
+* **The prover's run**: per game, its nodes against the solver's (the ratio's trend past 2000: done, threefold per 1000
+  in n, [EXPERIMENTS](EXPERIMENTS.md#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10)), and where its
+  tree branches (members above n/2 against below), which is A2's premise: the share of its nodes spent on U\*.  The
+  run's lines hold totals only, so the second needs a rerun that counts them.
 * **The scaling at 192** (on the machine): effective parallelism, idle and lock time on a dear game, the nogood
   period (IDEAS.md, section 3), the checkpoint pause at 300 s
   ([RUNBOOK 8](../tools/cloud/RUNBOOK.md#8-what-has-not-been-measured)).  Measured but for the nogood period, on

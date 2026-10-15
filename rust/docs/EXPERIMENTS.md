@@ -329,12 +329,14 @@ The work of [the prover](../prover/README.md) and the proofs of [THEORY.md](../.
 | The Lagrangian bound over the nogoods beside the parity bound | [parity bound](#the-parity-bound-in-the-model-free-proofs-2026-10) | not kept | cut nothing at 990: the same 44,411 nodes, 7% slower |
 | Resuming the matching bound's open searches with the parity bound, against starting afresh | [parity bound](#the-parity-bound-in-the-model-free-proofs-2026-10) | measured | both finish; resuming costs more (990: 89,639 more nodes against 44,389 from scratch; 992: 214,329 against 66,892) |
 | Does an optimal game play the most moves, M(n)?  (The wiki's open question; in its whole-game form, the conjecture behind `revise_freedoms`.)  M(n) from the matching number ν(n) and a unit-weight search, against the optimal game's moves, n = 2..1300 | [prover 6](../prover/README.md#6-does-an-optimal-game-play-the-most-moves); [THEORY: longest games](../../heuristics/THEORY.md#longest-games) | not kept: false | at n = 833, 834 and 835 every optimal game is one move short of the longest (the heaviest 363-move game of 833 scores 29 less); every other game to 1300 is a longest game, 1,293 by ν(n) alone; pruning branches that cannot reach M(n) moves would be unsound |
-| Predict the cost of `exact` on 1301-2175 from the root's parity gap (tenfold nodes per 84 to 130 points of it, as over 900-1300) | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | not kept: wrong by 10 to 1000 times | gap 364 took 18 thousand nodes (1576), gap 401 63 thousand (1501), gap 315 300 thousand (1326); the slope from gap 310 to the 767 of 2170-2173 said 90 to 900 thread-hours for one game and 1,000 to 5,000 for the campaign |
-| Predict it from the nodes of the solver's own search of the game (`strict.jsonl`), times a ratio fitted on finished games | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | kept: the order of `prover.sh` and the estimate (about 140 thread-hours) | 34 games finished: 0.13 to 13 times the solver's nodes, the ratio growing tenfold per 1000 in n (geometric mean 0.9 at 1300-1400, 7 at 1975-2103), sd 0.28 decades; the first fit on 1302-1576 alone said 61 thread-hours, low by 2.3 times |
+| Predict the cost of `exact` on 1301-2175 from the root's parity gap (tenfold nodes per 84 to 130 points of it, as over 900-1300) | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | not kept: wrong by 10 to 1000 times | gap 364 took 18 thousand nodes (1576), gap 401 63 thousand (1501), gap 315 300 thousand (1326); the slope from gap 310 to the 767 of 2170-2173 said 90 to 900 thread-hours for one game and 1,000 to 5,000 for the campaign; the run's 490 searches fit tenfold per 210 points (R² 0.61, sd 0.45 decades) |
+| Predict it from the nodes of the solver's own search of the game (`strict.jsonl`), times a ratio fitted on finished games | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | kept for the order of `prover.sh`; the estimate (about 140 thread-hours) and the ratio's trend were low | 34 games finished: 0.13 to 13 times the solver's nodes, the ratio growing tenfold per 1000 in n (geometric mean 0.9 at 1300-1400, 7 at 1975-2103), sd 0.28 decades; the first fit on 1302-1576 alone said 61 thread-hours, low by 2.3 times; the run: 226 thread-hours, the ratio of its 457 priced games threefold per 1000 in n (geometric mean 2.5 at 1301-1499, 6.1 at 2060-2169, sd 0.35 decades), and 33 games the solver settles without a search priced at zero |
+| The prover's proofs of opt(n) for 1301-2175: `exact` over the 875 games, each from scratch with the parity bound, on one `c8g.4xlarge` on spot (`prover.sh`, 190 passes of 300 s, 2026-10-14 and 15) | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | kept: opt(n) proven equal to the recorded score for every n in 2..2175 | 490 searches, 309.2 million nodes, 226.0 thread-hours at 2.63 ms a node (2.0 to 2.6 through 1899, 3.9 at 2100-2175); 15.9 hours, 16.0 instance-hours, $3.84; no counterexample, no interruption, every pass ended with status 0; projected 140 thread-hours (100 to 250), 11 to 17 hours, $2.6 to 4.1 |
+| Price the games the solver settles without a search (0 nodes in `strict.jsonl`) in `summarize.py order` | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | open | 33 games priced at zero took 22.1 million nodes and 13.9 thread-hours; two of them, 1837 and 1839 (2.6 hours each), started in the 159th pass and ended the run; perfect packing of the 226 thread-hours is 14.1 hours against the run's 15.9 (about $0.42) |
 | Thread scaling of `exact` (one game per thread) | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | measured | the same 275,105 nodes at 1, 2, 4 and 8 threads, user time a node 2.19 to 2.46 ms (+12%), the 8-thread wall time the longest game's (151 s of 606) |
-| A single game's search over several threads or processes (a `--shard i/K` over the open units of a checkpoint) | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | open: not needed | at 16 vCPUs the campaign ends with the dearest games (11 hours) and 4 to 5 of them run at once |
-| A clean pause of `exact` on SIGTERM (a stop handler) | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | open: replaced by passes in `prover.sh` | passes of 300 s bound what a kill loses to 5 minutes of the threads, and a resumed search has the nodes of an uninterrupted one |
-| A 192-vCPU instance for the proofs of 1301-2175 | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | not kept | from 16 vCPUs up the dearest games (2170-2173) set the wall time, 11 hours; 192 vCPUs cost eight times as much for the same hours |
+| A single game's search over several threads or processes (a `--shard i/K` over the open units of a checkpoint) | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | open: not needed | projected to end at 16 vCPUs with the dearest games (11 hours), 4 to 5 of them at once; in the run the four dearest took 7.7 to 7.9 hours and the wall time was 15.9, set by the packing of the late starts (1837 and 1839) |
+| A clean pause of `exact` on SIGTERM (a stop handler) | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | open: replaced by passes in `prover.sh` | passes of 300 s bound what a kill loses to 5 minutes of the threads, and a resumed search has the nodes of an uninterrupted one; the run's 190 passes cost under 1% and none was killed |
+| A 192-vCPU instance for the proofs of 1301-2175 | [1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | not kept | from 16 vCPUs up the dearest games (2170-2173) set the wall time, 11 hours; 192 vCPUs cost eight times as much for the same hours (the dearest game took 7.9 hours in the run) |
 | How the parity bound relates to Franklín and Moniot's Theorem 1 and bound | [THEORY: relation to Franklín and Moniot](../../heuristics/THEORY.md#relation-to-franklín-and-moniot) | kept (proven; evaluation/fm_relation.py) | playable / independent / matchable iff exactly one / an odd number / at least one payment scheme onto some payment set (Theorem 12); no odd core below board 45, so the parity bound is exact to 44; checked on every pick set of 2..22 and 18,200 dense sets on 30-120 |
 | Must a move of an optimal game ever pay three or more numbers of tax?  (The wiki's open question.)  Every move of `optimal.json` and the chain, an exhaustive search over every optimal game of 2..56, and a reordering of the games that pay three | [wiki questions](#the-wikis-open-questions-2026-10) | kept (proven in part; evaluation/wiki_questions.py) | some optimal game pays three at 40, 41 and 56, and 74 committed games do (1250..2159; none of the Java's to 1000); a move of an optimal game pays only maximal factors of it, or s/p and s/p² (a theorem), so three needs three distinct primes; every committed game reorders into one paying at most two by moving one move, so no n ≤ 2175 forces three; that every n has an optimal game paying at most two is a conjecture |
 | Which n does the wiki's procedure for reusing the game of n − 1 make optimal, and what predicts them?  (The wiki's open question.)  The procedure as the page has it on both files' games, n = 2..2175; the Java's set-level reuse emulated; an exhaustive search over every optimal game of n − 1 to 50 | [wiki questions](#the-wikis-open-questions-2026-10) | kept (proven in part; evaluation/wiki_questions.py) | 45% of 2..1000 (930 of 2..2175), not the page's 70%, which is the Java's reuse (690 of 2..1000 emulated); optimal exactly when the move it skips is δ(n) = n + opt(n − 1) − opt(n); always at the primes and at the even n whose half n − 1 does not play (so opt(2p) = 2p + opt(2p − 1)); never when δ(n) is coprime to a composite n (644 games, nearly every odd semiprime: δ(pq) = p′q′ at all 417 with p′q′ > pq/2); the games that adapt are nearly those the solver settles without a search |
@@ -379,7 +381,7 @@ single-sacrifice route) have their row above.
 | [The per-frame bound](#the-per-frame-bound-2026-10) | does a bound exact frame by frame (frames tied by Lagrangian multipliers) close a share of the GF(2) residual that holds with n? | where it can be computed it closes most of it (90-100% at 900, 936, 1088; 29 and 27 of 30 open probe nodes cut with node-level steps), but each evaluation solves the frames' own odd-core searches: within 200 steps 59% on average, falling with n (15-39% at 1254-1300); in the branch and bound 2.8 times fewer nodes at 28 times the time; not recommended | the entry (no solver change; the study's code was not kept) |
 | [The GF(2) bound in the search](#the-gf2-bound-in-the-search-2026-10) | can the search use the GF(2) intersection as its node bound at a cost a node that pays, what machinery earns its keep with it, and what does it do to the chain? | kept, the default: the 146 one-thread proofs 45 times faster (426 times fewer nodes); the chain 1001-1300 16 times faster on half the threads; a chain from 1300 reached 2175 in 92 minutes on 2 threads, with no growth a fit resolves; `lagrange` off | 679635b to the entry |
 | [The committed chain to 2175](#the-committed-chain-to-2175-2026-10) | does the build with the GF(2) bound make the committed chain from n = 1 as far as the chain from 1300 reached, in one invocation? | yes: 1..2175 in 1638.6 s on 8 threads, nothing assumed; every score and proof kind of 1..1300 is the previous chain's, every score of 1301..2175 the independent chain's from 1300 | feba6d0 |
-| [The model-free proofs of 1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | what does the prover's check of the chain's 1301..2175 cost, and how does it run on a cloud machine? | about 140 thread-hours (100 to 250) from the solver's node counts times a ratio that grows tenfold per 1000 in n; the root's gap does not predict it; one game a thread, so half a day on 16 vCPUs; `prover.sh`, not yet run | 888a718 |
+| [The model-free proofs of 1301-2175](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) | what does the prover's check of the chain's 1301..2175 cost, and how does it run on a cloud machine? | projected about 140 thread-hours (100 to 250) from the solver's node counts times a ratio, one game a thread, so half a day on 16 vCPUs; `prover.sh` ran it on a `c8g.4xlarge` on spot: opt(n) proven equal to the recorded score for every n in 2..2175, 226 thread-hours (309 million nodes), 15.9 hours, $3.84; the ratio grows threefold per 1000 in n, not tenfold, and 33 games the solver settles without a search were priced at zero | 888a718 (the plan), 4db7a14 (the build that ran) and the entry |
 | [Graviton calibration](#graviton-calibration-2026-10) | how fast is a Graviton core against the M1 Max's, for the solver and the prover; what does full load cost; how does a proof scale to 64 threads; how many chain games an hour; which instance for the prover's run and the chain? | Graviton4 0.90 (solver) and 0.93 (prover) of an M1 Max core, Graviton3 0.70 and 0.75; no contention in 64 copies; 58 times at 64 threads; 430 to 470 chain games an hour on a c8g.16xlarge; the prover on a c8g.4xlarge (about $3 to $4), the chain on a c8g.16xlarge ($0.0016 a game); $0.96 spent | 9dc603d, 307cafc, 0e650b0 |
 | [The wall regime](#the-wall-regime-2026-10) | what grows with n and with the size of a tree, besides parallel scaling, and what should change first? | a node +0.042 decades per 100 n, 98% of it the GF(2) intersection; trees past 2175 4 to 18 times 2170's at equal gaps; nothing grows with a tree on a thread; the serial fixed costs (1 to 7 s a game, mostly the start's local search) and the results check (up to 10 minutes a start) set the rate of cheap games; the sets' width is 1% of a node, so the renumbering is not worth it; first: the fixed-cost round (skip at the ceiling, the local search and the check on all threads, problems kept in memory) | 49c7917, dddc5fd and the entry (no solver change) |
 | [Round A: the fixed costs of a game](#round-a-the-fixed-costs-of-a-game-2026-10) | can the fixed costs of a game, the serial part of the chain, be cut with every tree and result unchanged? | yes: a repeat 0.78 s to 0.02 s, a prime 0.12 to 0.01, a search at its ceiling 1.0 to 0.02 (2226-2249, one thread); the results check of 2,225 games 56 s to 10 (one thread) and 4 (4 threads); the board layer 12 to 70 times faster; what is left is the start's local search, now on the search's threads; the fixed costs of 2200..4095 1.5 hours of one thread to 0.7, 0.2 on 4 threads | fd2c67f, 239afd3, f7e8adb, acf964e and the entry |
@@ -3586,8 +3588,9 @@ What it agrees with:
 * The chain from `optimal.json`'s game of 1300 of the previous entry (`bench/gf2/chain.jsonl`, build 716ebd9, 2
   threads) in 1301..2175: every score, proof kind and method, and every move list but 1560-1563 (an exchange of five
   numbers of the sum 3008).  Both used the GF(2) bound, so this is a second run of the same search, not a check of the
-  bound; the model-free check of 1301..2175 (`rust/evidence`) is pending
-  ([prepared](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10), not run).
+  bound; the check on the whole board is the prover's, whose proofs of 1301..2175 were pending when this file was made
+  and have since been done ([the run](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10), 2026-10-14
+  and 15): every score of this file is the optimum.
 * `optimal.json` in 1..1300 (`optimal_match` true).  It still ends at 1300 and was not extended (the lines of
   1301..2175 say `optimal_match` null); `taxman extend-optimal results/strict.jsonl` would add 875 games.
 
@@ -3599,7 +3602,8 @@ describes the present file.
 ## The model-free proofs of 1301-2175: cost and the cloud run (2026-10)
 
 *Question.*  The committed chain now reaches 2175, and the model-free proofs of [prover
-3](../prover/README.md#3-the-proofs-of-optn) stop at 1300 (the entry above says the check of 1301..2175 is pending).
+3](../prover/README.md#3-the-proofs-of-optn) stopped at 1300 (the entry above, when this one began, said that the check
+of 1301..2175 was pending).
 What does it cost, can `exact` use the many cores of a cloud machine, and how should it be run?  Measured on the M1 Max
 (10 cores, other jobs running throughout), with `exact` as it is: no proving code was changed.
 
@@ -3670,8 +3674,84 @@ build (`--build-arg RUST_IMAGE=taxman-cloud`): the registry's metadata did not a
 
 *Not done, and why.*  No change to `exact` to use many cores on one game (its open units are independent subtrees, so a
 `--shard i/K` over a checkpoint's units would do it), nor to pause on a signal: at 16 vCPUs the campaign ends when the
-dearest game does, and a pass of 300 s bounds what a kill loses.  The run on EC2 and the check of 1301..2175 are the
-owner's; the results go to `evidence/data/exact_parity_1301_2175.jsonl`.
+dearest game does, and a pass of 300 s bounds what a kill loses.  The run on EC2 and the check of 1301..2175 were the
+owner's, and are below; the results are in `prover/data/exact_parity_1301_2175.jsonl`.
+
+*The run (2026-10-14 and 15).*  The plan above ran, the check passed, and the cost came out higher than the projection's
+central figure, inside its ranges.
+
+*What ran.*  `rust/tools/cloud/prover.sh 1301 2175` as [RUNBOOK 9.4](../tools/cloud/RUNBOOK.md#94-run) describes, on one
+`c8g.4xlarge` (Graviton4, 16 vCPUs, 31 GiB) on spot in us-east-1b at $0.2402 an hour, launched 2026-10-14 23:22:58 UTC
+(the run began at 23:28:46 and ended "complete" at 15:21:58 on the 15th: 15.9 hours), the build of commit 4db7a14 with
+`-C target-cpu=native`.  The instance shut itself down at the end (`POWEROFF=always`) and was terminated: 16.0
+instance-hours, **$3.84**.  190 passes of 300 s, every one ended with status 0: no spot interruption, no crash, no
+error.  The results, 875 lines of 152 KB, are `prover/data/exact_parity_1301_2175.jsonl`; the logs and the checkpoints
+are not kept.
+
+*The check.*  `OK: opt(n) is proven equal to the recorded score for every n in 2..2175`, printed on the instance and
+again at home (`prover.sh --verify 1301 2175`, which is `summarize.py check`): every score of the committed chain is the
+optimum on the whole board, and no search found a set that beat one.  With the 1..1300 proofs of
+`prover/data/exact_parity_2_1300.jsonl`, `summarize.py exact` counts 2,174 games proven: 45 by the Franklín–Moniot bound
+and 199 by the parity bound at the root, 1,047 by a search (557 and 490), 607 at their ceiling and 276 by the prime
+formula (337 and 270, 161 and 115).  Of the 875 games 490 needed a search, and all of them ran to the end.  They took
+309.2 million nodes and **226.0 thread-hours**, 2.63 ms a node; the 385 others took 83 seconds in all.
+[The prover's README](../prover/README.md#to-2175-on-a-cloud-machine) has the table by band (`summarize.py cost --band
+100`).
+
+*Against the projection above.*
+
+| | projected | the run |
+|---|---|---|
+| nodes, the 490 searches | about 200 million (150 to 300) | 309.2 million |
+| thread-hours | about 140 (100 to 250), at 2.5 ms a node | 226.0, at 2.63 ms a node |
+| a node | 2.5 ms throughout | 2.0 to 2.6 ms through 1899, 2.8 at 1900-1999, 3.1 at 2000-2099, 3.9 at 2100-2175; 4.10 to 4.15 at 2170-2173 |
+| 2170-2173 | 8 million nodes each, 6 hours at 2.5 ms a node | 6.79 to 6.87 million nodes, 7.7 to 7.9 hours each |
+| 1475, 1430, 1472, 1521 | 1.7 to 2.5 million nodes, 1.2 to 1.7 hours | 6.33, 2.88, 3.85 and 0.89 million nodes; 4.9, 1.9, 3.0 and 0.6 hours |
+| 16 vCPUs, wall time | 11 to 17 hours | 15.9 hours |
+| spot price | $2.6 to 4.1 | $3.84 |
+
+The wall time and the price are inside the projected ranges, the thread-hours too, the nodes just above (1.5 times the
+central figure, 1.6 times for the hours).  The dearest four took 0.85 of the projected nodes, at 1.6 times the cost of
+a node it assumed; the next ones were dearer than projected: 1848-1851 took 5.33, 5.33, 4.51 and 4.50 million nodes, 3.0
+to 3.6 hours each, 2060 and 2064 3.4 and 4.0 hours, 1473 3.1; of the projection's list, 2160 and 1863 took 0.2 and 0.6
+hours.  Its order put 12 of the 16 dearest games among its first 16.  The dear tail is wide: 77 searches took a million
+nodes or more, 57 an hour or more, the ten dearest 24% of the thread-hours and the fifty dearest 59%.
+
+*What the model got wrong.*
+
+* **The ratio to the solver's nodes grows threefold per 1000 in n, not tenfold.**  Over the 457 searched games for
+  which the committed chain records nodes (the next bullet is the other 33), `exact` took 0.13 to 28 times the solver's
+  nodes: geometric mean 2.5 at 1301-1499 (112 games), 3.3 at 1500-1799 (156), 4.0 at 1800-2059 (129), 6.1 at 2060-2169
+  (56) and 5.3 at 2170-2175 (4).  The fit is log10 ratio = 0.33 + 0.50 (n - 1300)/1000, residual sd 0.35 decades; the 34
+  finished games on which the projection rested gave -0.07 + 1.02, sd 0.28 (0.9 at 1300-1400, against 2.5 for all the
+  games of 1301-1499; a sample of the games a busy laptop finished is not a random one).  The old fit would have given
+  these 457 games 170 million nodes, and they took 287 million: by the geometric mean of the games 2.4 times as many at
+  1301-1499, 1.7 at 1500-1799, as many at 1800-2169 (1.05 and 1.06) and 0.8 times at 2170-2175.  Carried to 3000, the
+  old trend priced the prover's nodes at about 60 times the solver's ([agenda
+  2](AGENDA.md#2-the-diagnosis-of-the-wall)), this one at about 15: an extrapolation of 800 in n.
+* **The model priced 33 games at zero, and `exact` took 22.1 million nodes and 13.9 thread-hours on them** (15 thousand
+  to 4.2 million nodes each).  The solver's chain records no nodes for these: each is a repeat (`same_search`, through
+  one to five other repeats) of a game whose search ended before its first node, at the ceiling (the proof `cap`).  The
+  prover has no such bound, and `summarize.py order` ranks a game by the solver's nodes, so these went after the 457
+  priced ones and before the 385 that `exact` skips (at their ceiling or prime).  1837 and 1839 (4.17 million nodes,
+  2.6 hours each, the same tree) started only in the 159th pass, at 12:42 UTC, and ended the run.
+* **The root's parity gap does predict the cost, with a flatter slope than over 900-1300.**  The 490 searches fit
+  log10 nodes = a + 0.477 (0.017) per 100 points of gap (tenfold per 210; R² 0.61, residual sd 0.45 decades, a factor
+  of 2.8), against tenfold per 84 over 900-1300 (R² 0.76): the projection from the gap used the old slope, and was
+  wrong by that.  The gap (mean 384, 125 to 767; 2170-2173 at 767, 1475 at 590, 1848-1851 at 543) and the solver's
+  nodes are both guides to which games are dear.  Against n there is no growth that a fit resolves (-0.009 +- 0.013
+  decades per 100 in n for the nodes, +0.007 +- 0.013 for the seconds, R² 0.00), as for the solver's own search of the
+  chain.
+
+*The tail.*  All 16 threads were busy until 13:07 UTC; from then fewer than 16 games were left (13 at 13:07, 8 at 13:12,
+5 at 13:47, 3 at 13:52, and from 14:12 to the end at 15:22 two, 1837 and 1839).  The last 2.2 hours left 27 thread-hours
+of CPUs idle, 11% of the machine's 254 in all (226 of search, so 89% busy; the restarts of 190 passes cost under 1%: the
+games in flight times the passes' length come to 227 thread-hours).  Packing 226 thread-hours on 16 threads perfectly
+takes 14.1 hours, 1.8 fewer (about $0.42): the most that a better order could have saved.
+
+*Not measured.*  Where a proof's tree branches (members above n/2 against below, the premise of [agenda
+A2](AGENDA.md#a2-certify-the-frame-model-then-prove-with-its-facts-a-change-of-slope-for-the-proven-wall)): the lines
+hold totals only.  Graviton5.  A spot interruption, which never came in 15.9 hours.
 
 ## Graviton calibration (2026-10)
 
@@ -4433,8 +4513,9 @@ and says that this gives an optimal game in about 70% of 1..1000: is there a pat
 `adapt` read `optimal.json` and the committed chain and search small boards exhaustively with `certify.py`'s exact
 solver: about 7 and 10 seconds with the default `--exhaustive 40`; the figures to 56 and to 50 below are `tax
 --exhaustive 56` (5 minutes) and `adapt --exhaustive 50` (40 seconds).  No solver change.  The scores are proven on
-the whole board to 1300 ([the prover](../prover/README.md)) and within the frame model above, so what is said of
-1301..2175 rests on the frame model.
+the whole board to 1300 ([the prover](../prover/README.md); its proofs of 1301..2175 came after this was written, [the
+run](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10)) and within the frame model above, so what
+was said of 1301..2175 then rested on the frame model.
 
 *Words.*  A move's *tax* is what the taxman takes for it, every divisor of the move still in the pot; the move *pays
 k* when its tax has k numbers.  δ(n) = n + opt(n − 1) − opt(n) is how far opt(n) falls short of the ceiling.
