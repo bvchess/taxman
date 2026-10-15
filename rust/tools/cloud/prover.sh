@@ -8,9 +8,10 @@
 # It runs `exact` of the prover (rust/prover, README section 3), which knows nothing of the solver's frame
 # model, over the range.  `exact` runs one game per thread (a game's search is one thread), so the games are spread over
 # the CPUs; it runs for PASS_SECONDS, then pauses every search still going, saving its open subtrees and learned
-# conflicts to a checkpoint ($CKPT/exact_N.ckpt), and this script runs it again, which resumes them.  A game may take
-# any number of passes.  The games go dearest first, by the nodes the solver's search of each took (strict.jsonl;
-# `exact` takes one to three times as many), so that a long game starts early instead of last.
+# conflicts to a checkpoint ($CKPT/exact_N_low.ckpt), and this script runs it again, which resumes them.  A game may
+# take any number of passes.  The games go dearest first, by the nodes the solver's search of each took (strict.jsonl;
+# `exact` takes one to three times as many), so that a long game starts early instead of last.  The searches start
+# from the roles of Theorem B (`exact`'s default; EXTRA_ARGS='--fix-low 0' for the plain root).
 #
 # Safe to run again at any time, after a crash, a reboot, a spot interruption or a SIGTERM: finished games are in the
 # output file (one line each, appended and synced), unfinished ones in their checkpoints.  `exact` has no stop handler,
@@ -29,7 +30,7 @@
 # When the range is complete it runs the check (`--verify`) and exits 0 only if that passes.
 #
 # List mode (`--list N1,N2,...`) runs `exact` over exactly the listed games, in the order given, in the same resumable
-# passes, with EXTRA_ARGS (the flags of the measurement, for instance `--fix-low 1`) into OUT, which must be set.  It
+# passes, with EXTRA_ARGS (the flags of the measurement, for instance `--fix-upper 1`) into OUT, which must be set.  It
 # is for a measurement, not a proof of a range: there is no order file and no check at the end.  It ends `complete`
 # (and exits 0) when every listed game has a line in OUT.
 #

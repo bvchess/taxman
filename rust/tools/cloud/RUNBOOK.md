@@ -663,6 +663,13 @@ the prover at 0.93 of an M1 Max core, a Graviton3 core at 0.75; Graviton5 was no
 that the cost of a node on Graviton4 grows with n (section 9.2).  The run was on a `c8g.4xlarge` on spot, launched on
 2026-10-14 as section 9.4 describes; section 9.6 is what to do with the results of a run.
 
+That run, and everything this section says of its cost, is of searches from the plain root.  `exact` now starts from
+the roles of Theorem B by default (`--fix-low 1`: still a proof, since every optimal set obeys them; it records
+`"fix_low":1` on every line and the check counts the proofs that rest on it), which took the same nodes within 5% and
+half the time a node over 2..999 ([the prover's README](../../prover/README.md#3-the-proofs-of-optn)), so a new run
+costs about half what is estimated here.  `EXTRA_ARGS='--fix-low 0' rust/tools/cloud/prover.sh 1301 2175` reproduces
+the run as it was; its checkpoints are `ckpt/exact_N.ckpt`, those of the default `ckpt/exact_N_low.ckpt`.
+
 ### 9.1 How `exact` uses the CPUs, and what the script does about it
 
 * **One game per thread.**  `exact` hands the games of a range to its worker threads one at a time; each game's search
@@ -673,7 +680,7 @@ that the cost of a node on Graviton4 grows with n (section 9.2).  The run was on
   laptop); the 8-thread run was bounded by its longest game (141 to 151 s), not by the threads
   ([EXPERIMENTS.md](../../docs/EXPERIMENTS.md#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10)).
 * **Passes, not a signal.**  A search that is still going when `--seconds` run out pauses: its open subtrees and learned
-  conflicts go to `ckpt/exact_N.ckpt`, and a rerun resumes it (the tree is the same: node counts are identical to an
+  conflicts go to `ckpt/exact_N_low.ckpt`, and a rerun resumes it (the tree is the same: node counts are identical to an
   uninterrupted run).  Checkpoints are written only then, and `exact` has no signal handler, so a kill or a SIGTERM
   loses the searches of the pass in progress back to their last checkpoint.  `prover.sh` therefore runs `exact` in
   passes of `PASS_SECONDS` (default 300) and starts it again until every game has a line: an interruption costs at
@@ -886,7 +893,7 @@ the check, in a work directory of its own, as a step of its own.  It replaces a 
 export TAXMAN_WORK=~/rehearsal THREADS=2 PASS_SECONDS=20
 rust/tools/cloud/prover.sh 1301 1310 &              # makes the order, then passes of 20 s
 sleep 40; kill -TERM $(cat ~/rehearsal/prover.pid)      # a stop in the middle: "ended: stopped", status 143
-wait $!; echo $?; ls ~/rehearsal/ckpt                   # 143 (a bare `wait` returns 0); exact_N.ckpt: searches paused
+wait $!; echo $?; ls ~/rehearsal/ckpt                   # 143 (a bare `wait` returns 0); exact_N_low.ckpt, paused
 rust/tools/cloud/prover.sh 1301 1310                  # resumes ("N searches paused"), finishes, runs the check
 OUT=~/rehearsal/results/exact_parity_1301_1310.jsonl rust/tools/cloud/prover.sh --verify 1301 1311   # must FAIL
 unset TAXMAN_WORK THREADS PASS_SECONDS; rm -rf ~/rehearsal
@@ -989,11 +996,11 @@ results come home as in 9.6.  E6 may run first; E9(a) is independent of it.
 ### 10.1 E6: does leaving the sources free cost the prover's search anything?
 
 *What.*  `exact` on 25 games of 1301-2175 with a root parity gap of 364 to 603 and a proof of 0.6 to 30 minutes in
-the run of section 9, twice: **B**, `--fix-low 1`, from the roles of Theorem B (the largest prime and U\*_2 forced,
-every other prime and number of layer 2 barred), the sources of layer 3 and up free, which is still a proof of
-opt(n); and **D**, `--fix-low 1 --fix-upper 1`, the whole upper part fixed to U\*, which is the frame model's problem
-on the whole board and proves nothing (its lines say `"search":"upper_fixed"`).  Each line also counts the nodes that
-branched on a source of layer 3 or up and those that barred a member of U\*_{≥3}.  The games, dearest first:
+the run of section 9, twice: **B**, the default `--fix-low 1`, from the roles of Theorem B (the largest prime and
+U\*_2 forced, every other prime and number of layer 2 barred), the sources of layer 3 and up free, which is still a
+proof of opt(n); and **D**, `--fix-upper 1`, the whole upper part fixed to U\* as well, which is the frame model's
+problem on the whole board and proves nothing (its lines say `"search":"upper_fixed"`).  Each line also counts the
+nodes that branched on a source of layer 3 or up and those that barred a member of U\*_{≥3}.  The games, dearest first:
 
 ```
 L=2159,2168,2166,2167,1800,2020,1537,1820,1504,1400,1551,2100,2160,2165,2163,1512,1482,1495,1547,1445,1573,1500,1480,1584,1575
@@ -1015,8 +1022,8 @@ of 25 is bounded by its dearest game, about 16 to 30 minutes on a `c8g.4xlarge` 
 ```
 export D=s3://taxman-013764204840-us-east-1/e6 W=/home/ec2-user/taxman-work/results
 cd ~/taxman && tmux new-session -d -s e6 "export DEADLINE_HOURS=3 S3_DEST=$D; \
-    OUT=$W/e6_low.jsonl EXTRA_ARGS='--fix-low 1' rust/tools/cloud/prover.sh --list $L; \
-    POWEROFF=always OUT=$W/e6_upper.jsonl EXTRA_ARGS='--fix-low 1 --fix-upper 1' rust/tools/cloud/prover.sh --list $L"
+    OUT=$W/e6_low.jsonl rust/tools/cloud/prover.sh --list $L; \
+    POWEROFF=always OUT=$W/e6_upper.jsonl EXTRA_ARGS='--fix-upper 1' rust/tools/cloud/prover.sh --list $L"
 tmux new-session -d -s sw 'rust/tools/cloud/spot-watch.sh'
 ```
 

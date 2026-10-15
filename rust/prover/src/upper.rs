@@ -6,10 +6,11 @@
 //!
 //! THEORY.md's Theorem B pins down the two bottom layers of every optimal set S of n: S holds the largest prime
 //! q ≤ n and no other prime; among the sources of layer 2 it holds exactly U\*_2; and wherever U\*_2 spans every
-//! prime up to n/2 (every n ≥ 187) it holds no number of layer 2 up to n/2 at all.  [`low_roles`] writes this down
-//! as roles for the parity bound ([`crate::parity`], Theorem 10), which is a certified upper bound on the weight of
-//! every playable set whose forced members (role `Pick`) are all in it and whose barred ones (role `Barred`) are
-//! none of it.  So the bound at those roles bounds every playable set that obeys Theorem B.
+//! prime up to n/2 (the frames of layer 2 are closed: every board from 187 to 8191, and some below) it holds no
+//! number of layer 2 up to n/2 at all.  [`low_roles`] writes this down as roles for the parity bound
+//! ([`crate::parity`], Theorem 10), which is a certified upper bound on the weight of every playable set whose forced
+//! members (role `Pick`) are all in it and whose barred ones (role `Barred`) are none of it.  So the bound at those
+//! roles bounds every playable set that obeys Theorem B.
 //!
 //! Now bar one member u of U\*_{≥3} as well.  If the bound is then at most V, a score, no playable set that obeys
 //! Theorem B and lacks u is worth more than V; that is, every set beating V that obeys Theorem B holds u.  Call u
@@ -21,19 +22,16 @@
 //!
 //! The members certified for a lower V are certified for a higher one: the bound does not depend on V.
 //!
-//! The same roles start the searches of `bin/exact.rs` that measure what the sources of layer 3 and up cost.  A
-//! search from [`low_roles`] still proves "no playable set beats V", since every optimal set obeys them (Theorem B).
-//! A search from [`upper_fixed_roles`], which fixes the whole upper part to U\* as well, is the frame model's problem
-//! and proves nothing about opt(n).  [`watched`] names the numbers whose branching and barring the search counts.
+//! The same roles start the searches of `bin/exact.rs` (by default).  A search from [`low_roles`] still proves "no
+//! playable set beats V", since every optimal set obeys them (Theorem B): if some set beat V, an optimal set would,
+//! and it would obey the roles.  A search from [`upper_fixed_roles`], which fixes the whole upper part to U\* as well,
+//! is the frame model's problem and proves nothing about opt(n).  [`watched`] names the numbers whose branching and
+//! barring the search counts.
 
 use crate::game::{Board, Role};
 use crate::parity::{Meet, Outcome, Parity};
 use crate::peel::u_star;
 use crate::primes::is_prime;
-
-/// From this board on, U\*_2 spans every prime up to n/2 (THEORY.md, Theorem B: the frames of layer 2 are closed on
-/// every board from 187 to 8191; below 187 there are boards where they are not).  [`low_roles`] checks it.
-const CLOSED_FROM: u32 = 187;
 
 /// Ω(c): the number of prime factors of c counted with multiplicity (0 for c ≤ 1).
 pub fn omega(c: u32, spf: &[u32]) -> u32 {
@@ -70,45 +68,41 @@ fn in_ustar(n: u32, ustar: &[u32]) -> Vec<bool> {
     member
 }
 
+/// Whether the frames of layer 2 are closed on game n (THEORY.md, Theorem B): `ustar`, U\* in any order, has as many
+/// members of layer 2 as there are primes up to n/2.  U\*_2 is a forest in the graph on those primes and a ground
+/// vertex (pq is the edge p–q and p² the edge p–ground), so with that many edges it is a spanning tree and every other
+/// number of layer 2 closes a cycle with it.  It decides each board by its own U\*; it does not assume a board size
+/// (every board from 187 to 8191 is closed, and so are some below it).
+pub fn layer_two_closed(n: u32, spf: &[u32], ustar: &[u32]) -> bool {
+    let member = in_ustar(n, ustar);
+    let members = (n / 2 + 1..=n).filter(|&c| member[c as usize] && omega(c, spf) == 2).count();
+    let primes = (2..=n / 2).filter(|&p| is_prime(u64::from(p), spf)).count();
+    members == primes
+}
+
 /// The roles of every optimal set of game n in the two bottom layers (THEORY.md, Theorem B), indexed 0..=n, where
 /// `ustar` is U\* in any order.  0 and 1 are barred (they cannot be picked); the largest prime q ≤ n is forced and
-/// every other prime barred; each number of layer 2 above n/2 is forced if it is in U\* and barred if not; and, from
-/// n = 187 on, every number of layer 2 up to n/2 is barred.  Everything else is free.
-///
-/// The last rule rests on U\*_2 spanning every prime up to n/2: an independent set of that many edges on the primes
-/// up to n/2 and a ground vertex (pq is the edge p–q and p² the edge p–ground) is a spanning tree, so every other
-/// number of layer 2 closes a cycle with it and Theorem B excludes it.  The function checks that U\*_2 has as many
-/// members as there are primes up to n/2 and panics, naming n and both counts, if not.  Below 187 the numbers of
-/// layer 2 up to n/2 stay free.
+/// every other prime barred; each number of layer 2 above n/2 is forced if it is in U\* and barred if not; and, if the
+/// frames of layer 2 are closed on this board ([`layer_two_closed`]), every number of layer 2 up to n/2 is barred,
+/// since each closes a cycle with U\*_2 and Theorem B excludes it.  On a board where they are not closed those
+/// numbers stay free, with everything else.
 pub fn low_roles(n: u32, spf: &[u32], ustar: &[u32]) -> Vec<Role> {
     assert!(n >= 2, "game n={n}: the board is 2..=n");
     let half = n / 2;
     let member = in_ustar(n, ustar);
+    let closed = layer_two_closed(n, spf, ustar);
     let largest_prime = (2..=n).rev().find(|&p| is_prime(u64::from(p), spf)).expect("a board with n >= 2 has a prime");
     let mut roles = vec![Role::Free; n as usize + 1];
     roles[0] = Role::Barred;
     roles[1] = Role::Barred;
-    let mut sources_in_layer_two = 0;
     for c in 2..=n {
-        let role = match omega(c, spf) {
+        roles[c as usize] = match omega(c, spf) {
             1 if c == largest_prime => Role::Pick,
             1 => Role::Barred,
-            2 if c > half && member[c as usize] => {
-                sources_in_layer_two += 1;
-                Role::Pick
-            }
-            2 if c > half || n >= CLOSED_FROM => Role::Barred,
+            2 if c > half && member[c as usize] => Role::Pick,
+            2 if c > half || closed => Role::Barred,
             _ => Role::Free,
         };
-        roles[c as usize] = role;
-    }
-    if n >= CLOSED_FROM {
-        let primes = (2..=half).filter(|&p| is_prime(u64::from(p), spf)).count();
-        assert_eq!(
-            sources_in_layer_two, primes,
-            "n={n}: U*_2 has {sources_in_layer_two} members but there are {primes} primes up to n/2, so the \
-             frames of layer 2 are not closed"
-        );
     }
     roles
 }
@@ -293,18 +287,34 @@ mod tests {
         }
     }
 
-    /// From 187 on U\*_2 spans every prime up to n/2 (the function checks it), and every recorded game of
-    /// optimal.json obeys the roles.  Every board, 187..=1300.
+    /// The roles follow each board's own closure of the frames of layer 2: the numbers of layer 2 up to n/2 are
+    /// barred where U\*_2 spans every prime up to n/2 and free where it does not, and every recorded game of
+    /// optimal.json obeys its board's roles, closed or not.  The frames are closed on every board from 187 on, as
+    /// THEORY.md says (and on some below it, which the roles then bar too).  Every board, 2..=1300.
     #[test]
-    fn the_layer_two_closure_holds_to_1300() {
+    fn the_roles_follow_each_boards_closure_of_layer_two() {
         let (known, spf) = (optimal(), smallest_prime_factors(1300));
-        let mut boards = 0;
-        for (&n, (_, moves)) in known.range(CLOSED_FROM as u64..) {
-            let roles = low_roles(n as u32, &spf, &played_sources(n, moves));
+        let (mut boards, mut open_boards) = (0, Vec::new());
+        for (&n, (_, moves)) in known.iter().filter(|(&n, _)| n >= 2) {
+            let ustar = played_sources(n, moves);
+            let closed = layer_two_closed(n as u32, &spf, &ustar);
+            let roles = low_roles(n as u32, &spf, &ustar);
             obeys(&roles, moves).unwrap_or_else(|e| panic!("n={n}: the recorded game: {e}"));
+            let wanted = if closed { Role::Barred } else { Role::Free };
+            let mut low_layer_two = (2..=n as u32 / 2).filter(|&c| omega(c, &spf) == 2);
+            assert!(low_layer_two.all(|c| roles[c as usize] == wanted), "n={n}: closed {closed}");
+            if !closed {
+                open_boards.push(n);
+            }
             boards += 1;
         }
-        assert_eq!(boards, 1300 - CLOSED_FROM + 1);
+        eprintln!(
+            "{boards} boards, the frames of layer 2 not closed on {} of them: {open_boards:?}",
+            open_boards.len()
+        );
+        assert_eq!(boards, 1299);
+        assert!(!open_boards.is_empty(), "the check of closure is never false");
+        assert!(open_boards.iter().all(|&n| n < 187), "a board from 187 on is not closed: {open_boards:?}");
     }
 
     /// The figures of the barred bounds at 600 (they appear in THEORY.md's "What is known of U": 4 of the 161
