@@ -1,7 +1,7 @@
 //! The fields study: a bound on the promotions that adds GF(3) signed frame matroids to the two GF(2) frame matroids
 //! and couples them by Lagrangian decomposition (avenue A1 of `docs/AGENDA.md`, experiment E1; the record is
 //! `docs/EXPERIMENTS.md`, "A bound over GF(2) and GF(3) signed frame matroids").  `common/dw.rs` has the bound and
-//! why it is valid (Lemmas 1-3, `heuristics/THEORY.md` once they are proven there), `common/gf3.rs` the signed
+//! why it is valid (`heuristics/THEORY.md`, Theorems 14 and 15), `common/gf3.rs` the signed
 //! matroids, `common/cores.rs` the cores and their signings, `common/lp.rs` the master's simplex.
 //!
 //! ```text
@@ -27,7 +27,8 @@
 //!   at most it), the bound in mode `root` (the main arm's final signings and multipliers at the root, one evaluation
 //!   at the node's matroids) and `node` (the node's own master and separation from those signings, `--seconds` a
 //!   node), each the lower of it and the node's GF(2) bound.  `--exact` gives best completions to check against.
-//! * **check**: Lemmas 1, 5 and 6 at scale (the tests 3, 4 and 6 of the study on any boards).
+//! * **check**: Theorems 14 and 15 and the column-sum signings at scale (the tests 3, 4 and 6 of the study on any
+//!   boards).
 //!
 //! Every run asserts that the bound is at least `P*` (at nodes, at least the best completion where known), that the
 //! optimal game's promotions are independent in every final matroid, and checks the crate's intersection against
@@ -606,8 +607,8 @@ fn column_sum_signing(core: &Core, seed: u64) -> Signing {
     s
 }
 
-/// The checks of Lemmas 1, 5, 6 and 3 at the root of `n` (see the module docs), with `samples` random sets of each
-/// kind; prints what was checked.
+/// The checks of Theorem 14, the column-sum signings and Theorem 15 at the root of `n` (see the module docs), with
+/// `samples` random sets of each kind; prints what was checked.
 fn check<const W: usize>(n: u32, known: &Known, samples: usize) {
     let Some((board, p)) = setup::<W>(n) else { return };
     let model = &p.model;
@@ -615,7 +616,7 @@ fn check<const W: usize>(n: u32, known: &Known, samples: usize) {
     let cands: Vec<u32> = p.candidates.iter().collect();
     let mut rng = Rng(0x2545_F491_4F6C_DD1D ^ u64::from(n));
     let mut scratch = Scratch::<W>::new();
-    // Lemma 1: the optimal promotions and random maximal promotable sets under the plain and random signings.
+    // Theorem 14: the optimal promotions and random maximal promotable sets under the plain and random signings.
     let mut promotable: Vec<Bits<W>> = (0..samples).map(|_| random_promotable(model, root, &cands, &mut rng)).collect();
     let opt = known.opt(n, board.in_the_bag);
     if let Some(set) = opt.and_then(|o| optimal_promotions(n, known, &board, o)) {
@@ -626,7 +627,7 @@ fn check<const W: usize>(n: u32, known: &Known, samples: usize) {
         signings.push(Signing::ones(h));
         signings.extend((0..5).map(|i| Signing::random(h, seed(n, h, i, SALT_RANDOM))));
     }
-    // Lemmas 5-6: random unpromotable sets, made dependent by the column-sum signings of their residuals and cores.
+    // The converse: random unpromotable sets, made dependent by the column-sum signings of their residuals and cores.
     let (mut unpromotable, mut cores_checked) = (0, 0);
     let mut generated = 0;
     let mut tries = 0;
@@ -664,7 +665,7 @@ fn check<const W: usize>(n: u32, known: &Known, samples: usize) {
             assert!(m.independent(&members), "n={n}: a promotable set is dependent in frame {}", s.frame);
         }
     }
-    // Lemma 3: random multipliers never bound below P*; zero multipliers give the GF(2) bound.
+    // Theorem 15: random multipliers never bound below P*; zero multipliers give the GF(2) bound.
     let fm = frame_matroids(model, root, &p.candidates);
     let cap = p.max_total as usize;
     let gf2 = fm.bound(cap).value;
@@ -736,7 +737,7 @@ mod tests {
         out
     }
 
-    /// The study's test 3: Lemma 1 (frame form) at every root with at most 22 candidates, by exhaustion, and at
+    /// The study's test 3: Theorem 14 at every root with at most 22 candidates, by exhaustion, and at
     /// the roots of 137-400 for the optimal promotions and 100 random maximal promotable sets.
     #[test]
     fn promotable_sets_are_independent_in_every_signed_matroid() {

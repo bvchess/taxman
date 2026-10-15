@@ -7,7 +7,7 @@
 //! moves, or a candidate of home `h + 1`) has the vector `v(u) = Σ σ(u, f) e_f` over its maximal factors `f` among
 //! the frame's factors, where the signing `σ` values each incidence `(u, f)` as 1 or 2.  A candidate `y` of home `h`
 //! that is a factor of the frame has the unit vector `e_y`.  The moves' vectors are independent for every signing
-//! (Lemma 1 of the fields study; [`Matroid3::build`] panics if they are not), so contracting them, that is, taking
+//! (THEORY.md, Theorem 14; [`Matroid3::build`] panics if they are not), so contracting them, that is, taking
 //! each candidate's vector modulo their span, gives a linear matroid on the candidates that touch the frame: `N_h^σ`,
 //! the [`Matroid3`] of the frame, of rank the frame's factors minus its moves.  Its loops are the candidates whose
 //! class is zero.

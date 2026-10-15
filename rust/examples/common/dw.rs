@@ -7,20 +7,20 @@
 //! Let `A`, `B` be the two GF(2) frame matroids of a state (`frames::FrameMatroids`) and `N_1, …, N_K` signed GF(3)
 //! frame matroids (`gf3::Matroid3`, each of one frame `h_k` and one signing, on the candidates touching that frame,
 //! `supp_k`).  Every promotable set `Q` is independent in `A` and `B` (Theorem 11) and has `Q ∩ supp_k` independent
-//! in every `N_k` (Lemmas 1-2 of the study: any field, any nonzero entries).  For any multipliers `λ_k ≥ 0` on
+//! in every `N_k` (THEORY.md, Theorem 14: any field, any nonzero entries).  For any multipliers `λ_k ≥ 0` on
 //! `supp_k`,
 //!
 //! ```text
-//! w(Q) = (w − Σ_k λ_k)(Q) + Σ_k λ_k(Q ∩ supp_k) ≤ MI_cap(w − Σ_k λ_k) + Σ_k G_k(λ_k) = L(λ)     (Lemma 3)
+//! w(Q) = (w − Σ_k λ_k)(Q) + Σ_k λ_k(Q ∩ supp_k) ≤ MI_cap(w − Σ_k λ_k) + Σ_k G_k(λ_k) = L(λ)     (Theorem 15)
 //! ```
 //!
 //! with `MI_cap(c)` the heaviest common independent set of `A` and `B` of at most `cap` elements (elements of weight
 //! at most 0 left out, which loses nothing over a down-closed family) and `G_k(μ)` the heaviest independent set of
 //! `N_k` (greedy).  A candidate that is a loop of some `N_k` is in no promotable set and is left out of the
-//! intersection (it is `L` at `λ_{k,x} = w_x`, so Lemma 3 covers it).  The bound reported is `⌊L⌋` evaluated exactly
+//! intersection (it is `L` at `λ_{k,x} = w_x`, so Theorem 15 covers it).  The bound reported is `⌊L⌋` evaluated exactly
 //! in integers: weights `x·S` and multipliers rounded to the grid `1/S` (`S = 2^16`, [`SCALE`]), the intersection by
 //! the crate's `taxman::gf2::meet::Meet` (checked against `common/meet.rs`'s `intersect` every `check_every`-th call)
-//! and the greedies over GF(3), all in `i64`.  Its soundness rests on Lemma 3 and the two exact oracles, never on
+//! and the greedies over GF(3), all in `i64`.  Its soundness rests on Theorem 15 and the two exact oracles, never on
 //! the floating-point LP below, which only proposes multipliers.
 //!
 //! # The multipliers
