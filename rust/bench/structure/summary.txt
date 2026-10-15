@@ -1,0 +1,19 @@
+boards checked: 8190 of 2..=8191
+check A: 0 boards fail
+check C: 0 boards fail
+check D: 0 boards fail
+check E: 0 boards fail
+check F: 0 boards fail
+check G: 0 boards fail
+layers of frame 0: {2}: 80 boards; {3}: 8100 boards; {}: 10 boards
+boards where frame 0 includes layer 2 (80): 8, 12-14, 18-24, 28-34, 42-54, 70-76, 78-84, 98-120, 138-144, 182-186
+boards where the numbers do not follow the layers (0): first none
+boards where a number's frames span several layers (0): first none
+boards where a frame of layer 2 has freedoms (80): 8, 12-14, 18-24, 28-34, 42-54, 70-76, 78-84, 98-120, 138-144, 182-186
+claims as setup forms the frames: 108454 front, 4602026 back
+claims in the search's frames: 1630 front, 2201516 back
+boards with back claims that have a composite among the factors (7423): 21 (1), 22 (1), 23 (1), 24 (1), 33 (1), 34 (1), 44 (1), 45 (1), 46 (1), 47 (1), 48 (1), 49 (1), 50 (1), 51 (1), 52 (2), 53 (2), 54 (2), 70 (2), 71 (2), 72 (2), ...
+merged_away: reached on 1 boards (114), 2 times, answered yes 0 times
+largest: frames 22 (n=6000), numbers 9 (n=4096), max_layer 12 (n=4096), candidates 2281 (n=8190)
+seconds, summed over the boards: 623.7
+PASS
