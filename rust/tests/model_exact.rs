@@ -15,9 +15,9 @@
 //! one that no other test touches.  Playability is decided on the whole board, by `common::playable` (the peel of
 //! THEORY.md, Theorems 1 to 3), with code that shares nothing with `frames` or `model`.
 //!
-//! * On every board up to 100 (and, in an ignored test, 101 to 120) both directions are checked on every set: the sets L
-//!   with U\* ∪ L playable, found by depth-first search, are all promotion sets and make games of the right score, the
-//!   promotion sets, found the same way, are all playable with U\*, and the two families are equal.
+//! * On every board up to 100 (and, in an ignored test, 101 to 120) both directions are checked on every set: the
+//!   sets L with U\* ∪ L playable, found by depth-first search, are all promotion sets and make games of the right
+//!   score, the promotion sets, found the same way, are all playable with U\*, and the two families are equal.
 //! * On larger boards (to 1300 by default, to 8191 in an ignored test) the sets are random: promotion sets made by
 //!   promoting candidates in a random order, and maximal playable extensions of U\* made by trying the numbers up to
 //!   n/2 in a random order.

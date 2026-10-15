@@ -6,7 +6,8 @@
 //! tests and the committed results (`results/strict.jsonl`, n = 1..2175; `optimal.json` has its games to 1300, but
 //! that is the solver's own answer and no check of it).  What is cheap to run here: the same small game at every
 //! width that holds it (a width-dependent bug changes the tree), games of 1100 to 1250 that need a few thousand
-//! nodes against the committed results, boards of 2048 and more through their setup, and the boards past 4095
+//! nodes against the committed results, boards of 2048 and more through their setup (a sample of the boards to 8191
+//! through setup's refusal of a board whose numbering of the frames is not clean), and the boards past 4095
 //! (128 words, and the GF(2) bound's engines of four and five block words) through theirs.
 
 mod common;
@@ -203,6 +204,19 @@ fn the_largest_boards_fit_in_a_frame_set() {
     {
         let built = with_width!(n, W => build_frames::<W>(&Tables::new(n)).frames.len());
         assert_eq!(built, frames, "n={n}");
+    }
+}
+
+/// Setup refuses a board whose numbering of the frames is not clean (`build_frames`; heuristics/THEORY.md, N), and
+/// accepts every board to 8191, which the census `examples/structure.rs` checked one by one.  A sample, at the width
+/// each board dispatches to: every 199th board from 401, the boards where the count of frames steps up (512, 1024,
+/// 2048, 4096) and the largest.
+#[test]
+fn setup_accepts_a_sample_of_the_boards_to_8191() {
+    let boards = (401..=8191).step_by(199).chain([512, 1024, 2048, 4096, 8191]);
+    for n in boards {
+        let frames = with_width!(n, W => build_frames::<W>(&Tables::new(n)).frames.len());
+        assert!((1..=MAX_FRAMES).contains(&frames), "n={n}: {frames} frames");
     }
 }
 
