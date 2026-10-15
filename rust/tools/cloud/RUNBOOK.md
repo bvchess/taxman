@@ -14,10 +14,11 @@ image after the `run.sh` split.  On EC2 (Amazon Linux 2023, Graviton) the calibr
 ([bench/cloud/](../../bench/cloud/README.md)) ran the solver and the prover on a `c7g.16xlarge` and a `c8g.16xlarge`
 with its own scripts, and the prover's run of section 9 uses `setup.sh` (`PROVER_ONLY=1`), `prover.sh`, `save.sh` (with
 an instance role) and `spot-watch.sh`, all of which have run there; no spot interruption has yet tested `spot-watch.sh`.
-Not run on EC2: `chain.sh`, `scaling.sh` and `verify.sh` (the calibration did by hand what they do), and nothing has
-run on Ubuntu.  Sections 2 and 3 exist to find the problems that a macOS run cannot, on a machine that costs cents.  The
-speed of a Graviton core and the scaling of a proof to 64 threads are measured (the calibration); what is not is in
-section 8.
+The scaling run on a `c8g.48xlarge` ran `setup.sh` in full (without the tests) and `verify.sh` there.  Not run on EC2:
+`chain.sh` and `scaling.sh` (the calibration and the scaling run did by hand what they do), and nothing has run on
+Ubuntu.  Sections 2 and 3 exist to find the problems that a macOS run cannot, on a machine that costs cents.  The speed
+of a Graviton core and the scaling of the solver to 64 and 192 threads are measured (the calibration and the
+[scaling run](../../docs/EXPERIMENTS.md#scaling-to-192-threads-2026-10)); what is not is in section 8.
 
 * [Rules for every launch](#rules-for-every-launch)
 * [0. The plan](#0-the-plan)
@@ -119,12 +120,15 @@ are new.  The solver is the same code as on a laptop; the machine only changes h
 [docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#the-gf2-bound-in-the-search-2026-10)): a chain from `optimal.json`'s
 game of 1300 reached 2175 in 92 minutes of game time on 2 threads of the M1 Max, the dearest game 2170 at 290 s, its
 cost in waves (bands of 25 n from 11 s to 850 s) that follow the root's GF(2) gap, with no growth a fit over 1301-2175
-resolves.  Taking the 192-CPU machine as 43 to 86 times those 2 threads (an assumption), a day reaches the end of the
+resolves.  Taking the 192-CPU machine as 43 to 86 times those 2 threads (an assumption; the scaling run, below, puts it
+near 60 on long searches), a day reaches the end of the
 set widths, n = 4095, at every slope those data support, and even at the steepest any GF(2) measurement has shown (×10
 per 413 n), a day reaches about 3200 and a week about 3600.  How a search spreads over threads is measured to 64: the
 proof of 2172 (1.4 million nodes in the calibration's build) ran 58.5 times as fast as on one thread on a
 `c8g.16xlarge`, and the same instance made the chain's games past 2175 at a rate and a price that the
-[calibration](../../docs/EXPERIMENTS.md#graviton-calibration-2026-10) gives; over 192 threads nothing is measured.  What
+[calibration](../../docs/EXPERIMENTS.md#graviton-calibration-2026-10) gives.  At 192 threads, a `c8g.48xlarge` ran the
+chain past 2225 1.9 to 2.7 times as fast as 64 threads, for 1.1 to 1.9 times the cost a game (the
+[scaling run](../../docs/EXPERIMENTS.md#scaling-to-192-threads-2026-10)).  What
 follows is the matching path's estimate (`--tactic gf2=off --tactic lagrange=on --tactic symmetry=off`, the default
 before), kept for comparison.
 
@@ -155,7 +159,8 @@ rerunning `chain.sh` with a larger N later continues the same file.
 * **Workload.**  CPU-bound integer and bit-set code (no floating point, no SIMD requirement), one process, as many
   threads as CPUs; memory is small: a proof's peak was 32 MB on one thread, 130 at 16 and 363 to 374 at 64 on Graviton
   (the [calibration](../../docs/EXPERIMENTS.md#graviton-calibration-2026-10), which also has the chain's 400 to 540 MB
-  with the results file loaded), so about a gigabyte at 192 threads if the growth goes on, plus 64 MiB of reserved
+  with the results file loaded), and at 192 threads 0.7 to 1.0 GB for the chain past 2225 and 2.3 GB at 4000 (the
+  [scaling run](../../docs/EXPERIMENTS.md#scaling-to-192-threads-2026-10)), plus 64 MiB of reserved
   address space per thread for stacks, which is not memory.  Disk I/O is one checkpoint every 300 s by default, tens of
   KB at 2 threads and at most a few MB at 192 (it holds the work stacks of all workers).  So: the cheapest vCPUs, with
   1 GiB per vCPU or less.
@@ -168,11 +173,11 @@ rerunning `chain.sh` with a larger N later continues the same file.
   calibration chose; `c9g` (Graviton5) is up to 25 % faster per vCPU by AWS's figure, 9 % dearer, and offered in four
   regions only; `c7g` (Graviton3) is the cheapest per vCPU-hour and slower; the `m` families give 4 GiB per vCPU, which
   this workload does not use, at 12 % more per vCPU.  Prices, spot interruption rates and their sources: section 9.3.
-  The solver chain's times below were estimated for 192 CPUs (they scale with the CPUs only as far as the engine does,
-  which the calibration measured to 64 threads and not beyond).  The 192-vCPU `c9g.48xlarge` this page was first
-  written for still works with every script, if you have the quota and want the chain in hours: `scaling.sh` and
-  `chain.sh` take the CPU count from the machine.  On x86_64 compare the nodes per second per thread (`k/s/thr` in the
-  sweep) before choosing.
+  The solver chain's times below were estimated for 192 CPUs (they scale with the CPUs only as far as the engine
+  does, which the calibration measured to 64 threads and the scaling run to 192).  The 192-vCPU `c9g.48xlarge` this
+  page was first written for still works with every script, if you have the quota and want the chain in hours:
+  `scaling.sh` and `chain.sh` take the CPU count from the machine.  On x86_64 compare the nodes per second per thread
+  (`k/s/thr` in the sweep) before choosing.
 * **A small instance of the same family first** (`c8g.xlarge`, 4 vCPUs, which fits the default quota; or `2xlarge`): the
   same CPU, so the same build and the same per-thread speed, for a sixteenth of the price (or less).  It is where setup
   problems on Linux, the tests, the 1-to-4-thread part of the sweep and the single-thread rate are found.
@@ -350,7 +355,8 @@ The default games are brief since the GF(2) bound and the inner-loop round (the 
 thread), so the default sweep shows that the machine and the build work, and the rates of a few threads, not the
 scaling.  The proofs of 2170 and 2172 take about a minute on one thread, which suits 4 to 16 threads and is seconds at
 64; for 64 and 192 threads use the commands of [bench/wall/README.md](../../bench/wall/README.md#for-a-cloud-machine)
-(items 7 and 8: the node rate a thread, and the window of games in flight), which are the unmeasured part of section 8.
+(items 7 and 8: the node rate a thread, and the window of games in flight), which the
+[scaling run](../../docs/EXPERIMENTS.md#scaling-to-192-threads-2026-10) ran once on a `c8g.48xlarge`.
 
 ### 4.3 Reading the sweep
 
@@ -459,9 +465,10 @@ progress line every 60 s.  Its variables (all optional) are documented at the to
 searched, from n's best game so far, while n is still being proved, and the threads move to the searches that keep them
 busy, so that a machine of many threads is not left idle by one game's search.  Games are still concluded and recorded
 in order, with the scores, proofs and repeats of a window of 1, which solves them one after the other
-([README](../../README.md#games-in-flight); [DESIGN.md](../../DESIGN.md#the-window-games-in-flight)).  The window was
-measured at 4 threads only; what to set it to on 64 or 192 threads is measured in items 7 and 8 of
-[bench/wall/README.md](../../bench/wall/README.md#for-a-cloud-machine).
+([README](../../README.md#games-in-flight); [DESIGN.md](../../DESIGN.md#the-window-games-in-flight)).  On 64 and 192
+threads the [scaling run](../../docs/EXPERIMENTS.md#scaling-to-192-threads-2026-10) found a window of 4 the best of 1,
+4, 16 and 32 on the games past 2225, and the default of 16 a fifth slower than 1 on 64 threads: set `WINDOW=4` until
+the default changes.
 
 * **Where the chain starts.**  From an empty `~/taxman-work`, `chain.sh` solves from n = 1, which reproduces the
   committed `rust/results/strict.jsonl` (n = 1 to 2175; the scores equal, the moves may differ) in minutes on the big
@@ -509,10 +516,10 @@ most, `spilled 0`, `pauses N (x%)` with x under 1, `best` rising early and then 
 always, found long before the proof ends).  The node rate grows with the thread count: one M1 Max thread does 12
 thousand nodes a second at n = 1215 and 8 thousand at 2172 (the table of
 [round B](../../docs/EXPERIMENTS.md#round-b-the-chain-on-many-threads-2026-10); the matching path's were 100 to 130
-thousand, in trees a hundred times larger).  A Graviton4 core runs the solver at 0.9 of an M1 Max core and a thread kept
-93 to 94 % of its one-thread rate at 64 ([calibration](../../docs/EXPERIMENTS.md#graviton-calibration-2026-10)), so past
-2000 about 7 thousand a thread and a million a second at 192 threads if the CPUs scale, which nothing has measured yet
-(item 7 of [bench/wall/README.md](../../bench/wall/README.md#for-a-cloud-machine)).  Estimate when a long game will end
+thousand, in trees a hundred times larger).  On a Graviton4 core the proof of 2172 does 6.5 thousand a second on one
+thread, and the chain's searches of 2277..2336 did 3.3 to 6.2 thousand a thread on 192 threads (0.6 to 1.2 million a
+second) and 3.9 to 5.3 thousand on 64 (0.25 to 0.34 million)
+([the scaling run](../../docs/EXPERIMENTS.md#scaling-to-192-threads-2026-10)).  Estimate when a long game will end
 from the previous ones: the log has each game's seconds; past 1300 they come in waves of a few hundred n, not on a
 smooth curve.
 
@@ -605,28 +612,31 @@ with.
 The Graviton calibration measured the speed of a Graviton3 and a Graviton4 core against the M1 Max's, the contention
 among 64 one-thread copies (none), a proof's scaling to 64 threads, and the chain's games an hour on 64 threads: it is
 the entry [Graviton calibration](../../docs/EXPERIMENTS.md#graviton-calibration-2026-10), with its scripts and data in
-[bench/cloud/](../../bench/cloud/README.md).  What it did not measure:
+[bench/cloud/](../../bench/cloud/README.md).  The scaling run of 2026-10-15 on a `c8g.48xlarge` (two sockets, two NUMA
+nodes) measured, after the inner loop's round, round A and round B, where a thread's time goes at 16, 64, 96 and 192
+threads, the window at 64 and 192 threads, the pause of a checkpoint and the memory at 192, the fixed costs of a game
+on a Graviton4 core, and the chain's speed and cost a game on 64 and 192 threads: the entry
+[Scaling to 192 threads](../../docs/EXPERIMENTS.md#scaling-to-192-threads-2026-10).  What neither measured:
 
-* **Anything above 64 threads.**  64 threads on one socket of Graviton3 and Graviton4 are measured.  The engine's design
-  (one shared deque; a demand count so that all workers are busy in a few rounds of splits) was also tested on a toy
-  problem at 64 and 192 threads on a 10-CPU machine.  The 10x to 19x assumed for 192 CPUs (bench/curve/README.md) comes
-  from the design, not from data.  The commands for the first data are in
-  [bench/wall/README.md](../../bench/wall/README.md#for-a-cloud-machine), "For a cloud machine" (the node rate a thread
-  at 64 and 192 threads, the pause of a checkpoint, memory at 4000, the window), and section 4.2 here.
+* **Why a 192-thread search after one-thread work in the same process steps 1.6 to 1.7 times slower.**  The ladder
+  showed it twice, `solve` never; the suspect is the kernel's automatic NUMA balancing.  The check (the threads' CPUs
+  during such a run, and the same under `numactl --interleave=all`) takes minutes on the next 192-thread machine; it
+  matters for a long `chain.sh` run on 192 threads.
+* **Where the second socket's cost goes.**  At 192 threads a step is 7 to 10% dearer than on one socket; remote memory
+  and the other chip's caches were not separated.
+* **Large trees on many threads.**  The longest search at 192 threads was 85 s (2288); hours of one tree (item 2 of
+  [bench/wall/README.md](../../bench/wall/README.md#for-a-cloud-machine)) were not run, and nor was the size of a
+  checkpoint at 4000 on 192 threads (its standalone search ended in 43 s, before the first).
+* **The window's policy on many threads.**  Its constants (a tick of 5 ms, busy below 5% idle, giving back at 25% idle,
+  10 ms to settle) were not tuned; a window of 4 was the best of 1, 4, 16 and 32 on the games past 2225 at 64 and 192
+  threads in one run each, and 2, 3, 6 and 8 were not tried there.
 * **Graviton5.**  A `c9g.16xlarge` was launched for the calibration and the spot service took it back five minutes in,
-  before it ran anything.  The speed of its CPUs against Graviton4's (AWS says up to 25 %), and the cache and memory
-  behaviour of 192 CPUs sharing a chip, are unmeasured.
-* **NUMA** on the largest shapes: the 64-vCPU instances measured are one socket and one node; a 192-vCPU instance has
-  not been looked at.
+  before it ran anything.  The speed of its CPUs against Graviton4's (AWS says up to 25 %) is unmeasured.
 * **PGO and `target-cpu=native` on Graviton.**  `tools/pgo.sh` exists and was run on the M1 only; no gain from
   profile-guided builds is claimed for Graviton, and the calibration built with `native` without comparing generic code.
-* **The window of games in flight** (`taxman solve --window`, `WINDOW` in `chain.sh`) was measured at 4 threads only:
-  1..1300 about 16% faster, the games past 2225 no slower.  Its policy's constants (a tick of 5 ms, busy below 5% idle,
-  giving back at 25% idle, 10 ms to settle) were not tuned for 64 or 192 threads, and where a step's time goes at those
-  thread counts (the units' starts, the lock, the ramp and the tail, now in the ladder's table) is not known:
-  `bench/wall/README.md`, "For a cloud machine", items 7 and 8, are the commands.
-* **The scripts on Linux and on EC2.**  See the status box: `chain.sh`, `scaling.sh` and `verify.sh` have not run on
-  EC2, and `spot-watch.sh` has not seen an interruption.  The first run of each on a small instance is the test.
+* **The scripts on Linux and on EC2.**  See the status box: `chain.sh` and `scaling.sh` have not run on EC2, and
+  `spot-watch.sh` has not seen an interruption (the scaling run's instance had its notice two minutes before the end,
+  with no `spot-watch.sh` running).  The first run of each on a small instance is the test.
 
 ## 9. The prover's proofs of opt(n), 1301 to 2175
 
