@@ -3,8 +3,9 @@
 
 Reads the output of `examples/fields.rs bnb`, next to this script unless an option says otherwise: bnb.jsonl (a line
 per run, `--bnb`), audit.jsonl (a line per audited node, `--audit`) and the per-node logs in logs/, named
-`n{N}-{variant}-{policy}-k{K}.jsonl` (`--logs`).  A line that repeats the key of an earlier one (a rerun) replaces it;
-a missing file or directory is noted and its sections skipped.  Prints Markdown to standard output: 1. the exact trees,
+`n{N}-{variant}-{policy}-k{K}.jsonl` (`--logs`), or its gzipped `.jsonl.gz` form when the plain file is absent.  A line
+that repeats the key of an earlier one (a rerun) replaces it; a missing file or directory is noted and its sections
+skipped.  Prints Markdown to standard output: 1. the exact trees,
 their ratios against v0 and the node cost model; 2. the time per node; 3. the audit (the methods against the
 reference, by game and host variant and by GF(2) excess); 4. the pilot's kill criterion, fixed in advance, per game
 (only 1472 decides); 5. the refits by GF(2) excess and depth, from the logs; 6. Knuth's estimates beside the exact
@@ -12,6 +13,7 @@ counts.  A run that stopped at a budget gives only bounds, and its ratios are sh
 `./e3.py > e3_output.md`.
 """
 import argparse
+import gzip
 import json
 import sys
 from array import array
@@ -412,7 +414,7 @@ def read_log(path):
     exceeds its parent's, so one sweep in id order marks a node when it or any ancestor was refitted."""
     groups = [Group() for _ in GROUPS]
     ids, parents, masks = array("q"), array("q"), array("H")  # a node's id, its parent's (-1: none), its groups
-    with path.open() as f:
+    with (gzip.open(path, "rt") if path.suffix == ".gz" else path.open()) as f:
         for line in f:
             if not line.startswith("{"):
                 continue
@@ -451,7 +453,10 @@ def read_log(path):
 
 
 def log_path(directory, r):
-    return directory / f"n{r['n']}-{r['variant']}-{r.get('policy')}-k{r.get('k')}.jsonl"
+    """The run's per-node log: the gzipped copy if only it exists, else the plain file (which may be absent)."""
+    plain = directory / f"n{r['n']}-{r['variant']}-{r.get('policy')}-k{r.get('k')}.jsonl"
+    gzipped = plain.with_name(plain.name + ".gz")
+    return gzipped if not plain.exists() and gzipped.exists() else plain
 
 
 def section_refits(trees, directory):

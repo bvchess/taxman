@@ -116,7 +116,7 @@ pub const LOCAL_PER_FRAME: usize = 8;
 /// The most cores a node's separation takes from one frame of one column (design S3.3).
 pub const LOCAL_CORES_PER_FRAME: usize = 2;
 /// Where the indices of the seeds of node-local signings' defaults start: past those of a root's core-derived
-/// signings at the default cap of 8 a frame.
+/// signings at the default limit of 8 a frame.
 pub const LOCAL_SEEDS: usize = 8;
 /// No row, no position.
 const NONE: u32 = u32::MAX;

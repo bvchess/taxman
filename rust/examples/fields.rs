@@ -483,9 +483,9 @@ fn assert_independent<const W: usize>(n: u32, fam: &Family, set: &Bits<W>, what:
     }
 }
 
-/// Runs `f` at the root of `n` set up as every root computation is: the GF(2) matroids of the candidates, the cap
-/// `max_total`, the target `P*` (not stopping there) and the GF(2) gap for the closing tolerance; `f` is given the
-/// context and the GF(2) bound.
+/// Runs `f` at the root of `n` set up as every root computation is: the GF(2) matroids of the candidates, the most
+/// promotions `max_total`, the target `P*` (not stopping there) and the GF(2) gap for the closing tolerance; `f` is
+/// given the context and the GF(2) bound.
 fn at_root<const W: usize, R>(n: u32, p: &Prepared<W>, opt: u64, f: impl FnOnce(&Ctx<'_, W>, i64) -> R) -> R {
     let fm = frame_matroids(&p.model, &p.root, &p.candidates);
     let cap = p.max_total as usize;
