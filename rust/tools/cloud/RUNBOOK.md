@@ -10,10 +10,14 @@ Before launching anything, read [Rules for every launch](#rules-for-every-launch
 SIGTERM stop, deliberate interruptions and resumes, a crash loop and a deadline; `scaling.sh` in all three modes (a
 sweep, `--engine`, `--pauses`); `setup.sh` through its build and checks; `verify.sh`.  `prover.sh` (section 9) ran on
 macOS and in the Docker image (Linux, arm64) over a range, with a SIGTERM stop and a resume; `chain.sh` also ran in the
-image after the `run.sh` split.  Nothing has been run on Amazon Linux, Ubuntu or EC2; `save.sh` and `spot-watch.sh` need
-S3 and EC2 and have not been run at all.  Sections 2 and 3 exist to find the problems that a macOS run cannot, on a
-machine that costs cents.  Nothing about scaling beyond 8 threads or about the speed of a Graviton CPU has been
-measured (section 8).
+image after the `run.sh` split.  On EC2 (Amazon Linux 2023, Graviton) the calibration
+([bench/cloud/](../../bench/cloud/README.md)) ran the solver and the prover on a `c7g.16xlarge` and a `c8g.16xlarge`
+with its own scripts, and the prover's run of section 9 uses `setup.sh` (`PROVER_ONLY=1`), `prover.sh`, `save.sh` (with
+an instance role) and `spot-watch.sh`, all of which have run there; no spot interruption has yet tested `spot-watch.sh`.
+Not run on EC2: `chain.sh`, `scaling.sh` and `verify.sh` (the calibration did by hand what they do), and nothing has
+run on Ubuntu.  Sections 2 and 3 exist to find the problems that a macOS run cannot, on a machine that costs cents.  The
+speed of a Graviton core and the scaling of a proof to 64 threads are measured (the calibration); what is not is in
+section 8.
 
 * [Rules for every launch](#rules-for-every-launch)
 * [0. The plan](#0-the-plan)
@@ -65,18 +69,19 @@ calibration.  The sections below point here instead of repeating them.
   Then delete the key pairs and security groups the launch created, and only those (found by the same tag; a launch
   may use a key pair or security group that existed before, and leaves it alone), and report the instance-hours (launch
   to the terminate call), the spot price of the hour and the cost, as the "Cost" paragraph of the calibration entry
-  does.
+  does.  The bucket and the role and instance profile `taxman-ec2` (section 9.4) are kept for the next run on purpose;
+  a finished run's prefix in the bucket can go once its results are home.
 
 ## 0. The plan
 
 1. Optional, on your machine: build and test in Docker (section 2).
-2. A small instance of the same family, on-demand, for an hour or two (cents): `setup.sh`, the tests, the scaling sweep
-   up to its 8 threads (section 3).
-3. The production instance (section 1: mid-size), on-demand, for the checks: the large-machine tests, the sweep to
+2. A small instance of the same family, on spot like every launch, for an hour or two (cents): `setup.sh`, the tests,
+   the scaling sweep up to its CPU count (section 3).
+3. The production instance (section 1: mid-size), on spot, for the checks: the large-machine tests, the sweep to
    its CPU count, the cost of a checkpoint pause, and a rehearsal of the whole chain to 1231 with deliberate
    interruptions (section 4).
 4. The production chain, from n = 1 or from the committed `results/strict.jsonl` (which holds it to 2175), in
-   tmux, on spot or on-demand, with a deadline and a copy of the state kept off the machine (section 5).
+   tmux, on spot, with a deadline and a copy of the state kept off the machine (section 5).
 5. Verify, bring the results home, shut everything down (section 6).
 
 The files in this directory:
@@ -111,12 +116,15 @@ Nothing is taken from `optimal.json` (it is only compared with, to n = 1300), so
 are new.  The solver is the same code as on a laptop; the machine only changes how long it takes.
 
 **With the GF(2) bound** (the default since 2026-10;
-[docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#the-gf2-bound-in-the-search-2026-10)): a chain from `optimal.json`'s game of 1300 reached 2175 in 92 minutes of game time on 2 threads of the M1 Max, the
-dearest game 2170 at 290 s, its cost in waves (bands of 25 n from 11 s to 850 s) that follow the root's GF(2) gap,
-with no growth a fit over 1301-2175 resolves.  Taking the 192-CPU machine as 43 to 86 times those 2 threads (an
-assumption), a day reaches the end of the set widths, n = 4095, at every slope those data support, and even at the
-steepest any GF(2) measurement has shown (×10 per 413 n), a day reaches about 3200 and a week about 3600.  How a
-search of 10^5-10^6 nodes spreads over 192 threads has not been measured (to 4 threads: 2.9 times one).  What
+[docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#the-gf2-bound-in-the-search-2026-10)): a chain from `optimal.json`'s
+game of 1300 reached 2175 in 92 minutes of game time on 2 threads of the M1 Max, the dearest game 2170 at 290 s, its
+cost in waves (bands of 25 n from 11 s to 850 s) that follow the root's GF(2) gap, with no growth a fit over 1301-2175
+resolves.  Taking the 192-CPU machine as 43 to 86 times those 2 threads (an assumption), a day reaches the end of the
+set widths, n = 4095, at every slope those data support, and even at the steepest any GF(2) measurement has shown (×10
+per 413 n), a day reaches about 3200 and a week about 3600.  How a search spreads over threads is measured to 64: the
+proof of 2172 (1.4 million nodes in the calibration's build) ran 58.5 times as fast as on one thread on a
+`c8g.16xlarge`, and the same instance made the chain's games past 2175 at a rate and a price that the
+[calibration](../../docs/EXPERIMENTS.md#graviton-calibration-2026-10) gives; over 192 threads nothing is measured.  What
 follows is the matching path's estimate (`--tactic gf2=off --tactic lagrange=on --tactic symmetry=off`, the default
 before), kept for comparison.
 
@@ -145,36 +153,41 @@ rerunning `chain.sh` with a larger N later continues the same file.
 ### Instance
 
 * **Workload.**  CPU-bound integer and bit-set code (no floating point, no SIMD requirement), one process, as many
-  threads as CPUs; memory is tiny: about 30 MB plus 2 MB per thread were measured on an M1 (33 MB at 2 threads, 45 MB
-  at 8), so a few hundred MB at 192 threads, plus 64 MiB of reserved address space per thread for stacks, which is not
-  memory.  Disk I/O is one checkpoint a minute, tens of KB at 2 threads and at most a few MB at 192 (it holds the work
-  stacks of all workers).  So: the cheapest vCPUs, with 1 GiB per vCPU or less.
+  threads as CPUs; memory is small: a proof's peak was 32 MB on one thread, 130 at 16 and 363 to 374 at 64 on Graviton
+  (the [calibration](../../docs/EXPERIMENTS.md#graviton-calibration-2026-10), which also has the chain's 400 to 540 MB
+  with the results file loaded), so about a gigabyte at 192 threads if the growth goes on, plus 64 MiB of reserved
+  address space per thread for stacks, which is not memory.  Disk I/O is one checkpoint every 300 s by default, tens of
+  KB at 2 threads and at most a few MB at 192 (it holds the work stacks of all workers).  So: the cheapest vCPUs, with
+  1 GiB per vCPU or less.
 * **A mid-size instance, 16 to 64 vCPUs** (`c8g.4xlarge` to `c8g.16xlarge`; the same sizes of `c9g` or `c7g`), for
   hours or days, rather than the largest for minutes.  Graviton has no SMT, so a vCPU is a core and each worker thread
   gets a whole one; on Intel families a vCPU is a hyperthread and the throughput per thread is lower.  The price per
   vCPU-hour is the same at every size of a family on demand and within a factor of 1.5 on spot, the largest spot pools
   are the thinnest, and the prover's proofs need no more than 16.  (A new account's vCPU quota is 5, the owner's
-  account allows 640 spot vCPUs: section 9.3.)  Which family: `c8g`
-  (Graviton4) is the safe default; `c9g` (Graviton5) is up to 25 % faster per vCPU by AWS's figure, 9 % dearer, and
-  offered in four regions only; `c7g` (Graviton3) is the cheapest per vCPU-hour and slower; the `m` families give 4 GiB
-  per vCPU, which this workload does not use, at 12 % more per vCPU.  Prices, spot interruption rates and their sources:
-  section 9.3.  The solver chain's times below were estimated for 192 CPUs (they scale with the CPUs only as far as the
-  engine does, which has not been measured past 8 threads).  The 192-vCPU `c9g.48xlarge` this page was first written
-  for still works with every script, if you have the quota and want the chain in hours: `scaling.sh` and `chain.sh`
-  take the CPU count from the machine.  On x86_64 compare the nodes per second per thread (`k/s/thr` in the sweep)
-  before choosing.
+  account allows 640 spot vCPUs: section 9.3.)  Which family: `c8g` (Graviton4) is the safe default, and what the
+  calibration chose; `c9g` (Graviton5) is up to 25 % faster per vCPU by AWS's figure, 9 % dearer, and offered in four
+  regions only; `c7g` (Graviton3) is the cheapest per vCPU-hour and slower; the `m` families give 4 GiB per vCPU, which
+  this workload does not use, at 12 % more per vCPU.  Prices, spot interruption rates and their sources: section 9.3.
+  The solver chain's times below were estimated for 192 CPUs (they scale with the CPUs only as far as the engine does,
+  which the calibration measured to 64 threads and not beyond).  The 192-vCPU `c9g.48xlarge` this page was first
+  written for still works with every script, if you have the quota and want the chain in hours: `scaling.sh` and
+  `chain.sh` take the CPU count from the machine.  On x86_64 compare the nodes per second per thread (`k/s/thr` in the
+  sweep) before choosing.
 * **A small instance of the same family first** (`c8g.xlarge`, 4 vCPUs, which fits the default quota; or `2xlarge`): the
   same CPU, so the same build and the same per-thread speed, for a sixteenth of the price (or less).  It is where setup
   problems on Linux, the tests, the 1-to-4-thread part of the sweep and the single-thread rate are found.
 * **Check `lscpu` on a large one** for the number of NUMA nodes.  The engine does not pin threads; each searcher
   allocates its own state on its own thread, so first touch keeps it local.  If there are several nodes and the sweep
-  shows a step in `k/s/thr` where the thread count crosses a node, that is the cause.
+  shows a step in `k/s/thr` where the thread count crosses a node, that is the cause.  The 64-vCPU instances of the
+  calibration were one socket and one node (`bench/cloud/machines/`).
 * **Build on the machine type that runs it.**  `-C target-cpu=native` is opt-in: a plain `cargo build` is generic code
   (README, section 2), and these scripts add it through `RUSTFLAGS` (the default of `env.sh`; set `RUSTFLAGS=` to build
   generic code).  It tunes for the CPU that builds; a binary built on a newer CPU can fail with an illegal instruction
   on an older one.  `setup.sh` prints the CPU that `native` resolved to (`native cpu:` line); it should be a Neoverse
-  CPU name, not `generic`.  The gain of `native` has not been measured on Graviton (expect 0 to 3 %; on the M1 it
-  measured 0 %).
+  CPU name (`neoverse-v2` on Graviton4), not `generic`.  That line is the only place the log names the CPU there: a
+  known gap of `env_report`, which greps `lscpu` for `^Model name`, while on Graviton4 with Amazon Linux 2023 `lscpu`
+  prints only `BIOS Model name: AWS Graviton4`, so the logs have no model line.  The gain of `native` has not been
+  measured on Graviton (expect 0 to 3 %; on the M1 it measured 0 %).
 * **Profile-guided optimization** (PGO) is optional: `rust/tools/pgo.sh` makes the build (its header says how; on the
   M1 it adds 0 to 2 % now, see [DESIGN.md](../../DESIGN.md#10-performance)).  PGO changes code
   generation only: the search and its answers are the same, a checkpoint can be resumed by either binary, and
@@ -182,12 +195,15 @@ rerunning `chain.sh` with a larger N later continues the same file.
 
 ### Spot or on-demand
 
-* **On-demand for sections 3 and 4**: a spot interruption in the middle of a measurement ruins it.
+* **Spot for sections 3 and 4 too**, as a one-time request: an interruption in the middle of a measurement ruins that
+  measurement, which is repeated.  The calibration's `c9g.16xlarge` was taken back five minutes in and cost $0.06, and
+  on-demand costs about 3 to 4 times as much a vCPU-hour (section 9.3).  On-demand is for a measurement that must not be
+  lost, or when the spot pool has no capacity.
 * **Spot for the production chain is reasonable**, because the run is built for it: a stop by SIGTERM loses nothing, a
   kill loses at most one checkpoint interval (300 s), and `chain.sh` is safe to start again.  What an interruption
-  really costs is the time to get a machine again (the spot pool of a large size can be thin) and your attention; fall back to
-  on-demand, or to a smaller size (`THREADS` can differ between resumes), if you cannot.  Use `spot-watch.sh` to turn the
-  two-minute notice into a clean stop and a save.
+  really costs is the time to get a machine again (the spot pool of a large size can be thin) and your attention; fall
+  back to on-demand, or to a smaller size (`THREADS` can differ between resumes), if you cannot.  Use `spot-watch.sh` to
+  turn the two-minute notice into a clean stop and a save.
 * A **persistent** spot request launches a replacement after an interruption: that is convenient and also a way to
   keep paying for something nobody watches.  If you use one, `DEADLINE_HOURS` and `POWEROFF` (section 5) are your
   protection, and the request is cancelled at the end like everything else
@@ -209,8 +225,11 @@ the copy that matters is the one off the machine: `S3_DEST` (section 5) or a pul
 * AMI: Amazon Linux 2023, arm64 (user `ec2-user`); or Ubuntu 22.04 or 24.04 arm64 (user `ubuntu`).
 * Storage: one gp3 root volume, 40 GB.  A second, if you want the state to outlive the instance: mount it, set
   `TAXMAN_WORK` to a directory on it, and turn "delete on termination" off (it is deleted at the end, with the rest).
-* Security group: SSH from your address only; nothing else inbound.  A key pair.  Require IMDSv2 (`spot-watch.sh` uses it).
-* Instance role (for S3 only): list, get, put and delete on one bucket prefix, nothing else.
+* Access, one of two.  Session Manager (SSM), as the prover's run does (section 9.4): a security group with no inbound
+  rules and no key pair, and an instance profile with `AmazonSSMManagedInstanceCore`.  Or SSH: a security group with SSH
+  from your address only, nothing else inbound, and a key pair.  Require IMDSv2 either way (`spot-watch.sh` uses it).
+* Instance role: for S3, list, get, put and delete on the one bucket the runs use, nothing else (section 9.4 has the
+  role `taxman-ec2` that exists), and for SSM the managed policy above.
 * Shutdown behaviour, the timer, and the tags (with a `Name`): as in [Rules for every launch](#rules-for-every-launch).
 * A budget alert on the account, before the first launch.  Cost guardrails for the run itself are in section 5.
 
@@ -244,7 +263,7 @@ speed; the scaling numbers of a container on a laptop mean nothing for the cloud
 
 ## 3. A small instance first
 
-1. Launch it (section 1; the [rules for every launch](#rules-for-every-launch)), on-demand, with a timer of 180
+1. Launch it (section 1; the [rules for every launch](#rules-for-every-launch)), on spot, with a timer of 180
    minutes.
 2. Get the code and set up:
 
@@ -264,12 +283,12 @@ speed; the scaling numbers of a container on a laptop mean nothing for the cloud
 3. In `tmux new -s tx` (detach with Ctrl-b d, return with `tmux attach -t tx`), run the sweep:
 
    ```
-   rust/tools/cloud/scaling.sh                        # about 10 minutes at 8 vCPUs
+   rust/tools/cloud/scaling.sh                        # short now: its default games are brief (section 4.2)
    ```
 
-   Read section 4.3 for the tables.  What to take from this machine: the single-thread rate (`k/s/thr` at 1 thread; the
-   M1 Max did 100 to 130 thousand nodes per second per thread on single games from n = 1184 to 1215, depending on
-   the game), the speedup to 8 threads, and a
+   Read section 4.3 for the tables.  What to take from this machine: the single-thread rate (`k/s/thr` at 1 thread: the
+   M1 Max did 12.3 at n = 1215, the sample of section 4.3, and the calibration found a Graviton4 core 0.9 of an M1 Max
+   core on the solver, so about 11 is expected of a `c8g`), the speedup to the machine's threads, and a
    `Maximum resident set size` in the log (GNU `time` is used if installed).
 4. Try the pieces that will matter on the big machine, on a small chain:
 
@@ -284,9 +303,10 @@ speed; the scaling numbers of a container on a laptop mean nothing for the cloud
 
 ## 4. The big instance: checks before the chain
 
-Launch the production instance (section 1) on-demand, with a timer of 240 minutes, and run `setup.sh` as above (about
-the same time).  Use tmux for everything.  Count on one to one and a half hours, roughly $10 to $15 at the assumed
-price.
+Launch the production instance (section 1) on spot, with a timer of 240 minutes, and run `setup.sh` as above (about the
+same time).  Use tmux for everything.  Count on one to one and a half hours: about $1 on a `c8g.16xlarge` at the spot
+price of 2026-10-14 ($0.68 an hour; the calibration's instance of that size ran 0.775 hours for $0.53), and $10 to $15
+for the 192-vCPU instance this page was first written for, on demand.
 
 ### 4.1 Correctness
 
@@ -298,9 +318,10 @@ TXENGINE_STRESS=2000 cargo test --release --test engine -- --ignored stress
 TXENGINE_CONSERVATION=500 cargo test --release --test robustness conservation
 ```
 
-* The suite takes about 30 s to run after compiling, with two or four test threads ([DESIGN.md](../../DESIGN.md#9-testing), "Testing"); it includes
-  the node-count tripwires (`tests/tripwires.rs`), which assert exact trees on one thread and so check the arithmetic
-  and the search against a different CPU and compiler.
+* The suite takes about 30 s to run after compiling, with two or four test threads
+  ([DESIGN.md](../../DESIGN.md#9-testing), "Testing"); it includes the node-count tripwires (`tests/tripwires.rs`),
+  which assert exact trees on one thread and so check the arithmetic and the search against a different CPU and
+  compiler.
 * `many_threads` runs the engine on a toy problem at 64 and at 192 workers: answers, splitting, checkpoints every 2 ms,
   spilling, a panicking worker.  `--nocapture` prints each run's counters (`eff`, `splits`, `full`): the first look at
   192 threads.
@@ -314,16 +335,22 @@ All of these pass or the machine is not ready.  Save the output.
 ### 4.2 The scaling sweep
 
 ```
-rust/tools/cloud/scaling.sh              # --seed-opt proofs of 1215 and 1225 at 1, 2, 4, ... 128, 192 threads; 10 to 15 minutes
+rust/tools/cloud/scaling.sh              # --seed-opt proofs of 1215 and 1225 at 1, 2, 4, ... and all CPUs: brief
 rust/tools/cloud/scaling.sh --engine     # adds the engine's own benchmark (no work per node): 5 to 10 minutes
-rust/tools/cloud/scaling.sh --pauses     # adds one real game at 192 threads with a checkpoint every 0.5 s
-GAMES=1230 THREADS=4,16,64,192 rust/tools/cloud/scaling.sh    # a longer proof, from 4 threads up
+rust/tools/cloud/scaling.sh --pauses     # adds one real game at all CPUs with a checkpoint every 0.5 s
+GAMES="2170 2172" THREADS=1,4,16 rust/tools/cloud/scaling.sh    # dearer proofs, for the scaling to 16 threads
 ```
 
 Each ladder line is a search of one game at one thread count, with the optimum given as the starting incumbent
 (`--seed-opt`) so that the work is the proof alone and the node count barely depends on the threads, the default
 tactics, and the ceiling of the chain.  The tables are printed per game and for all games together.  Run it on an idle
 machine; the log (`~/taxman-work/logs/scaling-*.txt`) starts with the machine and the build.
+
+The default games are brief since the GF(2) bound and the inner-loop round (the proof of 1215 takes 0.3 s on one M1
+thread), so the default sweep shows that the machine and the build work, and the rates of a few threads, not the
+scaling.  The proofs of 2170 and 2172 take about a minute on one thread, which suits 4 to 16 threads and is seconds at
+64; for 64 and 192 threads use the commands of [bench/wall/README.md](../../bench/wall/README.md#for-a-cloud-machine)
+(items 7 and 8: the node rate a thread, and the window of games in flight), which are the unmeasured part of section 8.
 
 ### 4.3 Reading the sweep
 
@@ -342,7 +369,7 @@ scaling, n=1215 (speedup over 1 thread(s), times 1; * = stopped by the time limi
 | `search s` | wall time of the search; `*` if the time limit stopped it | a `*` makes that row useless; raise `SECONDS_LIMIT` |
 | `speedup` | time of the first row times its threads, over this time | close to the thread count for a long game; see the next paragraph |
 | `nodes` | steps taken, all threads | compare with the 1-thread row: tens of percent either way is normal (below) |
-| `k/s/thr` | thousands of nodes per second per thread | the engine's efficiency apart from the tree size: it falls a little with more threads (M1, the proof of 1225: 80 to 65 from 1 to 8 threads, 19 %; the rate depends on the game: the 1-thread row above is 12.3 at n = 1215); a step down at one thread count suggests memory, frequency or NUMA |
+| `k/s/thr` | thousands of nodes per second per thread | the engine's efficiency apart from the tree size: it falls a little with more threads (12.3, 11.7 and 11.0 from 1 to 4 threads above, 11 % down; 93 to 94 % of the one-thread rate at 64 threads on Graviton3 and 4, in the [calibration](../../docs/EXPERIMENTS.md#graviton-calibration-2026-10)); the rate depends on the game (12.3 at n = 1215 above, 8.3 at 2172 on one thread, in the table of [round B](../../docs/EXPERIMENTS.md#round-b-the-chain-on-many-threads-2026-10)); a step down at one thread count suggests memory, frequency or NUMA |
 | `µs/step` | the workers' busy time per step (busy time over `nodes`), in µs | `k/s/thr` is about 10 x `eff %` / `µs/step` for a search that is long against its own setup, so a fall of `k/s/thr` is a rise of `µs/step` (a step costs more) or a fall of `eff %` (the workers wait); compare the rows of a game |
 | `µs/tree` | the same without the units' starts: (busy time - rebuild - first nodes) over (`nodes` - units with a first node) | the cost of a step inside a unit's tree; if it stays level while `µs/step` rises, the units' starts are the loss (`reb %` and `1st %`), if it rises with `µs/step`, the step itself is dearer on more threads (caches, memory, fewer nogoods learned a thread) |
 | `eff %` | busy time / (wall x threads) | 99 to 100 up to 8 threads on the M1; below ~90 at 192 only means the game is too short, if `idle %` explains it |
@@ -360,20 +387,22 @@ scaling, n=1215 (speedup over 1 thread(s), times 1; * = stopped by the time limi
 Notes on judging it:
 
 * **Time is the measure; the speedup mixes two effects.**  Each thread keeps its own table of learned conflicts
-  (nogoods) and forgets it every 50,000 of its steps, so the tree differs with the thread count: the proof of 1225 took 12.07M
-  nodes on 1 thread and 9.30M on 8, and sped up 8.4x on 8 threads while the node rate sped up 6.5x
-  (bench/curve/README.md).  Speedup(time) = speedup(nodes per second) x (nodes at 1 thread / nodes at T threads).
-  Judge the engine by `k/s/thr` and `eff %`, the search by `nodes`, and the result by time.
-* **Games must be long enough for the thread count.**  A proof of 1225 takes about 150 s on one M1 thread: at 192 threads
-  that is a second, of which the ramp-up and the tail are a large part.  `eff %` below 100 at 192 threads for such a
-  game is expected and says nothing about long games.  The long games are in the chain itself (n above ~1300 take minutes
-  to hours at 192 threads), and its progress lines (section 5) are the real test: ask of them `eff` of 95 % or more,
-  `lock` near 0, `pauses` under 1 %.
+  (nogoods) and forgets it every 50,000 of its steps, so the tree differs with the thread count: the proof of 2172 took
+  1.43M nodes on 1 thread and 1.27M on 4 on a Graviton4 core, and sped up 4.5x on 4 threads while the node rate sped up
+  4.0x ([calibration](../../docs/EXPERIMENTS.md#graviton-calibration-2026-10), which has 16 and 64 threads too).
+  Speedup(time) = speedup(nodes per second) x (nodes at 1 thread / nodes at T threads).  Judge the engine by `k/s/thr`
+  and `eff %`, the search by `nodes`, and the result by time.
+* **Games must be long enough for the thread count.**  A proof of 1215 takes 0.3 s on one M1 thread and one of 2172 a
+  minute: at 64 or 192 threads that is milliseconds to seconds, of which the ramp-up and the tail are a large part.
+  `eff %` below 100 at 192 threads for such a game is expected and says nothing about long games.  The long games are
+  the dear ones past 2175 (in the calibration's chain on 64 threads, 2184 took three minutes and 2260 a minute and a
+  half: `bench/cloud/c8g.chain-2176.jsonl`), and the chain's progress lines (section 5) are the real test: ask of them
+  `eff` of 95 % or more, `lock` near 0, `pauses` under 1 %.
 * **Memory** is the `Maximum resident set size` line near the end of the log, if GNU `time` was available.
 * **Compare with the small instance**: the 1- and 8-thread rows of both should agree on `k/s/thr`.
-* What would make you stop: `lock %` of several percent or `full s` in seconds at 192 threads on a long game; a `k/s/thr`
-  at 192 below half that at 1 thread (the machine, not the code, is probably the limit, and a smaller instance is cheaper
-  for the same work); any failed test.
+* What would make you stop: `lock %` of several percent or `full s` in seconds at 192 threads on a long game; a
+  `k/s/thr` at 192 below half that at 1 thread (the machine, not the code, is probably the limit, and a smaller
+  instance is cheaper for the same work); any failed test.
 
 ### 4.4 The cost of a checkpoint
 
@@ -418,16 +447,21 @@ Start in tmux, with a deadline and with the state copied off the machine:
 
 ```
 tmux new -s tx
-DEADLINE_HOURS=30 POWEROFF=always S3_DEST=s3://YOUR-BUCKET/taxman-run1 rust/tools/cloud/chain.sh 1400
+DEADLINE_HOURS=30 POWEROFF=always S3_DEST=s3://taxman-013764204840-us-east-1/chain-run1 rust/tools/cloud/chain.sh 1400
 ```
 
-In a second window, if spot: `rust/tools/cloud/spot-watch.sh`.  `chain.sh N` is the whole command: the chain 1..N
-into `~/taxman-work/results/strict.jsonl`, all CPUs, sixteen games in flight at once, a checkpoint every 300 s and a
+(The bucket is the one of section 9.4, a prefix of its own for each run.)  In a second window, on spot:
+`rust/tools/cloud/spot-watch.sh`.  `chain.sh N` is the whole command: the chain 1..N into
+`~/taxman-work/results/strict.jsonl`, all CPUs, sixteen games in flight at once, a checkpoint every 300 s and a
 progress line every 60 s.  Its variables (all optional) are documented at the top of the script: `THREADS`, `WINDOW`,
 `CHECKPOINT_INTERVAL`, `PROGRESS`, `EXTRA_ARGS`, `DEADLINE_HOURS`, `POWEROFF`, `MAX_FAILS`, `S3_DEST`, `SAVE_EVERY`.
-`WINDOW` is the number of games in flight at once, which share the threads (`taxman solve --window`): 1 solves the
-games one after the other, and the scores and proofs are the same for every value; what to set it to on 64 or 192
-threads is measured in items 7 and 8 of [bench/wall/README.md](../../bench/wall/README.md#for-a-cloud-machine).
+`WINDOW` is the number of consecutive games kept in flight at once (`taxman solve --window`): game n + 1 is set up and
+searched, from n's best game so far, while n is still being proved, and the threads move to the searches that keep them
+busy, so that a machine of many threads is not left idle by one game's search.  Games are still concluded and recorded
+in order, with the scores, proofs and repeats of a window of 1, which solves them one after the other
+([README](../../README.md#games-in-flight); [DESIGN.md](../../DESIGN.md#the-window-games-in-flight)).  The window was
+measured at 4 threads only; what to set it to on 64 or 192 threads is measured in items 7 and 8 of
+[bench/wall/README.md](../../bench/wall/README.md#for-a-cloud-machine).
 
 * **Where the chain starts.**  From an empty `~/taxman-work`, `chain.sh` solves from n = 1, which reproduces the
   committed `rust/results/strict.jsonl` (n = 1 to 2175; the scores equal, the moves may differ) in minutes on the big
@@ -439,12 +473,12 @@ threads is measured in items 7 and 8 of [bench/wall/README.md](../../bench/wall/
   rust/tools/cloud/chain.sh 2300                    # skips the 2175 games it holds and solves 2176 on
   ```
 
-  The file is checked when `chain.sh` opens it, assumes nothing (a chain from n = 1), and its lines
-  keep the build that made them (commit feba6d0), as the lines added will keep the cloud's.  It was made in one
-  invocation and holds no incomplete line.  The comparison of `verify.sh` with the committed file is then
-  trivial for 1..2175, so the games above 2175 are checked by the referees alone (each game replayed, the chain
-  bounds, Franklín–Moniot, the heuristic chain); a run from n = 1 is the cross-check of the machine and the build.  On
-  a replacement machine, restore the saved state instead (below), never the committed file over it.
+  The file is checked when `chain.sh` opens it, assumes nothing (a chain from n = 1), and its lines keep the build that
+  made them (commit feba6d0), as the lines added will keep the cloud's.  It was made in one invocation and holds no
+  incomplete line.  The comparison of `verify.sh` with the committed file is then trivial for 1..2175, so the games
+  above 2175 are checked by the referees alone (each game replayed, the chain bounds, Franklín–Moniot, the heuristic
+  chain); a run from n = 1 is the cross-check of the machine and the build.  On a replacement machine, restore the
+  saved state instead (below), never the committed file over it.
 
 * **Stop on purpose**: Ctrl-C in tmux, or `kill -TERM $(cat ~/taxman-work/chain.pid)`.  The solver writes a final
   checkpoint; `chain.sh` ends with status 143.  **Start again**: run the same command.  It skips every completed game
@@ -470,13 +504,17 @@ ls -l ~/taxman-work/ckpt                      # a checkpoint no older than ~2 mi
 htop                                          # all 192 CPUs near 100 %
 ```
 
-A healthy progress line at 192 threads: `eff` 95 % or more, `lock` under 1 %, `idle` small, `queue` a few hundred at most,
-`spilled 0`, `pauses N (x%)` with x under 1, `best` rising early and then still (the incumbent is often, not always,
-found long before the proof ends).  The node rate grows with the thread count: with the GF(2) bound 7 to 9 thousand
-per thread on the M1 at n = 1200-1300 and about 3 thousand past 2000 (the matching path's was 100 to 130 thousand, in
-trees a hundred times larger), so about a million per second at 192 threads if the CPUs scale.  Estimate when a long
-game will end from the previous ones: the log has each game's seconds; past 1300 they come in waves of a few hundred
-n, not on a smooth curve.
+A healthy progress line at 192 threads: `eff` 95 % or more, `lock` under 1 %, `idle` small, `queue` a few hundred at
+most, `spilled 0`, `pauses N (x%)` with x under 1, `best` rising early and then still (the incumbent is often, not
+always, found long before the proof ends).  The node rate grows with the thread count: one M1 Max thread does 12
+thousand nodes a second at n = 1215 and 8 thousand at 2172 (the table of
+[round B](../../docs/EXPERIMENTS.md#round-b-the-chain-on-many-threads-2026-10); the matching path's were 100 to 130
+thousand, in trees a hundred times larger).  A Graviton4 core runs the solver at 0.9 of an M1 Max core and a thread kept
+93 to 94 % of its one-thread rate at 64 ([calibration](../../docs/EXPERIMENTS.md#graviton-calibration-2026-10)), so past
+2000 about 7 thousand a thread and a million a second at 192 threads if the CPUs scale, which nothing has measured yet
+(item 7 of [bench/wall/README.md](../../bench/wall/README.md#for-a-cloud-machine)).  Estimate when a long game will end
+from the previous ones: the log has each game's seconds; past 1300 they come in waves of a few hundred n, not on a
+smooth curve.
 
 ### Surviving a spot interruption
 
@@ -484,7 +522,10 @@ n, not on a smooth curve.
    it, the OS shutdown signals the processes, and in the worst case you lose one checkpoint interval.
 2. With `S3_DEST` set, `chain.sh` has been copying results, logs and checkpoints every 10 minutes (`save.sh`; the
    checkpoints with `--delete`, so a finished game's disappears), at the lowest CPU and I/O priority (`nice -n 19`,
-   `ionice -c 3` on Linux), so that a save (about 1.5 s of CPU) never competes with the workers.
+   `ionice -c 3` on Linux), so that a save (about 1.5 s of CPU) never competes with the workers.  The price of that
+   priority is time: against 16 busy threads a save took about 80 s of wall time on a `c8g.4xlarge`, and the next waits
+   `SAVE_EVERY` after it ends, so the copies are `SAVE_EVERY` plus the save apart (about 380 s for `prover.sh`, whose
+   `SAVE_EVERY` is 300 s).  That is harmless: the final saves, at a stop or the end, run after the work has stopped.
 3. On a replacement machine: `setup.sh` (same commit: `git checkout` it if the branch moved, or the checkpoint may be
    refused), then `S3_DEST=... rust/tools/cloud/save.sh --restore`, then `chain.sh N` again.  It refuses to restore over
    an existing results file unless `FORCE=1`.  With a separate EBS volume instead, attach it in the same availability
@@ -492,11 +533,11 @@ n, not on a smooth curve.
 
 ### Cost guardrails
 
-* `DEADLINE_HOURS`: after that many hours from the first start, `chain.sh` stops the solver cleanly (final checkpoint) and
-  ends with status 3.  `POWEROFF=done` powers the machine off when the range is complete, `POWEROFF=always` whenever
-  `chain.sh` ends for any reason (needs passwordless `sudo`, as on both AMIs): the choice for an unattended run, since an
-  idle machine after an error or a deadline costs as much as a busy one.  `chain.sh` saves to `S3_DEST` before it powers
-  off, which matters because a shutdown terminates the instance.
+* `DEADLINE_HOURS`: after that many hours from the first start, `chain.sh` stops the solver cleanly (final checkpoint)
+  and ends with status 3.  `POWEROFF=done` powers the machine off when the range is complete, `POWEROFF=always`
+  whenever `chain.sh` ends for any reason (needs passwordless `sudo`, as on both AMIs): the choice for an unattended
+  run, since an idle machine after an error or a deadline costs as much as a busy one.  `chain.sh` saves to `S3_DEST`
+  before it powers off, which matters because a shutdown terminates the instance.
 * The timer (a backstop that depends on no script), the tags and the cleanup are in
   [Rules for every launch](#rules-for-every-launch); a budget alert on the account is the other half.
 * When done: what the rules say for the end, and the S3 prefix you no longer need.
@@ -556,34 +597,48 @@ with.
 | `/tmp` or `$TAXMAN_WORK` is a memory filesystem | `chain.sh` refuses: set `TAXMAN_WORK` to a directory on EBS |
 | `Permission denied` installing packages | run as a user with sudo, or install git, a C compiler, python3 and curl and use `SKIP_PACKAGES=1` |
 | the SSH connection dropped | the run is in tmux: reconnect, `tmux attach -t tx`; if tmux is gone the machine rebooted: `setup.sh` is not needed again, run `chain.sh N` |
+| a step sent with `aws ssm send-command` runs as root, or its quoting is mangled | `send-command` runs as root: put the step in a script file and run `sudo -u ec2-user -i bash FILE` (section 9.4); a multi-line `bash -lc '...'` through `sudo -i` mangles its quoting |
 | the machine rebooted | tmux and `chain.sh` are gone; the state is in `~/taxman-work`: run `chain.sh N` again |
 
 ## 8. What has not been measured
 
-* **Anything above 8 threads.**  The engine's design (one shared deque; a demand count so that all workers are busy in
-  a few rounds of splits) was tested on a toy problem at 64 and 192 threads on a 10-CPU machine, and on the solver at
-  up to 8 threads.  The 10x to 19x assumed for 192 CPUs (bench/curve/README.md) comes from the design, not from data.
-  Section 4.2 produces the first data.
-* **Graviton5.**  The speed of its CPUs against the M1's, the effect of `target-cpu=native`, the cache and memory
-  behaviour of 192 CPUs sharing a chip.
-* **NUMA**, if the 48xlarge has more than one node.
-* **PGO.**  `tools/pgo.sh` exists and was run on the M1 only; no gain from profile-guided builds is claimed for Graviton.
+The Graviton calibration measured the speed of a Graviton3 and a Graviton4 core against the M1 Max's, the contention
+among 64 one-thread copies (none), a proof's scaling to 64 threads, and the chain's games an hour on 64 threads: it is
+the entry [Graviton calibration](../../docs/EXPERIMENTS.md#graviton-calibration-2026-10), with its scripts and data in
+[bench/cloud/](../../bench/cloud/README.md).  What it did not measure:
+
+* **Anything above 64 threads.**  64 threads on one socket of Graviton3 and Graviton4 are measured.  The engine's design
+  (one shared deque; a demand count so that all workers are busy in a few rounds of splits) was also tested on a toy
+  problem at 64 and 192 threads on a 10-CPU machine.  The 10x to 19x assumed for 192 CPUs (bench/curve/README.md) comes
+  from the design, not from data.  The commands for the first data are in
+  [bench/wall/README.md](../../bench/wall/README.md#for-a-cloud-machine), "For a cloud machine" (the node rate a thread
+  at 64 and 192 threads, the pause of a checkpoint, memory at 4000, the window), and section 4.2 here.
+* **Graviton5.**  A `c9g.16xlarge` was launched for the calibration and the spot service took it back five minutes in,
+  before it ran anything.  The speed of its CPUs against Graviton4's (AWS says up to 25 %), and the cache and memory
+  behaviour of 192 CPUs sharing a chip, are unmeasured.
+* **NUMA** on the largest shapes: the 64-vCPU instances measured are one socket and one node; a 192-vCPU instance has
+  not been looked at.
+* **PGO and `target-cpu=native` on Graviton.**  `tools/pgo.sh` exists and was run on the M1 only; no gain from
+  profile-guided builds is claimed for Graviton, and the calibration built with `native` without comparing generic code.
 * **The window of games in flight** (`taxman solve --window`, `WINDOW` in `chain.sh`) was measured at 4 threads only:
   1..1300 about 16% faster, the games past 2225 no slower.  Its policy's constants (a tick of 5 ms, busy below 5% idle,
   giving back at 25% idle, 10 ms to settle) were not tuned for 64 or 192 threads, and where a step's time goes at those
   thread counts (the units' starts, the lock, the ramp and the tail, now in the ladder's table) is not known:
   `bench/wall/README.md`, "For a cloud machine", items 7 and 8, are the commands.
-* **The scripts on Linux and on EC2.**  See the status box.  The first run on the small instance is the test.
+* **The scripts on Linux and on EC2.**  See the status box: `chain.sh`, `scaling.sh` and `verify.sh` have not run on
+  EC2, and `spot-watch.sh` has not seen an interruption.  The first run of each on a small instance is the test.
 
 ## 9. The prover's proofs of opt(n), 1301 to 2175
 
 The committed chain (`results/strict.jsonl`) reaches 2175, and the prover in `rust/prover` has proven opt(n) = V(n)
 without the frame model only to 1300 ([the prover's README, section 3](../../prover/README.md#3-the-proofs-of-optn)).
 `prover.sh` runs the same program, `exact`, over 1301..2175 on a cloud machine.  It is a small job next to the
-chain: about 140 thread-hours (100 to 250), half a day on 16 vCPUs, for a few dollars.  The estimate rests on
-measurements on a laptop and on the committed data of the 1..1300 proofs, not on a Graviton CPU; a separate
-calibration (`rust/bench/cloud/`, when it exists) measures the prover and the solver per CPU on Graviton3, 4 and 5 spot
-instances, and its figures replace the milliseconds per node and the factor of 1.0 to 1.6 below.
+chain: about 140 thread-hours at the laptop's speed (100 to 250), half a day on 16 vCPUs, for a few dollars.  The
+estimate rests on measurements on a laptop and on the committed data of the 1..1300 proofs.  The
+[Graviton calibration](../../docs/EXPERIMENTS.md#graviton-calibration-2026-10) has since measured the CPU (a Graviton4
+core runs the prover at 0.93 of an M1 Max core, a Graviton3 core at 0.75; Graviton5 was not measured), and the run
+itself found that the cost of a node on Graviton4 grows with n (section 9.2).  The first run, on a `c8g.4xlarge` on
+spot, started on 2026-10-14 as section 9.4 describes; section 9.6 is what to do with its results.
 
 ### 9.1 How `exact` uses the CPUs, and what the script does about it
 
@@ -621,21 +676,24 @@ ratio growing about tenfold per 1000 in n: geometric mean 0.97 at 1300-1500, 1.6
 scatter of 0.28 decades; `exact` has the weaker bound, the parity one.  Five dear games were stopped unfinished at 1.1
 to 2.2 million nodes (1430, 1472, 1475, 2052, 2170).  The committed proofs of 1..1300 cost 1.2 to 1.7 ms a node on two
 quiet laptop threads (1.73 at 1200-1300); the sample at 1300-1500 on a busy machine, 2.2 to 2.5 (user time; 8 threads in
-parallel add 12 %), and the node hardly changes with n in that range (above it nothing clean was measured).  490 of the
-875 games need a search (the rest are decided by the ceiling or the prime formula).  With the fitted ratio and 2.5 ms a
-node:
+parallel add 12 %).  Past 1500 the node is not flat in n: the run on Graviton4 (16 threads of a `c8g.4xlarge`) costs
+about 2.2 ms a node at 1430-1863, 3.1 to 3.3 at 2060-2160 and 3.9 to 4.2 at 2170-2173, against 2.44 for the searches of
+1301-1310 in the rehearsal (section 9.4).  The model below takes 2.5 ms throughout, so it is low for the late games, the
+dear ones above all.  490 of the 875 games need a search (the rest are decided by the ceiling or the prime formula).
+With the fitted ratio and 2.5 ms a node:
 
 | | |
 |---|---|
 | nodes, all 490 searches | about 200 million (150 to 300) |
 | thread-hours at the laptop's speed | **about 140** (100 to 250; 115 at 2.0 ms a node, 170 at 3.0) |
-| the dearest games | 2170-2173 (gap 767; the model says 8 million nodes each, 6 hours; 2170 had done 1.25 million nodes after 90 minutes), then 1475, 1430, 1472, 1521 (1.7 to 2.5 million, 1.2 to 1.7 hours), 1849-1863, 2160 |
+| the dearest games | 2170-2173 (gap 767; the model says 8 million nodes each: 6 hours at 2.5 ms a node, about 9 at Graviton4's 3.9 to 4.2; 2170 had done 1.25 million nodes after 90 minutes on the laptop), then 1475, 1430, 1472, 1521 (1.7 to 2.5 million, 1.2 to 1.7 hours at 2.5 ms), 1849-1863, 2160 |
 
 Wall time and price by size, by list scheduling over costs drawn from that model (the order is `summarize.py order`),
-at the laptop's speed and at 1.6 times as long (a Graviton CPU against an M1 Max CPU: not measured; the first pass
-of the real run gives it, as milliseconds per node in `prover.err`).  Add 10 % for restarts.  Spot prices are the
-cheapest zone of us-east-1 in the owner's account's spot price history on 2026-10-14 (4 and 8 vCPUs: Vantage, the
-same day); on demand is Vantage's Linux price in US East (`c8g`: $0.0399 per vCPU-hour at every size):
+at the laptop's speed and at 1.6 times as long (the factor of a Graviton CPU against an M1 Max CPU, which the
+calibration has measured since: a Graviton4 core takes 1.08 times as long, so the lower end of each range is the nearer,
+before the rise of the node's cost with n above).  Add 10 % for restarts.  Spot prices are the cheapest zone of
+us-east-1 in the owner's account's spot price history on 2026-10-14 (4 and 8 vCPUs: Vantage, the same day); on demand is
+Vantage's Linux price in US East (`c8g`: $0.0399 per vCPU-hour at every size):
 
 | vCPUs | shape | wall | spot $/hour | spot total | on-demand total |
 |---|---|---|---|---|---|
@@ -647,19 +705,20 @@ same day); on demand is Vantage's Linux price in US East (`c8g`: $0.0399 per vCP
 | 192 | `c8g.48xlarge` | 11 to 17 h | 1.9939 | $22 to 34 | $84 to 130 |
 
 From 16 vCPUs up the dearest games set the wall time, not the CPUs: 2170-2173 start at once and the longest of them
-decides (6 to 24 hours over the draws, at the laptop's speed), and the idle CPUs are paid for.
+decides (6 to 24 hours over the draws, at the laptop's speed; about 9 hours at Graviton4's cost per node for the
+model's 8 million nodes), and the idle CPUs are paid for.  The run's own totals replace this table (section 9.6).
 
 ### 9.3 Which instance, and the quota
 
 * **Quota.**  AWS's documented default for a new account is 5 vCPUs for Standard (A, C, D, H, I, M, R, T, Z) On-Demand
   instances and 5 for Standard Spot requests, per region, raised automatically with use
   ([EC2 instance type quotas](https://docs.aws.amazon.com/ec2/latest/instancetypes/ec2-instance-quotas.html),
-  [On-Demand](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-on-demand-instances.html#ec2-on-demand-instances-limits),
+  [On-Demand](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-on-demand-instances.html),
   [Spot](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-spot-limits.html)): a 4-vCPU shape fits, 8 does not.
   The owner's account, read with the AWS CLI in us-east-1 on 2026-10-14, allows **1280 vCPUs On-Demand and 640 Spot**,
-  so any shape here launches without a request.  To read it again, in the console (Service Quotas, Amazon EC2, the region
-  at the top right, "Applied quota value" of "Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances" and "All
-  Standard (A, C, D, H, I, M, R, T, Z) Spot Instance Requests") or:
+  so any shape here launches without a request.  To read it again, in the console (Service Quotas, Amazon EC2, the
+  region at the top right, "Applied quota value" of "Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances"
+  and "All Standard (A, C, D, H, I, M, R, T, Z) Spot Instance Requests") or:
 
   ```
   aws login --profile bvc                      # short-lived credentials; or export AWS_PROFILE=bvc after it
@@ -679,67 +738,129 @@ decides (6 to 24 hours over the draws, at the laptop's speed), and the idle CPUs
 
   Within a family the price per vCPU on demand is the same at every size and on spot it varies by 1.5 times between
   sizes, so the size is chosen by wall time, not by price.  `c9g` is up to 25 % faster than `c8g` per vCPU (AWS's
-  [announcement](https://aws.amazon.com/about-aws/whats-new/2026/06/ec2-c9g-c9gd-instances-graviton5-processors-available/),
-  a maximum, not measured here) for 9 % more, and is offered in us-east-1, us-east-2, us-west-2 and eu-central-1 only;
-  `c7g` is slower per CPU; the `m` families give memory the run does not use (a thread needs about 25 to 50 MB).
+  [announcement](
+  https://aws.amazon.com/about-aws/whats-new/2026/06/ec2-c9g-c9gd-instances-graviton5-processors-available/),
+  a maximum, not measured here: the calibration's `c9g` was reclaimed before it ran) for 9 % more, and is offered in
+  us-east-1, us-east-2, us-west-2 and eu-central-1 only; `c7g` is slower per CPU; the `m` families give memory the run
+  does not use (a thread needs about 25 to 50 MB).
 * **Spot interruptions.**  The Spot Instance Advisor's rate for us-east-1 (the
   [public data](https://spot-bid-advisor.s3.amazonaws.com/spot-advisor-data.json) behind the
   [advisor page](https://aws.amazon.com/ec2/spot/instance-advisor/), fetched 2026-10-14; the share of instances
-  interrupted in the trailing month) is `c8g`: 4 vCPUs above 20 %, 8 10 to 15 %, 16 above 20 %, 32 5 to 10 %, 64 5 to 10 %,
-  96 above 20 %, 192 10 to 15 %; `c7g`: 16 and 32 under 5 %, 64 5 to 10 %; `c9g` is not listed yet.  At even 20 % a month
-  a run of 12 hours has a chance of about one in 300 if the rate is uniform, and an interruption costs one pass and
-  a few minutes (section 9.5), so spot is fine; on demand costs about $4 to $7 more.
-* **The recommendation: `c8g.4xlarge` (16 vCPUs), spot or on demand, about half a day.**  `c8g.2xlarge` (8) takes a day
-  and costs the same.  Nothing larger buys time, since the dearest games set it; once the calibration has measured the
-  Graviton CPUs, `c9g` (or `c7g` at 64 vCPUs, the cheapest spot per vCPU) may beat it on price per unit of work.
-  Storage: one gp3 root volume of 20 GB (the build of the prover alone is under 2 GB; the output is 200 KB and the
-  checkpoints a few MB).  The launch checklist of section 1 applies, with the instance role only if you use `S3_DEST`.
+  interrupted in the trailing month) is `c8g`: 4 vCPUs above 20 %, 8 10 to 15 %, 16 above 20 %, 32 5 to 10 %, 64 5 to
+  10 %, 96 above 20 %, 192 10 to 15 %; `c7g`: 16 and 32 under 5 %, 64 5 to 10 %; `c9g` is not listed yet.  At even 20 %
+  a month a run of 12 hours has a chance of about one in 300 if the rate is uniform, and an interruption costs one pass
+  and a few minutes (section 9.5), so spot is fine; on demand costs about $4 to $7 more.
+* **The recommendation: `c8g.4xlarge` (16 vCPUs), spot (on demand if spot has no capacity), about half a day.**
+  `c8g.2xlarge` (8) takes a day and costs the same.  Nothing larger buys time, since the dearest games set it.  The
+  calibration settled the family: a Graviton4 core does a unit of work for 12 to 15 % less than a Graviton3 core, and
+  the `c8g.4xlarge` was $0.24 to $0.31 an hour in us-east-1b, a, c and d on 2026-10-14; `c9g` is unmeasured, and
+  `c7g` at 64 vCPUs (the cheapest spot per vCPU) is no use to a job that 16 vCPUs finish.  Storage: one gp3 root volume
+  of 20 GB (the build of the prover alone is under 2 GB; the output is 200 KB and the checkpoints a few MB).  The launch
+  checklist of section 1 applies, with the instance role of section 9.4 (S3 for `S3_DEST`, SSM for the commands).
 
 ### 9.4 Run
 
-Launch, under the [rules for every launch](#rules-for-every-launch) (the console, section 1's checklist: Amazon Linux
-2023 arm64, `ec2-user`, the timer and tags, a security group with SSH from your address; or the CLI, an example whose
-AMI parameter you can check first with `aws ssm get-parameter --name ...`; the timer is 49 hours, a little past the
-`DEADLINE_HOURS=48` below):
+The run needs no SSH: the instance has an instance profile (for S3 and SSM), its security group has no inbound rule,
+it has no key pair, and the steps are sent to it through AWS Systems Manager (SSM) with `aws ssm send-command`.  SSH is
+the fallback (the end of this section).  Everything here is under the [rules for every launch](#rules-for-every-launch),
+and every `aws` command runs as `AWS_PROFILE=bvc` in us-east-1 (`export AWS_PROFILE=bvc AWS_DEFAULT_REGION=us-east-1`
+after `aws login --profile bvc`).
+
+**What the run needs, and what exists in the account.**  The bucket and the role are made once and kept between runs
+(they were created with Brian's approval on 2026-10-14; the commands are here for another account or region); the
+security group is made for each launch and deleted at its end:
+
+| what | name | content |
+|---|---|---|
+| S3 bucket | `taxman-013764204840-us-east-1` | the state of every run, one prefix a run: `prover-1301-2175/` holds `results/`, `logs/` and `ckpt/`, the layout `save.sh` writes |
+| IAM role and instance profile | `taxman-ec2` | trusted by EC2; an inline policy that lists that bucket and gets, puts and deletes its objects; the managed policy `AmazonSSMManagedInstanceCore` |
+| security group | one a launch | no inbound rules (the SSM agent connects out, over HTTPS); tagged like everything else |
 
 ```
+aws s3api create-bucket --bucket taxman-013764204840-us-east-1 --region us-east-1
+aws iam create-role --role-name taxman-ec2 --assume-role-policy-document \
+    '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},
+      "Action":"sts:AssumeRole"}]}'
+aws iam put-role-policy --role-name taxman-ec2 --policy-name taxman-s3-bucket --policy-document \
+    '{"Version":"2012-10-17","Statement":[
+      {"Effect":"Allow","Action":"s3:ListBucket","Resource":"arn:aws:s3:::taxman-013764204840-us-east-1"},
+      {"Effect":"Allow","Action":["s3:GetObject","s3:PutObject","s3:DeleteObject"],
+       "Resource":"arn:aws:s3:::taxman-013764204840-us-east-1/*"}]}'
+aws iam attach-role-policy --role-name taxman-ec2 --policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+aws iam create-instance-profile --instance-profile-name taxman-ec2
+aws iam add-role-to-instance-profile --instance-profile-name taxman-ec2 --role-name taxman-ec2
+```
+
+**Launch.**  One `c8g.4xlarge` on spot, in the zone with the lowest price in the spot price history (us-east-1b, $0.2402
+an hour, when the first run was launched), Amazon Linux 2023 arm64 (`ec2-user`), no key pair.  The timer is 37 hours, a
+little past the `DEADLINE_HOURS=36` below (the dearest games alone take about 9 hours: section 9.2).  The AMI parameter
+can be checked first with `aws ssm get-parameter --name ...`:
+
+```
+export D=s3://taxman-013764204840-us-east-1/prover-1301-2175           # this run's prefix, for 9.5 and 9.6
 tags='{Key=Project,Value=taxman},{Key=Purpose,Value=prover}'
-aws ec2 run-instances --profile bvc --region us-east-1 --instance-type c8g.4xlarge \
+vpc=$(aws ec2 describe-vpcs --filters Name=is-default,Values=true --query 'Vpcs[0].VpcId' --output text)
+sg=$(aws ec2 create-security-group --group-name taxman-prover-$(date +%Y%m%d) --vpc-id $vpc \
+    --description 'taxman prover, no inbound' --tag-specifications "ResourceType=security-group,Tags=[$tags]" \
+    --query GroupId --output text)
+aws ec2 run-instances --instance-type c8g.4xlarge --placement AvailabilityZone=us-east-1b \
     --image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64 \
-    --key-name YOUR-KEY --security-group-ids sg-YOURS \
+    --security-group-ids $sg --iam-instance-profile Name=taxman-ec2 --metadata-options HttpTokens=required \
     --block-device-mappings 'DeviceName=/dev/xvda,Ebs={VolumeSize=20,VolumeType=gp3,DeleteOnTermination=true}' \
-    --instance-initiated-shutdown-behavior terminate --user-data $'#!/bin/bash\nshutdown -h +2940' \
+    --instance-initiated-shutdown-behavior terminate --user-data $'#!/bin/bash\nshutdown -h +2220' \
     --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=taxman-prover},$tags]" \
         "ResourceType=volume,Tags=[$tags]" "ResourceType=spot-instances-request,Tags=[$tags]" \
     --instance-market-options 'MarketType=spot'      # on demand: leave out this line and the spot request's tags
 ```
 
-On the instance (a copy of the repository with these scripts: a pushed branch or `rsync`, section 3):
+**Steps through SSM.**  The instance is ready for commands when `aws ssm describe-instance-information --filters
+Key=InstanceIds,Values=$I --query 'InstanceInformationList[].PingStatus'` says `Online` (`$I` is the instance id that
+`run-instances` printed).  A step is then a `send-command` and a read of its result:
 
 ```
-sudo dnf install -y git tmux
+aws ssm send-command --instance-ids $I --document-name AWS-RunShellScript --timeout-seconds 60 \
+    --parameters '{"commands":["sudo -u ec2-user -i bash /tmp/step.sh"],"executionTimeout":["600"]}' \
+    --query Command.CommandId --output text                                # prints the command id, CID
+aws ssm get-command-invocation --instance-id $I --command-id CID \
+    --query '[Status,StandardOutputContent,StandardErrorContent]' --output text
+```
+
+`send-command` runs as root, with no login shell, so the steps run as `ec2-user`, from script files, with
+`sudo -u ec2-user -i bash FILE` (a multi-line `bash -lc '...'` through `sudo -i` mangled its quoting).  A first
+`send-command` writes the file (its text base64-encoded, `base64 -d > /tmp/step.sh`), or the step fetches it from the
+bucket, which the role may read.  A command is cut off at its `executionTimeout` (an hour unless set), so a step that
+lasts hours is not a foreground command: the full run starts in a detached tmux session and its step returns at once.
+
+On the instance, the steps in order (the first as root, the others as `ec2-user`; a copy of the repository with these
+scripts is a pushed branch, cloned, or a `git archive` tarball in the bucket, since `rsync` has no ssh to ride on):
+
+```
+dnf install -y git tmux                                              # as root; setup.sh would do it with sudo
 git clone https://github.com/bvchess/taxman.git && cd taxman           # BRANCH=... for another branch
-PROVER_ONLY=1 rust/tools/cloud/setup.sh                              # a few minutes: the prover, its checks
-tmux new -s pv
-DEADLINE_HOURS=48 POWEROFF=always S3_DEST=s3://YOUR-BUCKET/prover1 rust/tools/cloud/prover.sh 1301 2175
+PROVER_ONLY=1 rust/tools/cloud/setup.sh                              # 46 s on a c8g.4xlarge, 10 s of it the build
+# ... the rehearsal below ...
+cd ~/taxman && tmux new-session -d -s pv "DEADLINE_HOURS=36 POWEROFF=always \
+    S3_DEST=s3://taxman-013764204840-us-east-1/prover-1301-2175 rust/tools/cloud/prover.sh 1301 2175"
+tmux new-session -d -s sw 'rust/tools/cloud/spot-watch.sh'           # on spot: stops the run and saves on a notice
 ```
 
-`S3_DEST` needs an instance role that may write that prefix.  It is not optional with `POWEROFF`: the instance is
-terminated when it shuts down, and its root volume with it (the rules above), so `prover.sh` copies the results to S3
-first.  Without `S3_DEST`, leave `POWEROFF` out and pull the files yourself (below) before the timer ends.
+The prefix `prover-1301-2175` is this run's own (one prefix a run); the laptop-side commands of 9.5 and 9.6 reach it as
+`$D`, exported with the launch.  `S3_DEST` needs the instance profile above.  It is not optional with `POWEROFF`: the
+instance is terminated when it shuts down, and its root volume with it (the rules above), so `prover.sh` copies the
+results to S3 first.  Without `S3_DEST`, leave `POWEROFF` out and pull the files yourself (below) before the timer ends.
 `POWEROFF=always` shuts the machine down whenever the script ends (all 875 games and the check, the deadline, an error:
 an idle machine costs as much as a busy one; `POWEROFF=done` only when the range is complete), and `DEADLINE_HOURS`
-stops the run cleanly after that many hours.  On spot, run
-`rust/tools/cloud/spot-watch.sh` in a second tmux window.  `THREADS` defaults to every vCPU.
+stops the run cleanly after that many hours.  `THREADS` defaults to every vCPU.  The saves are `SAVE_EVERY` apart (here
+300 s) plus the time a save takes, about 80 s at the lowest priority (section 5, "Surviving a spot interruption").
 
 **Before the full run, a rehearsal on the instance itself** (minutes, cents): a small range, a SIGTERM and a resume, and
-the check, in a work directory of its own.  It replaces a dry run on a laptop.
+the check, in a work directory of its own, as a step of its own.  It replaces a dry run on a laptop.
 
 ```
 export TAXMAN_WORK=~/rehearsal THREADS=2 PASS_SECONDS=20
 rust/tools/cloud/prover.sh 1301 1310 &              # makes the order, then passes of 20 s
 sleep 40; kill -TERM $(cat ~/rehearsal/prover.pid)      # a stop in the middle: "ended: stopped", status 143
-wait; ls ~/rehearsal/ckpt                               # exact_N.ckpt: the searches that were paused
+wait $!; echo $?; ls ~/rehearsal/ckpt                   # 143 (a bare `wait` returns 0); exact_N.ckpt: searches paused
 rust/tools/cloud/prover.sh 1301 1310                  # resumes ("N searches paused"), finishes, runs the check
 OUT=~/rehearsal/results/exact_parity_1301_1310.jsonl rust/tools/cloud/prover.sh --verify 1301 1311   # must FAIL
 unset TAXMAN_WORK THREADS PASS_SECONDS; rm -rf ~/rehearsal
@@ -748,13 +869,31 @@ unset TAXMAN_WORK THREADS PASS_SECONDS; rm -rf ~/rehearsal
 The second command must end with `OK: opt(n) is proven equal to the recorded score for every n in 2..1310` and exit
 status 0, and the last command must print `without a line: 1311` and `FAILED` (on a laptop the five searches among those
 ten games take about 3 minutes of one thread; their node counts are the same whatever the stops).  The `ms/node` of the
-real CPUs is also here: `secs` over `nodes` of the lines of `~/rehearsal/results/exact_parity_1301_1310.jsonl`.
+real CPUs is also here: `secs` over `nodes` of the lines of `~/rehearsal/results/exact_parity_1301_1310.jsonl` (2.44 ms
+for the searches of these ten games on the `c8g.4xlarge`).
 
 First minutes of the full run: `prover.sh` prints the machine, makes the order, and logs `pass 1: 0 of 875 games done`.
 In `~/taxman-work/logs/prover.err` the lines `exact: n=... paused after N nodes, U open units` give the nodes a long
-game has done; divide the seconds of a pass by the nodes of one pass for milliseconds per node (the laptop: 2.2 to 2.5).
+game has done; divide the seconds of a pass by the nodes of one pass for milliseconds per node (about 2.2 to 3.3 for the
+games of the first passes on a `c8g.4xlarge`, more for the latest games: section 9.2).
+
+**With SSH instead** (a console launch, say): a key pair and a security group with SSH from your address only, the
+instance profile only if you use `S3_DEST`; then the same commands in a shell on the instance, the run in tmux
+(`tmux new -s pv`), and `rsync`/`scp` for the code and the results (section 3).
 
 ### 9.5 Watch, stop, resume, the tail
+
+From the laptop, with no access to the instance, the saves in S3 (`$D` of 9.4; as old as the last save, about 6 minutes
+at most):
+
+```
+aws s3 cp $D/logs/prover.log - | tail            # a line a pass: games done, searches paused, the exit status
+aws s3 cp $D/logs/prover.err - | tail -n 20      # exact's lines: finished games and paused searches with their nodes
+aws s3 cp $D/results/exact_parity_1301_2175.jsonl - | grep -c .      # games done, of 875
+aws s3 ls $D/ckpt/                               # a checkpoint per unfinished search, rewritten every pass
+```
+
+On the instance, in a shell, or as steps through SSM (where root's `~` is not ec2-user's: write `/home/ec2-user/` out):
 
 ```
 tail -f ~/taxman-work/logs/prover.log            # a line a pass: games done, searches paused, the exit status
@@ -763,8 +902,9 @@ grep -c . ~/taxman-work/results/exact_parity_1301_2175.jsonl      # games done, 
 ls -l ~/taxman-work/ckpt                         # a checkpoint per unfinished search, rewritten every pass
 ```
 
-* **Stop**: Ctrl-C in tmux or `kill -TERM $(cat ~/taxman-work/prover.pid)`; the searches of the pass in progress go
-  back to their last checkpoint.  **Resume**: the same command (`THREADS`, `S3_DEST` may differ).
+* **Stop**: Ctrl-C in tmux or `kill -TERM $(cat ~/taxman-work/prover.pid)` (through SSM, which is root, the pid file is
+  `/home/ec2-user/taxman-work/prover.pid`); the searches of the pass in progress go back to their last checkpoint.
+  **Resume**: the same command (`THREADS`, `S3_DEST` may differ).
 * **Spot interruption**: `spot-watch.sh` stops it and saves; on a replacement machine run `PROVER_ONLY=1 setup.sh`, then
   `S3_DEST=... rust/tools/cloud/save.sh --restore`, then the same `prover.sh` command.  Without a saved copy, the
   results file and checkpoints are on the root volume, which a spot termination deletes: use `S3_DEST`, or `rsync`
@@ -780,7 +920,9 @@ ls -l ~/taxman-work/ckpt                         # a checkpoint per unfinished s
 
 ```
 export AWS_PROFILE=bvc                                                    # after: aws login --profile bvc
-aws s3 cp s3://YOUR-BUCKET/prover1/results/exact_parity_1301_2175.jsonl rust/prover/data/     # or, without S3:
+aws s3 cp $D/results/exact_parity_1301_2175.jsonl rust/prover/data/       # $D: the exports of 9.4
+aws s3 sync $D/logs/ ./prover-logs/
+# or, over SSH, without S3:
 rsync -av ec2-user@HOST:taxman-work/results/exact_parity_1301_2175.jsonl rust/prover/data/
 rsync -av ec2-user@HOST:taxman-work/logs/ ./prover-logs/
 OUT=rust/prover/data/exact_parity_1301_2175.jsonl rust/tools/cloud/prover.sh --verify 1301 2175
@@ -802,5 +944,6 @@ another file).  Do not commit the work directory, the checkpoints or the logs.  
 the prover's proofs stop at 1300 or are pending: the table and sections 3 and 8 of
 [../../prover/README.md](../../prover/README.md), the "pending" sentence of the entry "The committed chain to 2175" and
 the register row of [../../docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md), with the totals from the two commands above
-and the real milliseconds per node of a Graviton CPU (this section's table is a prediction).  Then the end of the
-[rules for every launch](#rules-for-every-launch): terminate the instance and confirm that nothing is left.
+and the real milliseconds per node of a Graviton CPU by n (the table of 9.2 is a prediction).  Then the end of the
+[rules for every launch](#rules-for-every-launch): terminate the instance (`POWEROFF=always` has shut it down, which
+terminates it) and confirm that nothing is left, the launch's security group included.
