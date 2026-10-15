@@ -734,7 +734,8 @@ struct Outcome {
 
 /// A game set up for a search, whatever its set width: what the game's thread and the driver of the range need of it.
 /// The thread runs the search ([`search`](Job::search)); the driver, meanwhile, reads the best promotions so far for
-/// the games that follow, and gives the search its ceiling and a seed through its control.
+/// the games that follow, weighs what a seed would give the search, and gives the search its ceiling and seeds through
+/// its control.
 trait Job: Send + Sync {
     /// The game that `promotions` (a promotable set of the board's candidates) make on the board.
     fn moves_for(&self, promotions: &[u32]) -> Vec<u32>;
@@ -749,6 +750,9 @@ trait Job: Send + Sync {
     /// Offers the search, if it takes a seed, the promotions of the game `moves` of `n − 1` that can still be promoted
     /// here, as an incumbent ([`search::offer_seed`]).
     fn hint(&self, moves: &[u32]);
+    /// The promotion sum of what survives here of the game `moves` of `n − 1` as a seed
+    /// ([`search::seed_survivors_sum`]): a search seeded with that game starts at least that high.
+    fn survivors(&self, moves: &[u32]) -> u64;
     /// The control through which the driver steers the search ([`engine::Control`]).
     fn control(&self) -> &Control;
     /// The search, from the go (the game's third phase), and the game its promotions make.  The game's checkpoint is
@@ -786,6 +790,10 @@ impl<const W: usize> Job for SearchJob<W> {
         if self.seeds {
             search::offer_seed(&self.prepared, &self.control, &self.board.seed(moves));
         }
+    }
+
+    fn survivors(&self, moves: &[u32]) -> u64 {
+        search::seed_survivors_sum(&self.prepared, &self.board.seed(moves))
     }
 
     fn control(&self) -> &Control {
@@ -895,10 +903,10 @@ fn set_up_with_width<const W: usize>(n: u32, before: &Before, opts: &SolveOption
     Ok(SetUp::Search(SearchSetUp { job, setup, in_the_bag, frames, greedy }, problem))
 }
 
-/// The ceiling on the promotion sum of game `n`, whose `in_the_bag` is given, from its previous game `prev`, if there
-/// is one and `prev_cap` is on ([`promotion_cap`]).
-fn ceiling(n: u32, in_the_bag: u64, prev: Option<&Prev>, opts: &SolveOptions) -> Option<u64> {
-    prev.filter(|_| opts.tactics.prev_cap).and_then(|prev| promotion_cap(n, in_the_bag, prev.score))
+/// The ceiling on the promotion sum of game `n`, whose `in_the_bag` is given, from the score of its previous game, if
+/// there is one and `prev_cap` is on ([`promotion_cap`]).
+fn ceiling(n: u32, in_the_bag: u64, prev_score: Option<u64>, opts: &SolveOptions) -> Option<u64> {
+    prev_score.filter(|_| opts.tactics.prev_cap).and_then(|score| promotion_cap(n, in_the_bag, score))
 }
 
 /// How a game was found, as its conclusion takes it.
@@ -949,7 +957,8 @@ fn conclude_game(
         }
         Found::Searched(set, searched) => {
             set.fill(&mut result);
-            let setup = SearchSetup { cap: ceiling(n, set.in_the_bag, context.prev, opts), ..set.setup };
+            let cap = ceiling(n, set.in_the_bag, context.prev.map(|prev| prev.score), opts);
+            let setup = SearchSetup { cap, ..set.setup };
             result.setup = Some(setup);
             let sum: u64 = searched.promotions.iter().map(|&p| u64::from(p)).sum();
             // A search ends when its incumbent reaches its ceiling, which proves it optimal.  One that was started

@@ -4,11 +4,12 @@
 //! ceiling.  Everything else (its board, its frames, its search problem and whether an earlier game settled that
 //! problem) is its own, and the ceiling only stops a search early.  So a range keeps a *window* of up to K consecutive
 //! games in flight ([`SolveOptions::window`], `--window K`): game `n + 1` is set up while `n` searches, its search
-//! starts from `n`'s best game so far, without a ceiling, and takes the ceiling `n + 1 + opt(n) − in_the_bag` and the
-//! seed of `n`'s final game the moment `n` is concluded.  The threads are moved between the searches while they run
-//! (`allot`).  With K = 1, and always with one thread, this is the range solved in order: a game enters the window
-//! only once the one before it is concluded, so its search starts with the final seed and the ceiling, on every
-//! thread, and the lines are those of a loop over the games.
+//! starts from `n`'s best game so far, without a ceiling, is given `n`'s better games as they are found, and takes the
+//! ceiling `n + 1 + opt(n) − in_the_bag` and the seed of `n`'s final game the moment `n` is concluded.  The threads are
+//! moved between the searches while they run, the oldest search first (`allot`).  With K = 1, and always with one
+//! thread, this is the range solved in order: a game enters the window only once the one before it is concluded, so
+//! its search starts with the final seed and the ceiling, on every thread, and the lines are those of a loop over the
+//! games.
 //!
 //! # The phases of a game
 //!
@@ -21,7 +22,8 @@
 //!    repeats when the range is solved in order.  A repeat waits for the game it repeats, which is older and so is
 //!    concluded first.
 //! 3. *Search*, on the game's thread, when the driver says go ([`Go`]): with the seed and the ceiling known then, and
-//!    the workers the driver grants it.  Its outcome goes back to the driver; the checkpoint stays.
+//!    the workers the driver grants it, not while it is deferred (see "Deferring").  Its outcome goes back to the
+//!    driver; the checkpoint stays.
 //! 4. *Conclusion*, on the driver's thread, of the oldest game of the window (the *head*) only, whose previous game is
 //!    concluded ([`conclude_game`]): the result is built and checked, appended to the results file and handed to the
 //!    caller, the checkpoint of a completed game is deleted, and the game becomes the previous game of the next.  A
@@ -41,8 +43,30 @@
 //! or those of the game it repeats in turn) on its own board; for a prime game, the prime formula on the provisional
 //! game before it; for a trivial game, the game with no promotions; otherwise there is none yet.  A search starts only
 //! once the game before it has a provisional game to seed it with, unless it takes no seed (`seed_incumbent` off, or
-//! resumed) or has no previous game; it never waits for that game to be proven.  The game before it improving its
-//! best game later is not passed on until its conclusion: passing on each improvement is a possible refinement.
+//! resumed) or has no previous game; it never waits for that game to be proven.
+//!
+//! The provisional game of the game before it improves as that game's search runs, and a search that takes a seed is
+//! given each improvement: every tick, while the game before it is in flight, a running search is given that game's
+//! provisional game as a hint ([`Job::hint`]: the survivors of its seed offered to its control) when its score is
+//! better than that of the game the search was seeded or last hinted with.  The score of a game is the sum of its
+//! moves, and the moves of a provisional game take a pass over a board, so they are made only for a game whose
+//! *value* has changed, which is known without them ([`Seed::value`]): the moves' sum of a game of moves, the
+//! promotions' sum of a game of promotions (its search's best value, read from its control), and the value of the game
+//! before it for a prime game.  The conclusion of the game before it gives the search the final seed, as a hint, with
+//! its ceiling (phase 5).
+//!
+//! # Deferring
+//!
+//! A search ready to start whose previous game is not concluded is *deferred* while the sum of its seed's survivors
+//! ([`Job::survivors`]) reaches the *provisional ceiling*: the ceiling the provisional game of the game before it would
+//! give if it were final (`n + score − in_the_bag`, [`ceiling`]).  If that game is final, the ceiling settles the
+//! search at once when it is given, so a search started without it could only do work that is thrown away, on threads
+//! the older searches could use.  The search is weighed again whenever the value of that provisional game changes, and
+//! starts as usual once its seed's survivors no longer reach the provisional ceiling, or once the game before it is
+//! concluded: then with its ceiling, so that it ends at once if they reach it.  A deferred search is not a claim on
+//! the threads, and, not started, has no provisional game for the game after it.  Deferring changes no result: the
+//! game is searched, or settled by the ceiling, exactly as it would be once the game before it is concluded; it only
+//! waits.  The head is never deferred, since the game before it is concluded.
 //!
 //! # Provenance
 //!
@@ -56,9 +80,10 @@
 //!   the ceiling exactly when that best reaches the ceiling, however the search ran: a search started before its
 //!   ceiling was known and stopped (by a limit or a signal) with its best at the ceiling is proven by it, as it would
 //!   have stopped there with the ceiling given from the start.
-//! * Seeds from a provisional game, offers at a conclusion and ceilings given late change how a search runs, never
-//!   the promotion sum it proves best: every set offered is promotable (the seed's survivors), and the ceiling is
-//!   proven given the game of `n − 1` optimal, which a proof by the ceiling rests on anyway.
+//! * Seeds and hints from a provisional game, offers at a conclusion, ceilings given late and deferrals change how or
+//!   when a search runs, never the promotion sum it proves best: every set offered is promotable (the seed's
+//!   survivors), and the ceiling is proven given the game of `n − 1` optimal, which a proof by the ceiling rests on
+//!   anyway.
 //! * What may differ: the moves and promotions where a problem has several optimal sets (as between thread counts),
 //!   and so the next line's digest of the previous game's moves; nodes, the searches' counters, the engines' counters
 //!   and the times.
@@ -218,7 +243,7 @@ impl Plan {
     /// The problem of a lookup still to be made, taken out; the plan is then a search not started, until the lookup
     /// decides.
     fn take_problem(&mut self) -> Option<Problem> {
-        match mem::replace(self, Plan::Search(Search::NotStarted)) {
+        match mem::replace(self, Plan::Search(Search::NotStarted(Weighed::default()))) {
             Plan::Unlooked(problem) => Some(problem),
             plan => {
                 *self = plan;
@@ -230,9 +255,26 @@ impl Plan {
 
 /// A game's own search.
 enum Search {
-    NotStarted,
+    /// Not started, as last weighed for deferring (see "Deferring").
+    NotStarted(Weighed),
     Running(Run),
     Done(Box<Outcome>),
+}
+
+/// What became of a search not started when it was last weighed against the provisional game of `n − 1`: that game's
+/// value ([`Seed::value`]), if it was weighed while that game is in flight, and whether the search defers.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct Weighed {
+    value: Option<u64>,
+    defers: bool,
+}
+
+/// The provisional game of `n − 1` as a running search was given it (see "Seeds"): its value when it was last looked
+/// at ([`Seed::value`]), and the score of the best one given, as the seed or a hint.
+#[derive(Clone, Copy)]
+struct Given {
+    value: u64,
+    score: u64,
 }
 
 /// A search that runs, as the driver follows it.
@@ -244,12 +286,15 @@ struct Run {
     /// Its engine's status at the last sample, once the engine has been seen running.
     last: Option<Status>,
     load: Load,
+    /// What it was given of the provisional game of `n − 1`, if it was seeded with one; not if it started with the
+    /// final game, or without a seed.
+    given: Option<Given>,
 }
 
 impl Run {
-    fn new(target: usize, now: Instant) -> Run {
+    fn new(target: usize, now: Instant, given: Option<Given>) -> Run {
         // Just given its threads: nothing to act on until the next sample.
-        Run { target, granted: now, last: None, load: Load::Starting { fresh: false } }
+        Run { target, granted: now, last: None, load: Load::Starting { fresh: false }, given }
     }
 
     /// Takes a sample of the engine's status (`None` before the engine starts and after it ends).
@@ -314,6 +359,26 @@ impl Seed<'_> {
             Seed::Prime(n, before) => prime_shortcut(*n, &before.moves()),
         }
     }
+
+    /// What the game's score is known by without its moves (see "Seeds"): the moves' sum of a game of moves (its
+    /// score); the promotions' sum of a game of promotions (its score less the board's `in_the_bag`, as for every game
+    /// of the frame model); for a prime game, the value of the game before it (whose score fixes the prime game's: less
+    /// the prime it opens with, plus the board size).  So the score of a provisional game changes only when its value
+    /// does: within one kind of game by the above, and from one kind to the other, from promotions to moves (its
+    /// search ends, or it is concluded), the value goes from a promotions' sum to a score on the same board, which is
+    /// larger.
+    fn value(&self) -> u64 {
+        match self {
+            Seed::Moves(moves) => sum(moves),
+            Seed::On(_, promotions) => sum(promotions),
+            Seed::Prime(_, before) => before.value(),
+        }
+    }
+}
+
+/// The sum of `numbers`: a game's score, of its moves, or a promotion sum.
+fn sum(numbers: &[u32]) -> u64 {
+    numbers.iter().map(|&k| u64::from(k)).sum()
 }
 
 /// The driver's state.
@@ -405,6 +470,7 @@ impl<'a> Window<'a> {
             let now = Instant::now();
             if now >= tick {
                 self.sample();
+                self.hint();
                 tick = now + TICK;
             }
         }
@@ -540,7 +606,7 @@ impl<'a> Window<'a> {
         let Some(Game { stage: Stage::Search(set, Plan::Search(Search::Running(_))), .. }) = self.games.get(&n) else {
             return;
         };
-        if let Some(ceiling) = ceiling(n, set.in_the_bag, Some(prev), self.opts) {
+        if let Some(ceiling) = ceiling(n, set.in_the_bag, Some(prev.score), self.opts) {
             set.job.control().set_ceiling(ceiling);
             self.trace(format_args!("told n={n}"));
         }
@@ -591,13 +657,83 @@ impl<'a> Window<'a> {
         }
     }
 
-    /// Whether the search of game `n`, set up and not started, can start.
-    fn ready(&self, n: u32, set: &SearchSetUp) -> bool {
+    /// Whether the search of game `n`, set up and not started, and last weighed as `weighed` ([`weigh`](Self::weigh)),
+    /// can start.
+    fn ready(&self, n: u32, set: &SearchSetUp, weighed: Weighed) -> bool {
         // After a stop signal every engine stops on its own, and only the head's search starts (see "Stopping").
         if engine::stop_signal().is_some() && n != self.next {
             return false;
         }
-        !set.job.seeds() || !matches!(self.known_before(n), Known::NotYet)
+        !weighed.defers && (!set.job.seeds() || !matches!(self.known_before(n), Known::NotYet))
+    }
+
+    /// Weighs each search set up and not started for deferring (see "Deferring"): one that takes a seed, while the game
+    /// before it is in flight, defers while its seed's survivors reach the provisional ceiling, and is weighed again
+    /// only when the value of that game's provisional game changes; any other does not defer.
+    fn weigh(&mut self) {
+        let mut changed = Vec::new();
+        for (&n, game) in &self.games {
+            let Stage::Search(set, Plan::Search(Search::NotStarted(last))) = &game.stage else { continue };
+            let (weighed, reached) = match self.known_before(n) {
+                Known::Provisional(before) if set.job.seeds() => {
+                    let value = before.value();
+                    if last.value == Some(value) {
+                        continue;
+                    }
+                    let moves = before.moves();
+                    let cap = ceiling(n, set.in_the_bag, Some(sum(&moves)), self.opts);
+                    // The survivors and the provisional ceiling, if they reach it.
+                    let reached =
+                        cap.map(|cap| (set.job.survivors(&moves), cap)).filter(|(survivors, cap)| survivors >= cap);
+                    (Weighed { value: Some(value), defers: reached.is_some() }, reached)
+                }
+                _ => (Weighed::default(), None),
+            };
+            if weighed != *last {
+                if let (false, Some((survivors, cap))) = (last.defers, reached) {
+                    self.trace(format_args!("defer n={n} survivors={survivors} ceiling={cap}"));
+                }
+                changed.push((n, weighed));
+            }
+        }
+        for (n, weighed) in changed {
+            if let Some(Game { stage: Stage::Search(_, Plan::Search(Search::NotStarted(last))), .. }) =
+                self.games.get_mut(&n)
+            {
+                *last = weighed;
+            }
+        }
+    }
+
+    /// Gives each running search whose previous game is in flight that game's provisional game as a hint, if its score
+    /// is better than that of the game the search was seeded or last hinted with (see "Seeds").  The moves are made
+    /// only for a provisional game whose value has changed since it was last looked at.
+    fn hint(&mut self) {
+        let mut looked = Vec::new();
+        for (&n, game) in &self.games {
+            let Stage::Search(set, Plan::Search(Search::Running(Run { given: Some(given), .. }))) = &game.stage else {
+                continue;
+            };
+            let Known::Provisional(before) = self.known_before(n) else { continue };
+            let value = before.value();
+            if value == given.value {
+                continue;
+            }
+            let moves = before.moves();
+            let score = sum(&moves);
+            if score > given.score {
+                set.job.hint(&moves);
+                self.trace(format_args!("hint n={n} score={score}"));
+            }
+            looked.push((n, Given { value, score: score.max(given.score) }));
+        }
+        for (n, given) in looked {
+            if let Some(Game { stage: Stage::Search(_, Plan::Search(Search::Running(run))), .. }) =
+                self.games.get_mut(&n)
+            {
+                run.given = Some(given);
+            }
+        }
     }
 
     /// What the games hold and claim, oldest first, for [`allot()`].
@@ -605,8 +741,10 @@ impl<'a> Window<'a> {
         let need = |(&n, game): (&u32, &Game)| match &game.stage {
             Stage::Waiting => Need::SetUp,
             Stage::SettingUp => Need::SettingUp,
-            Stage::Search(set, Plan::Search(Search::NotStarted)) if self.ready(n, set) => Need::Ready,
-            Stage::Search(_, Plan::Unlooked(_) | Plan::Search(Search::NotStarted)) => Need::Pending,
+            Stage::Search(set, Plan::Search(Search::NotStarted(weighed))) if self.ready(n, set, *weighed) => {
+                Need::Ready
+            }
+            Stage::Search(_, Plan::Unlooked(_) | Plan::Search(Search::NotStarted(_))) => Need::Pending,
             Stage::Search(_, Plan::Search(Search::Running(run))) => Need::Running(run.need(now)),
             Stage::Search(_, Plan::Repeat(_) | Plan::Search(Search::Done(_)))
             | Stage::Derived(_)
@@ -615,24 +753,25 @@ impl<'a> Window<'a> {
         self.games.iter().map(need).collect()
     }
 
-    /// Whether the driver must wake every tick: a search runs (to sample it), or a game waits for a thread or for a
-    /// seed (threads free as engines retire workers, and seeds appear as searches run).  Otherwise only setups run, or
-    /// nothing does, and what happens next is an event (the head is concluded before the driver waits, so a head
-    /// that waits for nothing does not wait).
+    /// Whether the driver must wake every tick: a search runs (to sample it and give it hints), or a game waits for a
+    /// thread, for a seed or while deferred (threads free as engines retire workers, and seeds appear and improve as
+    /// searches run).  Otherwise only setups run, or nothing does, and what happens next is an event (the head is
+    /// concluded before the driver waits, so a head that waits for nothing does not wait).
     fn ticking(&self) -> bool {
         self.games.values().any(|game| {
             matches!(
                 game.stage,
-                Stage::Waiting | Stage::Search(_, Plan::Search(Search::NotStarted | Search::Running(_)))
+                Stage::Waiting | Stage::Search(_, Plan::Search(Search::NotStarted(_) | Search::Running(_)))
             )
         })
     }
 
-    /// Shares the threads ([`allot()`]) and carries out the grants.
+    /// Weighs the searches not started for deferring, then shares the threads ([`allot()`]) and carries out the grants.
     fn share<'s>(&mut self, scope: &'s Scope<'s, '_>)
     where
         'a: 's,
     {
+        self.weigh();
         let now = Instant::now();
         let grants = allot(self.opts.threads, &self.needs(now));
         let sizes: Vec<u32> = self.games.keys().copied().collect();
@@ -680,12 +819,16 @@ impl<'a> Window<'a> {
     fn start_search(&mut self, n: u32, threads: usize, now: Instant) {
         let Some(Game { stage: Stage::Search(set, _), .. }) = self.games.get(&n) else { return };
         let seeds = set.job.seeds();
-        let (seed, cap) = match self.known_before(n) {
+        let (seed, cap, given) = match self.known_before(n) {
             Known::Final(prev) => {
-                (seeds.then(|| prev.moves.clone()), ceiling(n, set.in_the_bag, Some(prev), self.opts))
+                (seeds.then(|| prev.moves.clone()), ceiling(n, set.in_the_bag, Some(prev.score), self.opts), None)
             }
-            Known::Provisional(before) => (seeds.then(|| before.moves()), None),
-            Known::NotYet | Known::None => (None, None),
+            Known::Provisional(before) if seeds => {
+                let moves = before.moves();
+                let given = Given { value: before.value(), score: sum(&moves) };
+                (Some(moves), None, Some(given))
+            }
+            Known::Provisional(_) | Known::NotYet | Known::None => (None, None, None),
         };
         self.trace(format_args!("start n={n} threads={threads} seed={} cap={cap:?}", seed.is_some()));
         let Some(game) = self.games.get_mut(&n) else { return };
@@ -694,7 +837,7 @@ impl<'a> Window<'a> {
             let _ = go.send(Go { seed, cap, threads });
         }
         if let Stage::Search(_, plan) = &mut game.stage {
-            *plan = Plan::Search(Search::Running(Run::new(threads, now)));
+            *plan = Plan::Search(Search::Running(Run::new(threads, now, given)));
         }
     }
 

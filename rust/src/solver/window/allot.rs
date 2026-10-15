@@ -26,15 +26,28 @@
 //!   with idle workers now, and last given threads at least [`SETTLE`] ago gives back the smaller of its idle workers
 //!   and the workers its idle time over the tick amounts to, keeping at least one.  Its engine retires them as they
 //!   come idle, and only then are they free.
+//! * *Reclaims*, once the claims have been served, by the *oldest search claim* only (the first game, oldest first,
+//!   that is a search ready to start or a saturated running one): if it is left short (a ready search not started for
+//!   lack of a thread, or a saturated one granted fewer than it asks), the running searches younger than it give back
+//!   threads, the youngest first, each keeping at least one worker, until together they give what it is short of.
+//!   Threads already on their way back count toward that: those that the other searches were told to give up and have
+//!   not retired yet (live above target), and those released in the same round; otherwise each tick would lower the
+//!   same searches again while their busy workers come back.  Nothing goes to the oldest search claim in the same
+//!   round: the threads are free only once the engines retire the workers (a busy one when it next hands its units
+//!   over), and the claims, oldest first, serve it at a later round.  Why the oldest: the chain waits for it before any younger game,
+//!   and the younger searches are speculative (each searches from a provisional seed, without its ceiling until the
+//!   game before it is concluded, and may do far more work than it would have done in order), so they run on what the
+//!   oldest does not use.  A younger claim never reclaims.
 //!
 //! Each sample of an engine, and each tick of a search in its start, is acted on once: between ticks (the driver also
 //! runs the policy when a setup or a search ends, so that a game waits for no tick to start) a saturated search still
 //! counts as a claim, so that younger games do not take all the free threads past it, but asks for nothing more until
 //! the next sample.  A search just given its threads has nothing to act on yet.
 //!
-//! So a search earns threads by keeping them busy.  A dear game ends up with every thread: it stays saturated, so it
-//! keeps doubling while threads are free, and the younger games' searches give their idle workers back to it.  A short
-//! game finishes before it has grown.  Threads freed by a search that ends or idles go to the oldest game that can use
+//! So a search earns threads by keeping them busy.  A dear game ends up with every thread but one for each younger
+//! search: it stays saturated, so it keeps doubling while threads are free, the younger games' searches give their
+//! idle workers back to it, and, while it is the oldest search claim, all but one of their busy ones.  A short game
+//! finishes before it has grown.  Threads freed by a search that ends or idles go to the oldest game that can use
 //! them.  This is the online form of a running estimate of a search's tree: what a search does with its threads is
 //! measured instead of what is left of its tree estimated (Knuth's estimator of the size of a tree from random paths
 //! was considered and not used).  The constants can only be tuned on a machine of many threads.
@@ -72,8 +85,8 @@ pub(super) enum Need {
     SetUp,
     /// Its setup runs: it holds one thread.
     SettingUp,
-    /// Set up for a search that cannot start yet (its repeat lookup is not made, or the game before it has no game
-    /// yet to seed it with): it may claim threads later.
+    /// Set up for a search that cannot start yet (its repeat lookup is not made, the game before it has no game yet to
+    /// seed it with, or it is deferred): it may claim threads later.
     Pending,
     /// Its search can start.
     Ready,
@@ -115,7 +128,7 @@ pub(super) enum Grant {
     SetUp,
     /// Start its search with this many workers.
     Start(usize),
-    /// Its search's new number of workers: more for a claim, fewer for a release.
+    /// Its search's new number of workers: more for a claim, fewer for a release or a reclaim.
     Workers(usize),
 }
 
@@ -222,7 +235,62 @@ pub(super) fn allot(threads: usize, needs: &[Need]) -> Vec<(usize, Grant)> {
             Need::SettingUp | Need::Pending | Need::Nothing => unreachable!("only claims are served"),
         }
     }
+    reclaim(needs, &mut grants);
     grants
+}
+
+/// Adds the reclaims of the round to `grants`, which has served the claims of `needs` (see "Reclaims" in the module
+/// documentation): if the oldest search claim is left short, the searches younger than it give back what it is short
+/// of, less what is on its way back already, as far as they can.  A search that released workers in the round gives
+/// from what it kept, its release replaced.
+fn reclaim(needs: &[Need], grants: &mut Vec<(usize, Grant)>) {
+    let search_claim = |need: &Need| matches!(need, Need::Ready | Need::Running(_)) && need.claims();
+    let Some(oldest) = needs.iter().position(search_claim) else { return };
+    let short = match (needs[oldest], grant_of(grants, oldest)) {
+        (Need::Ready, None) => 1,
+        (Need::Running(running), granted) => {
+            let more = match granted {
+                Some(Grant::Workers(workers)) => workers.saturating_sub(running.target),
+                _ => 0,
+            };
+            running.asks().saturating_sub(more)
+        }
+        _ => 0,
+    };
+    // The workers a running search is to have after the grants so far.
+    let after = |grants: &[(usize, Grant)], i: usize, running: &Running| match grant_of(grants, i) {
+        Some(Grant::Workers(workers)) => workers,
+        _ => running.target,
+    };
+    // On their way back: the workers the other searches hold beyond what they are to have.
+    let mut given: usize = (0..needs.len())
+        .filter(|&i| i != oldest)
+        .map(|i| match &needs[i] {
+            Need::Running(running) => running.holds().saturating_sub(after(grants, i, running)),
+            _ => 0,
+        })
+        .sum();
+    for i in (oldest + 1..needs.len()).rev() {
+        if given >= short {
+            break;
+        }
+        let Need::Running(running) = &needs[i] else { continue };
+        let workers = after(grants, i, running);
+        let back = workers.saturating_sub(1).min(short - given);
+        if back > 0 {
+            let grant = (i, Grant::Workers(workers - back));
+            match grants.iter_mut().find(|(j, _)| *j == i) {
+                Some(release) => *release = grant,
+                None => grants.push(grant),
+            }
+            given += back;
+        }
+    }
+}
+
+/// What `grants` grants the game of index `i`, if anything.
+fn grant_of(grants: &[(usize, Grant)], i: usize) -> Option<Grant> {
+    grants.iter().find(|&&(j, _)| j == i).map(|&(_, grant)| grant)
 }
 
 #[cfg(test)]
@@ -334,6 +402,96 @@ mod tests {
         assert_eq!(allot(8, &[all_idle, Need::Ready]), [(0, Grant::Workers(1)), (1, Grant::Start(5))]);
         let one = sampled(1, 1, 1.0, 1, LONG_AGO);
         assert_eq!(allot(1, &[one, Need::Ready]), []);
+    }
+
+    /// A search that keeps its workers busy without being saturated (idle a tenth of the last tick, none idle now):
+    /// it neither claims nor releases.
+    fn busy(target: usize) -> Need {
+        sampled(target, target, 0.1, 0, LONG_AGO)
+    }
+
+    #[test]
+    fn a_ready_oldest_search_with_nothing_free_reclaims_one_thread_from_the_youngest() {
+        let needs = [Need::Ready, busy(2), busy(2)];
+        assert_eq!(allot(4, &needs), [(2, Grant::Workers(1))]);
+        // Younger saturated searches are claims too, but the oldest search claim is served first, and reclaims.
+        let saturated = sampled(2, 2, 0.0, 0, LONG_AGO);
+        assert_eq!(allot(4, &[Need::Ready, saturated, saturated]), [(2, Grant::Workers(1))]);
+        // The youngest that can give: one keeping a single worker gives nothing.
+        assert_eq!(allot(4, &[Need::Ready, busy(3), busy(1)]), [(1, Grant::Workers(2))]);
+        // An older game holding a thread changes nothing.
+        assert_eq!(allot(5, &[Need::SettingUp, Need::Ready, busy(2), busy(2)]), [(3, Grant::Workers(1))]);
+    }
+
+    #[test]
+    fn a_saturated_oldest_search_left_short_reclaims_what_it_is_short_of_youngest_first_each_keeping_one() {
+        // Asks 2 more with nothing free: the youngest gives both.
+        let oldest = sampled(2, 2, 0.0, 0, LONG_AGO);
+        assert_eq!(allot(8, &[oldest, busy(3), busy(3)]), [(2, Grant::Workers(1))]);
+        // Asks 3: the youngest gives all but one, the next the rest.
+        let oldest = sampled(3, 3, 0.0, 0, LONG_AGO);
+        assert_eq!(allot(9, &[oldest, busy(4), busy(2)]), [(2, Grant::Workers(1)), (1, Grant::Workers(2))]);
+        // Granted 1 of the 3 it asks from a free thread: short of 2, which only the next younger search can give.
+        assert_eq!(allot(9, &[oldest, busy(4), busy(1)]), [(0, Grant::Workers(4)), (1, Grant::Workers(2))]);
+        // A search in its start, at a tick, asks as many again as it was given, and reclaims the same way.
+        let oldest = starting(2, true, Duration::ZERO);
+        assert_eq!(allot(6, &[oldest, busy(4)]), [(1, Grant::Workers(2))]);
+    }
+
+    #[test]
+    fn a_reclaim_is_capped_at_what_the_younger_searches_can_give() {
+        let oldest = sampled(4, 4, 0.0, 0, LONG_AGO);
+        assert_eq!(allot(8, &[oldest, busy(2), busy(2)]), [(2, Grant::Workers(1)), (1, Grant::Workers(1))]);
+        // Each younger search keeps at least one worker.
+        assert_eq!(allot(6, &[oldest, busy(1), busy(1)]), []);
+    }
+
+    #[test]
+    fn no_reclaim_when_the_oldest_search_claim_is_served_or_nothing_younger_runs() {
+        // Served from free threads.
+        let oldest = sampled(2, 2, 0.0, 0, LONG_AGO);
+        assert_eq!(allot(8, &[oldest, busy(2)]), [(0, Grant::Workers(4))]);
+        assert_eq!(allot(8, &[Need::Ready, busy(2)]), [(0, Grant::Start(6))]);
+        // A saturated search whose sample has been acted on asks nothing, so it is not short.
+        let load = Load::Sampled { idle_share: 0.0, idle_now: 0, idle_time: Duration::ZERO, fresh: false };
+        let used = Need::Running(Running { target: 2, live: 2, load, since_grant: LONG_AGO });
+        assert_eq!(allot(4, &[used, busy(2)]), []);
+        // Short, but nothing younger runs: an older search is never reclaimed from, nor a game that is not a search.
+        assert_eq!(allot(3, &[busy(3), Need::Ready]), []);
+        assert_eq!(allot(1, &[Need::Ready, Need::SettingUp, Need::Pending]), []);
+        // No search claim at all.
+        assert_eq!(allot(4, &[busy(2), busy(2)]), []);
+    }
+
+    #[test]
+    fn a_younger_claim_never_reclaims() {
+        // The oldest search claim takes the free threads; the younger saturated one is left short and takes nothing
+        // back.
+        let (oldest, younger) = (sampled(2, 2, 0.0, 0, LONG_AGO), sampled(1, 1, 0.0, 0, LONG_AGO));
+        assert_eq!(allot(7, &[oldest, younger, busy(2)]), [(0, Grant::Workers(4))]);
+        // Two ready searches with one thread free: the oldest starts, the younger waits.
+        assert_eq!(allot(5, &[Need::Ready, Need::Ready, busy(4)]), [(0, Grant::Start(1))]);
+        // A game that is not a search claim does not reclaim: a setup with nothing free waits.
+        assert_eq!(allot(2, &[Need::SetUp, busy(2)]), []);
+    }
+
+    #[test]
+    fn threads_on_their_way_back_count_toward_a_reclaim() {
+        let oldest = sampled(2, 2, 0.0, 0, LONG_AGO);
+        // Told to keep 2 of its 4 live workers: the 2 on their way back are what the oldest is short of.
+        let retiring =
+            |target, live| Need::Running(Running { target, live, load: Load::Unknown, since_grant: LONG_AGO });
+        assert_eq!(allot(6, &[oldest, retiring(2, 4)]), []);
+        // One on its way back: one more is reclaimed.
+        assert_eq!(allot(5, &[oldest, retiring(2, 3)]), [(1, Grant::Workers(1))]);
+        // An older search's retirements count as well: their threads go to the oldest claim first.
+        assert_eq!(allot(8, &[retiring(1, 3), oldest, busy(3)]), []);
+        // Released in the same round: 2 idle workers of 4, which is all the oldest is short of.
+        let idle = sampled(4, 4, 0.5, 2, LONG_AGO);
+        assert_eq!(allot(6, &[oldest, idle]), [(1, Grant::Workers(2))]);
+        // Short of 3, with 2 released: the release is lowered by one more.
+        let oldest = sampled(3, 3, 0.0, 0, LONG_AGO);
+        assert_eq!(allot(7, &[oldest, idle]), [(1, Grant::Workers(1))]);
     }
 
     #[test]

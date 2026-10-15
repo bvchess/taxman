@@ -70,8 +70,8 @@
 //! * `header`: the checkpoint's header.
 //! * `diagnostics`: [`Diagnostics`], for tuning.
 //! * [`symmetry`]: the root's prime exchanges (symmetric pairs of primes) and the rule they give the search.
-//! * here: [`search`], which starts or resumes the engine on a prepared game; [`offer_seed`] and [`best_so_far`], for
-//!   a caller that steers searches through their [`Control`] (`EngineConfig::control`).
+//! * here: [`search`], which starts or resumes the engine on a prepared game; [`offer_seed`], [`best_so_far`] and
+//!   [`seed_survivors_sum`], for a caller that steers searches through their [`Control`] (`EngineConfig::control`).
 
 mod diagnostics;
 mod header;
@@ -303,6 +303,13 @@ fn search_forgetting<const W: usize>(
 /// incumbent ([`Control::offer`]).
 pub fn offer_seed<const W: usize>(prepared: &Prepared<W>, control: &Control, seed: &Bits<W>) -> bool {
     offer_set(control, &surviving(prepared, seed))
+}
+
+/// The promotion sum of what survives of `seed` in `prepared`, the game searched: of the candidates of `seed` that can
+/// still be promoted, from the largest down, the set that [`search`] and [`offer_seed`] make of a seed.  A search
+/// seeded with `seed` starts from that set or a better one, so a ceiling that this sum reaches settles it at once.
+pub fn seed_survivors_sum<const W: usize>(prepared: &Prepared<W>, seed: &Bits<W>) -> u64 {
+    surviving(prepared, seed).sum()
 }
 
 /// `set` as the payload of an incumbent, which is how the searchers encode one ([`put_bits`]).
