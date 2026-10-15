@@ -3,6 +3,7 @@
 #
 #   rust/tools/cloud/prover.sh A B             prove opt(n) = V(n) for n = A..B  (V: rust/results/strict.jsonl)
 #   rust/tools/cloud/prover.sh --verify A B    check the output: every n in 2..B proven, every score the recorded one
+#   OUT=FILE rust/tools/cloud/prover.sh --list N1,N2,...   a measurement on exactly those games (list mode, below)
 #
 # It runs `exact` of the prover (rust/prover, README section 3), which knows nothing of the solver's frame
 # model, over the range.  `exact` runs one game per thread (a game's search is one thread), so the games are spread over
@@ -27,13 +28,18 @@
 #
 # When the range is complete it runs the check (`--verify`) and exits 0 only if that passes.
 #
+# List mode (`--list N1,N2,...`) runs `exact` over exactly the listed games, in the order given, in the same resumable
+# passes, with EXTRA_ARGS (the flags of the measurement, for instance `--fix-low 1`) into OUT, which must be set.  It
+# is for a measurement, not a proof of a range: there is no order file and no check at the end.  It ends `complete`
+# (and exits 0) when every listed game has a line in OUT.
+#
 # Output: $OUT (default $TAXMAN_WORK/results/exact_parity_A_B.jsonl, one line per game, the format of
 # rust/prover/data/exact_parity_2_1300.jsonl), logs in $LOGS: prover.log (this script), prover.err (`exact`).
 #
-# Environment (all optional):
+# Environment (all optional, but OUT in list mode):
 #   THREADS         threads, default every CPU
 #   PASS_SECONDS    the length of a pass, default 300: the work lost to a kill, against the small cost of a restart
-#   OUT             the output file
+#   OUT             the output file (required in list mode)
 #   STRICT          the recorded optima, default rust/results/strict.jsonl (committed)
 #   BASELINE        the proofs of the smaller games the check builds on (default: the prover's
 #                   data/exact_parity_2_1300.jsonl)
@@ -52,19 +58,42 @@ STRICT="${STRICT:-$CRATE/results/strict.jsonl}"
 BASELINE="${BASELINE:-$PROVER/data/exact_parity_2_1300.jsonl}"
 SUMMARIZE=("python3" "$PROVER/tools/summarize.py")
 
-usage() { die "usage: prover.sh [--verify] A B   (the first and last board size, 2 <= A <= B)"; }
+usage() {
+    die "usage: prover.sh [--verify] A B   (the first and last board size, 2 <= A <= B)" \
+        "or OUT=FILE prover.sh --list N1,N2,...   (board sizes, each at least 2)"
+}
 verify_only=0
+list_mode=0
 if [ "${1:-}" = "--verify" ]; then
     verify_only=1
     shift
+elif [ "${1:-}" = "--list" ]; then
+    list_mode=1
+    shift
 fi
-[ "$#" -eq 2 ] || usage
-from="$1"
-to="$2"
-case "$from$to" in *[!0-9]*) usage ;; esac
-[ "$from" -ge 2 ] && [ "$to" -ge "$from" ] || usage
-total=$((to - from + 1))
-OUT="${OUT:-$TAXMAN_WORK/results/exact_parity_${from}_${to}.jsonl}"
+if [ "$list_mode" = 1 ]; then
+    # The games to measure, each once, in the order given.
+    [ "$#" -eq 1 ] || usage
+    case "$1" in "" | *[!0-9,]* | ,* | *, | *,,*) usage ;; esac
+    list="$(printf '%s\n' "$1" | tr ',' '\n' | awk '!seen[$0]++' | paste -sd, -)"
+    for n in ${list//,/ }; do
+        [ "$n" -ge 2 ] || usage
+    done
+    total="$(printf '%s\n' "$list" | tr ',' '\n' | wc -l | tr -d ' ')"
+    [ -n "${OUT:-}" ] || die "--list needs OUT=FILE, the output file of the measurement (it is not named after a range)"
+    label="list"
+    all_of="listed games"
+else
+    [ "$#" -eq 2 ] || usage
+    from="$1"
+    to="$2"
+    case "$from$to" in *[!0-9]*) usage ;; esac
+    [ "$from" -ge 2 ] && [ "$to" -ge "$from" ] || usage
+    total=$((to - from + 1))
+    OUT="${OUT:-$TAXMAN_WORK/results/exact_parity_${from}_${to}.jsonl}"
+    label="$from-$to"
+    all_of="games of $from-$to"
+fi
 
 # The check: a line for every n in A..B, each with the recorded score, every n in 2..B proven.
 verify() {
@@ -78,7 +107,13 @@ fi
 
 [ -x "$EXACT_BIN" ] || die "$EXACT_BIN is missing: run setup.sh"
 [ -r "$STRICT" ] || die "$STRICT is not readable"
-grep -q "\"n\":$to," "$STRICT" || die "$STRICT has no game $to (it holds the recorded optima to prove)"
+if [ "$list_mode" = 1 ]; then
+    for n in ${list//,/ }; do
+        grep -q "\"n\":$n," "$STRICT" || die "$STRICT has no game $n (it holds the recorded optima)"
+    done
+else
+    grep -q "\"n\":$to," "$STRICT" || die "$STRICT has no game $to (it holds the recorded optima to prove)"
+fi
 THREADS="${THREADS:-$(ncpu)}"
 PASS_SECONDS="${PASS_SECONDS:-300}"
 MAX_FAILS="${MAX_FAILS:-5}"
@@ -87,19 +122,27 @@ SAVE_EVERY="${SAVE_EVERY:-$PASS_SECONDS}"
 . "$here/run.sh"
 run_begin prover "$(dirname "$OUT")"
 
-# The games of A..B with a line in $OUT.
+# The games of A..B (in list mode, the distinct listed ones) with a line in $OUT.
 games_done() {
     [ -r "$OUT" ] || { echo 0; return; }
-    grep -o '^{"n":[0-9]*' "$OUT" | cut -d: -f2 | awk -v a="$from" -v b="$to" '$1 >= a && $1 <= b && !seen[$1]++' |
-        wc -l | tr -d ' '
+    if [ "$list_mode" = 1 ]; then
+        grep -o '^{"n":[0-9]*' "$OUT" | cut -d: -f2 |
+            awk -v list="$list" 'BEGIN { k = split(list, a, ","); for (i = 1; i <= k; i++) want[a[i]] = 1 }
+                                 ($1 in want) && !seen[$1]++' | wc -l | tr -d ' '
+    else
+        grep -o '^{"n":[0-9]*' "$OUT" | cut -d: -f2 | awk -v a="$from" -v b="$to" '$1 >= a && $1 <= b && !seen[$1]++' |
+            wc -l | tr -d ' '
+    fi
 }
 
-# The order of the games, the dearest first, made once and kept (the order does not change a result).
-order_file="$TAXMAN_WORK/prover-order_${from}_${to}.txt"
-[ -s "$order_file" ] || "${SUMMARIZE[@]}" order "$from" "$to" >"$order_file" || die "could not order the games"
-list="$(cat "$order_file")"
+if [ "$list_mode" = 0 ]; then
+    # The order of the games, the dearest first, made once and kept (the order does not change a result).
+    order_file="$TAXMAN_WORK/prover-order_${from}_${to}.txt"
+    [ -s "$order_file" ] || "${SUMMARIZE[@]}" order "$from" "$to" >"$order_file" || die "could not order the games"
+    list="$(cat "$order_file")"
+fi
 
-log "prover $from-$to: $total games; threads $THREADS; passes of ${PASS_SECONDS}s; output $OUT; checkpoints $CKPT"
+log "prover $label: $total games; threads $THREADS; passes of ${PASS_SECONDS}s; output $OUT; checkpoints $CKPT"
 env_report | tee -a "$LOGS/prover.log" >&2
 
 fails=0
@@ -111,7 +154,7 @@ while :; do
     fi
     done_now="$(games_done)"
     if [ "$done_now" -ge "$total" ]; then
-        log "all $total games of $from-$to have a line"
+        log "all $total $all_of have a line"
         outcome="complete"
         break
     fi
@@ -159,7 +202,7 @@ while :; do
 done
 
 log "ended: $outcome"
-if [ "$outcome" = complete ]; then
+if [ "$outcome" = complete ] && [ "$list_mode" = 0 ]; then
     verify 2>&1 | tee -a "$LOGS/prover.log" || outcome="failed"
 fi
 case "$outcome" in

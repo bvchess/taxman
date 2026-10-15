@@ -25,9 +25,8 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 use taxman_prover::game::{relation, Board, Relation};
 use taxman_prover::jsonl::{campaign, parse_items, recorded_games, Obj};
-use taxman_prover::peel::u_star;
 use taxman_prover::primes::smallest_prime_factors;
-use taxman_prover::upper::{barred_bounds, low_roles, obeys, played_sources, Open};
+use taxman_prover::upper::{barred_bounds, low_roles, obeys, recorded_ustar, Open};
 
 /// An open member as a JSON triple [u, Ω(u), margin], the margin null when there is none.
 fn triple(open: &Open) -> String {
@@ -65,10 +64,7 @@ fn main() {
         let (score, moves) = &known[&n];
         let board = Board::new(n as u32, &spf);
         assert_eq!(board.replay(moves), Ok(*score), "n={n}: the recorded game does not replay to its score");
-        let ustar = played_sources(n, moves);
-        let mut expected = u_star(n, &spf);
-        expected.sort_unstable();
-        assert_eq!(ustar, expected, "n={n}: the recorded game's moves above n/2 are not U*");
+        let ustar = recorded_ustar(n, moves, &spf);
         let roles = low_roles(n as u32, &spf, &ustar);
         obeys(&roles, moves).unwrap_or_else(|e| panic!("n={n}: the recorded game breaks the roles of Theorem B: {e}"));
         let prev = known.get(&(n - 1)).map_or(0, |(s, _)| *s);

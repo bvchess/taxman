@@ -20,9 +20,15 @@
 //! them, and its excess over V is the gap that the open members share out.
 //!
 //! The members certified for a lower V are certified for a higher one: the bound does not depend on V.
+//!
+//! The same roles start the searches of `bin/exact.rs` that measure what the sources of layer 3 and up cost.  A
+//! search from [`low_roles`] still proves "no playable set beats V", since every optimal set obeys them (Theorem B).
+//! A search from [`upper_fixed_roles`], which fixes the whole upper part to U\* as well, is the frame model's problem
+//! and proves nothing about opt(n).  [`watched`] names the numbers whose branching and barring the search counts.
 
 use crate::game::{Board, Role};
 use crate::parity::{Meet, Outcome, Parity};
+use crate::peel::u_star;
 use crate::primes::is_prime;
 
 /// From this board on, U\*_2 spans every prime up to n/2 (THEORY.md, Theorem B: the frames of layer 2 are closed on
@@ -46,6 +52,24 @@ pub fn played_sources(n: u64, moves: &[u32]) -> Vec<u32> {
     sources
 }
 
+/// U\* of a recorded game of n, ascending: the game's moves above n/2 ([`played_sources`]), checked against descending
+/// greedy ([`u_star`], `spf` must reach n), which every recorded game plays.  Panics, naming n, if they differ.
+pub fn recorded_ustar(n: u64, moves: &[u32], spf: &[u32]) -> Vec<u32> {
+    let ustar = played_sources(n, moves);
+    let mut expected = u_star(n, spf);
+    expected.sort_unstable();
+    assert_eq!(ustar, expected, "n={n}: the recorded game's moves above n/2 are not U*");
+    ustar
+}
+
+/// Which numbers 0..=n are in U\*, given in any order (they must all be above n/2 and at most n).
+fn in_ustar(n: u32, ustar: &[u32]) -> Vec<bool> {
+    assert!(ustar.iter().all(|&u| n / 2 < u && u <= n), "n={n}: U* holds only numbers above n/2 and up to n");
+    let mut member = vec![false; n as usize + 1];
+    ustar.iter().for_each(|&u| member[u as usize] = true);
+    member
+}
+
 /// The roles of every optimal set of game n in the two bottom layers (THEORY.md, Theorem B), indexed 0..=n, where
 /// `ustar` is U\* in any order.  0 and 1 are barred (they cannot be picked); the largest prime q ≤ n is forced and
 /// every other prime barred; each number of layer 2 above n/2 is forced if it is in U\* and barred if not; and, from
@@ -59,9 +83,7 @@ pub fn played_sources(n: u64, moves: &[u32]) -> Vec<u32> {
 pub fn low_roles(n: u32, spf: &[u32], ustar: &[u32]) -> Vec<Role> {
     assert!(n >= 2, "game n={n}: the board is 2..=n");
     let half = n / 2;
-    assert!(ustar.iter().all(|&u| half < u && u <= n), "n={n}: U* holds only numbers above n/2 and up to n");
-    let mut in_ustar = vec![false; n as usize + 1];
-    ustar.iter().for_each(|&u| in_ustar[u as usize] = true);
+    let member = in_ustar(n, ustar);
     let largest_prime = (2..=n).rev().find(|&p| is_prime(u64::from(p), spf)).expect("a board with n >= 2 has a prime");
     let mut roles = vec![Role::Free; n as usize + 1];
     roles[0] = Role::Barred;
@@ -71,7 +93,7 @@ pub fn low_roles(n: u32, spf: &[u32], ustar: &[u32]) -> Vec<Role> {
         let role = match omega(c, spf) {
             1 if c == largest_prime => Role::Pick,
             1 => Role::Barred,
-            2 if c > half && in_ustar[c as usize] => {
+            2 if c > half && member[c as usize] => {
                 sources_in_layer_two += 1;
                 Role::Pick
             }
@@ -89,6 +111,30 @@ pub fn low_roles(n: u32, spf: &[u32], ustar: &[u32]) -> Vec<Role> {
         );
     }
     roles
+}
+
+/// The roles of the frame model's problem on the whole board: [`low_roles`] (Theorem B), and above n/2 every member
+/// of `ustar` forced and every other number barred, so that nothing above n/2 is free.  A search from these roles
+/// proves nothing about opt(n): it looks only for sets whose upper part is U\*, and that some optimal set has that
+/// upper part is the open U of THEORY.md.  It is a measurement of what the frame model's problem costs.
+pub fn upper_fixed_roles(n: u32, spf: &[u32], ustar: &[u32]) -> Vec<Role> {
+    let mut roles = low_roles(n, spf, ustar);
+    let member = in_ustar(n, ustar);
+    for c in n / 2 + 1..=n {
+        roles[c as usize] = if member[c as usize] { Role::Pick } else { Role::Barred };
+    }
+    roles
+}
+
+/// Two sets of numbers for the counters of [`Prover::watch`](crate::game::Prover::watch), each flagged over 0..=n:
+/// the sources of layer 3 and up (every number above n/2 with Ω ≥ 3), and the members of U\*_{≥3} (those of `ustar`,
+/// in any order, with Ω ≥ 3).
+pub fn watched(n: u32, spf: &[u32], ustar: &[u32]) -> (Vec<bool>, Vec<bool>) {
+    let member = in_ustar(n, ustar);
+    let high: Vec<bool> = (0..=n).map(|c| omega(c, spf) >= 3).collect();
+    let sources = (0..=n).map(|c| c > n / 2 && high[c as usize]).collect();
+    let members = (0..=n).map(|c| member[c as usize] && high[c as usize]).collect();
+    (sources, members)
 }
 
 /// Whether the numbers a game plays, `set`, obey `roles`: it holds every number with role `Pick` and none with role
@@ -177,7 +223,7 @@ pub fn barred_bounds(board: &Board, spf: &[u32], v: u64, ustar: &[u32]) -> Barre
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::{Prover, Verdict};
+    use crate::game::{relation, Prover, Relation, Verdict};
     use crate::jsonl::recorded_games;
     use crate::primes::smallest_prime_factors;
     use std::collections::BTreeMap;
@@ -274,5 +320,150 @@ mod tests {
         assert_eq!(barred.members.len(), 161);
         assert_eq!(barred.open.len(), 4, "{:?}", barred.open);
         assert!(barred.open.iter().all(|o| o.margin.is_some_and(|m| m > 0)));
+    }
+
+    /// A game that needs a search: its board size, recorded score, moves and U\*.
+    struct Searched {
+        n: u64,
+        v: u64,
+        moves: Vec<u32>,
+        ustar: Vec<u32>,
+    }
+
+    /// The games of optimal.json in 187..=800 that need a search, as `exact` decides it: the relation to the game
+    /// before is none and the parity bound at the root is above the score.  Found once for all the tests.
+    fn searched_games() -> &'static [Searched] {
+        static GAMES: std::sync::OnceLock<Vec<Searched>> = std::sync::OnceLock::new();
+        GAMES.get_or_init(|| {
+            let (known, spf) = (optimal(), smallest_prime_factors(800));
+            let mut games = Vec::new();
+            for n in 187..=800u64 {
+                let (v, moves) = known[&n].clone();
+                if relation(n, v, known[&(n - 1)].0, &spf) != Relation::None {
+                    continue;
+                }
+                let board = Board::new(n as u32, &spf);
+                let weights: Vec<i64> = (0..=n as i64).collect();
+                let roles = Prover::new(&board, v, u64::MAX).root_roles();
+                let Outcome::Bound(root) = Meet::new(Parity::pair(&board, &weights)).solve(&roles) else {
+                    panic!("n={n}: the root's parity bound is not certified")
+                };
+                if root.value > v as i64 {
+                    let ustar = recorded_ustar(n, &moves, &spf);
+                    games.push(Searched { n, v, moves, ustar });
+                }
+            }
+            games
+        })
+    }
+
+    /// The games of [`searched_games`] with n in `range`.
+    fn searched_in(range: std::ops::RangeInclusive<u64>) -> Vec<&'static Searched> {
+        searched_games().iter().filter(|g| range.contains(&g.n)).collect()
+    }
+
+    /// The flags of a set of picks over 0..=n.
+    fn flags(n: u64, set: &[u32]) -> Vec<bool> {
+        let mut pick = vec![false; n as usize + 1];
+        set.iter().for_each(|&c| pick[c as usize] = true);
+        pick
+    }
+
+    /// Every recorded game of optimal.json plays exactly U\* above n/2 (`recorded_ustar` checks it).  Boards 2..=1300.
+    #[test]
+    fn every_recorded_game_plays_ustar() {
+        let (known, spf) = (optimal(), smallest_prime_factors(1300));
+        for (&n, (_, moves)) in &known {
+            if n >= 2 {
+                recorded_ustar(n, moves, &spf);
+            }
+        }
+    }
+
+    /// The counters of `Prover::watch` change nothing in the search: the verdict and the node count are those of the
+    /// search without them.  Every 30th game that needs a search in 500..=800 (every 10th takes three times the time).
+    #[test]
+    fn watching_changes_nothing() {
+        let started = Instant::now();
+        let spf = smallest_prime_factors(800);
+        let games = searched_in(500..=800);
+        let mut checked = 0;
+        for game in games.iter().step_by(30) {
+            let board = Board::new(game.n as u32, &spf);
+            let mut bare = Prover::new(&board, game.v, u64::MAX).with_parity();
+            let (branch, barred) = watched(game.n as u32, &spf, &game.ustar);
+            let mut watching = Prover::new(&board, game.v, u64::MAX).with_parity().watch(branch, barred);
+            assert_eq!(watching.run(), bare.run(), "n={}", game.n);
+            assert_eq!(watching.nodes, bare.nodes, "n={}", game.n);
+            checked += 1;
+        }
+        eprintln!("{checked} of {} games compared, {:.2?}", games.len(), started.elapsed());
+        assert!(checked > 0, "the test checked nothing");
+    }
+
+    /// Fixing the two bottom layers by Theorem B keeps the proofs and the optima: from `low_roles`, with the target
+    /// the score nothing beats it, and with the target one below a playable set obeying the roles is found, worth
+    /// the score.  Every 3rd game that needs a search in 187..=700 (all of them take three times the time).
+    #[test]
+    fn fixing_the_bottom_layers_keeps_the_proofs() {
+        let started = Instant::now();
+        let spf = smallest_prime_factors(700);
+        let games = searched_in(187..=700);
+        for Searched { n, v, ustar, .. } in games.iter().step_by(3).copied() {
+            let board = Board::new(*n as u32, &spf);
+            let roles = low_roles(*n as u32, &spf, ustar);
+            let mut proof = Prover::new(&board, *v, u64::MAX).with_parity();
+            assert_eq!(proof.run_units(vec![roles.clone()]), Verdict::Proven, "n={n}");
+            let mut beaten = Prover::new(&board, v - 1, u64::MAX).with_parity();
+            let Verdict::Beaten(set) = beaten.run_units(vec![roles.clone()]) else {
+                panic!("n={n}: no set beats {}", v - 1)
+            };
+            assert!(set.iter().map(|&c| u64::from(c)).sum::<u64>() >= *v, "n={n}: the set {set:?} is worth less");
+            assert!(board.playable(&flags(*n, &set)), "n={n}: the set {set:?} is not playable");
+            obeys(&roles, &set).unwrap_or_else(|e| panic!("n={n}: the set {set:?}: {e}"));
+        }
+        eprintln!("{} of {} games, {:.2?}", games.len().div_ceil(3), games.len(), started.elapsed());
+        assert!(!games.is_empty(), "the test checked nothing");
+    }
+
+    /// The counters count what they say.  From `upper_fixed_roles` nothing above n/2 is free and no member of U\*_{≥3}
+    /// is barred, so both are 0, and the search proves the score (the recorded game has upper part U\*, so nothing
+    /// with that upper part beats it); from `low_roles` neither exceeds the nodes.  Every 4th game that needs a
+    /// search in 187..=700 (all of them take four times the time); the totals are printed.
+    #[test]
+    fn the_counters_count_the_sources() {
+        let started = Instant::now();
+        let spf = smallest_prime_factors(700);
+        let games = searched_in(187..=700);
+        let (mut low_nodes, mut fixed_nodes, mut branching, mut barring) = (0u64, 0u64, 0u64, 0u64);
+        for Searched { n, v, moves, ustar } in games.iter().step_by(4).copied() {
+            let (n32, board) = (*n as u32, Board::new(*n as u32, &spf));
+            let (branch, barred) = watched(n32, &spf, ustar);
+            assert!((0..=*n as usize).all(|c| !barred[c] || branch[c]), "n={n}: U*_(>=3) is not in the sources");
+            let fixed_roles = upper_fixed_roles(n32, &spf, ustar);
+            assert!(fixed_roles[(n32 / 2 + 1) as usize..].iter().all(|&r| r != Role::Free), "n={n}: a source is free");
+            obeys(&fixed_roles, moves).unwrap_or_else(|e| panic!("n={n}: the recorded game: {e}"));
+            let mut fixed = Prover::new(&board, *v, u64::MAX).with_parity().watch(branch.clone(), barred.clone());
+            assert_eq!(fixed.run_units(vec![fixed_roles]), Verdict::Proven, "n={n}");
+            let watch = fixed.watch.as_ref().expect("watching");
+            assert_eq!((watch.branching, watch.barring), (0, 0), "n={n}: the fixed upper part is never free or barred");
+            fixed_nodes += fixed.nodes;
+
+            let mut low = Prover::new(&board, *v, u64::MAX).with_parity().watch(branch, barred);
+            assert_eq!(low.run_units(vec![low_roles(n32, &spf, ustar)]), Verdict::Proven, "n={n}");
+            let watch = low.watch.as_ref().expect("watching");
+            assert!(watch.branching <= low.nodes && watch.barring <= low.nodes, "n={n}: more than one per node");
+            low_nodes += low.nodes;
+            branching += watch.branching;
+            barring += watch.barring;
+        }
+        eprintln!(
+            "{} of {} games: B {low_nodes} nodes ({branching} branching on a source of layer 3 or up, {barring} \
+             barring a member of U*_>=3), D {fixed_nodes} nodes, {:.2?}",
+            games.len().div_ceil(4),
+            games.len(),
+            started.elapsed()
+        );
+        assert!(!games.is_empty(), "the test checked nothing");
     }
 }
