@@ -1,6 +1,6 @@
-# The prover: independent proofs and checks of the solver's results
+# The prover: independent proofs and checks of the frame solver's results
 
-The prover is the second program of this repository.  The solver finds the optimal games (`rust/results`,
+The prover is the second program of this repository.  The frame solver finds the optimal games (`rust/results`,
 `src/main/resources/optimal.json`) by searching promotions within the frame model, whose assumptions are validated,
 not proven ([DESIGN.md §2](../DESIGN.md#what-optimal-means)), and whose handling of the numbers above n/2 rests on an
 open conjecture, the upper-half optimality conjecture, equivalently conjecture (★)
@@ -8,12 +8,12 @@ open conjecture, the upper-half optimality conjecture, equivalently conjecture (
 the whole board.  It decides playability by peel (THEORY.md, Theorem 1), uses only proven bounds, takes the recorded
 score as its target and proves that no set of moves beats it, so that the frame model's answers are checked without
 assuming the frame model.  It also lists every optimal set of a game, finds the longest games, certifies conjecture (★)
-at scale and searches for adversarial instances.  It shares no code with the solver or with the Python heuristics; it
-rests only on THEORY.md's theorems (Theorem 1 with peel as the playability oracle, and the residual theorems) and on
+at scale and searches for adversarial instances.  It shares no code with the frame solver or with the Python heuristics;
+it rests only on THEORY.md's theorems (Theorem 1 with peel as the playability oracle, and the residual theorems) and on
 elementary bounds, and every exact method in it is tested against brute force.
 
-This document says *pick* for a number the player takes (the solver's and the wiki's *move*) and *forced picks* for
-the numbers fixed in at a node (the solver's *forced member* is the same idea for its own search).
+This document says *pick* for a number the player takes (the frame solver's and the wiki's *move*) and *forced picks*
+for the numbers fixed in at a node (the frame solver's *forced member* is the same idea for its own search).
 
 | assumption | before this work | now | grade |
 |---|---|---|---|
@@ -432,7 +432,7 @@ What the data shows (observed, not proven):
 The wiki's "Questions" page asks it (its third question, left open, with the belief that the answer is yes): does an
 optimal game take as many moves as any game of the board can, or does some longer game score less?  If optimal
 games were always longest, a solver could stop searching every branch that cannot reach the most moves.  Neither the
-Java solver nor the solver does that (below), but the Java's `reviseFreedoms` rests on a local form of the claim.
+Java solver nor the frame solver does that (below), but the Java's `reviseFreedoms` rests on a local form of the claim.
 
 ### What is proven
 
@@ -511,18 +511,18 @@ What the data shows:
 
 ### The solvers and the wiki
 
-* **Neither the Java solver nor the solver prunes a branch for having fewer moves than possible.**  Counts enter the
-  Java's search only as upper bounds.  A frame's *freedoms* are its factors minus its moves (`search/Frame.java:43`).
-  `FrameSet.computeMaxNumberOfPromotions` (`search/FrameSet.java:136-151`) turns them into `maxTotalPromotions`, the
-  most promotions the freedoms allow (`search/SearchManager.java:121-122`, `maxAdditionalPromotions` at :192-197).
-  The upper bound then sums at most that many of the largest candidates, and a branch is cut on that *sum*
-  (`search/BranchExplorer.java:77`).  *In the bag* is a score, what the game with no promotions makes
-  (`frame/FrameSolver.java:155-160`), not a count.  The solver's `max_total` (`search/setup.rs`), `max_additional`
-  (`bounds.rs`) and `in_the_bag` (`board.rs`) are the same.
+* **Neither the Java solver nor the frame solver prunes a branch for having fewer moves than possible.**  Counts enter
+  the Java's search only as upper bounds.  A frame's *freedoms* are its factors minus its moves
+  (`search/Frame.java:43`).  `FrameSet.computeMaxNumberOfPromotions` (`search/FrameSet.java:136-151`) turns them into
+  `maxTotalPromotions`, the most promotions the freedoms allow (`search/SearchManager.java:121-122`,
+  `maxAdditionalPromotions` at :192-197).  The upper bound then sums at most that many of the largest candidates, and a
+  branch is cut on that *sum* (`search/BranchExplorer.java:77`).  *In the bag* is a score, what the game with no
+  promotions makes (`frame/FrameSolver.java:155-160`), not a count.  The solver's `max_total` (`search/setup.rs`),
+  `max_additional` (`bounds.rs`) and `in_the_bag` (`board.rs`) are the same.
 * **The belief appears once, in `reviseFreedoms`** (`search/UpperBoundEstimator.java:41-90`).  Its comment states
   as a theorem, without proof, that the promotion set with the largest sum also has the most promotions.  It
   solves the two-frame game of frames 0 and 1 for its heaviest promotion set and lowers frame 0's freedoms to that
-  set's size, which can cut sets with *more* promotions into frame 0, never fewer.  The solver ported it as the
+  set's size, which can cut sets with *more* promotions into frame 0, never fewer.  The frame solver ported it as the
   tactic `revise_freedoms`, measured it and removed it ([which tactics earn their
   keep](../docs/EXPERIMENTS.md#which-tactics-earn-their-keep-2026-10)).  (`SearchManager.finalReport`, :185-188,
   reports an optimum with fewer promotions than `maxTotalPromotions` as "max promotions was over-estimated".)

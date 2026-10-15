@@ -652,9 +652,10 @@ against 1,167.
 The same exchange is a promotion set of the frame model: the optimal
 game promotes 48 numbers and the longer one 49, which is `max_total`,
 so the "theorem" of the Java's comment is false for the whole frame
-game of 833 (`rust/tests/soundness.rs`).  `revise_freedoms` applies it
-only to the two-frame game of frames 0 and 1, where it stays
-unproven.
+game of 833 (`rust/tests/soundness.rs`).  The Java's `reviseFreedoms`
+applied it only to the two-frame game of frames 0 and 1, where it stayed
+unproven; the frame solver had it as the tactic `revise_freedoms`, measured
+that it no longer paid, and removed it.
 
 What is measured (`rust/prover`, "Does an optimal game play the
 most moves?"): to n = 1300 the recorded optimal game is a longest

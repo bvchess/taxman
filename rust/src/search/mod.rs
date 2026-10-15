@@ -1,7 +1,8 @@
 //! The branch-and-bound search for the promotion set with the largest sum, run on the parallel [`engine`].
 //!
-//! `DESIGN.md`, section 4 ("The search"), explains the algorithm: nodes, steps and units, the matching bound,
-//! conflicts, forced members and nogoods, the pseudocode of "The default step", and why the search is exact.  The
+//! `DESIGN.md`, section 4 ("The search"), explains the algorithm: nodes, steps and units, the GF(2) bound (the
+//! default) and the matching bound, conflicts, forced members and nogoods, the pseudocode of "The default step", and
+//! why the search is exact.  The
 //! docs here say where each piece of it is, and carry the arguments next to the code they justify.
 //!
 //! The words the code uses: a *node* is a set `P` of promotions, with the state they reach (the root with `P`
@@ -17,7 +18,8 @@
 //! has four phases, which take the steps of DESIGN.md's "The default step" in order:
 //!
 //! * `check_node` (steps 1 and 2): does the node's loop go on?  The sum of its `max_add` largest candidates, then
-//!   the matching check, or the verdict the node's check left when it was made as a child, if `need` is the same.
+//!   the node's bound check, or the verdict the node's check left when it was made as a child, if `need` is the
+//!   same.
 //!   With the tactic `symmetry`, the rule of [`symmetry`] comes between them (`Stepper::apply_symmetry`): it cuts
 //!   the node, or drops candidates from its loop, and the sum of the largest is checked again for what is left.
 //! * `choose_branch` (steps 3 to 5): the member of the conflict to branch on (with strong branching,
@@ -27,20 +29,22 @@
 //! * `check_child` (steps 8 and 9): the child's own check, which with `symmetry` begins with the rule's test of the
 //!   child (cut if no completion keeps the inequalities); then it is offered as the incumbent and pushed.
 //!
-//! The matching check of a node or a child is `Stepper::check` with `refine::Refiner::top`: the matching bound
-//! ([`crate::matchbound`]), the forced members, the conflict of the heaviest matching (the smallest the nogood table
-//! knows, [`crate::model::Nogoods`], else [`Model::conflict_using`](crate::model::Model::conflict_using)), and the
-//! refinement; then, where they leave it open, the Lagrangian bound over the nogoods and the forced members it
-//! finds (`lagrange::Lagrangian::check`).  The tactics that switch these pieces are the fields of
-//! [`SearchTactics`].
+//! The bound check of a node or a child is `Stepper::check`.  With the tactic `gf2`, the default, it is `check_gf2`:
+//! the GF(2) bound ([`crate::gf2`]), the forced members, and the conflict of the heaviest set (the smallest the
+//! nogood table knows, [`crate::model::Nogoods`], else
+//! [`FrameGraph::conflict_using`](crate::model::FrameGraph::conflict_using)).  Without it, on the matching path, it is
+//! `refine::Refiner::top`: the matching bound ([`crate::matchbound`]), the forced members, the conflict of the
+//! heaviest matching, and the refinement.  With the tactic `lagrange`, where they leave it open, the Lagrangian bound
+//! over the nogoods and the forced members it finds follow (`lagrange::Lagrangian::check`).  The tactics that switch
+//! these pieces are the fields of [`SearchTactics`].
 //!
 //! # Where the arguments are
 //!
 //! * The sum of the `max_add` largest candidates bounds every completion by itself, not as a shortcut for the
-//!   matching bound: no completion has more promotions than the freedoms allow (see [`crate::model::FrameSet`]),
+//!   other bounds: no completion has more promotions than the freedoms allow (see [`crate::model::FrameSet`]),
 //!   nor larger ones.
-//! * The matching bound: [`crate::matchbound`].  Conflicts:
-//!   [`Model::conflict_using`](crate::model::Model::conflict_using); nogoods: [`crate::model::Nogoods`];
+//! * The bounds: [`crate::gf2`] (default) and [`crate::matchbound`].  Conflicts:
+//!   [`FrameGraph::conflict_using`](crate::model::FrameGraph::conflict_using); nogoods: [`crate::model::Nogoods`];
 //!   refinement and forced members: `refine::Refiner` and `refine::strongest`; the rule-outs of children:
 //!   `Stepper::make_child`; the Lagrangian bound and its forced members: [`crate::matchbound::lagrange`] and
 //!   [`lagrange`].
@@ -65,7 +69,7 @@
 //! * `setup`: [`prepare`]: the root, the greedy incumbent, `max_total`; the [`Problem`] a setup poses.
 //! * `incumbent`: the starting incumbent (seed, dive, local search).
 //! * `searcher`: [`TaxSearcher`], its stack and its steps; [`SearchSpace`], [`TaxUnit`], the counters [`stat`].
-//! * `refine`: the matching check (`Refiner`) and strong branching (`strongest`).
+//! * `refine`: the matching path's check (`Refiner`) and strong branching on it (`strongest`).
 //! * [`lagrange`]: the Lagrangian bound in the search: where it is tried, its forced members, its refits.
 //! * `header`: the checkpoint's header.
 //! * `diagnostics`: [`Diagnostics`], for tuning.

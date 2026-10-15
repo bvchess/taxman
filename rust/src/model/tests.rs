@@ -162,7 +162,7 @@ const CANDIDATES_85: [u32; 10] = [8, 12, 16, 20, 24, 28, 30, 36, 40, 42];
 
 #[test]
 fn java_frame_set_test_promote() {
-    let (model, fs) = Model::build::<2>(&Tables::new(85), &columns_85()).unwrap();
+    let (model, fs) = FrameGraph::build::<2>(&Tables::new(85), &columns_85()).unwrap();
     let mut state = fs;
     for n in [42, 40, 28] {
         state = model.promote(&state, n).expect("promotable");
@@ -177,7 +177,7 @@ fn java_frame_set_test_promote() {
 
 #[test]
 fn java_frame_set_test_candidates_and_max_moves() {
-    let (model, fs) = Model::build::<2>(&Tables::new(85), &columns_85()).unwrap();
+    let (model, fs) = FrameGraph::build::<2>(&Tables::new(85), &columns_85()).unwrap();
     let candidates = bits::<2>(&CANDIDATES_85);
     assert_eq!(fs.narrow_candidates(&candidates), candidates);
     assert_eq!(fs.max_promotions(), 3);
@@ -187,7 +187,7 @@ fn java_frame_set_test_candidates_and_max_moves() {
 
 #[test]
 fn frame_set_helpers() {
-    let (model, fs) = Model::build::<2>(&Tables::new(85), &columns_85()).unwrap();
+    let (model, fs) = FrameGraph::build::<2>(&Tables::new(85), &columns_85()).unwrap();
     assert_eq!((model.home(42), model.home(40), model.home(9), model.home(84), model.home(999)), (1, 2, 0, 0, 0));
     assert!(model.contains_factor(&fs, 42) && !model.contains_factor(&fs, 84) && !model.contains_factor(&fs, 999));
     assert!(!model.can_promote(&fs, 9) && model.promote(&fs, 9).is_none(), "frame 0 cannot promote");
@@ -203,7 +203,7 @@ fn frame_set_helpers() {
 // ---- golden data ----
 
 fn check_golden_frame_set<const W: usize>(g: &Golden) {
-    let (_, fs) = Model::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
+    let (_, fs) = FrameGraph::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
     let expect = g.json.get("frameSet").and_then(Json::as_arr).expect("frameSet");
     assert_eq!(fs.len(), expect.len(), "n={}", g.n);
     for (i, (frame, want)) in fs.frames().iter().zip(expect).enumerate() {
@@ -297,7 +297,7 @@ fn check_frame<const W: usize>(
 
 fn random_agreement<const W: usize>(g: &Golden, rng: &mut Rng, stats: &mut PeelStats) {
     let tables = Tables::new(g.n);
-    let (model, root) = Model::build::<W>(&tables, &g.columns).unwrap();
+    let (model, root) = FrameGraph::build::<W>(&tables, &g.columns).unwrap();
     let all: Vec<u32> = g.columns.iter().flatten().copied().collect();
     let math = FactorProvider::new(&tables, &all);
     let universes = universes::<W>(&g.columns);
@@ -399,7 +399,7 @@ fn fast_peeling_and_reduction_agree_with_reference() {
 
 /// Promoting the same numbers in different orders reaches the same state whenever every step succeeds.
 fn confluence<const W: usize>(g: &Golden, rng: &mut Rng) -> (u64, u64) {
-    let (model, root) = Model::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
+    let (model, root) = FrameGraph::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
     let candidates = Bits::<W>::from_slice(&g.candidates);
     let (mut orders, mut failed_orders) = (0, 0);
     for _ in 0..20 {
@@ -437,17 +437,17 @@ fn promotion_order_does_not_matter() {
         failed += f;
     }
     eprintln!("confluence: {orders} orders tried, {failed} failed part way");
-    assert_eq!(failed, 0, "a feasible set failed in some other order");
+    assert_eq!(failed, 0, "a promotable set failed in some other order");
 }
 
-/// Checks [`Model::conflict_using`] on `set` in `state`: none exactly when the set can be promoted, else a
+/// Checks [`FrameGraph::conflict_using`] on `set` in `state`: none exactly when the set can be promoted, else a
 /// non-empty subset that cannot, the minimal one no larger than the one the residual gives.
-fn check_conflicts<const W: usize>(model: &Model, state: &FrameSet<W>, set: &Bits<W>, feasible: bool) {
+fn check_conflicts<const W: usize>(model: &FrameGraph, state: &FrameSet<W>, set: &Bits<W>, promotable: bool) {
     let mut scratch = Scratch::new();
     let core = model.conflict_using(&mut scratch, state, set, false);
     let minimal = model.conflict_using(&mut scratch, state, set, true);
-    assert_eq!(core.is_none(), feasible, "{set:?}: core conflict {core:?}");
-    assert_eq!(minimal.is_none(), feasible, "{set:?}: minimal conflict {minimal:?}");
+    assert_eq!(core.is_none(), promotable, "{set:?}: core conflict {core:?}");
+    assert_eq!(minimal.is_none(), promotable, "{set:?}: minimal conflict {minimal:?}");
     if let (Some(core), Some(minimal)) = (core, minimal) {
         for k in [core, minimal] {
             assert!(!k.is_empty() && k.is_subset(set), "conflict {k:?} of {set:?}");
@@ -459,9 +459,9 @@ fn check_conflicts<const W: usize>(model: &Model, state: &FrameSet<W>, set: &Bit
 
 /// Promoting a set one by one succeeds exactly when every frame is winnable with the whole set promoted.
 fn set_check<const W: usize>(g: &Golden, rng: &mut Rng) -> (u64, u64) {
-    let (model, root) = Model::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
+    let (model, root) = FrameGraph::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
     let candidates = Bits::<W>::from_slice(&g.candidates);
-    let (mut feasible, mut tried) = (0, 0);
+    let (mut promotable, mut tried) = (0, 0);
     for _ in 0..200 {
         let density = 3 + rng.below(30);
         let set = rng.subset(&candidates, density);
@@ -486,23 +486,23 @@ fn set_check<const W: usize>(g: &Golden, rng: &mut Rng) -> (u64, u64) {
         let all = model.promote_all_using(&mut Scratch::new(), &root, &set);
         assert_eq!(all, one_by_one.then_some(state), "n={}: promote_all of {set:?}", g.n);
         tried += 1;
-        feasible += u64::from(one_by_one);
+        promotable += u64::from(one_by_one);
     }
-    (tried, feasible)
+    (tried, promotable)
 }
 
 #[test]
 fn sets_can_be_checked_frame_by_frame() {
     let mut rng = Rng(0xFEED_FACE_0BAD_CAFE);
-    let (mut tried, mut feasible) = (0, 0);
+    let (mut tried, mut promotable) = (0, 0);
     for n in golden_ns().into_iter().filter(|&n| n >= 20 && (n % 5 == 0 || n >= 480)) {
         let g = load(n);
         let (t, f) = if n < 512 { set_check::<8>(&g, &mut rng) } else { set_check::<16>(&g, &mut rng) };
         tried += t;
-        feasible += f;
+        promotable += f;
     }
-    eprintln!("frame-by-frame set check: {tried} sets, {feasible} feasible");
-    assert!(feasible > tried / 10 && feasible < tried);
+    eprintln!("frame-by-frame set check: {tried} sets, {promotable} promotable");
+    assert!(promotable > tried / 10 && promotable < tried);
 }
 
 /// Nogoods made from the conflicts of states along random promotion paths of `g`: each is a subset of the
@@ -511,7 +511,7 @@ fn sets_can_be_checked_frame_by_frame() {
 /// Returns the numbers of nogoods made and of later checks.  Eight paths per game (forty took 2 s and made 13,500
 /// nogoods, checked 3.8 million times later).
 fn nogood_check<const W: usize>(g: &Golden, rng: &mut Rng) -> (u64, u64) {
-    let (model, root) = Model::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
+    let (model, root) = FrameGraph::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
     let candidates = Bits::<W>::from_slice(&g.candidates);
     let mut scratch = Scratch::new();
     let mut table = Nogoods::<W>::new(g.n, 1 << 10);

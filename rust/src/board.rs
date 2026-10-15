@@ -21,7 +21,7 @@
 
 use crate::accelerate::solution_for_promotions;
 use crate::bits::Bits;
-use crate::frames::{build_frames, FrameColumns};
+use crate::frames::{build_frames, SearchFrames};
 use crate::numtheory::Tables;
 use crate::search::{self, Prepared, Problem, SearchTactics};
 use std::path::Path;
@@ -33,7 +33,7 @@ pub struct Board<const W: usize> {
     pub tables: Tables,
     /// The board's frames as the search takes them (numbered from the front, those with one number merged), with
     /// the promotion candidates.
-    pub frames: FrameColumns<W>,
+    pub frames: SearchFrames<W>,
     /// The game with no promotions, in play order.
     pub plain: Vec<u32>,
     /// What [`plain`](Self::plain) scores (the Java's `inTheBag`): the part of every score that no promotion

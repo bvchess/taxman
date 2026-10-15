@@ -31,7 +31,7 @@
 //! * `lagrange`: a Lagrangian bound over nogoods of the root (`matchbound::lagrange`), fitted by at most
 //!   `--lagrange` (default 8000; 0 skips it) subgradient steps towards `P* + 1` (see [`root_lagrange`]), whose
 //!   nogoods are generated as it goes: the conflicts of the refinement above, and at each step conflicts of the
-//!   weighted matching's candidates (`Model::conflict_using`, minimal).  The search learns its nogoods at its
+//!   weighted matching's candidates (`FrameGraph::conflict_using`, minimal).  The search learns its nogoods at its
 //!   nodes; these are the root's own, so this is about the best bound the root has with nogoods and no search.
 //!   `refit` is what `matchbound::lagrange::fit` makes of the same nogoods in the steps of one of the search's
 //!   refits (which, unlike this, starts from the multipliers of the refit before).  With the incumbent at the
@@ -65,7 +65,7 @@ use taxman::game::Optimal;
 use taxman::json::Json;
 use taxman::matchbound::lagrange::{LagrangeBound, Relaxation, SCALE};
 use taxman::matchbound::{MatchBound, MatchGraph};
-use taxman::model::{FrameSet, Model, Scratch};
+use taxman::model::{FrameGraph, FrameSet, Scratch};
 use taxman::search::{search, Diagnostics, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
 use taxman::tactics::Tactics;
 
@@ -338,7 +338,7 @@ fn roots<const W: usize>(n: u32, o: &Options, known: &Known) {
 /// branch is left (the required members cannot be promoted together).  Leaves `m` as it found it.
 fn refine<const W: usize>(
     m: &mut MatchBound<'_, W>,
-    model: &Model,
+    model: &FrameGraph,
     scratch: &mut Scratch<W>,
     root: &FrameSet<W>,
     required: Bits<W>,
@@ -379,7 +379,7 @@ fn refine<const W: usize>(
 /// candidates that cannot be promoted from the root or with which it falls below.
 fn decided<const W: usize>(
     graph: &MatchGraph,
-    model: &Model,
+    model: &FrameGraph,
     root: &FrameSet<W>,
     cands: &Bits<W>,
     l: &RootLagrange<W>,

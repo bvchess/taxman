@@ -512,12 +512,12 @@ mod tests {
     use super::super::tests::{check_bounds_excluding, check_level, setup, walks};
     use super::*;
     use crate::model::test_support::*;
-    use crate::model::{FrameSet, Model, Scratch};
+    use crate::model::{FrameGraph, FrameSet, Scratch};
 
     /// The bound of the node `(promoted, cands)` with state `state` from its definition, by the reference solver:
     /// the live nogoods, the weights and the constant worked out afresh.
     fn reference<const W: usize>(
-        model: &Model,
+        model: &FrameGraph,
         state: &FrameSet<W>,
         promoted: &Bits<W>,
         cands: &Bits<W>,
@@ -606,7 +606,12 @@ mod tests {
     }
 
     /// Nogoods of the root of `g`: minimal conflicts of random sets of candidates.
-    fn real_nogoods<const W: usize>(rng: &mut Rng, model: &Model, root: &FrameSet<W>, all: &Bits<W>) -> Vec<Bits<W>> {
+    fn real_nogoods<const W: usize>(
+        rng: &mut Rng,
+        model: &FrameGraph,
+        root: &FrameSet<W>,
+        all: &Bits<W>,
+    ) -> Vec<Bits<W>> {
         let mut scratch = Scratch::new();
         let mut nogoods = Vec::new();
         for _ in 0..200 {

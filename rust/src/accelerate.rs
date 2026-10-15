@@ -11,7 +11,7 @@
 //! turns the promotion set that the frame model works with into the moves of an actual game.
 
 use crate::bits::Bits;
-use crate::hives::Apiary;
+use crate::frames::BoardFrames;
 use crate::numtheory::Tables;
 
 /// The game for a prime `n`: the game for `n − 1` with its first move replaced by `n`.  The game for 1 has no
@@ -66,17 +66,17 @@ pub fn prime_shortcut(n: u32, prev_moves: &[u32]) -> Vec<u32> {
 }
 
 /// The game that plays the given promotions: the numbers in `promotions` become moves (they are treated as
-/// sources, see [`crate::hives`]), the frames are formed again around them, and the frames' games are concatenated,
+/// sources, see [`crate::frames`]), the frames are formed again around them, and the frames' games are concatenated,
 /// the frames in front first.
 ///
 /// This is the last step of every path: the frame model, and so the search, works with promotion sets, and this
 /// turns the winner into moves.  For a set the search accepted (every frame stays winnable) no source is lost, so
-/// the game scores `in_the_bag + Σ promotions`, where `in_the_bag` is what [`Apiary::solution`] scores with no
+/// the game scores `in_the_bag + Σ promotions`, where `in_the_bag` is what [`BoardFrames::solution`] scores with no
 /// promotions; the solver checks that identity of every game as a cross-check between the frames as setup forms
-/// them ([`crate::hives`]) and the frames as the search takes them.  For a set that is not winnable the frames
+/// them ([`crate::frames`]) and the frames as the search takes them.  For a set that is not winnable the frames
 /// simply drop the moves they cannot fit, and the game scores less.
 pub fn solution_for_promotions<const W: usize>(t: &Tables, promotions: Bits<W>) -> Vec<u32> {
-    Apiary::<W>::new(t, promotions).solution()
+    BoardFrames::<W>::new(t, promotions).solution()
 }
 
 #[cfg(test)]

@@ -21,7 +21,7 @@ use taxman::engine::EngineConfig;
 use taxman::frames::build_frames;
 use taxman::game::Optimal;
 use taxman::gf2::{Gf2Bound, Gf2Graph};
-use taxman::model::{FrameSet, Model, Scratch};
+use taxman::model::{FrameGraph, FrameSet, Scratch};
 use taxman::numtheory::Tables;
 use taxman::search::lagrange::Refits;
 use taxman::search::symmetry::Symmetries;
@@ -577,7 +577,7 @@ fn perturbed(rng: &mut Rng, n: u32, frames: u64, density: u64) -> Option<Game<4>
             }
         }
     }
-    let (model, root) = Model::build::<4>(&tables, &columns).ok()?;
+    let (model, root) = FrameGraph::build::<4>(&tables, &columns).ok()?;
     if !root.frames().iter().all(|f| model.winnable(&f.moves, &f.factors)) {
         return None;
     }
@@ -649,7 +649,7 @@ fn perturbed_frame_sets_are_searched_exactly() {
 fn promotion_order_conflicts_and_nogoods_on_perturbed_frame_sets() {
     let mut rng = Rng(0x0DE5_0002_C0DE_F00D);
     let mut scratch = Scratch::<4>::new();
-    let (mut games, mut orders, mut feasible, mut conflicts) = (0, 0, 0, 0);
+    let (mut games, mut orders, mut promotable, mut conflicts) = (0, 0, 0, 0);
     while games < 40 {
         let n = 30 + rng.below(220) as u32;
         let (frames, density) = (2 + rng.below(6), 94 + rng.below(7));
@@ -680,7 +680,7 @@ fn promotion_order_conflicts_and_nogoods_on_perturbed_frame_sets() {
                 assert!(ok == at_once.is_some() && ok == from_root.is_some(), "n={n} {before:?} + {order:?}: {ok}");
                 assert!(!ok || at_once == Some(state), "n={n} {before:?} + {order:?}: not the same state");
             }
-            feasible += usize::from(at_once.is_some());
+            promotable += usize::from(at_once.is_some());
             if let Some(k) = model.conflict_using(&mut scratch, &start, &set, true) {
                 conflicts += 1;
                 assert!(model.promote_all_using(&mut scratch, &start, &k).is_none(), "n={n}: {k:?} is no conflict");
@@ -692,7 +692,10 @@ fn promotion_order_conflicts_and_nogoods_on_perturbed_frame_sets() {
             }
         }
     }
-    assert!(orders > 1500 && feasible > 50 && conflicts > 100, "{orders} orders, {feasible} feasible, {conflicts}");
+    assert!(
+        orders > 1500 && promotable > 50 && conflicts > 100,
+        "{orders} orders, {promotable} promotable, {conflicts}"
+    );
 }
 
 /// The conjecture that the promotion set with the largest sum also has the most promotions is false for the whole

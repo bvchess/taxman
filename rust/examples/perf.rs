@@ -22,7 +22,7 @@
 //!   potentials, the exact ones without each member of the conflict (strong branching), children pushed and
 //!   evaluated, and lookups and rule-outs in a nogood table learned from the nodes' conflicts.
 //! * F2, frame checks, made from F1 on the fly: the two frames that promoting each candidate of each node changes
-//!   (one gains the move, one loses the factor), each checked by `Model::winnable_using`.
+//!   (one gains the move, one loses the factor), each checked by `FrameGraph::winnable_using`.
 //! * `nNNNN.window.ckpt` (F3, a search window): a checkpoint (TXSH, as `taxman solve` writes) of that proof after
 //!   some nodes, resumed on one thread for `--steps` steps (default 50,000, one period of forgetting nogoods).  A
 //!   resumed search starts with empty nogood tables, so the window is the same tree every time, and its
@@ -60,7 +60,7 @@ use taxman::engine::{self, Ctx, EngineConfig, Searcher, Start};
 use taxman::game::Optimal;
 use taxman::gf2::{Gf2Bound, Gf2Graph};
 use taxman::matchbound::{MatchBound, MatchGraph};
-use taxman::model::{Lookup, Model, Nogoods, Scratch};
+use taxman::model::{FrameGraph, Lookup, Nogoods, Scratch};
 use taxman::search::{search, stat, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
 use taxman::tactics::Tactics;
 
@@ -202,7 +202,7 @@ struct Node<const W: usize> {
 fn kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> Result<(), String> {
     let (n, incumbent, units) = read_nodes::<W>(path)?;
     let p = setup::<W>(n);
-    let model: &Model = &p.model;
+    let model: &FrameGraph = &p.model;
     let graph = MatchGraph::new(model, &p.root);
     let mut scratch = Scratch::<W>::new();
     if !incumbent.is_subset(&p.candidates) || model.promote_all_using(&mut scratch, &p.root, &incumbent).is_none() {
@@ -395,7 +395,7 @@ fn kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> Resul
 fn gf2_kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> Result<(), String> {
     let (n, incumbent, units) = read_nodes::<W>(path)?;
     let p = setup::<W>(n);
-    let model: &Model = &p.model;
+    let model: &FrameGraph = &p.model;
     let graph = Gf2Graph::new(model, &p.root, &p.candidates);
     let mut scratch = Scratch::<W>::new();
     let best = incumbent.sum();

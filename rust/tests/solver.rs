@@ -7,8 +7,8 @@ use common::{matching_options, options, TempDir};
 use std::fs;
 use std::time::Duration;
 use taxman::bits::Bits;
+use taxman::frames::BoardFrames;
 use taxman::game::Optimal;
-use taxman::hives::Apiary;
 use taxman::json::Json;
 use taxman::numtheory::Tables;
 use taxman::results::{verify_files, Proof};
@@ -33,7 +33,7 @@ fn a_range_reproduces_optimal_json() {
     // A promotion is exactly a candidate that the game plays, however the game was found.
     for r in &results {
         let tables = Tables::new(r.n);
-        let candidates = Apiary::<8>::new(&tables, Bits::EMPTY).promotion_candidates();
+        let candidates = BoardFrames::<8>::new(&tables, Bits::EMPTY).promotion_candidates();
         let played: Bits<8> = r.moves.iter().copied().collect();
         assert_eq!(r.promotions, (candidates & played).to_vec(), "n={} ({})", r.n, r.method.as_str());
     }
@@ -134,8 +134,8 @@ fn an_interrupted_game_resumes_from_its_checkpoint() {
 
 /// Solves `n` (600 or 760, games with a search of a few thousand nodes on the matching path) and `n + 1` (the prime
 /// after it, which takes `n` as its predecessor) from `base`, with no previous game to start from: a node limit stops
-/// the search of `n`, and a second run, without the limit, resumes it and goes on.  Returns the games of the second run and the lines
-/// of the results file, which the verifier accepts.
+/// the search of `n`, and a second run, without the limit, resumes it and goes on.  Returns the games of the second run
+/// and the lines of the results file, which the verifier accepts.
 fn run_stopped_and_resumed(name: &str, base: SolveOptions, n: u32) -> (Vec<GameResult>, Vec<Json>) {
     let dir = TempDir::new(name);
     let results = dir.join("results.jsonl");

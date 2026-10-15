@@ -31,7 +31,8 @@ def pct(k, total):
 def screening(title, name):
     """Per game: the share of open nodes dominated, by what proves it and by the sampled upper estimate."""
     print(f"\n### {title} ({name})\n")
-    print('| n | nodes | open | promoted (median) | relevant (median) | literal cover, all of C | literal cover, relevant |'
+    print('| n | nodes | open | promoted (median) | relevant (median) | literal cover, all of C '
+          '| literal cover, relevant |'
           ' prime exchange cover | symmetry rule (hopeless / bound) | any proof | sampled upper estimate | twins |')
     print('|---|---|---|---|---|---|---|---|---|---|---|---|')
     for n, rs in sorted(by_n(lines(name)).items()):
@@ -54,7 +55,8 @@ def screening(title, name):
 
 def pairs(title, name):
     print(f"\n### {title} ({name})\n")
-    print('| n | nodes | sampled: one for one | two for one or two | either, or a prime exchange or the symmetry rule |')
+    print('| n | nodes | sampled: one for one | two for one or two '
+          '| either, or a prime exchange or the symmetry rule |')
     print('|---|---|---|---|---|')
     for n, rs in sorted(by_n(lines(name)).items()):
         live = [r for r in rs if not r.get('closed')]
@@ -82,13 +84,15 @@ def classes(pair_list):
 
 def symmetries():
     print("\n### The root's prime symmetries by band (symmetries.jsonl)\n")
-    print('| n | games | candidates | classes of primes | largest class | candidates moved | log10 of the group order |')
+    print('| n | games | candidates | classes of primes | largest class | candidates moved '
+          '| log10 of the group order |')
     print('|---|---|---|---|---|---|---|')
     bands = defaultdict(list)
     for r in lines('symmetries.jsonl'):
         cl = classes(ast.literal_eval(r['pairs']))
         order = sum(math.log10(math.factorial(len(c))) for c in cl)
-        bands[(r['n'] - 1) // 50].append((r['candidates'], len(cl), max((len(c) for c in cl), default=0), r['moved'], order))
+        largest = max((len(c) for c in cl), default=0)
+        bands[(r['n'] - 1) // 50].append((r['candidates'], len(cl), largest, r['moved'], order))
     for k in sorted(bands):
         v = bands[k]
         m = [sum(x[i] for x in v) / len(v) for i in range(5)]
@@ -115,8 +119,8 @@ def compare(title, base, rule):
 
 def pilots():
     print('\n### The pilots: nodes with the rule against without (pilots/)\n')
-    print('| search, rule | games | nodes, geometric ratio | total ratio | fewest | most | slope of log ratio on log nodes |'
-          ' time |')
+    print('| search, rule | games | nodes, geometric ratio | total ratio | fewest | most '
+          '| slope of log ratio on log nodes | time |')
     print('|---|---|---|---|---|---|---|---|')
     compare('solver, hopeless', 'pilots/solver_off.jsonl', 'pilots/solver_hopeless.jsonl')
     compare('solver, matching bound of the constraint', 'pilots/solver_off.jsonl', 'pilots/solver_bound.jsonl')

@@ -3,12 +3,13 @@
 //! incumbent ([`greedy`]).
 //!
 //! The Java bounds every node with `blameGame` and filters the candidates of a child with a preclusion table and
-//! promotability checks.  Here the matching bound ([`crate::matchbound`]) bounds every node, the conflicts it finds
-//! take the place of the checks, and a child's candidates are only narrowed to the frames that still have freedoms
-//! ([`FrameSet::narrow_candidates`]).
+//! promotability checks.  Here a bound over the node's candidates bounds every node (the GF(2) bound,
+//! [`crate::gf2`], by default; the matching bound, [`crate::matchbound`], on the matching path), the conflicts it
+//! finds take the place of the checks, and a child's candidates are only narrowed to the frames that still have
+//! freedoms ([`FrameSet::narrow_candidates`]).
 
 use crate::bits::Bits;
-use crate::model::{FrameSet, Model, Scratch};
+use crate::model::{FrameGraph, FrameSet, Scratch};
 
 /// The Java's `SearchManager.maxAdditionalPromotions`: how many more promotions a node can make, given the
 /// overall limit `max_total`, the promotions made so far, and the candidates left; never negative.  (A count:
@@ -22,7 +23,7 @@ pub fn max_additional<const W: usize>(max_total: u32, state: &FrameSet<W>, promo
 /// The Java's `LowerBoundEstimator.greedy` (`findGreedySolutionWithSkips` with no skips): from the top, promote
 /// every candidate that can be; after each success, narrow the candidates in the new state and go on with the
 /// next one below in the narrowed set.  Returns the promotions made: the search's first incumbent.
-pub fn greedy<const W: usize>(model: &Model, root: &FrameSet<W>, cands: &Bits<W>) -> Bits<W> {
+pub fn greedy<const W: usize>(model: &FrameGraph, root: &FrameSet<W>, cands: &Bits<W>) -> Bits<W> {
     let mut scratch = Scratch::new();
     let mut state = *root;
     let mut cands = *cands;
@@ -44,8 +45,8 @@ mod tests {
     use crate::model::test_support::*;
     use crate::numtheory::Tables;
 
-    fn setup<const W: usize>(g: &Golden) -> (Model, FrameSet<W>, Bits<W>) {
-        let (model, root) = Model::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
+    fn setup<const W: usize>(g: &Golden) -> (FrameGraph, FrameSet<W>, Bits<W>) {
+        let (model, root) = FrameGraph::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
         (model, root, Bits::from_slice(&g.candidates))
     }
 

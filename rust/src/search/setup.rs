@@ -10,7 +10,7 @@ use super::tactics::SearchTactics;
 use crate::bits::Bits;
 use crate::bounds;
 use crate::engine;
-use crate::model::{FrameSet, Model};
+use crate::model::{FrameGraph, FrameSet};
 use crate::numtheory::Tables;
 use std::path::Path;
 use std::sync::Arc;
@@ -27,7 +27,7 @@ pub struct PrepareTimings {
 pub struct Prepared<const W: usize> {
     /// The board size.
     pub n: u32,
-    pub model: Arc<Model>,
+    pub model: Arc<FrameGraph>,
     /// The starting state of the search: the frames as built.
     pub root: FrameSet<W>,
     pub candidates: Bits<W>,
@@ -48,29 +48,29 @@ impl<const W: usize> Prepared<W> {
 }
 
 /// The search problem a game's setup poses, in a canonical form: everything the search is given that its answer
-/// can depend on, so that two games with equal problems have the same feasible promotion sets and the same best
+/// can depend on, so that two games with equal problems have the same promotable sets and the same best
 /// promotion sum (DESIGN.md, "Same search").
 ///
 /// The search is given the model (the factor graph and each number's home frame), the root frame set, the
-/// candidates and `max_total`, besides the tactics, the cap and the seed; the matching graph and the greedy set are
-/// functions of those.  The feasible promotion sets are the sets of candidates that can be promoted from the root,
+/// candidates and `max_total`, besides the tactics, the ceiling and the seed; the matching graph and the greedy set are
+/// functions of those.  The promotable sets are the sets of candidates that can be promoted from the root,
 /// keeping every frame's freedoms, with at most `max_total` members; which they are depends
 /// on the frames and on the graph's edges among their numbers, not on `n`.  So the form records, as a list of
-/// `u32`: the number of frames; for each frame, bottom first, its freedoms (as the bits of an `i32`) and its moves
+/// `u32`: the number of frames; for each frame, front first, its freedoms (as the bits of an `i32`) and its moves
 /// and its factors (each list as its length and then its numbers, ascending); the candidates; `max_total`; and for
 /// each number of the frames (their moves and factors), ascending, the number, its home frame, the maximal factors
 /// that can pay for it and the maximal composites it can pay for, as the model's graph lists them.  The graph's
 /// lists for a number can name numbers no longer in a frame (reducing the frames drops some), which the search never
 /// sees; recording them anyway errs on the side of telling more problems apart.  The numbers are game numbers, so
-/// the form does not depend on the set width.  The tactics, the cap and the seed are not in it: the sound tactics,
-/// the cap and the seed change how the search runs, not its answer.
+/// the form does not depend on the set width.  The tactics, the ceiling and the seed are not in it: the sound tactics,
+/// the ceiling and the seed change how the search runs, not its answer.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Problem(Vec<u32>);
 
 impl Problem {
     /// The problem of a search of the model `model` from `root` over `candidates`, with at most `max_total`
     /// promotions.
-    pub fn of<const W: usize>(model: &Model, root: &FrameSet<W>, candidates: &Bits<W>, max_total: u32) -> Problem {
+    pub fn of<const W: usize>(model: &FrameGraph, root: &FrameSet<W>, candidates: &Bits<W>, max_total: u32) -> Problem {
         fn list(words: &mut Vec<u32>, items: impl ExactSizeIterator<Item = u32>) {
             words.push(items.len() as u32);
             words.extend(items);
@@ -148,7 +148,7 @@ pub fn problem_of<const W: usize>(
     Ok(Problem::of(&model, &root, candidates, max_total(&root, candidates)))
 }
 
-/// Sets up the search for the game whose frames are `columns` (factors and moves per frame, bottom first) and
+/// Sets up the search for the game whose frames are `columns` (factors and moves per frame, front first) and
 /// whose promotion candidates are `candidates`.
 pub fn prepare<const W: usize>(
     tables: &Tables,
@@ -186,12 +186,15 @@ pub fn prepare_for_resume<const W: usize>(
 /// The model and the root frame set of the game whose frames are `columns`, and the time it took to build them.
 ///
 /// Every frame of the root is winnable (the frame builder makes it so), and the search relies on it: promoting a
-/// move that has a factor no move of the frame below uses takes no peel (`Model::promote`), which is exact only
-/// if that frame is winnable, as every frame of every state reached from a winnable root is.  Debug builds check
-/// it here.
-fn build_root<const W: usize>(tables: &Tables, columns: &[Vec<u32>]) -> Result<(Model, FrameSet<W>, Duration), String> {
+/// number that has a factor no move of the frame it is promoted into uses takes no peel (`FrameGraph::promote`), which
+/// is exact only if that frame is winnable, as every frame of every state reached from a winnable root is.  Debug
+/// builds check it here.
+fn build_root<const W: usize>(
+    tables: &Tables,
+    columns: &[Vec<u32>],
+) -> Result<(FrameGraph, FrameSet<W>, Duration), String> {
     let t0 = Instant::now();
-    let (model, root) = Model::build::<W>(tables, columns)?;
+    let (model, root) = FrameGraph::build::<W>(tables, columns)?;
     let build = t0.elapsed();
     debug_assert!(
         root.frames().iter().all(|f| model.winnable(&f.moves, &f.factors)),

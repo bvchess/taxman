@@ -7,15 +7,15 @@
 //! conflict among them says which ones to try leaving out.
 //!
 //! A conflict is found in a frame that fails, from its *residual* (the moves a peel cannot drop, see
-//! [`super::peel`]), and made minimal ([`Model::conflict_using`]).  A conflict of a node is relative to the
-//! node's promotions; [`Model::nogood`] turns it into a conflict of the root, a *nogood*, which holds at every
+//! [`super::peel`]), and made minimal ([`FrameGraph::conflict_using`]).  A conflict of a node is relative to the
+//! node's promotions; [`FrameGraph::nogood`] turns it into a conflict of the root, a *nogood*, which holds at every
 //! node ([`super::nogoods`]).
 
 use super::peel::Scratch;
-use super::{Frame, FrameSet, Model, MAX_FRAMES};
+use super::{Frame, FrameGraph, FrameSet, MAX_FRAMES};
 use crate::bits::Bits;
 
-impl Model {
+impl FrameGraph {
     /// A *conflict* of `set` in `state`: a subset of `set` that cannot be promoted from `state`, or `None` if
     /// all of `set` can be.  Since a subset of a set that can be promoted can be promoted too (see
     /// [`winnable`](Self::winnable)), every set that can be promoted leaves out some member of a conflict.
@@ -177,7 +177,7 @@ struct FrameEdits<const W: usize> {
     minimal: bool,
 }
 
-/// The last answer [`Model::conflict_cached`] found for each frame, to reuse when the frame and its edits are the
+/// The last answer [`FrameGraph::conflict_cached`] found for each frame, to reuse when the frame and its edits are the
 /// same: along a search, consecutive heaviest matchings mostly promote the same numbers in most frames.
 pub struct ConflictCache<const W: usize> {
     entries: [Option<(FrameEdits<W>, Option<Bits<W>>)>; MAX_FRAMES],

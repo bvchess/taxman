@@ -81,8 +81,8 @@ use crate::accelerate::{prime_shortcut, solution_for_promotions};
 use crate::bits::{words_for, Bits};
 use crate::board::{promotion_cap, search_problem, Board};
 use crate::engine::{self, Control, Counters, EngineConfig, Stats};
+use crate::frames::BoardFrames;
 use crate::game::{replay, replay_finished, Optimal};
-use crate::hives::Apiary;
 use crate::json::Json;
 use crate::numtheory::Tables;
 use crate::results::{
@@ -864,7 +864,7 @@ fn set_up_with_width<const W: usize>(n: u32, before: &Before, opts: &SolveOption
     let derive = !opts.force_search && checkpoint.is_none();
 
     if derive && tactics.prime_shortcut && tables.is_prime(n) && !matches!(before, Before::None) {
-        let candidates = Apiary::<W>::new(&tables, Bits::EMPTY).promotion_candidates();
+        let candidates = BoardFrames::<W>::new(&tables, Bits::EMPTY).promotion_candidates();
         return Ok(SetUp::Derived(Derived::Prime { candidates: candidates.to_vec() }));
     }
 

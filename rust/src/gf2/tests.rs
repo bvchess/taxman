@@ -47,7 +47,12 @@ fn independent<const W: usize>(graph: &Gf2Graph, set: &Bits<W>) -> bool {
 }
 
 /// Every promotable subset of `cands` from `state`, by depth-first enumeration (at most `limit` of them).
-fn promotable_sets<const W: usize>(model: &Model, state: &FrameSet<W>, cands: &Bits<W>, limit: usize) -> Vec<Bits<W>> {
+fn promotable_sets<const W: usize>(
+    model: &FrameGraph,
+    state: &FrameSet<W>,
+    cands: &Bits<W>,
+    limit: usize,
+) -> Vec<Bits<W>> {
     let mut scratch = Scratch::new();
     let cands = cands.to_vec();
     let mut out = Vec::new();

@@ -1,4 +1,4 @@
-use super::{FrameSet, Model};
+use super::{FrameGraph, FrameSet};
 use crate::bits::Bits;
 use crate::json::Json;
 use std::path::PathBuf;
@@ -71,12 +71,12 @@ pub(crate) fn load(n: u32) -> Golden {
 /// The largest sum of at most `max_size` members of `cands` that can be promoted from `state` (exhaustive,
 /// pruned only by sums): the truth that upper bounds are checked against.
 pub(crate) fn best_completion<const W: usize>(
-    model: &Model,
+    model: &FrameGraph,
     state: &FrameSet<W>,
     cands: &Bits<W>,
     max_size: u32,
 ) -> u64 {
-    fn dfs<const W: usize>(model: &Model, state: &FrameSet<W>, list: &[u32], sum: u64, left: u32, best: &mut u64) {
+    fn dfs<const W: usize>(model: &FrameGraph, state: &FrameSet<W>, list: &[u32], sum: u64, left: u32, best: &mut u64) {
         *best = (*best).max(sum);
         if left == 0 {
             return;

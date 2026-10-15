@@ -28,17 +28,17 @@
 //! n ──► numtheory::Tables               maximal factors and composites of 1..=n
 //!        │
 //!        ▼
-//!       board::Board                   hives::Apiary → frames::build_frames: the frames (0 = front) and the
+//!       board::Board                   frames::BoardFrames → frames::build_frames: the frames (0 = front) and the
 //!        │                              promotion candidates; in_the_bag = the score with no promotions
 //!        ▼
-//!       search::prepare                model::Model: the root state; greedy incumbent
+//!       search::prepare                model::FrameGraph and its root FrameSet; greedy incumbent
 //!        │
 //!        ▼
 //!       search::search ───────────────► engine::run: threads, shared deque with disk spill, checkpoints
 //!        │                               └ Stepper::step per node: gf2 (or matchbound) → conflicts,
 //!        │                                 forced members, nogoods → branch → child
 //!        ▼
-//!       promotions ──► hives::Apiary ──► the moves ──► game::replay ──► score, results line
+//!       promotions ──► frames::BoardFrames ──► the moves ──► game::replay ──► score, results line
 //! ```
 //!
 //! [`solver`] runs this for a game, with the shortcuts that can skip the search (`accelerate`, and the repeat of an
@@ -52,15 +52,14 @@
 //!
 //! | layer | module | what it is |
 //! |---|---|---|
-//! | foundations | [`game`] | the rules as a referee ([`game::replay`]), and the table of optimal games ([`game::Optimal`]) |
+//! | foundations | [`game`] | the rules as a referee ([`game::replay`]), and the table of optimal games |
 //! | | [`numtheory`] | maximal factors and composites, primes, divisors of the numbers on a board |
 //! | | [`bits`] | fixed-width bitsets `Bits<W>` for sets of game numbers; the set widths, dispatched |
 //! | | [`json`] | a small JSON reader and writer (the table of optimal games, golden data, results lines) |
-//! | frame model | [`hives`] | sources, factors and the frames as setup forms them; what they can play and spare |
-//! | | [`frames`] | the frames numbered from the front and merged, and the promotion candidates |
+//! | frame model | [`frames`] | the frames of a board: formed, simplified, numbered from the front and merged |
 //! | | [`model`] | the search state: frames, winnability, promotion, conflicts, nogoods |
 //! | | [`accelerate`] | the prime shortcut (the game of a prime `n` from the game of `n − 1`); promotions → moves |
-//! | search | [`matchbound`] | the matching bound, the upper bound on a node's completions; the Lagrangian bound |
+//! | search | [`matchbound`] | the matching bound, an upper bound on a node's completions; the Lagrangian bound |
 //! | | [`gf2`] | the GF(2) bound, the default node bound: two frame matroids and their weighted intersection |
 //! | | [`search`] | the branch-and-bound searcher, its tactics, its setup and checkpoint header |
 //! | | [`bounds`] | the greedy incumbent and the limit on a node's further promotions |
@@ -89,7 +88,6 @@ pub mod engine;
 pub mod frames;
 pub mod game;
 pub mod gf2;
-pub mod hives;
 pub mod json;
 pub mod matchbound;
 pub mod model;

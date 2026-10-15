@@ -228,7 +228,7 @@ pub struct Meet<const R: usize> {
     pred: Vec<u32>,
     /// The last augmenting path, from its source to its sink.
     path: Vec<u32>,
-    /// Bellman–Ford's frontier: the outside elements and the members whose distance changed in the last phase,
+    /// Bellman–Ford's worklist: the outside elements and the members whose distance changed in the last phase,
     /// the changed members' slots per block of each matroid, and the phase each vertex was last listed in.
     changed_out: Vec<u32>,
     changed_in: Vec<u32>,
@@ -447,9 +447,9 @@ impl<const R: usize> Meet<R> {
         }
     }
 
-    /// The weight and size of a common independent set of the elements `live` (ascending) found greedily: `base` (common
-    /// independent), then each other element by decreasing weight that keeps it so.  A lower bound on the heaviest
-    /// common independent set, for a few reductions per element.
+    /// The weight and size of a common independent set of the elements `live` (ascending) found greedily: `base`
+    /// (common independent), then each other element by decreasing weight that keeps it so.  A lower bound on the
+    /// heaviest common independent set, for a few reductions per element.
     pub fn greedy_from(&mut self, p: &Problem<'_, R>, live: &[u32], base: &[u32]) -> (i64, usize) {
         // The workspace no longer holds the last solve.
         self.solves += 1;

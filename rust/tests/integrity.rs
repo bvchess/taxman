@@ -11,8 +11,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use taxman::bits::Bits;
+use taxman::frames::BoardFrames;
 use taxman::game::{legal_moves_left, replay, Optimal};
-use taxman::hives::Apiary;
 use taxman::json::Json;
 use taxman::numtheory::Tables;
 use taxman::results::{assumed_optimal, moves_digest, rejected_path, Assumptions, Proof, ResultsFile, SCHEMA};
@@ -391,7 +391,7 @@ fn every_game_from_the_frame_model_scores_in_the_bag_plus_its_promotions() {
     let opts = SolveOptions { force_search: true, ..options(1) };
     for r in solver::solve_range(2, 160, &opts, None).unwrap() {
         let tables = Tables::new(r.n);
-        let bag: u64 = Apiary::<8>::new(&tables, Bits::EMPTY).solution().iter().map(|&m| u64::from(m)).sum();
+        let bag: u64 = BoardFrames::<8>::new(&tables, Bits::EMPTY).solution().iter().map(|&m| u64::from(m)).sum();
         let sum: u64 = r.promotions.iter().map(|&p| u64::from(p)).sum();
         assert_eq!((r.in_the_bag, r.score), (Some(bag), bag + sum), "n={}", r.n);
     }

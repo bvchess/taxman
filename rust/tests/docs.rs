@@ -386,8 +386,8 @@ const RETIRED_EVERYWHERE: &[Retired] = &[
     retired("model-free", "the prover's (proofs, search), or: on the whole board"),
     retired("evidence crate", "the prover"),
     retired("evidence solver", "the prover"),
-    retired("exact solver", "the solver"),
-    retired("main solver", "the solver"),
+    retired("exact solver", "the frame solver"),
+    retired("main solver", "the frame solver"),
     retired("chain relation", "the ceiling"),
     retired("chain game", "a game at its ceiling"),
     retired("prime relation", "the prime formula"),
@@ -411,7 +411,7 @@ const RETIRED_IN_THE_SOLVER: &[Retired] = &[
     retired("strict run", "the committed chain"),
     retired("strict runs", "the committed chain"),
     retired("strict chain", "the committed chain"),
-    retired("rust solver", "the solver"),
+    retired("rust solver", "the frame solver"),
     retired("forced pair", "(a move left with one live factor is paid by it; no name)"),
     retired("forced pairs", "(a move left with one live factor is paid by it; no name)"),
     retired("many cores", "many CPUs or threads"),
@@ -434,6 +434,11 @@ const RETIRED_NAMES: &[Retired] = &[
     retired("evidence_only", "PROVER_ONLY"),
     retired("taxman_evidence", "taxman_prover"),
     retired("taxman-evidence", "taxman-prover"),
+    retired("src/hives.rs", "src/frames/"),
+    retired("golden_hives", "golden_frames"),
+    retired("framecolumn", "SearchFrames (the search's frames are model::Frame)"),
+    retired("free_factor_count", "freedoms"),
+    retired("has_free_factors", "is_closed"),
 ];
 
 /// Phrases that contain a retired word and stay: the heuristics' and the matroids' own meanings, and plain English
@@ -441,9 +446,8 @@ const RETIRED_NAMES: &[Retired] = &[
 const STAYS: &[&str] =
     &["frontier argument", "frontier jam", "odd core", "odd cores", "memory cap", "mem-cap", "cap reached"];
 
-/// Files whose words move in the next stage, together with their identifiers (the modules `gf2` and `search`, and the
-/// golden test of the hives), and this file, which lists the words.
-const NOT_YET: &[&str] = &["src/gf2.rs", "src/gf2/", "src/search/", "tests/golden_hives.rs", "tests/docs.rs"];
+/// The files the check skips: this one, which lists the words.
+const SKIPPED: &[&str] = &["tests/docs.rs"];
 
 /// `line` with the targets of its links (`](target)`) taken out: a target names a file or an anchor, not a word.
 fn without_link_targets(line: &str) -> String {
@@ -558,7 +562,7 @@ fn vocabulary_files() -> Vec<(PathBuf, bool)> {
         found.extend(["README.md", "THEORY.md"].iter().map(|name| outside.join("heuristics").join(name)));
     }
     let shown = |path: &Path| path.strip_prefix(crate_dir()).unwrap_or(path).to_string_lossy().replace('\\', "/");
-    let checked = found.into_iter().filter(|path| !NOT_YET.iter().any(|skip| shown(path).starts_with(skip)));
+    let checked = found.into_iter().filter(|path| !SKIPPED.iter().any(|skip| shown(path).starts_with(skip)));
     checked.map(|path| (path.clone(), shown(&path).starts_with("prover/") || shown(&path).starts_with(".."))).collect()
 }
 

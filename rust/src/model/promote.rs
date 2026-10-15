@@ -8,7 +8,7 @@
 //! Promoting a set `S` one member after the other succeeds, in any order, exactly when every member is a factor
 //! of its home frame `h ≥ 1` and every frame is winnable with all of `S` applied at once: its moves plus the
 //! members promoted into it, its factors minus the members promoted out of it, with no reduction in between
-//! ([`Model::winnable`], [`Model::can_promote_all_using`]).  Three facts give this:
+//! ([`FrameGraph::winnable`], [`FrameGraph::can_promote_all_using`]).  Three facts give this:
 //!
 //! * winnability only gets harder as moves are added and factors removed, so the frames with all of `S` applied
 //!   are winnable exactly when every frame along the way is;
@@ -18,15 +18,15 @@
 //!   after the other it is no longer a factor of its home frame, and all at once that move is left with no factor.
 //!
 //! The state after promoting `S` is then the same in any order, since reduction is confluent on winnable frames,
-//! and [`Model::promote_all_using`] makes it by checking and reducing each frame once.  Everything that reasons
+//! and [`FrameGraph::promote_all_using`] makes it by checking and reducing each frame once.  Everything that reasons
 //! about sets of promotions rests on this: conflicts and nogoods ([`super::conflict`], [`super::nogoods`]), the
 //! matching bound's relaxation ([`crate::matchbound`]), and a search node rebuilt from its promotions alone.
 
 use super::peel::{reduce_from, Scratch, Worklist};
-use super::{Frame, FrameSet, Model, MAX_FRAMES};
+use super::{Frame, FrameGraph, FrameSet, MAX_FRAMES};
 use crate::bits::Bits;
 
-impl Model {
+impl FrameGraph {
     /// Whether the frame `moves -> factors` is winnable, where `moves` and `factors` are those of a frame of this
     /// model with numbers promoted into and out of it (its moves plus factors of the frame behind it; its factors).
     /// Applied to each frame with a whole set promoted at once, this decides whether the set can be promoted
@@ -191,7 +191,7 @@ impl Model {
     }
 }
 
-/// A set of promotions split by frame (see [`Model::edits`]).
+/// A set of promotions split by frame (see [`FrameGraph::edits`]).
 #[derive(Clone, Copy, Debug)]
 pub struct Edits<const W: usize> {
     /// Per frame, the numbers promoted into it (its new moves).

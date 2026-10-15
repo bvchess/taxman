@@ -35,8 +35,9 @@ and instructions of the `nodes` lines are the process's, and those of the start 
 In the two profiles `attribute.py` could not symbolicate the inlined frames of this binary, so its kinds and purposes
 say `other`; the innermost functions are the useful part, as truncated symbols: `gf2::meet::Meet<3>::shortest_path`
 (`...Meet...13s`), `Meet<3>::add` (`...3ad`), `Gf2Bound<64>::evaluate` (`...8eva`), `Meet<3>::insert_both` (`...11i`),
-`Meet<3>::apply_path` (`...10a`), `model::peel::Scratch<64>::winnable` (`...peel...Scratch`), `hives::Apiary<64>::
-count_freedoms` (`...6Apiary...14cou`), `model::peel::reduce_from` (`...11reduce_from`).
+`Meet<3>::apply_path` (`...10a`), `model::peel::Scratch<64>::winnable` (`...peel...Scratch`),
+`BoardFrames<64>::count_freedoms` (`...6Apiary...14cou`: the build of the profiles called it `hives::Apiary`),
+`model::peel::reduce_from` (`...11reduce_from`).
 
 ## For a cloud machine
 
@@ -48,9 +49,9 @@ calibration found no contention among 64 copies).
 1. The fixed costs on Graviton, every 25 boards past 2175 (one thread, about 15 minutes):
    `wall setup K $(seq 2200 25 4095) > setup_c8g.jsonl`.
 2. Large GF(2) trees past 2175 (sets of 36 words since round A), on one thread each, a time series of 10^7 nodes and
-   more: the dear games of the c8g chain, `wall grow K2 --nodes 40000000 --progress 30 --ckpt-dir ck_N --every 60 N > grow_N.jsonl
-   2> grow_N.progress` for N = 2184 (25.6 million nodes on 64 threads), 2260, 2268, 2254 (hours each: about 0.5 ms a
-   node).
+   more: the dear games of the c8g chain,
+   `wall grow K2 --nodes 40000000 --progress 30 --ckpt-dir ck_N --every 60 N > grow_N.jsonl 2> grow_N.progress` for N =
+   2184 (25.6 million nodes on 64 threads), 2260, 2268, 2254 (hours each: about 0.5 ms a node).
 3. The pause of a checkpoint with 192 (or 64) threads near the wall, the real one rather than one worker's: on a copy of
    the committed results cut after 2183 and extended with the c8g lines to 2183, `taxman solve 2184 --threads 192
    --out COPY --checkpoint-dir DIR --checkpoint-interval 1 --progress 10 --time-limit 600`; the end of its progress

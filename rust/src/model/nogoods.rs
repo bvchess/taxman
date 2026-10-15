@@ -6,7 +6,7 @@
 //!
 //! * A node's state is the root with its promotions `P` promoted, and promoting a set `F` from it succeeds
 //!   exactly when `P ∪ F` can be promoted from the root: both are decided frame by frame on the union (see
-//!   [`Model::winnable`](super::Model::winnable); reducing the frames in between changes nothing).
+//!   [`FrameGraph::winnable`](super::FrameGraph::winnable); reducing the frames in between changes nothing).
 //! * A set that cannot be promoted from the root makes every superset fail too (a subset of a promotable set is
 //!   promotable).
 //!
@@ -15,7 +15,7 @@
 //! a checkpoint (a resumed search simply starts with none).
 //!
 //! A conflict `K` found at a node with promotions `P` becomes a nogood by
-//! [`Model::nogood`](super::Model::nogood): a minimal subset of `P ∪ K` that keeps one of the root's frames
+//! [`FrameGraph::nogood`](super::FrameGraph::nogood): a minimal subset of `P ∪ K` that keeps one of the root's frames
 //! unwinnable.  The search uses the table for the conflict to branch on and to refine with (the smallest it
 //! knows, [`Nogoods::lookup`]) and to rule candidates out of children ([`Nogoods::ruled_out`]).
 

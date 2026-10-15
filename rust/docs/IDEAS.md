@@ -19,12 +19,12 @@ which settings, and the numbers that decided it.  The register of everything tri
 How it was measured.  The machine is the 10-CPU M1 Max laptop, shared with other jobs the whole time (its load average
 stayed between 4 and 8), so every pilot uses at most 4 CPUs at a time and reports counts (nodes, lookups, nogoods
 learned, cuts) and cycles of the process before wall time; wall times are quoted only where nothing else says what
-something costs, and only as ratios within one run.  All searches use only proven tactics (`revise_freedoms=off`) and,
-unless they say otherwise, *proof-only*: seeded with the game's own optimum (`ladder --seed-opt`), which makes the node
-count of a one-thread search exact and leaves the tree to the bound and the branching, the parts these ideas change.
-"Fast set" is EXPERIMENTS' 880, 936, 1050, 1100, 1170, 1184 seeded from n − 1.  What matters at the end of the chain is
-the slope of the cost curve ([bench/curve/README.md](../bench/curve/README.md): ×10 per 55-70 in n), so each result says
-whether its effect grows with n where that could be measured.
+something costs, and only as ratios within one run.  All searches use only proven tactics (`revise_freedoms=off`, a
+tactic since removed) and, unless they say otherwise, *proof-only*: seeded with the game's own optimum
+(`ladder --seed-opt`), which makes the node count of a one-thread search exact and leaves the tree to the bound and the
+branching, the parts these ideas change.  "Fast set" is EXPERIMENTS' 880, 936, 1050, 1100, 1170, 1184 seeded from n − 1.
+What matters at the end of the chain is the slope of the cost curve ([bench/curve/README.md](../bench/curve/README.md):
+×10 per 55-70 in n), so each result says whether its effect grows with n where that could be measured.
 
 ## 1. The recommended order
 
@@ -54,12 +54,13 @@ are second-order and can wait for (2), which changes the time split they would a
 ## 2. Where the time goes in the hardest games
 
 The three slowest games of the committed chain 1232-1300 of commit bd9bb5d (1232 439 s, 1287 273 s, 1299 265 s on 6
-threads; `results/strict.jsonl` is a later run), each run as the chain runs it (`taxman solve N --strict`, its
+threads; `results/strict.jsonl` is a later run), each run as the chain runs it (`taxman solve N`, with `--strict` then,
+which left out the tactics that were unproven and has gone with them: every tactic is proven or sound now; its
 predecessor from a copy of the chain's results truncated before N) for 40-70 s on 4 threads and sampled every
 millisecond by macOS `sample`.  Each sample's return addresses were symbolicated with their inlined frames (`atos -i`),
 so that code the compiler inlined into the step is charged to the function it came from: the *kind* of work is the
-innermost function of the crate, the *purpose* the innermost search function above it.  Shares of busy samples (the
-idle coordinator thread excluded):
+innermost function of the crate, the *purpose* the innermost search function above it.  Shares of busy samples (the idle
+coordinator thread excluded):
 
 | kind of work | 1232 | 1287 | 1299 |
 |---|---|---|---|
@@ -239,7 +240,8 @@ Implemented as the tactic and proof kind `same_search`
 ### 4.2 A Lagrangian bound over the nogoods (rank 2)
 
 Done since: kept incrementally, and with the forced members its potentials give, it is the tactic `lagrange`, on by
-default, about 3 times fewer cycles on the proofs of 1184-1300 ([EXPERIMENTS.md](EXPERIMENTS.md#a-lagrangian-bound-over-the-nogoods-2026-10)).
+default, about 3 times fewer cycles on the proofs of 1184-1300
+([EXPERIMENTS.md](EXPERIMENTS.md#a-lagrangian-bound-over-the-nogoods-2026-10)).
 
 *Mechanism.*  The matching bound knows no nogood.  Every completion `F` of a node with promotions `P` promotes at most
 `|N − P| − 1` members of each nogood `N`; dualizing these inequalities with multipliers `λ_N ≥ 0` gives, for every
@@ -393,7 +395,7 @@ experiment.  "Pilot" refers to section 4.
   nogood's members come from two adjacent frames, so size stands in for glue, and the large nogoods are the useful
   ones (section 3).  Sound (a cache).  Measured: keeping those of ≤ 3 members changes nothing.  Not worth more.
 * *Clause minimization*: already done; a nogood is a minimal subset keeping a frame of the root unwinnable
-  (`Model::nogood`).
+  (`FrameGraph::nogood`).
 * *Restarts with phase saving*: in a branch-and-bound proof with the optimum known the tree is fixed by the bound,
   so a restart only loses work; their use in SAT (escaping heavy tails while looking for a solution) is the
   incumbent-finding phase, which is not where the time goes (section 2).  Not tried.
@@ -443,10 +445,11 @@ experiment.  "Pilot" refers to section 4.
   (more ways to be paid, but more taken), and a sound dominance needs a proof per pair; the symmetric case (two
   candidates with the same neighbourhoods) is rare, since a number's maximal factors determine it (up to those
   missing from the frame).  High cost, unknown payoff; not tried.  A first, cheap look would count pairs with
-  nested neighbourhoods in a frame.  *Piloted later*: [EXPERIMENTS, "Dominance and symmetry"](EXPERIMENTS.md#dominance-and-symmetry-2026-10)
-  (no twins, literal dominance at a few percent of the nodes).
+  nested neighbourhoods in a frame.  *Piloted later*: [EXPERIMENTS, "Dominance and
+  symmetry"](EXPERIMENTS.md#dominance-and-symmetry-2026-10) (no twins, literal dominance at a few percent of the nodes).
 * *Symmetry breaking*: none found here; there are symmetries after all, exchanges of primes that the frame builder
-  treats alike, and breaking them is a constant factor ([the same entry](EXPERIMENTS.md#dominance-and-symmetry-2026-10)).
+  treats alike, and breaking them is a constant factor ([the same
+  entry](EXPERIMENTS.md#dominance-and-symmetry-2026-10)).
 * *Nogood recording on restarts*: subsumed by the existing nogoods.
 
 **From #SAT and model counting**
@@ -504,10 +507,11 @@ the experiment that follows it up.
 The register in [EXPERIMENTS.md](EXPERIMENTS.md#register-of-everything-tried) has a row for each.  A pilot that
 graduates (rank 2 first, once its incremental matching pays) comes to `master` as a tactic, rewritten for it.
 
-To reproduce what is still reproducible (from `rust/`, after `cargo build --release --examples`; `K=results/strict.jsonl`):
+To reproduce what is still reproducible (from `rust/`, after `cargo build --release --examples`;
+`K=results/strict.jsonl`):
 
 ```
-ladder --threads 16 --cores 4 --seed-opt --known $K --tactic revise_freedoms=off 1215    # 16 workers on 4 CPUs
+ladder --threads 16 --cores 4 --seed-opt --known $K 1215    # 16 workers on 4 CPUs
 tools/profile/profile.sh 1232 40 4 /tmp/prof    # the profile of section 2
 ```
 

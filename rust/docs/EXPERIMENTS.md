@@ -1,15 +1,15 @@
-# Experiments: the lab notebook of the solver
+# Experiments: the lab notebook of the frame solver
 
-What was tried, in what order, and what it was worth.  [DESIGN.md](../DESIGN.md) says how the solver works now;
+What was tried, in what order, and what it was worth.  [DESIGN.md](../DESIGN.md) says how the frame solver works now;
 this page is the record of how it got there: a register of every experiment, kept or not, and every round of
 improvements with the measurements that decided it, the ideas that were measured and not kept among them, with their
 numbers.  Entries are dated by month (the whole record so far is from 2026-10 unless a section says otherwise) and
 name the commits that made each step, so `git show COMMIT` finds the code.  Statements are true of the code at the
 time of the entry; where a later entry changed the picture it says so, and DESIGN.md is the authority on the present.
 
-Terms (conflict, nogood, forced member, step, `W`, ...) are defined in the [glossary of the README](../README.md#7-glossary)
-and in DESIGN.md; the measurements were made with the ladder, the probe and `taxman bench`, which DESIGN.md
-("Performance") describes.
+Terms (conflict, nogood, forced member, step, `W`, ...) are defined in the [glossary of the
+README](../README.md#7-glossary) and in DESIGN.md; the measurements were made with the ladder, the probe and
+`taxman bench`, which DESIGN.md ("Performance") describes.
 
 * [Terms changed](#terms-changed-2026-10): the old words of the dated entries, and the words that replaced them.
 * [Register of everything tried](#register-of-everything-tried): one row per experiment, by subject, with where its
@@ -29,6 +29,9 @@ tactic names, data file fields, golden data keys, `results/strict.jsonl`):
 | in the entries | now |
 |---|---|
 | hive, apiary, level (of hives) | frame; the frames that get the same number are merged into one |
+| the types `Hive`, `Apiary`, `FrameColumn` and `FrameColumns`, the modules `hives` and `frames` (two files) | `frames::Frame` (a frame as setup forms it; the search takes it as `model::Frame`), `BoardFrames`, `SearchFrames`; one module, `src/frames/` |
+| `hive_index_of`, `downstream_hives` and `upstream_hives`, `hive_promotion_candidates`, `hive_solution`, `free_factor_count`, `has_free_factors`, `levels_of_free_hives` | `frame_index_of`, `frames_in_front` and `frames_behind`, `promotion_candidates_of`, `solution_of`, `freedoms`, `is_closed`, `numbered_frames` |
+| `model::Model`, `results::Certificate`, `tests/golden_hives.rs` | `model::FrameGraph`, `results::CeilingProof`, `tests/golden_frames.rs` |
 | downstream / upstream, below / above, bottom / top | in front of / behind, front / back (frame 0 is the front) |
 | free factor count, spare factors | freedoms |
 | feasible (a set of promotions) | promotable |
@@ -37,7 +40,7 @@ tactic names, data file fields, golden data keys, `results/strict.jsonl`):
 | core (what a peel cannot drop in a frame) | residual |
 | the evidence crate, `rust/evidence/`, `evidence.sh`; the model-free search, checker, proofs, bound | the prover, `rust/prover/`, `tools/cloud/prover.sh`; the prover's search and proofs; a bound on the whole board |
 | the matching bound of the model-free search, chain relation, prime relation | the Franklín–Moniot bound, the ceiling, the prime formula |
-| the Rust solver, the exact solver | the solver |
+| the Rust solver, the exact solver, the main solver | the frame solver ("the solver" for short; the prover stays the prover) |
 | strict chain, strict runs | the committed chain (the file keeps the name `results/strict.jsonl`) |
 | frontier (the largest n solved in a row, or the hardest games) | the end of the chain, the hardest games |
 | cores (CPU) | CPUs, threads |
@@ -270,7 +273,7 @@ those of the page the row points to; a game is named by its board size, and time
 | `match_refine=0` with the Lagrangian bound | [tactics review](#the-alternatives-that-are-off) | open | the proof of 1215: cycles −12%, nodes +1%; its default needs the bench set and the small games |
 | Support for old file formats: result schemas 1 to 3, the committed schema-1 files, checkpoint compatibility, the golden tests of the Java's tactics | [tactics review](#old-file-formats) | removed | with the tactics: results schemas 1 to 4 (schema 5 only is read), `results/default.jsonl`, checkpoint headers before version 4 and the width widening; the Java's golden data for the frame builder stays |
 | Re-solve 1..1000 and 1001-1300 with no unproven tactic, and the non-primes of 1001-1231 standalone | [results](../results/README.md#what-supports-the-scores) | kept | `strict.jsonl` reproduces all 1000 scores of optimal.json; the 197 standalone searches agree with the chain |
-| The Java's merged-away `Hive` branch (a quirk of using a stale `Hive`) in the frame builder | [`src/hives.rs`](../src/hives.rs) | measured | reached once (n = 114) for 2 ≤ n ≤ 2000, and forcing it off changes no frame |
+| The Java's merged-away branch (`Home::MergedAway`, a quirk of using a stale frame) in the frame builder | [`src/frames/board_frames.rs`](../src/frames/board_frames.rs) | measured | reached once (n = 114) for 2 ≤ n ≤ 2000, and forcing it off changes no frame |
 | The chain's fixed costs a game against n: everything but the search (the board, the earlier game's problem, the search's setup, the moves, the replays, the prime path) | [wall regime](#the-wall-regime-2026-10) | measured | 1.2 s a game at 2200 and 4.9 at 4000 on average (0.38, 2.67 and 8.42 s for a prime, a repeat and a searched game at 4000): 1.1 to 1.6 hours of one thread to 4095, the start's local search 60% of it |
 | The start's local search, singles against pairs (175 games of 1301..2175) | [wall regime](#the-wall-regime-2026-10) | measured | the pairs take 70 to 80 times the singles' time; they raise the start in 16 of 47 exhausted searches, and change nothing at the ceiling (16 of 63 searched games) |
 | The results check against n (`ResultsFile::open`, `verify-results`) | [wall regime](#the-wall-regime-2026-10) | measured (model) | 53 s at 2175 (43 to 48 s measured), 3.5 minutes at 3000, 10 minutes at 4095, on one thread at every start of the solver |
@@ -324,10 +327,11 @@ The work of [the prover](../prover/README.md) and the proofs of [THEORY.md](../.
 
 The strategies (solvent, onetax, maxturn, cascade, continuation), the certificates and the experiments that did not
 pay (a 2-tax rule for OneTax, the fork oracle, trusting certificates as cutoffs, the matroid frame, matching-existence
-as acceptance, bitsets) are in [heuristics/README.md, "Dead ends worth remembering"](../../heuristics/README.md#dead-ends-worth-remembering),
-with what is proven, conjectured and measured in [its ledger](../../heuristics/README.md#the-theory-the-upper-half-is-a-matching-problem)
-and [THEORY.md's table of evidence](../../heuristics/THEORY.md#evidence).  Entries that also bear on the solver
-(the matroid frame, the single-sacrifice route) have their row above.
+as acceptance, bitsets) are in [heuristics/README.md, "Dead ends worth
+remembering"](../../heuristics/README.md#dead-ends-worth-remembering), with what is proven, conjectured and measured in
+[its ledger](../../heuristics/README.md#the-theory-the-upper-half-is-a-matching-problem) and [THEORY.md's table of
+evidence](../../heuristics/THEORY.md#evidence).  Entries that also bear on the solver (the matroid frame, the
+single-sacrifice route) have their row above.
 
 ## Index of rounds
 
@@ -374,19 +378,15 @@ solver and this one").  Its setup had to reproduce the Java's values exactly (th
 `testdata/golden/` is the check) and every final score had to equal optimal.json; the search itself was
 designed for speed from scratch.  One defect of the Java was found and fixed on the way:
 
-* **Upper bound runner-up (a defect of the Java's bound, fixed in the port; `legacy_bound` brings it back)** (`UpperBoundEstimator.getRunnerUp`): when
-  `largestThatFitInFrames` skips candidates because frame 1 or the last frame
-  is at its cap, the Java replaces the failing number with the next candidate
-  below the smallest bid member.  A skipped candidate from the failing
-  number's frame can be larger, so the Java bound can be too low (exhaustive
-  checks find it below the best completion, e.g. at the root of n=114: 358
-  against 360).  Sound version: the heaviest set within the caps that leaves
-  out some bid member at or above the failure, which by matroid exchange is
-  the bid with one member swapped for the best outside candidate the caps
-  allow.  (Simply taking the largest candidate not in the bid is also sound
-  but swaps skipped candidates of a full frame in for members of other frames;
-  it made n=700 take over 10 minutes instead of 18 s.)  (Re-solving n=2..760
-  in Java with the simple fix changed no answers; n=740 timed out.)
+* **Upper bound runner-up (a defect of the Java's bound, fixed in the port; `legacy_bound` brings it back)**
+  (`UpperBoundEstimator.getRunnerUp`): when `largestThatFitInFrames` skips candidates because frame 1 or the last frame
+  is at its cap, the Java replaces the failing number with the next candidate below the smallest bid member.  A skipped
+  candidate from the failing number's frame can be larger, so the Java bound can be too low (exhaustive checks find it
+  below the best completion, e.g. at the root of n=114: 358 against 360).  Sound version: the heaviest set within the
+  caps that leaves out some bid member at or above the failure, which by matroid exchange is the bid with one member
+  swapped for the best outside candidate the caps allow.  (Simply taking the largest candidate not in the bid is also
+  sound but swaps skipped candidates of a full frame in for members of other frames; it made n=700 take over 10 minutes
+  instead of 18 s.)  (Re-solving n=2..760 in Java with the simple fix changed no answers; n=740 timed out.)
 * `Memo.test` computes its value twice — moot, `Memo` is not ported.
 * `TxSet.MAX_VALUE = 1023` — gone; set width is chosen from n.
 
@@ -1026,9 +1026,9 @@ use them).
 *Question.*  Rank 1 of [IDEAS.md](IDEAS.md#1-the-recommended-order): many games pose exactly the search problem of an
 earlier game of the chain (the same frames, candidates, `max_total` and factor graph; only the cap differs), so they
 have its best promotion sum, yet the solver proves it again.  How many, what does it cost, and does concluding them
-from the earlier game hold up?  The pilot ([IDEAS.md 4.1](IDEAS.md#41-memoizing-searches-that-repeat-rank-1)) hashed the root frames, the
-candidates and `max_total` with Rust's `DefaultHasher`; this round makes it a proof kind (commits f5a2af3 and
-1cc4067; DESIGN.md, ["Same search"](../DESIGN.md#same-search), has the argument).
+from the earlier game hold up?  The pilot ([IDEAS.md 4.1](IDEAS.md#41-memoizing-searches-that-repeat-rank-1)) hashed the
+root frames, the candidates and `max_total` with Rust's `DefaultHasher`; this round makes it a proof kind (commits
+f5a2af3 and 1cc4067; DESIGN.md, ["Same search"](../DESIGN.md#same-search), has the argument).
 
 *Method.*  The problem is written out canonically (`search::Problem`, which also records the model's factor lists and
 home frames for every number of the frames) and compared whole; the digest only finds candidates.  The repeats are
@@ -1087,13 +1087,13 @@ again (the verifier caches them by board size), so a schema-4 chain to 1300 will
 
 ## A Lagrangian bound over the nogoods (2026-10)
 
-The question (docs/IDEAS.md, rank 2): the pilot ([IDEAS.md 4.2](IDEAS.md#42-a-lagrangian-bound-over-the-nogoods-rank-2)) folded the nogoods
-into the matching bound by Lagrangian multipliers fitted once at the root, and cut the nodes of proofs by 13 to 67%,
-but it solved the weighted matching from scratch, 7 times slower per node.  Can the bound be kept incrementally,
-cheaply enough to pay in cycles?  Yes, and with the forced members its potentials give it pays far more than the
-pilot's node counts suggested: proofs from 1184 to 1300 take 2 to 6 times fewer cycles, about 3 times, with no trend
-in n.  Kept as the tactic `lagrange`, on by default (commit e6b37d2; DESIGN.md, section 4, "The Lagrangian bound over
-the nogoods", has the design, and `src/matchbound/lagrange.rs` the argument).
+The question (docs/IDEAS.md, rank 2): the pilot ([IDEAS.md 4.2](IDEAS.md#42-a-lagrangian-bound-over-the-nogoods-rank-2))
+folded the nogoods into the matching bound by Lagrangian multipliers fitted once at the root, and cut the nodes of
+proofs by 13 to 67%, but it solved the weighted matching from scratch, 7 times slower per node.  Can the bound be kept
+incrementally, cheaply enough to pay in cycles?  Yes, and with the forced members its potentials give it pays far more
+than the pilot's node counts suggested: proofs from 1184 to 1300 take 2 to 6 times fewer cycles, about 3 times, with no
+trend in n.  Kept as the tactic `lagrange`, on by default (commit e6b37d2; DESIGN.md, section 4, "The Lagrangian bound
+over the nogoods", has the design, and `src/matchbound/lagrange.rs` the argument).
 
 **How it was measured.**  One-thread proof-only searches (`ladder --threads 1 --seed-opt --tactic
 revise_freedoms=off`, the ladder's `--node-limit` for prefixes), whose node counts are exact, and the process's
@@ -1131,9 +1131,9 @@ The node counts are the pilot's (1184: 52,065 against its 54,795), at 30-55% mor
 costs: run without cutting (computed and thrown away, on master's tree; 1215, first million nodes), 604k bounds took
 18.7 → 24.8 G cycles, 10k cycles each, +30% per step; tried only at the checks of nodes, not of children (where 78%
 of its cuts were), 207k bounds took 5.8 G against 6.4 G in the same run (each derived from further up the path, and
-the work for a parent's level repeated for each child); keeping the multipliers of dead nogoods, which needs no weight to rise,
-saved a tenth of it (24.2 G).  A micro-benchmark of the root's expansion loop (`bench_lagrange_1215`, ignored test)
-puts a Lagrangian level at the price of a matching level (3.6-3.7 µs a step against 3.3).  So the second matching
+the work for a parent's level repeated for each child); keeping the multipliers of dead nogoods, which needs no weight
+to rise, saved a tenth of it (24.2 G).  A micro-benchmark of the root's expansion loop (`bench_lagrange_1215`, ignored
+test) puts a Lagrangian level at the price of a matching level (3.6-3.7 µs a step against 3.3).  So the second matching
 costs about what the node's own matching checks cost, twice over (no strong-branching level to reuse, and its own
 optimum, which the search does not branch along): this setting pays only where nodes fall by more than a third.
 
@@ -1295,11 +1295,12 @@ game at the ceiling) and `same_search` (the rest) now prove.
 
 ### `revise_freedoms`: the same trees
 
-Its premise is false for the whole frame game ([n = 833](../prover/README.md#6-does-an-optimal-game-play-the-most-moves),
-`tests/soundness.rs`), and the owner decided to remove it; measuring stopped there.  Measured before that: in every
-one of the 60 searched or repeated games of 1232..1300 it searches the two-frame game (282 to 2,238 nodes, 16 to 27 ms,
-1.2 s for the 60) and lowers frame 0's freedoms by 4 to 6 and `max_total` by 0 to 5, so every problem changes; yet
-seven frontier proofs have the same trees with it on and off, node for node:
+Its premise is false for the whole frame game ([n =
+833](../prover/README.md#6-does-an-optimal-game-play-the-most-moves), `tests/soundness.rs`), and the owner decided to
+remove it; measuring stopped there.  Measured before that: in every one of the 60 searched or repeated games of
+1232..1300 it searches the two-frame game (282 to 2,238 nodes, 16 to 27 ms, 1.2 s for the 60) and lowers frame 0's
+freedoms by 4 to 6 and `max_total` by 0 to 5, so every problem changes; yet seven frontier proofs have the same trees
+with it on and off, node for node:
 
 | proof | nodes, on and off | G cycles, on | G cycles, off |
 |---|---|---|---|
@@ -1377,8 +1378,8 @@ the line's `unproven_tactics_on` and the rules of a game's own taint (`results::
 `tools/check_results.py`) go, with their tests (`strict_turns_off_exactly_the_unproven_tactics`,
 `a_game_made_with_unproven_tactics_on_but_not_used_is_clean`, the `--strict` cases of `tests/cli.rs`,
 `design_grades_the_unproven_tactics_as_the_code_lists_them`), and a taint can then only be inherited from
-`optimal.json` (whose games 1..1000 the Java made with those tactics on, so `--allow-tainted-prev` stays).  Of `SearchTactics` there remain `match_refine`,
-`fix_forced`, `nogoods`, `forget_nogoods` and `lagrange`.
+`optimal.json` (whose games 1..1000 the Java made with those tactics on, so `--allow-tainted-prev` stays).  Of
+`SearchTactics` there remain `match_refine`, `fix_forced`, `nogoods`, `forget_nogoods` and `lagrange`.
 
 ### What each removal deletes
 
@@ -1578,10 +1579,11 @@ conflict's smallest member (0.45 of those a step), the very level strong branchi
 
 `sample` lists the several addresses of a leaf on one line and the attribution symbolicates only the first, which is
 right to the function but coarse below it (`attribute.py` says so).  For the picture by source line the proof of
-1215 was recorded, after the first change below, with Instruments' Time Profiler (`xcrun xctrace record --template 'Time Profiler' --launch --
-...`, every sample with its own address), which agrees on the kinds (the matching's searches 31.9%, the Lagrangian
-levels' 19.0%, peels 18.4%) and shows the Hungarian search's edges at about 20 instructions when an edge is skipped
-and 45 when it pushes an event, at about 3.3 instructions a cycle.
+1215 was recorded, after the first change below, with Instruments' Time Profiler
+(`xcrun xctrace record --template 'Time Profiler' --launch -- ...`, every sample with its own address), which agrees on
+the kinds (the matching's searches 31.9%, the Lagrangian levels' 19.0%, peels 18.4%) and shows the Hungarian search's
+edges at about 20 instructions when an edge is skipped and 45 when it pushes an event, at about 3.3 instructions a
+cycle.
 
 **Changes kept.**  Cumulative, all builds measured together (k cycles a step in the probe's windows, the defaults and
 `lagrange=off`; G cycles of the proof of 1250):
@@ -1626,8 +1628,8 @@ before and after (G cycles, nodes unchanged): 936 1.22 → 1.11 (−9.1%), 1050 
 2,122 steps, is mostly setup: +2.3% cycles, −1.7% instructions.)  The strict chain 1201-1231 on one thread (`taxman
 solve 1201-1231 --strict --allow-tainted-prev`, from optimal.json's 1200): 1092.0 G cycles (345 s) before, 1003.2 G
 (315 s) after, −8.1% (instructions −14.0%), every game's nodes the same; `taxman regress --to 600 --strict` −1%.
-1254 as the chain runs it on two threads, profiled again: 21.4 s against 25.3 s.  A step of the window of 1215 now costs 22.0k cycles with the Lagrangian bound and
-14.6k without.
+1254 as the chain runs it on two threads, profiled again: 21.4 s against 25.3 s.  A step of the window of 1215 now costs
+22.0k cycles with the Lagrangian bound and 14.6k without.
 
 Where the time goes now (the proof of 1215, one thread, by Instruments): the matching's searches 32.6%, the
 Lagrangian levels' 19.2%, peels 18.9%, the node's own work 9.7%, the nogood table 3.7%, refits 3.2%, bounds from the
@@ -1945,16 +1947,16 @@ parities make two matroids on `2..=n`, and `opt(n)` is at most their heaviest co
 Franklín–Moniot matching bound is this construction with Hall's condition in place of linear independence.
 
 *Method.*  No solver code changed.  The data were made on the build of 4372b36, before the tactics cleanup
-(271c817), with `revise_freedoms` off; on the cleaned-up build the examples reproduce `roots.jsonl` exactly, and every command's
-values that were checked.  `examples/common/meet.rs` (commits 67bb492, 8ee0199, 12a0f60): direct sums of
-linear matroids over GF(2), the weighted intersection by shortest augmenting paths (Lawler; Schrijver, Theorem
-41.7: Bellman–Ford lexicographic in length and arcs; the reference `intersect`), a fast form for blocks of rank at
-most 64 (`intersect_fast`: rows by pivot with slot masks, the arcs from or to an element independent of the set
-relaxed through one minimum, a start from the heaviest uncontended elements), warm starts checked extreme
-(`intersect_warm`) and the weight split (`split`).  `examples/matroid.rs` builds the frame matroids of any state
-and runs the measurements; `bench/matroid/` holds the data and `matroid.py`, which makes the tables below
-(`matroid_output.md`).  The commands (all `cargo run --release --example matroid --`, one thread, at most two
-processes, on the laptop shared with other agents, so the times are indicative):
+(271c817), with `revise_freedoms` off; on the cleaned-up build the examples reproduce `roots.jsonl` exactly, and every
+command's values that were checked.  `examples/common/meet.rs` (commits 67bb492, 8ee0199, 12a0f60): direct sums of
+linear matroids over GF(2), the weighted intersection by shortest augmenting paths (Lawler; Schrijver, Theorem 41.7:
+Bellman–Ford lexicographic in length and arcs; the reference `intersect`), a fast form for blocks of rank at most 64
+(`intersect_fast`: rows by pivot with slot masks, the arcs from or to an element independent of the set relaxed through
+one minimum, a start from the heaviest uncontended elements), warm starts checked extreme (`intersect_warm`) and the
+weight split (`split`).  `examples/matroid.rs` builds the frame matroids of any state and runs the measurements;
+`bench/matroid/` holds the data and `matroid.py`, which makes the tables below (`matroid_output.md`).  The commands (all
+`cargo run --release --example matroid --`, one thread, at most two processes, on the laptop shared with other agents,
+so the times are indicative):
 
 * `roots --opts bench/curve/slope_roots.jsonl 880-1310 1350-1352` (`roots.jsonl`; the matching and Lagrangian bounds
   are those of the slope study's `slope_roots.jsonl`, whose Lagrangian is fitted with up to 8,000 steps over the
@@ -2877,11 +2879,12 @@ set is independent in two linear matroids over GF(2), split by the parity of Ω.
 from its mathematics (no code shared with the solver or the study) and proven there as a theorem, does it carry the
 model-free proofs to the end of the committed chain, 1300?  What does a proof cost, and how fast does that grow?
 
-*The theorem.*  THEORY.md, [the parity matroids](../../heuristics/THEORY.md#the-parity-matroids-a-bound-on-the-whole-game)
-(Theorem 10): a playable set's vectors of maximal factors, with the unit vectors of its own members up to n/2, are
-linearly independent (from a legal order and Theorem 1's lifting argument; for the upper half it is Theorem 7's
-lemma), and each vector lies in the coordinates of one parity of Ω, so every playable set is independent in both
-parity matroids; at a node of a search, with the forced picks contracted and the barred numbers deleted.
+*The theorem.*  THEORY.md, [the parity
+matroids](../../heuristics/THEORY.md#the-parity-matroids-a-bound-on-the-whole-game) (Theorem 10): a playable set's
+vectors of maximal factors, with the unit vectors of its own members up to n/2, are linearly independent (from a legal
+order and Theorem 1's lifting argument; for the upper half it is Theorem 7's lemma), and each vector lies in the
+coordinates of one parity of Ω, so every playable set is independent in both parity matroids; at a node of a search,
+with the forced picks contracted and the barred numbers deleted.
 
 *Method.*  `src/parity.rs` (commits ff714b3, 7efc38b, 44803b6): the two matroids from the board alone, an echelon basis
 over GF(2) kept in reduced form whose rows carry the members they sum (a circuit costs one row per coordinate of a
@@ -2947,8 +2950,8 @@ resumed them anyway, so the old searches are part of the proofs (`"matching_node
 *Conclusion.*  The parity matroids' bound, proven as THEORY.md's Theorem 10 and reimplemented independently with a
 certificate checked on every value, carries the model-free proofs of opt(n) from 989 to the end of the committed
 chain: the frame model's answer is the true optimum for every game n ≤ 1300, each proven twice (to 989 by each bound,
-from 990 by a resumed and a fresh search), at about a thousandth of the matching bound's nodes where both ran.  Its cost grows
-×1.7 per 100 in n, so the reach is limited by the recorded optima, not by the laptop.
+from 990 by a resumed and a fresh search), at about a thousandth of the matching bound's nodes where both ran.  Its cost
+grows ×1.7 per 100 in n, so the reach is limited by the recorded optima, not by the laptop.
 
 ## The anatomy of the gap (2026-10)
 
@@ -3485,12 +3488,11 @@ cap); per game the default's nodes and G cycles, and each variant's nodes and cy
    spot, $8.35/h on-demand; a game at n costing the mean of 1301-2175 (6.27 s on 2 threads, at 1738) times
    10^(slope × (n − 1738)), summed from 2176:
 
-   | slope | to 3000, 192 cores | to 4095, this machine's 2 threads | to 4095, 192 cores | a day on 192 cores ($80 spot) reaches | a week ($559) |
-   |---|---|---|---|---|---|
-   | the fit over 1301-2175 (none) | 1-2 minutes | 2.3 hours | 2-3 minutes | 4095 | 4095 |
-   | the fit + 2 s.e. (×10 per 1,878 n) | 3-6 minutes | 23 hours | 16-32 minutes | 4095 | 4095 |
-   | the gap model (×10 per 1,350 n) | 5-9 minutes | 55 hours | 38-77 minutes | 4095 | 4095 |
-   | the 146 proofs' slope, 880-1352 (×10 per 413 n) | 4-8 hours | 18 years | 77-154 days | 3191-3315 | 3540-3664 |
+   | slope | to 3000, 192 cores | to 4095, this machine's 2 threads | to 4095, 192 cores | a day on 192 cores ($80 spot)
+   reaches | a week ($559) | |---|---|---|---|---|---| | the fit over 1301-2175 (none) | 1-2 minutes | 2.3 hours | 2-3
+   minutes | 4095 | 4095 | | the fit + 2 s.e. (×10 per 1,878 n) | 3-6 minutes | 23 hours | 16-32 minutes | 4095 | 4095 |
+   | the gap model (×10 per 1,350 n) | 5-9 minutes | 55 hours | 38-77 minutes | 4095 | 4095 | | the 146 proofs' slope,
+   880-1352 (×10 per 413 n) | 4-8 hours | 18 years | 77-154 days | 3191-3315 | 3540-3664 |
 
    In words: with the GF(2) bound the chain is not a question of a large machine's time up to the largest board the
    set widths cover (4095; beyond it is a code change, a wider set).  A day on 192 cores takes it there at every slope
@@ -3565,7 +3567,8 @@ What it agrees with:
 * The chain from `optimal.json`'s game of 1300 of the previous entry (`bench/gf2/chain.jsonl`, build 716ebd9, 2
   threads) in 1301..2175: every score, proof kind and method, and every move list but 1560-1563 (an exchange of five
   numbers of the sum 3008).  Both used the GF(2) bound, so this is a second run of the same search, not a check of the
-  bound; the model-free check of 1301..2175 (`rust/evidence`) is pending ([prepared](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10), not run).
+  bound; the model-free check of 1301..2175 (`rust/evidence`) is pending
+  ([prepared](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10), not run).
 * `optimal.json` in 1..1300 (`optimal_match` true).  It still ends at 1300 and was not extended (the lines of
   1301..2175 say `optimal_match` null); `taxman extend-optimal results/strict.jsonl` would add 875 games.
 
@@ -3576,18 +3579,18 @@ describes the present file.
 
 ## The model-free proofs of 1301-2175: cost and the cloud run (2026-10)
 
-*Question.*  The committed chain now reaches 2175, and the model-free proofs of [prover 3](../prover/README.md#3-the-proofs-of-optn)
-stop at 1300 (the entry above says the check of 1301..2175 is pending).  What does it cost, can `exact` use the many
-cores of a cloud machine, and how should it be run?  Measured on the M1 Max (10 cores, other jobs running throughout),
-with `exact` as it is: no proving code was changed.
+*Question.*  The committed chain now reaches 2175, and the model-free proofs of [prover
+3](../prover/README.md#3-the-proofs-of-optn) stop at 1300 (the entry above says the check of 1301..2175 is pending).
+What does it cost, can `exact` use the many cores of a cloud machine, and how should it be run?  Measured on the M1 Max
+(10 cores, other jobs running throughout), with `exact` as it is: no proving code was changed.
 
 *How `exact` uses threads (from the code, then measured).*  One game per thread: `campaign` (`evidence/src/jsonl.rs`)
 gives the games of a range to its workers through an atomic counter, each worker runs one game's search alone (a
 `Prover` is one thread), and a finished game is appended and synced as one line.  `--seconds` is a pause deadline for
 every search in flight and the end of new work; the paused searches write `exact_N.ckpt` (target, nodes, seconds,
-nogoods, open units; temp file, `fsync`, rename) and a rerun resumes them.  Checkpoints are written only at the pause and
-there is no signal handler, so a SIGTERM or a kill loses the pass in progress.  The same 12 games (1302-1364, 275,105
-nodes in all) at 1, 2, 4 and 8 threads, longest first:
+nogoods, open units; temp file, `fsync`, rename) and a rerun resumes them.  Checkpoints are written only at the pause
+and there is no signal handler, so a SIGTERM or a kill loses the pass in progress.  The same 12 games (1302-1364,
+275,105 nodes in all) at 1, 2, 4 and 8 threads, longest first:
 
 | threads | wall s | user s | speedup | user ms a node | longest game s |
 |---|---|---|---|---|---|
@@ -3597,9 +3600,9 @@ nodes in all) at 1, 2, 4 and 8 threads, longest first:
 | 8 | 151 | 675 | 4.00 | 2.46 | 151 |
 
 The node counts are identical at every thread count (no sharing between games); the user time per node rises 12 % at 8
-threads on a busy machine; the 8-thread wall time is the longest game's, not the threads'.  Pausing does not change a tree:
-the same games stopped every 20-25 s (and by SIGTERM) and resumed took exactly the node counts of an uninterrupted run
-(1316: 12,567; 1320: 62,784; and the rest of the 13 searches of 1301-1320, in `evidence.sh` runs on macOS and in the
+threads on a busy machine; the 8-thread wall time is the longest game's, not the threads'.  Pausing does not change a
+tree: the same games stopped every 20-25 s (and by SIGTERM) and resumed took exactly the node counts of an uninterrupted
+run (1316: 12,567; 1320: 62,784; and the rest of the 13 searches of 1301-1320, in `evidence.sh` runs on macOS and in the
 Linux image).
 
 *The cost of the proofs of 1301..2175.*  (a) *The root's parity gap does not predict it.*  Over 900-1300 a proof's
@@ -3619,8 +3622,8 @@ the 34 games finished, `exact`'s nodes over those are 0.13 to 13:
 to the end are 1521: 0.66, 1612: 1.7, 1803: 3.1, 1805: 2.1, 1975: 5.4.)  Five dear games were stopped unfinished:
 1430 (2.19 million nodes so far, the solver's search 1.61 million), 1472 (1.83, 1.35), 1475 (1.73, 1.92), 2052
 (1.15, 0.21) and 2170 (1.25, 1.25), after 1 to 1.6 hours each of a thread on the busy machine.  The first estimate,
-from the 20 games of 1302-1576 alone (ratio 0.95, 61 thread-hours), was low by 2.3 times: the ratio grows with n.  490 of
-the 875 games need a search; with the fit (and the order `summarize.py order`, which weights the solver's nodes by
+from the 20 games of 1302-1576 alone (ratio 0.95, 61 thread-hours), was low by 2.3 times: the ratio grows with n.  490
+of the 875 games need a search; with the fit (and the order `summarize.py order`, which weights the solver's nodes by
 10^((n - 1300)/1000)) the model gives, at 2.5 ms a node (the committed proofs of 1..1300 cost 1.2 to 1.7 ms on two quiet
 threads, 1.73 at 1200-1300; this sample 2.2 to 2.5 user time; no clean measure above 1500):
 
@@ -3699,8 +3702,8 @@ the prover on 990 at K = 64: c7g 1.002 (1.010), c8g 0.996 (0.998).  There is non
 its own L2, and the working sets (28 MB resident for a solver, 25 MB for a prover) are small.  So 64 games a
 machine is 64 times one game, which is how the prover runs (`exact` gives each thread a game).
 
-*Thread scaling* of the proof of 2172 (`--seed-opt`, search seconds; speedup over one thread; effective parallelism of the
-engine 99.9, 99.6 to 99.7 and 98.1 % at 4, 16 and 64 threads on both):
+*Thread scaling* of the proof of 2172 (`--seed-opt`, search seconds; speedup over one thread; effective parallelism of
+the engine 99.9, 99.6 to 99.7 and 98.1 % at 4, 16 and 64 threads on both):
 
 | threads | c7g s | nodes | speedup | c8g s | nodes | speedup |
 |---|---|---|---|---|---|---|
@@ -3740,24 +3743,24 @@ is so slow there was not looked into.  The laptop's rate past 2175 was not measu
 games an hour.
 
 *Cost.*  Instance-hours from launch to the terminate call, at the spot price of the hour (it did not move): c7g 0.594
-h, $0.37; c8g 0.775 h, $0.53; the c9g 0.078 h, $0.06; **$0.96 in all**, no volume, address or spot request left.  A core-hour of work costs, in M1
-Max performance-core-hours at the 16xlarge spot prices, $0.0118 (solver) and $0.0114 (prover) on c8g and $0.0139 and
-$0.0130 on c7g: Graviton4 is 12 to 15% cheaper a unit of work, and for the chain 1.7 times as fast a game at 1.09
-times the price.  A proof of 2172 on one core costs $0.002 on c8g; 1000 chain games at this stage cost $1.6 at 64
-threads and take 2.3 to 2.5 hours.
+h, $0.37; c8g 0.775 h, $0.53; the c9g 0.078 h, $0.06; **$0.96 in all**, no volume, address or spot request left.  A
+core-hour of work costs, in M1 Max performance-core-hours at the 16xlarge spot prices, $0.0118 (solver) and $0.0114
+(prover) on c8g and $0.0139 and $0.0130 on c7g: Graviton4 is 12 to 15% cheaper a unit of work, and for the chain 1.7
+times as fast a game at 1.09 times the price.  A proof of 2172 on one core costs $0.002 on c8g; 1000 chain games at this
+stage cost $1.6 at 64 threads and take 2.3 to 2.5 hours.
 
 *Which instance.*  (a) The prover over 1301..2175: the work is about 150 thread-hours on c8g (the entry above gives
-142 at its 2.5 ms a node, on the M1 Max; divided by the prover's speed of 0.93), but the wall time is the dearest game's,
-about 12 hours on c8g (10.9 on the M1 Max; 14.6 on c7g), from 16 threads up.  So rent 16 vCPUs, not 64: **c8g.4xlarge
-on spot** ($0.24 to $0.31 an hour in us-east-1b, a, c and d on 2026-10-14; $3 to $4 for the 12 hours); a c8g.16xlarge
-would cost $8 for the same 12 hours with 48 vCPUs idle after the first, and a c7g.4xlarge ($0.20 to $0.25) the same
-as the c8g for a run 2.6 hours longer.  The prices of the smaller sizes were read, not run: a vCPU is a core, so the
-figures above carry over.  (b) The solver's chain: **c8g.16xlarge on spot** ($0.68 an hour), 64 threads: a proof scales
-to 58 times at 64 threads, 98% effective, and the instance makes 430 to 470 games an hour at the present difficulty,
-$0.0016 a game.  Beyond 64 threads nothing is measured, and the fixed 0.6 s a game and the ramp-up of short searches
-will cost: the average game here is 7.6 s at 64 threads, so a c8g.48xlarge ($2.0 to $2.5 an hour) would have to make 3
-to 3.7 times the games to pay.  Graviton5 would have to be 12% faster a core than Graviton4 to pay at the c9g.16xlarge's
-$0.76 to $0.79; it is the one thing a repeat of the calibration (about $0.5) should add.
+142 at its 2.5 ms a node, on the M1 Max; divided by the prover's speed of 0.93), but the wall time is the dearest
+game's, about 12 hours on c8g (10.9 on the M1 Max; 14.6 on c7g), from 16 threads up.  So rent 16 vCPUs, not 64:
+**c8g.4xlarge on spot** ($0.24 to $0.31 an hour in us-east-1b, a, c and d on 2026-10-14; $3 to $4 for the 12 hours); a
+c8g.16xlarge would cost $8 for the same 12 hours with 48 vCPUs idle after the first, and a c7g.4xlarge ($0.20 to $0.25)
+the same as the c8g for a run 2.6 hours longer.  The prices of the smaller sizes were read, not run: a vCPU is a core,
+so the figures above carry over.  (b) The solver's chain: **c8g.16xlarge on spot** ($0.68 an hour), 64 threads: a proof
+scales to 58 times at 64 threads, 98% effective, and the instance makes 430 to 470 games an hour at the present
+difficulty, $0.0016 a game.  Beyond 64 threads nothing is measured, and the fixed 0.6 s a game and the ramp-up of short
+searches will cost: the average game here is 7.6 s at 64 threads, so a c8g.48xlarge ($2.0 to $2.5 an hour) would have to
+make 3 to 3.7 times the games to pay.  Graviton5 would have to be 12% faster a core than Graviton4 to pay at the
+c9g.16xlarge's $0.76 to $0.79; it is the one thing a repeat of the calibration (about $0.5) should add.
 
 ## The inner loop of the GF(2) search (2026-10)
 
@@ -3933,16 +3936,17 @@ n the searches are shorter, and the chain's throughput on many threads is decide
 short searches, until the wall, where trees are large again.  What matters, in order:
 
 1. *The serial time of a game* (0.6 s at 2126 on one core, growing with n: the frames take 0.017 s at 1300 and 0.12
-   s at 2126; the move list, the local search) against a search that is now often a second or two on 64 threads: a chain on 64 threads spent 43 s of
-   900 on start-up and about 0.6 s a game outside the search.  Changes: (a) pipeline the chain: game n + 1's setup
-   (frames, problem, repeat lookup) needs only n's promotions and score, so it can run while n's move list is built
-   and checked, and n + 1's search can start with n's incumbent as its seed while n's proof is still running, the
-   ceiling installed when n's score is proven (the ceiling only stops a search; a result whose proof uses it records
-   that it assumes n, as `assumes` does now); (b) make the parts cheaper: the move list from the promotions (45%) is
-   built from scratch each game, and the local search can stop at once when the seed reaches the ceiling; (c) skip
-   the start-up's rebuilding of every repeat's search problem (a digest check, or check only the games the run will
-   use).  Several consecutive games at once, each with the provisional n − 1 as its seed, are the general form of (a);
-   the results' provenance rules hold if a game's proof is recorded only after the games it rests on are proven.
+   s at 2126; the move list, the local search) against a search that is now often a second or two on 64 threads: a chain
+   on 64 threads spent 43 s of 900 on start-up and about 0.6 s a game outside the search.  Changes: (a) pipeline the
+   chain: game n + 1's setup (frames, problem, repeat lookup) needs only n's promotions and score, so it can run while
+   n's move list is built and checked, and n + 1's search can start with n's incumbent as its seed while n's proof is
+   still running, the ceiling installed when n's score is proven (the ceiling only stops a search; a result whose proof
+   uses it records that it assumes n, as `assumes` does now); (b) make the parts cheaper: the move list from the
+   promotions (45%) is built from scratch each game, and the local search can stop at once when the seed reaches the
+   ceiling; (c) skip the start-up's rebuilding of every repeat's search problem (a digest check, or check only the games
+   the run will use).  Several consecutive games at once, each with the provisional n − 1 as its seed, are the general
+   form of (a); the results' provenance rules hold if a game's proof is recorded only after the games it rests on are
+   proven.
 2. *Short searches on many threads*: the ramp-up (all threads busy within milliseconds on the matching path; to be
    measured on GF(2) trees, whose unit restarts are dearer: a unit's level is solved from the uncontended prefix) and
    the end of a search, where threads idle while the last subtrees finish.  Changes: start a game's search on fewer
@@ -3965,14 +3969,14 @@ minutes at 64 threads; the fixed time profiled at 2200; the engine's counters).
 
 ## The wall regime (2026-10)
 
-*Question.*  The committed chain reaches 2175 with costs that barely grow, and the set widths stop at n = 4095.  Near the
-wall trees will be large and n larger.  What grows with n, and with the size of a tree, apart from parallel scaling
+*Question.*  The committed chain reaches 2175 with costs that barely grow, and the set widths stop at n = 4095.  Near
+the wall trees will be large and n larger.  What grows with n, and with the size of a tree, apart from parallel scaling
 (another study's): the cost of a node and where it goes, the root's bound and gap, memory, the nogood tables, the deque
 and checkpoints, the chain's fixed costs per game, the set widths and what lies beyond 4095, the checkpoints and the S3
 saves of a cloud run?  And what should change first?  Measured on the M1 Max (one process at a time, `nice -n 10`, one
 thread unless said, other jobs running at load 4 to 5), with no change to the solver: `examples/wall.rs` (commits
-49c7917 and dddc5fd) measures, and [bench/wall/](../bench/wall/README.md) has the data, the commands, `wall.py` with
-its tables (`wall_output.md`) and the commands for a cloud machine.
+49c7917 and dddc5fd) measures, and [bench/wall/](../bench/wall/README.md) has the data, the commands, `wall.py` with its
+tables (`wall_output.md`) and the commands for a cloud machine.
 
 *What was built.*  `examples/wall.rs`, five commands: `setup` (the fixed costs of a game piece by piece, the sizes, the
 root's GF(2) bound and its gap, at any set width), `start` (the starting incumbent's local search, singles against
@@ -4591,18 +4595,18 @@ jobs keeping the load at 3 to 6, so a few per cent of noise); the many-thread me
 
 1. *A control on an engine run* (00d4b68; suspension in 3815e82).  `engine::Control`, attached with
    `EngineConfig::control`, steers a run from another thread: a ceiling, given before or while it runs, ends the run
-   once the incumbent reaches it (an offer stores the incumbent and then loads the ceiling, and giving the ceiling stores
-   it and then loads the incumbent, all `SeqCst`, so one of them sees the other); incumbents offered from outside; a stop
-   like a limit's; and the number of workers, which the coordinator raises by starting workers and lowers by retiring
-   workers that hold no unit (a running one beyond the number hands all its units to the deque at its next poll), down
-   to 0, which suspends the run with every unit in its deque.  A control remembers what it is told, so a request made
-   before the run applies when it starts.  Without a control a run is unchanged.  The counters (per invocation, not in
-   checkpoints): the capacity (the workers' lifetimes, wall × threads when their number is fixed, which `share` and
-   the effective parallelism divide by), the most workers alive, those added and retired, the idle time of the ramp
-   (before all first ran at once) and of the tail (after the last moment a worker finished a unit while all ran), and
-   the units' starts: from a unit's start to its first poll (the searcher's rebuild) and from its first poll to its
-   second (its first node, the GF(2) bound solved from scratch), found by one test of a byte in `poll`.  The progress
-   line shows ramp, tail, rebuild and first.
+   once the incumbent reaches it (an offer stores the incumbent and then loads the ceiling, and giving the ceiling
+   stores it and then loads the incumbent, all `SeqCst`, so one of them sees the other); incumbents offered from
+   outside; a stop like a limit's; and the number of workers, which the coordinator raises by starting workers and
+   lowers by retiring workers that hold no unit (a running one beyond the number hands all its units to the deque at its
+   next poll), down to 0, which suspends the run with every unit in its deque.  A control remembers what it is told, so
+   a request made before the run applies when it starts.  Without a control a run is unchanged.  The counters (per
+   invocation, not in checkpoints): the capacity (the workers' lifetimes, wall × threads when their number is fixed,
+   which `share` and the effective parallelism divide by), the most workers alive, those added and retired, the idle
+   time of the ramp (before all first ran at once) and of the tail (after the last moment a worker finished a unit while
+   all ran), and the units' starts: from a unit's start to its first poll (the searcher's rebuild) and from its first
+   poll to its second (its first node, the GF(2) bound solved from scratch), found by one test of a byte in `poll`.  The
+   progress line shows ramp, tail, rebuild and first.
 2. *The search through the control* (9ca2c13, and in 8462d2c).  The ceiling is the engine's: `SearchSpace::cap` and the
    searcher's check went, and `search` gives its cap to its control, so a ceiling can come while the search runs.  The
    start (greedy set and seed, dive, local search) is offered to the control as it is made, so whoever steers the

@@ -2,7 +2,7 @@
 //! built on, plus the sieve and divisor lists they come from.
 //!
 //! Where this fits: the first step of every game.  `solver` builds one [`Tables`] for the board size; the frames
-//! as setup forms them ([`crate::hives`]) read the maximal-factor and maximal-composite lists to decide which number
+//! as setup forms them ([`crate::frames`]) read the maximal-factor and maximal-composite lists to decide which number
 //! can pay for which move, and the search's factor provider ([`crate::model`]) is built from the same lists.
 //!
 //! # Maximal factors and composites
@@ -109,7 +109,7 @@ impl Tables {
     /// ([`crate::sacrifice`]) builds punctured boards; the solver never does.
     ///
     /// A hole is never in the pot, so it is never a move and never pays tax.  The lists stay arithmetic (they
-    /// still mention the holes): the frames ([`crate::hives::Apiary`]) leave the holes out, and the search only
+    /// still mention the holes): the frames ([`crate::frames::BoardFrames`]) leave the holes out, and the search only
     /// ever looks at the numbers of its frames.  A number whose maximal factor is a hole does *not* pay with the
     /// hole's own divisors instead (the lifting argument above fails), so on a punctured board the frame model
     /// plays the *maximal-factor rule*, which is stricter than the rules of the game there

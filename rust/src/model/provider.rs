@@ -3,7 +3,7 @@
 //!
 //! A move `m` is paid for by one of its *maximal factors* `m/p` (`p` a prime dividing `m`), and a number `y` can
 //! pay for its *maximal composites* `y·p`.  Within a frame set, a number can only pay for a move of the frame its
-//! factors are in, so [`Model::build`](super::Model::build) keeps only the pairs whose roles can meet: `y` a
+//! factors are in, so [`FrameGraph::build`](super::FrameGraph::build) keeps only the pairs whose roles can meet: `y` a
 //! factor of frame `i`, `x` a move of frame `i` or a factor of frame `i + 1` (promoted into frame `i`).  That keeps
 //! every live neighbour a peel or a reduction can see and drops the rest.  Numbers are stored as `u16`, which
 //! bounds boards at 65535 (the solver stops at 4095).

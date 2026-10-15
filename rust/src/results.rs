@@ -246,7 +246,7 @@ pub struct StoredGame {
     pub proof: Proof,
     pub assumes: Assumptions,
     /// Which theorem the score reaches, given the game of `n − 1` (if the file or `optimal.json` has it).
-    pub certificate: Option<Certificate>,
+    pub ceiling_proof: Option<CeilingProof>,
     /// For a game that set a search up (searched or repeat), the size of its search problem as the line records it
     /// (`setup.frames`, `setup.candidates`, `setup.max_total`), which the problem set up again from its board size
     /// ([`search_problem`]) must have.
@@ -255,31 +255,32 @@ pub struct StoredGame {
     pub digest: Option<u64>,
 }
 
-/// A score that equals a proven ceiling, given that the game of `n − 1` is optimal: this certifies the game
+/// A score that equals a proven ceiling, given that the game of `n − 1` is optimal: this proves the game optimal
 /// whatever found it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Certificate {
+pub enum CeilingProof {
     /// `score(n) = n + score(n − 1)`, the ceiling `opt(n) ≤ n + opt(n − 1)`.
     NPlusPrev,
-    /// A prime `n` with `score(n) = n + score(n − 1) − P`, `P` the largest prime below `n` (proof at `accelerate::prime_shortcut`).
+    /// A prime `n` with `score(n) = n + score(n − 1) − P`, `P` the largest prime below `n` (proof at
+    /// `accelerate::prime_shortcut`).
     PrimeFormula,
 }
 
-impl Certificate {
+impl CeilingProof {
     pub fn as_str(self) -> &'static str {
         match self {
-            Certificate::NPlusPrev => "n + score(n-1)",
-            Certificate::PrimeFormula => "prime formula",
+            CeilingProof::NPlusPrev => "n + score(n-1)",
+            CeilingProof::PrimeFormula => "prime formula",
         }
     }
 
     /// The ceiling that a game of `n` scoring `score` reaches, given that the game of `n − 1` scores `before`.
-    pub fn of(n: u32, score: u64, before: u64) -> Option<Certificate> {
+    pub fn of(n: u32, score: u64, before: u64) -> Option<CeilingProof> {
         let ceiling = before + u64::from(n);
         if score == ceiling {
-            Some(Certificate::NPlusPrev)
+            Some(CeilingProof::NPlusPrev)
         } else if largest_prime_at_most(n) == Some(n) && score + replaced_by_prime(n) == ceiling {
-            Some(Certificate::PrimeFormula)
+            Some(CeilingProof::PrimeFormula)
         } else {
             None
         }
@@ -882,7 +883,7 @@ fn check_entry(
     if *recorded_assumes != assumes {
         return Err(fail(format!("it records the assumptions {recorded_assumes:?}, but they are {assumes:?}")));
     }
-    let certificate = prev_score.and_then(|before| Certificate::of(n, e.score, before));
+    let ceiling_proof = prev_score.and_then(|before| CeilingProof::of(n, e.score, before));
     Ok(StoredGame {
         n,
         line: e.line,
@@ -891,7 +892,7 @@ fn check_entry(
         promotions: e.promotions,
         proof,
         assumes,
-        certificate,
+        ceiling_proof,
         size: e.setup.map(|s| s.size),
         digest: e.setup.map(|s| s.digest),
     })
@@ -974,7 +975,7 @@ impl ResultsFile {
                     promotions: result.promotions.clone(),
                     proof,
                     assumes: result.assumes.clone(),
-                    certificate: result.prev.as_ref().and_then(|p| Certificate::of(result.n, result.score, p.score)),
+                    ceiling_proof: result.prev.as_ref().and_then(|p| CeilingProof::of(result.n, result.score, p.score)),
                     size: result.setup.map(|s| s.size()),
                     digest: result.setup.map(|s| s.digest),
                 };
@@ -1112,8 +1113,8 @@ impl fmt::Display for FileReport {
         for (statement, count) in by {
             write!(f, "; {count} {} that {statement}", if count == 1 { "assumes" } else { "assume" })?;
         }
-        let certificates = counts(games.values().filter_map(|g| g.certificate), |c| c.as_str().to_owned());
-        write!(f, "\n  scores at a proven ceiling, given the game of n-1: {certificates}")
+        let ceiling_proofs = counts(games.values().filter_map(|g| g.ceiling_proof), |c| c.as_str().to_owned());
+        write!(f, "\n  scores at a proven ceiling, given the game of n-1: {ceiling_proofs}")
     }
 }
 
@@ -1260,7 +1261,7 @@ mod tests {
         assert_eq!(contents.games.keys().copied().collect::<Vec<_>>(), (1..=12).collect::<Vec<_>>());
         assert!(!contents.torn && contents.incomplete_lines == 0 && contents.lines == 12);
         assert_eq!(contents.games[&11].proof, Proof::PrimeFormula);
-        assert_eq!(contents.games[&11].certificate, Some(Certificate::PrimeFormula));
+        assert_eq!(contents.games[&11].ceiling_proof, Some(CeilingProof::PrimeFormula));
         assert_eq!(contents.games[&10].proof, Proof::Trivial);
     }
 

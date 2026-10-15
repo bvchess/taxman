@@ -20,7 +20,7 @@ use taxman::board::Board;
 use taxman::engine::EngineConfig;
 use taxman::frames::build_frames;
 use taxman::matchbound::{match_bound, MatchBound, MatchGraph};
-use taxman::model::{Model, Scratch, MAX_FRAMES};
+use taxman::model::{FrameGraph, Scratch, MAX_FRAMES};
 use taxman::numtheory::Tables;
 use taxman::sacrifice::{sacrifice_bound, PuncturedOptions};
 use taxman::search::{SearchTactics, TaxUnit};
@@ -205,7 +205,7 @@ fn a_board_past_2047_builds_bounds_and_searches_at_w64() {
     let n = 2050;
     let tables = Tables::new(n);
     let frames = build_frames::<64>(&tables);
-    let (model, root) = Model::build::<64>(&tables, &frames.columns()).unwrap();
+    let (model, root) = FrameGraph::build::<64>(&tables, &frames.columns()).unwrap();
     assert!(frames.candidates.len() > 500);
     assert!(frames.frames.iter().any(|f| (f.moves | f.factors).max().is_some_and(|m| m > 2047)));
 
@@ -311,7 +311,7 @@ fn a_w20_search_interrupted_and_resumed_gives_the_same_answer() {
 // ---------------------------------------------------------------------------------------------------------
 // Promoting on wide boards
 
-/// Promoting one number at a time (`Model::promote`, which skips the peel when the move has a factor no move of
+/// Promoting one number at a time (`FrameGraph::promote`, which skips the peel when the move has a factor no move of
 /// the frame in front of it uses) leaves the same state, and fails in the same places, as promoting it with the peel of
 /// every frame (`promote_all_using` of the one number), in states reached by promoting random candidates; and those
 /// states are what promoting them all at once leaves.  The shortcut is exact only in winnable frames, which every

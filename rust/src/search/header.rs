@@ -47,7 +47,7 @@ impl<const W: usize> Header<W> {
         engine::checksum(&bytes)
     }
 
-    /// A digest of every frame's moves, factors and freedoms, bottom first.
+    /// A digest of every frame's moves, factors and freedoms, front first.
     pub(super) fn digest_frames(frames: &FrameSet<W>) -> u64 {
         let mut bytes = Vec::with_capacity(frames.len() * (16 * W + 4));
         for frame in frames.frames() {
