@@ -1,4 +1,4 @@
-//! The board layer ([`taxman::hives`], [`taxman::frames`], [`taxman::board`]) against the committed chain.
+//! The board layer ([`taxman::frames`], [`taxman::board`]) against the committed chain.
 //!
 //! Every game of `results/strict.jsonl` that was searched (or repeats a search) records the moves of the game its
 //! promotions make and the digest of the search problem its board poses.  Both come out of the board layer, which

@@ -7,8 +7,8 @@ use common::{matching_options, options, TempDir};
 use std::fs;
 use std::time::Duration;
 use taxman::bits::Bits;
+use taxman::frames::BoardFrames;
 use taxman::game::Optimal;
-use taxman::hives::Apiary;
 use taxman::json::Json;
 use taxman::numtheory::Tables;
 use taxman::results::{verify_files, Proof};
@@ -33,7 +33,7 @@ fn a_range_reproduces_optimal_json() {
     // A promotion is exactly a candidate that the game plays, however the game was found.
     for r in &results {
         let tables = Tables::new(r.n);
-        let candidates = Apiary::<8>::new(&tables, Bits::EMPTY).promotion_candidates();
+        let candidates = BoardFrames::<8>::new(&tables, Bits::EMPTY).promotion_candidates();
         let played: Bits<8> = r.moves.iter().copied().collect();
         assert_eq!(r.promotions, (candidates & played).to_vec(), "n={} ({})", r.n, r.method.as_str());
     }

@@ -112,10 +112,9 @@ use taxman::accelerate::solution_for_promotions;
 use taxman::bits::{words_for, Bits};
 use taxman::board::{search_problem, Board};
 use taxman::engine::{self, Counters, EngineConfig, Start, Stats};
-use taxman::frames::build_frames;
+use taxman::frames::{build_frames, BoardFrames};
 use taxman::game::{replay_finished, Optimal};
 use taxman::gf2::{Gf2Bound, Gf2Graph};
-use taxman::hives::Apiary;
 use taxman::matchbound::MatchGraph;
 use taxman::model::Scratch;
 use taxman::numtheory::Tables;
@@ -715,7 +714,7 @@ fn setup<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Result<(), S
     line.seconds("moves_s", moves_s)
         .seconds("replay_s", replay_s)
         .field("replay_ok", replay.is_ok())
-        .seconds("prime_path_s", fastest(r, || Apiary::<W>::new(tables, Bits::EMPTY).promotion_candidates()).0);
+        .seconds("prime_path_s", fastest(r, || BoardFrames::<W>::new(tables, Bits::EMPTY).promotion_candidates()).0);
 
     line.field("max_total", p.max_total);
     Sizes::of_root(n, p).add_to(&mut line, "frame_");
@@ -920,7 +919,7 @@ fn frames<const W: usize>(n: u32) {
     let t0 = Instant::now();
     let built = build_frames::<W>(&tables);
     let frames_s = t0.elapsed().as_secs_f64();
-    let shapes = built.frames.iter().map(|f| (f.moves, f.factors, f.free_factor_count));
+    let shapes = built.frames.iter().map(|f| (f.moves, f.factors, f.freedoms));
     let sizes = Sizes::new(n, shapes, &built.candidates);
     let mut line = Line::of(n);
     line.seconds("frames_s", frames_s);

@@ -1,5 +1,5 @@
-//! Checks the hive, frame and prime shortcut code against the Java solver's results (`testdata/golden`,
-//! `testdata/golden_wide`, `testdata/games_java.txt`).
+//! Checks the frame builder (forming, simplifying, numbering and merging the frames) and the prime shortcut against the
+//! Java solver's results (`testdata/golden`, `testdata/golden_wide`, `testdata/games_java.txt`).
 //!
 //! The golden files hold, for each board size, what the Java produced for the stages these modules
 //! reimplement.  Every comparison is exact, including list orders.  Mismatches are collected over all the
@@ -20,9 +20,8 @@ use taxman::accelerate::{prime_shortcut, solution_for_promotions};
 use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::bounds::greedy;
-use taxman::frames::build_frames;
+use taxman::frames::{build_frames, BoardFrames};
 use taxman::game::{replay, Optimal};
-use taxman::hives::Apiary;
 use taxman::json::Json;
 use taxman::model::Model;
 use taxman::numtheory::Tables;
@@ -94,65 +93,63 @@ impl Mismatches {
 // ---------------------------------------------------------------------------------------------------------
 // The structure of a board, at any width
 
-fn check_apiary<const W: usize>(g: &Golden, bad: &mut Mismatches) {
+/// The board's frames as setup forms them, against the Java's `apiary` (a `BoardFrames`) and its `hives` (their
+/// `Frame`s; the Java's `freeFactorCount` is their `freedoms`).  The golden data keeps the Java's keys.
+fn check_board_frames<const W: usize>(g: &Golden, bad: &mut Mismatches) {
     let n = g.n;
     let t = Tables::new(n);
-    let apiary = Apiary::<W>::new(&t, Bits::EMPTY);
+    let board_frames = BoardFrames::<W>::new(&t, Bits::EMPTY);
     let want = g.field("apiary");
-    let want_hives = want.get("hives").and_then(Json::as_arr).unwrap();
-    bad.check(n, "hive count", apiary.hives().len(), want_hives.len());
-    for (i, (got, want)) in apiary.hives().iter().zip(want_hives).enumerate() {
-        let field = |name: &str| want.get(name).unwrap_or_else(|| panic!("n={n} hive {i}: no {name}"));
-        let at = |what: &str| format!("hive {i} {what}");
+    let want_frames = want.get("hives").and_then(Json::as_arr).unwrap();
+    bad.check(n, "frame count", board_frames.frames().len(), want_frames.len());
+    for (i, (got, want)) in board_frames.frames().iter().zip(want_frames).enumerate() {
+        let field = |name: &str| want.get(name).unwrap_or_else(|| panic!("n={n} frame {i}: no {name}"));
+        let at = |what: &str| format!("frame {i} {what}");
         bad.check(n, &at("name"), got.name(), field("name").as_str().unwrap());
         bad.check(n, &at("sources"), got.sources(), set(field("sources")));
         bad.check(n, &at("factors"), got.factors(), set(field("factors")));
         bad.check(n, &at("remainingSources"), got.remaining_sources(), set(field("remainingSources")));
         bad.check(n, &at("remainingFactors"), got.remaining_factors(), set(field("remainingFactors")));
         bad.check(n, &at("impossible"), got.impossible(), set(field("impossible")));
-        bad.check(
-            n,
-            &at("freeFactorCount"),
-            i64::from(got.free_factor_count()),
-            field("freeFactorCount").as_i64().unwrap(),
-        );
+        bad.check(n, &at("freeFactorCount"), i64::from(got.freedoms()), field("freeFactorCount").as_i64().unwrap());
         bad.check(
             n,
             &at("promotionCandidates"),
-            apiary.hive_promotion_candidates(i).to_vec(),
+            board_frames.promotion_candidates_of(i).to_vec(),
             ints(field("promotionCandidates")),
         );
-        bad.check(n, &at("solution"), apiary.hive_solution(i), ints(field("solution")));
+        bad.check(n, &at("solution"), board_frames.solution_of(i), ints(field("solution")));
     }
-    bad.check(n, "solution", apiary.solution(), ints(want.get("solution").unwrap()));
-    bad.check(n, "impossible", apiary.impossible(), set(want.get("impossible").unwrap()));
-    bad.check(n, "promotionCandidates", apiary.promotion_candidates(), set(want.get("promotionCandidates").unwrap()));
+    bad.check(n, "solution", board_frames.solution(), ints(want.get("solution").unwrap()));
+    bad.check(n, "impossible", board_frames.impossible(), set(want.get("impossible").unwrap()));
+    bad.check(
+        n,
+        "promotionCandidates",
+        board_frames.promotion_candidates(),
+        set(want.get("promotionCandidates").unwrap()),
+    );
 }
 
-/// The frames of the frame builder; returns how many there were.
-fn check_frames<const W: usize>(g: &Golden, bad: &mut Mismatches) -> usize {
+/// The frames of the frame builder, against the Java's `frames`; returns how many there were.
+fn check_search_frames<const W: usize>(g: &Golden, bad: &mut Mismatches) -> usize {
     let n = g.n;
-    let cols = build_frames::<W>(&Tables::new(n));
+    let found = build_frames::<W>(&Tables::new(n));
     let want_frames = g.field("frames").as_arr().unwrap();
-    bad.check(n, "frame count", cols.frames.len(), want_frames.len());
-    for (i, (got, want)) in cols.frames.iter().zip(want_frames).enumerate() {
+    bad.check(n, "frame count", found.frames.len(), want_frames.len());
+    bad.check(n, "name count", found.names.len(), want_frames.len());
+    for (i, ((got, name), want)) in found.frames.iter().zip(&found.names).zip(want_frames).enumerate() {
         let field = |name: &str| want.get(name).unwrap_or_else(|| panic!("n={n} frame {i}: no {name}"));
         let at = |what: &str| format!("frame {i} {what}");
-        bad.check(n, &at("name"), got.name.as_str(), field("name").as_str().unwrap());
+        bad.check(n, &at("name"), name.as_str(), field("name").as_str().unwrap());
         bad.check(n, &at("factors"), got.factors, set(field("remainingFactors")));
         bad.check(n, &at("moves"), got.moves, set(field("remainingSources")));
-        bad.check(
-            n,
-            &at("freeFactorCount"),
-            i64::from(got.free_factor_count),
-            field("freeFactorCount").as_i64().unwrap(),
-        );
+        bad.check(n, &at("freeFactorCount"), i64::from(got.freedoms), field("freeFactorCount").as_i64().unwrap());
     }
-    bad.check(n, "candidates", cols.candidates, set(g.field("allCandidates")));
+    bad.check(n, "candidates", found.candidates, set(g.field("allCandidates")));
     want_frames.len()
 }
 
-/// The reduced frame set the search starts from, its unrevised promotion cap and the greedy incumbent, from the
+/// The reduced frame set the search starts from, its unrevised `max_total` and the greedy incumbent, from the
 /// Java's own columns (the `frames` of the file) and from the frame builder's.
 fn check_reduced<const W: usize>(g: &Golden, bad: &mut Mismatches) {
     let n = g.n;
@@ -197,11 +194,11 @@ fn check_reduced<const W: usize>(g: &Golden, bad: &mut Mismatches) {
 }
 
 #[test]
-fn apiary_matches_java() {
+fn board_frames_match_java() {
     let mut bad = Mismatches::default();
     let golden = load_golden();
     for g in &golden {
-        check_apiary::<W>(g, &mut bad);
+        check_board_frames::<W>(g, &mut bad);
     }
     bad.assert_none(golden.len());
 }
@@ -210,7 +207,7 @@ fn apiary_matches_java() {
 fn frames_match_java() {
     let mut bad = Mismatches::default();
     let golden = load_golden();
-    let total_frames: usize = golden.iter().map(|g| check_frames::<W>(g, &mut bad)).sum();
+    let total_frames: usize = golden.iter().map(|g| check_search_frames::<W>(g, &mut bad)).sum();
     assert!(total_frames > 500, "suspiciously few frames: {total_frames}");
     bad.assert_none(golden.len());
 }
@@ -225,8 +222,8 @@ fn wide_boards_match_the_java() {
     assert_eq!(widths, [8, 16, 16, 16, 16, 20, 20, 20, 20, 32, 36], "the set width each board dispatches to");
     for g in &golden {
         with_width!(g.n, W => {
-            check_apiary::<W>(g, &mut bad);
-            check_frames::<W>(g, &mut bad);
+            check_board_frames::<W>(g, &mut bad);
+            check_search_frames::<W>(g, &mut bad);
             check_reduced::<W>(g, &mut bad);
         });
     }
@@ -256,7 +253,7 @@ fn acceleration_matches_java() {
     bad.assert_none(golden.len());
 }
 
-/// Every how-many-th line of the Java fixture below the test checks.  All of it takes 3.2 s (building the hives of 171
+/// Every how-many-th line of the Java fixture below the test checks.  All of it takes 3.2 s (forming the frames of 171
 /// boards of 760 to 2049); half of it has the same power, as the lines are samples of the same few kinds.  Set to 1
 /// to check them all.
 const FIXTURE_STRIDE: usize = 2;
@@ -299,7 +296,7 @@ fn promotions_become_the_java_game() {
     bad.assert_none(checked);
 }
 
-/// The Java's apiary game for sets of promotions that are not just the optimal ones (halves and random subsets of
+/// The Java's game of the board's frames for sets of promotions that are not just the optimal ones (halves and random subsets of
 /// them, and sets at the edges of the set widths), for boards up to 2049: the same moves in the same order, which
 /// then score what the game with no promotions scores plus the promotions (the identity the search's incumbent
 /// value stands on).
@@ -331,19 +328,19 @@ fn promotion_sets_become_the_java_game_beyond_the_golden_data() {
 fn wide_boards_build() {
     for n in [1500u32, 2000] {
         let t = Tables::new(n);
-        let cols = build_frames::<32>(&t);
-        assert_eq!(cols.frames.len(), 7, "n={n}");
-        for (i, frame) in cols.frames.iter().enumerate() {
-            assert!(frame.free_factor_count > 0, "n={n} frame {i}");
-            assert!(frame.factors.len() as i32 >= frame.free_factor_count, "n={n} frame {i}");
+        let found = build_frames::<32>(&t);
+        assert_eq!(found.frames.len(), 7, "n={n}");
+        for (i, frame) in found.frames.iter().enumerate() {
+            assert!(frame.freedoms > 0, "n={n} frame {i}");
+            assert!(frame.factors.len() as i32 >= frame.freedoms, "n={n} frame {i}");
             assert!(!frame.moves.is_empty(), "n={n} frame {i}");
         }
-        assert!(!cols.candidates.is_empty(), "n={n}");
+        assert!(!found.candidates.is_empty(), "n={n}");
         // The frames are disjoint columns of numbers.
-        let all: Bits<32> = cols.frames.iter().fold(Bits::EMPTY, |acc, f| acc | f.factors | f.moves);
-        let counted: u32 = cols.frames.iter().map(|f| f.factors.len() + f.moves.len()).sum();
+        let all: Bits<32> = found.frames.iter().fold(Bits::EMPTY, |acc, f| acc | f.factors | f.moves);
+        let counted: u32 = found.frames.iter().map(|f| f.factors.len() + f.moves.len()).sum();
         assert_eq!(all.len(), counted, "n={n}");
-        let moves = Apiary::<32>::new(&t, Bits::EMPTY).solution();
+        let moves = BoardFrames::<32>::new(&t, Bits::EMPTY).solution();
         assert!(replay(n, &moves).is_ok(), "n={n}");
     }
 }

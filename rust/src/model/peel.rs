@@ -21,7 +21,7 @@
 //! invertible Bloom lookup table: each factor keeps the count and the XOR of its live moves, so a factor with
 //! count 1 names its move.  (`heuristics/THEORY.md`, Theorem 4, proves the same facts for the Python side's
 //! `peel`, there called dismantling; its residual is the residual below.)  "Peel" means this procedure
-//! throughout the Rust code; `hives::count_freedoms` (setup's count of a frame's freedoms) and the Python `peel`
+//! throughout the Rust code; `BoardFrames::count_freedoms` (setup's count of a frame's freedoms) and the Python `peel`
 //! are other procedures.
 //!
 //! # The residual

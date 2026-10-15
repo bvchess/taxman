@@ -15,7 +15,7 @@
 //! * *What stays in use.*  `tests/wide.rs` uses [`sacrifice_bound`] as an upper bound that does not come from the
 //!   search under test, to prove one result at `W = 20` (game 1133), beyond what the Java can check.  The support
 //!   for punctured boards (holes) exists for this study alone: [`crate::numtheory::Tables::punctured`],
-//!   [`crate::game::replay_punctured`], and the hole cases of [`crate::hives`].
+//!   [`crate::game::replay_punctured`], and the hole cases of [`crate::frames`].
 //! * *Not here.*  The proof that the prime shortcut is optimal, which the solver does rely on, is with the shortcut
 //!   ([`crate::accelerate::prime_shortcut`]); the "Prime `n`" remark below is its case in this setting.
 //!
@@ -92,13 +92,13 @@
 //! # Computing it
 //!
 //! [`punctured`] computes `opt_M(B)` for `B = [n] ∖ {hole}` with the frame model on [`Tables::punctured`]: the
-//! hole is in no frame and no factor or composite list ([`Apiary`](crate::hives::Apiary), the board's frames), so
-//! the frame model plays exactly the maximal-factor rule.  Two things had to be right for that, both found by the
+//! hole is in no frame and no factor or composite list ([`BoardFrames`](crate::frames::BoardFrames), the board's
+//! frames), so the frame model plays exactly the maximal-factor rule.  Two things had to be right for that, both found by the
 //! brute force: the sources stay the numbers above `n/2` (a number whose only maximal composite is the hole is
 //! optional, not a source, which the model plays), and the frames are ordered through the hole (a number still
 //! sweeps divisors whose maximal-factor chain to it passes through the hole).  The frame model's own assumptions
 //! (greedy impossible sources, mandatory moves, closed frames, one-frame promotions; DESIGN.md §2 and §5, and
-//! [`crate::hives`]) apply to punctured boards as they do to `[n]`, and they are only validated, not proven: against
+//! [`crate::frames`]) apply to punctured boards as they do to `[n]`, and they are only validated, not proven: against
 //! the brute force
 //! ([`crate::brute`]) on every board `[N] ∖ {h}` with `N ≤ 52`.  A bound computed this way is as sound as the frame
 //! model, no more.  Each punctured game is warm-started from an optimal game of the unpunctured board, which is its
@@ -397,15 +397,15 @@ mod tests {
     use super::*;
     use crate::bits::Bits;
     use crate::brute::{self, Rule};
+    use crate::frames::BoardFrames;
     use crate::game::{replay, Optimal};
-    use crate::hives::Apiary;
 
     #[test]
-    fn the_hives_of_a_punctured_board_leave_the_hole_out() {
+    fn the_frames_of_a_punctured_board_leave_the_hole_out() {
         let t = Tables::punctured(30, &[6]);
         assert!(t.is_hole(6) && !t.is_hole(5) && t.holes == [6]);
-        let a = Apiary::<1>::new(&t, Bits::EMPTY);
-        let everything = a.hives().iter().fold(Bits::<1>::EMPTY, |acc, h| acc | h.sources() | h.factors());
+        let a = BoardFrames::<1>::new(&t, Bits::EMPTY);
+        let everything = a.frames().iter().fold(Bits::<1>::EMPTY, |acc, h| acc | h.sources() | h.factors());
         assert_eq!(everything | a.impossible(), Bits::from_range(1, 30).without(6));
         assert!(!a.solution().contains(&6));
         let plain = Tables::new(30);

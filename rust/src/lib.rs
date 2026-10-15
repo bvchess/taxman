@@ -28,7 +28,7 @@
 //! n ──► numtheory::Tables               maximal factors and composites of 1..=n
 //!        │
 //!        ▼
-//!       board::Board                   hives::Apiary → frames::build_frames: the frames (0 = front) and the
+//!       board::Board                   frames::BoardFrames → frames::build_frames: the frames (0 = front) and the
 //!        │                              promotion candidates; in_the_bag = the score with no promotions
 //!        ▼
 //!       search::prepare                model::Model: the root state; greedy incumbent
@@ -38,7 +38,7 @@
 //!        │                               └ Stepper::step per node: gf2 (or matchbound) → conflicts,
 //!        │                                 forced members, nogoods → branch → child
 //!        ▼
-//!       promotions ──► hives::Apiary ──► the moves ──► game::replay ──► score, results line
+//!       promotions ──► frames::BoardFrames ──► the moves ──► game::replay ──► score, results line
 //! ```
 //!
 //! [`solver`] runs this for a game, with the shortcuts that can skip the search (`accelerate`, and the repeat of an
@@ -56,8 +56,7 @@
 //! | | [`numtheory`] | maximal factors and composites, primes, divisors of the numbers on a board |
 //! | | [`bits`] | fixed-width bitsets `Bits<W>` for sets of game numbers; the set widths, dispatched |
 //! | | [`json`] | a small JSON reader and writer (the table of optimal games, golden data, results lines) |
-//! | frame model | [`hives`] | sources, factors and the frames as setup forms them; what they can play and spare |
-//! | | [`frames`] | the frames numbered from the front and merged, and the promotion candidates |
+//! | frame model | [`frames`] | the frames of a board: formed and simplified (what they can play and spare), numbered from the front and merged; the promotion candidates |
 //! | | [`model`] | the search state: frames, winnability, promotion, conflicts, nogoods |
 //! | | [`accelerate`] | the prime shortcut (the game of a prime `n` from the game of `n − 1`); promotions → moves |
 //! | search | [`matchbound`] | the matching bound, the upper bound on a node's completions; the Lagrangian bound |
@@ -89,7 +88,6 @@ pub mod engine;
 pub mod frames;
 pub mod game;
 pub mod gf2;
-pub mod hives;
 pub mod json;
 pub mod matchbound;
 pub mod model;

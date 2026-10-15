@@ -737,7 +737,7 @@ fn bench_search_one() {
     {
         let optimal = crate::game::Optimal::built_in();
         let in_the_bag: u64 =
-            crate::hives::Apiary::<16>::new(&tables, Bits::EMPTY).solution().iter().map(|&x| u64::from(x)).sum();
+            crate::frames::BoardFrames::<16>::new(&tables, Bits::EMPTY).solution().iter().map(|&x| u64::from(x)).sum();
         let best = optimal.score(n).map(|s| s - in_the_bag);
         let cap = optimal.score(n - 1).map(|s| u64::from(n) + s - in_the_bag);
         eprintln!("n={n}: optimal promotion sum {best:?}, prev_cap {cap:?}, greedy {}", p.greedy.sum());
