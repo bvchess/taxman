@@ -46,11 +46,13 @@ const PRICE_TOL: f64 = 1e-9;
 /// Harris's tolerance: the ratio test's relaxed bound lets a basic value fall to −`FEAS_TOL`.
 const FEAS_TOL: f64 = 1e-9;
 /// An entry of `B⁻¹ a` at most this is never a pivot.
-const PIVOT_TOL: f64 = 1e-11;
+const PIVOT_TOL: f64 = 1e-9;
 /// A step below this is degenerate.
 const DEGENERATE: f64 = 1e-12;
 /// After this many consecutive degenerate pivots, Bland's rule until a nondegenerate one.
 const BLAND_AFTER: u32 = 50;
+/// The shortest segment of columns a partial pricing scans (a segment is an eighth of the columns, or this).
+const PARTIAL: usize = 200;
 /// Pivots between refactorizations.
 const REFACTOR_EVERY: u32 = 64;
 /// Gauss–Jordan elimination's smallest pivot: below it the basis is singular.
@@ -93,6 +95,9 @@ pub struct LpStats {
     pub refactors: u64,
     /// The largest number of C-rows.
     pub max_s: usize,
+    /// Singular bases met at a periodic refactorization (rounding drift), each answered by a return to the last basis
+    /// given to [`Lp::reset`].
+    pub repairs: u64,
 }
 
 /// An entering variable: a structural column (by id), or the slack of a C-row (by row id).
@@ -137,6 +142,10 @@ pub struct Lp {
     /// False after an `Eq` row is added, until [`Lp::reset`].
     valid: bool,
     since_refactor: u32,
+    /// Where the next partial pricing starts among the columns.
+    next_price: usize,
+    /// The last basis given to [`Lp::reset`], returned to when a refactorization finds the basis singular.
+    fallback: Vec<usize>,
     degenerate_run: u32,
     stats: LpStats,
     /// Scratch, kept to avoid allocating in the pivot loop: `u` and `v` of FTRAN (`v` per row, nonzero only on the
@@ -177,6 +186,8 @@ impl Lp {
             stride: 0,
             valid: true,
             since_refactor: 0,
+            next_price: 0,
+            fallback: Vec::new(),
             degenerate_run: 0,
             stats: LpStats::default(),
             u: Vec::new(),
@@ -239,6 +250,26 @@ impl Lp {
         r
     }
 
+    /// Adds a `Le` row that the current point may violate, keeping the basis: if the point violates it by `v`, an
+    /// artificial column (entry −1 in the row, cost −`penalty`) enters in place of the row's slack at the value `v`
+    /// (a pivot of the bordering kind, `B⁻¹a` being `−e_r`), so the basis stays primal feasible, and the primal
+    /// simplex drives the artificial out, provided the LP is feasible and `penalty` exceeds the row's dual at its
+    /// optima.  Returns the row and the artificial column, if one was needed.
+    pub fn add_row_elastic(&mut self, rhs: f64, entries: &[(usize, f64)], penalty: f64) -> (usize, Option<usize>) {
+        let valid = self.valid;
+        self.valid = false;
+        let r = self.add_row(RowKind::Le, rhs, entries);
+        self.valid = valid;
+        if !valid || self.slack[r] >= -START_TOL {
+            return (r, None);
+        }
+        let t = self.add_column(-penalty, &[(r, -1.0)]);
+        self.ftran(Enter::Column(t));
+        let theta = self.slack[r] / self.v[r];
+        self.pivot(Enter::Column(t), Leave::Slack(r), theta);
+        (r, Some(t))
+    }
+
     /// Adds a structural column, nonbasic at 0. Entries (row id, value), any order, no duplicates.
     pub fn add_column(&mut self, cost: f64, entries: &[(usize, f64)]) -> usize {
         let j = self.cols.len();
@@ -262,6 +293,7 @@ impl Lp {
     /// Sets the basis to the structural columns `basis` (as many as there are Eq rows, the C-rows then being exactly
     /// the Eq rows) and the slacks of all Le rows; refactorizes. Panics if singular or infeasible (beyond 1e-9).
     pub fn reset(&mut self, basis: &[usize]) {
+        self.fallback = basis.to_vec();
         for &j in &self.scol {
             self.colpos[j as usize] = NONE;
         }
@@ -300,6 +332,11 @@ impl Lp {
     pub fn kill(&mut self, j: usize) {
         assert_eq!(self.colpos[j], NONE, "Lp::kill: column {j} is basic");
         self.dead[j] = true;
+    }
+
+    /// Whether column `j` is basic.
+    pub fn is_basic(&self, j: usize) -> bool {
+        self.colpos[j] != NONE
     }
 
     /// Whether column `j` is dead.
@@ -344,8 +381,10 @@ impl Lp {
             }
             self.stats.max_s = self.stats.max_s.max(self.scol.len());
             self.since_refactor += 1;
-            if self.since_refactor >= REFACTOR_EVERY {
-                self.refactor();
+            if self.since_refactor >= REFACTOR_EVERY && !self.factor() {
+                self.stats.repairs += 1;
+                let basis = std::mem::take(&mut self.fallback);
+                self.reset(&basis);
             }
         }
     }
@@ -387,6 +426,11 @@ impl Lp {
     /// Rebuilds `Binv` from `A` (`B_s` inverted by Gauss–Jordan elimination with partial pivoting) and recomputes
     /// the basic values and the duals from scratch.  Panics if the basis is singular.
     pub fn refactor(&mut self) {
+        assert!(self.factor(), "Lp::refactor: the basis is singular");
+    }
+
+    /// [`refactor`](Self::refactor), returning false (and leaving the basis to be replaced) if it is singular.
+    fn factor(&mut self) -> bool {
         let s = self.scol.len();
         self.reserve(s, 0);
         let st = self.stride;
@@ -412,7 +456,9 @@ impl Lp {
         for k in 0..s {
             let best = (k..s).max_by(|&a, &b| w[a * s + k].abs().total_cmp(&w[b * s + k].abs())).expect("k < s");
             let pivot = w[best * s + k];
-            assert!(pivot.abs() >= SINGULAR, "Lp::refactor: the basis is singular (pivot {pivot:e} in column {k})");
+            if pivot.abs() < SINGULAR {
+                return false;
+            }
             if best != k {
                 swap_rows(w, s, s, best, k);
                 swap_rows(&mut self.binv, st, s, best, k);
@@ -453,6 +499,7 @@ impl Lp {
         self.compute_duals();
         self.since_refactor = 0;
         self.stats.refactors += 1;
+        true
     }
 
     /// Whether row `r` is an S-row: a `Le` row whose slack is basic.
@@ -460,42 +507,50 @@ impl Lp {
         self.kind[r] == RowKind::Le && self.cpos[r] == NONE
     }
 
-    /// The entering variable, `None` at an optimum: by Dantzig's rule the largest reduced cost above `PRICE_TOL`, by
-    /// Bland's the eligible variable of lowest index, structural columns by id before slacks by row id.
-    fn price(&self, bland: bool) -> Option<Enter> {
+    /// The entering variable, `None` at an optimum: by Dantzig's rule (partial: over the slacks and the first
+    /// segments of columns that yield one) the largest reduced cost above `PRICE_TOL`, by Bland's the eligible variable
+    /// of lowest index, structural columns by id before slacks by row id.
+    fn price(&mut self, bland: bool) -> Option<Enter> {
+        let d_of = |lp: &Lp, j: usize| lp.cost[j] - lp.cols[j].iter().map(|&(r, a)| lp.y[r as usize] * a).sum::<f64>();
+        let live = |lp: &Lp, j: usize| lp.colpos[j] == NONE && !lp.dead[j];
+        if bland {
+            if let Some(j) = (0..self.cols.len()).find(|&j| live(self, j) && d_of(self, j) > PRICE_TOL) {
+                return Some(Enter::Column(j));
+            }
+            let slacks = self.crow.iter().map(|&r| r as usize).filter(|&r| self.kind[r] == RowKind::Le);
+            return slacks.filter(|&r| -self.y[r] > PRICE_TOL).min().map(Enter::Slack);
+        }
         let mut best = None;
         let mut best_d = PRICE_TOL;
-        for (j, col) in self.cols.iter().enumerate() {
-            if self.colpos[j] != NONE || self.dead[j] {
-                continue;
-            }
-            let d = self.cost[j] - col.iter().map(|&(r, a)| self.y[r as usize] * a).sum::<f64>();
-            if d > best_d {
-                if bland {
-                    return Some(Enter::Column(j));
-                }
-                (best, best_d) = (Some(Enter::Column(j)), d);
-            }
-        }
-        let mut lowest: Option<usize> = None;
         for &r in &self.crow {
             let r = r as usize;
-            if self.kind[r] == RowKind::Le {
-                let d = -self.y[r];
-                if bland {
-                    if d > PRICE_TOL && lowest.is_none_or(|l| r < l) {
-                        lowest = Some(r);
-                    }
-                } else if d > best_d {
-                    (best, best_d) = (Some(Enter::Slack(r)), d);
-                }
+            if self.kind[r] == RowKind::Le && -self.y[r] > best_d {
+                (best, best_d) = (Some(Enter::Slack(r)), -self.y[r]);
             }
         }
-        if bland {
-            lowest.map(Enter::Slack)
-        } else {
-            best
+        // Partial pricing: the columns in segments from where the last pricing stopped, until a segment yields a
+        // candidate (a full cycle without one proves the basis optimal).
+        let n = self.cols.len();
+        let segment = (n / 8).max(PARTIAL);
+        let (mut j, mut scanned) = (self.next_price.min(n.saturating_sub(1)), 0);
+        while scanned < n {
+            let end = (scanned + segment).min(n);
+            while scanned < end {
+                if live(self, j) {
+                    let d = d_of(self, j);
+                    if d > best_d {
+                        (best, best_d) = (Some(Enter::Column(j)), d);
+                    }
+                }
+                j = if j + 1 == n { 0 } else { j + 1 };
+                scanned += 1;
+            }
+            if best.is_some() {
+                break;
+            }
         }
+        self.next_price = j;
+        best
     }
 
     /// FTRAN: `B⁻¹ a = (u, v)` for the entering variable's column `a`, with `u = Binv a_C` and, on the S-rows that

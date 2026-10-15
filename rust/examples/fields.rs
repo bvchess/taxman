@@ -126,7 +126,6 @@ fn parse() -> Result<Options, String> {
             "--fixed-seconds" => o.fixed_seconds = num(value("--fixed-seconds")?)?,
             "--root-seconds" => o.root_seconds = num(value("--root-seconds")?)?,
             "--samples" => o.samples = num(value("--samples")?)? as usize,
-            "--eps" => o.settings.eps = num(value("--eps")?)?,
             "--close" => o.settings.close = num(value("--close")?)?,
             "--frames" => {
                 o.frames = list(value("--frames")?)
@@ -322,7 +321,8 @@ fn roots<const W: usize>(n: u32, known: &Known, o: &Options, out: &mut Output, c
     let fm = frame_matroids(model, &p.root, &p.candidates);
     let cap = p.max_total as usize;
     let gf2 = fm.bound(cap).value;
-    let ctx = Ctx::new(n, model, &p.root, &fm, cap, opt as i64, false);
+    let mut ctx = Ctx::new(n, model, &p.root, &fm, cap, opt as i64, false);
+    ctx.gap = Some(gf2 - opt as i64);
     let optimal = optimal_promotions(n, known, &board, opt);
     if let Some(set) = &optimal {
         fm.independent(set).unwrap_or_else(|e| panic!("n={n}: the optimal promotions: {e}"));
@@ -399,8 +399,9 @@ fn root_line<const W: usize>(
          \"bracket\":{bracket:.4},\"converged\":{converged},\"share\":{share},\"stop\":\"{:?}\",\"matroids\":[{}],\
          \"core_signings\":[{}],\"cores_found\":{},\"cores_assigned\":{},\"cores_skipped\":{},\
          \"cores_repeated\":{},\"gf3_loops\":{},\"rounds\":{},\"pricings_mi\":{},\"pricings_greedy\":{},\
-         \"pivots\":{},\"degenerate\":{},\"bland\":{},\"solves\":{},\"masters\":{},\"columns\":{},\"rows\":{},\
-         \"max_rows\":{},\"max_s\":{},\"support\":{},\
+         \"pivots\":{},\"degenerate\":{},\"repairs\":{},\"solves\":{},\"masters\":{},\"columns\":{},\"cuts\":{},\
+         \"master\":{:.4},\"cuts_cheap\":{},\"cuts_exact\":{},\"checks_exact\":{},\"pivots_exact\":{},\"max_s\":{},\
+         \"support\":{},\
          \"support_promotable\":{promotable},\"mass_unpromotable\":{unpromotable_mass:.5},\"checks\":{},\
          \"ms\":{:.0},\"ms_mi\":{:.0},\"ms_simplex\":{:.0}}}",
         r.bound,
@@ -419,12 +420,16 @@ fn root_line<const W: usize>(
         s.pricings_greedy,
         s.pivots,
         s.degenerate,
-        s.bland,
+        s.repairs,
         s.solves,
         s.masters,
         r.columns,
-        r.rows,
-        s.max_rows,
+        r.cuts,
+        r.master,
+        s.cuts_cheap,
+        s.cuts_exact,
+        s.checks_exact,
+        s.pivots_exact,
         s.max_s,
         r.support.len(),
         s.checks,
@@ -500,7 +505,8 @@ fn nodes<const W: usize>(path: &Path, known: &Known, o: &Options, exact: &Exact,
     let opt = known.opt(n, board.in_the_bag).expect("a known optimum");
     let model = &p.model;
     let fm = frame_matroids(model, &p.root, &p.candidates);
-    let ctx = Ctx::new(n, model, &p.root, &fm, p.max_total as usize, opt as i64, false);
+    let mut ctx = Ctx::new(n, model, &p.root, &fm, p.max_total as usize, opt as i64, false);
+    ctx.gap = Some(fm.bound(p.max_total as usize).value - opt as i64);
     let (signings, _) = arm("f1cores", n, p.root.len(), &o.frames);
     let root_settings = Settings { seconds: o.root_seconds, ..o.settings.clone() };
     let root = bound(&ctx, signings, None, true, &root_settings);
@@ -825,47 +831,82 @@ mod tests {
 
     /// The study's test 7: on boards with at most 16 candidates, the exact LP (every common independent set of `A`
     /// and `B` of at most `cap` elements and every independent set of each extra matroid as a column) against the
-    /// column generation: the master's value and the lowest `L` bracket the LP, and both are within 10⁻³ of it (no
-    /// perturbation, run until nothing prices out; the pricing is at multipliers rounded to the grid 1/S, so a
-    /// column is missed only by the rounding, a few 10⁻⁴ on these boards).
+    /// column generation: the certified lower bound and the lowest `L` bracket the LP, and both are within 10⁻⁵ of it,
+    /// relatively (run until nothing prices out; the pricing is at multipliers rounded to the grid 1/S, so a column is
+    /// missed only by the rounding, and the perturbations of the rows move the point by 10⁻⁶ a row).
     #[test]
     fn column_generation_reaches_the_exact_lp() {
-        let (mut boards, mut tighter) = (0, 0);
+        let (mut instances, mut tighter) = (0, 0);
+        // Every board with 4-16 candidates.
         for n in 2..=200u32 {
             let Some((_, p)) = setup::<8>(n) else { continue };
-            let cands: Vec<u32> = p.candidates.iter().collect();
-            if cands.len() > 16 || cands.len() < 4 {
-                continue;
-            }
-            let fm = frame_matroids(&p.model, &p.root, &p.candidates);
-            let cap = p.max_total as usize;
-            let ctx = Ctx::new(n, &p.model, &p.root, &fm, cap, 0, false);
-            let signings: Vec<Signing> = (1..p.root.len())
-                .flat_map(|h| [Signing::ones(h), Signing::random(h, seed(n, h, 0, SALT_RANDOM))])
-                .collect();
-            let fam = Family::new(&ctx, signings.clone());
-            let lp = exact_lp(&ctx, &fam, cap);
-            let settings = Settings {
-                seconds: 60.0,
-                pricings: 100_000,
-                polyak: 5,
-                check_every: 1,
-                close: 1e-9,
-                eps: 0.0,
-                ..Settings::default()
-            };
-            let r = bound(&ctx, signings, None, false, &settings);
-            assert!(r.lb <= lp + 1e-6, "n={n}: master {} above the LP {lp}", r.lb);
-            assert!(r.lb >= lp - 1e-3, "n={n}: master {} below the LP {lp}", r.lb);
-            assert!(r.l_best >= lp - 1e-6, "n={n}: L {} below the LP {lp}", r.l_best);
-            assert!(r.l_best <= lp + 1e-3, "n={n}: L {} far above the LP {lp}", r.l_best);
-            boards += 1;
-            if lp < fm.bound(cap).value as f64 - 1e-6 {
-                tighter += 1;
+            if (4..=16).contains(&p.candidates.len()) {
+                tighter += usize::from(exact_against_generated(n, &p, &p.candidates));
+                instances += 1;
             }
         }
-        eprintln!("test 7: {boards} boards, {tighter} with the LP below the GF(2) bound");
-        assert!(boards >= 10);
+        // Their GF(2) bounds are their optima, so the extra matroids cannot cut: also boards of 300-700 restricted to
+        // at most 12 candidates, those of the cores of the GF(2) bound's heaviest set first (its members, then the
+        // other candidates in its frames).
+        for n in (300..=700u32).filter(|&n| !is_prime(n)).step_by(5) {
+            let Some((_, p)) = setup::<16>(n) else { continue };
+            let fm = frame_matroids(&p.model, &p.root, &p.candidates);
+            let heaviest: Vec<u32> = fm.chosen::<16>(&fm.bound(p.max_total as usize)).iter().collect();
+            let cores = cores_of(&p.model, &p.root, &heaviest, 1);
+            let Some(core) = cores.iter().min_by_key(|c| c.promoted_in.len() + c.promoted_out.len()) else { continue };
+            let mut chosen: Vec<u32> = core.promoted_in.iter().chain(&core.promoted_out).copied().collect();
+            let frames = [core.frame, core.frame + 1];
+            let all: Vec<u32> = p.candidates.iter().collect();
+            let more = heaviest.iter().chain(&all).copied();
+            for x in more.filter(|&x| frames.contains(&p.model.home(x))) {
+                if chosen.len() < 12 && !chosen.contains(&x) {
+                    chosen.push(x);
+                }
+            }
+            tighter += usize::from(exact_against_generated(n, &p, &Bits::from_slice(&chosen)));
+            instances += 1;
+        }
+        eprintln!("test 7: {instances} instances, {tighter} with the LP below the GF(2) bound");
+        assert!(instances >= 80 && tighter >= 10);
+    }
+
+    /// Test 7 on one instance: the board of `n` with the candidates `cands`; the family is the plain and a random
+    /// signing of each frame and the column-sum signings of the cores of the GF(2) bound's heaviest set and of three
+    /// random sets.  Whether the LP is below the GF(2) bound.
+    fn exact_against_generated<const W: usize>(n: u32, p: &taxman::search::Prepared<W>, cands: &Bits<W>) -> bool {
+        let fm = frame_matroids(&p.model, &p.root, cands);
+        let cap = p.max_total as usize;
+        let ctx = Ctx::new(n, &p.model, &p.root, &fm, cap, 0, false);
+        let mut signings: Vec<Signing> = (1..p.root.len())
+            .flat_map(|h| [Signing::ones(h), Signing::random(h, seed(n, h, 0, SALT_RANDOM))])
+            .collect();
+        let gf2 = fm.bound(cap);
+        let mut rng = Rng(0x5851_F42D_4C95_7F2D ^ u64::from(n));
+        let mut sets: Vec<Vec<u32>> = vec![fm.chosen::<W>(&gf2).iter().collect()];
+        sets.extend((0..3).map(|_| fm.elems.iter().copied().filter(|_| rng.below(2) == 0).collect::<Vec<u32>>()));
+        for q in &sets {
+            for core in cores_of(&p.model, &p.root, q, 2) {
+                signings.push(column_sum_signing(&core, seed(n, core.frame, signings.len(), 3)));
+            }
+        }
+        let fam = Family::new(&ctx, signings.clone());
+        let lp = exact_lp(&ctx, &fam, cap);
+        let settings = Settings {
+            seconds: 60.0,
+            pricings: 100_000,
+            polyak: 5,
+            check_every: 1,
+            close: 1e-9,
+            ..Settings::default()
+        };
+        let r = bound(&ctx, signings, None, false, &settings);
+        assert!(r.lb <= lp + 1e-6, "n={n}: the certified bound {} above the LP {lp}", r.lb);
+        // The certified point loses what the perturbations (10⁻⁶ a row) and the checks' tolerance leave out.
+        let near = 1e-5 * lp.max(1.0);
+        assert!(r.lb >= lp - near, "n={n}: the certified bound {} below the LP {lp}", r.lb);
+        assert!(r.l_best >= lp - 1e-6, "n={n}: L {} below the LP {lp}", r.l_best);
+        assert!(r.l_best <= lp + near, "n={n}: L {} far above the LP {lp}", r.l_best);
+        lp < gf2.value as f64 - 1e-6
     }
 
     /// The LP over `P(A) ∩ P(B) ∩ ⋂ P(N_k)` with `Σ z ≤ cap`, every column enumerated.
