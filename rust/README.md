@@ -713,6 +713,7 @@ comment that is worth reading first; section 6 above is the map of how the piece
 | [DESIGN.md](DESIGN.md) | the design as it is now: goals, the game and the frame model, the architecture, the search, the tactics and their grades, the engine, the pipeline, the trust model, the tests, performance |
 | [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) | the register of everything tried, kept or not (check it before proposing an experiment), and the lab notebook: every round of improvements with its measurements |
 | [docs/IDEAS.md](docs/IDEAS.md) | ideas borrowed from other fields (SAT, MaxSAT, MIP, #SAT, ...), ranked, with pilot measurements, the profile of the hardest games and the study of nogoods at many threads |
+| [docs/AGENDA.md](docs/AGENDA.md) | the research agenda (2026-10): what limits the end of the chain, the avenues ranked, conjectures, and what the cloud runs should measure |
 | [results/README.md](results/README.md) | the committed results files and what supports their scores |
 | [bench/curve/README.md](bench/curve/README.md) | how the cost grows with n beyond the end of the chain, and projections for a larger machine |
 | [prover/README.md](prover/README.md) | the prover: independent proofs and checks of the solver's results on the whole board, and the conjecture checks |
