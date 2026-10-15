@@ -169,18 +169,23 @@ instructions), the sacrifice study, `repeats` (the games whose search repeats an
 and what a results file spent on them), `slope` (the gaps of a game's root, and proofs with every bound lowered by a
 margin), `matroid` (the study of the GF(2) bound: at roots and nodes, as a plain branch and bound, and the search's
 proofs with it, `matroid prove`) and `wall` (what grows with n and with a tree: a game's fixed costs piece by piece, a
-node's cost at any set width, large trees with their memory and checkpoints, the frames past 4095); `tests/` the
+node's cost at any set width, large trees with their memory and checkpoints, the frames of any board); `tests/` the
 integration tests (section 9); `tools/` the results referee in Python, the PGO build, the Java golden export and the
 cloud scripts.
 
 **Width dispatch.**  Everything that holds sets of game numbers is generic over `const W: usize`, the number of 64-bit
 words, and the macro `with_width!` (in `bits`, used by the solver, the examples and the tests) picks the narrowest of
-`bits::WIDTHS` = {8, 16, 20, 24, 28, 32, 36, 40, 48, 56, 64} that holds n (n ≤ 511, 1023, 1279, 1535, 1791, 2047, 2303,
-2559, 3071, 3583, 4095).  Every set operation is a loop over all W words, so the steps of 4 to 8 words past n = 1023
-pay.  Each width is a copy of the search's code, which costs build time (a release build takes about 75 seconds on an
-M1 Max; EXPERIMENTS has the times as widths were added).  A checkpoint records its width, and one made at another
+`bits::WIDTHS` = {8, 16, 20, 24, 28, 32, 36, 40, 48, 56, 64, 128} that holds n (n ≤ 511, 1023, 1279, 1535, 1791, 2047,
+2303, 2559, 3071, 3583, 4095, 8191).  Every set operation is a loop over all W words, so the steps of 4 to 8 words past
+n = 1023 pay; past 4095 they would not (a node at 4100 costs 1% more at 128 words than at 72, the board layer the
+same), so 128 is the only width there.  Each width is a copy of the search's code, which costs build time (a release
+build takes about 100 seconds on an M1 Max, 12 more for a width; EXPERIMENTS has the times as widths were added).  The
+largest board, 8191 (`solver::MAX_N`, from the widest width), is also what the other fixed sizes hold, every board to
+it checked in 2026-10: at most nine frames (`model::MAX_FRAMES`), a peel's worklist of two summary words, and the
+GF(2) bound's vectors of at most five words (section 4).  A checkpoint records its width, and one made at another
 width than this build gives its game is refused, so a checkpoint of a game of 2048 to 3583 made at 64, before the
-widths of 36, 40, 48 and 56 were added, is refused by a build that has them.
+widths of 36, 40, 48 and 56 were added, is refused by a build that has them; adding 128 moved no board, so the
+checkpoints of the games to 4095 resume with the build that goes past it.
 
 ## 4. The search
 
@@ -382,6 +387,12 @@ with three or more factors.  At the roots of 880–1300 its gap to the optimum i
   costs more than the cuts it saves), so `match_refine` has no effect; the conflicts, nogoods, forced members and
   exact sets are used as with the matching bound.  The Lagrangian bound over nogoods still applies after it when on,
   but changes no tree of the GF(2) search measured and costs 2–4%, so `lagrange` is off by default.
+* **Block words.**  A level's vectors are as wide as the root's largest frame rank (its freedoms) needs: one to three
+  words of 64 bits on every board to 4095 (ranks up to 169), four from 4740 and five from 6392 (up to 314 at 8191; the
+  scan of every board is in EXPERIMENTS, "Boards past 4095").  Each word count is a copy of the bound's code
+  (`Levels<W, R>`, R = 1 to `gf2::MAX_WORDS` = 5) for every set width that has it; only the sets of 128 words have the
+  copies of four and five words, so the narrower widths are built as before.  Tests run those copies on small boards
+  with the vectors padded with zero words (`Gf2Graph::padded`), where they must search the same tree.
 * **Open for other weights.**  `meet::Problem` takes any positive weights, but the start from the heaviest
   uncontended elements and the greedy lower bound assume that weights do not decrease with an element's index (the
   root's candidates by increasing number).  A bound that reweighs the candidates (a Lagrangian over nogoods or a
@@ -865,9 +876,12 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   bound is never below the exhaustive best completion and the optimal promotions are independent in both matroids;
   and along random paths of games 60–1000 (promotions, deletions, backtracking) every level equals the matroids built
   afresh at its node, and every member it calls forced is (the bound without it, solved afresh, is below what the
-  node needs); at the 600 nodes of the probe's fixtures (936 and 1215), completions promoted in random orders are
-  independent in the node's matroids and no heavier than its bound, and the matching path's search started from the
-  bound finds nothing above it (`tests/soundness.rs`).  Conflicts and residuals are checked against promoting the sets.
+  node needs), and along the same kind of paths the copies of every word count (1 to 5, padded) give the same results
+  and do the same work; blocks of more than 255 members (five words) against the greedy algorithm, one matroid free
+  and the other random; at the 600 nodes of the probe's fixtures (936 and 1215), completions promoted in random orders
+  are independent in the node's matroids and no heavier than its bound, and the matching path's search started from
+  the bound finds nothing above it (`tests/soundness.rs`).  Conflicts and residuals are checked against promoting the
+  sets.
   The prime exchanges (`src/search/symmetry.rs`): the symmetric pairs against their definition (every number looked
   at, every pair of primes tried) on the boards 2..=300 and a sample to 2200; the images of the optimal set and of
   random maximal promotable sets promotable and worth the formula, every optimum keeping every inequality, and on the
@@ -943,13 +957,18 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   results file a stopped run left; a game with a checkpoint is resumed, not repeated; a repeat assumes what the game
   it repeats assumes.  A unit test of `board` checks that the problem set up again from a board size is the one the
   setup posed, and the same at two set widths.
-* **Large boards** (`tests/wide.rs`): the Java stopped at 1000, and the sets that hold a board are 8 to 64 words
+* **Large boards** (`tests/wide.rs`): the Java stopped at 1000, and the sets that hold a board are 8 to 128 words
   wide, so nothing above 1023 meets anything but the committed results and these tests.  The same game at every
-  width that holds it has the same frames, candidates, greedy set, `max_total`, answer and tree; game 1133 (W = 20,
-  about 2,400 nodes) under every tactic against `strict.jsonl`; a slice of that chain; the sacrifice bound
-  proves game 1133 by an independent route; a board of 2050 built at W = 64 (it dispatches to 36) through frames,
-  matching bound, conflicts, greedy set and a node-limited search; boards of 2050, 2400, 2800 and 3100 at the widths
-  they dispatch to (36, 40, 48 and 56) and at 64, with the same start and the same node-limited search; a committed
+  width that holds it (128 included) has the same frames, candidates, greedy set, `max_total`, answer and tree; game
+  1133 (W = 20, about 2,400 nodes) under every tactic against `strict.jsonl`; a slice of that chain; the sacrifice bound
+  proves game 1133 by an independent route; a board of 2050 built at W = 64 (it dispatches to 36) and one of 4100 at
+  128 through frames, matching bound, conflicts, greedy set and a node-limited search; boards of 2050, 2400, 2800 and
+  3100 at the widths they dispatch to (36, 40, 48 and 56) and at 64 (2050 also at 128), with the same start and the
+  same node-limited search, and 4095 at 64 and 128 with the same start; the boards past 4095 (4096, 4100, 4740, 6000,
+  6392, 8191) at 128 words against the board layer's own invariants (nine frames, the plain game, the freedoms, the
+  greedy set and subsets of it promoted and played to the score their sum says, the root's GF(2) bound between the
+  greedy sum and the matching bound, with three, four and five block words); the GF(2) bound's copies of four and
+  five words (only at 128) searching game 1000's tree as the copy of one word does; a committed
   checkpoint of game 1133 (`testdata/n1133_after_1000_nodes.ckpt`, W = 20) that must still resume (a deliberate
   change of the checkpoint format fails it; the test says how to make the file again); the levels of a real
   depth-first stack of game 1215 (`testdata/n1215_deep_units.txt`): the
@@ -1047,7 +1066,8 @@ before it; the one-thread proofs of the quick set and the bench set 0.75 of the 
 optimal.json's game of 1300 reached 2175 in 92 minutes of game time on 2 threads, and the committed chain from n = 1
 took 27 minutes on 8 ([results/README.md](results/README.md)); its cost comes in waves that
 follow the root's GF(2) gap, with no growth that a fit over 1301–2175 resolves, and a day on 192 CPUs would take
-it to the end of the set widths (4095) at every slope the data support (EXPERIMENTS has the projections).
+it to 4095, the end of the set widths then, at every slope the data support (EXPERIMENTS has the projections); the
+widths now go to 8191.
 
 **The matching path** (the default before the GF(2) bound; these are the build of commit 4b6ef38, on the M1 Max): the
 proof of 1215 takes 33 s on one thread (106 G cycles), and 1184 takes 3.2 G cycles.  The chain 1..1231 took 279 s of

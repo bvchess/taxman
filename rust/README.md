@@ -34,7 +34,7 @@ Finding an optimal game is a search over an enormous tree.  The frame solver's r
 sequences of moves with their scores, for every n from 1 to 2175: `results/strict.jsonl` is a chain from n = 1 (section
 3), whose games 1 to 1000 reproduce the Java's table, whose games 1001 to 1300 go beyond it (the table `optimal.json`
 has them now too, see `extend-optimal` in section 3) and whose games 1301 to 2175 are past the table.  The code can
-attempt any larger n up to 4095, the largest board the set widths cover.  With the GF(2) bound (the default since
+attempt any larger n up to 8191, the largest board the set widths cover.  With the GF(2) bound (the default since
 2026-10), a chain from `optimal.json`'s game of 1300 reached 2175 in 92 minutes on two threads of a laptop, and the
 committed chain from n = 1 in 27 minutes on eight ([results/README.md](results/README.md)), the cost in waves with no
 growth a fit resolves ([docs/EXPERIMENTS.md](docs/EXPERIMENTS.md#the-gf2-bound-in-the-search-2026-10)); before it, the
@@ -121,7 +121,7 @@ Python 3 (standard library only) for `tools/check_results.py`.
 
 ```
 cd rust
-cargo build --release              # about 75 seconds on an M1 Max; the binary is target/release/taxman
+cargo build --release              # about 100 seconds on an M1 Max; the binary is target/release/taxman
 cargo build --release --examples   # also the ladder (scaling and progress harness), the probe, the sacrifice study,
                                    # the list of repeated searches, the slope study (root gaps, margin scans) and
                                    # the matroid study (the GF(2) intersection bound)
@@ -526,7 +526,7 @@ second build's chain, what the games assume).
    |                                  from this run, FILE or (--use-prev) optimal.json,
    |                                  and is checked (legal, over, opens with the largest prime) before anything uses it
    v
- solver::set_up(n) -> set_up_with_width::<W>      W = 8 to 64 words of 64 bits (bits::WIDTHS), by n
+ solver::set_up(n) -> set_up_with_width::<W>      W = 8 to 128 words of 64 bits (bits::WIDTHS), by n
    |
    |  [1] numtheory::Tables            maximal factors and maximal composites of 1..=n; the set width W
    |  [2] n prime ............ accelerate::prime_shortcut   the game of n-1 with its first move replaced by n
