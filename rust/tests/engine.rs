@@ -273,6 +273,11 @@ fn big_instance() -> Instance {
     Instance::new(BIG_ITEMS, 10_000, 99)
 }
 
+/// A longer one (about 0.65 G nodes), far more than a run explores before a script on another thread has acted on it.
+fn long_instance() -> Instance {
+    Instance::new(64, 10_000, 99)
+}
+
 const HEADER: &[u8] = b"knapsack n=48 range=10000 seed=99";
 
 fn config(threads: usize) -> EngineConfig {
@@ -936,8 +941,7 @@ fn a_ceiling_the_starting_incumbent_reaches_needs_no_search() {
 /// A ceiling given while the run goes, at the incumbent the run has then, ends the run at once.
 #[test]
 fn a_ceiling_the_incumbent_has_reached_ends_the_run_at_once() {
-    // About 0.65 G nodes, far more than the run explores before the ceiling comes.
-    let inst = Instance::new(64, 10_000, 99);
+    let inst = long_instance();
     let control = Control::new();
     let cfg = controlled(config(2), &control);
     let (out, ceiling) = alongside(
@@ -1151,6 +1155,134 @@ fn running_workers_beyond_the_target_retire_promptly() {
     assert!(!out.completed, "stopped");
     let c = &out.counters;
     assert_eq!((c.threads, c.spawned, c.retired), (4, 0, 3), "{c:?}");
+    assert_accounting(c);
+}
+
+/// A run told to have no worker while it goes is suspended: every worker retires, the units wait in the deque, and
+/// nothing is searched until it is given workers again; then it ends at the exact optimum.
+#[test]
+fn a_run_suspended_while_it_goes_and_given_workers_again_is_exact() {
+    let inst = long_instance();
+    let control = Control::new();
+    let cfg = controlled(config(4), &control);
+    let (out, script) = alongside(
+        || {
+            wait_for(&control, |status| status.running == 4)?;
+            control.set_workers(0);
+            let suspended = wait_for(&control, |status| status.live == 0)?;
+            thread::sleep(Duration::from_millis(20));
+            let later = control.status()?;
+            control.set_workers(3);
+            wait_for(&control, |status| status.live == 3)?;
+            Some((suspended, later))
+        },
+        || solve(&cfg, fresh(), &inst),
+    );
+    let (suspended, later) = script.unwrap_or_else(|| panic!("not suspended and resumed: {:?}", out.counters));
+    assert!(suspended.running == 0 && suspended.idle == 0 && suspended.queued > 0, "{suspended:?}");
+    let nothing_moved = (later.live, later.nodes, later.queued) == (0, suspended.nodes, suspended.queued);
+    assert!(nothing_moved, "searched while suspended: {suspended:?} then {later:?}");
+    assert!(out.completed && !out.optimal_declared);
+    assert_optimal(&out, &inst, inst.dp());
+    let c = &out.counters;
+    assert_eq!((c.threads, c.spawned, c.retired), (4, 3, 4), "{c:?}");
+    assert_accounting(c);
+}
+
+/// A run suspended before it starts (its control told 0) starts no worker and waits for one; with no unit at all it is
+/// complete at once.
+#[test]
+fn a_run_suspended_before_it_starts_waits_for_workers() {
+    let inst = instance();
+    let control = Control::new();
+    control.set_workers(0);
+    let cfg = controlled(config(4), &control);
+    let (out, script) = alongside(
+        || {
+            let waiting = wait_for(&control, |_| true)?;
+            thread::sleep(Duration::from_millis(20));
+            let later = control.status()?;
+            control.set_workers(2);
+            Some((waiting, later))
+        },
+        || solve(&cfg, fresh(), &inst),
+    );
+    let (waiting, later) = script.unwrap_or_else(|| panic!("not seen suspended: {:?}", out.counters));
+    assert_eq!((waiting.live, waiting.queued, later.live, later.queued, later.nodes), (0, 1, 0, 1, 0), "{later:?}");
+    assert!(out.completed);
+    assert_optimal(&out, &inst, inst.dp());
+    let c = &out.counters;
+    assert_eq!((c.threads, c.spawned, c.retired), (2, 2, 0), "{c:?}");
+    assert_accounting(c);
+
+    let control = Control::new();
+    control.set_workers(0);
+    let start = Start::Fresh { units: Vec::new(), best: 17, payload: b"seed".to_vec() };
+    let out = solve(&controlled(config(4), &control), start, &inst);
+    assert!(out.completed && !out.optimal_declared);
+    assert_eq!((out.best, out.payload.as_slice(), out.counters.threads), (17, &b"seed"[..], 0));
+}
+
+/// A suspended run checkpoints as it goes and stops with a final checkpoint, from which the search resumes to the
+/// exact optimum.
+#[test]
+fn a_suspended_run_checkpoints_and_stops_and_resumes_exactly() {
+    let inst = long_instance();
+    let dir = TempDir::new("suspended-stop");
+    let ckpt = dir.join("ckpt.bin");
+    let control = Control::new();
+    let cfg =
+        EngineConfig { checkpoint: Some((ckpt.clone(), Duration::from_millis(5))), ..controlled(config(2), &control) };
+    let (out, script) = alongside(
+        || {
+            wait_for(&control, |status| status.running == 2)?;
+            control.set_workers(0);
+            wait_for(&control, |status| status.live == 0)?;
+            // A checkpoint written from now on is written while the run is suspended: it is later than any before.
+            let elapsed = || engine::read_checkpoint(&ckpt).map(|head| head.elapsed).ok();
+            let before = elapsed();
+            let asked = Instant::now();
+            while elapsed() <= before && asked.elapsed() < Duration::from_secs(60) {
+                thread::sleep(Duration::from_millis(1));
+            }
+            let still = control.status()?;
+            control.stop();
+            Some((elapsed() > before, still))
+        },
+        || solve(&cfg, fresh(), &inst),
+    );
+    let (periodic, still) = script.unwrap_or_else(|| panic!("not suspended: {:?}", out.counters));
+    assert!(periodic && still.live == 0, "no checkpoint while suspended: {still:?}, {:?}", out.counters);
+    assert!(!out.completed && ckpt.exists() && out.counters.checkpoints >= 2, "{:?}", out.counters);
+    assert_accounting(&out.counters);
+    let rest = solve(&EngineConfig { control: None, ..cfg }, Start::Resume(ckpt.clone()), &inst);
+    assert!(rest.completed && !ckpt.exists());
+    assert_optimal(&rest, &inst, inst.dp());
+}
+
+/// A suspended run given a ceiling that its incumbent reaches ends at once, as optimal.
+#[test]
+fn a_suspended_run_given_a_ceiling_its_incumbent_reaches_ends_as_optimal() {
+    let inst = long_instance();
+    let control = Control::new();
+    let cfg = controlled(config(2), &control);
+    let (out, ceiling) = alongside(
+        || {
+            wait_for(&control, |status| status.running == 2 && status.best > 0)?;
+            control.set_workers(0);
+            wait_for(&control, |status| status.live == 0)?;
+            let (best, _) = control.best()?;
+            control.set_ceiling(best);
+            Some(best)
+        },
+        || solve(&cfg, fresh(), &inst),
+    );
+    let ceiling = ceiling.unwrap_or_else(|| panic!("not suspended: {:?}", out.counters));
+    assert!(out.completed && out.optimal_declared && out.best == ceiling, "{:?}", out.counters);
+    let mask = u64::from_le_bytes(out.payload.as_slice().try_into().unwrap());
+    assert_eq!(inst.check(mask), Some(out.best), "the payload is the incumbent's");
+    let c = &out.counters;
+    assert_eq!((c.threads, c.spawned, c.retired), (2, 0, 2), "{c:?}");
     assert_accounting(c);
 }
 

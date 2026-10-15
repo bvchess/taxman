@@ -279,7 +279,7 @@ struct Given {
 
 /// A search that runs, as the driver follows it.
 struct Run {
-    /// The workers it was last told to have.
+    /// The workers it was last told to have (0: its engine is to be suspended).
     target: usize,
     /// When it was last given threads.
     granted: Instant,
@@ -306,9 +306,13 @@ impl Run {
             (Some(now), Some(before)) => {
                 let idle_time = now.idle_time.saturating_sub(before.idle_time);
                 let capacity = now.capacity.saturating_sub(before.capacity);
-                let idle_share =
-                    if capacity.is_zero() { 0.0 } else { idle_time.as_secs_f64() / capacity.as_secs_f64() };
-                Load::Sampled { idle_share, idle_now: now.idle, idle_time, fresh: true }
+                // A tick in which the engine had no worker (suspended) says nothing of its idle share.
+                if capacity.is_zero() {
+                    Load::Unknown
+                } else {
+                    let idle_share = idle_time.as_secs_f64() / capacity.as_secs_f64();
+                    Load::Sampled { idle_share, idle_now: now.idle, idle_time, fresh: true }
+                }
             }
         };
         if now.is_some() {
@@ -323,6 +327,7 @@ impl Run {
         }
     }
 
+    /// What [`allot()`] sees of it at `now`: suspended once its target is 0 and the last sample saw no worker left.
     fn need(&self, now: Instant) -> allot::Running {
         let live = self.last.map_or(0, |status| status.live);
         allot::Running { target: self.target, live, load: self.load, since_grant: now - self.granted }
@@ -841,7 +846,7 @@ impl<'a> Window<'a> {
         }
     }
 
-    /// Tells the search of game `n` to have `workers` workers from now on.
+    /// Tells the search of game `n` to have `workers` workers from now on (0 suspends its engine).
     fn set_workers(&mut self, n: u32, workers: usize, now: Instant) {
         let Some(Game { stage: Stage::Search(set, Plan::Search(Search::Running(run))), .. }) = self.games.get_mut(&n)
         else {
@@ -916,5 +921,38 @@ impl Drop for Window<'_> {
             }
         }
         self.games.clear();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ms(millis: u64) -> Duration {
+        Duration::from_millis(millis)
+    }
+
+    /// An engine's status: `live` workers, `idle` of them waiting for work, over lifetimes of `capacity` ms in all of
+    /// which they waited `idle_time` ms.
+    fn status(live: usize, idle: usize, capacity: u64, idle_time: u64) -> Status {
+        let (capacity, idle_time) = (ms(capacity), ms(idle_time));
+        Status { live, running: live - idle, idle, queued: 0, idle_time, capacity, best: 0, nodes: 0 }
+    }
+
+    #[test]
+    fn a_tick_in_which_the_engine_had_no_worker_has_no_idle_share() {
+        let now = Instant::now();
+        let mut run = Run::new(1, now, None);
+        run.sample(Some(status(1, 0, 10, 0)));
+        run.target = 0;
+        run.sample(Some(status(0, 0, 10, 0)));
+        // Suspended, and not saturated: it claims one thread, not as many again as it has.
+        let need = run.need(now);
+        assert_eq!((need.load, need.target, need.live), (Load::Unknown, 0, 0));
+        assert_eq!(allot(4, &[Need::Running(need)]), [(0, Grant::Workers(1))]);
+        // Started again on one worker, busy over its first tick with it: saturated, it asks one more.
+        run.target = 1;
+        run.sample(Some(status(1, 0, 15, 0)));
+        assert_eq!(allot(4, &[Need::Running(run.need(now))]), [(0, Grant::Workers(2))]);
     }
 }

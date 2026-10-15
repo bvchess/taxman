@@ -226,9 +226,12 @@ fn conservation_is_exact_under_random_configurations() {
     }
 }
 
-/// The same with a control that sets a random number of workers, from 1 to 4, every millisecond or so, while the run
+/// The same with a control that sets a random number of workers, from 0 to 4, every millisecond or so, while the run
 /// checkpoints often, spills, stops at a node limit and resumes: workers are added, and retired while idle or while
-/// running, through pauses and across resumes, and no unit is lost or explored twice.
+/// running, the search is suspended (0) and goes on again, through pauses and across resumes, and no unit is lost or
+/// explored twice.  The controller follows a 0 with a number of at least 1, so that no run stays suspended for good:
+/// it sets one at most a few milliseconds later, before as after a resume, until the last run has ended.  It sees the
+/// runs suspended: told 0, with no worker left and units queued.
 #[test]
 fn conservation_is_exact_while_workers_come_and_go() {
     let iterations: u64 = std::env::var("TXENGINE_CONSERVATION").ok().and_then(|s| s.parse().ok()).unwrap_or(8);
@@ -239,7 +242,8 @@ fn conservation_is_exact_while_workers_come_and_go() {
     };
     let dir = TempDir::new("workers");
     let (ckpt, spill) = (dir.join("ckpt"), dir.join("spill"));
-    let (mut fewest, mut most) = (usize::MAX, 0);
+    // The fewest and most workers seen running, and the times a run was seen suspended.
+    let (mut fewest, mut most, mut suspensions) = (usize::MAX, 0, 0);
     for it in 0..iterations {
         let pick = |options: &[u64], r: u64| options[(r % options.len() as u64) as usize];
         let tree = Tree { max_depth: pick(&[22, 24, 26], next()) as u32, salt: 1 + next() % 7 };
@@ -256,19 +260,25 @@ fn conservation_is_exact_while_workers_come_and_go() {
         };
         let (drop_leaves, seed) = (next() % 2 == 1, next());
         let done = AtomicBool::new(false);
-        let (result, seen) = thread::scope(|scope| {
+        let (result, (seen, suspended)) = thread::scope(|scope| {
             let controller = scope.spawn(|| {
-                let (mut r, mut seen) = (seed, (usize::MAX, 0));
+                let (mut r, mut seen, mut workers, mut suspended) = (seed, (usize::MAX, 0), 1, 0);
                 while !done.load(Ordering::Relaxed) {
-                    // (Before the first worker starts and after the last one leaves, none is live.)
-                    if let Some(status) = control.status().filter(|status| status.running > 0) {
-                        seen = (seen.0.min(status.live), seen.1.max(status.live));
+                    // (Before the first worker starts, after the last one leaves and while suspended, none is live.)
+                    if let Some(status) = control.status() {
+                        if status.running > 0 {
+                            seen = (seen.0.min(status.live), seen.1.max(status.live));
+                        }
+                        // Told 0 a moment ago, with no worker left, after nodes were searched and with units queued.
+                        let gone = status.live == 0 && status.nodes > 0 && status.queued > 0;
+                        suspended += usize::from(workers == 0 && gone);
                     }
                     r = mix(r.wrapping_add(1));
-                    control.set_workers(1 + (r % 4) as usize);
+                    workers = if workers == 0 { 1 + (r % 4) as usize } else { (r % 5) as usize };
+                    control.set_workers(workers);
                     thread::sleep(Duration::from_micros(500 + r % 1000));
                 }
-                seen
+                (seen, suspended)
             });
             // The controller stops however the runs end.
             let result = panic::catch_unwind(AssertUnwindSafe(|| run_through(&cfg, tree, drop_leaves)));
@@ -276,13 +286,14 @@ fn conservation_is_exact_while_workers_come_and_go() {
             (result, controller.join().unwrap())
         });
         let (out, invocations) = result.unwrap_or_else(|e| panic::resume_unwind(e));
-        (fewest, most) = (fewest.min(seen.0), most.max(seen.1));
+        (fewest, most, suspensions) = (fewest.min(seen.0), most.max(seen.1), suspensions + suspended);
         let context = format!("iteration {it}: {invocations} invocations, drop_leaves {drop_leaves}, {cfg:?}");
         assert_eq!((out.stats.nodes, out.best), (size, best), "{context}");
         assert!(!ckpt.exists(), "{context}: checkpoint left behind");
         assert!(dir_is_empty(&spill), "{context}: spill segments left behind");
     }
     assert_eq!((fewest, most), (1, 4), "the workers the runs were seen with");
+    assert!(suspensions > 0, "no run was seen suspended");
 }
 
 /// With a checkpoint interval of zero the coordinator used to pause again at once after every release, without

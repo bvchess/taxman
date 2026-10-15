@@ -101,18 +101,19 @@
 //!
 //! The next periodic checkpoint is due one interval after a pause ends, but never sooner than that pause
 //! lasted, and its pause begins only once the released workers are all running again (`resuming` is clear:
-//! no held unit is left, and the deque is empty or every worker runs).  The coordinator waits for that
-//! without the lock, so with any interval, zero included, the workers make progress and pauses take at most
-//! about half of their time.
+//! no held unit is left, and the deque is empty or every live worker runs, as every one does when none is
+//! live).  The coordinator waits for that without the lock, so with any interval, zero included, the workers
+//! make progress and pauses take at most about half of their time.
 //!
 //! **Output.**  Progress lines and warnings go to stderr outside the lock, so a blocked stderr cannot stall
 //! the workers, and write errors are ignored, so a closed one (a dead `tee`, EPIPE) cannot kill them either.
 //!
 //! **Termination.**  The search is complete when a worker that needs work finds the deque and spill empty,
 //! `running == 0`, no held units and no pause; that worker sets `done` and `exit`.  (While paused, the
-//! coordinator makes the same check once the pause is complete.)  `declare_optimal` sets `exit` directly and
-//! all remaining work is discarded.  Every state change that can satisfy a waiter's condition is made under
-//! the mutex and followed by a notify, so no wakeup is lost.
+//! coordinator makes the same check once the pause is complete, and while no worker is live, at every look:
+//! see "Workers".)  `declare_optimal` sets `exit` directly and all remaining work is discarded.  Every state
+//! change that can satisfy a waiter's condition is made under the mutex and followed by a notify, so no
+//! wakeup is lost.
 //!
 //! **Panics.**  In a build that unwinds (tests), a guard in every worker and in the coordinator sets `exit`
 //! when its thread unwinds, so nobody waits forever and `std::thread::scope` re-raises the panic; no
@@ -192,12 +193,32 @@
 //! deque in the critical section in which it stops running (a split that keeps nothing), and leaves; one with nothing
 //! to give goes to `acquire` like any worker that needs work.  To bring running workers back promptly, the demand of
 //! "Splitting" also counts the live workers beyond the target that are not idle (the idle ones retire by themselves),
-//! and it does not count as needing work the idle workers that will retire.  Termination is kept: the target is at
-//! least 1 and a worker retires only while more are live than the target, so some worker is live until the run ends; a
-//! retiring idle worker has just seen that another worker runs (its termination test failed, outside a pause, with
-//! nothing to take), and a retiring running one leaves its units in the deque and wakes idle workers for them.  So
-//! the last worker to need work still makes the termination test.  Without a control the target and the live workers
-//! are the configured threads from start to end, and no worker grows or retires.
+//! and it does not count as needing work the idle workers that will retire.  Without a control the target and the live
+//! workers are the configured threads from start to end, and no worker grows or retires.
+//!
+//! *Suspending.*  A target of 0 suspends the search (not a pause: no worker is parked, none is live): every worker
+//! retires as above, the idle ones at once and the running ones at their next answer, and the units wait in the deque
+//! and the spill until the target rises, when the coordinator starts workers as for any rise.  `EngineConfig::threads`
+//! is at least 1, so a run starts with workers unless its control was given 0 before it started.  The rest of the run
+//! goes on without workers: a pause finds none running at once, so a checkpoint, periodic or the final one of a stop,
+//! writes the queued units; a stop, a stop signal, a deadline and a ceiling given or reached end the run as ever; and
+//! `resuming` ends as soon as no worker is live, since then every live worker runs.
+//!
+//! *Conservation and termination as workers come and go.*  A worker leaves only holding no unit: a running one hands
+//! its units over in the critical section in which it stops running, and an idle one holds none, since a held unit is
+//! the first thing its worker takes after a pause and no worker retires in a pause.  So with no worker live every unit
+//! is in the deque or the spill, from which only workers take, and no unit moves until workers start again (the
+//! coordinator's checkpoints copy them).  The termination test is made by every worker that needs work and finds none,
+//! before it may retire, and by the coordinator after a pause and whenever no worker is live.  When the search's last
+//! run ends, its worker has nothing to hand over, needs work and makes the test (or, in a pause, the coordinator does),
+//! whatever the target, so a run whose last unit ends as it is suspended completes.  A run with no worker live is
+//! suspended, not complete: a retiring idle worker has just seen its test fail with nothing to take, outside a pause,
+//! so another worker runs or holds a unit and is live; the last worker to leave before the run ends is therefore a
+//! running one, which leaves its units in the deque.  The one exception, a run suspended from its start with no unit
+//! at all, is complete, and the coordinator's test ends it at its first look.  With a target of at least 1 a worker
+//! retires only while more are live than the target, so some worker is live until the run ends, and the units a
+//! retiring one leaves are taken: it wakes idle workers for them, and the running ones come back for work.  So the last
+//! worker to need work still makes the termination test.
 //!
 //! # Instrumentation
 //!
@@ -291,7 +312,7 @@ impl Stats {
 /// How to run the engine.
 #[derive(Clone, Debug)]
 pub struct EngineConfig {
-    /// Worker threads (at least 1); [`Control::set_workers`] changes their number.
+    /// Worker threads (at least 1); [`Control::set_workers`] changes their number, and can suspend the run with 0.
     pub threads: usize,
     /// Maximum number of units kept in memory in the shared deque; the rest are spilled (needs `spill_dir`).
     pub queue_mem_cap: usize,
@@ -436,12 +457,12 @@ impl Control {
         }
     }
 
-    /// The number of workers the run should have from now on (at least 1).  While the run goes, it starts workers
-    /// until it has that many (each makes its own searcher with `make(i)`, `i` a new number) and retires workers that
-    /// have no unit, or have just handed theirs over, until it has no more.  Given before the run, it replaces
-    /// [`EngineConfig::threads`].
+    /// The number of workers the run should have from now on.  While the run goes, it starts workers until it has that
+    /// many (each makes its own searcher with `make(i)`, `i` a new number) and retires workers that have no unit, or
+    /// have just handed theirs over, until it has no more.  0 suspends the search: the units wait in the run's deque
+    /// until the number is raised again, and the run is not over meanwhile ("Suspending" in the module docs).  Given
+    /// before the run, it replaces [`EngineConfig::threads`], 0 included.
     pub fn set_workers(&self, workers: usize) {
-        let workers = workers.max(1);
         let mut state = lock(&self.state);
         state.workers = Some(workers);
         if let Some(run) = Self::attached(&state) {
@@ -1288,7 +1309,7 @@ struct State<U> {
     worker_stats: Vec<Stats>,
     /// Workers alive: started (counted from the moment their slots are reserved), not yet retired or exited.
     live: usize,
-    /// How many workers should be live (see "Workers"); at least 1.
+    /// How many workers should be live (see "Workers"); 0 suspends the search.
     target: usize,
     /// Workers inside `Searcher::run`.
     running: usize,
@@ -1522,6 +1543,9 @@ impl<U: Unit> Shared<U> {
         st.resuming = true;
         self.signal.0.fetch_and(!(SIG_YIELD | SIG_PAUSE), Ordering::AcqRel);
         self.update_split(st);
+        // Every live worker is parked and some unit is left (else the run has ended), so this ends `resuming` only when
+        // no worker is live ("Suspending").
+        self.note_running(st, Instant::now());
         self.work_cv.notify_all();
     }
 
@@ -1672,16 +1696,17 @@ impl<U: Unit> Shared<U> {
         self.update_split(st);
     }
 
-    /// What follows when every live worker may have come to run (a run began, a worker retired, or workers could not be
-    /// started): the first full occupancy, which ends the ramp, and the end of `resuming` (see "Checkpoint").
+    /// What follows when every live worker may have come to run (a run began, a worker retired, workers could not be
+    /// started, or none is live at the start or at a release): the first full occupancy, which ends the ramp, and the
+    /// end of `resuming` (see "Checkpoint"), which with no worker live is at once.
     fn note_running(&self, st: &mut State<U>, now: Instant) {
-        let full = st.running == st.live && st.live > 0;
-        if full && st.counters.full_occupancy.is_none() {
+        let all = st.running == st.live;
+        if all && st.live > 0 && st.counters.full_occupancy.is_none() {
             st.counters.full_occupancy = Some(now.saturating_duration_since(st.began));
             // No live worker waits, so every idle wait so far is complete.
             st.counters.ramp_idle = st.idle_done;
         }
-        if st.resuming && st.held_units == 0 && (st.queue_empty() || full) {
+        if st.resuming && st.held_units == 0 && (st.queue_empty() || all) {
             st.resuming = false;
             self.coord_cv.notify_all();
         }
@@ -1882,6 +1907,8 @@ impl<U: Unit> Shared<U> {
         let mut last_report = (plan.began, 0);
         let stopping = |st: &State<U>| st.stop_requested || plan.stop_due();
         let mut guard = self.lock();
+        // With no worker live (a run suspended from its start), `resuming` ends at once ("Suspending").
+        self.note_running(&mut guard, Instant::now());
         loop {
             if guard.exit {
                 break;
@@ -1923,6 +1950,13 @@ impl<U: Unit> Shared<U> {
                 self.release(st);
                 // See "Checkpoint": never sooner than the pause took, and not before the workers run again.
                 next_checkpoint = plan.checkpoint.and_then(|(_, every)| Instant::now().checked_add(every.max(pause)));
+                continue;
+            }
+            // With no worker live, the coordinator makes the termination test, which only a run suspended from its
+            // start with no unit passes (see "Workers").
+            if guard.live == 0 && !guard.has_work() {
+                guard.done = true;
+                self.set_exit(&mut guard);
                 continue;
             }
             // The control raised the target ("Workers"); `grow` checks again under its own lock.
@@ -2105,7 +2139,7 @@ trait Remote: Send + Sync {
     fn incumbent(&self) -> (u64, Vec<u8>);
     /// Stop the run with a final checkpoint.
     fn stop(&self);
-    /// Set the target number of workers (at least 1).
+    /// Set the target number of workers (0 suspends the search).
     fn set_workers(&self, workers: usize);
     fn status(&self) -> Status;
 }
@@ -2158,7 +2192,7 @@ impl<U: Unit> Remote for Shared<U> {
 
     fn set_workers(&self, workers: usize) {
         let mut st = self.lock();
-        st.target = workers.max(1);
+        st.target = workers;
         // Growing is the coordinator's, retiring the workers' own: wake whoever has to act.
         if st.live < st.target {
             self.coord_cv.notify_all();

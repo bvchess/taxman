@@ -580,7 +580,8 @@ design in outline.
 * **Control** (`engine::Control`): a handle through which another thread steers a run while it goes: a ceiling (a
   proven upper bound, which ends the run once the incumbent reaches it), outside incumbents, a stop, and the number of
   workers, which grows by starting workers and shrinks by retiring workers that hold no unit (a running one hands all
-  its units to the deque first).  Requests made before the run apply when it starts (engine docs, "The control").
+  its units to the deque first); 0 suspends the search, its units waiting in the deque until the number rises again.
+  Requests made before the run apply when it starts (engine docs, "The control").
 * **Instrumentation** (`engine::Counters`, per invocation): each worker's time split into busy, idle, parked and lock
   wait; the effective parallelism busy / capacity (the workers' lifetimes summed, wall × threads when their number is
   fixed); splits and the units they gave, steals, runs and tiny runs; when all workers first ran at once; the workers
