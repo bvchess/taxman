@@ -86,7 +86,7 @@ What is proven vs. trusted, precisely:
 | no upper half beats M\*, the max-weight *matchable* upper set | proven (lifting: every game's picks pair with distinct factors) |
 | U\* (`solve_upper_half`) equals the optimal game's upper half | measured, 1000/1000 |
 | U\* is the *unique* heaviest playable upper set (every other playable upper set is termwise below it) | theorem given (★) (THEORY.md, "Uniqueness of the optimal set", Theorem 8), so certified for every n ≤ 100,000 |
-| *every* optimal game, not just the recorded one, has upper part U\* | measured: the prover (`rust/prover`, section 5) enumerated every optimal set in every completely enumerated game; open in general |
+| *every* optimal game, not just the recorded one, has upper part U\* | measured: the prover (`rust/prover`, section 5) enumerated every optimal set in every completely enumerated game; open in general.  **Theorem** for the members of U\* with one or two prime factors (THEORY.md, Theorem B); the frame solver's answers rest on the weaker statement that *some* optimal game plays the rest, U (THEORY.md, "The frame model: what is proven and what remains"), which holds for every n ≤ 1300 |
 | the optimal set (not just its upper half) is unique | measured for every n ≤ 424; **false** from 425 on, where some games have two or three optimal sets, differing by equal-sum exchanges below n/2 |
 | optimal sets of n from those of n−1: T ∪ {n} at a game at its ceiling (opt(n) = n + opt(n−1)), T − p + n (a bijection) at a prime | theorem (THEORY.md, Theorem 9) |
 | an optimal game plays the most moves any game of the board can (the wiki's open question; the Java's `reviseFreedoms` assumes a local form) | **false**: at n = 833, 834 and 835 every optimal game is one move short of the longest; the heaviest 363-move game of 833 scores 29 less than the optimum (THEORY.md, "Longest games").  True of every other game to 1300, the gap never above one (`rust/prover`, section 6).  The bounds M(n) ≤ ν(n) (a matching certificate) and M(n−1) ≤ M(n) ≤ M(n−1) + 1 are theorems |
@@ -433,7 +433,7 @@ resumes with `--resume` — container restarts cost at most a few games.
 
 | file | contents |
 |---|---|
-| `THEORY.md` | the proofs: the decision procedure (playability, schedulability, completeness), cores and the residual, the frontier argument, the cardinality reformulation |
+| `THEORY.md` | the proofs: the decision procedure (playability, schedulability, completeness), cores and the residual, the frontier argument, the cardinality reformulation, and the theorems behind the frame solver (the parity and frame matroids, prime exchanges, the frame model's exactness) |
 | `core.py` | shared foundations: `maximal_factors`, the wiki's `peel` / `optimize_mini`, `order_for_real_game`, `solve_upper_half`, divisor tables, `check_sequence` replay validation |
 | `strategies/solvent.py` | the fast solvent implementation (incremental matching + complete fallback tier) |
 | `strategies/solvent_b.py` | solvent-b: solvent plus the dual-use audit (recovers ~52% of solvent's loss for one factor of n in cost) |

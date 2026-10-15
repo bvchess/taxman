@@ -1,12 +1,16 @@
 //! Helpers shared by the integration tests: temporary directories and a random number generator (`support.rs`, which
 //! the unit tests share), the Java's golden data and the committed results files as oracles beyond `optimal.json`,
-//! one-thread searches at a chosen set width, and a few small utilities.
+//! one-thread searches at a chosen set width, an oracle for the playability of a set on the whole board
+//! (`playable.rs`, which uses nothing of the frame solver), and a few small utilities.
 //!
 //! Each test binary compiles this module for itself and uses only part of it.
 #![allow(dead_code)]
 
+mod playable;
 mod support;
 
+#[allow(unused_imports)]
+pub use playable::{peel, play_order, playable};
 #[allow(unused_imports)]
 pub use support::{Rng, TempDir};
 

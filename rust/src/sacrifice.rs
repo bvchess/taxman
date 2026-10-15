@@ -96,11 +96,13 @@
 //! frames), so the frame model plays exactly the maximal-factor rule.  Two things had to be right for that, both found
 //! by the brute force: the sources stay the numbers above `n/2` (a number whose only maximal composite is the hole is
 //! optional, not a source, which the model plays), and the frames are ordered through the hole (a number still sweeps
-//! divisors whose maximal-factor chain to it passes through the hole).  The frame model's own assumptions (greedy
+//! divisors whose maximal-factor chain to it passes through the hole).  The frame model's own rules (greedy
 //! impossible sources, mandatory moves, closed frames, one-frame promotions; DESIGN.md §2 and §5, and
-//! [`crate::frames`]) apply to punctured boards as they do to `[n]`, and they are only validated, not proven: against
-//! the brute force ([`crate::brute`]) on every board `[N] ∖ {h}` with `N ≤ 52`.  A bound computed this way is as sound
-//! as the frame model, no more.  Each punctured game is warm-started from an optimal game of the unpunctured board,
+//! [`crate::frames`]) apply to punctured boards as they do to `[n]`.  On `[n]` they are proven, given that the
+//! numbering of the frames is clean (heuristics/THEORY.md, Theorem M), but a punctured board is not covered: the
+//! proof is for `[n]`, and the numbering of a punctured board need not be clean (56 without 39 is not).  There they
+//! are only validated: against the brute force ([`crate::brute`]) on every board `[N] ∖ {h}` with `N ≤ 52`.  A
+//! bound computed this way is as sound as the frame model on the punctured board, no more.  Each punctured game is warm-started from an optimal game of the unpunctured board,
 //! which is its ceiling: if that game replays on the punctured board, its score is the answer with no search.
 //!
 //! # Findings (the negative result)
