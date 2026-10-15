@@ -75,7 +75,7 @@
 //!   when it takes out two as well (the solver's call), each with its time in `singles_s` and `pairs_s`.  `opt` is the
 //!   known optimum promotion sum, or null, and `max_rss` the process's peak resident set.
 //! * **frames**: for boards beyond the widest set the solver supports (up to 8191, at 128 words): the frames the
-//!   board builder makes (before `Model::build` reduces them, which keeps every frame's freedoms), the time it
+//!   board builder makes (before `FrameGraph::build` reduces them, which keeps every frame's freedoms), the time it
 //!   took, and the sizes the later stages would need: per frame the factors, moves and freedoms, `max_freedoms`
 //!   and the `block_words` of the GF(2) bound's vectors it needs (`max_freedoms.div_ceil(64)`).
 //!

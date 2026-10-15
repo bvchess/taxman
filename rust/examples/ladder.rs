@@ -361,10 +361,10 @@ fn print_diagnostics(d: &Diagnostics, nodes: u64, found_steps: Option<u64>) {
     );
     if d.match_open > 0 {
         println!(
-            "    matching bounds that did not prune: {}, heaviest matching feasible at {:.1}%; one level of \
+            "    matching bounds that did not prune: {}, heaviest matching promotable at {:.1}%; one level of \
              refinement would prune {:.1}%",
             d.match_open,
-            100.0 * d.match_open_feasible as f64 / d.match_open as f64,
+            100.0 * d.match_open_promotable as f64 / d.match_open as f64,
             100.0 * d.refine_cuts as f64 / d.match_open as f64
         );
         let quantiles = |counts: &[u64]| -> String {

@@ -23,7 +23,7 @@ use taxman::bounds::greedy;
 use taxman::frames::{build_frames, BoardFrames};
 use taxman::game::{replay, Optimal};
 use taxman::json::Json;
-use taxman::model::Model;
+use taxman::model::FrameGraph;
 use taxman::numtheory::Tables;
 use taxman::search::SearchTactics;
 use taxman::with_width;
@@ -164,7 +164,7 @@ fn check_reduced<const W: usize>(g: &Golden, bad: &mut Mismatches) {
     let built = build_frames::<W>(&tables);
     bad.check(n, "the frame builder's columns", built.columns(), java_columns.clone());
     let candidates: Bits<W> = set(g.field("allCandidates"));
-    let (model, root) = Model::build::<W>(&tables, &java_columns).unwrap();
+    let (model, root) = FrameGraph::build::<W>(&tables, &java_columns).unwrap();
     let want = g.field("frameSet").as_arr().unwrap();
     bad.check(n, "reduced frame count", root.len(), want.len());
     for (i, (frame, want)) in root.frames().iter().zip(want).enumerate() {

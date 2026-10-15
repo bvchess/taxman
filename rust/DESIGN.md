@@ -239,7 +239,7 @@ of that frame run: the moves it cannot drop, its *residual* (heuristics/THEORY.m
 ends at), are stuck however the order goes, and the members of `Q*` that the residual needs (promoted into the frame and
 residual moves, or promoted out of it and factors of residual moves) cannot be promoted together.  Minimized by peeling
 only the residual, such a set `K ⊆ Q*` is a *conflict*: a set of candidates that
-cannot be promoted together from the node's state (`Model::conflict_using`).  Conflicts are tiny (a median of two
+cannot be promoted together from the node's state (`FrameGraph::conflict_using`).  Conflicts are tiny (a median of two
 members at n = 760–1000, a quarter of them single members).
 
 The idea behind everything that follows: a subset of a promotable set is promotable (moves left out and factors kept
@@ -272,7 +272,7 @@ is *forced*: every completion that beats the incumbent promotes it.
 * **Forced members** (`fix_forced`).  The child promotes every forced member of the conflict, not only the chosen
   one; the node's loop ends after that child, since the child covers every completion that can beat the incumbent.
   If they cannot all be promoted, or the child's candidate filter dropped one, the child has no such completion at
-  all.  They are promoted together, each frame checked once (`Model::promote_all_using`).  The forced members are
+  all.  They are promoted together, each frame checked once (`FrameGraph::promote_all_using`).  The forced members are
   found from the potentials for every member of the heaviest matching, and strong branching solves only where none
   is found; a conflict all of whose members are forced ends the node at once.
 * **Nogoods** (`nogoods`).  A conflict `K` found at a node with promotions `P` is relative to `P`; a minimal subset of

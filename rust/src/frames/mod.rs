@@ -6,7 +6,7 @@
 //! one frame.  It then simplifies them: it drops the impossible sources, settles the mandatory moves (`unzip`) and
 //! counts the freedoms.  [`build_frames`] numbers the frames that have freedoms from the front (0 is played first) and
 //! merges those with the same number, which gives the [`SearchFrames`] the search works on.  The next step is
-//! [`crate::model::Model::build`], which takes [`SearchFrames::columns`], and then [`crate::search`].  At the end of
+//! [`crate::model::FrameGraph::build`], which takes [`SearchFrames::columns`], and then [`crate::search`].  At the end of
 //! every game [`BoardFrames::solution`], on the frames built with the winning promotions as sources, turns them into
 //! the moves of a game.
 //!
@@ -185,7 +185,7 @@ pub struct SearchFrames<const W: usize> {
 }
 
 impl<const W: usize> SearchFrames<W> {
-    /// The frames in the shape [`crate::model::Model::build`] takes: for each frame, front first, its factors
+    /// The frames in the shape [`crate::model::FrameGraph::build`] takes: for each frame, front first, its factors
     /// and then its moves.
     pub fn columns(&self) -> Vec<Vec<u32>> {
         self.frames.iter().flat_map(|f| [f.factors.to_vec(), f.moves.to_vec()]).collect()

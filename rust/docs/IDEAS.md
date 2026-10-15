@@ -393,7 +393,7 @@ experiment.  "Pilot" refers to section 4.
   nogood's members come from two adjacent frames, so size stands in for glue, and the large nogoods are the useful
   ones (section 3).  Sound (a cache).  Measured: keeping those of ≤ 3 members changes nothing.  Not worth more.
 * *Clause minimization*: already done; a nogood is a minimal subset keeping a frame of the root unwinnable
-  (`Model::nogood`).
+  (`FrameGraph::nogood`).
 * *Restarts with phase saving*: in a branch-and-bound proof with the optimum known the tree is fixed by the bound,
   so a restart only loses work; their use in SAT (escaping heavy tails while looking for a solution) is the
   incumbent-finding phase, which is not where the time goes (section 2).  Not tried.

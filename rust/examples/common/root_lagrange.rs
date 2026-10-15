@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use taxman::bits::Bits;
 use taxman::matchbound::lagrange::{fit, LagrangeBound, Relaxation, SCALE};
 use taxman::matchbound::MatchGraph;
-use taxman::model::{FrameSet, Model, Scratch};
+use taxman::model::{FrameGraph, FrameSet, Scratch};
 use taxman::search::lagrange::FIT_STEPS;
 
 /// [`root_lagrange`]'s damping halves after this many steps without a lower bound.
@@ -40,7 +40,7 @@ pub struct RootLagrange<const W: usize> {
 #[allow(clippy::too_many_arguments)]
 pub fn root_lagrange<const W: usize>(
     graph: &MatchGraph,
-    model: &Model,
+    model: &FrameGraph,
     scratch: &mut Scratch<W>,
     root: &FrameSet<W>,
     cands: &Bits<W>,

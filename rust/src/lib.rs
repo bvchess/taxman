@@ -31,7 +31,7 @@
 //!       board::Board                   frames::BoardFrames → frames::build_frames: the frames (0 = front) and the
 //!        │                              promotion candidates; in_the_bag = the score with no promotions
 //!        ▼
-//!       search::prepare                model::Model: the root state; greedy incumbent
+//!       search::prepare                model::FrameGraph and its root FrameSet; greedy incumbent
 //!        │
 //!        ▼
 //!       search::search ───────────────► engine::run: threads, shared deque with disk spill, checkpoints

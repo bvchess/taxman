@@ -96,7 +96,7 @@ impl<const W: usize> fmt::Debug for Frame<W> {
 }
 
 /// The frames of a game, front (frame 0) first, inline: `Copy`, no heap.  Created by
-/// [`Model::build`](super::Model::build); every
+/// [`FrameGraph::build`](super::FrameGraph::build); every
 /// frame in it is reduced and winnable.  A search state is the root frame set with some candidates promoted.
 /// Equality and hashing look at the frames in use only.
 #[derive(Clone, Copy)]

@@ -10,7 +10,7 @@
 use super::searcher::{Counts, Node};
 use crate::bits::Bits;
 use crate::matchbound::MatchBound;
-use crate::model::{FrameSet, Model, Scratch};
+use crate::model::{FrameGraph, FrameSet, Scratch};
 use std::sync::{Mutex, PoisonError};
 
 /// Why a node's loop ended or a promoted child was not explored, for [`Diagnostics`].
@@ -63,9 +63,9 @@ pub struct Diagnostics {
     /// Matching bounds that did not prune, and how many of those had a heaviest matching whose candidates can
     /// all be promoted together (with at most the node's `max_add` of them), which makes the bound exact.
     pub match_open: u64,
-    pub match_open_feasible: u64,
+    pub match_open_promotable: u64,
     /// At those matching bounds: histograms of the size of the conflict from the core, and of the minimal
-    /// conflict (see [`Model::conflict_using`]).
+    /// conflict (see [`FrameGraph::conflict_using`]).
     pub core_sizes: Vec<u64>,
     pub conflict_sizes: Vec<u64>,
     /// At those matching bounds: how far one level of refinement (with the minimal conflict) lowers the bound
@@ -114,7 +114,7 @@ impl Diagnostics {
         self.failed_promotions += other.failed_promotions;
         add_all(&mut self.gaps, &other.gaps);
         self.match_open += other.match_open;
-        self.match_open_feasible += other.match_open_feasible;
+        self.match_open_promotable += other.match_open_promotable;
         add_all(&mut self.core_sizes, &other.core_sizes);
         add_all(&mut self.conflict_sizes, &other.conflict_sizes);
         add_all(&mut self.refine_drops, &other.refine_drops);
@@ -195,7 +195,7 @@ impl<'a> Probe<'a> {
         &mut self,
         scratch: &mut Scratch<W>,
         m: &mut MatchBound<'_, W>,
-        model: &Model,
+        model: &FrameGraph,
         node: &Node<W>,
         need: u64,
     ) {
@@ -203,13 +203,13 @@ impl<'a> Probe<'a> {
         self.matching_open(scratch, m, model, &node.state, node.max_add, need);
     }
 
-    /// A matching bound that did not prune (it is at least `need`): is its heaviest matching a feasible
+    /// A matching bound that did not prune (it is at least `need`): is its heaviest matching a promotable
     /// completion, and what would one level of conflict refinement do?
     pub(super) fn matching_open<const W: usize>(
         &mut self,
         scratch: &mut Scratch<W>,
         m: &mut MatchBound<'_, W>,
-        model: &Model,
+        model: &FrameGraph,
         state: &FrameSet<W>,
         max_add: u32,
         need: u64,
@@ -217,8 +217,8 @@ impl<'a> Probe<'a> {
         let chosen = m.chosen();
         let value = m.value();
         self.local.match_open += 1;
-        let feasible = chosen.len() <= max_add && model.can_promote_all_using(scratch, state, &chosen);
-        self.local.match_open_feasible += u64::from(feasible);
+        let promotable = chosen.len() <= max_add && model.can_promote_all_using(scratch, state, &chosen);
+        self.local.match_open_promotable += u64::from(promotable);
         if let Some(core) = model.conflict_using(scratch, state, &chosen, false) {
             bump(&mut self.local.core_sizes, core.len() as usize);
             let conflict = model.conflict_using(scratch, state, &chosen, true).expect("a conflict");

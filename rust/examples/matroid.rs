@@ -67,7 +67,7 @@ use taxman::game::Optimal;
 use taxman::json::Json;
 use taxman::matchbound::lagrange::SCALE;
 use taxman::matchbound::{MatchBound, MatchGraph};
-use taxman::model::{FrameSet, Model, Scratch};
+use taxman::model::{FrameGraph, FrameSet, Scratch};
 use taxman::search::{stat, Gf2Branching, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
 use taxman::tactics::Tactics;
 
@@ -105,7 +105,7 @@ struct FrameSpace {
 }
 
 impl FrameSpace {
-    fn new<const W: usize>(model: &Model, factors: &Bits<W>, moves: &Bits<W>, max: u32) -> Result<Self, String> {
+    fn new<const W: usize>(model: &FrameGraph, factors: &Bits<W>, moves: &Bits<W>, max: u32) -> Result<Self, String> {
         let mut coord = vec![u32::MAX; max as usize + 1];
         for (k, y) in factors.iter().enumerate() {
             coord[y as usize] = k as u32;
@@ -135,7 +135,7 @@ impl FrameSpace {
     }
 
     /// The vector of the mover `u` (its maximal factors among the frame's factors).
-    fn vector(&self, model: &Model, u: u32) -> Vec<u64> {
+    fn vector(&self, model: &FrameGraph, u: u32) -> Vec<u64> {
         let mut v = vec![0u64; self.words];
         for &q in model.graph().factors(u) {
             if let Some(&c) = self.coord.get(usize::from(q)) {
@@ -203,7 +203,7 @@ fn meet_bits(v: &[u64]) -> Vec<usize> {
     out
 }
 
-fn frame_matroids<const W: usize>(model: &Model, state: &FrameSet<W>, cands: &Bits<W>) -> FrameMatroids {
+fn frame_matroids<const W: usize>(model: &FrameGraph, state: &FrameSet<W>, cands: &Bits<W>) -> FrameMatroids {
     let frames = state.frames();
     let max = frames.iter().flat_map(|f| f.factors.max().into_iter().chain(f.moves.max())).max().unwrap_or(0);
     let max = max.max(cands.max().unwrap_or(0));

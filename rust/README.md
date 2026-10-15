@@ -536,7 +536,7 @@ second build's chain, what the games assume).
    |                                   and merged; candidates; in_the_bag
    |      no candidates ...... the game with no promotions   method=trivial      proof=trivial
    |  [4] search ............. method=search                 proof=exhausted | cap
-   |        Board::prepare             search::prepare: model::Model::build -> the root FrameSet; greedy set;
+   |        Board::prepare             search::prepare: model::FrameGraph::build -> the root FrameSet; greedy set;
    |                                   max_total; the search::Problem it poses, and its digest
    |        same_search ...... one of the 8 games before it posed the same problem and settled it: its promotions
    |                                                         method=repeat       proof=same_search
@@ -618,7 +618,7 @@ the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#t
   set.
 * **in the bag** (`in_the_bag`, the Java's `inTheBag`): what the game with no promotions scores.
 * **max_total** (`maxTotalPromotions`): the most promotions the frames' freedoms allow.
-* **the frame model**: this decomposition and its assumptions (section 1).  `model::Model` is the immutable factor
+* **the frame model**: this decomposition and its assumptions (section 1).  `model::FrameGraph` is the immutable factor
   graph and home frames, not "the model".
 
 ### The search
@@ -662,7 +662,7 @@ the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#t
   kept); (2) the eight board sizes before a game among which it looks for one whose search it repeats
   (`SAME_SEARCH_WINDOW`); (3) the probe's windows, a checkpoint resumed for 50,000 steps (DESIGN.md, "Performance").
 * **ceiling**: `n + score(n-1)`, which no game of n can exceed; a score that reaches it needs no search to prove (it is
-  recorded as a `results::Certificate`).  As a bound on the promotion *sum* it is `n + score(n-1) - in_the_bag`, which
+  recorded as a `results::CeilingProof`).  As a bound on the promotion *sum* it is `n + score(n-1) - in_the_bag`, which
   the results lines and the tactic call `cap` (proof `cap`, `reached_cap`, `setup.cap`, tactic `prev_cap`).
 * **prime formula**: for a prime n, the game of n - 1 with its first move replaced by n (tactic `prime_shortcut`, proof
   `prime_formula`).
@@ -710,7 +710,7 @@ comment that is worth reading first; section 6 above is the map of how the piece
 4. `src/json.rs`: the small JSON reader and writer.  Skim; it matters once you read results lines.
 5. `src/hives.rs`: sources, factors, the setup's frames, unzip, impossible moves, freedoms.
 6. `src/frames.rs`: the frames numbered from the front and merged; the candidates.
-7. `src/model/`: `mod.rs` says what is where: `Frame`, `FrameSet` (`frame.rs`), `Model`, winnability and reduction
+7. `src/model/`: `mod.rs` says what is where: `Frame`, `FrameSet` (`frame.rs`), `FrameGraph`, winnability and reduction
    (`peel.rs`), promotion (`promote.rs`), then conflicts (`conflict.rs`) and nogoods (`nogoods.rs`).
 8. `src/accelerate.rs`: the shortcuts from the game of n - 1 (read the comment of `prime_shortcut` for the proof of the
    prime shortcut), and the last step from promotions to moves.

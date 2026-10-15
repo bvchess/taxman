@@ -29,7 +29,7 @@
 //!
 //! The matching check of a node or a child is `Stepper::check` with `refine::Refiner::top`: the matching bound
 //! ([`crate::matchbound`]), the forced members, the conflict of the heaviest matching (the smallest the nogood table
-//! knows, [`crate::model::Nogoods`], else [`Model::conflict_using`](crate::model::Model::conflict_using)), and the
+//! knows, [`crate::model::Nogoods`], else [`FrameGraph::conflict_using`](crate::model::FrameGraph::conflict_using)), and the
 //! refinement; then, where they leave it open, the Lagrangian bound over the nogoods and the forced members it
 //! finds (`lagrange::Lagrangian::check`).  The tactics that switch these pieces are the fields of
 //! [`SearchTactics`].
@@ -40,7 +40,7 @@
 //!   matching bound: no completion has more promotions than the freedoms allow (see [`crate::model::FrameSet`]),
 //!   nor larger ones.
 //! * The matching bound: [`crate::matchbound`].  Conflicts:
-//!   [`Model::conflict_using`](crate::model::Model::conflict_using); nogoods: [`crate::model::Nogoods`];
+//!   [`FrameGraph::conflict_using`](crate::model::FrameGraph::conflict_using); nogoods: [`crate::model::Nogoods`];
 //!   refinement and forced members: `refine::Refiner` and `refine::strongest`; the rule-outs of children:
 //!   `Stepper::make_child`; the Lagrangian bound and its forced members: [`crate::matchbound::lagrange`] and
 //!   [`lagrange`].

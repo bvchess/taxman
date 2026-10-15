@@ -21,7 +21,7 @@ use taxman::engine::{self, EngineConfig, Start};
 use taxman::gf2::Gf2Graph;
 use taxman::json::Json;
 use taxman::matchbound::MatchGraph;
-use taxman::model::{FrameSet, Model, Scratch};
+use taxman::model::{FrameGraph, FrameSet, Scratch};
 use taxman::numtheory::Tables;
 use taxman::results::Assumptions;
 use taxman::search::lagrange::Refits;
@@ -257,7 +257,7 @@ pub struct Outcome<const W: usize> {
 /// Searching from a unit with an incumbent worth less than the best completion (and a payload that is not a
 /// completion) tests every pruning at once: if one loses every best completion, the fake incumbent survives.
 pub struct Game<const W: usize> {
-    pub model: Model,
+    pub model: FrameGraph,
     pub root: FrameSet<W>,
     pub candidates: Bits<W>,
     pub max_total: u32,
@@ -266,7 +266,7 @@ pub struct Game<const W: usize> {
 
 impl<const W: usize> Game<W> {
     /// The game that starts at `root` and may promote `candidates`.
-    pub fn new(model: Model, root: FrameSet<W>, candidates: Bits<W>) -> Self {
+    pub fn new(model: FrameGraph, root: FrameSet<W>, candidates: Bits<W>) -> Self {
         let max_total = root.max_promotions_among(&candidates).max(0) as u32;
         let graph = MatchGraph::new(&model, &root);
         Game { model, root, candidates, max_total, graph }
@@ -275,7 +275,7 @@ impl<const W: usize> Game<W> {
     /// The game with the frames `columns` (factors and moves per frame, front first), if every frame of the root is
     /// winnable.
     pub fn from_columns(tables: &Tables, columns: &[Vec<u32>], candidates: Bits<W>) -> Option<Self> {
-        let (model, root) = Model::build::<W>(tables, columns).ok()?;
+        let (model, root) = FrameGraph::build::<W>(tables, columns).ok()?;
         let winnable = root.frames().iter().all(|f| model.winnable(&f.moves, &f.factors));
         winnable.then(|| Game::new(model, root, candidates))
     }
@@ -408,7 +408,7 @@ impl<const W: usize> Game<W> {
         possible: &dyn Fn(&Bits<W>, &Bits<W>) -> bool,
     ) -> Option<Option<(u64, Bits<W>)>> {
         struct Dfs<'a, const W: usize> {
-            model: &'a Model,
+            model: &'a FrameGraph,
             budget: u64,
             accepts: &'a dyn Fn(&Bits<W>) -> bool,
             possible: &'a dyn Fn(&Bits<W>, &Bits<W>) -> bool,

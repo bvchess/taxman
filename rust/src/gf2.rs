@@ -59,7 +59,7 @@
 pub mod meet;
 
 use crate::bits::Bits;
-use crate::model::{FrameSet, Model};
+use crate::model::{FrameGraph, FrameSet};
 use meet::{bit, is_zero, lowest, xor, Meet, Problem, Vector};
 
 const NONE: u32 = u32::MAX;
@@ -104,7 +104,7 @@ struct FrameSpace {
 }
 
 impl FrameSpace {
-    fn new<const W: usize>(model: &Model, factors: &Bits<W>, moves: &Bits<W>, max: u32) -> Result<Self, String> {
+    fn new<const W: usize>(model: &FrameGraph, factors: &Bits<W>, moves: &Bits<W>, max: u32) -> Result<Self, String> {
         let mut coord = vec![NONE; max as usize + 1];
         for (k, y) in factors.iter().enumerate() {
             coord[y as usize] = k as u32;
@@ -134,7 +134,7 @@ impl FrameSpace {
     }
 
     /// The vector of the mover `u`: its maximal factors among the frame's factors.
-    fn vector(&self, model: &Model, u: u32) -> Vec<u64> {
+    fn vector(&self, model: &FrameGraph, u: u32) -> Vec<u64> {
         let mut v = vec![0u64; self.words];
         for &q in model.graph().factors(u) {
             if let Some(&c) = self.coord.get(usize::from(q)) {
@@ -188,7 +188,7 @@ impl Gf2Graph {
     /// The matroids of `state` (the root of a search, or any state: its frames must all be winnable) and its
     /// candidates `cands`.  Candidates that are not factors of their home frame, or are loops of either matroid
     /// (no promotable set holds them), are left out.
-    pub fn new<const W: usize>(model: &Model, state: &FrameSet<W>, cands: &Bits<W>) -> Self {
+    pub fn new<const W: usize>(model: &FrameGraph, state: &FrameSet<W>, cands: &Bits<W>) -> Self {
         let frames = state.frames();
         let max = frames.iter().flat_map(|f| f.factors.max().into_iter().chain(f.moves.max())).max().unwrap_or(0);
         let max = max.max(cands.max().unwrap_or(0));

@@ -24,7 +24,7 @@ use crate::bounds::max_additional;
 use crate::engine::{Ctx, Poll, Searcher, Stats, Unit};
 use crate::gf2::{Gf2Bound, Gf2Graph, Gf2Stats};
 use crate::matchbound::{MatchBound, MatchGraph};
-use crate::model::{ConflictCache, FrameSet, Lookup, Model, Nogoods, Scratch};
+use crate::model::{ConflictCache, FrameGraph, FrameSet, Lookup, Nogoods, Scratch};
 use std::sync::{Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
@@ -72,7 +72,7 @@ pub(super) fn get_bits<const W: usize>(bytes: &[u8]) -> Bits<W> {
 
 /// What every searcher of one search shares, read-only.
 pub struct SearchSpace<'a, const W: usize> {
-    pub model: &'a Model,
+    pub model: &'a FrameGraph,
     /// The starting state: the frames as built.
     pub root: &'a FrameSet<W>,
     /// The root's matching graph, which bounds every node.
@@ -618,7 +618,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
         self.counts.attempts += 1;
         child.checked = None;
         let added = branch.added;
-        // Several forced members are promoted together, each frame checked once (see `Model::promote_all_using`);
+        // Several forced members are promoted together, each frame checked once (see `FrameGraph::promote_all_using`);
         // one by one, each would take a freedom from its two frames, so together they fit exactly when no frame
         // they touch ends with negative freedoms.
         let promoted = if added.len() == 1 {

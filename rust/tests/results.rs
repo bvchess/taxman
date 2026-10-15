@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use taxman::game::Optimal;
 use taxman::json::Json;
-use taxman::results::{assumed_optimal, moves_digest, verify_files, Assumptions, Certificate, FileReport, Proof};
+use taxman::results::{assumed_optimal, moves_digest, verify_files, Assumptions, CeilingProof, FileReport, Proof};
 use taxman::solver::{self, GameResult, Method, SolveOptions};
 
 fn crate_path(relative: &str) -> PathBuf {
@@ -376,13 +376,13 @@ fn forged_repeats_are_refused_by_both_verifiers() {
     assert_eq!(run.status.code(), Some(0), "{}", String::from_utf8_lossy(&run.stdout));
 }
 
-/// How many games of the report in the board sizes `range` have the proof, the certificate, or no assumption.
+/// How many games of the report in the board sizes `range` have the proof, the ceiling proof, or no assumption.
 fn proofs(file: &FileReport, range: RangeInclusive<u32>, proof: Proof) -> usize {
     file.contents.games.range(range).filter(|(_, g)| g.proof == proof).count()
 }
 
-fn certificates(file: &FileReport, certificate: Certificate) -> usize {
-    file.contents.games.values().filter(|g| g.certificate == Some(certificate)).count()
+fn ceiling_proofs(file: &FileReport, ceiling_proof: CeilingProof) -> usize {
+    file.contents.games.values().filter(|g| g.ceiling_proof == Some(ceiling_proof)).count()
 }
 
 fn clean(file: &FileReport) -> usize {
@@ -465,6 +465,6 @@ fn the_committed_results_pass_the_verifier() {
     assert_eq!(by(LAST_OF_TABLE + 1..=LAST), [0, 115, 77, 314, 369]);
     assert_eq!(clean(strict), LAST as usize);
     // Scores at a proven ceiling given the game of n − 1 (what certifies a game whatever found it).
-    let ceilings = [Certificate::NPlusPrev, Certificate::PrimeFormula].map(|c| certificates(strict, c));
+    let ceilings = [CeilingProof::NPlusPrev, CeilingProof::PrimeFormula].map(|c| ceiling_proofs(strict, c));
     assert_eq!(ceilings, [694, 325]);
 }

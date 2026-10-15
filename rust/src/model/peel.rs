@@ -30,7 +30,7 @@
 //! winnable.  Every live factor of a residual move is shared with another residual move, so no order takes all of
 //! them (the last would find its factors taken), and the frame stays unwinnable however many moves are added,
 //! factors removed, or factors added that no residual move has.  Conflicts are built from it
-//! ([`Model::conflict_using`](super::Model::conflict_using)).
+//! ([`FrameGraph::conflict_using`](super::FrameGraph::conflict_using)).
 //!
 //! # Reduction
 //!
@@ -124,7 +124,7 @@ fn live_neighbours<const W: usize>(list: &[u16], live: &Bits<W>) -> (u32, u32) {
 const ONE_MOVE: u32 = 1 << 16;
 
 /// Scratch space for winnability checks.  Making one zeroes `512·W` bytes, so code that checks many promotions
-/// keeps one (one per thread) and passes it to the `*_using` methods of [`Model`](super::Model); every check
+/// keeps one (one per thread) and passes it to the `*_using` methods of [`FrameGraph`](super::FrameGraph); every check
 /// leaves it ready for the next.
 ///
 /// Inside: one cell per number, holding for a factor the count of its live moves (high 16 bits) and the XOR of

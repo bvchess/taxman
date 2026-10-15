@@ -21,7 +21,7 @@
 //!   reusable [`Scratch`].
 //! * [`Frame`], [`FrameSet`] (`frame`): one frame, and a game's frames (`Copy`, no heap); narrowing the candidates
 //!   and counting the promotions left from the freedoms.
-//! * [`Model`] (here): what every state of one game's search shares, the factor graph and each number's home
+//! * [`FrameGraph`] (here): what every state of one game's search shares, the factor graph and each number's home
 //!   frame.  Its methods promote (`promote`: why a set of promotions can be checked frame by frame) and find
 //!   conflicts and nogoods (`conflict`).
 //! * [`Nogoods`] (`nogoods`): the table of conflicts of the root that a searcher learns.
@@ -54,25 +54,24 @@ use crate::numtheory::Tables;
 
 /// Most frames a [`FrameSet`] can hold.  The frame builder gives every board up to 4095, the largest supported,
 /// at most 8 frames (all of them were checked in 2026-10: 6 frames from n = 512, 7 from 1024, 8 from 2048), and
-/// frame sets and per-frame arrays are copied whole, so they have no room to spare.  [`Model::build`] refuses
+/// frame sets and per-frame arrays are copied whole, so they have no room to spare.  [`FrameGraph::build`] refuses
 /// more (`tests/wide.rs` builds the boards where the count steps up, and the largest).
 pub const MAX_FRAMES: usize = 8;
 
 /// What every state of one game's search shares: the factor graph and each number's home frame.  Immutable
-/// and `Sync`, so search threads can share one.  (Not "the frame model" as a whole: the states are
-/// [`FrameSet`]s, and this is what interprets them.)
+/// and `Sync`, so search threads can share one.  The states are [`FrameSet`]s, and this is what interprets them.
 #[derive(Clone, Debug)]
-pub struct Model {
+pub struct FrameGraph {
     graph: FactorProvider,
     /// Home frame of each number: the frame whose factors held it when the frame set was built; 0 for numbers
     /// that were not a factor anywhere (as the Java's `FrameMapper`).
     home: Vec<u8>,
 }
 
-impl Model {
+impl FrameGraph {
     /// The Java's `FrameSet.create`: `columns` alternate factors and moves per frame, front first; each frame
     /// is reduced.  Returns the model and the starting frame set.
-    pub fn build<const W: usize>(tables: &Tables, columns: &[Vec<u32>]) -> Result<(Model, FrameSet<W>), String> {
+    pub fn build<const W: usize>(tables: &Tables, columns: &[Vec<u32>]) -> Result<(FrameGraph, FrameSet<W>), String> {
         if !columns.len().is_multiple_of(2) {
             return Err(format!("{} columns: expected factors and moves for each frame", columns.len()));
         }
@@ -115,7 +114,7 @@ impl Model {
                 home[x as usize] = i as u8;
             }
         }
-        Ok((Model { graph, home }, root))
+        Ok((FrameGraph { graph, home }, root))
     }
 
     /// The factor graph, restricted to the frames each number belongs to; valid for every frame of this model.

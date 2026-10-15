@@ -44,7 +44,7 @@ use taxman::board::Board;
 use taxman::engine::{self, Ctx, EngineConfig, Searcher, Start};
 use taxman::game::Optimal;
 use taxman::matchbound::{MatchBound, MatchGraph};
-use taxman::model::{FactorProvider, Frame, FrameSet, Model, Scratch};
+use taxman::model::{FactorProvider, Frame, FrameGraph, FrameSet, Scratch};
 use taxman::numtheory::sieve;
 use taxman::search::symmetry::{cofactors, map_set, root_pairs, swap_primes};
 use taxman::search::{Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
@@ -389,7 +389,7 @@ fn covers_mapped<const W: usize>(
 /// maximal factors in frame `h − 1` and the same users in frame `h` (the moves of the residual of frame `h` for
 /// completions within `cands`, and the members of `cands` that could be promoted into it).  Exchanging two twins is
 /// an automorphism of the node's problem restricted to `cands`.  The members of the classes of two or more.
-fn twins<const W: usize>(model: &Model, state: &FrameSet<W>, cands: &Bits<W>) -> usize {
+fn twins<const W: usize>(model: &FrameGraph, state: &FrameSet<W>, cands: &Bits<W>) -> usize {
     let g = model.graph();
     let frames = state.frames();
     let users: Vec<Bits<W>> = (0..frames.len())
@@ -420,7 +420,7 @@ fn twins<const W: usize>(model: &Model, state: &FrameSet<W>, cands: &Bits<W>) ->
 /// `None` if the node's own bound is below `need`.
 fn relevant<const W: usize>(
     m: &mut MatchBound<'_, W>,
-    model: &Model,
+    model: &FrameGraph,
     scratch: &mut Scratch<W>,
     state: &FrameSet<W>,
     promoted: &Bits<W>,
@@ -454,7 +454,7 @@ fn next(rng: &mut u64) -> u64 {
 /// A maximal subset of `cands` that can be promoted from `state`: the candidates in a random order, each kept if
 /// it can be promoted after those kept.
 fn random_maximal<const W: usize>(
-    model: &Model,
+    model: &FrameGraph,
     scratch: &mut Scratch<W>,
     state: &FrameSet<W>,
     cands: &Bits<W>,
@@ -477,7 +477,7 @@ fn random_maximal<const W: usize>(
 #[allow(clippy::too_many_arguments)]
 fn symmetry_cut<const W: usize>(
     m: &mut MatchBound<'_, W>,
-    model: &Model,
+    model: &FrameGraph,
     scratch: &mut Scratch<W>,
     state: &FrameSet<W>,
     pairs: &[(u32, u32)],

@@ -45,7 +45,7 @@
 //! * [`Symmetries`], [`RuleScratch`]: the pairs of a game as the search's rule uses them, built once per search.
 
 use crate::bits::Bits;
-use crate::model::{FrameSet, Model};
+use crate::model::{FrameGraph, FrameSet};
 use crate::numtheory;
 
 /// `x` (at least 1) with the exponents of the primes `p` and `q` exchanged; `u32::MAX` if that is more than a `u32`
@@ -111,7 +111,7 @@ fn maps_into<const W: usize>(set: &Bits<W>, p: u32, q: u32) -> bool {
 /// divisible by neither prime are fixed.  So are their maximal factors (a divisor of such a number is divisible by
 /// neither prime either), and a fixed number's list of maximal factors is its own image.
 pub fn is_root_symmetry<const W: usize>(
-    model: &Model,
+    model: &FrameGraph,
     root: &FrameSet<W>,
     candidates: &Bits<W>,
     p: u32,
@@ -175,7 +175,7 @@ fn for_each_prime_power(spf: &[u32], mut x: u32, mut f: impl FnMut(u32, u32)) {
 /// the exponent `a`.  A prime that divides no candidate cannot be part of a pair (if `p` divides a candidate and the
 /// exchange maps the candidates onto themselves, `q` divides one too), so only the primes that divide a candidate
 /// are factored and compared.
-pub fn root_pairs<const W: usize>(model: &Model, root: &FrameSet<W>, candidates: &Bits<W>) -> Vec<(u32, u32)> {
+pub fn root_pairs<const W: usize>(model: &FrameGraph, root: &FrameSet<W>, candidates: &Bits<W>) -> Vec<(u32, u32)> {
     let frames = root.frames();
     let numbers = frames.iter().fold(*candidates, |all, frame| all | frame.moves | frame.factors);
     let Some(top) = numbers.max() else { return Vec::new() };
@@ -247,7 +247,7 @@ pub struct RuleScratch {
 
 impl Symmetries {
     /// The symmetric pairs of the game at its root ([`root_pairs`]) and what the rule needs of them.
-    pub fn of<const W: usize>(model: &Model, root: &FrameSet<W>, candidates: &Bits<W>) -> Self {
+    pub fn of<const W: usize>(model: &FrameGraph, root: &FrameSet<W>, candidates: &Bits<W>) -> Self {
         Self::with_pairs(root_pairs(model, root, candidates), candidates)
     }
 

@@ -7,13 +7,13 @@
 
 use crate::bits::Bits;
 use crate::matchbound::MatchBound;
-use crate::model::{ConflictCache, FrameSet, Lookup, Model, Nogoods, Scratch};
+use crate::model::{ConflictCache, FrameGraph, FrameSet, Lookup, Nogoods, Scratch};
 
 /// The matching bound of a node refined by conflicts (tactic `match_refine`), on top of a [`MatchBound`] whose
 /// top level is the node, with `state` and the candidates `C` of that level.
 ///
 /// If `Q*` can really be promoted from `state`, it is the best completion and the bound is exact.  Otherwise some
-/// subset `K ⊆ Q*` cannot be promoted, a *conflict* ([`Model::conflict_using`]), and every completion `F ⊆ C` that
+/// subset `K ⊆ Q*` cannot be promoted, a *conflict* ([`FrameGraph::conflict_using`]), and every completion `F ⊆ C` that
 /// can be promoted leaves out some member of `K` (a subset of a promotable set is promotable).  With `K`'s
 /// members `k₁ < k₂ < … < k_r`, every such `F` is in exactly one of the branches "`k₁ … k_{j−1}` in `F`, `k_j`
 /// not", and the best completion is at most the largest of the branches' matching bounds: the matching with
@@ -35,7 +35,7 @@ use crate::model::{ConflictCache, FrameSet, Lookup, Model, Nogoods, Scratch};
 /// them, so a conflict all of whose members are forced leaves the node with no such completion.
 pub(super) struct Refiner<'r, 'g, const W: usize> {
     pub(super) m: &'r mut MatchBound<'g, W>,
-    pub(super) model: &'r Model,
+    pub(super) model: &'r FrameGraph,
     pub(super) scratch: &'r mut Scratch<W>,
     pub(super) state: &'r FrameSet<W>,
     pub(super) need: u64,
@@ -64,10 +64,10 @@ pub(super) struct Learning<'r, const W: usize> {
 }
 
 /// Where a node's conflicts come from (shared by [`Refiner`] and the GF(2) check): the smallest the nogood table
-/// knows within a set (tactic `nogoods`), else a minimal conflict computed by a peel ([`Model::conflict_cached`]),
+/// knows within a set (tactic `nogoods`), else a minimal conflict computed by a peel ([`FrameGraph::conflict_cached`]),
 /// which is then learned as a nogood; either way kept in `known` for the node and its subtree.
 pub(super) struct Seek<'r, 'l, const W: usize> {
-    pub(super) model: &'r Model,
+    pub(super) model: &'r FrameGraph,
     pub(super) scratch: &'r mut Scratch<W>,
     pub(super) cache: &'r mut ConflictCache<W>,
     pub(super) state: &'r FrameSet<W>,

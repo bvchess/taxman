@@ -7,7 +7,7 @@ use crate::frames::build_frames;
 use crate::json::Json;
 use crate::matchbound::MatchBound;
 use crate::model::test_support::*;
-use crate::model::{ConflictCache, Model, Nogoods, Scratch};
+use crate::model::{ConflictCache, FrameGraph, Nogoods, Scratch};
 use crate::numtheory::Tables;
 use crate::test_support::TempDir;
 use std::thread;
@@ -35,13 +35,13 @@ fn prepare_golden<const W: usize>(g: &Golden, tactics: SearchTactics) -> Prepare
     prepare::<W>(&Tables::new(g.n), &g.columns, &Bits::from_slice(&g.candidates), tactics).unwrap()
 }
 
-/// Searches and checks that the result is complete, made of candidates, and feasible.
+/// Searches and checks that the result is complete, made of candidates, and promotable.
 fn search_checked<const W: usize>(p: &Prepared<W>, threads: usize, what: &str) -> SearchResult<W> {
     let r = search(p, &config(threads), None, None, false).unwrap();
     assert!(r.completed, "{what}: incomplete");
     assert!(r.promotions.is_subset(&p.candidates), "{what}: {:?} are not all candidates", r.promotions);
-    let feasible = p.model.promote_all_using(&mut Scratch::new(), &p.root, &r.promotions);
-    assert!(feasible.is_some(), "{what}: {:?} cannot be promoted", r.promotions);
+    let promotable = p.model.promote_all_using(&mut Scratch::new(), &p.root, &r.promotions);
+    assert!(promotable.is_some(), "{what}: {:?} cannot be promoted", r.promotions);
     r
 }
 
@@ -73,7 +73,7 @@ fn golden_games_up_to_400_match_the_java() {
 /// and the conflicts it keeps, carried down the path, stay conflicts.  Returns the numbers of verdicts, of
 /// prunings the plain matching bound would not make, and of exact completions.
 fn refinement_soundness<const W: usize>(g: &Golden, rng: &mut Rng) -> [u64; 3] {
-    let (model, root) = Model::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
+    let (model, root) = FrameGraph::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
     let all = Bits::<W>::from_slice(&g.candidates);
     let max_total = root.max_promotions_among(&all).max(0) as u32;
     let graph = MatchGraph::new(&model, &root);
@@ -170,7 +170,7 @@ fn refined_matching_bound_is_sound() {
 /// reaches `need`.  Returns the numbers of nodes checked and of forced members.  Two paths per game (six took
 /// 3.5 s and found 7,400 nodes and 18,000 forced members, 15 to 60 times what the test asks for).
 fn forced_soundness<const W: usize>(g: &Golden, rng: &mut Rng) -> [u64; 2] {
-    let (model, root) = Model::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
+    let (model, root) = FrameGraph::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
     let all = Bits::<W>::from_slice(&g.candidates);
     let max_total = root.max_promotions_among(&all).max(0) as u32;
     let graph = MatchGraph::new(&model, &root);
@@ -269,7 +269,7 @@ fn candidates_can_be_promoted_from_the_root<const W: usize>(ns: impl Iterator<It
     for n in ns {
         let tables = Tables::new(n);
         let frames = build_frames::<W>(&tables);
-        let (model, root) = Model::build::<W>(&tables, &frames.columns()).unwrap();
+        let (model, root) = FrameGraph::build::<W>(&tables, &frames.columns()).unwrap();
         for x in frames.candidates.iter() {
             assert!(model.can_promote_using(&mut scratch, &root, x), "n={n}: candidate {x} cannot be promoted");
         }

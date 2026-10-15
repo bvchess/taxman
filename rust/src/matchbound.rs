@@ -10,7 +10,7 @@
 //! whichever is taken first takes two factors and leaves one for the other two.
 //!
 //! Promoting a set `Q` of candidates from a state succeeds exactly when every frame is winnable with all of `Q`
-//! promoted at once (see [`Model::winnable`]).  So for a promotable `Q` there is an assignment that gives every
+//! promoted at once (see [`FrameGraph::winnable`]).  So for a promotable `Q` there is an assignment that gives every
 //! move of every frame `i` a distinct maximal factor among frame `i`'s factors and every `x ∈ Q` a distinct
 //! maximal factor among the factors of frame `home(x) − 1`, using no member of `Q` as a factor.  The *matching
 //! bound* is the largest `sum(Q)` over the `Q ⊆ cands` that have such an assignment: at least the sum of the best
@@ -56,7 +56,7 @@
 //!
 //! An edge counts when its upper end is required or a candidate and its lower end is not required.  The frames
 //! of a state reached by promotions are the root's minus the pairs a reduction drops (a move left with a single
-//! factor takes it, see [`Model`]); the graph keeps those pairs, but every matching that matches the required
+//! factor takes it, see [`FrameGraph`]); the graph keeps those pairs, but every matching that matches the required
 //! vertices pairs them up just as the reduction did, so the optimum is the same.
 //!
 //! # The incremental solver
@@ -83,7 +83,7 @@
 pub mod lagrange;
 
 use crate::bits::Bits;
-use crate::model::{FrameSet, Model};
+use crate::model::{FrameGraph, FrameSet};
 use std::collections::VecDeque;
 
 // ---------------------------------------------------------------------------------------------------------
@@ -95,7 +95,7 @@ use std::collections::VecDeque;
 ///
 /// This is the reference for [`MatchBound`]: a min-cost flow, solved by successive shortest paths with
 /// Bellman–Ford, clear rather than fast (milliseconds on large games).
-pub fn match_bound<const W: usize>(model: &Model, state: &FrameSet<W>, cands: &Bits<W>) -> u64 {
+pub fn match_bound<const W: usize>(model: &FrameGraph, state: &FrameSet<W>, cands: &Bits<W>) -> u64 {
     match_bound_weighted(model, state, cands, i64::from).map_or(0, |(value, _)| value as u64)
 }
 
@@ -104,7 +104,7 @@ pub fn match_bound<const W: usize>(model: &Model, state: &FrameSet<W>, cands: &B
 /// candidates; `None` when the moves of `state` cannot all be matched.  The reference for the Lagrangian bound
 /// ([`lagrange`]), which changes the weights.
 fn match_bound_weighted<const W: usize>(
-    model: &Model,
+    model: &FrameGraph,
     state: &FrameSet<W>,
     cands: &Bits<W>,
     weight: impl Fn(u32) -> i64,
@@ -276,7 +276,7 @@ pub struct MatchGraph {
 impl MatchGraph {
     /// The graph of `root`: its moves and factors, each move joined to its maximal factors in its frame, and each
     /// factor of a frame behind frame 0 to its maximal factors in the frame in front of it.
-    pub fn new<const W: usize>(model: &Model, root: &FrameSet<W>) -> Self {
+    pub fn new<const W: usize>(model: &FrameGraph, root: &FrameSet<W>) -> Self {
         let frames = root.frames();
         let mut num: Vec<u32> = frames.iter().flat_map(|f| f.moves.iter().chain(f.factors.iter())).collect();
         num.sort_unstable();
@@ -1292,7 +1292,7 @@ impl<'g, const W: usize> MatchBound<'g, W> {
 
 /// The matching bound of one state, with [`MatchBound`] and no search around it: builds the graph with `state`
 /// as the root and solves it from scratch.  Equal to [`match_bound`], and faster.
-pub fn match_bound_once<const W: usize>(model: &Model, state: &FrameSet<W>, cands: &Bits<W>) -> u64 {
+pub fn match_bound_once<const W: usize>(model: &FrameGraph, state: &FrameSet<W>, cands: &Bits<W>) -> u64 {
     let graph = MatchGraph::new(model, state);
     let mut solver = MatchBound::new(&graph);
     solver.reset(&Bits::EMPTY, cands);
@@ -1312,17 +1312,17 @@ mod tests {
     use std::hint::black_box;
     use std::time::Instant;
 
-    pub(super) fn setup<const W: usize>(g: &Golden) -> (Model, FrameSet<W>, Bits<W>) {
-        let (model, root) = Model::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
+    pub(super) fn setup<const W: usize>(g: &Golden) -> (FrameGraph, FrameSet<W>, Bits<W>) {
+        let (model, root) = FrameGraph::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
         (model, root, Bits::from_slice(&g.candidates))
     }
 
     // ---- the definition, by exhaustion ----
 
     /// Whether each of `movers` can be given its own maximal factor among `factors` (Kuhn's augmenting paths).
-    fn covers<const W: usize>(model: &Model, movers: &[u32], factors: &Bits<W>) -> bool {
+    fn covers<const W: usize>(model: &FrameGraph, movers: &[u32], factors: &Bits<W>) -> bool {
         fn augment<const W: usize>(
-            model: &Model,
+            model: &FrameGraph,
             movers: &[u32],
             factors: &Bits<W>,
             k: usize,
@@ -1351,7 +1351,7 @@ mod tests {
     /// The matching bound straight from its definition: the best of all subsets `Q` of the candidates that can
     /// be promoted (at most 14 of them) such that every frame's moves plus the members of `Q` promoted into it
     /// can be given distinct factors among its factors minus the members of `Q` promoted out of it.
-    fn brute_bound<const W: usize>(model: &Model, state: &FrameSet<W>, cands: &Bits<W>) -> u64 {
+    fn brute_bound<const W: usize>(model: &FrameGraph, state: &FrameSet<W>, cands: &Bits<W>) -> u64 {
         let frames = state.frames();
         let movable: Vec<(u32, usize)> = (1..frames.len())
             .flat_map(|i| frames[i].factors.intersect(cands).to_vec().into_iter().map(move |x| (x, i)))
@@ -1419,7 +1419,7 @@ mod tests {
         // Frame 0: factors 4, 6, 10 and moves 12 (pays with 4 or 6) and 20 (4 or 10); frame 1: the factor 30.
         // Promoting 30 adds the move 30 (6 or 10) to frame 0: matchable, 12→4, 20→10, 30→6, but not winnable.
         let columns = vec![vec![4, 6, 10], vec![12, 20], vec![30], vec![]];
-        let (model, root) = Model::build::<1>(&Tables::new(30), &columns).unwrap();
+        let (model, root) = FrameGraph::build::<1>(&Tables::new(30), &columns).unwrap();
         let cands = Bits::from_slice(&[30]);
         assert!(!model.can_promote(&root, 30));
         assert_eq!(best_completion(&model, &root, &cands, u32::MAX), 0);
@@ -1440,7 +1440,7 @@ mod tests {
     /// loop takes the largest candidate, sometimes descends into the child it makes, then goes on with the
     /// candidates shrunk.  Evaluations are random too, so changes pile up between them.
     struct Walk<'a, const W: usize> {
-        model: &'a Model,
+        model: &'a FrameGraph,
         rng: Rng,
         /// Loop iterations left.
         budget: usize,
@@ -1754,7 +1754,7 @@ mod tests {
             });
         }
         eprintln!(
-            "matching bound soundness: {checks} states, exact at {tight}, all candidates feasible at {everything}"
+            "matching bound soundness: {checks} states, exact at {tight}, all candidates promotable at {everything}"
         );
         assert!(checks > 3000);
     }
