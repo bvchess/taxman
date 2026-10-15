@@ -188,6 +188,13 @@ those of the page the row points to; a game is named by its board size, and time
 | The root's GF(2) gap past 2175, and the trees of the c8g chain's dear games | [wall regime](#the-wall-regime-2026-10) | measured | over the unseeded start +57 per 100 n, 1,300 to 2,600 at 3100-4095 (upper bounds; the start is 0 to 403 below the optimum where known); the dear games past 2175 have 2170's gaps (636 to 887) and 4 to 18 times its tree |
 | A looser start incumbent (the optimum less 200 to 2,000) to make large GF(2) trees on known games | [wall regime](#the-wall-regime-2026-10) | not kept | 1215: 10,371 steps become 37,709 and 47,757, and no more: the search finds the optimum early |
 | The root gaps of every exhausted search of the c8g chain 2176-2276, against the fit of 1301-2175's trees on their gaps (log10 nodes ≈ 3.24 + G/255) | [agenda 7.1](AGENDA.md#71-the-root-gaps-of-the-c8g-chain) | measured | mean residual +0.08 ± 0.08 decades over the 39 (sd 0.50): the trees past 2175 follow their gaps, and the wall regime's 4 to 18 times came from the dear games alone; the gaps rise (mean 672 against 516 at 2101-2175); residuals in runs (2250-2275 +0.35 to +1.09) |
+| The true root gap of every searched game of the EC2 chain past 2175 (509 games, 2176-3312: `wall nodes --nodes 1`), and its growth in n (C5) | [the gap past 2175](#the-gap-past-2175-2026-10) | measured | mean 818 (341 to 1,443) against 391 at 1301-2175, risen from about 450 at 2100 to 660 at 2160-2200, then in waves of a hundred games and more; +37 per 100 n over 1301-3312 (22 to 50 by blocks of 100 games; 6 to 63 by blocks of 200), +25 over 2176-3312 alone (-43 to +83); G/n steady at 300; neither +7 (a flat stretch below 2150) nor +57 (4% of the draws) |
+| The window's speculation and the threads in a game's nodes (the scaling run's windows 1, 4, 16 and 32 against the EC2 chain's own, game by game) | [the gap past 2175](#the-gap-past-2175-2026-10) | measured | a window of 1 or 4: -0.04 ± 0.03 decades by game (-0.11 over 2226-2276, +0.02 over 2277-2336); reruns at 16 reproduce the chain to 0.055 decades a game; 192 against 64 threads -0.02; one against 64 threads +0.02 |
+| What at the root explains the cost model's residuals (A4: the heaviest set's conflicts, the cores per frame, forced members, the start's distance from the optimum, sizes; 400 searches of 2176-3312) | [the gap past 2175](#the-gap-past-2175-2026-10), [agenda A4](AGENDA.md#a4-what-the-cost-per-unit-of-gap-is-made-of-a-diagnostic-then-branching-on-cores) | measured (A4 killed) | the best single feature explains 13% (19% against the gap alone) of the residual's variance, none adds to the cost per unit of gap, all 18 together are worth nothing held out; the dear games are the high-gap games (47 searches of gap 1,100 or more hold 77% of the nodes); the first conflict has 13.3 members and falls 0.7 per 100 n |
+| The gap's waves against the arithmetic of n (counts of numbers of three or more distinct primes, and of primes, by tier of the board) | [the gap past 2175](#the-gap-past-2175-2026-10) | measured; lead | held-out R² 0.31 over 2176-3312 (n alone -0.12) and 0.68 over 1301-3312 (0.52): a third of the waves' variance is arithmetic; not kept as a model |
+| The committed chain's 391 searched games of 1301-2175 solved again by the EC2 chain's build (`taxman solve 1301-2175 --threads 1`, in order): trees against the committed chain's | [the gap past 2175](#the-gap-past-2175-2026-10) | measured | the same scores and proofs; 0.29 times the nodes (0.27 at 1301-1500, 0.41 at 2101-2175; the Graviton calibration's chain 0.44 on 2176-2276), 24 minutes of one thread; the committed chain's cost model (3.24 + G/255) is for a build with 3.4 times the trees |
+| The cost model refitted on one build, 1301-3312 (714 exhausted searches): the gap alone and scaled by a power of n, tested out of sample | [the gap past 2175](#the-gap-past-2175-2026-10), [agenda 2](AGENDA.md#2-the-diagnosis-of-the-wall) | measured | 2.67 + G/247 (R² 0.85, sd 0.47) and 2.30 + 0.0479 G/n^0.3 (R² 0.875, sd 0.44); a decade per 250 of gap as before; the gap alone overpredicts later stretches by 0.2-0.6 decades, p = 0.3 has the smallest worst bias (0.27) and 0 to 0.5 bracket it (the two chains disagree: 0-0.2 across 2175, 0.4-0.5 within 2176-3312) |
+| The cost of a game at 4000, 5000 and 6000 and the board that 24 hours on a `c8g.16xlarge` reach (Monte Carlo of the cost model, the gap's waves and the observed residuals) | [the gap past 2175](#the-gap-past-2175-2026-10), [agenda 2](AGENDA.md#2-the-diagnosis-of-the-wall) | measured; estimate | median searched game 3-6, 13-32 and 48-166 million nodes (90th percentile 40 times the median); a game costs ×10 per 1,050-1,250 n (830-1,500); a day reaches about 4,100 (3,700-4,850), 4000 in 13-20 hours past 3313, 5000 in 4-10 days; the old +57 regime would have reached 3,830-3,890 |
 | Other fields and signings beside GF(2): is the parity bound's heaviest set at the root dependent over GF(3), GF(5), GF(7) or the rationals, with 0/1 entries or Koszul signs (its peel residual's rank) | [agenda 7.2](AGENDA.md#72-other-fields-at-the-roots-of-the-whole-game) | measured; open as a bound ([agenda A1](AGENDA.md#a1-a-bound-over-several-fields-and-signings-a-change-of-slope-if-its-share-holds)) | of the 1,055 games of 78-1300 whose parity bound exceeds opt(n), 566 dependent in some field or signing (GF(3) with 0/1 entries 412), rising from 49% at 300-599 to 73% at 1100-1300; none over the rationals; 54% of the 658 square residuals have determinant ±1 under both entries |
 | Does the root's GF(2) heaviest set have the optimum's size? (`bench/gf2/roots.jsonl`'s `size` against `strict.jsonl`'s promotions, 1301-2175) | [agenda C4](AGENDA.md#4-conjectures) | measured | 758 of the 760 searched and repeated games; at 1320 and 1322 the heaviest set has 77 members and the optimum 78 (`max_total`) |
 | Barring each member of U\* in the parity bound at the root, against opt(n) (a certificate that every optimal set holds it) | [agenda 7.3](AGENDA.md#73-barred-bounds-on-the-upper-part) | measured; open ([agenda A2](AGENDA.md#a2-certify-the-frame-model-then-prove-with-its-facts-a-change-of-slope-for-the-proven-wall)) | certifies 207 of 224 (600), 339 of 377 (1000), 472 of 490 (1300); the open ones within the root's gap, the largest prime among them |
@@ -377,6 +384,7 @@ single-sacrifice route) have their row above.
 | [The wiki's open questions](#the-wikis-open-questions-2026-10) | must a move of an optimal game ever pay three numbers of tax, and which games can be adapted from the game of n − 1? | three: possible (from 40; the committed games from 1250), only for a move with three distinct primes (a theorem), never forced to 2175; the page's procedure: 45% of 2..1000, the 70% being the Java's reuse; optimal exactly when it skips a move worth δ(n); proven always at primes and 2p, never when δ(n) is coprime to a composite n | the entry (no solver change) |
 | [Round B: the chain on many threads](#round-b-the-chain-on-many-threads-2026-10) | can the chain keep 64 to 192 threads busy: games in flight with the threads moved between their searches, and what does a thread lose at many threads? | a window of games in flight with the proofs of a range solved in order (line for line with one thread); on 4 threads 1..1300 16% faster and 2226..2249 no slower, after speculation that cost 50% was made subordinate (reclaims, suspension, hints, deferring); the engine reports the units' starts, ramp and tail: on 4 threads a step 7% dearer, none of it in the units' starts; 64 and 192 threads are commands | 00d4b68, 9ca2c13, 8462d2c, af545ac, 3815e82, 13804bb, e4bfc4e and the entry |
 | [Scaling to 192 threads](#scaling-to-192-threads-2026-10) | where does a thread's time go at 64 and 192 threads on Graviton4, what does the window do there, and should the chain run on a `c8g.48xlarge` rather than a `c8g.16xlarge`? | at 64 threads the step costs what it does on one, the loss the units' first nodes and the ramp and tail; at 192 the second socket makes the step 7-10% dearer, lock 0.00-0.02%; a window of 16 makes the games past 2225 20-32% slower on 64 threads, 4 is the best measured; the 48xlarge 1.9-2.7 times as fast at 1.1-1.9 times the cost a game: the 16xlarge stays; $1.83 spent | 55287ff (no solver change) and the entry |
+| [The gap past 2175](#the-gap-past-2175-2026-10) | what are the true root gaps of the EC2 chain's games, how do they grow, do they explain its trees (the 2340s, 3174-3176, 3300), what at the root is left, and what will 4000 to 6000 cost? | 509 gaps of 341 to 1,443 (mean 818), +37 per 100 n over 1301-3312 and G/n steady at 300: neither of the two regimes; the current build's trees are 0.29 times the committed chain's, a decade of nodes per 250 of gap, the gap counting in units of n^0.3 (0 to 0.5 bracket); the dear games are the games of high gap, nothing at the root explains the rest (A4 killed); a game costs ×10 per 1,050-1,250 n and a day on a `c8g.16xlarge` reaches about 4,100 | ee03872 (no solver change) and the entry |
 
 ## The port and its first improvements
 
@@ -4904,3 +4912,333 @@ price did not move), **$1.83**, with the 30 GB root volume and the S3 copies add
 interruption for want of capacity at 04:33:49, the two-minute notice, as the last run was ending (04:34:33, its
 outputs copied to S3); the terminate call came first, and nothing was lost.  Afterwards no instance, volume, spot
 request or security group of the run was left.
+
+## The gap past 2175 (2026-10)
+
+*Question.*  The [research agenda](AGENDA.md#6-what-the-cloud-runs-should-measure) left one measurement to the chain
+past 2175: the true root GF(2) gap of every searched game, against the chain's own optima.  It says which of two
+regimes of the gap's growth the wall follows (C5: +7 per 100 n, the committed games', or +57, the unseeded starts'
+upper bound to 4095, which would put the wall between 3000 and 4000), whether the cost model of 1301-2175 (`log10
+nodes ≈ 3.24 + G/255`) carries over, whether the gaps explain the dear games (2343 and 2346 with 175 million and 1.14
+billion nodes, 3174-3176 about 210 million each, 3300 635 million) or something else at the root does (A4, C6), and so
+what a game costs at 4000, 5000 and 6000 and how far 24 hours on one `c8g.16xlarge` reach.  The EC2 chain (the run
+past 2175 on a `c8g.16xlarge`: `taxman solve`, 64 threads, the code of 55287ff, a window of 16 to about game 3310 and
+4 after it) had made 2176..3314 in 6.4 hours when a copy of its results file was taken (2026-10-15).
+
+*What was run*, on the laptop (one process at a time under `nice -n 10`, one thread, no solver change, nothing on AWS;
+the commands and the data are in [bench/wall/](../bench/wall/README.md)):
+
+* `examples/wall.rs nodes --nodes 1` over the copy, for its 509 searched games past 2175 (400 `exhausted`, 109 `cap`:
+  ended by the ceiling; a repeat poses its source's problem, and every source is among them): the root's GF(2) bound
+  less the optimum.  9 minutes.
+* `examples/matroid.rs lagrange --limit 0` and `cores` for the same games: the conflicts of the root bound's heaviest
+  set and the cores it runs into.  3 minutes.  That example's own intersection (`common/meet.rs`) and the crate's agree
+  on the gaps of all 509 games.
+* `taxman solve 1301-2175 --threads 1` on the committed chain cut after game 1300: its 391 searched games as the
+  EC2 chain's build solves them, in order (24 minutes); every score and proof kind is the committed chain's.
+  Why this was needed is in 4.
+* `bench/wall/gap.py`: the tables ([gap_output.md](../bench/wall/gap_output.md)); `gaps_chain.jsonl` is the per-game
+  data (n, gap, nodes, seconds, proof, threads, the root's sizes), `anatomy_chain.jsonl` and `resolved_1301_2175.jsonl`
+  the others.
+
+**1. The gaps.**  The 509 searched games of 2176..3312 have root gaps from 341 to 1,443 (mean 818, sd 211), against 125
+to 887 (mean 391) for the 391 searched games of 1301-2175:
+
+| n | searched games | mean gap | sd | min | max | mean 1000 G/n |
+|---|---|---|---|---|---|---|
+| 1301-1500 (committed) | 88 | 370 | 126 | 125 | 590 | 261 |
+| 1501-1700 | 90 | 404 | 85 | 261 | 561 | 254 |
+| 1701-1900 | 87 | 365 | 114 | 192 | 543 | 202 |
+| 1901-2100 | 90 | 348 | 104 | 179 | 598 | 173 |
+| 2101-2200 (to 2175 committed) | 47 | 560 | 124 | 398 | 887 | 260 |
+| 2201-2300 | 44 | 728 | 148 | 566 | 1126 | 323 |
+| 2301-2400 | 46 | 961 | 181 | 686 | 1346 | 408 |
+| 2401-2500 | 45 | 747 | 135 | 547 | 1048 | 305 |
+| 2501-2600 | 43 | 788 | 129 | 439 | 950 | 309 |
+| 2601-2700 | 46 | 528 | 106 | 341 | 731 | 199 |
+| 2701-2800 | 47 | 820 | 48 | 717 | 875 | 298 |
+| 2801-2900 | 48 | 687 | 32 | 612 | 774 | 241 |
+| 2901-3000 | 42 | 662 | 111 | 482 | 818 | 224 |
+| 3001-3100 | 44 | 912 | 142 | 766 | 1239 | 299 |
+| 3101-3200 | 45 | 1126 | 135 | 924 | 1388 | 357 |
+| 3201-3300 | 43 | 1014 | 119 | 795 | 1443 | 312 |
+| 3301-3312 | 5 | 1346 | 58 | 1300 | 1443 | 407 |
+
+The rise began inside the committed chain, not at 2176 (mean 473 at 2101-2150, 660 at 2151-2200; 437 at 2150, 603 at
+2166, 767 at 2170), and then the gap runs in waves of a hundred games and more around a rising level: 960 at 2301-2400,
+530 at 2601-2700, 1,130 at 3101-3200.  The gap per n is steadier: 1000 G/n is 300 on average (224 at 1301-2175), drifts
+down 3 ± 1 per 100 n within 2176-3312, and its extremes are 173 (1901-2100) and 408 (2301-2400).
+
+**2. How the gap grows (C5).**  Least-squares slope of the gap on n, per 100 n, with 95% intervals by a moving-block
+bootstrap (blocks of 15 and of 100 consecutive games; the waves are longer than 15 games, so the first understates):
+
+| games | slope | blocks of 15 | blocks of 100 | R² |
+|---|---|---|---|---|
+| 1301-2150 | +3.5 | -18 to 14 | -49 to 18 | 0.01 |
+| 1301-2175 (committed chain) | +7.5 | -15 to 16 | -44 to 20 | 0.03 |
+| 2176-3312 | +25.2 | 4 to 41 | -43 to 83 | 0.15 |
+| 2276-3312 | +24.4 | 0 to 47 | -40 to 97 | 0.11 |
+| 2176-2800 | -15.4 | -70 to 9 | -143 to 43 | 0.02 |
+| 2800-3312 | +118.9 | 89 to 177 | 64 to 257 | 0.62 |
+| 1301-3312 | +37.0 | 30 to 42 | 22 to 50 | 0.59 |
+
+(1301-3312 with blocks of 200 games, about 450 n: 6 to 63.)  So: over 2176-3312 alone the slope cannot be told, the
+waves being too long for a window of 1,100 n to average out; the sub-ranges (flat to 2800, +119 after) are waves, not
+regimes.  Over the whole 1301-3312 the gap grows +37 per 100 n (22 to 50): not the committed games' +7, which was a
+flat stretch below 2150, and not +57, which lies outside that interval and at the edge of the one by blocks of 200
+(4% of the draws reach it).  The unseeded start's +57 was an upper bound, as said: that start is about 770 below the
+optimum at 3100 (its gap 1,947, the true one 1,181), against 0 to 403 where it had been measured.  The other form of
+C5, G/n bounded, holds over 2176-3312 (mean 300, drifting down); G is proportional to n there, G ≈ 0.30 n, and a power
+law over 1301-3312 gives G ∝ n^1.4 (the jump at 2150 included).  The upper envelope, which is what the dear games
+are: the 90th percentile of the gap by 400 n is 514, 519, 1035, 868 and 1193 (1301-1700, 1701-2100, 2101-2500,
+2501-2900, 2901-3300) and the maximum 590, 598, 1346, 950, 1443.
+
+**3. The speculation and the threads in the chain's nodes.**  The chain's nodes come from 64 threads with a window of
+16 (4 after about 3310), whose speculation (younger searches run on a weaker incumbent until the game before them is
+concluded) added nodes in the [scaling run](#scaling-to-192-threads-2026-10).  That run's per-game nodes at other
+windows and thread counts, 2226..2276 and 2277..2336, against the chain's own for the same games (each game once, its
+mean over the runs of a window):
+
+| window | games | mean log10 of the run's nodes over the chain's | se | sd | of 2226-2276 | of 2277-2336 |
+|---|---|---|---|---|---|---|
+| 1 | 39 | -0.039 | 0.030 | 0.185 | -0.107 (18 games, four runs) | +0.018 (21) |
+| 4 | 18 | -0.078 | 0.031 | 0.131 | -0.078 | |
+| 16 (reruns) | 18 | 0.000 | 0.013 | 0.055 | | |
+| 32 | 18 | +0.002 | 0.020 | 0.083 | | |
+
+A rerun at the chain's own window reproduces the chain's trees to 0.055 decades a game, so what a window of 1 or 4
+removes is the speculation and not noise: -0.04 ± 0.03 decades over the 39 games (-0.11 over the 18 of 2226-2276 where
+the dear games of the stretch lay, +0.02 over 2277-2336), with a spread of 0.13-0.19 decades a game.  The threads:
+192 against 64 at a window of 1, -0.02 decades (sd 0.05) over the 18 games; the ladder's 1 against 64 threads on
+2170 and 2172, 951 thousand nodes against 1.00 million (+0.02).  The fits below take the chain's nodes less 0.04
+decades (a window of 1 or 4) and less 0.02 (one thread), and the 0.03 spread of the first moves their intercept and none
+of their slopes.
+
+**4. The cost model on the EC2 chain's trees.**  *The build.*  The committed chain's fit (`log10 nodes = 3.24 + G/255`
+on 314 searches) belongs to the build of feba6d0; the EC2 chain runs the build of 55287ff, which has the inner loop's
+tree changes and the rule of symmetric pairs.  A first fit of the chain's 400 exhausted searches on their gaps gave
+`2.99 + G/266` (R² 0.71, residual sd 0.52) and a mean residual of -0.39 decades against the committed model (-0.28
+over 2176-2276, +0.04 over 2277-2600, -0.61 after), which reads like a cost per unit of gap that falls with n and is
+largely the build: the 39 searches of 2176-2276 that the Graviton calibration's chain (the build of 407645f, in
+order) also made have 0.44 times its nodes (-0.355 decades, sd 0.15; -0.40 with the window's 0.04 taken off).  So the
+committed chain's 391 searched games were solved again by the EC2 chain's build (`taxman solve 1301-2175 --threads
+1`, in order; every score and proof kind is the committed chain's, and 2170 has the 440,988 nodes of the
+[prime-exchange entry](#prime-exchanges-in-the-search-2026-10)):
+
+| games | searches of 1000 nodes or more | mean log10 of the new nodes over the committed | sd | ratio of the sums | correlation with the gap |
+|---|---|---|---|---|---|
+| 1301-1500 | 79 | -0.614 | 0.173 | 0.27 | +0.58 |
+| 1501-1700 | 73 | -0.414 | 0.164 | 0.34 | -0.18 |
+| 1701-1900 | 64 | -0.627 | 0.099 | 0.23 | +0.17 |
+| 1901-2100 | 56 | -0.525 | 0.240 | 0.29 | +0.38 |
+| 2101-2175 | 27 | -0.468 | 0.135 | 0.41 | +0.47 |
+| 1301-2175 | 299 | -0.538 | 0.190 | 0.29 | +0.34 |
+
+A tree of the current build has 0.29 times the committed chain's nodes (-0.54 ± 0.19 decades a game, less of a saving
+as the gap grows: 0.41 at 2101-2175, 0.44 at 2176-2276).  All the fits that follow are on this build, on one thread in
+order: the re-solved games as they are, and the EC2 chain's own nodes less 0.04 (the window) and 0.02 (the threads).
+
+*The gap alone.*  The same games on the new build: `2.46 + G/221` (314 searches, R² 0.64, sd 0.39); the EC2 chain's:
+`2.93 + G/266` (400, R² 0.71, sd 0.52); both together, 1301-3312, `2.67 + G/247` (714 searches, R² 0.852, sd 0.47).  The
+slope is the committed chain's, about a decade of nodes for 250 of gap (221 ± 10, 266 ± 7, 247 ± 4), and the intercept
+0.6 to 0.8 lower (the build).  The sub-ranges of the EC2 chain fit as tightly (R² 0.83, 0.83, 0.87 over 2176-2400,
+2401-2600, 3001-3312, with slopes of 219, 161 and 216 per decade) but at intercepts that drift: at a slope of 250 per
+decade the mean intercept falls 0.5 decades over the 900 n from 1301 to 2200 and 0.4 over the 1,200 n from 2201 to
+3400, and is 0.6 higher at the start of the second chain than at the end of the first.
+
+*The scale of the gap.*  Scaling the gap by a power of n, G / n^p, fits better, and the powers disagree between the
+chains.  R² of log10 nodes on G / n^p, over the two chains and over their pooled 714 searches, and the step that a
+pooled fit leaves between them (the coefficient of a 0/1 variable for the EC2 chain; none if the model holds across
+2175):
+
+| p | R², 1301-2175 | R², 2176-3312 | R², pooled | step at 2176 (se) |
+|---|---|---|---|---|
+| 0 (the gap alone) | 0.643 | 0.706 | 0.852 | +0.11 (0.05) |
+| 0.1 | 0.668 | 0.726 | 0.862 | +0.14 (0.05) |
+| 0.2 | 0.691 | 0.742 | 0.870 | +0.19 (0.04) |
+| 0.3 | 0.710 | 0.755 | 0.875 | +0.26 (0.04) |
+| 0.4 | 0.725 | 0.764 | 0.875 | +0.34 (0.04) |
+| 0.5 | 0.735 | 0.768 | 0.870 | +0.44 (0.04) |
+| 1 (G/n) | 0.733 | 0.721 | 0.709 | +1.09 (0.04) |
+
+Each chain alone prefers a power of 0.5 or more (0.8 for 1301-2175, 0.5-0.6 for 2176-3312), the pooled fit 0.3-0.4, and
+the step between the chains grows with the power (+0.11 at 0, +0.26 at 0.3, +0.44 at 0.5): the smaller powers continue
+the model across 2175 best.  Out of sample, a model fitted to the games of 1301..origin and tested on the later ones
+(the bias, the actual less the predicted, in decades, and the rmse):
+
+| model | fitted to 1301..2175 | to 2400 | to 2600 | to 2800 | to 3000 | worst bias |
+|---|---|---|---|---|---|---|
+| G | -0.16 / 0.57 | -0.34 / 0.66 | -0.58 / 0.79 | -0.45 / 0.62 | -0.57 / 0.65 | 0.58 |
+| G / n^0.2 | +0.09 / 0.50 | -0.12 / 0.54 | -0.35 / 0.62 | -0.25 / 0.48 | -0.38 / 0.49 | 0.38 |
+| G / n^0.3 | +0.23 / 0.53 | -0.01 / 0.51 | -0.23 / 0.56 | -0.13 / 0.42 | -0.27 / 0.41 | 0.27 |
+| G / n^0.4 | +0.38 / 0.60 | +0.11 / 0.50 | -0.11 / 0.51 | -0.02 / 0.40 | -0.14 / 0.35 | 0.38 |
+| G / n^0.5 | +0.52 / 0.70 | +0.24 / 0.53 | +0.03 / 0.49 | +0.11 / 0.41 | -0.01 / 0.33 | 0.52 |
+| G / n | +1.22 / 1.35 | +0.91 / 1.03 | +0.75 / 0.89 | +0.83 / 0.92 | +0.80 / 0.89 | 1.22 |
+| G and n | +0.58 / 0.76 | +0.11 / 0.56 | -0.31 / 0.65 | -0.20 / 0.50 | -0.44 / 0.54 | 0.58 |
+
+The gap alone overpredicts every later stretch by 0.2 to 0.6 decades (the intercept's drift); G/n underpredicts by 0.8
+to 1.2; a straight n term does no better than the gap alone (worst bias 0.58).  The power with the smallest worst
+error is 0.3 (0.27 decades), and the model run over the chain's own games takes 6.1 hours of the chain's 6.4 (8
+below);
+so the scaled gap with p = 0.3 is the centre of the projection and 0 and 0.5 its brackets.  On 1301-3312 it is
+`2.30 + 0.0479 G / n^0.3` (R² 0.875, sd 0.44): a decade of nodes per 230 of gap at n = 3000, 251 at 4000 and 284 at
+6000 (on 2176-3312 alone, `2.67 + 0.0438 G / n^0.3`: 252, 275 and 311).  What it leaves: within the EC2 chain's
+stretch a drift of -0.35 ± 0.06 decades per 1,000 n (the error ignores the runs), and the 0.26 decades by which the
+two chains' trees disagree.  The exponent is the weakest number of this entry; the projection carries it as a range.
+
+**5. The dear games and the runs (C6).**  The 47 exhausted searches of gap 1,100 or more (12% of the 400) hold 77% of
+the chain's nodes, the 11 of gap 1,300 or more 53%, and the ten dearest searches 54% (2346 alone 18.5%); all of the 18
+dearest have a gap of 1,094 or more.  Their runs are runs of high gaps (gap, nodes in millions): 2340-2349 (1,333 and
+318; 1,248 and 175; 1,248 and 118; 1,151 and 45; 1,346 and 1,143; 1,114 and 68), 2376-2388 (1,213 and 114; 1,213 and
+96; 1,165 and 100; 1,173 and 140; 1,094 and 87 and 80), 3102-3104 (1,301 and 172; 1,373 and 92), 3174-3179 (1,388 and
+218, 216 and 209, then 1,225 and 63) and 3297-3312 (1,213 and 54; 1,443 and 635; 1,343 and 123; 1,303 and 94; 1,300 and
+56).  Against the gap alone their residuals are +0.4 to +1.0 decades in the 2340s and 2380s (2343 +0.56, 2346 +1.01) and
+-0.2 to +0.4 from 3102 on; against the gap scaled by n^0.3 they are -0.15 to +0.59, with the 2340s at +0.08, +0.19,
++0.02, 3174-3176 at +0.18 to +0.20, and the most in excess 2346 (+0.59, 3.9 times the model's nodes), 2387-2388 (+0.57,
++0.53), 3300 (+0.52, 3.3 times) and 2385 (+0.44), against a residual sd of 0.48 (the dearest of 400 are expected above
+the model: the 18 average +0.27).  So the gap explains them: a game is dear because its root gap is high, to within
+the scatter that every game has (a factor of 3).  The residuals of all the searches run in blocks (lag-1
+autocorrelation +0.84; section 6), and of the blocks of 150 n the means are +0.06, +0.10, +0.47, -0.24, -0.04, -0.33,
+-0.15 and +0.05.
+
+**6. What at the root explains the rest (A4).**  The residuals of the cost model run: their lag-1 autocorrelation is
++0.86 against the gap alone and +0.84 against the gap scaled by n^0.3 (section 4), the signs about the median make 60
+runs where independence gives 201, and the means of 20 consecutive searches vary 3.4 times as much as independent games
+would, because consecutive boards pose nearly one problem.  Nineteen features of the root were tried against them, for
+the 400 exhausted searches: the heaviest set's conflicts (`matroid lagrange`'s successive minimal conflicts as the
+heaviest set is made promotable: their number, the first one's size, the mean, the largest, the members in all), the
+cores it runs into (`matroid cores`: the frames holding one, their movers, the movers with three or more live factors,
+the factors and the promoted members inside), the forced members at the root, the start incumbent's distance below the
+optimum, and the sizes (candidates, `max_total`, the heaviest set's size, the freedoms, n).  The share of a residual's
+variance that a feature explains (R² of the residual on it), for the residual of the gap alone and of the scaled gap;
+none adds to the cost per unit of gap (the R² with G and with G and the feature times G is the same to two places):
+
+| feature | mean | sd | share, G alone | share, G / n^0.3 |
+|---|---|---|---|---|
+| largest conflict | 28.7 | 3.3 | 0.19 | 0.13 |
+| n | 2729 | 335 | 0.17 | 0.05 |
+| candidates | 724 | 94 | 0.15 | 0.04 |
+| mean conflict size | 20.4 | 2.3 | 0.14 | 0.09 |
+| frames holding a core | 3.6 | 0.7 | 0.07 | 0.05 |
+| members in the first conflict | 13.3 | 4.7 | 0.05 | 0.02 |
+| start below the optimum | 33.8 | 82.9 | 0.04 | 0.02 |
+| movers in cores | 246 | 43 | 0.02 | 0.01 |
+| wide movers in cores (three or more live factors) | 154 | 31 | 0.02 | 0.00 |
+| conflicts in the heaviest set | 13.5 | 3.0 | 0.01 | 0.00 |
+| promoted in cores | 60.5 | 11.8 | 0.00 | 0.00 |
+| movers in the cores of frames 1-3 | 231 | 38 | 0.00 | 0.00 |
+| forced at the root | 1.0 | 2.9 | 0.00 | 0.00 |
+
+All 18 features at once (without n) explain 0.47 and 0.38 in sample, and nothing held out (R² -0.45 and -0.71, a stretch
+of 40 consecutive searches predicted from a fit to the rest).  The best single feature, the largest conflict, is
+correlated *negatively* with the residual (the bigger the conflict, the fewer nodes than the gap says), and the sizes
+(n, candidates) are the same drift as in 4.  What the roots do show: the cores grow with the gap they make (the movers
+in the cores of frames 1-3, 231 on average and +5 per 100 n, correlate 0.68 with G; the promoted members inside them,
+0.69), the first conflict has 13.3 members and falls 0.7 per 100 n (the anatomy's 12.9 members at 880-1300, +1.1 per 100
+n, does not continue), 13.5 conflicts are met before the heaviest set is promotable, and 161 of the 509 roots force
+members (3.3 on average; 118 of the 400 exhausted searches): those are games of low gap (mean 627 against 904) and small
+trees (geometric mean 0.18 million nodes against 2.65), and carry no residual.  So A4's kill criterion (nothing
+explains more than 30%) holds: the victim law's branching on whole cores has nothing measured under it.
+
+**7. The waves of the gap are partly arithmetic.**  The tiers of the board (the numbers with k multiples on it,
+n/(k+1) < m ≤ n/k) are its frames, and the odd cores that make the gap are made of movers with three or more distinct
+primes.  A linear model of the gap on the counts, by tier k = 1..7, of the numbers m ≤ n of three or more distinct
+primes, fitted to nine tenths of the games (consecutive stretches) and tested on the tenth left out, has R² 0.31 over
+2176-3312 (n alone: -0.12) and 0.68 over 1301-3312 (n alone 0.52); the counts of primes by tier, k = 1..9, 0.30 and
+0.58.  So about a third of the waves' variance is arithmetic that is known for every n; the rest is not in these
+counts.  Not kept as a model of the gap (the projection below draws the waves from the observed ones); a lead for C6
+and for the density-evolution model of AGENDA section 5.
+
+**8. The projection.**  A search of nodes N at board n costs N u(n) / 64 seconds on 64 threads, with the cost of a node
+u(n) = u0 10^(0.02 (n - 3000) / 100).  The chain's own nodes in its 6.4 hours fix u0 = 265 thread-microseconds, and the
+two independent figures agree with the line: u(2184) = 182 µs (the ladder's proof of 2184 on 64 threads: 166 µs a step,
+plus the window's idle time) and u(4000) = 419 µs (the standalone search of 4000 on 192 threads, 19.8 million nodes in
+42.8 s: 417).  The slope 0.02 is that of those two figures, not of the root-sized nodes' +0.042; at 0.01 or 0.035 the
+reach below moves by about 150.  The serial work besides the search (the board, the moves and the replays of every game
+and half the unseeded local search of a searched one, from `setup_c8g.jsonl`) is 1.7 s a game at 4000.  A game is
+drawn as the chain's were: 35% are exhausted searches (the others are repeats, primes and ceilings, which cost their
+serial work and no search), each with the next wave of the gap and the next residual of a stretch of 100 consecutive
+searches taken from the observed ones (resampled in blocks, 300 draws, so that the waves and the residuals' runs are
+kept); the gap's trend is the scenario's: **trend**, the linear fit of 2176-3312 (G = 136 + 0.25 n: 1,142 at 4000,
+1,393 at 5000, 1,645 at 6000); **ratio**, G proportional to n (0.30 n: 1,210, 1,513, 1,815); **steep**, the old
+regime's +57 per 100 n from the fit at 3312 (1,361, 1,931, 2,501).  The cost model is the scaled gap G / n^p of 4, with
+p = 0.3 as the centre and the two exponents that bracket it, 0 (the gap alone) and 0.5; their cost fits are redone on
+each draw's stretch.  The model over the chain's own games, 2176..3312, takes 6.1 hours (10th to 90th percentile 1.8
+to 13.0) for p = 0.3 on the trend (6.5 on the ratio), 8.9 for the gap alone and 5.1 for p = 0.5, against the chain's
+6.4.
+
+A searched game's nodes on 64 threads with a window of 4 (millions: median [10th, 90th percentile]), and the hours of
+the 64 threads that 100 consecutive games cost (the mean over the draws and starting points; the median in brackets):
+
+| model, gap | nodes at 4000 | 5000 | 6000 | hours per 100 games at 4000 | 5000 |
+|---|---|---|---|---|---|
+| G / n^0.3, trend | 3.1 [0.5, 136] | 12.7 [1.9, 504] | 48 [6, 1,733] | 4.6 (2.3) | 22 (8.3) |
+| G / n^0.3, ratio | 5.5 [0.9, 246] | 32 [4, 1,299] | 166 [19, 6,268] | 8.3 (4.1) | 44 (9.7) |
+| G / n^0.3, steep | 19 [3, 895] | 834 [76, 37,058] | 27,533 | 34 (15) | |
+| the gap alone, trend | 7.7 [1, 648] | 78 [7, 7,199] | 786 [52, 77,655] | 34 (6.5) | |
+| the gap alone, ratio | 14 [2, 1,253] | 233 [19, 22,260] | 3,777 [194, 403,738] | 43 (8.9) | |
+| G / n^0.5, trend | 1.7 [0.3, 52] | 4.4 [0.7, 103] | 10 [2, 195] | 1.5 (1.0) | 3.9 (2.0) |
+| G / n^0.5, ratio | 2.9 [0.5, 89] | 10 [2, 239] | 30 [4, 582] | 2.6 (1.7) | 9.0 (4.3) |
+
+(An empty cell is a case the simulation did not reach within 720 hours.)  Hours from 3313 to reach a board (median
+[10th, 90th percentile]) and the board that 24 hours reach, of the whole chain from 2176 (the 17.6 hours past 3313 that
+remain) and past 3313:
+
+| model, gap | to 4000 | to 5000 | to 6000 | 24 hours from 2176 | 24 hours past 3313 |
+|---|---|---|---|---|---|
+| G / n^0.3, trend | 13 [4, 33] | 107 [28, 229] | 607 [134, >720] | 4,088 [3,726, 4,740] | 4,223 [3,863, 4,963] |
+| G / n^0.3, ratio | 20 [5, 56] | 228 [50, 521] | >720 [325, >720] | 3,956 [3,553, 4,555] | 4,052 [3,674, 4,679] |
+| G / n^0.3, steep | 38 [8, 146] | >720 | >720 | 3,827 [3,543, 4,250] | 3,886 [3,607, 4,349] |
+| the gap alone, trend | 42 [7, 243] | >720 [92, >720] | >720 | 3,800 [3,427, 4,343] | 3,858 [3,436, 4,492] |
+| the gap alone, ratio | 70 [11, 442] | >720 [177, >720] | >720 | 3,720 [3,420, 4,166] | 3,782 [3,427, 4,264] |
+| G / n^0.5, trend | 6 [2, 12] | 29 [12, 50] | 98 [39, 161] | 4,613 [4,243, 5,229] | 4,849 [4,467, 5,545] |
+| G / n^0.5, ratio | 9 [3, 18] | 56 [19, 101] | 234 [78, 406] | 4,274 [3,982, 4,947] | 4,454 [4,145, 5,099] |
+
+What it says, with its uncertainty stated:
+
+* *A game at 4000, 5000 and 6000* (p = 0.3, the trend and the ratio): a median searched game has 3 to 6 million nodes at
+  4000 (20 to 36 s of the 64 threads), 13 to 32 million at 5000 (2 to 6 minutes), 48 to 166 million at 6000 (13 to 46
+  minutes); the 90th percentile is 40 to 45 times the median; averaged over the waves, 100 games cost 4.6 to 8.3 hours
+  at 4000 and 22 to 44 at 5000, against 0.01 to 1.9 for the chain's hundreds (the table in `gap_output.md`: a valley
+  costs seconds, a crest of the gap an hour or two).  A tree grows 4 to 6 times for each 1,000 n (3.1 to 12.7 to 48
+  million on the trend, 5.5 to 32 to 166 on the ratio), and with the node's +0.02 a game costs ×10 for each
+  1,050-1,250 n.  The exponent is the uncertain part: at p = 0 ×10 for each 830 n, at p = 0.5 for each 1,500 n.
+* *24 hours on one `c8g.16xlarge`* ($0.675 an hour at the cheapest zone's spot price: $16): about 4,100 from 2176 in 24
+  hours of the whole chain (3,960 to 4,090 for the ratio and the trend), 4,050 to 4,220 in 24 hours past 3313, for p =
+  0.3; 3,720 to 3,860 for the gap alone and 4,270 to 4,850 for p = 0.5.  A single run's luck, the waves, moves it by
+  about -400 to +700 (10th to 90th percentile).  So a day reaches about the end of the set widths, 4095, and no further;
+  4000 takes 13 to 20 hours past 3313, 5000 takes 4 to 10 days (107 to 228 hours; 29 to 56 at p = 0.5) and 6000 a month
+  or more.  Boards past 4095 also need the widths and `MAX_FRAMES` that [the wall regime](#the-wall-regime-2026-10)
+  lists.
+* *The old regime* (+57 per 100 n, the `steep` rows) would have taken 38 hours to 4000 and a day would have reached
+  3,830 to 3,890.
+
+*Conclusion.*
+
+* **The gap (C5).**  509 root gaps from 341 to 1,443 (mean 818), risen from about 450 at 2100 to 650-1,000 by 2400 and
+  since then in waves of a hundred games and more.  +37 per 100 n over 1301-3312 (22 to 50), G/n steady at 300: neither
+  of the two regimes of AGENDA section 2.  +7 was a flat stretch below 2150; +57, the unseeded starts' upper bound, is
+  not the gap's growth (4% of the draws by blocks of 200 games).  A window of 1,100 n cannot fix a slope: the waves
+  are longer.
+* **The steeper regime is refuted, and the reason is the gaps, not the 6.4 hours.**  The chain's speed alone is no
+  evidence (a crest of the gap costs an hour or two of the 64 threads for a hundred games, a valley seconds).  With the
+  measured gaps the cost of a game grows ×10 for each 1,050-1,250 n at the centre of the model (830 to 1,500 across its
+  exponents), against ×10 for each 380 n for the old regime; 100 times the compute buys 2,100 to 2,500 n (1,700 to
+  3,000).  A day on one `c8g.16xlarge` reaches about 4,100, the end of the present set widths.
+* **The cost model carries over in slope and not in level.**  A decade of nodes per 250 of gap (221, 266 and 247 for
+  the two chains and both) as in the committed chain's fit, but the current build's trees are 0.29 times the committed
+  chain's (0.41 near 2175), and at a given gap a larger board is somewhat cheaper (the gap counting in units of n^p, p
+  between 0 and 0.5; 0.3 predicts best, `2.30 + 0.0479 G / n^0.3` on 1301-3312, R² 0.875, sd 0.44).  The AGENDA's
+  conclusion that G alone is the model to project with stands as the conservative end (3,700-3,900 in a day).
+* **The dear games (C6) are the games of high gap.**  47 searches of gap 1,100 or more hold 77% of the nodes; against
+  the scaled gap the 18 dearest are within +0.6 decades (2346 3.9 times the model, 3300 3.3 times; the rest of the
+  2340s within +0.2).  Nothing at the root explains the rest (A4, killed: 19 features, the best 13% of the residual,
+  none out of sample); the residuals run because consecutive boards are nearly one problem.
+* **The waves are partly arithmetic**: counts of numbers of three or more distinct primes by tier predict a third of
+  their variance out of sample.
+* **Not settled**: the exponent of n (the chains disagree: 0 to 0.2 across 2175, 0.4 to 0.5 within 2176-3312), the gap's
+  trend beyond 3312, and the heights of the waves' crests, which set the cost of the dear games.  The cheapest next
+  measurement is `gap.py` on a later copy of the chain's results file, which needs no machine.
+
+*Cost.*  The laptop only, one thread at a time: 9 minutes for the gaps, 3 for the conflicts and cores, 24 for the
+committed chain's games solved again.  Nothing was run on AWS.
