@@ -2488,7 +2488,7 @@ fn fit_game<const W: usize>(n: u32, known: &Known, o: &Options, out: &mut Output
             let fit = dw::Fit { signings: signings.clone(), lambda: lambda.clone().unwrap_or_default() };
             fit.bound(ctx, &mut Stats::default())
         });
-        let (carried_signings, offered) = (signings.len(), offer.len());
+        let (carried_signings, offered) = (start.as_ref().map(|_| signings.len()), offer.len());
         let r = bound_offered(ctx, signings, lambda.as_deref(), offer.clone(), true, &o.settings);
         assert!(r.bound >= opt as i64, "n={n}: the fit's bound {} is below P* = {opt}", r.bound);
         if let Some(set) = &optimal {
@@ -2518,7 +2518,7 @@ fn fit_game<const W: usize>(n: u32, known: &Known, o: &Options, out: &mut Output
             ("share", Json::Num(share(r.bound))),
             ("carried", carried.map_or(Json::Null, Json::from)),
             ("carried_share", carried.map_or(Json::Null, |b| Json::Num(share(b)))),
-            ("carried_signings", carried_signings.into()),
+            ("carried_signings", carried_signings.map_or(Json::Null, Json::from)),
             ("offered", offered.into()),
             ("offered_placed", offered_placed.into()),
             ("signings", r.family.extras.len().into()),
