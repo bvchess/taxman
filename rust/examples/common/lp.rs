@@ -418,6 +418,35 @@ impl Lp {
             && (0..self.rows()).all(|r| !self.is_s_row(r) || self.slack[r] >= -FEASIBLE_TOL)
     }
 
+    /// How far the current basis is from primal feasible: the largest of 0, the basic values' negatives and the S-rows'
+    /// slacks' negatives (infinite if one is NaN).
+    pub fn violation(&self) -> f64 {
+        let slacks = (0..self.rows()).filter(|&r| self.is_s_row(r)).map(|r| self.slack[r]);
+        self.xb
+            .iter()
+            .copied()
+            .chain(slacks)
+            .fold(0.0, |worst, x| if x.is_nan() { f64::INFINITY } else { worst.max(-x) })
+    }
+
+    /// The largest magnitude of a dual at the current basis (infinite if one is NaN).
+    pub fn largest_dual(&self) -> f64 {
+        self.y.iter().fold(0.0, |m, &y| if y.is_nan() { f64::INFINITY } else { m.max(y.abs()) })
+    }
+
+    /// The slack of row `r` at the current basis: its value for an S-row, 0 for a C-row (its slack nonbasic) and for
+    /// an `Eq` row.
+    pub fn slack(&self, r: usize) -> f64 {
+        self.slack[r]
+    }
+
+    /// For the tests of a caller's handling of a breakdown: makes the current basis what rounding drift in `Binv` can
+    /// leave, optimal by the duals but not primal feasible, by setting the first structural basic value to −1.
+    #[cfg(test)]
+    pub fn corrupt(&mut self) {
+        self.xb[0] = -1.0;
+    }
+
     /// The counters.
     pub fn stats(&self) -> LpStats {
         self.stats

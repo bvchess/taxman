@@ -14,11 +14,17 @@
 //!     [--root-seconds 120] [--fit-mode certified|search] [--exact bench/matroid/nodes_exact.jsonl] [--out FILE]
 //!     FIXTURE...
 //! cargo run --release --example fields -- check [--known FILE] [--samples 100] N|A-B...
-//! cargo run --release --example fields -- bnb --known results/strict.jsonl [--variants v0,v1,r1,r2,r2c] [--refit 20]
-//!     [--policy all|excess:E|tier1:F] [--fit PATH] [--fit-seconds 300] [--fit-mode certified|search]
-//!     [--seconds 7200] [--nodes 10000000] [--refit-seconds 30] [--audit EVERY] [--audit-seconds 10]
-//!     [--audit-out FILE] [--knuth DIVES] [--seed 1] [--ci 0.90] [--log DIR] [--checkpoint DIR]
-//!     [--checkpoint-minutes 10] [--out FILE] N|A-B|A-B/STEP...
+//! cargo run --release --example fields -- bnb --known results/strict.jsonl [--variants v0,v1,r1,r2,r2c|r3]
+//!     [--refit 20] [--policy all|excess:E|tier1:F|r3-all|r3-top:A] [--r3-seconds 1] [--r3-pricings 300]
+//!     [--r3-exact on|off] [--r3-cores on|off] [--label NAME] [--fit PATH] [--fit-seconds 300]
+//!     [--fit-mode certified|search] [--seconds 7200] [--nodes 10000000] [--refit-seconds 30] [--audit EVERY]
+//!     [--audit-seconds 10] [--audit-out FILE] [--knuth DIVES] [--max-depth D] [--seed 1] [--ci 0.90] [--log DIR]
+//!     [--checkpoint DIR] [--checkpoint-minutes 10] [--save-states DIR] [--every 1] [--harvest FILE] [--out FILE]
+//!     N|A-B|A-B/STEP...
+//! cargo run --release --example fields -- replay --known results/strict.jsonl [--methods r2,r3:1,ref:10]
+//!     [--refit 20] [--r3-pricings 300] [--refit-seconds 30] [--out FILE] STATES...
+//! cargo run --release --example fields -- fit --known results/strict.jsonl [--start FIT] [--offer CORES]
+//!     [--seconds 60] [--per-frame 8] [--label own] [--save-fit PATH] [--out FILE] N...
 //! ```
 //!
 //! Games are set up as `taxman solve` sets them up; `P*`, the optimum promotion sum, is the known score less
@@ -77,6 +83,39 @@
 //!   its inherited state, the reference (`nodes`' node mode, `--audit-seconds`) and the traces of R1, R2 and R2c over
 //!   20 pricings, a line keyed by `n`, `variant` and `node`.
 //!
+//!   Variant `r3` (design U4) refits by R3 (`dw::refit_r3`: R2's pricing, the exact checks and the node's own
+//!   separation, within `--r3-seconds` and `--r3-pricings`, `--r3-exact` and `--r3-cores` switching the last two off)
+//!   at the Tier-1-open nodes its policy selects and by R2 at the others: `r3-all` every one, `r3-top:A` those whose
+//!   GF(2) excess is at least `A` times the root's GF(2) gap.  It runs alone, and the r3 policies are its alone.  Its
+//!   line and files carry R3's settings (the key field `r3`, `t{T}-p{P}` with `-noexact`, `-nocores`), and a run
+//!   with `--label` the label (a key field too).  The run line also counts the Tier-1-open nodes below the root
+//!   (`tier1_open`), R3's refits, those that cut, their pricings, rounds and ms (`r3_*`, `ms_r3`), the refits ended by
+//!   a second breakdown of their master (`refit_breakdowns`), and the time in the exact checks, the separation and
+//!   the masters' builds (`ms_exact`, `ms_separate`, `ms_master_build`); the per-node log the refit's `method`.
+//!   `--max-depth D` stops each Knuth dive after its node of depth `D`.  `--save-states DIR` (with `--every K`): the
+//!   state of every K-th Tier-1-open node below the root, as the run reaches it, a line of
+//!   `DIR/{stem}.states.jsonl` (`state_line`: the node, its bounds, the state it inherited, and what the run's refit
+//!   made of it); `--harvest FILE`: every distinct core that the nodes' separation finds, a line each
+//!   (`cores::Core::to_json`).
+//! * **replay** (design U4): each state of the files given (or of the `*.states.jsonl` of the directories given)
+//!   made again, its GF(2) bound and Tier 1 checked against the state's line, then each method of `--methods` from
+//!   it, on its own statistics: `r1`, `r2`, `r2c` (with `--refit` pricings), `r3:T`, `r3x:T` (R3 without its
+//!   separation: R2 and the exact checks), `r3c:T` (without its exact checks: R2 and the separation), each with T₃ =
+//!   T seconds and `--r3-pricings`, and `ref:T` (the reference, the audit's, within T seconds).  A line per state and
+//!   method, keyed by `n`, `host`, `index` and `method`: the node's depth and excesses, the bound, `excess`, `cut`,
+//!   `pricings`, `rounds`, `new_signings`, `cores` (found), `stop`, `host_same` (for the host's own method: whether
+//!   the bound and the final state are the host's), the exact checks' cuts and checks, `breakdowns`, and the ms of
+//!   the whole (`ms`), of making the node (`ms_node`), of the pricings, the simplex, the exact checks, the separation
+//!   and the masters' builds.
+//! * **fit** (design U4 and T7): the main arm's fit at a root, certified with separation within `--seconds` (60), from
+//!   the family of the fit `--start` (its signings frozen, those of frames the root lacks left out, its multipliers
+//!   by candidate number) or from the plain signings, with the cores of `--offer` (a `--harvest` file) placed first
+//!   in new core-derived signings (`dw::bound_offered`, at most `--per-frame` a frame); saved to `--save-fit` (a
+//!   `.json` file, or a directory for `n{N}.json`); a line keyed by `n` and `label` (`--label`, default `own`) with
+//!   the bound, its share of the GF(2) gap, the carried family's bound and share before the refit, the cores offered
+//!   and placed, the signings and the time.  It asserts the bound at least `P*` and the optimal promotions
+//!   independent in every matroid of the family.
+//!
 //! `--fit-mode` (`dw::FitMode`; of `roots` and `nodes`, every computation of the run; of `bnb`, the root fit):
 //! `certified` (the default) brackets each LP with a certified lower bound (the exact checks); `search` fits the
 //! multipliers as a search would, without the exact checks (a family's generation ends when nothing prices out and no
@@ -119,7 +158,8 @@ mod meet;
 use bnb::{BoundKind, ExtraBound, Fate, NodeLog, NodeRecord, NodeView, Pending, Search, Tally};
 use cores::{core_of, cores_of, frame_with, merge, primes, residual, sees, zero_one, Core};
 use dw::{
-    bound, evaluate, refit_r1, refit_r2, tier1, Ctx, Eval, Family, FitMode, Outcome, Settings, Stats, Stop, Trace, Warm,
+    bound, bound_offered, evaluate, refit_r1, refit_r2, refit_r3, tier1, Ctx, Eval, Family, FitMode, Outcome, Settings,
+    Stats, Stop, Trace, Warm, LOCAL_PER_NODE, R3,
 };
 use fit::SavedFit;
 use frames::{frame_matroids, is_prime, setup, Known, Rng};
@@ -158,6 +198,11 @@ struct Options {
     samples: usize,
     games: Vec<u32>,
     files: Vec<PathBuf>,
+    /// The methods of `replay`.
+    methods: Vec<String>,
+    /// The fit `fit` starts from, and the cores it offers.
+    start: Option<PathBuf>,
+    offer: Option<PathBuf>,
     bnb: BnbOptions,
 }
 
@@ -167,6 +212,17 @@ struct BnbOptions {
     /// The most pricings of a refit (`--refit`).
     k: usize,
     policy: Policy,
+    /// R3's budgets and switches (`--r3-seconds`, `--r3-pricings`, `--r3-exact`, `--r3-cores`).
+    r3: R3,
+    /// A name for the run beside its variant and policy (`--label`; the root fit's arm, say).
+    label: Option<String>,
+    /// Where the states of every `every`-th Tier-1-open node go (`--save-states`, `--every`).
+    save_states: Option<PathBuf>,
+    every: u64,
+    /// Where the distinct cores that the nodes' separation finds go (`--harvest`).
+    harvest: Option<PathBuf>,
+    /// The depth at which a Knuth dive stops (`--max-depth`).
+    max_depth: Option<usize>,
     /// Where the root fits are (`--fit`).
     fit: Option<PathBuf>,
     fit_seconds: f64,
@@ -192,9 +248,15 @@ struct BnbOptions {
 impl Default for BnbOptions {
     fn default() -> Self {
         BnbOptions {
-            variants: Variant::ALL.to_vec(),
+            variants: Variant::PILOT.to_vec(),
             k: 20,
             policy: Policy::All,
+            r3: R3::default(),
+            label: None,
+            save_states: None,
+            every: 1,
+            harvest: None,
+            max_depth: None,
             fit: None,
             fit_seconds: 300.0,
             seconds: 7200.0,
@@ -224,7 +286,7 @@ impl BnbOptions {
 
 fn parse() -> Result<Options, String> {
     let mut args = std::env::args().skip(1);
-    let command = args.next().ok_or("expected a command: roots, nodes, check or bnb")?;
+    let command = args.next().ok_or("expected a command: roots, nodes, check, bnb, replay or fit")?;
     let mut o = Options {
         command,
         known: Vec::new(),
@@ -241,14 +303,37 @@ fn parse() -> Result<Options, String> {
         samples: 100,
         games: Vec::new(),
         files: Vec::new(),
+        methods: ["r2", "r3:1", "ref:10"].map(String::from).to_vec(),
+        start: None,
+        offer: None,
         bnb: BnbOptions::default(),
     };
     let mut seconds = None;
     let list = |s: String| s.split(',').map(str::to_string).collect::<Vec<_>>();
+    let on_off = |name: &str, v: String| match v.as_str() {
+        "on" => Ok(true),
+        "off" => Ok(false),
+        other => Err(format!("{name} {other:?}: not on or off")),
+    };
     while let Some(arg) = args.next() {
         let mut value = |name: &str| args.next().ok_or(format!("{name} needs a value"));
         let num = |v: String| v.parse::<f64>().map_err(|e| format!("{v}: {e}"));
         match arg.as_str() {
+            "--r3-seconds" => o.bnb.r3.seconds = num(value("--r3-seconds")?)?,
+            "--r3-pricings" => o.bnb.r3.pricings = num(value("--r3-pricings")?)? as usize,
+            "--r3-exact" => o.bnb.r3.exact = on_off("--r3-exact", value("--r3-exact")?)?,
+            "--r3-cores" => o.bnb.r3.cores = on_off("--r3-cores", value("--r3-cores")?)?,
+            "--label" => o.bnb.label = Some(value("--label")?),
+            "--save-states" => o.bnb.save_states = Some(value("--save-states")?.into()),
+            "--every" => match num(value("--every")?)? as u64 {
+                0 => return Err("--every needs a positive K".into()),
+                every => o.bnb.every = every,
+            },
+            "--harvest" => o.bnb.harvest = Some(value("--harvest")?.into()),
+            "--max-depth" => o.bnb.max_depth = Some(num(value("--max-depth")?)? as usize),
+            "--methods" => o.methods = list(value("--methods")?),
+            "--start" => o.start = Some(value("--start")?.into()),
+            "--offer" => o.offer = Some(value("--offer")?.into()),
             "--known" => o.known.push(value("--known")?.into()),
             "--arms" => o.arms = list(value("--arms")?),
             "--modes" => o.modes = list(value("--modes")?),
@@ -310,12 +395,18 @@ fn parse() -> Result<Options, String> {
             "--log" => o.bnb.log = Some(value("--log")?.into()),
             "--checkpoint" => o.bnb.checkpoint = Some(value("--checkpoint")?.into()),
             "--checkpoint-minutes" => o.bnb.checkpoint_every = Every::Minutes(num(value("--checkpoint-minutes")?)?),
-            file if o.command == "nodes" => o.files.push(file.into()),
+            file if o.command == "nodes" || o.command == "replay" => o.files.push(file.into()),
             range => o.games.extend(games(range)?),
         }
     }
     if o.command == "bnb" {
         o.bnb.seconds = seconds.unwrap_or(o.bnb.seconds);
+        let r3 = o.bnb.variants.contains(&Variant::R3);
+        if r3 != o.bnb.policy.is_r3() || (r3 && o.bnb.variants.len() > 1) {
+            return Err(
+                "variant r3 runs alone, with the policy r3-all or r3-top:A, which no other variant takes".into()
+            );
+        }
         if o.bnb.checkpoint.is_some() && o.bnb.fit.is_none() {
             return Err("--checkpoint needs --fit: a resumed run must start from the same root fit".into());
         }
@@ -326,7 +417,11 @@ fn parse() -> Result<Options, String> {
             return Err(format!("--ci {} is not a level between 0 and 1", o.bnb.ci));
         }
     } else {
-        let default_seconds = if o.command == "nodes" { 10.0 } else { 120.0 };
+        let default_seconds = match o.command.as_str() {
+            "nodes" => 10.0,
+            "fit" => 60.0,
+            _ => 120.0,
+        };
         o.settings.seconds = seconds.unwrap_or(default_seconds);
     }
     Ok(o)
@@ -382,6 +477,15 @@ impl Output {
         self.done.contains(key)
     }
 
+    /// Writes `json` as a line unless a line with its key (the fields `key`) is there or was written; whether it was.
+    fn write_once(&mut self, json: &Json, key: &[&str]) -> bool {
+        let fresh = self.done.insert(Self::key_of(json, key));
+        if fresh {
+            self.write(&json.to_string());
+        }
+        fresh
+    }
+
     fn write(&mut self, line: &str) {
         match &mut self.file {
             Some(f) => {
@@ -428,6 +532,23 @@ fn main() {
             let mut audit = o.bnb.audit.map(|_| Output::open(o.bnb.audit_out.as_deref(), &AUDIT_KEY));
             for &n in &o.games {
                 taxman::with_width!(n, W => bnb::<W>(n, &known, &o, &mut out, audit.as_mut()));
+            }
+        }
+        "replay" => {
+            let probes: Result<Vec<Probe>, String> = o.methods.iter().map(|m| Probe::parse(m, &o.bnb)).collect();
+            let probes = probes.unwrap_or_else(|e| {
+                eprintln!("error: {e}");
+                std::process::exit(2);
+            });
+            let mut out = Output::open(o.out.as_deref(), &REPLAY_KEY);
+            for path in state_files(&o.files) {
+                replay(&path, &known, &probes, &o.bnb, &mut out);
+            }
+        }
+        "fit" => {
+            let mut out = Output::open(o.out.as_deref(), &["n", "label"]);
+            for &n in &o.games {
+                taxman::with_width!(n, W => fit_game::<W>(n, &known, &o, &mut out));
             }
         }
         other => {
@@ -921,16 +1042,21 @@ fn check<const W: usize>(n: u32, known: &Known, samples: usize) {
 // ---------------------------------------------------------------------------------------------------------
 // bnb
 
-/// The fields that identify a run's line of `bnb`.
-const BNB_KEY: [&str; 5] = ["n", "variant", "policy", "k", "mode"];
+/// The fields that identify a run's line of `bnb` (`r3` and `label` only where they are given).
+const BNB_KEY: [&str; 7] = ["n", "variant", "policy", "k", "mode", "r3", "label"];
 /// The fields that identify an audit's line.
 const AUDIT_KEY: [&str; 3] = ["n", "variant", "node"];
+/// The fields that identify a saved state's line (in its run's file) and a line of `replay`.
+const STATE_KEY: [&str; 1] = ["index"];
+const REPLAY_KEY: [&str; 4] = ["n", "host", "index", "method"];
+/// The fields that identify a core in a harvest's file.
+const CORE_KEY: [&str; 3] = ["frame", "members", "columns"];
 /// The pricings of each method's trace in the audit (the design's horizon).
 const AUDIT_K: usize = 20;
 /// The resamples of a bootstrap interval.
 const RESAMPLES: usize = 1000;
 /// The columns of a line of the per-node log, in order (`-` for none).
-const NODE_COLUMNS: [&str; 7] = ["id", "parent", "depth", "excess_gf2", "excess_tier1", "pricings", "cut"];
+const NODE_COLUMNS: [&str; 8] = ["id", "parent", "depth", "excess_gf2", "excess_tier1", "pricings", "method", "cut"];
 
 /// A variant of `bnb` (see the module docs).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -945,19 +1071,25 @@ enum Variant {
     R2,
     /// R2 with node-local signings.
     R2c,
+    /// R3 at the Tier-1-open nodes its policy selects (`r3-all`, `r3-top:A`), R2 at the others.
+    R3,
 }
 
 /// How a variant refits.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum Method {
     /// Deflected Polyak ([`refit_r1`]).
     R1,
     /// The warm master ([`refit_r2`]), with at most `local` node-local signings a frame.
     R2 { local: usize },
+    /// The warm master with the exact checks and the node's separation ([`refit_r3`]).
+    R3(R3),
 }
 
 impl Variant {
-    const ALL: [Variant; 5] = [Variant::V0, Variant::V1, Variant::R1, Variant::R2, Variant::R2c];
+    const ALL: [Variant; 6] = [Variant::V0, Variant::V1, Variant::R1, Variant::R2, Variant::R2c, Variant::R3];
+    /// The E3 pilot's variants, `bnb`'s default.
+    const PILOT: [Variant; 5] = [Variant::V0, Variant::V1, Variant::R1, Variant::R2, Variant::R2c];
 
     fn name(self) -> &'static str {
         match self {
@@ -966,6 +1098,7 @@ impl Variant {
             Variant::R1 => "r1",
             Variant::R2 => "r2",
             Variant::R2c => "r2c",
+            Variant::R3 => "r3",
         }
     }
 
@@ -973,20 +1106,34 @@ impl Variant {
         Variant::ALL.into_iter().find(|v| v.name() == name).ok_or(format!("unknown variant {name:?}"))
     }
 
-    /// How it refits, if it does.
-    fn method(self) -> Option<Method> {
+    /// How it refits a node of GF(2) excess `excess` under `policy` (`root_gap` the root's GF(2) gap, `r3` R3's
+    /// budgets), if it does.
+    fn method(self, policy: Policy, excess: i64, root_gap: i64, r3: R3) -> Option<Method> {
         match self {
             Variant::V0 | Variant::V1 => None,
             Variant::R1 => Some(Method::R1),
             Variant::R2 => Some(Method::R2 { local: 0 }),
-            Variant::R2c => Some(Method::R2 { local: 2 }),
+            Variant::R2c => Some(Method::R2 { local: LOCAL_PER_NODE }),
+            Variant::R3 if policy.r3_at(excess, root_gap) => Some(Method::R3(r3)),
+            Variant::R3 => Some(Method::R2 { local: 0 }),
         }
     }
 }
 
 impl Method {
-    /// The refit at a node from `warm`, whose Tier-1 evaluation there is `first`, with at most `k` pricings: `fam` is
-    /// a family of `warm`'s signings at the node (R2 consumes it), `settings` R2's (its budget in seconds).
+    /// The method's name in the logs: `r1`, `r2`, `r2c` (R2 with node-local signings) or `r3`.
+    fn name(self) -> &'static str {
+        match self {
+            Method::R1 => "r1",
+            Method::R2 { local: 0 } => "r2",
+            Method::R2 { .. } => "r2c",
+            Method::R3(_) => "r3",
+        }
+    }
+
+    /// The refit at a node from `warm`, whose Tier-1 evaluation there is `first`, with at most `k` pricings (R1's and
+    /// R2's): `fam` is a family of `warm`'s signings at the node (R2 and R3 consume it), `settings` R2's (its budget
+    /// in seconds).
     #[allow(clippy::too_many_arguments)]
     fn refit<const W: usize>(
         self,
@@ -1001,8 +1148,16 @@ impl Method {
         match self {
             Method::R1 => refit_r1(ctx, &fam, warm, &first, k, stats),
             Method::R2 { local } => refit_r2(ctx, fam, warm, first, k, local, settings, stats),
+            Method::R3(r3) => refit_r3(ctx, fam, warm, first, &r3, stats),
         }
     }
+}
+
+/// R3's budgets and switches as a run's key and files name them: `t{T₃}-p{P₃}`, then `-noexact` and `-nocores` for
+/// the switches that are off.
+fn r3_name(r3: &R3) -> String {
+    let off = |on: bool, what: &str| if on { String::new() } else { format!("-no{what}") };
+    format!("t{}-p{}{}{}", r3.seconds, r3.pricings, off(r3.exact, "exact"), off(r3.cores, "cores"))
 }
 
 /// Which Tier-1-open nodes a variant refits.
@@ -1014,6 +1169,11 @@ enum Policy {
     Excess(i64),
     /// Those whose Tier-1 excess is at most this share of their GF(2) excess.
     Tier1(f64),
+    /// For variant r3: every one, by R3.
+    R3All,
+    /// For variant r3: every one, by R3 where its GF(2) excess is at least this share of the root's GF(2) gap, by R2
+    /// elsewhere.
+    R3Top(f64),
 }
 
 impl Policy {
@@ -1021,9 +1181,11 @@ impl Policy {
         let bad = |e: String| format!("policy {text:?}: {e}");
         match text.split_once(':') {
             None if text == "all" => Ok(Policy::All),
+            None if text == "r3-all" => Ok(Policy::R3All),
             Some(("excess", e)) => e.parse().map(Policy::Excess).map_err(|e| bad(e.to_string())),
             Some(("tier1", f)) => f.parse().map(Policy::Tier1).map_err(|e| bad(e.to_string())),
-            _ => Err(bad("not all, excess:E or tier1:F".into())),
+            Some(("r3-top", a)) => a.parse().map(Policy::R3Top).map_err(|e| bad(e.to_string())),
+            _ => Err(bad("not all, excess:E, tier1:F, r3-all or r3-top:A".into())),
         }
     }
 
@@ -1032,16 +1194,32 @@ impl Policy {
             Policy::All => "all".into(),
             Policy::Excess(e) => format!("excess:{e}"),
             Policy::Tier1(f) => format!("tier1:{f}"),
+            Policy::R3All => "r3-all".into(),
+            Policy::R3Top(a) => format!("r3-top:{a}"),
         }
+    }
+
+    /// Whether it is one of variant r3's.
+    fn is_r3(self) -> bool {
+        matches!(self, Policy::R3All | Policy::R3Top(_))
     }
 
     /// Whether a Tier-1-open node with the GF(2) bound `gf2` and the Tier-1 bound `t1` is refitted (`target` its
     /// `need − 1`).
     fn refits(self, gf2: i64, t1: i64, target: i64) -> bool {
         match self {
-            Policy::All => true,
+            Policy::All | Policy::R3All | Policy::R3Top(_) => true,
             Policy::Excess(e) => gf2 - target >= e,
             Policy::Tier1(f) => (t1 - target) as f64 <= f * (gf2 - target) as f64,
+        }
+    }
+
+    /// Whether a node of GF(2) excess `excess` gets R3 (under an r3 policy), `root_gap` being the root's GF(2) gap.
+    fn r3_at(self, excess: i64, root_gap: i64) -> bool {
+        match self {
+            Policy::R3All => true,
+            Policy::R3Top(a) => excess as f64 >= a * root_gap as f64,
+            _ => false,
         }
     }
 }
@@ -1060,20 +1238,88 @@ enum Every {
 #[derive(Clone, Debug, Default)]
 struct Counters {
     tier1_evals: u64,
+    /// Tier-1-open nodes below the root (those `--save-states` counts).
+    tier1_open: u64,
     refits: u64,
     /// Pricings of the refits after Tier 1.
     pricings_refit: u64,
     /// Node-local signings the refits opened.
     signings_local: u64,
-    /// Refits that ran out of seconds.
+    /// Refits that ran out of seconds, and that ended at a second breakdown of their master.
     refit_timeouts: u64,
+    refit_breakdowns: u64,
+    /// R3's refits, those that cut, their pricings and rounds.
+    r3_refits: u64,
+    r3_cut: u64,
+    r3_pricings: u64,
+    r3_rounds: u64,
     /// Nodes the audit selected.
     audited: u64,
-    /// Times in ms: building the nodes' contexts and families, Tier 1, the refits, the audit.
+    /// Times in ms: building the nodes' contexts and families, Tier 1, the refits (R3's apart as well), the audit.
     ms_builds: f64,
     ms_tier1: f64,
     ms_refit: f64,
+    ms_r3: f64,
     ms_audit: f64,
+}
+
+/// Where a run writes the states of its Tier-1-open nodes (`--save-states`): every `every`-th, to `out`.
+struct States {
+    every: u64,
+    out: Output,
+}
+
+/// The node's state as `--save-states` writes it (its run's `host` stem, its number `index` among the run's
+/// Tier-1-open nodes below the root): the node (`order`, the promotions in the order made; `cands`, `need`,
+/// `max_add`, `depth`, `hash`), its bounds (`gf2`, `excess_gf2`, `excess_tier1`), the state it inherited (`warm`, its
+/// node-local signings among its signings) and what the run's refit made of it (`host`: its method, bound, pricings,
+/// stop and the digest of its final state's JSON; null if it did not refit).
+#[allow(clippy::too_many_arguments)]
+fn state_line<const W: usize>(
+    n: u32,
+    host: &str,
+    index: u64,
+    v: &NodeView<'_, W>,
+    warm: &Warm,
+    t1: i64,
+    refit: Option<(Method, i64, &Warm, &Trace)>,
+) -> Json {
+    let target = v.need as i64 - 1;
+    let refit = refit.map_or(Json::Null, |(method, bound, state, trace)| {
+        let mut pairs = vec![
+            ("method", method.name().into()),
+            ("bound", bound.into()),
+            ("pricings", trace.pricings.into()),
+            ("stop", format!("{:?}", trace.stop.expect("a refit's stop")).into()),
+            ("digest", digest(&state.to_json().to_string()).into()),
+        ];
+        if let Method::R3(r3) = method {
+            pairs.push(("r3", r3_name(&r3).into()));
+        }
+        Json::object(pairs)
+    });
+    Json::object([
+        ("n", Json::from(n)),
+        ("host", host.into()),
+        ("index", index.into()),
+        ("hash", format!("{:016x}", node_hash(&v.promoted, &v.cands)).into()),
+        ("depth", v.depth.into()),
+        ("order", Json::array(v.order.iter().copied())),
+        ("cands", Json::array(v.cands.iter())),
+        ("need", v.need.into()),
+        ("max_add", v.max_add.into()),
+        ("gf2", v.gf2.into()),
+        ("excess_gf2", (v.gf2 - target).into()),
+        ("excess_tier1", (t1 - target).into()),
+        ("warm", warm.to_json()),
+        ("refit", refit),
+    ])
+}
+
+/// A digest of a text (FNV-1a, 64 bits) in hexadecimal: what a saved state's refit is compared by.
+fn digest(text: &str) -> String {
+    let h = text.bytes().fold(0xcbf2_9ce4_8422_2325u64, |h, b| (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3));
+    format!("{h:016x}")
 }
 
 /// The audit of an extra bound: it selects the nodes whose hash is 0 modulo `every`, gives the reference `seconds`,
@@ -1092,36 +1338,58 @@ struct A1<'a, const W: usize> {
     variant: Variant,
     /// The root fit's state.
     root: Rc<Warm>,
+    /// The root's GF(2) gap (what `r3-top` measures a node's excess against).
+    root_gap: i64,
     /// The most pricings of a refit.
     k: usize,
     policy: Policy,
     /// The refits' settings: their budget in seconds (`refit_r2` sets search mode, the pricings and the cores a frame
     /// itself).
     refit: Settings,
+    /// R3's budgets and switches.
+    r3: R3,
     audit: Option<Audit<'a>>,
+    /// The run's name (its files' stem), the states to save and the harvest's file of cores.
+    host: String,
+    states: Option<States>,
+    harvest: Option<Output>,
     /// The statistics of the run's Tier 1 evaluations and refits (not the audit's).
     stats: Stats,
     counters: Counters,
 }
 
 impl<'a, const W: usize> A1<'a, W> {
+    #[allow(clippy::too_many_arguments)]
     fn new(
         n: u32,
         model: &'a FrameGraph,
         variant: Variant,
         root: Rc<Warm>,
+        root_gap: i64,
         o: &BnbOptions,
         audit: Option<Audit<'a>>,
+        host: String,
     ) -> Self {
+        let file = |dir: &Path, what: &str| make_dir(dir).join(format!("{host}.{what}.jsonl"));
+        let states = o
+            .save_states
+            .as_deref()
+            .map(|dir| States { every: o.every, out: Output::open(Some(&file(dir, "states")), &STATE_KEY) });
+        let harvest = o.harvest.as_deref().map(|path| Output::open(Some(path), &CORE_KEY));
         A1 {
             n,
             model,
             variant,
             root,
+            root_gap,
             k: o.k,
             policy: o.policy,
             refit: Settings { seconds: o.refit_seconds, ..Settings::default() },
+            r3: o.r3,
             audit,
+            host,
+            states,
+            harvest,
             stats: Stats::default(),
             counters: Counters::default(),
         }
@@ -1154,8 +1422,7 @@ impl<'a, const W: usize> A1<'a, W> {
         }
         let t0 = Instant::now();
         let target = ctx.target;
-        let settings = Settings { seconds: audit.seconds, ..Settings::default() };
-        let r = bound(ctx, warm.signings.clone(), Some(&warm.lambda), true, &settings);
+        let r = reference(ctx, warm, audit.seconds);
         let reference = Json::object([
             ("bound", r.bound.into()),
             ("excess", (r.bound - target).into()),
@@ -1173,8 +1440,7 @@ impl<'a, const W: usize> A1<'a, W> {
             ("excess_tier1", (t1 - target).into()),
             ("reference", reference),
         ]);
-        for variant in [Variant::R1, Variant::R2, Variant::R2c] {
-            let method = variant.method().expect("a variant that refits");
+        for method in [Method::R1, Method::R2 { local: 0 }, Method::R2 { local: LOCAL_PER_NODE }] {
             let t = Instant::now();
             let fam = Family::new(ctx, warm.signings.clone());
             let (_, _, trace) = method.refit(ctx, fam, warm, ev.clone(), AUDIT_K, &self.refit, &mut Stats::default());
@@ -1190,11 +1456,44 @@ impl<'a, const W: usize> A1<'a, W> {
             if let Method::R2 { .. } = method {
                 fields.push(("new_signings", trace.new_signings.into()));
             }
-            pairs.push((variant.name(), Json::object(fields)));
+            pairs.push((method.name(), Json::object(fields)));
         }
         audit.out.write(&Json::object(pairs).to_string());
         self.counters.ms_audit += ms(t0);
     }
+
+    /// The refit of a Tier-1-open node below the root with `method`, from `warm` and its Tier-1 evaluation `ev`, its
+    /// counters kept, the cores its separation found offered to the harvest: the bound, final state and trace.
+    fn refit(&mut self, ctx: &Ctx<'_, W>, fam: Family, warm: &Warm, ev: Eval, method: Method) -> (i64, Warm, Trace) {
+        let t = Instant::now();
+        let (refitted, state, trace) = method.refit(ctx, fam, warm, ev, self.k, &self.refit, &mut self.stats);
+        let c = &mut self.counters;
+        c.ms_refit += ms(t);
+        c.refits += 1;
+        c.pricings_refit += trace.pricings as u64;
+        c.signings_local += trace.new_signings as u64;
+        c.refit_timeouts += u64::from(trace.stop == Some(Stop::Seconds));
+        c.refit_breakdowns += u64::from(trace.stop == Some(Stop::Breakdown));
+        if let Method::R3(_) = method {
+            c.ms_r3 += ms(t);
+            c.r3_refits += 1;
+            c.r3_cut += u64::from(refitted <= ctx.target);
+            c.r3_pricings += trace.pricings as u64;
+            c.r3_rounds += trace.rounds as u64;
+        }
+        if let Some(out) = &mut self.harvest {
+            for core in &trace.cores {
+                out.write_once(&core.to_json(), &CORE_KEY);
+            }
+        }
+        (refitted, state, trace)
+    }
+}
+
+/// The reference at a node (E1n's node mode, the audit's): the certified master with separation from `warm`'s
+/// signings (frozen) and multipliers, 100 Polyak steps first, within `seconds`.
+fn reference<const W: usize>(ctx: &Ctx<'_, W>, warm: &Warm, seconds: f64) -> Outcome {
+    bound(ctx, warm.signings.clone(), Some(&warm.lambda), true, &Settings { seconds, ..Settings::default() })
 }
 
 impl<const W: usize> ExtraBound<W> for A1<'_, W> {
@@ -1202,8 +1501,8 @@ impl<const W: usize> ExtraBound<W> for A1<'_, W> {
 
     /// With `target = need − 1`: the state inherited (the root fit's at the root and for `v1`, else the parent's as
     /// the node takes it over, `Warm::child`); Tier 1 there; the audit, at a Tier-1-open node below the root; then,
-    /// at such a node, the variant's refit if it has one and the policy selects the node.  The lower of the bounds
-    /// and the final state.
+    /// at such a node, the variant's refit if it has one and the policy selects the node (R3 or R2 for r3, by the
+    /// policy); the node's state saved if it is due.  The lower of the bounds and the final state.
     fn bound(&mut self, v: &NodeView<'_, W>, parent: Option<&Rc<Warm>>) -> (i64, Rc<Warm>, NodeLog) {
         let target = v.need as i64 - 1;
         let warm = match parent {
@@ -1222,22 +1521,27 @@ impl<const W: usize> ExtraBound<W> for A1<'_, W> {
         self.counters.tier1_evals += 1;
         let mut log = NodeLog { excess_tier1: Some(t1 - target), ..NodeLog::default() };
         let open = t1 > target && parent.is_some();
-        if open {
-            self.audit_node(&ctx, v, &warm, &ev, t1);
+        if !open {
+            return (t1, warm, log);
         }
-        let Some(method) = self.variant.method().filter(|_| open && self.policy.refits(v.gf2, t1, target)) else {
+        self.counters.tier1_open += 1;
+        self.audit_node(&ctx, v, &warm, &ev, t1);
+        let method = self
+            .variant
+            .method(self.policy, v.gf2 - target, self.root_gap, self.r3)
+            .filter(|_| self.policy.refits(v.gf2, t1, target));
+        let refit = method.map(|method| (method, self.refit(&ctx, fam, &warm, ev, method)));
+        let index = self.counters.tier1_open;
+        if let Some(states) = self.states.as_mut().filter(|s| index.is_multiple_of(s.every)) {
+            let host = refit.as_ref().map(|(method, (bound, state, trace))| (*method, *bound, state, trace));
+            let line = state_line(self.n, &self.host, index, v, &warm, t1, host);
+            states.out.write_once(&line, &STATE_KEY);
+        }
+        let Some((method, (refitted, state, trace))) = refit else {
             return (t1, warm, log);
         };
-        let t = Instant::now();
-        let (refitted, state, trace) = method.refit(&ctx, fam, &warm, ev, self.k, &self.refit, &mut self.stats);
-        let c = &mut self.counters;
-        c.ms_refit += ms(t);
-        c.refits += 1;
-        c.pricings_refit += trace.pricings as u64;
-        c.signings_local += trace.new_signings as u64;
-        c.refit_timeouts += u64::from(trace.stop == Some(Stop::Seconds));
         log.pricings = trace.pricings;
-        log.refit = true;
+        log.method = Some(method.name());
         (t1.min(refitted), Rc::new(state), log)
     }
 }
@@ -1294,12 +1598,18 @@ impl<'g, const W: usize> Game<'g, W> {
         'g: 'a,
     {
         let audit = o.audit.zip(audit).map(|(every, out)| Audit { every, seconds: o.audit_seconds, out });
-        A1::new(self.n, &self.p.model, variant, Rc::clone(&self.root), o, audit)
+        let gap = self.fit.gf2 - self.opt as i64;
+        let stem = self.stem(variant, o);
+        A1::new(self.n, &self.p.model, variant, Rc::clone(&self.root), gap, o, audit, stem)
     }
 
-    /// The name of a run's files: `n{N}-{variant}-{policy}-k{K}`.
+    /// The name of a run's files: `n{N}-{variant}-{policy}-k{K}`, then R3's settings for r3 and the label if any.
     fn stem(&self, variant: Variant, o: &BnbOptions) -> String {
-        format!("n{}-{}-{}-k{}", self.n, variant.name(), o.policy.name(), o.k)
+        let mut stem = format!("n{}-{}-{}-k{}", self.n, variant.name(), o.policy.name(), o.k);
+        for part in run_id(self.n, variant, o, "").into_iter().filter(|(k, _)| matches!(*k, "r3" | "label")) {
+            stem += &format!("-{}", part.1.as_str().expect("a name"));
+        }
+        stem
     }
 
     /// The fields that open a run's line (and identify its checkpoint): its key, then the game's figures.
@@ -1316,15 +1626,23 @@ impl<'g, const W: usize> Game<'g, W> {
     }
 }
 
-/// The key fields of a run's line ([`BNB_KEY`]).
+/// The key fields of a run's line ([`BNB_KEY`]): `r3` (R3's settings, [`r3_name`]) for r3 alone, and `label` if
+/// given.
 fn run_id(n: u32, variant: Variant, o: &BnbOptions, mode: &str) -> Vec<(&'static str, Json)> {
-    vec![
+    let mut id = vec![
         ("n", n.into()),
         ("variant", variant.name().into()),
         ("policy", o.policy.name().into()),
         ("k", o.k.into()),
         ("mode", mode.into()),
-    ]
+    ];
+    if variant == Variant::R3 {
+        id.push(("r3", r3_name(&o.r3).into()));
+    }
+    if let Some(label) = &o.label {
+        id.push(("label", label.as_str().into()));
+    }
+    id
 }
 
 /// The counters and times of a run: the search's tally, the extra bound's counters and statistics, and the run's
@@ -1359,10 +1677,16 @@ impl Totals {
             ("better", true, Slot::Count(&mut t.better)),
             ("branches", true, Slot::Count(&mut t.branches)),
             ("tier1_evals", true, Slot::Count(&mut c.tier1_evals)),
+            ("tier1_open", true, Slot::Count(&mut c.tier1_open)),
             ("refits", true, Slot::Count(&mut c.refits)),
             ("pricings_refit", true, Slot::Count(&mut c.pricings_refit)),
             ("signings_local", true, Slot::Count(&mut c.signings_local)),
             ("refit_timeouts", true, Slot::Count(&mut c.refit_timeouts)),
+            ("refit_breakdowns", true, Slot::Count(&mut c.refit_breakdowns)),
+            ("r3_refits", true, Slot::Count(&mut c.r3_refits)),
+            ("r3_cut", true, Slot::Count(&mut c.r3_cut)),
+            ("r3_pricings", true, Slot::Count(&mut c.r3_pricings)),
+            ("r3_rounds", true, Slot::Count(&mut c.r3_rounds)),
             ("audited", true, Slot::Count(&mut c.audited)),
             ("ms", true, Slot::Ms(ms)),
             ("ms_gf2", true, Slot::Time(&mut t.bound_time)),
@@ -1371,11 +1695,17 @@ impl Totals {
             ("ms_builds", true, Slot::Ms(&mut c.ms_builds)),
             ("ms_tier1", true, Slot::Ms(&mut c.ms_tier1)),
             ("ms_refit", true, Slot::Ms(&mut c.ms_refit)),
+            ("ms_r3", true, Slot::Ms(&mut c.ms_r3)),
             ("ms_audit", true, Slot::Ms(&mut c.ms_audit)),
             ("ms_mi", true, Slot::Ms(&mut s.ms_mi)),
             ("ms_greedy", true, Slot::Ms(&mut s.ms_greedy)),
             ("ms_simplex", true, Slot::Ms(&mut s.ms_simplex)),
+            ("ms_exact", true, Slot::Ms(&mut s.ms_exact)),
+            ("ms_separate", true, Slot::Ms(&mut s.ms_separate)),
+            ("ms_master_build", true, Slot::Ms(&mut s.ms_build)),
             ("checks", true, Slot::Count(&mut s.checks)),
+            ("checks_exact", true, Slot::Count(&mut s.checks_exact)),
+            ("cuts_exact", true, Slot::Count(&mut s.cuts_exact)),
             ("breakdowns", true, Slot::Count(&mut s.breakdowns)),
             ("saturated", true, Slot::Count(&mut s.saturated)),
             ("warm", false, Slot::Count(&mut t.warm)),
@@ -1479,13 +1809,7 @@ fn restore_stack<const W: usize>(j: &Json, p: &Prepared<W>) -> Vec<Pending<W, Rc
             let list = |name| entry(e, name).as_u32_vec().unwrap_or_else(|| panic!("{name}: not a list of numbers"));
             let bits = |name| Bits::<W>::from_slice(&list(name));
             let order = list("order");
-            let mut state = p.root;
-            for &x in &order {
-                state = p
-                    .model
-                    .promote_all_using(&mut scratch, &state, &Bits::EMPTY.with(x))
-                    .unwrap_or_else(|| panic!("{x} on a checkpoint's path cannot be promoted"));
-            }
+            let state = state_along(p, &order, &mut scratch);
             let promoted = bits("promoted");
             assert_eq!(Bits::<W>::from_slice(&order), promoted, "a checkpoint's path and promotions differ");
             Pending {
@@ -1502,6 +1826,16 @@ fn restore_stack<const W: usize>(j: &Json, p: &Prepared<W>) -> Vec<Pending<W, Rc
             }
         })
         .collect()
+}
+
+/// The state of a node of the branch and bound: the root with the members `order` promoted one at a time, as the
+/// search made it ([`Pending::order`]).
+fn state_along<const W: usize>(p: &Prepared<W>, order: &[u32], scratch: &mut Scratch<W>) -> FrameSet<W> {
+    order.iter().fold(p.root, |state, &x| {
+        p.model
+            .promote_all_using(scratch, &state, &Bits::EMPTY.with(x))
+            .unwrap_or_else(|| panic!("{x} on a node's path cannot be promoted"))
+    })
 }
 
 /// `dir`, made if it is not there.
@@ -1571,7 +1905,8 @@ impl NodeFile {
             r.depth.to_string(),
             or_dash(r.excess),
             or_dash(r.log.excess_tier1),
-            or_dash(r.log.refit.then_some(r.log.pricings as i64)),
+            or_dash(r.log.method.map(|_| r.log.pricings as i64)),
+            r.log.method.unwrap_or("-").to_string(),
             cut_name(r.fate).to_string(),
         ];
         writeln!(self.file, "{}", columns.join(" ")).unwrap_or_else(|e| panic!("{}: {e}", self.tmp.display()));
@@ -1733,7 +2068,9 @@ fn run_knuth<const W: usize>(
             break;
         }
         let t = Instant::now();
-        let (gf2, a1) = s.dive(extra.extra(), &mut dive_rng(o.seed, g.n, i));
+        let mut rng = dive_rng(o.seed, g.n, i);
+        let depth = o.max_depth.unwrap_or(usize::MAX);
+        let (gf2, a1) = s.dive_to(extra.extra(), &mut |c| rng.below(c.len() as u64) as usize, depth);
         if let Some(log) = &mut log {
             let dive = [("dive", i.into()), ("gf2", gf2.into()), ("a1", a1.into()), ("ms", rounded(ms(t)))];
             log.write(&Json::object(dive).to_string());
@@ -1745,6 +2082,7 @@ fn run_knuth<const W: usize>(
     let totals = Totals { ms: ms(t0), tally: s.tally.clone(), counters: extra.counters.clone(), stats: extra.stats };
     let mut pairs = g.head(variant, o, "knuth");
     pairs.extend([("dives", values.len().into()), ("seed", o.seed.into()), ("ci", o.ci.into())]);
+    pairs.push(("max_depth", o.max_depth.map_or(Json::Null, Json::from)));
     pairs.extend(estimate.pairs());
     pairs.push(("completed", (values.len() == dives).into()));
     pairs.extend(totals.pairs(false));
@@ -1910,6 +2248,282 @@ fn bnb<const W: usize>(n: u32, known: &Known, o: &Options, out: &mut Output, mut
         }
         eprintln!("n={n} {}: {:.1} s", variant.name(), t.elapsed().as_secs_f64());
     }
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// replay
+
+/// A method of `replay` (see the module docs), with its name as given.
+enum Probe {
+    /// A refit.
+    Refit(Method, String),
+    /// The reference, within these seconds.
+    Reference(f64, String),
+}
+
+impl Probe {
+    /// The method named `text`: `r1`, `r2`, `r2c` (with `o.k` pricings), `r3:T`, `r3x:T` (R3 without its separation:
+    /// R2 and the exact checks) and `r3c:T` (R3 without its exact checks: R2 and the separation), each with `T₃ = T`
+    /// seconds (`o.r3`'s if not given) and `o.r3`'s pricings, or `ref:T`, the reference within `T` seconds (10 if not
+    /// given).
+    fn parse(text: &str, o: &BnbOptions) -> Result<Probe, String> {
+        let (kind, seconds) = match text.split_once(':') {
+            Some((kind, t)) => (kind, Some(t.parse::<f64>().map_err(|e| format!("method {text:?}: {e}"))?)),
+            None => (text, None),
+        };
+        let r3 = |exact, cores| R3 { seconds: seconds.unwrap_or(o.r3.seconds), exact, cores, ..o.r3 };
+        let method = match kind {
+            "r1" => Method::R1,
+            "r2" => Method::R2 { local: 0 },
+            "r2c" => Method::R2 { local: LOCAL_PER_NODE },
+            "r3" => Method::R3(r3(true, true)),
+            "r3x" => Method::R3(r3(true, false)),
+            "r3c" => Method::R3(r3(false, true)),
+            "ref" => return Ok(Probe::Reference(seconds.unwrap_or(10.0), text.to_string())),
+            _ => return Err(format!("unknown method {text:?}: not r1, r2, r2c, r3:T, r3x:T, r3c:T or ref:T")),
+        };
+        Ok(Probe::Refit(method, text.to_string()))
+    }
+}
+
+/// The files of saved states that `paths` name: a file itself, a directory its `*.states.jsonl`, sorted.
+fn state_files(paths: &[PathBuf]) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    for path in paths {
+        if path.is_dir() {
+            let entries = std::fs::read_dir(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+            let mut found: Vec<PathBuf> = entries
+                .map(|e| e.unwrap_or_else(|e| panic!("{}: {e}", path.display())).path())
+                .filter(|p| p.to_str().is_some_and(|s| s.ends_with(".states.jsonl")))
+                .collect();
+            found.sort();
+            files.extend(found);
+        } else {
+            files.push(path.clone());
+        }
+    }
+    files
+}
+
+/// `replay` of the states in the file `path` (`bnb --save-states`'s lines, of one game): each state's node made
+/// again, its GF(2) bound checked against the line's, Tier 1 at its inherited state, then each of `probes` from that
+/// state, on its own statistics; a line per state and probe to `out` (see the module docs).
+fn replay(path: &Path, known: &Known, probes: &[Probe], o: &BnbOptions, out: &mut Output) {
+    let text = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    let lines: Vec<Json> = text
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| Json::parse(l).unwrap_or_else(|e| panic!("{}: {e}", path.display())))
+        .collect();
+    let Some(n) = lines.first().map(|j| entry(j, "n").as_u32().expect("a state's n")) else { return };
+    taxman::with_width!(n, W => replay_states::<W>(n, &lines, known, probes, o, out));
+}
+
+fn replay_states<const W: usize>(
+    n: u32,
+    lines: &[Json],
+    known: &Known,
+    probes: &[Probe],
+    o: &BnbOptions,
+    out: &mut Output,
+) {
+    let (board, p) = setup::<W>(n).expect("a game with candidates");
+    let opt = known.opt(n, board.in_the_bag).expect("a known optimum");
+    let refit = Settings { seconds: o.refit_seconds, ..Settings::default() };
+    let mut scratch = Scratch::<W>::new();
+    for j in lines {
+        assert_eq!(entry(j, "n").as_u32(), Some(n), "the states of one game a file");
+        let host = entry(j, "host").as_str().expect("a state's host").to_string();
+        let index = entry(j, "index").as_u64().expect("a state's index");
+        let id = |method: &str| -> Vec<(&'static str, Json)> {
+            vec![("n", n.into()), ("host", host.as_str().into()), ("index", index.into()), ("method", method.into())]
+        };
+        let name = |probe: &Probe| match probe {
+            Probe::Refit(_, name) | Probe::Reference(_, name) => name.clone(),
+        };
+        let todo: Vec<&Probe> =
+            probes.iter().filter(|q| !out.done(&Output::key_of(&Json::object(id(&name(q))), &REPLAY_KEY))).collect();
+        if todo.is_empty() {
+            continue;
+        }
+        let number = |name: &str| entry(j, name).as_i64().unwrap_or_else(|| panic!("a state's {name}"));
+        let order = entry(j, "order").as_u32_vec().expect("a state's order");
+        let cands = Bits::<W>::from_slice(&entry(j, "cands").as_u32_vec().expect("a state's candidates"));
+        let warm = Warm::from_json(entry(j, "warm")).unwrap_or_else(|e| panic!("a state's warm state: {e}"));
+        let (need, max_add) = (number("need"), number("max_add") as usize);
+        let state = state_along(&p, &order, &mut scratch);
+        let t = Instant::now();
+        let fm = frame_matroids(&p.model, &state, &cands);
+        let gf2 = fm.bound(max_add).value;
+        assert_eq!(gf2, number("gf2"), "n={n} {host} state {index}: the GF(2) bound made again differs");
+        let target = need - 1;
+        assert!(Bits::<W>::from_slice(&order).sum() as i64 + need == opt as i64 + 1, "n={n}: a state of another P*");
+        let ctx = Ctx::new(n, &p.model, &state, &fm, max_add, target, true);
+        let fam = || Family::new(&ctx, warm.signings.clone());
+        let (t1, ev) = tier1(&ctx, &fam(), &warm, &mut Stats::default());
+        assert_eq!(t1 - target, number("excess_tier1"), "n={n} {host} state {index}: Tier 1 made again differs");
+        let ms_node = ms(t);
+        let host_refit = entry(j, "refit");
+        let host_of = |field: &str| host_refit.get(field).and_then(Json::as_str).map(str::to_string);
+        for probe in todo {
+            let t = Instant::now();
+            let mut stats = Stats::default();
+            let (bound, fields) = match probe {
+                Probe::Refit(method, _) => {
+                    let (bound, state, trace) = method.refit(&ctx, fam(), &warm, ev.clone(), o.k, &refit, &mut stats);
+                    let r3 = match method {
+                        Method::R3(r3) => Some(r3_name(r3)),
+                        _ => None,
+                    };
+                    let same =
+                        (host_of("method").as_deref() == Some(method.name()) && host_of("r3") == r3).then(|| {
+                            host_refit.get("bound").and_then(Json::as_i64) == Some(t1.min(bound))
+                                && host_of("digest") == Some(digest(&state.to_json().to_string()))
+                        });
+                    let fields = vec![
+                        ("pricings", trace.pricings.into()),
+                        ("rounds", trace.rounds.into()),
+                        ("new_signings", trace.new_signings.into()),
+                        ("cores", trace.cores.len().into()),
+                        ("stop", format!("{:?}", trace.stop.expect("a refit's stop")).into()),
+                        ("host_same", same.map_or(Json::Null, Json::from)),
+                    ];
+                    (t1.min(bound), fields)
+                }
+                Probe::Reference(seconds, _) => {
+                    let r = reference(&ctx, &warm, *seconds);
+                    stats = r.stats;
+                    let fields = vec![
+                        ("pricings", r.stats.pricings_mi.into()),
+                        ("rounds", r.rounds.into()),
+                        ("new_signings", (r.family.extras.len() - warm.signings.len()).into()),
+                        ("cores", r.cores.len().into()),
+                        ("stop", format!("{:?}", r.stop).into()),
+                        ("host_same", Json::Null),
+                    ];
+                    (t1.min(r.bound), fields)
+                }
+            };
+            let mut pairs = id(&name(probe));
+            pairs.extend([
+                ("depth", entry(j, "depth").clone()),
+                ("excess_gf2", number("excess_gf2").into()),
+                ("excess_tier1", (t1 - target).into()),
+                ("bound", bound.into()),
+                ("excess", (bound - target).into()),
+                ("cut", (bound <= target).into()),
+            ]);
+            pairs.extend(fields);
+            pairs.extend([
+                ("cuts_exact", stats.cuts_exact.into()),
+                ("checks_exact", stats.checks_exact.into()),
+                ("breakdowns", stats.breakdowns.into()),
+                ("ms", rounded(ms(t))),
+                ("ms_node", rounded(ms_node)),
+                ("ms_pricing", rounded(stats.ms_mi + stats.ms_greedy)),
+                ("ms_simplex", rounded(stats.ms_simplex)),
+                ("ms_exact", rounded(stats.ms_exact)),
+                ("ms_separate", rounded(stats.ms_separate)),
+                ("ms_build", rounded(stats.ms_build)),
+            ]);
+            out.write(&Json::object(pairs).to_string());
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// fit
+
+/// The cores of a harvest's file (`bnb --harvest`), in its order.
+fn read_cores(path: &Path) -> Vec<Core> {
+    let text = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    let parse = |l: &str| Json::parse(l).map_err(|e| e.to_string()).and_then(|j| Core::from_json(&j));
+    text.lines().filter(|l| !l.trim().is_empty()).map(|l| parse(l).unwrap_or_else(|e| panic!("{e}"))).collect()
+}
+
+/// The `fit` command for the game `n` (see the module docs): the main arm's fit at the root, from the family of the
+/// fit `--start` (its signings frozen, those of a frame the root lacks left out, its multipliers by candidate number)
+/// or from the main arm's signings, with the cores of `--offer` placed first, certified with separation within the
+/// budget; saved to `--save-fit` (a `.json` file, or a directory for `n{N}.json`), its line to `out`.
+fn fit_game<const W: usize>(n: u32, known: &Known, o: &Options, out: &mut Output) {
+    let label = o.bnb.label.clone().unwrap_or_else(|| "own".into());
+    let id = [("n", Json::from(n)), ("label", Json::from(label.as_str()))];
+    if out.done(&Output::key_of(&Json::object(id.clone()), &["n", "label"])) {
+        return;
+    }
+    let Some((board, p)) = setup::<W>(n) else { return };
+    let Some(opt) = known.opt(n, board.in_the_bag) else {
+        eprintln!("n={n}: no known optimum, skipped");
+        return;
+    };
+    let start = o.start.as_deref().map(|f| SavedFit::load(f).unwrap_or_else(|e| panic!("{e}")));
+    let offer = o.offer.as_deref().map(read_cores).unwrap_or_default();
+    let optimal = optimal_promotions(n, known, &board, opt);
+    at_root(n, &p, opt, |ctx, gf2| {
+        let frames = ctx.state.len();
+        let (signings, lambda): (Vec<Signing>, Option<Vec<HashMap<u32, f64>>>) = match &start {
+            Some(s) => {
+                let kept = |i: &usize| s.fit.signings[*i].frame < frames;
+                let kept: Vec<usize> = (0..s.fit.signings.len()).filter(kept).collect();
+                let signings = kept.iter().map(|&i| dw::frozen(&s.fit.signings[i])).collect();
+                (signings, Some(kept.iter().map(|&i| s.fit.lambda[i].clone()).collect()))
+            }
+            None => (arm("f1cores", n, frames, &o.frames).0, None),
+        };
+        let carried = start.as_ref().map(|_| {
+            let fit = dw::Fit { signings: signings.clone(), lambda: lambda.clone().unwrap_or_default() };
+            fit.bound(ctx, &mut Stats::default())
+        });
+        let (carried_signings, offered) = (signings.len(), offer.len());
+        let r = bound_offered(ctx, signings, lambda.as_deref(), offer.clone(), true, &o.settings);
+        assert!(r.bound >= opt as i64, "n={n}: the fit's bound {} is below P* = {opt}", r.bound);
+        if let Some(set) = &optimal {
+            assert_independent(n, &r.family, set, "the optimal promotions");
+            let fit_family = Family::new(ctx, r.fit.signings.clone());
+            assert_independent(n, &fit_family, set, "the optimal promotions");
+        }
+        let fit = SavedFit::of(n, opt, gf2, o.settings.mode.name(), &r);
+        if let Some(path) = &o.save_fit {
+            let file = if path.extension().is_some_and(|e| e == "json") {
+                path.clone()
+            } else {
+                path.join(format!("n{n}.json"))
+            };
+            fit.save(&file).unwrap_or_else(|e| panic!("{e}"));
+        }
+        let offered_placed = r.cores[..offered.min(r.cores.len())].iter().filter(|f| f.assigned.is_some()).count();
+        let share = |b: i64| if gf2 > opt as i64 { (gf2 - b) as f64 / (gf2 - opt as i64) as f64 } else { 0.0 };
+        let path_name = |p: &Option<PathBuf>| p.as_ref().map_or(Json::Null, |p| Json::from(p.display().to_string()));
+        let mut pairs: Vec<(&str, Json)> = id.to_vec();
+        pairs.extend([
+            ("start", path_name(&o.start)),
+            ("offer", path_name(&o.offer)),
+            ("opt", opt.into()),
+            ("gf2", gf2.into()),
+            ("bound", r.bound.into()),
+            ("share", Json::Num(share(r.bound))),
+            ("carried", carried.map_or(Json::Null, Json::from)),
+            ("carried_share", carried.map_or(Json::Null, |b| Json::Num(share(b)))),
+            ("carried_signings", carried_signings.into()),
+            ("offered", offered.into()),
+            ("offered_placed", offered_placed.into()),
+            ("signings", r.family.extras.len().into()),
+            ("fit_signings", r.fit.signings.len().into()),
+            ("cores_found", r.cores.len().into()),
+            ("cores_assigned", r.cores_assigned.into()),
+            ("converged", (r.lb > 0.0 && r.l_best - r.lb <= 0.01 * (gf2 - opt as i64) as f64).into()),
+            ("stop", format!("{:?}", r.stop).into()),
+            ("rounds", r.rounds.into()),
+            ("seconds", rounded(r.seconds)),
+        ]);
+        out.write(&Json::object(pairs).to_string());
+        eprintln!(
+            "n={n} {label}: bound {} (share {:.3}, carried {carried:?}), {:.1} s",
+            r.bound,
+            share(r.bound),
+            r.seconds
+        );
+    });
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -2377,6 +2991,9 @@ mod tests {
             samples: 0,
             games: Vec::new(),
             files: Vec::new(),
+            methods: Vec::new(),
+            start: None,
+            offer: None,
             bnb: BnbOptions::default(),
         };
         for n in [300u32, 360, 420, 480] {
@@ -2433,8 +3050,10 @@ mod tests {
 
     /// Asserts what a refit's results must satisfy: its trace starts at Tier 1's bound `tier`, never falls below
     /// `P*` and never rises, has an entry per pricing after Tier 1's, and ends at the bound returned, which the
-    /// returned state's multipliers give again exactly.
-    fn assert_refit<const W: usize>(ctx: &Ctx<'_, W>, what: &str, tier: i64, r: &(i64, Warm, Trace)) {
+    /// returned state's multipliers give again exactly (with `exactly` false, a bound no lower: R3's later rounds can
+    /// merge cores into the signings its earlier rounds opened, whose matroids then change, so that the final family's
+    /// lowest `L` can lie above an earlier family's).
+    fn assert_refit<const W: usize>(ctx: &Ctx<'_, W>, what: &str, tier: i64, r: &(i64, Warm, Trace), exactly: bool) {
         let (value, state, trace) = r;
         let after = &trace.after;
         assert_eq!(after.first(), Some(&tier), "{what}: the trace starts at Tier 1");
@@ -2444,14 +3063,25 @@ mod tests {
         assert_eq!(after.last(), Some(value), "{what}: the bound returned is the trace's last");
         let fam = Family::new(ctx, state.signings.clone());
         let (again, _) = tier1(ctx, &fam, state, &mut Stats::default());
-        assert_eq!(again, *value, "{what}: the state returned gives another bound");
+        if exactly {
+            assert_eq!(again, *value, "{what}: the state returned gives another bound");
+        } else {
+            assert!(again >= *value, "{what}: the state returned gives a lower bound than the refit's");
+        }
     }
 
-    /// R1 and R2 (local 0 and 2) with `k = 20` at the roots of the non-prime boards 300-700 every 40th, from the main
-    /// arm's search-mode fit (3 s) with every multiplier halved: valid traces and states (`assert_refit`).
+    /// R3 with the budgets of the tests (validity does not depend on them).
+    fn test_r3() -> R3 {
+        R3 { seconds: 0.5, pricings: 100, ..R3::default() }
+    }
+
+    /// R1, R2 (local 0 and 2) with `k = 20` and R3 (with each of its switches off as well) at the roots of the
+    /// non-prime boards 300-700 every 40th, from the main arm's search-mode fit (3 s) with every multiplier halved:
+    /// valid traces and states (`assert_refit`), R3's at most 2 new signings a frame.
     #[test]
     fn refits_are_valid() {
         let (mut lowered, mut pricings, mut opened) = (0, 0, 0);
+        let mut r3_checked = 0;
         for n in (300..=700u32).step_by(40).filter(|&n| !is_prime(n)) {
             taxman::with_width!(n, W => with_root_fit::<W>(n, 3.0, |_, ctx, r, _| {
                 let mut warm = Warm::from_outcome(r);
@@ -2464,7 +3094,7 @@ mod tests {
                 let f = fam();
                 let (tier, first) = tier1(ctx, &f, &warm, &mut stats);
                 let r1 = refit_r1(ctx, &f, &warm, &first, 20, &mut stats);
-                assert_refit(ctx, &format!("n={n} r1"), tier, &r1);
+                assert_refit(ctx, &format!("n={n} r1"), tier, &r1, true);
                 assert_eq!((r1.2.new_signings, &r1.1.columns, &r1.1.cuts), (0, &warm.columns, &warm.cuts));
                 let mut line = format!("n={n}: tier 1 {tier}, r1 {} ({} pricings)", r1.0, r1.2.pricings);
                 for local in [0, 2] {
@@ -2472,7 +3102,7 @@ mod tests {
                     let (_, first) = tier1(ctx, &f, &warm, &mut stats);
                     let r2 = refit_r2(ctx, f, &warm, first, 20, local, &settings, &mut stats);
                     let what = format!("n={n} r2 local {local}");
-                    assert_refit(ctx, &what, tier, &r2);
+                    assert_refit(ctx, &what, tier, &r2, true);
                     let (state, trace) = (&r2.1, &r2.2);
                     assert!(trace.new_signings <= 2 * ctx.state.len() * local, "{what}");
                     assert_eq!(state.local, warm.local + trace.new_signings, "{what}");
@@ -2486,12 +3116,33 @@ mod tests {
                     pricings += trace.pricings;
                     opened += trace.new_signings;
                 }
+                for (exact, cores) in [(true, true), (true, false), (false, true)] {
+                    let f = fam();
+                    let (_, first) = tier1(ctx, &f, &warm, &mut stats);
+                    let r3 = refit_r3(ctx, f, &warm, first, &R3 { exact, cores, ..test_r3() }, &mut stats);
+                    let what = format!("n={n} r3 exact {exact} cores {cores}");
+                    assert_refit(ctx, &what, tier, &r3, false);
+                    let (state, trace) = (&r3.1, &r3.2);
+                    for h in 0..ctx.state.len() {
+                        let new = state.local_in(h) - warm.local_in(h);
+                        assert!(new <= LOCAL_PER_NODE, "{what}: {new} new signings of frame {h}");
+                    }
+                    assert!(cores || trace.new_signings == 0, "{what}: signings without the separation");
+                    assert_eq!(state.signings.len(), warm.signings.len() + trace.new_signings, "{what}");
+                    assert!(state.signings.iter().all(|s| !s.mergeable && s.cores.is_empty()), "{what}: frozen");
+                    line += &format!(
+                        ", r3/{exact}/{cores} {} ({} pricings, {} rounds, {} signings, {:?})",
+                        r3.0, trace.pricings, trace.rounds, trace.new_signings, trace.stop
+                    );
+                    lowered += usize::from(r3.0 < tier);
+                    r3_checked += 1;
+                }
                 lowered += usize::from(r1.0 < tier);
                 pricings += r1.2.pricings;
                 eprintln!("{line}");
             }));
         }
-        eprintln!("refits: {lowered} lowered the bound, {pricings} pricings, {opened} local signings");
+        eprintln!("refits: {lowered} lowered the bound, {pricings} pricings, {opened} local signings, {r3_checked} R3");
         assert!(lowered > 0 && opened > 0, "the refits had nothing to do");
     }
 
@@ -2643,25 +3294,37 @@ mod tests {
         assert!(nodes > 0 && columns > 0 && cuts > 0);
     }
 
+    /// The options of a test's run of `variant` under `policy`, with R3's budgets of the tests.
+    fn options(variant: Variant, policy: Policy) -> BnbOptions {
+        BnbOptions { variants: vec![variant], policy, r3: test_r3(), ..BnbOptions::default() }
+    }
+
+    /// The pilot's variants (their default policy) and r3 under `r3_policies`, as the tests run them.
+    fn runs(r3_policies: &[Policy]) -> Vec<(Variant, BnbOptions)> {
+        let pilot = Variant::PILOT.into_iter().map(|v| (v, options(v, Policy::All)));
+        pilot.chain(r3_policies.iter().map(|&p| (Variant::R3, options(Variant::R3, p)))).collect()
+    }
+
     /// The design's S5.2 test 2: at the games 300, 350, …, 1300, with the incumbent `P* − 1` (so that no node on the
     /// path of the optimal promotions `S*` is cut by a valid bound), a dive along `S*` (the child whose promotions
-    /// are in `S*` and whose member left out is not) for each of v1, r1, r2 and r2c: the extra bound at every node is
-    /// at least `w(S* − promoted)`, and the dive ends at a leaf, the GF(2) heaviest set promotable.
+    /// are in `S*` and whose member left out is not) for each of v1, r1, r2, r2c and r3 (`r3-all` and
+    /// `r3-top:0.25`, U4's test): the extra bound at every node is at least `w(S* − promoted)`, and the dive ends at
+    /// a leaf, the GF(2) heaviest set promotable.
     #[test]
     fn bounds_hold_along_the_optimum() {
         let mut nodes = 0;
         for n in (300..=1300u32).step_by(50) {
             taxman::with_width!(n, W => with_game::<W>(n, 3.0, 1, |g, optimal| {
                 let optimal = optimal.expect("the optimal promotions");
-                for variant in [Variant::V1, Variant::R1, Variant::R2, Variant::R2c] {
-                    let what = format!("n={n} {}", variant.name());
+                for (variant, o) in runs(&[Policy::R3All, Policy::R3Top(0.25)]).into_iter().skip(1) {
+                    let what = format!("n={n} {} {}", variant.name(), o.policy.name());
                     let watch = |v: &NodeView<'_, W>, _: Option<&Rc<Warm>>, bound: i64| {
                         assert!(v.promoted.is_subset(&optimal), "{what}: a node off the optimum's path");
                         let rest = (optimal - v.promoted).sum() as i64;
                         assert!(bound >= rest, "{what}: {bound} below w(S* − promoted) = {rest} at depth {}", v.depth);
                         nodes += 1;
                     };
-                    let mut extra = watched(g.a1(variant, &BnbOptions::default(), None), watch);
+                    let mut extra = watched(g.a1(variant, &o, None), watch);
                     let mut s = g.search();
                     s.dive_by(Some(&mut extra), &mut |children| {
                         let on_path = |c: &Pending<W, Rc<Warm>>| {
@@ -2679,14 +3342,15 @@ mod tests {
     }
 
     /// The design's S5.2 test 3: at every non-prime game 30-600 with `P* > 0`, with the incumbent `P* − 1`, the
-    /// branch and bound of each variant finds a completion worth `P*` (a `better` one) within 200,000 nodes.
+    /// branch and bound of each variant (r3 with `r3-top:0.25`, U4's test) finds a completion worth `P*` (a `better`
+    /// one) within 200,000 nodes.
     #[test]
     fn handicapped_incumbent_is_found() {
         let mut games = 0;
         for n in (30..=600u32).filter(|&n| !is_prime(n)) {
             taxman::with_width!(n, W => with_game::<W>(n, 2.0, 1, |g, _| {
-                for variant in Variant::ALL {
-                    let mut extra = g.a1(variant, &BnbOptions::default(), None);
+                for (variant, o) in runs(&[Policy::R3Top(0.25)]) {
+                    let mut extra = g.a1(variant, &o, None);
                     let mut s = g.search();
                     while s.tally.better == 0 && s.tally.nodes < 200_000 && s.step(extra.extra()).is_some() {}
                     let nodes = s.tally.nodes;
@@ -2699,10 +3363,10 @@ mod tests {
         assert!(games > 400);
     }
 
-    /// The records of `variant`'s whole tree in the order visited, which must be complete within 10⁶ nodes, find
-    /// nothing better than the incumbent, and have no two nodes alike (promotions, candidates).
-    fn tree_records<const W: usize>(g: &Game<'_, W>, variant: Variant) -> Vec<NodeRecord<W>> {
-        let mut extra = g.a1(variant, &BnbOptions::default(), None);
+    /// The records of `variant`'s whole tree under the options `o` in the order visited, which must be complete
+    /// within 10⁶ nodes, find nothing better than the incumbent, and have no two nodes alike (promotions, candidates).
+    fn tree_records<const W: usize>(g: &Game<'_, W>, variant: Variant, o: &BnbOptions) -> Vec<NodeRecord<W>> {
+        let mut extra = g.a1(variant, o, None);
         let mut s = g.search();
         let mut records = Vec::new();
         while let Some(r) = s.step(extra.extra()) {
@@ -2715,25 +3379,25 @@ mod tests {
         records
     }
 
-    /// The nodes (promotions, candidates) of `variant`'s whole tree ([`tree_records`]).
-    fn tree_nodes<const W: usize>(g: &Game<'_, W>, variant: Variant) -> HashSet<(Bits<W>, Bits<W>)> {
-        tree_records(g, variant).iter().map(|r| (r.promoted, r.cands)).collect()
+    /// The nodes (promotions, candidates) of `variant`'s whole tree under `o` ([`tree_records`]).
+    fn tree_nodes<const W: usize>(g: &Game<'_, W>, variant: Variant, o: &BnbOptions) -> HashSet<(Bits<W>, Bits<W>)> {
+        tree_records(g, variant, o).iter().map(|r| (r.promoted, r.cands)).collect()
     }
 
-    /// The design's S5.2 test 4: on 20 non-prime games spread over 300-900, the nodes of the whole trees of r2 and
-    /// r2c are among those of v0's (the extra bound only cuts).
+    /// The design's S5.2 test 4 (and U4's): on 20 non-prime games spread over 300-900, the nodes of the whole trees
+    /// of r2, r2c and r3 (`r3-top:0.25`) are among those of v0's (the extra bound only cuts).
     #[test]
     fn extra_trees_are_subtrees() {
         for n in spread(300, 900, 20) {
             taxman::with_width!(n, W => with_game::<W>(n, 3.0, 0, |g, _| {
-                let v0 = tree_nodes(g, Variant::V0);
+                let v0 = tree_nodes(g, Variant::V0, &BnbOptions::default());
                 let mut sizes = vec![v0.len()];
-                for variant in [Variant::R2, Variant::R2c] {
-                    let nodes = tree_nodes(g, variant);
+                for (variant, o) in runs(&[Policy::R3Top(0.25)]).into_iter().skip(3) {
+                    let nodes = tree_nodes(g, variant, &o);
                     assert!(nodes.is_subset(&v0), "n={n} {}: a node not in v0's tree", variant.name());
                     sizes.push(nodes.len());
                 }
-                eprintln!("n={n}: v0, r2 and r2c trees of {sizes:?} nodes");
+                eprintln!("n={n}: v0, r2, r2c and r3 trees of {sizes:?} nodes");
             }));
         }
     }
@@ -2816,8 +3480,8 @@ mod tests {
         let critical = 1.63 / (DIVES as f64).sqrt();
         for n in [1000u32, 1100, 1215, 1300] {
             taxman::with_width!(n, W => with_game::<W>(n, 30.0, 0, |g, _| {
-                let v0 = tree_records(g, Variant::V0);
-                let v1 = tree_records(g, Variant::V1);
+                let v0 = tree_records(g, Variant::V0, &BnbOptions::default());
+                let v1 = tree_records(g, Variant::V1, &BnbOptions::default());
                 let cut: HashSet<_> =
                     v1.iter().filter(|r| r.fate == Fate::Tier1).map(|r| (r.promoted, r.cands)).collect();
                 let exact = exact_dives(&v0, &cut);
@@ -3038,5 +3702,92 @@ mod tests {
                 }
             }
         });
+    }
+
+    /// The lines of a file of JSON lines.
+    fn json_lines(path: &Path) -> Vec<Json> {
+        let text = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        text.lines().map(|l| Json::parse(l).expect("a JSON line")).collect()
+    }
+
+    /// U4's tests of the saved states, the harvest and the offer, at 840 (trees of a few hundred nodes).  Runs of r2
+    /// and of r3 (`r3-all`, budgets that never bind there) save every 3rd Tier-1-open node's state; `replay` of each
+    /// state with the host's method gives the host's refit exactly (its bound and the digest of its final state), and
+    /// the reference runs from it.  The r3 run harvests the cores its nodes' separation found; the fit of 841's root
+    /// from 840's (`fit`), with those cores offered, places some of them, gives a bound of at least `P*` with the
+    /// optimal promotions independent in every matroid (which `fit_game` asserts), and its saved fit gives its bound
+    /// again.
+    #[test]
+    fn states_replay_and_cores_carry() {
+        let n = 840;
+        let known = Known::load(&[], None).expect("the built-in optimum table");
+        let dir =
+            make_dir(&std::env::temp_dir().join(format!("fields-replay-test-{}", std::process::id()))).to_path_buf();
+        let harvest = dir.join("cores.jsonl");
+        taxman::with_width!(n, W => with_game::<W>(n, 3.0, 0, |g, _| {
+            for (variant, policy, method) in [(Variant::R2, Policy::All, "r2"), (Variant::R3, Policy::R3All, "r3:60")] {
+                let o = BnbOptions {
+                    variants: vec![variant],
+                    policy,
+                    r3: R3 { seconds: 60.0, ..R3::default() },
+                    save_states: Some(dir.clone()),
+                    every: 3,
+                    harvest: (variant == Variant::R3).then(|| harvest.clone()),
+                    ..BnbOptions::default()
+                };
+                let mut out = Output::open(Some(&dir.join("bnb.jsonl")), &BNB_KEY);
+                assert!(run_tree(g, variant, &o, None, &mut out));
+                let states = dir.join(format!("{}.states.jsonl", g.stem(variant, &o)));
+                let probes = [method, "ref:5"].map(|m| Probe::parse(m, &o).expect("a method"));
+                let replayed = dir.join(format!("{}.replay.jsonl", variant.name()));
+                replay(&states, &known, &probes, &o, &mut Output::open(Some(&replayed), &REPLAY_KEY));
+                let lines = json_lines(&replayed);
+                let saved = json_lines(&states).len();
+                assert!(saved >= 5, "{}: {saved} states saved", variant.name());
+                assert_eq!(lines.len(), 2 * saved, "{}: a line per state and method", variant.name());
+                for j in lines.iter().filter(|j| j.get("method") == Some(&Json::from(method))) {
+                    assert_eq!(j.get("host_same"), Some(&Json::Bool(true)), "{}: replay differs: {j}", variant.name());
+                }
+                eprintln!("{}: {saved} states replayed as the host refitted them", variant.name());
+            }
+        }));
+        let cores = read_cores(&harvest);
+        assert!(!cores.is_empty(), "the r3 run's nodes found no core");
+        let fits = dir.join("fits");
+        let mut o = Options {
+            command: "fit".into(),
+            known: Vec::new(),
+            arms: Vec::new(),
+            modes: Vec::new(),
+            settings: Settings { seconds: 20.0, ..Settings::default() },
+            fixed_seconds: 20.0,
+            root_seconds: 20.0,
+            frames: vec![1, 2, 3],
+            out: None,
+            census: None,
+            save_fit: Some(fits.join("n840.json")),
+            exact: None,
+            samples: 0,
+            games: Vec::new(),
+            files: Vec::new(),
+            methods: Vec::new(),
+            start: None,
+            offer: None,
+            bnb: BnbOptions::default(),
+        };
+        let lines = dir.join("fits.jsonl");
+        let mut out = Output::open(Some(&lines), &["n", "label"]);
+        taxman::with_width!(840, W => fit_game::<W>(840, &known, &o, &mut out));
+        (o.start, o.offer, o.save_fit) = (Some(fits.join("n840.json")), Some(harvest), Some(fits.join("n841.json")));
+        o.bnb.label = Some("harvest".into());
+        taxman::with_width!(841, W => fit_game::<W>(841, &known, &o, &mut out));
+        let lines = json_lines(&lines);
+        let placed = lines[1].get("offered_placed").and_then(Json::as_u64).expect("offered_placed");
+        assert_eq!(lines[1].get("offered").and_then(Json::as_u64), Some(cores.len() as u64));
+        assert!(placed > 0, "none of the {} cores offered was placed", cores.len());
+        let saved = SavedFit::load(&fits.join("n841.json")).unwrap_or_else(|e| panic!("{e}"));
+        taxman::with_width!(841, W => check_saved::<W>(&saved));
+        eprintln!("841 from 840 with {placed} of {} cores placed: {}", cores.len(), lines[1]);
+        std::fs::remove_dir_all(&dir).expect("the test directory removed");
     }
 }

@@ -60,6 +60,9 @@ pub struct NodeView<'a, const W: usize> {
     pub promoted_now: Bits<W>,
     /// The member the branch from the parent left out (`k_j`); empty at the root.
     pub removed: Bits<W>,
+    /// The promotions of the node's path in the order they were made, one member at a time (from which `state` is
+    /// made again exactly: [`Pending::order`]).
+    pub order: &'a [u32],
 }
 
 /// What an extra bound reports of a node, for the per-node logs.
@@ -69,8 +72,8 @@ pub struct NodeLog {
     pub excess_tier1: Option<i64>,
     /// Refit pricings spent at the node.
     pub pricings: usize,
-    /// Whether a refit ran.
-    pub refit: bool,
+    /// The refit's method, if one ran.
+    pub method: Option<&'static str>,
 }
 
 /// A bound evaluated at the nodes the GF(2) bound leaves open, with a state that a node hands to its children.
@@ -260,8 +263,19 @@ impl<'p, const W: usize, S: Clone> Search<'p, W, S> {
     /// them, the index of the child to go on to) instead of uniformly.
     pub fn dive_by<E: ExtraBound<W, State = S>>(
         &mut self,
+        extra: Option<&mut E>,
+        choose: &mut dyn FnMut(&[Pending<W, S>]) -> usize,
+    ) -> (f64, f64) {
+        self.dive_to(extra, choose, usize::MAX)
+    }
+
+    /// [`dive_by`](Self::dive_by), stopping after the node of depth `depth` (whose children are not counted): the
+    /// sums are then those of the tree cut at that depth.
+    pub fn dive_to<E: ExtraBound<W, State = S>>(
+        &mut self,
         mut extra: Option<&mut E>,
         choose: &mut dyn FnMut(&[Pending<W, S>]) -> usize,
+        depth: usize,
     ) -> (f64, f64) {
         let (mut gf2, mut with_extra, mut product) = (0.0, 0.0, 1.0);
         let mut alive = true;
@@ -275,7 +289,7 @@ impl<'p, const W: usize, S: Clone> Search<'p, W, S> {
             if matches!(record.fate, Fate::Tier1 | Fate::Refit) {
                 alive = false;
             }
-            if children.is_empty() {
+            if children.is_empty() || record.depth >= depth {
                 return (gf2, with_extra);
             }
             product *= children.len() as f64;
@@ -383,6 +397,7 @@ impl<'p, const W: usize, S: Clone> Search<'p, W, S> {
                 depth,
                 promoted_now,
                 removed,
+                order: &order,
             };
             let te = Instant::now();
             let (bound, final_state, log) = e.bound(&view, inherited.as_ref());
