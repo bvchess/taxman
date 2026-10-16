@@ -360,6 +360,12 @@ pub struct Stats {
     pub restarts: u64,
     /// Exact checks stopped at their column limit.
     pub checks_capped: u64,
+    /// Master solves that ended optimal at a basis that is not primal feasible: the simplex broke down, and the
+    /// duals it reports are not to be trusted.
+    pub breakdowns: u64,
+    /// Evaluations of `L` whose value saturated at `i64::MAX` (multipliers far beyond every weight; see
+    /// [`evaluate_grid`]).
+    pub saturated: u64,
     /// Rank inequalities added by the cheap separation and by the exact checks, the checks made and their pivots.
     pub cuts_cheap: u64,
     pub cuts_exact: u64,
@@ -388,6 +394,8 @@ impl Stats {
             purged,
             restarts,
             checks_capped,
+            breakdowns,
+            saturated,
             cuts_cheap,
             cuts_exact,
             checks_exact,
@@ -409,6 +417,8 @@ impl Stats {
         self.purged += purged;
         self.restarts += restarts;
         self.checks_capped += checks_capped;
+        self.breakdowns += breakdowns;
+        self.saturated += saturated;
         self.cuts_cheap += cuts_cheap;
         self.cuts_exact += cuts_exact;
         self.checks_exact += checks_exact;
@@ -496,6 +506,7 @@ pub fn evaluate_grid<const W: usize>(
     for s in &mut sets {
         s.sort_unstable();
     }
+    stats.saturated += u64::from(value == i64::MAX);
     Eval { value, q, sets }
 }
 
@@ -1050,6 +1061,7 @@ impl Master {
         stats.degenerate += after.degenerate - before.degenerate;
         stats.repairs += after.repairs - before.repairs;
         stats.solves += 1;
+        stats.breakdowns += u64::from(optimal && !self.lp.feasible());
         stats.ms_simplex += t.elapsed().as_secs_f64() * 1e3;
         stats.max_rows = stats.max_rows.max(self.lp.rows());
         stats.max_s = stats.max_s.max(after.max_s);

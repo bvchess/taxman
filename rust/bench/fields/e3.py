@@ -181,8 +181,9 @@ def section_trees(trees):
           "refit pricings per Tier-1 evaluation; c = 2.5 + 3p the model's cost of a node in v0-node units (v0: 1).  "
           "Measured cost: (ms - ms_audit) per node over v0's ms per node.  Time ratio: (ms - ms_audit) / v0 ms.  Work "
           "ratio: v0 nodes / (nodes · c), the model's prediction of the time ratio's inverse (above 1: the variant "
-          "wins).  `≥` and `≤`: a run stopped at a budget, so its counts are only lower bounds and the ratio is "
-          "bounded on one side.\n")
+          "wins).  Breakdowns: the master solves that ended optimal at a basis that is not primal feasible, whose "
+          "duals are not to be trusted.  `≥` and `≤`: a run stopped at a budget, so its counts are only lower bounds "
+          "and the ratio is bounded on one side.\n")
     for n in sorted({r["n"] for r in trees}):
         runs = sorted((r for r in trees if r["n"] == n), key=run_order)
         base = base_run(trees, n)
@@ -199,12 +200,12 @@ def section_trees(trees):
             out.append([r["variant"], r.get("policy"), r.get("k"), num(r["nodes"]), yes_no(done(r)),
                         show(tree_ratio(r, base)), num(r.get("cut_gf2")), num(r.get("cut_tier1")),
                         num(r.get("cut_refit")), num(r.get("tier1_evals")), num(r.get("refits")),
-                        fmt(div(r.get("pricings_refit"), r.get("refits")), 1),
+                        num(r.get("breakdowns")), fmt(div(r.get("pricings_refit"), r.get("refits")), 1),
                         fmt(div(r.get("pricings_refit"), r.get("tier1_evals")), 2), fmt(c, 2), fmt(measured, 2),
                         show(time), show(work)])
         table(["variant", "policy", "k", "nodes", "completed", "tree ratio", "cut gf2", "cut tier1", "cut refit",
-               "Tier-1 evals", "refits", "pricings per refit", "p", "c", "measured cost per node", "time ratio",
-               "work ratio"], out)
+               "Tier-1 evals", "refits", "breakdowns", "pricings per refit", "p", "c", "measured cost per node",
+               "time ratio", "work ratio"], out)
         worse = [label(r) for r in runs if r.get("better")]
         if worse:
             print(f"**Warning**: `better` is not zero for {', '.join(worse)}: a bound or P* is wrong.\n")

@@ -54,19 +54,21 @@
 //!   `refit_timeouts`, `audited`), the times in ms (`ms` the run's and `ms_extra` the extra bound's, both with the
 //!   audit's; `ms_gf2` the GF(2) bound's with `ms_gf2_build` its matroids'; `ms_builds`, `ms_tier1`, `ms_refit`,
 //!   `ms_audit` the extra bound's parts; `ms_mi`, `ms_greedy`, `ms_simplex` its evaluations' and masters') and
-//!   `checks` (intersections cross-checked).  The default is the exact tree; with `--knuth DIVES`, paired dives of
-//!   Knuth's estimator instead (dive `i`'s generator seeded by `--seed`, `n` and `i`, so that every variant follows
-//!   the same dives), and the line has `dives`, `seed`, `ci` and the means, medians and bootstrap intervals (level
-//!   `--ci`, 1,000 resamples) of the GF(2) tree's estimate (`gf2_*`), of the A1 tree's (`a1_*`) and of the ratio of
-//!   their means (`ratio*`).  `--log DIR`: per node of a tree, a line of `n{N}-{variant}-{policy}-k{K}.jsonl` (`id`,
-//!   `parent`, `depth`, `excess_gf2`, `excess_tier1`, `pricings`, `cut`, `subtree`, null for none; `cut` is `count`,
-//!   `gf2`, `tier1`, `refit`, `leaf` or `none`); per dive, a line of `n{N}-{variant}-{policy}-k{K}-knuth.jsonl`, which
-//!   a resumed run skips.  `--checkpoint DIR` (with `--fit`, so that a resumed run has the same root fit; for trees):
-//!   every `--checkpoint-minutes`, the tree's stack, warm states and counters in
-//!   `n{N}-{variant}-{policy}-k{K}.ckpt.json`, from which an interrupted run resumes to the same tree.  `--audit EVERY`
-//!   (to `--audit-out`): at each Tier-1-open node below the root whose hash is 0 modulo `EVERY`, from its inherited
-//!   state, the reference (`nodes`' node mode, `--audit-seconds`) and the traces of R1, R2 and R2c over 20 pricings,
-//!   a line keyed by `n`, `variant` and `node`.
+//!   `checks` (intersections cross-checked), `breakdowns` (master solves that ended optimal at a basis that is not
+//!   primal feasible, whose duals are not to be trusted) and `saturated` (evaluations of `L` whose value saturated at
+//!   `i64::MAX`, multipliers having gone far beyond every weight).  The default is the exact tree; with `--knuth
+//!   DIVES`, paired dives of Knuth's estimator instead (dive `i`'s generator seeded by `--seed`, `n` and `i`, so that
+//!   every variant follows the same dives), and the line has `dives`, `seed`, `ci` and the means, medians and bootstrap
+//!   intervals (level `--ci`, 1,000 resamples) of the GF(2) tree's estimate (`gf2_*`), of the A1 tree's (`a1_*`) and of
+//!   the ratio of their means (`ratio*`).  `--log DIR`: per node of a tree, a line of
+//!   `n{N}-{variant}-{policy}-k{K}.jsonl` (`id`, `parent`, `depth`, `excess_gf2`, `excess_tier1`, `pricings`, `cut`,
+//!   `subtree`, null for none; `cut` is `count`, `gf2`, `tier1`, `refit`, `leaf` or `none`); per dive, a line of
+//!   `n{N}-{variant}-{policy}-k{K}-knuth.jsonl`, which a resumed run skips.  `--checkpoint DIR` (with `--fit`, so that
+//!   a resumed run has the same root fit; for trees): every `--checkpoint-minutes`, the tree's stack, warm states and
+//!   counters in `n{N}-{variant}-{policy}-k{K}.ckpt.json`, from which an interrupted run resumes to the same tree.
+//!   `--audit EVERY` (to `--audit-out`): at each Tier-1-open node below the root whose hash is 0 modulo `EVERY`, from
+//!   its inherited state, the reference (`nodes`' node mode, `--audit-seconds`) and the traces of R1, R2 and R2c over
+//!   20 pricings, a line keyed by `n`, `variant` and `node`.
 //!
 //! `--fit-mode` (of `roots` and `nodes`, every computation of the run; of `bnb`, the root fit): `certified` (the
 //! default) brackets each LP with a certified lower bound (the exact checks); `search` fits the multipliers as a
@@ -1338,6 +1340,8 @@ impl Totals {
             ("ms_greedy", true, Slot::Ms(&mut s.ms_greedy)),
             ("ms_simplex", true, Slot::Ms(&mut s.ms_simplex)),
             ("checks", true, Slot::Count(&mut s.checks)),
+            ("breakdowns", true, Slot::Count(&mut s.breakdowns)),
+            ("saturated", true, Slot::Count(&mut s.saturated)),
             ("warm", false, Slot::Count(&mut t.warm)),
             ("cold", false, Slot::Count(&mut t.cold)),
             ("augmentations", false, Slot::Count(&mut t.augmentations)),
@@ -2273,7 +2277,10 @@ mod tests {
         let on_grid = dw::evaluate_grid(&ctx, &fam, &lhat, &mut stats, 1).value;
         assert_eq!(evaluate(&ctx, &fam, &lam, &mut stats, 1).value, on_grid, "n={n}: the grid beyond i64");
         assert_eq!(stats.checks, stats.pricings_mi, "n={n}: every intersection checked against the reference");
-        (stats.pricings_mi, saturated + u64::from(on_grid == i64::MAX))
+        // The counter of saturated evaluations has the rounds' and `on_grid`'s, which the last two evaluations make.
+        let on_grid_saturated = u64::from(on_grid == i64::MAX);
+        assert_eq!(stats.saturated, saturated + 2 * on_grid_saturated, "n={n}: the saturated evaluations counted");
+        (stats.pricings_mi, saturated + on_grid_saturated)
     }
 
     /// The intersection where the E3 pilot's tree of r2 at 1472 stopped (`testdata/n1472_r2_intersection.txt`, in the
