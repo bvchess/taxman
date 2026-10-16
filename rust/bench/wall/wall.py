@@ -10,6 +10,10 @@ sentence.  Pure Python; the inputs are found relative to this file, so it runs f
 
     ./wall.py > wall_output.md      every table
     ./wall.py setup nodes           only the named ones
+    ./wall.py --chain-end 3440      the committed chain's games 1..3440 instead of 1..CHAIN_END
+
+The tables of the committed chain (phases, zero, fixed and check) take its games 1..CHAIN_END = 2175, the chain as it
+was when `wall_output.md` was made; `strict.jsonl` has grown since, to 3440.
 
 The tables, with their inputs (files of this directory unless a path says otherwise):
 
@@ -48,6 +52,7 @@ HERE = Path(__file__).resolve().parent
 RUST = HERE.parents[1]
 CHAIN = RUST / "results" / "strict.jsonl"
 C8G_CHAIN = RUST / "bench" / "cloud" / "c8g.chain-2176.jsonl"
+CHAIN_END = 2175  # the last game of the committed chain that the tables use (wall_output.md: the chain ended here)
 
 PHASE_BAND = 250  # games to a band in the tables of the committed chain
 START_BAND = 175  # games to a band in the table of the start's local search
@@ -78,6 +83,14 @@ PROGRESS_LINE = re.compile(r"n=\d+ (?:(\d+)m)?([\d.]+)s nodes (\d+) \([\d.]+k?/s
 def load(path):
     """The JSON objects of a JSON-lines file.  A file is read once, so callers must not change the list."""
     return [json.loads(line) for line in Path(path).read_text().splitlines() if line.startswith("{")]
+
+
+chain_end = CHAIN_END  # the last game of the committed chain in use: --chain-end sets it
+
+
+def committed_chain():
+    """The lines of the committed chain, games 1..chain_end."""
+    return [r for r in load(CHAIN) if r["n"] <= chain_end]
 
 
 def node_lines(*names):
@@ -149,7 +162,7 @@ def section(title, sentence, header, rows):
 
 def phases():
     games = collections.defaultdict(list)
-    for r in load(CHAIN):
+    for r in committed_chain():
         seconds = r.get("seconds") or {}
         games[(band(r["n"], PHASE_BAND), r["method"])].append(
             [seconds.get(phase, 0) for phase in ("total", "search", "frames")])
@@ -169,7 +182,7 @@ def phases():
 
 def zero_node_games():
     games = collections.defaultdict(list)
-    for r in load(CHAIN):
+    for r in committed_chain():
         if r["method"] != "search":
             continue
         seconds = r.get("seconds") or {}
@@ -234,7 +247,7 @@ def frames():
 
 
 def fixed_model():
-    chain = load(CHAIN)
+    chain = committed_chain()
     last = chain[-1]["n"]
     setup_rows = load(HERE / "setup.jsonl")
     at = {key: interpolation(setup_rows, key) for key in (
@@ -292,7 +305,7 @@ def fixed_model():
 
 
 def check_model():
-    chain = load(CHAIN)
+    chain = committed_chain()
     last = chain[-1]["n"]
     setup_rows = load(HERE / "setup.jsonl")
     search_problem = interpolation(setup_rows, "search_problem_s")
@@ -557,7 +570,16 @@ TABLES = {"phases": phases, "zero": zero_node_games, "setup": setup, "frames": f
           "series": series, "grow": grow_runs, "c8g": c8g_chain}
 
 
-def main(names):
+def main(args):
+    global chain_end
+    names = list(args)
+    if "--chain-end" in names:
+        i = names.index("--chain-end")
+        if i + 1 == len(names):
+            print("--chain-end needs the last game of the committed chain", file=sys.stderr)
+            return 2
+        chain_end = int(names[i + 1])
+        del names[i : i + 2]
     unknown = [name for name in names if name not in TABLES]
     if unknown:
         print(f"unknown table {', '.join(unknown)}; the tables are {', '.join(TABLES)}", file=sys.stderr)

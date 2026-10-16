@@ -21,7 +21,7 @@
 
 use crate::accelerate::solution_for_promotions;
 use crate::bits::Bits;
-use crate::frames::{build_frames, SearchFrames};
+use crate::frames::{build_extended, build_frames, ExtendedFrames, SearchFrames};
 use crate::numtheory::Tables;
 use crate::search::{self, Prepared, Problem, SearchTactics};
 use std::path::Path;
@@ -84,6 +84,68 @@ impl<const W: usize> Board<W> {
         search::prepare(&self.tables, &self.frames.columns(), &self.frames.candidates, tactics)
     }
 
+    /// Sets the search up for the extended problem Π⁺(∅) ([`build_extended`]): the frame model without the claims of
+    /// `unzip`, and the problem it poses.  [`prepare_extended_with`](Self::prepare_extended_with) with no open source.
+    ///
+    /// # Errors
+    ///
+    /// As [`prepare_extended_with`](Self::prepare_extended_with).
+    pub fn prepare_extended(&self, tactics: SearchTactics) -> Result<(ExtendedFrames<W>, Prepared<W>), String> {
+        self.prepare_extended_with(&Bits::EMPTY, tactics)
+    }
+
+    /// Sets the search up for the extended problem Π⁺(O) with the open sources `open` ([`build_extended`]), its
+    /// one-sided candidates (the open sources and those greedy rejected beside them) candidates of the search beside
+    /// the two-sided ones ([`search::prepare_extended`]).  Research code: the certificates of `taxman certify`; the
+    /// default path is [`prepare`](Self::prepare).
+    ///
+    /// # Errors
+    ///
+    /// If `open` holds a number that cannot be open, if the problem has more frames than a frame set holds, or if it
+    /// has one-sided candidates and `tactics` are not those of extended mode
+    /// ([`SearchTactics::refusal_with_one_sided`]).
+    pub fn prepare_extended_with(
+        &self,
+        open: &Bits<W>,
+        tactics: SearchTactics,
+    ) -> Result<(ExtendedFrames<W>, Prepared<W>), String> {
+        let extended = build_extended(&self.tables, open)?;
+        let (columns, one_sided) = (extended.columns(), &extended.one_sided);
+        let prepared = search::prepare_extended(&self.tables, &columns, one_sided, &extended.candidates, tactics)?;
+        Ok((extended, prepared))
+    }
+
+    /// How many block words the GF(2) bound of Π⁺(`open`) needs at its root ([`search::extended_words`]): opening a
+    /// source adds one to its frame's rank, so a problem with many open sources can need more than the engines of this
+    /// set width have, which [`prepare_extended_with`](Self::prepare_extended_with) refuses.
+    ///
+    /// # Errors
+    ///
+    /// As [`build_extended`], and if the frames cannot be built into a model.
+    pub fn extended_words(&self, open: &Bits<W>) -> Result<usize, String> {
+        let extended = build_extended(&self.tables, open)?;
+        search::extended_words(&self.tables, &extended.columns(), &extended.one_sided, &extended.candidates)
+    }
+
+    /// [`prepare_extended_with`](Self::prepare_extended_with) for resuming the checkpoint at `checkpoint`, with its
+    /// tactics ([`search::prepare_extended_for_resume`]).
+    ///
+    /// # Errors
+    ///
+    /// As [`prepare_extended_with`](Self::prepare_extended_with), and if the checkpoint does not belong to this problem
+    /// or cannot be read.
+    pub fn prepare_extended_for_resume(
+        &self,
+        open: &Bits<W>,
+        checkpoint: &Path,
+    ) -> Result<(ExtendedFrames<W>, Prepared<W>), String> {
+        let extended = build_extended(&self.tables, open)?;
+        let (columns, one_sided) = (extended.columns(), &extended.one_sided);
+        let candidates = &extended.candidates;
+        let prepared = search::prepare_extended_for_resume(&self.tables, &columns, one_sided, candidates, checkpoint)?;
+        Ok((extended, prepared))
+    }
+
     /// Sets the search up to resume the checkpoint at `checkpoint`, with its tactics, see
     /// [`search::prepare_for_resume`].
     ///
@@ -113,6 +175,21 @@ impl<const W: usize> Board<W> {
     /// As [`search::problem_of`].
     pub fn problem(&self) -> Result<Problem, String> {
         search::problem_of(&self.tables, &self.frames.columns(), &self.frames.candidates)
+    }
+
+    /// The extended problem Π⁺(`open`) ([`build_extended`]) and the search problem that
+    /// [`prepare_extended_with`](Self::prepare_extended_with) poses for it, built again without a search, see
+    /// [`search::problem_of_extended`].  It needs no tactics and does not check the GF(2) bound's block words, so
+    /// it is the same at every set width.
+    ///
+    /// # Errors
+    ///
+    /// As [`build_extended`] and [`search::problem_of_extended`].
+    pub fn extended_problem(&self, open: &Bits<W>) -> Result<(ExtendedFrames<W>, Problem), String> {
+        let extended = build_extended(&self.tables, open)?;
+        let (columns, one_sided) = (extended.columns(), &extended.one_sided);
+        let problem = search::problem_of_extended(&self.tables, &columns, one_sided, &extended.candidates)?;
+        Ok((extended, problem))
     }
 }
 
@@ -194,6 +271,57 @@ mod tests {
         }
         let board = Board::<8>::for_n(85);
         assert_eq!(search_problem(85).unwrap(), (board.problem().unwrap(), board.in_the_bag));
+    }
+
+    /// The extended problem with no open source poses the search what the frame model does on every board to 300 that
+    /// has something to promote: the same `max_total` and candidates, and the same `in_the_bag`.
+    #[test]
+    fn the_extended_problem_without_open_sources_is_posed_as_the_frame_model_is() {
+        for n in 2..=300 {
+            let board = Board::<8>::for_n(n);
+            if board.is_trivial() {
+                continue;
+            }
+            let plain = board.prepare(SearchTactics::default()).unwrap();
+            let (extended, prepared) = board.prepare_extended(SearchTactics::default()).unwrap();
+            assert_eq!((prepared.max_total, prepared.candidates), (plain.max_total, plain.candidates), "n={n}");
+            assert_eq!(extended.in_the_bag, board.in_the_bag, "n={n}");
+        }
+    }
+
+    /// What `taxman certify` sets up again from a certificate's line (the board size and the open members) is the
+    /// extended problem the setup posed, at any set width, for all of U\*_{≥3} open and for every other member of it.
+    #[test]
+    fn the_extended_problem_set_up_again_is_the_one_the_setup_posed() {
+        let mut compared = 0;
+        for n in 2..=120 {
+            let board = Board::<8>::for_n(n);
+            if board.is_trivial() {
+                continue;
+            }
+            let from_3: Vec<u32> =
+                board.plain.iter().copied().filter(|&x| 2 * x > n && board.tables.omega(x) >= 3).collect();
+            let every_other: Vec<u32> = from_3.iter().copied().step_by(2).collect();
+            for open in [from_3, every_other] {
+                let set: Bits<8> = open.iter().copied().collect();
+                let prepared = match board.prepare_extended_with(&set, SearchTactics::extended()) {
+                    Ok((_, prepared)) => prepared,
+                    Err(refusal) => {
+                        assert!(refusal.contains("block words of the GF(2) bound"), "n={n} open {open:?}: {refusal}");
+                        continue;
+                    }
+                };
+                let (extended, problem) = board.extended_problem(&set).unwrap();
+                assert_eq!(problem, prepared.problem(), "n={n} open {open:?}");
+                assert_eq!(extended.one_sided.len() as u32, open.len() as u32 + extended.rejected.len(), "n={n}");
+
+                let wide_set: Bits<16> = open.iter().copied().collect();
+                let wide = Board::<16>::for_n(n).extended_problem(&wide_set).unwrap().1;
+                assert_eq!((problem.digest(), &problem), (wide.digest(), &wide), "n={n} open {open:?}");
+                compared += 1;
+            }
+        }
+        assert!(compared > 100, "{compared} problems compared");
     }
 
     #[test]

@@ -16,6 +16,7 @@
 
 use std::cmp::Reverse;
 use std::collections::HashMap;
+use taxman::json::Json;
 use taxman::model::{Frame, FrameGraph, FrameSet};
 
 /// The marker of a number that has no coordinate, and of a coordinate that has no quotient coordinate.
@@ -322,6 +323,50 @@ impl Signing {
                 1 + (splitmix64(seed ^ g) & 1) as u8
             }
         }
+    }
+
+    /// The signing as the fit files and the checkpoints keep it, frozen: `frame`; `default`, `"ones"` or `"random"`
+    /// with its `seed` as a decimal string (a seed uses all 64 bits, more than a JSON number reads back exactly);
+    /// `fixed`, the `[mover, factor, value]` triples ascending; `mergeable` false.  Its cores are not kept.
+    pub fn to_json(&self) -> Json {
+        let mut fixed: Vec<(u32, u32, u8)> = self.fixed.iter().map(|(&(u, f), &v)| (u, f, v)).collect();
+        fixed.sort_unstable();
+        let mut pairs = vec![("frame", Json::from(self.frame))];
+        match self.default {
+            Default3::Ones => pairs.push(("default", Json::Str("ones".into()))),
+            Default3::Random(seed) => {
+                pairs.push(("default", Json::Str("random".into())));
+                pairs.push(("seed", Json::Str(seed.to_string())));
+            }
+        }
+        let triples =
+            fixed.into_iter().map(|(u, f, v)| Json::Arr(vec![Json::from(u), Json::from(f), Json::from(u32::from(v))]));
+        pairs.push(("fixed", Json::Arr(triples.collect())));
+        pairs.push(("mergeable", Json::Bool(false)));
+        Json::object(pairs)
+    }
+
+    /// The signing of [`to_json`](Self::to_json)'s object, frozen: `mergeable` false, no cores.
+    pub fn from_json(json: &Json) -> Result<Signing, String> {
+        let frame = json.get("frame").and_then(Json::as_u64).ok_or("a signing has no frame")? as usize;
+        let default = match json.get("default").and_then(Json::as_str) {
+            Some("ones") => Default3::Ones,
+            Some("random") => {
+                let seed = json.get("seed").and_then(Json::as_str).ok_or("a random signing has no seed")?;
+                Default3::Random(seed.parse().map_err(|e| format!("seed {seed:?}: {e}"))?)
+            }
+            other => return Err(format!("unknown default {other:?}")),
+        };
+        let mut fixed = HashMap::new();
+        for t in json.get("fixed").and_then(Json::as_arr).ok_or("a signing has no fixed values")? {
+            match (t.at(0).and_then(Json::as_u32), t.at(1).and_then(Json::as_u32), t.at(2).and_then(Json::as_u32)) {
+                (Some(u), Some(f), Some(v @ (1 | 2))) => {
+                    fixed.insert((u, f), v as u8);
+                }
+                _ => return Err("a fixed value is not [mover, factor, 1 or 2]".into()),
+            }
+        }
+        Ok(Signing { frame, default, fixed, cores: Vec::new(), mergeable: false })
     }
 }
 

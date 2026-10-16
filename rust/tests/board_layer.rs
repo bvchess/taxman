@@ -63,11 +63,11 @@ fn moves_of(line: &Line) -> Vec<u32> {
 }
 
 /// The moves of the games a promotion set makes, and the digest of the search problem of a board, are those of the
-/// committed chain: at a sample of boards from 18 to 2175, the sets of 8 to 36 words.
+/// committed chain: at a sample of boards from 18 to 3440, the sets of 8 to 56 words.
 #[test]
 fn the_board_layer_reproduces_the_chains_moves_and_problems() {
     let lines = sampled_lines();
-    assert!(lines.len() > 60 && lines.last().is_some_and(|l| l.n == 2175), "{} lines", lines.len());
+    assert!(lines.len() > 100 && lines.last().is_some_and(|l| l.n == 3440), "{} lines", lines.len());
     for line in &lines {
         assert_eq!(moves_of(line), line.moves, "n={}: the game the promotions make", line.n);
         let (problem, _in_the_bag) = search_problem(line.n).expect("a problem");

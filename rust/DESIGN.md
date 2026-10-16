@@ -26,8 +26,8 @@ performance is measured.  Each term is defined where it first matters.
 ## 1. Goals and constraints
 
 * Find optimal games beyond n = 1000, where the Java solver's table of optimal games stopped, as far as the machines
-  at hand reach: today every n to 2175 on one laptop (Apple M1 Max, 10 CPUs, 32 GB RAM, fast SSD), and the same
-  chain on a many-core cloud machine for what is beyond (`tools/cloud/RUNBOOK.md`).
+  at hand reach: today every n to 2175 on one laptop (Apple M1 Max, 10 CPUs, 32 GB RAM, fast SSD), and to 3440 with
+  the same chain on a many-core cloud machine in a day (`tools/cloud/RUNBOOK.md`).
 * Be right before being fast.  Every game is replayed by an independent referee before it counts, every result
   records how its optimality is established and what that proof takes as given, every tactic is proven or sound, and
   every tactic can be switched off so that its effect on speed can be measured.
@@ -67,9 +67,11 @@ one frame (`frames::BoardFrames` forms them).  Frame X is *in front of* frame Y 
 has a maximal factor in X, that is, Y's numbers are multiples of X's; the frames in front are played first.  Simplifying
 a frame finds its mandatory moves (`unzip`: a source with one usable factor must take it), the sources that cannot be
 played together with the larger ones (`removeImpossible`), and its *freedoms*, factors minus sources: how many factors
-it can spare; a frame with none is *closed*.  The frames with freedoms are numbered from 0 at the front
-(`frames::build_frames`): number 0 is every one that has no other in front of it, number k + 1 every one directly behind
-number k.  Frames with the same number are merged into one, so that a promotion always has one frame to go to (the
+it can spare; a frame with none is *closed*.  The frames with freedoms are numbered from 0 at the front, by *layer*
+(`frames::build_frames`): the layer of a frame is the number of prime factors of its sources, frames in front of it lie
+one layer lower, and a frame with freedoms gets its layer less the lowest layer of a frame with freedoms.  (The Java
+numbered them breadth first: number 0 every one that has no other in front of it, number k + 1 every one directly
+behind number k.  The two are the same on every board the solver supports.)  Frames with the same number are merged into one, so that a promotion always has one frame to go to (the
 README's example shows where that happens).  A frame is a game of *Taxman Mini*: a set of moves and a set of factors, in
 which every move must still have one of its maximal factors in the frame when it is taken, and taking it removes all of
 its factors still in the frame (not only the one that pays for it).  A frame is *winnable* when some order takes every
@@ -98,19 +100,28 @@ example, the board 1..=21, is in the [README](README.md#how-the-solver-sees-the-
   is, is proven in [THEORY.md, "The frame model: what is proven and what
   remains"](../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains):
   * the sources that setup keeps are U\*, descending greedy on each frame, and in_the_bag = ΣU\* (Theorem M, M1);
-  * **completeness and soundness** (Theorem M): if the numbering of the frames is clean (N: every frame with
-    freedoms directly in front of frame h is frame h − 1), a set U\* ∪ L with L up to n/2 is playable exactly when L
-    is a promotion set of Π_n, and then it scores in_the_bag + ΣL.  So `unzip`'s mandatory moves, freedoms =
-    factors − sources, closed frames taking no part, a promotion paying one frame forward, the numbering, the
-    candidate filter and the root's reduction lose no game that plays U\* and admit none that is not a game.  N holds
-    on every board to 8191 (the census `examples/structure.rs`, `bench/structure/`), and `frames::build_frames`
-    refuses a board where it would not;
+  * **completeness and soundness** (Theorem M): a set U\* ∪ L with L up to n/2 is playable exactly when L is a
+    promotion set of Π_n, and then it scores in_the_bag + ΣL.  So `unzip`'s mandatory moves, freedoms = factors −
+    sources, closed frames taking no part, a promotion paying one frame forward, the numbering, the candidate filter
+    and the root's reduction lose no game that plays U\* and admit none that is not a game.  What the proof needs of
+    the numbering is that it is *clean* (N: every frame with freedoms directly in front of frame h is frame h − 1),
+    which the numbering by layer is by construction;
   * every optimal game plays the members of U\* with one or two prime factors (Theorem B);
   * so in_the_bag + P\*(Π_n) = opt(n) exactly when **U** holds at n: some optimal game plays the members of U\* with
     three or more prime factors.  U is open in general; it holds for every n ≤ 2175, where the prover (a branch and
     bound over sets of moves on the whole board, from the playability theorems, the Franklín–Moniot bound, the parity
     bound of THEORY.md's Theorem 10, the ceiling and the prime formula, and nothing of frames) proves the optimum of
-    every game of the committed chain.
+    every game of the committed chain.  The committed games of 2176-3440 are proven within the frame model alone: each
+    is opt(n) wherever U holds at n, and U is not yet certified for them (`taxman certify` will check it game by game,
+    "Certificates of U" below).  Game by game, the prover's barred parity bounds certify 93% of those members
+    over 1301-2175 and 85% over the committed chain's 2176-3314, but close no game alone ([its
+    README](prover/README.md#the-upper-part-game-by-game)); what is left needs a search that leaves the open ones
+    optional, and `examples/hunt.rs` looks for a counterexample on the boards without each of them.  That search is
+    the search of the *extended problem* Π⁺(O) (THEORY.md, Theorem M⁺; `frames::build_extended`, research code): the
+    frame model with the set O of open members optional, exact like Π_n, so that a search of it that finds nothing
+    better, the other members certified, proves opt(n) on the whole board.  The search takes it with the open members
+    as one-sided candidates (section 4, "Extended mode"; `Board::prepare_extended_with`), and with nothing open,
+    Π⁺(∅), as the frame model without the claims (`examples/extended.rs`).
 
   What each proof kind needs of this, beyond the code's correctness and the games before it:
 
@@ -118,17 +129,19 @@ example, the board 1..=21, is in the [README](README.md#how-the-solver-sees-the-
   |---|---|
   | `prime_formula` | nothing of the model (proved at `accelerate::prime_shortcut`) |
   | `cap` | nothing of the model: the game is replayed, and reaches the ceiling n + score(n − 1) ≥ opt(n) given that score(n − 1) = opt(n − 1) |
-  | `exhausted`, `trivial` | completeness at n, so U at n (and N, which holds) |
+  | `exhausted`, `trivial` | completeness at n, so U at n |
   | `same_search` of an exhausted game m | U at n, and Π_n = Π_m (checked) |
   | `same_search` of a `cap` game m | U at n, Π_n = Π_m (checked), and soundness at m (Theorem M), which makes m's ceiling P\*(Π_m) |
 
   The tests tie the theorems to the code: `tests/model_exact.rs` checks Theorem M both ways, on every set of every
   board to 100 and on random sets to 8191, against a playability oracle that shares no code with `frames` or
-  `model`; `tests/bottom_layers.rs` checks Theorem B on every recorded and enumerated optimal set; and two exhaustive
+  `model`; `tests/model_extended.rs` checks Theorem M⁺ the same way, with sources open; `tests/bottom_layers.rs`
+  checks Theorem B on every recorded and enumerated optimal set; and two exhaustive
   searches agree with the frame model's games on small boards: `brute`, the solver's own (to 40 in the test suite, 52
   in `examples/sacrifice validate`), and `heuristics/evaluation/certify.py` (to 62).  The sacrifice
-  bound (`sacrifice`) is an upper bound on opt(n) by a different route (games on punctured boards, where N can fail,
-  so it is not covered by Theorem M); it proves game 1133 and disagrees with nothing.  [The prover's
+  bound (`sacrifice`) is an upper bound on opt(n) by a different route (games on punctured boards, where Theorem M
+  holds too, but U and Theorem B are statements about the board 1..n, so the bound rests on the upper part of each
+  punctured board); it proves game 1133 and disagrees with nothing.  [The prover's
   README](prover/README.md) has the details of the prover.
 * **Given the pruning is exact.**  Every tactic is proven or sound (section 5 grades each).  The Java used two
   shortcuts that rest on conjectures (`reuse_prev` and `revise_freedoms`); the frame solver had them as tactics for a
@@ -184,7 +197,7 @@ up:
 | engine | `engine` | the problem-independent parallel depth-first driver |
 | solving | `tactics`, `board`, `solver`, `results`, `paths` | the switchable tactics; a board prepared for a search; the per-game pipeline and the range driver; what a result records and the checks of a results file; the default files |
 | studies | `brute`, `sacrifice` | exhaustive search to certify small boards; the sacrifice bound and punctured games (not used by the solver) |
-| front end | `main.rs`, `cli.rs`, `commands.rs` | `solve`, `regress`, `bench`, `verify-optimal`, `verify-results`, `extend-optimal`, `tables` |
+| front end | `main.rs`, `cli.rs`, `commands.rs` | `solve`, `regress`, `bench`, `verify-optimal`, `verify-results`, `extend-optimal`, `tables`, `certify`, `verify-certificates` |
 
 On the path of a solve are all the layers but the studies.  `examples/` holds the ladder (standalone searches of hard
 games with time limits, thread scaling, diagnostics), the probe `perf` (the hot paths from fixtures, in cycles and
@@ -532,6 +545,46 @@ made (after the greedy set and the seed, the dive and the local search), so whoe
 far before the engine starts, and the engine's start is unchanged.  Board/search setup is in
 `board::Board`: it is the one place that knows the tables → frames → prepare → ceiling and seed path.
 
+### Extended mode: one-sided candidates
+
+The search can also take the *extended problem* Π⁺(O) (THEORY.md, ["The extended
+problem"](../heuristics/THEORY.md#the-extended-problem); `frames::build_extended`): the frame model with a set O of the
+sources of three or more prime factors that setup keeps left optional, and nothing claimed by `unzip`.  Besides the
+candidates of the frame model (*two-sided*: out of one frame, into the one in front) it has *one-sided* candidates, the
+members of O and the sources greedy rejected beside them, each a possible move of its *own* frame.  It is the
+problem that a certificate of U searches (THEORY.md, the corollary of Theorem M⁺; `taxman certify`, section 8,
+"Certificates of U").  Research code: the solver's own path
+never builds one, and with no one-sided candidate every piece below is what it was.
+
+* **The model** (`model`, "One-sided candidates"): `FrameGraph::build_extended` gives each one-sided candidate its own
+  frame (`own`), and the factor graph lists its maximal factors there, as it does a move's.  Promoting one adds it to
+  that frame's moves if the frame stays winnable, takes no factor, and spends one freedom of that frame only
+  (`frames_touched`).  The frame-by-frame check of a set, the reduction, conflicts and nogoods need nothing new: a
+  one-sided member is one more move of its frame.  The state does not record which were promoted (a promoted two-sided
+  candidate is no longer a factor of its home), so each is promoted once along a path, which the search's candidates
+  ensure.  `FrameGraph::narrow` keeps a one-sided candidate while its frame has a freedom, and
+  `FrameGraph::max_promotions_among` adds their number to the freedoms' count (sound, not tight).
+* **The GF(2) bound** (`gf2`, "One-sided candidates"; THEORY.md, Theorem 11 for Π⁺): a one-sided candidate's element has
+  the vector of its maximal factors in its own frame's matroid and is a coloop of the other, its own unit vector in a
+  *free block* after the frames' blocks, `64·words` of them to a block, so that hundreds of them widen no vector.
+* **The search**: `Board::prepare_extended_with(open)` (`search::prepare_extended`) makes them candidates of the search.
+  The problem's form ends with them, after a tag that no plain problem's form has, and the checkpoint header (format
+  5) records their digest, so neither a repeat nor a resumed checkpoint can take an extended problem for another (a
+  checkpoint of version 4, of a build before, resumes only a search without them: section 8).
+* **What it refuses** (`SearchTactics::refusal_with_one_sided`): with one-sided candidates the search needs `gf2` (the
+  matching bound gives a one-sided candidate no vertex, so it is no bound there; the dive, which rounds the root's
+  matching for a starting incumbent, still runs and never picks one), and refuses `lagrange` (built on the matching
+  bound) and `symmetry` (Theorem 13 is proven for the frame model; for Π⁺ each prime exchange would have to map the
+  one-sided candidates of each frame onto themselves, which nothing checks yet).  `SearchTactics::extended` is the
+  default without `symmetry`.  Π⁺(∅) has no one-sided candidate and takes any tactics; its search is the default
+  engine's on the same problem, node for node (`tests/tripwires.rs` has a table of its own).
+* **Its frames**: Π⁺(O) has a frame for each layer from the lowest with freedoms to the highest, nine at most up to
+  4095 (layers 3 to 11) whatever O is, and ten from 4096 with every source open, which `build_extended` refuses
+  (`MAX_FRAMES`), naming the board and the layers; the census of the frames records the count with every such source
+  open for every board to 8191 (`bench/structure/`).  Opening a source also adds one to its frame's rank, so a problem
+  with many open sources can need more words of the GF(2) bound than the narrow set widths compile (three, rank 192)
+  or the widest (five, rank 320): `search::prepare_extended` refuses it, saying so, rather than fail in the search.
+
 ## 5. Tactics
 
 Each row is a tactic in `tactics::Tactics`, set from the CLI with `--tactic name=value` (`on` or `off`; `match_refine`
@@ -748,9 +801,17 @@ setup poses and a repeat's record of the game it repeats.  A line is never rewri
 file it appends to.
 
 **What identifies a checkpoint.**  The header the search stores: a format version, the set width, n, digests of the root
-candidates and of the frames (every frame's moves, factors and freedoms, as built), `max_total` and the tactics (format
-version 4; this build refuses every other version with one message, so a checkpoint of an older build cannot resume with
-tactics that are gone).  Resuming checks all of them and says which differs, and checks that the stored incumbent is a
+candidates, of the frames (every frame's moves, factors and freedoms, as built) and of the one-sided candidates of the
+extended problem (section 4, "Extended mode"), `max_total` and the tactics (format version 5).  This build also reads
+version 4, the format of the builds before the extended problem's search, whose headers lack the digest of the one-sided
+candidates:
+those builds searched no problem with one-sided candidates, so a version-4 header reads as version 5 with the digest of
+none, every other field is checked as for version 5, the run goes on under the header it was written with (the engine
+compares it byte for byte), and a version-4 checkpoint asked to resume a search with one-sided candidates is refused,
+saying so.  (Spec 18.3.1 of the extended problem's search had version 4 refused; it is read so that a chain stopped by a
+build before it resumes, and `tests/wide.rs` resumes a real version-4 checkpoint to the node count of the build that
+wrote it.)  Every other version is refused with one message, so a checkpoint of an older build cannot resume with
+tactics that are gone.  Resuming checks all of them and says which differs, and checks that the stored incumbent is a
 set of candidates that can be promoted from the root and is worth the stored value; so a checkpoint of another game, or
 of an older build whose frame builder differs, is refused instead of pruning with a foreign incumbent or failing to
 rebuild its units.  A resumed game rests on nothing a game that ran in one piece does not.
@@ -782,8 +843,8 @@ what a multi-threaded search may vary:
 
 ### Same search
 
-Consecutive boards often pose exactly the same search problem with another ceiling: of the 1836 games of the committed
-chain 1..2175 that need a search, 914 pose the problem of the game before them (or the one before that, past a prime).
+Consecutive boards often pose exactly the same search problem with another ceiling: of the 2946 games of the committed
+chain 1..3440 that need a search, 1457 pose the problem of the game before them (or the one before that, past a prime).
 The chain of commit bd9bb5d, which searched the 545 of them in 1..1300, spent 953 of its 3359 s on those, 851 s of them
 in 1232–1300 (EXPERIMENTS, "Same search").  The tactic `same_search` (proven, on by default) concludes such a game from
 the earlier one with no search; the committed `results/strict.jsonl` was made with it.
@@ -809,7 +870,7 @@ rests on the digest alone (below).
   pruning is exact, which every exhausted proof rests on;
 * `cap`: its promotions S are promotable and sum to ceiling(m) = m + score(m − 1) − in_the_bag(m), so P\*(Π_m) ≥
   ceiling(m).  And every promotable set T of Π_m is a legal game of m scoring in_the_bag(m) + sum(T): this is the
-  soundness of the frame model (THEORY.md, Theorem M, which needs only the clean numbering that setup checks), the
+  soundness of the frame model (THEORY.md, Theorem M), the
   direction every search relies on each time it offers an incumbent, and the referee replays every game built from
   one (none has ever failed).  So in_the_bag(m) + P\*(Π_m) ≤ opt(m) ≤ m + opt(m − 1) = m + score(m
   − 1), given that the game of m − 1 is optimal (which the proof by the ceiling rests on, and m's assumptions record),
@@ -837,7 +898,7 @@ its board size (milliseconds; `board::search_problem`), or, when the run set tha
 (the problem its setup posed, which is the same problem), and compared with n's whole.  The first equal one is m.
 Setting m up again with this build stands for the problem m's own build searched, which the digest recorded by that
 build ties to it (a problem with the recorded digest is that problem, but for a 64-bit collision), and the problem
-set up again must also have the size its line records (frames, candidates, `max_total`).  Every repeat of 1..2175
+set up again must also have the size its line records (frames, candidates, `max_total`).  Every repeat of 1..3440
 repeats the last game before it that set a search up (n − 1, or n − 2 past a prime), so the window loses nothing
 there, keeps the setups a range starts with to eight, and makes m a function of the window's games.
 
@@ -850,6 +911,122 @@ any line.  `tools/check_results.py` shares no code with the solver and cannot bu
 structure from the lines (m earlier, completed, settling its search; the recorded digests and sizes equal; the
 promotions equal; score − in_the_bag equal; the assumptions inherited), and says that it takes the problems' equality,
 like an exhausted search, on trust.
+
+### Certificates of U
+
+A score whose proof uses the frame model (`exhausted`, `trivial`, `same_search`) is the optimum on the whole board when
+U holds at n (section 2).  `taxman certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE`
+(`src/certify.rs`) proves that game by game, by the corollary of Theorem M⁺ (THEORY.md, "The extended problem").  For
+a game whose line in the prover's barred parity bounds (`prover/data/upper_*.jsonl`) says it needs one, it takes that
+line's open members O, sets up the extended problem Π⁺(O) in extended mode (section 4, "Extended mode"), the other
+members of U\*_{≥3} fixed, and searches it from the recorded game, as the promotion set (O, its moves up to n/2),
+with the ceiling n + score(n − 1) − in_the_bag⁺.  Before the search it checks that the game replays to its score,
+plays U\* above n/2 and is a promotion set of Π⁺(O) worth the score (Theorem M⁺ says a playable one is).
+
+* *certified*: the search ends with nothing better, so opt(n) is the score, given that the members not open were
+  certified against it; a line of the bounds whose score is above the recorded one certifies nothing against it, and
+  is refused.
+* *beaten*: the search found a promotion set worth more.  Its set F ∪ K ∪ L is played in the order of the peel of
+  `playable` (the whole-board oracle, which shares nothing with the frame model), finished with the largest legal
+  move left until none is, and refereed by `game::replay_finished`: a counterexample to the score, and to U if the
+  score rests on the frame model.  It is written to `<out>.counterexample.jsonl` as well, and the run exits with
+  status 2.
+
+*The same problem.*  Consecutive games often pose the same Π⁺(O) (the same `search::Problem`, which has no n in it:
+"Same search"), and then an earlier game's certificate settles the later one with no search.  If game m is certified,
+by a search or by this rule, and Π⁺(n) equals Π⁺(m), the heaviest promotion set of Π⁺(n) is worth best(m) = score(m) −
+in_the_bag⁺(m), which m's certificate proved, and a recorded game of n worth the same has nothing above it.  After the
+checks of n's recorded game and before its search (a checkpoint of n, if there is one, changes nothing) `certify` looks
+at the certified games of the `SAME_SEARCH_WINDOW` = 8 board sizes before n, those of the file `--out` and those of the
+run, latest first, and never further.  A game whose line records another digest than Π⁺(n)'s is passed over; for one
+whose digest agrees, its problem is the one the run set up when it certified it (kept for the last eight sizes) or, for
+a line of the file, the one set up again from m's board size and the open members the line records
+(`certify::extended_problem`), which must reproduce the line (its digest, frames, candidates, rejected sources and
+in_the_bag⁺), or the line is dropped; it is compared with Π⁺(n) whole, so that the answer never rests on two digests
+alone, and the first game with an equal problem is m.  Then, with worth(n) = score(n) − in_the_bag⁺(n):
+
+* worth(n) = best(m): n is *certified* with `nodes` 0 and `"same_problem": {"n": m, "digest": ..., "best": ...,
+  "worth": ...}` in its line;
+* worth(n) < best(m): the recorded game is not optimal, so the rule is not used and n is searched (the search finds the
+  better set and says *beaten*);
+* worth(n) > best(m): impossible with genuine data (the recorded game of n is a promotion set of a problem that m's
+  certificate says nothing beats), so the run fails naming n, m and both values, and nothing is certified.
+
+The rule is sound because equal problems have equal heaviest promotion sets (the form holds the frames, the candidates,
+`max_total` and the graph's lists, and nothing of n), so nothing beats n's recorded game, and n's own barred bounds
+then give opt(n) = score(n) by the corollary, exactly as after a search.  The refusal of a line of bounds that was found
+against a higher score applies to a game settled by the rule too.
+
+One line a game in `--out`: the board, the score, the open members, how many sources greedy rejected beside them,
+the frames and candidates of Π⁺(O), the nodes and seconds of the search, the threads and set width, the verdict, the
+digest of Π⁺(O), the game it rests on if the rule settled it (`same_problem`) and the build.  A search stopped by a
+limit or a signal writes an `incomplete` line and keeps its checkpoint (the same flags as `solve`'s); a rerun skips the
+games with a verdict and resumes the others.  A problem whose GF(2) bound needs more block words than the engines of
+the board's set width have is searched at the widest set width (128 words, five words of engine).  The width is
+`certify::certificate_width`, the one place it is decided; the line records it.
+
+*A list of boards.*  `certify` takes the boards of a list file (`--list FILE`) in place of a range `A-B`, exactly one of
+the two: one board size a line, in the order to certify them, blank lines and lines whose first non-blank character is
+`#` skipped, no board twice.  A line that is none of these is a usage error that names the file and the line.  The games
+are taken in the file's order by the loop of the range, with the same rules: the game's line of the barred bounds must
+exist, a game that needs no certificate is counted (`not needing one`) and passed over, a final verdict in `--out` skips
+the game, and the rule of the same problem looks at the certified games of the file and of the run, whatever order they
+were made in.  The tally line reads `list FILE (K boards): ...` where a range gives `A..=B: ...`.  The lists of the
+campaign on 2176-3440 and its estimate are made by `tools/certify_plan.py` (standard library only) from the results,
+the barred bounds, the extended problems of `examples/extended.rs problems` (which games the rule will settle) and the
+root gaps; a game the rule settles goes into the list of the game it rests on, after it, since the rule reads only its
+own `--out` (`bench/certify/`).  The campaign's phases (a pilot of seven dear games with a stop rule, the dear games,
+four balanced lists, the repeats the rule cannot settle) are cut from that work list by `tools/certify_campaign.py`
+into `bench/certify/lists/stage4/`, rated by `tools/certify_pilot.py` and run by `tools/cloud/certify.sh` (RUNBOOK,
+section 11).
+
+*Verifying the certificates.*  `taxman verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...]
+[--threads K]` (`src/certify/verify.rs`) reads the files `certify --out` wrote, without changing them, and checks every
+line.  A last line without its newline is noted and ignored, as the file cuts it when it is opened; a complete line that
+is no certificate, or whose `build` lacks the commit (40 hexadecimal digits) or the `dirty` flag, is an error; an
+`incomplete` line is counted and skipped.  A line with a final verdict is checked in this order:
+
+1. the barred bounds have a line for the board, it says it needs a certificate, and its open members and its score are
+   the line's;
+2. the results have a game of the board with the line's score, the game passes the checks `certify` makes of it (it
+   replays to its score, plays U\* above n/2 and is a promotion set of Π⁺(O) worth the score: `check_recorded_game`,
+   shared by the two), and the line's `width` is the one `certificate_width` gives;
+3. Π⁺(O) set up again reproduces the line: its digest, frames, candidates, rejected sources and `in_the_bag⁺`;
+4. a `certified` line has no `beaten_by`, and the file of counterexamples beside the certificates
+   (`<certificates>.counterexample.jsonl`) has no line for its board;
+5. a `certified` line with `same_problem` {m, digest, best, worth} rests on a game m among the 8 board sizes before it
+   whose last final line before it in the same file is `certified`; the rule of the same problem (`apply_rule`, the
+   function `certify` applies, so that the rule is written once) is applied again to the two problems, which must be
+   equal whole, and must give exactly the `same_problem` the line records (the digest, `best` = score(m) −
+   `in_the_bag⁺`(m), `worth` = the line's score − `in_the_bag⁺`, equal);
+6. a `beaten` line has a finished legal game (`game::replay_finished`) that scores what the line says, which is more
+   than the recorded score, and the counterexample file has an identical line;
+7. a board with final lines in more than one place (one file or several) has only `certified` ones: a `beaten` line
+   beside another is a contradiction of verdicts.
+
+The first line to fail ends the command with status 1, naming the file, the line and the board; the dear checks (the
+problems set up again) run on K threads (default: all CPUs), and the first line to fail is the same for any K.  What
+it cannot check is that a search explored its whole tree: a `certified` line made by a search is taken on trust, as an
+exhausted proof is, and the summary says so.  The summary has, for each file, the lines, the final and `incomplete`
+ones, the `certified` ones by search and by the same problem, and the `beaten` ones; the boards certified; the
+counterexamples (the board, the recorded score, the score of the game that beats it); the builds that wrote the lines
+(commit, `dirty`, lines); and the proven end of the chain.
+
+*How far the proofs reach.*  A game n (1 to the largest board of the results) is *proven* when n = 1, or the prover
+proved it, or it has a certificate that passed, or its score reaches a proven ceiling and the game n − 1 is proven.  The
+prover's proofs are the lines of `--exact` (default every `rust/prover/data/exact_*.jsonl`, by name; a later file's
+line for a board replaces an earlier file's, and lines with `fix_upper` set are measurements and skipped), whose score
+must be the results' (a line with another score is an error naming the board and both scores).  A line proves its game
+by the rule of `exact_proofs` in `prover/tools/summarize.py`: its Franklín–Moniot bound or its parity bound is the
+score, or its search is `proven` (a search that used the segment cuts counts only if every smaller game is proven), or
+its relation is `chain` or `prime` and the game n − 1 is proven.  A ceiling is `results::CeilingProof`: the score
+n + score(n − 1), or the prime formula.  The command prints `proven frontier: every game to N is proven; the first that
+is not is M (reason)`, where the reason is that the results have no game of M or that it needs a certificate (the barred
+bounds say so) and the files given have none, and then how many games past M are proven all the same, which are those
+that no gap stops (a bound of the prover, a certificate); `verify::frontier` is that function of plain data (the
+results' scores, the prover's lines, the boards certified).  With the committed prover files and no certificate the end
+of the chain is 2175: the prover proved every game to there, and the first game past it that needs a certificate is
+2176.
 
 ## 9. Testing
 
@@ -883,20 +1060,24 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   1001, 1023, 1024, 1025, 1100, 1231, 2047 and 2048, checked at the width `with_width!` picks) and `games_java.txt` (the
   Java's game of the board's frames, move for move, for 171 sets of promotions at 762–2049).
 * **The board layer against the chain** (`tests/board_layer.rs`): for every 25th searched game of `results/strict.jsonl`
-  (and the last, n = 2175), the moves that the game's promotions make and the digest of the board's search problem are
+  (and the last, n = 3440), the moves that the game's promotions make and the digest of the board's search problem are
   the line's, which the golden data (up to 2049) cannot say of the boards that matter.  The unit tests of `frames` check
   what the frames remember (which numbers each can take on, which sources `removeImpossible` has been through) against a
   fresh computation.
 * **The frame model's exactness** (THEORY.md, Theorems B and M; section 2, "What optimal means"):
   `tests/model_exact.rs` decides playability on the whole board with an oracle that shares no code with `frames` or
-  `model` (`tests/common/playable.rs`, the peel; itself checked against the rules on every subset of the boards to
+  `model` (`src/playable.rs`, the peel; itself checked against the rules on every subset of the boards to
   20), and checks both directions of Theorem M on every set of every board to 100 (to 120 ignored) and on random sets
   of boards to 1300 (to 8191 ignored), and the near miss that only the candidate filter keeps out (n = 98);
+  `tests/model_extended.rs` checks Theorem M⁺ (the extended problem, with sources of three or more prime factors
+  optional) both ways on every set of every board to 80 (to 60 with every such source open) and on random sets to
+  1300 (to 4095 ignored), and that with none open its promotion sets are the frame model's;
   `tests/bottom_layers.rs` checks Theorem B on every game of optimal.json, the committed chain and the chain past it,
   every optimal set the prover enumerated, and every optimal set of the boards to 48; the unit tests of `frames`
-  check that `unzip`'s claims are its mandatory pairs, that `numbering` is what `build_frames` uses, and the check of
-  clean numbering, which `tests/wide.rs` runs on a sample of the boards to 8191.  The census of every board
-  (`examples/structure.rs`, data in `bench/structure/`) checks the hypotheses of Theorem M one board at a time.
+  check that `unzip`'s claims are its mandatory pairs, that `numbering` is what `build_frames` uses, that the frames
+  lie in layers (Lemma Ω, also on punctured boards), and that the numbering by layer is the Java's breadth-first
+  numbering on every board to 400 and a sample to 8191.  The census of every board (`examples/structure.rs`, data in
+  `bench/structure/`) checks what Theorem M's proof says of setup one board at a time.
 * **Regression**: `taxman regress --to N` solves 1..N as one range and checks every score against optimal.json.
 * **Tactic invariance**: games 1..300 forced to search with each tactic off or changed must give identical scores,
   and a checkpoint is refused when any of the search tactics differs.
@@ -952,6 +1133,29 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   the tree on purpose fails them.**  Run `cargo test --test tripwires
   -- --nocapture`: it prints the rows as observed, in the layout of the table at the top of the file; check that the
   promotion sums (the answers) have not moved, paste the rows in, and update any node counts quoted in the docs.
+  The table `EXTENDED` does the same for the extended problem with nothing open, Π⁺(∅), whose search must also be
+  the default engine's on the same problem, node for node.
+* **Extended mode** (section 4, "Extended mode: one-sided candidates"): the model with one-sided candidates against
+  the extended problem's reference predicate on every board 2..=300, for nothing open, every source of three or more
+  prime factors open (to 120) and five random sets of them (`tests/model_extended.rs`: sets promoted at once and one
+  by one in random orders, their conflicts and nogoods, the narrowing and the count), and its search against the
+  whole-board oracle on every board to 80 (to 60 with every such source open, 69 ignored); the GF(2) bound's free
+  blocks (the intersection against brute force with coloops; every promotion set of the boards to 120 independent and
+  under the bound; random paths to 1300 matching the matroids built afresh at every node); the soundness harness in
+  extended mode on every board 2..=300 under eight configurations, and a game resumed every 1,000 nodes; the header's
+  digest of the one-sided candidates and the refusals of what extended mode cannot take (tactics, block words, another
+  problem's checkpoint).  `taxman certify` (`tests/certify.rs`): every game of 600..=1300 that needs a certificate
+  certified (ignored; a sample by default) and some past 1300; a planted wrong score beaten by a game the referee
+  accepts, with status 2 and the counterexample file, and said again by a rerun; a certificate's search stopped every
+  1,000 nodes and resumed to the same verdict; the games a certificate cannot be made for refused; the file of
+  certificates and the bounds' files read as they should be; `--list` certifying the boards of a file in its order.
+  `taxman verify-certificates` (`tests/certify.rs`): a file `certify` wrote over 1312..=1317 (three games that rest
+  on the game before them) passes, on one thread and on two, with the summary's counts and the committed prover files'
+  proven end of the chain (2175); each doctored line (another digest, score, open members or width, a `same_problem`
+  with nothing to rest on or with its numbers changed, a certified line with a counterexample, a `build` without a
+  commit, a score the results do not have) is refused naming the line; a beaten line is verified with its
+  counterexample and cannot stand beside a certified one; the end of the chain on synthetic data (a gap stops what
+  rests on it) and on the committed chain.
 * **Engine** (`tests/engine.rs`, `tests/robustness.rs`, `tests/stop_signal.rs`): a toy problem with a known optimum
   (knapsack against dynamic programming), run with 1 and many threads, with a tiny `queue_mem_cap` to force spilling,
   and killed and resumed from checkpoints, must give the same answer; ignored tests do the same with 64 and 192 threads,
@@ -1051,7 +1255,8 @@ on the machine moves wall times by up to 3×.  What measures what:
   augmentations, which measure work.  The probe's fingerprint is 7e8e724717d26545, 5b83bbebf0bb2899 with `--tactic
   lagrange=off`, and f3deaac0dbdc030a with `--tactic gf2=on`.  (The windows were made again when the search's
   counters were
-  renumbered and the checkpoint header went to version 4, 2026-10; the fingerprints EXPERIMENTS quotes before then,
+  renumbered and the checkpoint header went to version 4, 2026-10, and again for version 5, with the tactics they
+  record, the matching path's, and the same fingerprints; the fingerprints EXPERIMENTS quotes before version 4,
   36981d0eaeeae319 and 6197a47eae6cf8c8, are of the earlier windows, made before `lagrange`.)  About 5 s in all;
   `perf make-nodes` and `perf make-window` make the fixtures again, deterministically.
   For whole searches, `/usr/bin/time -l` reports the same counters per process.
@@ -1099,10 +1304,11 @@ the chain 1..1300 on one thread to 36 s (26 s of search) and 290,503 nodes again
 before it; the one-thread proofs of the quick set and the bench set 0.75 of the nodes and 0.81 of the cycles
 (geometric means; EXPERIMENTS, "Prime exchanges in the search").  A chain from
 optimal.json's game of 1300 reached 2175 in 92 minutes of game time on 2 threads, and the committed chain from n = 1
-took 27 minutes on 8 ([results/README.md](results/README.md)); its cost comes in waves that
-follow the root's GF(2) gap, with no growth that a fit over 1301–2175 resolves, and a day on 192 CPUs would take
-it to 4095, the end of the set widths then, at every slope the data support (EXPERIMENTS has the projections); the
-widths now go to 8191.
+to 2175 took 27 minutes on 8 ([results/README.md](results/README.md)); its cost comes in waves that
+follow the root's GF(2) gap, with no growth that a fit over 1301–2175 resolves.  Past 2175 it grows, tenfold per about
+1,040 in n, and a day on one 64-CPU cloud machine took the chain from 2176 to 3440 (the [cloud
+run](docs/EXPERIMENTS.md#the-frontier-chain-to-3440-2026-10) sets it beside the projections of the day: near 4,100, and
+3,400 to 3,700 at their pessimistic end); the widths go to 8191.
 
 **The matching path** (the default before the GF(2) bound; these are the build of commit 4b6ef38, on the M1 Max): the
 proof of 1215 takes 33 s on one thread (106 G cycles), and 1184 takes 3.2 G cycles.  The chain 1..1231 took 279 s of
@@ -1124,12 +1330,15 @@ quarter, refinement 14% and strong branching 11%.
 
 ## 11. Status and what is left
 
-Every n to 2175 has a game proven within the frame model: `results/strict.jsonl` is a chain from n = 1 whose games to
+Every n to 3440 has a game proven within the frame model: `results/strict.jsonl` is a chain from n = 1 whose games to
 1000 reproduce optimal.json's scores, whose games 1001–1300 go beyond it (and are now appended to optimal.json too, by
-`taxman extend-optimal`) and whose games 1301–2175 are past the table; `results/README.md` says what supports each
-score.  The production chain on a many-core machine can start from `strict.jsonl` (`tools/cloud/RUNBOOK.md`), and a
-chain from n = 1 reproduces its scores.  With the GF(2) bound (section 4), the chain goes past 1300 on a laptop
-(EXPERIMENTS, "The GF(2) bound in the search" and "The committed chain to 2175").  What is left to try: strong
+`taxman extend-optimal`) and whose games 1301–3440 are past the table; those to 2175 are also proven on the whole
+board, by the prover, and U is not yet certified for the games past 2175 (`taxman certify`, "Certificates of U"
+above, will check it game by game); `results/README.md` says what supports each score.  The production chain on a
+many-core machine can start from `strict.jsonl` (`tools/cloud/RUNBOOK.md`), and a chain from n = 1 reproduces its
+scores.  With the GF(2) bound (section 4), the chain goes past 1300 on a laptop (EXPERIMENTS, "The GF(2) bound in the
+search" and "The committed chain to 2175"), and a day on a 64-CPU cloud machine took it from 2176 to 3440 (the [cloud
+run](docs/EXPERIMENTS.md#the-frontier-chain-to-3440-2026-10)).  What is left to try: strong
 branching's solves, 70% of the intersection's work, which restart far below their answer (canceling the negative cycles
 of the optimum less the member would start them next to it); the removal of the matching path's search machinery that
 the GF(2) bound leaves idle (refinement, the Lagrangian bound in the search; EXPERIMENTS has the list), once a

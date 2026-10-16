@@ -13,6 +13,7 @@
 #   TAXMAN_BIN    the solver binary               (default rust/target/release/taxman)
 #   LADDER_BIN    the ladder example binary       (default rust/target/release/examples/ladder)
 #   EXACT_BIN     the prover's `exact`            (default rust/prover/target/release/exact; prover.sh)
+#   HUNT_BIN      the hunt example binary         (default rust/target/release/examples/hunt; hunt.sh)
 #   RUSTFLAGS     default "-C target-cpu=native" in these scripts (a plain `cargo build` builds generic code): build
 #                 for the CPU of the machine that builds.  Build on the machine type that will run the binary.  Set it
 #                 to the empty string to build generic code.
@@ -26,6 +27,7 @@ CKPT="${CKPT:-$TAXMAN_WORK/ckpt}"
 LOGS="${LOGS:-$TAXMAN_WORK/logs}"
 TAXMAN_BIN="${TAXMAN_BIN:-$CRATE/target/release/taxman}"
 LADDER_BIN="${LADDER_BIN:-$CRATE/target/release/examples/ladder}"
+HUNT_BIN="${HUNT_BIN:-$CRATE/target/release/examples/hunt}"
 PROVER="$CRATE/prover"
 EXACT_BIN="${EXACT_BIN:-$PROVER/target/release/exact}"
 CLOUD_DIR="$_cloud_dir"
@@ -42,8 +44,16 @@ if ! command -v cargo >/dev/null 2>&1 && [ -r "$HOME/.cargo/env" ]; then
     . "$HOME/.cargo/env"
 fi
 
+# A message goes to the terminal (stderr) and, when LOG_FILE is set, to that file, written directly (not through a tee,
+# which would die with a Ctrl-C aimed at the whole foreground group and take the log with it).  run_begin (run.sh) sets
+# LOG_FILE to $LOGS/NAME.log; spot-watch.sh sets it to $LOGS/spot-watch.log.  Not an environment setting: it starts
+# empty here and is not exported, so a script run by another (save.sh) keeps no log of its own.
+LOG_FILE=""
 log() {
-    printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >&2
+    local line
+    line="$(printf '%s %s' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*")"
+    [ -n "${LOG_FILE:-}" ] && printf '%s\n' "$line" >>"$LOG_FILE"
+    printf '%s\n' "$line" >&2
 }
 
 die() {

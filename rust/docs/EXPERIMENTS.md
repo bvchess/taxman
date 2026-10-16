@@ -199,6 +199,10 @@ those of the page the row points to; a game is named by its board size, and time
 | A bound over the GF(2) frame matroids and GF(3) signed frame matroids (plain, random, and signings built from the cores of the LP's own columns, merged), coupled by Lagrangian multipliers fitted by column generation with a certified bracket (A1's E1, `examples/fields.rs`) | [fields](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) | measured: passes its kill criteria strongly; instrument kept, no solver change | the core-derived arm closes 0.62 of the root's GF(2) gap at n ≥ 1700 (18 converged roots), slope +1.0 ± 2.6 points per 100 n over 54 converged roots of 900-2175; fixed signings 2-9%; at the probe's nodes, with node-fitted multipliers, 86% (1215) and 98% (936) of the nodes GF(2) leaves open cut, the root's multipliers 0.37 of that; 36 s a root, 0.1-0.6 s a node |
 | The fields study's first master: GF(2) and independent-set columns tied by link rows `Σ α [x ∈ Q] − Σ β [x ∈ I] ≤ ε` (the design's), dense revised simplex | [fields](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) | not kept: replaced by rank inequalities with an exact certificate | 71% of the pivots steps of the perturbation's size; 1000 unconverged in 60 s (master 18,893 against L 24,382); the rank-inequality master converges there in 4-8 s |
 | A dual simplex for the fields master's violated rows (instead of elastic rows) | [fields](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) | not kept | looped: 10 million pivots in a 73-row LP within one 120 s root |
+| A1: carry the fields bound's core-derived signings and multipliers from one searched game's root to the next (a pilot: a `carry` command of `examples/fields.rs`, fits of 120 s, refits of 12 s) | [carrying 7](#carrying-a-searchs-learning-to-the-next-game-2026-10) | measured (pilot); the carry worth building, inside A1's E3 | five pairs of 1800-2172: carried with no refit 0.59-0.94 of the next root's own share of the GF(2) gap closed (median 0.75), refitted for a tenth of the budget with separation 0.82-1.17 (median 1.08), above its own in four of five (43-63 signings against 26-33 from one root); below only at 2170→2172, whose first fit did not converge; sound with no check (Lemma S); step 2 (about 30 roots, then a chain of ten) decides it |
+| The fields bound past 2175: the main arm certified at 17 roots of 2200-3400, 600 s a root (A1's E2) | [E2](#e2-past-2175-2026-10) | measured: not killed (K1, K2), not a strong pass; the 17 root fits saved for E3 | 0.46 of the root's GF(2) gap (12 converged roots; 0.37-0.40 at the dearest games, gaps of 1,300-1,450), flat in n past 2200 but 0.15 below E1's 0.62; against the gap −3.8 ± 1.1 points per 100 of gap; over 900-3333 the slope is −1.00 ± 0.34 points per 100 n (t −2.9); 81 minutes of one thread |
+| Core-derived signings a frame: 16 against 8 (A1's E2) | [E2](#e2-past-2175-2026-10) | measured: the limit stays 8 | +0.047 of the gap at the 6 roots of gap ≤ 1,013, +0.006 at the 5 dear roots (the design asks 0.05): its rounds end in an exact check of twice as many matroids, so at the large gaps it completes 5-6 rounds in 600 s where 8 completes 12-14 |
+| Search mode for the fields bound (no exact checks, 60 s), and the main arm certified with a 60 s budget, against E1's certified bounds (A1's E2) | [E2](#e2-past-2175-2026-10) | search mode not kept; the certified fit with a budget is | search mode ends in under 4 s at 0.274 of the gap above E1's bound, within 5% of the gap at 0 of 54 roots (the cheap inequalities describe a relaxation of the LP); certified with 60 s: at 54 of 54, mean 0.002 of the gap; at the 17 roots past 2175, 0.038 of the gap above the 600 s run (worst 0.151) |
 | The A1 bound in a branch and bound (A1's E3 pilot, `fields bnb`): the plain branch and bound with Tier 1 (one evaluation of L at the inherited multipliers) and refits of at most 20 pricings at the Tier-1-open nodes (R1 deflected Polyak, R2 the warm master, R2c with node-local signings), multipliers carried from parent to child, at 1215 and 1472, audited against the node's own master | [E3 pilot](#the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10) | measured: no kill (the criterion fixed in advance); instrument kept, no solver change | r2's tree 4.95 (1215) and 5.04 (1472) times smaller than GF(2)'s: a constant factor, both trees a decade per 172 of gap; 23 GF(2) nodes of time a node (4.6 times v0's time at 1472); within 20 pricings R2 makes 0.41 of the cuts of the node's own master with exact checks and separation, which cuts 95-100% of the nodes r2 leaves open; v1 and r1 far weaker, r2c a little stronger |
 | Larger refit budgets (K = 50, 100, 200) and refit policies (`excess:50`, `tier1:0.5`) for R1 and R2 at 1215 | [E3 pilot](#the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10) | measured | R2 stops by itself after about 27 pricings (trees 4.95, 6.62, 6.89, 6.99 times smaller at 1.3-2.0 times v0's time); R1 creeps (1.99 to 2.48); the policies save refits but lose more tree (2.56 and 1.63) than time |
 | Knuth's estimator (paired dives) for the plain branch and bound's trees, against exact trees | [E3 pilot](#the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10) | measured: not good enough for counts | the dives follow the estimator's exact distribution, but its tail is so heavy that 2,000 dives underestimate: at 1472 0.74 million [0.39, 1.17] against 3.40, two dives 43% of the sum; ratios better but loose (r2 2.17 [1.48, 4.12] against 5.04); dive-by-dive comparisons of variants informative |
@@ -214,6 +218,7 @@ those of the page the row points to; a game is named by its board size, and time
 | Nogood propagation alone, every conflict computed and made a nogood | [forced members](#forced-members-and-nogoods-2026-10-second-round) | not kept | cut nodes less (880 to 61k against 39k with lookups) and cost more than it saved |
 | 256-bit signatures to skip nogoods in a scan | [forced members](#forced-members-and-nogoods-2026-10-second-round) | superseded by exact lookups over compact member indices | −5% to −10% from the signatures, then about −2% more from the exact form |
 | Carry the nogoods of game n − 1 into game n | [carrying](#carrying-nogoods-over-2026-10-measured-not-kept) | not kept | 1227, the ceiling: −10% nodes, +3% time; the chain 1201-1231 617 s to 941 s |
+| Carry the nogoods of game n into game n + 1 on the GF(2) path: those still unpromotable from n + 1's root, made minimal there, preloaded once (*carry*) or put back after each forgetting (*pin*); eight pairs of 1463-2172, one thread | [carrying 6](#carrying-a-searchs-learning-to-the-next-game-2026-10) | not kept | user CPU ×1.31 (carry) and ×1.34 (pin) in geometric mean, 2 and 4 of 8 pairs faster (pin by 1-9%), the worst pair ×2.09 and ×2.74; they are valid (every one across a restriction, 59-100% across a relaxation) and answer 54-100% of the lookups, but change which conflict a node branches on; the criterion (15% less CPU in geometric mean, no pair above +10%) failed, as the matching path's did |
 | Store the nogood tables in checkpoints | [carrying](#carrying-nogoods-over-2026-10-measured-not-kept) | not kept | a resume with empty tables loses nothing and is faster (1220: 143 s against 191 s with the tables kept) |
 | Forget each searcher's nogoods every N steps (`forget_nogoods`, N = 50,000) | [forgetting](#forgetting-nogoods-2026-10) | kept | 26% less time on 1024, 1025, 1215 and 1220 together; the chain 1201-1231 on 4 threads 571 s to 377 s |
 | Forget by table size (64, 128, 256) | [forgetting](#forgetting-nogoods-2026-10) | not kept | 15-22% less time on the hard four, but the smaller games slower (936: 0.51 s against 0.85/0.61/0.53 s) |
@@ -246,6 +251,7 @@ those of the page the row points to; a game is named by its board size, and time
 | 64 one-thread copies of a proof or of the prover on a 64-vCPU instance (contention) | [Graviton calibration](#graviton-calibration-2026-10) | measured | mean time of a copy 0.996 to 1.002 of one alone (the slowest copy at most 1.011): none; a game a thread costs nothing in 64 |
 | Thread scaling of the proof of 2172 to 64 threads on Graviton3 and Graviton4 | [Graviton calibration](#graviton-calibration-2026-10) | measured | 4.5, 15.1 and 58.5 times at 4, 16 and 64 threads on c8g (c7g 4.4, 15.7, 51.9); engine 98% effective at 64, the rest the tree (3% and 15% larger) and the node rate (93 to 94%) |
 | Chain games an hour on a 64-vCPU instance, and the same games again against the committed file | [Graviton calibration](#graviton-calibration-2026-10) | measured | c8g: 2126..2175 in 69 s of games against the laptop's 250 (8 threads), the file's scores; 101 new games 2176..2276 in 15 minutes (473 an hour in game seconds, 404 with the start-up and the unfinished game), checked by `check_results.py`; c7g 1.7 times slower a game, mostly the fixed time a game spends outside the search |
+| The committed chain from 2175 for a day on a 64-vCPU instance (spot `c8g.16xlarge`, `chain.sh 4095`, a window of 16 and then 4 from game 3310, two instances) | [the cloud run to 3440](#the-frontier-chain-to-3440-2026-10) | measured; kept (the games are committed) | 2176..3440 in 24 hours for $16.46: 567 searches (448 exhausted, 17.73 G nodes), 543 repeats, 155 primes, nothing assumed, both referees pass; the calibration's 101 games and a rehearsal's 125 equal move for move; 3441 left at 626 M nodes; a day reached 3440 against the projected 4,100; search seconds ×10 per about 1,040 in n, a decade of scatter in the patches |
 | The cost of a game against n beyond the end of the chain (cost-curve study) | [bench/curve](../bench/curve/README.md#results) | measured | ×10 per 55-70 in n, jagged (×18 from 1250 to 1300); a standalone game costs 1.9 times the chained one where it matters |
 | Where the time of a game of the chain goes outside the search past 2125 (a profile of 2126-2135, one thread) | [inner loop](#the-inner-loop-of-the-gf2-search-2026-10) | measured | about 0.5 s a game besides frames and search: the move list from the promotions 45%, the frames 22%, the local search on the start 30%, the repeat lookup 8%; the run's start-up (each repeat's search problem built again) 77% of the run |
 | Many threads after the inner-loop round: pipelined or side-by-side chain games, start-up and move lists cheaper, unit restarts warm-started, the ramp-up and the node rate at 64 measured | [inner loop](#the-inner-loop-of-the-gf2-search-2026-10) | design; built in [round A](#round-a-the-fixed-costs-of-a-game-2026-10) (the fixed costs) and [round B](#round-b-the-chain-on-many-threads-2026-10) (the window, the counters); the 64-thread measurements open | the proof of 2172 scales 58.5x at 64 threads (Graviton calibration); with searches 3 to 9 times cheaper the serial 0.6 s a game and short searches decide the chain's throughput until trees grow again |
@@ -288,7 +294,18 @@ those of the page the row points to; a game is named by its board size, and time
 | Incumbents from the games above: n + 1's optimal set on n's board; the look-ahead start of n + 1..n + 3 seeded from n − 1 | [going higher 4](#going-higher-and-coming-back-down-2026-10) | not kept | the optimal set reaches P\* in 91 of the 110 exhausted games that start below it, but rests on n's optimum; the look-ahead beats n's start in 7 and reaches P\* in 1 (1290) |
 | A chain that comes back down: solve n + 1 first and derive n | [going higher 7](#going-higher-and-coming-back-down-2026-10) | not kept | in 1001-1300 only 1023 (from 1024, whose proof costs the same from 6 below): 0.55% of the nodes of the exhausted searches |
 | Equivalent search problems (same promotable sets, not equal) as a wider same search: strip the movers that a peel of each frame's hardest state drops, then a checked isomorphism fixing the candidates | [going higher 6](#going-higher-and-coming-back-down-2026-10) | not kept | 8 games beyond the 545 repeats, all below 186 (18 nodes); near repeats with the same P\* and candidates are not isomorphic and cost 643k nodes over 1001-1300 at most |
-| Proving a run of neighbours that share a core (equal GF(2) root gaps) in one search | [going higher 5](#going-higher-and-coming-back-down-2026-10) | open | every chain step after an exhausted game keeps the GF(2) gap (37 of 37); runs with equal gaps hold 19.8% of the proof nodes of 880-1300 beyond each run's dearest; trees within a run differ by up to ×3.9; not piloted |
+| Proving a run of neighbours that share a core (equal GF(2) root gaps) in one search (one tree over the run's problems that cuts a node only where every member's bound allows, Lemma J) | [going higher 5](#going-higher-and-coming-back-down-2026-10), [carrying 2, 3, 5](#carrying-a-searchs-learning-to-the-next-game-2026-10) | not kept (closed by the carrying study; not built) | going higher: every chain step after an exhausted game keeps the GF(2) gap (37 of 37); runs with equal gaps hold 19.8% of the proof nodes of 880-1300 beyond each run's dearest; trees within a run differ by up to ×3.9.  Carrying: the trees of consecutive searched games share 0.15% of their steps (median of 14 pairs), even proven at one level (1472 and 1475 at 52,565 share the root and nothing else), and by Theorem D the next proof's obligation is disjoint from the previous proof's, so the union of the trees is their sum; a run cannot cost less than its dearest game, 1.22 times that at equal gaps to 1.41 within 50 on 2176-3312 (1.28 and 1.47 on 1301-2175) |
+| What changes between consecutive searched games: the search problems of 22 steps of 3372-3423 on the EC2 chain and of nine pairs below 2175 compared frame by frame, each game's optimal promotions tried on the other root (`examples/diff.rs`) | [carrying 1](#carrying-a-searchs-learning-to-the-next-game-2026-10) | measured | every step is one local edit: a relaxation (a number f moved one frame back as a new candidate, 13 of 22) or a restriction (a move, or two moves over a new factor, added, 9), two of them larger edits; all but the 2 steps the ceiling settles move the optimum, by 12 to 1,664; games whose P\* moves by more than 500 hold 62.8% of the nodes of the 443 exhausted searches of 2176-3423, by 20 or less 6.4% |
+| How much of game n + 1's tree is game n's: the steps of 14 pairs of consecutive searched games of 1460-2172 recorded node by node (a hash of the promotions), one thread | [carrying 2](#carrying-a-searchs-learning-to-the-next-game-2026-10) | measured; replay and reuse of the previous tree not kept | the median pair has 0.15% of its steps at shared nodes (criterion for pursuing it: 30%); 100% for the two near repeats, 5-39% where P\* moved by 8 to 296, 0.0-0.2% beyond (restrictions 0.0-0.1%); the trees part at the first branches |
+| The same games proven at one level (1472 and 1475 at 52,565, 1475 at its optimum 52,386; the incumbent a value, one thread) | [carrying 2](#carrying-a-searchs-learning-to-the-next-game-2026-10) | measured | 309,591, 9,196 and 489,761 steps; 1472 and 1475 at one level share the root and nothing else, 1475 at its two levels 117 of 489,761 steps: the edit alone and the level alone each change the tree from its first branch; the proof above the ceiling is the cheap part (9 thousand of 490 thousand steps) |
+| Theorem D: across a relaxation every set the next proof must refute is unpromotable in the previous problem; across a restriction the obligation lies in the band of values (P\*_{n+1}, P\*_n] | [carrying 3](#carrying-a-searchs-learning-to-the-next-game-2026-10) | kept (proven in the entry) | two lines; value facts of one proof say nothing the next must refute, while facts of promotability (nogoods) and bound state that is not a value (signings, multipliers) carry |
+| What repeats from game to game: the root GF(2) gap of the 509 searched games of 2176-3312 and the nogoods each game learns | [carrying 4](#carrying-a-searchs-learning-to-the-next-game-2026-10) | measured | the gap's lag-1 autocorrelation 0.95; consecutive searched games at most 6 apart have equal gaps in 51% and gaps within 50 in 75% (mean change 33, sd of the gaps 211); 19-73% of the next game's nogoods were learned by the previous one (median 46%, 11 pairs of one edit); every nogood stays one across a restriction, 59-100% across a relaxation |
+| The most any reuse of work could save: a run of neighbours costing its dearest game (400 exhausted searches of 2176-3312; 314 of 1301-2175 solved again on one thread) | [carrying 5](#carrying-a-searchs-learning-to-the-next-game-2026-10) | measured | total over the sum of the runs' dearest 1.22 (equal gaps) to 1.41 (within 50) on 2176-3312, 1.28 and 1.47 (equal, within 10) on 1301-2175, 3.9 on the patch 3396-3423; 10 times is out of reach of any reuse of work |
+| Replay of a near repeat's tree with each verdict re-certified (Lemma P), a wider `same_search` | [carrying 6](#carrying-a-searchs-learning-to-the-next-game-2026-10) | not built | near repeats and small shifts of the optimum (20 or less) hold 6.4% of the nodes past 2175, 2.1% for a shift of 0 |
+| The gap as an aspiration value: a search from the incumbent V − 1, V the root bound less the previous game's gap, followed by the ordinary search if it fails (Lemma A) | [carrying 6](#carrying-a-searchs-learning-to-the-next-game-2026-10) | not built | exact either way; it saves only the lateness of finding the optimum, 12% of the steps at 1472 and 11% at 1475, on the half of the games whose gap repeats |
+| Other state carried from game to game: the branching order, forced members, weight splits, certified levels, the root's matroids and the setup | [carrying 6](#carrying-a-searchs-learning-to-the-next-game-2026-10) | not kept (not carried) | tied to the node's need and to the matroids, recomputed in micro- to milliseconds; the trees part at the first branches |
+| Carrying by the methods of other fields: reoptimization in MIP (SCIP, SYMPHONY), parametric analysis (Geoffrion and Nauss), incremental heuristic search (LPA\*, D\* Lite), pseudocosts across instances | [carrying 6](#carrying-a-searchs-learning-to-the-next-game-2026-10) | not kept (considered, not piloted) | each assumes what Theorem D and the disjoint trees deny (leaves that stay pruned, a parameter of the objective, states shared between searches); pseudocosts could save at most strong branching's ninth of a step |
+| Benders-style reuse of the core frames' value cuts across edits elsewhere | [carrying 6](#carrying-a-searchs-learning-to-the-next-game-2026-10) | open (noted, not proposed) | most restriction steps edit frame 0, where the GF(2) bound has no excess; it needs a search decomposed at a frame boundary, which is avenue A5's AND/OR search (high risk: the cores sit in adjacent frames) |
 | Lower frame 0's freedoms by solving the two-frame game (`revise_freedoms`) | [tactics review](#revise_freedoms-the-same-trees) | removed 2026-10: its premise is false | assumes the max-sum set also has the max count, which fails on about one perturbed game in 1,300, and for the whole frame game of n = 833 (48 promotions optimal, 49 promotable: [prover 6](../prover/README.md#6-does-an-optimal-game-play-the-most-moves)); the two-frame form it applies is undecided |
 | What `reuse_prev` still saves in a chain that has `same_search`, the ceiling and the seed (from the setups, no search) | [tactics review](#reuse_prev-nothing-left-to-save) | measured; removed | of 2..1300 it accepts 670 games, every one settled anyway (545 repeats, 115 at the ceiling at once, 10 searches of at most 1.6 s): 3.8 s of the chain's 1052 s of search, 0.5 s of 813 s in 1232..1300; no score or move differs |
 | What `revise_freedoms` changes in the proofs of the hardest games | [tactics review](#revise_freedoms-the-same-trees) | measured; removed | it changes the problem of every searched game of 1232..1300 (frame 0's freedoms down 4 to 6, `max_total` 0 to 5), yet the proofs of 1215, 1225, 1240, 1254, 1272, 1287 and 1300 have the same trees, node for node |
@@ -347,12 +364,24 @@ The work of [the prover](../prover/README.md) and the proofs of [THEORY.md](../.
 | How the parity bound relates to Franklín and Moniot's Theorem 1 and bound | [THEORY: relation to Franklín and Moniot](../../heuristics/THEORY.md#relation-to-franklín-and-moniot) | kept (proven; evaluation/fm_relation.py) | playable / independent / matchable iff exactly one / an odd number / at least one payment scheme onto some payment set (Theorem 12); no odd core below board 45, so the parity bound is exact to 44; checked on every pick set of 2..22 and 18,200 dense sets on 30-120 |
 | Must a move of an optimal game ever pay three or more numbers of tax?  (The wiki's open question.)  Every move of `optimal.json` and the chain, an exhaustive search over every optimal game of 2..56, and a reordering of the games that pay three | [wiki questions](#the-wikis-open-questions-2026-10) | kept (proven in part; evaluation/wiki_questions.py) | some optimal game pays three at 40, 41 and 56, and 74 committed games do (1250..2159; none of the Java's to 1000); a move of an optimal game pays only maximal factors of it, or s/p and s/p² (a theorem), so three needs three distinct primes; every committed game reorders into one paying at most two by moving one move, so no n ≤ 2175 forces three; that every n has an optimal game paying at most two is a conjecture |
 | Which n does the wiki's procedure for reusing the game of n − 1 make optimal, and what predicts them?  (The wiki's open question.)  The procedure as the page has it on both files' games, n = 2..2175; the Java's set-level reuse emulated; an exhaustive search over every optimal game of n − 1 to 50 | [wiki questions](#the-wikis-open-questions-2026-10) | kept (proven in part; evaluation/wiki_questions.py) | 45% of 2..1000 (930 of 2..2175), not the page's 70%, which is the Java's reuse (690 of 2..1000 emulated); optimal exactly when the move it skips is δ(n) = n + opt(n − 1) − opt(n); always at the primes and at the even n whose half n − 1 does not play (so opt(2p) = 2p + opt(2p − 1)); never when δ(n) is coprime to a composite n (644 games, nearly every odd semiprime: δ(pq) = p′q′ at all 417 with p′q′ > pq/2); the games that adapt are nearly those the solver settles without a search |
-| The frame model's assumptions as theorems: frames are layers by Ω (Lemma Ω), playability splits by layer (Theorem L), every optimal set plays the largest prime and U\*_2 (Theorem B), and, given clean numbering (N), U\* ∪ L is playable iff L is a promotion set (Theorem M); what is left is U, some optimal set contains U\*_{≥3} | [proven footing](#the-frame-model-on-a-proven-footing-2026-10); [THEORY: the frame model](../../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains) | kept (proven) | the proofs of a consultation of 2026-10-15, written out; E1-E3 below found no exception; the frame solver's answer is opt(n) iff U holds at n, on every board the solver supports |
+| The frame model's assumptions as theorems: frames are layers by Ω (Lemma Ω), playability splits by layer (Theorem L), every optimal set plays the largest prime and U\*_2 (Theorem B), and, given clean numbering (N; by construction since 2A, below), U\* ∪ L is playable iff L is a promotion set (Theorem M); what is left is U, some optimal set contains U\*_{≥3} | [proven footing](#the-frame-model-on-a-proven-footing-2026-10); [THEORY: the frame model](../../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains) | kept (proven) | the proofs of a consultation of 2026-10-15, written out; E1-E3 below found no exception; the frame solver's answer is opt(n) iff U holds at n, on every board the solver supports |
 | E1: the census of every board's frames, 2..8191 (`examples/structure.rs`): layers, N, back claims against the candidates, candidates in frame 0, homes, U\* against an independent greedy | [proven footing](#the-frame-model-on-a-proven-footing-2026-10) | kept (`bench/structure/`) | no violation on any board; frame 0 is layer 3 on 8,100 boards and layer 2 on the 80 boards to 186 where layer 2 has freedoms, and the numbers follow the layers on every board; 156 s on four threads |
 | E2: Theorem M against the code, both ways (`tests/model_exact.rs`), with a playability oracle that shares no code with the frame solver | [proven footing](#the-frame-model-on-a-proven-footing-2026-10) | kept (tests) | every set of every board to 120 and random sets to 8191, no failure; the candidate filter alone keeps out a promotion the model would accept and the board refuses on 27 boards to 2000 (first n = 98) |
 | E3: Theorem B against every recorded and enumerated optimal set (`tests/bottom_layers.rs`) | [proven footing](#the-frame-model-on-a-proven-footing-2026-10) | kept (tests) | no exception in 3,574 recorded games, 1,044 enumerated sets and every optimal set of 2..54; numbers of layer 2 up to n/2 only on 76 boards, all ≤ 186 |
-| N as a hard check of setup (`build_frames` refuses a board whose numbering is not clean) | [proven footing](#the-frame-model-on-a-proven-footing-2026-10) | kept | every supported board passes, so nothing changes (fingerprints, tripwires, regress, the chain 1..1300 line for line); punctured boards (the sacrifice study's) are not checked: 56 without 39 is not clean |
-| Certify U game by game: barred parity bounds with layers 1-2 fixed by Theorem B, then a search of the open members (or a search that treats the open sources as optional) | [THEORY: the upper part](../../heuristics/THEORY.md#the-upper-part) | open | the consultation's scratch measurements: the bounds leave 3-12 members of U\*_{≥3} open to 1300, 26-102 at 1500-2276; a search on the whole board closes the rest at every n tried to 1500 |
+| N as a hard check of setup (`build_frames` refuses a board whose numbering is not clean) | [proven footing](#the-frame-model-on-a-proven-footing-2026-10) | superseded by the numbering by layer (next row) | every supported board passed, so nothing changed (fingerprints, tripwires, regress, the chain 1..1300 line for line); punctured boards (the sacrifice study's) were not checked: 56 without 39 is not clean |
+| 2A: number the frames by layer (ℓ − ℓ₀), the definition in place of the Java's breadth-first numbering, so that N holds by construction, on boards with holes too; a number without frames gives an empty frame | [by layer](#the-frame-model-by-layer-and-the-extended-problem-2026-10) | kept | the two numberings equal on every board to 8191 (the census reproduced line for line), so no tree changes: fingerprints, tripwires, regress, the chain 1..1300 line for line; Theorem M loses its hypothesis; `sacrifice validate 52` still exact, with the boards 32-34 that have an empty frame |
+| E8 stage 1: the extended problem Π⁺(O), a set O of the sources of three or more prime factors optional and nothing claimed (`frames::build_extended`), Theorem M⁺ (S ⊇ U\* ∖ O playable iff it is a promotion set) and its certificate of U, tested against the whole-board oracle (`tests/model_extended.rs`) | [by layer](#the-frame-model-by-layer-and-the-extended-problem-2026-10) | kept (proven; research code) | no mismatch on every set of every board to 80 (60 with every source open; 100 and 69 ignored), 30 million sets, nor on random sets to 4095, rejected sources included |
+| Search Π⁺(∅), the frame model without `unzip`'s claims, with the existing engine (`Board::prepare_extended`, `examples/extended.rs`) | [by layer](#the-frame-model-by-layer-and-the-extended-problem-2026-10) | measured | a chain 2..1300 searching every game gives every score of optimal.json; 2.5% more nodes and 11% more time than the default problem searched the same way (1201-1300: 0.9% and 9%), 31 games more than 10% above (at most 1.24); the claims are worth a few percent |
+| E8 stage 2: the open sources as one-sided candidates of the search (the model, the GF(2) bound with free blocks, extended mode) and `taxman certify` | [one-sided](#one-sided-candidates-in-the-search-2026-10) | kept (research code; proven, THEORY.md Theorem 11 for Π⁺, and tested) | every game of 600..1300 that needs a certificate certified (377 in 45 s on one thread), a planted wrong score beaten by the real optimum; the first certificates past 1300 at the plain proof's nodes without the rule of symmetric pairs, 1.1 to 1.9 times its time with the rule (median 1.55); the default mode's trees unchanged |
+| S1: `certified (same problem as m)`: a game whose Π⁺(O) an earlier certified game of the 8 board sizes before it posed (digest, then the problems compared whole) and whose recorded game is worth what that certificate proved the most is certified with no search | [certificates past 2175](#certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10) | kept (proven: equal problems have equal heaviest promotion sets; THEORY.md under the certificate corollary) | 81 of the 377 games of 600..1300 that need a certificate, each equal to a search of it; the problems file finds 114 such games in 1301..2175 and 145 of the 708 in 2176..3440; five pairs past 2175 (2248 → 2249 to 2652 → 2653) equal to their searches, which take exactly the nodes of the game they rest on |
+| S2: the campaign of certificates on 2176-3440 planned (`tools/certify_plan.py`, `bench/certify/`), with the barred bounds of 3315-3440, `certify --list`, `taxman verify-certificates` and the proven end of the chain | [certificates past 2175](#certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10) | kept; the campaign waits for the owner's approval | 708 games need a certificate (3424, 3425 and 3440 among them), 145 settled by S1; priced by nodes at the run's own cost per node (the recorded seconds count the window 3.27 and 1.55 times): 3,300 thread-hours at twice the plain search (2,640-3,960 at 1.6-2.4), 52 hours of one `c8g.16xlarge`, $35 at spot or $132 on demand, 3440 alone 10.6 hours; the unshared repeats cost 361 thread-hours, 3427 alone 223 |
+| S4 preparation: the tooling of the campaign of certificates on 2176-3440 (`tools/cloud/certify.sh`, the phase lists in `bench/certify/lists/stage4`, `tools/certify_campaign.py`, `tools/certify_pilot.py` with the pilot's stop rule) and RUNBOOK section 11 | [RUNBOOK 11](../tools/cloud/RUNBOOK.md#11-certifying-u-stage-4) | kept; the campaign waits for the owner's approval, the pilot first | the 708 games in 7 lists: the pilot `pilot7` (7 games and the 3 that rest on them, 288 thread-hours, 4.5 hours of one `c8g.16xlarge`, $3 at spot), `dear_rest` (14 games led by 3440, 3424, 3425 and 2346, 1,837), `rest_1` to `rest_4` (567 games, 204 each), `deferred` (the 115 repeats the rule cannot settle and 2 games that share with them, 361; 0 if a build with Lemma M5⁺ settles them); the stop rule (median R at most 3 and none above 5, R = the certificate's thread-seconds over the chain's nodes times the stretch's cost per node, the plan's 2; stop on `beaten`) computed by `certify_pilot.py`, tested on real lines of 1301-2175; `certify.sh` rehearsed on the laptop (two lists at once, a SIGTERM and its resume, stand-ins for a counterexample, an error, a crash and the deadline; not on EC2) |
+| Certify U game by game: barred parity bounds with layers 1-2 fixed by Theorem B, then a search of the open members (or a search that treats the open sources as optional) | [THEORY: the upper part](../../heuristics/THEORY.md#the-upper-part) | open | the bounds close no game alone (E5, next row); the rest needs the integrated search, which leaves the open sources optional, and E6 measures what that costs the prover's search (prepared); its problem, the extended problem, has its theory and setup (the E8 rows above), and its search with the open sources one-sided is `taxman certify` (E8 stage 2): stage 3 measures it at the end of the chain |
+| E5: barred parity bounds on every game of 1301-3314 that rests on the frame model (`prover/src/bin/upper.rs`): layers 1 and 2 fixed by Theorem B, each member of U\*_{≥3} barred in turn, certified when the bound is at most the recorded score | [upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | kept (`prover/data/upper_*.jsonl`) | 7.5% of the members open over 1301-2175 (1 to 102 a game), 14.9% over the EC2 chain's 2176-3314 (15 to 317); no game closed by the bounds alone; the open share follows the root's gap (+2 to 3 points per 100), not n; the root's heaviest set plays all of U\*_{≥3} in all 1,125 games; 26 minutes on one thread; and on 3315-3440 (S2, `prover/data/upper_3315_3440.jsonl`): 73 games need it, 19.9% of the members open (172 to 271 a game), the root's heaviest set holding all of U\*_{≥3} in every one, 277 s |
+| E6: the prover's search with the sources of layer 3 and up free (`exact`, from Theorem B's roles) against the same with the upper part fixed to U\* (`--fix-upper 1`), with two counters, on 25 games of gap 364-603 | [upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | superseded (the fourth consultation, 2026-10-15; prepared, never run): E8 stage 2 measured directly what the free sources cost a search, the certificates taking the plain proof's nodes without the rule of symmetric pairs | criterion fixed in advance (B/D ≤ 1.2 on 90% of the games, never above 2, branching on those sources at ≤ 5% of the nodes); at 1575 and 1584 on the laptop B and D have the same nodes and neither counter fires; one `c8g.4xlarge` for one to one and a half hours, about $0.40 at spot ([RUNBOOK 10.1](../tools/cloud/RUNBOOK.md#101-e6-does-leaving-the-sources-free-cost-the-provers-search-anything)) |
+| Theorem B's roles in the prover's proofs (`exact`, now by default, `--fix-low 0` for the plain root: the largest prime and U\*_2 forced, the other numbers of layers 1 and 2 barred, those of layer 2 up to n/2 too where the board's frames of layer 2 are closed) | [Theorem B by default](#theorem-b-by-default-in-the-prover-and-the-hunts-probes-2026-10); first measured in [upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | kept (the default) | the 391 searches of 2..999: 588,026 nodes and 357 s against the plain root's 614,900 and 712 s; at 1575 and 1584 within 2.1% of the nodes and half the time a node (19.8 s against 36.1 s for 1575): the parity solves have fewer free elements; a proof as before since Theorem B is a theorem, and it records `"fix_low"` and `fixed_bound` on every line; the recorded game obeys the roles on every game of 2..2175 |
+| 2B's certificates: the test recomputed at each claim T of V − 1, V − 2, V − 5, with a mutation check (a rule certifying also when the bound is at most T + 10) | [Theorem B by default](#theorem-b-by-default-in-the-prover-and-the-hunts-probes-2026-10) | kept (tests) | 1,403 (set, member) checks without a miss; the wrong rule is caught on 12 boards (15 misses), so the test can see an over-generous certificate |
+| E9(a): a counterexample hunt for U at the 20 games of largest gap past 2175: the frame solver on the board without each open source, from an incumbent worth the recorded score (`examples/hunt.rs`, `sacrifice::hunt`) | [upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | superseded (the fourth consultation, 2026-10-15; prepared, never run): the campaign of certificates settles each game exactly, where the hunt only probes | 4,499 pairs; a pair's cost follows its margin (under 6 s to 781, 1-3 minutes at 835-899, beyond 5 minutes from 959, one thread; `bench/hunt/`); the policy of the third consultation (pairs in decreasing margin, up to 900 to completion in at most 10 minutes, above it a probe of the solver's start and 3 minutes, `probed`, never `none`; [the entry](#theorem-b-by-default-in-the-prover-and-the-hunts-probes-2026-10)) makes it about 140 vCPU-hours instead of 400: a `c8g.16xlarge` for about 2.6 hours with the setup, about $2 at spot ([RUNBOOK 10.2](../tools/cloud/RUNBOOK.md#102-e9a-a-counterexample-hunt-at-the-games-of-largest-gap)); a hit is a counterexample |
 
 ### The Python heuristics project
 
@@ -405,6 +434,14 @@ single-sacrifice route) have their row above.
 | [The gap past 2175](#the-gap-past-2175-2026-10) | what are the true root gaps of the EC2 chain's games, how do they grow, do they explain its trees (the 2340s, 3174-3176, 3300), what at the root is left, and what will 4000 to 6000 cost? | 509 gaps of 341 to 1,443 (mean 818), +37 per 100 n over 1301-3312 and G/n steady at 300: neither of the two regimes; the current build's trees are 0.29 times the committed chain's, a decade of nodes per 250 of gap, the gap counting in units of n^0.3 (0 to 0.5 bracket); the dear games are the games of high gap, nothing at the root explains the rest (A4 killed); a game costs ×10 per 1,050-1,250 n and a day on a `c8g.16xlarge` reaches about 4,100 | ee03872 (no solver change) and the entry |
 | [Boards past 4095](#boards-past-4095-2026-10) | what limits the boards to 4095, how far does one more width take them, and what does a board past 4095 cost? | built: boards to 8191 at 128 words, every board's frames and ranks scanned to bound the rest (9 frames, 5 block words); nothing changes to 4095; a node at 4100 1.1% dearer at 128 words than at 72, so no width between | 4316168 |
 | [The frame model on a proven footing](#the-frame-model-on-a-proven-footing-2026-10) | are the frame model's assumptions theorems, and what is left?  Steps E1-E4 of the consultation of 2026-10-15 | yes, given clean numbering, which holds on every board to 8191 and setup now checks: Lemma Ω and Theorems L, B and M in THEORY.md, the census and two test files with no exception; left: U, some optimal game plays U\*_{≥3} | 631e027, a122f43, de63aba, d7a322a, 5e44ac6 and the write-up after them |
+| [A bound over GF(2) and GF(3) signed frame matroids](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) | does the LP over the GF(2) frame matroids and GF(3) signed frame matroids (signings made for the cores its columns meet) close a share of the root's GF(2) gap that holds with n (A1's E1, with E1n at the probe's nodes)? | yes: 0.62 of the gap at n ≥ 1700, no trend in n (+1.0 ± 2.6 points per 100 n), passing its kill criteria strongly; fixed signings close little; 86-98% of the probe's nodes GF(2) leaves open cut with node-fitted multipliers; Theorems 14-15 in THEORY.md; E2 past 2175: 0.46 at 17 roots of 2200-3400 (0.37-0.40 at gaps of 1,300-1,450), not killed | 7666072 to 1e12c77, 32cccb3 (E2's instrument) and the entry (no solver change) |
+| [The upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | which members of U\*_{≥3} do barred parity bounds certify past 1300 (E5), and are the cloud measurements E6 (free sources in the prover) and E9(a) (a counterexample hunt) ready? | E5: 85-93% of the members certified, no game closed, the open share following the root's gap; E6 and E9(a) built, tested and calibrated, each under $1 or about $5 at spot, waiting for approval | abcfb18, 4076730, 8afefaa and the write-up |
+| [The frame model by layer, and the extended problem](#the-frame-model-by-layer-and-the-extended-problem-2026-10) | steps 2A and 3 of the second consultation: can the numbering by layer be the definition with no result changing, and is the extended problem Π⁺(O), with some sources optional, exact? | 2A: yes, no tree changes, N by construction, Theorem M with no hypothesis.  3: yes, Theorem M⁺ proven, no mismatch with the oracle in 30 million sets and random sets to 4095; Π⁺(∅) searched by the existing engine gives every score of 2..1300 at 2.5% more nodes | 40cf6d0 (2A), d2dde50 (3) |
+| [Theorem B by default in the prover, and the hunt's probes](#theorem-b-by-default-in-the-prover-and-the-hunts-probes-2026-10) | should the prover run from Theorem B's roles, what should E9(a) spend on a pair, and does 2B's test of the certificates see an over-generous rule? | yes: 4% fewer nodes and half the time a node over 2..999, the roles obeyed by every recorded game to 2175, closure decided per board; the hunt in decreasing margin with probes above 900, about 140 vCPU-hours instead of 400; the mutation is caught on 12 boards | 52fc685, 7d67ef5, c308c77 |
+| [Carrying a search's learning to the next game](#carrying-a-searchs-learning-to-the-next-game-2026-10) | in a bad patch of the chain, is the solver doing the same search over and over; what do consecutive games share, and can what one game's search learns be carried into the next? | the difficulty repeats, the work does not: each step is one local edit that moves the optimum (all but the two the ceiling settles, by 12 to 1,664), the trees share 0.15% of their steps (median of 14 pairs; Theorem D says why), the gap is autocorrelated 0.95 across games, carried nogoods cost ×1.31 to ×1.34 CPU, perfect reuse would save 18-29% of the nodes at most; the fields bound's signings and multipliers carry (a pilot at five roots: 0.75 of the next root's own share with no refit, 1.08 after a tenth of the budget) and are the carry to build, inside A1's E3 | 2e8b851 (the base of the scratch copy) and the entry (no solver change; `examples/diff.rs`) |
+| [One-sided candidates in the search](#one-sided-candidates-in-the-search-2026-10) | E8 stage 2 of the third consultation: can the search take the open sources as one-sided candidates, and `taxman certify` prove a recorded score on the whole board game by game, the default mode untouched? | yes: the model, the GF(2) bound (free blocks, Theorem 11 for Π⁺) and the search in extended mode, tested against the reference predicate and the whole-board oracle; every game of 600..1300 that needs it certified; the first certificates past 1300 at 1.55 times the plain proof (median), the open sources costing no nodes and the rule of symmetric pairs, which extended mode refuses, the rest | f747855 (18.1), 0c32d11 (18.2), 100eea1 (18.3) and the commit after it (18.4) |
+| [The frontier chain to 3440](#the-frontier-chain-to-3440-2026-10) | how far does a day on one `c8g.16xlarge` take the committed chain from 2175, with every game proven within the frame model and nothing assumed, and do the independent chains that cover it agree? | 3440: 1,265 games (448 exhausted searches, 119 at the ceiling, 543 repeats, 155 primes) for $16.46, both referees passing, the calibration's 101 games and a rehearsal's 125 equal to it move for move; the projection said about 4,100 and 3441 was left at 626 million nodes; search seconds ×10 per about 1,040 in n; six fixes to the runbook | 55287ff |
+| [Certificates past 2175: the same problem, the work list, the verifier](#certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10) | S1 and S2 of the fourth consultation: can a repeat be certified by the game it repeats, and what will certifying every game of 2176-3440 that rests on the frame model cost? | yes, when the two extended problems are equal whole (81 of 377 games of 600..1300, 145 of the 708 of 2176..3440); 3,300 thread-hours at twice the plain search, 52 hours of one `c8g.16xlarge`, $35 at spot, 3440 alone 10.6 hours; the work list, `certify --list`, `verify-certificates` and the proven end of the chain (2175 today) built | c5d585a (S1), ed526a4, 35c614b and the commit of the work list |
 | [A bound over GF(2) and GF(3) signed frame matroids](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) | does the LP over the GF(2) frame matroids and GF(3) signed frame matroids (signings made for the cores its columns meet) close a share of the root's GF(2) gap that holds with n (A1's E1, with E1n at the probe's nodes)? | yes: 0.62 of the gap at n ≥ 1700, no trend in n (+1.0 ± 2.6 points per 100 n), passing its kill criteria strongly; fixed signings close little; 86-98% of the probe's nodes GF(2) leaves open cut with node-fitted multipliers; Theorems 14-15 in THEORY.md | 7666072 to 1e12c77 and the entry (no solver change) |
 | [The A1 bound in a branch and bound](#the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10) | E3's pilot: with multipliers carried from parent to child and refits of 20 pricings, how much smaller are the trees of 1215 and 1472, at what cost, and how far does a refit get against the node's own master? | no kill: r2's tree 5 times smaller at both gaps (a constant factor, not a slope), at 23 GF(2) nodes of time a node; within 20 pricings the refits make 0.41 of the cuts of the node's own master, which cuts 95-100% of the open nodes; Knuth's estimator too heavy-tailed for the large trees; an overflow in L's evaluation fixed | 9e3ecae to the entry (no solver change) |
 
@@ -1746,11 +1783,11 @@ candidates, `max_total`), or something else?  And so what would change it?
 *Method.*  No search code changed.  `examples/slope.rs` (commit db7faf1) measures the root of a game and runs proofs
 with the incumbent set by value, through the library's public interfaces (`Board`, `MatchBound`,
 `matchbound::lagrange`, `engine::run`); `bench/curve/slope.py` makes the tables below (and more) from its two data
-files, `bench/curve/slope_roots.jsonl` and `bench/curve/slope_proofs.jsonl`, and `results/strict.jsonl`.  The solver
-of 331eb09 with `--tactic revise_freedoms=off` (the strict tactics; the tactic has been removed since, and the
-commands below, which no longer pass it, run the same searches), one thread a process and at most two processes, on
-the laptop while another agent ran the test suite.  `P*` is a game's optimum promotion sum (its score minus
-`in_the_bag`).
+files, `bench/curve/slope_roots.jsonl` and `bench/curve/slope_proofs.jsonl`, and `results/strict.jsonl` as of 2487671
+(the 1..1300 chain of the older build, which the script reads from git).  The solver of 331eb09 with
+`--tactic revise_freedoms=off` (the strict tactics; the tactic has been removed since, and the commands below, which no
+longer pass it, run the same searches), one thread a process and at most two processes, on the laptop while another
+agent ran the test suite.  `P*` is a game's optimum promotion sum (its score minus `in_the_bag`).
 
 * *Roots* (`slope roots --known results/strict.jsonl --sums bench/curve/bands.jsonl 880-1300` and the games past 1300
   that `bands.jsonl` solved; about a second a game): the root's matching bound; the matching bound refined one to three
@@ -2902,7 +2939,9 @@ runs of nearby searched games that hold a fifth of the proof nodes of 880-1300.
   tree over the relaxation that keeps both problems' incumbents and cuts a node only when both bounds allow) could
   save up to a fifth of the proof nodes at 880-1300; whether the trees overlap enough is unmeasured, and is worth
   measuring only once the GF(2) bound is in the search, which will change the trees (it is the bound whose gap the
-  runs share).
+  runs share).  (Measured since, with the GF(2) bound in the search: the trees of consecutive games share 0.15% of
+  their steps, and a run costs at least its dearest game, so perfect reuse saves 18-29% of the nodes at best: ["Carrying
+  a search's learning"](#carrying-a-searchs-learning-to-the-next-game-2026-10).)
 * *The bound is the lever, not the neighbours*: since every exact relation above preserves the gap, the slope is set
   by the shared core's gap, and closing it (the GF(2) bound in the search) is what changes the cost of these games.
 
@@ -5744,6 +5783,1129 @@ first), and THEORY.md now proves the bound (Theorems 14 and 15).
 9. 66 roots, not 67 (1475 is a multiple of 25).  The census reports `det0` for square cores and the rank deficiency over
    GF(3) for all, and adds whether the plain signing sees each core.
 
+### E2: past 2175 (2026-10)
+
+*Question.*  The advisor's second consultation (S4): does the main arm's share hold on the games past 2175, where the
+chain stops and the root gaps are 440 to 1,440?  The kill criteria were fixed before any run, on `f1cores` certified at
+600 s a root: **K1** the mean share over the roots from 2200 on that converge (a bracket within 1% of the gap) below
+0.25; **K2** a slope of the share against n over 900 to the last root of −2 points per 100 n or worse with t ≤ −2; and
+if more than 30% of the roots from 2200 on fail to converge in 600 s, the mean over all of them decides (their shares
+are lower bounds on their LPs').  The same runs decide the limit on core-derived signings a frame (16 against 8, adopted
+at a gain of 0.05 of the gap or more at the dear roots), whether *search mode* (a fit with no exact checks, 60 s)
+reaches E1's certified bound within 5% of the gap at 80% of E1's 54 converged roots, and they write the root fits that
+E3 starts from.
+
+*Roots and data.*  The optima past 2175 are those of the EC2 chain, from a snapshot of its results to board 3423 (not
+yet in `results/`: `--known` takes the snapshot after `results/strict.jsonl`, and [the README of
+bench/fields](../bench/fields/README.md) names it by its hash).  The roots: every 100th game of 2200-3400 (13) and the
+*dear* games, the searched games (proof `exhausted`) past 2175 with the largest root GF(2) gaps: 3300 (1443), 3333, 3335
+and 3336 (1427 each) and 3176 (1388): 17 distinct roots, 3300 being both.  3333, 3335 and 3336 are neighbours of one
+search with nearly one root, three roots of one family and not three independent ones.  Two games of proof `cap` have
+gaps as large (3303: 1443, 3339: 1427); they were not searched, and are not among the dear roots.
+
+*Instrument* (32cccb3; the bound, its validity and E1's results are as they were, see the reproduction below).
+`--fit-mode search` skips the exact checks: a family's generation ends when no column prices out at the master's duals
+and no cheap inequality is violated, the run when the separation then finds no new core (`Stop::Fitted`); `lb` is 0, so
+the root does not count as converged.  `--save-fit DIR` writes the fit of each `f1cores` run as `DIR/n{N}.json`:
+`common/fit.rs` (its module comment is the format) holds the signings, the multipliers, the final master's columns and
+its rank inequalities, reads a file back, and gives its bound again at the root, which every run asserts before it
+writes.  The fit is that of the *lowest L the run evaluated*, not of the final family: merging cores into a signing
+changes its matroid, which is not a restriction of the old one, and then the final family's LP can be the higher; a
+certified lower bound above the run's bound proves it, and happened at 3335 (the final family's lower bound 254732.7,
+the bound 254722) and in 17 of E1's 132 core-arm runs.  An arm `f1cores16` is the main arm with 16 core-derived signings
+a frame.  `common/dw.rs` already dispatched the intersection to `Meet<3>` for blocks of 129 to 192 coordinates (it
+asserts at most 192; the largest frame matroid has rank 137 at 3423, 128 at 3200 and 132 at 3300); a test compares it
+with the reference at 3200, 3300 and 3400, and every run checks it every 50th pricing as before.  A test reads
+`bench/fields/fits` back and checks each file's bound at its root.
+
+**The main arm certified, 600 s a root.**  Share of the GF(2) gap closed (`*`: not converged in 600 s, the share a lower
+bound on the LP's), seconds, and the share with a limit of 16 signings a frame where run:
+
+| n | gap | share | s | limit 16 | | n | gap | share | s | limit 16 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 2200 | 573 | 0.529 | 27 | 0.614 | | 3000 | 734 | 0.496 | 96 | 0.522 |
+| 2300 | 721 | 0.320 | 40 | | | 3100 | 1181 | 0.633* | 600 | |
+| 2400 | 740 | 0.428 | 152 | 0.469* | | 3176 | 1388 | 0.465* | 600 | 0.441* |
+| 2500 | 1048 | 0.467 | 248 | | | 3200 | 1013 | 0.519 | 277 | 0.571* |
+| 2600 | 439 | 0.392 | 32 | 0.419 | | 3300 | 1443 | 0.398* | 600 | 0.377* |
+| 2700 | 731 | 0.539 | 43 | | | 3333 | 1427 | 0.391 | 396 | 0.404* |
+| 2800 | 774 | 0.616 | 122 | 0.667 | | 3335 | 1427 | 0.371 | 345 | 0.379* |
+| 2900 | 662 | 0.495 | 71 | | | 3336 | 1427 | 0.367* | 600 | 0.423* |
+| | | | | | | 3400 | 1320 | 0.488* | 600 | 0.360* |
+
+Twelve of the 17 roots converged (5 did not, 29.4%: under the 30% at which the rule changes), so the criteria are
+computed on the converged roots.  **K1**: the mean share over them is **0.464** (0.466 over all 17; killed below 0.25).
+**K2**: over the converged roots of 900-3333, E1's 54 and E2's 12, the slope is **−1.00 ± 0.34 points per 100 n, t =
+−2.9** (killed at −2 or worse with t ≤ −2); over all 83 roots −0.84 ± 0.27, t = −3.1.  So E2 is **not killed**; it does
+not pass strongly either (E1's measure: a mean of 0.5 and a slope above −1 point).  Past 2200 alone the share is flat:
+by 200 n from 2200 the means are 0.43, 0.45, 0.47, 0.56, 0.53, 0.41, 0.49 (−0.02 ± 0.69 points per 100 n over the 12
+converged roots), at a mean of 0.464, 0.155 ± 0.046 below E1's 0.619 at 1700-2175 (t = 3.4): the share fell as the games
+went from E1's to E2's, and then stopped falling.
+
+*The fall is the gap's.*  After the fact (not one of the criteria), over E1's and E2's 83 roots of the main arm,
+converged or not: the share against the root's GF(2) gap is 0.725 at gaps of 0-199, 0.571 at 200-399, 0.544 at 400-599,
+0.467 at 600-799, 0.540 at 1000-1249 (3 roots) and 0.413 at 1250-1499 (6 roots), and a least-squares fit of the share on
+n and the gap gives +0.9 ± 0.6 points per 100 n and **−3.8 ± 1.1 points per 100 of gap**.  The chain's gaps grow with n
+(+37 per 100 n over 1301-3312), so the share seems a function of the gap, not of n, and at the gaps of the dearest
+games, 1,300 to 1,450, it is 0.4 (0.37-0.40 at 3300 and 3333-3336).  E1's draw of roots had gaps of 70-770; E2's are
+440-1,443.  (The standard errors take the roots as independent, which they are not quite.)
+
+*The unconverged roots are near their LPs.*  At the five roots that did not converge, the lowest L is within 6.2-9.9 of
+the master's value, an uncertified estimate of the LP (1% of their gaps is 12-14): what is missing is the certificate,
+whose exact checks and separation take three quarters of the time (3300: 535 s of 600 outside the intersections and the
+master's simplex, 15.7 million pivots in the checks), not a bound that is still falling.  Their shares are probably
+within about 0.01 of the LPs'.  At 3100 the share (0.633) is the highest of the 17.
+
+*The limit of 16.*  With 16 core-derived signings a frame the shares at the six roots of gap 1,013 or less are higher by
+0.086, 0.041, 0.027, 0.050, 0.026 and 0.051 of the gap (mean 0.047; 2200 converged, in 471 s against 27 s); at the five
+dear roots the gains are −0.024, −0.021, +0.013, +0.008 and +0.056 (mean **0.006**; the design asks for 0.05), and at
+3400 −0.128.  Over all 12 roots the mean gain is 0.015 and three are worse.  At the large gaps the 16-signing fit does
+not finish in 600 s (all five dear roots end at the budget, with certified lower bounds far below), because its rounds
+end in an exact check of about twice as many matroids (49-63 against 28-36): at 3333, 3335, 3336 and 3400 it completes 5
+or 6 rounds where the main arm completes 12 to 14, and finds fewer cores (3400: 128 against 648).  By the rule **the
+limit stays 8**; whether 16 would gain at the dear roots with more time is not measured (its gain at the roots that
+converge, 0.03-0.09, suggests it would, and that the limit of 8 binds: every root has 8 core-derived signings on at
+least one of frames 1-4, and 57% of the cores found cannot be placed).
+
+*Search mode does not serve; a short certified budget does.*  Search mode as specified ends in under 4 s (the 60 s
+are not used: the separation finds no new core after 23 to 480 pricings, where E1's runs at the same roots took 133 to
+1,082) with a bound above E1's certified one by **0.274 of the gap** on average (median 0.252, worst 0.640; 0.26 to 0.33
+in every band of 500 n), within 5% of the gap at **0 of E1's 54 converged roots** (80% needed).  Its master has only the
+cheap inequalities (the most violated level set of its point, and the support sets, closed), which describe a relaxation
+of the LP: the exact checks find rank inequalities that those miss, so what they add is bound, not only certificate.  By
+the design's rule the fit is then *certified mode with a longer budget*, and a budget alone does it: the main arm
+certified with **60 s**, cut off wherever it is, is within 5% of the gap of E1's bound at **54 of 54** of E1's roots
+(mean difference 0.002 of the gap, worst 0.044, at 1950 and 1975, which need 88 and 114 s to converge) and, at the 17
+roots past 2175, above the 600 s run's by 0.038 of the gap on average (median 0.025), within 5% at 12 of the 17 (the
+other five, 2500, 3176, 3200, 3300 and 3400, are above it by 0.088, 0.058, 0.117, 0.051 and 0.151).  A fit of 60 s thus
+costs under 0.05 of the gap where the gap is under 800 and up to 0.15 at the frontier's gaps, where the design's budget
+that grows with the gap is the right shape.  The runs of the 54 roots with the new code reproduce E1's lines exactly
+where both converged within 60 s (48 of 48 roots: bound, lowest L, lower bound, pricings, rounds, cores, columns and
+cuts all equal): the changes to `dw.rs` did not touch the fit.
+
+*Fits, signings and cost.*  The 17 fits are in `bench/fields/fits` (14 MB; the README there says what each holds).  The
+main arm took 81 minutes of one thread for the 17 roots (the design's 5 hours were for 600 s at every root), 27 to 600 s
+a root; the 12 roots of the limit of 16, 96 minutes.  A pricing (one intersection and the greedies) costs 1.2 ms at 2200
+and 2.9 ms at 3400 (0.15-0.96 ms at 900-2175), 640 to 2,660 of them a root; over the 17 roots the intersections are 1%
+of the time, the master's simplex 24% and the rest, 75%, the exact checks (millions of pivots a root) and the
+separation, converged roots and others alike.  The cores come from more frames than E1's: frame 4 holds core-derived
+signings at every root from 2700 on, with 8 at 6 of the 12 (E1 had them on frames 1-3), and frames 5 and 6 at four
+roots; a root finds 150 to 663 distinct cores, 57% of them unplaced (E1: 48%).  No GF(3) loop occurred.
+
+*Conclusion.*  E2 does not kill A1 at the frontier, and does not repeat E1's strong pass.  The main arm closes 0.46 of
+the root GF(2) gap at 17 roots of 2200-3400 (12 certified; the master's value puts the other five within about 0.01 of
+their LPs): flat past 2200 (−0.02 ± 0.69 points per 100 n) but 0.15 below E1's 0.62, a fall that goes with the gap (−3.8
+± 1.1 points per 100 of gap, +0.9 ± 0.6 per 100 n beside it) and leaves 0.37-0.40 at the dearest games, gaps of 1,300 to
+1,450.  The advisor's table S2 (second consultation) puts a share of 0.3 at +210 of affordable gap and 0.5 at +930 for a
+node 20 times as dear as GF(2)'s; 0.4 lies between.  The limit of 8 core-derived signings a frame stays (16 gains
+0.03-0.09 where it converges, nothing at the dear roots in 600 s), and the family stays fragmented: every root fills the
+limit on some frame, and 57% of the cores found go unplaced.  For E3 and E4 the root fit should be the certified arm
+with a budget that grows with the gap, not search mode (60 s costs under 0.05 of the gap below a gap of 800 and up to
+0.15 above it, and the 17 certified fits are in `bench/fields/fits`).
+
+*Questions for the advisor and deviations from the design* (each resolved as stated, all sound):
+
+1. 17 distinct roots, not 18: 3300 is a multiple of 100 and a dear root.  The dear roots are the literal five largest
+   gaps among the chain's exhausted searches; 3333, 3335 and 3336 are neighbours (one root family), so the verdict on
+   the limit at "the dear roots" rests on three families, 3300, 3176 and 3333-3336.  3303 and 3339 (proof `cap`) were
+   left out.
+2. The saved fit is the lowest L the run evaluated, not the final family's, so that the file's `bound` is the run's
+   bound and reproducible; the cuts of the final master are kept for the signings the fit has and their ranks are the
+   final family's (a reader takes the ranks again).  `support` (how many leading columns are the master's support) is an
+   addition to the design's format.
+3. Runs beyond the design: the main arm certified with 60 s at E1's 54 roots and at the 17 roots (the design's fallback
+   "certified mode with a longer budget" needed to know what a budget buys), and the roots reproduction above.  The
+   search-mode criterion is measured on the bound each run reached (E1's `bound` against the search run's), the lowest L
+   over all families, not E1's `l_best` of the final family.
+4. The kill criteria were applied as written: K2 over the converged roots of 900-3333 (E1's 54 and E2's 12); the slope
+   over all roots is also given.  Its t of −2.9 with a slope of −1.0 is a significant fall that the criterion, set at
+   −2, does not count; the gap fit above is an after-the-fact reading of it and not a test.
+5. The limit-of-16 fits (12 MB) were not kept in the repository; the budgets are wall-clock, and the runs shared the
+   laptop with other jobs (the 1-minute load was 4 to 10), so the five unconverged roots might converge on an idle one.
+   No run overlapped the owner's pause of the machine's low-priority jobs (14:00-14:40), which would have eaten its
+   budget.
+6. `--known` already took several files (E1's code: `Known::load` gets all of them); no change was needed.
+
+## The upper part game by game, and two cloud runs prepared (2026-10)
+
+*Question.*  Steps 2B to 2D of the theory track's second consultation (2026-10-15).  Since the entry above, the
+prover's proofs reach 2175, so U holds there; every game past 2175 that rests on the frame model rests on U.  (E5)
+For every game of 1301 to the end of the chain that rests on the model, which members of U\*_{≥3} do barred parity
+bounds certify, and how many stay open?  (E6) Does the prover's search cost more with the sources of layer 3 and up
+free than with the whole upper part fixed to U\*: is the integrated search, which leaves the open sources optional,
+worth building?  (E9(a)) Does the frame solver find a game above the recorded score on the board without an open
+source, at the games of largest gap past 2175?  E5 ran on the laptop; E6 and E9(a) are built, tested and calibrated on
+the laptop and wait for approval to run on EC2 ([RUNBOOK section
+10](../tools/cloud/RUNBOOK.md#10-the-theory-tracks-measurements-e6-and-e9a)).
+
+*E5* (commit abcfb18 and the data).  The prover's `upper` (`src/upper.rs`, `src/bin/upper.rs`): per game that rests on
+the model (neither at its ceiling nor given by the prime formula), the roles of Theorem B (the largest prime forced
+and every other prime barred, U\*_2 forced and every other source of layer 2 barred, and from 187 on, where it checks
+that U\*_2 spans every prime up to n/2, every number of layer 2 up to n/2 barred), then each member u of U\*_{≥3}
+barred in turn; u is certified when the parity bound is at most the recorded score V (every set beating V that obeys
+Theorem B plays u), open otherwise, with its margin.  Its tests: on boards to 60 every member certified against
+V − 1, V − 2 and V − 5 is in every playable set beating that claim (found by enumeration with the matching bound
+alone; 1,403 checks), Theorem B's roles hold for every optimal set there and every recorded game to 1300, and the
+figures at 600 are the consultation's.  It reproduces the consultation's scratch figures where they overlap (600, 1000,
+1300, 2000).  The committed chain's 1301-2175 (490 games need it, 300 s) and the copy of the EC2 chain's results of
+2026-10-15, 2176-3314 (635, 1,272 s), one thread on the laptop; the table by band is in [the prover's
+README](../prover/README.md#the-upper-part-game-by-game):
+
+| | 1301-2175 | 2176-3314 |
+|---|---|---|
+| games resting on the model | 490 | 635 |
+| members of U\*_{≥3} per game | 371 to 640 | 641 to 993 |
+| open, in all | 18,596 of 247,482 (7.5%) | 77,195 of 518,992 (14.9%) |
+| open per game | 1 (1305) to 102 (2172) | 15 (2610) to 317 (2346) |
+| certified per game | 84% to 99.7% (median 93%) | 54% to 98% (median 85%) |
+| the open share against the root's gap | +3.1 points per 100 (R² 0.73) | +2.0 points per 100 (R² 0.73) |
+| the open members' layers | 3: 52%, 5: 21%, 4: 19%, 6-10: 8% | 3: 58%, 5: 27%, 4: 9%, 6-11: 7% |
+
+No game is certified whole, and the open share follows the root's gap, not n (it falls with the gap at 2600-2699).
+The root's gap with layers 1 and 2 fixed is the solver's GF(2) gap at the root on all 400 games past 2175 that
+[the gap past 2175](#the-gap-past-2175-2026-10) measured, and the root's heaviest parity set plays all of U\*_{≥3} in
+every one of the 1,125 games, so no game is flagged.  The fixed set of the integrated search (U\* less a game's open
+members) is in these files.  THEORY.md's "What is known of U" now cites them; its scratch figures and the sentence on
+searches closing U to 1500, which the prover's proofs to 2175 supersede, are gone.
+
+*E6, prepared* (commit 4076730).  `exact --fix-low 1` searches from Theorem B's roles (still a proof: every optimal set
+obeys them) and `--fix-low 1 --fix-upper 1` from the roles that also fix the upper part to U\* (the frame model's
+problem on the whole board, written `"search":"upper_fixed"` so that no tool counts it as a proof); every searched line
+counts the nodes that branched on a source of layer 3 or up (`branched_on_sources`) and those whose roles bar a member
+of U\*_{≥3} (`barred_upper`), with `game::Prover::watch`, which changes no tree; checkpoints are kept apart by kind.
+`summarize.py sources B D` prints the table and the criterion fixed in advance (B/D ≤ 1.2 on at least 90% of the games
+and never above 2, and branching on those sources at most 5% of B's nodes: then build the integrated search's stages 2
+and 3; otherwise stage 1 only, and stage 2 on two games first); `prover.sh --list` runs `exact` on given games in its
+resumable passes, with no check at the end.  Tests: the counters change nothing (verdicts and nodes), Theorem B's roles
+keep every proof and every optimum of 187-700 that needs a search, and with the upper part fixed both counters are 0.
+A plain run of 1575 has the committed line's 16,801 nodes.  On the laptop, one thread:
+
+| n | gap | plain proof (section 3) | B: nodes, s | D: nodes, s | B's counters |
+|---|---|---|---|---|---|
+| 1575 | 364 | 16,801 nodes, 36.1 s (laptop) | 16,651, 19.8 | 16,651, 19.4 | 0, 0 |
+| 1584 | 400 | 25,981 nodes, 60 s (Graviton4) | 26,516, 30.8 | 26,510, 30.8 | 0, 0 |
+
+Two games say nothing about the criterion, but one thing is plain already: **Theorem B's roles halve the time of a
+node** at the same nodes within 2.1%, since the parity solves have the primes and the numbers of layer 2 settled.  The
+prover's next campaign can run with `--fix-low 1` and stay a proof.  Over 56 searched games of 187-700 (the test) B
+took 9,405 nodes and D 9,398, with 3 nodes branching on a source of layer 3 or up and 6 barring a member of
+U\*_{≥3}.  The cloud run: the 25 games of the design (gaps 364 to 603, proofs of 0.6 to 30 minutes, 4.8 thread-hours in
+the run of 1301-2175), B and D, on one `c8g.4xlarge`: one to one and a half hours, about $0.40 at spot, $1 on demand.
+
+*E9(a), prepared* (commit 8afefaa).  `sacrifice::hunt(n, hole, claim, ...)` searches the board without `hole` with
+the frame model from a handicapped incumbent worth claim − in_the_bag with an empty payload (the soundness tests'
+method), so it looks only for promotion sets beating the claim; a set found becomes a game, refereed on the punctured
+board, and `examples/hunt.rs` replays it on the whole board too (a source is nobody's factor, so a game without it is a
+game of n).  The search's payload helpers are public for it (`search::payload_of`, `set_of_payload`).  Tests: on 624
+pairs (every source of the boards 30, 37, ..., 149) the hunt finds a game at one below the punctured board's exact
+optimum and nothing at it, the game replaying on the whole board; on every board to 30 and every hole it agrees with
+the brute force.  `examples/hunt.rs` takes the 20 games of largest gap that need a certificate and each one's open
+members (`--per-game`, `--list` to choose otherwise), runs `--jobs` pairs at once on `--threads` each with a time
+limit, appends a line per pair, resumes, summarizes, and exits 2 on a counterexample; `tools/cloud/hunt.sh` runs it
+under `run.sh`'s deadline, saves and power-off, and `spot-watch.sh` now stops it too.  Calibration, one laptop thread
+(`bench/hunt/`): at 1302 the three open members end in milliseconds (U is proven there); at 3311 (gap 1303) and 2346
+(gap 1346) the cost of a pair follows its margin, not the gap: under 6 seconds to margin 781, 51 to 182 seconds at 835
+to 899, and every pair from 959 to 1215 out of its 3 to 5 minutes; no counterexample.  The 20 games (3300,
+3174-3176, 3104, 2346, 3304, 3305, 3309, 2340, 3311, 3102, 3103, 3312, 3172, 3173, 3105, 3107, 3168, 3171; gaps 1257 to
+1443) have 4,499 open members, 578 of margin above 900; at 4 threads and 10 minutes a pair, about 400 vCPU-hours: a
+`c8g.16xlarge` for about 7 hours, $5 at spot, $18 on demand, with a few hundred timeouts among the largest margins.
+The punctured boards are numbered by the present (breadth-first) numbering, which the census did not check on them;
+that can only hide games from the hunt, never invent one, since every game found is refereed.  (Since the next entry
+every board, a punctured one included, is numbered by layer, which is clean by construction, so the hunt's model on
+a punctured board is exact given the sources setup keeps there: THEORY.md, "Boards with holes".)
+
+*What it changes.*  The figures of U's certification are now committed data rather than scratch measurements, and they
+say that the barred bounds alone close no game: the certificate needs a search of the open sources, at 15 to 317 a game
+past 2175, which is what the integrated search (stage 1 next, after numbering by layer) is for.  E6 decides how far to
+build it and E9(a) is the cheap early warning if U fails; both wait for approval.  Theorem B's roles halve the
+prover's node at no cost to its proofs.
+
+## The frame model by layer, and the extended problem (2026-10)
+
+*Question.*  The second consultation of 2026-10-15, after "The frame model on a proven footing", set the goal (its
+steps 2B-2D are the entry above): every game past 2175 that
+rests on the frame model certified as a whole-board optimum, at a cost close to the solver's own.  Its first steps
+for the solver are (2A) to make the numbering by layer the definition, so that clean numbering (N), the one
+hypothesis of Theorem M, holds by construction and also on boards with holes, with no result changing; and (3, E8
+stage 1) to build the *extended problem* Π⁺(O), the frame model with a set O of the sources of three or more prime
+factors left optional, prove it exact (Theorem M⁺), test it against the whole-board oracle, and search Π⁺(∅) with the
+existing engine through a chain.
+
+*2A, numbering by layer.*  `frames::numbered_frames` gives a frame with freedoms of layer ℓ the number ℓ − ℓ₀, ℓ₀
+the lowest layer of a frame with freedoms (`frames::layer_of`, `Tables::omega`); the frames of one number are merged
+in the order of their smallest source, as before.  The Java's breadth-first numbering is kept for the tests, which
+find the two equal frame by frame on every board to 400 and on a sample to 8191 (1.3 s).  The refusal of an unclean
+board is gone; in its place a debug assertion of Lemma Ω (every frame in one layer, its factors one lower, the frames in
+front one lower), which a test runs on every board to 400 and every board of up to 60 numbers with one hole.  A layer
+between ℓ₀ and the highest layer with freedoms that has none leaves its number without frames, and the search then
+has an empty frame (no moves, factors or freedoms).  No board 1..n has one; the boards with one hole to 127 that do are
+32, 33 and 34 without 4, 10, 14 or 15: on 32 without 4, the frame of 18, 20, 27, 28 and 30 (layer 3) splits into two
+closed frames, while layers 2 and 4 have freedoms.  The model and the search take the empty frame as it is (a test searches 32
+without 4 with the GF(2) bound and on the matching path against the brute force).  On 56 without 39 the breadth-first
+numbering was not clean; by layer it is.
+
+No tree changed: the probe's fingerprints 7e8e724717d26545 and f3deaac0dbdc030a (`gf2=on`), its cycles 4.732 G and
+5.770 G; `cargo test --release` with the tripwires; `taxman regress --to 1000 --threads 1` (9.2 s); the chain 1..1300
+on one thread line for line equal to the base commit's (290,503 nodes) but for times and the build; and the census
+`examples/structure.rs 2 8191` on one thread, every line equal to `bench/structure/`'s but for the seconds (605 s
+summed against 624).  `examples/sacrifice validate 52` is exact on all 1,378 punctured boards (40.7 s), the boards
+with an empty frame among them.  THEORY.md's "Clean numbering" is now "Numbering by layer"; Theorem M and its
+corollary lose the hypothesis; a paragraph covers boards with holes, where the model is exact given the sources setup
+keeps there, which is what the sacrifice bound rests on (its module comment says so).
+
+*3, the extended problem (E8 stage 1).*  `frames::build_extended(t, open)` builds Π⁺(O) for a set O of members of
+U\*_{≥3}: the frames as setup forms them (the components), each with its fixed sources F = U\* ∖ O and all its factors;
+freedoms⁺ = factors − fixed sources; the frames with freedoms⁺ numbered by layer and united by number (no claims, no
+merge order to keep); the two-sided candidates by setup's two tests with F for the remaining sources; the one-sided
+candidates O ∪ R (R: the sources greedy rejected in the frames that hold a member of O), each with the frame of its
+layer; in_the_bag⁺ = ΣF.  `ExtendedFrames::promotable` is the reference predicate for a pair (K, L): plain peels of the
+unreduced frames with K and L applied (setup's own peel, `BoardFrames::count_freedoms`).  `Board::prepare_extended`
+hands Π⁺(∅) to `search::prepare` as it is; the one-sided candidates are not in the search (stage 2).  THEORY.md has
+Theorem M⁺ (S ⊇ F is playable iff (K, L) is a promotion set, and weighs in_the_bag⁺ + ΣK + ΣL), its proof (Theorem M's,
+without M5) and the certificate of U it gives, with the evidence row.
+
+`tests/model_extended.rs` checks Theorem M⁺ against the whole-board oracle of `tests/common/playable.rs`, both ways, on
+every set: every board 2..80 for O = ∅ and for three random O of 1-8 members each (2.2 million sets), every board 2..60
+for O = U\*_{≥3} (4.2 million), and, ignored, 81..100 (3.4 million) and 61..69 with every source open (20.9 million;
+the boards 70 and 71 have 62 million each, the count doubling every two boards); the heaviest set is optimal.json's on
+every board.  Random sets, 100 of each kind (promotion sets built in a random order, maximal playable sets built in a
+random order) for O a random 20 members of U\*_{≥3}, for O = U\*_{≥3} and for O = ∅ (where the frame model's random
+promotion sets are Π⁺(∅)'s and the reverse) at 300, 600, 1000 and 1300, and at 741, 1100 and 1200, the boards where
+greedy rejects a source of layer 3 (374, 578, 605; none on the boards to 740, nor at 1000 or 1300), so that sets with a
+rejected source are met (92-97 of 200 with every source open); ignored, 2000, 3000 and 4095 (R of 5 and 10 members at
+3000 and 4095).  No mismatch anywhere: 29 s for the default tests, 132 s for the ignored ones.  With O = ∅, Π⁺(∅)'s
+frames are the frame model's with the claimed pairs put back, and its candidates, freedoms and `in_the_bag` the same,
+on every board to 400; its promotion sets are those of Π_n and of the problem `prepare_extended` poses on every board
+to 100 (unit tests of `frames::extended` and `board`).
+
+`examples/extended.rs chain 2 1300 --compare` searches every game (primes included, no repeats) on one thread, seeded
+from the game before and capped at the ceiling, on Π⁺(∅) and on the default problem.  Every one of the 1,299 games
+scores optimal.json's, through a legal game of in_the_bag + its promotions.  What dropping the claims costs:
+
+| band | nodes, Π⁺(∅) | nodes, default | ratio | seconds, Π⁺(∅) | seconds, default |
+|---|---|---|---|---|---|
+| 2..900 | 36,387 | 34,812 | 1.045 | 5.7 | 5.0 |
+| 901..1000 | 118,770 | 117,783 | 1.008 | 9.5 | 8.9 |
+| 1001..1100 | 123,871 | 116,945 | 1.059 | 10.6 | 9.5 |
+| 1101..1200 | 16,899 | 16,529 | 1.022 | 5.6 | 4.6 |
+| 1201..1300 | 178,846 | 177,286 | 1.009 | 19.2 | 17.6 |
+| all | 474,773 | 463,355 | 1.025 | 50.7 | 45.6 |
+
+1,064 games take the same nodes; 31 take more than 10% more (the most 1.24, at 616; 19 of them in 601-700, the rest at
+432-433, 576-595, 832-865 and 1023-1029), 5 more than 10% fewer (940-943, 984-985; at least 0.88).  The probe's games:
+936 376 nodes against 394, 1215 10,012 against 9,979; the bench set 1050, 1100, 1133 and 1170 the same nodes, 1184 174
+against 170.  A node costs about 8% more (the claimed pairs stay in the frames the peels see).  So the claims are worth
+a few percent to the search, not more: the extended problem's search, with nothing open, costs what the default's does.
+
+The default mode is unchanged by all of it (the same gates as 2A: the fingerprints, the suite with the tripwires,
+`regress --to 1000 --threads 1` in 9.1 s, and the chain 1..1300 on one thread line for line).
+
+## Theorem B by default in the prover, and the hunt's probes (2026-10)
+
+*Question.*  The third consultation of 2026-10-15 (the theory track's program, part III, section 15) answered four
+questions on the entry "The upper part game by game": (c) should the prover run from Theorem B's roles from now on, (a)
+what should E9(a) spend on a pair, (d) does the hunt need rebuilding after the numbering by layer, and (b) is 2B's
+test of the certificates strong enough.
+
+*(c) The roles by default* (commit 52fc685).  `exact` starts every search from the roles of Theorem B unless told
+`--fix-low 0` (the plain root, which made the committed `data/exact_*.jsonl`); every line records `"fix_low"` (1 or 0)
+and `fixed_bound`; a search from the roles keeps its own checkpoint (`exact_N_low.ckpt`); `summarize.py exact` and
+`check` count the proofs that rest on Theorem B (none in the committed files, which still pass `check 2 1300` and
+`check 1301 2175`).  The frames of layer 2 are closed when U\*_2 has as many members as there are primes up to n/2, and
+`upper::layer_two_closed` now decides it for each board instead of trusting n ≥ 187: the numbers of layer 2 up to n/2
+are barred where it holds and free where it does not, which is the 80 boards of 2..1300 that THEORY.md lists, all
+below 187 (the old function panicked on a board from 187 up where it failed; there is none to 1300).  Checks: for every
+game of 2..2175 the recorded game obeys the roles and their parity bound is at least its score (`exact --budget 1`,
+50 s and 214 s on one thread); the 391 searches of 2..999 prove again, in 588,026 nodes and 357 s against the plain
+root's 614,900 nodes and 712 s (the nodes 4% fewer, the time a node halved); `tests/exact.rs` runs the binary over
+187..300 in the default, `--fix-low 0` and `--fix-upper 1` modes.  A new full proof would cost about half what
+RUNBOOK section 9 estimates.
+
+*(b) A mutation check for the certificates* (commit 7d67ef5).  The test of the barred bounds already recomputed the
+certification at each claim T of V − 1, V − 2 and V − 5 and checked every playable set that obeys Theorem B and is worth
+more than T (boards 2..60, 1,403 checks); the boards and claims are enumerated once now, and a second test applies the
+same check to a deliberately wrong rule, which certifies a member also when its barred bound is at most T + 10: it is
+caught, 12 false certifications over the boards and claims giving 15 (set, member) misses on 12 boards, so the test can
+see the failure it guards against.
+
+*(a, d) The hunt's probes* (commit c308c77).  The advisor's answer to what E9(a) should spend on a pair: do not
+drop the pairs of margin above 900, which matter most (a counterexample needs the punctured problem's own slack to be
+below the margin, the less the closer the margin is to the root's gap), but they will not finish, so run the pairs in
+decreasing margin, those up to 900 to completion under the 10-minute limit, and those above it as probes: the solver's own
+start and 3 minutes of search, recorded as `probed`, never as `none`.  `examples/hunt.rs` does that (`--probe-above`,
+`--probe-minutes`, a `finished` flag on a `probed` line whose search happened to end, `start_score`, and `--results FILE`
+for the recorded games that seed the start); `sacrifice::hunt` makes the start on request (`PuncturedOptions::start`
+and `seed`), from `search::start_incumbent`, the start of `search` taken out as it was (no tree changes, the suite and
+the tripwires are the check); `hunt.sh` has `PROBE_ABOVE` and `PROBE_MINUTES`.  Only a probe makes the start: a search
+that runs to its end finds every game above V without it, and it costs 2 to 7 seconds a pair at 3311.  Tests: the hunt
+with the start, seeded or not, agrees with the hunt without on 298 pairs of the boards 30 to 150 (the start alone finds
+the best game on 292), and `cargo t --release --example hunt` has six tests of the order, the probes, the verdicts and
+the seeds.  Rebuilt on master (numbering by layer) and rerun on one laptop thread, 12 of the calibration pairs
+(`bench/hunt/recalibration.jsonl`): the same nodes at every pair that finished (301, 11, 4 at 1302; 9,634, 15,065,
+152,993, 351,905 and 1,146,404 at 3311 and 2346), `none` for every margin up to 899 in the first calibration's seconds
+(53 at 835, 121 and 185 at 896-899), `probed` for 959, 1126 and 1215 (181.8 to 186.9 s each, the start reaching 598 to
+854 below V), no counterexample.  The cost of the cloud run falls from about 400 vCPU-hours (every pair using its 10
+minutes) to about 140: the probes, 578 pairs of 3.1 minutes on 4 threads, are 120 of them; a `c8g.16xlarge` for about 2.6
+hours with the setup, about $2 at spot, $7 on demand, deadline 5 hours.  Neither E9(a) nor E6 is launched: the owner
+deferred them to a later batch of AWS work.
+
+## Carrying a search's learning to the next game (2026-10)
+
+*Question.*  In a bad patch of the chain, a run of games whose root gap is high (3388-3424 on the EC2 chain), is the
+solver doing 99% of the same search over and over, game after game?  The owner asked it, with a second question
+behind it: can the frame solver carry the most important things one game's search learns into the next game's?  Taken
+apart: what changes from one searched game to the next; how much of the next game's search is the previous game's,
+and why; what does repeat; how much could any reuse of work save; what can be carried soundly; and what does carrying
+it give?  This entry records the diagnosis and the plan that followed it.
+
+*What was kept.*  Nothing in the solver, and one example: `examples/diff.rs` (how the search problems of two boards
+differ, below).  Everything else was scratch: a copy of master 2e8b851 with recording hooks and a few commands added to
+two examples, run on the laptop at `nice -n 10`, one thread a run, about 35 minutes of CPU in all, nothing on EC2.  The
+copy and its logs were not kept, so the tables below are the record, and the method is written out to be redone.  A
+*searched game* below is a game that poses a search problem of its own (not a prime, not a repeat that `same_search`
+settles); its search ends by exhausting the tree or at its ceiling.
+
+*The answer in brief.*  **The difficulty repeats, the work does not.**  Consecutive searched games pose problems that
+differ by one local edit, keep the same root gap (the same hard core) and relearn many of the same nogoods, but their
+search trees share almost no node, even when both are proven at the same level; a two-line theorem (Theorem D, below)
+says why: what one game's proof establishes about values says nothing about what the next game's proof must refute.
+What carries soundly (nogoods, the branching order, a value-free bound state) is measured to give nothing in the
+present solver: re-validated nogoods make the next search 1.31 times slower in geometric mean.  And the arithmetic of
+the runs limits any reuse of work to 1.2 to 1.4 times between games whose cores match.  What is worth carrying is what a
+better bound learns about the core: the fields study's core-derived signings and multipliers, which carry with no check
+at all.  A pilot at five pairs of roots says they do: a family fitted at one game's root closes 0.75 (the median) of
+what the next root's own fit closes, with no refit, and 1.08 of it after a tenth of the budget spent refitting, more
+than its own in four of five pairs, because the two games' cores add up.  So carrying is not a lever in the present
+solver; it is the way avenue A1's bound, once it is in the search (A1's E3), can learn along the chain.
+
+*Method.*  The games are the chain's: the recorded games of `results/strict.jsonl` (to 2175) and, past it, the EC2
+chain's results of 2026-10-15 (2176-3423, 64 threads; that snapshot is not committed, but
+`bench/wall/gaps_chain.jsonl` holds its games to 3312 with their root gaps and nodes).  The instruments:
+
+* `examples/diff.rs` (new, in the repository): `diff [--known FILE] A:B ...` sets up the boards A and B as the solver
+  does and compares their search problems frame by frame (the moves and factors each has that the other lacks, the
+  freedoms), the candidates gained and lost and those whose home frame changed, `max_total`, `in_the_bag`, and, for the
+  optimal promotions of each game (read from the chain), whether they are all candidates on the other board and can all
+  be promoted from its root.
+* A step log (scratch, the hooks inert unless switched on): per step of a searcher, that is per pass of its loop at
+  a node, the 64-bit FNV-1a hash of the node's promotions (their numbers ascending, four bytes each, little endian),
+  the hash of the child pushed (0 if none), the outcome (loop ended, child not pushed, child pushed), the node's depth,
+  its candidates after the step and its promotions; and every nogood the search learned (in `refine::Seek::conflict`,
+  next to the insert into the table), as its numbers.  Written to a file of 24-byte records by the ladder
+  (`examples/ladder.rs --threads 1 --known results/strict.jsonl N`, which seeds a game from the recorded game of n − 1
+  and stops it at its ceiling, as `taxman solve` in order does).  A game searched twice has the same steps (the base run
+  of 1832 in the nogood table below has the 114,150 steps of its recorded run).  A script reads two such files and
+  counts: the distinct nodes, the nodes both took steps at, the steps of each at the other's nodes, the identical steps
+  (same node, child and outcome), the common prefix of the two step sequences, the children both pushed, the nogoods
+  both learned.
+* The proof at a fixed value (scratch, in the ladder): the search with the incumbent a value V and no set behind it,
+  as `wall nodes --mode opt` runs one, so that two games are proven at the same level.
+* A preloaded table (scratch): game n's learned nogoods, each kept only if every member is a candidate of n + 1 and
+  `promote_all_using` from n + 1's root fails, made minimal there (`FrameGraph::nogood` with nothing promoted), inserted
+  into every searcher's table when it is made (*carry*: forgotten with the rest after the first 50,000 steps of that
+  searcher) or put back after each forgetting as well (*pin*); the table counts the lookups answered by a carried one.
+* For the pilot of section 7, a `carry` command of `examples/fields.rs` (below).
+
+**1. What changes from one searched game to the next.**  The end of the EC2 chain, from 3372 to 3423 in its snapshot:
+each searched game against the searched game before it (the repeats and primes between them pose the problem of one of
+them), from `diff`.
+
+| step | the edit | shape | P\* change | nodes of the later game (64 threads) |
+|---|---|---|---|---|
+| 3372→3375 | frame 3 gains the move 3375 | restriction | −162 | 25.7M |
+| 3375→3376 | 1688 leaves frame 1's moves; frame 2 gains 3376 and the factor 1688; candidate 1688 | relaxation | +124 | 26.2M |
+| 3376→3380 | the same with f = 1690 (frames 1→2) | relaxation | +630 | 45.1M |
+| 3380→3381 | frame 1 gains 3381 | restriction | −16 | 27.9M |
+| 3381→3384 | f = 1692 (frames 2→3) | relaxation | +1,571 | 36.0M |
+| 3384→3388 | f = 1694 (frames 1→2) | relaxation | +569 | 46.6M |
+| 3388→3390 | f = 1695 (frames 0→1) | relaxation | +169 | 47.4M |
+| 3390→3392 | f = 1696 (frames 3→4) | relaxation | +360 | 26.5M |
+| 3392→3393 | frame 1 gains 3393 | restriction | −57 | 103.0M |
+| 3393→3395 | frame 0 gains 3395 | restriction | −291 | 68.0M |
+| 3395→3396 | f = 1698 (frames 0→1) | relaxation | +12 | 63.0M |
+| 3396→3399 | frame 0 gains 2266, 3399 and the factor 1133 | restriction | −150 | 420.6M |
+| 3399→3400 | f = 1700 (frames 2→3) | relaxation | +1,556 | 522.1M |
+| 3400→3402 | f = 1701 (frames 3→4) | relaxation | +752 | 93.8M |
+| 3402→3404 | frames 0 and 1: six candidates gained (1178 … 1702) | relaxation (a larger edit) | +1,664 | 280.9M |
+| 3404→3405 | frame 0 gains 2270, 3405 and 1135 | restriction | 0 | 0 (the ceiling) |
+| 3405→3408 | f = 1704 (frames 2→3) | relaxation | +1,274 | 158.7M |
+| 3408→3411 | frame 0 gains 2274, 3411 and 1137 | restriction | 0 | 0 (the ceiling) |
+| 3411→3416 | f = 1708 (frames 1→2) | relaxation | +650 | 93.2M |
+| 3416→3417 | frame 0 ±3 moves; frame 1 loses 7 moves and 7 factors; 7 candidates lost | restriction (a larger edit) | −1,584 | 93.5M |
+| 3417→3420 | f = 1710 (frames 2→3) | relaxation | +1,409 | 206.6M |
+| 3420→3423 | frame 0 gains 2282, 3423 and 1141 | restriction | −336 | 118.7M |
+
+*Relaxation* is the shape of ["Going higher"](#going-higher-and-coming-back-down-2026-10), section 2 (from an odd n to
+n + 1 = 2f: f leaves the moves of frame h, becomes a candidate of home frame h + 1, and the new move 2f has f as a
+private factor).  In every such step the earlier game's optimal promotions are promotable on the later root and not the
+reverse, and the later optimum contains the new candidate.  *Restriction* is a new move, or two new moves over a new
+factor (2266 and 3399 over 1133, 2270 and 3405 over 1135); in every such step the later game's optimal promotions are
+promotable on the earlier root, and the earlier game's are not promotable on the later root unless the optimum stays
+(3405 and 3411, which the ceiling settles).  The single-f relaxations meet "Going higher"'s sufficient condition for
+one problem to relax another, and the one-move restrictions meet it with the roles exchanged (the problem without the
+move relaxes the problem with it); the two-move additions and the two larger edits (3402→3404, 3416→3417) are classed
+by the optimal-set check alone.  The analogues below 2175 are the same: 1460→1463 and 1472→1475 (frame 0 gains a move),
+1536→1539 (frame 2 gains a move), 2064→2065, and 1463→1464, 1475→1476 and 1539→1540 (f = 732, 738, 770).  Two
+near repeats are different problems with the same optimum, which `same_search` cannot see: 1832→1833 (frame 0 swaps the
+two moves 946 and 1419 over the factor 473 for 1222 and 1833 over 611, nothing else changes) and 2065→2067 (1034 and
+1551 over 517 for 1378 and 2067 over 689), both a swap of one factor's pair {2pq, 3pq} over pq in frame 0 for
+another's.
+
+So every step is one local edit, as the owner says, and **all but the steps the ceiling settles move the optimum** (by
+12 to 1,664 in the table above).  Of the 443 exhausted searches of 2176-3423 on the EC2 chain, those whose P\* differs
+from the previous searched game's by more than 500 hold 62.8% of the nodes (243 games), by 101-500 19.3% (98), by
+21-100 11.5% (58), by 1-20 4.3% (23), by 0 2.1% (21).
+
+**2. How much of game n + 1's search is game n's.**  Each pair searched on one thread as the ladder does it, with the
+step log on.  The 14 pairs are consecutive searched games of 1460-2172 that one thread records in minutes (29 thousand
+to 553 thousand steps), restrictions and relaxations, with shifts of the optimum from 0 to 714.  *Steps at shared
+nodes*: the share of n + 1's steps taken at a node at which n also took a step; *identical steps*: the same node,
+child and outcome; *nogoods known*: the share of the distinct nogoods n + 1 learned that n had learned too.
+
+| step | edit | P\* change | steps (n, n + 1) | steps at shared nodes | identical steps | first step that differs | nogoods known |
+|---|---|---|---|---|---|---|---|
+| 1832→1833 | near repeat | 0 | 114,150 / 114,150 | 100% | 100% | none | 100% |
+| 2065→2067 | near repeat | 0 | 73,037 / 73,037 | 100% | 100% | none | 100% |
+| 1830→1832 | relaxation (916) | +8 | 112,861 / 114,150 | 38.9% | 35.8% | 29 | 63% |
+| 1463→1464 | relaxation (732) | +296 | 87,630 / 88,367 | 12.8% | 11.0% | 17 | 73% |
+| 1540→1544 | relaxation (772) | +8 | 250,502 / 174,658 | 5.1% | 4.1% | 16 | 40% |
+| 2170→2172 | relaxation (1086) | +12 | 440,988 / 510,340 | 12.6% | 11.7% | 788 | 46% |
+| 1470→1472 | relaxation (736) | +563 | 136,217 / 352,483 | 0.2% | 0.1% | 18 | 52% |
+| 2064→2065 | restriction | −647 | 59,772 / 73,037 | 0.1% | 0.0% | 5 | 47% |
+| 1460→1463 | restriction (frame 0) | −197 | 28,897 / 87,630 | 0.0% | 0.0% | 2 | 26% |
+| 1472→1475 | restriction (frame 0) | −179 | 352,483 / 553,347 | 0.0% | 0.0% | 0 | 32% |
+| 1475→1476 | relaxation (738) | +640 | 553,347 / 353,508 | 0.0% | 0.0% | 1 | 41% |
+| 1536→1539 | restriction (frame 2) | −459 | 337,476 / 170,013 | 0.0% | 0.0% | 4 | 54% |
+| 1539→1540 | relaxation (770) | +342 | 170,013 / 250,502 | 0.0% | 0.0% | 4 | 19% |
+| 1464→1470 | three steps | +714 | 88,367 / 136,217 | 0.0% | 0.0% | 3 | 9% |
+
+The trees are shared only where the optimum barely moves: a near repeat is the same tree step for step; a shift of 8
+shares between a twentieth and two fifths of the steps, 12 an eighth (296 an eighth once); a shift of 179 to 647 shares
+a handful of nodes near the root and nothing else.  The median of the 14 pairs is 0.15% of the steps at shared nodes.
+Past 2175 the games whose optimum moved by 20 or less hold 6.4% of the nodes (section 1).
+
+*Is it the level or the edit?*  The restriction 1472→1475 proven at fixed levels, the incumbent a value with no set
+behind it, one thread:
+
+| proof | steps |
+|---|---|
+| 1472 at its optimum, 52,565 | 309,591 |
+| 1475 at 52,565 (1472's optimum, which is 1475's ceiling) | 9,196 |
+| 1475 at its optimum, 52,386 | 489,761 |
+
+At the same level the two trees share the root and nothing else (the first child differs), and 1475 at its two levels
+shares 117 of 489,761 steps.  So the edit alone changes the tree from its first branch (one move of frame 0 changes
+the root's heaviest set, its conflict and its forced members), and so does the level alone.  The table also shows where
+a restriction step's cost is: nothing above the ceiling is proven in 9 thousand steps, nothing above the optimum 179
+below it in 490 thousand (53 times, the margin scans' 0.01 decades per unit of value, see ["What drives the
+slope"](#what-drives-the-slope-2026-10)).
+
+**3. Why the work does not repeat: the two proofs have disjoint obligations.**  For a search problem Π (a game's root:
+its frames, candidates and `max_total`) let Prom(Π) be its promotion sets and P\*(Π) the largest sum ΣT over
+T ∈ Prom(Π).  For a value V, the *obligation* O(Π, V) = {T ∈ Prom(Π) : ΣT > V} is what a search whose incumbent is
+worth V must show empty.  The search of game n shows O(Π_n, P\*_n) = ∅.  Say Π′ *relaxes* Π when Prom(Π) ⊆ Prom(Π′):
+every set Π can promote from its root Π′ can promote from its own.  ("Going higher" proves a sufficient condition on
+the two roots, which the single-f relaxation steps of section 1 meet, and the one-move restriction steps with the roles
+exchanged.)
+
+**Theorem D.**  (a) If Π_{n+1} relaxes Π_n, then O(Π_{n+1}, V) ∩ Prom(Π_n) = ∅ for every V ≥ P\*_n, in particular for
+V = P\*_{n+1}: every set the proof of n + 1 must refute is unpromotable in Π_n.  (b) If Π_n relaxes Π_{n+1} (a
+restriction step), then O(Π_{n+1}, V) = {T ∈ Prom(Π_{n+1}) : V < ΣT ≤ P\*_n}: the obligation of n + 1 lies in the band
+of values (P\*_{n+1}, P\*_n], about which the proof of n claimed nothing.
+
+*Proof.*  (a) T ∈ Prom(Π_n) gives ΣT ≤ P\*_n ≤ V, so T ∉ O(Π_{n+1}, V).  (b) T ∈ Prom(Π_{n+1}) ⊆ Prom(Π_n) gives
+ΣT ≤ P\*_n.  ∎
+
+(The theorem is about what the searches must refute, and nothing in the solver or the prover rests on it, so it stays
+here rather than in THEORY.md, which holds the theorems the two programs rest on; the sufficient condition for a
+relaxation, which it uses to classify the edits, is proved in "Going higher".)  What it means for each kind of fact a
+search establishes:
+
+* *Value facts*, which are what a branch and bound tree is made of (a subtree is cut because its bound is below its
+  need: every completion of the node (P, C) is worth less than need − ΣP at the incumbent of the time).  Across a
+  relaxation they bound sets of Π_n, none of which is in the next obligation: no use.  Across a restriction they stay
+  true (the restricted problem's GF(2) matroids are contained in the other's, "Going higher" section 3, so its bound at
+  a node is no larger), but they settle a subtree of n + 1 only if they were cut with a margin of at least
+  P\*_n − P\*_{n+1}, and the trees do not share their nodes anyway (section 2).  The one value fact that carries in
+  full is the one the chain already carries, the ceiling, which in a restriction step that adds the new source to the
+  bag is exactly P\*_n; and the part of n + 1's obligation it settles, the sets above P\*_n, is the cheap part (at 1475,
+  9 thousand of 490 thousand steps, section 2).
+* *Facts of promotability* (nogoods: N cannot be promoted from the root) do not depend on values: they carry wherever
+  they stay true (section 6).
+* *Bound state that is not a value* (signings and multipliers of a Lagrangian bound): carries unconditionally, since
+  any signing and any multipliers give a valid bound (section 6).
+
+So "the same search over and over" is not what happens: the next proof refutes sets the previous proof never had to
+look at, in a tree of its own.
+
+**4. What does repeat: the hard core.**
+
+* *The gap.*  Over the 509 searched games of 2176-3312 (`bench/wall/gaps_chain.jsonl`) the root GF(2) gaps of
+  consecutive searched games have lag-1 autocorrelation 0.95; of consecutive searched games at most 6 apart, half
+  (51%) have exactly the same gap and three quarters gaps within 50 (median change 0, mean 33, against an sd of 211).
+  The edit moves the bound and the optimum together ("Going higher" section 5 saw it on 37 of 37 chain steps), so the
+  odd cores of frames 1-3 that make the gap are the same game after game.  That is why the cost residuals run (lag-1
+  0.84, [the gap past 2175](#the-gap-past-2175-2026-10)) and the bad patches come in runs: the same core priced again,
+  at 10^(G/250), game after game.
+* *The conflicts.*  19% to 73% of the nogoods the next game learns were learned by the previous one in the 11 pairs of
+  one edit that move the optimum (median 46%; 9% across three edits, 100% for the near repeats; the last column of the
+  table of section 2).  Of the previous game's nogoods, across a restriction step every one is still a nogood (1,102
+  of 1,102 and 2,240 of 2,240 in the pairs carried in section 6, as Lemma N (ii) says; 326 of 326 at 2064→2065);
+  across a relaxation step most are (651 of 651, 967 of 968, 1,628 of 1,628, 1,942 of 2,186, 612 of 1,035: the freedom
+  that f's leaving gives frame h releases the nogoods that leaned on it).
+
+Same difficulty, different work: each game refutes the same core along its own path, because the bound cannot hold what
+the previous game learned about the core.  The owner's expectation that the wall will be met in such a patch is right:
+the wall is a crest of the gap's waves, where every game costs about 10^(G/250) on its own; reuse cannot lower a crest,
+and a bound that closes a share of G can.
+
+*What the bound learns.*  Nothing persistent, in the default search.  The GF(2) bound is a function of the problem; its
+per-node state (the heaviest set, the weight split, the forced members, the certified levels) is tied to the node's
+need, is recomputed in micro- to milliseconds, and changes with every edit (section 2: the root's choices differ at
+once).  The only state a searcher accumulates is its nogood table, a cache forgotten every 50,000 of its steps; the
+Lagrangian multipliers over nogoods exist only with `lagrange`, off by default and changing no tree measured with
+`gf2`.  The one expensive, value-free bound state in the project is the fields study's: core-derived GF(3) signings and
+their multipliers, tens of seconds to fit at a root and valid on any problem.
+
+**5. The limit of any reuse of work.**  A search that proves a run of games together, or reuses every piece of work from
+game to game, still contains a proof of the run's dearest game: with perfect reuse a run costs its dearest member.  Over
+the EC2 chain's 400 exhausted searches of 2176-3312 (the nodes of `bench/wall/gaps_chain.jsonl`), runs cut where
+consecutive searched games are more than 6 apart or their gaps differ by more than a tolerance:
+
+| runs (gap tolerance) | total over the sum of the runs' dearest | saving if each run cost its dearest |
+|---|---|---|
+| equal gaps (252 runs) | 1.22 | 18% |
+| within 10 (224) | 1.29 | 22% |
+| within 50 (134) | 1.41 | 29% |
+| within 100 (63) | 1.84 | 46% |
+| any gap (15 runs) | 2.95 | 66% |
+
+On the patch 3396-3423 (10 exhausted searches, 2.05 billion nodes, the dearest 3400 with 0.52 billion) the ratio is 3.9
+times; 2.6 with 3424 at 1.3 billion nodes (a figure the snapshot lacks, which ends at 3423).  Over the committed chain's
+1301-2175, solved again by the current build on one thread (`bench/wall/resolved_1301_2175.jsonl`, 314 exhausted
+searches), it is 1.28 with equal gaps and 1.47 within 10.  So perfect reuse between games whose cores match would give
+1.2 to 1.4 times, and 10 times is out of reach of any reuse of work: it needs the dearest games themselves to get
+cheaper, which only a tighter bound gives.  And the measured reuse is far from perfect (section 2).
+
+**6. What can be carried soundly.**  Every row says when it is valid in game n + 1, the lemma that proves it, what it
+can buy, and what was measured.
+
+| what | valid in game n + 1 when | proof | what it can buy | measured | verdict |
+|---|---|---|---|---|---|
+| the incumbent (the seed) | always, its survivors | any promotable set is an incumbent | the start | in use | done |
+| the ceiling | always (n + opt(n − 1)) | `prev_cap` | in a restriction step, all of n's proof that bears on n + 1 (Theorem D) | in use | done |
+| nogoods | re-checked: every member a candidate, and not promotable from n + 1's root (exact, a peel per frame); no check needed in a restriction step | Lemma N | conflicts known sooner | ×0.90 to ×2.74 the time, ×1.31 in geometric mean | killed |
+| subtree certificates (value facts) | restriction steps only, as upper bounds, cutting only with a margin ≥ P\*_n − P\*_{n+1} | Lemma R | nothing: no shared nodes | 0% of steps shared in restriction steps | killed |
+| the branching order | always (any branching is a partition) | the search's exactness argument | strong branching's time at shared nodes | the trees part at the first branches | killed |
+| the gap, as an aspiration value | always, if a failed aspiration is followed by a normal search | Lemma A | the cost of finding the optimum late: 12% at 1472, 11% at 1475, on the half of the games whose gap repeats | not built | not worth building |
+| forced members, weight splits, certified levels | not as such: tied to the need and to the matroids | none | none | none | not carried |
+| the root's matroids, symmetric pairs, problem setup | recomputed per game | none | milliseconds a game | none | not carried |
+| a joint search of a run | sound if a node is cut only where it is cut for every member | Lemma J | the union of the trees instead of their sum | the trees share no node even at one level | killed |
+| replay of a near repeat | each replayed verdict re-certified in n + 1 | Lemma P | most of a near repeat's search | near repeats hold 2.1% of the nodes past 2175 | not worth building |
+| signings and multipliers of the fields bound (A1) | always: the signing by numbers, any nonzero value on a new incidence, multipliers by candidate number | Lemma S (Theorems 14, 15) | the next root's family and fit; a family that grows along the chain | pilot at 5 roots: no refit 0.59-0.94 of the root's own share (median 0.75), refit with separation for 12 s 0.82-1.17 (median 1.08) | the one worth building, inside A1's E3 |
+
+*Nogoods carried on the GF(2) path (measured).*  Game n's learned nogoods, carried and pinned as in the method above,
+into game n + 1 searched as in section 2; user CPU seconds from `/usr/bin/time` (so a stopped process does not count),
+one thread:
+
+| step | kept of n's | base: steps, s | carry: steps, s | pin: steps, s | lookups answered by a carried nogood (pin) |
+|---|---|---|---|---|---|
+| 1830→1832 (relaxation, +8) | 651 of 651 | 114,150, 10.1 | 192,425, 16.6 (×1.64) | 187,546, 16.6 (×1.64) | 95% |
+| 1463→1464 (relaxation, +296) | 967 of 968 | 88,367, 10.5 | 82,025, 9.9 (×0.94) | 76,760, 9.5 (×0.91) | 99.8% |
+| 1472→1475 (restriction, −179) | 1,102 of 1,102 | 553,347, 55.6 | 874,743, 94.3 (×1.69) | 871,796, 94.8 (×1.70) | 94% |
+| 1475→1476 (relaxation, +640) | 1,942 of 2,186 | 353,508, 26.4 | 646,395, 55.0 (×2.09) | 829,676, 72.2 (×2.74) | 93% |
+| 1536→1539 (restriction, −459) | 2,240 of 2,240 | 170,013, 16.9 | 148,402, 15.2 (×0.90) | 136,874, 15.4 (×0.91) | 100% |
+| 1539→1540 (relaxation, +342) | 612 of 1,035 | 250,502, 23.6 | 266,100, 24.8 (×1.05) | 227,617, 21.9 (×0.93) | 54% |
+| 2064→2065 (restriction, −647) | 326 of 326 | 73,037, 10.5 | 83,548, 12.8 (×1.21) | 120,722, 18.3 (×1.74) | 99.8% |
+| 2170→2172 (relaxation, +12) | 1,628 of 1,628 | 510,340, 67.7 | 720,115, 95.3 (×1.41) | 465,767, 67.2 (×0.99) | 100% |
+| geometric mean of the eight | | | ×1.31 (steps ×1.27); 2 of 8 faster | ×1.34 (steps ×1.25); 4 of 8 faster, by 1-9% | |
+
+Mostly valid (every one across a restriction; across a relaxation 59% to 100%, the rest made promotable by the freedom
+frame h gains), re-checked in microseconds, answering most lookups, and worse on balance.  As on the matching path
+in ["Carrying nogoods over"](#carrying-nogoods-over-2026-10-measured-not-kept) (1227, the best a carried table can be:
+−10% nodes, +3% time; the chain 1201-1231 617 s to 941 s), a carried table changes which conflict a node branches on
+(the smallest the table knows, rather than one computed from the frame where the heaviest set fails), so it changes the
+tree, and the change is noise around a loss.  A larger table also costs every node (["Forgetting
+nogoods"](#forgetting-nogoods-2026-10)).
+
+*The lemmas.*
+
+**Lemma N (nogoods across games).**  Let N be a set of candidates of Π_n that cannot be promoted from its root.  (i) N
+is a nogood of Π_{n+1} exactly when N ⊆ C_{n+1} and `promote_all_using` from Π_{n+1}'s root fails; every use the search
+makes of a nogood (the conflicts of nodes, the rule-outs of children) rests on that alone (`model::Nogoods`), so a
+table loaded with such sets is as sound as one learned.  (ii) If Π_n relaxes Π_{n+1}, every such N with N ⊆ C_{n+1} is
+a nogood of Π_{n+1} with no check (a set promotable in n + 1 is promotable in n).  (iii) In a relaxation step of the
+shape of section 1 (n + 1 = 2f), at every node that has promoted f, every nogood of Π_n (less the node's promotions) is
+a conflict with no check: if T ∋ f can be promoted in Π_{n+1}, then frame h with T applied is n's frame h with T − f
+applied, and frame h + 1 is n's frame h + 1 with T − f applied plus the move 2f (f itself being promoted out), so
+T − f can be promoted in Π_n.  The check of (i) costs a peel per frame and is what an implementation would do anyway.
+
+**Lemma R (value facts in a restriction step).**  If Π_n relaxes Π_{n+1}, then at every node (P, C) of n + 1, every
+upper bound on the completions of (P, C′) in Π_n with C ⊆ C′ bounds the completions of (P, C) in Π_{n+1}, and the
+GF(2) bound of n + 1 at (P, C) is at most n's (the contracted frame matroids of the restriction are contained in the
+relaxation's).  It cuts the node in n + 1 only if it is below P\*_{n+1} + 1 − ΣP.  The rule of symmetric pairs does not
+carry: a pair of n need not be a pair of n + 1 (the move 3417 = 3·17·67 breaks the pairs of 17 and of 67).
+
+**Lemma A (the gap as an aspiration value).**  Let V be a guess of P\*_{n+1}, say n + 1's root bound less n's gap.  A
+search started with the incumbent value V − 1 and no set behind it either finds a set worth V or more, after which it
+is the ordinary search, exact; or completes without one, which proves P\*_{n+1} ≤ V − 1, a ceiling for the ordinary
+search that must then follow.  Exact either way; it saves the time spent finding the optimum late when the guess is
+right (half the games keep their gap), and costs the cheap proof above the guess when it is too high.  What it could
+save is the difference between a game's search and its proof at its optimum: 352,483 steps against 309,591 at 1472
+(12%), 553,347 against 489,761 at 1475 (11%).
+
+**Lemma J (joint search).**  Let a tree's branching be any partition, and cut a node only when, for every member k of
+the run, it is cut for k (its bound for k below its need for k, or none of its completions is promotable in k).  The
+part of the tree each member sees is then a branch and bound of that member, so the search is exact for each.  Its
+size is the union of what each member needs under the common branching, at least the dearest member's; with the trees
+measured disjoint (section 2), the union is the sum.
+
+**Lemma P (replay of a near repeat).**  Replay n's tree in n + 1, re-certifying each verdict there (a cut: the bound
+below the need, or a conflict by a peel; forced members by their bounds; the symmetric pairs of n + 1) and searching
+afresh from any node whose verdict fails.  It is a branch and bound of n + 1 with a given branching and re-checked
+prunings, so it is exact.  Where the trees differ it saves strong branching and nothing else; where they agree (the
+near repeats) it saves most of a search, and those hold 2.1% of the nodes past 2175.
+
+**Lemma S (signings and multipliers across games).**  Let σ be a signing of frame h of Π_n over GF(3) (a nonzero value
+on each incidence of a mover with a maximal factor in the frame), given by numbers: `Signing { fixed: (mover, factor)
+→ value, default }` as `examples/common/gf3.rs` holds it.  Read on Π_{n+1}'s frame h, it gives σ(u, y) where (u, y) is
+an incidence of both and the default (1, or a hashed 1 or 2) elsewhere: a signing of Π_{n+1}'s frame h.  So every
+promotion set of Π_{n+1} is independent in its matroid (Theorem 14), and with any multipliers (n's, by candidate number,
+0 for a new candidate) L bounds every promotion set of Π_{n+1} (Theorem 15; [THEORY.md, signed frame
+matroids](../../heuristics/THEORY.md#signed-frame-matroids-the-frame-bound-over-other-fields)).  A core of n whose
+movers, their incidences and its factors are unchanged in n + 1 has the same column sums, so the carried signing still
+makes it dependent.  Frame h is the same layer in both games (numbering by layer, ℓ₀ = 3 on every board past 186;
+[THEORY.md, numbering by layer](../../heuristics/THEORY.md#numbering-by-layer)).  Nothing is re-checked: validity is
+unconditional, only the strength depends on the fit.
+
+*Ideas from other fields, and why they fit or not.*
+
+* *Incremental SAT* (learned clauses kept across calls, re-validated by their derivations when clauses go; the heuristic
+  state kept): fits the nogoods, which here re-validate more simply, by an exact test.  What it buys in SAT, clause
+  reuse and the branching state, measured here as a loss: a carried nogood steers the branching, not the bound.
+* *Reoptimization in MIP* (SCIP's, Gamrath, Hiller and Witzig 2015; SYMPHONY's warm start, Ralphs and Güzelsoy 2006:
+  keep the previous tree's leaves and re-solve each in the changed problem): assumes the leaves mostly stay pruned.
+  Theorem D says ours cannot (the obligation moves into the band, or into sets that were unpromotable), and the trees
+  share nothing.  Does not fit.
+* *Parametric and postoptimality analysis in IP* (Geoffrion and Nauss 1977): a tree valid over a range of a scalar
+  parameter.  Our edits change the constraints, not a parameter of the objective.  Does not fit.
+* *Proof reuse in verification* (IC3/PDR lemmas re-validated after a change; proof repair): lemmas that stay true are
+  kept.  The nogoods are such lemmas; the replay of a near repeat is proof repair.  Fits, worth little here.
+* *Nogood recording across restarts in constraint programming* (Lecoutre and others, 2007): as the nogoods; large
+  tables cost every node ("Forgetting nogoods").
+* *Lagrangian warm starts across related instances* (rolling horizons; column generation restarted from a previous
+  instance's duals): fits A1's multipliers, since any multipliers give a valid bound.
+* *Benders decomposition with cut reuse*: optimality cuts of an unchanged subproblem stay valid when only the master
+  changes, so value knowledge of the core frames would carry across edits elsewhere (most restriction steps edit frame
+  0, where the GF(2) bound has no excess).  It needs a search decomposed at a frame boundary, which is avenue A5's
+  AND/OR search with caching, ranked high-risk because the cores sit in adjacent frames.  Noted, not proposed.
+* *Solution-guided search, phase saving*: the seed, in use.  *Pseudocosts carried across instances*: exact strong
+  branching's cycles are about a ninth of a step (DESIGN.md, the proof of 1521), so at most that.  *Incremental
+  heuristic search* (LPA\*, D\* Lite): needs states shared between searches; the search has no transpositions, and the
+  trees share no state.
+
+**7. The A1 pilot: do the fields bound's signings and multipliers carry?**  The one carry with a reason to pay: in a bad
+patch the cores persist (section 4), so the core-derived signings fitted at one root should see most of the next root's
+gap.  `examples/fields.rs` already holds what is needed (`dw::bound` takes signings and starting multipliers by
+candidate number and returns the final family and multipliers; its `nodes` command carries a root's to its nodes the
+same way), and the pilot added a `carry` command to a scratch copy: `fields carry --known results/strict.jsonl
+--seconds 120 --refit 0.1 A:B ...`.  At A's root, the main arm (`arm("f1cores", …)`, `bound(ctx, signings, None, true,
+settings)`) with a budget of 120 s, keeping the family's signings and the multipliers.  At B's root: *own*, B's main arm
+with the budget; *own short*, with a tenth of it (12 s); *carried*, one `evaluate` of A's signings, frozen (no cores
+added), at A's multipliers re-indexed by number (0 for a candidate A did not have); *refit*, `bound(ctx_B, frozen,
+Some(&lambda_A), false, short)`; *refit with separation*, the same with `true`.  Each is reported as the share of B's
+root GF(2) gap it closes (by min(L, GF(2) bound)), and every bound is asserted at least P\*_B.  The share of B's root
+GF(2) gap closed, and in brackets its ratio to B's own fit; one thread, about 8 minutes in all:
+
+| A→B (P\* change) | gaps of A, B | A's own fit (s) | B's own fit (s) | B's own, 12 s | carried, no refit | refit, 12 s | refit with separation, 12 s | signings then |
+|---|---|---|---|---|---|---|---|---|
+| 2075→2076 (+36) | 327, 327 | 0.948 (15) | 0.847 (23) | 0.844 | 0.636 (0.75) | 0.948 (1.12) | 0.994 (1.17) | 47 |
+| 2100→2104 (+24) | 526, 526 | 0.633 (34) | 0.671 (15) | 0.669 | 0.443 (0.66) | 0.631 (0.94) | 0.684 (1.02) | 51 |
+| 1925→1926 (+895) | 215, 243 | 0.744 (11) | 0.593 (10) | 0.593 | 0.490 (0.83) | 0.638 (1.08) | 0.638 (1.08) | 43 |
+| 1800→1805 (−834) | 507, 474 | 0.611 (12) | 0.587 (6) | 0.587 | 0.549 (0.94) | 0.610 (1.04) | 0.673 (1.15) | 63 |
+| 2170→2172 (+12) | 767, 767 | 0.433 (120, open) | 0.505 (82) | 0.473 | 0.297 (0.59) | 0.408 (0.81) | 0.416 (0.82) | 51 |
+
+(The refit columns are budgets of 12 s; the fits that converged sooner stopped sooner: 1800→1805's refits took 2.2 s
+and 6.6 s.)  A family carried from one root and refitted briefly closes more of the next root's gap than the next root's
+own converged fit in four of five pairs (by 2, 8, 15 and 17%): the carried signings and the ones the next root's
+separation adds make a larger family (43-63 signings against the 26-33 one root builds), each seeing cores the other
+root's separation did not reach.  So the cores one game finds are worth keeping, and a family can grow along the chain:
+the learning the owner asked for, carried in the bound rather than in the tree.  The pair that goes the other way is
+the largest gap, 2170→2172, whose A did not converge in its 120 seconds.  Caveats: five pairs, roots only, one thread; a
+stronger root is not yet a smaller tree; a larger family costs more per evaluation (17-34 ms an evaluation here); E2's
+test (in progress) of 16 signings a frame against 8 overlaps with the effect; and the pilot pairs the final family with
+the multipliers of the lowest L, as the `nodes` command does, whereas E2 is reported to find that the fit to keep is
+the one of the lowest L evaluated, so that the pilot can only understate the carried bound.
+
+**8. The two criteria for carrying work in the present solver.**  The design fixed them after the scratch runs above, so
+the thresholds were written knowing the values; the values are far on the failing side of both, so the placement of the
+thresholds does not decide.
+
+| to pursue | criterion | measured | verdict |
+|---|---|---|---|
+| tree reuse (replay, joint search, the branching order carried) | on the median step pair, at least 30% of n + 1's steps at nodes n visited | 0.15% (14 pairs; 5-39% where the optimum moved by 8 to 296, 100% for the two near repeats) | killed |
+| nogood carry built into the chain | the pinned carry lowers user CPU at least 15% in geometric mean, with no pair above +10% | ×1.34 (carry ×1.31), the worst pair ×2.74 (×2.09), 4 of 8 pairs faster | killed |
+
+*Conclusion.*  The owner's suspicion is right about the difficulty and wrong about the work.  The difficulty does
+repeat: the hard core is the same game after game (the gap's lag-1 autocorrelation is 0.95, half of consecutive
+searched games have exactly the same gap, and a median of 46% of the next game's nogoods were learned by the previous
+one), and that is why the bad patches come in runs.  The work does not: every step not settled by the ceiling moves the
+optimum (by 12 to 1,664); the trees of consecutive games share 0.15% of their steps (median of 14 pairs), 5-39% where
+the optimum moved by 8 to 296, and all of them only for the two near repeats; and a proof at one level shows that the
+edit alone parts the trees at the first branch.  Theorem D says why: the next proof's obligation is disjoint from what
+the previous proof established about values (or lies in a band it claimed nothing about).  Nothing that carries
+soundly pays in the present solver: nogoods re-checked at the new root are valid (all across a restriction, 59% to
+100% across a relaxation) and answer most lookups, yet make the search 1.31 times slower (pinned 1.34; 2 and 4 of 8
+pairs faster), and perfect reuse between games whose cores match would give 1.2 to 1.4 times (18-29% of the nodes past
+2175), so 10 times is out of reach of any reuse of work.  What repeats is worth carrying only in a bound that learns
+it: the fields bound's signings and multipliers, which need no check, carry at 0.75 of the next root's own share and,
+refitted for a tenth of the budget, at 1.08.
+
+*What it implies.*
+
+* *Nothing to build in the present solver.*  Not the replay of the previous tree, a joint search of a run, the branching
+  order carried, forced members or weight splits carried, a nogood table carried or shared between the window's games, a
+  wider `same_search` by replaying near repeats (2.1% of the nodes), nor the gap as an aspiration value (a few percent
+  at best).  The open row about proving a run of neighbours that share a gap in one search is closed by sections 2, 3
+  and 5: the trees of neighbours are disjoint, and a run costs at least its dearest member.
+* *The bound is the lever, as before.*  What a bad patch needs is a bound that closes a share of the gap at the crest
+  of the wave, and carrying only helps such a bound along.
+* *Step 2, for the A1 track* (not built): a `fields carry` command, as the pilot's, in `examples/fields.rs`.  Where
+  E2's `--save-fit` and `common/fit.rs` (which write and read a root's fit) and E3's `Warm` (which carries a fit from a
+  node to its children) have landed, the command reads A's saved fit instead of fitting A again, and *refit* is E3's
+  refit from it.  Over every searched game that follows one of E1's converged roots of 1700-2175 (E1's
+  `bench/fields/roots.jsonl`), plus 2170→2172 and two pairs of the 2340s from the EC2 snapshot if their roots converge
+  in the budget: about 30 roots at 36-120 s, under an hour of one thread, S = 120 s and a tenth of it for the refit.
+  Criterion, fixed: the family carries if on the median pair *carried* ≥ 0.7 × *own* and *refit with separation* ≥
+  0.95 × *own*; then E3 starts each game from the previous searched game's family.  Otherwise E3 fits each game's root
+  afresh and carries only from a node to its children (E3's form (c) anyway).  The pilot passes this on the median
+  (0.75 and 1.08) and fails at 2170→2172; the thresholds were written after seeing it, so step 2 proper is the test.
+  And a *chain*: ten consecutive searched games of a high-gap run (2150-2175, and 3333-3336 with 3300 if their roots
+  converge), each root refitted with separation for a tenth of the budget from the family carried from the one before,
+  recording the share, the family's size and the time of an evaluation, against each root's own fit.  Criterion, fixed:
+  the carried share stays at least the own share at every root of the chain, with the family pruned to the signings the
+  master's support uses when it passes 64; then step 3.
+* *Step 3, inside E3, if step 2 passes*: each game's search starts from the previous searched game's final family and
+  multipliers (Lemma S) and hands its own to the next, through the window driver as the seed is (a family is a few
+  thousand numbers); a game whose roots differ in their number of frames, or below 187, starts afresh.  Sound with no
+  check.  Measured by E3's own criterion: the nodes and time of a bad patch with and without the carried family.
+* *Rebuilding the instrument*, if a later study wants the step log: the scratch hooks were a static switch and a global
+  log behind a mutex (fine for one thread; a rebuilt one for many threads would buffer per searcher and flush with the
+  searcher's other counters, never a lock per step), the nogoods recorded where they are inserted, and the optional
+  preloaded table, with the ladder's three options (record, check a nogood file against a root and load it, prove at a
+  value) and a script for the overlap.  With the hooks off every tree must be unchanged (the probe's fingerprints, the
+  tripwires and the one-thread chain 1..1300 are the gates).
+
+## One-sided candidates in the search (2026-10)
+
+*Question.*  Stage 2 of E8 (the third consultation of 2026-10-15): can the frame solver search the extended problem
+Π⁺(O) with the open sources as one-sided candidates, so that `taxman certify` proves a recorded score on the whole
+board game by game (Theorem M⁺ and its corollary), with the default mode untouched?  Built in four parts, each with
+the default's gates (the probe's fingerprints, the suite with the tripwires, `regress --to 1000 --threads 1`, and a
+one-thread chain 1..1300 line for line equal to the base commit's, 2e8b851).
+
+*18.1, the model.*  `FrameGraph::build_extended(tables, columns, one_sided)` gives each one-sided candidate its own
+frame; its promotion adds it to that frame's moves (winnable, with the shortcut of an unused factor), takes no factor,
+spends one freedom of that frame; `edits` puts it in its frame's gains, so the frame-by-frame check of a set, the
+conflicts and the nogoods take it unchanged; `frames_touched` replaces the home frame where the searcher checks the
+freedoms of a child that promotes several forced members; `FrameGraph::narrow` and `max_promotions_among` (the
+freedoms' count plus the number of one-sided candidates, sound, not tight) replace the frame set's in the searcher, the
+greedy set, the local search and `max_total`.  Tested against the reference predicate of stage 1
+(`ExtendedFrames::promotable`) on every board 2..300 for O empty, U\*_{≥3} (to 120) and five random subsets: 415,000
+sets promoted at once and one by one in random orders (290,000 of them promotion sets, 264,000 with a one-sided member),
+their conflicts (660,000) and nogoods (330,000) unpromotable, `narrow` dropping no member of a promotion set that extends
+the state (and nothing promotable), the count never below a promotion set's size; eight deliberate bugs in a scratch copy
+(narrowing, the count, `edits`, the freedoms, the nogood) were all caught.  `build_extended` refuses more frames than
+a frame set holds (9), naming the board and the layers, and the census of the frames records the worst case, every
+source of three or more prime factors open, on every board to 8191: 9 frames on 2048..4095 (layers 3 to 11) and 10 on
+every board from 4096 (`bench/structure/`, every earlier field unchanged).  No tree changed: the fingerprints
+7e8e724717d26545 and f3deaac0dbdc030a, the tripwires, `regress --to 1000 --threads 1` in 9.2 s, the chain 1..1300
+line for line (290,503 nodes).
+
+*18.2, the GF(2) bound.*  `Gf2Graph::new` gives a one-sided candidate of frame j the vector of its maximal factors in
+frame j's matroid and makes it a coloop of the other: its own unit vector in a *free block* after that matroid's frame
+blocks, `64·words` to a block, so the vectors are no wider than the frames need (THEORY.md, Theorem 11 for Π⁺).
+Nothing reads a frame from a block index outside `Gf2Graph::new`, and contraction needs nothing new.  Tested: the
+intersection against brute force on 7,000 random problems with free blocks (coloops in the heaviest set of 6,400 of
+them, at the heavy end of the weights or anywhere), its warm starts, weight splits and bounds without a member; on
+every board 2..120 with U\*_{≥3} and three random subsets open, the 7.6 million promotion sets of the 230 problems of at
+most 22 candidates independent in both matroids and the root's bound above the heaviest of them and above the optimum;
+random paths of 13 boards from 60 to 1000 and of 1300 (four words) with U\*_{≥3} and a random half of it open, every
+level equal to the matroids built afresh at its node, the forced members forced, the certified and solved bounds
+without a member right (12,020 nodes, 3,396 one-sided promotions).  Two things to know: certified children are rarer
+than in the frame model (0.7% of the nodes against 4.2%), and opening sources raises the rank of their frame by one
+each, so that with every source of layer 3 or more open frame 0 has rank 186 at 1200 and 322 at 2200, beyond the
+three words the narrow set widths compile (rank 192) and the five of the widest (320).  No tree changed: the
+fingerprints, the tripwires, `regress --to 1000 --threads 1` in 9.1 s, the chain 1..1300 line for line.
+
+*18.3, the search.*  `Board::prepare_extended_with(open, tactics)` (`search::prepare_extended`) sets Π⁺(O) up with its
+one-sided candidates among the search's.  The problem's form ends with them after a tag no plain form has
+(`Problem::ONE_SIDED`), so a plain problem's form and digest are what they were; the checkpoint header has a digest of
+them (format 5, which refuses version 4: the probe's windows and the committed checkpoint of 1133 were made again, with
+the matching path's tactics they record, and the fingerprints did not move).  Extended mode needs `gf2` and refuses
+`lagrange` and `symmetry` (`SearchTactics::refusal_with_one_sided`; `SearchTactics::extended` is the default without
+`symmetry`), and a problem one of whose frames needs more block words of the GF(2) bound than the set width's engines
+have: opening a source adds one to its frame's rank, so that with every source of layer 3 or more open the natural
+widths refuse it from 1266 (four words), which the widest width (128 words, five) takes.  Tested: the search of Π⁺(∅)
+is the default engine's on the same problem node for node at every tripwire board, with the default tactics and with
+extended mode's, in a table of its own (`EXTENDED`; extended mode's trees are the `symmetry=off` rows of the frame
+model at 600, 936 and 1000, and Π⁺(∅) with the rule of symmetric pairs differs from Π_n with it at 600, 660, 936 and
+1000, since the claimed pairs change the root's symmetries); the soundness harness in extended mode, 16,128 searches of
+1,258 problems of the boards 2..300 from handicapped incumbents under eight configurations, and the game 992 with 20
+sources open resumed every 1,000 nodes (22 pieces, 16,717 nodes uninterrupted); the search against the whole-board
+oracle on every board to 80 (to 60 with every source open; 69 ignored): its optimum is the heaviest playable set that
+holds F, every time.  No tree of the default mode changed: the fingerprints, the tripwires, `regress --to 1000
+--threads 1` in 8.9 s, the chain 1..1300 line for line.
+
+*18.4, `taxman certify`.*  `certify A-B --results FILE... --upper FILE... --out FILE` (`src/certify.rs`; DESIGN.md,
+"Certificates of U") takes, for each game whose barred bounds say it needs one, the open members O, checks that the
+recorded game replays to its score, plays U\* above n/2 and is a promotion set of Π⁺(O) worth it, and searches Π⁺(O)
+in extended mode from it with the ceiling n + V(n − 1) − in_the_bag⁺: `certified` if nothing beats it, `beaten` if
+something does (the set F ∪ K ∪ L ordered by the whole-board oracle's peel, moved from the tests into the library as
+`playable`, finished with the largest legal moves left and refereed by `game::replay_finished`; written to
+`<out>.counterexample.jsonl`; status 2).  Resumable like `solve`; a problem whose GF(2) bound needs more block words
+than its set width's engines is searched at the widest width.  The barred bounds of the table's games 2..1300 were
+made for its tests (`prover/data/upper_2_1300.jsonl`, 65 s: 665 games need a certificate, 417 of them with nothing
+open, 1.0% of the members open).  Every game of 600..1300 that needs one is certified: 377 games, 382,887 nodes, 44.9 s
+on one thread (the dearest 1287, 17,744 nodes); a planted wrong score (1302, 1305 and 1309 each with its smallest move
+up to n/2 taken out of the game) is beaten by a game of exactly the chain's score, which the referee accepts; a search
+stopped every 1,000 nodes resumes to the same verdict.  The words a certificate needs over the barred bounds of
+1301-3314 (`examples/extended.rs words`): one to three on every game but 3175 and 3176 (four, |O| = 255), which run at
+the widest width; none needs more than five.
+
+*The first certificates past 1300*, one thread, against the plain proof seeded with the optimum (the ladder's
+`--seed-opt`), with the default tactics and without the rule of symmetric pairs, which extended mode refuses:
+
+| n | gap | \|O\| | certify: nodes, s | plain: nodes, s | plain, `symmetry=off`: nodes, s | time over plain |
+|---|---|---|---|---|---|---|
+| 1400 | 395 | 35 | 12,257, 1.65 | 12,743, 1.51 | 14,572, 2.07 | 1.10 |
+| 1445 | 399 | 31 | 5,195, 0.84 | 5,373, 0.73 | 5,700, 0.79 | 1.15 |
+| 1592 | 484 | 57 | 26,459, 2.85 | 17,422, 1.53 | 26,580, 2.25 | 1.86 |
+| 1680 | 363 | 40 | 16,979, 2.30 | 11,925, 1.32 | 17,043, 1.85 | 1.74 |
+| 1880 | 203 | 11 | 5,591, 0.86 | 4,201, 0.59 | 5,563, 0.69 | 1.45 |
+| 2000 | 491 | 69 | 55,915, 8.00 | 38,118, 4.89 | 58,290, 6.90 | 1.64 |
+| 2112 | 517 | 69 | 15,119, 3.42 | 14,029, 1.99 | 14,057, 2.02 | 1.72 |
+| 2156 | 557 | 70 | 43,599, 7.77 | 43,899, 5.76 | 42,188, 5.73 | 1.35 |
+
+The open sources cost the trees almost nothing: the certificates take the nodes of the plain proof without the rule
+of symmetric pairs (0.84 to 1.08 of them).  What they cost is the rule (1.0 to 1.5 times the nodes where it prunes)
+and a fifth to a half more time a node past 2000 (more candidates, the one-sided elements in the GF(2) bound, the frames
+without claims).  The median over the plain proof is 1.55, inside stage 3's criterion of 2; Theorem 13 for Π⁺ (each
+prime exchange mapping the one-sided candidates of each frame onto themselves) would take back the rule.
+Consecutive games often pose the same Π⁺(O) (1312 and 1313, 1314 and 1315, 1316 and 1317 had one digest each): the
+optional line `certified (same problem as m)` of the design would halve those, and is not built.
+
+*Afterwards, version 4 read again.*  The EC2 chain's build (55287ff) writes headers of version 4, and a game it leaves
+unfinished holds hours of 64-thread work, so version 4 is read after all (relaxing spec 18.3.1, which had it refused):
+a version-4 header reads as version 5 with the digest of no one-sided candidates, every other check stays, the run
+goes on under the header it was written with, and a version-4 checkpoint offered to a search with open sources is
+refused, saying why.  The base commit's checkpoint of 1133 after 1,000 nodes (version 4) finishes under this build exactly
+as under the build that wrote it (2e8b851): the same line but for times and build, 3,058 nodes in two invocations; and
+stopped again after 1,000 more nodes and finished, both builds write a version-4 checkpoint and end at 3,146 nodes.  It
+is committed as `testdata/n1133_after_1000_nodes_v4.ckpt`, with a test in `tests/wide.rs`.
+
+## The frontier chain to 3440 (2026-10)
+
+*Question.*  The day on one `c8g.16xlarge` that [the gap past 2175](#the-gap-past-2175-2026-10) projected (from the
+committed file's 2175 games, about 4,100, with 3,700 to 4,850 across its models) was run.  How far did it take the chain
+with every game proven within the frame model and nothing assumed; what did the dear games cost; do the independent
+chains that cover its games agree with them; and what did its operators find wrong in the procedure
+([RUNBOOK](../tools/cloud/RUNBOOK.md))?
+
+*What was run* (2026-10-15 04:05:42Z to 2026-10-16 04:05:42Z, commit 55287ff, a clean tree): `rust/tools/cloud/chain.sh
+4095`, that is `taxman solve 1-4095 --window W --out strict.jsonl --checkpoint-dir ckpt --checkpoint-interval 300
+--progress 60` on all 64 CPUs of one `c8g.16xlarge` (Graviton4, 124 GiB) on spot in us-east-1d at $0.6752 an hour, on
+a copy of the committed file's 2175 lines, with a deadline of 24 hours, `S3_DEST` a prefix (`chain-2176/`) of the
+project's bucket (results, logs and checkpoints, every 10 minutes) and `spot-watch.sh` beside it; no interruption
+notice came.  A rehearsal of RUNBOOK 4.5 on the same instance came first (03:51 to 04:04Z, to 2185 and to 2300, with a
+TERM and a KILL, both referees agreeing), and found that its stops must wait for a checkpoint to exist: the games past
+2175 finish in seconds, and the first try ended before its stop and the second killed the solver with no checkpoint on
+disk.
+
+* *Instance 1* (i-0c23a62e915eac46e): window 16, the default.  Games 2176..3310 in 23,025 s (6.4 hours), then stopped
+  by a signal, with a final checkpoint, at 10:29:26Z; 6.80 instance-hours, $4.59.  A window of 16 had been measured
+  20-32% slower than 1 on the games past 2225 ([scaling to 192 threads](#scaling-to-192-threads-2026-10)), hence the
+  move.
+* *Instance 2* (i-0f588d4ad388bfd5c, launched 10:31:24Z): restored from the bucket, window 4, the solver from 10:40:41Z
+  with 3310 games done.  Games 3311..3440 and part of 3441 in 62,701 s (17.4 hours), then stopped by the deadline (24
+  hours after the first start, given as the hours that remained), with a final checkpoint; terminated; about 17.6
+  instance-hours, about $11.87.  3311, 3312 and 3315 were in flight at the move and finished from their checkpoints
+  (`invocations` is 2 in their lines).
+
+About $16.46 in all, nothing left running; the prefix `chain-2176/` keeps the logs and the two checkpoints.
+
+*What it made.*  The 1,265 games 2176..3440, each built from the one before, assuming nothing: 567 searches (448
+exhausted, 119 at the ceiling, of which 116 decided before their first node), 543 repeats and 155 primes (the search
+problem of 483 repeats is the one of n − 1, of 60 the one of n − 2).  The searches took 17.73 billion nodes, 70 games of
+30 million nodes or more taking 16.34 billion of them.  By blocks of 200 n, the 448 exhausted searches:
+
+| n | searches | nodes | search seconds, summed |
+|---|---|---|---|
+| 2176-2375 | 76 | 2.25 G | 19,352 |
+| 2376-2575 | 76 | 1.32 G | 18,862 |
+| 2576-2775 | 71 | 0.02 G | 258 |
+| 2776-2975 | 58 | 0.02 G | 186 |
+| 2976-3175 | 70 | 1.06 G | 21,532 |
+| 3176-3375 | 73 | 3.27 G | 37,203 |
+| 3376-3440 | 24 | 9.78 G | 72,330 |
+
+(The seconds of games in flight overlap, so they add up to more than the day.)  The cost comes in patches: the 2340s
+(2346 at 1.14 G nodes), 2375-2388, 3102-3112, 3174-3176 (about 210 M each), 3300 (635 M), the 3330s, and from 3399 on
+three of the four dearest games of the run, 3424 (1.30 G, 2.0 hours on 64 threads), 3425 (1.23 G, 3.5 hours) and 3440
+(3.72 G nodes, 18,184 s, 5.05 hours), with 3400 (522 M) and 3430 (804 M) beside them; the valleys (2576-2975) cost
+minutes.  A least-squares line through the log of the search seconds of the 448 gives a decade per about 1,040 in n
+(1,070 without 3440), 7 s at 2200 and 97 s at 3400 (93 without 3440), with a standard deviation of one decade around
+it, nearly all of it the patches, against a decade per about 1,050-1,250 in n that [the gap past
+2175](#the-gap-past-2175-2026-10) projected from the gaps.  The long searches
+run at the engine's best: 3441 at 202 to 209 thousand nodes a second on 64 threads (3.2 thousand a thread), `eff`
+100%, `idle` and `lock` 0.0%, 71 pauses for checkpoints (0.0%, the longest 29.9 ms), 4,100 to 6,100 units queued in its
+last minutes, none spilled; its checkpoint is 5.5 MB.
+
+*Against the projection.*  The projection gave 4,088 for a day of the whole chain from 2176 in its centre model (10th
+to 90th percentile 3,726 to 4,740) and 3,720 to 4,613 across the others.  The day reached 3440: under the 10th
+percentile of five of the seven scenarios (all but the two that use the gap alone, whose 10th percentiles are 3,427 and
+3,420) and with 3441 unfinished, at 626 million nodes after 5.9 hours (best so far 3,729,369, the ceiling being
+3,731,167; 3444 was begun, at 63 nodes).  What fell short is the end: the first instance made 2176..3310 in 6.4 hours,
+about where the model put it (6.1 hours), and the remaining 130 games took 17.4, the last forty holding three of the
+four dearest games of the run.  The projection's range for a single run's luck (−400 to +700 around 4,100) does not
+reach 3440; whether the patch at the end is luck or the trend is open, and what the gaps of 3315..3440 were is not
+measured (the committed games can be fed to `bench/wall/gap.py` and `examples/wall.rs nodes --nodes 1`: one thread, a
+few minutes).
+
+*Agreement.*  Both referees on the file (`rust/tools/cloud/verify.sh`: `taxman verify-results`, 10 s and 42 s of CPU on
+several threads, and `tools/check_results.py`, 3 s): every game replayed legally and finished, the chain bounds, the
+Franklín–Moniot bound, the heuristic chain; proofs trivial 13, prime formula 481, cap 311, exhausted 1178, same search
+1457; nothing assumed; scores at a proven ceiling given the game before: n + score(n − 1) 1096, prime formula 480.  The
+file's first 2175 lines are the committed file's, byte for byte.  The Graviton calibration's chain
+(`bench/cloud/c8g.chain-2176.jsonl`: 101 games, 2176..2276) and a rehearsal of this run's own (125 games, 2176..2300; not
+committed) have this file's scores, proofs, methods, promotions and moves in every game they share with it, move for
+move.  Past 2300 nothing else covers the games; the prover's proofs on the whole board stop at 2175.
+
+*What the file does and does not say.*  The 991 games of 2176..3440 proven by an exhausted search or a repeat rest on
+statement U (the frame solver's answer is opt(n) exactly when U holds at n), and the 274 proven at the ceiling or by the
+prime formula on the games before them.  U holds where the prover has proven the optimum (n ≤ 2175) and is not certified
+past it: the barred bounds of `prover/data/upper_2176_3314.jsonl` leave members open in every game, and `taxman
+certify` (E8 stage 2) will close them game by game with the open ones optional.  `optimal.json` stays at 1300.
+
+*What the operators found* (each is now in the [RUNBOOK](../tools/cloud/RUNBOOK.md)): the rehearsal's stops wait for a
+checkpoint (4.5); `spot-watch.sh` logs only to its terminal, so it is run through `tee` into `logs/spot-watch.log`; the
+copy of `save.log` in S3 trails by one save; `save.sh --restore` brings back the results and the checkpoints but not
+the logs (copy them back first, or the next save overwrites the old instance's); the deadline file is not saved, so a
+replacement machine starts a new deadline unless `DEADLINE_HOURS` is set to the hours that remain; `run-instances`
+needs `SpotOptions` with a `MaxPrice`; and `chain.sh`'s default window, 16, is documented as measured worse than 4 at 64
+threads.  The checkpoints of 3441 and 3444 (format 4) are read by the present build: 3441 resumed from the saved file at
+its 625,763,557 nodes on a laptop (20 seconds on 2 threads, to 625,901,481).
+
+*Cost.*  $16.46 on AWS; the laptop only checked the file afterwards (both referees, the tests of the chain, the extension
+of `optimal.json` into a scratch file, the resume of 3441).  The tests that pin the chain
+(`tests/results.rs`, `tests/board_layer.rs`, `tests/bottom_layers.rs`) are brought up to 3440, and the documents that
+said 2175 now say what is proven and by what (the prover to 2175, the frame model to 3440).
+
+## Certificates past 2175: the same problem, the work list, the verifier (2026-10)
+
+*Question.*  S1 and S2 of the fourth consultation of the theory track (2026-10-15), what the campaign of certificates
+on 2176-3440 needs before the owner approves it: can a game whose extended problem an earlier certified game posed be
+certified with no search, and what will certifying every game of 2176-3440 that rests on the frame model cost, game by
+game?  The games are the committed chain's (games 1..3440, merged before S2's runs).
+
+*S1, `certified (same problem as m)`* (c5d585a).  Equal problems have equal heaviest promotion sets, so a certificate of
+m, which shows the heaviest promotion set of Π⁺(O) worth best(m) = V(m) − in_the_bag⁺(m), settles a game n whose Π⁺ is
+the same and whose recorded game is worth as much in it; n's own barred bounds then give opt(n) = V(n) by Theorem M⁺'s
+corollary (THEORY.md, a paragraph under it).  `taxman certify` looks, after the checks of n's recorded game and before
+its search, at the certified games of the 8 board sizes before n (those of `--out` and of the run, latest first),
+compares the digests and then the problems whole (m's from memory, or set up again from its line, which must reproduce
+the line's digest, sizes and in_the_bag⁺), and the first equal one decides: worth(n) = best(m) gives a `certified` line
+with `"same_problem": {"n", "digest", "best", "worth"}` and no nodes; worth(n) < best(m) means n's game is not optimal,
+and n is searched (and beaten); worth(n) > best(m) contradicts m's certificate, and the run stops with an error.  (The
+design's condition is worth(n) ≥ best(m); with genuine data only equality can occur, since n's game is a promotion set
+of the very problem m's certificate bounds, so the strict case is treated as the inconsistency it is.)  DESIGN.md,
+"Certificates of U", has the rule.
+
+* *600..1300*, one thread, in order: 81 of the 377 games that need a certificate are settled by the rule (68,628 nodes
+  of search saved; 39 s for the whole range against 45 s), each equal to a search of it (verdict, digest, sizes,
+  score), each resting on the latest game of the window whose problem is the same (found independently in the test by
+  comparing the problems): 62 on n − 1, 17 on n − 2, 2 on n − 3, and 1260 → 1261 → 1263 a chain of them.  The file is
+  committed (`bench/certify/certificates_600_1300.jsonl`).
+* *Past 2175*, with the committed chain: the problems file (below) finds 114 such games in 1301..2175, 129 in 2176..3314
+  and 16 in 3315..3440, every one of equal worth.  Five pairs past 2175 certified both ways on one thread (2248 → 2249,
+  2610 → 2611, 2613 → 2615, 2622 → 2623, 2652 → 2653): the rule's certificate is the direct search's (digest, sizes,
+  verdict), and the direct search takes exactly the nodes of the game it rests on (36,398, 15,081, 15,237, 57,026 and
+  7,048), as one problem must; `verify-certificates` passes the files.
+* Tests (`tests/certify.rs`, the units of `src/certify.rs`): the rule against a direct search on 630..640 and 1312..1317
+  (all of 600..1300 ignored, 48 s); a planted wrong score on a repeat (1315, whose problem is 1314's) is beaten by the
+  chain's score; lines that are not what they say are not used (a verdict not `certified`, another game's line with
+  n's digest, m's line with an open member dropped or with a size or in_the_bag⁺ changed), a lowered score on m's line
+  is an error and a raised one makes n searched; the window never looks past 8 sizes.
+
+*S2.1, the barred bounds of 3315-3440* (ed526a4): `upper --from 3315 --to 3440` on the committed chain, one thread,
+277 s, into the new file `prover/data/upper_3315_3440.jsonl`: 126 games, 73 needing a certificate, 3424, 3425 and 3440
+among them (each an exhausted search below its ceiling, so each rests on the frame model); 19.9% of the members of
+U\*_{≥3} open (172 to 271 a game, against 14.9% on 2176-3314), the root's gap 1,103 to 1,555, the root's heaviest set
+holding all of U\*_{≥3} in every one.  The same games' root gaps from the solver's GF(2) bound (`wall nodes --nodes 1`,
+111 s, `bench/wall/gaps_chain_3313_3440.jsonl`: the 58 searched games of 3315..3440) equal the barred bounds' at all 48
+games both have.
+
+*S2.3-S2.5* (35c614b): `taxman certify --list FILE` takes the boards of a file in its order, so that the campaign can
+split its work by cost.  `taxman verify-certificates CERTS... --results --upper [--exact] [--threads K]` checks every
+line without changing the files: the barred bounds' line, the results' game by the checks `certify` makes (now one
+function), the width (now one function), Π⁺(O) set up again reproducing the digest and the sizes, a `certified` line
+with no counterexample, a `same_problem` line resting on an earlier certified line of its file with the rule applied
+again (the same function `certify` applies) and the two problems equal whole, a `beaten` line's game refereed and in
+the counterexample file, no contradictory verdicts; a search's verdict is taken on trust, as an exhausted proof is.
+Then how far the proofs reach: every game to N is proven by the prover (`prover/data/exact_*.jsonl`, the rule of
+`prover/tools/summarize.py`), by a certificate that passed, or by a ceiling or the prime formula above a proven game.
+On the committed files it is 2175, the first game that is not proven 2176 (it needs a certificate); the certificates of
+600..1300 change nothing (the prover proved those games already); the five pairs past 2175 above add 13 games past
+2176 (the ten certified and three at a ceiling above them).  `examples/extended.rs problems` sets each game's Π⁺(O) up
+without a search and writes its sizes, worth, width, digest and the latest game of the window with the same problem
+(`bench/certify/problems_600_3440.jsonl`, 1,575 games, 79 s; three need the widest set width: 3175, 3176 and 3440).
+
+*S2.2, the work list and the estimate* (`tools/certify_plan.py`, standard library only; `bench/certify/plan.md`, the
+summary for the approval, `plan.jsonl` and the list files).  The chain ran several searches at once (a window of 16 to
+3310, then 4), so a game's recorded search seconds are the time it shared the machine: summed, they are 3.27 times the
+run's wall time × 64 threads over 2176..3310 and 1.55 times over 3311..3440.  The plan prices a search by its nodes
+instead, at each stretch's own cost per node (the run's wall time × 64 / the stretch's nodes: 244 µs of a thread a node
+over 2176..3310 in 6.4 hours, 327 over 3311..3440 in the second instance's 17.4 hours less the 0.85 that the unfinished
+3441 took), and a certificate at twice that, the design's factor (stage 2 measured 1.1 to 1.9 at 1400..2156).  A
+repeat costs its source's search; a repeat of a game proven at its ceiling, whose problem no search has finished, costs
+what the cost model of AGENDA section 2 gives for the source's root gap (10^(2.30 + 0.0479 G / n^0.3), +0.06 decades for
+the window); a game the rule settles costs nothing.  On 2176..3440:
+
+| | games | need a certificate | settled by S1 | expected thread-hours |
+|---|---|---|---|---|
+| 2176-3314 | 1,139 | 635 (400 searches, 235 repeats) | 129 | 912 |
+| 3315-3440 | 126 | 73 (48 searches, 25 repeats) | 16 | 2,389 |
+| all | 1,265 | 708 | 145 | 3,301 |
+
+* *The estimate*: 3,301 thread-hours (2,641 to 3,961 for a factor of 1.6 to 2.4), 51.6 hours of one `c8g.16xlarge`
+  (41 to 62), $35 at the spot price paid on 2026-10-15 or $132 on demand; from the recorded seconds instead of nodes it
+  would be 6,702, the upper end that ignores the window.  It is above the consultation's 1,800-3,060 because of the end
+  of the chain: 3315-3440 is 72% of it.
+* *The dearest*: 3440 (3.72 billion nodes in the chain; 676 thread-hours, 10.6 hours on 64 threads, the floor on the
+  campaign's wall time), 3424 (235), 3425 (223), 3427 (223: a repeat of 3425 that the rule cannot settle), 2346 (155),
+  3430 (146), 3400 (95), 3300 (86).  2349, which the consultation's pilot named for its recorded 4,879 s, took 68
+  million nodes, 9 thread-hours: its seconds are mostly the window's (2346 and its neighbours ran beside it).
+* *The lists*: `pilot.txt` the five dearest (2346, 3424, 3425, 3427, 3440: 1,513 thread-hours, 24 hours of one
+  machine), `dear.txt` the next fifteen with the games that rest on them (835), and `rest_1..4.txt` the others in
+  increasing n, balanced (231 to 245 each).  A game the rule settles is in its source's list, after it.
+* *The repeats the rule cannot settle*: 115 of the 260, 361 thread-hours, 3427 alone 223.  3427 has 3425's search
+  problem, the same open members, sizes and worth, but another Π⁺: the two forms differ in exactly one pair.  On the
+  board of 3427 the new source 3426 = 2·3·571 and its factor 1713 = 3·571, whose only maximal composite it is, enter
+  frame 0; the frame model's `unzip` claims the pair (3426 takes 1713), so the plain problems are equal word for word,
+  but Π⁺ claims nothing, keeps both in frame 0 (with 3426 in the graph's lists of 6 and 1142), and so is another form,
+  though 3426 can always take 1713 and nothing else changes (the freedoms, the candidates and `max_total` are the same,
+  and in_the_bag⁺ is 4,212 more, 3426 and 3427 fixed and 2641 no longer, which is the difference in score).  The
+  claims in Π⁺ with the check of Lemma M5⁺ (the third consultation's 15(f), postponed then as an optimization worth
+  about 10%) would make the two problems equal, and the rule would settle 3427 and its like; a question for the next
+  consultation.
+
+*Checks.*  No tree of the default mode changed at any step: the probe's fingerprints 7e8e724717d26545 and
+f3deaac0dbdc030a, the tripwires, `regress --to 1000 --threads 1` (8.9 s), the one-thread chain 1..1300 line for line
+equal to the base commit's binary (4f1c35b), both suites, clippy and fmt.  The plan's prediction is checked against
+`certify`'s own lines on 600..1300 (the games that need one, their open and rejected sources, the 81 the rule settles),
+and `verify-certificates` passes the committed certificates.  The laptop only ran setups and searches of seconds, one
+thread at a time; nothing ran on AWS.
+
 ## The A1 bound in a branch and bound: the E3 pilot (2026-10)
 
 *Question.*  The pilot of experiment E3 of avenue A1 (the advisor's second consultation on A1, its sections S3-S5,
@@ -5767,7 +6929,8 @@ estimator; `matroid bnb` prints the same lines as before (936, 1100, 1215 with `
 (`bound`'s results unchanged at 45 regression roots of 300-1100, every arm), `FitMode::Search` (no exact checks), the
 warm states (a child takes its parent's master columns that hold the members just promoted and avoid the one left
 out, those taken out; its rank inequalities restricted to the child's elements, ranks taken again in the child's
-matroids; its multipliers restricted likewise), root fits as files (the design's format), Tier 1, R1 (direction
+matroids; its multipliers restricted likewise), root fits as files (E2's format since the merge with it:
+`common/fit.rs`), Tier 1, R1 (direction
 `g + β d_prev`, Camerini, Fratta and Maffioli, steps toward the target) and R2 (the master warm-started from the
 inherited columns and inequalities, Wentges-stabilized pricing from the inherited multipliers, cheap separation only).
 `fields bnb` (bc33638, 33fb719): the variants, refit policies (`all`, `excess:E`, `tier1:F`), the audit, per-node logs
@@ -5865,7 +7028,10 @@ missing: from the same inherited states the reference cuts 95-100% of the nodes 
 
 A larger budget hardly helps: R2 stops on its own (nothing prices out and no cheap inequality is violated) after about
 27 pricings whatever K, R1 creeps.  What the reference has and R2 lacks is the exact checks and the separation (R2c's
-local signings gain a quarter of the nodes at 1215).  The policies save refits but lose more tree than time.
+local signings gain a quarter of the nodes at 1215).  [E2](#e2-past-2175-2026-10) found the same at the roots: in
+search mode (R2's) the cheap inequalities describe a relaxation of the LP, and the fit stops above it (0.27 of the
+gap at E1's roots), where a certified fit of 60 s gets within 5% of it everywhere.  The policies save refits but lose
+more tree than time.
 
 *Knuth's estimator.*  Paired dives (2,000, the same dives for every variant) at 1472: the GF(2) tree's estimate is
 741,585 with a 90% interval of [389,979; 1,166,791], against an exact 3,401,305; r2's 341,789 [137,227; 637,208] against
@@ -5894,9 +7060,12 @@ longest run, r2c at 1475), about $4-5; the 2170s (gap 767) and the games past 21
 *Choices and deviations* (all sound; none changes a bound's validity):
 
 1. The root fits are the main arm's in certified mode, 300 s (1215 converged at 35,168 in 2.6 s; 1472 at 52,871 after
-   300 s, unconverged), not search mode: search mode is much weaker at the roots (at 600, 840, 900, 1000, 1100 it closes
-   0.38, 0.34, 0.65, 0.31, 0.25 of the gap against certified's 0.60, 0.57, 0.97, 0.48, 0.54), a question for E2 (the
-   design's S3.6 assumed it close).  The root node's bound is Tier 1 at the fit (recomputed), not the fit file's.
+   300 s, unconverged), not search mode, which is much weaker at the roots (here at 600, 840, 900, 1000, 1100 it
+   closed 0.38, 0.34, 0.65, 0.31, 0.25 of the gap against certified's 0.60, 0.57, 0.97, 0.48, 0.54; E2 measured it at
+   54 roots and did not keep it).  The root node's bound is Tier 1 at the fit (recomputed), not the fit file's.  The
+   two fit files were written in this branch's first format, holding the final family's lowest L, and converted at
+   the merge with E2 to `common/fit.rs`'s, every value kept (the 1215 runs come out the same from them:
+   [bench/fields](../bench/fields/README.md#the-fits-fits)); a fit `bnb` computes now is E2's, the lowest L evaluated.
 2. The audit samples by a hash of the node (every 25th at 1215, every 500th at 1472, not the design's every 25th at
    1472, whose references would have taken over a day); it runs in the host variant's tree from that tree's states.
 3. Only v0's and r2's trees were run at 1472; v1, r1 and r2c only as paired dives (above).  r2's run had a budget of

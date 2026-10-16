@@ -16,7 +16,7 @@ Two primary approaches:
    points**, starting from nothing at n=2, and extends to n = 1001..2000,
    provably within 0.35% of the Franklín–Moniot upper bound in
    aggregate.  Ground truth now exists out there: the solver in `rust/`
-   has proven games to n=2175 (within its frame model), and the prover
+   has proven games to n=3440 (within its frame model), and the prover
    (`rust/prover`, a branch and bound over sets of moves on the whole
    board) proves their scores optimal on the whole board to n=2175.
 
@@ -252,7 +252,7 @@ bound's own looseness averages 0.29% — beating solvent in 894 games and
 tying the other 106.  Each of those 1000 games has a per-game certified
 gap (the distance to the bound, which the true optimum also lives
 inside).  The ground truth to compare them with now exists: the solver
-in `rust/` has proven games to n=2175 (`rust/results/strict.jsonl`,
+in `rust/` has proven games to n=3440 (`rust/results/strict.jsonl`,
 within the frame model) and the prover proves their scores optimal on
 the whole board to n=2175.
 

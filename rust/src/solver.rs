@@ -1096,8 +1096,8 @@ fn different_tactics(checkpoint: &Path, made: SearchTactics, now: Tactics) -> St
 }
 
 /// Deletes game `n`'s checkpoint, if checkpointing is on.  Called only once the game's result is safe: in the
-/// results file, or (without one) handed to the caller.
-fn discard_checkpoint(opts: &SolveOptions, n: u32) {
+/// results file (or `taxman certify`'s file of certificates), or (without one) handed to the caller.
+pub fn discard_checkpoint(opts: &SolveOptions, n: u32) {
     if let Some(path) = opts.checkpoint_file(n) {
         if let Err(e) = engine::remove_checkpoint(&path) {
             let _ = writeln!(std::io::stderr(), "warning: cannot remove the checkpoint of a finished game: {e}");
@@ -1110,7 +1110,7 @@ fn discard_checkpoint(opts: &SolveOptions, n: u32) {
 /// one, or one's removing it would fail the other's creating it.  The spill directory of the checkpoint directory is
 /// shared by the games of a range, which may search side by side, so the range removes it when it ends
 /// ([`shared_spill_dir`]); one the options name is the caller's.
-fn spill_dir(opts: &SolveOptions, n: u32) -> (PathBuf, bool) {
+pub(crate) fn spill_dir(opts: &SolveOptions, n: u32) -> (PathBuf, bool) {
     static TEMP_DIRS: AtomicU64 = AtomicU64::new(0);
     if let Some(dir) = opts.spill_dir.clone().or_else(|| shared_spill_dir(opts)) {
         (dir, false)
@@ -1133,8 +1133,8 @@ fn shared_spill_dir(opts: &SolveOptions) -> Option<PathBuf> {
 // Repeats of earlier searches
 
 /// How far back a game looks for an earlier game whose search problem it repeats (tactic `same_search`): the board
-/// sizes `n − SAME_SEARCH_WINDOW` to `n − 1`.  A board's frames change a little with each number: each of the 914
-/// games of the committed chain 1..2175 whose problem an earlier game posed repeats the last board size before it that
+/// sizes `n − SAME_SEARCH_WINDOW` to `n − 1`.  A board's frames change a little with each number: each of the 1457
+/// games of the committed chain 1..3440 whose problem an earlier game posed repeats the last board size before it that
 /// set a search up, `n − 1`, or `n − 2` when `n − 1` is prime (docs/EXPERIMENTS.md, "Same search").  The window
 /// keeps the setups a range starts with to a few, and makes the game repeated a function of the window's games alone.
 pub const SAME_SEARCH_WINDOW: u32 = 8;

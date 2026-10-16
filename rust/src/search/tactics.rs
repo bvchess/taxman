@@ -75,6 +75,33 @@ impl SearchTactics {
         SearchTactics { gf2: false, lagrange: true, symmetry: false, ..SearchTactics::default() }
     }
 
+    /// The tactics of *extended mode*, a search of a problem with one-sided candidates (the extended problem's,
+    /// `crate::frames::build_extended`): the default without the rule of symmetric pairs, which such a search refuses
+    /// ([`refusal_with_one_sided`](Self::refusal_with_one_sided)).
+    pub fn extended() -> Self {
+        SearchTactics { symmetry: false, ..SearchTactics::default() }
+    }
+
+    /// Why these tactics cannot search a problem with one-sided candidates, if they cannot: such a search needs the
+    /// GF(2) bound (`gf2`; the matching bound, `gf2=off`, gives a one-sided candidate no vertex, so it is no bound
+    /// there), and refuses the Lagrangian bound (`lagrange`, built on the matching bound) and the rule of symmetric
+    /// pairs (`symmetry`: Theorem 13 is proven for the frame model, and for the extended problem would need each prime
+    /// exchange to map the one-sided candidates of each frame onto themselves, which nothing checks yet).
+    pub fn refusal_with_one_sided(&self) -> Option<String> {
+        let mut why = Vec::new();
+        if !self.gf2 {
+            why.push("gf2=off (the matching bound does not know them)");
+        }
+        if self.lagrange {
+            why.push("lagrange=on (the Lagrangian bound is the matching bound's)");
+        }
+        if self.symmetry {
+            why.push("symmetry=on (Theorem 13 is not proven for them)");
+        }
+        (!why.is_empty())
+            .then(|| format!("a search with one-sided candidates (extended mode) cannot run with {}", why.join(", ")))
+    }
+
     /// The tactics as the header of a checkpoint records them: `match_refine` in bits 0 to 2, then one bit for each
     /// switch that is on, `fix_forced` (bit 3), `nogoods` (4), `forget_nogoods` (5), `lagrange` (6), `gf2` (7) and
     /// `symmetry` (8); the defaults are `0x1B9`.  (A checkpoint of a build before `gf2` has bit 7 clear: it resumes

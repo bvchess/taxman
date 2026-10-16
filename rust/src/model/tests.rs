@@ -762,3 +762,267 @@ fn provider_lists_match_the_java() {
     assert!(p.factors(97).is_empty(), "1 is not among the numbers");
     assert!(p.factors(1000).is_empty() && p.composites(1000).is_empty());
 }
+
+// ---- one-sided candidates ----
+
+/// One-sided candidates for the frames of the board 85 (`columns_85`), each with its own frame: 18 (maximal factors 6
+/// and 9, both factors of frame 0), 44 and 52 (4 alone among the factors of frame 0), all three of frame 0; 88 (8 alone)
+/// of frame 1 and 176 (16 alone) of frame 2.  None is a move or a factor of those columns, and the last two are beyond
+/// the board 85, so these models are built on the tables for 200.
+const ONE_SIDED_85: [(u32, usize); 5] = [(18, 0), (44, 0), (52, 0), (88, 1), (176, 2)];
+
+/// The model of the columns of 85 with [`ONE_SIDED_85`] (given in an order other than ascending), its root and its
+/// tables.
+fn model_with_one_sided_85() -> (FrameGraph, FrameSet<4>, Tables) {
+    let tables = Tables::new(200);
+    let scrambled = [(176, 2), (44, 0), (18, 0), (88, 1), (52, 0)];
+    let (model, root) = FrameGraph::build_extended::<4>(&tables, &columns_85(), &scrambled).unwrap();
+    (model, root, tables)
+}
+
+/// `build_extended` refuses a one-sided candidate that cannot be one, and names it: a frame that does not exist, a
+/// number that is a move or a factor of a frame, a number listed twice, and a number beyond the tables or the set
+/// width (as it does any number of the columns).
+#[test]
+fn build_extended_refuses_what_cannot_be_a_one_sided_candidate() {
+    let tables = Tables::new(200);
+    let columns = columns_85();
+    type Listed<'a> = &'a [(u32, usize)];
+    let refused = |one_sided: Listed| FrameGraph::build_extended::<4>(&tables, &columns, one_sided).unwrap_err();
+    let cases: [(Listed, u32, &str); 11] = [
+        (&[(52, 3)], 52, "a frame past the last of three"),
+        (&[(18, 0), (52, 99)], 52, "a frame far beyond the last"),
+        (&[(45, 0)], 45, "a move of frame 0"),
+        (&[(84, 1)], 84, "a move of frame 1"),
+        (&[(80, 0)], 80, "a move of frame 2, listed with the frame 0"),
+        (&[(25, 0)], 25, "a factor of frame 0"),
+        (&[(42, 2)], 42, "a factor of frame 1, listed with the frame 2"),
+        (&[(36, 2)], 36, "a factor of frame 2"),
+        (&[(44, 0), (44, 0)], 44, "listed twice with its frame"),
+        (&[(44, 0), (88, 1), (44, 2)], 44, "listed twice with two frames"),
+        (&[(18, 0), (44, 0), (88, 1), (44, 0)], 44, "listed twice, not next to each other"),
+    ];
+    for (one_sided, number, why) in cases {
+        let message = refused(one_sided);
+        assert!(message.contains(&number.to_string()), "{why}: the message {message:?} does not name {number}");
+    }
+    // A number past the tables, and one past the width of the sets: Bits<2> holds up to 127.
+    let message = FrameGraph::build_extended::<4>(&Tables::new(85), &columns, &[(86, 0)]).unwrap_err();
+    assert!(message.contains("86"), "{message}");
+    let message = FrameGraph::build_extended::<2>(&tables, &columns, &[(150, 0)]).unwrap_err();
+    assert!(message.contains("150"), "{message}");
+    // The same candidates, once they are ones, are accepted.
+    assert!(FrameGraph::build_extended::<4>(&tables, &columns, &[(44, 0), (88, 1), (176, 2)]).is_ok());
+}
+
+/// With no one-sided candidate `build_extended` is `build`: the same root, home frames, and factor lists.
+#[test]
+fn build_extended_with_no_one_sided_candidate_is_build() {
+    let tables = Tables::new(85);
+    let (plain, plain_root) = FrameGraph::build::<2>(&tables, &columns_85()).unwrap();
+    let (model, root) = FrameGraph::build_extended::<2>(&tables, &columns_85(), &[]).unwrap();
+    assert_eq!(root, plain_root);
+    assert!(!model.has_one_sided() && model.one_sided().is_empty());
+    for x in 0..=85 {
+        assert_eq!(model.home(x), plain.home(x), "home of {x}");
+        assert_eq!(model.own(x), None, "own frame of {x}");
+        assert_eq!(model.graph().factors(x), plain.graph().factors(x), "factors of {x}");
+        assert_eq!(model.graph().composites(x), plain.graph().composites(x), "composites of {x}");
+    }
+}
+
+/// A one-sided candidate has its own frame and no home, touches that frame only, and is paid for by its maximal
+/// factors that are factors of that frame; a two-sided candidate touches its home and the frame in front.  The root
+/// and the home frames are those of the model without them, and the factor lists add the one-sided candidates as
+/// composites of those factors.
+#[test]
+fn one_sided_candidates_have_their_own_frames() {
+    let (model, root, tables) = model_with_one_sided_85();
+    let columns = columns_85();
+    let (plain, plain_root) = FrameGraph::build::<4>(&tables, &columns).unwrap();
+    assert_eq!(root, plain_root);
+    assert!(model.has_one_sided() && !plain.has_one_sided());
+    assert_eq!(model.one_sided(), ONE_SIDED_85, "ascending");
+    for (s, j) in ONE_SIDED_85 {
+        assert_eq!((model.own(s), model.home(s), model.frames_touched(s)), (Some(j), 0, (j, None)), "{s}");
+        let payers: Vec<u16> = tables.max_factors[s as usize]
+            .iter()
+            .filter(|&&f| columns[2 * j].contains(&f))
+            .map(|&f| f as u16)
+            .collect();
+        assert!(!payers.is_empty(), "{s} has no maximal factor in the frame {j}");
+        assert_eq!(model.graph().factors(s), payers, "factors of {s}");
+        assert!(payers.iter().all(|&f| model.graph().composites(u32::from(f)).contains(&(s as u16))), "{s}");
+        assert!(!model.contains_factor(&root, s), "{s} is no factor of its home");
+    }
+    for c in CANDIDATES_85 {
+        let h = model.home(c);
+        assert_eq!(h, plain.home(c), "home of {c}");
+        assert_eq!((model.own(c), model.frames_touched(c)), (None, (h - 1, Some(h))), "{c}");
+    }
+    for x in (0..=85).filter(|x| !ONE_SIDED_85.iter().any(|&(s, _)| s == *x)) {
+        assert_eq!((model.own(x), model.home(x)), (None, plain.home(x)), "{x}");
+    }
+    assert_eq!(model.own(999), None);
+    // The numbers each one-sided candidate is a composite of, and no others: 4 pays for 44 and 52, 6 and 9 for 18.
+    let composites = |f: u32| model.graph().composites(f).to_vec();
+    assert!(composites(4).contains(&44) && composites(4).contains(&52) && !composites(4).contains(&18));
+    assert!(composites(6).contains(&18) && composites(9).contains(&18) && !composites(10).contains(&18));
+}
+
+/// Promoting a one-sided candidate adds it to the moves of its own frame, removes no factor, changes no other frame
+/// and spends a freedom of that frame, however it is done: `promote`, `promote_in_place_using`, `promote_all_using`.
+/// What the reduction after it then drops, a move with the factor that pays for it, leaves the freedoms the factors
+/// less the moves.  `edits` puts it in its own frame's gains and nowhere else.
+#[test]
+fn promoting_a_one_sided_candidate_changes_only_its_own_frame() {
+    let (model, root, _) = model_with_one_sided_85();
+    let mut scratch = Scratch::<4>::new();
+    for (s, j) in ONE_SIDED_85 {
+        assert!(model.can_promote(&root, s), "{s}");
+        let state = model.promote(&root, s).expect("promotable");
+        let mut in_place = root;
+        assert!(model.promote_in_place_using(&mut scratch, &mut in_place, s), "{s}");
+        assert_eq!(in_place, state, "{s}: in place");
+        assert_eq!(model.promote_all_using(&mut scratch, &root, &bits(&[s])), Some(state), "{s}: all at once");
+        for (i, (before, after)) in root.frames().iter().zip(state.frames()).enumerate() {
+            assert!(i == j || before == after, "{s}: frame {i} changed");
+        }
+        let (before, after) = (root.frames()[j], state.frames()[j]);
+        let dropped = before.factors.len() - after.factors.len();
+        assert!(after.factors.is_subset(&before.factors), "{s}: factors");
+        assert!(after.moves.is_subset(&before.moves.with(s)), "{s}: moves");
+        assert_eq!(after.moves.len() + dropped, before.moves.len() + 1, "{s}: a move is dropped with each factor");
+        assert_eq!(after.freedoms, before.freedoms - 1, "{s}: freedoms");
+        assert_eq!(after.freedoms, after.factors.len() as i32 - after.moves.len() as i32, "{s}: freedoms and sizes");
+    }
+    // 18 has two live factors in frame 0 and stays a move; 44 has only 4, and is dropped with it.
+    let frame0 = root.frames()[0];
+    let after_18 = model.promote(&root, 18).unwrap().frames()[0];
+    assert_eq!((after_18.moves, after_18.factors), (frame0.moves.with(18), frame0.factors));
+    let after_44 = model.promote(&root, 44).unwrap().frames()[0];
+    assert_eq!((after_44.moves, after_44.factors), (frame0.moves, frame0.factors.without(4)));
+
+    // 88 into frame 1, 18 into frame 0 and 42 (a factor of frame 1) into frame 0 out of frame 1.
+    let (edits, none) = model.edits(&root, &bits(&[88, 18, 42]));
+    assert_eq!(none, None);
+    let gained: Vec<Vec<u32>> = edits.gained.iter().map(Bits::to_vec).collect();
+    let lost: Vec<Vec<u32>> = edits.lost.iter().map(Bits::to_vec).collect();
+    assert_eq!(gained[..3], [vec![18, 42], vec![88], vec![]]);
+    assert_eq!(lost[..3], [vec![], vec![42], vec![]]);
+}
+
+/// One-sided candidates of one frame compete for its factors as the moves of that frame do: 44 and 52 are paid for by
+/// 4 alone, so only one of them can be promoted, in either order, and the conflict and the nogood say so.
+#[test]
+fn one_sided_candidates_compete_for_the_factors_of_their_frame() {
+    let (model, root, _) = model_with_one_sided_85();
+    let mut scratch = Scratch::<4>::new();
+    let mut can = |from: &FrameSet<4>, xs: &[u32]| model.can_promote_all_using(&mut scratch, from, &bits(xs));
+    assert!(can(&root, &[44]) && can(&root, &[52]) && !can(&root, &[44, 52]));
+    assert!(can(&root, &[18, 44]) && can(&root, &[18, 52]) && !can(&root, &[18, 44, 52]));
+    assert!(can(&root, &[18, 44, 88, 176]), "one in each frame, and 18 and 44 pay with different factors");
+    for (first, second) in [(44, 52), (52, 44)] {
+        let state = model.promote(&root, first).unwrap();
+        assert!(!model.can_promote(&state, second), "{second} after {first}");
+    }
+
+    let both = bits(&[44, 52]);
+    for minimal in [false, true] {
+        let conflict = model.conflict_using(&mut scratch, &root, &bits(&[18, 44, 52, 88]), minimal);
+        assert_eq!(conflict, Some(both), "minimal = {minimal}");
+    }
+    let after_18 = model.promote(&root, 18).unwrap();
+    assert_eq!(model.conflict_using(&mut scratch, &after_18, &bits(&[44, 52, 176]), true), Some(both));
+    assert_eq!(model.nogood(&mut scratch, &root, &bits(&[18]), &both), Some(both));
+    assert!(model.conflict_using(&mut scratch, &root, &bits(&[18, 44, 88, 176]), true).is_none());
+}
+
+/// Whether every frame of `columns` is winnable by exhaustion with the members of `set` promoted at once (`math` pairs
+/// every number with its maximal factors, and the exhaustion keeps those among the frame's factors), where the
+/// one-sided members of `one_sided` are added to the moves of their own frames and any other member is moved from the
+/// factors of its home frame to the moves of the frame in front (none if it has no home, or the home is frame 0).
+fn winnable_by_exhaustion(
+    math: &FactorProvider,
+    columns: &[Vec<u32>],
+    one_sided: &[(u32, usize)],
+    set: &[u32],
+) -> bool {
+    let frames = columns.len() / 2;
+    let mut moves: Vec<Bits<4>> = (0..frames).map(|i| bits(&columns[2 * i + 1])).collect();
+    let mut factors: Vec<Bits<4>> = (0..frames).map(|i| bits(&columns[2 * i])).collect();
+    for &x in set {
+        if let Some(&(_, own)) = one_sided.iter().find(|&&(s, _)| s == x) {
+            moves[own].insert(x);
+        } else {
+            match (0..frames).find(|&h| columns[2 * h].contains(&x)) {
+                Some(home) if home >= 1 => {
+                    moves[home - 1].insert(x);
+                    factors[home].remove(x);
+                }
+                _ => return false,
+            }
+        }
+    }
+    (0..frames).all(|i| tax_winnable(moves[i], factors[i], math))
+}
+
+/// A set of the candidates of 85 and the one-sided ones can be promoted exactly when every frame is winnable with it
+/// applied, as the game defines winnable (some order of the moves in which each still has a factor present when it is
+/// taken), found by exhaustion for every set of up to six of the fifteen numbers, and that is the same one at a time.
+#[test]
+fn one_sided_sets_are_promotable_when_every_frame_is_winnable_by_exhaustion() {
+    let (model, root, tables) = model_with_one_sided_85();
+    let columns = columns_85();
+    let numbers: Vec<u32> = CANDIDATES_85.iter().copied().chain(ONE_SIDED_85.iter().map(|&(s, _)| s)).collect();
+    let math = FactorProvider::new(&tables, &(1..=tables.n).collect::<Vec<_>>());
+    let mut scratch = Scratch::<4>::new();
+    let (mut sets, mut promotable, mut mixed) = (0, 0, 0);
+    for mask in 0u32..1 << numbers.len() {
+        if mask.count_ones() > 6 {
+            continue;
+        }
+        let set: Vec<u32> = (0..numbers.len()).filter(|&i| mask >> i & 1 == 1).map(|i| numbers[i]).collect();
+        let expected = winnable_by_exhaustion(&math, &columns, &ONE_SIDED_85, &set);
+        let at_once = model.can_promote_all_using(&mut scratch, &root, &bits(&set));
+        let all = model.promote_all_using(&mut scratch, &root, &bits(&set));
+        let mut state = root;
+        let one_by_one = set.iter().rev().all(|&x| model.promote_in_place_using(&mut scratch, &mut state, x));
+        assert_eq!(at_once, expected, "all at once: {set:?}");
+        assert_eq!(all.is_some(), expected, "promote_all_using: {set:?}");
+        assert_eq!(one_by_one, expected, "one by one: {set:?}");
+        if expected {
+            // The two ways reach the same state, whose freedoms are the factors less the moves.
+            assert_eq!(all, Some(state), "the state after {set:?}");
+            for frame in state.frames() {
+                let sizes = frame.factors.len() as i32 - frame.moves.len() as i32;
+                assert_eq!(frame.freedoms, sizes, "freedoms after {set:?}");
+            }
+        }
+        sets += 1;
+        promotable += usize::from(expected);
+        let one_sided_members = set.iter().filter(|&&x| model.own(x).is_some()).count();
+        mixed += usize::from(expected && 0 < one_sided_members && one_sided_members < set.len());
+    }
+    eprintln!("one-sided sets of 85: {sets} sets, {promotable} promotable, {mixed} of them with both kinds of member");
+    assert!(sets > 9_000 && promotable > 400 && promotable < sets - 400, "{sets} sets, {promotable} promotable");
+    assert!(mixed > 200, "only {mixed} promotable sets have members of both kinds");
+}
+
+/// Each one-sided candidate in the cands is one more promotion for the count beside what the freedoms allow the
+/// two-sided ones, and `narrow` keeps a one-sided candidate while its own frame has a freedom left: 176 spends the one
+/// freedom of frame 2, which takes the factors of frame 2 and 176 itself out of the narrowing.
+#[test]
+fn one_sided_candidates_count_in_the_narrowing_and_the_bound() {
+    let (model, root, _) = model_with_one_sided_85();
+    let cands = bits::<4>(&CANDIDATES_85) | bits(&[18, 44, 52, 88, 176]);
+    assert_eq!(model.narrow(&root, &cands), cands);
+    assert_eq!(model.max_promotions_among(&root, &bits(&CANDIDATES_85)), 3);
+    assert_eq!(model.max_promotions_among(&root, &cands), 3 + 5);
+    assert_eq!(model.max_promotions_among(&root, &bits(&[18, 44])), 2, "no two-sided candidate among them");
+
+    let state = model.promote(&root, 176).unwrap();
+    assert_eq!(state.frames().iter().map(|frame| frame.freedoms).collect::<Vec<_>>(), [4, 3, 0]);
+    assert_eq!(model.narrow(&state, &cands).to_vec(), [8, 12, 18, 20, 28, 30, 42, 44, 52, 88]);
+    assert_eq!(model.max_promotions_among(&state, &cands.without(176)), 3 + 4);
+}

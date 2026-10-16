@@ -49,19 +49,25 @@
 //! merged into core-derived signings (first fit, at most `per_frame` a frame), and the master is rebuilt for the
 //! changed family from its columns (but those holding a new loop) and its inequalities (ranks taken again).
 //!
-//! In [`FitMode::Search`] the exact checks are never run: a family's generation ends when nothing prices out and no
-//! cheap inequality is violated, a separation round that places no core ends the computation, and `LB` stays 0.
+//! In [`FitMode::Search`] the exact checks are not run: a family's generation ends when nothing prices out and no
+//! cheap inequality is violated, and the computation when the separation finds no new core ([`Stop::Fitted`]); `LB`
+//! stays 0.  The result is a fit ([`Fit`]: signings and multipliers) with a valid bound and no certified bracket.
+//! [`Outcome::fit`] is the fit of the lowest `L` ever evaluated, which can be lower than the final family's lowest
+//! `L`: merging cores into a signing changes its matroid, which is not a restriction of the old one, so a later
+//! family's LP can be the higher.  `common/fit.rs` writes a fit to disk.
 //!
 //! # Warm states and the node methods
 //!
 //! A fitted state ([`Warm`]: frozen signings, multipliers, the master's columns and inequalities, all by candidate
-//! number) passes from a node to its children ([`Warm::child`]) and from a root fit to a file ([`Fit`]).  At a node,
-//! [`tier1`] evaluates `L` at the inherited multipliers; [`refit_r1`] takes deflected Polyak steps from them, and
-//! [`refit_r2`] runs the column generation of [`bound`] from the inherited master in search mode, with one separation
-//! round for node-local signings.  Each returns the lowest `⌊L⌋` it evaluated, which is valid at any multipliers and
-//! signings (Theorems 14 and 15, at a node by (2)); the master and the steps only propose multipliers.
+//! number) comes from a root fit read from its file ([`Warm::from_saved`]) and passes from a node to its children
+//! ([`Warm::child`]).  At a node, [`tier1`] evaluates `L` at the inherited multipliers; [`refit_r1`] takes deflected
+//! Polyak steps from them, and [`refit_r2`] runs the column generation of [`bound`] from the inherited master in
+//! search mode, with one separation round for node-local signings.  Each returns the lowest `⌊L⌋` it evaluated, which
+//! is valid at any multipliers and signings (Theorems 14 and 15, at a node by (2)); the master and the steps only
+//! propose multipliers.
 
 use crate::cores::{cores_of, merge, Core};
+use crate::fit::SavedFit;
 use crate::frames::FrameMatroids;
 use crate::gf3::{seed, Basis3, Default3, Matroid3, Signing};
 use crate::lp::{Lp, RowKind, Status};
@@ -101,6 +107,8 @@ const PACK_COLUMNS: usize = 300;
 const CUTS_PER_CHECK: usize = 5;
 /// The nonbasic columns the master keeps when it purges, which it does when it has twice as many.
 const KEEP: usize = 300;
+/// The most columns of the final master an outcome carries (so a fit file and a [`Warm`] state).
+pub const SAVED_COLUMNS: usize = 300;
 /// The independent sets an extra matroid's pool keeps.
 const POOL: usize = 400;
 /// The largest perturbation of a rank inequality's right-hand side in the master, and of a bound `y ≤ z` in the exact
@@ -110,8 +118,6 @@ const PERTURB: f64 = 1e-6;
 pub const SALT_CORES: u64 = 2;
 /// The default of [`Settings::check_every`], and the cross-check of the evaluations of [`tier1`] and [`refit_r1`].
 pub const CHECK_EVERY: u64 = 50;
-/// The most master columns an [`Outcome`] (so a [`Warm`] state) keeps.
-pub const WARM_COLUMNS: usize = 300;
 /// The most node-local signings of a frame along a path (design S3.3).
 pub const LOCAL_PER_FRAME: usize = 8;
 /// The most cores a node's separation takes from one frame of one column (design S3.3).
@@ -203,12 +209,26 @@ impl<'a, const W: usize> Ctx<'a, W> {
     }
 }
 
-/// What a computation is for: the study's measurement, with a certified lower bound on the LP (the exact checks),
-/// or a search, which needs only the bound (design S3.6).
+/// How far a fit goes in certifying its bracket.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FitMode {
+    /// The exact checks run once the separation finds no new core: the bracket `[lb, l_best]` is certified, and the
+    /// computation ends when it closes (the study's instrument).
     Certified,
+    /// No exact checks: a family's generation ends when no column prices out at the master's duals and no cheap
+    /// inequality is violated, and the computation when the separation then finds no new core (or at a budget).  `lb`
+    /// is 0, so the root is not counted as converged; `bound` is the same valid bound.  What a search can afford.
     Search,
+}
+
+impl FitMode {
+    /// The mode as the lines and the fit files name it.
+    pub fn name(self) -> &'static str {
+        match self {
+            FitMode::Certified => "certified",
+            FitMode::Search => "search",
+        }
+    }
 }
 
 /// The budgets and knobs of a bound computation.
@@ -328,6 +348,84 @@ impl Family {
     fn zeros(&self) -> Vec<Vec<f64>> {
         self.extras.iter().map(|ex| vec![0.0; ex.elem.len()]).collect()
     }
+
+    /// The multipliers `lambda` (per signing, by candidate number; zero where missing) as vectors indexed like each
+    /// matroid's elements; signings past the end of `lambda` get zeros.
+    pub fn multipliers_of(&self, lambda: &[HashMap<u32, f64>]) -> Vec<Vec<f64>> {
+        let none = HashMap::new();
+        self.extras
+            .iter()
+            .enumerate()
+            .map(|(k, ex)| {
+                let by_number = lambda.get(k).unwrap_or(&none);
+                ex.m.elems.iter().map(|x| by_number.get(x).copied().unwrap_or(0.0)).collect()
+            })
+            .collect()
+    }
+
+    /// The multipliers `lam` (indexed like each matroid's elements) by candidate number, the positive ones.
+    fn by_number(&self, lam: &[Vec<f64>]) -> Vec<HashMap<u32, f64>> {
+        self.extras
+            .iter()
+            .zip(lam)
+            .map(|(ex, l)| ex.m.elems.iter().copied().zip(l.iter().copied()).filter(|&(_, v)| v > 0.0).collect())
+            .collect()
+    }
+}
+
+/// A fit: signings and multipliers, which together give a valid bound at the state they were fitted at (and at its
+/// nodes: Theorems 14 and 15).
+#[derive(Clone, Debug, Default)]
+pub struct Fit {
+    pub signings: Vec<Signing>,
+    /// Per signing, the multipliers by candidate number (the positive ones).
+    pub lambda: Vec<HashMap<u32, f64>>,
+}
+
+impl Fit {
+    /// The family `fam` at the multipliers `lam` (indexed like each matroid's elements).
+    fn of(fam: &Family, lam: &[Vec<f64>]) -> Fit {
+        Fit { signings: fam.extras.iter().map(|ex| ex.signing.clone()).collect(), lambda: fam.by_number(lam) }
+    }
+
+    /// `⌊L⌋` of this fit at the state of `ctx`: the bound it gives.
+    pub fn bound<const W: usize>(&self, ctx: &Ctx<'_, W>, stats: &mut Stats) -> i64 {
+        let fam = Family::new(ctx, self.signings.clone());
+        let lam = fam.multipliers_of(&self.lambda);
+        evaluate(ctx, &fam, &lam, stats, 1).value.div_euclid(SCALE)
+    }
+}
+
+/// Multipliers by candidate number as the fit files and the checkpoints have them: per signing,
+/// `[[candidate, multiplier]...]` ascending by candidate.
+pub fn multipliers_to_json(lambda: &[HashMap<u32, f64>]) -> Json {
+    let lists = lambda.iter().map(|l| {
+        let mut pairs: Vec<(u32, f64)> = l.iter().map(|(&x, &v)| (x, v)).collect();
+        pairs.sort_unstable_by_key(|&(x, _)| x);
+        Json::Arr(pairs.into_iter().map(|(x, v)| Json::Arr(vec![Json::from(x), Json::Num(v)])).collect())
+    });
+    Json::Arr(lists.collect())
+}
+
+/// The multipliers of [`multipliers_to_json`]'s array, which must hold a list for each of `signings` signings.
+pub fn multipliers_from_json(json: &Json, signings: usize) -> Result<Vec<HashMap<u32, f64>>, String> {
+    let lists = json.as_arr().ok_or("the multipliers are not an array")?;
+    if lists.len() != signings {
+        return Err(format!("{signings} signings but {} multiplier lists", lists.len()));
+    }
+    lists
+        .iter()
+        .map(|l| {
+            let pairs = l.as_arr().ok_or("a signing's multipliers are not an array")?;
+            pairs
+                .iter()
+                .map(|p| match (p.at(0).and_then(Json::as_u32), p.at(1).and_then(Json::as_f64)) {
+                    (Some(x), Some(v)) => Ok((x, v)),
+                    _ => Err("a multiplier is not [candidate, value]".to_string()),
+                })
+                .collect::<Result<HashMap<u32, f64>, String>>()
+        })
+        .collect()
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -1093,9 +1191,11 @@ pub struct Found {
 /// Why a computation stopped.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Stop {
-    /// The bracket closed (certified; in search mode, nothing priced out and no cheap cut was violated) and
-    /// separation (if on) found nothing new.
+    /// The bracket closed (certified; in search mode without separation, nothing priced out and no cheap cut was
+    /// violated) and separation (if on) found nothing new.
     Converged,
+    /// A search-mode fit ended: nothing prices out, no cheap inequality is violated, separation found no new core.
+    Fitted,
     /// The bound reached the target (a node, cut).
     Target,
     Seconds,
@@ -1127,36 +1227,35 @@ pub struct Outcome {
     pub cores_repeated: usize,
     pub rounds: usize,
     pub stop: Stop,
+    /// The lowest `L` ever evaluated, over every family: its signings and multipliers (`fit.bound` gives `bound`).
+    pub fit: Fit,
     /// The master's support at the end: (value, set as candidate numbers).
     pub support: Vec<(f64, Vec<u32>)>,
-    /// The final master's columns as candidate numbers (ascending each): the support first, by decreasing value,
-    /// then its other nonempty columns in its order; at most [`WARM_COLUMNS`].
-    pub master_columns: Vec<Vec<u32>>,
-    /// The final master's rank inequalities: (extra matroid, set as candidate numbers ascending, rank).
-    pub master_cuts: Vec<(usize, Vec<u32>, usize)>,
     pub columns: usize,
     pub cuts: usize,
+    /// The final master's columns as candidate numbers (ascending each): the support first, by decreasing value,
+    /// then its other nonempty columns in its order; at most [`SAVED_COLUMNS`].
+    pub master_columns: Vec<Vec<u32>>,
+    /// The final master's rank inequalities: (index of the matroid in the final family, candidates ascending, rank).
+    pub master_cuts: Vec<(usize, Vec<u32>, usize)>,
     pub stats: Stats,
     pub seconds: f64,
 }
 
-/// The multipliers of `maps` (per extra matroid, by candidate number; zero where absent, and for the extras past
-/// them), one vector per extra matroid of `fam`, indexed like its elements.
-fn by_number(fam: &Family, maps: &[HashMap<u32, f64>]) -> Vec<Vec<f64>> {
-    fam.extras
-        .iter()
-        .enumerate()
-        .map(|(k, ex)| ex.m.elems.iter().map(|x| maps.get(k).and_then(|m| m.get(x)).copied().unwrap_or(0.0)).collect())
-        .collect()
+/// The lowest `L` evaluated so far, scaled by [`SCALE`], and the fit that gave it.
+struct Best {
+    scaled: i64,
+    fit: Fit,
 }
 
-/// The positive multipliers of `lam` (one vector per extra matroid of `fam`) by candidate number.
-fn to_numbers(fam: &Family, lam: &[Vec<f64>]) -> Vec<HashMap<u32, f64>> {
-    fam.extras
-        .iter()
-        .zip(lam)
-        .map(|(ex, l)| ex.m.elems.iter().copied().zip(l.iter().copied()).filter(|&(_, v)| v > 0.0).collect())
-        .collect()
+impl Best {
+    /// Keeps `fam` at the multipliers `lam` if the value `L = value` (scaled) of that evaluation is the lowest yet.
+    fn offer(&mut self, value: i64, fam: &Family, lam: &[Vec<f64>]) {
+        if value < self.scaled {
+            self.scaled = value;
+            self.fit = Fit::of(fam, lam);
+        }
+    }
 }
 
 /// The subgradient of `L` at the evaluation `ev`, `g_{k,x} = [x ∈ I_k] − [x ∈ Q]` (one vector per extra matroid,
@@ -1198,15 +1297,17 @@ pub fn frozen(s: &Signing) -> Signing {
 }
 
 /// One computation's state, which [`bound`] and [`refit_r2`] drive through the same phases: the family and its
-/// master, the lowest `L` of all and of the family with its multipliers, the cores found, the budgets, the stop.
+/// master, the lowest `L` of all (with its fit) and of the family with its multipliers, the cores found, the
+/// budgets, the stop.
 struct Fitter<'r, 'a, const W: usize> {
     ctx: &'r Ctx<'a, W>,
     settings: &'r Settings,
     stats: &'r mut Stats,
     fam: Family,
     master: Master,
-    /// The lowest `L` of all (scaled), of the current family, and the family's multipliers there.
-    best_scaled: i64,
+    /// The lowest `L` of all (scaled, with the fit that gave it), of the current family, and the family's multipliers
+    /// there.
+    best: Best,
     fam_best: i64,
     lam_best: Vec<Vec<f64>>,
     found: Vec<Found>,
@@ -1252,7 +1353,7 @@ impl<'r, 'a, const W: usize> Fitter<'r, 'a, W> {
             settings,
             fam,
             master,
-            best_scaled: i64::MAX,
+            best: Best { scaled: i64::MAX, fit: Fit::default() },
             fam_best: i64::MAX,
             lam_best: start,
             found: Vec::new(),
@@ -1288,14 +1389,15 @@ impl<'r, 'a, const W: usize> Fitter<'r, 'a, W> {
         evaluate(self.ctx, &self.fam, at, self.stats, self.settings.check_every)
     }
 
-    /// Records the value of an evaluation at `at`: the lowest `L` of all, the trace, the target (a stop when the
-    /// context stops there), and the family's lowest with its multipliers.  Whether it is the family's lowest.
+    /// Records the value of an evaluation at `at`: the lowest `L` of all with its fit, the trace, the target (a stop
+    /// when the context stops there), and the family's lowest with its multipliers.  Whether it is the family's lowest.
     fn note(&mut self, value: i64, at: &[Vec<f64>]) -> bool {
-        self.best_scaled = self.best_scaled.min(value);
+        self.best.offer(value, &self.fam, at);
+        let best = self.best.scaled.div_euclid(SCALE);
         if let Some(trace) = &mut self.trace {
-            trace.push(self.best_scaled.div_euclid(SCALE));
+            trace.push(best);
         }
-        if self.ctx.stop_at_target && self.best_scaled.div_euclid(SCALE) <= self.ctx.target {
+        if self.ctx.stop_at_target && best <= self.ctx.target {
             self.stop = Some(Stop::Target);
         }
         let lower = value < self.fam_best;
@@ -1575,15 +1677,16 @@ impl<'r, 'a, const W: usize> Fitter<'r, 'a, W> {
             .filter(|c| !c.set.is_empty() && self.master.lp.primal(c.lp) <= SUPPORT)
             .map(|c| &c.set);
         let master_columns =
-            support.iter().map(|(_, s)| s).chain(others).take(WARM_COLUMNS).map(|s| numbers(s)).collect();
+            support.iter().map(|(_, s)| s).chain(others).take(SAVED_COLUMNS).map(|s| numbers(s)).collect();
         let master_cuts = self.master.cuts.iter().map(|c| (c.k, numbers(&c.set), c.rank)).collect();
         Outcome {
-            bound: self.best_scaled.div_euclid(SCALE),
-            best_scaled: self.best_scaled,
+            bound: self.best.scaled.div_euclid(SCALE),
+            best_scaled: self.best.scaled,
             l_best: self.fam_best as f64 / SCALE as f64,
             lb: self.lb,
             master: self.master.lp.value(),
-            lambda: to_numbers(&self.fam, &self.lam_best),
+            lambda: self.fam.by_number(&self.lam_best),
+            fit: self.best.fit,
             cores_assigned: self.found.iter().filter(|f| f.assigned.is_some()).count(),
             cores_unplaced: self.found.iter().filter(|f| f.assigned.is_none()).count(),
             cores_repeated: self.repeated,
@@ -1614,7 +1717,7 @@ pub fn bound<const W: usize>(
     let t0 = Instant::now();
     let mut stats = Stats::default();
     let fam = Family::new(ctx, signings);
-    let lam = by_number(&fam, start.unwrap_or_default());
+    let lam = fam.multipliers_of(start.unwrap_or_default());
     let mut f = Fitter::new(ctx, fam, lam, &[], &[], settings, &mut stats, t0);
     f.polyak();
     let search = settings.mode == FitMode::Search;
@@ -1634,7 +1737,10 @@ pub fn bound<const W: usize>(
         let (placed, _) = f.separate(&|_| settings.per_frame, 0);
         if placed > 0 {
             certify = false;
-        } else if certified || search {
+        } else if search {
+            f.stop = Some(Stop::Fitted);
+            break;
+        } else if certified {
             break;
         } else {
             certify = true;
@@ -1644,7 +1750,7 @@ pub fn bound<const W: usize>(
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// Warm states and fits
+// Warm states
 
 /// A fitted state at a node: the frozen signings (the root's, then the node-local ones), the multipliers, the
 /// master's columns and cuts.  All by candidate number, so that a child can take them over.
@@ -1662,6 +1768,19 @@ pub struct Warm {
 }
 
 impl Warm {
+    /// The state of a root fit read from its file (or about to be written to it): the fit's signings frozen, its
+    /// multipliers, the final master's columns and rank inequalities (their ranks left out).  None of its signings is
+    /// node-local.
+    pub fn from_saved(saved: &SavedFit) -> Warm {
+        Warm {
+            signings: saved.fit.signings.iter().map(frozen).collect(),
+            local: 0,
+            lambda: saved.fit.lambda.clone(),
+            columns: saved.columns.clone(),
+            cuts: saved.cuts.iter().map(|(k, set, _)| (*k, set.clone())).collect(),
+        }
+    }
+
     /// The state of a computation's outcome: its family's signings frozen (`mergeable: false`, `cores` emptied, so
     /// that nothing merges into them during a search), its multipliers (`Outcome::lambda`), master columns and cuts.
     /// None of its signings is node-local.
@@ -1710,195 +1829,42 @@ impl Warm {
         self.signings[self.signings.len() - self.local..].iter().filter(|s| s.frame == h).count()
     }
 
-    /// The state as a JSON object (the fields of the fit file, cuts without ranks).
+    /// The state as a checkpoint keeps it: `signings` ([`Signing::to_json`]), `local`, `lambda`
+    /// ([`multipliers_to_json`]), `columns`, and `cuts` as `[signing, [candidates]]`.
     pub fn to_json(&self) -> Json {
-        Json::object(self.pairs(None))
-    }
-
-    /// The state's fields of the fit file (design S5.1): `signings`, `local`, `lambda`, `columns`, `cuts` (each
-    /// `[signing, [candidates]]`, with its rank appended when `ranks` are given).
-    fn pairs(&self, ranks: Option<&[usize]>) -> Vec<(&'static str, Json)> {
-        let lambda = self.lambda.iter().map(|m| {
-            let mut entries: Vec<(u32, f64)> = m.iter().map(|(&x, &v)| (x, v)).collect();
-            entries.sort_by_key(|&(x, _)| x);
-            Json::Arr(entries.into_iter().map(|(x, v)| Json::Arr(vec![x.into(), Json::Num(v)])).collect())
-        });
-        let cuts = self.cuts.iter().enumerate().map(|(i, (k, set))| {
-            let mut cut = vec![Json::from(*k), Json::array(set.iter().copied())];
-            cut.extend(ranks.map(|r| Json::from(r[i])));
-            Json::Arr(cut)
-        });
-        vec![
-            ("signings", Json::Arr(self.signings.iter().map(signing_to_json).collect())),
+        let cuts = self.cuts.iter().map(|(k, set)| Json::Arr(vec![Json::from(*k), Json::array(set.iter().copied())]));
+        Json::object([
+            ("signings", Json::Arr(self.signings.iter().map(Signing::to_json).collect())),
             ("local", self.local.into()),
-            ("lambda", Json::Arr(lambda.collect())),
+            ("lambda", multipliers_to_json(&self.lambda)),
             ("columns", Json::Arr(self.columns.iter().map(|c| Json::array(c.iter().copied())).collect())),
             ("cuts", Json::Arr(cuts.collect())),
-        ]
+        ])
     }
 
-    /// The state of a JSON object with the fields of [`to_json`](Self::to_json) (a cut's rank, if there, ignored).
+    /// The state of [`to_json`](Self::to_json)'s object.
     pub fn from_json(j: &Json) -> Result<Warm, String> {
-        let signings = field(j, "signings")?
-            .as_arr()
-            .ok_or("signings: not an array")?
-            .iter()
-            .map(signing_from_json)
-            .collect::<Result<Vec<Signing>, String>>()?;
-        let local = field(j, "local")?.as_u64().ok_or("local: not a count")? as usize;
+        let field = |name: &str| j.get(name).ok_or(format!("no field {name:?}"));
+        let list = |name: &str| field(name)?.as_arr().ok_or(format!("{name}: not an array"));
+        let signings = list("signings")?.iter().map(Signing::from_json).collect::<Result<Vec<_>, _>>()?;
+        let local = field("local")?.as_u64().ok_or("local: not a count")? as usize;
         if local > signings.len() {
             return Err(format!("local: {local} of {} signings", signings.len()));
         }
-        let lambda = field(j, "lambda")?
-            .as_arr()
-            .ok_or("lambda: not an array")?
-            .iter()
-            .map(|m| {
-                m.as_arr()
-                    .ok_or("lambda: a signing's multipliers are not an array")?
-                    .iter()
-                    .map(|p| match p.as_arr() {
-                        Some([x, v]) => {
-                            Ok((x.as_u32().ok_or("lambda: a bad candidate")?, v.as_f64().ok_or("lambda: a bad value")?))
-                        }
-                        _ => Err("lambda: not an [x, value] pair"),
-                    })
-                    .collect::<Result<HashMap<u32, f64>, &str>>()
-            })
-            .collect::<Result<Vec<_>, &str>>()?;
-        if lambda.len() != signings.len() {
-            return Err(format!("lambda: {} lists for {} signings", lambda.len(), signings.len()));
-        }
-        let columns = field(j, "columns")?
-            .as_arr()
-            .ok_or("columns: not an array")?
+        let lambda = multipliers_from_json(field("lambda")?, signings.len())?;
+        let columns = list("columns")?
             .iter()
             .map(|c| c.as_u32_vec().ok_or("columns: not a list of candidates"))
-            .collect::<Result<Vec<_>, &str>>()?;
-        let cuts = cuts_of(j)?
-            .into_iter()
-            .map(|(k, set, _)| if k < signings.len() { Ok((k, set)) } else { Err(format!("cuts: signing {k}")) })
+            .collect::<Result<Vec<_>, _>>()?;
+        let cuts = list("cuts")?
+            .iter()
+            .map(|c| match (c.at(0).and_then(Json::as_u64), c.at(1).and_then(Json::as_u32_vec)) {
+                (Some(k), Some(set)) if (k as usize) < signings.len() => Ok((k as usize, set)),
+                _ => Err(format!("cuts: {c} is not [signing, [candidates]] of a signing there")),
+            })
             .collect::<Result<Vec<_>, String>>()?;
         Ok(Warm { signings, local, lambda, columns, cuts })
     }
-}
-
-/// The field `name` of a JSON object.
-fn field<'j>(j: &'j Json, name: &str) -> Result<&'j Json, String> {
-    j.get(name).ok_or(format!("no field {name:?}"))
-}
-
-/// A cut as a fit file has it: signing, candidates, rank if given.
-type FileCut = (usize, Vec<u32>, Option<usize>);
-
-/// The cuts of a fit file's object.
-fn cuts_of(j: &Json) -> Result<Vec<FileCut>, String> {
-    let cuts = field(j, "cuts")?.as_arr().ok_or("cuts: not an array")?;
-    cuts.iter()
-        .map(|c| {
-            let parts = c.as_arr().filter(|p| p.len() == 2 || p.len() == 3).ok_or("cuts: not [signing, set, rank]")?;
-            let k = parts[0].as_u64().ok_or("cuts: a bad signing")? as usize;
-            let set = parts[1].as_u32_vec().ok_or("cuts: a bad set")?;
-            let rank = parts.get(2).map(|r| r.as_u64().map(|r| r as usize).ok_or("cuts: a bad rank")).transpose()?;
-            Ok((k, set, rank))
-        })
-        .collect()
-}
-
-/// A signing as the fit file has it: `frame`, `default` (`ones`, or `random` with its `seed` as a decimal string, a
-/// u64 not fitting JSON's numbers), `fixed` as `[u, f, v]` sorted by `(u, f)`, `mergeable`.  Its cores are not kept.
-fn signing_to_json(s: &Signing) -> Json {
-    let mut pairs = vec![("frame", Json::from(s.frame))];
-    match s.default {
-        Default3::Ones => pairs.push(("default", "ones".into())),
-        Default3::Random(seed) => {
-            pairs.push(("default", "random".into()));
-            pairs.push(("seed", seed.to_string().into()));
-        }
-    }
-    let mut fixed: Vec<(u32, u32, u8)> = s.fixed.iter().map(|(&(u, f), &v)| (u, f, v)).collect();
-    fixed.sort_unstable();
-    pairs.push(("fixed", Json::Arr(fixed.into_iter().map(|(u, f, v)| Json::array([u, f, u32::from(v)])).collect())));
-    pairs.push(("mergeable", s.mergeable.into()));
-    Json::object(pairs)
-}
-
-/// The signing of [`signing_to_json`]'s object (no cores).
-fn signing_from_json(j: &Json) -> Result<Signing, String> {
-    let frame = field(j, "frame")?.as_u64().ok_or("a signing's frame is not a number")? as usize;
-    let default = match field(j, "default")?.as_str() {
-        Some("ones") => Default3::Ones,
-        Some("random") => {
-            let seed = field(j, "seed")?.as_str().ok_or("a signing's seed is not a string")?;
-            Default3::Random(seed.parse().map_err(|e| format!("a signing's seed {seed:?}: {e}"))?)
-        }
-        _ => return Err("a signing's default is neither \"ones\" nor \"random\"".into()),
-    };
-    let mut fixed = HashMap::new();
-    for t in field(j, "fixed")?.as_arr().ok_or("a signing's fixed values are not an array")? {
-        match t.as_u32_vec().as_deref() {
-            Some(&[u, f, v]) if v == 1 || v == 2 => fixed.insert((u, f), v as u8),
-            _ => return Err(format!("a signing's fixed value {t} is not [u, f, 1 or 2]")),
-        };
-    }
-    let mergeable = field(j, "mergeable")?.as_bool().ok_or("a signing's mergeable is not a boolean")?;
-    Ok(Signing { frame, default, fixed, cores: Vec::new(), mergeable })
-}
-
-/// A root fit, as a file (design S5.1): the game, the bounds, the state.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Fit {
-    pub n: u32,
-    pub opt: i64,
-    pub gf2: i64,
-    pub bound: i64,
-    pub l_best: f64,
-    pub warm: Warm,
-    /// The ranks of `warm.cuts` at the root (written for reference; never trusted when read).
-    pub ranks: Vec<usize>,
-}
-
-impl Fit {
-    pub fn from_outcome(n: u32, opt: i64, gf2: i64, r: &Outcome) -> Fit {
-        Fit {
-            n,
-            opt,
-            gf2,
-            bound: r.bound,
-            l_best: r.l_best,
-            warm: Warm::from_outcome(r),
-            ranks: r.master_cuts.iter().map(|&(_, _, rank)| rank).collect(),
-        }
-    }
-
-    /// The fit file's one line: `n`, `opt`, `gf2`, `bound`, `l_best`, then the state's fields, cuts with ranks.
-    pub fn to_json(&self) -> String {
-        let head =
-            [("n", self.n.into()), ("opt", self.opt.into()), ("gf2", self.gf2.into()), ("bound", self.bound.into())];
-        let pairs =
-            head.into_iter().chain([("l_best", Json::Num(self.l_best))]).chain(self.warm.pairs(Some(&self.ranks)));
-        Json::object(pairs).to_string()
-    }
-}
-
-/// The fit of a fit file's line.
-pub fn fit_from_json(text: &str) -> Result<Fit, String> {
-    let j = Json::parse(text).map_err(|e| e.to_string())?;
-    let int = |name: &str| field(&j, name)?.as_i64().ok_or(format!("{name}: not an integer"));
-    let warm = Warm::from_json(&j)?;
-    let ranks = cuts_of(&j)?
-        .into_iter()
-        .map(|(_, _, rank)| rank.ok_or("cuts: a fit's cut without its rank"))
-        .collect::<Result<Vec<_>, &str>>()?;
-    Ok(Fit {
-        n: u32::try_from(int("n")?).map_err(|e| format!("n: {e}"))?,
-        opt: int("opt")?,
-        gf2: int("gf2")?,
-        bound: int("bound")?,
-        l_best: field(&j, "l_best")?.as_f64().ok_or("l_best: not a number")?,
-        warm,
-        ranks,
-    })
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -1920,7 +1886,7 @@ pub struct Trace {
 /// node's state.  Returns ⌊L⌋ and the evaluation (its sets start a refit).
 pub fn tier1<const W: usize>(ctx: &Ctx<'_, W>, fam: &Family, warm: &Warm, stats: &mut Stats) -> (i64, Eval) {
     assert_eq!(fam.extras.len(), warm.signings.len(), "a family of the warm state's signings");
-    let ev = evaluate(ctx, fam, &by_number(fam, &warm.lambda), stats, CHECK_EVERY);
+    let ev = evaluate(ctx, fam, &fam.multipliers_of(&warm.lambda), stats, CHECK_EVERY);
     (ev.value.div_euclid(SCALE), ev)
 }
 
@@ -1939,7 +1905,7 @@ pub fn refit_r1<const W: usize>(
     stats: &mut Stats,
 ) -> (i64, Warm, Trace) {
     let pricings = stats.pricings_mi;
-    let mut lam = by_number(fam, &warm.lambda);
+    let mut lam = fam.multipliers_of(&warm.lambda);
     let mut lam_best = lam.clone();
     let mut best = first.value;
     let mut after = vec![best.div_euclid(SCALE)];
@@ -1989,7 +1955,7 @@ pub fn refit_r1<const W: usize>(
         last = Some(next);
         previous = Some(d);
     };
-    let state = Warm { lambda: to_numbers(fam, &lam_best), ..warm.clone() };
+    let state = Warm { lambda: fam.by_number(&lam_best), ..warm.clone() };
     let pricings = (stats.pricings_mi - pricings) as usize;
     (best.div_euclid(SCALE), state, Trace { after, pricings, new_signings: 0, stop: Some(stop) })
 }
@@ -2030,7 +1996,7 @@ pub fn refit_r2<const W: usize>(
         .map(|(j, set)| (*j, elements(set).into_iter().filter(|&e| fam.extras[*j].position(e).is_some()).collect()))
         .filter(|(j, set): &(usize, Vec<usize>)| rank(&fam.extras[*j], set) < set.len())
         .collect();
-    let start = by_number(&fam, &warm.lambda);
+    let start = fam.multipliers_of(&warm.lambda);
     let settings =
         Settings { mode: FitMode::Search, pricings: k, cores_per_frame: LOCAL_CORES_PER_FRAME, ..settings.clone() };
     let mut f = Fitter::new(ctx, fam, start.clone(), &columns, &cuts, &settings, stats, t0);

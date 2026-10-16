@@ -606,20 +606,73 @@ fn a_checkpoint_made_with_other_tactics_names_them() {
     }
 }
 
-/// A checkpoint whose header has another format version (here 3, that of the builds before this one, whose headers
-/// recorded tactics that are gone) is refused with one message, naming the file, and left alone.
+/// A checkpoint whose header has a format version this build does not read (3, whose headers recorded tactics that
+/// are gone, and 6, a later one) is refused with one message, naming the file, and left alone.  Version 4, that of the
+/// builds before the extended problem's search, is read (`tests/wide.rs` resumes a real one), but not with the length
+/// of version 5, which is what forging the number gives.  The header of this build, version 5, is the one that the
+/// checkpoint was written with, so the same game resumes from it once the version is put back.
 #[test]
 fn a_checkpoint_of_another_format_is_refused() {
     let dir = TempDir::new("format");
     let opts = SolveOptions { node_limit: Some(1500), ..options(&dir.0) };
     assert!(!solver::solve_game(600, None, &opts).unwrap().completed);
     let checkpoint = dir.join("n0600.ckpt");
-    forge_header(&checkpoint, |header| header[4..8].copy_from_slice(&3u32.to_le_bytes()));
-    let err = solver::solve_game(600, None, &opts).unwrap_err();
-    for part in ["n0600.ckpt", "format version 3", "reads version 4 only", "delete the checkpoint"] {
-        assert!(err.contains(part), "{part}: {err}");
+    let version = |checkpoint: &Path| fs::read(checkpoint).unwrap()[20 + 4..20 + 8].to_vec();
+    assert_eq!(version(&checkpoint), 5u32.to_le_bytes(), "this build writes the header's version 5");
+    for other in [3u32, 6] {
+        forge_header(&checkpoint, |header| header[4..8].copy_from_slice(&other.to_le_bytes()));
+        let err = solver::solve_game(600, None, &opts).unwrap_err();
+        let format = format!("format version {other}");
+        for part in ["n0600.ckpt", format.as_str(), "reads versions 4 and 5 only", "delete the checkpoint"] {
+            assert!(err.contains(part), "{part}: {err}");
+        }
+        assert!(checkpoint.exists(), "a refused checkpoint is left alone");
     }
+    forge_header(&checkpoint, |header| header[4..8].copy_from_slice(&4u32.to_le_bytes()));
+    let err = solver::solve_game(600, None, &opts).unwrap_err();
+    assert!(err.contains("n0600.ckpt") && err.contains("46 bytes, not 38"), "{err}");
     assert!(checkpoint.exists(), "a refused checkpoint is left alone");
+    forge_header(&checkpoint, |header| header[4..8].copy_from_slice(&5u32.to_le_bytes()));
+    let opts = SolveOptions { node_limit: None, ..opts };
+    assert!(solver::solve_game(600, None, &opts).unwrap().completed, "the checkpoint resumes with its own version");
+}
+
+/// A checkpoint of the extended problem Π⁺(O) whose header has the digest of other one-sided candidates, and nothing
+/// else different (no two open sets of the boards pose problems that differ only in their one-sided candidates, so the
+/// file is forged: the digest sits after the digests of the candidates and of the frames, at byte 32 of the header),
+/// is refused as "other one-sided candidates", by both setups that read it, and left alone; with the digest put back it
+/// resumes.
+#[test]
+fn a_checkpoint_with_other_one_sided_candidates_is_refused() {
+    let dir = TempDir::new("one-sided");
+    let checkpoint = dir.join("n0200.ckpt");
+    let board = Board::<8>::for_n(200);
+    let open = Bits::<8>::from_slice(&common::upper_from_3(&board));
+    let (ext, prepared) = board.prepare_extended_with(&open, SearchTactics::extended()).unwrap();
+    assert!(!ext.one_sided.is_empty());
+    let cfg = EngineConfig {
+        threads: 1,
+        checkpoint: Some((checkpoint.clone(), Duration::from_secs(3600))),
+        time_limit: Some(Duration::ZERO),
+        ..EngineConfig::default()
+    };
+    assert!(!search::search(&prepared, &cfg, None, None, false).unwrap().completed);
+
+    forge_header(&checkpoint, |header| header[32] ^= 1);
+    let wanted = "the checkpoint is of other one-sided candidates";
+    let err = board.prepare_extended_for_resume(&open, &checkpoint).err().expect("refused");
+    assert!(err.starts_with(wanted), "{err}");
+    // The search itself checks the header of the checkpoint it resumes, with the setup that does not.
+    let err = search::search(&prepared, &cfg, None, None, true).unwrap_err();
+    assert_eq!(err.kind(), std::io::ErrorKind::InvalidData, "{err}");
+    assert!(err.to_string().contains("other one-sided candidates") && err.to_string().contains("n0200.ckpt"), "{err}");
+    assert!(checkpoint.exists(), "a refused checkpoint is left alone");
+
+    forge_header(&checkpoint, |header| header[32] ^= 1);
+    let (_, resumed) = board.prepare_extended_for_resume(&open, &checkpoint).unwrap();
+    let cfg = EngineConfig { time_limit: None, ..cfg };
+    let result = search::search(&resumed, &cfg, None, None, true).unwrap();
+    assert!(result.completed, "the checkpoint resumes with its own digest");
 }
 
 // ------------------------------------------------------------------------------------------------------------

@@ -3,11 +3,10 @@
 //! The Java stopped at n = 1000, and the sets that hold the numbers of a board are 8 words wide up
 //! to n = 511, then 16, 20, 24, 28, 32, 36, 40, 48 and 56 words up to 1023, 1279, 1535, 1791, 2047, 2303, 2559, 3071
 //! and 3583, 64 up to 4095 and 128 up to 8191 (`bits::WIDTHS`), so nothing above n = 1023 meets anything but these
-//! tests and the committed results (`results/strict.jsonl`, n = 1..2175; `optimal.json` has its games to 1300, but
+//! tests and the committed results (`results/strict.jsonl`, n = 1..3440; `optimal.json` has its games to 1300, but
 //! that is the solver's own answer and no check of it).  What is cheap to run here: the same small game at every
 //! width that holds it (a width-dependent bug changes the tree), games of 1100 to 1250 that need a few thousand
-//! nodes against the committed results, boards of 2048 and more through their setup (a sample of the boards to 8191
-//! through setup's refusal of a board whose numbering of the frames is not clean), and the boards past 4095
+//! nodes against the committed results, boards of 2048 and more through their setup, and the boards past 4095
 //! (128 words, and the GF(2) bound's engines of four and five block words) through theirs.
 
 mod common;
@@ -207,19 +206,6 @@ fn the_largest_boards_fit_in_a_frame_set() {
     }
 }
 
-/// Setup refuses a board whose numbering of the frames is not clean (`build_frames`; heuristics/THEORY.md, N), and
-/// accepts every board to 8191, which the census `examples/structure.rs` checked one by one.  A sample, at the width
-/// each board dispatches to: every 199th board from 401, the boards where the count of frames steps up (512, 1024,
-/// 2048, 4096) and the largest.
-#[test]
-fn setup_accepts_a_sample_of_the_boards_to_8191() {
-    let boards = (401..=8191).step_by(199).chain([512, 1024, 2048, 4096, 8191]);
-    for n in boards {
-        let frames = with_width!(n, W => build_frames::<W>(&Tables::new(n)).frames.len());
-        assert!((1..=MAX_FRAMES).contains(&frames), "n={n}: {frames} frames");
-    }
-}
-
 /// Board `n`'s frames, model, matching bound, conflicts, greedy set and a short search, built at width `W`, for a
 /// board with numbers above `above` in its frames (so the numbers that the width before `W` could not hold are in
 /// the model, the matching graph and the search).
@@ -371,7 +357,7 @@ fn boards_past_4095_are_set_up_at_128_words() {
 
 /// A checkpoint that an earlier build wrote (`testdata/n1133_after_1000_nodes.ckpt`: game 1133 at W = 20 with
 /// the default tactics of that build, now those of the matching path (`SearchTactics::matching`), stopped after
-/// 1,023 nodes on one thread; search header format TXSH v4) still resumes and
+/// 1,023 nodes on one thread; search header format TXSH v5) still resumes and
 /// finishes with the committed score.  Every write/read test of the format uses the code's own constants, so a
 /// change of the layout that round-trips (the version, the byte order of a set, the order of the header's fields,
 /// the packing of the tactics) passes them and refuses this file.
@@ -395,6 +381,37 @@ fn a_committed_checkpoint_resumes() {
     assert_eq!(r.invocations, 2, "the game was resumed, not started over");
     assert!(r.assumes.is_empty(), "{:?}", r.assumes);
     assert!(r.nodes > 1000, "{} nodes in all, 1,000 of them before the checkpoint", r.nodes);
+    assert!(!checkpoint.exists(), "a finished game removes its checkpoint");
+}
+
+/// A checkpoint of the format before the extended problem's search (`testdata/n1133_after_1000_nodes_v4.ckpt`: the
+/// same search as the fixture above, written by the build of commit 2e8b851, whose headers are version 4, with no digest
+/// of the one-sided candidates) resumes with this build and finishes as the build that wrote it finishes it: the same
+/// score, two invocations and 3,058 nodes in all (the count that build's binary gave, finishing the same file).  Its
+/// header reads as a version-5 header with no one-sided candidates; asked to resume a search of the extended problem
+/// with open sources instead, it is refused, saying why.
+#[test]
+fn a_committed_checkpoint_of_format_4_resumes_as_the_build_that_wrote_it_finishes_it() {
+    let games = stored_games("strict.jsonl");
+    let dir = TempDir::new("committed-checkpoint-v4");
+    let opts = SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), ..matching_options(1) };
+    let checkpoint = opts.checkpoint_file(1133).unwrap();
+    std::fs::create_dir_all(checkpoint.parent().unwrap()).unwrap();
+    std::fs::copy(testdata("n1133_after_1000_nodes_v4.ckpt"), &checkpoint).unwrap();
+    let version = std::fs::read(&checkpoint).unwrap()[24..28].to_vec();
+    assert_eq!(version, 4u32.to_le_bytes(), "the fixture's header is of version 4");
+
+    // A search of the extended problem with open sources cannot be this checkpoint's, and is refused, saying why.
+    let board = Board::<20>::for_n(1133);
+    let open: Bits<20> = board.plain.iter().copied().filter(|&x| 2 * x > 1133 && board.tables.omega(x) >= 3).collect();
+    let refused = board.prepare_extended_for_resume(&open, &checkpoint).err().expect("refused");
+    assert!(refused.contains("format version 4") && refused.contains("one-sided candidates"), "{refused}");
+
+    let r = solver::solve_game(1133, Some(&prev_of(&games, 1133)), &opts).unwrap();
+    assert!(r.completed && r.method == Method::Search);
+    assert_eq!(r.score, games[&1133].0);
+    assert_eq!((r.invocations, r.nodes), (2, 3058), "the build that wrote the checkpoint finishes it so");
+    assert!(r.assumes.is_empty(), "{:?}", r.assumes);
     assert!(!checkpoint.exists(), "a finished game removes its checkpoint");
 }
 

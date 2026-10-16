@@ -3,7 +3,9 @@
 //! The subcommands are in `commands.rs`; the flag parser, the error type and the output macros they share are in
 //! `cli.rs`.  Every subcommand is a plain function of the arguments after its name.  A command
 //! that fails prints `error: ...` and exits with status 1; a bad command line prints the usage and exits with
-//! status 2; a run that SIGINT or SIGTERM stopped (see `solve`) exits with 128 plus the signal.
+//! status 2; a run that SIGINT or SIGTERM stopped (see `solve`) exits with 128 plus the signal; `certify` exits with
+//! status 2 when it finds a game that beats a recorded score.  `verify-certificates` fails with status 1 on the first
+//! line that is not what it says.
 
 mod cli;
 mod commands;
@@ -60,6 +62,28 @@ commands:
                           write the built-in optimal.json (or the table FILE) to --out FILE with the games of the
                           results file RESULTS appended: from the board size after the table's last, each game that
                           RESULTS has completed, up to the first that it lacks.  A rebuild takes in a changed table
+  certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE [options]
+                          prove the recorded scores of A..B (or of the boards of the list FILE, one board size a
+                          line in the order to certify them, blank lines and # comments skipped) that rest on the
+                          frame model on the whole board, game by game: the extended problem with the open
+                          members of the barred bounds (--upper, the prover's `upper` files) optional, searched
+                          from the recorded game (--results, over optimal.json); one line a game in --out,
+                          certified or beaten; a game whose extended problem an earlier certified game of the
+                          last 8 board sizes posed is certified without a search (same_problem); a game that
+                          beats its score is also written to OUT.counterexample.jsonl and the run exits with
+                          status 2.
+                          Options: --threads K, --checkpoint-dir DIR, --checkpoint-interval S, --progress S,
+                          --time-limit S, --node-limit N, --mem-cap UNITS, as for solve; a rerun skips the games
+                          --out has a verdict for and resumes a stopped search from its checkpoint
+  verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...] [--threads K]
+                          check the files of certificates `certify --out` wrote, without changing them: every
+                          line against the recorded games, the barred bounds and the extended problem set up
+                          again, the games that rest on one another, and the counterexample files beside them;
+                          the first line to fail ends it with status 1 (that a search explored its whole tree is
+                          taken on trust).  Then says how far the proofs of the recorded scores reach: every
+                          game to some board is proven by the prover (--exact, default every exact_*.jsonl of
+                          rust/prover/data), by a certificate, or by a ceiling above a proven game.  K threads
+                          set the problems up (default: all CPUs)
   tables N K...           print the maximal factors and composites of each K on the board 1..=N
   help                    show this message
 ";
@@ -85,6 +109,10 @@ fn main() -> ExitCode {
             errln!("error: {message}");
             ExitCode::FAILURE
         }
+        Err(CliError::Counterexample(message)) => {
+            errln!("counterexample: {message}");
+            ExitCode::from(2)
+        }
     }
 }
 
@@ -104,6 +132,8 @@ fn run(args: &[String]) -> CliResult {
         "verify-results" => commands::verify_results(rest),
         "extend-optimal" => commands::extend_optimal(rest),
         "tables" => commands::tables(rest),
+        "certify" => commands::certify(rest),
+        "verify-certificates" => commands::verify_certificates(rest),
         other => Err(CliError::Usage(format!("unknown command {other:?}"))),
     }
 }

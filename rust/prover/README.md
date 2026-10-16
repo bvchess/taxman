@@ -12,8 +12,10 @@ the whole board.  It decides playability by peel (THEORY.md, Theorem 1), uses on
 score as its target and proves that no set of moves beats it, so that the frame model's answers are checked without
 assuming the frame model.  It also lists every optimal set of a game, finds the longest games, certifies conjecture (★)
 at scale and searches for adversarial instances.  It shares no code with the frame solver or with the Python heuristics;
-it rests only on THEORY.md's theorems (Theorem 1 with peel as the playability oracle, and the residual theorems) and on
-elementary bounds, and every exact method in it is tested against brute force.
+it rests only on THEORY.md's theorems (Theorem 1 with peel as the playability oracle, the residual theorems, the
+parity matroids of Theorem 10 and, in the proofs that start from the roles of Theorem B, the default of `exact`,
+Theorem B, the bottom layers of every optimal set; [section 3](#3-the-proofs-of-optn) lists what each proof rests on)
+and on elementary bounds, and every exact method in it is tested against brute force.
 
 This document says *pick* for a number the player takes (the frame solver's and the wiki's *move*) and *forced picks*
 for the numbers fixed in at a node (the frame solver's *forced member* is the same idea for its own search).
@@ -41,8 +43,9 @@ What the evidence is, in one paragraph each:
   optimum by a tenth of what the Franklín–Moniot bound does.  It branches on minimal unplayable sets found by peel,
   with forced picks from the duals and learned nogoods; with the proven ceiling opt(n) ≤ n + opt(n−1) and the prime
   formula (in the data, `relation: chain` is a game at its ceiling, V(n) = n + V(n−1), and `relation: prime` one given
-  by the prime formula), it proves the recorded optimum for every n ≤ 2175, the whole committed chain (the
-  Franklín–Moniot bound alone had reached 989).
+  by the prime formula), it proves the recorded optimum for every n ≤ 2175, the committed chain as far as it went when
+  the proofs were made (the Franklín–Moniot bound alone had reached 989).  The games 2176–3440 that the chain has
+  since gained are proven within the frame model alone, not by the prover.
 * **Every optimal set.**  The same search, run in an enumeration mode one below the optimum, lists every optimal
   set of a game for about the cost of proving the optimum.  The optimal set is unique for every n ≤ 424; from 425
   some games have two or three, always with the same upper part, U\*, and differing by an exchange of lower-half
@@ -145,9 +148,16 @@ Cross-checks: the Rust greedy equals `heuristics/core.py`'s `optimize_mini` on e
 `src/game.rs` proves upper bounds on opt(n) from proven facts only: Theorem 1 with peel (a set of picks is
 playable iff dismantling the instance of the picks, each listing its maximal factors that are not picks,
 removes everything), the Franklín–Moniot bound, the parity bound (THEORY.md, Theorem 10),
-opt(n) ≤ n + opt(n−1), and the prime formula's upper bound (a game playing a prime n plays it first; swapping it for
-the largest prime below n gives a game of n − 1).  It knows nothing of frames, greedy, `unzip` or
-promotions.  The search:
+opt(n) ≤ n + opt(n−1), the prime formula's upper bound (a game playing a prime n plays it first; swapping it for
+the largest prime below n gives a game of n − 1) and, in a search that starts from the roles of Theorem B (the default
+of `exact`; `--fix-low 0` starts from the plain root), THEORY.md's Theorem B: every optimal set holds the largest prime
+and no other, holds exactly U\*_2 among the sources of layer 2, and, on a board whose frames of layer 2 are closed
+(U\*_2 spans every prime up to n/2, which `src/upper.rs` decides for each board from its own U\*), holds no number of
+layer 2 up to n/2.  Such a search proves that no playable set that obeys those roles beats V(n), which proves
+opt(n) ≤ V(n) because an optimal set beating V(n) would obey them.  Its lines say `"fix_low":1` (the plain root's
+`"fix_low":0`; the committed `data/exact_*.jsonl` are all plain and rest on no Theorem B), and
+`tools/summarize.py exact` and `check` count the proofs that rest on it.  The prover knows nothing of frames, greedy,
+`unzip` or promotions.  The search:
 
 * **Bound**: the maximum-weight matching between numbers and their maximal factors, with forced picks matched
   downward and barred numbers only paying, solved once by successive shortest paths and then re-optimized in
@@ -177,10 +187,20 @@ promotions.  The search:
 * **Pausing**: a search still running at the end of a run saves its open subtrees and nogoods and resumes in the
   next run (depth first), so a game can take any number of ten-minute runs.
 
-The target is the recorded optimum V(n); the search proves that no playable set beats it, and the recorded game
-replays by the rules to V(n), so opt(n) = V(n).  Every rule above is tested against brute force or against the
-optimum (the search must still reach optimal.json's score from one below it, with each rule on, and the parity
-bound's intersection is checked against enumeration on random pairs of matroids).
+The target is the recorded optimum V(n); the search proves that no playable set beats it (from the roles of Theorem B,
+none that obeys them, which is as good), and the recorded game replays by the rules to V(n), so opt(n) = V(n).  Every
+rule above is tested against brute force or against the optimum (the search must still reach optimal.json's score from
+one below it, with each rule on, and the parity bound's intersection is checked against enumeration on random pairs of
+matroids; from the roles of Theorem B too, on every third game of 187-700 that needs a search).
+
+**From the roles of Theorem B** (the default since 2026-10; the committed proofs below are from the plain root).  Over
+the games of 2..999 the 391 searches took 588,026 nodes and 357 s from the roles, against 614,900 nodes and 712 s from
+the plain root (`data/exact_parity_2_1300.jsonl`): the nodes within 5%, the time a node halved, since the parity
+solves have the primes and the numbers of layer 2 settled.  Every game of 2..2175 has the recorded game obey the
+roles, and the roles' parity bound is at least its score (`exact --budget 1` checks both for every game before any
+search).  The frames of layer 2 are closed on every board from 187 on and on most below it; the roles bar the numbers
+of layer 2 up to n/2 where they are, and leave them free on the 80 boards of 2..1300 where they are not, all of them
+at most 186 (`upper::tests`).
 
 ### With the Franklín–Moniot bound (to 989)
 
@@ -248,10 +268,11 @@ nodes grows 0.16 ± 0.04 and log10 seconds 0.23 ± 0.04 per 100 in n over 900–
 dominate), 0.33 and 0.34 from n = 78 on.  The search with the Franklín–Moniot bound alone had spent 50–70 million
 nodes on each of 990–996 without finishing; the parity bound proves them from scratch in 44,000–68,000.
 
-The committed chain (`../results/strict.jsonl`) reaches 2175, and the next subsection is the run that proved it.  The
-extrapolation from the bands above (0.23 decades per 100 in n: to 2000 about 57 hours of thread time, the hardest
-proofs about 3 hours) was made before there was anything to measure it against, and it was low: 1301–1999 took 164
-hours, the hardest proof (1475) 4.9.
+The committed chain (`../results/strict.jsonl`) reached 2175 when the prover's run began, and the next subsection is
+the run that proved it (the chain has since been extended to 3440, within the frame model; the prover has not proven
+the games past 2175).  The extrapolation from the bands above (0.23 decades per 100 in n: to 2000 about 57 hours of
+thread time, the hardest proofs about 3 hours) was made before there was anything to measure it against, and it was
+low: 1301–1999 took 164 hours, the hardest proof (1475) 4.9.
 
 ### To 2175, on a cloud machine
 
@@ -272,7 +293,7 @@ data/exact_parity_1301_2175.jsonl`:
 | proven by a search | 1,047 (557 to 1300, 490 from 1301) |
 | `chain`, at its ceiling V(n) = n + V(n−1), predecessor proven | 607 (337 and 270) |
 | `prime`, by the prime formula, predecessor proven | 276 (161 and 115) |
-| **every n in 2 .. 2175**, the whole committed chain | **2174** |
+| **every n in 2 .. 2175**, the committed chain to there | **2174** |
 
 Of the 875 games of 1301–2175, 490 needed a search, and every one ran to the end (the root's parity bound exceeds the
 recorded score in each, by 125 to 767, mean 384); the other 385 are at their ceiling or meet the prime formula, and
@@ -312,6 +333,73 @@ hours each, and 2060 and 2064 3.4 and 4.0 hours; 2160 and 1863, on the projectio
 projection's order of the games put 12 of the 16 dearest among its first 16.
 [EXPERIMENTS.md](../docs/EXPERIMENTS.md#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) has the
 run's account and what it says about the projection's model.
+
+### The upper part, game by game
+
+The frame solver's answer for a game that rests on its search is opt(n) exactly when U holds at n: some optimal set
+plays U\*_{≥3}, the members of U\* with three or more prime factors
+([THEORY.md](../../heuristics/THEORY.md#the-upper-part)).  `src/bin/upper.rs` (`src/upper.rs`) asks the parity bound
+which of those members every set beating the recorded score V must play.  It fixes layers 1 and 2 as Theorem B says
+every optimal set has them (the largest prime and no other; U\*_2 among the sources of layer 2; where U\*_2 spans
+every prime up to n/2, which it decides for each board, no number of layer 2 up to n/2), bars one member u at a time,
+and calls u *certified* when the bound is then at most V: every set that beats V and obeys Theorem B plays u, so if
+opt(n) > V every optimal set plays every certified member.  The others are *open*, with the bound's margin over V.
+Certified members can be fixed in a search that leaves the open ones optional (the integrated search of the theory
+track), which is why the file is kept: U\* less a game's open members is that search's fixed set.  The tests check the
+certificates, recomputed at each claim T of V − 1, V − 2 and V − 5 (a member certified against V says nothing of the
+sets worth V − 4), against every playable set that obeys Theorem B and is worth more than T, on boards to 60 (1,403
+checks); that a deliberately wrong rule, which certifies a member also when its bound is at most T + 10, is caught by
+the same check (12 false certifications over the boards and claims, 15 (set, member) misses on 12 boards), so that
+the test can see the failure it guards against; and Theorem B's roles against every optimal set there and every recorded game to 1300.  Only the games that
+rest on the frame model need it
+(`"needs":1`: neither at the ceiling nor given by the prime formula).
+
+Two files, one thread on the laptop: `data/upper_1301_2175.jsonl`, the committed chain's games 1301–2175 (875 games,
+490 of them needing it; 300 s), and `data/upper_2176_3314.jsonl`, the copy of the EC2 chain's results taken on
+2026-10-15 (games the committed chain now has) that
+[the gap past 2175](../docs/EXPERIMENTS.md#the-gap-past-2175-2026-10) measured (1,139 games, 635 needing it; 1,272 s,
+4.1 s for the slowest game).  A third, `data/upper_2_1300.jsonl`, does the same for the table's games 2..1300 (1,299
+games, 665 needing it, 417 of those with nothing open, 1.0% of the members open; 65 s), for the tests of `taxman
+certify` (the frame solver's certificates of U, [DESIGN.md](../DESIGN.md#certificates-of-u)).  A fourth,
+`data/upper_3315_3440.jsonl`, the rest of the committed chain (126 games, 73 needing it, 3424, 3425 and 3440 among
+them; 277 s, 4.3 s for the slowest game), is the input of the campaign of certificates on 2176-3440
+(`../bench/certify/`).  By band (the open members and the margins of each game; the share is of all members):
+
+| n | games | the root's gap (mean) | members of U\*_{≥3} | open (least, median, most) | open | margin (median, largest) |
+|---|---|---|---|---|---|---|
+| 1301-1399 | 60 | 297 | 371-400 | 1, 12, 47 | 4.5% | 86, 322 |
+| 1400-1499 | 58 | 447 | 401-432 | 19, 38, 59 | 9.2% | 110, 388 |
+| 1500-1599 | 58 | 458 | 433-467 | 4, 42, 65 | 8.8% | 127, 432 |
+| 1600-1699 | 53 | 340 | 467-496 | 14, 32, 58 | 6.5% | 77, 398 |
+| 1700-1799 | 55 | 313 | 497-525 | 5, 33, 62 | 5.9% | 66, 401 |
+| 1800-1899 | 54 | 433 | 525-556 | 11, 77, 86 | 11.6% | 155, 480 |
+| 1900-1999 | 52 | 294 | 558-587 | 9, 22, 68 | 4.4% | 68, 422 |
+| 2000-2099 | 56 | 374 | 587-619 | 11, 43, 69 | 6.3% | 102, 530 |
+| 2100-2175 | 44 | 527 | 620-640 | 30, 68, 102 | 10.3% | 144, 691 |
+| 2176-2299 | 73 | 724 | 641-681 | 59, 89, 152 | 14.1% | 221, 910 |
+| 2300-2399 | 56 | 936 | 681-710 | 88, 112, 317 | 20.8% | 298, 1270 |
+| 2400-2499 | 60 | 745 | 711-741 | 62, 109, 171 | 14.8% | 247, 1003 |
+| 2500-2599 | 58 | 793 | 741-774 | 78, 116, 163 | 14.9% | 262, 1004 |
+| 2600-2699 | 55 | 515 | 774-807 | 15, 69, 105 | 7.5% | 141, 645 |
+| 2700-2799 | 49 | 817 | 808-844 | 113, 129, 142 | 15.8% | 289, 796 |
+| 2800-2899 | 53 | 691 | 845-871 | 97, 110, 127 | 13.0% | 215, 708 |
+| 2900-2999 | 48 | 660 | 871-899 | 59, 115, 135 | 11.7% | 205, 774 |
+| 3000-3099 | 59 | 915 | 899-925 | 120, 134, 194 | 15.3% | 336, 1163 |
+| 3100-3199 | 58 | 1118 | 925-959 | 133, 170, 255 | 18.6% | 435, 1312 |
+| 3200-3314 | 66 | 1030 | 959-993 | 113, 150, 246 | 16.1% | 372, 1355 |
+| 3315-3440 | 73 | 1259 | 994-1035 | 172, 197, 271 | 19.9% | 531, 1467 |
+
+* **No game is certified whole**: every one leaves members open, from 1 (1305) to 102 (2172) to 2175 and from 15
+  (2610) to 317 (2346) past it; 7.5% of the members in all to 2175 (18,596 of 247,482), 14.9% on 2176-3314 (77,195
+  of 518,992) and 19.9% on 3315-3440 (14,704 of 73,968, 172 to 271 a game, the root's gap 1,103 to 1,555).
+* **The open share follows the root's gap, not n**: 3.1 points more per 100 of gap to 2175 and 2.0 past it (R² 0.73
+  in each file), and it falls back with the gap (2600-2699).  The root's gap is the one the solver's search costs by:
+  with layers 1 and 2 fixed it equals the solver's GF(2) gap at the root on all 400 games past 2175 that both
+  measured (`../bench/wall/gaps_chain.jsonl`).  The margins grow with it: the largest is close to the gap.
+* **The root's heaviest set plays all of U\*_{≥3} in every one of the 1,125 games**, as at every root measured
+  before; no game is flagged.
+* **The open members are mostly of layer 3** (52% and 58%), then layer 5 (21%, 27%) and 4 (19%, 9%), the rest in
+  layers 6 to 11.
 
 ## 4. Adversarial search: what protects greedy
 
@@ -604,13 +692,14 @@ cargo build --release
 ./target/release/span --from 2 --to 100000 --threads 6 --seconds 540 --out OUT.jsonl     # resumable; ~10 min
 ./target/release/span --from 101000 --to 1000000 --step 1000 --threads 6 --seconds 540 --out OUT.jsonl
 ./target/release/star --from 2 --to 20000 --threads 6 --seconds 540 --out OUT.jsonl
-./target/release/exact --from 2 --to 1300 --threads 3 --seconds 540 --checkpoints work/fresh --out OUT.jsonl
-                                    # with the parity bound, rerun until done (data/exact_parity_2_1300.jsonl)
-./target/release/exact --from 2 --to 1231 --parity 0 --threads 6 --seconds 540 --out OUT.jsonl
+./target/release/exact --from 2 --to 1300 --threads 3 --seconds 540 --fix-low 0 --checkpoints work/fresh --out OUT.jsonl
+                                    # with the parity bound, rerun until done (data/exact_parity_2_1300.jsonl; without
+                                    # --fix-low 0 the searches start from the roles of Theorem B, the default now)
+./target/release/exact --from 2 --to 1231 --parity 0 --fix-low 0 --threads 6 --seconds 540 --out OUT.jsonl
                                     # the Franklín–Moniot bound alone (data/exact_2_1231.jsonl, which left open
                                     # searches:)
 tar -xzf data/checkpoints/exact_open_searches.tar.gz -C work   # to resume them with the parity bound:
-./target/release/exact --from 990 --to 1300 --threads 3 --seconds 540 --out data/exact_parity_990_1300.jsonl
+./target/release/exact --from 990 --to 1300 --fix-low 0 --threads 3 --seconds 540 --out data/exact_parity_990_1300.jsonl
 cargo run --release --example parityroot 2 1300     # the root's parity bound, checked, for every game
 cargo run --release --example paritycheck 2 1300    # one below each optimum, the search finds it (~30 minutes)
 bash tools/adversary_campaign.sh                                                          # data/adversary/
@@ -619,9 +708,20 @@ bash tools/adversary_campaign.sh                                                
 ./target/release/optsets --from 2 --to 989 --out OUT.jsonl     # then the games at their ceiling and the primes, derived
 ./target/release/optsets --list 798,799,800 --upper fixed --threads 1 --seconds 540 --out FIXED.jsonl
 ./target/release/moves --from 2 --to 1300 --seconds 540 --out OUT.jsonl         # one thread; ~7 minutes
-../tools/cloud/prover.sh 1301 2175                # `exact` over a range in resumable passes, all CPUs, then the check
+EXTRA_ARGS='--fix-low 0' ../tools/cloud/prover.sh 1301 2175   # `exact` over a range in resumable passes, all CPUs,
+                                    # then the check (data/exact_parity_1301_2175.jsonl; without EXTRA_ARGS the
+                                    # searches start from the roles of Theorem B)
 tools/summarize.py check 1301 2175 data/exact_parity_2_1300.jsonl data/exact_parity_1301_2175.jsonl
-                                    # every n in 2..2175 proven, scores recorded
+                                    # every n in 2..2175 proven, scores recorded, and how many proofs rest on Theorem B
+./target/release/exact --from 2 --to 2175 --budget 1 --out PRE.jsonl    # no search, only the roles' checks (4 min)
+./target/release/upper --from 1301 --to 2175 --out data/upper_1301_2175.jsonl          # one thread, 5 minutes
+./target/release/upper --from 2176 --to 3314 --results ../results/strict.jsonl --results CHAIN.jsonl \
+    --out data/upper_2176_3314.jsonl          # CHAIN.jsonl: the EC2 chain's results (21 minutes)
+./target/release/upper --from 3315 --to 3440 --results ../results/strict.jsonl \
+    --out data/upper_3315_3440.jsonl          # the committed chain's last games (5 minutes)
+./target/release/exact --list 1575,1584 --out B.jsonl                   # E6: the sources of layer >= 3 free
+./target/release/exact --list 1575,1584 --fix-upper 1 --out D.jsonl     # ... and fixed to U*
+tools/summarize.py sources B.jsonl D.jsonl          # E6's table and criterion (RUNBOOK section 10 for the cloud run)
 tools/summarize.py span|star|exact|cost|adversary|optsets|moves FILE...
 tools/crosscheck_optsets.py data/optsets_2_989.jsonl --max 57 --budget 120     # theory-free, about 8 minutes
 tools/crosscheck_greedy.py data/span_2_100000.jsonl.gz --max 1000
@@ -639,18 +739,22 @@ gzipped where large (`gunzip -k` to resume into it).
   rejection of descending greedy on an upper-half instance is a GF(2) dependency of what it kept above — a
   statement about cores and closed surfaces mod 2 that the adversarial results tie to the window law with the
   real ranking of the primes.
-* The prover's proofs reach 2175, the end of the committed chain; 1301–2175 took 226 thread-hours (section 3), and a
-  longer chain will need more.  What the parity bound still misses are the odd cores (THEORY.md, Theorem 10): its
-  root gap, 130 points on average at 1000–1300 and 384 over the searched games of 1301–2175 (125 to 767, no steady
-  rise), and the cost with it (tenfold the nodes per 210 points); the conflicts of its heaviest sets are large (20–45
-  members at 990).
+* The prover's proofs reach 2175, where the committed chain ended when they were made (it reaches 3440 now, within the
+  frame model); 1301–2175 took 226 thread-hours (section 3), and a longer chain will need more.  What the parity
+  bound still misses are the odd cores (THEORY.md, Theorem 10): its root gap, 130 points on average at 1000–1300 and
+  384 over the searched games of 1301–2175 (125 to 767, no steady rise), and the cost with it (tenfold the nodes per 210
+  points); the conflicts of its heaviest sets are large (20–45 members at 990).
 * The optimal sets of 990–1300 are not enumerated.  The enumeration mode works with the parity bound (tested
   against brute force), so `optsets` with it would extend section 5 at about the cost of the proofs.
 * The frame model's individual assumptions are no longer open: they are theorems given a per-board fact that holds
   on every board to 8191 ([THEORY.md](../../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains),
   Theorems B and M), and what the model's answers rest on is one statement, U: some optimal game plays every source of
-  three or more prime factors that setup keeps.  The prover's proofs establish U at every n ≤ 2175; certifying it
-  game by game beyond (barred parity bounds, then a search of the members they leave open) is the next step.
+  three or more prime factors that setup keeps.  The prover's proofs establish U at every n ≤ 2175.  Beyond, the
+  committed games of 2176–3440 that rest on U (an exhausted search or a repeat) have it uncertified, and the
+  barred parity bounds certify 85% of those sources per game to 3314 but close no game alone
+  ([section 3](#the-upper-part-game-by-game)); the rest needs a search that leaves the open sources optional, whose
+  cost against the search with them fixed is the measurement E6 (`exact` against `exact --fix-upper 1`,
+  prepared, [RUNBOOK section 10](../tools/cloud/RUNBOOK.md#10-the-theory-tracks-measurements-e6-and-e9a)).
 * Whether every optimal game's upper part is U\*.  Theorem 8 settles the upper half alone; for the whole game, a
   frontier argument would start from an optimal S whose upper part S_U is not U\*: termwise domination puts the
   largest disagreement d in U\* ∖ S_U, and S + d is unplayable, so the question is whether some repair costs less

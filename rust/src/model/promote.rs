@@ -1,7 +1,10 @@
 //! Promotions: whether a number or a set can be promoted from a state, and the state after.
 //!
 //! Promoting `n` takes it out of the factors of its home frame `h ≥ 1` and adds it to the moves of frame `h − 1`.
-//! It is legal when both frames stay winnable; both are then reduced, and each loses a freedom.
+//! It is legal when both frames stay winnable; both are then reduced, and each loses a freedom.  A one-sided candidate
+//! (see the module docs of [`super`]) is added to the moves of its own frame and taken from no frame: legal when that
+//! frame stays winnable, which is then reduced and loses a freedom.  Below, "a member promoted into a frame" includes
+//! the one-sided members of its own frame; nothing else changes.
 //!
 //! # Sets are checked frame by frame
 //!
@@ -43,7 +46,8 @@ impl FrameGraph {
     }
 
     /// Whether `n` can be promoted: it is a factor of its home frame `h ≥ 1`, and frames `h − 1` (gaining the
-    /// move) and `h` (losing the factor) both stay winnable.
+    /// move) and `h` (losing the factor) both stay winnable; or it is a one-sided candidate (not promoted on the way
+    /// to `state`) and its own frame stays winnable with it as a move.
     #[inline]
     pub fn can_promote<const W: usize>(&self, state: &FrameSet<W>, n: u32) -> bool {
         self.can_promote_using(&mut Scratch::new(), state, n)
@@ -55,17 +59,27 @@ impl FrameGraph {
         self.promotable(scratch, state, n).is_some()
     }
 
-    /// The home frame of `n` if `n` can be promoted.
+    /// The frames that promoting `n` touches ([`frames_touched`](Self::frames_touched)) if `n` can be promoted.
     #[inline]
-    fn promotable<const W: usize>(&self, scratch: &mut Scratch<W>, state: &FrameSet<W>, n: u32) -> Option<usize> {
+    fn promotable<const W: usize>(
+        &self,
+        scratch: &mut Scratch<W>,
+        state: &FrameSet<W>,
+        n: u32,
+    ) -> Option<(usize, Option<usize>)> {
+        let into_wins = |scratch: &mut Scratch<W>, into: &Frame<W>| {
+            self.has_unused_factor(into, n) || scratch.winnable(&into.moves.with(n), &into.factors, &self.graph)
+        };
+        if let Some(j) = self.own(n) {
+            return into_wins(scratch, &state.frames[j]).then_some((j, None));
+        }
         let h = self.home(n);
         if h == 0 || !self.contains_factor(state, n) {
             return None;
         }
         let (into, out) = (&state.frames[h - 1], &state.frames[h]);
-        let ok = (self.has_unused_factor(into, n) || scratch.winnable(&into.moves.with(n), &into.factors, &self.graph))
-            && scratch.winnable(&out.moves, &out.factors.without(n), &self.graph);
-        ok.then_some(h)
+        let ok = into_wins(scratch, into) && scratch.winnable(&out.moves, &out.factors.without(n), &self.graph);
+        ok.then_some((h - 1, Some(h)))
     }
 
     /// Whether the move `x` has a live factor in the winnable `frame` that none of the frame's moves has: then the
@@ -99,21 +113,28 @@ impl FrameGraph {
         state: &mut FrameSet<W>,
         n: u32,
     ) -> bool {
-        let Some(h) = self.promotable(scratch, state, n) else {
+        let Some((into, out)) = self.promotable(scratch, state, n) else {
             return false;
         };
         let single = Bits::EMPTY.with(n);
-        self.apply(&mut state.frames[h - 1], &single, &Bits::EMPTY);
-        self.apply(&mut state.frames[h], &Bits::EMPTY, &single);
+        self.apply(&mut state.frames[into], &single, &Bits::EMPTY);
+        if let Some(out) = out {
+            self.apply(&mut state.frames[out], &Bits::EMPTY, &single);
+        }
         true
     }
 
-    /// Splits `set` by frame, from its largest member down: per frame, the members promoted into it and out of
-    /// it.  Stops at the first member that is not a factor of a home frame `h ≥ 1` in `state` (so cannot be
-    /// promoted at all) and returns it too; the split then covers only the members above it.
+    /// Splits `set` by frame, from its largest member down: per frame, the members promoted into it (one-sided ones
+    /// into their own frame) and out of it.  Stops at the first member that is neither one-sided nor a factor of a
+    /// home frame `h ≥ 1` in `state` (so cannot be promoted at all) and returns it too; the split then covers only
+    /// the members above it.
     pub fn edits<const W: usize>(&self, state: &FrameSet<W>, set: &Bits<W>) -> (Edits<W>, Option<u32>) {
         let mut edits = Edits { gained: [Bits::EMPTY; MAX_FRAMES], lost: [Bits::EMPTY; MAX_FRAMES] };
         for x in set.iter_desc() {
+            if let Some(j) = self.own(x) {
+                edits.gained[j].insert(x);
+                continue;
+            }
             let h = self.home(x);
             if h == 0 || !self.contains_factor(state, x) {
                 return (edits, Some(x));

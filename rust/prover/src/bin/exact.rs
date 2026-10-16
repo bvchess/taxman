@@ -3,7 +3,8 @@
 //! lacks the game of `--results`, by default the solver's `results/strict.jsonl`).  One line per game, resumable:
 //!
 //!     exact --from A --to B [--list ...] [--threads T] [--seconds S] [--budget NODES] [--all 1] [--parity 0]
-//!           [--segments 1] [--lagrangian 0|1] [--checkpoints DIR] [--optimal FILE] [--results FILE] --out FILE
+//!           [--segments 1] [--lagrangian 0|1] [--fix-low 0 | --fix-upper 1] [--checkpoints DIR]
+//!           [--optimal FILE] [--results FILE] --out FILE
 //!
 //! Per game: the recorded game is replayed by the rules (a lower bound, opt(n) >= V(n)); the Franklín–Moniot
 //! bound and the parity bound (THEORY.md, Theorem 10; `parity.rs`) are computed at the root; the ceiling
@@ -13,14 +14,39 @@
 //! `data/exact_2_1231.jsonl` ran).  Which games end up proven, given their predecessors, is worked out by
 //! `tools/summarize.py exact` from the file.
 //!
-//! A search still running at `--seconds` pauses and saves its open subtrees and nogoods to
-//! `DIR/exact_N.ckpt` (default `work/checkpoints`); the next run resumes it, so a game may take any number of
-//! runs.  Without the parity bound, a search that outlasts a 20-second warm-up, or resumes, goes on with the
-//! Lagrangian bound fitted to the nogoods learned so far (`--lagrangian 0` turns that off, `--lagrangian 1` turns
-//! it on with the parity bound too).  `--segments 1` turns on the segment cuts, which make a game's proof rest on
-//! the smaller games' bounds (recorded as `"segments":1`); they are off by default, so that each search stands
+//! The roles of Theorem B (`--fix-low 1`, the default; `--fix-low 0` starts from the plain root, as the committed
+//! files `data/exact_*.jsonl` were made): the search starts from the roles `upper::low_roles` writes down, "B" below,
+//! the largest prime forced and every other prime barred, the sources of layer 2 in U\* forced and the other numbers of
+//! layer 2 above n/2 barred, and, on a board whose frames of layer 2 are closed (the function decides it from the
+//! board's own U\*, not from a board size), every number of layer 2 up to n/2 barred.  THEORY.md's Theorem B says every
+//! optimal set obeys them, so a search from them that proves "no playable set obeying them beats V" still proves
+//! opt(n) <= V (an optimal set beating V would obey them), and its line is written `"proven"` like any other.  The
+//! recorded game must obey them (checked).  The sources of layer 3 and up stay free.  Against the plain root it takes
+//! half the time a node (the parity solves have fewer free elements) at the plain search's nodes within a few percent
+//! (1575 and 1584).  Because the proof rests on Theorem B besides the other theorems, every line records `"fix_low"`,
+//! 1 or 0, and with it `fixed_bound`, the parity bound at the roles searched from.
+//!
+//! A search still running at `--seconds` pauses and saves its open subtrees and nogoods to a checkpoint in
+//! `DIR` (default `work/checkpoints`); the next run resumes it, so a game may take any number of runs.  A search of
+//! one kind never resumes another's: the checkpoint is `exact_N_low.ckpt`, `exact_N.ckpt` (`--fix-low 0`) or
+//! `exact_N_upper.ckpt`.  Without the parity bound, a search that outlasts a 20-second warm-up, or resumes, goes on
+//! with the Lagrangian bound fitted to the nogoods learned so far (`--lagrangian 0` turns that off, `--lagrangian 1`
+//! turns it on with the parity bound too).  `--segments 1` turns on the segment cuts, which make a game's proof rest
+//! on the smaller games' bounds (recorded as `"segments":1`); they are off by default, so that each search stands
 //! alone.  A proof's `"matching_nodes"` are its nodes searched without the parity bound (a search resumed from a
 //! checkpoint of such a run); its `"nodes"` count all of them.
+//!
+//! What the sources of layer 3 and up cost (E6): `--fix-upper 1` (it needs `--fix-low 1`) also fixes the whole upper
+//! part to U\*, every source in it forced and every other barred, "D" below, which is the frame model's problem on
+//! the whole board.  It proves nothing about opt(n) (that some optimal set has the upper part U\* is the open U of
+//! THEORY.md), so a finished search of that kind is written `"search":"upper_fixed"` and no tool counts it as a
+//! proof; it is a measurement, and its line has `"fix_upper":1`.  A playable set beating V is a real game whatever
+//! the roles, so a search that finds one stops with an error in every mode.  Two counters show where B spends on the
+//! sources of layer 3 and up, in every search (0 for a game not searched): `branched_on_sources`, the nodes that
+//! branched on a set holding a free source of layer 3 or up, and `barred_upper`, the nodes whose roles, as the node
+//! received them, bar a member of U\*_{>=3} (`game::Prover::watch`; they change nothing in the search).  `fm_bound`,
+//! `parity_bound` and the choice of the games to search stay the whole board's.  `tools/summarize.py sources`
+//! compares B with D.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -29,6 +55,7 @@ use taxman_prover::game::{relation, Board, Prover, Role, Verdict};
 use taxman_prover::jsonl::{campaign, parse_items, recorded_games, Obj};
 use taxman_prover::parity::{Meet, Outcome, Parity};
 use taxman_prover::primes::smallest_prime_factors;
+use taxman_prover::upper::{low_roles, obeys, recorded_ustar, upper_fixed_roles, watched};
 
 /// A paused search: its target, nodes so far (and how many of them without the parity bound), nogoods and open
 /// units (roles as letters F, P, B).
@@ -39,6 +66,9 @@ struct Checkpoint {
     matching_nodes: Option<u64>,
     /// Seconds spent in earlier runs.
     secs: f64,
+    /// The counters of [`Prover::watch`] so far (0 in a checkpoint written before they existed).
+    branching: u64,
+    barring: u64,
     nogoods: Vec<Vec<u32>>,
     units: Vec<Vec<Role>>,
 }
@@ -46,6 +76,7 @@ struct Checkpoint {
 impl Checkpoint {
     fn save(&self, path: &Path) {
         let mut text = format!("target {}\nnodes {}\nsecs {}\n", self.target, self.nodes, self.secs);
+        text += &format!("branching {}\nbarring {}\n", self.branching, self.barring);
         if let Some(m) = self.matching_nodes {
             text += &format!("matching_nodes {m}\n");
         }
@@ -72,8 +103,16 @@ impl Checkpoint {
 
     fn load(path: &Path) -> Option<Checkpoint> {
         let text = fs::read_to_string(path).ok()?;
-        let mut cp =
-            Checkpoint { target: 0, nodes: 0, matching_nodes: None, secs: 0.0, nogoods: Vec::new(), units: Vec::new() };
+        let mut cp = Checkpoint {
+            target: 0,
+            nodes: 0,
+            matching_nodes: None,
+            secs: 0.0,
+            branching: 0,
+            barring: 0,
+            nogoods: Vec::new(),
+            units: Vec::new(),
+        };
         for line in text.lines() {
             let (key, rest) = line.split_once(' ')?;
             match key {
@@ -81,6 +120,8 @@ impl Checkpoint {
                 "nodes" => cp.nodes = rest.parse().ok()?,
                 "matching_nodes" => cp.matching_nodes = Some(rest.parse().ok()?),
                 "secs" => cp.secs = rest.parse().ok()?,
+                "branching" => cp.branching = rest.parse().ok()?,
+                "barring" => cp.barring = rest.parse().ok()?,
                 "nogood" => cp.nogoods.push(rest.split(' ').map(|c| c.parse().unwrap()).collect()),
                 "unit" => cp.units.push(
                     rest.chars()
@@ -98,11 +139,19 @@ impl Checkpoint {
     }
 }
 
+/// The counters of the prover's watch: (nodes that branched on a source of layer 3 or up, nodes that barred a member
+/// of U\*_{>=3}); zeros for a prover that is not watching (a game that was not searched).
+fn counters(prover: &Prover<'_>) -> (u64, u64) {
+    prover.watch.as_ref().map_or((0, 0), |w| (w.branching, w.barring))
+}
+
 fn main() {
     let (items, flags) = parse_items(std::env::args().skip(1));
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let (mut threads, mut seconds, mut budget) = (1usize, f64::INFINITY, u64::MAX);
     let (mut all, mut parity, mut segments, mut lagrangian) = (false, true, false, None);
+    // The roles of Theorem B are the default; --fix-low 0 starts from the plain root.
+    let (mut fix_low, mut fix_upper) = (true, false);
     let mut optimal = root.join("../../src/main/resources/optimal.json");
     let mut results = root.join("../results/strict.jsonl");
     let mut checkpoints = root.join("work/checkpoints");
@@ -116,6 +165,8 @@ fn main() {
             "--parity" => parity = value == "1" || value == "true",
             "--segments" => segments = value == "1" || value == "true",
             "--lagrangian" => lagrangian = Some(value == "1" || value == "true"),
+            "--fix-low" => fix_low = value == "1" || value == "true",
+            "--fix-upper" => fix_upper = value == "1" || value == "true",
             "--checkpoints" => checkpoints = value.into(),
             "--optimal" => optimal = value.into(),
             "--results" => results = value.into(),
@@ -124,6 +175,15 @@ fn main() {
         }
     }
     assert!(!out.as_os_str().is_empty(), "--out is required");
+    assert!(fix_low || !fix_upper, "--fix-upper needs the roles of Theorem B (--fix-low 1, the default)");
+    // A search of one kind never resumes another's.
+    let kind = if fix_upper {
+        "_upper"
+    } else if fix_low {
+        "_low"
+    } else {
+        ""
+    };
     // The Lagrangian bound cut nothing beside the parity bound at 990 (the same 44,411 nodes, 7% more time).
     let lagrangian = lagrangian.unwrap_or(!parity);
     let known = recorded_games(&[&optimal, &results]);
@@ -149,25 +209,51 @@ fn main() {
         }
         let fm = prover.root_bound();
         assert!(fm >= *score, "n={n}: the matching bound {fm} is below a legal game's {score}");
+        let weights: Vec<i64> = (0..=n as i64).collect();
+        let parity_at = |roles: &[Role]| Meet::new(Parity::pair(&board, &weights)).solve(roles);
         let parity_bound = {
-            let weights: Vec<i64> = (0..=n as i64).collect();
             let mut roles = prover.root_roles();
-            let Outcome::Bound(root_bound) = Meet::new(Parity::pair(&board, &weights)).solve(&roles) else {
+            let Outcome::Bound(root_bound) = parity_at(&roles) else {
                 panic!("n={n}: the root's parity bound is not certified")
             };
             assert!(root_bound.value >= *score as i64, "n={n}: the parity bound is below a legal game's {score}");
             // The recorded game's moves are independent in both parity matroids (Theorem 10).
             moves.iter().for_each(|&c| roles[c as usize] = Role::Pick);
-            let independent = Meet::new(Parity::pair(&board, &weights)).solve(&roles);
+            let independent = parity_at(&roles);
             assert!(matches!(independent, Outcome::Bound(_)), "n={n}: the recorded game is dependent");
             root_bound.value as u64
         };
-        let ckpt = checkpoints.join(format!("exact_{n}.ckpt"));
+        let ckpt = checkpoints.join(format!("exact_{n}{kind}.ckpt"));
         let (mut matching_nodes, mut loaded_nodes) = (0u64, 0u64);
         let bounded = fm == *score || (parity && parity_bound == *score);
-        let (search, note) = if bounded || (relation != "none" && !all) {
+        let skip = bounded || (relation != "none" && !all);
+        // U* fixes the roles and names the numbers the counters watch; a game that is left alone needs neither.
+        let ustar = if fix_low || !skip { recorded_ustar(n, moves, &spf) } else { Vec::new() };
+        // The roles the search starts from (those of Theorem B unless --fix-low 0 says the plain root): the recorded
+        // game obeys them, so their parity bound is at least its score.
+        let unit = if fix_upper {
+            upper_fixed_roles(n as u32, &spf, &ustar)
+        } else if fix_low {
+            low_roles(n as u32, &spf, &ustar)
+        } else {
+            prover.root_roles()
+        };
+        if fix_low {
+            obeys(&unit, moves)
+                .unwrap_or_else(|e| panic!("n={n}: the recorded game breaks the roles searched from: {e}"));
+        }
+        let fixed_bound = fix_low.then(|| {
+            let Outcome::Bound(bound) = parity_at(&unit) else {
+                panic!("n={n}: the parity bound at the roles searched from is not certified")
+            };
+            assert!(bound.value >= *score as i64, "n={n}: the bound at the roles searched from is below {score}");
+            bound.value as u64
+        });
+        let (search, note) = if skip {
             ("skipped", None)
         } else {
+            let (branch, barred) = watched(n as u32, &spf, &ustar);
+            prover = prover.watch(branch, barred);
             // A search that outlasts a short warm-up (or resumes from a checkpoint) goes on with the Lagrangian
             // bound fitted to the nogoods learned so far.
             let warmup = (Instant::now() + Duration::from_secs(20)).min(pause_at);
@@ -179,12 +265,15 @@ fn main() {
                     matching_nodes = cp.matching_nodes.unwrap_or(cp.nodes);
                     earlier.set(cp.secs);
                     prover.nogoods = cp.nogoods;
+                    if let Some(watch) = prover.watch.as_mut() {
+                        (watch.branching, watch.barring) = (cp.branching, cp.barring);
+                    }
                     prover.take_units(pause_at);
                     Err(cp.units)
                 }
                 None => {
                     prover.take_units(warmup);
-                    match prover.run() {
+                    match prover.run_units(vec![unit]) {
                         Verdict::Paused => Err(prover.take_units(pause_at)),
                         other => Ok(other),
                     }
@@ -203,14 +292,18 @@ fn main() {
                 matching_nodes += prover.nodes - loaded_nodes;
             }
             match verdict {
-                Verdict::Proven => ("proven", None),
+                // A search from the roles of the frame model's problem proves nothing about opt(n).
+                Verdict::Proven => (if fix_upper { "upper_fixed" } else { "proven" }, None),
                 Verdict::Budget => ("budget", Some(format!("budget exhausted after {} nodes", prover.nodes))),
                 Verdict::Paused => {
+                    let (branching, barring) = counters(&prover);
                     let cp = Checkpoint {
                         target: *score,
                         nodes: prover.nodes,
                         matching_nodes: Some(matching_nodes),
                         secs: earlier.get() + started.elapsed().as_secs_f64(),
+                        branching,
+                        barring,
                         nogoods: prover.nogoods.clone(),
                         units: prover.open_units().to_vec(),
                     };
@@ -225,7 +318,8 @@ fn main() {
             }
         };
         let _ = fs::remove_file(&ckpt);
-        let line = Obj::new()
+        let (branching, barring) = counters(&prover);
+        let mut line = Obj::new()
             .num("n", n)
             .num("score", *score)
             .num("fm_bound", fm)
@@ -237,7 +331,15 @@ fn main() {
             .num("nodes", prover.nodes)
             .num("matching_nodes", matching_nodes)
             .float("secs", earlier.get() + started.elapsed().as_secs_f64())
-            .finish();
-        (Some(line), note)
+            .num("branched_on_sources", branching)
+            .num("barred_upper", barring)
+            .num("fix_low", u8::from(fix_low));
+        if let Some(bound) = fixed_bound {
+            line = line.num("fixed_bound", bound);
+        }
+        if fix_upper {
+            line = line.num("fix_upper", 1);
+        }
+        (Some(line.finish()), note)
     });
 }

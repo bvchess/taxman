@@ -7,7 +7,7 @@
 //! cargo run --release --example perf -- [--reps R] [--steps K] [--brief] [--fixtures DIR] [--tactic NAME=VALUE]...
 //!     [GAME...]
 //! cargo run --release --example perf -- make-nodes N [--known FILE] [--every K] [--keep M] [--fixtures DIR]
-//! cargo run --release --example perf -- make-window N AT [--known FILE] [--fixtures DIR]
+//! cargo run --release --example perf -- make-window N AT [--known FILE] [--fixtures DIR] [--tactic NAME=VALUE]...
 //! ```
 //!
 //! The fixtures, in `testdata/perf/` unless `--fixtures` says otherwise (games 936 and 1215 by default: W = 16,
@@ -28,9 +28,11 @@
 //!   resumed search starts with empty nogood tables, so the window is the same tree every time, and its
 //!   fingerprint is the search's counters (steps, promotions, children, matching bounds, ...), less the GF(2)
 //!   bound's counts of solves and augmentations, which measure work rather than the tree.  The checkpoint
-//!   is read-only.  The window searches with the tactics the checkpoint records, the defaults (`make-window 936
-//!   4500` and `make-window 1215 600000`), which `--tactic` changes (the search tactics only, as for the ladder):
-//!   `--tactic lagrange=off`, say, searches the same window without the Lagrangian bound.
+//!   is read-only.  The window searches with the tactics the checkpoint records, the matching path's, the defaults when
+//!   the windows were first made (`make-window 936 4500` and `make-window 1215 600000`, with `--tactic gf2=off --tactic
+//!   lagrange=on --tactic symmetry=off` since; `make-window` takes `--tactic` as the probe does, on top of the
+//!   defaults), which `--tactic` changes (the search tactics only, as for the ladder): `--tactic lagrange=off`, say,
+//!   searches the same window without the Lagrangian bound.
 //!
 //! Each kernel runs `--reps` times (default 3; the window 2) and the fastest by cycles is reported, per
 //! operation and in all; the fingerprints of all runs must agree.  The incremental matching kernels (marked `+`)
@@ -625,8 +627,18 @@ fn make_nodes<const W: usize>(dir: &Path, n: u32, optimal: &Optimal, every: u64,
     Ok(())
 }
 
-fn make_window<const W: usize>(dir: &Path, n: u32, optimal: &Optimal, at: u64) -> Result<(), String> {
-    let p = setup::<W>(n);
+fn make_window<const W: usize>(
+    dir: &Path,
+    n: u32,
+    optimal: &Optimal,
+    at: u64,
+    changes: &[String],
+) -> Result<(), String> {
+    let mut tactics = Tactics::default();
+    for change in changes {
+        tactics.set(change).map_err(|e| format!("--tactic: {e}"))?;
+    }
+    let p = Board::<W>::for_n(n).prepare(tactics.search).map_err(|e| format!("n={n}: {e}"))?;
     let incumbent = seed(&p, optimal);
     let path = fixture(dir, n, "window.ckpt");
     std::fs::create_dir_all(path.parent().expect("a directory")).map_err(|e| e.to_string())?;
@@ -687,7 +699,7 @@ fn run() -> Result<(), String> {
         }
         (Some("make-window"), &[n, at]) => {
             let n = n as u32;
-            taxman::with_width!(n, W => make_window::<W>(&dir, n, &optimal()?, at))
+            taxman::with_width!(n, W => make_window::<W>(&dir, n, &optimal()?, at, &changes))
         }
         (Some(command), _) => Err(format!("{command}: wrong arguments (see the top of examples/perf.rs)")),
         (None, games) => {

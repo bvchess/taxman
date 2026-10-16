@@ -1,0 +1,18 @@
+# dear_rest: phase B, the other dear groups, the dearest first
+# games: 14 in 12 groups
+# expected thread-hours: 1,836.59
+# command: certify_campaign.py lists --plan bench/certify/plan.jsonl --out-dir bench/certify/lists/stage4
+3440
+3424
+3425
+2346
+3430
+3431
+3400
+3401
+3399
+3330
+3404
+3333
+3432
+3174

@@ -68,11 +68,12 @@ stamp "measure.sh starts; uptime $(uptime_min) min; cpus $NCPU; node 0 $NODE0; 6
 } > "$OUT/machine.txt" 2>&1
 cp "$HOME/taxman-work/logs/setup.log" "$OUT/setup.log" 2>/dev/null
 
-# The inputs: the known games (committed chain and the c8g chain), the prefix to 2225, the copy to 2183.
-cat results/strict.jsonl bench/cloud/c8g.chain-2176.jsonl > "$WORK/known.jsonl"
+# The inputs: the known games (the committed chain's first 2175 games, which the file has more than now, and the c8g
+# chain), the prefix to 2225, the copy to 2183.
+{ head -n 2175 results/strict.jsonl; cat bench/cloud/c8g.chain-2176.jsonl; } > "$WORK/known.jsonl"
 { head -n 2175 results/strict.jsonl; awk -F'"n":' '{ if ($2 + 0 <= 2225) print }' bench/cloud/c8g.chain-2176.jsonl; } \
     > "$WORK/prefix.jsonl"
-{ cat results/strict.jsonl; awk -F'"n":' '{ if ($2 + 0 <= 2183) print }' bench/cloud/c8g.chain-2176.jsonl; } \
+{ head -n 2175 results/strict.jsonl; awk -F'"n":' '{ if ($2 + 0 <= 2183) print }' bench/cloud/c8g.chain-2176.jsonl; } \
     > "$WORK/c2183.jsonl"
 wc -l "$WORK"/*.jsonl | tee -a "$OUT/steps.log"
 save

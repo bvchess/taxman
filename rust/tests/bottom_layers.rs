@@ -22,8 +22,9 @@
 //!   (`Board::plain`) are Kruskal's, on every board to 400 and on a sample of the boards to 8191 (an ignored test
 //!   takes every 25th).
 //! * [`theorem_b_holds_for_every_recorded_game`]: the games of the table `optimal.json`, of the committed chain
-//!   `results/strict.jsonl` and of the chain 2176 to 2276 made on EC2.  The frame solver's games play numbers of
-//!   layer 2 up to n/2 only on small boards, where the frames of layer 2 have freedoms.
+//!   `results/strict.jsonl` (2..3440) and of the chain 2176 to 2276 of the Graviton calibration, another run of games
+//!   the committed chain has.  The frame solver's games play numbers of layer 2 up to n/2 only on small boards, where
+//!   the frames of layer 2 have freedoms.
 //! * [`theorem_b_holds_for_every_enumerated_optimal_set`]: the prover's lists of all the optimal sets of a board
 //!   (`prover/data/optsets_*.jsonl`): the other sets of a board as well as the recorded game.  Each set is checked to
 //!   be playable and worth the optimum before the theorem is asked of it.
@@ -330,7 +331,7 @@ fn check_games(source: &str, games: &[(u32, Vec<u32>)]) -> Vec<String> {
 }
 
 /// Theorem B on the games of the table `optimal.json`, of the committed chain `results/strict.jsonl` and of the chain
-/// 2176 to 2276 made on EC2.
+/// 2176 to 2276 of the Graviton calibration.
 #[test]
 fn theorem_b_holds_for_every_recorded_game() {
     let table: Vec<(u32, Vec<u32>)> =
@@ -338,8 +339,8 @@ fn theorem_b_holds_for_every_recorded_game() {
     let chain = completed_games(&results_path("strict.jsonl"));
     let ec2 = completed_games(&crate_path("bench/cloud/c8g.chain-2176.jsonl"));
     assert!(table.len() >= 1299, "the table has the games of 2 to 1300, not {}", table.len());
-    assert!(chain.len() >= 2174, "the chain has the games of 2 to 2175, not {}", chain.len());
-    assert!(ec2.len() >= 101, "the chain made on EC2 has the games of 2176 to 2276, not {}", ec2.len());
+    assert!(chain.len() >= 3439, "the chain has the games of 2 to 3440, not {}", chain.len());
+    assert!(ec2.len() >= 101, "the calibration's chain has the games of 2176 to 2276, not {}", ec2.len());
 
     let mut failures = check_games("optimal.json", &table);
     failures.extend(check_games("results/strict.jsonl", &chain));

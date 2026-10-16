@@ -74,7 +74,8 @@
 //! * `header`: the checkpoint's header.
 //! * `diagnostics`: [`Diagnostics`], for tuning.
 //! * [`symmetry`]: the root's prime exchanges (symmetric pairs of primes) and the rule they give the search.
-//! * here: [`search`], which starts or resumes the engine on a prepared game; [`offer_seed`], [`best_so_far`] and
+//! * here: [`search`], which starts or resumes the engine on a prepared game; [`start_incumbent`], the incumbent it
+//!   starts from, which the hunt (`sacrifice::hunt`) also makes without a search; [`offer_seed`], [`best_so_far`] and
 //!   [`seed_survivors_sum`], for a caller that steers searches through their [`Control`] (`EngineConfig::control`).
 
 mod diagnostics;
@@ -90,7 +91,10 @@ mod tactics;
 pub use diagnostics::{cut, Diagnostics, GAP_BUCKETS};
 pub use incumbent::Neighbourhood;
 pub use searcher::{stat, Found, Gf2Branching, SearchSpace, TaxSearcher, TaxUnit};
-pub use setup::{prepare, prepare_for_resume, problem_of, PrepareTimings, Prepared, Problem, ProblemSize};
+pub use setup::{
+    extended_words, prepare, prepare_extended, prepare_extended_for_resume, prepare_for_resume, problem_of,
+    problem_of_extended, PrepareTimings, Prepared, Problem, ProblemSize,
+};
 pub use tactics::SearchTactics;
 
 use crate::bits::Bits;
@@ -202,43 +206,7 @@ fn search_forgetting<const W: usize>(
     }
     let cfg = &EngineConfig { control: Some(Arc::clone(&control)), ..cfg.clone() };
     let match_graph = MatchGraph::new(&prepared.model, &prepared.root);
-    // The start's incumbent is offered to the control as soon as it is known and each time it improves, so that a
-    // caller reading the control ([`best_so_far`]) has it while the start is still being computed, not only once the
-    // engine runs.  The run starts from exactly what it started from without the offers: the engine takes the better
-    // of its `Start`'s incumbent and the best offered to the control, strictly better only, and the start's final
-    // incumbent is at least every one offered, so it keeps its own, and the trees do not change.  (A resumed run's
-    // `Start` is its checkpoint, whose incumbent is at least the start of the run that wrote it: the same, with the
-    // same seed, so it keeps its own too; one that a start beats is replaced by it, as `best` below counts it.)
-    let mut incumbent = prepared.greedy;
-    if let Some(seed) = seed {
-        let kept = surviving(prepared, seed);
-        if kept.sum() > incumbent.sum() {
-            incumbent = kept;
-        }
-    }
-    offer_set(&control, &incumbent);
-    // A start that reaches the ceiling cannot be beaten, so the dive and the local search are skipped: they could
-    // not change it if the ceiling holds, as the proof by the ceiling assumes (and `solver::conclude` rejects any
-    // game above it).  The dive is taken only when strictly heavier, and the local search keeps only strictly
-    // heavier sets, after a first fill that can only add candidates; no promotable set is heavier than the ceiling.
-    // The ceiling is read when each is due, and by the local search before each pass: the control may be given a
-    // lower one meanwhile.
-    if !reaches(&incumbent, control.ceiling()) {
-        let dived = dive(&prepared.model, &prepared.root, &match_graph, &prepared.candidates);
-        if dived.sum() > incumbent.sum() {
-            incumbent = dived;
-            offer_set(&control, &incumbent);
-        }
-    }
-    if !reaches(&incumbent, control.ceiling()) {
-        let hood = Neighbourhood { model: &prepared.model, root: &prepared.root, candidates: &prepared.candidates };
-        let improved =
-            hood.improve_on(|| control.workers().unwrap_or(cfg.threads), || control.ceiling(), &incumbent, true);
-        if improved.sum() > incumbent.sum() {
-            offer_set(&control, &improved);
-        }
-        incumbent = improved;
-    }
+    let incumbent = start_incumbent(prepared, &match_graph, &control, cfg.threads, seed);
     let checkpoint = cfg.checkpoint.as_ref().map(|(path, _)| path.as_path());
     let resumed = if resume {
         let path =
@@ -279,12 +247,18 @@ fn search_forgetting<const W: usize>(
             Start::Fresh { units: vec![root], best: incumbent.sum(), payload: payload_of(&incumbent) }
         }
     };
-    let header = Header::of(prepared).encode();
+    // A resumed run goes on under the header it was written with, which `resume_point` read and found to be this
+    // search's: the engine checks the stored header byte for byte, and one of an earlier format (version 4) is this
+    // search's without being this build's encoding of it.  So the checkpoints of a run keep its format.
+    let header = match &resumed {
+        Some((_, head)) => head.header.clone(),
+        None => Header::of(prepared).encode(),
+    };
     let engine_start = Instant::now();
     let outcome = engine::run(cfg, start, &header, |_| TaxSearcher::new(&space))?;
     // The engine's elapsed time includes the runs before a resume; what it counts beyond this call is theirs.
     let earlier_runs = outcome.elapsed.saturating_sub(engine_start.elapsed());
-    let promotions = get_bits(&outcome.payload);
+    let promotions = set_of_payload(&outcome.payload);
     assert_eq!(promotions.sum(), outcome.best, "the incumbent's payload does not match its value");
     let time = t0.elapsed();
     Ok(SearchResult {
@@ -299,6 +273,56 @@ fn search_forgetting<const W: usize>(
         found: space.found.into_inner().unwrap_or_else(PoisonError::into_inner),
         start: incumbent,
     })
+}
+
+/// The incumbent a search starts from, made as [`search`] makes it (its documentation has the steps): the best of the
+/// greedy set and what survives of `seed`, then the dive, then the local search on `threads` threads (the control's
+/// workers if it has them).  `graph` is the matching graph of `prepared`.
+///
+/// The incumbent is offered to `control` as soon as it is known and each time it improves, so that a caller reading the
+/// control ([`best_so_far`]) has it while the start is still being computed, not only once the engine runs.  The run
+/// starts from exactly what it started from without the offers: the engine takes the better of its `Start`'s incumbent
+/// and the best offered to the control, strictly better only, and the start's final incumbent is at least every one
+/// offered, so it keeps its own, and the trees do not change.  (A resumed run's `Start` is its checkpoint, whose
+/// incumbent is at least the start of the run that wrote it: the same, with the same seed, so it keeps its own too;
+/// one that a start beats is replaced by it, as `best` in [`search`] counts it.)
+///
+/// A start that reaches the control's ceiling cannot be beaten, so the dive and the local search are skipped: they could
+/// not change it if the ceiling holds, as the proof by the ceiling assumes (and `solver::conclude` rejects any game
+/// above it).  The dive is taken only when strictly heavier, and the local search keeps only strictly heavier sets,
+/// after a first fill that can only add candidates; no promotable set is heavier than the ceiling.  The ceiling is
+/// read when each is due, and by the local search before each pass: the control may be given a lower one meanwhile.
+pub fn start_incumbent<const W: usize>(
+    prepared: &Prepared<W>,
+    graph: &MatchGraph,
+    control: &Control,
+    threads: usize,
+    seed: Option<&Bits<W>>,
+) -> Bits<W> {
+    let mut incumbent = prepared.greedy;
+    if let Some(seed) = seed {
+        let kept = surviving(prepared, seed);
+        if kept.sum() > incumbent.sum() {
+            incumbent = kept;
+        }
+    }
+    offer_set(control, &incumbent);
+    if !reaches(&incumbent, control.ceiling()) {
+        let dived = dive(&prepared.model, &prepared.root, graph, &prepared.candidates);
+        if dived.sum() > incumbent.sum() {
+            incumbent = dived;
+            offer_set(control, &incumbent);
+        }
+    }
+    if !reaches(&incumbent, control.ceiling()) {
+        let hood = Neighbourhood { model: &prepared.model, root: &prepared.root, candidates: &prepared.candidates };
+        let improved = hood.improve_on(|| control.workers().unwrap_or(threads), || control.ceiling(), &incumbent, true);
+        if improved.sum() > incumbent.sum() {
+            offer_set(control, &improved);
+        }
+        incumbent = improved;
+    }
+    incumbent
 }
 
 /// Offers the candidates of `seed` that can still be promoted in `prepared`, the game searched, as an incumbent to the
@@ -316,11 +340,18 @@ pub fn seed_survivors_sum<const W: usize>(prepared: &Prepared<W>, seed: &Bits<W>
     surviving(prepared, seed).sum()
 }
 
-/// `set` as the payload of an incumbent, which is how the searchers encode one ([`put_bits`]).
-fn payload_of<const W: usize>(set: &Bits<W>) -> Vec<u8> {
+/// `set` as the payload of an incumbent, which is how the searchers encode one ([`put_bits`]): a caller that starts the
+/// engine itself ([`engine::run`] with a [`TaxSearcher`]) gives its starting incumbent this payload.
+pub fn payload_of<const W: usize>(set: &Bits<W>) -> Vec<u8> {
     let mut payload = Vec::new();
     put_bits(&mut payload, set);
     payload
+}
+
+/// The promotion set that `payload` encodes, the inverse of [`payload_of`]: the incumbent of an engine's
+/// [`Outcome`](engine::Outcome).  The payload must be exactly `8·W` bytes, as every searcher's incumbent is.
+pub fn set_of_payload<const W: usize>(payload: &[u8]) -> Bits<W> {
+    get_bits(payload)
 }
 
 /// Offers `set` to `control` as an incumbent, worth its sum ([`Control::offer`]).
@@ -333,7 +364,7 @@ fn offer_set<const W: usize>(control: &Control, set: &Bits<W>) -> bool {
 /// soon as it is known ([`search`]).  The control must belong to a search of width `W`, whose payloads are promotion
 /// sets (as [`offer_seed`] makes them).
 pub fn best_so_far<const W: usize>(control: &Control) -> Option<Bits<W>> {
-    control.best().map(|(_, payload)| get_bits(&payload))
+    control.best().map(|(_, payload)| set_of_payload(&payload))
 }
 
 /// Whether `set` is worth `ceiling`, the ceiling on the promotion sum, or more, which proves it optimal.
@@ -357,7 +388,7 @@ fn resume_point<const W: usize>(
     if head.payload.len() != 8 * W {
         return Err(at(format!("its incumbent has {} bytes, not {}", head.payload.len(), 8 * W)));
     }
-    let kept = get_bits(&head.payload);
+    let kept = set_of_payload(&head.payload);
     let fits = kept.is_subset(&prepared.candidates)
         && prepared.model.promote_all_using(&mut Scratch::new(), &prepared.root, &kept).is_some();
     if !fits {

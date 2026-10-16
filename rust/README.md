@@ -3,8 +3,9 @@
 `rust/` is a Cargo crate (a library and one binary, `taxman`; no third-party dependencies): the *frame solver*, which
 finds optimal games of Taxman.  It reimplements the algorithm of the Java solver in the repository root
 (`src/main/java`) with a search built for speed and for many threads, and it has found optimal games for every n up to
-2175 (the Java solver got to 1000).  A second program, the prover ([prover/](prover/README.md)), checks the frame
-solver's answers on the whole board, without the frame model.  Below, "the solver" is the frame solver.
+3440 (the Java solver got to 1000).  A second program, the prover ([prover/](prover/README.md)), checks the frame
+solver's answers on the whole board, without the frame model, so far to 2175.  Below, "the solver" is the frame
+solver.
 
 This page is the user guide: what the frame solver computes and what "optimal" means here, how to build and run it, how
 to read its output, why its answers can be trusted (and what they assume), the project's vocabulary,
@@ -31,15 +32,20 @@ scores the most.  The best score for each n is the Taxman sequence ([OEIS A01931
 n = 4 the optimal game is 3, 4 (the taxman takes 1, then 2) and scores 7.
 
 Finding an optimal game is a search over an enormous tree.  The frame solver's results are the optimal games, as
-sequences of moves with their scores, for every n from 1 to 2175: `results/strict.jsonl` is a chain from n = 1 (section
+sequences of moves with their scores, for every n from 1 to 3440: `results/strict.jsonl` is a chain from n = 1 (section
 3), whose games 1 to 1000 reproduce the Java's table, whose games 1001 to 1300 go beyond it (the table `optimal.json`
-has them now too, see `extend-optimal` in section 3) and whose games 1301 to 2175 are past the table.  The code can
-attempt any larger n up to 8191, the largest board the set widths cover.  With the GF(2) bound (the default since
-2026-10), a chain from `optimal.json`'s game of 1300 reached 2175 in 92 minutes on two threads of a laptop, and the
-committed chain from n = 1 in 27 minutes on eight ([results/README.md](results/README.md)), the cost in waves with no
-growth a fit resolves ([docs/EXPERIMENTS.md](docs/EXPERIMENTS.md#the-gf2-bound-in-the-search-2026-10)); before it, the
-cost of a game grew by a factor of ten for every 55 to 70 in n past 1200
-([bench/curve/README.md](bench/curve/README.md)).
+has them now too, see `extend-optimal` in section 3) and whose games 1301 to 3440 are past the table.  Its games 2 to
+2175 are also proven on the whole board, by the prover; its games 2176 to 3440 are proven within the frame model, which
+is exact given statement U (below, "What optimal means"), and U is not yet certified past 2175 (`taxman certify` will
+check it game by game).  The code can attempt any larger n up to 8191, the largest board the set widths cover.  With the
+GF(2) bound (the default since 2026-10), a chain from `optimal.json`'s game of 1300 reached 2175 in 92 minutes on two
+threads of a laptop, and the committed chain from n = 1 to 2175 in 27 minutes on eight
+([results/README.md](results/README.md)), the cost in waves with no growth a fit over those games resolves
+([docs/EXPERIMENTS.md](docs/EXPERIMENTS.md#the-gf2-bound-in-the-search-2026-10)); before it, the cost of a game grew by a
+factor of ten for every 55 to 70 in n past 1200 ([bench/curve/README.md](bench/curve/README.md)).  Past 2175 it grows:
+the search times of the games 2176 to 3440, which a day on one 64-thread cloud machine made for about $16, rise
+tenfold per about 1,040 in n, with about a decade of scatter
+([docs/EXPERIMENTS.md](docs/EXPERIMENTS.md#the-frontier-chain-to-3440-2026-10)).
 
 ### How the solver sees the game (the frame model)
 
@@ -58,14 +64,16 @@ cost of a game grew by a factor of ten for every 55 to 70 in n past 1200
    played first.  Each frame is a small game, *Taxman Mini*: a set of moves and a set of factors, in which the moves
    must be playable in some order.  Setup drops a frame's *impossible* sources, settles the moves a source with one
    usable factor must make, and counts its *freedoms*, its factors minus its moves: how many factors it can spare.  A
-   frame with none is *closed* and takes no part in the search.  The others are numbered from the front: frame 0 is
-   every one that has no other in front of it, frame 1 every one directly behind those, and so on.  Frames with the
-   same number are merged into one, so that a promotion always has one frame to go to.
+   frame with none is *closed* and takes no part in the search.  The others are numbered from the front, by *layer*:
+   all the sources of a frame have the same number of prime factors, the frames in front of it have one fewer, and
+   frame 0 is the frames with freedoms whose sources have the fewest, frame 1 those with one more, and so on (so frame
+   0 is every one that has no other in front of it, frame 1 every one directly behind those, on every board the solver
+   supports).  Frames with the same
+   number are merged into one, so that a promotion always has one frame to go to.
 4. What a game can choose is which of the spare factors to *promote*: to play it as a move instead of leaving it as
    tax.  Promoting a factor of frame h makes it a move of frame h-1, one frame forward: its own maximal factors, which
    would pay for it, are in the frames directly in front of its frame, and the numbering puts those with freedoms in
-   frame h-1 (that nothing further forward is needed is proven, given that the numbering is clean: see "What optimal
-   means" below).
+   frame h-1 (that nothing further forward is needed is proven: see "What optimal means" below).
    Both frames must stay winnable.
 5. The score of a game is `in_the_bag` (what the game with no promotions scores) plus the sum of its promotions.  So the
    frame solver searches for the *promotion set* with the largest sum, with a branch-and-bound over which candidates to
@@ -108,14 +116,15 @@ promotion from that frame needs one frame to go to.
 
   > **U**: some optimal game plays every source with three or more prime factors that setup keeps (U\*).
 
-  Precisely: on a board whose numbering of the frames is *clean* (every frame with freedoms directly in front of
-  frame h is frame h - 1, which holds on every board to 8191, the largest the solver supports, and which setup
-  checks), the games that play every source setup keeps are exactly U\* with a promotion set added (Theorem M); every
+  Precisely: the games that play every source setup keeps are exactly U\* with a promotion set added (Theorem M,
+  which needs of the numbering that it is *clean*, every frame with freedoms directly in front of frame h being frame
+  h - 1, as the numbering by layer is by construction); every
   optimal game plays the sources setup keeps with one or two prime factors (Theorem B); so the heaviest promotion set
   gives opt(n) exactly when U holds at n.  U is open in general.  It holds for every n <= 2175, where [the
   prover](prover/README.md) proves the optimum on the whole board, without the frame model.  So a game proven above
-  2175 by an exhausted search, a trivial board or a repeat assumes U at n;
-  a game proven at its ceiling or by the prime formula does not (section 5).  The results lines do not record it.
+  2175 by an exhausted search, a trivial board or a repeat assumes U at n: the committed games of 2176 to 3440 proven
+  that way, 991 of the 1265, do, and U is not yet certified for them (`taxman certify` checks it game by game, section
+  3).  A game proven at its ceiling or by the prime formula does not (section 5).  The results lines do not record it.
   [DESIGN.md](DESIGN.md#what-optimal-means) says what each proof kind needs of the model.
 * **Given the pruning is exact.**  Every tactic is proven or sound: none prunes a promotion set that could win
   ([DESIGN.md, Tactics](DESIGN.md#5-tactics) grades each).  So a result rests on nothing but U (where its proof uses
@@ -208,7 +217,7 @@ n=12    score=50        trivial nodes=0               0.000 s  optimal ok  proof
 
 Each game is built from the one before it.  A game whose search problem an earlier game of the range or of the results
 file already posed and settled is concluded at once with that game's promotions (tactic `same_search`, method
-`repeat`, proof `same_search`, section 5): 914 of the 1836 games of a chain to 2175 that would be searched.
+`repeat`, proof `same_search`, section 5): 1457 of the 2946 games of a chain to 3440 that would be searched.
 With `--out FILE`, each result is appended to the file (one JSON line per game, flushed and synced) as soon as it is
 done, and a rerun skips every game the file already completed, whatever the tactics of the rerun (the file's lines
 keep the tactics they were made with and what they assume):
@@ -223,7 +232,7 @@ skipped 300 games already done in mine.jsonl
 
 `optimal.json` stops at 1300.  A game above 1300 needs its predecessor in the run or the results file: extend a copy
 of a file that has it, or start at 1301 with `--use-prev`, which takes `optimal.json`'s game of 1300.  The committed
-`results/strict.jsonl` (1-2175, a chain from n = 1) assumes nothing, and a copy of it extended stays so.  The copy
+`results/strict.jsonl` (1-3440, a chain from n = 1) assumes nothing, and a copy of it extended stays so.  The copy
 matters: `--out` appends to the file and `results/` must not be overwritten.
 
 ```
@@ -252,9 +261,11 @@ $ taxman solve 1-2175 --out strict.jsonl --checkpoint-dir ckpt --checkpoint-inte
 
 Starting at n = 1, no game is taken from `optimal.json` (it is only compared with, up to 1300, where it ends: a score
 that differs is a hard error), so no proof in the file assumes anything beyond the frame model.  The committed
-`results/strict.jsonl` is such a run ([results/README.md](results/README.md) has the details of it), and this command
-reproduces its scores.  A run that takes a game from `optimal.json` (`--use-prev`) records, in every result whose proof
-rests on it, that it assumes that game optimal.
+`results/strict.jsonl` is such a run, in two parts ([results/README.md](results/README.md) has the details of them): its
+games 1 to 2175 were made by this command (up to the paths and the thread count), and a run of it reproduces their
+scores; its games 2176 to 3440 continue them (a run on a cloud machine, started from a copy of the 2175 lines).  A run
+that takes a game from `optimal.json` (`--use-prev`) records, in every result whose proof rests on it, that it assumes
+that game optimal.
 
 ### Games in flight
 
@@ -369,17 +380,29 @@ for any n they share.  Then, from the board size after the table's last, it take
 to the first that is missing or only an unfinished search, and says which and why.  A game that assumes a game of the
 table optimal is taken too: it assumes nothing the table does not stand for.  The old games are written back byte for
 byte, FILE is written whole or not at all, and RESULTS can never be FILE.  This is how games 1001 to 1300 were added to
-the Java's 1000.  The table has not been extended past 1300, so the same command on the committed file adds the games
-to 2175:
+the Java's 1000.  The table has not been extended past 1300 (and stays there for now), so the same command on the
+committed file adds the games to 3440:
 
 ```
 $ taxman extend-optimal results/strict.jsonl --out /tmp/optimal.json
-added 875 games (n = 1301..=2175); the table has 2175 games, n up to 2175; wrote /tmp/optimal.json
-stopped at n = 2176: the results end at n = 2175
+added 2140 games (n = 1301..=3440); the table has 3440 games, n up to 3440; wrote /tmp/optimal.json
+stopped at n = 3441: the results end at n = 3440
 ```
 
 Check the new file with `taxman verify-optimal /tmp/optimal.json` before it replaces `src/main/resources/optimal.json`;
 the binaries built after that carry the new table.
+
+`certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE` proves, game by game, that the recorded
+scores of A..B (or of the boards of the list FILE, one board size a line, in that order) that rest on the frame model
+are the optima on the whole board (statement U at each n; section 1, "What optimal means"):
+for each game the prover's barred bounds (`--upper`, `prover/data/upper_*.jsonl`) say needs it, a search of the
+extended problem with the bounds' open members optional, started from the recorded game, ends `certified` (nothing
+beats it) or `beaten` (a game that does, written to `OUT.counterexample.jsonl` too; the run exits with status 2).  It
+takes `--threads`, the checkpoint flags and the limits of `solve`, and resumes like it.
+`verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...] [--threads K]` checks the files it
+wrote without changing them, line by line, and says how far the proofs of the recorded scores reach (the prover's, the
+certificates' and the ceilings').
+[DESIGN.md, "Certificates of U"](DESIGN.md#certificates-of-u) has what they check and what a line holds.
 
 ## 4. Reading the output
 
@@ -497,7 +520,7 @@ a game was found: a proof that rests on its game of n - 1 assumes "the game of n
 game that assumes nothing is proven within the frame model, given that the solver is right.  `taxman solve` prints
 what a game assumes in the summary line.  What a proof rests on through the frame model, the statement U at n
 (section 1, "What optimal means"), is not recorded: it concerns the games proven by an exhausted search, a trivial
-board or a repeat, and holds for every n <= 1300.
+board or a repeat, and holds for every n <= 2175 (the prover); past 2175 it is not yet certified.
 
 ### The verifiers
 
@@ -519,10 +542,10 @@ board or a repeat, and holds for every n <= 1300.
 
 ```
 $ taxman verify-results results/strict.jsonl
-results/strict.jsonl: 2175 completed games, n = 1..=2175 (0 missing), 0 incomplete lines
-  proof: trivial 13, prime_formula 326, cap 192, exhausted 730, same_search 914
-  assumptions: none in 2175 of 2175 games
-  scores at a proven ceiling, given the game of n-1: n + score(n-1) 694, prime formula 325
+results/strict.jsonl: 3440 completed games, n = 1..=3440 (0 missing), 0 incomplete lines
+  proof: trivial 13, prime_formula 481, cap 311, exhausted 1178, same_search 1457
+  assumptions: none in 3440 of 3440 games
+  scores at a proven ceiling, given the game of n-1: n + score(n-1) 1096, prime formula 480
 0 board sizes are in more than one file, with equal scores in all
 ```
 
@@ -607,8 +630,8 @@ the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#t
 * **source**: a number with no maximal composite (every number above n/2): never tax, and played unless it is found
   impossible (below).  **factor**: any number that is not a source.
 * **frame**: a connected group of sources together with all the factors they compete for (sources that share a factor
-  are in one frame).  Setup simplifies the frames, numbers the ones that have freedoms from the front (0 is played
-  first) and merges those with the same number, so that a promotion always has one frame to go to; the search works
+  are in one frame).  Setup simplifies the frames, numbers the ones that have freedoms by layer, from the front (0 is
+  played first), and merges those with the same number, so that a promotion always has one frame to go to; the search works
   on the merged frames.  In the code a frame is `frames::Frame` as setup forms it (`frames::BoardFrames` holds all of a
   board's) and `model::Frame` as the search takes it (`frames::SearchFrames` holds those).
 * **front, back**: frame X is in front of frame Y (and Y behind X) when a number of Y has a maximal factor in X, that
@@ -633,11 +656,14 @@ the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#t
   set.
 * **in the bag** (`in_the_bag`, the Java's `inTheBag`): what the game with no promotions scores.
 * **max_total** (`maxTotalPromotions`): the most promotions the frames' freedoms allow.
-* **the frame model**: this decomposition (section 1), exact given that the numbering of the frames is clean and the
-  statement U holds (section 1, "What optimal means").  `model::FrameGraph` is the immutable factor graph and home
-  frames, not "the model".
-* **clean numbering** (N): every frame with freedoms directly in front of frame h is frame h - 1; the frames are then
-  numbered by layer (the number of prime factors of their sources).  True on every board to 8191, checked by setup.
+* **the frame model**: this decomposition (section 1), exact given that the statement U holds (section 1, "What
+  optimal means").  `model::FrameGraph` is the immutable factor graph and home frames, not "the model".
+* **layer**: the number of prime factors of a number, counted with multiplicity; a frame's layer is its sources'.  The
+  frames in front of a frame lie one layer lower, and frame h is the frames with freedoms of the lowest layer that has
+  some, plus h.
+* **clean numbering** (N): every frame with freedoms directly in front of frame h is frame h - 1.  The numbering by
+  layer is clean by construction, and on every board the solver supports it is the Java's numbering (breadth first
+  from the front).
 
 ### The search
 
@@ -727,7 +753,9 @@ The code, in the order to read it, which is the order of the module map in `src/
 comment that is worth reading first; section 6 above is the map of how the pieces fit, so keep it open):
 
 1. `src/game.rs`: the rules as a referee, and `optimal.json`.
-2. `src/numtheory.rs`: maximal factors and composites.
+2. `src/numtheory.rs`: maximal factors and composites; and `src/playable.rs`, whether a set of numbers can all be played
+   on the whole board, with nothing of the frame model (the oracle of the tests of the model, and the referee of
+   `taxman certify`).
 3. `src/bits.rs`: `Bits<W>`, the fixed-width bitsets of game numbers that everything below is generic over, and the
    set widths.  The module comment is enough at first.
 4. `src/json.rs`: the small JSON reader and writer.  Skim; it matters once you read results lines.
@@ -753,9 +781,10 @@ comment that is worth reading first; section 6 above is the map of how the piece
 11. `src/bounds.rs`: two small functions the Java has too, the limit on a node's further promotions and the greedy
     incumbent.
 12. `src/engine.rs`: the protocol in the module comment (conservation, splitting, checkpoint, termination).
-13. `src/tactics.rs`, `src/board.rs`, `src/solver.rs`, `src/results.rs`, `src/paths.rs`: the switchable tactics, a board
-    prepared for a search, the per-game pipeline, provenance and verification, the default files.  The range driver is
-    `src/solver/window.rs`, the window of games in flight, and its child `window/allot.rs` how they share the threads.
+13. `src/tactics.rs`, `src/board.rs`, `src/solver.rs`, `src/results.rs`, `src/certify.rs`, `src/paths.rs`: the
+    switchable tactics, a board prepared for a search, the per-game pipeline, provenance and verification, the
+    certificates of `taxman certify`, the default files.  The range driver is `src/solver/window.rs`, the window of
+    games in flight, and its child `window/allot.rs` how they share the threads.
 14. `src/main.rs`, `src/cli.rs`, `src/commands.rs`: the command line.
 15. Studies, skipped on a first read: `src/brute.rs` (exhaustive search, the test oracle) and `src/sacrifice.rs` (the
     sacrifice bound).

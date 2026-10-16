@@ -11,8 +11,9 @@ EC2 chain made of it.  Inputs (this directory unless a path says otherwise):
   and `cores`; `./gap.py join-anatomy` makes it).
 * resolved_1301_2175.jsonl: the committed chain's searched games of 1301-2175 solved again by the build of the
   EC2 chain, one thread, in order, with their roots' gaps (`./gap.py join-resolved` makes it).
-* ../../results/strict.jsonl and ../gf2/roots.jsonl: the committed chain to 2175 and its roots (the gaps of 1301-2175,
-  the committed chain's own nodes).
+* ../../results/strict.jsonl and ../gf2/roots.jsonl: the committed chain to CHAIN_END = 2175 and its roots (the gaps of
+  1301-2175, the committed chain's own nodes).  The chain was that long when `gap_output.md` was made; the file has
+  grown since, to 3440, and the tables read only its games to CHAIN_END (the EC2 chain's games begin past it).
 * ../cloud/c8g48/games.jsonl: the scaling run's per-game nodes at windows of 1, 4 and 16 (the speculation).
 * ../cloud/c8g.chain-2176.jsonl: the Graviton calibration's chain, 2176-2276 (the build against the EC2 chain's).
 * setup_c8g.jsonl: the fixed costs of a game on Graviton4.
@@ -49,7 +50,8 @@ ANATOMY = HERE / "anatomy_chain.jsonl"
 RESOLVED = HERE / "resolved_1301_2175.jsonl"
 CALIBRATION = RUST / "bench" / "cloud" / "c8g.chain-2176.jsonl"
 
-FIRST = 2176  # the first game past the committed chain
+CHAIN_END = 2175  # the last game of the committed chain that the tables use (strict.jsonl runs on to 3440)
+FIRST = CHAIN_END + 1  # the first game past it, where the EC2 chain's games begin
 LAST = 3312  # the last searched game of the snapshot
 MIN_NODES = 50  # the fits take the exhausted searches of at least this many nodes, as AGENDA section 7.1 does
 P = 0.3  # the exponent of n in the scale of the gap, G / n^P (the cost table says why)
@@ -165,6 +167,11 @@ def completed(path):
     return {r["n"]: r for r in read_jsonl(path) if r.get("completed")}
 
 
+def committed():
+    """The completed games of the committed chain, 1..CHAIN_END."""
+    return {n: r for n, r in completed(STRICT).items() if n <= CHAIN_END}
+
+
 def games_of(snapshot):
     """The board sizes past 2175 whose line is a completed search, on one line, for `wall` and `matroid`."""
     chain = completed(snapshot)
@@ -205,7 +212,7 @@ def join_resolved(results):
     """The resolved file: each searched game of the committed chain's 1301-2175 as the build of the EC2 chain
     solved it again (`taxman solve 1301-2175 --threads 1 --out RESULTS`, in order), with its root gap from
     ../gf2/roots.jsonl and the committed chain's own nodes, for the same game."""
-    strict = completed(STRICT)
+    strict = committed()
     roots = {r["n"]: r for r in read_jsonl(ROOTS)}
     again = completed(results)
     for n in sorted(strict):
@@ -225,7 +232,7 @@ def load_games():
 
 def baseline():
     """The searched games of 1301-2175 of the committed chain with their roots: n, gap, nodes, proof."""
-    strict = completed(STRICT)
+    strict = committed()
     roots = {r["n"]: r for r in read_jsonl(ROOTS)}
     out = []
     for n in sorted(strict):

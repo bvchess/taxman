@@ -6,10 +6,14 @@
 
     summarize.py span FILE...     the (♦) span campaign: games, rejections, spanned, violations, by range
     summarize.py star FILE...     the threshold-by-threshold (★) campaign: thresholds and components by method
-    summarize.py exact FILE...    the proofs of optimal scores (a later file overrides)
+    summarize.py exact FILE...    the proofs of optimal scores (a later file overrides), and how many searches start
+                                  from the roles of Theorem B (`fix_low` 1, which `exact` does unless told not to)
     summarize.py check A B FILE...  FILEs prove every n in 2..B, with the recorded scores in A..B
     summarize.py order A B        the games A..B, dearest first by the solver's nodes (the order prover.sh runs them)
     summarize.py cost [--band N] FILE...  its cost curve: the searches made with the parity bound from scratch, by band
+    summarize.py sources B_FILE D_FILE  E6: the search with the sources of layer 3 and up free (exact, from the roles
+                                  of Theorem B) against the same search with the whole upper part fixed to U*
+                                  (--fix-upper 1)
     summarize.py optsets FILE...  every optimal pick set per game (bin/optsets.rs): tables, exchanges, canonical sets
     summarize.py moves FILE...    the longest games against the optimal ones (bin/moves.rs)
 """
@@ -84,7 +88,11 @@ def exact_proofs(rows):
     parity bound equals the recorded score, or the search proved it (if it used the segment cuts, only when every
     smaller game is proven), or its score is at its ceiling (`chain`) or meets the prime formula (`prime`) and n - 1
     is proven.  Returns (proven, how, first_gap): whether each n in 1..max(rows) is proven, how the proven ones were
-    (counts by kind), and the first n that is not (None if all are)."""
+    (counts by kind), and the first n that is not (None if all are).
+
+    Only `"search":"proven"` counts as a proof.  A line with `"search":"upper_fixed"` (`exact --fix-upper 1`, the
+    frame model's problem with the whole upper part fixed to U*) is a measurement and never a proof.  A search with
+    `fix_low` 1 started from the roles of Theorem B, so its proof rests on that theorem too (`on_theorem_b`)."""
     proven = {1: True}
     how = Counter()
     first_gap = None
@@ -108,13 +116,25 @@ def exact_proofs(rows):
     return proven, how, first_gap
 
 
+def on_theorem_b(rows):
+    """What the proofs of `rows` rest on beyond the model-independent bounds: the number of searches among them that
+    started from the roles of Theorem B (`fix_low` 1), and the number of all searches that proved."""
+    searches = [r for r in rows.values() if r["search"] == "proven"]
+    return sum(1 for r in searches if r.get("fix_low")), len(searches)
+
+
 def exact(paths):
     """The proofs of optimal scores (`exact_proofs`); a later file's line for a game replaces an earlier file's."""
-    rows = {r["n"]: r for r in lines(paths)}
+    rows = {r["n"]: r for r in lines(paths) if not r.get("fix_upper")}  # fix_upper lines are measurements
+    if not rows:
+        print("no lines to summarize (lines with fix_upper are measurements, not proofs, and are ignored)")
+        return
     proven, how, first_gap = exact_proofs(rows)
     done = sorted(rows)
     print(f"games recorded: {len(rows)} ({done[0]}..{done[-1]}); proven: {sum(proven.values()) - 1}; "
           f"by {dict(how)}")
+    from_b, searches = on_theorem_b(rows)
+    print(f"searches that proved: {searches}, of them {from_b} from the roles of Theorem B (fix_low)")
     print(f"every n in 2..{(first_gap or max(rows) + 1) - 1} proven; first unproven: {first_gap}")
     if first_gap:
         beyond = [n for n in range(first_gap, max(rows) + 1) if proven.get(n)]
@@ -136,12 +156,14 @@ def exact(paths):
 def exact_cost(args):
     """cost [--band N] FILE...: the cost curve of the searches made with the parity bound from scratch (no nodes
     without it), by band of n (50 wide unless N says): how many, nodes and seconds, milliseconds a node (total seconds
-    over total nodes), the root's parity gap; and the least-squares slopes of log10 nodes and seconds."""
+    over total nodes), the root's parity gap; and the least-squares slopes of log10 nodes and seconds.  Lines with
+    `fix_upper` (measurements of the frame model's problem) are ignored.  A search from the roles of Theorem B
+    (`fix_low` 1) takes about half the time a node of the plain root's: do not mix them in one table."""
     import math
     import statistics
     band, paths = (int(args[1]), args[2:]) if args[:1] == ["--band"] else (50, args)
     rows = sorted((r for r in lines(paths) if r.get("parity") and r["search"] == "proven"
-                   and not r.get("matching_nodes")), key=lambda r: r["n"])
+                   and not r.get("matching_nodes") and not r.get("fix_upper")), key=lambda r: r["n"])
     hours = sum(r['secs'] for r in rows) / 3600
     print(f"searches with the parity bound from scratch: {len(rows)}, total {hours:.2f} h")
     print(f"{'n':>11} {'games':>5} {'gap':>6} {'median nodes':>12} {'max nodes':>10} {'median s':>9} {'max s':>8} "
@@ -177,6 +199,67 @@ def exact_cost(args):
         b, se, r2 = slope([r["parity_bound"] - r["score"] for r in sel], [math.log10(max(r["nodes"], 1)) for r in sel])
         print(f"from n = {lo_n}: log10 nodes grows {100 * b:.3f} ± {100 * se:.3f} per 100 of the root's parity gap "
               f"(R² {r2:.2f})")
+
+
+# The criterion of E6, fixed before the measurement: the integrated search, which leaves the sources of layer 3 and up
+# free, is worth building in full if it is not much dearer than the search with the whole upper part fixed.
+E6_RATIO = 1.2  # B/D at most this on ...
+E6_SHARE = 0.9  # ... at least this share of the games,
+E6_WORST = 2.0  # B/D never above this, and
+E6_BRANCHING = 0.05  # B's nodes branching on a source of layer 3 or up at most this share of all B's nodes.
+
+
+def exact_sources(args):
+    """sources B_FILE D_FILE: E6, what the sources of layer 3 and up cost.  B_FILE holds the searches from the roles of
+    Theorem B (`exact`, whose default is `--fix-low 1`: `fix_low` 1, no `fix_upper`, `"search":"proven"`, so each is
+    a proof of opt(n) <= V with the sources of layer 3 and up free); D_FILE the same searches with the whole upper
+    part fixed to U* (`--fix-upper 1`: `fix_upper` 1, `"search":"upper_fixed"`, which is the frame model's problem on
+    the whole board and proves nothing).  For each game with a finished search in both files, a row: n, the root's
+    parity gap (`parity_bound - score`), the nodes of B and of D, B/D, the seconds of B and of D, and B's counters
+    `branched_on_sources` (nodes that branched on a free source of layer 3 or up) and `barred_upper` (nodes whose roles
+    bar a member of U*_{>=3}) as percentages of B's nodes.  The games finished in only one file are listed.  Then
+    the criterion of E6, printed part by part with its figure and PASS or FAIL:
+
+        B/D at most 1.2 on at least 90% of the games, B/D never above 2, and the nodes of B branching on a source of
+        layer 3 or up at most 5% of all B's nodes (summed over the games).
+
+    The last line is the verdict: PASS (build the integrated search's stages 2-3) or FAIL (build stage 1 only and
+    measure stage 2 on two games first).  Exits 1, with no verdict, if no game is finished in both files."""
+    b_path, d_path = args
+    b_rows = {r["n"]: r for r in lines([b_path]) if r.get("fix_low") and not r.get("fix_upper")
+              and r["search"] == "proven"}
+    d_rows = {r["n"]: r for r in lines([d_path]) if r.get("fix_upper") and r["search"] == "upper_fixed"}
+    both = sorted(b_rows.keys() & d_rows.keys())
+    if not both:
+        print(f"no game has a finished search in both {b_path} (B) and {d_path} (D)")
+        sys.exit(1)
+    print(f"{'n':>5} {'gap':>6} {'B nodes':>10} {'D nodes':>10} {'B/D':>6} {'B secs':>9} {'D secs':>9} "
+          f"{'B branching':>11} {'B barring':>10}")
+    ratios = []
+    for n in both:
+        b, d = b_rows[n], d_rows[n]
+        ratios.append(b["nodes"] / d["nodes"])
+        print(f"{n:>5} {b['parity_bound'] - b['score']:>6} {b['nodes']:>10} {d['nodes']:>10} {ratios[-1]:>6.2f} "
+              f"{b['secs']:>9.1f} {d['secs']:>9.1f} {100 * b['branched_on_sources'] / b['nodes']:>10.2f}% "
+              f"{100 * b['barred_upper'] / b['nodes']:>9.2f}%")
+    only_b, only_d = sorted(b_rows.keys() - d_rows.keys()), sorted(d_rows.keys() - b_rows.keys())
+    print(f"finished in B only: {compact_ranges(only_b)}; in D only: {compact_ranges(only_d)}")
+    close = sum(r <= E6_RATIO for r in ratios)
+    worst = max(ratios)
+    branching = sum(b_rows[n]["branched_on_sources"] for n in both) / sum(b_rows[n]["nodes"] for n in both)
+    parts = [
+        (f"B/D <= {E6_RATIO} on at least {100 * E6_SHARE:.0f}% of the games", close >= E6_SHARE * len(both),
+         f"{close} of {len(both)} games ({100 * close / len(both):.1f}%)"),
+        (f"B/D never above {E6_WORST}", worst <= E6_WORST, f"largest {worst:.2f} (n={both[ratios.index(worst)]})"),
+        (f"B's nodes branching on a source of layer >= 3 at most {100 * E6_BRANCHING:.0f}% of B's nodes",
+         branching <= E6_BRANCHING, f"{100 * branching:.2f}%"),
+    ]
+    for what, ok, figure in parts:
+        print(f"{'PASS' if ok else 'FAIL'}  {what}: {figure}")
+    if all(ok for _, ok, _ in parts):
+        print("E6: PASS (build the integrated search's stages 2-3)")
+    else:
+        print("E6: FAIL (build stage 1 only and measure stage 2 on two games first)")
 
 
 def adversary(paths):
@@ -480,6 +563,8 @@ def exact_check(args):
           f"{dict(in_range)}; proven by {dict(how)}")
     print(f"without a line: {compact_ranges(missing) or 'none'}; score not the recorded optimum: "
           f"{compact_ranges(wrong) or 'none'}; not proven in 2..{hi}: {compact_ranges(unproven) or 'none'}")
+    from_b, searches = on_theorem_b({n: r for n, r in rows.items() if n <= hi})
+    print(f"searches that proved: {searches}, of them {from_b} from the roles of Theorem B (fix_low)")
     ok = not (missing or wrong or unproven)
     print(f"{'OK: opt(n) is proven equal to the recorded score for every n in 2..' + str(hi) if ok else 'FAILED'}")
     sys.exit(0 if ok else 1)
@@ -487,4 +572,4 @@ def exact_check(args):
 
 if __name__ == "__main__":
     {"span": span, "star": star, "exact": exact, "check": exact_check, "order": exact_order, "cost": exact_cost,
-     "adversary": adversary, "optsets": optsets, "moves": moves}[sys.argv[1]](sys.argv[2:])
+     "sources": exact_sources, "adversary": adversary, "optsets": optsets, "moves": moves}[sys.argv[1]](sys.argv[2:])
