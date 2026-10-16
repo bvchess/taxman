@@ -298,7 +298,7 @@ pub struct Meet<const R: usize> {
     back: Vec<u32>,
     settled_at: Vec<u32>,
     offered_at: Vec<u32>,
-    heap: BinaryHeap<Reverse<(Dist, u32)>>,
+    heap: Queue,
     columns: Vec<Vec<u32>>,
     columns_for: u64,
     free_a: Vec<u32>,
@@ -330,6 +330,116 @@ pub struct Meet<const R: usize> {
     pub check: Option<Box<Meet<R>>>,
     #[cfg(test)]
     pub checked: u64,
+}
+
+/// The queue of the searches of the exchange graph, which take the entries `(distance, vertex)` least first (the
+/// vertex [`FREE_A`] after every element at the same distance).  When the distances stay below a bound under 2^49 and
+/// the elements fit 14 bits, the entries are keys of a [`RadixHeap`], the distance above the vertex (`FREE_A` the
+/// largest vertex): a search pushes no entry below the last it took (every arc adds an arc to the packed distance,
+/// and the hubs' entries are later still), so the keys are monotone and come out in the same order as from a binary
+/// heap, which takes the other searches.
+struct Queue {
+    radix: RadixHeap,
+    heap: BinaryHeap<Reverse<(Dist, u32)>>,
+    packed: bool,
+}
+
+impl Queue {
+    const BITS: u32 = 14;
+    const FREE: u64 = (1 << Self::BITS) - 1;
+
+    fn new(n: usize) -> Self {
+        Queue { radix: RadixHeap::new(), heap: BinaryHeap::with_capacity(n), packed: false }
+    }
+
+    /// Empties the queue for a search whose distances stay below `bound`, of elements numbered below `n`.
+    fn start(&mut self, bound: Dist, n: usize) {
+        self.packed = (0..1 << 49).contains(&bound) && (n as u64) < Self::FREE;
+        self.radix.clear();
+        self.heap.clear();
+    }
+
+    #[inline]
+    fn push(&mut self, d: Dist, v: u32) {
+        if self.packed {
+            let code = if v == FREE_A { Self::FREE } else { u64::from(v) };
+            self.radix.push((d as u64) << Self::BITS | code);
+        } else {
+            self.heap.push(Reverse((d, v)));
+        }
+    }
+
+    #[inline]
+    fn pop(&mut self) -> Option<(Dist, u32)> {
+        if self.packed {
+            self.radix.pop().map(|k| {
+                let code = k & Self::FREE;
+                ((k >> Self::BITS) as Dist, if code == Self::FREE { FREE_A } else { code as u32 })
+            })
+        } else {
+            self.heap.pop().map(|Reverse(entry)| entry)
+        }
+    }
+}
+
+/// A monotone priority queue of keys (Ahuja, Mehlhorn, Orlin and Tarjan's radix heap): every key pushed must be at
+/// least the last one popped, and a pop takes the least key.  A key sits in the bucket of the highest bit in which it
+/// differs from the last one popped (bucket 0 if it equals it); a pop with bucket 0 empty takes the least key of the
+/// first bucket that is not, and spreads that bucket over the ones below.
+struct RadixHeap {
+    buckets: Vec<Vec<u64>>,
+    /// Bit `i` set when bucket `i` is not empty.
+    full: u128,
+    last: u64,
+}
+
+impl RadixHeap {
+    fn new() -> Self {
+        RadixHeap { buckets: (0..65).map(|_| Vec::new()).collect(), full: 0, last: 0 }
+    }
+
+    fn clear(&mut self) {
+        let mut full = self.full;
+        while full != 0 {
+            self.buckets[full.trailing_zeros() as usize].clear();
+            full &= full - 1;
+        }
+        self.full = 0;
+        self.last = 0;
+    }
+
+    #[inline]
+    fn push(&mut self, key: u64) {
+        debug_assert!(key >= self.last, "a key below the last one popped");
+        let b = (64 - (key ^ self.last).leading_zeros()) as usize;
+        self.buckets[b].push(key);
+        self.full |= 1 << b;
+    }
+
+    #[inline]
+    fn pop(&mut self) -> Option<u64> {
+        if self.full & 1 == 0 {
+            if self.full == 0 {
+                return None;
+            }
+            let i = self.full.trailing_zeros() as usize;
+            let mut keys = std::mem::take(&mut self.buckets[i]);
+            self.full &= !(1 << i);
+            self.last = *keys.iter().min().expect("a bucket marked full");
+            for &k in &keys {
+                let b = (64 - (k ^ self.last).leading_zeros()) as usize;
+                self.buckets[b].push(k);
+                self.full |= 1 << b;
+            }
+            keys.clear();
+            self.buckets[i] = keys;
+        }
+        let k = self.buckets[0].pop();
+        if self.buckets[0].is_empty() {
+            self.full &= !1;
+        }
+        k
+    }
 }
 
 /// A copy of a workspace's tableau ([`Meet::save`]) to derive another from later ([`Meet::derive_from`]): per
@@ -385,7 +495,7 @@ impl<const R: usize> Meet<R> {
             back: vec![NONE; n],
             settled_at: vec![0; n],
             offered_at: vec![0; n],
-            heap: BinaryHeap::with_capacity(n),
+            heap: Queue::new(n),
             columns: vec![Vec::new(); blocks[0] * 64 * R],
             columns_for: 0,
             free_a: Vec::with_capacity(n),
@@ -1525,14 +1635,14 @@ impl<const R: usize> Meet<R> {
         let settled = self.next_generation(2);
         let reached = settled - 1;
         let (reach, back, seen, stamp) = (&mut self.reach, &mut self.back, &mut self.seen, &mut self.settled_at);
+        // Distances from `limit + 1` on cannot lead to a cycle that certifies.
+        let bound = (limit + 1) * HOPS;
         let (heap, offered_at, by_w2) = (&mut self.heap, &mut self.offered_at, &self.by_w2);
-        heap.clear();
+        heap.start(bound, self.pos.len());
         // A banned element counts as settled: never offered, nor reached as an element free in A.
         for &e in banned {
             stamp[e as usize] = settled;
         }
-        // Distances from `limit + 1` on cannot lead to a cycle that certifies.
-        let bound = (limit + 1) * HOPS;
         let mut cycle = (bound, NONE);
         // The elements free in A, by decreasing w1: the next one unsettled, and the member through which they are
         // reached (the least distance plus w1, packed).
@@ -1557,7 +1667,7 @@ impl<const R: usize> Meet<R> {
                     reach[i] = d;
                     back[i] = $from;
                     offered_at[i] = tick;
-                    heap.push(Reverse((d, v)));
+                    heap.push(d, v);
                 }
             }};
         }
@@ -1570,7 +1680,7 @@ impl<const R: usize> Meet<R> {
                 if let (Some(&z), true) = (by_w2.get(next_member), hub.0 != INF) {
                     let dz = hub.0 + w2(z) * HOPS;
                     if dz < bound {
-                        heap.push(Reverse((dz, z)));
+                        heap.push(dz, z);
                     }
                 }
             }};
@@ -1584,16 +1694,16 @@ impl<const R: usize> Meet<R> {
                 if let Some(&y) = self.free_a.get(next_free) {
                     let dy = through.0 - w1(y) * HOPS + 1;
                     if dy < bound {
-                        heap.push(Reverse((dy, FREE_A)));
+                        heap.push(dy, FREE_A);
                     }
                 }
             }};
         }
-        heap.push(Reverse((0, x)));
+        heap.push(0, x);
         seen[x as usize] = reached;
         reach[x as usize] = 0;
         back[x as usize] = NONE;
-        while let Some(Reverse((d, v))) = heap.pop() {
+        while let Some((d, v)) = heap.pop() {
             if d >= cycle.0 || (first && cycle.1 != NONE) {
                 break;
             }
@@ -1700,7 +1810,7 @@ impl<const R: usize> Meet<R> {
         let reached = settled - 1;
         let (reach, seen, stamp) = (&mut self.reach, &mut self.seen, &mut self.settled_at);
         let heap = &mut self.heap;
-        heap.clear();
+        heap.start(INF, self.pos.len());
         let mut best = INF;
         macro_rules! offer {
             ($v:expr, $d:expr) => {{
@@ -1709,7 +1819,7 @@ impl<const R: usize> Meet<R> {
                 if d < best && stamp[i] != settled && (seen[i] != reached || d < reach[i]) {
                     seen[i] = reached;
                     reach[i] = d;
-                    heap.push(Reverse((d, v)));
+                    heap.push(d, v);
                 }
             }};
         }
@@ -1721,14 +1831,14 @@ impl<const R: usize> Meet<R> {
                     next_free += 1;
                 }
                 if let Some(&y) = self.free_a.get(next_free) {
-                    heap.push(Reverse((through - w1(y) * HOPS + 1, FREE_A)));
+                    heap.push(through - w1(y) * HOPS + 1, FREE_A);
                 }
             }};
         }
         for &z in &self.members {
             offer!(z, w2(z) * HOPS);
         }
-        while let Some(Reverse((d, v))) = heap.pop() {
+        while let Some((d, v)) = heap.pop() {
             if d >= best {
                 break;
             }
