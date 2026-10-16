@@ -13,6 +13,12 @@
 //! one with no search (`same_problem`): the tests check the games it settles against a search of the same game, that a
 //! wrong score on such a game is still beaten, and that lines that are not what they say are not used.
 //!
+//! The extended problem has two formulations, with the claims of `unzip` that Lemma M5⁺ keeps (the default, which the
+//! tests use unless they say otherwise) and without (`--no-claims`, the committed certificates' of 600..=1300).  A line
+//! records which; the rule compares the problems in the run's formulation whichever the earlier game's certificate was
+//! made in, which the tests check within each formulation and across the two; the claims make the rule settle more
+//! games (101 of 600..=1300 against 81); and a file that mixes the formulations verifies.
+//!
 //! `taxman certify` takes the boards of a list file as well as a range, and `taxman verify-certificates` checks the
 //! files it wrote: a file made over a stretch with repeats passes, each doctored line is refused naming the file, the
 //! line and the board, and the proven end of the chain is found on synthetic data and on the committed chain.
@@ -35,10 +41,11 @@ use taxman::bits::{width_for, words_for};
 use taxman::certify::verify::{frontier, read_exact, ExactLine, Frontier, Gap};
 use taxman::certify::{
     certificate_width, certify_game, certify_game_with, extended_problem, read_upper, Certificate, CertificateFile,
-    EarlierCertificates, SameProblem, Upper, Verdict,
+    EarlierCertificates, Posed, SameProblem, Upper, Verdict,
 };
 use taxman::game::{replay, replay_finished, Optimal};
 use taxman::json::Json;
+use taxman::search::Problem;
 use taxman::solver::{digest_text, SolveOptions, SAME_SEARCH_WINDOW};
 
 // ---------------------------------------------------------------------------------------------------------
@@ -75,10 +82,16 @@ fn needing(range: RangeInclusive<u32>) -> Vec<u32> {
     range.filter(|n| fixtures().upper[n].needs).collect()
 }
 
-/// Certifies the recorded game of `n` with the committed data and `opts`.
+/// Certifies the recorded game of `n` with the committed data and `opts`, in the default formulation (with the claims
+/// of `unzip` that Lemma M5⁺ keeps).
 fn certify(n: u32, opts: &SolveOptions) -> Certificate {
+    certify_in(n, true, opts)
+}
+
+/// [`certify`] in the formulation `claims`.
+fn certify_in(n: u32, claims: bool, opts: &SolveOptions) -> Certificate {
     let Fixtures { known, upper } = fixtures();
-    certify_game(n, known, &upper[&n], opts).unwrap_or_else(|e| panic!("{e}"))
+    certify_game(n, known, &upper[&n], claims, opts).unwrap_or_else(|e| panic!("{e}"))
 }
 
 /// Checks a certificate that says nothing beats the recorded game of `n` against the data it was made from: the
@@ -102,7 +115,11 @@ fn assert_certified(c: &Certificate, n: u32) {
     assert_eq!(c.threads, 1);
     let own = width_for(words_for(n)).unwrap();
     assert!(c.width == own || c.width == 128, "n={n}: searched at width {}, not {own} or 128", c.width);
-    assert_eq!(certificate_width(n, &c.open).unwrap().1, Some(c.width), "n={n}: the width is the one it takes");
+    assert_eq!(
+        certificate_width(n, &c.open, c.claims).unwrap().1,
+        Some(c.width),
+        "n={n}: the width is the one it takes"
+    );
 }
 
 /// Certifies each of `boards` on one thread, checks and prints each certificate, and returns the nodes and the seconds
@@ -258,6 +275,18 @@ fn a_certificate_writes_the_fields_of_its_search() {
         assert!(summary.contains(text), "no {text:?} in {summary:?}");
     }
     println!("{summary}");
+
+    // The formulation is written right after the width, and said in the summary where it is the older one.
+    let keys: Vec<&str> = json.as_obj().unwrap().iter().map(|(key, _)| key.as_str()).collect();
+    let at = keys.iter().position(|&key| key == "width").unwrap();
+    assert_eq!(keys[at..at + 3], ["width", "claims", "digest"], "{keys:?}");
+    assert!(c.claims && json.get("claims") == Some(&Json::Bool(true)) && !summary.contains("no claims"));
+    let older = certify_in(n, false, &options(1));
+    assert_certified(&older, n);
+    let json = Json::parse(&older.to_json().to_string()).unwrap();
+    assert!(!older.claims && json.get("claims") == Some(&Json::Bool(false)), "{json}");
+    assert!(older.summary_line().ends_with(&format!("problem {} (no claims)", digest_text(older.digest))));
+    assert_eq!((older.score, older.open.clone()), (c.score, c.open.clone()));
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -293,7 +322,7 @@ fn a_planted_wrong_score_is_beaten_by_a_game_the_referee_accepts() {
         let table = Optimal::built_in().with_results_files(&[file]).unwrap();
         assert_eq!(table.score(n), Some(planted));
 
-        let c = certify_game(n, &table, &upper[&n], &options(1)).unwrap_or_else(|e| panic!("{e}"));
+        let c = certify_game(n, &table, &upper[&n], true, &options(1)).unwrap_or_else(|e| panic!("{e}"));
         println!("{} (the smallest move up to n/2, {left_out}, left out)", c.summary_line());
         assert_beaten_by_the_optimum(&c, n, planted);
     }
@@ -345,7 +374,9 @@ fn a_game_that_a_certificate_cannot_be_made_for_is_refused() {
     let (score, moves) = (known.score(n).unwrap(), known.moves(n).unwrap());
     let dir = TempDir::new("certify-refused");
     let refused = |table: &Optimal, line: &Upper, why: &str| {
-        let e = certify_game(n, table, line, &options(1)).err().unwrap_or_else(|| panic!("n={n}: not refused: {why}"));
+        let e = certify_game(n, table, line, true, &options(1))
+            .err()
+            .unwrap_or_else(|| panic!("n={n}: not refused: {why}"));
         assert!(e.contains(&format!("n={n}: ")) && e.contains(why), "expected {why:?} in {e:?}");
     };
 
@@ -598,25 +629,48 @@ struct RuleRun {
     nodes_saved: u64,
 }
 
-/// Certifies `boards` (games that need a certificate, ascending) in order, as `taxman certify` does: each rests on the
-/// games certified before it in the run where the rule allows.  The game it rests on must be the latest of the window
-/// whose problem is the same, which is found here by comparing the problems of the games themselves; and every game the
-/// rule settles is checked against a search of the same game (the same problem, sizes and score, and the record of
-/// the game it rests on).
-fn certify_by_the_rule(boards: &[u32]) -> RuleRun {
+/// Π⁺(O) of each of `boards` (games that need a certificate) in the formulation `claims`, set up without a search.
+fn posed_of(boards: &[u32], claims: bool) -> BTreeMap<u32, Posed> {
+    let upper = &fixtures().upper;
+    boards.iter().map(|&n| (n, extended_problem(n, &upper[&n].open, claims).unwrap())).collect()
+}
+
+/// The problems of [`posed_of`].
+fn problems_of(boards: &[u32], claims: bool) -> BTreeMap<u32, Problem> {
+    posed_of(boards, claims).into_iter().map(|(n, posed)| (n, posed.problem)).collect()
+}
+
+/// The game the rule rests `n` on, given the problems of the games before it: the latest of the last
+/// `SAME_SEARCH_WINDOW` board sizes whose problem is `problem`, found by comparing the problems whole.
+fn latest_with_problem(n: u32, problem: &Problem, problems: &BTreeMap<u32, Problem>) -> Option<u32> {
+    (n.saturating_sub(SAME_SEARCH_WINDOW)..n).rev().find(|m| problems.get(m) == Some(problem))
+}
+
+/// The pairs (m, n) the rule settles among the games whose problems are `problems`, ascending: the games that have a
+/// game in the window before them with the same problem, and that game.
+fn same_problem_pairs(problems: &BTreeMap<u32, Problem>) -> Vec<(u32, u32)> {
+    problems.iter().filter_map(|(&n, problem)| latest_with_problem(n, problem, problems).map(|m| (m, n))).collect()
+}
+
+/// Certifies `boards` (games that need a certificate, ascending) in order, as `taxman certify` does, in the formulation
+/// `claims`: each rests on the games certified before it in the run where the rule allows.  The game it rests on must
+/// be the latest of the window whose problem is the same, which is found here by comparing the problems of the games
+/// themselves; and every game the rule settles is checked against a search of the same game (the same problem, sizes
+/// and score, and the record of the game it rests on).
+fn certify_by_the_rule(boards: &[u32], claims: bool) -> RuleRun {
     let Fixtures { known, upper } = fixtures();
     let mut earlier = EarlierCertificates::default();
-    let (mut certificates, mut problems) = (BTreeMap::new(), BTreeMap::new());
+    let (mut certificates, problems) = (BTreeMap::new(), problems_of(boards, claims));
     let mut run = RuleRun { settled: Vec::new(), nodes_saved: 0 };
     for &n in boards {
-        let c = certify_game_with(n, known, &upper[&n], &options(1), &mut earlier).unwrap_or_else(|e| panic!("{e}"));
+        let c = certify_game_with(n, known, &upper[&n], claims, &options(1), &mut earlier)
+            .unwrap_or_else(|e| panic!("{e}"));
         assert_certified(&c, n);
+        assert_eq!(c.claims, claims, "n={n}: the formulation is the run's");
         println!("{}", c.summary_line());
 
-        let problem = extended_problem(n, &upper[&n].open).unwrap().problem;
-        let latest_equal = (n.saturating_sub(SAME_SEARCH_WINDOW)..n).rev().find(|m| problems.get(m) == Some(&problem));
+        let latest_equal = latest_with_problem(n, &problems[&n], &problems);
         assert_eq!(c.same_problem.as_ref().map(|same| same.n), latest_equal, "n={n}: the game the rule rests on");
-        problems.insert(n, problem);
 
         if let Some(same) = &c.same_problem {
             let m: &Certificate = certificates.get(&same.n).expect("the game it rests on was certified in the run");
@@ -625,7 +679,7 @@ fn certify_by_the_rule(boards: &[u32]) -> RuleRun {
             assert_eq!((best, same.digest), (worth, m.digest), "n={n}: the same problem, the same heaviest set");
             assert!(c.nodes == 0 && c.seconds <= 0.0 && c.seconds_all_runs <= 0.0, "n={n}: no search");
 
-            let direct = certify(n, &options(1));
+            let direct = certify_in(n, claims, &options(1));
             assert_certified(&direct, n);
             assert!(direct.same_problem.is_none() && direct.nodes > 0, "n={n}: a search: {}", direct.summary_line());
             let (rule, search) =
@@ -641,33 +695,163 @@ fn certify_by_the_rule(boards: &[u32]) -> RuleRun {
 
 /// Over stretches of the chain where consecutive games pose the same extended problem, the rule settles those games
 /// with no search, and each comes out as a search of it does: in 630..=640 two pairs, 632 → 633 and (633 being settled)
-/// 633 → 635; in 1312..=1317 three, 1312 → 1313, 1314 → 1315 and 1316 → 1317.
+/// 633 → 635; in 1312..=1317 three, 1312 → 1313, 1314 → 1315 and 1316 → 1317.  The same pairs in both formulations (the
+/// claims make more games pose the same problem elsewhere, as the test of all of 600..=1300 below counts).
 #[test]
 fn the_rule_settles_repeats_as_a_search_does() {
-    let run = certify_by_the_rule(&needing(630..=640));
-    assert_eq!(run.settled, [(632, 633), (633, 635)]);
-    let run = certify_by_the_rule(&needing(1312..=1317));
-    assert_eq!(run.settled, [(1312, 1313), (1314, 1315), (1316, 1317)]);
-    println!("{} nodes of search saved", run.nodes_saved);
+    for claims in [true, false] {
+        let run = certify_by_the_rule(&needing(630..=640), claims);
+        assert_eq!(run.settled, [(632, 633), (633, 635)], "claims {claims}");
+        let run = certify_by_the_rule(&needing(1312..=1317), claims);
+        assert_eq!(run.settled, [(1312, 1313), (1314, 1315), (1316, 1317)], "claims {claims}");
+        println!("claims {claims}: {} nodes of search saved", run.nodes_saved);
+    }
 }
 
-/// The same over every game of 600..=1300 that needs a certificate: the rule rests each repeat on the latest game of
-/// the window with the same problem, and each comes out as a search of it does.
+/// The same over every game of 600..=1300 that needs a certificate, in both formulations: the rule rests each repeat
+/// on the latest game of the window with the same problem, and each comes out as a search of it does.
 #[test]
-#[ignore = "certifies the 377 games of 600..=1300 that need one, and searches the repeats again: about a minute"]
+#[ignore = "certifies the 377 games of 600..=1300 that need one twice, and searches the repeats again: a few minutes"]
 fn the_rule_over_600_to_1300() {
     let boards = needing(600..=1300);
     assert_eq!(boards.len(), 377);
-    let start = Instant::now();
-    let run = certify_by_the_rule(&boards);
-    println!(
-        "{} games, {} settled by the rule, which saved {} nodes of search: {:.1} s with the searches that check them",
-        boards.len(),
-        run.settled.len(),
-        run.nodes_saved,
-        start.elapsed().as_secs_f64()
-    );
-    assert!(run.settled.len() > 50, "{} games settled", run.settled.len());
+    for claims in [false, true] {
+        let start = Instant::now();
+        let run = certify_by_the_rule(&boards, claims);
+        println!(
+            "claims {claims}: {} games, {} settled by the rule, which saved {} nodes of search: {:.1} s with the \
+             searches that check them",
+            boards.len(),
+            run.settled.len(),
+            run.nodes_saved,
+            start.elapsed().as_secs_f64()
+        );
+        assert!(run.settled.len() > 50, "{} games settled", run.settled.len());
+    }
+}
+
+/// The claims change the problems and not their sizes, and make the rule settle more games.  Over the 377 games of
+/// 600..=1300 that need a certificate: the frames, the candidates, the rejected sources and `in_the_bag⁺` are the same
+/// in both formulations (the rule goes by the first two to pass over a line of the other formulation); 231 of the
+/// problems differ; and the rule settles 81 games without the claims, the ones the committed certificates were settled
+/// by, and 101 with them: the same 81 and 20 more, whose problems differ without the claims and are equal with them.
+/// No two games that pose the same problem without the claims pose different ones with them.
+#[test]
+fn the_claims_change_the_problems_and_not_their_sizes_and_the_rule_settles_more_games_with_them() {
+    let boards = needing(600..=1300);
+    let (without, with) = (posed_of(&boards, false), posed_of(&boards, true));
+    let sizes = |posed: &Posed| (posed.frames, posed.two_sided, posed.one_sided, posed.rejected, posed.in_the_bag);
+    for &n in &boards {
+        assert_eq!(sizes(&without[&n]), sizes(&with[&n]), "n={n}: the claims change neither the sizes nor the bag");
+    }
+    let differ = boards.iter().filter(|n| without[n].problem != with[n].problem).count();
+    assert_eq!(differ, 231, "problems that the claims change");
+
+    let (problems_without, problems_with) = (problems_of(&boards, false), problems_of(&boards, true));
+    let (pairs_without, pairs_with) = (same_problem_pairs(&problems_without), same_problem_pairs(&problems_with));
+    let committed: Vec<(u32, u32)> = json_lines(&crate_file("bench/certify/certificates_600_1300.jsonl"))
+        .iter()
+        .filter_map(|line| Some((field(line.get("same_problem")?, "n").as_u32()?, board_of(line)?)))
+        .collect();
+    assert_eq!(pairs_without, committed, "the pairs the rule settled in the committed certificates");
+    assert_eq!((pairs_without.len(), pairs_with.len()), (81, 101));
+    let gained: Vec<(u32, u32)> = pairs_with.iter().copied().filter(|pair| !pairs_without.contains(pair)).collect();
+    assert!(pairs_without.iter().all(|pair| pairs_with.contains(pair)), "nothing the rule settled is lost");
+    assert_eq!(gained.len(), 20);
+    for &(m, n) in &gained {
+        assert!(problems_without[&m] != problems_without[&n] && problems_with[&m] == problems_with[&n], "{m} {n}");
+    }
+    println!("settled with the claims and not without: {gained:?}");
+}
+
+/// A pair the claims make the rule settle: 609 and 611 pose different problems without the claims and the same one
+/// with them.  With them, 611 is certified from the certificate of 609 with no search, and comes out as a search of it
+/// does (the heaviest set is the recorded game's in both formulations); without them, 611 is searched.
+#[test]
+fn a_pair_of_games_is_settled_by_the_rule_only_with_the_claims() {
+    let (m, n) = (609, 611);
+    let (without, with) = (problems_of(&[m, n], false), problems_of(&[m, n], true));
+    assert!(without[&m] != without[&n] && with[&m] == with[&n], "the problems of {m} and {n}");
+
+    let run = certify_by_the_rule(&[m, n], true);
+    assert_eq!(run.settled, [(m, n)]);
+    // Without them both are searched (a game the rule settles has no nodes, and `certify_by_the_rule` checks that the
+    // game it rests on is the latest of the window with the same problem, which there is none of).
+    let run = certify_by_the_rule(&[m, n], false);
+    assert!(run.settled.is_empty(), "{:?}", run.settled);
+    assert_eq!(run.nodes_saved, 0);
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// The two formulations
+
+/// Certifies `boards` (games that need a certificate, ascending) in order in the formulation `claims`, as `taxman
+/// certify` does, and returns the certificates.
+fn certify_run(boards: &[u32], claims: bool) -> Vec<Certificate> {
+    let Fixtures { known, upper } = fixtures();
+    let mut earlier = EarlierCertificates::default();
+    let mut certify = |&n: &u32| {
+        let opts = options(1);
+        let c = certify_game_with(n, known, &upper[&n], claims, &opts, &mut earlier).unwrap_or_else(|e| panic!("{e}"));
+        assert_certified(&c, n);
+        assert_eq!(c.claims, claims, "n={n}: the formulation is the run's");
+        c
+    };
+    boards.iter().map(&mut certify).collect()
+}
+
+/// Certifies `boards` in the formulation opposite to `first` with only the certificates of `first` to rest on: the
+/// games of `boards` are certified in `first` (as a run does, the rule at work among them), and then each game that
+/// the rule settles in the other formulation, `second`, is certified there on its own, with the certificates of the
+/// games before it, made in `first`, as the only earlier games.  Each must come out settled by the latest game of the
+/// window whose problem in `second` is its own, and as a search of it in `second` does.  Returns the pairs (m, n).
+fn certify_across(boards: &[u32], first: bool) -> Vec<(u32, u32)> {
+    let Fixtures { known, upper } = fixtures();
+    let second = !first;
+    let (lines, problems) = (certify_run(boards, first), problems_of(boards, second));
+    let mut settled = Vec::new();
+    for &n in boards {
+        let Some(m) = latest_with_problem(n, &problems[&n], &problems) else { continue };
+        let mut earlier = EarlierCertificates::default();
+        lines.iter().filter(|line| line.n < n).for_each(|line| earlier.insert(line.clone()));
+        let c = certify_game_with(n, known, &upper[&n], second, &options(1), &mut earlier)
+            .unwrap_or_else(|e| panic!("{e}"));
+        assert_certified(&c, n);
+        println!("{}", c.summary_line());
+
+        let line = lines.iter().find(|line| line.n == m).expect("the game it rests on was certified");
+        let same = c.same_problem.as_ref().unwrap_or_else(|| panic!("n={n} rests on {m}: {}", c.summary_line()));
+        assert_eq!((line.claims, c.claims), (first, second), "n={n}: a certificate of the other formulation");
+        let (best, worth) = (line.worth().unwrap(), c.worth().unwrap());
+        let digest = problems[&n].digest();
+        assert_eq!(*same, SameProblem { n: m, digest, best, worth }, "n={n}: the digest is the problem's in `second`");
+        assert_eq!((c.digest, best), (digest, worth), "n={n}: the same heaviest set, whichever formulation m was in");
+        assert!(c.nodes == 0 && c.seconds <= 0.0, "n={n}: no search");
+
+        let direct = certify_in(n, second, &options(1));
+        assert_certified(&direct, n);
+        assert!(direct.same_problem.is_none() && direct.nodes > 0, "n={n}: a search: {}", direct.summary_line());
+        let (rule, search) =
+            ((c.digest, c.score, problem_sizes(&c)), (direct.digest, direct.score, problem_sizes(&direct)));
+        assert_eq!(rule, search, "n={n}: the rule's certificate is the search's");
+        settled.push((m, n));
+    }
+    settled
+}
+
+/// A certificate made in one formulation settles a later game in the other, when the later game's problem in its own
+/// formulation is the earlier game's problem in that one: the rule settles across the two exactly the pairs it settles
+/// within one, each with the digest of the problem in the formulation of the run, and each comes out as a search of the
+/// game in that formulation does.
+#[test]
+fn the_rule_settles_across_formulations_as_it_does_within_one() {
+    for boards in [needing(630..=640), needing(1312..=1317)] {
+        for first in [false, true] {
+            let pairs = same_problem_pairs(&problems_of(&boards, !first));
+            assert!(!pairs.is_empty(), "{boards:?}: games that pose the same problem");
+            assert_eq!(certify_across(&boards, first), pairs, "{boards:?}: from the claims {first} to {}", !first);
+        }
+    }
 }
 
 /// A wrong score planted on a game that repeats an earlier game's problem is still beaten: its recorded game is worth
@@ -678,19 +862,20 @@ fn a_planted_wrong_score_on_a_repeat_is_beaten() {
     let Fixtures { known, upper } = fixtures();
     let (m, n) = (1314, 1315);
     let mut earlier = EarlierCertificates::default();
-    let before = certify_game_with(m, known, &upper[&m], &options(1), &mut earlier).unwrap_or_else(|e| panic!("{e}"));
+    let before =
+        certify_game_with(m, known, &upper[&m], true, &options(1), &mut earlier).unwrap_or_else(|e| panic!("{e}"));
     assert_certified(&before, m);
 
     // The real game of 1315 is settled by the rule from the certificate of 1314 (set up again from its line).
     let mut from_the_line = EarlierCertificates::default();
     from_the_line.insert(before);
-    let real = certify_game_with(n, known, &upper[&n], &options(1), &mut from_the_line).unwrap();
+    let real = certify_game_with(n, known, &upper[&n], true, &options(1), &mut from_the_line).unwrap();
     assert_eq!(real.same_problem.as_ref().map(|same| same.n), Some(m));
 
     let dir = TempDir::new("certify-planted-repeat");
     let (file, planted, left_out) = plant_wrong_score(&dir, n);
     let table = Optimal::built_in().with_results_files(&[file]).unwrap();
-    let c = certify_game_with(n, &table, &upper[&n], &options(1), &mut earlier).unwrap_or_else(|e| panic!("{e}"));
+    let c = certify_game_with(n, &table, &upper[&n], true, &options(1), &mut earlier).unwrap_or_else(|e| panic!("{e}"));
     println!("{} (the smallest move up to n/2, {left_out}, left out)", c.summary_line());
     assert_beaten_by_the_optimum(&c, n, planted);
     assert!(c.same_problem.is_none() && c.nodes > 0, "searched, not settled by the rule");
@@ -704,7 +889,8 @@ fn a_planted_wrong_score_on_a_repeat_is_beaten() {
 fn doctored_lines_are_not_used() {
     let Fixtures { known, upper } = fixtures();
     let (m, n) = (633, 635);
-    let certify_n = |earlier: &mut EarlierCertificates| certify_game_with(n, known, &upper[&n], &options(1), earlier);
+    let certify_n =
+        |earlier: &mut EarlierCertificates| certify_game_with(n, known, &upper[&n], true, &options(1), earlier);
     let whole = certify(n, &options(1));
     assert_certified(&whole, n);
     let searched = |c: Result<Certificate, String>| {
@@ -727,7 +913,8 @@ fn doctored_lines_are_not_used() {
 
     // The refusal of bounds that were found against a higher score applies to a game the rule settles as to a searched.
     let higher = Upper { score: whole.score + 1, ..upper[&n].clone() };
-    let e = certify_game_with(n, known, &higher, &options(1), &mut with(&[&real])).expect_err("bounds above the score");
+    let e = certify_game_with(n, known, &higher, true, &options(1), &mut with(&[&real]))
+        .expect_err("bounds above the score");
     assert!(e.contains(&format!("n={n}: nothing beats {}, but the open members", whole.score)), "{e}");
     assert!(e.contains(&format!("found against {}, more: not a certificate", whole.score + 1)), "{e}");
 
@@ -738,10 +925,10 @@ fn doctored_lines_are_not_used() {
 
     // (b) Another game of the window whose problem is not n's, with n's digest on its line: it does not reproduce its
     // line when set up again.
-    let ours = extended_problem(n, &upper[&n].open).unwrap().problem;
+    let ours = extended_problem(n, &upper[&n].open, true).unwrap().problem;
     let other = (n - SAME_SEARCH_WINDOW..n)
         .rev()
-        .find(|&k| k != m && upper[&k].needs && extended_problem(k, &upper[&k].open).unwrap().problem != ours)
+        .find(|&k| k != m && upper[&k].needs && extended_problem(k, &upper[&k].open, true).unwrap().problem != ours)
         .expect("another game of the window that needs a certificate and poses another problem");
     let other = Certificate { digest: ours.digest(), ..certify(other, &options(1)) };
     searched(certify_n(&mut with(&[&other])));
@@ -840,7 +1027,7 @@ fn the_command_writes_same_problem_lines() {
     assert_eq!(at(635).get("nodes").and_then(Json::as_u64), Some(0));
     assert!(at(636).get("same_problem").is_none());
     assert_eq!(at(635).get("digest"), at(633).get("digest"));
-    let posed = extended_problem(633, &fixtures().upper[&633].open).unwrap();
+    let posed = extended_problem(633, &fixtures().upper[&633].open, true).unwrap();
     assert_eq!(at(633).get("digest").and_then(Json::as_str), Some(digest_text(posed.problem.digest()).as_str()));
 }
 
@@ -864,6 +1051,7 @@ fn certificate(n: u32, verdict: Verdict) -> Certificate {
         seconds_all_runs: 0.5,
         threads: 1,
         width: 8,
+        claims: true,
         verdict,
         digest: 0xfeed,
         same_problem: None,
@@ -1266,6 +1454,66 @@ fn a_file_certify_wrote_passes_and_the_summary_counts_it() {
     assert_eq!(steady(&again.stdout), steady(out));
 }
 
+/// A file that mixes the formulations passes: the first game of a stretch certified with `--no-claims` and then the
+/// stretch with the claims, into the same `--out`, which skips the first game and settles the next from its line (the
+/// problem of that game set up again with the claims is the next game's), and each after that from the game before it,
+/// which was made with them.  The stretches are ones where the games pose different problems without the claims and one
+/// problem with them (609 and 611, with five open sources each; 667, 669 and 671, with none), so the rule settles
+/// across the formulations what it could not within the older one.  The counts are those of a file of one formulation.
+/// A line whose formulation is changed to the other is refused, naming the line and the board: the problem set up again
+/// in that formulation is not the line's.
+#[test]
+fn a_file_that_mixes_the_formulations_passes_and_a_changed_formulation_is_refused() {
+    let dir = TempDir::new("verify-mixed");
+    let results = results_path("strict.jsonl");
+    for (first, last) in [(609, 611), (667, 671)] {
+        let boards = needing(first..=last);
+        let total = boards.len();
+        let (without, with) = (problems_of(&boards, false), problems_of(&boards, true));
+        assert!(boards.iter().all(|n| with[n] == with[&boards[0]]), "{boards:?} pose one problem with the claims");
+        assert!(boards[1..].iter().all(|n| without[n] != without[&boards[0]]), "{boards:?}: not without them");
+
+        let certs = dir.join(format!("certs-{first}.jsonl"));
+        let run = run_certify(&format!("{first}-{first}"), &results, &certs, &["--no-claims"]);
+        assert_eq!(run.code, Some(0), "{}{}", run.stdout, run.stderr);
+        assert!(run.stdout.contains("(no claims)"), "{}", run.stdout);
+        let run = run_certify(&format!("{first}-{last}"), &results, &certs, &[]);
+        assert_eq!(run.code, Some(0), "{}{}", run.stdout, run.stderr);
+        assert!(run.stdout.contains("already in --out 1"), "{}", run.stdout);
+        assert!(!run.stdout.contains("(no claims)"), "{}", run.stdout);
+
+        let lines = json_lines(&certs);
+        assert_eq!(lines.iter().filter_map(board_of).collect::<Vec<_>>(), boards);
+        let claims: Vec<bool> = lines.iter().map(|line| line.get("claims") == Some(&Json::Bool(true))).collect();
+        assert_eq!(claims, (0..total).map(|k| k > 0).collect::<Vec<_>>(), "the first game is the one made without");
+        for (k, line) in lines.iter().enumerate().skip(1) {
+            let rests_on = line.get("same_problem").and_then(|same| same.get("n")).and_then(Json::as_u32);
+            assert_eq!(rests_on, Some(boards[k - 1]), "n={}: settled by the game before it", boards[k]);
+        }
+        assert_ne!(lines[0].get("digest"), lines[1].get("digest"), "the line without the claims is of another problem");
+
+        let run = run_verify(&[&certs], &results, &upper_files(), &[]);
+        assert_eq!(run.code, Some(0), "{}{}", run.stdout, run.stderr);
+        let counts = format!(
+            "{total} lines, {total} final, 0 incomplete; certified by search 1, certified by the same problem {}, \
+             beaten 0",
+            total - 1
+        );
+        assert!(run.stdout.contains(&format!("{}: {counts}", certs.display())), "{}", run.stdout);
+        assert!(run.stdout.contains(&format!("boards certified: {total} (")), "{}", run.stdout);
+
+        // The formulation of a line changed: the problem set up again is not the line's (a line that rests on another
+        // is checked before the rule is, so the first to fail is the line whose formulation was changed).
+        for (k, line) in lines.iter().enumerate() {
+            let flipped = with_value(line, &["claims"], Json::Bool(!claims[k]));
+            let mut doctored = lines.clone();
+            doctored[k] = flipped;
+            let (name, why) = (format!("flipped-{}.jsonl", boards[k]), "Π⁺(O) set up again is not the line's");
+            assert_refused(&dir, &name, &doctored, k + 1, boards[k], why);
+        }
+    }
+}
+
 /// Verifying the file of `lines` (written to `name` in `dir`, over the real games and bounds) fails with status 1 and
 /// prints nothing on stdout; the message names the file, the line `at` (from 1), the board `n` and `why`.
 fn assert_refused(dir: &Path, name: &str, lines: &[Json], at: usize, n: u32, why: &str) {
@@ -1634,19 +1882,19 @@ fn the_prover_proves_the_committed_chain_to_2175() {
 #[test]
 fn the_width_a_certificate_takes_is_the_boards_own_where_the_block_words_fit() {
     let open = &fixtures().upper[&1302].open;
-    let (words, width) = certificate_width(1302, open).unwrap();
+    let (words, width) = certificate_width(1302, open, true).unwrap();
     assert_eq!((words <= 3, width), (true, width_for(words_for(1302))));
-    assert!(certificate_width(1302, &[7]).unwrap_err().starts_with("n=1302: "));
-    assert!(certificate_width(8192, &[]).unwrap_err().contains("beyond the largest supported board"));
+    assert!(certificate_width(1302, &[7], true).unwrap_err().starts_with("n=1302: "));
+    assert!(certificate_width(8192, &[], true).unwrap_err().contains("beyond the largest supported board"));
 
     let (n, known) = (3000, &fixtures().known);
     let open: Vec<u32> = taxman::with_width!(n, W => {
         let board = taxman::board::Board::<W>::for_n(n);
         board.plain.iter().copied().filter(|&x| 2 * x > n && board.tables.omega(x) >= 3).collect()
     });
-    assert_eq!(certificate_width(n, &open).unwrap().1, None);
+    assert_eq!(certificate_width(n, &open, true).unwrap().1, None);
     let upper = Upper { n, score: known.score(n).unwrap(), needs: true, open };
-    let e = certify_game(n, known, &upper, &options(1)).unwrap_err();
+    let e = certify_game(n, known, &upper, true, &options(1)).unwrap_err();
     assert!(e.starts_with("n=3000: ") && e.contains("block words of the GF(2) bound"), "{e}");
 }
 

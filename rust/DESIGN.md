@@ -923,6 +923,12 @@ members of U\*_{≥3} fixed, and searches it from the recorded game, as the prom
 with the ceiling n + score(n − 1) − in_the_bag⁺.  Before the search it checks that the game replays to its score,
 plays U\* above n/2 and is a promotion set of Π⁺(O) worth the score (Theorem M⁺ says a playable one is).
 
+*The formulation.*  Π⁺(O) has two formulations (`Board::extended`; THEORY.md, Lemma M5⁺): with the claims of `unzip`
+that the lemma allows to keep (the default), and without any (`certify --no-claims`; every certificate made before the
+lemma).  The two have the same promotion sets and so the same heaviest promotion set (the corollary of the lemma), so
+a certificate made in one bounds the heaviest promotion set of the problem in the other.  A line records the
+formulation it was made in (`claims`, true or false); a line with no such field is read as false.
+
 * *certified*: the search ends with nothing better, so opt(n) is the score, given that the members not open were
   certified against it; a line of the bounds whose score is above the recorded one certifies nothing against it, and
   is refused.
@@ -938,12 +944,16 @@ by a search or by this rule, and Π⁺(n) equals Π⁺(m), the heaviest promotio
 in_the_bag⁺(m), which m's certificate proved, and a recorded game of n worth the same has nothing above it.  After the
 checks of n's recorded game and before its search (a checkpoint of n, if there is one, changes nothing) `certify` looks
 at the certified games of the `SAME_SEARCH_WINDOW` = 8 board sizes before n, those of the file `--out` and those of the
-run, latest first, and never further.  A game whose line records another digest than Π⁺(n)'s is passed over; for one
-whose digest agrees, its problem is the one the run set up when it certified it (kept for the last eight sizes) or, for
-a line of the file, the one set up again from m's board size and the open members the line records
-(`certify::extended_problem`), which must reproduce the line (its digest, frames, candidates, rejected sources and
-in_the_bag⁺), or the line is dropped; it is compared with Π⁺(n) whole, so that the answer never rests on two digests
-alone, and the first game with an equal problem is m.  Then, with worth(n) = score(n) − in_the_bag⁺(n):
+run, latest first, and never further.  The problems are compared in the run's formulation, whatever formulation m's
+certificate was made in.  A game of the run's formulation whose line records another digest than Π⁺(n)'s is passed
+over; so is a game of the other formulation (whose digest says nothing of Π⁺(n)'s) unless its frames and candidates
+are Π⁺(n)'s, which the claims do not change.  For a game that is not passed over, its problem in the run's formulation
+is the one the run set up when it certified it (kept for the last eight sizes; only if its line is of the run's
+formulation) or, for a line of the file, the one set up again from m's board size and the open members the line
+records (`certify::extended_problem`) in the line's own formulation, which must reproduce the line (its formulation,
+digest, frames, candidates, rejected sources and in_the_bag⁺), or the line is dropped, and then, for a line of the
+other formulation, set up again in the run's.  It is compared with Π⁺(n) whole, so that the answer never rests on two
+digests alone, and the first game with an equal problem is m.  Then, with worth(n) = score(n) − in_the_bag⁺(n):
 
 * worth(n) = best(m): n is *certified* with `nodes` 0 and `"same_problem": {"n": m, "digest": ..., "best": ...,
   "worth": ...}` in its line;
@@ -953,15 +963,16 @@ alone, and the first game with an equal problem is m.  Then, with worth(n) = sco
   certificate says nothing beats), so the run fails naming n, m and both values, and nothing is certified.
 
 The rule is sound because equal problems have equal heaviest promotion sets (the form holds the frames, the candidates,
-`max_total` and the graph's lists, and nothing of n), so nothing beats n's recorded game, and n's own barred bounds
-then give opt(n) = score(n) by the corollary, exactly as after a search.  The refusal of a line of bounds that was found
-against a higher score applies to a game settled by the rule too.
+`max_total` and the graph's lists, and nothing of n), and the heaviest promotion set of a problem does not depend on
+the formulation it was certified in, so nothing beats n's recorded game, and n's own barred bounds then give opt(n) =
+score(n) by the corollary, exactly as after a search.  The refusal of a line of bounds that was found against a
+higher score applies to a game settled by the rule too.
 
 One line a game in `--out`: the board, the score, the open members, how many sources greedy rejected beside them,
-the frames and candidates of Π⁺(O), the nodes and seconds of the search, the threads and set width, the verdict, the
-digest of Π⁺(O), the game it rests on if the rule settled it (`same_problem`) and the build.  A search stopped by a
-limit or a signal writes an `incomplete` line and keeps its checkpoint (the same flags as `solve`'s); a rerun skips the
-games with a verdict and resumes the others.  A problem whose GF(2) bound needs more block words than the engines of
+the frames and candidates of Π⁺(O), the nodes and seconds of the search, the threads and set width, the formulation
+(`claims`), the verdict, the digest of Π⁺(O), the game it rests on if the rule settled it (`same_problem`) and the
+build.  A search stopped by a limit or a signal writes an `incomplete` line and keeps its checkpoint (the same flags
+as `solve`'s); a rerun skips the games with a verdict and resumes the others.  A problem whose GF(2) bound needs more block words than the engines of
 the board's set width have is searched at the widest set width (128 words, five words of engine).  The width is
 `certify::certificate_width`, the one place it is decided; the line records it.
 
@@ -987,15 +998,18 @@ is no certificate, or whose `build` lacks the commit (40 hexadecimal digits) or 
    the line's;
 2. the results have a game of the board with the line's score, the game passes the checks `certify` makes of it (it
    replays to its score, plays U\* above n/2 and is a promotion set of Π⁺(O) worth the score: `check_recorded_game`,
-   shared by the two), and the line's `width` is the one `certificate_width` gives;
-3. Π⁺(O) set up again reproduces the line: its digest, frames, candidates, rejected sources and `in_the_bag⁺`;
+   shared by the two), and the line's `width` is the one `certificate_width` gives; both are set up in the line's own
+   formulation (`claims`);
+3. Π⁺(O) set up again reproduces the line: its formulation, digest, frames, candidates, rejected sources and
+   `in_the_bag⁺`;
 4. a `certified` line has no `beaten_by`, and the file of counterexamples beside the certificates
    (`<certificates>.counterexample.jsonl`) has no line for its board;
 5. a `certified` line with `same_problem` {m, digest, best, worth} rests on a game m among the 8 board sizes before it
    whose last final line before it in the same file is `certified`; the rule of the same problem (`apply_rule`, the
    function `certify` applies, so that the rule is written once) is applied again to the two problems, which must be
-   equal whole, and must give exactly the `same_problem` the line records (the digest, `best` = score(m) −
-   `in_the_bag⁺`(m), `worth` = the line's score − `in_the_bag⁺`, equal);
+   equal whole in the formulation of the line that rests on m (m is set up again in it if m's line is of the other), and
+   must give exactly the `same_problem` the line records (the digest, `best` = score(m) − `in_the_bag⁺`(m), `worth` =
+   the line's score − `in_the_bag⁺`, equal);
 6. a `beaten` line has a finished legal game (`game::replay_finished`) that scores what the line says, which is more
    than the recorded score, and the counterexample file has an identical line;
 7. a board with final lines in more than one place (one file or several) has only `certified` ones: a `beaten` line
@@ -1152,7 +1166,13 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   with nothing to rest on or with its numbers changed, a certified line with a counterexample, a `build` without a
   commit, a score the results do not have) is refused naming the line; a beaten line is verified with its
   counterexample and cannot stand beside a certified one; the end of the chain on synthetic data (a gap stops what
-  rests on it) and on the committed chain.
+  rests on it) and on the committed chain.  The two formulations (`tests/certify.rs`): a line records its formulation
+  and an old line reads as without the claims; the rule settles the same pairs in each formulation and across them (a
+  certificate of one settles a later game in the other, with the digest of the problem in the run's formulation, and
+  as a search of the game does); the claims change the problems of 231 of the 377 games of 600..=1300 that need a
+  certificate and none of their sizes, and make the rule settle 101 games where it settled 81 (609 and 611, say, which
+  pose different problems without the claims and one with them); a file that mixes the formulations passes, and a line
+  whose formulation is changed is refused.
 * **Engine** (`tests/engine.rs`, `tests/robustness.rs`, `tests/stop_signal.rs`): a toy problem with a known optimum
   (knapsack against dynamic programming), run with 1 and many threads, with a tiny `queue_mem_cap` to force spilling,
   and killed and resumed from checkpoints, must give the same answer; ignored tests do the same with 64 and 192 threads,

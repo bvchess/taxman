@@ -398,7 +398,9 @@ are the optima on the whole board (statement U at each n; section 1, "What optim
 for each game the prover's barred bounds (`--upper`, `prover/data/upper_*.jsonl`) say needs it, a search of the
 extended problem with the bounds' open members optional, started from the recorded game, ends `certified` (nothing
 beats it) or `beaten` (a game that does, written to `OUT.counterexample.jsonl` too; the run exits with status 2).  It
-takes `--threads`, the checkpoint flags and the limits of `solve`, and resumes like it.
+takes `--threads`, the checkpoint flags and the limits of `solve`, and resumes like it; the extended problem keeps the
+claims of `unzip` that Lemma M5⁺ allows unless `--no-claims` (the formulation of the certificates made before it), and
+a line records which.
 `verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...] [--threads K]` checks the files it
 wrote without changing them, line by line, and says how far the proofs of the recorded scores reach (the prover's, the
 certificates' and the ceilings').
