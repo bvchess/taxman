@@ -120,8 +120,9 @@ example, the board 1..=21, is in the [README](README.md#how-the-solver-sees-the-
     the search of the *extended problem* Π⁺(O) (THEORY.md, Theorem M⁺; `frames::build_extended`, research code): the
     frame model with the set O of open members optional, exact like Π_n, so that a search of it that finds nothing
     better, the other members certified, proves opt(n) on the whole board.  The search takes it with the open members
-    as one-sided candidates (section 4, "Extended mode"; `Board::prepare_extended_with`), and with nothing open,
-    Π⁺(∅), as the frame model without the claims (`examples/extended.rs`).
+    as one-sided candidates (section 4, "Extended mode"; `Board::prepare_extended_with`).  It keeps the claims of
+    `unzip` that Lemma M5⁺ allows (THEORY.md), which with nothing open are all of them, so that Π⁺(∅) is Π_n itself;
+    without the claims, Π⁺(∅) is the frame model with them put back (`examples/extended.rs --no-claims`).
 
   What each proof kind needs of this, beyond the code's correctness and the games before it:
 
@@ -549,12 +550,24 @@ far before the engine starts, and the engine's start is unchanged.  Board/search
 
 The search can also take the *extended problem* Π⁺(O) (THEORY.md, ["The extended
 problem"](../heuristics/THEORY.md#the-extended-problem); `frames::build_extended`): the frame model with a set O of the
-sources of three or more prime factors that setup keeps left optional, and nothing claimed by `unzip`.  Besides the
-candidates of the frame model (*two-sided*: out of one frame, into the one in front) it has *one-sided* candidates, the
-members of O and the sources greedy rejected beside them, each a possible move of its *own* frame.  It is the
-problem that a certificate of U searches (THEORY.md, the corollary of Theorem M⁺; `taxman certify`, section 8,
-"Certificates of U").  Research code: the solver's own path
-never builds one, and with no one-sided candidate every piece below is what it was.
+sources of three or more prime factors that setup keeps left optional.  Besides the candidates of the frame model
+(*two-sided*: out of one frame, into the one in front) it has *one-sided* candidates, the members of O and the sources
+greedy rejected beside them, each a possible move of its *own* frame.  It is the problem that a certificate of U
+searches (THEORY.md, the corollary of Theorem M⁺; `taxman certify`, section 8, "Certificates of U").  Research code:
+the solver's own path never builds one, and with no one-sided candidate every piece below is what it was.
+
+*The claims of `unzip`* (THEORY.md, Lemma M5⁺).  The problem comes in two formulations, which have the same promotion
+sets (the lemma's corollary): without any claim, and, the default, with the claims of the frame model
+(`SearchFrames::claims`) that the lemma keeps.  `build_extended` gives each claim the frame (as setup forms it) of its
+source; a frame keeps its claims if it holds no member of O ∪ R and the factor of each of its back claims passes the
+check (`frames::ClaimCheck`): it is no two-sided candidate, and no candidate has it among its maximal factors.  The
+pairs of a frame that keeps them leave the moves and the factors before the root is reduced; the freedoms and the
+candidates do not change.  `ExtendedFrames` records the claims kept and those refused (`refused`).  With nothing open
+every claim is kept, and Π⁺(∅) is Π_n: the same problem, so the same trees (`tests/tripwires.rs`; the census's check
+H).  The check matters: a frame that holds an open source has more freedoms and can take on composites of a claimed
+factor that Π_n could not (at 24 with 16, 20 and 24 open, 12 becomes a candidate that lists 6, which 18 claims; taking
+the pair out anyway loses the promotion set {8, 12}, which the oracle catches); the census counts, board by board, the
+claims some O refuses (`m5_refused`).  `Board::extended(open, claims)` is the one place the board's claims are passed.
 
 * **The model** (`model`, "One-sided candidates"): `FrameGraph::build_extended` gives each one-sided candidate its own
   frame (`own`), and the factor graph lists its maximal factors there, as it does a move's.  Promoting one adds it to
@@ -1081,14 +1094,16 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   20), and checks both directions of Theorem M on every set of every board to 100 (to 120 ignored) and on random sets
   of boards to 1300 (to 8191 ignored), and the near miss that only the candidate filter keeps out (n = 98);
   `tests/model_extended.rs` checks Theorem M⁺ (the extended problem, with sources of three or more prime factors
-  optional) both ways on every set of every board to 80 (to 60 with every such source open) and on random sets to
-  1300 (to 4095 ignored), and that with none open its promotion sets are the frame model's;
+  optional) both ways, in both formulations (with and without the claims of `unzip`, Lemma M5⁺), on every set of every
+  board to 80 (to 60 with every such source open) and on random sets to 1300 (to 4095 ignored), that with none open
+  its promotion sets are the frame model's, and that a mutant that skips the check of Lemma M5⁺ is caught;
   `tests/bottom_layers.rs` checks Theorem B on every game of optimal.json, the committed chain and the chain past it,
   every optimal set the prover enumerated, and every optimal set of the boards to 48; the unit tests of `frames`
   check that `unzip`'s claims are its mandatory pairs, that `numbering` is what `build_frames` uses, that the frames
   lie in layers (Lemma Ω, also on punctured boards), and that the numbering by layer is the Java's breadth-first
   numbering on every board to 400 and a sample to 8191.  The census of every board (`examples/structure.rs`, data in
-  `bench/structure/`) checks what Theorem M's proof says of setup one board at a time.
+  `bench/structure/`) checks what Theorem M's proof says of setup one board at a time, and that Π⁺(∅) with the claims
+  of `unzip` is Π_n (check H).
 * **Regression**: `taxman regress --to N` solves 1..N as one range and checks every score against optimal.json.
 * **Tactic invariance**: games 1..300 forced to search with each tactic off or changed must give identical scores,
   and a checkpoint is refused when any of the search tactics differs.
@@ -1144,8 +1159,9 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   the tree on purpose fails them.**  Run `cargo test --test tripwires
   -- --nocapture`: it prints the rows as observed, in the layout of the table at the top of the file; check that the
   promotion sums (the answers) have not moved, paste the rows in, and update any node counts quoted in the docs.
-  The table `EXTENDED` does the same for the extended problem with nothing open, Π⁺(∅), whose search must also be
-  the default engine's on the same problem, node for node.
+  The table `EXTENDED` does the same for the extended problem with nothing open, Π⁺(∅), without the claims of
+  `unzip`, whose search must also be the default engine's on the same problem, node for node; with the claims, Π⁺(∅)
+  must pose the default problem itself and reproduce every row of the default table, node for node.
 * **Extended mode** (section 4, "Extended mode: one-sided candidates"): the model with one-sided candidates against
   the extended problem's reference predicate on every board 2..=300, for nothing open, every source of three or more
   prime factors open (to 120) and five random sets of them (`tests/model_extended.rs`: sets promoted at once and one

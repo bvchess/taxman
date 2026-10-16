@@ -1606,7 +1606,12 @@ worth V(m) − in_the_bag⁺(m), and V(n) − in_the_bag⁺(n) ≥ V(m) −
 in_the_bag⁺(m), then no promotion set of Π⁺ of n is worth more than
 V(n) − in_the_bag⁺(n), and with n's own certified members the corollary
 gives opt(n) = V(n) without a search (`taxman certify`'s
-`same_problem`).
+`same_problem`).  The two problems are compared in one formulation,
+with the claims of Lemma M5⁺ or without, whatever formulation m's
+certificate was made in: the heaviest promotion set of Π⁺ of m is the
+same in both (the corollary of Lemma M5⁺).  With the claims more
+consecutive games pose the same problem, since a claimed pair that
+only one of them has is no longer part of it.
 
 ## Signed frame matroids: the frame bound over other fields
 
