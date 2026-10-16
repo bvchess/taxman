@@ -48,7 +48,7 @@ if [ "$each" -lt 120 ]; then
     stamp "extras2: not enough time; skipped"
     exit 0
 fi
-{ cat results/strict.jsonl; awk -F'"n":' '{ if ($2 + 0 <= 2276) print }' bench/cloud/c8g.chain-2176.jsonl; } \
+{ head -n 2175 results/strict.jsonl; awk -F'"n":' '{ if ($2 + 0 <= 2276) print }' bench/cloud/c8g.chain-2176.jsonl; } \
     > "$WORK/p2276.jsonl"
 for t in 192 64; do
     cp "$WORK/p2276.jsonl" "$WORK/n$t.jsonl"

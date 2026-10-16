@@ -20,7 +20,7 @@
 //!   coming back down").
 //!
 //! The optimal games are those of optimal.json and of the completed games of each `--known` results file (as
-//! `results/strict.jsonl` for the games of 2..2175, or a copy of a longer chain); a game that none of them has gets no
+//! `results/strict.jsonl` for the games of 2..3440, or a copy of a longer chain); a game that none of them has gets no
 //! line.
 
 use std::path::PathBuf;

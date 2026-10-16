@@ -26,8 +26,8 @@ performance is measured.  Each term is defined where it first matters.
 ## 1. Goals and constraints
 
 * Find optimal games beyond n = 1000, where the Java solver's table of optimal games stopped, as far as the machines
-  at hand reach: today every n to 2175 on one laptop (Apple M1 Max, 10 CPUs, 32 GB RAM, fast SSD), and the same
-  chain on a many-core cloud machine for what is beyond (`tools/cloud/RUNBOOK.md`).
+  at hand reach: today every n to 2175 on one laptop (Apple M1 Max, 10 CPUs, 32 GB RAM, fast SSD), and to 3440 with
+  the same chain on a many-core cloud machine in a day (`tools/cloud/RUNBOOK.md`).
 * Be right before being fast.  Every game is replayed by an independent referee before it counts, every result
   records how its optimality is established and what that proof takes as given, every tactic is proven or sound, and
   every tactic can be switched off so that its effect on speed can be measured.
@@ -111,8 +111,10 @@ example, the board 1..=21, is in the [README](README.md#how-the-solver-sees-the-
     three or more prime factors.  U is open in general; it holds for every n ≤ 2175, where the prover (a branch and
     bound over sets of moves on the whole board, from the playability theorems, the Franklín–Moniot bound, the parity
     bound of THEORY.md's Theorem 10, the ceiling and the prime formula, and nothing of frames) proves the optimum of
-    every game of the committed chain.  Game by game, the prover's barred parity bounds certify 93% of those members
-    over 1301-2175 and 85% over the EC2 chain's 2176-3314, but close no game alone ([its
+    every game of the committed chain.  The committed games of 2176-3440 are proven within the frame model alone: each
+    is opt(n) wherever U holds at n, and U is not yet certified for them (`taxman certify` will check it game by game,
+    "Certificates of U" below).  Game by game, the prover's barred parity bounds certify 93% of those members
+    over 1301-2175 and 85% over the committed chain's 2176-3314, but close no game alone ([its
     README](prover/README.md#the-upper-part-game-by-game)); what is left needs a search that leaves the open ones
     optional, and `examples/hunt.rs` looks for a counterexample on the boards without each of them.  That search is
     the search of the *extended problem* Π⁺(O) (THEORY.md, Theorem M⁺; `frames::build_extended`, research code): the
@@ -841,8 +843,8 @@ what a multi-threaded search may vary:
 
 ### Same search
 
-Consecutive boards often pose exactly the same search problem with another ceiling: of the 1836 games of the committed
-chain 1..2175 that need a search, 914 pose the problem of the game before them (or the one before that, past a prime).
+Consecutive boards often pose exactly the same search problem with another ceiling: of the 2946 games of the committed
+chain 1..3440 that need a search, 1457 pose the problem of the game before them (or the one before that, past a prime).
 The chain of commit bd9bb5d, which searched the 545 of them in 1..1300, spent 953 of its 3359 s on those, 851 s of them
 in 1232–1300 (EXPERIMENTS, "Same search").  The tactic `same_search` (proven, on by default) concludes such a game from
 the earlier one with no search; the committed `results/strict.jsonl` was made with it.
@@ -896,7 +898,7 @@ its board size (milliseconds; `board::search_problem`), or, when the run set tha
 (the problem its setup posed, which is the same problem), and compared with n's whole.  The first equal one is m.
 Setting m up again with this build stands for the problem m's own build searched, which the digest recorded by that
 build ties to it (a problem with the recorded digest is that problem, but for a 64-bit collision), and the problem
-set up again must also have the size its line records (frames, candidates, `max_total`).  Every repeat of 1..2175
+set up again must also have the size its line records (frames, candidates, `max_total`).  Every repeat of 1..3440
 repeats the last game before it that set a search up (n − 1, or n − 2 past a prime), so the window loses nothing
 there, keeps the setups a range starts with to eight, and makes m a function of the window's games.
 
@@ -969,7 +971,7 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   1001, 1023, 1024, 1025, 1100, 1231, 2047 and 2048, checked at the width `with_width!` picks) and `games_java.txt` (the
   Java's game of the board's frames, move for move, for 171 sets of promotions at 762–2049).
 * **The board layer against the chain** (`tests/board_layer.rs`): for every 25th searched game of `results/strict.jsonl`
-  (and the last, n = 2175), the moves that the game's promotions make and the digest of the board's search problem are
+  (and the last, n = 3440), the moves that the game's promotions make and the digest of the board's search problem are
   the line's, which the golden data (up to 2049) cannot say of the boards that matter.  The unit tests of `frames` check
   what the frames remember (which numbers each can take on, which sources `removeImpossible` has been through) against a
   fresh computation.
@@ -1206,10 +1208,11 @@ the chain 1..1300 on one thread to 36 s (26 s of search) and 290,503 nodes again
 before it; the one-thread proofs of the quick set and the bench set 0.75 of the nodes and 0.81 of the cycles
 (geometric means; EXPERIMENTS, "Prime exchanges in the search").  A chain from
 optimal.json's game of 1300 reached 2175 in 92 minutes of game time on 2 threads, and the committed chain from n = 1
-took 27 minutes on 8 ([results/README.md](results/README.md)); its cost comes in waves that
-follow the root's GF(2) gap, with no growth that a fit over 1301–2175 resolves, and a day on 192 CPUs would take
-it to 4095, the end of the set widths then, at every slope the data support (EXPERIMENTS has the projections); the
-widths now go to 8191.
+to 2175 took 27 minutes on 8 ([results/README.md](results/README.md)); its cost comes in waves that
+follow the root's GF(2) gap, with no growth that a fit over 1301–2175 resolves.  Past 2175 it grows, tenfold per about
+1,040 in n, and a day on one 64-CPU cloud machine took the chain from 2176 to 3440 (the [cloud
+run](docs/EXPERIMENTS.md#the-frontier-chain-to-3440-2026-10) sets it beside the projections of the day: near 4,100, and
+3,400 to 3,700 at their pessimistic end); the widths go to 8191.
 
 **The matching path** (the default before the GF(2) bound; these are the build of commit 4b6ef38, on the M1 Max): the
 proof of 1215 takes 33 s on one thread (106 G cycles), and 1184 takes 3.2 G cycles.  The chain 1..1231 took 279 s of
@@ -1231,12 +1234,15 @@ quarter, refinement 14% and strong branching 11%.
 
 ## 11. Status and what is left
 
-Every n to 2175 has a game proven within the frame model: `results/strict.jsonl` is a chain from n = 1 whose games to
+Every n to 3440 has a game proven within the frame model: `results/strict.jsonl` is a chain from n = 1 whose games to
 1000 reproduce optimal.json's scores, whose games 1001–1300 go beyond it (and are now appended to optimal.json too, by
-`taxman extend-optimal`) and whose games 1301–2175 are past the table; `results/README.md` says what supports each
-score.  The production chain on a many-core machine can start from `strict.jsonl` (`tools/cloud/RUNBOOK.md`), and a
-chain from n = 1 reproduces its scores.  With the GF(2) bound (section 4), the chain goes past 1300 on a laptop
-(EXPERIMENTS, "The GF(2) bound in the search" and "The committed chain to 2175").  What is left to try: strong
+`taxman extend-optimal`) and whose games 1301–3440 are past the table; those to 2175 are also proven on the whole
+board, by the prover, and U is not yet certified for the games past 2175 (`taxman certify`, "Certificates of U"
+above, will check it game by game); `results/README.md` says what supports each score.  The production chain on a
+many-core machine can start from `strict.jsonl` (`tools/cloud/RUNBOOK.md`), and a chain from n = 1 reproduces its
+scores.  With the GF(2) bound (section 4), the chain goes past 1300 on a laptop (EXPERIMENTS, "The GF(2) bound in the
+search" and "The committed chain to 2175"), and a day on a 64-CPU cloud machine took it from 2176 to 3440 (the [cloud
+run](docs/EXPERIMENTS.md#the-frontier-chain-to-3440-2026-10)).  What is left to try: strong
 branching's solves, 70% of the intersection's work, which restart far below their answer (canceling the negative cycles
 of the optimum less the member would start them next to it); the removal of the matching path's search machinery that
 the GF(2) bound leaves idle (refinement, the Lagrangian bound in the search; EXPERIMENTS has the list), once a

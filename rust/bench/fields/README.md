@@ -24,8 +24,8 @@ bound and every field) and `fields.py`, which makes the entry's tables from them
 | `e2_output.md` | `./e2.py > e2_output.md` | E2's tables |
 
 `S` is `--known` of a snapshot of the EC2 chain's results to board 3423 (`chain_snapshot2.jsonl`, 3,423 games, sha256
-`a24709934602002d79c9caf29f4b39e3c3aad17c9650115fcb8d4ccd18e008a9`; the chain's games past 2175 are not yet in
-`results/`), after `K`; the optimum of each game used is `opt` of its line.  The dear roots are the searched games
+`a24709934602002d79c9caf29f4b39e3c3aad17c9650115fcb8d4ccd18e008a9`; the chain's games past 2175 were not yet in
+`results/` then; they are now), after `K`; the optimum of each game used is `opt` of its line.  The dear roots are the searched games
 (`method` search, proof `exhausted`) past 2175 with the largest root GF(2) gaps in that snapshot: 3300 (1443), 3333,
 3335 and 3336 (1427 each; neighbours of one search, with the same root structure) and 3176 (1388, the longest search
 of the three games of that gap).  Games with a proof of `cap` (3303: 1443, 3339: 1427) were not searched.

@@ -1,10 +1,11 @@
 # Research agenda (2026-10)
 
-What to pursue to push the wall (the largest n for which an optimal game is proven) much further than 2175: where the
+What to pursue to push the wall (the largest n for which an optimal game is proven) much further than 3440: where the
 project stands, what limits it, the avenues ranked, the conjectures worth proving, the ideas worth borrowing, and what
 the coming cloud runs should measure.  Written on 2026-10-14, after the rule of symmetric pairs was merged.  It links
 to the measurements instead of repeating them; the ones made for it are in section 7.  On 2026-10-15 section 2 and the
-results of A4, C5 and C6 were brought up to date with the measurement of the chain past 2175 (section 7.4).  The
+results of A4, C5 and C6 were brought up to date with the measurement of the chain past 2175 (section 7.4), and
+"Where we are" with the committed chain, which the cloud run took to 3440.  The
 register of [EXPERIMENTS.md](EXPERIMENTS.md#register-of-everything-tried) stays the record of what was tried; an
 avenue started from here gets its row there when it ends.
 
@@ -18,13 +19,15 @@ avenue started from here gets its row there when it ends.
 
 ## 1. Where we are
 
-**Known.**  Every n ≤ 2175 has a game proven optimal within the frame model, a chain from n = 1
+**Known.**  Every n ≤ 3440 has a game proven optimal within the frame model, a chain from n = 1
 ([results/README.md](../results/README.md)); the prover, which knows nothing of frames, proves every n ≤ 2175 on the
 whole board, 1301-2175 in a cloud run of 226 thread-hours and $3.84
-([prover 3](../prover/README.md#to-2175-on-a-cloud-machine)).
-A 64-thread chain reached 2276 in the Graviton calibration (`bench/cloud/c8g.chain-2176.jsonl`, benchmark data, not
-a committed result), and the EC2 chain, 64 threads on a `c8g.16xlarge`, 3314 in 6.4 hours (a snapshot of
-2026-10-15, not committed; its root gaps are section 7.4).  The frame model's assumptions are proven (2026-10-15),
+([prover 3](../prover/README.md#to-2175-on-a-cloud-machine)), so the games 2176-3440 are proven within the frame
+model, which is exact given U, and U is not yet certified past 2175 (`taxman certify` will check it game by game).
+The games past 2175 are the EC2 chain's: 64 threads on a `c8g.16xlarge`, 3314 in 6.4 hours and 3440 in 24 hours
+([the cloud run](EXPERIMENTS.md#the-frontier-chain-to-3440-2026-10), committed; section 7.4 measures its root
+gaps on a snapshot at 3314), and a 64-thread chain reached 2276 in the Graviton calibration
+(`bench/cloud/c8g.chain-2176.jsonl`, benchmark data).  The frame model's assumptions are proven (2026-10-15),
 but for one statement, U: some optimal game plays every source of three or more prime factors that setup keeps
 ([README](../README.md#what-optimal-means);
 [THEORY.md](../../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains)).  Outside the project the record stops at n = 1000 (OEIS A019312's table is
@@ -125,7 +128,9 @@ the evidence: its cost sits in the crests of the gap, an hour or two of the 64 t
 valleys cost seconds.)  The wall of the present search on one `c8g.16xlarge`: a day reaches about 4,100 (3,700 to 4,850
 across the models, −400 to +700 for a single run's luck), 4000 takes 13 to 20 hours past 3313, 5000 four to ten days,
 6000 a month or more; a `c8g.48xlarge` (1.9 to 2.7 times as fast) adds 300 to 500 n to a day.  The numbers and their
-derivation are in the entry [The gap past 2175](EXPERIMENTS.md#the-gap-past-2175-2026-10).
+derivation are in the entry [The gap past 2175](EXPERIMENTS.md#the-gap-past-2175-2026-10).  The day was then run and
+reached 3440, under the 10th percentile of the centre model; [the entry on that run](EXPERIMENTS.md#the-frontier-chain-to-3440-2026-10)
+sets it beside these numbers.
 
 **Where an order of magnitude can come from.**
 
@@ -480,8 +485,8 @@ their output files, analysed afterwards on one thread; what needs the machine is
 * **The true root gap of every searched game** past 2175, from the chain's own optima (`examples/wall.rs nodes --nodes
   1` over the results file, as in section 7.1): the gap's trend (C5, the two regimes of section 2) and the residuals
   of the cost model, with the thread count in the fit.  Done for a snapshot of the EC2 chain at game 3314 (509
-  searched games, section 7.4, [EXPERIMENTS](EXPERIMENTS.md#the-gap-past-2175-2026-10)); it can be repeated on a later
-  snapshot with `bench/wall/gap.py`, to see whether the waves keep their level.
+  searched games, section 7.4, [EXPERIMENTS](EXPERIMENTS.md#the-gap-past-2175-2026-10)); it can be repeated on the
+  committed chain, which now reaches 3440, with `bench/wall/gap.py`, to see whether the waves keep their level.
 * **The tree's growth with threads** (on the machine): the same three dear games at 1, 16, 64 and 192 threads, for
   converting 192-thread trees to one-thread equivalents in that fit.  Measured for 2170 and 2172 (1 to 192 threads)
   and 2184 (16 to 192): the trees differ by up to 18% with no trend in the threads
@@ -567,4 +572,5 @@ tables in `gap_output.md` (`gap.py` makes them), and the study is the entry
 to 1,443, +37 per 100 n over 1301-3312, G/n steady at 300), neither regime of section 2; the cost model on one build
 (a decade per 250 of gap, trees 0.29 times the committed chain's, the gap counting in units of n^0.3 with 0 and 0.5 as
 brackets); the dear games as the games of high gap; A4 killed; and the projection (a day on a `c8g.16xlarge` reaches
-about 4,100).
+about 4,100).  The day itself reached 3440, below the projection's 10th percentile for the centre model
+([the cloud run](EXPERIMENTS.md#the-frontier-chain-to-3440-2026-10)).
