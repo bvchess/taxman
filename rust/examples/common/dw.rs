@@ -2222,11 +2222,14 @@ pub struct R3 {
     pub pricings: usize,
     pub exact: bool,
     pub cores: bool,
+    /// The order of (B) and (C): the design's, the exact checks first, or the reference's, the node's separation
+    /// first and the exact checks only once it finds nothing new (see [`refit_r3`]).
+    pub cores_first: bool,
 }
 
 impl Default for R3 {
     fn default() -> Self {
-        R3 { seconds: 1.0, pricings: 300, exact: true, cores: true }
+        R3 { seconds: 1.0, pricings: 300, exact: true, cores: true, cores_first: false }
     }
 }
 
@@ -2238,8 +2241,10 @@ impl Default for R3 {
 /// [`LOCAL_PER_FRAME`] a frame along the path, seeded as R2's), back to (A) if any core was placed.  It stops at the
 /// target (if the context stops there), at `r3.seconds` or `r3.pricings`, at a breakdown, or after a round in which
 /// the pricing settled and (B) and (C) added nothing.  `r3.exact` and `r3.cores` switch (B) and (C) off (without (B)
-/// a round's pricing ends when nothing prices out and no cheap cut is violated, or at the phase's limit).  Returns
-/// the lowest ⌊L⌋ (with Tier 1's), the final state and the trace.
+/// a round's pricing ends when nothing prices out and no cheap cut is violated, or at the phase's limit).  With
+/// `r3.cores_first`, (C) comes before (B), as in [`bound`]'s certified separation (the reference's order): a round's
+/// pricing is not checked exactly until a round of (C) has placed no core, and a core placed starts the rounds
+/// without the checks again.  Returns the lowest ⌊L⌋ (with Tier 1's), the final state and the trace.
 pub fn refit_r3<const W: usize>(
     ctx: &Ctx<'_, W>,
     fam: Family,
@@ -2259,13 +2264,22 @@ pub fn refit_r3<const W: usize>(
     f.phase = Some(R3_PHASE);
     let per_frame = |h: usize| LOCAL_PER_NODE.min(LOCAL_PER_FRAME.saturating_sub(warm.local_in(h)));
     let mut rounds = 0;
+    // Whether a round's pricing is checked exactly: every round's in the design's order; in the reference's, once a
+    // round of the separation has placed no core.
+    let first_certify = r3.exact && !r3.cores_first;
+    let mut certify = first_certify;
     while f.stop.is_none() {
         rounds += 1;
-        let generated = f.generate(r3.exact);
+        let generated = f.generate(certify);
         if f.stop.is_some() {
             break;
         }
         if r3.cores && f.separate(&per_frame, LOCAL_SEEDS + warm.local).0 > 0 {
+            certify = first_certify;
+            continue;
+        }
+        if r3.exact && !certify {
+            certify = true;
             continue;
         }
         if generated != Generated::Capped {

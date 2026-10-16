@@ -16,7 +16,8 @@
 //! cargo run --release --example fields -- check [--known FILE] [--samples 100] N|A-B...
 //! cargo run --release --example fields -- bnb --known results/strict.jsonl [--variants v0,v1,r1,r2,r2c|r3]
 //!     [--refit 20] [--policy all|excess:E|tier1:F|r3-all|r3-top:A] [--r3-seconds 1] [--r3-pricings 300]
-//!     [--r3-exact on|off] [--r3-cores on|off] [--label NAME] [--fit PATH] [--fit-seconds 300]
+//!     [--r3-exact on|off] [--r3-cores on|off] [--r3-order exact-first|cores-first] [--label NAME] [--fit PATH]
+//!     [--fit-seconds 300]
 //!     [--fit-mode certified|search] [--seconds 7200] [--nodes 10000000] [--refit-seconds 30] [--audit EVERY]
 //!     [--audit-seconds 10] [--audit-out FILE] [--knuth DIVES] [--max-depth D] [--seed 1] [--ci 0.90] [--log DIR]
 //!     [--checkpoint DIR] [--checkpoint-minutes 10] [--save-states DIR] [--every 1] [--harvest FILE] [--out FILE]
@@ -84,11 +85,12 @@
 //!   20 pricings, a line keyed by `n`, `variant` and `node`.
 //!
 //!   Variant `r3` (design U4) refits by R3 (`dw::refit_r3`: R2's pricing, the exact checks and the node's own
-//!   separation, within `--r3-seconds` and `--r3-pricings`, `--r3-exact` and `--r3-cores` switching the last two off)
-//!   at the Tier-1-open nodes its policy selects and by R2 at the others: `r3-all` every one, `r3-top:A` those whose
-//!   GF(2) excess is at least `A` times the root's GF(2) gap.  It runs alone, and the r3 policies are its alone.  Its
-//!   line and files carry R3's settings (the key field `r3`, `t{T}-p{P}` with `-noexact`, `-nocores`), and a run
-//!   with `--label` the label (a key field too).  The run line also counts the Tier-1-open nodes below the root
+//!   separation, within `--r3-seconds` and `--r3-pricings`, `--r3-exact` and `--r3-cores` switching the last two off,
+//!   `--r3-order cores-first` putting the separation before the exact checks, as the reference does) at the
+//!   Tier-1-open nodes its policy selects and by R2 at the others: `r3-all` every one, `r3-top:A` those whose GF(2)
+//!   excess is at least `A` times the root's GF(2) gap.  It runs alone, and the r3 policies are its alone.  Its line
+//!   and files carry R3's settings (the key field `r3`, `t{T}-p{P}` with `-noexact`, `-nocores`, `-coresfirst`), and a
+//!   run with `--label` the label (a key field too).  The run line also counts the Tier-1-open nodes below the root
 //!   (`tier1_open`), R3's refits, those that cut, their pricings, rounds and ms (`r3_*`, `ms_r3`), the refits ended by
 //!   a second breakdown of their master (`refit_breakdowns`), and the time in the exact checks, the separation and
 //!   the masters' builds (`ms_exact`, `ms_separate`, `ms_master_build`); the per-node log the refit's `method`.
@@ -100,8 +102,9 @@
 //! * **replay** (design U4): each state of the files given (or of the `*.states.jsonl` of the directories given)
 //!   made again, its GF(2) bound and Tier 1 checked against the state's line, then each method of `--methods` from
 //!   it, on its own statistics: `r1`, `r2`, `r2c` (with `--refit` pricings), `r3:T`, `r3x:T` (R3 without its
-//!   separation: R2 and the exact checks), `r3c:T` (without its exact checks: R2 and the separation), each with T₃ =
-//!   T seconds and `--r3-pricings`, and `ref:T` (the reference, the audit's, within T seconds).  A line per state and
+//!   separation: R2 and the exact checks), `r3c:T` (without its exact checks: R2 and the separation), `r3s:T` (in the
+//!   reference's order, the separation first), each with T₃ = T seconds and `--r3-pricings`, and `ref:T` (the
+//!   reference, the audit's, within T seconds).  A line per state and
 //!   method, keyed by `n`, `host`, `index` and `method`: the node's depth and excesses, the bound, `excess`, `cut`,
 //!   `pricings`, `rounds`, `new_signings`, `cores` (found), `stop`, `host_same` (for the host's own method: whether
 //!   the bound and the final state are the host's), the exact checks' cuts and checks, `breakdowns`, and the ms of
@@ -323,6 +326,13 @@ fn parse() -> Result<Options, String> {
             "--r3-pricings" => o.bnb.r3.pricings = num(value("--r3-pricings")?)? as usize,
             "--r3-exact" => o.bnb.r3.exact = on_off("--r3-exact", value("--r3-exact")?)?,
             "--r3-cores" => o.bnb.r3.cores = on_off("--r3-cores", value("--r3-cores")?)?,
+            "--r3-order" => {
+                o.bnb.r3.cores_first = match value("--r3-order")?.as_str() {
+                    "exact-first" => false,
+                    "cores-first" => true,
+                    other => return Err(format!("--r3-order {other:?}: not exact-first or cores-first")),
+                }
+            }
             "--label" => o.bnb.label = Some(value("--label")?),
             "--save-states" => o.bnb.save_states = Some(value("--save-states")?.into()),
             "--every" => match num(value("--every")?)? as u64 {
@@ -1154,10 +1164,11 @@ impl Method {
 }
 
 /// R3's budgets and switches as a run's key and files name them: `t{T₃}-p{P₃}`, then `-noexact` and `-nocores` for
-/// the switches that are off.
+/// the switches that are off and `-coresfirst` for the reference's order.
 fn r3_name(r3: &R3) -> String {
     let off = |on: bool, what: &str| if on { String::new() } else { format!("-no{what}") };
-    format!("t{}-p{}{}{}", r3.seconds, r3.pricings, off(r3.exact, "exact"), off(r3.cores, "cores"))
+    let order = if r3.cores_first { "-coresfirst" } else { "" };
+    format!("t{}-p{}{}{}{order}", r3.seconds, r3.pricings, off(r3.exact, "exact"), off(r3.cores, "cores"))
 }
 
 /// Which Tier-1-open nodes a variant refits.
@@ -2263,24 +2274,27 @@ enum Probe {
 
 impl Probe {
     /// The method named `text`: `r1`, `r2`, `r2c` (with `o.k` pricings), `r3:T`, `r3x:T` (R3 without its separation:
-    /// R2 and the exact checks) and `r3c:T` (R3 without its exact checks: R2 and the separation), each with `T₃ = T`
-    /// seconds (`o.r3`'s if not given) and `o.r3`'s pricings, or `ref:T`, the reference within `T` seconds (10 if not
-    /// given).
+    /// R2 and the exact checks), `r3c:T` (R3 without its exact checks: R2 and the separation) and `r3s:T` (R3 in the
+    /// reference's order, the separation first), each with `T₃ = T` seconds (`o.r3`'s if not given) and `o.r3`'s
+    /// pricings, or `ref:T`, the reference within `T` seconds (10 if not given).
     fn parse(text: &str, o: &BnbOptions) -> Result<Probe, String> {
         let (kind, seconds) = match text.split_once(':') {
             Some((kind, t)) => (kind, Some(t.parse::<f64>().map_err(|e| format!("method {text:?}: {e}"))?)),
             None => (text, None),
         };
-        let r3 = |exact, cores| R3 { seconds: seconds.unwrap_or(o.r3.seconds), exact, cores, ..o.r3 };
+        let r3 = |exact, cores, cores_first| {
+            Method::R3(R3 { seconds: seconds.unwrap_or(o.r3.seconds), exact, cores, cores_first, ..o.r3 })
+        };
         let method = match kind {
             "r1" => Method::R1,
             "r2" => Method::R2 { local: 0 },
             "r2c" => Method::R2 { local: LOCAL_PER_NODE },
-            "r3" => Method::R3(r3(true, true)),
-            "r3x" => Method::R3(r3(true, false)),
-            "r3c" => Method::R3(r3(false, true)),
+            "r3" => r3(true, true, false),
+            "r3x" => r3(true, false, false),
+            "r3c" => r3(false, true, false),
+            "r3s" => r3(true, true, true),
             "ref" => return Ok(Probe::Reference(seconds.unwrap_or(10.0), text.to_string())),
-            _ => return Err(format!("unknown method {text:?}: not r1, r2, r2c, r3:T, r3x:T, r3c:T or ref:T")),
+            _ => return Err(format!("unknown method {text:?}: not r1, r2, r2c, r3:T, r3x:T, r3c:T, r3s:T or ref:T")),
         };
         Ok(Probe::Refit(method, text.to_string()))
     }
@@ -3116,11 +3130,12 @@ mod tests {
                     pricings += trace.pricings;
                     opened += trace.new_signings;
                 }
-                for (exact, cores) in [(true, true), (true, false), (false, true)] {
+                for (exact, cores, cores_first) in [(true, true, false), (true, false, false), (false, true, false), (true, true, true)] {
                     let f = fam();
                     let (_, first) = tier1(ctx, &f, &warm, &mut stats);
-                    let r3 = refit_r3(ctx, f, &warm, first, &R3 { exact, cores, ..test_r3() }, &mut stats);
-                    let what = format!("n={n} r3 exact {exact} cores {cores}");
+                    let settings = R3 { exact, cores, cores_first, ..test_r3() };
+                    let r3 = refit_r3(ctx, f, &warm, first, &settings, &mut stats);
+                    let what = format!("n={n} {}", r3_name(&settings));
                     assert_refit(ctx, &what, tier, &r3, false);
                     let (state, trace) = (&r3.1, &r3.2);
                     for h in 0..ctx.state.len() {
@@ -3131,8 +3146,13 @@ mod tests {
                     assert_eq!(state.signings.len(), warm.signings.len() + trace.new_signings, "{what}");
                     assert!(state.signings.iter().all(|s| !s.mergeable && s.cores.is_empty()), "{what}: frozen");
                     line += &format!(
-                        ", r3/{exact}/{cores} {} ({} pricings, {} rounds, {} signings, {:?})",
-                        r3.0, trace.pricings, trace.rounds, trace.new_signings, trace.stop
+                        ", {} {} ({} pricings, {} rounds, {} signings, {:?})",
+                        r3_name(&settings),
+                        r3.0,
+                        trace.pricings,
+                        trace.rounds,
+                        trace.new_signings,
+                        trace.stop
                     );
                     lowered += usize::from(r3.0 < tier);
                     r3_checked += 1;
