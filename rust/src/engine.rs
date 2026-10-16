@@ -2405,8 +2405,15 @@ const VERSION: u32 = 1;
 /// Largest header or payload accepted when reading (guards against allocating for garbage lengths).
 const MAX_BLOB: u64 = 1 << 32;
 
-/// Read and verify a whole checkpoint, passing each unit's bytes to `unit` in order.
-fn scan_checkpoint(path: &Path, mut unit: impl FnMut(&[u8]) -> io::Result<()>) -> io::Result<CheckpointHead> {
+/// Read and verify a whole checkpoint, passing each unit's bytes (decoded by [`Unit::decode`]) to `unit` in the order
+/// the checkpoint holds them, the shared deque from its front (the shallowest, largest subtrees) to its back and then
+/// the units the workers held, and return everything but the units ([`read_checkpoint`] is this with no use for them).
+/// For a caller that studies a checkpoint's work (`examples/tune.rs`); the engine itself resumes from it this way.
+///
+/// # Errors
+///
+/// As [`read_checkpoint`], and the first error `unit` returns.
+pub fn scan_checkpoint(path: &Path, mut unit: impl FnMut(&[u8]) -> io::Result<()>) -> io::Result<CheckpointHead> {
     let mut r = HashReader { inner: BufReader::with_capacity(1 << 20, File::open(path)?), hash: Hash64::new() };
     let mut scan = || -> io::Result<CheckpointHead> {
         let header = get_prefix(&mut r)?;
