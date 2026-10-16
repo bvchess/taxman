@@ -6,7 +6,7 @@
 
 rust/docs/EXPERIMENTS.md, "The wiki's open questions (2026-10)", has the method, the results and the proofs; this
 module computes every number there.  The games read are optimal.json (1..1300) and the committed chain
-rust/results/strict.jsonl (1..2175).
+rust/results/strict.jsonl (its games 1..2175, TOP, which the study was made on; the file has more now).
 
 * `tax`: how many numbers the taxman takes for one move (its *tax*).  Every committed game, the moves that
   pay three, the shapes a tax can have (a check of the entry's theorem), a reordering of every game that has a
