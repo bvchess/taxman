@@ -65,8 +65,10 @@ commands:
                           prove the recorded scores of A..B that rest on the frame model on the whole board, game
                           by game: the extended problem with the open members of the barred bounds (--upper,
                           the prover's `upper` files) optional, searched from the recorded game (--results, over
-                          optimal.json); one line a game in --out, certified or beaten; a game that beats its
-                          score is also written to OUT.counterexample.jsonl and the run exits with status 2.
+                          optimal.json); one line a game in --out, certified or beaten; a game whose extended
+                          problem an earlier certified game of the last 8 board sizes posed is certified without
+                          a search (same_problem); a game that beats its score is also written to
+                          OUT.counterexample.jsonl and the run exits with status 2.
                           Options: --threads K, --checkpoint-dir DIR, --checkpoint-interval S, --progress S,
                           --time-limit S, --node-limit N, --mem-cap UNITS, as for solve; a rerun skips the games
                           --out has a verdict for and resumes a stopped search from its checkpoint

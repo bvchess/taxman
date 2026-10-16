@@ -930,12 +930,37 @@ and is a promotion set of Π⁺(O) worth the score (Theorem M⁺ says a playable
   score rests on the frame model.  It is written to `<out>.counterexample.jsonl` as well, and the run exits with
   status 2.
 
+*The same problem.*  Consecutive games often pose the same Π⁺(O) (the same `search::Problem`, which has no n in it:
+"Same search"), and then an earlier game's certificate settles the later one with no search.  If game m is certified,
+by a search or by this rule, and Π⁺(n) equals Π⁺(m), the heaviest promotion set of Π⁺(n) is worth best(m) = score(m) −
+in_the_bag⁺(m), which m's certificate proved, and a recorded game of n worth the same has nothing above it.  After the
+checks of n's recorded game and before its search (a checkpoint of n, if there is one, changes nothing) `certify` looks
+at the certified games of the `SAME_SEARCH_WINDOW` = 8 board sizes before n, those of the file `--out` and those of the
+run, latest first, and never further.  A game whose line records another digest than Π⁺(n)'s is passed over; for one
+whose digest agrees, its problem is the one the run set up when it certified it (kept for the last eight sizes) or, for
+a line of the file, the one set up again from m's board size and the open members the line records
+(`certify::extended_problem`), which must reproduce the line (its digest, frames, candidates, rejected sources and
+in_the_bag⁺), or the line is dropped; it is compared with Π⁺(n) whole, so that the answer never rests on two digests
+alone, and the first game with an equal problem is m.  Then, with worth(n) = score(n) − in_the_bag⁺(n):
+
+* worth(n) = best(m): n is *certified* with `nodes` 0 and `"same_problem": {"n": m, "digest": ..., "best": ...,
+  "worth": ...}` in its line;
+* worth(n) < best(m): the recorded game is not optimal, so the rule is not used and n is searched (the search finds the
+  better set and says *beaten*);
+* worth(n) > best(m): impossible with genuine data (the recorded game of n is a promotion set of a problem that m's
+  certificate says nothing beats), so the run fails naming n, m and both values, and nothing is certified.
+
+The rule is sound because equal problems have equal heaviest promotion sets (the form holds the frames, the candidates,
+`max_total` and the graph's lists, and nothing of n), so nothing beats n's recorded game, and n's own barred bounds
+then give opt(n) = score(n) by the corollary, exactly as after a search.  The refusal of a line of bounds that was found
+against a higher score applies to a game settled by the rule too.
+
 One line a game in `--out`: the board, the score, the open members, how many sources greedy rejected beside them,
 the frames and candidates of Π⁺(O), the nodes and seconds of the search, the threads and set width, the verdict, the
-digest of Π⁺(O) and the build.  A search stopped by a limit or a signal writes an `incomplete` line and keeps its
-checkpoint (the same flags as `solve`'s); a rerun skips the games with a verdict and resumes the others.  A problem
-whose GF(2) bound needs more block words than the engines of the board's set width have is searched at the widest set
-width (128 words, five words of engine).
+digest of Π⁺(O), the game it rests on if the rule settled it (`same_problem`) and the build.  A search stopped by a
+limit or a signal writes an `incomplete` line and keeps its checkpoint (the same flags as `solve`'s); a rerun skips the
+games with a verdict and resumes the others.  A problem whose GF(2) bound needs more block words than the engines of
+the board's set width have is searched at the widest set width (128 words, five words of engine).
 
 ## 9. Testing
 

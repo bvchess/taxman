@@ -29,7 +29,7 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use taxman::certify::{certify_game, read_upper, CertificateFile, Verdict};
+use taxman::certify::{certify_game_with, read_upper, CertificateFile, EarlierCertificates, Verdict};
 use taxman::engine;
 use taxman::game::Optimal;
 use taxman::json::Json;
@@ -149,8 +149,11 @@ const CERTIFY_FLAGS: [&str; 4] = ["--results", "--upper", "--out", "--threads"];
 /// from the prover's barred bounds (`upper` files).  A game whose line there does not say `needs` (a prime, or a score
 /// at its ceiling, which rest on n − 1) is passed over.  Each game's certificate is appended to `--out` as it is made,
 /// and a rerun skips the games the file has a certificate for and resumes a stopped search from its checkpoint.  A
-/// game found to beat its recorded score is printed, written to `<out>.counterexample.jsonl` too, and ends the run
-/// with status 2, as does a rerun over a game the file records beaten.
+/// game whose extended problem a certified game of the last 8 board sizes (of this run, or of the file) posed, with a
+/// recorded game worth what that game's certificate proved the most, is certified with no search
+/// (`same_problem`; [`taxman::certify`]).  A game found to beat its recorded score is printed, written to
+/// `<out>.counterexample.jsonl` too, and ends the run with status 2, as does a rerun over a game the file records
+/// beaten.
 pub fn certify(args: &[String]) -> CliResult {
     let usage = |why: &str| {
         CliError::Usage(format!("{why}\nusage: certify A-B --results FILE... --upper FILE... --out FILE [options]"))
@@ -173,6 +176,7 @@ pub fn certify(args: &[String]) -> CliResult {
     let known = Optimal::built_in().with_results_files(&results).map_err(failed)?;
     let upper = read_upper(&uppers).map_err(failed)?;
     let mut file = CertificateFile::open(&out).map_err(failed)?;
+    let mut earlier = EarlierCertificates::of_file(&file);
     let _lock = guard_checkpoints(&opts)?;
 
     let mut tally = BTreeMap::<&str, usize>::new();
@@ -197,7 +201,7 @@ pub fn certify(args: &[String]) -> CliResult {
             }
             None => {}
         }
-        let certificate = certify_game(n, &known, line, &opts).map_err(failed)?;
+        let certificate = certify_game_with(n, &known, line, &opts, &mut earlier).map_err(failed)?;
         file.append(&certificate).map_err(failed)?;
         outln!("{}", certificate.summary_line());
         let _ = std::io::stdout().flush();
@@ -220,7 +224,8 @@ pub fn certify(args: &[String]) -> CliResult {
             }
             Verdict::Certified => {
                 solver::discard_checkpoint(&opts, n);
-                *tally.entry("certified").or_default() += 1;
+                let how = if certificate.same_problem.is_some() { "certified (same problem)" } else { "certified" };
+                *tally.entry(how).or_default() += 1;
             }
         }
     }

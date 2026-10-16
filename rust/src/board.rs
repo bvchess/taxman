@@ -176,6 +176,21 @@ impl<const W: usize> Board<W> {
     pub fn problem(&self) -> Result<Problem, String> {
         search::problem_of(&self.tables, &self.frames.columns(), &self.frames.candidates)
     }
+
+    /// The extended problem Π⁺(`open`) ([`build_extended`]) and the search problem that
+    /// [`prepare_extended_with`](Self::prepare_extended_with) poses for it, built again without a search, see
+    /// [`search::problem_of_extended`].  It needs no tactics and does not check the GF(2) bound's block words, so
+    /// it is the same at every set width.
+    ///
+    /// # Errors
+    ///
+    /// As [`build_extended`] and [`search::problem_of_extended`].
+    pub fn extended_problem(&self, open: &Bits<W>) -> Result<(ExtendedFrames<W>, Problem), String> {
+        let extended = build_extended(&self.tables, open)?;
+        let (columns, one_sided) = (extended.columns(), &extended.one_sided);
+        let problem = search::problem_of_extended(&self.tables, &columns, one_sided, &extended.candidates)?;
+        Ok((extended, problem))
+    }
 }
 
 /// The ceiling on the promotion sum of the board `1..=n`, whose `in_the_bag` is given, given that the game of `n − 1`
@@ -272,6 +287,41 @@ mod tests {
             assert_eq!((prepared.max_total, prepared.candidates), (plain.max_total, plain.candidates), "n={n}");
             assert_eq!(extended.in_the_bag, board.in_the_bag, "n={n}");
         }
+    }
+
+    /// What `taxman certify` sets up again from a certificate's line (the board size and the open members) is the
+    /// extended problem the setup posed, at any set width, for all of U\*_{≥3} open and for every other member of it.
+    #[test]
+    fn the_extended_problem_set_up_again_is_the_one_the_setup_posed() {
+        let mut compared = 0;
+        for n in 2..=120 {
+            let board = Board::<8>::for_n(n);
+            if board.is_trivial() {
+                continue;
+            }
+            let from_3: Vec<u32> =
+                board.plain.iter().copied().filter(|&x| 2 * x > n && board.tables.omega(x) >= 3).collect();
+            let every_other: Vec<u32> = from_3.iter().copied().step_by(2).collect();
+            for open in [from_3, every_other] {
+                let set: Bits<8> = open.iter().copied().collect();
+                let prepared = match board.prepare_extended_with(&set, SearchTactics::extended()) {
+                    Ok((_, prepared)) => prepared,
+                    Err(refusal) => {
+                        assert!(refusal.contains("block words of the GF(2) bound"), "n={n} open {open:?}: {refusal}");
+                        continue;
+                    }
+                };
+                let (extended, problem) = board.extended_problem(&set).unwrap();
+                assert_eq!(problem, prepared.problem(), "n={n} open {open:?}");
+                assert_eq!(extended.one_sided.len() as u32, open.len() as u32 + extended.rejected.len(), "n={n}");
+
+                let wide_set: Bits<16> = open.iter().copied().collect();
+                let wide = Board::<16>::for_n(n).extended_problem(&wide_set).unwrap().1;
+                assert_eq!((problem.digest(), &problem), (wide.digest(), &wide), "n={n} open {open:?}");
+                compared += 1;
+            }
+        }
+        assert!(compared > 100, "{compared} problems compared");
     }
 
     #[test]

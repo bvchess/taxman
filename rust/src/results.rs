@@ -362,24 +362,32 @@ enum Line {
     },
 }
 
-/// Field access with errors that name the field.
-struct Fields<'a>(&'a Json);
+/// Field access with errors that name the field (also the reader of `taxman certify`'s certificates uses it).
+pub(crate) struct Fields<'a>(pub(crate) &'a Json);
 
 impl<'a> Fields<'a> {
-    fn get(&self, name: &str) -> Result<&'a Json, String> {
+    pub(crate) fn get(&self, name: &str) -> Result<&'a Json, String> {
         self.0.get(name).ok_or_else(|| format!("missing \"{name}\""))
     }
 
-    fn bad(name: &str) -> String {
+    pub(crate) fn bad(name: &str) -> String {
         format!("bad \"{name}\"")
     }
 
-    fn u32(&self, name: &str) -> Result<u32, String> {
+    pub(crate) fn u32(&self, name: &str) -> Result<u32, String> {
         self.get(name)?.as_u32().ok_or_else(|| Self::bad(name))
     }
 
-    fn u64(&self, name: &str) -> Result<u64, String> {
+    pub(crate) fn u64(&self, name: &str) -> Result<u64, String> {
         self.get(name)?.as_u64().ok_or_else(|| Self::bad(name))
+    }
+
+    pub(crate) fn usize(&self, name: &str) -> Result<usize, String> {
+        self.get(name)?.as_u64().and_then(|value| usize::try_from(value).ok()).ok_or_else(|| Self::bad(name))
+    }
+
+    pub(crate) fn f64(&self, name: &str) -> Result<f64, String> {
+        self.get(name)?.as_f64().ok_or_else(|| Self::bad(name))
     }
 
     fn opt_u64(&self, name: &str) -> Result<Option<u64>, String> {
@@ -397,7 +405,7 @@ impl<'a> Fields<'a> {
         self.get(name)?.as_str().ok_or_else(|| Self::bad(name))
     }
 
-    fn u32s(&self, name: &str) -> Result<Vec<u32>, String> {
+    pub(crate) fn u32s(&self, name: &str) -> Result<Vec<u32>, String> {
         self.get(name)?.as_u32_vec().ok_or_else(|| Self::bad(name))
     }
 
@@ -414,7 +422,7 @@ impl<'a> Fields<'a> {
     }
 
     /// A search problem's digest, as [`crate::solver::digest_text`] writes it.
-    fn digest(&self, name: &str) -> Result<u64, String> {
+    pub(crate) fn digest(&self, name: &str) -> Result<u64, String> {
         parse_digest(self.str(name)?).ok_or_else(|| Self::bad(name))
     }
 }

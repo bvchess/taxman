@@ -4,7 +4,8 @@
 //! the same for a problem with one-sided candidates, the extended problem's (`crate::frames::build_extended`).
 //!
 //! The search problem a setup poses, in a canonical form that two games can be compared by, is a [`Problem`]
-//! ([`Prepared::problem`]); [`problem_of`] rebuilds it from the frames alone, without preparing a search.
+//! ([`Prepared::problem`]); [`problem_of`] rebuilds it from the frames alone, without preparing a search, and
+//! [`problem_of_extended`] does the same for the extended problem's.
 
 use super::header::Header;
 use super::tactics::SearchTactics;
@@ -169,8 +170,25 @@ pub fn problem_of<const W: usize>(
     columns: &[Vec<u32>],
     candidates: &Bits<W>,
 ) -> Result<Problem, String> {
-    let (model, root, _) = build_root::<W>(tables, columns, &[])?;
-    Ok(Problem::of(&model, &root, candidates, max_total(&model, &root, candidates)))
+    problem_of_extended(tables, columns, &[], candidates)
+}
+
+/// The search problem ([`Problem`]) that [`prepare_extended`] poses for the game whose frames are `columns`, with the
+/// one-sided candidates `one_sided` besides the (two-sided) `candidates`: built as [`prepare_extended`] builds it, but
+/// with no greedy set and without the check of the GF(2) bound's block words, so that it can be compared with another
+/// problem whatever set width either would be searched at.  With no one-sided candidates it is [`problem_of`].
+///
+/// # Errors
+///
+/// If the frames cannot be built into a model.
+pub fn problem_of_extended<const W: usize>(
+    tables: &Tables,
+    columns: &[Vec<u32>],
+    one_sided: &[(u32, usize)],
+    candidates: &Bits<W>,
+) -> Result<Problem, String> {
+    let (model, root, candidates, _) = build_extended_root::<W>(tables, columns, one_sided, candidates)?;
+    Ok(Problem::of(&model, &root, &candidates, max_total(&model, &root, &candidates)))
 }
 
 /// Sets up the search for the game whose frames are `columns` (factors and moves per frame, front first) and
