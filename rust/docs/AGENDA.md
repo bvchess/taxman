@@ -19,19 +19,10 @@ avenue started from here gets its row there when it ends.
 
 ## 1. Where we are
 
-**Known.**  Every n ≤ 3440 has a game proven optimal within the frame model, a chain from n = 1
-([results/README.md](../results/README.md)); the prover, which knows nothing of frames, proves every n ≤ 2175 on the
-whole board, 1301-2175 in a cloud run of 226 thread-hours and $3.84
-([prover 3](../prover/README.md#to-2175-on-a-cloud-machine)), so the games 2176-3440 are proven within the frame
-model, which is exact given U, and U is not yet certified past 2175 (`taxman certify` will check it game by game).
-The games past 2175 are the EC2 chain's: 64 threads on a `c8g.16xlarge`, 3314 in 6.4 hours and 3440 in 24 hours
-([the cloud run](experiments/the-frontier-chain-to-3440-2026-10.md), committed; section 7.4 measures its root
-gaps on a snapshot at 3314), and a 64-thread chain reached 2276 in the Graviton calibration
-(`bench/cloud/c8g.chain-2176.jsonl`, benchmark data).  The frame model's assumptions are proven (2026-10-15),
-but for one statement, U: some optimal game plays every source of three or more prime factors that setup keeps
-([README](../README.md#what-optimal-means);
-[THEORY.md](../../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains)).  Outside the project the record stops at n = 1000 (OEIS A019312's table is
-this project's), and the literature has bounds and one asymptotic result, not optima (section 5).
+**Known.**  The results and what each rests on are in the [README](../README.md#what-optimal-means), and the
+current state of the work in [STATUS.md](STATUS.md); section 7.4 measures the root gaps of the cloud chain.  Outside
+the project the record stops at n = 1000 (OEIS A019312's table is this project's), and the literature has bounds and
+one asymptotic result, not optima (section 5).
 
 **The theory the search stands on.**  A set of moves is playable, independent over GF(2) in the parity matroids, or
 matchable exactly when some payment set has one, an odd number, or at least one payment scheme

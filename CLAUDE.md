@@ -1,17 +1,15 @@
 # Working notes for Claude
 
-Rules Brian has set for all work in this project.  How-to lives in the docs listed at the end.
+Rules Brian has set for all work in this project.  Rules for the Rust programs are in rust/CLAUDE.md.  How-to lives in
+the docs listed at the end.
 
 * **Commits.**  Never cite yourself in a commit message: no `Co-Authored-By: Claude` trailer and no Claude or
   Anthropic mention, whatever a harness default says.
 * **Delegation.**  Don't write code on the main model: delegate it to subagents on the cheapest model that suits the
   task (Haiku for mechanical edits, Sonnet for routine work, Opus for hard reasoning).  Give each a precise spec and
-  verify its work before merging (rust/DESIGN.md, "Testing").  Parallel agents work in their own git worktrees.
-  Experimental branches are never pushed: harvest what works onto master, record the rest, delete the branch.
-* **Nothing unproven.**  Every rule the frame solver relies on is proven (heuristics/THEORY.md) and tested.
-  Committed results are evidence, and runs never overwrite them.
-* **Record every experiment.**  Check the register at the top of rust/docs/EXPERIMENTS.md before proposing one, and
-  add to it when one ends, failures included.
+  verify its work before merging (rust/DESIGN.md, "Testing").  Brief each with the files and sections its task needs,
+  never a whole long document.  Parallel agents work in their own git worktrees.  Experimental branches are never
+  pushed: harvest what works onto master, record the rest, delete the branch.
 * **Computation.**  Heavy runs go to EC2; this laptop's load stays light.  Long runs write results as they go and
   resume after an interruption.  Prefer small, fast tests that capture the heart of a large-n problem; run large n
   only when the question needs it.
@@ -23,12 +21,11 @@ Rules Brian has set for all work in this project.  How-to lives in the docs list
 
 ## Where things are
 
-* **rust/**, the active work: the frame solver, an exact solver in Rust.  rust/README.md is its guide, glossary and
-  reading order; rust/DESIGN.md its design; rust/docs/EXPERIMENTS.md the lab notebook; rust/tools/cloud/RUNBOOK.md
-  the guide to running on EC2; rust/results/ the committed chain of proven games.
-* **rust/prover/**, also active: the prover, a separate program that shares no code with the frame solver and proves
-  its results independently, without the frame model.
-* **heuristics/THEORY.md**: the theorems both programs rest on (active, despite its directory).
+* **rust/**: the frame solver, an exact solver in Rust; its rules, and the map of its documents, are in
+  rust/CLAUDE.md.
+* **rust/prover/**: the prover, a separate program that shares no code with the frame solver and proves its results
+  independently, without the frame model.
+* **heuristics/THEORY.md**: the theorems both programs rest on.
 * **src/, pom.xml and bin/**: the original frame solver, in Java (the wiki describes it; it reached n = 1000).  Kept
   for reference, not under active development; its src/main/resources/optimal.json, the table of optimal games, is
   built into the Rust frame solver.
