@@ -24,7 +24,7 @@
 //!     N|A-B|A-B/STEP...
 //! cargo run --release --example fields -- replay --known results/strict.jsonl [--methods r2,r3:1,ref:10]
 //!     [--refit 20] [--r3-pricings 300] [--refit-seconds 30] [--out FILE] STATES...
-//! cargo run --release --example fields -- fit --known results/strict.jsonl [--start FIT] [--offer CORES]
+//! cargo run --release --example fields -- fit --known results/strict.jsonl [--start FIT] [--prune K] [--offer CORES]
 //!     [--seconds 60] [--per-frame 8] [--label own] [--save-fit PATH] [--out FILE] N...
 //! ```
 //!
@@ -111,13 +111,14 @@
 //!   the whole (`ms`), of making the node (`ms_node`), of the pricings, the simplex, the exact checks, the separation
 //!   and the masters' builds.
 //! * **fit** (design U4 and T7): the main arm's fit at a root, certified with separation within `--seconds` (60), from
-//!   the family of the fit `--start` (its signings frozen, those of frames the root lacks left out, its multipliers
-//!   by candidate number) or from the plain signings, with the cores of `--offer` (a `--harvest` file) placed first
-//!   in new core-derived signings (`dw::bound_offered`, at most `--per-frame` a frame); saved to `--save-fit` (a
-//!   `.json` file, or a directory for `n{N}.json`); a line keyed by `n` and `label` (`--label`, default `own`) with
-//!   the bound, its share of the GF(2) gap, the carried family's bound and share before the refit, the cores offered
-//!   and placed, the signings and the time.  It asserts the bound at least `P*` and the optimal promotions
-//!   independent in every matroid of the family.
+//!   the family of the fit `--start` (its signings frozen, those of frames the root lacks left out, with `--prune K`
+//!   those without a positive multiplier too and all but the `K` of the largest sums of multipliers a frame; its
+//!   multipliers by candidate number) or from the plain signings, with the cores of `--offer` (a `--harvest` file)
+//!   placed first in new core-derived signings (`dw::bound_offered`, at most `--per-frame` a frame); saved to
+//!   `--save-fit` (a `.json` file, or a directory for `n{N}.json`); a line keyed by `n` and `label` (`--label`,
+//!   default `own`) with the bound, its share of the GF(2) gap, the carried family's bound and share before the
+//!   refit, the cores offered and placed, the signings and the time.  It asserts the bound at least `P*` and the
+//!   optimal promotions independent in every matroid of the family.
 //!
 //! `--fit-mode` (`dw::FitMode`; of `roots` and `nodes`, every computation of the run; of `bnb`, the root fit):
 //! `certified` (the default) brackets each LP with a certified lower bound (the exact checks); `search` fits the
@@ -203,9 +204,10 @@ struct Options {
     files: Vec<PathBuf>,
     /// The methods of `replay`.
     methods: Vec<String>,
-    /// The fit `fit` starts from, and the cores it offers.
+    /// The fit `fit` starts from, the cores it offers, and how many carried signings a frame it keeps (`--prune`).
     start: Option<PathBuf>,
     offer: Option<PathBuf>,
+    prune: Option<usize>,
     bnb: BnbOptions,
 }
 
@@ -309,6 +311,7 @@ fn parse() -> Result<Options, String> {
         methods: ["r2", "r3:1", "ref:10"].map(String::from).to_vec(),
         start: None,
         offer: None,
+        prune: None,
         bnb: BnbOptions::default(),
     };
     let mut seconds = None;
@@ -344,6 +347,7 @@ fn parse() -> Result<Options, String> {
             "--methods" => o.methods = list(value("--methods")?),
             "--start" => o.start = Some(value("--start")?.into()),
             "--offer" => o.offer = Some(value("--offer")?.into()),
+            "--prune" => o.prune = Some(num(value("--prune")?)? as usize),
             "--known" => o.known.push(value("--known")?.into()),
             "--arms" => o.arms = list(value("--arms")?),
             "--modes" => o.modes = list(value("--modes")?),
@@ -2455,10 +2459,29 @@ fn read_cores(path: &Path) -> Vec<Core> {
     text.lines().filter(|l| !l.trim().is_empty()).map(|l| parse(l).unwrap_or_else(|e| panic!("{e}"))).collect()
 }
 
+/// The signings of `fit` that a fit at a root of `frames` frames carries over, ascending: those of the frames it has;
+/// with `prune` (`Some(k)`), only those with a positive multiplier, at most `k` a frame, those of the largest sums of
+/// multipliers (design T3 and U5: the family pruned to what the multipliers use).
+fn carried(fit: &dw::Fit, frames: usize, prune: Option<usize>) -> Vec<usize> {
+    let sum = |i: usize| fit.lambda[i].values().sum::<f64>();
+    let mut kept: Vec<usize> = (0..fit.signings.len()).filter(|&i| fit.signings[i].frame < frames).collect();
+    if let Some(most) = prune {
+        kept.retain(|&i| sum(i) > 0.0);
+        kept.sort_by(|&a, &b| sum(b).total_cmp(&sum(a)).then(a.cmp(&b)));
+        let mut per_frame = vec![0; frames];
+        kept.retain(|&i| {
+            per_frame[fit.signings[i].frame] += 1;
+            per_frame[fit.signings[i].frame] <= most
+        });
+        kept.sort_unstable();
+    }
+    kept
+}
+
 /// The `fit` command for the game `n` (see the module docs): the main arm's fit at the root, from the family of the
-/// fit `--start` (its signings frozen, those of a frame the root lacks left out, its multipliers by candidate number)
-/// or from the main arm's signings, with the cores of `--offer` placed first, certified with separation within the
-/// budget; saved to `--save-fit` (a `.json` file, or a directory for `n{N}.json`), its line to `out`.
+/// fit `--start` (the signings [`carried`], frozen, their multipliers by candidate number) or from the main arm's
+/// signings, with the cores of `--offer` placed first, certified with separation within the budget; saved to
+/// `--save-fit` (a `.json` file, or a directory for `n{N}.json`), its line to `out`.
 fn fit_game<const W: usize>(n: u32, known: &Known, o: &Options, out: &mut Output) {
     let label = o.bnb.label.clone().unwrap_or_else(|| "own".into());
     let id = [("n", Json::from(n)), ("label", Json::from(label.as_str()))];
@@ -2477,8 +2500,7 @@ fn fit_game<const W: usize>(n: u32, known: &Known, o: &Options, out: &mut Output
         let frames = ctx.state.len();
         let (signings, lambda): (Vec<Signing>, Option<Vec<HashMap<u32, f64>>>) = match &start {
             Some(s) => {
-                let kept = |i: &usize| s.fit.signings[*i].frame < frames;
-                let kept: Vec<usize> = (0..s.fit.signings.len()).filter(kept).collect();
+                let kept = carried(&s.fit, frames, o.prune);
                 let signings = kept.iter().map(|&i| dw::frozen(&s.fit.signings[i])).collect();
                 (signings, Some(kept.iter().map(|&i| s.fit.lambda[i].clone()).collect()))
             }
@@ -3008,6 +3030,7 @@ mod tests {
             methods: Vec::new(),
             start: None,
             offer: None,
+            prune: None,
             bnb: BnbOptions::default(),
         };
         for n in [300u32, 360, 420, 480] {
@@ -3130,7 +3153,8 @@ mod tests {
                     pricings += trace.pricings;
                     opened += trace.new_signings;
                 }
-                for (exact, cores, cores_first) in [(true, true, false), (true, false, false), (false, true, false), (true, true, true)] {
+                let orders = [(true, true, false), (true, false, false), (false, true, false), (true, true, true)];
+                for (exact, cores, cores_first) in orders {
                     let f = fam();
                     let (_, first) = tier1(ctx, &f, &warm, &mut stats);
                     let settings = R3 { exact, cores, cores_first, ..test_r3() };
@@ -3793,13 +3817,14 @@ mod tests {
             methods: Vec::new(),
             start: None,
             offer: None,
+            prune: None,
             bnb: BnbOptions::default(),
         };
         let lines = dir.join("fits.jsonl");
         let mut out = Output::open(Some(&lines), &["n", "label"]);
         taxman::with_width!(840, W => fit_game::<W>(840, &known, &o, &mut out));
         (o.start, o.offer, o.save_fit) = (Some(fits.join("n840.json")), Some(harvest), Some(fits.join("n841.json")));
-        o.bnb.label = Some("harvest".into());
+        (o.bnb.label, o.prune) = (Some("harvest".into()), Some(24));
         taxman::with_width!(841, W => fit_game::<W>(841, &known, &o, &mut out));
         let lines = json_lines(&lines);
         let placed = lines[1].get("offered_placed").and_then(Json::as_u64).expect("offered_placed");
