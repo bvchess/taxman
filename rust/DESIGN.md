@@ -567,7 +567,8 @@ never builds one, and with no one-sided candidate every piece below is what it w
   *free block* after the frames' blocks, `64·words` of them to a block, so that hundreds of them widen no vector.
 * **The search**: `Board::prepare_extended_with(open)` (`search::prepare_extended`) makes them candidates of the search.
   The problem's form ends with them, after a tag that no plain problem's form has, and the checkpoint header (format
-  5) records their digest, so neither a repeat nor a resumed checkpoint can take an extended problem for another.
+  5) records their digest, so neither a repeat nor a resumed checkpoint can take an extended problem for another (a
+  checkpoint of version 4, of a build before, resumes only a search without them: section 8).
 * **What it refuses** (`SearchTactics::refusal_with_one_sided`): with one-sided candidates the search needs `gf2` (the
   matching bound gives a one-sided candidate no vertex, so it is no bound there; the dive, which rounds the root's
   matching for a starting incumbent, still runs and never picks one), and refuses `lagrange` (built on the matching
@@ -799,9 +800,16 @@ file it appends to.
 
 **What identifies a checkpoint.**  The header the search stores: a format version, the set width, n, digests of the root
 candidates, of the frames (every frame's moves, factors and freedoms, as built) and of the one-sided candidates of the
-extended problem (section 4, "Extended mode"), `max_total` and the tactics (format version 5; this build refuses every
-other version with one message, so a checkpoint of an older build cannot resume with tactics that are gone, or without
-the digest that tells one extended problem from another).  Resuming checks all of them and says which differs, and checks that the stored incumbent is a
+extended problem (section 4, "Extended mode"), `max_total` and the tactics (format version 5).  This build also reads
+version 4, the format of the builds before the extended problem's search, whose headers lack the digest of the one-sided
+candidates:
+those builds searched no problem with one-sided candidates, so a version-4 header reads as version 5 with the digest of
+none, every other field is checked as for version 5, the run goes on under the header it was written with (the engine
+compares it byte for byte), and a version-4 checkpoint asked to resume a search with one-sided candidates is refused,
+saying so.  (Spec 18.3.1 of the extended problem's search had version 4 refused; it is read so that a chain stopped by a
+build before it resumes, and `tests/wide.rs` resumes a real version-4 checkpoint to the node count of the build that
+wrote it.)  Every other version is refused with one message, so a checkpoint of an older build cannot resume with
+tactics that are gone.  Resuming checks all of them and says which differs, and checks that the stored incumbent is a
 set of candidates that can be promoted from the root and is worth the stored value; so a checkpoint of another game, or
 of an older build whose frame builder differs, is refused instead of pruning with a foreign incumbent or failing to
 rebuild its units.  A resumed game rests on nothing a game that ran in one piece does not.

@@ -6682,3 +6682,12 @@ without claims).  The median over the plain proof is 1.55, inside stage 3's crit
 prime exchange mapping the one-sided candidates of each frame onto themselves) would take back the rule.
 Consecutive games often pose the same Π⁺(O) (1312 and 1313, 1314 and 1315, 1316 and 1317 had one digest each): the
 optional line `certified (same problem as m)` of the design would halve those, and is not built.
+
+*Afterwards, version 4 read again.*  The EC2 chain's build (55287ff) writes headers of version 4, and a game it leaves
+unfinished holds hours of 64-thread work, so version 4 is read after all (relaxing spec 18.3.1, which had it refused):
+a version-4 header reads as version 5 with the digest of no one-sided candidates, every other check stays, the run
+goes on under the header it was written with, and a version-4 checkpoint offered to a search with open sources is
+refused, saying why.  The base commit's checkpoint of 1133 after 1,000 nodes (version 4) finishes under this build exactly
+as under the build that wrote it (2e8b851): the same line but for times and build, 3,058 nodes in two invocations; and
+stopped again after 1,000 more nodes and finished, both builds write a version-4 checkpoint and end at 3,146 nodes.  It
+is committed as `testdata/n1133_after_1000_nodes_v4.ckpt`, with a test in `tests/wide.rs`.

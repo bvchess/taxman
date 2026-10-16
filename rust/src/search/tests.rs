@@ -640,19 +640,36 @@ fn units_and_headers_round_trip() {
     assert!(Header::<16>::decode(&bytes).unwrap_err().contains("Bits<8>"));
     assert!(Header::<8>::decode(b"nonsense").unwrap_err().contains("not a checkpoint"));
     assert!(Header::<8>::decode(&bytes[..20]).is_err());
-    // Every other format version, the older ones (`TXS2` was version 2; version 4 had no digest of the one-sided
-    // candidates) and any later one, is refused with one message.
+    // Version 4, the format of the builds before the extended problem's search, is version 5 without the digest of the
+    // one-sided candidates (`max_total` and the tactics follow the digest of the frames): it reads as this header with
+    // the digest of none, which this problem (no one-sided candidates) has, so nothing differs but the version.
+    let v4 = [&bytes[..4], &4u32.to_le_bytes(), &bytes[8..32], &bytes[40..]].concat();
+    assert_eq!(v4.len(), Header::<8>::LEN_4);
+    let read = Header::<8>::decode(&v4).unwrap();
+    assert_eq!(read, Header { version: 4, ..header });
+    assert_eq!(read.one_sided, Header::<8>::digest_one_sided(&[]));
+    assert_eq!(read.mismatch(&header), None);
+    // A version-4 header of a search with one-sided candidates cannot exist, and one is refused for such a search,
+    // saying so before anything else.
+    let extended = Header { one_sided: Header::<8>::digest_one_sided(&[(150, 0)]), ..header };
+    let refused = read.mismatch(&extended).unwrap();
+    assert!(refused.contains("format version 4") && refused.contains("one-sided candidates"), "{refused}");
+    // A version-4 number with a header of version 5's length is refused for its length, as any short or long header.
+    let versioned = |version: u32| [&bytes[..4], &version.to_le_bytes(), &bytes[8..]].concat();
+    let err = Header::<8>::decode(&versioned(4)).unwrap_err();
+    assert!(err.contains(&format!("{} bytes, not {}", Header::<8>::LEN, Header::<8>::LEN_4)), "{err}");
+    // Every other format version, the older ones (`TXS2` was version 2; version 3 recorded tactics that are gone) and
+    // any later one, is refused with one message.
     let mut txs2 = b"TXS2".to_vec();
     txs2.extend_from_slice(&[0; 4 + 64 + 4 + 1 + 4 + 2]);
-    let versioned = |version: u32| [&bytes[..4], &version.to_le_bytes(), &bytes[8..]].concat();
     assert_eq!(Header::<8>::VERSION, 5);
     assert_eq!(Header::<8>::decode(&versioned(5)), Ok(header));
-    for (version, bytes) in [("2", txs2), ("3", versioned(3)), ("4", versioned(4))]
-        .into_iter()
-        .chain([("6", versioned(6)), ("unreadable", b"TXSH".to_vec())])
+    for (version, bytes) in
+        [("2", txs2), ("3", versioned(3))].into_iter().chain([("6", versioned(6)), ("unreadable", b"TXSH".to_vec())])
     {
         let err = Header::<8>::decode(&bytes).unwrap_err();
-        assert!(err.contains(&format!("format version {version}, and this build reads version 5 only")), "{err}");
+        let message = format!("format version {version}, and this build reads versions 4 and 5 only");
+        assert!(err.contains(&message), "{err}");
     }
     // Every field that differs is named.
     let other = |change: fn(&mut Header<8>)| {

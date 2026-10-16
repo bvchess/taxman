@@ -267,7 +267,8 @@ pub fn prepare_for_resume<const W: usize>(
 }
 
 /// [`prepare_for_resume`] for the problem of [`prepare_extended`]; a checkpoint of another problem (other one-sided
-/// candidates, say) is refused as one of another game is.
+/// candidates, say) is refused as one of another game is, and one of format version 4 (a build before this search)
+/// for a problem with one-sided candidates first of all.
 pub fn prepare_extended_for_resume<const W: usize>(
     tables: &Tables,
     columns: &[Vec<u32>],
@@ -277,6 +278,10 @@ pub fn prepare_extended_for_resume<const W: usize>(
 ) -> Result<Prepared<W>, String> {
     let bytes = engine::read_checkpoint_header(checkpoint).map_err(|e| format!("{}: {e}", checkpoint.display()))?;
     let header = Header::<W>::decode(&bytes)?;
+    // A checkpoint that cannot be of a search with one-sided candidates says so before its tactics are looked at.
+    if let Some(refusal) = header.one_sided_refusal().filter(|_| !one_sided.is_empty()) {
+        return Err(refusal);
+    }
     let prepared = prepare_extended(tables, columns, one_sided, candidates, header.tactics)?;
     match header.mismatch(&Header::of(&prepared)) {
         Some(mismatch) => Err(mismatch),

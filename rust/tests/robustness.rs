@@ -606,10 +606,11 @@ fn a_checkpoint_made_with_other_tactics_names_them() {
     }
 }
 
-/// A checkpoint whose header has another format version (here 4, that of the build before this one, whose headers had
-/// no digest of the one-sided candidates; 3, whose headers recorded tactics that are gone; and 6, a later one) is
-/// refused with one message, naming the file, and left alone.  The header of this build, version 5, is the one that
-/// the checkpoint was written with, so the same game resumes from it once the version is put back.
+/// A checkpoint whose header has a format version this build does not read (3, whose headers recorded tactics that
+/// are gone, and 6, a later one) is refused with one message, naming the file, and left alone.  Version 4, that of the
+/// builds before the extended problem's search, is read (`tests/wide.rs` resumes a real one), but not with the length
+/// of version 5, which is what forging the number gives.  The header of this build, version 5, is the one that the
+/// checkpoint was written with, so the same game resumes from it once the version is put back.
 #[test]
 fn a_checkpoint_of_another_format_is_refused() {
     let dir = TempDir::new("format");
@@ -618,15 +619,19 @@ fn a_checkpoint_of_another_format_is_refused() {
     let checkpoint = dir.join("n0600.ckpt");
     let version = |checkpoint: &Path| fs::read(checkpoint).unwrap()[20 + 4..20 + 8].to_vec();
     assert_eq!(version(&checkpoint), 5u32.to_le_bytes(), "this build writes the header's version 5");
-    for other in [3u32, 4, 6] {
+    for other in [3u32, 6] {
         forge_header(&checkpoint, |header| header[4..8].copy_from_slice(&other.to_le_bytes()));
         let err = solver::solve_game(600, None, &opts).unwrap_err();
         let format = format!("format version {other}");
-        for part in ["n0600.ckpt", format.as_str(), "reads version 5 only", "delete the checkpoint"] {
+        for part in ["n0600.ckpt", format.as_str(), "reads versions 4 and 5 only", "delete the checkpoint"] {
             assert!(err.contains(part), "{part}: {err}");
         }
         assert!(checkpoint.exists(), "a refused checkpoint is left alone");
     }
+    forge_header(&checkpoint, |header| header[4..8].copy_from_slice(&4u32.to_le_bytes()));
+    let err = solver::solve_game(600, None, &opts).unwrap_err();
+    assert!(err.contains("n0600.ckpt") && err.contains("46 bytes, not 38"), "{err}");
+    assert!(checkpoint.exists(), "a refused checkpoint is left alone");
     forge_header(&checkpoint, |header| header[4..8].copy_from_slice(&5u32.to_le_bytes()));
     let opts = SolveOptions { node_limit: None, ..opts };
     assert!(solver::solve_game(600, None, &opts).unwrap().completed, "the checkpoint resumes with its own version");

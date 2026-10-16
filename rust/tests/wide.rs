@@ -384,6 +384,37 @@ fn a_committed_checkpoint_resumes() {
     assert!(!checkpoint.exists(), "a finished game removes its checkpoint");
 }
 
+/// A checkpoint of the format before the extended problem's search (`testdata/n1133_after_1000_nodes_v4.ckpt`: the
+/// same search as the fixture above, written by the build of commit 2e8b851, whose headers are version 4, with no digest
+/// of the one-sided candidates) resumes with this build and finishes as the build that wrote it finishes it: the same
+/// score, two invocations and 3,058 nodes in all (the count that build's binary gave, finishing the same file).  Its
+/// header reads as a version-5 header with no one-sided candidates; asked to resume a search of the extended problem
+/// with open sources instead, it is refused, saying why.
+#[test]
+fn a_committed_checkpoint_of_format_4_resumes_as_the_build_that_wrote_it_finishes_it() {
+    let games = stored_games("strict.jsonl");
+    let dir = TempDir::new("committed-checkpoint-v4");
+    let opts = SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), ..matching_options(1) };
+    let checkpoint = opts.checkpoint_file(1133).unwrap();
+    std::fs::create_dir_all(checkpoint.parent().unwrap()).unwrap();
+    std::fs::copy(testdata("n1133_after_1000_nodes_v4.ckpt"), &checkpoint).unwrap();
+    let version = std::fs::read(&checkpoint).unwrap()[24..28].to_vec();
+    assert_eq!(version, 4u32.to_le_bytes(), "the fixture's header is of version 4");
+
+    // A search of the extended problem with open sources cannot be this checkpoint's, and is refused, saying why.
+    let board = Board::<20>::for_n(1133);
+    let open: Bits<20> = board.plain.iter().copied().filter(|&x| 2 * x > 1133 && board.tables.omega(x) >= 3).collect();
+    let refused = board.prepare_extended_for_resume(&open, &checkpoint).err().expect("refused");
+    assert!(refused.contains("format version 4") && refused.contains("one-sided candidates"), "{refused}");
+
+    let r = solver::solve_game(1133, Some(&prev_of(&games, 1133)), &opts).unwrap();
+    assert!(r.completed && r.method == Method::Search);
+    assert_eq!(r.score, games[&1133].0);
+    assert_eq!((r.invocations, r.nodes), (2, 3058), "the build that wrote the checkpoint finishes it so");
+    assert!(r.assumes.is_empty(), "{:?}", r.assumes);
+    assert!(!checkpoint.exists(), "a finished game removes its checkpoint");
+}
+
 /// A W = 20 search interrupted every few hundred nodes and resumed from its checkpoint, under two sets of tactics
 /// of the matching path (the tactics are part of the checkpoint's header and must read back as written; the GF(2)
 /// bound's search of 1133 is too short to stop, and `tests/soundness.rs` resumes it on game 1000 at W = 20).  The
