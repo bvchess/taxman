@@ -117,9 +117,9 @@ example, the board 1..=21, is in the [README](README.md#how-the-solver-sees-the-
     optional, and `examples/hunt.rs` looks for a counterexample on the boards without each of them.  That search is
     the search of the *extended problem* Π⁺(O) (THEORY.md, Theorem M⁺; `frames::build_extended`, research code): the
     frame model with the set O of open members optional, exact like Π_n, so that a search of it that finds nothing
-    better, the other members certified, proves opt(n) on the whole board.  Its search with nothing open, Π⁺(∅), goes
-    through the engine as it is (`Board::prepare_extended`, `examples/extended.rs`); the open members are not in the
-    search yet.
+    better, the other members certified, proves opt(n) on the whole board.  The search takes it with the open members
+    as one-sided candidates (section 4, "Extended mode"; `Board::prepare_extended_with`), and with nothing open,
+    Π⁺(∅), as the frame model without the claims (`examples/extended.rs`).
 
   What each proof kind needs of this, beyond the code's correctness and the games before it:
 
@@ -543,6 +543,44 @@ made (after the greedy set and the seed, the dive and the local search), so whoe
 far before the engine starts, and the engine's start is unchanged.  Board/search setup is in
 `board::Board`: it is the one place that knows the tables → frames → prepare → ceiling and seed path.
 
+### Extended mode: one-sided candidates
+
+The search can also take the *extended problem* Π⁺(O) (THEORY.md, ["The extended
+problem"](../heuristics/THEORY.md#the-extended-problem); `frames::build_extended`): the frame model with a set O of the
+sources of three or more prime factors that setup keeps left optional, and nothing claimed by `unzip`.  Besides the
+candidates of the frame model (*two-sided*: out of one frame, into the one in front) it has *one-sided* candidates, the
+members of O and the sources greedy rejected beside them, each a possible move of its *own* frame.  It is the
+problem that a certificate of U searches (THEORY.md, the corollary of Theorem M⁺).  Research code: the solver's own path
+never builds one, and with no one-sided candidate every piece below is what it was.
+
+* **The model** (`model`, "One-sided candidates"): `FrameGraph::build_extended` gives each one-sided candidate its own
+  frame (`own`), and the factor graph lists its maximal factors there, as it does a move's.  Promoting one adds it to
+  that frame's moves if the frame stays winnable, takes no factor, and spends one freedom of that frame only
+  (`frames_touched`).  The frame-by-frame check of a set, the reduction, conflicts and nogoods need nothing new: a
+  one-sided member is one more move of its frame.  The state does not record which were promoted (a promoted two-sided
+  candidate is no longer a factor of its home), so each is promoted once along a path, which the search's candidates
+  ensure.  `FrameGraph::narrow` keeps a one-sided candidate while its frame has a freedom, and
+  `FrameGraph::max_promotions_among` adds their number to the freedoms' count (sound, not tight).
+* **The GF(2) bound** (`gf2`, "One-sided candidates"; THEORY.md, Theorem 11 for Π⁺): a one-sided candidate's element has
+  the vector of its maximal factors in its own frame's matroid and is a coloop of the other, its own unit vector in a
+  *free block* after the frames' blocks, `64·words` of them to a block, so that hundreds of them widen no vector.
+* **The search**: `Board::prepare_extended_with(open)` (`search::prepare_extended`) makes them candidates of the search.
+  The problem's form ends with them, after a tag that no plain problem's form has, and the checkpoint header (format
+  5) records their digest, so neither a repeat nor a resumed checkpoint can take an extended problem for another.
+* **What it refuses** (`SearchTactics::refusal_with_one_sided`): with one-sided candidates the search needs `gf2` (the
+  matching bound gives a one-sided candidate no vertex, so it is no bound there; the dive, which rounds the root's
+  matching for a starting incumbent, still runs and never picks one), and refuses `lagrange` (built on the matching
+  bound) and `symmetry` (Theorem 13 is proven for the frame model; for Π⁺ each prime exchange would have to map the
+  one-sided candidates of each frame onto themselves, which nothing checks yet).  `SearchTactics::extended` is the
+  default without `symmetry`.  Π⁺(∅) has no one-sided candidate and takes any tactics; its search is the default
+  engine's on the same problem, node for node (`tests/tripwires.rs` has a table of its own).
+* **Its frames**: Π⁺(O) has a frame for each layer from the lowest with freedoms to the highest, nine at most up to
+  4095 (layers 3 to 11) whatever O is, and ten from 4096 with every source open, which `build_extended` refuses
+  (`MAX_FRAMES`), naming the board and the layers; the census of the frames records the count with every such source
+  open for every board to 8191 (`bench/structure/`).  Opening a source also adds one to its frame's rank, so a problem
+  with many open sources can need more words of the GF(2) bound than the narrow set widths compile (three, rank 192)
+  or the widest (five, rank 320): `search::prepare_extended` refuses it, saying so, rather than fail in the search.
+
 ## 5. Tactics
 
 Each row is a tactic in `tactics::Tactics`, set from the CLI with `--tactic name=value` (`on` or `off`; `match_refine`
@@ -759,9 +797,10 @@ setup poses and a repeat's record of the game it repeats.  A line is never rewri
 file it appends to.
 
 **What identifies a checkpoint.**  The header the search stores: a format version, the set width, n, digests of the root
-candidates and of the frames (every frame's moves, factors and freedoms, as built), `max_total` and the tactics (format
-version 4; this build refuses every other version with one message, so a checkpoint of an older build cannot resume with
-tactics that are gone).  Resuming checks all of them and says which differs, and checks that the stored incumbent is a
+candidates, of the frames (every frame's moves, factors and freedoms, as built) and of the one-sided candidates of the
+extended problem (section 4, "Extended mode"), `max_total` and the tactics (format version 5; this build refuses every
+other version with one message, so a checkpoint of an older build cannot resume with tactics that are gone, or without
+the digest that tells one extended problem from another).  Resuming checks all of them and says which differs, and checks that the stored incumbent is a
 set of candidates that can be promoted from the root and is worth the stored value; so a checkpoint of another game, or
 of an older build whose frame builder differs, is refused instead of pruning with a foreign incumbent or failing to
 rebuild its units.  A resumed game rests on nothing a game that ran in one piece does not.
@@ -967,6 +1006,18 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   the tree on purpose fails them.**  Run `cargo test --test tripwires
   -- --nocapture`: it prints the rows as observed, in the layout of the table at the top of the file; check that the
   promotion sums (the answers) have not moved, paste the rows in, and update any node counts quoted in the docs.
+  The table `EXTENDED` does the same for the extended problem with nothing open, Π⁺(∅), whose search must also be
+  the default engine's on the same problem, node for node.
+* **Extended mode** (section 4, "Extended mode: one-sided candidates"): the model with one-sided candidates against
+  the extended problem's reference predicate on every board 2..=300, for nothing open, every source of three or more
+  prime factors open (to 120) and five random sets of them (`tests/model_extended.rs`: sets promoted at once and one
+  by one in random orders, their conflicts and nogoods, the narrowing and the count), and its search against the
+  whole-board oracle on every board to 80 (to 60 with every such source open, 69 ignored); the GF(2) bound's free
+  blocks (the intersection against brute force with coloops; every promotion set of the boards to 120 independent and
+  under the bound; random paths to 1300 matching the matroids built afresh at every node); the soundness harness in
+  extended mode on every board 2..=300 under eight configurations, and a game resumed every 1,000 nodes; the header's
+  digest of the one-sided candidates and the refusals of what extended mode cannot take (tactics, block words, another
+  problem's checkpoint).
 * **Engine** (`tests/engine.rs`, `tests/robustness.rs`, `tests/stop_signal.rs`): a toy problem with a known optimum
   (knapsack against dynamic programming), run with 1 and many threads, with a tiny `queue_mem_cap` to force spilling,
   and killed and resumed from checkpoints, must give the same answer; ignored tests do the same with 64 and 192 threads,
@@ -1066,7 +1117,8 @@ on the machine moves wall times by up to 3×.  What measures what:
   augmentations, which measure work.  The probe's fingerprint is 7e8e724717d26545, 5b83bbebf0bb2899 with `--tactic
   lagrange=off`, and f3deaac0dbdc030a with `--tactic gf2=on`.  (The windows were made again when the search's
   counters were
-  renumbered and the checkpoint header went to version 4, 2026-10; the fingerprints EXPERIMENTS quotes before then,
+  renumbered and the checkpoint header went to version 4, 2026-10, and again for version 5, with the tactics they
+  record, the matching path's, and the same fingerprints; the fingerprints EXPERIMENTS quotes before version 4,
   36981d0eaeeae319 and 6197a47eae6cf8c8, are of the earlier windows, made before `lagrange`.)  About 5 s in all;
   `perf make-nodes` and `perf make-window` make the fixtures again, deterministically.
   For whole searches, `/usr/bin/time -l` reports the same counters per process.

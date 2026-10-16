@@ -416,6 +416,10 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
     /// on this constant is dropped before code generation where it is false).
     const WIDE: bool = W > 64;
 
+    /// The most block words an engine has at this set width: [`MAX_WORDS`] for the sets wider than 64 words, three for
+    /// the others.  A graph that needs more ([`Gf2Graph::words`]) cannot be searched at this width.
+    pub const MOST_WORDS: usize = if Self::WIDE { MAX_WORDS } else { NARROW_WORDS };
+
     /// A solver for the states of `graph`'s search, positioned at the root with no candidates.
     pub fn new(graph: &'g Gf2Graph) -> Self {
         Self::with_words(graph, graph.words)
@@ -425,7 +429,7 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
     /// with its vectors padded with zeros, which tests use to run the engines of more words than a board needs.
     pub fn with_words(graph: &'g Gf2Graph, words: usize) -> Self {
         assert!(words >= graph.words, "{words} words are fewer than the graph's {}", graph.words);
-        let most = if Self::WIDE { MAX_WORDS } else { NARROW_WORDS };
+        let most = Self::MOST_WORDS;
         if words > most {
             panic!("a frame of rank above {} ({words} words) is not supported at a set width of {W} words", 64 * most);
         }

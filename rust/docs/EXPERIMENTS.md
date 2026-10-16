@@ -5964,3 +5964,22 @@ than in the frame model (0.7% of the nodes against 4.2%), and opening sources ra
 each, so that with every source of layer 3 or more open frame 0 has rank 186 at 1200 and 322 at 2200, beyond the
 three words the narrow set widths compile (rank 192) and the five of the widest (320).  No tree changed: the
 fingerprints, the tripwires, `regress --to 1000 --threads 1` in 9.1 s, the chain 1..1300 line for line.
+
+*18.3, the search.*  `Board::prepare_extended_with(open, tactics)` (`search::prepare_extended`) sets Π⁺(O) up with its
+one-sided candidates among the search's.  The problem's form ends with them after a tag no plain form has
+(`Problem::ONE_SIDED`), so a plain problem's form and digest are what they were; the checkpoint header has a digest of
+them (format 5, which refuses version 4: the probe's windows and the committed checkpoint of 1133 were made again, with
+the matching path's tactics they record, and the fingerprints did not move).  Extended mode needs `gf2` and refuses
+`lagrange` and `symmetry` (`SearchTactics::refusal_with_one_sided`; `SearchTactics::extended` is the default without
+`symmetry`), and a problem one of whose frames needs more block words of the GF(2) bound than the set width's engines
+have: opening a source adds one to its frame's rank, so that with every source of layer 3 or more open the natural
+widths refuse it from 1266 (four words), which the widest width (128 words, five) takes.  Tested: the search of Π⁺(∅)
+is the default engine's on the same problem node for node at every tripwire board, with the default tactics and with
+extended mode's, in a table of its own (`EXTENDED`; extended mode's trees are the `symmetry=off` rows of the frame
+model at 600, 936 and 1000, and Π⁺(∅) with the rule of symmetric pairs differs from Π_n with it at 600, 660, 936 and
+1000, since the claimed pairs change the root's symmetries); the soundness harness in extended mode, 16,128 searches of
+1,258 problems of the boards 2..300 from handicapped incumbents under eight configurations, and the game 992 with 20
+sources open resumed every 1,000 nodes (22 pieces, 16,717 nodes uninterrupted); the search against the whole-board
+oracle on every board to 80 (to 60 with every source open; 69 ignored): its optimum is the heaviest playable set that
+holds F, every time.  No tree of the default mode changed: the fingerprints, the tripwires, `regress --to 1000
+--threads 1` in 8.9 s, the chain 1..1300 line for line.

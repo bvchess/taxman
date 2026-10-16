@@ -3,9 +3,10 @@
 //! The frame solver searches Π_n: the frames with freedoms, their sources fixed to U\* (the sources setup keeps), the
 //! pairs `unzip` settled taken out.  Π⁺(O) makes a set O of the members of U\* in layers 3 and up optional, and
 //! settles nothing.  It is research code, for certifying that a game's optimum plays U\*_{≥3} (heuristics/THEORY.md,
-//! "The extended problem"); the solver does not use it.  The search can take Π⁺(∅) as it is
-//! ([`Board::prepare_extended`](crate::board::Board::prepare_extended)); the one-sided candidates below, which an open
-//! source needs, are not in the search yet, and only the reference predicate [`ExtendedFrames::promotable`] knows them.
+//! "The extended problem"; `taxman certify`); the solver does not use it.  The search takes it with
+//! its one-sided candidates ([`Board::prepare_extended_with`](crate::board::Board::prepare_extended_with); the model's
+//! "One-sided candidates", [`crate::model`]), and the reference predicate [`ExtendedFrames::promotable`] decides its
+//! promotion sets for the tests.
 //!
 //! # The problem
 //!

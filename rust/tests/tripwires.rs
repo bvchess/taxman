@@ -17,13 +17,18 @@
 //! which prints, on failure, the rows of the failing boards as observed, in the layout of [`EXPECTED`].  Check that
 //! the changes are the intended ones (the promotion sum, which is the answer, never moves), paste the rows in, and
 //! change the node counts quoted in DESIGN.md and docs/EXPERIMENTS.md if they are affected.  The same goes for
-//! [`FORGETTING`].
+//! [`FORGETTING`] and for [`EXTENDED`], the table of the search of the extended problem Π⁺(∅) (the frame model with
+//! the claims of `unzip` put back and no source open; `Board::prepare_extended_with`), whose rows are checked the
+//! same way.  Besides its table, Π⁺(∅) is held to the default engine: with no one-sided candidate its search is that
+//! engine's on the same frames and candidates, node for node, which no table needs to say.
 
 mod common;
 
 use common::{search_at_width, Config, Game};
+use taxman::bits::Bits;
+use taxman::board::Board;
 use taxman::bounds::greedy;
-use taxman::search::SearchTactics;
+use taxman::search::{prepare, search, Prepared, SearchTactics};
 use taxman::tactics::Tactics;
 use taxman::with_width;
 
@@ -98,12 +103,41 @@ const EXPECTED: [(u32, &str, u64, u64); 54] = [
     (1133, "matching,match_refine=0", 28690, 2156),
 ];
 
+/// (board, tactics, promotion sum, nodes): the search of the extended problem Π⁺(∅) of the board, set up by
+/// `Board::prepare_extended_with` with no source open, on one thread.  The tactics are `default` and `extended`
+/// ([`SearchTactics::extended`]: the default without the rule of the symmetric pairs, the tactics of a search with
+/// one-sided candidates, which refuses the rule).  The promotion sums are those of [`EXPECTED`]: Π⁺(∅) has the frame
+/// model's promotion sets, and the sum is the answer.  The rows `extended` are the frame model's trees, node for node,
+/// where [`EXPECTED`] has the same tactics (its rows `symmetry=off` for 600, 936 and 1000); the rows `default` differ
+/// from those of [`EXPECTED`] (408 against 365 nodes at 600, 367 against 385 at 936, 2,258 against 2,172 at 1000), so
+/// what differs is what the rule of the symmetric pairs reads from the two models, not the search.  Both are also held
+/// to the default engine's search of the same frames and candidates ([`extended_searches`]), whatever the table says.
+const EXTENDED: [(u32, &str, u64, u64); 16] = [
+    (480, "default", 5350, 37),
+    (480, "extended", 5350, 37),
+    (600, "default", 8507, 408),
+    (600, "extended", 8507, 533),
+    (640, "default", 9220, 15),
+    (640, "extended", 9220, 21),
+    (660, "default", 10242, 547),
+    (660, "extended", 10242, 573),
+    (760, "default", 14170, 182),
+    (760, "extended", 14170, 186),
+    (936, "default", 20507, 367),
+    (936, "extended", 20507, 665),
+    (1000, "default", 24168, 2258),
+    (1000, "extended", 24168, 2657),
+    (1133, "default", 28690, 41),
+    (1133, "extended", 28690, 41),
+];
+
 fn tactics(assignments: &str) -> SearchTactics {
     let mut tactics = Tactics::default();
     for assignment in assignments.split(',') {
         match assignment {
             "default" => {}
             "matching" => tactics.search = SearchTactics::matching(),
+            "extended" => tactics.search = SearchTactics::extended(),
             _ => tactics.set(assignment).unwrap(),
         }
     }
@@ -129,7 +163,52 @@ fn check_trees(ns: &[u32]) {
     );
 }
 
-/// The boards of [`EXPECTED`] in three tests, so that the test threads share the work; every board is in one.
+/// (promotion sum, nodes) of the search of `p` on one thread, which must complete.
+fn searched<const W: usize>(p: &Prepared<W>) -> (u64, u64) {
+    let r = search(p, &common::config(1), None, None, false).unwrap();
+    assert!(r.completed);
+    (r.sum, r.stats.nodes)
+}
+
+/// (promotion sum, nodes) of the search of the extended problem Π⁺(∅) of game `n` at width `W` (set up by
+/// `Board::prepare_extended_with` with no source open), and of the default engine's search of the same problem: the
+/// frames of Π⁺(∅) and its candidates given to `search::prepare`, which builds the model with `FrameGraph::build`.  The
+/// two setups pose the same problem, and (the problem has no one-sided candidate) the two searches are one search.
+fn extended_searches<const W: usize>(n: u32, tactics: SearchTactics) -> ((u64, u64), (u64, u64)) {
+    let board = Board::<W>::for_n(n);
+    let (ext, prepared) = board.prepare_extended_with(&Bits::EMPTY, tactics).unwrap();
+    assert!(!prepared.model.has_one_sided(), "n={n}: Π⁺(∅) has a one-sided candidate");
+    let engine = prepare::<W>(&board.tables, &ext.columns(), &ext.candidates, tactics).unwrap();
+    assert_eq!(prepared.problem(), engine.problem(), "n={n}: the two setups pose different problems");
+    assert_eq!((prepared.root, prepared.candidates), (engine.root, engine.candidates), "n={n}: the roots");
+    assert_eq!((prepared.greedy, prepared.max_total), (engine.greedy, engine.max_total), "n={n}: the starts");
+    (searched(&prepared), searched(&engine))
+}
+
+/// Checks the rows of [`EXTENDED`] for the boards `ns`, and that each of the searches is the default engine's on the
+/// same problem; on a difference from the table, prints those boards' rows as observed.
+fn check_extended_trees(ns: &[u32]) {
+    let mut observed = Vec::new();
+    let mut changed = 0;
+    for (n, assignments, sum, nodes) in EXTENDED.into_iter().filter(|row| ns.contains(&row.0)) {
+        let (actual, engine) = with_width!(n, W => extended_searches::<W>(n, tactics(assignments)));
+        assert_eq!(actual, engine, "n={n} {assignments}: the search of Π⁺(∅) is not the default engine's");
+        observed.push(format!("    ({n}, {assignments:?}, {}, {}),", actual.0, actual.1));
+        if actual != (sum, nodes) {
+            changed += 1;
+            println!("n={n} {assignments}: (sum, nodes) {actual:?}, expected {:?}", (sum, nodes));
+        }
+    }
+    assert!(
+        changed == 0,
+        "{changed} search trees of Π⁺(∅) changed (see the top of tests/tripwires.rs for what to do about it); \
+         observed:\n{}",
+        observed.join("\n")
+    );
+}
+
+/// The boards of [`EXPECTED`] and of [`EXTENDED`] in three tests each, so that the test threads share the work; every
+/// board is in one of each.
 const GROUPS: [&[u32]; 3] = [&[480, 600, 640], &[660, 760, 1000], &[936, 1133]];
 
 #[test]
@@ -148,13 +227,50 @@ fn the_search_trees_of_936_and_1133_have_not_changed() {
 }
 
 #[test]
-fn every_board_of_the_table_is_checked() {
-    let mut boards: Vec<u32> = EXPECTED.iter().map(|row| row.0).collect();
-    boards.sort_unstable();
-    boards.dedup();
+fn the_extended_search_trees_of_480_600_and_640_have_not_changed() {
+    check_extended_trees(GROUPS[0]);
+}
+
+#[test]
+fn the_extended_search_trees_of_660_760_and_1000_have_not_changed() {
+    check_extended_trees(GROUPS[1]);
+}
+
+#[test]
+fn the_extended_search_trees_of_936_and_1133_have_not_changed() {
+    check_extended_trees(GROUPS[2]);
+}
+
+#[test]
+fn every_board_of_the_tables_is_checked() {
     let mut covered: Vec<u32> = GROUPS.concat();
     covered.sort_unstable();
-    assert_eq!(boards, covered, "the boards of EXPECTED and of GROUPS");
+    let tables: [(&str, Vec<u32>); 2] = [
+        ("EXPECTED", EXPECTED.iter().map(|row| row.0).collect()),
+        ("EXTENDED", EXTENDED.iter().map(|row| row.0).collect()),
+    ];
+    for (name, mut boards) in tables {
+        boards.sort_unstable();
+        boards.dedup();
+        assert_eq!(boards, covered, "the boards of {name} and of GROUPS");
+    }
+    // Each board of EXTENDED has a row for the default tactics and one for those of extended mode.
+    for n in covered {
+        let tactics: Vec<&str> = EXTENDED.iter().filter(|row| row.0 == n).map(|row| row.1).collect();
+        assert_eq!(tactics, ["default", "extended"], "n={n}: the tactics of EXTENDED");
+    }
+}
+
+/// `SearchTactics::extended` is the default without the rule of the symmetric pairs, which is how the table `EXPECTED`
+/// names it (`symmetry=off`), so its rows of that name and the table `EXTENDED`'s of `extended` are searches under the
+/// same tactics.
+#[test]
+fn the_tactics_of_extended_mode_are_the_default_without_the_symmetry_rule() {
+    assert_eq!(tactics("extended"), tactics("symmetry=off"));
+    assert_eq!(tactics("extended"), SearchTactics { symmetry: false, ..SearchTactics::default() });
+    assert_ne!(tactics("extended"), tactics("default"));
+    assert_eq!(tactics("extended").refusal_with_one_sided(), None);
+    assert!(tactics("default").refusal_with_one_sided().is_some_and(|why| why.contains("symmetry=on")));
 }
 
 /// DESIGN.md (section 4): deterministic on one thread (nogoods, forgetting and all); nothing else asserts it for the

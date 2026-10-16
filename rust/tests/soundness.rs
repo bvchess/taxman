@@ -6,27 +6,33 @@
 //! and `<=` boundaries: from `truth − 1`, every node whose bound is exactly `truth` must be explored.  `truth` is
 //! `optimal.json`'s promotion sum at the root of a real game, and an exhaustive search for perturbed games and
 //! units deep in the tree.
+//!
+//! The last section runs the same tests on the extended problem Π⁺(O) (a problem with one-sided candidates, searched
+//! under the tactics of extended mode): every board to 300 from the root, and one large game resumed from
+//! checkpoints.
 
 mod common;
 #[allow(dead_code)]
 #[path = "../examples/common/fixtures.rs"]
 mod fixtures;
 
-use common::{config, random_subset, stored_games, testdata, Config, Game, Rng, TempDir};
+use common::{
+    config, random_open_sets, random_subset, stored_games, testdata, upper_from_3, Config, Game, Rng, TempDir,
+};
 use std::cell::OnceCell;
 use std::time::Duration;
 use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::engine::EngineConfig;
-use taxman::frames::build_frames;
+use taxman::frames::{build_frames, ExtendedFrames};
 use taxman::game::Optimal;
 use taxman::gf2::{Gf2Bound, Gf2Graph};
 use taxman::model::{FrameGraph, FrameSet, Scratch};
 use taxman::numtheory::Tables;
 use taxman::search::lagrange::Refits;
 use taxman::search::symmetry::Symmetries;
-use taxman::search::Gf2Branching;
 use taxman::search::TaxUnit;
+use taxman::search::{search, Gf2Branching, SearchTactics};
 
 /// Every tactic that acts inside the search, alone and in the combinations that matter: first the matching path
 /// ([`SearchTactics::matching`], which is without the rule of the root's symmetric pairs, tactic `symmetry`; 0 to
@@ -726,4 +732,183 @@ fn the_heaviest_promotion_set_of_833_is_not_the_largest() {
         let refereed = taxman::game::replay_finished(833, &played).map(|s| (played.len(), s));
         assert_eq!(refereed, Ok((moves, score)));
     }
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// The extended problem: one-sided candidates, searched in extended mode
+
+/// The configurations of extended mode, the search of a problem with one-sided candidates: the tactics of
+/// [`SearchTactics::extended`] (the default without the rule of the symmetric pairs, which such a search refuses, and
+/// with the GF(2) bound it needs) on one thread; on two; with the nogoods forgotten at every step; without forced
+/// members; without nogoods; and with each way of choosing the member of a conflict to branch on that the default
+/// does not use (the default is the exact one).
+fn extended_configs() -> Vec<Config> {
+    let e = Config::of(&SearchTactics::extended());
+    vec![
+        e,
+        Config { threads: 2, ..e },
+        Config { period: Some(1), ..e },
+        Config { fix_forced: false, ..e },
+        Config { nogoods: false, ..e },
+        Config { gf2_branching: Gf2Branching::Split, ..e },
+        Config { gf2_branching: Gf2Branching::Largest, ..e },
+        Config { gf2_branching: Gf2Branching::Forced, ..e },
+    ]
+}
+
+/// `optimal.json`'s best promotion sum of the extended problem `ext` of game `n`, whatever sources are open: its score
+/// less what the sources fixed in `ext` make (U holds up to 1300: some optimal game plays all of U\*, so the heaviest
+/// promotion set of Π⁺(O) plays the open sources too).
+fn extended_optimum<const W: usize>(optimal: &Optimal, n: u32, ext: &ExtendedFrames<W>) -> u64 {
+    optimal.score(n).expect("a known game") - ext.in_the_bag
+}
+
+/// Every board 2..=300 searched as the extended problem Π⁺(O) from the root, from an incumbent worth 1 or 5 less than
+/// `optimal.json`'s promotion sum of it and an empty payload, under each configuration of extended mode: the search
+/// must complete with exactly that sum and a set that is promotable.  The sets O are the empty set, all of U\*_{≥3}
+/// (the boards to 120, where the problem has dozens of one-sided candidates) and three random non-empty subsets of it.
+/// Past the board 200 one configuration in three runs, as in the game tests above.  Unlike them it searches games whose
+/// candidates are not all numbers of a frame: the one-sided candidates, each a move of its own frame.
+#[test]
+fn a_search_of_the_extended_problem_from_a_handicapped_incumbent_finds_the_optimum() {
+    let optimal = Optimal::built_in();
+    let configs = extended_configs();
+    let mut rng = Rng(0xE87E_4DED_5EED_0001);
+    let (mut problems, mut with_one_sided, mut runs, mut one_sided_runs) = (0, 0, 0, 0);
+    for n in 2..=300 {
+        let board = Board::<8>::for_n(n);
+        let from_3 = upper_from_3(&board);
+        let mut opens = vec![Vec::new()];
+        if n <= 120 && !from_3.is_empty() {
+            opens.push(from_3.clone());
+        }
+        opens.extend(random_open_sets(&mut rng, &from_3, 3, 20));
+        for open in opens {
+            let (ext, prepared) = board
+                .prepare_extended_with(&Bits::from_slice(&open), SearchTactics::extended())
+                .unwrap_or_else(|e| panic!("n={n}: O={open:?}: {e}"));
+            if prepared.candidates.is_empty() {
+                continue;
+            }
+            let game = Game::of_prepared(&prepared);
+            let truth = extended_optimum(optimal, n, &ext);
+            let one_sided = prepared.model.has_one_sided();
+            problems += 1;
+            with_one_sided += usize::from(one_sided);
+            for (i, cfg) in configs.iter().enumerate() {
+                for k in [1, 5] {
+                    if k > truth || (n > 200 && i % 3 != 0) {
+                        continue;
+                    }
+                    let out = game.search(*cfg, vec![game.root_unit()], truth - k, None, None);
+                    runs += 1;
+                    one_sided_runs += usize::from(one_sided);
+                    let at = format!("n={n} O={open:?} {cfg:?} from {}: truth {truth}", truth - k);
+                    assert!(out.completed, "{at}: not completed");
+                    assert!(out.best == truth && out.real, "{at}, got {out:?}");
+                }
+            }
+        }
+    }
+    println!("{problems} problems, {with_one_sided} with one-sided candidates, {runs} runs, {one_sided_runs} of them");
+    // There were 1,258 problems, 978 of them with one-sided candidates, and 16,128 runs, 12,648 of them on those.
+    assert!(problems > 1100 && with_one_sided > 850, "{problems} problems, {with_one_sided} with one-sided candidates");
+    assert!(runs > 14_000 && one_sided_runs > 11_000, "{runs} runs, {one_sided_runs} on problems with one-sided ones");
+}
+
+/// The harness's own exhaustive oracle on the extended problem: [`Game::exhaustive`] on the game of Π⁺(O), whose counts
+/// of promotions and narrowing of candidates come from the model that knows the one-sided candidates, finds
+/// `optimal.json`'s promotion sum and a set that is real, on the boards to 60 for O empty, all of U\*_{≥3} and two
+/// random subsets of it.  (The perturbed games above are held to this oracle, so it must be right where the search is
+/// run.)
+#[test]
+fn the_exhaustive_oracle_finds_the_optimum_of_the_extended_problem() {
+    let optimal = Optimal::built_in();
+    let mut rng = Rng(0x0AC1_E0F5_0E27_0001);
+    let (mut finished, mut with_one_sided, mut skipped) = (0, 0, 0);
+    for n in 2..=60 {
+        let board = Board::<8>::for_n(n);
+        let from_3 = upper_from_3(&board);
+        let mut opens = vec![Vec::new(), from_3.clone()];
+        opens.extend(random_open_sets(&mut rng, &from_3, 2, 8));
+        for open in opens {
+            let (ext, prepared) =
+                board.prepare_extended_with(&Bits::from_slice(&open), SearchTactics::extended()).unwrap();
+            if prepared.candidates.is_empty() {
+                continue;
+            }
+            let game = Game::of_prepared(&prepared);
+            let Some((best, set)) = game.exhaustive(&game.root, &game.candidates, 3_000_000) else {
+                skipped += 1;
+                continue;
+            };
+            let truth = extended_optimum(optimal, n, &ext);
+            assert!(
+                best == truth && game.is_real(&set, best),
+                "n={n} O={open:?}: truth {truth}, got {best} with {set:?}"
+            );
+            finished += 1;
+            with_one_sided += usize::from(prepared.model.has_one_sided());
+        }
+    }
+    println!("{finished} problems, {with_one_sided} with one-sided candidates, {skipped} past the budget");
+    assert!(finished > 150 && with_one_sided > 100, "{finished} problems, {with_one_sided} with one-sided candidates");
+}
+
+/// The game and the seed for the open sources of
+/// [`a_search_of_the_extended_problem_resumed_over_and_over_finds_the_optimum`]: a random 20 of the game's U\*_{≥3},
+/// drawn with the seed.  The extended search of 992 with them takes 16,717 steps on one thread (of the games from 600
+/// to 1000 only 990 to 998 take more than 10,000; the search of 1000 takes 2,293 steps, that of 988 6,273).
+const EXTENDED_RESUME: (u32, u64) = (992, 0x5EED_0E27_E4DE_D001);
+
+/// The extended problem of game `EXTENDED_RESUME.0`, with a random 20 of its U\*_{≥3} open, searched on one thread in
+/// pieces of 1,000 nodes, each resumed from the checkpoint the one before it left, ends with the sum of an
+/// uninterrupted search, which is `optimal.json`'s.  The sets are the search's own (`Board::prepare_extended_with`,
+/// `Board::prepare_extended_for_resume`, `search::search`), so the checkpoints are the ones the real search writes:
+/// their header records the one-sided candidates, and the resume checks them.  The engine checks a node limit every
+/// 1,024 steps of a searcher, so a piece is at least that long.
+#[test]
+fn a_search_of_the_extended_problem_resumed_over_and_over_finds_the_optimum() {
+    let (n, seed) = EXTENDED_RESUME;
+    let board = Board::<16>::for_n(n);
+    let mut open = upper_from_3(&board);
+    common::shuffle(&mut Rng(seed), &mut open);
+    open.truncate(20);
+    open.sort_unstable();
+    let open = Bits::<16>::from_slice(&open);
+    let (ext, prepared) = board.prepare_extended_with(&open, SearchTactics::extended()).unwrap();
+    assert!(prepared.model.has_one_sided() && ext.open == open, "n={n}: the open sources");
+    let truth = extended_optimum(Optimal::built_in(), n, &ext);
+
+    let whole = search(&prepared, &config(1), None, None, false).unwrap();
+    assert!(whole.completed && whole.sum == truth, "n={n}: uninterrupted: {} not {truth}", whole.sum);
+    assert!(whole.stats.nodes > 10_000, "n={n}: only {} nodes, too few for the limit to stop it", whole.stats.nodes);
+
+    let dir = TempDir::new("extended-resume");
+    let checkpoint = dir.join("n.ckpt");
+    let cfg = EngineConfig {
+        checkpoint: Some((checkpoint.clone(), Duration::from_secs(3600))),
+        node_limit: Some(1000),
+        queue_mem_cap: 4,
+        spill_dir: Some(dir.join("spill")),
+        ..config(1)
+    };
+    let mut result = search(&prepared, &cfg, None, None, false).unwrap();
+    let mut pieces = 1;
+    while !result.completed {
+        assert!(checkpoint.exists(), "n={n}: a stopped run leaves a checkpoint");
+        let (resumed_ext, resumed) = board.prepare_extended_for_resume(&open, &checkpoint).unwrap();
+        assert_eq!((resumed_ext.one_sided, resumed.tactics), (ext.one_sided.clone(), prepared.tactics));
+        assert_eq!(resumed.problem(), prepared.problem(), "n={n}: the problem set up from the checkpoint");
+        result = search(&resumed, &cfg, None, None, true).unwrap();
+        pieces += 1;
+        assert!(pieces < 100, "n={n}: no progress");
+    }
+    assert!(pieces >= 2, "n={n}: only {pieces} pieces");
+    assert!(!checkpoint.exists(), "a completed run deletes its checkpoint");
+    assert_eq!(result.sum, whole.sum, "n={n}: {pieces} pieces against the uninterrupted search");
+    assert_eq!(result.sum, truth);
+    let game = Game::of_prepared(&prepared);
+    assert!(game.is_real(&result.promotions, result.sum), "n={n}: the set {:?}", result.promotions);
+    println!("n={n}: {} nodes uninterrupted, {pieces} pieces of at least 1,000 nodes", whole.stats.nodes);
 }

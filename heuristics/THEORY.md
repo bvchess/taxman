@@ -1476,9 +1476,11 @@ form of the frame model's problem (frames of Taxman Mini numbered so
 that a candidate of frame h is promoted into frame h − 1, a reduced
 root, candidates), so the search, its bounds and its tactics apply to
 it unchanged: Theorems 11 and 13, the reduction lemma, the conflicts
-and the nogoods use nothing else.  The one-sided candidates are not
-in the search yet; a reference predicate (plain peels of the unreduced
-frames) decides the promotion sets of Π⁺(O) for the tests.
+and the nogoods use nothing else.  The search takes the one-sided
+candidates too, each as a possible move of its frame
+(rust/DESIGN.md, "Extended mode"), and a reference predicate (plain
+peels of the unreduced frames) decides the promotion sets of Π⁺(O)
+for the tests.
 
 *Theorem 11 for Π⁺.*  Give each one-sided candidate s, of frame h,
 the vector v_h(s) of its maximal factors among frame h's factors in

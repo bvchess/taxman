@@ -12,9 +12,10 @@ use crate::model::FrameSet;
 /// search (the same game, frames, candidates and tactics).
 ///
 /// Encoded (little-endian) as the magic `TXSH`, the format [`Header::VERSION`] (u32), the width `W` (u32),
-/// `n` (u32), the digests of the candidates and of the frames (u64 each), `max_total` (u32) and the tactics' bits
-/// (u16, [`SearchTactics::bits`]).  This build reads version 4 only: the headers of older builds (magic `TXS2`, or
-/// `TXSH` with versions 3 and below) recorded tactics that are gone, and are refused with one message.
+/// `n` (u32), the digests of the candidates, of the frames and of the one-sided candidates (u64 each), `max_total`
+/// (u32) and the tactics' bits (u16, [`SearchTactics::bits`]).  This build reads version 5 only: the headers of older
+/// builds (magic `TXS2`, or `TXSH` with versions 4 and below) recorded tactics that are gone, or (version 4) had no
+/// digest of the one-sided candidates, and are refused with one message.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct Header<const W: usize> {
     pub(super) n: u32,
@@ -22,20 +23,24 @@ pub(super) struct Header<const W: usize> {
     pub(super) candidates: u64,
     /// [`Header::digest_frames`] of the frames as built.
     pub(super) frames: u64,
+    /// [`Header::digest_one_sided`] of the one-sided candidates of the model (those of the extended problem), each
+    /// with its own frame: what tells a search of the extended problem from another with the same candidates.
+    pub(super) one_sided: u64,
     pub(super) max_total: u32,
     pub(super) tactics: SearchTactics,
 }
 
 impl<const W: usize> Header<W> {
     pub(super) const MAGIC: &'static [u8; 4] = b"TXSH";
-    pub(super) const VERSION: u32 = 4;
-    pub(super) const LEN: usize = 4 + 4 + 4 + 4 + 8 + 8 + 4 + 2;
+    pub(super) const VERSION: u32 = 5;
+    pub(super) const LEN: usize = 4 + 4 + 4 + 4 + 8 + 8 + 8 + 4 + 2;
 
     pub(super) fn of(prepared: &Prepared<W>) -> Self {
         Header {
             n: prepared.n,
             candidates: Self::digest_candidates(&prepared.candidates),
             frames: Self::digest_frames(&prepared.root),
+            one_sided: Self::digest_one_sided(prepared.model.one_sided()),
             max_total: prepared.max_total,
             tactics: prepared.tactics,
         }
@@ -58,6 +63,14 @@ impl<const W: usize> Header<W> {
         engine::checksum(&bytes)
     }
 
+    /// A digest of the one-sided candidates, each as its number and its own frame (u32 each); of none, the checksum of
+    /// nothing.
+    pub(super) fn digest_one_sided(one_sided: &[(u32, usize)]) -> u64 {
+        let bytes: Vec<u8> =
+            one_sided.iter().flat_map(|&(s, frame)| [s, frame as u32]).flat_map(u32::to_le_bytes).collect();
+        engine::checksum(&bytes)
+    }
+
     pub(super) fn encode(&self) -> Vec<u8> {
         let mut out = Self::MAGIC.to_vec();
         for word in [Self::VERSION, W as u32, self.n] {
@@ -65,6 +78,7 @@ impl<const W: usize> Header<W> {
         }
         out.extend_from_slice(&self.candidates.to_le_bytes());
         out.extend_from_slice(&self.frames.to_le_bytes());
+        out.extend_from_slice(&self.one_sided.to_le_bytes());
         out.extend_from_slice(&self.max_total.to_le_bytes());
         out.extend_from_slice(&self.tactics.bits().to_le_bytes());
         out
@@ -99,8 +113,9 @@ impl<const W: usize> Header<W> {
             n: u32_at(12).expect("length checked"),
             candidates: u64_at(16),
             frames: u64_at(24),
-            max_total: u32_at(32).expect("length checked"),
-            tactics: SearchTactics::from_bits(u16::from_le_bytes([bytes[36], bytes[37]]))?,
+            one_sided: u64_at(32),
+            max_total: u32_at(40).expect("length checked"),
+            tactics: SearchTactics::from_bits(u16::from_le_bytes([bytes[44], bytes[45]]))?,
         })
     }
 
@@ -112,6 +127,8 @@ impl<const W: usize> Header<W> {
             "other promotion candidates".into()
         } else if self.frames != expected.frames {
             "other frames (made by a build with another frame builder?)".into()
+        } else if self.one_sided != expected.one_sided {
+            "other one-sided candidates (another extended problem)".into()
         } else if self.max_total != expected.max_total {
             format!("max_total {}, not {}", self.max_total, expected.max_total)
         } else if self.tactics != expected.tactics {

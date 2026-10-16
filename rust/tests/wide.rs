@@ -357,7 +357,7 @@ fn boards_past_4095_are_set_up_at_128_words() {
 
 /// A checkpoint that an earlier build wrote (`testdata/n1133_after_1000_nodes.ckpt`: game 1133 at W = 20 with
 /// the default tactics of that build, now those of the matching path (`SearchTactics::matching`), stopped after
-/// 1,023 nodes on one thread; search header format TXSH v4) still resumes and
+/// 1,023 nodes on one thread; search header format TXSH v5) still resumes and
 /// finishes with the committed score.  Every write/read test of the format uses the code's own constants, so a
 /// change of the layout that round-trips (the version, the byte order of a set, the order of the header's fields,
 /// the packing of the tactics) passes them and refuses this file.

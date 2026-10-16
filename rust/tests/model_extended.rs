@@ -34,10 +34,18 @@
 //!   must be promoted, all at once and one member at a time, exactly when the reference says so, and the unpromotable
 //!   ones must have conflicts and nogoods that cannot be promoted, a narrowing that keeps what can be promoted, and a
 //!   count that is no lower than the size of a promotion set.
+//! * The search of Π⁺(O) (`Board::prepare_extended_with`, `search::search` on one thread) is held to the whole-board
+//!   oracle on every board from 2 to 80, for O empty (under the default tactics and those of extended mode), for
+//!   random subsets of U\*_{≥3} and for O = U\*_{≥3} (to 60 by default, to 69 in an ignored test): it finds a promotion
+//!   sum s with `in_the_bag` + s the heaviest weight of F ∪ X over the sets X of family A, which is also the table's
+//!   score, and the set it returns is a promotion set of the reference predicate that F makes playable.
 
 mod common;
 
-use common::{for_each_kept_subset, kept_subsets, play_order, playable, random_subset, shuffle, Rng};
+use common::{
+    config, for_each_kept_subset, kept_subsets, play_order, playable, random_open_sets, random_subset, shuffle, upper,
+    upper_from_3, Rng,
+};
 use std::collections::BTreeSet;
 use std::ops::RangeInclusive;
 use std::time::Instant;
@@ -46,7 +54,7 @@ use taxman::board::Board;
 use taxman::frames::{build_extended, BoardFrames, ExtendedFrames};
 use taxman::game::{self, Optimal};
 use taxman::model::{FrameGraph, FrameSet, Scratch};
-use taxman::search::{Prepared, SearchTactics};
+use taxman::search::{search, Prepared, SearchTactics};
 use taxman::with_width;
 
 // ---------------------------------------------------------------------------------------------------------
@@ -55,18 +63,6 @@ use taxman::with_width;
 /// The sum of `numbers`.
 fn sum(numbers: &[u32]) -> u64 {
     numbers.iter().map(|&x| u64::from(x)).sum()
-}
-
-/// U\*: the numbers of the game with no promotions above n/2, ascending.
-fn upper<const W: usize>(board: &Board<W>) -> Vec<u32> {
-    let mut upper: Vec<u32> = board.plain.iter().copied().filter(|&x| 2 * x > board.n()).collect();
-    upper.sort_unstable();
-    upper
-}
-
-/// U\*_{≥3}: the members of U\* with three or more prime factors, ascending.
-fn upper_from_3<const W: usize>(board: &Board<W>) -> Vec<u32> {
-    upper(board).into_iter().filter(|&x| board.tables.omega(x) >= 3).collect()
 }
 
 /// A board with what the theorem is about: F, O and the extended problem Π⁺(O).
@@ -190,21 +186,6 @@ fn check_every_board(boards: RangeInclusive<u32>, mut choose: impl FnMut(u32, &[
     }
     println!("the boards {boards:?}: {checks} open sets, {total} sets in {:.1?}", start.elapsed());
     assert!(total > checks, "no board has a set but the empty one");
-}
-
-/// Up to `sets` random subsets of `from_3` with 1 to `most` members each (none when it is empty, and no more than it
-/// has members), the stream being `rng`.
-fn random_open_sets(rng: &mut Rng, from_3: &[u32], sets: u64, most: usize) -> Vec<Vec<u32>> {
-    let most = from_3.len().min(most) as u64;
-    (0..sets.min(most))
-        .map(|_| {
-            let mut pool = from_3.to_vec();
-            shuffle(rng, &mut pool);
-            pool.truncate(1 + rng.below(most) as usize);
-            pool.sort_unstable();
-            pool
-        })
-        .collect()
 }
 
 /// Theorem M⁺ with no open source, on every set of every board from 2 to 80.
@@ -868,4 +849,128 @@ fn the_model_with_one_sided_candidates_301_to_500() {
 fn the_model_with_one_sided_candidates_with_more_draws() {
     let draws = Draws { subsets: 10 * DRAWS.subsets, chains: 10 * DRAWS.chains };
     assert_reached(&check_model_on_boards(2..=300, draws, 0xFF51_AFD7_ED55_8CCD));
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// The search against the whole-board oracle
+
+/// The heaviest sum of a set X of family A (F ∪ X playable by the oracle, found depth first), and the number of sets of
+/// the family: what the best game on the whole board makes beyond F.
+fn heaviest_playable<const W: usize>(case: &Case<W>) -> (u64, usize) {
+    let (mut heaviest, mut sets) = (0, 0);
+    for_each_kept_subset(&case.items_a(), &mut |x| case.playable_with(x), &mut |x| {
+        heaviest = heaviest.max(sum(x));
+        sets += 1;
+    });
+    (heaviest, sets)
+}
+
+/// What a check of the search found: the sets of family A, the searches made, those of them with a source open, and
+/// those whose answer plays a one-sided candidate.
+#[derive(Clone, Copy, Debug, Default)]
+struct Searched {
+    sets: usize,
+    searches: usize,
+    with_open: usize,
+    with_one_sided: usize,
+}
+
+impl Searched {
+    fn add(&mut self, other: &Searched) {
+        self.sets += other.sets;
+        self.searches += other.searches;
+        self.with_open += other.with_open;
+        self.with_one_sided += other.with_one_sided;
+    }
+}
+
+/// The search of Π⁺(`open`) of the board `1..=n` against the whole-board oracle: for each of `tactics` (all of which
+/// must take the problem), the search on one thread, with no seed and no ceiling, completes with a promotion sum s such
+/// that `in_the_bag` + s is the heaviest weight of F ∪ X over the sets X of family A (F ∪ X playable), and is
+/// `optimal.json`'s score; the set it returns is a promotion set by the reference predicate, and F together with it is
+/// playable.  The sets of family A are enumerated once for all the tactics.
+fn check_the_search(n: u32, open: &[u32], tactics: &[SearchTactics]) -> Searched {
+    let board = Board::<8>::for_n(n);
+    let case = Case::new(&board, open);
+    let (heaviest, sets) = heaviest_playable(&case);
+    let heaviest_total = sum(&case.fixed) + heaviest;
+    let mut found = Searched { sets, ..Searched::default() };
+    for &tactics in tactics {
+        let what = format!("n={n}, O={open:?}, {tactics:?}");
+        let (ext, prepared) =
+            board.prepare_extended_with(&Bits::from_slice(open), tactics).unwrap_or_else(|e| panic!("{what}: {e}"));
+        let result = search(&prepared, &config(1), None, None, false).unwrap_or_else(|e| panic!("{what}: {e}"));
+        assert!(result.completed, "{what}: the search did not complete");
+        let score = ext.in_the_bag + result.sum;
+        assert_eq!(score, heaviest_total, "{what}: the search's score and the heaviest set of the oracle");
+        assert_eq!(Some(score), Optimal::built_in().score(n), "{what}: the search's score and the table's");
+        let set = result.promotions.to_vec();
+        assert_eq!(sum(&set), result.sum, "{what}: the set {set:?}");
+        assert!(case.is_promotion_set(&set), "{what}: the set {set:?} is not a promotion set");
+        assert!(case.playable_with(&set), "{what}: F with the set {set:?} is not playable");
+        found.searches += 1;
+        found.with_open += usize::from(!open.is_empty());
+        found.with_one_sided += usize::from(set.iter().any(|&x| ext.one_sided.iter().any(|&(s, _)| s == x)));
+    }
+    found
+}
+
+/// [`check_the_search`] on each board of `boards`, for the open sets `choose` gives for the board `n` from its
+/// U\*_{≥3}, with the time of each.  Returns what the boards made.
+fn check_the_search_on_boards(
+    boards: RangeInclusive<u32>,
+    tactics: &[SearchTactics],
+    mut choose: impl FnMut(u32, &[u32]) -> Vec<Vec<u32>>,
+) -> Searched {
+    let (start, mut total) = (Instant::now(), Searched::default());
+    for n in boards.clone() {
+        let upper_from_3 = upper_from_3(&Board::<8>::for_n(n));
+        for open in choose(n, &upper_from_3) {
+            let began = Instant::now();
+            let found = check_the_search(n, &open, tactics);
+            println!("n={n:>3} |O|={:>2}: {:>7} sets  {:.1?}", open.len(), found.sets, began.elapsed());
+            total.add(&found);
+        }
+    }
+    println!("the boards {boards:?}: {total:?} in {:.1?}", start.elapsed());
+    total
+}
+
+/// The search of Π⁺(∅) on every board from 2 to 80, under the default tactics and those of extended mode (the search
+/// is the frame model's, but for the claims of `unzip` put back, and takes either).
+#[test]
+fn the_search_with_no_open_source_finds_the_heaviest_set() {
+    let both = [SearchTactics::default(), SearchTactics::extended()];
+    let found = check_the_search_on_boards(2..=80, &both, |_, _| vec![Vec::new()]);
+    assert_eq!(found.searches, 2 * 79);
+}
+
+/// The search of Π⁺(O) on every board from 2 to 80 that has sources of three or more prime factors, for three random
+/// subsets O of them with 1 to 8 members each, under the tactics of extended mode.
+#[test]
+fn the_search_with_open_sources_finds_the_heaviest_set() {
+    let mut rng = Rng(0x2C1B_3C6D_9E37_79B9);
+    let found = check_the_search_on_boards(2..=80, &[SearchTactics::extended()], |_, from_3| {
+        random_open_sets(&mut rng, from_3, 3, 8)
+    });
+    assert!(found.with_open > 100, "{found:?}");
+    assert!(found.with_one_sided * 2 > found.with_open, "most answers play an open source: {found:?}");
+}
+
+/// The search of Π⁺(U\*_{≥3}), every source of three or more prime factors open, on every board from 2 to 60.
+#[test]
+fn the_search_with_every_source_open_finds_the_heaviest_set() {
+    let found = check_the_search_on_boards(2..=60, &[SearchTactics::extended()], |_, from_3| vec![from_3.to_vec()]);
+    assert!(found.with_open > 20, "{found:?}");
+    assert!(found.with_one_sided * 2 > found.with_open, "most answers play an open source: {found:?}");
+}
+
+/// [`the_search_with_every_source_open_finds_the_heaviest_set`] on the boards 61 to 69, whose sets (0.4 to 5.5 million
+/// each, 21 million in all) are enumerated for the oracle's answer, as in
+/// [`theorem_m_plus_with_every_source_open_61_to_69`], in eighteen seconds.  The boards 70 and 71 have 62 million each.
+#[test]
+#[ignore = "takes twenty seconds; the boards to 60 are in the default test"]
+fn the_search_with_every_source_open_finds_the_heaviest_set_61_to_69() {
+    let found = check_the_search_on_boards(61..=69, &[SearchTactics::extended()], |_, from_3| vec![from_3.to_vec()]);
+    assert!(found.with_open > 0 && found.with_one_sided * 2 > found.with_open, "{found:?}");
 }

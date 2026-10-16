@@ -85,15 +85,52 @@ impl<const W: usize> Board<W> {
     }
 
     /// Sets the search up for the extended problem Π⁺(∅) ([`build_extended`]): the frame model without the claims of
-    /// `unzip`, and the problem it poses.  Research code; the default path is [`prepare`](Self::prepare).  The search
-    /// does not take one-sided candidates yet, so no source is open.
+    /// `unzip`, and the problem it poses.  [`prepare_extended_with`](Self::prepare_extended_with) with no open source.
     ///
     /// # Errors
     ///
-    /// If the frames cannot be built into a model (more frames than a frame set holds).
+    /// As [`prepare_extended_with`](Self::prepare_extended_with).
     pub fn prepare_extended(&self, tactics: SearchTactics) -> Result<(ExtendedFrames<W>, Prepared<W>), String> {
-        let extended = build_extended(&self.tables, &Bits::EMPTY)?;
-        let prepared = search::prepare(&self.tables, &extended.columns(), &extended.candidates, tactics)?;
+        self.prepare_extended_with(&Bits::EMPTY, tactics)
+    }
+
+    /// Sets the search up for the extended problem Π⁺(O) with the open sources `open` ([`build_extended`]), its
+    /// one-sided candidates (the open sources and those greedy rejected beside them) candidates of the search beside
+    /// the two-sided ones ([`search::prepare_extended`]).  Research code: the certificates of `taxman certify`; the
+    /// default path is [`prepare`](Self::prepare).
+    ///
+    /// # Errors
+    ///
+    /// If `open` holds a number that cannot be open, if the problem has more frames than a frame set holds, or if it
+    /// has one-sided candidates and `tactics` are not those of extended mode
+    /// ([`SearchTactics::refusal_with_one_sided`]).
+    pub fn prepare_extended_with(
+        &self,
+        open: &Bits<W>,
+        tactics: SearchTactics,
+    ) -> Result<(ExtendedFrames<W>, Prepared<W>), String> {
+        let extended = build_extended(&self.tables, open)?;
+        let (columns, one_sided) = (extended.columns(), &extended.one_sided);
+        let prepared = search::prepare_extended(&self.tables, &columns, one_sided, &extended.candidates, tactics)?;
+        Ok((extended, prepared))
+    }
+
+    /// [`prepare_extended_with`](Self::prepare_extended_with) for resuming the checkpoint at `checkpoint`, with its
+    /// tactics ([`search::prepare_extended_for_resume`]).
+    ///
+    /// # Errors
+    ///
+    /// As [`prepare_extended_with`](Self::prepare_extended_with), and if the checkpoint does not belong to this problem
+    /// or cannot be read.
+    pub fn prepare_extended_for_resume(
+        &self,
+        open: &Bits<W>,
+        checkpoint: &Path,
+    ) -> Result<(ExtendedFrames<W>, Prepared<W>), String> {
+        let extended = build_extended(&self.tables, open)?;
+        let (columns, one_sided) = (extended.columns(), &extended.one_sided);
+        let candidates = &extended.candidates;
+        let prepared = search::prepare_extended_for_resume(&self.tables, &columns, one_sided, candidates, checkpoint)?;
         Ok((extended, prepared))
     }
 

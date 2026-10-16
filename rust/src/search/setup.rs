@@ -1,6 +1,7 @@
 //! Setting a game up for the search ([`prepare`], the Java's `SearchManager.create`): the model and the root
 //! frame set, the greedy incumbent and `max_total`.  [`prepare_for_resume`] does the same for a search that a
-//! checkpoint will resume, taking the tactics from it.
+//! checkpoint will resume, taking the tactics from it.  [`prepare_extended`] and [`prepare_extended_for_resume`] are
+//! the same for a problem with one-sided candidates, the extended problem's (`crate::frames::build_extended`).
 //!
 //! The search problem a setup poses, in a canonical form that two games can be compared by, is a [`Problem`]
 //! ([`Prepared::problem`]); [`problem_of`] rebuilds it from the frames alone, without preparing a search.
@@ -10,6 +11,7 @@ use super::tactics::SearchTactics;
 use crate::bits::Bits;
 use crate::bounds;
 use crate::engine;
+use crate::gf2::{Gf2Bound, Gf2Graph, MAX_WORDS};
 use crate::model::{FrameGraph, FrameSet};
 use crate::numtheory::Tables;
 use std::path::Path;
@@ -64,10 +66,19 @@ impl<const W: usize> Prepared<W> {
 /// sees; recording them anyway errs on the side of telling more problems apart.  The numbers are game numbers, so
 /// the form does not depend on the set width.  The tactics, the ceiling and the seed are not in it: the sound tactics,
 /// the ceiling and the seed change how the search runs, not its answer.
+///
+/// A problem with one-sided candidates (the extended problem's, [`prepare_extended`]) has them among its candidates
+/// and, after all that, the tag [`Problem::ONE_SIDED`], their number, and for each, ascending, the number, its own
+/// frame and the maximal factors that can pay for it.  A problem without them ends before the tag, so no such problem
+/// equals one with them (the frames fix how many numbers the lists before the tag describe), and its form, and so its
+/// digest, are what they were before one-sided candidates existed.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Problem(Vec<u32>);
 
 impl Problem {
+    /// The tag before the one-sided candidates of a problem that has some: no number of a board (they end at 65535).
+    pub const ONE_SIDED: u32 = u32::MAX;
+
     /// The problem of a search of the model `model` from `root` over `candidates`, with at most `max_total`
     /// promotions.
     pub fn of<const W: usize>(model: &FrameGraph, root: &FrameSet<W>, candidates: &Bits<W>, max_total: u32) -> Problem {
@@ -91,7 +102,20 @@ impl Problem {
             list(&mut words, graph.factors(x).iter().map(|&y| u32::from(y)));
             list(&mut words, graph.composites(x).iter().map(|&y| u32::from(y)));
         }
+        if model.has_one_sided() {
+            words.extend([Self::ONE_SIDED, model.one_sided().len() as u32]);
+            for &(s, frame) in model.one_sided() {
+                words.extend([s, frame as u32]);
+                list(&mut words, graph.factors(s).iter().map(|&y| u32::from(y)));
+            }
+        }
         Problem(words)
+    }
+
+    /// The form's numbers, as listed above (for the tests of the form).
+    #[cfg(test)]
+    pub(super) fn form(&self) -> &[u32] {
+        &self.0
     }
 
     /// A digest of the problem: the engine's 64-bit checksum ([`engine::checksum`], the one checkpoints carry) of
@@ -145,7 +169,7 @@ pub fn problem_of<const W: usize>(
     columns: &[Vec<u32>],
     candidates: &Bits<W>,
 ) -> Result<Problem, String> {
-    let (model, root, _) = build_root::<W>(tables, columns)?;
+    let (model, root, _) = build_root::<W>(tables, columns, &[])?;
     Ok(Problem::of(&model, &root, candidates, max_total(&model, &root, candidates)))
 }
 
@@ -157,13 +181,48 @@ pub fn prepare<const W: usize>(
     candidates: &Bits<W>,
     tactics: SearchTactics,
 ) -> Result<Prepared<W>, String> {
-    let (model, root, build) = build_root::<W>(tables, columns)?;
+    prepare_extended(tables, columns, &[], candidates, tactics)
+}
+
+/// [`prepare`] with the one-sided candidates `one_sided` of the extended problem besides the (two-sided) `candidates`,
+/// each with its own frame (`model`'s module docs, "One-sided candidates"): the model of
+/// [`FrameGraph::build_extended`], and the search's candidates both kinds.  With none it is [`prepare`].
+///
+/// # Errors
+///
+/// If the frames cannot be built into a model, or, with one-sided candidates, if the tactics are ones that do not
+/// know them ([`SearchTactics::refusal_with_one_sided`]) or a frame needs more words of the GF(2) bound than the
+/// engines of the set width `W` have ([`Gf2Bound::MOST_WORDS`]: opening a source adds one to its frame's rank).
+pub fn prepare_extended<const W: usize>(
+    tables: &Tables,
+    columns: &[Vec<u32>],
+    one_sided: &[(u32, usize)],
+    candidates: &Bits<W>,
+    tactics: SearchTactics,
+) -> Result<Prepared<W>, String> {
+    if let Some(refusal) = tactics.refusal_with_one_sided().filter(|_| !one_sided.is_empty()) {
+        return Err(refusal);
+    }
+    let (model, root, build) = build_root::<W>(tables, columns, one_sided)?;
+    let candidates = one_sided.iter().fold(*candidates, |set, &(s, _)| set.with(s));
+    if !one_sided.is_empty() {
+        // Each open source adds one to its frame's rank, which can take a frame past the engines of this set width.
+        let words = Gf2Graph::new(&model, &root, &candidates).words();
+        if words > Gf2Bound::<W>::MOST_WORDS {
+            return Err(format!(
+                "n={}: a frame of the problem needs {words} block words of the GF(2) bound, and the set width {W} has \
+                 engines of at most {} (the widest, 128 words, has {MAX_WORDS})",
+                tables.n,
+                Gf2Bound::<W>::MOST_WORDS
+            ));
+        }
+    }
     let t0 = Instant::now();
-    let greedy = bounds::greedy(&model, &root, candidates);
+    let greedy = bounds::greedy(&model, &root, &candidates);
     let timings = PrepareTimings { build, greedy: t0.elapsed() };
-    let max_total = max_total(&model, &root, candidates);
+    let max_total = max_total(&model, &root, &candidates);
     let n = tables.n;
-    Ok(Prepared { n, model: Arc::new(model), root, candidates: *candidates, tactics, greedy, max_total, timings })
+    Ok(Prepared { n, model: Arc::new(model), root, candidates, tactics, greedy, max_total, timings })
 }
 
 /// [`prepare`] for resuming the search checkpointed in `checkpoint`, with the tactics the checkpoint records.  Fails,
@@ -175,16 +234,29 @@ pub fn prepare_for_resume<const W: usize>(
     candidates: &Bits<W>,
     checkpoint: &Path,
 ) -> Result<Prepared<W>, String> {
+    prepare_extended_for_resume(tables, columns, &[], candidates, checkpoint)
+}
+
+/// [`prepare_for_resume`] for the problem of [`prepare_extended`]; a checkpoint of another problem (other one-sided
+/// candidates, say) is refused as one of another game is.
+pub fn prepare_extended_for_resume<const W: usize>(
+    tables: &Tables,
+    columns: &[Vec<u32>],
+    one_sided: &[(u32, usize)],
+    candidates: &Bits<W>,
+    checkpoint: &Path,
+) -> Result<Prepared<W>, String> {
     let bytes = engine::read_checkpoint_header(checkpoint).map_err(|e| format!("{}: {e}", checkpoint.display()))?;
     let header = Header::<W>::decode(&bytes)?;
-    let prepared = prepare(tables, columns, candidates, header.tactics)?;
+    let prepared = prepare_extended(tables, columns, one_sided, candidates, header.tactics)?;
     match header.mismatch(&Header::of(&prepared)) {
         Some(mismatch) => Err(mismatch),
         None => Ok(prepared),
     }
 }
 
-/// The model and the root frame set of the game whose frames are `columns`, and the time it took to build them.
+/// The model and the root frame set of the game whose frames are `columns` and whose one-sided candidates are
+/// `one_sided`, and the time it took to build them.
 ///
 /// Every frame of the root is winnable (the frame builder makes it so), and the search relies on it: promoting a
 /// number that has a factor no move of the frame it is promoted into uses takes no peel (`FrameGraph::promote`), which
@@ -193,9 +265,10 @@ pub fn prepare_for_resume<const W: usize>(
 fn build_root<const W: usize>(
     tables: &Tables,
     columns: &[Vec<u32>],
+    one_sided: &[(u32, usize)],
 ) -> Result<(FrameGraph, FrameSet<W>, Duration), String> {
     let t0 = Instant::now();
-    let (model, root) = FrameGraph::build::<W>(tables, columns)?;
+    let (model, root) = FrameGraph::build_extended::<W>(tables, columns, one_sided)?;
     let build = t0.elapsed();
     debug_assert!(
         root.frames().iter().all(|f| model.winnable(&f.moves, &f.factors)),

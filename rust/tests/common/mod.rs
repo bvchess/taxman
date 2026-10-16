@@ -30,7 +30,7 @@ use taxman::numtheory::Tables;
 use taxman::results::Assumptions;
 use taxman::search::lagrange::Refits;
 use taxman::search::symmetry::{cofactors, Symmetries};
-use taxman::search::{search, Gf2Branching, SearchSpace, SearchTactics, TaxSearcher, TaxUnit, NOGOOD_PERIOD};
+use taxman::search::{search, Gf2Branching, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit, NOGOOD_PERIOD};
 use taxman::solver::{Prev, PrevSource, SolveOptions};
 
 /// A committed file under `testdata/`.
@@ -189,6 +189,34 @@ pub fn shuffle<T>(rng: &mut Rng, items: &mut [T]) {
     }
 }
 
+/// U\*, the sources that setup keeps: the numbers of the game with no promotions above n/2, ascending.
+pub fn upper<const W: usize>(board: &Board<W>) -> Vec<u32> {
+    let mut upper: Vec<u32> = board.plain.iter().copied().filter(|&x| 2 * x > board.n()).collect();
+    upper.sort_unstable();
+    upper
+}
+
+/// U\*_{≥3}, the sources that can be open in the extended problem: the members of U\* with three or more prime
+/// factors, ascending.
+pub fn upper_from_3<const W: usize>(board: &Board<W>) -> Vec<u32> {
+    upper(board).into_iter().filter(|&x| board.tables.omega(x) >= 3).collect()
+}
+
+/// Up to `sets` random subsets of `from_3` with 1 to `most` members each (none when it is empty, and no more than it
+/// has members), the stream being `rng`.
+pub fn random_open_sets(rng: &mut Rng, from_3: &[u32], sets: u64, most: usize) -> Vec<Vec<u32>> {
+    let most = from_3.len().min(most) as u64;
+    (0..sets.min(most))
+        .map(|_| {
+            let mut pool = from_3.to_vec();
+            shuffle(rng, &mut pool);
+            pool.truncate(1 + rng.below(most) as usize);
+            pool.sort_unstable();
+            pool
+        })
+        .collect()
+}
+
 /// Calls `visit` on every subset of `items` (ascending) that `keeps` accepts, and on the empty set, found depth first:
 /// a set is extended by a larger item only while it is kept, so `keeps` must hold of every subset of a set it holds
 /// of.  A set is visited only after every prefix of it (in the order of `items`) was kept, and in memory there is
@@ -304,6 +332,9 @@ pub struct Outcome<const W: usize> {
 /// The parts of a search of one game: the model, the starting state, the candidates and what the bounds need.
 /// Searching from a unit with an incumbent worth less than the best completion (and a payload that is not a
 /// completion) tests every pruning at once: if one loses every best completion, the fake incumbent survives.
+///
+/// The model may have one-sided candidates (the extended problem's, [`Game::of_prepared`]): every count and every
+/// narrowing here goes through the model, which knows them, and is the frame set's own where there are none.
 pub struct Game<const W: usize> {
     pub model: FrameGraph,
     pub root: FrameSet<W>,
@@ -315,9 +346,24 @@ pub struct Game<const W: usize> {
 impl<const W: usize> Game<W> {
     /// The game that starts at `root` and may promote `candidates`.
     pub fn new(model: FrameGraph, root: FrameSet<W>, candidates: Bits<W>) -> Self {
-        let max_total = root.max_promotions_among(&candidates).max(0) as u32;
+        let max_total = model.max_promotions_among(&root, &candidates).max(0) as u32;
         let graph = MatchGraph::new(&model, &root);
         Game { model, root, candidates, max_total, graph }
+    }
+
+    /// The game that a search of `prepared` plays: its model, root and candidates, one-sided candidates and all (the
+    /// extended problem's, [`Board::prepare_extended_with`]).  Its `max_total` must be what the setup computed.
+    pub fn of_prepared(prepared: &Prepared<W>) -> Self {
+        let game = Game::new((*prepared.model).clone(), prepared.root, prepared.candidates);
+        assert_eq!(game.max_total, prepared.max_total, "n={}: max_total", prepared.n);
+        game
+    }
+
+    /// The largest number in the root's frames and in the candidates (the one-sided candidates of the extended problem
+    /// are in no frame), as the search's space has it: what the nogoods hold.
+    fn root_max(&self) -> u32 {
+        let in_frames = self.root.frames().iter().filter_map(|f| (f.moves | f.factors).max());
+        in_frames.chain(self.candidates.max()).max().unwrap_or(0)
     }
 
     /// The game with the frames `columns` (factors and moves per frame, front first), if every frame of the root is
@@ -362,7 +408,7 @@ impl<const W: usize> Game<W> {
             nogood_period: cfg.period,
             lagrange: cfg.refits.filter(|_| cfg.nogoods),
             candidates: self.candidates,
-            root_max: self.root.frames().iter().filter_map(|f| (f.moves | f.factors).max()).max().unwrap_or(0),
+            root_max: self.root_max(),
             max_total: self.max_total,
             diagnostics: None,
             began: Instant::now(),
@@ -412,8 +458,9 @@ impl<const W: usize> Game<W> {
     }
 
     /// The best completion of `state` among `cands`, found exhaustively (pruned by the sum and the freedoms'
-    /// count; a number is tried only where both its frames have freedoms left, as the search narrows its
-    /// candidates), as its sum and its set (the first of the best ones that the search finds), or `None` past
+    /// count, [`FrameGraph::max_promotions_among`]; a number is tried only where both its frames have freedoms left,
+    /// as the search narrows its candidates with [`FrameGraph::narrow`], and a one-sided candidate where its own
+    /// frame has), as its sum and its set (the first of the best ones that the search finds), or `None` past
     /// `budget` nodes.
     pub fn exhaustive(&self, state: &FrameSet<W>, cands: &Bits<W>, budget: u64) -> Option<(u64, Bits<W>)> {
         let best = self.best_completion(state, cands, budget, &|_| true, &|_, _| true);
@@ -484,8 +531,8 @@ impl<const W: usize> Game<W> {
                 if (self.accepts)(&chosen) && self.best.is_none_or(|(best, _)| sum > best) {
                     self.best = Some((sum, chosen));
                 }
-                let cap = state.max_promotions_among(&left).max(0) as usize;
-                let open = state.narrow_candidates(&left);
+                let cap = self.model.max_promotions_among(state, &left).max(0) as usize;
+                let open = self.model.narrow(state, &left);
                 for i in 0..list.len() {
                     let optimistic: u64 = sum + list[i..].iter().take(cap).map(|&x| u64::from(x)).sum::<u64>();
                     if self.best.is_some_and(|(best, _)| optimistic <= best) {
