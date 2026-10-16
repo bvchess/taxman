@@ -401,6 +401,17 @@ with three or more factors.  At the roots of 880–1300 its gap to the optimum i
   than all smaller ones); when that is the parent's optimum, the child inherits it with no solve.  The parent here
   is the node as it was before it went on without the member the child promotes (it is kept aside for that), so
   that the child finds the node's optimum among those sets.
+* **Tableaux derived, not built.**  A solved level whose tableau the workspace no longer holds (a child that inherited
+  or was certified, a node going on without the member it branched on) needs it for its weight split.  A solve from
+  its optimum would build it, a pivot per member over its block; `Meet::derive` makes the same tableau (the same free
+  elements, circuits, slots and lists, which is all that is read of a tableau outside a solve) from a related one, at
+  a cost linear in the elements: from the parent's, which the workspace still holds when the child is checked (the
+  promoted members' slots dropped from the circuits, a contraction, and for a certified child the set first flipped
+  along the cycle by exchanges, each a pivot that keeps the span), or for the node from a copy of its own tableau
+  saved when it kept the certified level (`Snapshot`).  A block where an exchange would change the span is built, and
+  the elements the parent did not have (its own loops, candidates again in the child) are reduced by the block's
+  members.  The module comment of `src/gf2/meet.rs` ("Deriving a tableau") has the argument; the random paths of the
+  tests check every derived tableau against the one a solve builds.  The trees are the same.
 * **The heaviest set without a member, with no solve.**  The heaviest set without a member `x` of the optimum `I*`
   is, in practice, `I*` flipped along one cycle of its exchange graph through `x`; `Meet::without` finds the shortest
   such cycle by Dijkstra's search over the weight split's reduced lengths (below), checks the flipped set common
@@ -1123,8 +1134,8 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   warm start, with members deleted, and its weight split's bounds without each member; on the boards up to 400 the
   bound is never below the exhaustive best completion and the optimal promotions are independent in both matroids;
   and along random paths of games 60–1000 (promotions, deletions, backtracking) every level equals the matroids built
-  afresh at its node, and every member it calls forced is (the bound without it, solved afresh, is below what the
-  node needs), and along the same kind of paths the copies of every word count (1 to 5, padded) give the same results
+  afresh at its node, every member it calls forced is (the bound without it, solved afresh, is below what the
+  node needs), and every tableau derived instead of built is the one a solve builds, and along the same kind of paths the copies of every word count (1 to 5, padded) give the same results
   and do the same work; blocks of more than 255 members (five words) against the greedy algorithm, one matroid free
   and the other random; at the 600 nodes of the probe's fixtures (936 and 1215), completions promoted in random orders
   are independent in the node's matroids and no heavier than its bound, and the matching path's search started from
