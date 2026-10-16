@@ -19,7 +19,6 @@ import re
 import subprocess
 import sys
 
-binary = sys.argv[1]
 LINE = re.compile(r'^([ +!:|]*)(\d+) (.*)$')
 
 
@@ -59,7 +58,7 @@ def address(frame):
     return m.group(1) if m and '(in taxman)' in frame else None
 
 
-def symbolicate(load, addrs):
+def symbolicate(binary, load, addrs):
     chains = {}
     addrs = sorted(addrs)
     for i in range(0, len(addrs), 400):
@@ -73,9 +72,10 @@ def symbolicate(load, addrs):
 
 def idents(sym):
     """The identifiers of a v0-mangled Rust symbol, in order (<decimal length><identifier> tokens)."""
-    out, i = [], 0
+    out, i, end = [], 0, 0
     while i < len(sym):
-        if sym[i].isdigit() and (i == 0 or not sym[i - 1].isdigit()):
+        # A token starts after a non-digit, or right after the identifier before it (which may end in a digit: gf2).
+        if sym[i].isdigit() and (i == end or not sym[i - 1].isdigit()):
             j = i
             while j < len(sym) and sym[j].isdigit():
                 j += 1
@@ -87,7 +87,7 @@ def idents(sym):
             word = sym[j:j + n]
             if n > 0 and len(word) == n and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', word):
                 out.append(word)
-                i = j + n
+                i = end = j + n
                 continue
         i += 1
     return out
@@ -191,45 +191,51 @@ def kind(chain, frame, up):
     return "node's own work"
 
 
-for path in sys.argv[2:]:
-    load, nodes = parse(path)
-    addrs = set()
-    for _, stack in nodes:
-        for f in stack:
-            a = address(f)
-            if a:
-                addrs.add(a)
-    chains = symbolicate(load, addrs)
-    by_kind = collections.Counter()
-    by_purpose = collections.Counter()
-    by_both = collections.Counter()
-    by_leaf = collections.Counter()
-    for count, stack in nodes:
-        leaf = stack[-1]
-        leaf_chain = chains.get(address(leaf), [])
-        callers = [chains.get(address(f), []) for f in reversed(stack[:-1])]
-        k = kind(leaf_chain, leaf, callers)
-        by_kind[k] += count
-        if k == 'idle (waiting)':
-            continue
-        p = purpose([leaf_chain] + callers)
-        by_purpose[p] += count
-        by_both[(k, p)] += count
-        by_leaf[next((f for f in leaf_chain if f.startswith("taxman:")), None) or leaf.split('  (in')[0][:60]] += count
-    busy = sum(c for k, c in by_kind.items() if k != 'idle (waiting)')
-    pct = lambda c: f'{100 * c / busy:5.1f}%'
-    print(f'== {path}: {busy} busy samples, {by_kind["idle (waiting)"]} idle')
-    print(' kind of work:')
-    for k, c in by_kind.most_common():
-        if k != 'idle (waiting)':
-            print(f'  {pct(c)}  {k}')
-    print(' purpose:')
-    for p, c in by_purpose.most_common():
-        print(f'  {pct(c)}  {p}')
-    print(' kind x purpose (>= 1%):')
-    for (k, p), c in by_both.most_common():
-        if c / busy >= 0.01:
-            print(f'  {pct(c)}  {k:40} | {p}')
-    print(' innermost functions (self, top 15):')
-    for n, c in by_leaf.most_common(15):
-        print(f'  {pct(c)}  {n}')
+def main(binary, paths):
+    for path in paths:
+        load, nodes = parse(path)
+        addrs = set()
+        for _, stack in nodes:
+            for f in stack:
+                a = address(f)
+                if a:
+                    addrs.add(a)
+        chains = symbolicate(binary, load, addrs)
+        by_kind = collections.Counter()
+        by_purpose = collections.Counter()
+        by_both = collections.Counter()
+        by_leaf = collections.Counter()
+        for count, stack in nodes:
+            leaf = stack[-1]
+            leaf_chain = chains.get(address(leaf), [])
+            callers = [chains.get(address(f), []) for f in reversed(stack[:-1])]
+            k = kind(leaf_chain, leaf, callers)
+            by_kind[k] += count
+            if k == 'idle (waiting)':
+                continue
+            p = purpose([leaf_chain] + callers)
+            by_purpose[p] += count
+            by_both[(k, p)] += count
+            name = next((f for f in leaf_chain if f.startswith("taxman:")), None) or leaf.split('  (in')[0][:60]
+            by_leaf[name] += count
+        busy = sum(c for k, c in by_kind.items() if k != 'idle (waiting)')
+        pct = lambda c: f'{100 * c / busy:5.1f}%'
+        print(f'== {path}: {busy} busy samples, {by_kind["idle (waiting)"]} idle')
+        print(' kind of work:')
+        for k, c in by_kind.most_common():
+            if k != 'idle (waiting)':
+                print(f'  {pct(c)}  {k}')
+        print(' purpose:')
+        for p, c in by_purpose.most_common():
+            print(f'  {pct(c)}  {p}')
+        print(' kind x purpose (>= 1%):')
+        for (k, p), c in by_both.most_common():
+            if c / busy >= 0.01:
+                print(f'  {pct(c)}  {k:40} | {p}')
+        print(' innermost functions (self, top 15):')
+        for n, c in by_leaf.most_common(15):
+            print(f'  {pct(c)}  {n}')
+
+
+if __name__ == "__main__":
+    main(sys.argv[1], sys.argv[2:])

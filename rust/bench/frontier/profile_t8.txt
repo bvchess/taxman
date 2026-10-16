@@ -1,0 +1,142 @@
+== prof8/sample.txt: 313768 busy worker samples, idle 0.0%
+ groups:
+   28.0%  GF(2) bound: exchange graph rebuilt after a solve (Meet::rebuild)
+   19.9%  GF(2) bound: weight split (split_bounds)
+   15.2%  strong branching (choose_branch_gf2: exact bounds without each member)
+   14.3%  GF(2) bound: augmenting paths (Meet::solve, shortest_path, apply_path)
+   12.9%  forced members (shortest cycles of the exchange graph)
+    4.6%  GF(2) bound: the rest (evaluate, levels pushed and popped, certify_child)
+    3.4%  frame checks (promotion, winnable, peel)
+    0.7%  nogood table and conflicts (lookups, rule-outs, learning)
+    0.6%  the step's own work (loop, offers, bookkeeping)
+    0.4%  symmetry rule
+    0.0%  work units and the deque (engine, poll, rebuild of a unit)
+    0.0%  allocation (malloc, free, Vec growth)
+ kernels (leaf):
+   27.6%  Meet::add (the exchange graph's edges)
+   26.8%  Meet::shortest_cycle (cycles: forced members, bounds without a member)
+   17.4%  Meet::split_bounds (the weight split's bounds)
+    9.0%  Meet other (rebuild, resolve, xor, BlockSpan, is_zero, ...)
+    8.6%  Meet::shortest_path (augmenting path)
+    3.3%  peel (winnable, Stack::push)
+    2.4%  Meet::build_columns
+    1.5%  bits (Bits, iterators)
+    1.2%  Meet::smaller_loss
+    0.7%  gf2 other (evaluate, contract, certify, Gf2Graph)
+    0.7%  memcpy, memset
+    0.4%  symmetry
+    0.1%  conflicts and nogoods
+    0.1%  the step (searcher.rs)
+    0.1%  promote and narrow
+    0.0%  other: taxman:model::provider::FactorProvider::factors
+    0.0%  other: _RNvMs9_NtNtCs87L1bv5kwMu_5alloc11collections11binary_heapINtB5_10BinaryHeapINtNtCs33v9mEcCS3W_4core3cmp7ReverseTxmEEE4pushCs7ZlPYTRE1y1_6taxman
+    0.0%  other: _RINvNtNtNtCs33v9mEcCS3W_4core5slice4sort8unstable7ipnsortmNCINvMB6_Sm20sort_unstable_by_keyTINtNtB8_3cmp7ReversexEmENCNvMs_NtNtCs7ZlPYTRE1y1_6taxman3gf24meetINtB1X_4MeetKj1_E14shortest_cycle0E0EB21_
+    0.0%  other: taxman:model::provider::FactorProvider::composites
+    0.0%  other: taxman:model::frame::FrameSet::narrow_candidates
+    0.0%  other: taxman:model::frame::FrameSet::max_promotions_with::max_promotions_among
+    0.0%  other: taxman:model::frame::FrameSet::frames
+    0.0%  other: _RINvNtNtNtNtCs33v9mEcCS3W_4core5slice4sort6shared9smallsort25insertion_sort_shift_leftTxmENvYB1m_NtNtBa_3cmp10PartialOrd2ltECs7ZlPYTRE1y1_6taxman
+    0.0%  engine
+    0.0%  other: taxman:model::FrameGraph::own
+    0.0%  other: _platform_memcmp
+    0.0%  other: _RINvNtNtNtNtCs33v9mEcCS3W_4core5slice4sort8unstable9quicksort9quicksortmNCINvMB8_Sm20sort_unstable_by_keyTINtNtBa_3cmp7ReversexEmENCNvMs_NtNtCs7ZlPYTRE1y1_6taxman3gf24meetINtB2b_4MeetKj1_E14shortest_cycle0E0EB2f_
+    0.0%  other: taxman:model::FrameGraph::home
+    0.0%  other: DYLD-STUB$$bzero
+    0.0%  other: taxman:model::FrameGraph::narrow
+    0.0%  other: __bzero
+    0.0%  other: realloc
+    0.0%  other: xzm_malloc_zone_size
+    0.0%  other: taxman:model::FrameGraph::has_one_sided
+ group x kernel:
+   26.2%  GF(2) bound: exchange graph rebuilt after a solve (Meet::rebuild) | Meet::add (the exchange graph's edges)
+   17.4%  GF(2) bound: weight split (split_bounds) | Meet::split_bounds (the weight split's bounds)
+   12.6%  forced members (shortest cycles of the exchange graph) | Meet::shortest_cycle (cycles: forced members, bounds without a member)
+   12.2%  strong branching (choose_branch_gf2: exact bounds without each member) | Meet::shortest_cycle (cycles: forced members, bounds without a member)
+    7.9%  GF(2) bound: augmenting paths (Meet::solve, shortest_path, apply_path) | Meet::shortest_path (augmenting path)
+    5.0%  GF(2) bound: augmenting paths (Meet::solve, shortest_path, apply_path) | Meet other (rebuild, resolve, xor, BlockSpan, is_zero, ...)
+    3.1%  frame checks (promotion, winnable, peel) | peel (winnable, Stack::push)
+    2.4%  GF(2) bound: weight split (split_bounds) | Meet::build_columns
+    2.0%  GF(2) bound: the rest (evaluate, levels pushed and popped, certify_child) | Meet::shortest_cycle (cycles: forced members, bounds without a member)
+    1.8%  GF(2) bound: exchange graph rebuilt after a solve (Meet::rebuild) | Meet other (rebuild, resolve, xor, BlockSpan, is_zero, ...)
+    1.3%  GF(2) bound: augmenting paths (Meet::solve, shortest_path, apply_path) | Meet::add (the exchange graph's edges)
+    1.1%  strong branching (choose_branch_gf2: exact bounds without each member) | Meet other (rebuild, resolve, xor, BlockSpan, is_zero, ...)
+    0.7%  strong branching (choose_branch_gf2: exact bounds without each member) | Meet::smaller_loss
+    0.7%  strong branching (choose_branch_gf2: exact bounds without each member) | Meet::shortest_path (augmenting path)
+    0.7%  GF(2) bound: the rest (evaluate, levels pushed and popped, certify_child) | gf2 other (evaluate, contract, certify, Gf2Graph)
+    0.6%  GF(2) bound: the rest (evaluate, levels pushed and popped, certify_child) | Meet other (rebuild, resolve, xor, BlockSpan, is_zero, ...)
+    0.5%  GF(2) bound: the rest (evaluate, levels pushed and popped, certify_child) | Meet::smaller_loss
+    0.5%  GF(2) bound: the rest (evaluate, levels pushed and popped, certify_child) | bits (Bits, iterators)
+    0.4%  the step's own work (loop, offers, bookkeeping) | bits (Bits, iterators)
+    0.4%  symmetry rule | symmetry
+    0.3%  nogood table and conflicts (lookups, rule-outs, learning) | bits (Bits, iterators)
+    0.3%  forced members (shortest cycles of the exchange graph) | Meet other (rebuild, resolve, xor, BlockSpan, is_zero, ...)
+    0.3%  GF(2) bound: the rest (evaluate, levels pushed and popped, certify_child) | memcpy, memset
+    0.2%  nogood table and conflicts (lookups, rule-outs, learning) | peel (winnable, Stack::push)
+    0.2%  frame checks (promotion, winnable, peel) | bits (Bits, iterators)
+    0.1%  strong branching (choose_branch_gf2: exact bounds without each member) | Meet::add (the exchange graph's edges)
+    0.1%  the step's own work (loop, offers, bookkeeping) | memcpy, memset
+    0.1%  nogood table and conflicts (lookups, rule-outs, learning) | conflicts and nogoods
+    0.1%  strong branching (choose_branch_gf2: exact bounds without each member) | memcpy, memset
+    0.1%  frame checks (promotion, winnable, peel) | memcpy, memset
+ inclusive:
+  100.0%  taxman:search::searcher::TaxSearcher::engine::Searcher::TaxUnit
+  100.0%  _RNSNvYNCINvNtNtCs1IrzuoRvWaH_3std6thread9lifecycle15spawn_uncheckedNCNCNCINvNtCs7ZlPYTRE1y1_6taxman6engine3runINtNtNtB1e_6search8searcher7TaxUnitKj38_EINtB1N_11TaxSearcherKB2k_ENCINvB1P_17search_forgettingKB2k_Es2_0Es0_000uEs_0INtNtNtCs33v9mEcCS3W_4core3ops8function6FnOnceuE9call_once6vtableB1e_
+  100.0%  _pthread_start
+  100.0%  _RNvNvMs0_NtNtNtCs1IrzuoRvWaH_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+  100.0%  thread_start
+  100.0%  taxman:engine::run::search::searcher::TaxUnit::TaxSearcher
+  100.0%  taxman:engine::Shared::search::searcher::TaxUnit::worker
+  100.0%  taxman:search::searcher::TaxSearcher::step
+  100.0%  taxman:search::searcher::Stepper::step
+   76.2%  taxman:search::searcher::Stepper::check
+   76.2%  taxman:search::searcher::Stepper::check_gf2
+   75.5%  taxman:gf2::Gf2Bound::evaluate
+   75.5%  taxman:gf2::Levels::evaluate
+   51.9%  taxman:search::searcher::Stepper::check_child
+   51.4%  taxman:gf2::split
+   31.4%  taxman:gf2::resolve
+   31.1%  taxman:gf2::meet::Meet::solve::resolve
+   28.8%  taxman:search::searcher::Stepper::check_node
+   28.0%  taxman:gf2::meet::Meet::rebuild
+   27.7%  taxman:gf2::meet::Meet::add
+   27.4%  taxman:gf2::meet::Meet::shortest_cycle
+   19.9%  taxman:gf2::meet::Meet::split_bounds::split
+   15.9%  taxman:gf2::meet::each_bit::Meet::split_bounds::split
+   15.2%  taxman:search::searcher::Stepper::choose_branch
+   15.2%  taxman:search::searcher::Stepper::choose_branch_gf2
+   15.1%  taxman:gf2::meet::Meet::without
+   13.8%  taxman:gf2::Gf2Bound::certified_excluding
+   13.8%  taxman:gf2::Levels::certified_excluding
+   12.9%  taxman:gf2::Levels::force_by_cycles
+   12.9%  taxman:gf2::meet::Meet::has_cycle_within
+ self (innermost function of the leaf):
+   27.6%  taxman:gf2::meet::Meet::add
+   24.1%  taxman:gf2::meet::Meet::shortest_cycle
+   15.9%  taxman:gf2::meet::each_bit::Meet::split_bounds::split
+    5.8%  taxman:gf2::meet::Meet::shortest_path
+    4.2%  taxman:gf2::meet::is_zero
+    2.8%  taxman:gf2::meet::each_bit::Meet::shortest_path
+    2.7%  taxman:gf2::meet::each_bit::Meet::shortest_cycle
+    2.1%  taxman:model::peel::Stack::push
+    2.1%  taxman:gf2::meet::each_bit::Meet::build_columns
+    1.8%  taxman:gf2::meet::Meet::rebuild
+    1.5%  taxman:gf2::meet::Meet::solve::resolve
+    1.4%  taxman:gf2::meet::Meet::split_bounds::split
+    1.2%  taxman:gf2::meet::Meet::smaller_loss
+    0.9%  taxman:model::peel::peel
+    0.7%  taxman:bits::Iter::v9mEcCS3W_4core4iter6traits8itera::Iterator::next
+    0.7%  _platform_memmove
+    0.4%  taxman:gf2::meet::xor
+    0.4%  taxman:gf2::meet::Meet::build_columns
+    0.3%  taxman:gf2::contract
+    0.3%  taxman:gf2::Gf2Graph::element
+    0.3%  taxman:gf2::meet::BlockSpan::reduce
+    0.2%  taxman:bits::Bits::intersects
+    0.2%  taxman:search::symmetry::Symmetries::exclude
+    0.2%  taxman:gf2::meet::lowest
+    0.2%  taxman:gf2::meet::BlockSpan::insert
+    0.1%  taxman:gf2::meet::Meet::flipped_independent
+    0.1%  taxman:model::peel::Scratch::stuck
+    0.1%  taxman:gf2::meet::Meet::exchange
+    0.1%  taxman:bits::word_sum
+    0.1%  taxman:gf2::meet::bit
