@@ -104,3 +104,25 @@ version 5 as before when they are.  Each value other than the default finds the 
 931..940 on one thread (`tests/solver.rs`).
 
 *Commits*: fd93371 (the probe's window alone), eed1e75, dbd52fd, fd4a917, a0ac3d0, 1d27eff, f6ad43f (the tactics), and this entry.
+
+## Later (2026-10): the stamp's wrap and the committed chain
+
+The counter that fd4a917 keeps from wrapping, `Meet.generation` (32 bits), belongs to one engine worker for one game:
+each worker makes its searcher once, keeps it across the units it runs in that game, and drops it when the game ends
+or the window retires it; a resume is a new process.  Before a wrap every comparison of stamps is exact.  After one,
+the old code could lose propagation in the augmenting paths (a heaviest set's value below the truth), leave invalid
+split potentials, find no cycle through a member that has one (a member wrongly forced), or overestimate the loss of
+the smaller sets; each prunes completions, so a search could end exhausted below the optimum, and only a negative
+cycle is caught (the process aborts).  The tests of a78dc07 show it: of 2,800 workspaces started just below the wrap
+with the old counter, 6 gave a heaviest value below the truth, 51 a member wrongly forced, 136 a wrong loss, 1 the
+abort; with the fix, none.
+
+How near the committed games came: a step at n = 3441 takes 46.7 stamps on average (median 30, 99th percentile 208;
+the old code, 50,000 steps of the window), so a wrap needs about 92 million steps of one worker in one game.  On the
+64 workers of the cloud run, 3440 (3.72 billion nodes in 18,184 s) took about 58 million steps a worker, at most 64
+million: 63-70% of the wrap at the mean rate, a margin under two that is measured, not proven.  3425 took at most 44
+million (under half), 3424 at most 25 million, every other exhausted search fewer; the repeats and primes, the
+ceilings given the games before them, the one-thread gates (a wrap needs about 7 hours of one game on one thread at
+these sizes) and the prover (which shares no code) are not exposed.  So 3440 is the one committed game the wrap cannot
+be ruled out for; it is to be re-solved with the fixed build before 3441 is resumed on its ceiling.
+
