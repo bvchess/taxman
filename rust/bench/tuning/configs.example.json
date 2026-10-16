@@ -1,0 +1,6 @@
+{
+  "lagrange_on": ["lagrange=on"],
+  "symmetry_off": ["symmetry=off"],
+  "forget_nogoods_off": ["forget_nogoods=off"],
+  "lagrange_on_forget_off": ["lagrange=on", "forget_nogoods=off"]
+}
