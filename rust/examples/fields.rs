@@ -2180,6 +2180,127 @@ mod tests {
         stats.checks
     }
 
+    /// Multipliers far beyond every weight, as an R2 master whose basis broke down proposed them (see
+    /// `dw::evaluate_grid`), at the roots of 6 boards of 300-1300 with three signings of each of frames 1-3.  In each
+    /// of four rounds a random third of the elements get, in every extra matroid that has them, one of the round's
+    /// values (`i64::MAX`, what the grid makes of `λ` from about `1.4·10^14`; `2^62` and `2^61 + 12345`, which two or
+    /// three at once take beyond `i64`; `2^40 + 1` and `2^35`, which do not; all of them), the others a random
+    /// multiplier below their weight.  Each evaluation is `L` computed in `i128` (the reference algorithm's
+    /// intersection at the positive reweighted weights, plus the greedy sets' multipliers), or `i64::MAX` if that is
+    /// more, and is at least `P*`; every intersection agrees with the reference algorithm's; some values of `L` are
+    /// `i64::MAX` and some are not.  Then the multipliers `∞`, `10^300` and `2.3·10^56` evaluate as `i64::MAX` on the
+    /// grid.
+    #[test]
+    fn multipliers_beyond_the_weights() {
+        let known = Known::load(&[], None).expect("the built-in optimum table");
+        let (mut evaluations, mut saturated) = (0, 0);
+        for n in spread(300, 1300, 6) {
+            let (e, s) = taxman::with_width!(n, W => beyond_the_weights::<W>(n, &known));
+            (evaluations, saturated) = (evaluations + e, saturated + s);
+        }
+        eprintln!("{evaluations} evaluations at multipliers beyond the weights, {saturated} of L = i64::MAX");
+        assert_eq!(evaluations, 6 * 6);
+        assert!(saturated > 0 && saturated < evaluations, "{saturated} of {evaluations} saturated");
+    }
+
+    /// One board of [`multipliers_beyond_the_weights`]: the evaluations made, and those of `L = i64::MAX`.
+    fn beyond_the_weights<const W: usize>(n: u32, known: &Known) -> (u64, u64) {
+        let (board, p) = setup::<W>(n).expect("a board with candidates");
+        let opt = known.opt(n, board.in_the_bag).expect("a built-in optimum") as i64;
+        let fm = frame_matroids(&p.model, &p.root, &p.candidates);
+        let ctx = Ctx::new(n, &p.model, &p.root, &fm, p.max_total as usize, opt, false);
+        let random = |h: usize, i: usize| Signing::random(h, seed(n, h, i, SALT_RANDOM));
+        let frames = 1..4.min(p.root.len());
+        let fam = Family::new(&ctx, frames.flat_map(|h| [Signing::ones(h), random(h, 0), random(h, 1)]).collect());
+        let mut stats = Stats::default();
+        let mut rng = Rng(0x2545_F491_4F6C_DD1D ^ u64::from(n));
+        let rounds: [&[i64]; 4] = [
+            &[i64::MAX],
+            &[1 << 62, (1 << 61) + 12345],
+            &[(1 << 40) + 1, 1 << 35],
+            &[i64::MAX, 1 << 62, (1 << 61) + 12345, (1 << 40) + 1, 1 << 35],
+        ];
+        let mut saturated = 0;
+        let weight = |x: u32| i64::from(x) * dw::SCALE;
+        let mut far = vec![false; ctx.len()];
+        for beyond in rounds {
+            far.iter_mut().for_each(|f| *f = rng.below(3) == 0);
+            let lhat: Vec<Vec<i64>> = fam
+                .extras
+                .iter()
+                .map(|ex| {
+                    let pairs = ex.elem.iter().zip(&ex.m.elems);
+                    pairs
+                        .map(|(&e, &x)| match far[e] {
+                            true => beyond[rng.below(beyond.len() as u64) as usize],
+                            false => rng.below(weight(x) as u64) as i64,
+                        })
+                        .collect()
+                })
+                .collect();
+            let value = dw::evaluate_grid(&ctx, &fam, &lhat, &mut stats, 1).value;
+            // L in i128.
+            let mut c: Vec<i128> = fm.elems.iter().map(|&x| i128::from(weight(x))).collect();
+            for (ex, l) in fam.extras.iter().zip(&lhat) {
+                for (&e, &v) in ex.elem.iter().zip(l) {
+                    c[e] -= i128::from(v);
+                }
+            }
+            let positive: Vec<i64> =
+                (0..ctx.len()).map(|e| if fam.banned[e] || c[e] <= 0 { 0 } else { c[e] as i64 }).collect();
+            let mi = i128::from(crate::meet::intersect(&fm.a, &fm.b, &positive, ctx.cap, false).value);
+            let greedy: i128 = fam
+                .extras
+                .iter()
+                .zip(&lhat)
+                .map(|(ex, l)| ex.m.greedy(l).1.iter().map(|&i| i128::from(l[i])).sum::<i128>())
+                .sum();
+            let exact = i64::try_from(mi + greedy).unwrap_or(i64::MAX);
+            assert_eq!(value, exact, "n={n}: L is not exact");
+            assert!(value.div_euclid(dw::SCALE) >= opt, "n={n}: L = {value} below P* = {opt}");
+            saturated += u64::from(value == i64::MAX);
+        }
+        // The grid takes multipliers beyond i64 as i64::MAX.
+        let lam: Vec<Vec<f64>> = fam
+            .extras
+            .iter()
+            .map(|ex| {
+                ex.elem.iter().map(|&e| if far[e] { [f64::INFINITY, 1e300, 2.3e56][e % 3] } else { 0.0 }).collect()
+            })
+            .collect();
+        let lhat: Vec<Vec<i64>> =
+            lam.iter().map(|l| l.iter().map(|&v| if v > 0.0 { i64::MAX } else { 0 }).collect()).collect();
+        let on_grid = dw::evaluate_grid(&ctx, &fam, &lhat, &mut stats, 1).value;
+        assert_eq!(evaluate(&ctx, &fam, &lam, &mut stats, 1).value, on_grid, "n={n}: the grid beyond i64");
+        assert_eq!(stats.checks, stats.pricings_mi, "n={n}: every intersection checked against the reference");
+        (stats.pricings_mi, saturated + u64::from(on_grid == i64::MAX))
+    }
+
+    /// The intersection where the E3 pilot's tree of r2 at 1472 stopped (`testdata/n1472_r2_intersection.txt`, in the
+    /// format of `dw::Instance::from_text`): what `dw::intersection` hands the crate there, 211 elements.  The crate's
+    /// heaviest set weighs what the reference algorithm's does, and is common independent within the size limit.
+    /// Before the evaluation's sums saturated, 23 more elements came with these, their reweighted weights wrapped
+    /// around (16 near `2^63`, 7 just above their `x·S`), and the crate's distances overflowed.  The weights tie in
+    /// places, which the crate's contract allows (not decreasing).
+    #[test]
+    fn the_intersection_where_the_pilot_stopped() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("testdata/n1472_r2_intersection.txt");
+        let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        let instance = dw::Instance::from_text(&text).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        let w = &instance.weight;
+        assert!(w[0] > 0 && w.windows(2).all(|p| p[0] <= p[1]), "positive weights, not decreasing");
+        assert!(w.windows(2).any(|p| p[0] == p[1]), "weights that tie");
+        let (value, chosen) = instance.solve::<1>();
+        let [a, b] = instance.matroids();
+        assert_eq!(
+            value,
+            crate::meet::intersect(&a, &b, w, instance.cap, false).value,
+            "the crate against the reference"
+        );
+        assert!(chosen.len() <= instance.cap && independent_gf2(&a, &chosen) && independent_gf2(&b, &chosen));
+        assert_eq!(chosen.iter().map(|&e| w[e]).sum::<i64>(), value);
+    }
+
     /// The bound on small boards with the main arm: valid, converged, the optimal promotions independent in every
     /// final matroid (the asserts of `roots`).
     #[test]

@@ -462,19 +462,19 @@ impl Matroid3 {
 
     /// max { μ(I) : I independent }, μ indexed like `elems`: the greedy algorithm over the elements of positive
     /// weight, by decreasing weight (ties: lower index first), keeping each element independent of those kept.
-    /// Returns the value and the kept indices, ascending.
+    /// Returns the value (`i64::MAX` if it is more) and the kept indices, ascending.
     pub fn greedy(&self, mu: &[i64]) -> (i64, Vec<usize>) {
         assert_eq!(mu.len(), self.vecs.len(), "a weight for every element");
         let mut order: Vec<usize> = (0..mu.len()).filter(|&i| mu[i] > 0).collect();
         order.sort_by_key(|&i| (Reverse(mu[i]), i));
         let mut basis = Basis3::new(self.rank);
-        let (mut value, mut kept) = (0, Vec::new());
+        let (mut value, mut kept) = (0i64, Vec::new());
         for i in order {
             if basis.rank() == self.rank {
                 break;
             }
             if basis.try_insert(self.vecs[i].clone()) {
-                value += mu[i];
+                value = value.saturating_add(mu[i]);
                 kept.push(i);
             }
         }
@@ -698,6 +698,7 @@ mod tests {
         assert!(!m.independent(&[3]) && !m.independent(&[5, 3]), "a loop");
         assert!(!m.independent(&[5, 5]), "a repeated element");
         assert_eq!(m.greedy(&[1, 5, 3]), (8, vec![1, 2]));
+        assert_eq!(m.greedy(&[i64::MAX, 1, i64::MAX - 1]), (i64::MAX, vec![0, 2]), "the value saturates");
     }
 
     /// The integer determinant by the permutation expansion.

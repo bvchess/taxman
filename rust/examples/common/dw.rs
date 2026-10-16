@@ -20,7 +20,8 @@
 //! intersection (it is `L` at `λ_{k,x} = w_x`, so Theorem 15 covers it).  The bound reported is `⌊L⌋` evaluated exactly
 //! in integers: weights `x·S` and multipliers rounded to the grid `1/S` (`S = 2^16`, [`SCALE`]), the intersection by
 //! the crate's `taxman::gf2::meet::Meet` (checked against `common/meet.rs`'s `intersect` every `check_every`-th call)
-//! and the greedies over GF(3), all in `i64`.  Its soundness rests on Theorem 15 and the two exact oracles, never on
+//! and the greedies over GF(3), all in `i64` (sums that would leave it saturate, which keeps the bound valid whatever
+//! multipliers are proposed: [`evaluate_grid`]).  Its soundness rests on Theorem 15 and the two exact oracles, never on
 //! the floating-point LP below, which only proposes multipliers.
 //!
 //! # The multipliers
@@ -421,7 +422,8 @@ impl Stats {
     }
 }
 
-/// The multipliers on the grid: `max(0, round(λ·S))`.
+/// The multipliers on the grid: `max(0, round(λ·S))`, a `NaN` taken as 0 and a value of `2^63` or more (`λ` from
+/// about `1.4·10^14`, or infinite) as `i64::MAX`, which is still a multiplier, being at least 0.
 fn grid(lam: &[Vec<f64>]) -> Vec<Vec<i64>> {
     lam.iter().map(|l| l.iter().map(|&v| (v * SCALE as f64).round().max(0.0) as i64).collect()).collect()
 }
@@ -440,6 +442,16 @@ pub fn evaluate<const W: usize>(
 
 /// `L` at integer multipliers `lhat` (scaled by [`SCALE`], at least 0).  The intersection is checked against the
 /// reference algorithm on every `check`-th call (0: never).
+///
+/// The multipliers proposed can lie far beyond every weight (an R2 master whose basis broke down proposed some above
+/// `10^50`, which [`grid`] takes as `i64::MAX`), so the sums saturate instead of wrapping around: each is exact
+/// unless its true value lies beyond `i64`.  A reweighted weight `x·S − Σ_k λ̂_{k,x}` is then `i64::MIN`, not
+/// positive either, so the intersection gets exactly the elements of positive reweighted weight, with their weights.
+/// Those are at most `x·S < 2^29` (`n < 2^13`, the solver's largest board), as the crate needs: it packs a path's
+/// length, at most the sum of the weights (below `2^42`), times `2^16` with the path's number of arcs into one
+/// `i64`.  A greedy's value and `L` are then `i64::MAX`, still a bound, since every promotion set weighs less than
+/// `n²·S < 2^42`.  Wrapping around instead gave an element with two or more such multipliers a positive weight (near
+/// `2^63`, or a wrong one just above `x·S`), on which the crate's distances overflowed, and could make `L` wrong.
 pub fn evaluate_grid<const W: usize>(
     ctx: &Ctx<'_, W>,
     fam: &Family,
@@ -451,7 +463,7 @@ pub fn evaluate_grid<const W: usize>(
     for (ex, l) in fam.extras.iter().zip(lhat) {
         for (&e, &v) in ex.elem.iter().zip(l) {
             assert!(v >= 0, "multipliers are at least 0");
-            c[e] -= v;
+            c[e] = c[e].saturating_sub(v);
         }
     }
     let mut order: Vec<usize> = (0..ctx.len()).filter(|&e| !fam.banned[e] && c[e] > 0).collect();
@@ -476,7 +488,7 @@ pub fn evaluate_grid<const W: usize>(
     let t = Instant::now();
     for (ex, l) in fam.extras.iter().zip(lhat) {
         let (g, kept) = ex.m.greedy(l);
-        value += g;
+        value = value.saturating_add(g);
         sets.push(kept.into_iter().map(|i| ex.elem[i]).collect::<Vec<_>>());
         stats.pricings_greedy += 1;
     }
@@ -494,22 +506,103 @@ fn intersection<const W: usize, const R: usize>(ctx: &Ctx<'_, W>, order: &[usize
         return (0, Vec::new());
     }
     let fm = ctx.fm;
-    let vector = |v: &[u64], e: usize| -> [u64; R] {
-        let mut out = [0u64; R];
-        out.copy_from_slice(&v[e * ctx.words..e * ctx.words + R]);
-        out
+    let vectors = |v: &[u64]| order.iter().flat_map(|&e| v[e * ctx.words..e * ctx.words + R].iter().copied()).collect();
+    let instance = Instance {
+        words: R,
+        cap: ctx.cap,
+        block_words: [fm.a.words.clone(), fm.b.words.clone()],
+        block: [
+            order.iter().map(|&e| fm.a.block[e] as u8).collect(),
+            order.iter().map(|&e| fm.b.block[e] as u8).collect(),
+        ],
+        vector: [vectors(&ctx.va), vectors(&ctx.vb)],
+        weight: order.iter().map(|&e| c[e]).collect(),
     };
-    let block_a: Vec<u8> = order.iter().map(|&e| fm.a.block[e] as u8).collect();
-    let block_b: Vec<u8> = order.iter().map(|&e| fm.b.block[e] as u8).collect();
-    let vec_a: Vec<[u64; R]> = order.iter().map(|&e| vector(&ctx.va, e)).collect();
-    let vec_b: Vec<[u64; R]> = order.iter().map(|&e| vector(&ctx.vb, e)).collect();
-    let weight: Vec<i64> = order.iter().map(|&e| c[e]).collect();
-    let p = Problem { block: [&block_a, &block_b], vector: [&vec_a, &vec_b], weight: &weight };
-    let mut meet = Meet::<R>::new(order.len(), [fm.a.words.len(), fm.b.words.len()]);
-    let live: Vec<u32> = (0..order.len() as u32).collect();
-    meet.solve(&p, &live, &[], ctx.cap, i64::MAX, |_| {});
-    let set = (0..order.len()).filter(|&i| meet.contains(i as u32)).map(|i| order[i]).collect();
-    (meet.value, set)
+    let (value, chosen) = instance.solve::<R>();
+    (value, chosen.into_iter().map(|i| order[i]).collect())
+}
+
+/// One intersection as the crate's solve takes it (see [`intersection`]): the elements renumbered by increasing
+/// weight, each one's block and vector (`words` words) in `A` and `B` and its weight, the size limit, and each
+/// matroid's words per block (one entry per block).
+#[derive(Debug)]
+pub struct Instance {
+    pub words: usize,
+    pub cap: usize,
+    pub block_words: [Vec<usize>; 2],
+    pub block: [Vec<u8>; 2],
+    pub vector: [Vec<u64>; 2],
+    pub weight: Vec<i64>,
+}
+
+impl Instance {
+    /// The heaviest common independent set of at most `cap` elements, by the crate's intersection: its weight and its
+    /// elements, ascending.  `R` must be `words`.
+    pub fn solve<const R: usize>(&self) -> (i64, Vec<usize>) {
+        assert_eq!(self.words, R, "an instance of {} words solved with {R}", self.words);
+        let n = self.weight.len();
+        let vector = |m: usize| self.vector[m].as_chunks::<R>().0;
+        let p =
+            Problem { block: [&self.block[0], &self.block[1]], vector: [vector(0), vector(1)], weight: &self.weight };
+        let mut meet = Meet::<R>::new(n, [self.block_words[0].len(), self.block_words[1].len()]);
+        let live: Vec<u32> = (0..n as u32).collect();
+        meet.solve(&p, &live, &[], self.cap, i64::MAX, |_| {});
+        (meet.value, (0..n).filter(|&i| meet.contains(i as u32)).collect())
+    }
+
+    /// The two matroids as the reference algorithm takes them (`common/meet.rs`), each vector cut to its block's
+    /// words.
+    #[cfg(test)]
+    pub fn matroids(&self) -> [crate::meet::BlockMatroid; 2] {
+        [0, 1].map(|m| crate::meet::BlockMatroid {
+            block: self.block[m].iter().map(|&b| usize::from(b)).collect(),
+            vecs: (0..self.weight.len())
+                .map(|e| {
+                    let words = self.block_words[m][usize::from(self.block[m][e])];
+                    self.vector[m][e * self.words..e * self.words + words].to_vec()
+                })
+                .collect(),
+            words: self.block_words[m].clone(),
+        })
+    }
+
+    /// The instance of a text: a line `cap words`; a line per matroid, `A` then `B`, with each block's words; then a
+    /// line per element, ascending: its block in `A` and in `B`, its weight, and the `words` words of its vector in
+    /// `A` and then in `B`, in hexadecimal.
+    #[cfg(test)]
+    pub fn from_text(text: &str) -> Result<Instance, String> {
+        let mut lines = text.lines();
+        let mut numbers = |what: &str| -> Result<Vec<usize>, String> {
+            let line = lines.next().ok_or(format!("no {what}"))?;
+            line.split_whitespace().map(|t| t.parse().map_err(|e| format!("{what} {t:?}: {e}"))).collect()
+        };
+        let head = numbers("cap and words")?;
+        let [cap, words] = head[..] else { return Err(format!("cap and words: {head:?}")) };
+        let block_words = [numbers("words of A's blocks")?, numbers("words of B's blocks")?];
+        let mut instance = Instance {
+            words,
+            cap,
+            block_words,
+            block: [Vec::new(), Vec::new()],
+            vector: [Vec::new(), Vec::new()],
+            weight: Vec::new(),
+        };
+        for (i, line) in lines.filter(|l| !l.trim().is_empty()).enumerate() {
+            let t: Vec<&str> = line.split_whitespace().collect();
+            if t.len() != 3 + 2 * words {
+                return Err(format!("element {i}: {} fields", t.len()));
+            }
+            let bad = |e: String| format!("element {i}: {e}");
+            for m in 0..2 {
+                instance.block[m].push(t[m].parse().map_err(|e| bad(format!("{e}")))?);
+                for w in &t[3 + m * words..3 + (m + 1) * words] {
+                    instance.vector[m].push(u64::from_str_radix(w, 16).map_err(|e| bad(format!("{e}")))?);
+                }
+            }
+            instance.weight.push(t[2].parse().map_err(|e| bad(format!("{e}")))?);
+        }
+        Ok(instance)
+    }
 }
 
 // ---------------------------------------------------------------------------------------------------------
