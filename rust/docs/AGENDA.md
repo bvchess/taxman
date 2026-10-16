@@ -276,6 +276,12 @@ the surviving k.  *Kill:* a drop that cuts under 10% of the open probe nodes.
 *Payoff.*  A constant factor if the drop is a fixed amount; more if wrong-size completions are what deep nodes are
 made of.  *Risk:* low; nodes may already have the right size.  *Proven first:* nothing beyond the partition.
 
+*Result* (the nodes of 936, 1215 and 2112,
+[A3's test](EXPERIMENTS.md#split-by-the-number-of-promotions-a3s-test-2026-10)): killed at the diagnostic.  The root's
+window of winning sizes is one or two (52; 69; 116-117) and all 812 nodes, every open one included, have a heaviest
+completion of the root's total size, the root's heaviest set being a largest common independent set, so no node lies
+outside the window and the exact-size bound equals the plain bound.
+
 ### A4. What the cost per unit of gap is made of (a diagnostic, then branching on cores)
 
 *Idea.*  The residuals of the cost model run in blocks (2250-2275 four times dearer per unit of gap than 2196-2248).

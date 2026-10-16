@@ -213,6 +213,7 @@ those of the page the row points to; a game is named by its board size, and time
 | The slope test: r2 (the fixed master) and r3 with `r3-top:0.25` and `r3-top:0.5` (R3 at 1 s at the nodes of GF(2) excess at least that share of the root's gap, R2 at the others) at 27 games of 987-1352 (gaps 126-323), the log of each tree's ratio to the plain one regressed on the root's gap (A1's U4, Phase 2) | [U4](#r3-and-the-slope-test-u4-of-a1-2026-10) | measured: killed (the criterion fixed in advance); A1 stays a root-level tool, E4 not built | the ratio falls with the gap instead of growing: β −2.98 ± 0.97 and −3.68 ± 1.20 × 10⁻³ decades per unit of gap (t −3.1), s_eff −0.37 and −0.45; r3's trees 14.5 and 7.7 times smaller than v0's (24 at gaps 120-149, 6.6 at 300-323), at 6.2 and 3.7 times its time; r2 4.2 times, β −2.28 (t −2.6) |
 | Patch mode with R3 (a game's fit carried from the previous game's, pruned, and offered the cores its search's nodes found: `fields fit --start --prune --offer`, `bnb --harvest`) on 1197-1212 and 1274-1284, and R3's cost at 3300 and 3400 with the projection to a gap of 1,400 (A1's U4, Phases 3 and 4) | [U4](#r3-and-the-slope-test-u4-of-a1-2026-10) | not run: built and tested; Phase 2's kill ended U4 | - |
 | Does the root's GF(2) heaviest set have the optimum's size? (`bench/gf2/roots.jsonl`'s `size` against `strict.jsonl`'s promotions, 1301-2175) | [agenda C4](AGENDA.md#4-conjectures) | measured | 758 of the 760 searched and repeated games; at 1320 and 1322 the heaviest set has 77 members and the optimum 78 (`max_total`) |
+| A3, split by the number of promotions, Step 1: the root's window of total sizes whose heaviest common independent set beats the optimum's promotion sum, and where the total size of each node's heaviest completion lies against it, at the 300, 300 and 212 nodes of the fixtures of 936, 1215 and 2112 (`examples/promotions.rs`) | [A3's test](#split-by-the-number-of-promotions-a3s-test-2026-10) | measured: killed (the criterion fixed in advance: under 10% of the open nodes outside the window); Step 2, the exact-size bound, not run | the window is one size at 936 and 1215 (52 and 69) and two at 2112 (116, 117), and every node's heaviest completion has the root's total size: 0 of 137, 133 and 212 open nodes (0 of all 812) lie outside; the root's heaviest set is a largest common independent set at all three |
 | Barring each member of U\* in the parity bound at the root, against opt(n) (a certificate that every optimal set holds it) | [agenda 7.3](AGENDA.md#73-barred-bounds-on-the-upper-part) | measured; open ([agenda A2](AGENDA.md#a2-certify-the-frame-model-then-prove-with-its-facts-a-change-of-slope-for-the-proven-wall)) | certifies 207 of 224 (600), 339 of 377 (1000), 472 of 490 (1300); the open ones within the root's gap, the largest prime among them |
 
 ### Nogoods and conflicts
@@ -453,6 +454,7 @@ single-sacrifice route) have their row above.
 | [The A1 bound in a branch and bound](#the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10) | E3's pilot: with multipliers carried from parent to child and refits of 20 pricings, how much smaller are the trees of 1215 and 1472, at what cost, and how far does a refit get against the node's own master? | no kill: r2's tree 5 times smaller at both gaps (a constant factor, not a slope), at 23 GF(2) nodes of time a node; within 20 pricings the refits make 0.41 of the cuts of the node's own master, which cuts 95-100% of the open nodes; Knuth's estimator too heavy-tailed for the large trees; an overflow in L's evaluation fixed | 9e3ecae to the entry (no solver change) |
 | [The claims of `unzip` in the extended problem](#the-claims-of-unzip-in-the-extended-problem-2026-10) | 32.2 of the fifth consultation: can Π⁺(O) keep the claims of `unzip` where Lemma M5⁺'s check allows, so that Π⁺(∅) is Π_n and more repeats rest on the game they repeat? | yes, proven and built: Π⁺(∅) with the claims is Π_n on every board to 8191, and the rule settles 101 of the 377 games of 600..1300 against 81; but past 1300 the frame of layer 3 holding most sources always holds an open one, so the rule as designed settles none of the 115 deferred repeats and saves nothing at 2112 and 2156; kept claim by claim, the claims would settle 60 of them (3427 among them) and take 5-9% off a certificate | 8c833a1, 8b0d0d4, 3841753, cd959d1, 6146627 and the commit of the entry |
 | [R3 and the slope test](#r3-and-the-slope-test-u4-of-a1-2026-10) | U4 of A1: does a refit of the reference's strength at the nodes high in the tree make the A1 trees grow more slowly with the root's gap? | no: R3 at 1 s makes 0.60-0.66 of the reference's cuts at the dear nodes, and its trees are 14.5 times smaller than the plain ones at 987-1352, but the ratio falls with the gap (t −3.1): killed in the search, A1 stays a root-level tool; patch mode and the cost at 3300-3400 not run | 9f750a3 to the entry (no solver change) |
+| [Split by the number of promotions](#split-by-the-number-of-promotions-a3s-test-2026-10) | A3's Step 1: does the total size of a node's heaviest completion ever lie outside the root's window of sizes that can still beat the optimum, the only nodes that bounding by the heaviest set of the size needed could close? | no: at 936, 1215 and 2112 the window is one or two sizes and all 812 nodes of the fixtures (every open one) have a heaviest completion of the root's total size; killed, Step 2 not run | f7661cb to the entry (no solver change) |
 
 ## The port and its first improvements
 
@@ -7342,3 +7344,58 @@ three v0 trees 0.01; nothing on EC2.
    other jobs.
 6. The exact checks in R3 are those of the root's certification (`check`), each run to its column limit as at the
    root; no cheaper variant was tried.
+
+## Split by the number of promotions: A3's test (2026-10)
+
+*Question.*  [Agenda A3](AGENDA.md#a3-split-by-the-number-of-promotions-a-sound-tightening-constant-factor-maybe-more):
+every promotion set has one size, so a node can be closed if, for every total size `k` that can still beat the
+optimum's promotion sum `P*`, the node's promoted weight plus the heaviest common independent set of the node's two
+GF(2) frame matroids of size `k` less the promotions is at most `P*` (sound by partition, no conjecture).  The weights
+`best(k)` of the heaviest set of each size are concave in `k`, and a size can win only if the *root's* `best(k)` exceeds
+`P*`: the *window*, here one to two consecutive sizes.  Inside the window the node's bound for its heaviest completion's
+size is the plain bound, so only a node whose heaviest completion has a total size *outside* the window can be closed.
+Step 1 (a diagnostic, the kill fixed in advance: under 10% of the open nodes outside the window at every game) counts
+them; Step 2 (the exact-size bound of those, and its cost) was to run only if Step 1 passed.
+
+*What was run* (research code, no solver change; f7661cb).  `examples/promotions.rs`: `best(k)` for every `k` from the
+intersection run on the weights plus a uniform amount above their sum (every augmentation then gains, so the run passes
+through the heaviest set of each size up to the largest common independent set; `best(k)` is its weight less the
+amount times `k`), checked against the enumeration of all common independent sets of the roots and of nodes on the
+boards of 20-60 (tests) and, at every fixture node, against the plain bound and its set's size.  The fixtures: the
+probe's 300 nodes each of 936 and 1215, and the 212 of 2112 (the units that its proof, one thread, handed the searcher,
+made with `perf make-nodes` into `bench/promotions/n2112.nodes`; 2170, the larger game proposed, takes 588 s on one
+thread, so 2112 was taken).  `P*` is
+`strict.jsonl`'s score less `in_the_bag`, equal to each fixture's incumbent.  A node is *open* when its plain bound
+(at most `max_add` candidates) exceeds `P*` less its promotions' sum.
+
+| game | `P*` | root gap | `max_total` | `best(k) − P*` just below the window, in it | window | root's heaviest set, largest common independent set | nodes, open | open below, inside, above |
+|---|---|---|---|---|---|---|---|---|
+| 936 | 20,507 | 132 | 52 | k = 51: −134; 52: +132 | 52 | 52, 52 | 300, 137 | 0, 137, 0 |
+| 1215 | 35,050 | 213 | 73 | 68: −48; 69: +213 | 69 | 69, 69 | 300, 133 | 0, 133, 0 |
+| 2112 | 103,056 | 517 | 126 | 115: −304; 116: +201, 117: +517 | 116-117 | 117, 117 | 212, 212 | 0, 212, 0 |
+
+*Result: killed at Step 1.*  No open node lies outside the window at any of the three games (0 of 482; the criterion was
+under 10% at every game), and neither does any node that is closed (0 of all 812 with candidates): every node's heaviest
+completion has, with its promotions, the root's total size, 52, 69 and 117 (at 2112 the window's upper size).  The
+window is narrow because the size below it falls short of `P*` (by 134, 48 and 304), and the nodes never leave it: the
+root's heaviest set is a *largest* common independent set at all three games, so no size above it exists (a node's
+promotions and any completion are a common independent set of the root's matroids), and every node's promotions and
+heaviest completion again total that largest size, so nothing lies below.  The exact-size bound of a node inside the
+window is its plain bound, so A3 closes nothing here.  This agrees with C4 (the root's heaviest set has the optimum's
+size) and says more: the sizes that A3 would split by are all one, because a heaviest set takes every size the two
+matroids allow.
+
+*Limits.*  The fixtures are the units a search hands out (the open ones hold up to 40, 44 and 78 promotions), not every
+node of a tree; nodes inside a unit's subtree, after more promotions, were not sampled.  A heaviest completion that ties
+in size with a larger set is counted by its smaller size, which cannot matter at a node whose total is already the root's
+largest.  Games whose root has a smaller heaviest set than the optimum's (1320 and 1322, C4) were not run.  Step 2, and
+so the cost of the per-size computation, was not run; nor a split finer than the total size (by the promotions out of
+each frame).
+
+*Validity.*  Tests (`cargo t --release --example promotions`): `best(k)` equals the enumeration's at the roots and at
+nodes of every board of 20-60 that has candidates (both algorithms, whatever the limit); and, with every promotable set
+enumerated and every incumbent from 0 to one above the optimum, no node closed by the exact-size bound has a completion
+that beats the incumbent (22,266 pairs; on these boards, whose games promote at most 3 numbers, the rule never closes
+a node that the plain bound leaves open, so the test checks that closing loses nothing, not that it gains).
+
+*Cost.*  Seconds on one thread for the runs (`perf make-nodes` 2 s, the three games 5 s); nothing on EC2.
