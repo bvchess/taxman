@@ -60,7 +60,10 @@ scales 58 times on 64 threads ([wall regime](EXPERIMENTS.md#the-wall-regime-2026
   cycles); dominance by exchange and transpositions (none to speak of).  Constant factors, all taken.
 * *Reuse along the chain*: the ceiling, the prime formula and same search are in; carrying nogoods, a chain that
   comes back down, ceilings from neighbouring problems and equivalent problems gave nothing more
-  ([going higher](EXPERIMENTS.md#going-higher-and-coming-back-down-2026-10)).
+  ([going higher](EXPERIMENTS.md#going-higher-and-coming-back-down-2026-10)), nor did reusing the previous game's tree,
+  carrying its nogoods on the GF(2) path or proving a run in one search
+  ([carrying](EXPERIMENTS.md#carrying-a-searchs-learning-to-the-next-game-2026-10)); what carries is the fields bound's
+  signings and multipliers, once that bound is in the search (A1).
 * *The node and the engine*: the inner-loop round (×4.4 cycles), set widths, PGO, round A.  Constant factors.
 
 The one change of slope in the project's history is the GF(2) bound itself (the plain branch and bound's log10 nodes
@@ -335,8 +338,10 @@ member read off the exchange graph would cut its strong branching.  *Experiment:
 * Boards past 4095: a width of 128, `MAX_FRAMES` 9, the GF(2) vectors to 5 words
   ([wall regime, 4](EXPERIMENTS.md#the-wall-regime-2026-10)).  Built: the boards go to 8191
   ([boards past 4095](EXPERIMENTS.md#boards-past-4095-2026-10)).
-* Proving runs of neighbours that share a gap in one search (19.8% of the proof nodes of 880-1300; the register's
-  open row): a constant, and the run structure of section 2 says where it would pay.
+* Proving runs of neighbours that share a gap in one search: measured and closed, not worth building.  The trees of
+  consecutive games share 0.15% of their steps (median of 14 pairs), and a run costs at least its dearest game, which
+  limits the saving to 18-29% of the nodes past 2175
+  ([carrying](EXPERIMENTS.md#carrying-a-searchs-learning-to-the-next-game-2026-10)).
 
 ## 4. Conjectures
 

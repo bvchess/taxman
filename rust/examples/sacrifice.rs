@@ -316,7 +316,12 @@ fn one_game<const W: usize>(n: u32, o: &RangeOptions, games: &Optimal) -> Result
         return Ok(None);
     }
 
-    let popts = PuncturedOptions { tactics: o.tactics.search, threads: o.threads, time_limit: o.time_limit };
+    let popts = PuncturedOptions {
+        tactics: o.tactics.search,
+        threads: o.threads,
+        time_limit: o.time_limit,
+        ..PuncturedOptions::default()
+    };
     let target = if o.target { Some(opt.ok_or(format!("n={n}: --target needs the optimum"))?) } else { None };
     let bound = sacrifice_bound(n, prev_moves, prev_score, target, &popts).map_err(|e| format!("n={n}: {e}"))?;
     let holes: Vec<Json> = bound

@@ -47,6 +47,13 @@
 //! ends.  With separation, after each bracket the cores that the master's columns run into (`cores::cores_of`) are
 //! merged into core-derived signings (first fit, at most `per_frame` a frame), and the master is rebuilt for the
 //! changed family from its columns (but those holding a new loop) and its inequalities (ranks taken again).
+//!
+//! In [`FitMode::Search`] the exact checks are not run: a family's generation ends when nothing prices out and no
+//! cheap inequality is violated, and the computation when the separation finds no new core.  The result is a fit
+//! ([`Fit`]: signings and multipliers) with a valid bound and no certified bracket.  [`Outcome::fit`] is the fit of
+//! the lowest `L` ever evaluated, which can be lower than the final family's lowest `L`: merging cores into a signing
+//! changes its matroid, which is not a restriction of the old one, so a later family's LP can be the higher.
+//! `common/fit.rs` writes a fit to disk.
 
 use crate::cores::{cores_of, merge, Core};
 use crate::frames::FrameMatroids;
@@ -87,6 +94,8 @@ const PACK_COLUMNS: usize = 300;
 const CUTS_PER_CHECK: usize = 5;
 /// The nonbasic columns the master keeps when it purges, which it does when it has twice as many.
 const KEEP: usize = 300;
+/// The most columns of the final master an outcome carries.
+pub const SAVED_COLUMNS: usize = 300;
 /// The independent sets an extra matroid's pool keeps.
 const POOL: usize = 400;
 /// The largest perturbation of a rank inequality's right-hand side in the master, and of a bound `y ≤ z` in the exact
@@ -178,9 +187,31 @@ impl<'a, const W: usize> Ctx<'a, W> {
     }
 }
 
+/// How far a fit goes in certifying its bracket.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FitMode {
+    /// The exact checks run once the separation finds no new core: the bracket `[lb, l_best]` is certified, and the
+    /// computation ends when it closes (the study's instrument).
+    Certified,
+    /// No exact checks: a family's generation ends when no column prices out at the master's duals and no cheap
+    /// inequality is violated, and the computation when the separation then finds no new core (or at a budget).  `lb`
+    /// is 0, so the root is not counted as converged; `bound` is the same valid bound.  What a search can afford.
+    Search,
+}
+
+impl FitMode {
+    pub fn name(self) -> &'static str {
+        match self {
+            FitMode::Certified => "certified",
+            FitMode::Search => "search",
+        }
+    }
+}
+
 /// The budgets and knobs of a bound computation.
 #[derive(Clone, Debug)]
 pub struct Settings {
+    pub mode: FitMode,
     pub seconds: f64,
     /// The most evaluations of `L` (GF(2) pricings).
     pub pricings: usize,
@@ -205,6 +236,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Settings {
+            mode: FitMode::Certified,
             seconds: 120.0,
             pricings: 3000,
             rounds: 40,
@@ -292,6 +324,52 @@ impl Family {
     /// Zero multipliers.
     fn zeros(&self) -> Vec<Vec<f64>> {
         self.extras.iter().map(|ex| vec![0.0; ex.elem.len()]).collect()
+    }
+
+    /// The multipliers `lambda` (per signing, by candidate number; zero where missing) as vectors indexed like each
+    /// matroid's elements; signings past the end of `lambda` get zeros.
+    pub fn multipliers_of(&self, lambda: &[HashMap<u32, f64>]) -> Vec<Vec<f64>> {
+        let none = HashMap::new();
+        self.extras
+            .iter()
+            .enumerate()
+            .map(|(k, ex)| {
+                let by_number = lambda.get(k).unwrap_or(&none);
+                ex.m.elems.iter().map(|x| by_number.get(x).copied().unwrap_or(0.0)).collect()
+            })
+            .collect()
+    }
+
+    /// The multipliers `lam` (indexed like each matroid's elements) by candidate number, the positive ones.
+    fn by_number(&self, lam: &[Vec<f64>]) -> Vec<HashMap<u32, f64>> {
+        self.extras
+            .iter()
+            .zip(lam)
+            .map(|(ex, l)| ex.m.elems.iter().copied().zip(l.iter().copied()).filter(|&(_, v)| v > 0.0).collect())
+            .collect()
+    }
+}
+
+/// A fit: signings and multipliers, which together give a valid bound at the state they were fitted at (and at its
+/// nodes: Theorems 14 and 15).
+#[derive(Clone, Debug, Default)]
+pub struct Fit {
+    pub signings: Vec<Signing>,
+    /// Per signing, the multipliers by candidate number (the positive ones).
+    pub lambda: Vec<HashMap<u32, f64>>,
+}
+
+impl Fit {
+    /// The family `fam` at the multipliers `lam` (indexed like each matroid's elements).
+    fn of(fam: &Family, lam: &[Vec<f64>]) -> Fit {
+        Fit { signings: fam.extras.iter().map(|ex| ex.signing.clone()).collect(), lambda: fam.by_number(lam) }
+    }
+
+    /// `⌊L⌋` of this fit at the state of `ctx`: the bound it gives.
+    pub fn bound<const W: usize>(&self, ctx: &Ctx<'_, W>, stats: &mut Stats) -> i64 {
+        let fam = Family::new(ctx, self.signings.clone());
+        let lam = fam.multipliers_of(&self.lambda);
+        evaluate(ctx, &fam, &lam, stats, 1).value.div_euclid(SCALE)
     }
 }
 
@@ -892,6 +970,8 @@ pub struct Found {
 pub enum Stop {
     /// The bracket closed (certified) and separation (if on) found nothing new.
     Converged,
+    /// A search-mode fit ended: nothing prices out, no cheap inequality is violated, separation found no new core.
+    Fitted,
     /// The bound reached the target (a node, cut).
     Target,
     Seconds,
@@ -923,12 +1003,34 @@ pub struct Outcome {
     pub cores_repeated: usize,
     pub rounds: usize,
     pub stop: Stop,
+    /// The lowest `L` ever evaluated, over every family: its signings and multipliers (`fit.bound` gives `bound`).
+    pub fit: Fit,
     /// The master's support at the end: (value, set as candidate numbers).
     pub support: Vec<(f64, Vec<u32>)>,
     pub columns: usize,
     pub cuts: usize,
+    /// The final master's columns (the support first, then the others, at most [`SAVED_COLUMNS`]) as candidate
+    /// numbers, and its rank inequalities as (index of the matroid in the final family, candidates, rank).
+    pub master_columns: Vec<Vec<u32>>,
+    pub master_cuts: Vec<(usize, Vec<u32>, usize)>,
     pub stats: Stats,
     pub seconds: f64,
+}
+
+/// The lowest `L` evaluated so far, scaled by [`SCALE`], and the fit that gave it.
+struct Best {
+    scaled: i64,
+    fit: Fit,
+}
+
+impl Best {
+    /// Keeps `fam` at the multipliers `lam` if the value `L = value` (scaled) of that evaluation is the lowest yet.
+    fn offer(&mut self, value: i64, fam: &Family, lam: &[Vec<f64>]) {
+        if value < self.scaled {
+            self.scaled = value;
+            self.fit = Fit::of(fam, lam);
+        }
+    }
 }
 
 /// The bound at a state with the extra matroids of `signings` (and, with `separate`, the core-derived signings the
@@ -947,17 +1049,10 @@ pub fn bound<const W: usize>(
     let check_every = settings.check_every;
 
     // The multipliers: the start, by candidate number, or zero.
-    let mut lam = fam.zeros();
-    if let Some(start) = start {
-        for ((l, ex), st) in lam.iter_mut().zip(&fam.extras).zip(start) {
-            for (v, &x) in l.iter_mut().zip(&ex.m.elems) {
-                *v = st.get(&x).copied().unwrap_or(0.0);
-            }
-        }
-    }
+    let mut lam = start.map_or_else(|| fam.zeros(), |start| fam.multipliers_of(start));
 
-    // The lowest L of all, and of the current family with its multipliers.
-    let mut best_scaled = i64::MAX;
+    // The lowest L of all (with the fit that gave it), and of the current family with its multipliers.
+    let mut best = Best { scaled: i64::MAX, fit: Fit::default() };
     let mut fam_best = i64::MAX;
     let mut lam_best = lam.clone();
     let mut stop = None;
@@ -969,7 +1064,7 @@ pub fn bound<const W: usize>(
     let (mut theta, mut stall) = (1.0f64, 0usize);
     for _ in 0..steps {
         let ev = evaluate(ctx, &fam, &lam, &mut stats, check_every);
-        best_scaled = best_scaled.min(ev.value);
+        best.offer(ev.value, &fam, &lam);
         if ev.value < fam_best {
             fam_best = ev.value;
             lam_best.clone_from(&lam);
@@ -985,7 +1080,7 @@ pub fn bound<const W: usize>(
         for (ex, set) in fam.extras.iter_mut().zip(&ev.sets) {
             ex.remember(set);
         }
-        if reached(best_scaled) {
+        if reached(best.scaled) {
             stop = Some(Stop::Target);
             break;
         }
@@ -1028,7 +1123,8 @@ pub fn bound<const W: usize>(
     let close = ctx.gap.map_or(settings.close, |g| settings.close.max(settings.close_gap * g as f64));
     // Whether the current family's point is to be certified: from the start without separation, else once a
     // separation round has found no new core (and a certified family whose separation finds none is the end).
-    let mut certify = !separate;
+    let search = settings.mode == FitMode::Search;
+    let mut certify = !separate && !search;
     let mut certified = false;
     'rounds: while stop.is_none() {
         // Column and cut generation for the current family, until no column prices out and no cut is found (with
@@ -1063,12 +1159,12 @@ pub fn bound<const W: usize>(
                     for (ex, set) in fam.extras.iter_mut().zip(&ev.sets) {
                         ex.remember(set);
                     }
-                    best_scaled = best_scaled.min(ev.value);
+                    best.offer(ev.value, &fam, &at);
                     if ev.value < fam_best {
                         fam_best = ev.value;
                         lam_best = at;
                     }
-                    if reached(best_scaled) {
+                    if reached(best.scaled) {
                         stop = Some(Stop::Target);
                         break 'rounds;
                     }
@@ -1165,6 +1261,10 @@ pub fn bound<const W: usize>(
             }
         }
         if new == 0 {
+            if search {
+                stop = Some(Stop::Fitted);
+                break;
+            }
             if certified {
                 break;
             }
@@ -1198,32 +1298,36 @@ pub fn bound<const W: usize>(
         stats.masters += 1;
         // The lowest L of the new family starts at the old multipliers.
         let ev = evaluate(ctx, &fam, &lam_best, &mut stats, check_every);
-        best_scaled = best_scaled.min(ev.value);
+        best.offer(ev.value, &fam, &lam_best);
         fam_best = ev.value;
         master.add_mi(ctx, ev.q);
         lb = 0.0;
         (certify, certified) = (false, false);
-        if reached(best_scaled) {
+        if reached(best.scaled) {
             stop = Some(Stop::Target);
         }
     }
     let stop = stop.unwrap_or(Stop::Converged);
-    let lambda = fam
-        .extras
-        .iter()
-        .zip(&lam_best)
-        .map(|(ex, l)| ex.m.elems.iter().copied().zip(l.iter().copied()).filter(|&(_, v)| v > 0.0).collect())
-        .collect();
-    let support =
-        master.support().into_iter().map(|(a, s)| (a, s.iter().map(|&e| ctx.fm.elems[e]).collect())).collect();
+    let lambda = fam.by_number(&lam_best);
+    let numbers = |set: &[usize]| -> Vec<u32> { set.iter().map(|&e| ctx.fm.elems[e]).collect() };
+    let support_sets = master.support();
+    let support = support_sets.iter().map(|(a, s)| (*a, numbers(s))).collect();
+    let in_support: HashSet<&Vec<usize>> = support_sets.iter().map(|(_, s)| s).collect();
+    let mut master_columns: Vec<Vec<u32>> = support_sets.iter().map(|(_, s)| numbers(s)).collect();
+    master_columns.extend(master.mi.iter().filter(|c| !in_support.contains(&c.set)).map(|c| numbers(&c.set)));
+    master_columns.truncate(SAVED_COLUMNS);
+    let master_cuts = master.cuts.iter().map(|c| (c.k, numbers(&c.set), c.rank)).collect();
     Outcome {
-        bound: best_scaled.div_euclid(SCALE),
-        best_scaled,
+        bound: best.scaled.div_euclid(SCALE),
+        best_scaled: best.scaled,
         l_best: fam_best as f64 / SCALE as f64,
         lb,
         master: master.lp.value(),
         family: fam,
         lambda,
+        fit: best.fit,
+        master_columns,
+        master_cuts,
         cores_assigned: found.iter().filter(|f| f.assigned.is_some()).count(),
         cores_unplaced: found.iter().filter(|f| f.assigned.is_none()).count(),
         cores: found,
