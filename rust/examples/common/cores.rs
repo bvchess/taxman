@@ -28,6 +28,7 @@
 use crate::gf3::{det3, rank3, words_for, Signing, V3};
 use std::collections::{BTreeMap, HashSet};
 use taxman::bits::Bits;
+use taxman::json::Json;
 use taxman::model::{FrameGraph, FrameSet};
 
 // ---------------------------------------------------------------------------------------------------------
@@ -126,6 +127,50 @@ impl Core {
     pub fn listers(&self, f: u32) -> Option<&[u32]> {
         let i = self.columns.binary_search_by_key(&f, |column| column.0).ok()?;
         Some(&self.columns[i].1)
+    }
+
+    /// The core as a file of cores keeps it (`fields bnb --harvest`): `frame`, `members`, `columns` as
+    /// `[factor, [listers]]`, `promoted_in`, `promoted_out`.
+    pub fn to_json(&self) -> Json {
+        let numbers = |v: &[u32]| Json::array(v.iter().copied());
+        let columns = self.columns.iter().map(|(f, listers)| Json::Arr(vec![Json::from(*f), numbers(listers)]));
+        Json::object([
+            ("frame", Json::from(self.frame)),
+            ("members", numbers(&self.members)),
+            ("columns", Json::Arr(columns.collect())),
+            ("promoted_in", numbers(&self.promoted_in)),
+            ("promoted_out", numbers(&self.promoted_out)),
+        ])
+    }
+
+    /// The core of [`to_json`](Self::to_json)'s object, checked to be one: members ascending, each column's listers
+    /// at least two of them, ascending.
+    pub fn from_json(j: &Json) -> Result<Core, String> {
+        let list = |name: &str| j.get(name).and_then(Json::as_u32_vec).ok_or(format!("a core's {name:?}"));
+        let columns = j
+            .get("columns")
+            .and_then(Json::as_arr)
+            .ok_or("a core's \"columns\"")?
+            .iter()
+            .map(|c| match (c.at(0).and_then(Json::as_u32), c.at(1).and_then(Json::as_u32_vec)) {
+                (Some(f), Some(listers)) => Ok((f, listers)),
+                _ => Err(format!("a core's column {c} is not [factor, [listers]]")),
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        let core = Core {
+            frame: j.get("frame").and_then(Json::as_u64).ok_or("a core's \"frame\"")? as usize,
+            members: list("members")?,
+            columns,
+            promoted_in: list("promoted_in")?,
+            promoted_out: list("promoted_out")?,
+        };
+        let ascending = |v: &[u32]| v.windows(2).all(|w| w[0] < w[1]);
+        let column_ok =
+            |(_, l): &(u32, Vec<u32>)| l.len() >= 2 && ascending(l) && l.iter().all(|u| core.members.contains(u));
+        if !ascending(&core.members) || !core.columns.iter().all(column_ok) {
+            return Err(format!("not a core: {j}"));
+        }
+        Ok(core)
     }
 }
 
