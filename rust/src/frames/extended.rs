@@ -401,11 +401,11 @@ mod tests {
     /// The board of 24 with 16, 20 and 24 open, all of U\*_{≥3} but 18: the smallest board where a back claim fails the
     /// check of Lemma M5⁺ for some O (the candidates only grow with O, so a frame's claims fail for some O free of it
     /// exactly when they fail for all of U\*_{≥3} but its sources; a scan of the boards to 400 found 24-26 and 343-349,
-    /// none with every source open).  The frame model claims 6 for 18 (back: 6 is wanted by 18 alone, and 12, its other composite, is
-    /// a factor of the closed frame of 16 and 24).  With 16 and 24 open that frame has freedoms, 12 becomes a candidate
-    /// (the frame of 20, 20 open, can take it on with 4) and lists 6: the frame of 18 keeps nothing, and the frame of
-    /// layer 3 holds 18 and 6.  Taking the pair out anyway would lose the promotion set {8, 12}, in which 12 pays
-    /// with 6 (`tests/model_extended.rs` catches it).
+    /// none with every source open).  The frame model claims 6 for 18 (back: 6 is wanted by 18 alone, and 12, its
+    /// other composite, is a factor of the closed frame of 16 and 24).  With 16 and 24 open that frame has freedoms, 12
+    /// becomes a candidate (the frame of 20, 20 open, can take it on with 4) and lists 6: the frame of 18 keeps
+    /// nothing, and the frame of layer 3 holds 18 and 6.  Taking the pair out anyway would lose the promotion set
+    /// {8, 12}, in which 12 pays with 6 (`tests/model_extended.rs` catches it).
     #[test]
     fn a_back_claim_that_fails_the_check_is_refused() {
         let board = Board::<1>::for_n(24);

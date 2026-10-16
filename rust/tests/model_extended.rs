@@ -1,9 +1,12 @@
 //! Theorem M⁺, the extended problem Π⁺(O), against the code.
 //!
-//! Π⁺(O) (`taxman::frames::build_extended`, whose module documentation defines it) is the frame model with a set O of
-//! the sources of three or more prime factors that setup keeps made optional, with nothing settled by `unzip`, and
-//! with a reference predicate for its promotion sets, `ExtendedFrames::promotable`, that peels the unreduced frames.
-//! The theorem (heuristics/THEORY.md, "The extended problem"):
+//! Π⁺(O) (`Board::extended`, which calls `taxman::frames::build_extended`, whose module documentation defines it) is
+//! the frame model with a set O of the sources of three or more prime factors that setup keeps made optional, and with
+//! a reference predicate for its promotion sets, `ExtendedFrames::promotable`, that peels the unreduced frames.  It
+//! comes in two formulations, both checked here: without the claims of `unzip` (nothing settled by it), and with the
+//! claims that Lemma M5⁺ allows (heuristics/THEORY.md; with O empty that is the frame model's own problem Π_n).  The
+//! tests with `with_claims` in their names have the claims, the others none.  The theorem (heuristics/THEORY.md, "The
+//! extended problem"):
 //!
 //! > Let U\* be the sources that setup keeps (the numbers above n/2 of the game with no promotions, `board.plain`),
 //! > O ⊆ U\*_{≥3} the open sources and F = U\* ∖ O.  For every S ⊆ {2, …, n} with S ⊇ F, no prime up to n/2 in S, and
@@ -17,28 +20,37 @@
 //! counterexample to the theorem.
 //!
 //! * On every board up to 80 (and, in ignored tests, to 100; with every source open the default test goes to 60 and
-//!   an ignored one to 69) both directions are checked on every set, for O empty, for random subsets of U\*_{≥3} and
-//!   for O = U\*_{≥3}: the sets X = K ∪ L with F ∪ X playable (family A, found depth first), all promotion sets
-//!   (family B, found the same way), and the two families must be equal; the heaviest set weighs what the table of
-//!   optimal games has for n, and the oracle's order for it is a legal game of that score.
+//!   an ignored one to 69) both directions are checked on every set, in either formulation, for O empty, for random
+//!   subsets of U\*_{≥3} and for O = U\*_{≥3}: the sets X = K ∪ L with F ∪ X playable (family A, found depth first),
+//!   all promotion sets (family B, found the same way), and the two families must be equal; the heaviest set weighs
+//!   what the table of optimal games has for n, and the oracle's order for it is a legal game of that score.
 //! * With O empty, Π⁺(∅) has the promotion sets of the frame model: those of Π_n (`Board::prepare`) and those of the
 //!   problem the search is given for Π⁺(∅) (`Board::prepare_extended`).
-//! * On larger boards (to 1300 by default, to 4095 in an ignored test) the sets are random: promotion sets made by
-//!   adding candidates in a random order, and maximal playable sets made by adding numbers in a random order, for O
-//!   a random 20 members of U\*_{≥3}, for O = U\*_{≥3} and for O empty, where random promotion sets of the frame model
-//!   and of Π⁺(∅) are promotion sets of each other.  Greedy rejects a source of layer 3 or more on few boards (374 at
-//!   741, the first), and only the boards of the test for them (741, 1100, 1200) put a rejected source into a set.
+//! * On larger boards (to 1300 by default, to 4095 in an ignored test) the sets are random, in either formulation:
+//!   promotion sets made by adding candidates in a random order, and maximal playable sets made by adding numbers in a
+//!   random order, for O a random 20 members of U\*_{≥3}, for O = U\*_{≥3} and for O empty, where random promotion
+//!   sets of the frame model and of Π⁺(∅) are promotion sets of each other (and, with the claims, the search of Π⁺(∅)
+//!   is given the candidates and `max_total` of the frame model).  Greedy rejects a source of layer 3 or more on few
+//!   boards (374 at 741, the first), and only the boards of the test for them (741, 1100, 1200) put a rejected source
+//!   into a set.
+//! * The check of Lemma M5⁺ is needed.  On the boards to 400 it refuses the claims of a component, for some O that
+//!   leaves the component free, only on the boards 24 to 26 and 343 to 349, and then for O = U\*_{≥3} but the
+//!   component's sources, so no random subset meets it.  A mutant of the claims-on problem that keeps those claims
+//!   anyway (it takes the refused pairs out of the frames) is compared with the true problem on every set of the boards
+//!   to 80 for each such O (those of the boards 24 to 26) by `skipping_the_check_of_lemma_m5_plus_is_caught`: the true
+//!   problem agrees with the oracle, the mutant does not.
 //! * The model the search is given for Π⁺(O), `FrameGraph::build_extended` with the one-sided candidates, is checked
-//!   against the reference predicate on every board from 2 to 300 (to 500 in an ignored test), for O empty, for O =
-//!   U\*_{≥3} up to the board 120 and for five random subsets of it: random sets of candidates and random promotion sets
-//!   must be promoted, all at once and one member at a time, exactly when the reference says so, and the unpromotable
-//!   ones must have conflicts and nogoods that cannot be promoted, a narrowing that keeps what can be promoted, and a
-//!   count that is no lower than the size of a promotion set.
+//!   against the reference predicate, without the claims, on every board from 2 to 300 (to 500 in an ignored test), for
+//!   O empty, for O = U\*_{≥3} up to the board 120 and for five random subsets of it: random sets of candidates and
+//!   random promotion sets must be promoted, all at once and one member at a time, exactly when the reference says so,
+//!   and the unpromotable ones must have conflicts and nogoods that cannot be promoted, a narrowing that keeps what can
+//!   be promoted, and a count that is no lower than the size of a promotion set.
 //! * The search of Π⁺(O) (`Board::prepare_extended_with`, `search::search` on one thread) is held to the whole-board
-//!   oracle on every board from 2 to 80, for O empty (under the default tactics and those of extended mode), for
-//!   random subsets of U\*_{≥3} and for O = U\*_{≥3} (to 60 by default, to 69 in an ignored test): it finds a promotion
-//!   sum s with `in_the_bag` + s the heaviest weight of F ∪ X over the sets X of family A, which is also the table's
-//!   score, and the set it returns is a promotion set of the reference predicate that F makes playable.
+//!   oracle, in either formulation, on every board from 2 to 80, for O empty (under the default tactics and those of
+//!   extended mode), for random subsets of U\*_{≥3} and for O = U\*_{≥3} (to 60 by default, to 69 in an ignored test):
+//!   it finds a promotion sum s with `in_the_bag` + s the heaviest weight of F ∪ X over the sets X of family A, which
+//!   is also the table's score, and the set it returns is a promotion set of the reference predicate that F makes
+//!   playable.
 
 mod common;
 
@@ -51,9 +63,9 @@ use std::ops::RangeInclusive;
 use std::time::Instant;
 use taxman::bits::Bits;
 use taxman::board::Board;
-use taxman::frames::{build_extended, BoardFrames, ExtendedFrames};
+use taxman::frames::{BoardFrames, ClaimKind, ExtendedFrames};
 use taxman::game::{self, Optimal};
-use taxman::model::{FrameGraph, FrameSet, Scratch};
+use taxman::model::{self, FrameGraph, FrameSet, Scratch};
 use taxman::search::{search, Prepared, SearchTactics};
 use taxman::with_width;
 
@@ -65,6 +77,16 @@ fn sum(numbers: &[u32]) -> u64 {
     numbers.iter().map(|&x| u64::from(x)).sum()
 }
 
+/// What a formulation of Π⁺(O) is called in the messages and the lines a check prints: `claims=on` for the one with the
+/// claims of `unzip` that Lemma M5⁺ allows, `claims=off` for the one without.
+fn formulation(claims: bool) -> &'static str {
+    if claims {
+        "claims=on"
+    } else {
+        "claims=off"
+    }
+}
+
 /// A board with what the theorem is about: F, O and the extended problem Π⁺(O).
 struct Case<'b, const W: usize> {
     board: &'b Board<W>,
@@ -74,20 +96,28 @@ struct Case<'b, const W: usize> {
     /// F = U\* ∖ O, ascending.
     fixed: Vec<u32>,
     open: Vec<u32>,
+    /// Whether the problem is the formulation with the claims of `unzip` that Lemma M5⁺ allows.
+    claims: bool,
 }
 
 impl<'b, const W: usize> Case<'b, W> {
-    fn new(board: &'b Board<W>, open: &[u32]) -> Self {
+    fn new(board: &'b Board<W>, open: &[u32], claims: bool) -> Self {
         let n = board.n();
         let fixed = upper(board).into_iter().filter(|x| !open.contains(x)).collect();
-        let extended = build_extended::<W>(&board.tables, &Bits::from_slice(open), &[])
-            .unwrap_or_else(|e| panic!("n={n}: O={open:?}: {e}"));
+        let extended = board
+            .extended(&Bits::from_slice(open), claims)
+            .unwrap_or_else(|e| panic!("n={n}: O={open:?}, {}: {e}", formulation(claims)));
         let components = BoardFrames::new(&board.tables, Bits::EMPTY);
-        Case { board, components, extended, fixed, open: open.to_vec() }
+        Case { board, components, extended, fixed, open: open.to_vec(), claims }
     }
 
     fn n(&self) -> u32 {
         self.board.n()
+    }
+
+    /// The board, the open sources and the formulation, for the message of a failed check.
+    fn at(&self) -> String {
+        format!("n={}, O={:?}, {}", self.n(), self.open, formulation(self.claims))
     }
 
     /// The numbers family A chooses its sets from, ascending: the numbers up to n/2 that are not prime, and the sources
@@ -126,30 +156,77 @@ impl<'b, const W: usize> Case<'b, W> {
     /// What a failed check says of the set `x`.
     fn describe(&self, x: &[u32]) -> String {
         let (k, l) = self.split(x);
-        format!("n={}, O={:?}: S = F ∪ {x:?}, K = {:?}, L = {:?}", self.n(), self.open, k.to_vec(), l.to_vec())
+        format!("{}: S = F ∪ {x:?}, K = {:?}, L = {:?}", self.at(), k.to_vec(), l.to_vec())
+    }
+
+    /// What a failed check says of the set `x`, on which the oracle and the problem disagree as `kind` says.
+    fn disagreement(&self, kind: Disagreement, x: &[u32]) -> String {
+        format!("{}: {}", kind.what(), self.describe(x))
+    }
+
+    /// The mutant of this problem that skips the check of Lemma M5⁺: the claims of the components the check refused
+    /// ([`ExtendedFrames::refused`]) are kept after all, each pair (s, f) taken out of its frame (s from the moves and
+    /// f from the factors, the freedoms recomputed), as if the component had passed.  The problem is the same
+    /// otherwise.  Only a problem with claims (`claims` set) refuses any.
+    fn skipping_the_check(&self) -> Case<'b, W> {
+        let mut mutant = Case::new(self.board, &self.open, self.claims);
+        let refused = std::mem::take(&mut mutant.extended.refused);
+        for &(s, f, _) in &refused {
+            let frame = mutant.extended.frames.iter_mut().find(|frame| frame.moves.contains(s));
+            let frame = frame.unwrap_or_else(|| panic!("{}: the refused {s} is a move of no frame", self.at()));
+            *frame = model::Frame::new(frame.moves.without(s), frame.factors.without(f));
+        }
+        mutant.extended.claims.extend(refused);
+        mutant
+    }
+}
+
+/// How the oracle and the problem Π⁺(O) of a [`Case`] can disagree on a set X: the theorem says F ∪ X is playable
+/// exactly when the pair (K, L) of X is a promotion set.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Disagreement {
+    /// F ∪ X is playable but (K, L) is not a promotion set.
+    NotAPromotionSet,
+    /// (K, L) is a promotion set but F ∪ X is not playable.
+    NotPlayable,
+}
+
+impl Disagreement {
+    fn what(self) -> &'static str {
+        match self {
+            Disagreement::NotAPromotionSet => "S is playable but (K, L) is not a promotion set",
+            Disagreement::NotPlayable => "(K, L) is a promotion set but S is not playable",
+        }
     }
 }
 
 // ---------------------------------------------------------------------------------------------------------
 // Every set, on small boards
 
-/// Theorem M⁺ on the board `1..=n` for the open sources `open`, on every set: the sets X of family A (F ∪ X playable,
-/// found depth first) are promotion sets, the promotion sets of family B (found the same way) make F ∪ X playable,
-/// the two families are equal, `in_the_bag` is ΣF, the heaviest ΣS is what the table of optimal games has for `n`, and
-/// the oracle's order for the heaviest S replays to its sum.  Returns the number of sets.
-///
-/// The sets are visited as the searches find them and not kept.  Both families are closed under subsets, so each
-/// search finds every set of its family; every set of A asserted a promotion set puts A in B, and every set of B
-/// asserted playable with F puts B in A: the families are equal (and so are their sizes, which are compared too).
-fn check_every_set(n: u32, open: &[u32]) -> usize {
-    let board = Board::<8>::for_n(n);
-    let case = Case::new(&board, open);
-    assert_eq!(case.extended.in_the_bag, sum(&case.fixed), "n={n}, O={open:?}: in the bag");
-    assert!(case.playable_with(&[]), "n={n}, O={open:?}: F is not playable");
+/// What a walk over every set of a [`Case`] found: the sizes of the two families, and the heaviest set of family A.
+struct Families {
+    /// The sets X of family A: F ∪ X is playable by the oracle.
+    in_a: usize,
+    /// The promotion sets of Π⁺(O), family B.
+    in_b: usize,
+    /// The set of family A with the greatest sum.
+    heaviest: Vec<u32>,
+}
 
+/// Walks both families of `case`, the sets X of family A (F ∪ X playable, found depth first) and the promotion sets of
+/// family B (found the same way), and calls `disagree` with the kind and the set X for each set of A that is not a
+/// promotion set and each set of B that is not playable with F.
+///
+/// The sets are visited as the searches find them and not kept.  Both families are closed under subsets (for the
+/// promotion sets of any frames: taking a promotion out leaves every frame winnable), so each search finds every set of
+/// its family.  If no set of A is not a promotion set and no set of B is unplayable, A is in B and B is in A: the
+/// families are equal, and so are their sizes.
+fn walk_every_set<const W: usize>(case: &Case<W>, disagree: &mut dyn FnMut(Disagreement, &[u32])) -> Families {
     let (mut in_a, mut heaviest) = (0, Vec::new());
     for_each_kept_subset(&case.items_a(), &mut |x| case.playable_with(x), &mut |x| {
-        assert!(case.is_promotion_set(x), "S is playable but (K, L) is not a promotion set: {}", case.describe(x));
+        if !case.is_promotion_set(x) {
+            disagree(Disagreement::NotAPromotionSet, x);
+        }
         in_a += 1;
         if sum(x) > sum(&heaviest) {
             heaviest = x.to_vec();
@@ -157,41 +234,85 @@ fn check_every_set(n: u32, open: &[u32]) -> usize {
     });
     let mut in_b = 0;
     for_each_kept_subset(&case.items_b(), &mut |x| case.is_promotion_set(x), &mut |x| {
-        assert!(case.playable_with(x), "(K, L) is a promotion set but S is not playable: {}", case.describe(x));
+        if !case.playable_with(x) {
+            disagree(Disagreement::NotPlayable, x);
+        }
         in_b += 1;
     });
-    assert_eq!(in_a, in_b, "n={n}, O={open:?}: the families differ in size");
+    Families { in_a, in_b, heaviest }
+}
+
+/// How many sets the oracle and the problem of `case` disagree on, over every set of the two families: the sets of
+/// family A that are not promotion sets, and the sets of family B that are not playable.
+fn count_disagreements<const W: usize>(case: &Case<W>) -> (usize, usize) {
+    let (mut not_promotion_sets, mut not_playable) = (0, 0);
+    walk_every_set(case, &mut |kind, _| match kind {
+        Disagreement::NotAPromotionSet => not_promotion_sets += 1,
+        Disagreement::NotPlayable => not_playable += 1,
+    });
+    (not_promotion_sets, not_playable)
+}
+
+/// Theorem M⁺ on the board `1..=n` for the open sources `open`, in the formulation `claims` says, on every set: the
+/// sets X of family A (F ∪ X playable, found depth first) are promotion sets, the promotion sets of family B (found the
+/// same way) make F ∪ X playable, the two families are equal, `in_the_bag` is ΣF, the heaviest ΣS is what the table of
+/// optimal games has for `n`, and the oracle's order for the heaviest S replays to its sum.  Returns the number of
+/// sets.
+///
+/// The sets are those of [`walk_every_set`], which panics here at the first disagreement: every set of A asserted a
+/// promotion set puts A in B, and every set of B asserted playable with F puts B in A, so the families are equal (and
+/// so are their sizes, which are compared too).
+fn check_every_set(n: u32, open: &[u32], claims: bool) -> usize {
+    let board = Board::<8>::for_n(n);
+    let case = Case::new(&board, open, claims);
+    assert_eq!(case.extended.in_the_bag, sum(&case.fixed), "{}: in the bag", case.at());
+    assert!(case.playable_with(&[]), "{}: F is not playable", case.at());
+
+    let Families { in_a, in_b, heaviest } =
+        walk_every_set(&case, &mut |kind, x| panic!("{}", case.disagreement(kind, x)));
+    assert_eq!(in_a, in_b, "{}: the families differ in size", case.at());
 
     let total = case.extended.in_the_bag + sum(&heaviest);
-    assert_eq!(Some(total), Optimal::built_in().score(n), "n={n}, O={open:?}: the heaviest S and the table");
+    assert_eq!(Some(total), Optimal::built_in().score(n), "{}: the heaviest S and the table", case.at());
     let set = [case.fixed.as_slice(), &heaviest].concat();
     let order = play_order(&board.tables, &set).expect("the heaviest set is playable");
     assert_eq!(game::replay(n, &order), Ok(total), "{}: the oracle's order {order:?}", case.describe(&heaviest));
     in_a
 }
 
-/// [`check_every_set`] on each board of `boards`, for the open sets `choose` gives for the board `n` from its
-/// U\*_{≥3}, with the time of each.  There are sets other than the empty one on some board.
-fn check_every_board(boards: RangeInclusive<u32>, mut choose: impl FnMut(u32, &[u32]) -> Vec<Vec<u32>>) {
+/// [`check_every_set`] in the formulation `claims` says on each board of `boards`, for the open sets `choose` gives for
+/// the board `n` from its U\*_{≥3}, with the time of each.  There are sets other than the empty one on some board.
+fn check_every_board(boards: RangeInclusive<u32>, claims: bool, mut choose: impl FnMut(u32, &[u32]) -> Vec<Vec<u32>>) {
     let (start, mut total, mut checks) = (Instant::now(), 0, 0);
     for n in boards.clone() {
         let upper_from_3 = upper_from_3(&Board::<8>::for_n(n));
         for open in choose(n, &upper_from_3) {
             let began = Instant::now();
-            let sets = check_every_set(n, &open);
-            println!("n={n:>3} |O|={:>2}: {sets:>7} sets  {:.1?}", open.len(), began.elapsed());
+            let sets = check_every_set(n, &open, claims);
+            println!("n={n:>3} {} |O|={:>2}: {sets:>7} sets  {:.1?}", formulation(claims), open.len(), began.elapsed());
             total += sets;
             checks += 1;
         }
     }
-    println!("the boards {boards:?}: {checks} open sets, {total} sets in {:.1?}", start.elapsed());
+    println!(
+        "the boards {boards:?}, {}: {checks} open sets, {total} sets in {:.1?}",
+        formulation(claims),
+        start.elapsed()
+    );
     assert!(total > checks, "no board has a set but the empty one");
 }
 
 /// Theorem M⁺ with no open source, on every set of every board from 2 to 80.
 #[test]
 fn theorem_m_plus_with_no_open_source() {
-    check_every_board(2..=80, |_, _| vec![Vec::new()]);
+    check_every_board(2..=80, false, |_, _| vec![Vec::new()]);
+}
+
+/// [`theorem_m_plus_with_no_open_source`] in the formulation with the claims of `unzip`, which with no source open is
+/// the frame model's own problem.
+#[test]
+fn theorem_m_plus_with_no_open_source_with_claims() {
+    check_every_board(2..=80, true, |_, _| vec![Vec::new()]);
 }
 
 /// Theorem M⁺ with three random subsets of U\*_{≥3} open, on every set of every board from 2 to 80 that has such
@@ -199,22 +320,45 @@ fn theorem_m_plus_with_no_open_source() {
 #[test]
 fn theorem_m_plus_with_open_sources() {
     let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
-    check_every_board(2..=80, |_, from_3| random_open_sets(&mut rng, from_3, 3, 8));
+    check_every_board(2..=80, false, |_, from_3| random_open_sets(&mut rng, from_3, 3, 8));
+}
+
+/// [`theorem_m_plus_with_open_sources`] with the claims of `unzip`, for other random subsets.
+#[test]
+fn theorem_m_plus_with_open_sources_with_claims() {
+    let mut rng = Rng(0xBF58_476D_1CE4_E5B9);
+    check_every_board(2..=80, true, |_, from_3| random_open_sets(&mut rng, from_3, 3, 8));
 }
 
 /// Theorem M⁺ with every source of three or more prime factors open, on every set of every board from 2 to 60.
 #[test]
 fn theorem_m_plus_with_every_source_open() {
-    check_every_board(2..=60, |_, from_3| vec![from_3.to_vec()]);
+    check_every_board(2..=60, false, |_, from_3| vec![from_3.to_vec()]);
+}
+
+/// [`theorem_m_plus_with_every_source_open`] with the claims of `unzip`, which only the components of layers 1 and 2
+/// keep then.
+#[test]
+fn theorem_m_plus_with_every_source_open_with_claims() {
+    check_every_board(2..=60, true, |_, from_3| vec![from_3.to_vec()]);
 }
 
 /// [`theorem_m_plus_with_no_open_source`] and [`theorem_m_plus_with_open_sources`] on the boards 81 to 100.
 #[test]
 #[ignore = "takes twenty seconds; the boards to 80 are in the default tests"]
 fn theorem_m_plus_with_open_sources_81_to_100() {
-    check_every_board(81..=100, |_, _| vec![Vec::new()]);
+    check_every_board(81..=100, false, |_, _| vec![Vec::new()]);
     let mut rng = Rng(0xD1B5_4A32_D192_ED03);
-    check_every_board(81..=100, |_, from_3| random_open_sets(&mut rng, from_3, 3, 8));
+    check_every_board(81..=100, false, |_, from_3| random_open_sets(&mut rng, from_3, 3, 8));
+}
+
+/// [`theorem_m_plus_with_open_sources_81_to_100`] with the claims of `unzip`.
+#[test]
+#[ignore = "takes twenty seconds; the boards to 80 are in the default tests"]
+fn theorem_m_plus_with_open_sources_81_to_100_with_claims() {
+    check_every_board(81..=100, true, |_, _| vec![Vec::new()]);
+    let mut rng = Rng(0x94D0_49BB_1331_11EB);
+    check_every_board(81..=100, true, |_, from_3| random_open_sets(&mut rng, from_3, 3, 8));
 }
 
 /// [`theorem_m_plus_with_every_source_open`] on the boards 61 to 69, which have 0.4 to 5.5 million sets each and take
@@ -222,7 +366,77 @@ fn theorem_m_plus_with_open_sources_81_to_100() {
 #[test]
 #[ignore = "takes a minute; the boards to 60 are in the default test"]
 fn theorem_m_plus_with_every_source_open_61_to_69() {
-    check_every_board(61..=69, |_, from_3| vec![from_3.to_vec()]);
+    check_every_board(61..=69, false, |_, from_3| vec![from_3.to_vec()]);
+}
+
+/// [`theorem_m_plus_with_every_source_open_61_to_69`] with the claims of `unzip`.
+#[test]
+#[ignore = "takes a minute; the boards to 60 are in the default test"]
+fn theorem_m_plus_with_every_source_open_61_to_69_with_claims() {
+    check_every_board(61..=69, true, |_, from_3| vec![from_3.to_vec()]);
+}
+
+/// The check of Lemma M5⁺ is needed: a mutant of the problem with the claims that skips it is caught.
+///
+/// The check refuses the claims of a component that holds no open source when one of its back claims (s, f) has f a
+/// two-sided candidate or listed among the maximal factors of one (`ExtendedFrames::refused`).  The mutant keeps those
+/// claims anyway: it takes each refused pair out of its frame (`Case::skipping_the_check`), which on the board 24 with
+/// O = {16, 20, 24} is the pair (18, 6), where the candidate 12 lists 6.  It then loses the promotion set {8, 12}: in
+/// the game 18 pays with 9, 8 with 4 and 12 with 6, so F ∪ {8, 12} is playable, but without 6 in the frame 12 has
+/// nothing left to be paid with once 8 takes 4.
+///
+/// Such an O is rare.  Opening a source adds freedoms, so the candidates only grow with O, and so does the list of
+/// their maximal factors: a component's claims fail the check for some O free of it (with no member of O in it)
+/// exactly when they fail for the largest such O, which is all of U\*_{≥3} but the component's sources.  So the O to
+/// try on a board is U\*_{≥3} less the sources of C, for each component C of layer 3 or more; the components of layers
+/// 1 and 2 are free of every O, and so of U\*_{≥3} itself, which [`theorem_m_plus_with_every_source_open_with_claims`]
+/// enumerates (a scan of the boards to 400 found a refusal, for some O, only on the boards 24 to 26 and 343 to 349,
+/// each for an O that leaves out the sources of a component of layer 3 or more).  A random subset of U\*_{≥3} is
+/// unlikely to be such an O, which is why the other tests would hardly catch the mutant.  On each board from 2 to 80
+/// and each such O that the check refuses, this test enumerates every set (as [`check_every_set`] does) for the true
+/// problem, which must agree with the oracle on all of them, and for the mutant, which must not on at least one set of
+/// at least one board.
+/// The boards 343 to 349 are too large for every set (a board has 62 million at 70, and the number goes on growing),
+/// and are left to the unit test of `build_extended` (`a_back_claim_that_fails_the_check_is_refused`) and the census
+/// of the frames (`examples/structure.rs`).
+#[test]
+fn skipping_the_check_of_lemma_m5_plus_is_caught() {
+    let (start, mut refusing, mut caught) = (Instant::now(), 0, 0);
+    for n in 2..=80 {
+        let board = Board::<8>::for_n(n);
+        let (t, from_3) = (&board.tables, upper_from_3(&board));
+        let components = BoardFrames::<8>::new(t, Bits::EMPTY);
+        let sources = components.frames().iter().map(|component| component.sources());
+        for own in sources.filter(|own| own.min().is_some_and(|source| t.omega(source) >= 3)) {
+            let open: Vec<u32> = from_3.iter().copied().filter(|&x| !own.contains(x)).collect();
+            let case = Case::new(&board, &open, true);
+            if case.extended.refused.is_empty() {
+                continue;
+            }
+            let began = Instant::now();
+            let (truth, mutant) = (count_disagreements(&case), count_disagreements(&case.skipping_the_check()));
+            println!(
+                "n={n:>3} O={open:?} refused {:?}: true problem {truth:?}, mutant {mutant:?} (sets of A that are not \
+                 promotion sets, sets of B that are not playable)  {:.1?}",
+                case.extended.refused,
+                began.elapsed()
+            );
+            assert_eq!(truth, (0, 0), "{}: the true problem disagrees with the oracle", case.at());
+            refusing += 1;
+            caught += usize::from(mutant != (0, 0));
+        }
+    }
+    println!("{refusing} problems refuse a claim, {caught} of them caught the mutant, in {:.1?}", start.elapsed());
+    assert!(refusing > 0 && caught > 0, "no problem refuses a claim, or the mutant is never caught");
+
+    // The board 24 with 16, 20 and 24 open: the check refuses (18, 6), and the mutant loses {8, 12}.
+    let board = Board::<8>::for_n(24);
+    let case = Case::new(&board, &[16, 20, 24], true);
+    assert_eq!(case.extended.refused, [(18, 6, ClaimKind::Back)], "{}", case.at());
+    let mutant = case.skipping_the_check();
+    assert!(case.playable_with(&[8, 12]), "{}: F ∪ {{8, 12}} is playable", case.at());
+    assert!(case.is_promotion_set(&[8, 12]), "{}: {{8, 12}} is a promotion set", case.at());
+    assert!(!mutant.is_promotion_set(&[8, 12]), "{}: the mutant misses {{8, 12}}", case.at());
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -241,20 +455,19 @@ fn promotion_sets_of<const W: usize>(prepared: &Prepared<W>) -> BTreeSet<Vec<u32
 
 /// With no open source, Π⁺(∅) has the promotion sets of the frame model on every board from 2 to 100: the sets L of
 /// family B are the promotion sets of Π_n (`Board::prepare`) and those of the problem the search is given for Π⁺(∅)
-/// (`Board::prepare_extended`: the reduced root, the model built from `columns`).
-#[test]
-fn the_extended_problem_with_no_open_source_is_the_frame_model() {
+/// (`Board::prepare_extended`: the reduced root, the model built from `columns`), in the formulation `claims` says.
+fn check_the_extended_problem_with_no_open_source_is_the_frame_model(claims: bool) {
     let (start, mut total) = (Instant::now(), 0);
     for n in 2..=100 {
         let board = Board::<8>::for_n(n);
-        let case = Case::new(&board, &[]);
+        let case = Case::new(&board, &[], claims);
         assert!(case.extended.one_sided.is_empty(), "n={n}: a one-sided candidate");
         let extended: BTreeSet<Vec<u32>> = kept_subsets(&case.items_b(), &mut |x| case.is_promotion_set(x));
 
         let plain = board.prepare(SearchTactics::default()).unwrap_or_else(|e| panic!("n={n}: {e}"));
         let in_the_frame_model = promotion_sets_of(&plain);
         let (_, searched) =
-            board.prepare_extended(false, SearchTactics::default()).unwrap_or_else(|e| panic!("n={n}: {e}"));
+            board.prepare_extended(claims, SearchTactics::default()).unwrap_or_else(|e| panic!("n={n}: {e}"));
         let in_the_search = promotion_sets_of(&searched);
 
         let first_difference = |a: &BTreeSet<Vec<u32>>, b: &BTreeSet<Vec<u32>>| -> Vec<Vec<u32>> {
@@ -269,8 +482,18 @@ fn the_extended_problem_with_no_open_source_is_the_frame_model() {
         );
         total += extended.len();
     }
-    println!("the boards 2..=100: {total} promotion sets in {:.1?}", start.elapsed());
+    println!("the boards 2..=100, {}: {total} promotion sets in {:.1?}", formulation(claims), start.elapsed());
     assert!(total > 99, "no board has a promotion set but the empty one");
+}
+
+#[test]
+fn the_extended_problem_with_no_open_source_is_the_frame_model() {
+    check_the_extended_problem_with_no_open_source_is_the_frame_model(false);
+}
+
+#[test]
+fn the_extended_problem_with_no_open_source_and_the_claims_is_the_frame_model() {
+    check_the_extended_problem_with_no_open_source_is_the_frame_model(true);
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -347,17 +570,17 @@ impl Tally {
 fn check_random_sets<const W: usize>(case: &Case<W>, sets: usize, rng: &mut Rng) -> Tally {
     let mut tally = Tally::default();
     let rejected = case.extended.rejected;
-    assert!(case.playable_with(&[]), "n={}, O={:?}: F is not playable", case.n(), case.open);
+    assert!(case.playable_with(&[]), "{}: F is not playable", case.at());
     for _ in 0..sets {
         let x = random_promotion_set(case, rng);
-        assert!(case.playable_with(&x), "(K, L) is a promotion set but S is not playable: {}", case.describe(&x));
+        assert!(case.playable_with(&x), "{}", case.disagreement(Disagreement::NotPlayable, &x));
         tally.promotion_sets += 1;
         tally.promotion_members += x.len();
         tally.with_rejected += usize::from(x.iter().any(|&s| rejected.contains(s)));
     }
     for _ in 0..sets {
         let x = random_maximal_playable_set(case, rng);
-        assert!(case.is_promotion_set(&x), "S is playable but (K, L) is not a promotion set: {}", case.describe(&x));
+        assert!(case.is_promotion_set(&x), "{}", case.disagreement(Disagreement::NotAPromotionSet, &x));
         tally.maximal_sets += 1;
         tally.maximal_members += x.len();
         tally.with_rejected += usize::from(x.iter().any(|&s| rejected.contains(s)));
@@ -365,12 +588,24 @@ fn check_random_sets<const W: usize>(case: &Case<W>, sets: usize, rng: &mut Rng)
     tally
 }
 
-/// With no open source, random promotion sets of the frame model (`Board::prepare`) are promotion sets of Π⁺(∅), and
-/// random promotion sets of Π⁺(∅) are promotion sets of the frame model.
-fn check_random_sets_against_the_frame_model<const W: usize>(board: &Board<W>, sets: usize, rng: &mut Rng) {
-    let (n, case) = (board.n(), Case::new(board, &[]));
+/// With no open source, random promotion sets of the frame model (`Board::prepare`) are promotion sets of Π⁺(∅), in
+/// the formulation `claims` says, and random promotion sets of Π⁺(∅) are promotion sets of the frame model.  With the
+/// claims, the search is given the frame model's candidates and `max_total` (`Board::prepare_extended`).
+fn check_random_sets_against_the_frame_model<const W: usize>(
+    board: &Board<W>,
+    claims: bool,
+    sets: usize,
+    rng: &mut Rng,
+) {
+    let (n, case) = (board.n(), Case::new(board, &[], claims));
     let p = board.prepare(SearchTactics::default()).unwrap_or_else(|e| panic!("n={n}: {e}"));
-    assert_eq!(case.extended.candidates, p.candidates, "n={n}: the candidates");
+    assert_eq!(case.extended.candidates, p.candidates, "{}: the candidates", case.at());
+    if claims {
+        let (_, searched) =
+            board.prepare_extended(true, SearchTactics::default()).unwrap_or_else(|e| panic!("n={n}: {e}"));
+        assert_eq!(searched.candidates, p.candidates, "{}: the candidates the search is given", case.at());
+        assert_eq!(searched.max_total, p.max_total, "{}: max_total the search is given", case.at());
+    }
     let mut scratch = Scratch::<W>::new();
     for _ in 0..sets {
         let mut order = p.candidates.to_vec();
@@ -395,9 +630,10 @@ fn check_random_sets_against_the_frame_model<const W: usize>(board: &Board<W>, s
     }
 }
 
-/// Theorem M⁺ on the board `1..=n` at width `W`, on `sets` random sets of each kind for a random 20 members of
-/// U\*_{≥3} open, for all of them open, and for none open, where the frame model is checked against Π⁺(∅) too.
-fn check_random_board<const W: usize>(n: u32, sets: usize, rng: &mut Rng) -> Tally {
+/// Theorem M⁺ on the board `1..=n` at width `W`, in the formulation `claims` says, on `sets` random sets of each kind
+/// for a random 20 members of U\*_{≥3} open, for all of them open, and for none open, where the frame model is checked
+/// against Π⁺(∅) too.
+fn check_random_board<const W: usize>(n: u32, claims: bool, sets: usize, rng: &mut Rng) -> Tally {
     let board = Board::<W>::for_n(n);
     let every = upper_from_3(&board);
     let mut random = every.clone();
@@ -408,14 +644,15 @@ fn check_random_board<const W: usize>(n: u32, sets: usize, rng: &mut Rng) -> Tal
     let mut tally = Tally::default();
     for open in [random, every, Vec::new()] {
         let start = Instant::now();
-        let case = Case::new(&board, &open);
+        let case = Case::new(&board, &open, claims);
         let found = check_random_sets(&case, sets, rng);
         if open.is_empty() {
-            check_random_sets_against_the_frame_model(&board, sets, rng);
+            check_random_sets_against_the_frame_model(&board, claims, sets, rng);
         }
         println!(
-            "n={n:>5} W={W:>3} |O|={:>3} |R|={:>2}  {} candidates, {} one-sided  mean |X|: promotion sets {:>6.1}, \
+            "n={n:>5} W={W:>3} {} |O|={:>3} |R|={:>2}  {} candidates, {} one-sided  mean |X|: promotion sets {:>6.1}, \
              maximal sets {:>6.1}  with a rejected source: {}  {:.1?}",
+            formulation(claims),
             open.len(),
             case.extended.rejected.len(),
             case.extended.candidates.len(),
@@ -430,15 +667,15 @@ fn check_random_board<const W: usize>(n: u32, sets: usize, rng: &mut Rng) -> Tal
     tally
 }
 
-/// Theorem M⁺ on `sets` random sets of each kind on each of `boards`, each at the width the solver picks, from the
-/// random stream seeded with `seed`.
-fn check_random_boards(boards: &[u32], sets: usize, seed: u64) -> Tally {
+/// Theorem M⁺ on `sets` random sets of each kind on each of `boards`, each at the width the solver picks, in the
+/// formulation `claims` says, from the random stream seeded with `seed`.
+fn check_random_boards(boards: &[u32], claims: bool, sets: usize, seed: u64) -> Tally {
     let mut rng = Rng(seed);
     let (start, mut tally) = (Instant::now(), Tally::default());
     for &n in boards {
-        tally.add(&with_width!(n, W => check_random_board::<W>(n, sets, &mut rng)));
+        tally.add(&with_width!(n, W => check_random_board::<W>(n, claims, sets, &mut rng)));
     }
-    println!("{} boards, {sets} sets of each kind: {:.1?}", boards.len(), start.elapsed());
+    println!("{} boards, {}, {sets} sets of each kind: {:.1?}", boards.len(), formulation(claims), start.elapsed());
     // A check of tiny sets would show: the sets must not all be empty.
     assert!(tally.promotion_members > 0 && tally.maximal_members > 0, "only empty sets: {tally:?}");
     tally
@@ -447,14 +684,27 @@ fn check_random_boards(boards: &[u32], sets: usize, seed: u64) -> Tally {
 /// Theorem M⁺ on random sets of the boards 300, 600, 1000 and 1300.
 #[test]
 fn theorem_m_plus_on_random_sets() {
-    check_random_boards(&[300, 600, 1000, 1300], 100, 0xA076_1D64_78BD_642F);
+    check_random_boards(&[300, 600, 1000, 1300], false, 100, 0xA076_1D64_78BD_642F);
+}
+
+/// [`theorem_m_plus_on_random_sets`] with the claims of `unzip`, for other random sets.
+#[test]
+fn theorem_m_plus_on_random_sets_with_claims() {
+    check_random_boards(&[300, 600, 1000, 1300], true, 100, 0x5851_F42D_4C95_7F2D);
 }
 
 /// Theorem M⁺ on random sets of the boards 2000, 3000 and 4095.
 #[test]
 #[ignore = "takes a while; the boards to 1300 are in the default test"]
 fn theorem_m_plus_on_random_sets_past_1300() {
-    check_random_boards(&[2000, 3000, 4095], 100, 0xE703_7ED1_A0B4_28DB);
+    check_random_boards(&[2000, 3000, 4095], false, 100, 0xE703_7ED1_A0B4_28DB);
+}
+
+/// [`theorem_m_plus_on_random_sets_past_1300`] with the claims of `unzip`.
+#[test]
+#[ignore = "takes a while; the boards to 1300 are in the default test"]
+fn theorem_m_plus_on_random_sets_past_1300_with_claims() {
+    check_random_boards(&[2000, 3000, 4095], true, 100, 0x1405_7B7E_F767_814F);
 }
 
 /// Theorem M⁺ on random sets of boards where greedy rejects a source of layer 3, which the opening of a source above
@@ -462,7 +712,15 @@ fn theorem_m_plus_on_random_sets_past_1300() {
 /// the boards to 740, nor on 1000 or 1300, so the other tests never meet one; some of the sets here have one in them.
 #[test]
 fn theorem_m_plus_with_a_rejected_source() {
-    let tally = check_random_boards(&[741, 1100, 1200], 100, 0x8EBC_6AF0_9C88_C6E3);
+    let tally = check_random_boards(&[741, 1100, 1200], false, 100, 0x8EBC_6AF0_9C88_C6E3);
+    assert!(tally.with_rejected > 0, "no set has a rejected source: {tally:?}");
+}
+
+/// [`theorem_m_plus_with_a_rejected_source`] with the claims of `unzip` (which the components that hold an open or a
+/// rejected source do not keep).
+#[test]
+fn theorem_m_plus_with_a_rejected_source_with_claims() {
+    let tally = check_random_boards(&[741, 1100, 1200], true, 100, 0x2F72_B4B7_F3A9_C5D1);
     assert!(tally.with_rejected > 0, "no set has a rejected source: {tally:?}");
 }
 
@@ -525,9 +783,10 @@ struct Problem<'b, const W: usize> {
 }
 
 impl<'b, const W: usize> Problem<'b, W> {
-    /// The problem Π⁺(`open`) of `board`, or `None` if it has no candidate at all, two-sided or one-sided.
+    /// The problem Π⁺(`open`) of `board`, without the claims of `unzip`, or `None` if it has no candidate at all,
+    /// two-sided or one-sided.
     fn new(board: &'b Board<W>, open: &[u32]) -> Option<Self> {
-        let case = Case::new(board, open);
+        let case = Case::new(board, open, false);
         let extended = &case.extended;
         let (model, root) = FrameGraph::build_extended::<W>(&board.tables, &extended.columns(), &extended.one_sided)
             .unwrap_or_else(|e| panic!("n={}: O={open:?}: {e}", board.n()));
@@ -541,9 +800,9 @@ impl<'b, const W: usize> Problem<'b, W> {
         (!candidates.is_empty()).then_some(Problem { case, model, root, one_sided, candidates })
     }
 
-    /// The board and the open sources, for the message of a failed check.
+    /// The board, the open sources and the formulation, for the message of a failed check.
     fn at(&self) -> String {
-        format!("n={}, O={:?}", self.case.n(), self.case.open)
+        self.case.at()
     }
 
     /// Whether the set `x` is a promotion set, by the reference predicate: K is its one-sided members and L the rest.
@@ -885,21 +1144,21 @@ impl Searched {
     }
 }
 
-/// The search of Π⁺(`open`) of the board `1..=n` against the whole-board oracle: for each of `tactics` (all of which
-/// must take the problem), the search on one thread, with no seed and no ceiling, completes with a promotion sum s such
-/// that `in_the_bag` + s is the heaviest weight of F ∪ X over the sets X of family A (F ∪ X playable), and is
-/// `optimal.json`'s score; the set it returns is a promotion set by the reference predicate, and F together with it is
-/// playable.  The sets of family A are enumerated once for all the tactics.
-fn check_the_search(n: u32, open: &[u32], tactics: &[SearchTactics]) -> Searched {
+/// The search of Π⁺(`open`) of the board `1..=n`, in the formulation `claims` says, against the whole-board oracle: for
+/// each of `tactics` (all of which must take the problem), the search on one thread, with no seed and no ceiling,
+/// completes with a promotion sum s such that `in_the_bag` + s is the heaviest weight of F ∪ X over the sets X of
+/// family A (F ∪ X playable), and is `optimal.json`'s score; the set it returns is a promotion set by the reference
+/// predicate, and F together with it is playable.  The sets of family A are enumerated once for all the tactics.
+fn check_the_search(n: u32, open: &[u32], claims: bool, tactics: &[SearchTactics]) -> Searched {
     let board = Board::<8>::for_n(n);
-    let case = Case::new(&board, open);
+    let case = Case::new(&board, open, claims);
     let (heaviest, sets) = heaviest_playable(&case);
     let heaviest_total = sum(&case.fixed) + heaviest;
     let mut found = Searched { sets, ..Searched::default() };
     for &tactics in tactics {
-        let what = format!("n={n}, O={open:?}, {tactics:?}");
+        let what = format!("{}, {tactics:?}", case.at());
         let (ext, prepared) = board
-            .prepare_extended_with(&Bits::from_slice(open), false, tactics)
+            .prepare_extended_with(&Bits::from_slice(open), claims, tactics)
             .unwrap_or_else(|e| panic!("{what}: {e}"));
         let result = search(&prepared, &config(1), None, None, false).unwrap_or_else(|e| panic!("{what}: {e}"));
         assert!(result.completed, "{what}: the search did not complete");
@@ -917,10 +1176,11 @@ fn check_the_search(n: u32, open: &[u32], tactics: &[SearchTactics]) -> Searched
     found
 }
 
-/// [`check_the_search`] on each board of `boards`, for the open sets `choose` gives for the board `n` from its
-/// U\*_{≥3}, with the time of each.  Returns what the boards made.
+/// [`check_the_search`] in the formulation `claims` says on each board of `boards`, for the open sets `choose` gives
+/// for the board `n` from its U\*_{≥3}, with the time of each.  Returns what the boards made.
 fn check_the_search_on_boards(
     boards: RangeInclusive<u32>,
+    claims: bool,
     tactics: &[SearchTactics],
     mut choose: impl FnMut(u32, &[u32]) -> Vec<Vec<u32>>,
 ) -> Searched {
@@ -929,21 +1189,36 @@ fn check_the_search_on_boards(
         let upper_from_3 = upper_from_3(&Board::<8>::for_n(n));
         for open in choose(n, &upper_from_3) {
             let began = Instant::now();
-            let found = check_the_search(n, &open, tactics);
-            println!("n={n:>3} |O|={:>2}: {:>7} sets  {:.1?}", open.len(), found.sets, began.elapsed());
+            let found = check_the_search(n, &open, claims, tactics);
+            println!(
+                "n={n:>3} {} |O|={:>2}: {:>7} sets  {:.1?}",
+                formulation(claims),
+                open.len(),
+                found.sets,
+                began.elapsed()
+            );
             total.add(&found);
         }
     }
-    println!("the boards {boards:?}: {total:?} in {:.1?}", start.elapsed());
+    println!("the boards {boards:?}, {}: {total:?} in {:.1?}", formulation(claims), start.elapsed());
     total
 }
 
 /// The search of Π⁺(∅) on every board from 2 to 80, under the default tactics and those of extended mode (the search
-/// is the frame model's, but for the claims of `unzip` put back, and takes either).
+/// is the frame model's, but for the pairs of `unzip` left in the frames, and takes either).
 #[test]
 fn the_search_with_no_open_source_finds_the_heaviest_set() {
     let both = [SearchTactics::default(), SearchTactics::extended()];
-    let found = check_the_search_on_boards(2..=80, &both, |_, _| vec![Vec::new()]);
+    let found = check_the_search_on_boards(2..=80, false, &both, |_, _| vec![Vec::new()]);
+    assert_eq!(found.searches, 2 * 79);
+}
+
+/// [`the_search_with_no_open_source_finds_the_heaviest_set`] with the claims of `unzip`: the search is then the frame
+/// model's own.
+#[test]
+fn the_search_with_no_open_source_finds_the_heaviest_set_with_claims() {
+    let both = [SearchTactics::default(), SearchTactics::extended()];
+    let found = check_the_search_on_boards(2..=80, true, &both, |_, _| vec![Vec::new()]);
     assert_eq!(found.searches, 2 * 79);
 }
 
@@ -952,7 +1227,18 @@ fn the_search_with_no_open_source_finds_the_heaviest_set() {
 #[test]
 fn the_search_with_open_sources_finds_the_heaviest_set() {
     let mut rng = Rng(0x2C1B_3C6D_9E37_79B9);
-    let found = check_the_search_on_boards(2..=80, &[SearchTactics::extended()], |_, from_3| {
+    let found = check_the_search_on_boards(2..=80, false, &[SearchTactics::extended()], |_, from_3| {
+        random_open_sets(&mut rng, from_3, 3, 8)
+    });
+    assert!(found.with_open > 100, "{found:?}");
+    assert!(found.with_one_sided * 2 > found.with_open, "most answers play an open source: {found:?}");
+}
+
+/// [`the_search_with_open_sources_finds_the_heaviest_set`] with the claims of `unzip`, for other random subsets.
+#[test]
+fn the_search_with_open_sources_finds_the_heaviest_set_with_claims() {
+    let mut rng = Rng(0x7A6D_5E2F_3C4B_1A09);
+    let found = check_the_search_on_boards(2..=80, true, &[SearchTactics::extended()], |_, from_3| {
         random_open_sets(&mut rng, from_3, 3, 8)
     });
     assert!(found.with_open > 100, "{found:?}");
@@ -962,7 +1248,17 @@ fn the_search_with_open_sources_finds_the_heaviest_set() {
 /// The search of Π⁺(U\*_{≥3}), every source of three or more prime factors open, on every board from 2 to 60.
 #[test]
 fn the_search_with_every_source_open_finds_the_heaviest_set() {
-    let found = check_the_search_on_boards(2..=60, &[SearchTactics::extended()], |_, from_3| vec![from_3.to_vec()]);
+    let found =
+        check_the_search_on_boards(2..=60, false, &[SearchTactics::extended()], |_, from_3| vec![from_3.to_vec()]);
+    assert!(found.with_open > 20, "{found:?}");
+    assert!(found.with_one_sided * 2 > found.with_open, "most answers play an open source: {found:?}");
+}
+
+/// [`the_search_with_every_source_open_finds_the_heaviest_set`] with the claims of `unzip`.
+#[test]
+fn the_search_with_every_source_open_finds_the_heaviest_set_with_claims() {
+    let found =
+        check_the_search_on_boards(2..=60, true, &[SearchTactics::extended()], |_, from_3| vec![from_3.to_vec()]);
     assert!(found.with_open > 20, "{found:?}");
     assert!(found.with_one_sided * 2 > found.with_open, "most answers play an open source: {found:?}");
 }
@@ -973,6 +1269,16 @@ fn the_search_with_every_source_open_finds_the_heaviest_set() {
 #[test]
 #[ignore = "takes twenty seconds; the boards to 60 are in the default test"]
 fn the_search_with_every_source_open_finds_the_heaviest_set_61_to_69() {
-    let found = check_the_search_on_boards(61..=69, &[SearchTactics::extended()], |_, from_3| vec![from_3.to_vec()]);
+    let found =
+        check_the_search_on_boards(61..=69, false, &[SearchTactics::extended()], |_, from_3| vec![from_3.to_vec()]);
+    assert!(found.with_open > 0 && found.with_one_sided * 2 > found.with_open, "{found:?}");
+}
+
+/// [`the_search_with_every_source_open_finds_the_heaviest_set_61_to_69`] with the claims of `unzip`.
+#[test]
+#[ignore = "takes twenty seconds; the boards to 60 are in the default test"]
+fn the_search_with_every_source_open_finds_the_heaviest_set_61_to_69_with_claims() {
+    let found =
+        check_the_search_on_boards(61..=69, true, &[SearchTactics::extended()], |_, from_3| vec![from_3.to_vec()]);
     assert!(found.with_open > 0 && found.with_one_sided * 2 > found.with_open, "{found:?}");
 }
