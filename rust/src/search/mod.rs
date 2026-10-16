@@ -91,8 +91,8 @@ pub use diagnostics::{cut, Diagnostics, GAP_BUCKETS};
 pub use incumbent::Neighbourhood;
 pub use searcher::{stat, Found, Gf2Branching, SearchSpace, TaxSearcher, TaxUnit};
 pub use setup::{
-    prepare, prepare_extended, prepare_extended_for_resume, prepare_for_resume, problem_of, PrepareTimings, Prepared,
-    Problem, ProblemSize,
+    extended_words, prepare, prepare_extended, prepare_extended_for_resume, prepare_for_resume, problem_of,
+    PrepareTimings, Prepared, Problem, ProblemSize,
 };
 pub use tactics::SearchTactics;
 

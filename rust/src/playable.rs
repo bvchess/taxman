@@ -3,13 +3,15 @@
 //! The decision is the peel of heuristics/THEORY.md (Theorems 1 to 3): a set is playable, that is, some order of it is
 //! a legal game on the board `1..=n`, exactly when the peel pairs every member with a maximal factor of its own,
 //! whatever the order of the peel's moves.  The code uses only the tables of maximal factors and composites of
-//! [`taxman::numtheory::Tables`], which are foundation code, and `std`: it shares nothing with `frames` or `model`, so
-//! a test that decides playability here checks the frame model against the board and not against itself.
+//! [`crate::numtheory::Tables`], which are foundation code, and `std`: it shares nothing with `frames` or `model`.  So
+//! the tests that decide playability here check the frame model against the board and not against itself
+//! (`tests/model_exact.rs`, `tests/model_extended.rs`), and `taxman certify` ([`crate::certify`]) orders the game of a
+//! set that beats a recorded score with it, independently of the search that found the set.
 //!
 //! [`peel`] gives the pairing, [`playable`] the answer, and [`play_order`] a legal order of the set.
 
+use crate::numtheory::Tables;
 use std::mem;
-use taxman::numtheory::Tables;
 
 /// A move of the peel.
 enum Move {

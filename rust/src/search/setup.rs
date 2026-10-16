@@ -203,8 +203,7 @@ pub fn prepare_extended<const W: usize>(
     if let Some(refusal) = tactics.refusal_with_one_sided().filter(|_| !one_sided.is_empty()) {
         return Err(refusal);
     }
-    let (model, root, build) = build_root::<W>(tables, columns, one_sided)?;
-    let candidates = one_sided.iter().fold(*candidates, |set, &(s, _)| set.with(s));
+    let (model, root, candidates, build) = build_extended_root::<W>(tables, columns, one_sided, candidates)?;
     if !one_sided.is_empty() {
         // Each open source adds one to its frame's rank, which can take a frame past the engines of this set width.
         let words = Gf2Graph::new(&model, &root, &candidates).words();
@@ -223,6 +222,36 @@ pub fn prepare_extended<const W: usize>(
     let max_total = max_total(&model, &root, &candidates);
     let n = tables.n;
     Ok(Prepared { n, model: Arc::new(model), root, candidates, tactics, greedy, max_total, timings })
+}
+
+/// How many block words the GF(2) bound of the problem of [`prepare_extended`] needs at its root
+/// ([`Gf2Graph::words`]), whatever the tactics: what decides the set widths it can be searched at
+/// ([`Gf2Bound::MOST_WORDS`]).
+///
+/// # Errors
+///
+/// If the frames cannot be built into a model.
+pub fn extended_words<const W: usize>(
+    tables: &Tables,
+    columns: &[Vec<u32>],
+    one_sided: &[(u32, usize)],
+    candidates: &Bits<W>,
+) -> Result<usize, String> {
+    let (model, root, candidates, _) = build_extended_root::<W>(tables, columns, one_sided, candidates)?;
+    Ok(Gf2Graph::new(&model, &root, &candidates).words())
+}
+
+/// The model and root of [`build_root`], the search's candidates (`candidates` and the one-sided ones), and the time it
+/// took.
+fn build_extended_root<const W: usize>(
+    tables: &Tables,
+    columns: &[Vec<u32>],
+    one_sided: &[(u32, usize)],
+    candidates: &Bits<W>,
+) -> Result<(FrameGraph, FrameSet<W>, Bits<W>, Duration), String> {
+    let (model, root, build) = build_root::<W>(tables, columns, one_sided)?;
+    let candidates = one_sided.iter().fold(*candidates, |set, &(s, _)| set.with(s));
+    Ok((model, root, candidates, build))
 }
 
 /// [`prepare`] for resuming the search checkpointed in `checkpoint`, with the tactics the checkpoint records.  Fails,

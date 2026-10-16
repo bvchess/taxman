@@ -550,7 +550,8 @@ problem"](../heuristics/THEORY.md#the-extended-problem); `frames::build_extended
 sources of three or more prime factors that setup keeps left optional, and nothing claimed by `unzip`.  Besides the
 candidates of the frame model (*two-sided*: out of one frame, into the one in front) it has *one-sided* candidates, the
 members of O and the sources greedy rejected beside them, each a possible move of its *own* frame.  It is the
-problem that a certificate of U searches (THEORY.md, the corollary of Theorem M⁺).  Research code: the solver's own path
+problem that a certificate of U searches (THEORY.md, the corollary of Theorem M⁺; `taxman certify`, section 8,
+"Certificates of U").  Research code: the solver's own path
 never builds one, and with no one-sided candidate every piece below is what it was.
 
 * **The model** (`model`, "One-sided candidates"): `FrameGraph::build_extended` gives each one-sided candidate its own
@@ -901,6 +902,33 @@ structure from the lines (m earlier, completed, settling its search; the recorde
 promotions equal; score − in_the_bag equal; the assumptions inherited), and says that it takes the problems' equality,
 like an exhausted search, on trust.
 
+### Certificates of U
+
+A score whose proof uses the frame model (`exhausted`, `trivial`, `same_search`) is the optimum on the whole board when
+U holds at n (section 2).  `taxman certify A-B --results FILE... --upper FILE... --out FILE` (`src/certify.rs`) proves
+that game by game, by the corollary of Theorem M⁺ (THEORY.md, "The extended problem").  For a game whose line in the
+prover's barred parity bounds (`prover/data/upper_*.jsonl`) says it needs one, it takes that line's open members O,
+sets up the extended problem Π⁺(O) in extended mode (section 4, "Extended mode"), the other members of U\*_{≥3}
+fixed, and searches it from the recorded game, as the promotion set (O, its moves up to n/2), with the ceiling
+n + score(n − 1) − in_the_bag⁺.  Before the search it checks that the game replays to its score, plays U\* above n/2
+and is a promotion set of Π⁺(O) worth the score (Theorem M⁺ says a playable one is).
+
+* *certified*: the search ends with nothing better, so opt(n) is the score, given that the members not open were
+  certified against it; a line of the bounds whose score is above the recorded one certifies nothing against it, and
+  is refused.
+* *beaten*: the search found a promotion set worth more.  Its set F ∪ K ∪ L is played in the order of the peel of
+  `playable` (the whole-board oracle, which shares nothing with the frame model), finished with the largest legal
+  move left until none is, and refereed by `game::replay_finished`: a counterexample to the score, and to U if the
+  score rests on the frame model.  It is written to `<out>.counterexample.jsonl` as well, and the run exits with
+  status 2.
+
+One line a game in `--out`: the board, the score, the open members, how many sources greedy rejected beside them,
+the frames and candidates of Π⁺(O), the nodes and seconds of the search, the threads and set width, the verdict, the
+digest of Π⁺(O) and the build.  A search stopped by a limit or a signal writes an `incomplete` line and keeps its
+checkpoint (the same flags as `solve`'s); a rerun skips the games with a verdict and resumes the others.  A problem
+whose GF(2) bound needs more block words than the engines of the board's set width have is searched at the widest set
+width (128 words, five words of engine).
+
 ## 9. Testing
 
 **Before a change is merged** (what a reviewer of a subagent's work runs, besides reading it; the tests are described
@@ -939,7 +967,7 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   fresh computation.
 * **The frame model's exactness** (THEORY.md, Theorems B and M; section 2, "What optimal means"):
   `tests/model_exact.rs` decides playability on the whole board with an oracle that shares no code with `frames` or
-  `model` (`tests/common/playable.rs`, the peel; itself checked against the rules on every subset of the boards to
+  `model` (`src/playable.rs`, the peel; itself checked against the rules on every subset of the boards to
   20), and checks both directions of Theorem M on every set of every board to 100 (to 120 ignored) and on random sets
   of boards to 1300 (to 8191 ignored), and the near miss that only the candidate filter keeps out (n = 98);
   `tests/model_extended.rs` checks Theorem M⁺ (the extended problem, with sources of three or more prime factors
@@ -1017,7 +1045,11 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   under the bound; random paths to 1300 matching the matroids built afresh at every node); the soundness harness in
   extended mode on every board 2..=300 under eight configurations, and a game resumed every 1,000 nodes; the header's
   digest of the one-sided candidates and the refusals of what extended mode cannot take (tactics, block words, another
-  problem's checkpoint).
+  problem's checkpoint).  `taxman certify` (`tests/certify.rs`): every game of 600..=1300 that needs a certificate
+  certified (ignored; a sample by default) and some past 1300; a planted wrong score beaten by a game the referee
+  accepts, with status 2 and the counterexample file, and said again by a rerun; a certificate's search stopped every
+  1,000 nodes and resumed to the same verdict; the games a certificate cannot be made for refused; the file of
+  certificates and the bounds' files read as they should be.
 * **Engine** (`tests/engine.rs`, `tests/robustness.rs`, `tests/stop_signal.rs`): a toy problem with a known optimum
   (knapsack against dynamic programming), run with 1 and many threads, with a tiny `queue_mem_cap` to force spilling,
   and killed and resumed from checkpoints, must give the same answer; ignored tests do the same with 64 and 192 threads,

@@ -115,6 +115,18 @@ impl<const W: usize> Board<W> {
         Ok((extended, prepared))
     }
 
+    /// How many block words the GF(2) bound of Π⁺(`open`) needs at its root ([`search::extended_words`]): opening a
+    /// source adds one to its frame's rank, so a problem with many open sources can need more than the engines of this
+    /// set width have, which [`prepare_extended_with`](Self::prepare_extended_with) refuses.
+    ///
+    /// # Errors
+    ///
+    /// As [`build_extended`], and if the frames cannot be built into a model.
+    pub fn extended_words(&self, open: &Bits<W>) -> Result<usize, String> {
+        let extended = build_extended(&self.tables, open)?;
+        search::extended_words(&self.tables, &extended.columns(), &extended.one_sided, &extended.candidates)
+    }
+
     /// [`prepare_extended_with`](Self::prepare_extended_with) for resuming the checkpoint at `checkpoint`, with its
     /// tactics ([`search::prepare_extended_for_resume`]).
     ///

@@ -3,7 +3,8 @@
 //! The subcommands are in `commands.rs`; the flag parser, the error type and the output macros they share are in
 //! `cli.rs`.  Every subcommand is a plain function of the arguments after its name.  A command
 //! that fails prints `error: ...` and exits with status 1; a bad command line prints the usage and exits with
-//! status 2; a run that SIGINT or SIGTERM stopped (see `solve`) exits with 128 plus the signal.
+//! status 2; a run that SIGINT or SIGTERM stopped (see `solve`) exits with 128 plus the signal; `certify` exits with
+//! status 2 when it finds a game that beats a recorded score.
 
 mod cli;
 mod commands;
@@ -60,6 +61,15 @@ commands:
                           write the built-in optimal.json (or the table FILE) to --out FILE with the games of the
                           results file RESULTS appended: from the board size after the table's last, each game that
                           RESULTS has completed, up to the first that it lacks.  A rebuild takes in a changed table
+  certify A-B --results FILE... --upper FILE... --out FILE [options]
+                          prove the recorded scores of A..B that rest on the frame model on the whole board, game
+                          by game: the extended problem with the open members of the barred bounds (--upper,
+                          the prover's `upper` files) optional, searched from the recorded game (--results, over
+                          optimal.json); one line a game in --out, certified or beaten; a game that beats its
+                          score is also written to OUT.counterexample.jsonl and the run exits with status 2.
+                          Options: --threads K, --checkpoint-dir DIR, --checkpoint-interval S, --progress S,
+                          --time-limit S, --node-limit N, --mem-cap UNITS, as for solve; a rerun skips the games
+                          --out has a verdict for and resumes a stopped search from its checkpoint
   tables N K...           print the maximal factors and composites of each K on the board 1..=N
   help                    show this message
 ";
@@ -85,6 +95,10 @@ fn main() -> ExitCode {
             errln!("error: {message}");
             ExitCode::FAILURE
         }
+        Err(CliError::Counterexample(message)) => {
+            errln!("counterexample: {message}");
+            ExitCode::from(2)
+        }
     }
 }
 
@@ -104,6 +118,7 @@ fn run(args: &[String]) -> CliResult {
         "verify-results" => commands::verify_results(rest),
         "extend-optimal" => commands::extend_optimal(rest),
         "tables" => commands::tables(rest),
+        "certify" => commands::certify(rest),
         other => Err(CliError::Usage(format!("unknown command {other:?}"))),
     }
 }

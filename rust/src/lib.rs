@@ -54,6 +54,7 @@
 //! |---|---|---|
 //! | foundations | [`game`] | the rules as a referee ([`game::replay`]), and the table of optimal games |
 //! | | [`numtheory`] | maximal factors and composites, primes, divisors of the numbers on a board |
+//! | | [`playable`] | whether a set of numbers can all be played on the whole board, with nothing of the frame model |
 //! | | [`bits`] | fixed-width bitsets `Bits<W>` for sets of game numbers; the set widths, dispatched |
 //! | | [`json`] | a small JSON reader and writer (the table of optimal games, golden data, results lines) |
 //! | frame model | [`frames`] | the frames of a board: formed, simplified, numbered from the front and merged |
@@ -68,6 +69,7 @@
 //! | | [`board`] | a board analysed and prepared for a search: tables, frames, ceiling and seed |
 //! | | [`solver`] | the per-game pipeline, the options, the range driver |
 //! | | [`results`] | what a result line records about its proof, and the checks a results file passes |
+//! | | [`certify`] | `taxman certify`: a recorded score proven on the whole board by a search of the extended problem |
 //! | | [`paths`] | where the default files are, found at run time |
 //! | studies | [`brute`] | exhaustive search without the frame model, to certify small boards |
 //! | | [`sacrifice`] | the sacrifice bound and punctured games; not used by the solver |
@@ -84,6 +86,7 @@ pub mod bits;
 pub mod board;
 pub mod bounds;
 pub mod brute;
+pub mod certify;
 pub mod engine;
 pub mod frames;
 pub mod game;
@@ -93,6 +96,7 @@ pub mod matchbound;
 pub mod model;
 pub mod numtheory;
 pub mod paths;
+pub mod playable;
 pub mod results;
 pub mod sacrifice;
 pub mod search;

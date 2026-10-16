@@ -1096,8 +1096,8 @@ fn different_tactics(checkpoint: &Path, made: SearchTactics, now: Tactics) -> St
 }
 
 /// Deletes game `n`'s checkpoint, if checkpointing is on.  Called only once the game's result is safe: in the
-/// results file, or (without one) handed to the caller.
-fn discard_checkpoint(opts: &SolveOptions, n: u32) {
+/// results file (or `taxman certify`'s file of certificates), or (without one) handed to the caller.
+pub fn discard_checkpoint(opts: &SolveOptions, n: u32) {
     if let Some(path) = opts.checkpoint_file(n) {
         if let Err(e) = engine::remove_checkpoint(&path) {
             let _ = writeln!(std::io::stderr(), "warning: cannot remove the checkpoint of a finished game: {e}");
@@ -1110,7 +1110,7 @@ fn discard_checkpoint(opts: &SolveOptions, n: u32) {
 /// one, or one's removing it would fail the other's creating it.  The spill directory of the checkpoint directory is
 /// shared by the games of a range, which may search side by side, so the range removes it when it ends
 /// ([`shared_spill_dir`]); one the options name is the caller's.
-fn spill_dir(opts: &SolveOptions, n: u32) -> (PathBuf, bool) {
+pub(crate) fn spill_dir(opts: &SolveOptions, n: u32) -> (PathBuf, bool) {
     static TEMP_DIRS: AtomicU64 = AtomicU64::new(0);
     if let Some(dir) = opts.spill_dir.clone().or_else(|| shared_spill_dir(opts)) {
         (dir, false)
