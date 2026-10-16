@@ -401,6 +401,17 @@ with three or more factors.  At the roots of 880–1300 its gap to the optimum i
   than all smaller ones); when that is the parent's optimum, the child inherits it with no solve.  The parent here
   is the node as it was before it went on without the member the child promotes (it is kept aside for that), so
   that the child finds the node's optimum among those sets.
+* **Tableaux derived, not built.**  A solved level whose tableau the workspace no longer holds (a child that inherited
+  or was certified, a node going on without the member it branched on) needs it for its weight split.  A solve from
+  its optimum would build it, a pivot per member over its block; `Meet::derive` makes the same tableau (the same free
+  elements, circuits, slots and lists, which is all that is read of a tableau outside a solve) from a related one, at
+  a cost linear in the elements: from the parent's, which the workspace still holds when the child is checked (the
+  promoted members' slots dropped from the circuits, a contraction, and for a certified child the set first flipped
+  along the cycle by exchanges, each a pivot that keeps the span), or for the node from a copy of its own tableau
+  saved when it kept the certified level (`Snapshot`).  A block where an exchange would change the span is built, and
+  the elements the parent did not have (its own loops, candidates again in the child) are reduced by the block's
+  members.  The module comment of `src/gf2/meet.rs` ("Deriving a tableau") has the argument; the random paths of the
+  tests check every derived tableau against the one a solve builds.  The trees are the same.
 * **The heaviest set without a member, with no solve.**  The heaviest set without a member `x` of the optimum `I*`
   is, in practice, `I*` flipped along one cycle of its exchange graph through `x`; `Meet::without` finds the shortest
   such cycle by Dijkstra's search over the weight split's reduced lengths (below), checks the flipped set common
@@ -414,15 +425,21 @@ with three or more factors.  At the roots of 880–1300 its gap to the optimum i
 * **Forced members.**  The optimum's weight split (Frank: `w = w1 + w2` with the optimum heaviest in `A` for `w1` and
   in `B` for `w2`, from difference constraints by Bellman–Ford, each round from the vertices that changed) bounds the
   intersection without each member in one pass, by weak duality; a member without which it is below `need` is
-  forced, as the matching's are.  The split's bound is loose, so for the members it leaves free within `FORCE_WINDOW`
-  (80) of `need`, the exchange graph decides: a member is forced too when no cycle through it is shorter than the
-  slack `value − need` and the sets of other sizes lose more than that (`Meet::has_cycle_within`).
+  forced, as the matching's are.  The split's bound is loose, so for the members it leaves free within the tactic
+  `force_window` (80, `gf2::FORCE_WINDOW`) of `need`, the exchange graph decides: a member is forced too when no
+  cycle through it is shorter than the slack `value − need` and the sets of other sizes lose more than that
+  (`Meet::has_cycle_within`); a member on a cycle that the search for another found within the slack is not searched,
+  since that cycle passes through it.  The searches reach the elements free in `A` from the members, and the members
+  from the elements free in `B`, through one hub each (the least distance plus `w1`, less `w2`), which keeps their
+  distances, order and cycles; their queue is a radix heap of the packed (distance, vertex) keys, which come out in
+  the binary heap's order.
 * **Exact strong branching.**  The member of the conflict to branch on is the one without which the intersection
   is lowest, each bound read off the exchange graph where it is certified and solved where not (in the order of the
   split's bounds, each solve stopped once it reaches both the lowest so far and `need`, a greedy lower bound tried
   first); a member whose bound falls below `need` is forced too, and the chosen member's level, certified or solved,
   is what the node goes on with.  The cheaper choices (the split's bound alone, the largest member) take more nodes
-  and more time (EXPERIMENTS: "The GF(2) bound in the search").
+  and more time (EXPERIMENTS: "The GF(2) bound in the search"); the tactics `branching`, `strong_limit`,
+  `strong_depth`, `deep_branching` and `more_forced` choose among them, and how far strong branching goes (section 5).
 * **What it replaces.**  With `gf2` the matching bound is not computed (as a first check before the intersection it
   costs more than the cuts it saves), so `match_refine` has no effect; the conflicts, nogoods, forced members and
   exact sets are used as with the matching bound.  The Lagrangian bound over nogoods still applies after it when on,
@@ -604,9 +621,11 @@ claims some O refuses (`m5_refused`).  `Board::extended(open, claims)` is the on
 ## 5. Tactics
 
 Each row is a tactic in `tactics::Tactics`, set from the CLI with `--tactic name=value` (`on` or `off`; `match_refine`
-`0`…`7`).  The ones that act inside the search are the fields of `search::SearchTactics`; `examples/ladder.rs` takes
-the same names for them.  Status words: *proven* (a theorem, given a premise) and *sound* (never prunes a promotable
-optimum); every tactic is one or the other, and switching one off changes how fast an answer comes, never the answer.
+`0`…`7`; the tactics that tune the GF(2) search, `force_window` to `more_forced`, as their rows say).  The ones that
+act inside the search are the fields of `search::SearchTactics`; `examples/ladder.rs` takes the same names for them.
+A checkpoint records the search tactics in its header (section 6).  Status words: *proven* (a theorem, given a premise)
+and *sound* (never prunes a promotable optimum); every tactic is one or the other, and switching one off changes how
+fast an answer comes, never the answer.
 A test (`tests/docs.rs`) checks that this table lists the tactics of `tactics::Tactics`, in order, with their
 defaults.
 
@@ -621,6 +640,12 @@ defaults.
 | `lagrange` | off | proven (weak duality, for any multipliers over valid nogoods; `matchbound::lagrange`) | with `nogoods`, where the node bound leaves a node open, bound it also by a Lagrangian relaxation of the searcher's nogoods kept along its path (over the matching bound), and (with `fix_forced`) force the members without which that bound would cut; the multipliers are refitted at the root as the searcher learns (section 4).  On by default until `gf2`; with `gf2` it changes no tree and costs 2-4% |
 | `gf2` | on | proven (heuristics/THEORY.md, Theorem 11; weak duality for the forced members) | bound every node by the GF(2) bound (section 4) instead of the matching bound and its refinement, branch on the conflicts of its heaviest set by exact strong branching, and (with `fix_forced`) force the members without which it would cut; the Lagrangian bound over nogoods, if on, applies after it |
 | `symmetry` | on | proven (heuristics/THEORY.md, Theorem 13) | cut a node whose completions all break a symmetric pair's inequality, and drop from a node's candidates those that no completion keeping the inequalities holds (section 4, "Prime exchanges") |
+| `force_window` | 80 | sound (a member is called forced only where the exchange graph shows every completion without it short) | with `gf2` and `fix_forced`, which members of a node's heaviest set the weight split leaves free are searched for being forced by the exchange graph: those whose split bound is less than this far above the need (`0`: none), less than a percentage of the node's slack above it (`25%`), or `all`; a wider window forces more members (a smaller tree) for more searches (section 4, "Forced members") |
+| `branching` | exact | sound (every completion leaves out some member of the conflict) | with `gf2`, how a node chooses the member of its conflict to branch on: `exact` (the bound without each member, certified or solved), `forced` (each solved only as far as the need, the branch by the split's bound), `split` (the split's bound alone), `largest`; the cheaper choices take more nodes |
+| `strong_limit` | all | sound (as `branching`) | with `gf2`'s strong branching (`exact` or `forced`), the most members of a conflict whose bounds are found, the most promising by the split's bound first |
+| `strong_depth` | all | sound (as `branching`) | with `gf2`, a node with at least this many promotions branches as `deep_branching` says instead of `branching` (`all`: none does), so that the deep nodes, the most numerous, can choose more cheaply |
+| `deep_branching` | split | sound (as `branching`) | the choice of `branching` at the nodes `strong_depth` names |
+| `more_forced` | on | sound (as `fix_forced`) | with `gf2`'s strong branching and `fix_forced`: once a member is found forced, the bounds of the other members are still found, to find more forced members |
 | `prev_cap` | on | proven if opt(n−1) is optimal | stop as soon as the incumbent reaches n + opt(n−1) − in_the_bag (`FrameSolver.getMaxPromotionSum`) |
 | `seed_incumbent` | on | sound (any promotion set is a valid incumbent) | start from the better of greedy and the n−1 solution's promotions that are still promotable |
 
@@ -818,9 +843,11 @@ file it appends to.
 
 **What identifies a checkpoint.**  The header the search stores: a format version, the set width, n, digests of the root
 candidates, of the frames (every frame's moves, factors and freedoms, as built) and of the one-sided candidates of the
-extended problem (section 4, "Extended mode"), `max_total` and the tactics (format version 5).  This build also reads
-version 4, the format of the builds before the extended problem's search, whose headers lack the digest of the one-sided
-candidates:
+extended problem (section 4, "Extended mode"), `max_total` and the tactics (format version 5), and in format version
+6 the tactics that tune the GF(2) search (`force_window` to `more_forced`, section 5) after them: a search whose tuning
+is the default writes version 5, which implies it, so its checkpoint is the one the builds before those tactics wrote,
+and one whose tuning is not writes version 6.  This build also reads version 4, the format of the builds before the
+extended problem's search, whose headers lack the digest of the one-sided candidates:
 those builds searched no problem with one-sided candidates, so a version-4 header reads as version 5 with the digest of
 none, every other field is checked as for version 5, the run goes on under the header it was written with (the engine
 compares it byte for byte), and a version-4 checkpoint asked to resume a search with one-sided candidates is refused,
@@ -1123,8 +1150,8 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   warm start, with members deleted, and its weight split's bounds without each member; on the boards up to 400 the
   bound is never below the exhaustive best completion and the optimal promotions are independent in both matroids;
   and along random paths of games 60–1000 (promotions, deletions, backtracking) every level equals the matroids built
-  afresh at its node, and every member it calls forced is (the bound without it, solved afresh, is below what the
-  node needs), and along the same kind of paths the copies of every word count (1 to 5, padded) give the same results
+  afresh at its node, every member it calls forced is (the bound without it, solved afresh, is below what the
+  node needs), and every tableau derived instead of built is the one a solve builds, and along the same kind of paths the copies of every word count (1 to 5, padded) give the same results
   and do the same work; blocks of more than 255 members (five words) against the greedy algorithm, one matroid free
   and the other random; at the 600 nodes of the probe's fixtures (936 and 1215), completions promoted in random orders
   are independent in the node's matroids and no heavier than its bound, and the matching path's search started from
@@ -1350,7 +1377,11 @@ to 2175 took 27 minutes on 8 ([results/README.md](results/README.md)); its cost 
 follow the root's GF(2) gap, with no growth that a fit over 1301–2175 resolves.  Past 2175 it grows, tenfold per about
 1,040 in n, and a day on one 64-CPU cloud machine took the chain from 2176 to 3440 (the [cloud
 run](docs/experiments/the-frontier-chain-to-3440-2026-10.md) sets it beside the projections of the day: near 4,100, and
-3,400 to 3,700 at their pessimistic end); the widths go to 8191.
+3,400 to 3,700 at their pessimistic end); the widths go to 8191.  At the end of that chain (3441 resumed from the cloud
+run's checkpoint, one thread) a step cost 888k cycles, 92% of it in the GF(2) bound; with its tableaux derived, a hub
+for the elements free in `B` and the other changes of [cheaper GF(2)
+nodes](docs/experiments/cheaper-gf2-nodes-same-trees-2026-10.md) it costs 543k, the same trees (3,570 to 5,865 nodes a
+CPU-second).
 
 **The matching path** (the default before the GF(2) bound; these are the build of commit 4b6ef38, on the M1 Max): the
 proof of 1215 takes 33 s on one thread (106 G cycles), and 1184 takes 3.2 G cycles.  The chain 1..1231 took 279 s of

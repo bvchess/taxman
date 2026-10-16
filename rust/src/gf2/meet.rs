@@ -205,6 +205,30 @@ const FREE_A: u32 = u32::MAX - 1;
 /// `I` by one addition and a few exchanges in each matroid, and each is a pivot over the block's live elements
 /// ([`Meet::add`], [`Meet::exchange`]); when a path's changes cannot be applied as pivots in some order (an exchange
 /// across blocks, or with an element independent of `I`), the blocks they touch are rebuilt from their members.
+///
+/// # Deriving a tableau
+///
+/// Outside a solve only part of the tableau is ever read: which elements are free (`res[e] ≠ 0`), the circuits of the
+/// others (`mask[e]`), the member in each slot, and the lists of members and of the elements outside the set.  Of
+/// these the free elements and the circuits depend on the set alone, not on how the tableau was made, and a rebuild
+/// numbers each block's slots by increasing member.  So a tableau equal to the one a solve would build for a set
+/// follows from the tableau of a related set, at a cost linear in the elements instead of a pivot per member
+/// ([`derive`](Self::derive)):
+///
+/// * Exchanging a member `x` for an element `y` in the span whose circuit holds `x` keeps the span, so it changes
+///   no residue and is the pivot of [`exchange`](Self::exchange).  Two independent sets of a block with the same
+///   span are a pivot apart for every element of one that is not in the other (the circuit of such a `y` must hold
+///   a member that is not in the other set, which would be dependent otherwise), so the pivots reach the other set.
+///   A block where an element that enters is free, or where the numbers that enter and leave differ, is built.
+/// * Contracting by members `C` of the set `S` (promoting them): an element is in the span of `S − C` in the
+///   contraction exactly when it is in the span of `S`, and its circuit there is its circuit with respect to `S`
+///   less `C` (the vectors reduced modulo those of `C`).  So the circuits carry over without the slots of `C`.
+/// * Deleting elements that are not members changes no other element's circuit.
+/// * Numbering the slots by increasing member renames the bits of the circuits.
+///
+/// The search derives a child's tableau from its parent's (inherited, the members it promotes contracted; or
+/// certified, flipped along a cycle and contracted), and a node's without the member it branched on from its own,
+/// flipped along the certified cycle, from a copy ([`Snapshot`]) kept while the child's subtree uses the workspace.
 pub struct Meet<const R: usize> {
     mask: [Vec<Vector<R>>; 2],
     res: [Vec<Vector<R>>; 2],
@@ -229,7 +253,9 @@ pub struct Meet<const R: usize> {
     /// The last augmenting path, from its source to its sink.
     path: Vec<u32>,
     /// Bellman–Ford's worklist: the outside elements and the members whose distance changed in the last phase,
-    /// the changed members' slots per block of each matroid, and the phase each vertex was last listed in.
+    /// the changed members' slots per block of each matroid, and the phase each vertex was last listed in (a
+    /// stamp, also of the other searches, `generation` the last one given; see
+    /// [`next_generation`](Self::next_generation)).
     changed_out: Vec<u32>,
     changed_in: Vec<u32>,
     changed_slots: [Vec<Vector<R>>; 2],
@@ -243,9 +269,11 @@ pub struct Meet<const R: usize> {
     /// Whether the last solve stopped at its `stop` weight, before the heaviest set.
     pub stopped: bool,
     /// After a solve that settled: how much lighter the heaviest common independent set one larger than the
-    /// heaviest set is (the last shortest path's length), `i64::MAX` if there is none.  The heaviest sets of all
-    /// larger sizes are lighter still (the weights by size are concave).
-    pub gap: i64,
+    /// heaviest set is (the last shortest path's length), `i64::MAX` if there is none ([`gap`](Self::gap)), for the
+    /// tableau `gap_for` (a derived tableau's is found when first asked for).  The heaviest sets of all larger sizes
+    /// are lighter still (the weights by size are concave).
+    gap: i64,
+    gap_for: u64,
     /// Solves made: a caller can tell whether the workspace still holds the tableau of a solve it made.
     pub solves: u64,
     /// The solve whose tableau the workspace holds (a greedy set counts as a solve and spoils it).
@@ -262,22 +290,168 @@ pub struct Meet<const R: usize> {
     pot: Vec<i64>,
     repl: [Vec<i64>; 2],
     /// [`without`](Self::without)'s scratch: its search's distances, predecessors (towards the member searched
-    /// from), settled stamps and heap; the elements outside the set in the span of A by the slots of their circuits
-    /// (`columns`, per block of A 64·R slots) and those free in A, both built for the tableau `columns_for` (and
-    /// shared with the split), the latter by decreasing `w1` for the tableau `free_sorted_for`; and the elements of
-    /// the cycle found.
+    /// from), settled stamps, when each was offered its distance, and heap; the elements outside the set in the span
+    /// of A by the slots of their circuits (`columns`, per block of A 64·R slots) and those free in A, both built for
+    /// the tableau `columns_for` (and shared with the split), the latter by decreasing `w1`, and the members by
+    /// increasing `w2`, for the tableau `sorted_for` and its split; and the elements of the cycle found.
     reach: Vec<Dist>,
     back: Vec<u32>,
     settled_at: Vec<u32>,
-    heap: BinaryHeap<Reverse<(Dist, u32)>>,
+    offered_at: Vec<u32>,
+    heap: Queue,
     columns: Vec<Vec<u32>>,
     columns_for: u64,
     free_a: Vec<u32>,
-    free_sorted_for: u64,
+    by_w2: Vec<u32>,
+    sorted_for: u64,
     flip: Vec<u32>,
+    /// The element that closed the cycle the last [`has_cycle_within`](Self::has_cycle_within) found (`NONE` for
+    /// none).
+    found: u32,
     /// Counters of [`without`](Self::without): calls, and those it certified.
     pub withouts: u64,
     pub withouts_exact: u64,
+    /// [`derive`](Self::derive)'s scratch: marks by element, the new slot of each old one, the elements that enter
+    /// and leave a block, and the live elements the tableau derived from did not have.
+    mark: Vec<u8>,
+    slot_map: Vec<u16>,
+    entering: Vec<u32>,
+    leaving: Vec<u32>,
+    fresh: Vec<u32>,
+    /// Counters: tableaux derived (of which from a snapshot), blocks built in them, and blocks where elements were
+    /// reduced.
+    pub derived: u64,
+    pub restored: u64,
+    pub built: u64,
+    pub reduced: u64,
+    /// In tests: a workspace that solves every derived tableau's problem again, to check the derived one against it,
+    /// and the tableaux it checked.
+    #[cfg(test)]
+    pub check: Option<Box<Meet<R>>>,
+    #[cfg(test)]
+    pub checked: u64,
+}
+
+/// The queue of the searches of the exchange graph, which take the entries `(distance, vertex)` least first (the
+/// vertex [`FREE_A`] after every element at the same distance).  When the distances stay below a bound under 2^49 and
+/// the elements fit 14 bits, the entries are keys of a [`RadixHeap`], the distance above the vertex (`FREE_A` the
+/// largest vertex): a search pushes no entry below the last it took (every arc adds an arc to the packed distance,
+/// and the hubs' entries are later still), so the keys are monotone and come out in the same order as from a binary
+/// heap, which takes the other searches.
+struct Queue {
+    radix: RadixHeap,
+    heap: BinaryHeap<Reverse<(Dist, u32)>>,
+    packed: bool,
+}
+
+impl Queue {
+    const BITS: u32 = 14;
+    const FREE: u64 = (1 << Self::BITS) - 1;
+
+    fn new(n: usize) -> Self {
+        Queue { radix: RadixHeap::new(), heap: BinaryHeap::with_capacity(n), packed: false }
+    }
+
+    /// Empties the queue for a search whose distances stay below `bound`, of elements numbered below `n`.
+    fn start(&mut self, bound: Dist, n: usize) {
+        self.packed = (0..1 << 49).contains(&bound) && (n as u64) < Self::FREE;
+        self.radix.clear();
+        self.heap.clear();
+    }
+
+    #[inline]
+    fn push(&mut self, d: Dist, v: u32) {
+        if self.packed {
+            let code = if v == FREE_A { Self::FREE } else { u64::from(v) };
+            self.radix.push((d as u64) << Self::BITS | code);
+        } else {
+            self.heap.push(Reverse((d, v)));
+        }
+    }
+
+    #[inline]
+    fn pop(&mut self) -> Option<(Dist, u32)> {
+        if self.packed {
+            self.radix.pop().map(|k| {
+                let code = k & Self::FREE;
+                ((k >> Self::BITS) as Dist, if code == Self::FREE { FREE_A } else { code as u32 })
+            })
+        } else {
+            self.heap.pop().map(|Reverse(entry)| entry)
+        }
+    }
+}
+
+/// A monotone priority queue of keys (Ahuja, Mehlhorn, Orlin and Tarjan's radix heap): every key pushed must be at
+/// least the last one popped, and a pop takes the least key.  A key sits in the bucket of the highest bit in which it
+/// differs from the last one popped (bucket 0 if it equals it); a pop with bucket 0 empty takes the least key of the
+/// first bucket that is not, and spreads that bucket over the ones below.
+struct RadixHeap {
+    buckets: Vec<Vec<u64>>,
+    /// Bit `i` set when bucket `i` is not empty.
+    full: u128,
+    last: u64,
+}
+
+impl RadixHeap {
+    fn new() -> Self {
+        RadixHeap { buckets: (0..65).map(|_| Vec::new()).collect(), full: 0, last: 0 }
+    }
+
+    fn clear(&mut self) {
+        let mut full = self.full;
+        while full != 0 {
+            self.buckets[full.trailing_zeros() as usize].clear();
+            full &= full - 1;
+        }
+        self.full = 0;
+        self.last = 0;
+    }
+
+    #[inline]
+    fn push(&mut self, key: u64) {
+        debug_assert!(key >= self.last, "a key below the last one popped");
+        let b = (64 - (key ^ self.last).leading_zeros()) as usize;
+        self.buckets[b].push(key);
+        self.full |= 1 << b;
+    }
+
+    #[inline]
+    fn pop(&mut self) -> Option<u64> {
+        if self.full & 1 == 0 {
+            if self.full == 0 {
+                return None;
+            }
+            let i = self.full.trailing_zeros() as usize;
+            let mut keys = std::mem::take(&mut self.buckets[i]);
+            self.full &= !(1 << i);
+            self.last = *keys.iter().min().expect("a bucket marked full");
+            for &k in &keys {
+                let b = (64 - (k ^ self.last).leading_zeros()) as usize;
+                self.buckets[b].push(k);
+                self.full |= 1 << b;
+            }
+            keys.clear();
+            self.buckets[i] = keys;
+        }
+        let k = self.buckets[0].pop();
+        if self.buckets[0].is_empty() {
+            self.full &= !1;
+        }
+        k
+    }
+}
+
+/// A copy of a workspace's tableau ([`Meet::save`]) to derive another from later ([`Meet::derive_from`]): per
+/// matroid, the elements by block (the blocks' ends in `ends`) with their masks and residues, and the members of each
+/// block in slot order (their ends in `slot_ends`).
+#[derive(Clone, Default)]
+pub struct Snapshot<const R: usize> {
+    elems: [Vec<u32>; 2],
+    ends: [Vec<usize>; 2],
+    rows: [Vec<(Vector<R>, Vector<R>)>; 2],
+    slots: [Vec<u32>; 2],
+    slot_ends: [Vec<usize>; 2],
 }
 
 impl<const R: usize> Meet<R> {
@@ -307,6 +481,7 @@ impl<const R: usize> Meet<R> {
             settled: false,
             stopped: false,
             gap: 0,
+            gap_for: 0,
             solves: 0,
             tableau: 0,
             value: 0,
@@ -319,14 +494,30 @@ impl<const R: usize> Meet<R> {
             reach: vec![INF; n],
             back: vec![NONE; n],
             settled_at: vec![0; n],
-            heap: BinaryHeap::with_capacity(n),
+            offered_at: vec![0; n],
+            heap: Queue::new(n),
             columns: vec![Vec::new(); blocks[0] * 64 * R],
             columns_for: 0,
             free_a: Vec::with_capacity(n),
-            free_sorted_for: 0,
+            by_w2: Vec::with_capacity(n),
+            sorted_for: 0,
             flip: Vec::with_capacity(n),
+            found: NONE,
             withouts: 0,
             withouts_exact: 0,
+            mark: vec![0; n],
+            slot_map: vec![NO_SLOT; 64 * R],
+            entering: Vec::new(),
+            leaving: Vec::new(),
+            fresh: Vec::new(),
+            derived: 0,
+            restored: 0,
+            built: 0,
+            reduced: 0,
+            #[cfg(test)]
+            check: None,
+            #[cfg(test)]
+            checked: 0,
         }
     }
 
@@ -352,7 +543,6 @@ impl<const R: usize> Meet<R> {
         stop: i64,
         mut report: impl FnMut(&[u32]),
     ) {
-        let w = p.weight;
         self.solves += 1;
         self.tableau = self.solves;
         for &e in live {
@@ -392,6 +582,14 @@ impl<const R: usize> Meet<R> {
                 self.rebuild(p, m, b);
             }
         }
+        self.lists(p, live);
+        report(&self.members);
+        self.augment(p, cap, stop, report);
+    }
+
+    /// The members of the set (`inside`) among the elements `live` (ascending), and the others by their block of A,
+    /// each in increasing order; the set's weight.
+    fn lists(&mut self, p: &Problem<'_, R>, live: &[u32]) {
         self.members.clear();
         for list in &mut self.out_a {
             list.clear();
@@ -402,8 +600,11 @@ impl<const R: usize> Meet<R> {
             self.pos[i] = list.len() as u32;
             list.push(e);
         }
-        self.value = self.members.iter().map(|&e| w[e as usize]).sum();
-        report(&self.members);
+        self.value = self.members.iter().map(|&e| p.weight[e as usize]).sum();
+    }
+
+    /// The augmentations of [`solve`](Self::solve) from the set the tableau describes, its weight in `self.value`.
+    fn augment(&mut self, p: &Problem<'_, R>, cap: usize, stop: i64, mut report: impl FnMut(&[u32])) {
         self.settled = false;
         self.stopped = false;
         loop {
@@ -413,14 +614,14 @@ impl<const R: usize> Meet<R> {
             }
             let Some(sink) = self.shortest_path(p) else {
                 self.settled = true;
-                self.gap = i64::MAX;
+                (self.gap, self.gap_for) = (i64::MAX, self.tableau);
                 return;
             };
             let gain = -self.dist[sink as usize].div_euclid(HOPS);
             if gain <= 0 {
                 // The heaviest set of all sizes (even if it has `cap` members).
                 self.settled = true;
-                self.gap = -gain;
+                (self.gap, self.gap_for) = (-gain, self.tableau);
                 return;
             }
             if self.members.len() >= cap {
@@ -444,6 +645,45 @@ impl<const R: usize> Meet<R> {
             self.value += gain;
             self.augmentations += 1;
             report(&self.members);
+        }
+    }
+
+    /// The next `k` stamps (`k` at most 2) for `seen` and `settled_at`, the last of them returned: a search compares a
+    /// stamp only for equality with its own, so none it finds may be left from an earlier one.  Before the counter
+    /// would wrap, every stamp is cleared (the stamps start over at 1); otherwise, after 2^32 stamps, one left from
+    /// that long ago would pass for a new one.
+    fn next_generation(&mut self, k: u32) -> u32 {
+        if self.generation > u32::MAX - k {
+            self.seen.fill(0);
+            self.settled_at.fill(0);
+            self.generation = 0;
+        }
+        self.generation += k;
+        self.generation
+    }
+
+    /// After a solve that settled, or a [`derive`](Self::derive), with the workspace still holding it: how much
+    /// lighter the heaviest common independent set one larger than the heaviest set is, `i64::MAX` if there is none.
+    /// The heaviest sets of all larger sizes are lighter still (the weights by size are concave).
+    pub fn gap(&mut self, p: &Problem<'_, R>) -> i64 {
+        if self.gap_for != self.tableau {
+            debug_assert!(self.settled && self.tableau == self.solves, "the gap of no settled tableau");
+            self.gap = self.find_gap(p);
+            self.gap_for = self.tableau;
+        }
+        self.gap
+    }
+
+    /// The gap of the tableau's set, the heaviest of all sizes: the length of the shortest augmenting path, which
+    /// gains nothing.
+    fn find_gap(&mut self, p: &Problem<'_, R>) -> i64 {
+        match self.shortest_path(p) {
+            None => i64::MAX,
+            Some(sink) => {
+                let gain = -self.dist[sink as usize].div_euclid(HOPS);
+                debug_assert!(gain <= 0, "a path gains on the heaviest set of all sizes");
+                -gain
+            }
         }
     }
 
@@ -531,6 +771,314 @@ impl<const R: usize> Meet<R> {
                 debug_assert!(added, "a member of a common independent set is dependent");
             }
         }
+    }
+
+    /// The tableau that [`solve`](Self::solve) makes of the set `start` of the elements `live` (both ascending) of
+    /// `p`, from `start` with no size limit nor stop, where `start` is the heaviest set of all sizes (so that the solve
+    /// starts from it and augments nothing): its value and `settled` with it, and its [`gap`](Self::gap) when asked
+    /// for.  Where it can, it derives the tableau from the one the workspace holds, of a set `S` of elements `L` of a
+    /// problem `q`, instead of building it (see "Deriving a tableau" in the docs of [`Meet`]); for that `p` must be
+    /// `q` contracted by `contracted` (members of `start ∪ contracted`, which must be common independent in `q`), and
+    /// `L` must hold `start` and `contracted` (an element of `live` outside `L`, a loop of `q` in one matroid, say,
+    /// has its circuits found by reduction).  If the workspace holds no tableau, or `L` does not hold those, every
+    /// block is built.
+    pub fn derive(&mut self, p: &Problem<'_, R>, live: &[u32], start: &[u32], contracted: &[u32]) {
+        const SOURCE: u8 = 1;
+        const LIVE: u8 = 2;
+        const WANTED: u8 = 4;
+        let held = self.tableau == self.solves;
+        self.solves += 1;
+        self.tableau = self.solves;
+        // The elements of the tableau held are the live elements of its blocks of A.
+        for list in &self.block_live[0] {
+            for &e in list {
+                self.mark[e as usize] = SOURCE;
+            }
+        }
+        let mut ok = held;
+        self.fresh.clear();
+        for &e in live {
+            if self.mark[e as usize] & SOURCE == 0 {
+                self.fresh.push(e);
+            }
+            self.mark[e as usize] |= LIVE;
+        }
+        for &e in start.iter().chain(contracted) {
+            ok &= self.mark[e as usize] & SOURCE != 0;
+            self.mark[e as usize] |= WANTED;
+        }
+        for &e in contracted {
+            ok &= self.mark[e as usize] & LIVE == 0;
+        }
+        // In each block, `start ∪ contracted` from `S` by exchanges: each element that enters, in the span of the
+        // set, takes the slot of a member that leaves and is in its circuit (if the two sets are independent and
+        // span the same in the block, every element that enters has one), until none enters; the blocks where an
+        // element that enters is free, or the numbers that enter and leave differ, are built.
+        for m in 0..2 {
+            for b in 0..self.block_live[m].len() {
+                self.dirty[m][b] = !ok;
+                if !ok {
+                    continue;
+                }
+                self.entering.clear();
+                self.leaving.clear();
+                for &e in start.iter().chain(contracted) {
+                    if usize::from(p.block[m][e as usize]) == b && !self.inside[e as usize] {
+                        self.entering.push(e);
+                    }
+                }
+                for &x in &self.slot_elem[m][b][..self.next_slot[m][b]] {
+                    if self.mark[x as usize] & WANTED == 0 {
+                        self.leaving.push(x);
+                    }
+                }
+                if self.entering.len() != self.leaving.len() {
+                    self.dirty[m][b] = true;
+                    continue;
+                }
+                while let Some(&y) = self.entering.last() {
+                    let yi = y as usize;
+                    if !is_zero(&self.res[m][yi]) {
+                        break;
+                    }
+                    let (mask, slot) = (&self.mask[m][yi], &self.slot[m]);
+                    let Some(k) = self.leaving.iter().position(|&x| bit(mask, usize::from(slot[x as usize]))) else {
+                        break;
+                    };
+                    let x = self.leaving.swap_remove(k);
+                    self.entering.pop();
+                    self.exchange(m, b, x, y);
+                }
+                self.dirty[m][b] = !self.entering.is_empty();
+            }
+        }
+        // The new set and its elements; then each block's slots numbered by increasing member, or the block built.
+        for list in &self.block_live[0] {
+            for &e in list {
+                self.inside[e as usize] = false;
+            }
+        }
+        for &e in live {
+            self.inside[e as usize] = self.mark[e as usize] & WANTED != 0;
+        }
+        for list in &self.block_live[0] {
+            for &e in list {
+                self.mark[e as usize] = 0;
+            }
+        }
+        for &e in start.iter().chain(contracted).chain(&self.fresh) {
+            self.mark[e as usize] = 0;
+        }
+        for m in 0..2 {
+            for list in &mut self.block_live[m] {
+                list.clear();
+            }
+            for &e in live {
+                self.block_live[m][usize::from(p.block[m][e as usize])].push(e);
+            }
+            for b in 0..self.block_live[m].len() {
+                if self.dirty[m][b] {
+                    self.dirty[m][b] = false;
+                    self.rebuild(p, m, b);
+                    self.built += 1;
+                } else {
+                    self.renumber(m, b);
+                    self.reduce_fresh(p, m, b);
+                }
+            }
+        }
+        self.derived += 1;
+        self.lists(p, live);
+        // `start` is the heaviest set of all sizes: the solve would end with the shortest path that gains nothing, whose
+        // length is the gap, found when first asked for.
+        (self.settled, self.stopped) = (true, false);
+        #[cfg(test)]
+        if let Some(mut check) = self.check.take() {
+            check.solve(p, live, start, usize::MAX, i64::MAX, |_| {});
+            // The gap found as `gap` would, without the count of rounds, which the tests compare across engines.
+            let rounds = self.rounds;
+            let gap = self.find_gap(p);
+            self.rounds = rounds;
+            assert_eq!(gap, check.gap, "a derived tableau's gap differs from the solve's");
+            if let Err(e) = check.same_tableau(self, p, live) {
+                panic!("a derived tableau differs from the one a solve builds: {e}");
+            }
+            self.check = Some(check);
+            self.checked += 1;
+        }
+    }
+
+    /// Whether `other`'s tableau reads the same as this one's outside a solve (see "Deriving a tableau" in the docs
+    /// of [`Meet`]) for the live elements `live` of `p`: the same set, lists, free elements, circuits and slots, and
+    /// the same value and `settled`.
+    #[cfg(test)]
+    fn same_tableau(&self, other: &Meet<R>, p: &Problem<'_, R>, live: &[u32]) -> Result<(), String> {
+        let same = |what: &str, a: String, b: String| if a == b { Ok(()) } else { Err(format!("{what}: {a} {b}")) };
+        same("value", format!("{}", self.value), format!("{}", other.value))?;
+        same("settled", format!("{}", self.settled), format!("{}", other.settled))?;
+        same("members", format!("{:?}", self.members), format!("{:?}", other.members))?;
+        same("outside", format!("{:?}", self.out_a), format!("{:?}", other.out_a))?;
+        for m in 0..2 {
+            for b in 0..self.block_live[m].len() {
+                let slots = |t: &Meet<R>| format!("{:?}", &t.slot_elem[m][b][..t.next_slot[m][b]]);
+                same(&format!("slots of block {b} of {m}"), slots(self), slots(other))?;
+            }
+            for &e in live {
+                let i = e as usize;
+                let row = |t: &Meet<R>| {
+                    let free = !is_zero(&t.res[m][i]);
+                    if t.inside[i] {
+                        format!("member, slot {}", t.slot[m][i])
+                    } else if free {
+                        "free".to_string()
+                    } else {
+                        format!("circuit {:?}", t.mask[m][i])
+                    }
+                };
+                same(&format!("element {e} of block {} of {m}", p.block[m][i]), row(self), row(other))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// [`derive`](Self::derive) from the tableau `snapshot` holds (saved by [`save`](Self::save)) instead of the one
+    /// the workspace holds.
+    pub fn derive_from(
+        &mut self,
+        snapshot: &Snapshot<R>,
+        p: &Problem<'_, R>,
+        live: &[u32],
+        start: &[u32],
+        contracted: &[u32],
+    ) {
+        let s = snapshot;
+        for m in 0..2 {
+            let (mut at, mut slot_at) = (0, 0);
+            for b in 0..self.block_live[m].len() {
+                let list = &mut self.block_live[m][b];
+                list.clear();
+                for k in at..s.ends[m][b] {
+                    let e = s.elems[m][k];
+                    list.push(e);
+                    (self.mask[m][e as usize], self.res[m][e as usize]) = s.rows[m][k];
+                    self.slot[m][e as usize] = NO_SLOT;
+                }
+                at = s.ends[m][b];
+                let slots = &s.slots[m][slot_at..s.slot_ends[m][b]];
+                for (k, &e) in slots.iter().enumerate() {
+                    self.slot_elem[m][b][k] = e;
+                    self.slot[m][e as usize] = k as u16;
+                }
+                self.next_slot[m][b] = slots.len();
+                slot_at = s.slot_ends[m][b];
+            }
+        }
+        for &e in &s.elems[0] {
+            self.inside[e as usize] = false;
+        }
+        for &e in &s.slots[0] {
+            self.inside[e as usize] = true;
+        }
+        // The workspace holds the snapshot's tableau.
+        self.tableau = self.solves;
+        self.restored += 1;
+        self.derive(p, live, start, contracted);
+    }
+
+    /// Saves the tableau the workspace holds in `snapshot`, for [`derive_from`](Self::derive_from).
+    pub fn save(&self, snapshot: &mut Snapshot<R>) {
+        debug_assert_eq!(self.tableau, self.solves, "a snapshot of no tableau");
+        let s = snapshot;
+        for m in 0..2 {
+            for v in [&mut s.elems[m], &mut s.slots[m]] {
+                v.clear();
+            }
+            s.ends[m].clear();
+            s.rows[m].clear();
+            s.slot_ends[m].clear();
+            for b in 0..self.block_live[m].len() {
+                for &e in &self.block_live[m][b] {
+                    s.elems[m].push(e);
+                    s.rows[m].push((self.mask[m][e as usize], self.res[m][e as usize]));
+                }
+                s.ends[m].push(s.elems[m].len());
+                s.slots[m].extend_from_slice(&self.slot_elem[m][b][..self.next_slot[m][b]]);
+                s.slot_ends[m].push(s.slots[m].len());
+            }
+        }
+    }
+
+    /// The rows of the live elements of block `b` of matroid `m` that the tableau derived from did not have (`fresh`):
+    /// each reduced by the span of the block's members, inserted in slot order, so that its residue is zero exactly
+    /// when it is in the span, and its mask is then its circuit.
+    fn reduce_fresh(&mut self, p: &Problem<'_, R>, m: usize, b: usize) {
+        if !self.fresh.iter().any(|&e| usize::from(p.block[m][e as usize]) == b) {
+            return;
+        }
+        let span = &mut self.spans[m][b];
+        span.clear();
+        for &z in &self.block_live[m][b] {
+            if self.inside[z as usize] {
+                let inserted = span.insert(p.vector[m][z as usize], z);
+                debug_assert!(inserted, "a member of a common independent set is dependent");
+            }
+        }
+        for &e in &self.fresh {
+            let i = e as usize;
+            if usize::from(p.block[m][i]) == b {
+                (self.res[m][i], self.mask[m][i]) = span.reduce(p.vector[m][i]);
+                self.slot[m][i] = NO_SLOT;
+            }
+        }
+        self.reduced += 1;
+    }
+
+    /// Numbers the slots of block `b` of matroid `m` by increasing member among its live elements, as a rebuild does:
+    /// each member there has a slot, and the circuit of each other live element in the span is carried over to the
+    /// new numbers, less the slots of members that are no longer live elements (contracted).
+    fn renumber(&mut self, m: usize, b: usize) {
+        // Members in increasing order in their slots, none of them gone (every member here had a slot): the
+        // numbering is already a rebuild's, and so are the circuits.
+        let slots = &self.slot_elem[m][b][..self.next_slot[m][b]];
+        if slots.iter().all(|&z| self.inside[z as usize]) && slots.windows(2).all(|pair| pair[0] < pair[1]) {
+            return;
+        }
+        self.slot_map.fill(NO_SLOT);
+        let mut k = 0u16;
+        for &z in &self.block_live[m][b] {
+            if self.inside[z as usize] {
+                let s = self.slot[m][z as usize];
+                debug_assert_ne!(s, NO_SLOT, "a member without a slot");
+                self.slot_map[usize::from(s)] = k;
+                k += 1;
+            }
+        }
+        let mut k = 0;
+        for &z in &self.block_live[m][b] {
+            let z = z as usize;
+            if self.inside[z] {
+                self.slot_elem[m][b][k] = z as u32;
+                self.slot[m][z] = k as u16;
+                let mut own = [0; R];
+                own[k / 64] |= 1 << (k % 64);
+                self.mask[m][z] = own;
+                k += 1;
+            } else {
+                self.slot[m][z] = NO_SLOT;
+                if is_zero(&self.res[m][z]) {
+                    let mut circuit = [0; R];
+                    let map = &self.slot_map;
+                    each_bit(&self.mask[m][z], |s| {
+                        let t = map[s];
+                        if t != NO_SLOT {
+                            circuit[usize::from(t) / 64] |= 1 << (t % 64);
+                        }
+                    });
+                    self.mask[m][z] = circuit;
+                }
+            }
+        }
+        self.next_slot[m][b] = k;
     }
 
     /// Makes `y` (independent of the tableau's set in block `b` of matroid `m`) a member: a new slot, and the
@@ -704,8 +1252,7 @@ impl<const R: usize> Meet<R> {
         while !self.changed_out.is_empty() {
             rounds += 1;
             assert!(rounds <= limit, "a negative cycle in the exchange graph of an extreme set");
-            self.generation = self.generation.wrapping_add(1);
-            let generation = self.generation;
+            let generation = self.next_generation(1);
             // Outside to members.
             self.changed_in.clear();
             let mut free_improved = false;
@@ -848,8 +1395,7 @@ impl<const R: usize> Meet<R> {
             if rounds > limit {
                 return false;
             }
-            self.generation = self.generation.wrapping_add(1);
-            let generation = self.generation;
+            let generation = self.next_generation(1);
             self.changed_out.clear();
             let (pot, seen, next) = (&mut self.pot, &mut self.seen, &mut self.changed_out);
             let mut zero_fell = false;
@@ -994,8 +1540,11 @@ impl<const R: usize> Meet<R> {
     /// distances packed with the number of arcs as for the augmenting paths, so that of the shortest cycles one with
     /// the fewest arcs is found.  An element free in `A` has an arc from every member, so all of them are reached
     /// through the member with the least distance plus `w1`, in decreasing order of their own `w1`; an element free
-    /// in `B` has an arc to every member, `x` included.  The search stops at the first distance that no cycle
-    /// within `limit` and shorter than the best found can pass.
+    /// in `B` has an arc to every member, `x` included, so the members are reached through the element free in `B`
+    /// with the least distance less `w2`, in increasing order of their own `w2`: the same distances, the same order
+    /// of the vertices settled, and each member's predecessor the element whose offer reached its distance first, as
+    /// if each arc were offered.  The search stops at the first distance that no cycle within `limit` and shorter
+    /// than the best found can pass.
     pub fn without(&mut self, p: &Problem<'_, R>, pot: &[i64], x: u32, limit: i64, banned: &[u32]) -> Option<i64> {
         self.withouts += 1;
         let (length, end) = self.shortest_cycle(p, pot, x, limit, banned, false)?;
@@ -1026,7 +1575,35 @@ impl<const R: usize> Meet<R> {
             && self.tableau == self.solves
             && self.inside[x as usize]
             && (0..i64::MAX / (2 * HOPS)).contains(&limit);
-        !searchable || self.shortest_cycle(p, pot, x, limit, &[], true).is_some()
+        self.found = NONE;
+        if !searchable {
+            return true;
+        }
+        let Some((_, end)) = self.shortest_cycle(p, pot, x, limit, &[], true) else { return false };
+        self.found = end;
+        true
+    }
+
+    /// After a [`has_cycle_within`](Self::has_cycle_within) through `x` that found a cycle: its members besides
+    /// `x`, each of which has that cycle through it too, as long.
+    pub fn cycle_members(&self, x: u32, mut f: impl FnMut(u32)) {
+        // The search's predecessors from the element that closed the cycle lead back to x (checked first).
+        let walk = |f: &mut dyn FnMut(u32)| {
+            let (mut v, mut steps) = (self.found, 0);
+            while v != x && v != NONE && steps <= self.pos.len() {
+                f(v);
+                v = self.back[v as usize];
+                steps += 1;
+            }
+            v == x
+        };
+        if walk(&mut |_| {}) {
+            walk(&mut |v| {
+                if self.inside[v as usize] {
+                    f(v);
+                }
+            });
+        }
     }
 
     /// The search of [`without`](Self::without): the shortest cycle's length and the element that closes it at `x`,
@@ -1050,30 +1627,36 @@ impl<const R: usize> Meet<R> {
         if self.columns_for != self.tableau {
             self.build_columns();
         }
-        if self.free_sorted_for != self.tableau {
-            self.free_a.sort_unstable_by_key(|&y| (Reverse(pot[y as usize]), y));
-            self.free_sorted_for = self.tableau;
-        }
+        self.sort_by_split(p, pot);
         let w = p.weight;
         let w1 = |e: u32| pot[e as usize];
         let w2 = |e: u32| w[e as usize] - pot[e as usize];
         // Two fresh stamps: reached (the distance in `reach` is current) and settled.
-        self.generation = self.generation.wrapping_add(2);
-        let (reached, settled) = (self.generation.wrapping_sub(1), self.generation);
+        let settled = self.next_generation(2);
+        let reached = settled - 1;
         let (reach, back, seen, stamp) = (&mut self.reach, &mut self.back, &mut self.seen, &mut self.settled_at);
-        let heap = &mut self.heap;
-        heap.clear();
+        // Distances from `limit + 1` on cannot lead to a cycle that certifies.
+        let bound = (limit + 1) * HOPS;
+        let (heap, offered_at, by_w2) = (&mut self.heap, &mut self.offered_at, &self.by_w2);
+        heap.start(bound, self.pos.len());
         // A banned element counts as settled: never offered, nor reached as an element free in A.
         for &e in banned {
             stamp[e as usize] = settled;
         }
-        // Distances from `limit + 1` on cannot lead to a cycle that certifies.
-        let bound = (limit + 1) * HOPS;
         let mut cycle = (bound, NONE);
         // The elements free in A, by decreasing w1: the next one unsettled, and the member through which they are
         // reached (the least distance plus w1, packed).
         let mut next_free = 0;
         let mut through = (INF, NONE);
+        // The members as reached from the elements free in B (each has an arc to every member): the hub, the least
+        // distance less w2 (packed, with the arc) over those settled, the first that reached it and the vertex
+        // count when it did; and the members by increasing w2, of which the next one unsettled is queued at the
+        // hub's distance plus its w2.  A member's distance is the least of the hub's and its own offers', and its
+        // predecessor the one that offered that first, as if each element free in B offered every member.
+        let mut hub = (INF, NONE, 0u32);
+        let mut next_member = 0;
+        // The vertices settled so far, which orders the offers.
+        let mut tick = 0u32;
         // Offers the distance `d` to `v` from `from`.
         macro_rules! offer {
             ($v:expr, $d:expr, $from:expr) => {{
@@ -1083,7 +1666,22 @@ impl<const R: usize> Meet<R> {
                     seen[i] = reached;
                     reach[i] = d;
                     back[i] = $from;
-                    heap.push(Reverse((d, v)));
+                    offered_at[i] = tick;
+                    heap.push(d, v);
+                }
+            }};
+        }
+        // Queues the next member still unsettled, through the hub.
+        macro_rules! queue_member {
+            () => {{
+                while next_member < by_w2.len() && stamp[by_w2[next_member] as usize] == settled {
+                    next_member += 1;
+                }
+                if let (Some(&z), true) = (by_w2.get(next_member), hub.0 != INF) {
+                    let dz = hub.0 + w2(z) * HOPS;
+                    if dz < bound {
+                        heap.push(dz, z);
+                    }
                 }
             }};
         }
@@ -1096,16 +1694,16 @@ impl<const R: usize> Meet<R> {
                 if let Some(&y) = self.free_a.get(next_free) {
                     let dy = through.0 - w1(y) * HOPS + 1;
                     if dy < bound {
-                        heap.push(Reverse((dy, FREE_A)));
+                        heap.push(dy, FREE_A);
                     }
                 }
             }};
         }
-        heap.push(Reverse((0, x)));
+        heap.push(0, x);
         seen[x as usize] = reached;
         reach[x as usize] = 0;
         back[x as usize] = NONE;
-        while let Some(Reverse((d, v))) = heap.pop() {
+        while let Some((d, v)) = heap.pop() {
             if d >= cycle.0 || (first && cycle.1 != NONE) {
                 break;
             }
@@ -1125,12 +1723,35 @@ impl<const R: usize> Meet<R> {
                 queue_free!();
                 y
             } else {
-                if stamp[v as usize] == settled || d > reach[v as usize] {
+                let i = v as usize;
+                if stamp[i] == settled {
                     continue;
                 }
-                stamp[v as usize] = settled;
+                if self.inside[i] {
+                    let own = if seen[i] == reached { reach[i] } else { INF };
+                    let via_hub = if hub.0 == INF { INF } else { hub.0 + w2(v) * HOPS };
+                    let via_hub = if via_hub < bound { via_hub } else { INF };
+                    if d > own.min(via_hub) {
+                        continue;
+                    }
+                    if via_hub < own || (via_hub == own && hub.2 < offered_at[i]) {
+                        seen[i] = reached;
+                        reach[i] = via_hub;
+                        back[i] = hub.1;
+                    }
+                    stamp[i] = settled;
+                    if by_w2.get(next_member) == Some(&v) {
+                        queue_member!();
+                    }
+                } else {
+                    if d > reach[i] {
+                        continue;
+                    }
+                    stamp[i] = settled;
+                }
                 v
             };
+            tick += 1;
             let i = v as usize;
             if self.inside[i] {
                 // A member: arcs of A to the elements whose circuit holds it, and to every element free in A.
@@ -1143,14 +1764,13 @@ impl<const R: usize> Meet<R> {
                     queue_free!();
                 }
             } else if !is_zero(&self.res[1][i]) {
-                // Free in B: arcs to every member, x's closing a cycle.
+                // Free in B: arcs to every member, x's closing a cycle, the others' through the hub.
                 if d + (w2(x) - w2(v)) * HOPS + 1 < cycle.0 {
                     cycle = (d + (w2(x) - w2(v)) * HOPS + 1, v);
                 }
-                for &z in &self.members {
-                    if z != x {
-                        offer!(z, d + (w2(z) - w2(v)) * HOPS + 1, v);
-                    }
+                if d - w2(v) * HOPS + 1 < hub.0 {
+                    hub = (d - w2(v) * HOPS + 1, v, tick);
+                    queue_member!();
                 }
             } else {
                 // The members of its circuit in B.
@@ -1182,18 +1802,15 @@ impl<const R: usize> Meet<R> {
         if self.columns_for != self.tableau {
             self.build_columns();
         }
-        if self.free_sorted_for != self.tableau {
-            self.free_a.sort_unstable_by_key(|&y| (Reverse(pot[y as usize]), y));
-            self.free_sorted_for = self.tableau;
-        }
+        self.sort_by_split(p, pot);
         let w = p.weight;
         let w1 = |e: u32| pot[e as usize];
         let w2 = |e: u32| w[e as usize] - pot[e as usize];
-        self.generation = self.generation.wrapping_add(2);
-        let (reached, settled) = (self.generation.wrapping_sub(1), self.generation);
+        let settled = self.next_generation(2);
+        let reached = settled - 1;
         let (reach, seen, stamp) = (&mut self.reach, &mut self.seen, &mut self.settled_at);
         let heap = &mut self.heap;
-        heap.clear();
+        heap.start(INF, self.pos.len());
         let mut best = INF;
         macro_rules! offer {
             ($v:expr, $d:expr) => {{
@@ -1202,7 +1819,7 @@ impl<const R: usize> Meet<R> {
                 if d < best && stamp[i] != settled && (seen[i] != reached || d < reach[i]) {
                     seen[i] = reached;
                     reach[i] = d;
-                    heap.push(Reverse((d, v)));
+                    heap.push(d, v);
                 }
             }};
         }
@@ -1214,14 +1831,14 @@ impl<const R: usize> Meet<R> {
                     next_free += 1;
                 }
                 if let Some(&y) = self.free_a.get(next_free) {
-                    heap.push(Reverse((through - w1(y) * HOPS + 1, FREE_A)));
+                    heap.push(through - w1(y) * HOPS + 1, FREE_A);
                 }
             }};
         }
         for &z in &self.members {
             offer!(z, w2(z) * HOPS);
         }
-        while let Some(Reverse((d, v))) = heap.pop() {
+        while let Some((d, v)) = heap.pop() {
             if d >= best {
                 break;
             }
@@ -1256,9 +1873,9 @@ impl<const R: usize> Meet<R> {
                     queue_free!();
                 }
             } else if !is_zero(&self.res[1][i]) {
-                for &z in &self.members {
-                    offer!(z, d + (w2(z) - w2(v)) * HOPS + 1);
-                }
+                // Free in B: its arcs to the members offer each `d − w2(v) + 1 + w2(z)`, at least `w2(z) + 1` (the
+                // distances are not negative, and the split makes `w2(v) ≤ 0` for an element free in B), while each
+                // member started at `w2(z)`: none is an improvement.
             } else {
                 let elems = &self.slot_elem[1][usize::from(p.block[1][i])];
                 each_bit(&self.mask[1][i], |s| {
@@ -1296,6 +1913,19 @@ impl<const R: usize> Meet<R> {
         self.columns_for = self.tableau;
     }
 
+    /// For the searches of the exchange graph on the current tableau (its columns built) with the weight split `pot`:
+    /// the elements free in A by decreasing `w1` and the members by increasing `w2`, each then by element.
+    fn sort_by_split(&mut self, p: &Problem<'_, R>, pot: &[i64]) {
+        if self.sorted_for != self.tableau {
+            let w = p.weight;
+            self.free_a.sort_unstable_by_key(|&y| (Reverse(pot[y as usize]), y));
+            self.by_w2.clear();
+            self.by_w2.extend_from_slice(&self.members);
+            self.by_w2.sort_unstable_by_key(|&z| (w[z as usize] - pot[z as usize], z));
+            self.sorted_for = self.tableau;
+        }
+    }
+
     /// The cycle through the member that the last [`without`](Self::without) that answered found: its elements.
     pub fn cycle(&self) -> &[u32] {
         &self.flip
@@ -1310,7 +1940,7 @@ impl<const R: usize> Meet<R> {
     /// Whether the current set flipped on `self.flip` is independent in both matroids: in each block a flipped
     /// element belongs to, the members there that stay and the outside elements that come in, inserted in a span.
     fn flipped_independent(&mut self, p: &Problem<'_, R>) -> bool {
-        self.generation = self.generation.wrapping_add(1);
+        self.next_generation(1);
         for &e in &self.flip {
             self.seen[e as usize] = self.generation;
         }
@@ -1574,9 +2204,10 @@ mod tests {
             .filter(|set| independent(p.block[0], p.vector[0], set) && independent(p.block[1], p.vector[1], set))
             .map(|set| set.iter().map(|&e| p.weight[e as usize]).sum::<i64>())
             .max();
-        assert_eq!(meet.gap, larger.map_or(i64::MAX, |w| meet.value - w), "trial {trial}: the gap");
+        let gap = meet.gap(&p);
+        assert_eq!(gap, larger.map_or(i64::MAX, |w| meet.value - w), "trial {trial}: the gap");
         for cap in size..=n {
-            let limit = if cap > size { loss.min(meet.gap) } else { loss };
+            let limit = if cap > size { loss.min(gap) } else { loss };
             for &x in &members {
                 counts.asked += 1;
                 counts.asked_one_sided += usize::from(one_sided[x as usize]);
@@ -1765,7 +2396,7 @@ mod tests {
                     assert!(meet.split_bounds(&p, &live, |x, b| bounds.push((x, b))), "n={n}: no split");
                     assert_eq!(bounds.len(), size);
                     let pot = meet.potentials().to_vec();
-                    let (loss, gap) = (meet.smaller_loss(&p, &pot), meet.gap);
+                    let (loss, gap) = (meet.smaller_loss(&p, &pot), meet.gap(&p));
                     let sample: Vec<u32> = chosen.iter().copied().filter(|_| rng.chance(15)).collect();
                     let rests: Vec<Vec<u32>> = sample.iter().map(|&x| greedy(&owned, random, &live, Some(x))).collect();
                     for &(x, bound) in &bounds {

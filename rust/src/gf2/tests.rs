@@ -267,6 +267,11 @@ struct Walked {
     checks_with_one_sided: u64,
     forced_one_sided: u64,
     one_sided_promoted: u64,
+    /// Tableaux of solved levels derived from a related one (of those from a copy), each checked against the one a
+    /// solve builds ([`Gf2Bound::check_derivations`]).
+    derived: u64,
+    derived_from_copies: u64,
+    derivations_checked: u64,
 }
 
 /// Runs `f` on every engine, checks that all give the same result and returns it.
@@ -294,7 +299,8 @@ fn agree<const W: usize, T: PartialEq + Debug>(
 /// narrowing of a child's candidates and the count of the promotions left are the model's, so that `p` may be an
 /// extended problem with one-sided candidates (for a problem without them they are the frame set's own).  Of the
 /// forced members of a node, which can be hundreds when the need is close to the bound, at most `forced_cap` are
-/// checked, evenly spread over them.
+/// checked, evenly spread over them.  Every tableau the first engine derives from a related one instead of building it
+/// ([`Gf2Bound::check_derivations`]) is checked against the one a solve builds.
 fn walk_random_paths<const W: usize>(
     p: &Prepared<W>,
     rng: &mut Rng,
@@ -306,6 +312,7 @@ fn walk_random_paths<const W: usize>(
     let n = p.n;
     let one_sided: Bits<W> = p.model.one_sided().iter().map(|&(s, _)| s).collect();
     let mut scratch = Scratch::<W>::new();
+    engines[0].check_derivations();
     for _ in 0..paths {
         agree(engines, |e| e.reset(&Bits::EMPTY, &p.candidates));
         // The path: (state, promoted, candidates) per level.
@@ -433,6 +440,9 @@ fn walk_random_paths<const W: usize>(
     }
     walked.children += engines[0].stats().certified_children;
     let stats = engines[0].stats();
+    walked.derived += stats.derived;
+    walked.derived_from_copies += stats.derived_from_copies;
+    walked.derivations_checked += engines[0].derivations_checked();
     for (k, engine) in engines.iter().enumerate() {
         assert_eq!(engine.stats(), stats, "n={n}: the work of engine {k} differs from engine 0's");
     }
@@ -460,6 +470,12 @@ fn levels_match_fresh_matroids_along_random_paths() {
             && children > 100
             && excluded_checked > 300,
         "{checks} {inherited} {forced_checked} {certified_checked} {children} {excluded_checked}"
+    );
+    let Walked { derived, derived_from_copies, derivations_checked, .. } = walked;
+    println!("{derived} tableaux derived, {derived_from_copies} from a copy, {derivations_checked} checked");
+    assert!(
+        derived > 900 && derived_from_copies > 150 && derivations_checked == derived,
+        "{derived} {derived_from_copies} {derivations_checked}"
     );
 }
 
@@ -521,6 +537,9 @@ fn assert_walks_reached(walked: &Walked, scale: u64) {
         checks_with_one_sided > 4000 * scale && forced_one_sided > 20_000 * scale && one_sided_promoted > 1000 * scale,
         "{checks_with_one_sided} {forced_one_sided} {one_sided_promoted}"
     );
+    let Walked { derived, derived_from_copies, derivations_checked, .. } = *walked;
+    println!("{derived} tableaux derived, {derived_from_copies} from a copy, {derivations_checked} checked");
+    assert!(derived > 500 * scale && derivations_checked == derived, "{derived} {derivations_checked}");
 }
 
 /// Along random paths of the extended problem Π⁺(O) on the boards from 60 to 1000 at W = 16, with O = U\*_{≥3} and with

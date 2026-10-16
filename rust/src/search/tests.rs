@@ -5,7 +5,7 @@ use crate::board::Board;
 use crate::bounds::max_additional;
 use crate::engine::Unit;
 use crate::frames::build_frames;
-use crate::gf2::{Gf2Bound, Gf2Graph};
+use crate::gf2::{ForceWindow, Gf2Bound, Gf2Graph};
 use crate::json::Json;
 use crate::matchbound::MatchBound;
 use crate::model::test_support::*;
@@ -665,12 +665,47 @@ fn units_and_headers_round_trip() {
     assert_eq!(Header::<8>::VERSION, 5);
     assert_eq!(Header::<8>::decode(&versioned(5)), Ok(header));
     for (version, bytes) in
-        [("2", txs2), ("3", versioned(3))].into_iter().chain([("6", versioned(6)), ("unreadable", b"TXSH".to_vec())])
+        [("2", txs2), ("3", versioned(3))].into_iter().chain([("7", versioned(7)), ("unreadable", b"TXSH".to_vec())])
     {
         let err = Header::<8>::decode(&bytes).unwrap_err();
-        let message = format!("format version {version}, and this build reads versions 4 and 5 only");
+        let message = format!("format version {version}, and this build reads versions 4 to 6 only");
         assert!(err.contains(&message), "{err}");
     }
+    // A search whose tactics that tune the GF(2) search are not the defaults writes version 6, which records them
+    // after the switches' bits; one whose are writes version 5, which implies them.  Version 6's number with version
+    // 5's length is refused for its length.
+    assert_eq!(header.version, 5);
+    let tuned = Header {
+        tactics: SearchTactics {
+            force_window: ForceWindow::Share(40),
+            branching: Gf2Branching::Forced,
+            strong_limit: 4,
+            strong_depth: 30,
+            deep_branching: Gf2Branching::Largest,
+            more_forced: false,
+            ..header.tactics
+        },
+        version: 6,
+        ..header
+    };
+    let bytes6 = tuned.encode();
+    assert_eq!(bytes6.len(), Header::<8>::LEN_6);
+    assert_eq!(bytes6[..bytes.len()], [&bytes[..4], &6u32.to_le_bytes(), &bytes[8..]].concat()[..]);
+    assert_eq!(Header::<8>::decode(&bytes6), Ok(tuned));
+    assert!(tuned.mismatch(&header).unwrap().contains("tactics"));
+    let err = Header::<8>::decode(&versioned(6)).unwrap_err();
+    assert!(err.contains(&format!("{} bytes, not {}", Header::<8>::LEN, Header::<8>::LEN_6)), "{err}");
+    for window in [ForceWindow::Within(0), ForceWindow::Within(200), ForceWindow::All] {
+        for branching in Gf2Branching::ALL {
+            let t = SearchTactics { force_window: window, branching, ..tuned.tactics };
+            let h = Header { tactics: t, ..tuned };
+            assert_eq!(Header::<8>::decode(&h.encode()), Ok(h));
+        }
+    }
+    // An unknown tuning is refused.
+    let mut bad = bytes6.clone();
+    bad[Header::<8>::LEN + 5] = 9;
+    assert!(Header::<8>::decode(&bad).unwrap_err().contains("unknown branching"));
     // Every field that differs is named.
     let other = |change: fn(&mut Header<8>)| {
         let mut h = header;
@@ -696,6 +731,7 @@ fn units_and_headers_round_trip() {
                 lagrange: off,
                 gf2: on,
                 symmetry: off,
+                ..SearchTactics::default()
             };
             assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
             let t = SearchTactics { symmetry: on, ..t };
