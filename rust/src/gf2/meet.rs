@@ -662,6 +662,18 @@ impl<const R: usize> Meet<R> {
         self.generation
     }
 
+    /// In tests: the last stamp given ([`next_generation`](Self::next_generation)), and setting it, to start a
+    /// workspace's stamps just below the counter's wrap.
+    #[cfg(test)]
+    pub(crate) fn generation(&self) -> u32 {
+        self.generation
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_generation(&mut self, generation: u32) {
+        self.generation = generation;
+    }
+
     /// After a solve that settled, or a [`derive`](Self::derive), with the workspace still holding it: how much
     /// lighter the heaviest common independent set one larger than the heaviest set is, `i64::MAX` if there is none.
     /// The heaviest sets of all larger sizes are lighter still (the weights by size are concave).
@@ -2296,6 +2308,58 @@ mod tests {
         assert!(asked > 10_000 && certified > asked / 6, "{certified} of {asked} certified");
         assert!(asked_one_sided > asked / 4, "{asked_one_sided} of {asked} asked about are one-sided");
         assert!(certified_one_sided > asked_one_sided / 8, "{certified_one_sided} of {asked_one_sided} certified");
+    }
+
+    /// What a workspace computes from one problem, as numbers: the solve's value, whether it split, the split's bounds
+    /// and potentials, the loss of the smaller sets, and for each member of the heaviest set whether a cycle through it
+    /// is within each of a few limits and the bound without it read off the exchange graph.
+    fn everything(meet: &mut Meet<1>, owned: &Owned<1>) -> Vec<i64> {
+        let p = owned.problem();
+        let n = owned.weight.len();
+        let live: Vec<u32> = (0..n as u32).collect();
+        meet.solve(&p, &live, &[], n, i64::MAX, |_| {});
+        let mut bounds = Vec::new();
+        let split = meet.settled && meet.split_bounds(&p, &live, |x, b| bounds.push((x, b)));
+        let mut out = vec![meet.value, i64::from(split)];
+        if !split {
+            return out;
+        }
+        out.extend(bounds.iter().flat_map(|&(x, b)| [i64::from(x), b]));
+        let pot = meet.potentials().to_vec();
+        out.extend_from_slice(&pot);
+        let loss = meet.smaller_loss(&p, &pot);
+        out.push(loss);
+        let members: Vec<u32> = live.iter().copied().filter(|&e| meet.contains(e)).collect();
+        for &x in &members {
+            for limit in [0, 3, 10, 40] {
+                out.push(i64::from(meet.has_cycle_within(&p, &pot, x, limit)));
+            }
+            out.push(meet.without(&p, &pot, x, loss.min(1000), &[]).unwrap_or(-1));
+        }
+        out
+    }
+
+    /// The searches compare their stamps for equality only, with a 32-bit counter that a long search wraps (tens of
+    /// stamps a step: past some 90 M steps of one worker at 3441).  A workspace whose stamps start just below the wrap,
+    /// so that it wraps in a solve, a split, or a search of the exchange graph, computes exactly what one whose stamps
+    /// start at 0 does ([`Meet::next_generation`] clears the stamps before the wrap).  Before that, the counter came
+    /// back to 0, which every stamp never written holds, and then to stamps of 2^32 stamps before.
+    #[test]
+    fn the_stamps_hold_across_the_wrap_of_their_counter() {
+        let mut rng = Rng(0x57A3_9E11_0000_0001);
+        let mut wrapped = 0;
+        for trial in 0..400 {
+            let n = 2 + rng.below(10) as usize;
+            let owned = random(&mut rng, n, 4);
+            let fresh = everything(&mut Meet::<1>::new(n, owned.blocks()), &owned);
+            for below in [1u32, 2, 3, 4, 7, 20, 60] {
+                let mut meet = Meet::<1>::new(n, owned.blocks());
+                meet.set_generation(u32::MAX - below + 1);
+                assert_eq!(everything(&mut meet, &owned), fresh, "trial {trial}: stamps from {below} below the wrap");
+                wrapped += usize::from(meet.generation() < u32::MAX / 2);
+            }
+        }
+        assert!(wrapped > 1000, "{wrapped} workspaces wrapped");
     }
 
     /// A random word that is not a linear function of the generator's state over GF(2).  The generator is xorshift, so
