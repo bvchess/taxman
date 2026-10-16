@@ -360,8 +360,10 @@ Two files, one thread on the laptop: `data/upper_1301_2175.jsonl`, the committed
 [the gap past 2175](../docs/EXPERIMENTS.md#the-gap-past-2175-2026-10) measured (1,139 games, 635 needing it; 1,272 s,
 4.1 s for the slowest game).  A third, `data/upper_2_1300.jsonl`, does the same for the table's games 2..1300 (1,299
 games, 665 needing it, 417 of those with nothing open, 1.0% of the members open; 65 s), for the tests of `taxman
-certify` (the frame solver's certificates of U, [DESIGN.md](../DESIGN.md#certificates-of-u)).  By band (the open
-members and the margins of each game; the share is of all members):
+certify` (the frame solver's certificates of U, [DESIGN.md](../DESIGN.md#certificates-of-u)).  A fourth,
+`data/upper_3315_3440.jsonl`, the rest of the committed chain (126 games, 73 needing it, 3424, 3425 and 3440 among
+them; 277 s, 4.3 s for the slowest game), is the input of the campaign of certificates on 2176-3440
+(`../bench/certify/`).  By band (the open members and the margins of each game; the share is of all members):
 
 | n | games | the root's gap (mean) | members of U\*_{≥3} | open (least, median, most) | open | margin (median, largest) |
 |---|---|---|---|---|---|---|
@@ -385,10 +387,11 @@ members and the margins of each game; the share is of all members):
 | 3000-3099 | 59 | 915 | 899-925 | 120, 134, 194 | 15.3% | 336, 1163 |
 | 3100-3199 | 58 | 1118 | 925-959 | 133, 170, 255 | 18.6% | 435, 1312 |
 | 3200-3314 | 66 | 1030 | 959-993 | 113, 150, 246 | 16.1% | 372, 1355 |
+| 3315-3440 | 73 | 1259 | 994-1035 | 172, 197, 271 | 19.9% | 531, 1467 |
 
 * **No game is certified whole**: every one leaves members open, from 1 (1305) to 102 (2172) to 2175 and from 15
-  (2610) to 317 (2346) past it; 7.5% of the members in all to 2175 (18,596 of 247,482), 14.9% past it (77,195 of
-  518,992).
+  (2610) to 317 (2346) past it; 7.5% of the members in all to 2175 (18,596 of 247,482), 14.9% on 2176-3314 (77,195
+  of 518,992) and 19.9% on 3315-3440 (14,704 of 73,968, 172 to 271 a game, the root's gap 1,103 to 1,555).
 * **The open share follows the root's gap, not n**: 3.1 points more per 100 of gap to 2175 and 2.0 past it (R² 0.73
   in each file), and it falls back with the gap (2600-2699).  The root's gap is the one the solver's search costs by:
   with layers 1 and 2 fixed it equals the solver's GF(2) gap at the root on all 400 games past 2175 that both
@@ -714,6 +717,8 @@ tools/summarize.py check 1301 2175 data/exact_parity_2_1300.jsonl data/exact_par
 ./target/release/upper --from 1301 --to 2175 --out data/upper_1301_2175.jsonl          # one thread, 5 minutes
 ./target/release/upper --from 2176 --to 3314 --results ../results/strict.jsonl --results CHAIN.jsonl \
     --out data/upper_2176_3314.jsonl          # CHAIN.jsonl: the EC2 chain's results (21 minutes)
+./target/release/upper --from 3315 --to 3440 --results ../results/strict.jsonl \
+    --out data/upper_3315_3440.jsonl          # the committed chain's last games (5 minutes)
 ./target/release/exact --list 1575,1584 --out B.jsonl                   # E6: the sources of layer >= 3 free
 ./target/release/exact --list 1575,1584 --fix-upper 1 --out D.jsonl     # ... and fixed to U*
 tools/summarize.py sources B.jsonl D.jsonl          # E6's table and criterion (RUNBOOK section 10 for the cloud run)

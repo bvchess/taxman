@@ -392,13 +392,17 @@ stopped at n = 3441: the results end at n = 3440
 Check the new file with `taxman verify-optimal /tmp/optimal.json` before it replaces `src/main/resources/optimal.json`;
 the binaries built after that carry the new table.
 
-`certify A-B --results FILE... --upper FILE... --out FILE` proves, game by game, that the recorded scores of A..B that
-rest on the frame model are the optima on the whole board (statement U at each n; section 1, "What optimal means"):
+`certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE` proves, game by game, that the recorded
+scores of A..B (or of the boards of the list FILE, one board size a line, in that order) that rest on the frame model
+are the optima on the whole board (statement U at each n; section 1, "What optimal means"):
 for each game the prover's barred bounds (`--upper`, `prover/data/upper_*.jsonl`) say needs it, a search of the
 extended problem with the bounds' open members optional, started from the recorded game, ends `certified` (nothing
 beats it) or `beaten` (a game that does, written to `OUT.counterexample.jsonl` too; the run exits with status 2).  It
 takes `--threads`, the checkpoint flags and the limits of `solve`, and resumes like it.
-[DESIGN.md, "Certificates of U"](DESIGN.md#certificates-of-u) has what it checks and what a line holds.
+`verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...] [--threads K]` checks the files it
+wrote without changing them, line by line, and says how far the proofs of the recorded scores reach (the prover's, the
+certificates' and the ceilings').
+[DESIGN.md, "Certificates of U"](DESIGN.md#certificates-of-u) has what they check and what a line holds.
 
 ## 4. Reading the output
 

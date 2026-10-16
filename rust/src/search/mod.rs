@@ -93,7 +93,7 @@ pub use incumbent::Neighbourhood;
 pub use searcher::{stat, Found, Gf2Branching, SearchSpace, TaxSearcher, TaxUnit};
 pub use setup::{
     extended_words, prepare, prepare_extended, prepare_extended_for_resume, prepare_for_resume, problem_of,
-    PrepareTimings, Prepared, Problem, ProblemSize,
+    problem_of_extended, PrepareTimings, Prepared, Problem, ProblemSize,
 };
 pub use tactics::SearchTactics;
 

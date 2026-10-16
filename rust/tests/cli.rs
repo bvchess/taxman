@@ -28,7 +28,8 @@ fn help_lists_the_commands_and_every_tactic() {
             "bench",
             "verify-optimal",
             "extend-optimal RESULTS --out FILE",
-            "certify A-B --results FILE... --upper FILE... --out FILE",
+            "certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE",
+            "verify-certificates CERTS... --results FILE... --upper FILE...",
             "tables N K...",
             "--history FILE",
         ] {
@@ -79,7 +80,7 @@ fn bad_command_lines_are_usage_errors() {
 /// are no counts or limits.
 #[test]
 fn certify_command_lines_are_usage_errors() {
-    const USAGE: &str = "usage: certify A-B --results FILE... --upper FILE... --out FILE [options]";
+    const USAGE: &str = "usage: certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE [options]";
     let files = ["--results", "r.jsonl", "--upper", "u.jsonl", "--out", "o.jsonl"];
     let with_files = |head: &[&'static str]| [head, &files[..]].concat();
 
@@ -122,6 +123,75 @@ fn certify_command_lines_are_usage_errors() {
     assert_usage_error(&with_files(&["certify", "1302", "--node-limit", "0"]), "--node-limit must be at least 1");
     assert_usage_error(&with_files(&["certify", "1302", "--time-limit", "-1"]), "not a number of seconds");
     assert_usage_error(&with_files(&["certify", "1302", "--checkpoint-interval", "0"]), "must be more than 0 seconds");
+}
+
+/// `certify` takes a range or a list file of boards, exactly one of them, and reads the list before it opens any other
+/// file or starts a search: both, neither, two lists, a missing list file, a line that is no board, a board out of
+/// range, a board twice and a list with no board are usage errors that name the file and the line.
+#[test]
+fn certify_takes_a_range_or_a_list_of_boards_and_not_both() {
+    let dir = TempDir::new("certify-list-usage");
+    let files = ["--results", "r.jsonl", "--upper", "u.jsonl", "--out", "o.jsonl"];
+    let list = |name: &str, text: &str| {
+        let file = dir.join(name);
+        fs::write(&file, text).unwrap();
+        file
+    };
+    // The command line `head` followed by the files it cannot do without, refused with `message`.
+    let refused = |head: &[&str], message: &str| {
+        let args: Vec<&str> = head.iter().chain(&files).copied().collect();
+        assert_usage_error(&args, message);
+    };
+
+    let good = list("good.txt", "# the boards\n1304\n\n1302\n");
+    let (good, missing) = (path(&good), path(&dir.join("missing.txt")).to_owned());
+    refused(&["certify", "1302", "--list", good], "certify takes a range A-B or --list FILE, not both");
+    refused(&["certify", "--list", good, "--list", good], "certify takes one --list FILE");
+    refused(&["certify"], "certify takes one range A-B or --list FILE");
+    refused(&["certify", "--list", &missing], "missing.txt: ");
+    assert_usage_error(&["certify", "--list"], "--list needs a value");
+
+    let bad = |name: &str, text: &str, why: &str| {
+        let file = list(name, text);
+        refused(&["certify", "--list", path(&file)], &format!("{name}: line {why}"));
+    };
+    bad("word.txt", "1302\nboard\n", "2: expected a board size, got \"board\"");
+    bad("note.txt", "1302 # a note\n", "1: expected a board size, got \"1302 # a note\"");
+    bad("zero.txt", "0\n", "1: 0 is not a board size from 1 to 8191");
+    bad("large.txt", "# c\n\n8192\n", "3: 8192 is not a board size from 1 to 8191");
+    bad("twice.txt", "1302\n1304\n\n1302\n", "4: the board 1302 is listed again (first on line 1)");
+    let empty = list("empty.txt", "# nothing\n\n");
+    refused(&["certify", "--list", path(&empty)], "empty.txt: no board is listed");
+}
+
+/// `verify-certificates` needs a file of certificates, `--results` and `--upper`, takes `--exact` and `--threads` and
+/// no other flag, and a file that is not there is a failure (status 1) that names it.
+#[test]
+fn verify_certificates_command_lines() {
+    const USAGE: &str = "usage: verify-certificates CERTS... --results FILE... --upper FILE...";
+    assert_usage_error(
+        &["verify-certificates", "--results", "r.jsonl", "--upper", "u.jsonl"],
+        "needs a file of certificates",
+    );
+    assert_usage_error(
+        &["verify-certificates", "c.jsonl", "--upper", "u.jsonl"],
+        "needs --results FILE and --upper FILE",
+    );
+    assert_usage_error(&["verify-certificates", "c.jsonl", "--results", "r.jsonl"], USAGE);
+    let files = ["c.jsonl", "--results", "r.jsonl", "--upper", "u.jsonl"];
+    assert_usage_error(
+        &[&["verify-certificates"][..], &files, &["--threads", "0"]].concat(),
+        "--threads must be at least 1",
+    );
+    assert_usage_error(&[&["verify-certificates"][..], &files, &["--out", "o.jsonl"]].concat(), "unknown option --out");
+    assert_usage_error(&[&["verify-certificates"][..], &files, &["--exact"]].concat(), "--exact needs a value");
+
+    let dir = TempDir::new("verify-certificates-missing");
+    let missing = dir.join("missing.jsonl");
+    let run = taxman(&["verify-certificates", path(&missing), "--results", path(&missing), "--upper", path(&missing)]);
+    assert_eq!(run.code, Some(1), "{}{}", run.stdout, run.stderr);
+    assert!(run.stderr.contains("missing.jsonl"), "{}", run.stderr);
+    assert_eq!(run.stdout, "");
 }
 
 /// A command that fails on its inputs, not on its command line, exits with status 1 and names what is wrong, without

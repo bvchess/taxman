@@ -1520,6 +1520,14 @@ In a search for the optimum rather than a check of V, V can be the
 search's starting incumbent: members certified against it cover every
 set that beats it.
 
+Equal problems have equal heaviest promotion sets, so if Π⁺ of game n
+is Π⁺ of an earlier game m whose certificate showed its heaviest set
+worth V(m) − in_the_bag⁺(m), and V(n) − in_the_bag⁺(n) ≥ V(m) −
+in_the_bag⁺(m), then no promotion set of Π⁺ of n is worth more than
+V(n) − in_the_bag⁺(n), and with n's own certified members the corollary
+gives opt(n) = V(n) without a search (`taxman certify`'s
+`same_problem`).
+
 ## Signed frame matroids: the frame bound over other fields
 
 Theorem 11's argument never uses that its entries are 1 or that the

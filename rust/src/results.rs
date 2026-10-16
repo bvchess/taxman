@@ -362,24 +362,32 @@ enum Line {
     },
 }
 
-/// Field access with errors that name the field.
-struct Fields<'a>(&'a Json);
+/// Field access with errors that name the field (also the reader of `taxman certify`'s certificates uses it).
+pub(crate) struct Fields<'a>(pub(crate) &'a Json);
 
 impl<'a> Fields<'a> {
-    fn get(&self, name: &str) -> Result<&'a Json, String> {
+    pub(crate) fn get(&self, name: &str) -> Result<&'a Json, String> {
         self.0.get(name).ok_or_else(|| format!("missing \"{name}\""))
     }
 
-    fn bad(name: &str) -> String {
+    pub(crate) fn bad(name: &str) -> String {
         format!("bad \"{name}\"")
     }
 
-    fn u32(&self, name: &str) -> Result<u32, String> {
+    pub(crate) fn u32(&self, name: &str) -> Result<u32, String> {
         self.get(name)?.as_u32().ok_or_else(|| Self::bad(name))
     }
 
-    fn u64(&self, name: &str) -> Result<u64, String> {
+    pub(crate) fn u64(&self, name: &str) -> Result<u64, String> {
         self.get(name)?.as_u64().ok_or_else(|| Self::bad(name))
+    }
+
+    pub(crate) fn usize(&self, name: &str) -> Result<usize, String> {
+        self.get(name)?.as_u64().and_then(|value| usize::try_from(value).ok()).ok_or_else(|| Self::bad(name))
+    }
+
+    pub(crate) fn f64(&self, name: &str) -> Result<f64, String> {
+        self.get(name)?.as_f64().ok_or_else(|| Self::bad(name))
     }
 
     fn opt_u64(&self, name: &str) -> Result<Option<u64>, String> {
@@ -397,7 +405,7 @@ impl<'a> Fields<'a> {
         self.get(name)?.as_str().ok_or_else(|| Self::bad(name))
     }
 
-    fn u32s(&self, name: &str) -> Result<Vec<u32>, String> {
+    pub(crate) fn u32s(&self, name: &str) -> Result<Vec<u32>, String> {
         self.get(name)?.as_u32_vec().ok_or_else(|| Self::bad(name))
     }
 
@@ -414,7 +422,7 @@ impl<'a> Fields<'a> {
     }
 
     /// A search problem's digest, as [`crate::solver::digest_text`] writes it.
-    fn digest(&self, name: &str) -> Result<u64, String> {
+    pub(crate) fn digest(&self, name: &str) -> Result<u64, String> {
         parse_digest(self.str(name)?).ok_or_else(|| Self::bad(name))
     }
 }
@@ -589,22 +597,37 @@ fn repeat_boards(entries: &[Entry]) -> BTreeSet<u32> {
 /// setup of a board costs more the larger its size, so the largest come first, and the threads end together.
 fn set_up_boards(boards: &BTreeSet<u32>, threads: usize) -> Problems {
     let order: Vec<u32> = boards.iter().rev().copied().collect();
+    in_parallel(order.len(), threads, |i| (order[i], set_up(order[i]))).into_iter().collect()
+}
+
+/// `task(0)`, `task(1)`, ..., `task(count - 1)` in that order, computed on `threads` threads (at least one) that each
+/// take the next index from one counter, so that a slow task delays no other; with one thread, on the calling thread.
+/// Each task is a function of its index only, so the values are the same whatever `threads` is.
+pub(crate) fn in_parallel<T: Send>(count: usize, threads: usize, task: impl Fn(usize) -> T + Sync) -> Vec<T> {
+    if threads <= 1 {
+        return (0..count).map(task).collect();
+    }
     let next = AtomicUsize::new(0);
-    thread::scope(|scope| {
-        let workers: Vec<_> = (0..threads.min(order.len()))
+    let mut done: Vec<(usize, T)> = thread::scope(|scope| {
+        let workers: Vec<_> = (0..threads.min(count))
             .map(|_| {
                 scope.spawn(|| {
                     let mut done = Vec::new();
-                    while let Some(&k) = order.get(next.fetch_add(1, Ordering::Relaxed)) {
-                        done.push((k, set_up(k)));
+                    loop {
+                        let i = next.fetch_add(1, Ordering::Relaxed);
+                        if i >= count {
+                            break done;
+                        }
+                        done.push((i, task(i)));
                     }
-                    done
                 })
             })
             .collect();
-        // A worker that panicked panics here, as the same setup would have on the calling thread.
+        // A worker that panicked panics here, as the same task would have on the calling thread.
         workers.into_iter().flat_map(|w| w.join().unwrap_or_else(|panic| std::panic::resume_unwind(panic))).collect()
-    })
+    });
+    done.sort_unstable_by_key(|&(i, _)| i);
+    done.into_iter().map(|(_, value)| value).collect()
 }
 
 /// The search problem of game `k` and its board's `in_the_bag`: the one in `problems`, or else set up now and kept.
@@ -1235,6 +1258,17 @@ mod tests {
         let Json::Obj(pairs) = line else { panic!("not an object") };
         let pairs = pairs.iter().map(|(k, v)| (k.clone(), if k == key { value.clone() } else { v.clone() }));
         Json::Obj(pairs.collect())
+    }
+
+    #[test]
+    fn tasks_in_parallel_give_their_values_in_the_order_of_their_indices_whatever_the_threads() {
+        let square = |i: usize| i * i;
+        let expected = |count: usize| (0..count).map(square).collect::<Vec<_>>();
+        for (count, threads) in [(0, 1), (0, 3), (1, 4), (7, 1), (7, 2), (7, 3), (7, 16), (100, 4)] {
+            assert_eq!(in_parallel(count, threads, square), expected(count), "{count} tasks on {threads} threads");
+        }
+        // No threads asked for is one.
+        assert_eq!(in_parallel(3, 0, square), expected(3));
     }
 
     #[test]
