@@ -396,6 +396,26 @@ class Lists(Case):
         self.assertEqual(lists["rest_1"]["games"], [100, 106])
         self.assertEqual(lists["rest_2"]["games"], [101, 102, 103, 104, 105])
 
+    def test_spread_takes_the_heads_in_increasing_n_or_the_dearest_first(self):
+        members = {n: [n] for n in range(1, 7)}
+        cost = {1: 1.0, 2: 1.0, 3: 1.0, 4: 1.0, 5: 5.0, 6: 5.0}
+        # In increasing n: 1 and 2 to the two lists, 3 to list 1 (a tie), 4 to list 2, 5 to list 1, 6 to list 2.
+        self.assertEqual(certify_plan.spread(list(members), members, cost, 2), [[1, 3, 5], [2, 4, 6]])
+        # The dearest first: 5 and 6 to the two lists, then the four of cost 1 one after the other.
+        dearest = certify_plan.spread(list(members), members, cost, 2, dearest_first=True)
+        self.assertEqual(dearest, [[5, 1, 3], [6, 2, 4]])
+
+    def test_group_games_gives_the_groups_and_what_each_game_costs(self):
+        games = [{"n": 1, "needs": 1, "share": None, "expected_thread_hours": 4.0},
+                 {"n": 2, "needs": 0, "share": None, "expected_thread_hours": 0.0},
+                 {"n": 3, "needs": 1, "share": 1, "expected_thread_hours": 0.0},
+                 {"n": 4, "needs": 1, "share": 3, "expected_thread_hours": 0.0},
+                 {"n": 5, "needs": 1, "share": None, "expected_thread_hours": None}]
+        members, cost = certify_plan.group_games(games)
+        self.assertEqual(members, {1: [1, 3, 4], 5: [5]})
+        self.assertEqual(cost, {1: 4.0, 3: 0.0, 4: 0.0, 5: 0.0})
+        self.assertEqual(certify_plan.dearest_heads(members, cost), [1, 5])
+
     def test_an_unknown_cost_ranks_and_weighs_as_zero(self):
         games = [{"n": k, "needs": 1, "share": None, "expected_thread_hours": float(k)} for k in range(1, 7)]
         games.append({"n": 7, "needs": 1, "share": None, "expected_thread_hours": None})

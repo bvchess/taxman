@@ -13,6 +13,20 @@ committed chain (`results/strict.jsonl`, games 1..3440) and the prover's barred 
 | `certificates_600_1300.jsonl` | `taxman certify 600-1300 --results results/strict.jsonl U --out certificates_600_1300.jsonl --threads 1 --progress 0` (39 s) | a certificate for each of the 377 games of 600..1300 that need one: 296 certified by a search, 81 by the same problem as an earlier game; `taxman verify-certificates` passes it (4.6 s) |
 | `plan.jsonl`, `plan.md`, `lists/*.txt` | `tools/certify_plan.py --results results/strict.jsonl --upper prover/data/upper_2176_3314.jsonl prover/data/upper_3315_3440.jsonl --problems bench/certify/problems_600_3440.jsonl --gaps bench/wall/gaps_chain.jsonl bench/wall/gaps_chain_3313_3440.jsonl --from 2176 --to 3440 --era 2176-3310:6.396 --era 3311-3440:16.57 --out-dir bench/certify` | the work list of the campaign and its estimate: per game of 2176..3440 whether it needs a certificate, why it costs what it is expected to cost, and the list files `taxman certify --list` takes (`plan.md` is the summary the owner's approval reads) |
 
+The campaign itself (the owner's approval, the phases, the stop rule of the pilot) has its own files, made on the same
+data after the plan:
+
+| file | what it is |
+|---|---|
+| `lists/stage4/*.txt` | the plan's games cut into the phases of the campaign by `tools/certify_campaign.py lists --plan bench/certify/plan.jsonl --out-dir bench/certify/lists/stage4`: `pilot7` (phase A: 2340, 3175, 3300, 3335, 3336, 3408, 3420 and the games that rest on them, 10 games, 288 thread-hours), `dear_rest` (phase B: 3440, 3424, 3425, 2346 and the other dear groups, 14 games, 1,837), `rest_1` to `rest_4` (phase B: 567 games, 204 each), `deferred` (phase C: the 115 repeats the rule cannot settle and the 2 games that share with them, 361).  The old lists of `lists/` stay as `certify_plan.py` made them |
+| `certificates_sample_1301_2175.jsonl` | 12 real lines of `taxman certify` (commit ed09ac0, 2 threads) on the laptop for games of 1301..2175 (eight searches, three games settled by the rule, one search stopped by `--node-limit` and resumed), the real input of the tests of `tools/certify_pilot.py`; `verify-certificates` passes it |
+
+`tools/certify_campaign.py check` verifies any directory of lists against `plan.jsonl` (every game that needs a
+certificate in one list, none in two, a game that shares after the game it shares with in the same list, `deferred` the
+unsettled repeats with their groups), and `tools/certify_pilot.py` rates the certificates of the pilot against the plan
+and says GO, STOP or COUNTEREXAMPLE.  The procedure, the commands and the cost table are in [RUNBOOK
+section 11](../../tools/cloud/RUNBOOK.md#11-certifying-u-stage-4).
+
 **The two eras.**  `certify_plan.py` prices a search by its nodes, at the thread-seconds per node that the chain's own
 run paid in each stretch of it, since the chain ran several searches at once and a game's recorded seconds are the
 time it shared the machine.  The wall times are the run's (docs/EXPERIMENTS.md, [the cloud run to

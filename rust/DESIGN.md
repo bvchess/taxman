@@ -975,7 +975,10 @@ were made in.  The tally line reads `list FILE (K boards): ...` where a range gi
 campaign on 2176-3440 and its estimate are made by `tools/certify_plan.py` (standard library only) from the results,
 the barred bounds, the extended problems of `examples/extended.rs problems` (which games the rule will settle) and the
 root gaps; a game the rule settles goes into the list of the game it rests on, after it, since the rule reads only its
-own `--out` (`bench/certify/`).
+own `--out` (`bench/certify/`).  The campaign's phases (a pilot of seven dear games with a stop rule, the dear games,
+four balanced lists, the repeats the rule cannot settle) are cut from that work list by `tools/certify_campaign.py`
+into `bench/certify/lists/stage4/`, rated by `tools/certify_pilot.py` and run by `tools/cloud/certify.sh` (RUNBOOK,
+section 11).
 
 *Verifying the certificates.*  `taxman verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...]
 [--threads K]` (`src/certify/verify.rs`) reads the files `certify --out` wrote, without changing them, and checks every

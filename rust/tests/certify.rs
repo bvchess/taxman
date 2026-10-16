@@ -20,6 +20,10 @@
 //! The work list of the campaign (`tools/certify_plan.py`) is tested on its own and against the committed certificates
 //! of 600..=1300 (`bench/certify/certificates_600_1300.jsonl`): it names the games that were certified, their open
 //! members and the repeats that the rule settled with no search; and those certificates verify.
+//!
+//! The campaign's tools (`tools/certify_campaign.py`, `tools/certify_pilot.py`) pass their own tests, its lists cover
+//! every game that needs a certificate once and `taxman certify --list` reads them, and the real lines of the pilot
+//! tool's tests verify.
 
 mod common;
 
@@ -1761,4 +1765,54 @@ fn the_committed_certificates_verify() {
     let end = "proven frontier: every game to 2175 is proven; the first that is not is 2176 (needs a certificate and \
                has none in the files given)";
     assert!(out.contains(end), "{out}");
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// The campaign's lists and tools
+
+/// The campaign's own tools pass their tests (`tools/test_certify_campaign.py`, `tools/test_certify_pilot.py`, standard
+/// library only): the lists of the phases, and the pilot's stop rule on synthetic lines, on real ones and on the
+/// committed plan.
+#[test]
+fn the_campaign_tools_pass_their_own_tests() {
+    for script in ["tools/test_certify_campaign.py", "tools/test_certify_pilot.py"] {
+        let run = python(&crate_file(script), &[]);
+        assert_eq!(run.code, Some(0), "{script}: {}", run.stderr);
+    }
+}
+
+/// The lists of the campaign (`bench/certify/lists/stage4`) hold every game that needs a certificate once, a game that
+/// rests on another's certificate after it in the same list, and the repeats the rule cannot settle in their own list
+/// (`tools/certify_campaign.py check`); and `taxman certify --list` reads each of them (it reads the list before it
+/// asks for its other flags, so the usage error about `--results` is the sign that the list was accepted).
+#[test]
+fn the_campaign_lists_cover_every_game_once_and_certify_reads_them() {
+    let lists = crate_file("bench/certify/lists/stage4");
+    let plan = crate_file("bench/certify/plan.jsonl");
+    let args = ["check", "--plan", path(&plan), "--lists-dir", path(&lists)];
+    let run = python(&crate_file("tools/certify_campaign.py"), &args);
+    assert_eq!(run.code, Some(0), "{}{}", run.stdout, run.stderr);
+    assert!(run.stdout.starts_with("7 lists, 708 games: "), "{}", run.stdout);
+
+    let mut files: Vec<PathBuf> = fs::read_dir(&lists).unwrap().map(|entry| entry.unwrap().path()).collect();
+    files.sort();
+    assert_eq!(files.len(), 7);
+    for file in files {
+        let run = taxman(&["certify", "--list", path(&file)]);
+        let accepted = run.stderr.contains("certify needs --results FILE and --upper FILE");
+        assert!(run.code == Some(2) && accepted, "{}: {}", file.display(), run.stderr);
+    }
+}
+
+/// The real certificates of 1301..=2175 that the pilot tool's tests read (`bench/certify/certificates_sample_1301_2175
+/// .jsonl`, made by `taxman certify` on the laptop) verify: eight searches, three games settled by the rule, and one
+/// search that was stopped by a limit and resumed.
+#[test]
+fn the_sample_certificates_of_the_pilot_tests_verify() {
+    let certs = crate_file("bench/certify/certificates_sample_1301_2175.jsonl");
+    let run = run_verify(&[&certs], &results_path("strict.jsonl"), &committed_upper_files(), &["--threads", "2"]);
+    assert_eq!(run.code, Some(0), "{}{}", run.stdout, run.stderr);
+    let counts = "12 lines, 11 final, 1 incomplete; certified by search 8, certified by the same problem 3, beaten 0";
+    assert!(run.stdout.contains(&format!("{}: {counts}", certs.display())), "{}", run.stdout);
+    assert!(run.stdout.contains("counterexamples: none"), "{}", run.stdout);
 }

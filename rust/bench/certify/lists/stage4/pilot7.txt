@@ -1,0 +1,14 @@
+# pilot7: phase A, the 7 games of the pilot with their groups, the dearest first
+# games: 10 in 7 groups
+# expected thread-hours: 287.99
+# command: certify_campaign.py lists --plan bench/certify/plan.jsonl --out-dir bench/certify/lists/stage4
+3300
+2340
+3420
+3421
+3336
+3337
+3335
+3175
+3408
+3409

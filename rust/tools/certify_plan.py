@@ -476,25 +476,46 @@ def game_record(n, lo, hi, upper, results, problems, gaps, eras, overhead):
     return rec
 
 
-def make_lists(games, k):
-    """The lists of the games that need a certificate: pilot, dear and k balanced rest lists, as dicts."""
-    needing = [g for g in games if g["needs"] == 1]  # in increasing n
+def group_games(games):
+    """(members, cost) of the games that need a certificate, in increasing n: members maps each head, a game that has
+    no share, to the boards of its group (the head, and the games that share with it directly or through a chain of
+    shares), increasing; cost maps every such board to its expected thread-hours (0 where unknown)."""
+    needing = [g for g in games if g["needs"] == 1]
     cost = {g["n"]: g["expected_thread_hours"] or 0.0 for g in needing}
-    members = {}  # head -> the boards of its group, increasing
+    members = {}
     head_of = {}
     for g in needing:
         head = g["n"] if g["share"] is None else head_of[g["share"]]
         head_of[g["n"]] = head
         members.setdefault(head, []).append(g["n"])
-    dearest = sorted(members, key=lambda head: (-cost[head], head))
-    pilot, dear = dearest[:PILOT_HEADS], dearest[PILOT_HEADS:DEAR_HEADS]
-    taken = set(dearest[:DEAR_HEADS])
+    return members, cost
+
+
+def dearest_heads(members, cost):
+    """The heads of the groups, the dearest head first (ties to the lower n; the games that share cost nothing)."""
+    return sorted(members, key=lambda head: (-cost[head], head))
+
+
+def spread(heads, members, cost, k, dearest_first=False):
+    """The groups of `heads` in k lists, balanced by expected hours: the heads in increasing n (the dearest first, if
+    `dearest_first`: closer totals), each to the list with the smallest total so far (ties to the lowest list).
+    Returns the k lists of heads."""
     totals = [0.0] * k
-    rest = [[] for _ in range(k)]
-    for head in sorted(h for h in members if h not in taken):
+    lists = [[] for _ in range(k)]
+    for head in sorted(heads, key=(lambda h: (-cost[h], h)) if dearest_first else None):
         i = min(range(k), key=lambda j: (totals[j], j))
-        rest[i].append(head)
+        lists[i].append(head)
         totals[i] += sum(cost[n] for n in members[head])
+    return lists
+
+
+def make_lists(games, k):
+    """The lists of the games that need a certificate: pilot, dear and k balanced rest lists, as dicts."""
+    needing = [g for g in games if g["needs"] == 1]  # in increasing n
+    members, cost = group_games(games)
+    dearest = dearest_heads(members, cost)
+    pilot, dear = dearest[:PILOT_HEADS], dearest[PILOT_HEADS:DEAR_HEADS]
+    rest = spread([h for h in members if h not in set(dearest[:DEAR_HEADS])], members, cost, k)
     described = [
         ("pilot", f"the groups of the {PILOT_HEADS} dearest heads", pilot),
         ("dear", f"the groups of the next {DEAR_HEADS - PILOT_HEADS} dearest heads", dear),

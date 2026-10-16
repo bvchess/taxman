@@ -20,8 +20,12 @@ spot interruption has yet tested `spot-watch.sh`, and the run's 15.9 hours had n
 `chain.sh` (after a rehearsal of section 4.5 on the same machine type, which ran `verify.sh`), `save.sh` (with its
 restore on the second instance) and `spot-watch.sh`; no spot interruption came in it either, the first instance having
 been stopped on purpose.
-The scaling run on a `c8g.48xlarge` ran `setup.sh` in full (without the tests) and `verify.sh` there.  Not run on EC2:
-`scaling.sh` (the calibration and the scaling run did by hand what it does), and nothing has run on Ubuntu.  Sections 2
+The scaling run on a `c8g.48xlarge` ran `setup.sh` in full (without the tests) and `verify.sh` there.  `certify.sh`
+(section 11) ran on macOS (arm64, bash 3.2) with `taxman certify` on two lists at once through a complete run and its
+`verify-certificates`, a SIGTERM stop and its resume, and, with a stand-in for the binary, a counterexample, an error, a
+crash and a deadline; `run.sh` changed for it (`run_start` and `run_reap`), and `chain.sh` ran through the change to a
+complete chain, a SIGTERM stop and a deadline.  Not run on EC2: `certify.sh`, `scaling.sh` (the calibration and the
+scaling run did by hand what it does), and nothing has run on Ubuntu.  Sections 2
 and 3 exist to find the problems that a macOS run cannot, on a machine that costs cents.  The speed
 of a Graviton core and the scaling of the solver to 64 and 192 threads are measured (the calibration and the
 [scaling run](../../docs/EXPERIMENTS.md#scaling-to-192-threads-2026-10)); what is not is in section 8.
@@ -38,6 +42,7 @@ of a Graviton core and the scaling of the solver to 64 and 192 threads are measu
 * [8. What has not been measured](#8-what-has-not-been-measured)
 * [9. The prover's proofs of opt(n), 1301 to 2175](#9-the-provers-proofs-of-optn-1301-to-2175)
 * [10. The theory track's measurements: E6 and E9(a)](#10-the-theory-tracks-measurements-e6-and-e9a)
+* [11. Certifying U (stage 4)](#11-certifying-u-stage-4)
 
 ## Rules for every launch
 
@@ -57,7 +62,7 @@ calibration.  The sections below point here instead of repeating them.
   +MINUTES` at boot (in the user data), with MINUTES a little past the run's own deadline (`DEADLINE_HOURS`, section
   5).  Any shutdown (the timer, `POWEROFF`, the spot service) then terminates the instance, and one that is forgotten
   ends by itself.  It is the backstop that depends on no script.
-* **Tags** `Project=taxman` and `Purpose=...` (`trial`, `prover`, `chain`) on everything the launch creates that takes
+* **Tags** `Project=taxman` and `Purpose=...` (`trial`, `prover`, `chain`, `certify`) on everything the launch creates that takes
   one: the instance, its volumes and spot request, a key pair, a security group.  The check at the end finds them by
   `Project`.
 * **The root volume is deleted on termination**, so what must outlive the instance is copied off it first (`S3_DEST`
@@ -105,7 +110,8 @@ The files in this directory:
 | `save.sh` | copy results, logs and checkpoints to S3 (`--restore` on a fresh machine) |
 | `prover.sh A B` | the prover's proofs of opt(n) for n = A..B (section 9): resumable passes, all CPUs; `--verify` checks the output; `--list N1,N2,...` runs `exact` on given games as a measurement (section 10.1) |
 | `hunt.sh UPPER_FILE` | the counterexample hunt of section 10.2: the frame solver on boards without one open source each, resumable |
-| `spot-watch.sh` | on a spot interruption notice: stop `chain.sh`, `prover.sh` or `hunt.sh` and save |
+| `certify.sh LIST[:THREADS]...` | the certificates campaign (section 11): `taxman certify` over the lists of `bench/certify/lists/stage4`, several at once, resumable, with a final `verify-certificates` |
+| `spot-watch.sh` | on a spot interruption notice: stop `chain.sh`, `prover.sh`, `hunt.sh` or `certify.sh` and save |
 | `Dockerfile`, `Dockerfile.dockerignore` | a Linux build-and-test image (section 2) |
 
 All state lives in one directory, `$TAXMAN_WORK` (default `~/taxman-work`): `results/strict.jsonl` (and
@@ -1144,3 +1150,297 @@ tmux new-session -d -s sw 'mkdir -p ~/taxman-work/logs; rust/tools/cloud/spot-wa
 `hunt.sh` reruns the hunt after a crash and resumes it after a stop (finished pairs are in its output); exit status 2
 and "COUNTEREXAMPLE" lines in `hunt.log` are the finding to look for.  At home: `aws s3 cp $D/results/hunt.jsonl
 rust/bench/hunt/hunt_2176_3314.jsonl`, the summary from `hunt.out` beside it, and the README there brought up to date.
+
+## 11. Certifying U (stage 4)
+
+The campaign of [Certificates past
+2175](../../docs/EXPERIMENTS.md#certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10):
+`taxman certify` on every game of 2176-3440 that rests on the frame model, so that every game to 3440 is proven on the
+whole board, where today the proven end of the chain is 2175.  Built, tested on the laptop and **not run**: it waits for
+Brian's approval with the estimate below ([rules for every launch](#rules-for-every-launch)).  What a certificate is:
+[DESIGN.md, "Certificates of U"](../../DESIGN.md#certificates-of-u); the work list, its data and the lists:
+[bench/certify/](../../bench/certify/README.md).  It launches as section 9.4 does (an instance profile, steps through
+SSM, `S3_DEST`, a timer, `spot-watch.sh` beside the run, tmux); only the machine, the commands and the checks differ.
+
+### 11.1 What it costs, and what to approve
+
+708 games need a certificate.  145 of them the rule of the same problem settles with no search: they sit in the list
+of the game they rest on, after it.  115 more are repeats of a search that the rule cannot settle; they are searched
+too, and go last.  The plan prices a certificate at twice the plain search of its problem, by nodes at the cost per
+node of the chain's own run (`bench/certify/plan.md`).  The lists and their prices, in thread-hours of the plan, in
+hours of one `c8g.16xlarge` (64 threads) and in dollars at the spot price paid on 2026-10-15 ($0.6752 an hour) and
+on demand ($2.5517):
+
+| phase | lists | games | thread-hours | hours on 64 threads | spot | on demand |
+|---|---|---:|---:|---:|---:|---:|
+| A: the pilot, with the stop rule | `pilot7` | 10 (7 searched) | 288 | 4.5 | $3.04 | $11.48 |
+| B: the dear games, the dearest first (3440, 3424, 3425, 2346, ...) | `dear_rest` | 14 (12 searched) | 1,837 | 28.7 | $19.38 | $73.23 |
+| B: the others, four processes of 16 threads | `rest_1` to `rest_4` | 567 | 815 | 12.7 | $8.60 | $32.50 |
+| C: the repeats the rule cannot settle | `deferred` | 117 (115 searched) | 0-361 | 0-5.6 | $0-3.81 | $0-14.40 |
+| **all** | | **708** | **2,940-3,301** | **46-52** | **$31-35** | **$117-132** |
+
+Phase C costs nothing if a build with Lemma M5⁺ (unzip's claims in the extended problem, the open item of [the entry on
+certificates past 2175](../../docs/EXPERIMENTS.md#certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10))
+is merged by then, since its rule settles 3427 and its like from the certificates of phases A and B (3427 alone is 223
+thread-hours); without it the 117 games are searched, 361 thread-hours.
+
+* **If the overhead is not 2.**  The plan priced it at 2 times the plain search; stage 2 measured a median of 1.55.  At
+  1.6 the campaign costs 2,350-2,640 thread-hours ($25-28 at spot, $94-105 on demand), at 2.4 3,530-3,960 ($37-42,
+  $141-158).  The pilot measures it where the money goes (|O| near 200-300, root gaps 1,100-1,550).
+* **What to approve.**  Up to $50 at spot (or $160 on demand), released in two steps: phase A first ($3 at spot, $11
+  on demand), phases B and C once the stop rule of 11.2 says GO.
+* **Spending past 1.5 times the estimate pauses the campaign.**  Each phase runs under a `DEADLINE_HOURS` of 1.5 times
+  its expected hours (the table of 11.4), after which the script stops cleanly and the campaign waits for a report.
+  Resume only with Brian's yes.
+* **Wall time.**  About two days on one machine; the dearest game, 3440, takes 10.6 hours by itself.  Two machines (the
+  dear list on one, the four rest lists on the other, each with its own S3 prefix, 11.6) bring the rest down to about
+  29 hours at the same cost.
+* **Risks.**  The overhead at the dear end could be worse than the plan's; the pilot finds that out for $3.  A spot
+  interruption costs at most a checkpoint interval (5 minutes), nothing with `spot-watch.sh`.  A counterexample (a game
+  that beats a recorded score) stops everything and is the result itself: the chain's score would be too low at that
+  game.
+
+### 11.2 The stop rule of the pilot
+
+The seven games of `pilot7` (2340, 3175, 3300, 3335, 3336, 3408, 3420, with the games that rest on them) run one after
+the other on all 64 threads, so that each game's time per node is measured cleanly.  For each game that was searched,
+with N its nodes in the chain (`plan.jsonl`, `cost_nodes`) and c the cost per node of its stretch of the chain
+(243.84 microseconds of a thread up to 3310, 326.73 after; the table of eras in `plan.md`):
+
+* **R** = the certificate's thread-seconds (`seconds_all_runs` x `threads`) / (N x c): the plan priced it at 2.
+* **R_nodes** = the certificate's nodes / N, and **R_node** = its thread-microseconds per node / c, so that R = R_nodes
+  x R_node splits the overhead into the tree and the node.  Stage 2 predicts R_nodes about 1.1-1.5 (the rule of
+  symmetric pairs is missing) and R_node about 1.2-1.6.
+
+**Go on** if the median R is at most 3 and no R is above 5: the campaign then costs at most 1.5 times the plan.
+**Stop** otherwise: report, and build the speedups (Lemma M5⁺ and a faster node) before spending more.  **Stop at
+once** on any `beaten` verdict.  `tools/certify_pilot.py` (its header defines the quantities) computes all of it from the
+certificates and the plan (11.5).
+
+### 11.3 The machine and the build
+
+* **Machine.**  One `c8g.16xlarge` (64 vCPUs, Graviton4) on spot in us-east-1, in the zone with the lowest price of the
+  spot price history below (read it first: it is the price of the estimate), on demand if spot has no capacity.
+  Amazon Linux 2023 arm64 (`ec2-user`), no key pair, a gp3 root volume of 40 GB, the instance profile `taxman-ec2`,
+  IMDSv2 required, a security group with no inbound rule, and `Purpose=certify` on everything the launch creates.
+  Memory is no concern (a few hundred MB a process, the results file loaded in each).
+
+  ```
+  aws ec2 describe-spot-price-history --instance-types c8g.16xlarge --product-descriptions Linux/UNIX \
+      --start-time $(date -u -v-3H +%Y-%m-%dT%H:%M:%SZ) --query 'SpotPriceHistory[].[AvailabilityZone,SpotPrice]' \
+      --output text                                          # GNU date: -d '3 hours ago' in place of -v-3H
+  ```
+* **The commit.**  The commit of master that holds this section, pushed first (the instance clones it).  Call it
+  `COMMIT`; the whole campaign runs on it, and the lines of every certificate record it (`build`).  The build is
+  `setup.sh` with the tests skipped (they run on the laptop), which builds the solver and the prover for the CPU of the
+  machine and runs its smoke checks.
+* **Phase C on another build.**  If a build with Lemma M5⁺ is merged by phase C, check it out on the machine of phase C
+  (`git fetch && git checkout M5COMMIT`), build again, and delete the checkpoint directory of `deferred` if an earlier
+  attempt left one (a checkpoint of another build is refused).  Phases A and B never change build: a checkpoint is
+  resumed only by the build that made it, and the lines of one list should come from one build.
+* **Inputs**, all committed: `rust/results/strict.jsonl` (the recorded games, 1..3440), `rust/prover/data/upper_*.jsonl`
+  (the prover's barred bounds: 2..1300, 1301..2175, 2176..3314, 3315..3440), `rust/bench/certify/plan.jsonl` and
+  `plan.md`, and the lists in `rust/bench/certify/lists/stage4/`.  `certify.sh` takes them from the checkout.
+
+### 11.4 The lists, and the commands of the phases
+
+The lists are made from `plan.jsonl` by `tools/certify_campaign.py lists` (its header says how) and checked by
+`tools/certify_campaign.py check`; run the check on the machine before the first phase.  A game that rests on
+another's certificate follows it in the same list (the rule reads only the certificates of its own output file), and no
+game is in two lists.
+
+```
+python3 rust/tools/certify_campaign.py check --plan rust/bench/certify/plan.jsonl \
+    --lists-dir rust/bench/certify/lists/stage4              # 7 lists, 708 games: ...
+```
+
+| list | phase | games | thread-hours | threads | expected hours | `DEADLINE_HOURS` (1.5 times) |
+|---|---|---:|---:|---:|---:|---:|
+| `pilot7` | A | 10 | 288.0 | 64 | 4.5 | 7 |
+| `dear_rest` | B | 14 | 1,836.6 | 64 | 28.7 | 43 |
+| `rest_1`, `rest_2`, `rest_3`, `rest_4` | B | 151, 139, 134, 143 | 203.8 each | 16 each | 12.7 | 19 |
+| `deferred` | C | 117 | 361.2 | 64 | 5.6 | 9 |
+
+`certify.sh LIST[:THREADS]...` runs each list as a process of its own: `taxman certify --list` the list, with its output
+file `certificates_LIST.jsonl` in `$TAXMAN_WORK/results`, its checkpoint directory `$TAXMAN_WORK/ckpt/LIST` and a
+checkpoint every 300 seconds.  Without `:THREADS` the machine's threads are shared equally among the lists, so `rest_1
+rest_2 rest_3 rest_4` is four processes of 16.  One script, one deadline, one S3 saver and one `spot-watch.sh` for all
+of them.  Its header has the exit statuses and the variables.  When every list is done it runs `taxman
+verify-certificates` over their output files and exits 0 only if that passes.  A counterexample (status 2 of `taxman
+certify`) stops all the processes at once, with their checkpoints, and ends the script with status 2.
+
+| phase | command (in tmux, from `~/taxman`) | S3 prefix | timer at launch |
+|---|---|---|---|
+| A | `DEADLINE_HOURS=7 POWEROFF=done S3_DEST=$D/A rust/tools/cloud/certify.sh pilot7` | `$D/A` | `shutdown -h +480` |
+| B | `DEADLINE_HOURS=43 S3_DEST=$D/B rust/tools/cloud/certify.sh dear_rest && DEADLINE_HOURS=19 POWEROFF=always S3_DEST=$D/B rust/tools/cloud/certify.sh rest_1 rest_2 rest_3 rest_4` | `$D/B` | `shutdown -h +3900` |
+| C | `DEADLINE_HOURS=9 POWEROFF=done S3_DEST=$D/C rust/tools/cloud/certify.sh deferred` | `$D/C` | `shutdown -h +600` |
+
+`D=s3://taxman-013764204840-us-east-1/certify-2176-3440`: one prefix a phase, because a machine saves its checkpoint
+directory with `--delete`, and another machine's prefix must not be touched by it.  `POWEROFF=done` shuts the machine
+down (and so terminates it) when the phase is complete, after the final save; a phase that stops for any other reason
+leaves the machine up until its timer, so that the work directory can be looked at: pull what you need and terminate it
+(the rules for every launch).  The timers are the deadlines plus an hour for the setup, the final save and the
+verification.
+
+### 11.5 Phase A: the pilot
+
+Launch as 9.4 does, with these values: `c8g.16xlarge`, a 40 GB volume, `Purpose=certify`, the user data `shutdown -h
++480`, `ZONE` the zone of 11.3 and a `MaxPrice` above the spot price (a ceiling of $1.2 an hour is above any price
+seen).  Only after Brian's yes:
+
+```
+export AWS_PROFILE=bvc AWS_DEFAULT_REGION=us-east-1                         # after: aws login --profile bvc
+tags='{Key=Project,Value=taxman},{Key=Purpose,Value=certify}'
+vpc=$(aws ec2 describe-vpcs --filters Name=is-default,Values=true --query 'Vpcs[0].VpcId' --output text)
+sg=$(aws ec2 create-security-group --group-name taxman-certify-$(date +%Y%m%d) --vpc-id $vpc \
+    --description 'taxman certificates, no inbound' --tag-specifications "ResourceType=security-group,Tags=[$tags]" \
+    --query GroupId --output text)
+aws ec2 run-instances --instance-type c8g.16xlarge --placement AvailabilityZone=ZONE \
+    --image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64 \
+    --security-group-ids $sg --iam-instance-profile Name=taxman-ec2 --metadata-options HttpTokens=required \
+    --block-device-mappings 'DeviceName=/dev/xvda,Ebs={VolumeSize=40,VolumeType=gp3,DeleteOnTermination=true}' \
+    --instance-initiated-shutdown-behavior terminate --user-data $'#!/bin/bash\nshutdown -h +480' \
+    --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=taxman-certify},$tags]" \
+        "ResourceType=volume,Tags=[$tags]" "ResourceType=spot-instances-request,Tags=[$tags]" \
+    --instance-market-options 'MarketType=spot,SpotOptions={MaxPrice=1.2}'
+```
+
+Then, through SSM as in 9.4 (`$I` the instance id; the first step as root, the others as `ec2-user`, from script files),
+on the instance, with `COMMIT` the campaign's:
+
+```
+dnf install -y git tmux                                                     # as root
+git clone https://github.com/bvchess/taxman.git && cd taxman && git checkout COMMIT
+NO_PULL=1 SKIP_TESTS=1 rust/tools/cloud/setup.sh                            # builds for this CPU, smoke checks
+```
+
+and the check of the lists (11.4).
+
+**A rehearsal first** (minutes, cents): six small games of 1301-2175, in a work directory of its own, to see the build,
+the S3 saves and the deadline work on the machine itself:
+
+```
+export TAXMAN_WORK=~/rehearsal D=s3://taxman-013764204840-us-east-1/certify-rehearsal
+mkdir -p ~/rehearsal/lists && printf '%s\n' 1312 1313 1314 1315 1316 1317 >~/rehearsal/lists/r.txt
+LISTS=~/rehearsal/lists DEADLINE_HOURS=1 S3_DEST=$D rust/tools/cloud/certify.sh r:4    # 6 games: 3 searched, 3 by the rule
+unset TAXMAN_WORK; aws s3 rm --recursive $D; rm -rf ~/rehearsal
+```
+
+The rehearsal must end `ended: complete` with `verify-certificates` passing (status 0).  Then the pilot:
+
+```
+cd ~/taxman && export D=s3://taxman-013764204840-us-east-1/certify-2176-3440
+tmux new-session -d -s cert "DEADLINE_HOURS=7 POWEROFF=done S3_DEST=$D/A rust/tools/cloud/certify.sh pilot7"
+tmux new-session -d -s sw 'mkdir -p ~/taxman-work/logs; rust/tools/cloud/spot-watch.sh 2>&1 | tee -a ~/taxman-work/logs/spot-watch.log'
+```
+
+In about 4.5 hours the log says `ended: complete` and the machine shuts itself down; the results are in
+`$D/A/results/certificates_pilot7.jsonl`.  At home, the stop rule:
+
+```
+export AWS_PROFILE=bvc                                                     # after: aws login --profile bvc
+mkdir -p certify-run && aws s3 sync $D/A certify-run/A
+python3 rust/tools/certify_pilot.py certify-run/A/results/certificates_pilot7.jsonl \
+    --list rust/bench/certify/lists/stage4/pilot7.txt --bands
+```
+
+The report has a line a searched game (|O|, root gap, GF(2) words, set width, nodes against the chain's, R_nodes,
+R_node, R, thread-hours against the plan's), the median and largest R, the search time in dollars, and the verdict.
+Exit status 0 is GO, 3 STOP, 2 COUNTEREXAMPLE, 4 UNFINISHED (a game has no verdict yet; it also says STOP at once if a
+game is already above 5).  While the pilot runs, the same command on the copy in S3 (`aws s3 cp
+$D/A/results/certificates_pilot7.jsonl -`, saved every 10 minutes) shows the games so far.  On GO, report to Brian with
+the table and ask for phases B and C; on STOP, report and build the speedups; on COUNTEREXAMPLE, 11.8.
+
+### 11.6 Phase B
+
+A new machine (the pilot's is gone), launched and set up as in 11.5 with the user data `shutdown -h +3900`, no
+rehearsal needed:
+
+```
+cd ~/taxman && export D=s3://taxman-013764204840-us-east-1/certify-2176-3440
+tmux new-session -d -s cert "DEADLINE_HOURS=43 S3_DEST=$D/B rust/tools/cloud/certify.sh dear_rest && \
+    DEADLINE_HOURS=19 POWEROFF=always S3_DEST=$D/B rust/tools/cloud/certify.sh rest_1 rest_2 rest_3 rest_4"
+tmux new-session -d -s sw 'mkdir -p ~/taxman-work/logs; rust/tools/cloud/spot-watch.sh 2>&1 | tee -a ~/taxman-work/logs/spot-watch.log'
+```
+
+`dear_rest` goes first, the dearest games first (3440 alone takes 10.6 hours), on all threads, one game after the
+other; if it stops for any reason the second command does not run.  Then the four rest lists run together.  Two
+machines instead: the same two commands, one on each, `dear_rest` with `D/B1` and `POWEROFF=done`, the four rest lists
+with `D/B2` and `POWEROFF=done`, and a timer for each of its own deadline plus an hour; phase C then fetches both
+prefixes.
+
+### 11.7 Phase C
+
+The repeats the rule cannot settle, searched, or settled by the rule of a build with Lemma M5⁺ (11.3).  The output file
+of phase C starts as a copy of everything the earlier phases wrote, so that the rule finds the certificates of the games
+it rests on, and so that the file at the end is the whole campaign's.  On a machine set up as in 11.5 (on the build
+that phase C is to run on):
+
+```
+cd ~/taxman && export D=s3://taxman-013764204840-us-east-1/certify-2176-3440 W=$HOME/taxman-work/results
+mkdir -p $W && aws s3 cp $D/A/results/certificates_pilot7.jsonl $W/ && aws s3 sync $D/B/results $W
+cat $W/certificates_pilot7.jsonl $W/certificates_dear_rest.jsonl $W/certificates_rest_{1,2,3,4}.jsonl \
+    >$W/certificates_deferred.jsonl                          # the order matters: a game follows the game it rests on
+tmux new-session -d -s cert "DEADLINE_HOURS=9 POWEROFF=done S3_DEST=$D/C rust/tools/cloud/certify.sh deferred"
+tmux new-session -d -s sw 'mkdir -p ~/taxman-work/logs; rust/tools/cloud/spot-watch.sh 2>&1 | tee -a ~/taxman-work/logs/spot-watch.log'
+```
+
+`certify.sh` ends with `verify-certificates` over that file, which then holds all 708 games.  (The files of
+phases A and B, copied by `aws s3 sync` alongside, are the same lines again.)
+
+### 11.8 Watch, stop, resume, and a counterexample
+
+```
+tail -n 5 ~/taxman-work/logs/certify_pilot7.log        # this script: a status line every 10 minutes, the exits of the processes
+tail -n 3 ~/taxman-work/logs/certify_dear_rest.out     # the result lines of the games finished (nodes, seconds, verdict)
+tail -n 3 ~/taxman-work/logs/certify_dear_rest.err     # the progress lines of the game in progress (nodes, eff, best)
+ls -l ~/taxman-work/ckpt/*                              # a checkpoint no older than 5 minutes while a long game runs
+```
+
+The log of a phase is `certify_PHASE.log`, PHASE being the list's name, or the first list's with `x` and the number of
+lists for several (`certify_rest_1x4.log`); each list has its `certify_LIST.out` and `.err`.  The saves in S3 (as old
+as the last save, about 10 minutes) hold the same files under `$D/X/logs/` and the certificates under `$D/X/results/`,
+X being the phase's letter (A, B or C) of 11.4.
+
+* **Stop on purpose**: Ctrl-C in tmux, or `kill -TERM $(cat ~/taxman-work/certify_PHASE.pid)`.  Every process writes a
+  final checkpoint; the script ends with status 143.  **Resume**: the same command; it skips every game with a verdict
+  and resumes the search with a checkpoint.  The thread counts and `S3_DEST` may differ; the build may not.
+* **Spot interruption**: `spot-watch.sh` stops the run and saves.  On a replacement machine: set up as in 11.5 (the
+  same `COMMIT`), `S3_DEST=$D/X rust/tools/cloud/save.sh --restore`, copy the logs back (`aws s3 sync $D/X/logs
+  ~/taxman-work/logs`, or the new machine's first save overwrites the old ones), and run the same command with
+  `DEADLINE_HOURS` set to the hours that remain (the deadline is not saved).
+* **An error stop** (status 1): a game failed a check (a recorded game that does not replay, a certificate that
+  contradicts another, a checkpoint of another build).  Nothing is retried; read `certify_LIST.err`.
+* **A counterexample** (status 2, `COUNTEREXAMPLE` in the log): a game scores more than the recorded score of its
+  board.  The processes stopped with their checkpoints and the script saved to S3.  The game is in
+  `certificates_LIST.counterexample.jsonl` and in the last lines of `certify_LIST.out`.  Keep `~/taxman-work` as it is,
+  pull what is in S3, terminate the machine, and tell Brian: the recorded score at that board is too low, and the
+  chain is wrong from there.  Do not go on.
+
+### 11.9 Results home, verification, and the spending
+
+```
+aws s3 sync $D certify-run                                 # A/, B/ and C/ (the whole campaign is C's file)
+cp certify-run/C/results/certificates_deferred.jsonl rust/results/certificates_2176_3440.jsonl
+nice -n 10 rust/target/release/taxman verify-certificates rust/results/certificates_2176_3440.jsonl \
+    --results rust/results/strict.jsonl --upper rust/prover/data/upper_2_1300.jsonl \
+    --upper rust/prover/data/upper_1301_2175.jsonl --upper rust/prover/data/upper_2176_3314.jsonl \
+    --upper rust/prover/data/upper_3315_3440.jsonl --threads 4
+python3 rust/tools/certify_pilot.py rust/results/certificates_2176_3440.jsonl --bands > certify-run/overhead.txt
+```
+
+`verify-certificates` must report every game to 3440 proven (`proven frontier: every game to 3440 is proven`, which
+`results/README.md` and the guides then say).  If phase C was left for later, the file of the earlier phases is the
+`cat` of 11.7, the proven end of the chain is the first of the 117 games, and the same commands finish it.  Commit
+`rust/results/certificates_2176_3440.jsonl` (under 1 MB, never overwritten: a rerun is another file), update the
+places that say how far the proofs reach (`results/README.md`, README, DESIGN.md, `heuristics/THEORY.md`) and write the
+EXPERIMENTS entry with the times against the estimate and the overhead by |O| and gap (the report above, `--bands`).
+
+**Recording the spending against the estimate.**  The bill is the instance's hours, not the search's.  For each
+instance, from its launch to its termination (`aws ec2 describe-instances --instance-ids I --query
+'Reservations[].Instances[].[LaunchTime,StateTransitionReason]'` while it exists, the console's instance history or
+CloudTrail after), and the spot price of those hours (`describe-spot-price-history`, as in 11.3); multiply, and set it
+beside the estimate of 11.1 per phase, with the report's search time (`certify_pilot.py` prints the thread-hours of the
+search against the plan's, and what they come to on one machine).  The "Cost" paragraph of the calibration entry is the
+model.  Then the end of the [rules for every launch](#rules-for-every-launch): terminate what is left, confirm that
+nothing of the project remains, delete the launch's security group.
