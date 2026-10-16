@@ -1,11 +1,12 @@
-//! The tuning benchmark's solver: work units of frontier searches, each solved to completion on one thread.
+//! The tuning benchmark's solver: work units of searches at the end of the chain, each solved to completion on one
+//! thread.
 //!
-//! The search has settings (the tactics of `taxman solve --tactic`, and more to come) that were tuned on games near
-//! n = 1000, and the games at the frontier (n above 3400, billions of nodes) may want other values.  A setting's
-//! effect on the tree can only be measured by searches that run to completion, and a frontier game is far too big for
-//! that.  A frontier search is a deque of *units*, each the root of a subtree (a node: its promotions and its candidates,
+//! The search has settings (the tactics of `taxman solve --tactic`, and more to come) that were tuned on games near n =
+//! 1000, and the hardest games (n above 3400, billions of nodes) may want other values.  A setting's effect on the tree
+//! can only be measured by searches that run to completion, and one of the hardest games is far too big for that.  Such
+//! a search is a deque of *units*, each the root of a subtree (a node: its promotions and its candidates,
 //! `search::TaxUnit`), and a unit's subtree is a search of its own, small enough to finish.  This program takes units
-//! from the checkpoint of a frontier search and solves them, one thread to a unit: with one thread the search is exactly
+//! from the checkpoint of such a search and solves them, one thread to a unit: with one thread the search is exactly
 //! deterministic, so the nodes of two settings compare without noise.
 //!
 //! ```text
@@ -19,13 +20,13 @@
 //! (uniformly: Algorithm R with the generator seeded by S; all of them if there are fewer; default 100 and seed 1), and
 //! writes them to FILE as jsonl: a line `{"kind":"game", ...}` with what the game is (its candidates, the checkpoint's
 //! incumbent and node count, the known optimum if `--known` has it), then a line `{"kind":"unit", ...}` for each unit
-//! with its `id` (`GAME-INDEX`, INDEX its place in the checkpoint), its depth (the number of its promotions), the number
-//! of its candidates, the sum of its promotions, the GF(2) bound of the node's completions (`bound`), what they need to
-//! beat the incumbent (`need`: the known optimum's promotion sum if there is one, else the checkpoint's incumbent's, less
-//! the node's own sum, plus one) and `gap` = bound − need, and both sets in hex.  The gap is what a unit's size follows
-//! (a tree grows by some factor with every step of it), and costs a bound to find: `make_suite.py` picks the units to
-//! solve by it.  A summary of all the checkpoint's units (the spread of depths and of numbers
-//! of candidates) goes to stderr; without `--out` that is all.
+//! with its `id` (`GAME-INDEX`, INDEX its place in the checkpoint), its depth (the number of its promotions), the
+//! number of its candidates, the sum of its promotions, the GF(2) bound of the node's completions (`bound`), what they
+//! need to beat the incumbent (`need`: the known optimum's promotion sum if there is one, else the checkpoint's
+//! incumbent's, less the node's own sum, plus one) and `gap` = bound − need, and both sets in hex.  The gap is what a
+//! unit's size follows (a tree grows by some factor with every step of it), and costs a bound to find: `make_suite.py`
+//! picks the units to solve by it.  A summary of all the checkpoint's units (the spread of depths and of numbers of
+//! candidates) goes to stderr; without `--out` that is all.
 //!
 //! `solve` solves units of GAME to completion: each by an engine run of its own (one thread, fresh nogood tables),
 //! so that a unit's result does not depend on the others solved with it.  The incumbent a subtree starts from is the
@@ -45,8 +46,8 @@
 //!
 //! Which `best` a subtree finds does not depend on the settings, except `symmetry` where the incumbent is not the
 //! optimum: the rule keeps only the completions that keep the root's symmetric pairs' inequalities, and a subtree below
-//! the root can hold a heavier completion that breaks one (heuristics/THEORY.md, "Pruning with the inequalities").  With
-//! the optimum as the incumbent nothing beats it whatever the settings, so a different `best` there is a bug.
+//! the root can hold a heavier completion that breaks one (heuristics/THEORY.md, "Pruning with the inequalities").
+//! With the optimum as the incumbent nothing beats it whatever the settings, so a different `best` there is a bug.
 
 #[allow(dead_code)] // this reads and writes hex sets only; the probe reads the nodes fixtures too
 #[path = "common/fixtures.rs"]
@@ -135,8 +136,9 @@ struct Solved {
     stats: Stats,
 }
 
-/// Solves the subtree of `unit` on one thread, from the incumbent `start` (a promotion set, worth its sum), with a fresh
-/// searcher, so that the result is that of the unit alone: the same every time.  Stops after about `node_limit` nodes.
+/// Solves the subtree of `unit` on one thread, from the incumbent `start` (a promotion set, worth its sum), with a
+/// fresh searcher, so that the result is that of the unit alone: the same every time.  Stops after about `node_limit`
+/// nodes.
 fn solve_unit<const W: usize>(
     space: &SearchSpace<'_, W>,
     unit: TaxUnit<W>,
@@ -394,7 +396,8 @@ fn known_incumbent<const W: usize>(
     let set = survivors(prepared, &board.seed(moves))?;
     if set.sum() != opt {
         return Err(format!(
-            "the known game of {} has promotions worth {} that can be promoted here, not the {opt} it scores over the bag",
+            "the known game of {} has promotions worth {} that can be promoted here, not the {opt} it scores over \
+             the bag",
             board.n(),
             set.sum()
         ));
@@ -624,8 +627,8 @@ mod tests {
     }
 
     /// The root unit is the whole search: the nodes of the one-thread proof that `search` makes, seeded with the
-    /// optimum, are the root unit's.  (The checkable case: the subtree of a node below the root is not a part of
-    /// the search that one can check in this way, because the searcher's nogoods, learned in the units before it, are not
+    /// optimum, are the root unit's.  (The checkable case: the subtree of a node below the root is not a part of the
+    /// search that one can check in this way, because the searcher's nogoods, learned in the units before it, are not
     /// the fresh searcher's.)
     #[test]
     fn the_root_unit_is_the_whole_search() {
