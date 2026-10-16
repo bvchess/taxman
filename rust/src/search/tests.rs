@@ -9,7 +9,7 @@ use crate::gf2::{Gf2Bound, Gf2Graph};
 use crate::json::Json;
 use crate::matchbound::MatchBound;
 use crate::model::test_support::*;
-use crate::model::{ConflictCache, FrameGraph, Nogoods, Scratch};
+use crate::model::{ConflictCache, FrameGraph, Keep, Nogoods, Scratch};
 use crate::numtheory::Tables;
 use crate::test_support::TempDir;
 use std::thread;
@@ -330,10 +330,45 @@ fn forgetting_nogoods_often_does_not_change_answers() {
     for g in &searched_games(400) {
         let p = prepare_golden::<8>(g, SearchTactics::default());
         for (period, threads) in [(1, 1), (3, 2), (40, 1)] {
-            let r = search_forgetting(&p, &config(threads), None, None, false, None, Some(period)).unwrap();
+            let r =
+                search_forgetting(&p, &config(threads), None, None, false, None, Forgetting::every(period)).unwrap();
             let what = format!("n={}, forgetting every {period} steps on {threads} threads", g.n);
             assert!(r.completed && r.promotions.is_subset(&p.candidates), "{what}");
             assert_eq!(r.sum, golden_sum(g), "{what}");
+        }
+    }
+}
+
+/// Every policy of keeping and forgetting nogoods is sound: the table is a cache of nogoods that hold at every node,
+/// so whatever the searchers keep, however often they forget and however small the table's limit, the optimum is the
+/// same.  The periods are short, to make the policies act in searches of a few thousand steps.
+#[test]
+fn every_policy_of_keeping_nogoods_gives_the_same_optimum() {
+    let policies = [
+        Forgetting { period: None, keep: Keep::Nothing, limit: None },
+        Forgetting { period: Some(7), keep: Keep::Used, limit: None },
+        Forgetting { period: Some(7), keep: Keep::Short(2), limit: None },
+        Forgetting { period: Some(7), keep: Keep::Short(3), limit: None },
+        Forgetting { period: Some(7), keep: Keep::Short(4), limit: None },
+        Forgetting { period: Some(7), keep: Keep::Top(1), limit: None },
+        Forgetting { period: Some(7), keep: Keep::Top(64), limit: None },
+        Forgetting { period: Some(300), keep: Keep::Used, limit: None },
+        Forgetting { period: None, keep: Keep::Nothing, limit: Some(1) },
+        Forgetting { period: None, keep: Keep::Nothing, limit: Some(4) },
+        Forgetting { period: Some(50), keep: Keep::Top(3), limit: Some(5) },
+    ];
+    for g in &searched_games(400) {
+        let p = prepare_golden::<8>(g, SearchTactics::default());
+        for forgetting in policies {
+            for threads in [1, 2] {
+                let r = search_forgetting(&p, &config(threads), None, None, false, None, forgetting).unwrap();
+                let what = format!("n={}, {forgetting:?} on {threads} threads", g.n);
+                assert!(r.completed && r.promotions.is_subset(&p.candidates), "{what}");
+                assert_eq!(r.sum, golden_sum(g), "{what}");
+                if let Some(limit) = forgetting.limit {
+                    assert!(r.nogoods.largest <= limit as u64, "{what}: a table of {} nogoods", r.nogoods.largest);
+                }
+            }
         }
     }
 }
@@ -683,6 +718,12 @@ fn units_and_headers_round_trip() {
     assert!(other(|h| h.one_sided ^= 1).contains("one-sided candidates"));
     assert!(other(|h| h.max_total += 1).contains("max_total"));
     assert!(other(|h| h.tactics.nogoods = !h.tactics.nogoods).contains("tactics"));
+    // The policy of keeping and forgetting nogoods is not recorded, so a header made under another is this search's,
+    // and its bytes are those of the default's.
+    let mut policy = header;
+    policy.tactics = SearchTactics { nogood_period: 7, nogood_keep: Keep::Top(3), nogood_limit: 9, ..policy.tactics };
+    assert_eq!(policy.mismatch(&header), None);
+    assert_eq!(policy.encode(), header.encode());
 
     // Every setting of the search tactics reads back as it was written: `match_refine` in bits 0 to 2, a bit for
     // each switch that is on (the defaults: 0x1B9, `symmetry` is bit 8), and no higher bit is used.
@@ -696,6 +737,7 @@ fn units_and_headers_round_trip() {
                 lagrange: off,
                 gf2: on,
                 symmetry: off,
+                ..SearchTactics::default()
             };
             assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
             let t = SearchTactics { symmetry: on, ..t };

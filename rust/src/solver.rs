@@ -815,6 +815,7 @@ impl<const W: usize> Job for SearchJob<W> {
             time_limit: opts.time_limit,
             node_limit: opts.node_limit,
             label: format!("n={n}"),
+            progress_note: None,
             cores: None,
             control: Some(Arc::clone(&self.control)),
         };
@@ -876,9 +877,11 @@ fn set_up_with_width<const W: usize>(n: u32, before: &Before, opts: &SolveOption
 
     let prepared = match &checkpoint {
         Some(path) => {
-            let p = board.prepare_for_resume(path).map_err(|e| {
+            let mut p = board.prepare_for_resume(path).map_err(|e| {
                 format!("cannot resume from {}: {e} (delete the file to start the game over)", path.display())
             })?;
+            // A checkpoint does not record how the searchers keep their nogoods: this run says.
+            p.tactics = p.tactics.with_forgetting_of(&tactics.search);
             if p.tactics != tactics.search {
                 return Err(Failure::Error(different_tactics(path, p.tactics, tactics)));
             }

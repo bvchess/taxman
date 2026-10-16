@@ -79,7 +79,7 @@ impl<const W: usize> Seek<'_, '_, W> {
     /// A conflict of `set` from the state, or [`Lookup::AllForced`] if the table knows one all of whose members are
     /// in `forced`, or [`Lookup::None`] if `set` can be promoted; and whether the conflict had to be computed.
     pub(super) fn conflict(&mut self, set: &Bits<W>, forced: Bits<W>) -> (Lookup<W>, bool) {
-        if let Some(l) = self.learning.as_ref() {
+        if let Some(l) = self.learning.as_mut() {
             match l.table.lookup(&l.promoted, set, &forced) {
                 Lookup::None => {}
                 found => {

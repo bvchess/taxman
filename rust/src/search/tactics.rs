@@ -4,6 +4,9 @@
 //! checkpoints depend on.  Each is graded in `DESIGN.md`, section 5 (Tactics); the field docs say what each does
 //! and why it is sound.
 
+use super::NOGOOD_PERIOD;
+use crate::model::Keep;
+
 /// The tactics of DESIGN.md, section 5, that act inside the search.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SearchTactics {
@@ -23,10 +26,20 @@ pub struct SearchTactics {
     /// nogood holds everywhere).  What is learned depends on the order the search went, so with it a search's
     /// tree depends on its history (threads, interruptions), not only on the node.
     pub nogoods: bool,
-    /// With `nogoods`: each searcher forgets every nogood it knows after each
-    /// [`NOGOOD_PERIOD`](super::NOGOOD_PERIOD) of its steps (sound: the table is a cache).  Old nogoods cost
-    /// every lookup more than they help.
+    /// With `nogoods`: each searcher forgets the nogoods it knows after each [`nogood_period`](Self::nogood_period) of
+    /// its steps (sound: the table is a cache), all of them unless [`nogood_keep`](Self::nogood_keep) keeps some.  Old
+    /// nogoods cost every lookup more than they help.
     pub forget_nogoods: bool,
+    /// With `nogoods` and `forget_nogoods`: how many of a searcher's steps pass between its forgettings (tactic
+    /// `nogood_period`).  A research knob, like the two that follow: any value is sound, and none is recorded in a
+    /// checkpoint (a resumed search forgets as the run that resumes it says).
+    pub nogood_period: u64,
+    /// With `nogoods` and `forget_nogoods`: what a forgetting keeps (tactic `nogood_keep`; [`Keep`]).  The default
+    /// keeps nothing.
+    pub nogood_keep: Keep,
+    /// With `nogoods`: the most nogoods a searcher's table holds (tactic `nogood_limit`), the least recently used
+    /// dropped for a new one; 0: no limit.
+    pub nogood_limit: u64,
     /// With `nogoods`: where the matching bound and its refinement leave a node or a child open, bound it also by a
     /// Lagrangian relaxation of the nogoods the searcher has learned, kept incrementally along its path, and (with
     /// `fix_forced`) add to the forced members the members without which that bound would cut (proven: weak
@@ -54,6 +67,9 @@ impl Default for SearchTactics {
             fix_forced: true,
             nogoods: true,
             forget_nogoods: true,
+            nogood_period: NOGOOD_PERIOD,
+            nogood_keep: Keep::Nothing,
+            nogood_limit: 0,
             lagrange: false,
             gf2: true,
             symmetry: true,
@@ -61,7 +77,58 @@ impl Default for SearchTactics {
     }
 }
 
+/// How a searcher keeps and forgets its nogoods (the tactics `forget_nogoods`, `nogood_period`, `nogood_keep` and
+/// `nogood_limit`).  Every setting is sound: the table is a cache of nogoods that hold at every node
+/// ([`crate::model::Nogoods`]), so a policy changes how large the trees are, never the optimum.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Forgetting {
+    /// After how many of its steps a searcher forgets, if ever.
+    pub period: Option<u64>,
+    /// What a forgetting keeps.
+    pub keep: Keep,
+    /// The most nogoods a table holds, if limited.
+    pub limit: Option<usize>,
+}
+
+impl Forgetting {
+    /// Forget everything after each [`NOGOOD_PERIOD`] steps, with no limit: the default.
+    pub const DEFAULT: Forgetting = Forgetting { period: Some(NOGOOD_PERIOD), keep: Keep::Nothing, limit: None };
+
+    /// Forget everything after each `period` steps, with no limit.
+    pub const fn every(period: u64) -> Forgetting {
+        Forgetting { period: Some(period), ..Forgetting::DEFAULT }
+    }
+}
+
 impl SearchTactics {
+    /// How the searchers keep and forget their nogoods.
+    pub fn forgetting(&self) -> Forgetting {
+        Forgetting {
+            period: self.forget_nogoods.then_some(self.nogood_period),
+            keep: self.nogood_keep,
+            limit: (self.nogood_limit > 0).then_some(self.nogood_limit as usize),
+        }
+    }
+
+    /// Whether `other` is the same search as these tactics make, as a checkpoint tells ([`bits`](Self::bits)): the
+    /// tactics a checkpoint does not record, the policy of keeping and forgetting nogoods, may differ (a resumed
+    /// search starts with no nogoods whichever policy made the first run's).
+    pub fn same_recorded(&self, other: &SearchTactics) -> bool {
+        self.bits() == other.bits()
+    }
+
+    /// These tactics with the policy of keeping and forgetting nogoods of `run`'s: a checkpoint does not record it,
+    /// so the run that resumes the search says how its searchers keep their nogoods.
+    #[must_use]
+    pub fn with_forgetting_of(self, run: &SearchTactics) -> SearchTactics {
+        SearchTactics {
+            nogood_period: run.nogood_period,
+            nogood_keep: run.nogood_keep,
+            nogood_limit: run.nogood_limit,
+            ..self
+        }
+    }
+
     /// The largest `match_refine`: the header of a checkpoint has room for no more, so a deeper setting could not
     /// be told from this one on resuming.
     pub const MAX_MATCH_REFINE: u8 = 7;
@@ -104,7 +171,9 @@ impl SearchTactics {
 
     /// The tactics as the header of a checkpoint records them: `match_refine` in bits 0 to 2, then one bit for each
     /// switch that is on, `fix_forced` (bit 3), `nogoods` (4), `forget_nogoods` (5), `lagrange` (6), `gf2` (7) and
-    /// `symmetry` (8); the defaults are `0x1B9`.  (A checkpoint of a build before `gf2` has bit 7 clear: it resumes
+    /// `symmetry` (8); the defaults are `0x1B9`.  The knobs of the nogood table's policy (`nogood_period`,
+    /// `nogood_keep`, `nogood_limit`) are not recorded: they change the tree, never the answer, and a resumed search
+    /// starts with an empty table whichever policy made the first run's.  (A checkpoint of a build before `gf2` has bit 7 clear: it resumes
     /// with `gf2` off.  One of a build before `symmetry` has bit 8 clear: it resumes with `symmetry` off, which the
     /// default no longer is, so a run resumes it only with `--tactic symmetry=off`.  A build before `symmetry`
     /// refuses a checkpoint with the tactic on, as "unknown tactics": it would resume the search without a rule that
@@ -132,6 +201,7 @@ impl SearchTactics {
             lagrange: bits & 1 << 6 != 0,
             gf2: bits & 1 << 7 != 0,
             symmetry: bits & 1 << 8 != 0,
+            ..SearchTactics::default()
         })
     }
 }

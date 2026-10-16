@@ -579,6 +579,7 @@ fn search_from<const W: usize>(
         time_limit: opts.time_limit,
         node_limit: opts.node_limit,
         label: format!("n={n}"),
+        progress_note: None,
         cores: None,
         control: None,
     };

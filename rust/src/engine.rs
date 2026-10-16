@@ -338,6 +338,8 @@ pub struct EngineConfig {
     pub node_limit: Option<u64>,
     /// Prefix for progress lines.
     pub label: String,
+    /// Text the caller adds to the end of every progress line (what its searchers have counted, say).
+    pub progress_note: Option<ProgressNote>,
     /// Emulation of many workers on few CPUs, for measuring what a larger machine would do in counts (nodes,
     /// lookups), not time: at most this many of the `threads` workers search at once, taking turns every
     /// `POLL_BATCH` polls in the order they ask (a panic in a worker gives its turn up).  `None`: no limit, and
@@ -362,9 +364,21 @@ impl Default for EngineConfig {
             time_limit: None,
             node_limit: None,
             label: String::new(),
+            progress_note: None,
             cores: None,
             control: None,
         }
+    }
+}
+
+/// What a caller adds to the end of the engine's progress lines ([`EngineConfig::progress_note`]): called with the
+/// engine's lock held, so it must be quick and must not wait for anything a worker holds while it waits for the engine.
+#[derive(Clone)]
+pub struct ProgressNote(pub Arc<dyn Fn() -> String + Send + Sync>);
+
+impl std::fmt::Debug for ProgressNote {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ProgressNote")
     }
 }
 
@@ -822,6 +836,7 @@ where
         began,
         deadline: cfg.time_limit.and_then(|limit| began.checked_add(limit)),
         label: &cfg.label,
+        note: cfg.progress_note.as_ref(),
         header,
     };
     // See "Starting stopped": a stop that already holds is asked for before any worker exists to take a unit, so that
@@ -1207,6 +1222,7 @@ struct Plan<'p> {
     began: Instant,
     deadline: Option<Instant>,
     label: &'p str,
+    note: Option<&'p ProgressNote>,
     header: &'p [u8],
 }
 
@@ -1970,7 +1986,7 @@ impl<U: Unit> Shared<U> {
                 if now >= due {
                     let nodes = self.nodes.0.load(Ordering::Relaxed);
                     let rate = (nodes - last_report.1) as f64 / now.duration_since(last_report.0).as_secs_f64();
-                    let line = self.progress_line(&guard, plan.label, &format!("{}/s", si(rate)));
+                    let line = self.progress_line(&guard, plan, &format!("{}/s", si(rate)));
                     // Not under the lock: a blocked stderr (a full pipe) must not stall the workers.
                     drop(guard);
                     report(&line);
@@ -1998,15 +2014,16 @@ impl<U: Unit> Shared<U> {
             } else {
                 "stopped"
             };
-            let line = self.progress_line(&guard, plan.label, status);
+            let line = self.progress_line(&guard, plan, status);
             drop(guard);
             report(&line);
         }
     }
 
-    fn progress_line(&self, st: &State<U>, label: &str, note: &str) -> String {
+    fn progress_line(&self, st: &State<U>, plan: &Plan<'_>, note: &str) -> String {
         let nodes = self.base.nodes + self.nodes.0.load(Ordering::Relaxed);
-        format!(
+        let label = plan.label;
+        let line = format!(
             "{label}{}{} nodes {nodes} ({note}) best {} queue {} spilled {} | {}",
             if label.is_empty() { "" } else { " " },
             fmt_elapsed(self.prior + self.t0.elapsed()),
@@ -2014,7 +2031,11 @@ impl<U: Unit> Shared<U> {
             st.mem.len(),
             st.spill.units,
             Self::counters_at(st, Instant::now()).summary(),
-        )
+        );
+        match plan.note {
+            Some(extra) => format!("{line} | {}", (extra.0)()),
+            None => line,
+        }
     }
 
     /// The counters with the workers' times summed up to `now` (also for lifetimes, runs and waits still going on).

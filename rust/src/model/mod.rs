@@ -57,7 +57,7 @@ mod provider;
 
 pub use conflict::ConflictCache;
 pub use frame::{Frame, FrameSet};
-pub use nogoods::{Lookup, Nogoods};
+pub use nogoods::{Keep, Lookup, NogoodStats, Nogoods};
 pub use peel::Scratch;
 pub use promote::Edits;
 pub use provider::FactorProvider;

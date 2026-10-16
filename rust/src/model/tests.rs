@@ -721,6 +721,158 @@ fn nogood_table_lookups() {
     assert_eq!(table.ruled_out(&set(&[2]), &set(&[2]), &set(&[1])), set(&[]));
 }
 
+/// A table of four nogoods in which `b` has answered two lookups, then `c` one, then `d` ruled a candidate out; `a` has
+/// not been used.
+fn used_table() -> Nogoods<1> {
+    let set = |xs: &[u32]| Bits::<1>::from_slice(xs);
+    let mut table = Nogoods::<1>::new(60, 100);
+    for n in [&[1, 2][..], &[3, 4], &[5, 6, 7], &[8, 9]] {
+        table.insert(set(n));
+    }
+    assert_eq!(table.conflict(&set(&[3]), &set(&[4])), Some(set(&[4])));
+    assert_eq!(table.conflict(&set(&[3]), &set(&[4])), Some(set(&[4])));
+    assert_eq!(table.conflict(&set(&[5, 6]), &set(&[7])), Some(set(&[7])));
+    assert_eq!(table.ruled_out(&set(&[8]), &set(&[8]), &set(&[9])), set(&[9]));
+    table
+}
+
+#[test]
+fn nogood_table_forgets_as_the_policy_says() {
+    let set = |xs: &[u32]| Bits::<1>::from_slice(xs);
+    let (a, b, c, d) = (set(&[1, 2]), set(&[3, 4]), set(&[5, 6, 7]), set(&[8, 9]));
+    for (keep, kept) in [
+        (Keep::Nothing, vec![]),
+        // Everything used since the table was made: not `a`.
+        (Keep::Used, vec![b, c, d]),
+        // `b` is the most used; of `c` and `d`, used once each, `d` more recently.
+        (Keep::Top(1), vec![b]),
+        (Keep::Top(2), vec![b, d]),
+        (Keep::Top(9), vec![b, c, d]),
+        (Keep::Short(1), vec![]),
+        (Keep::Short(2), vec![a, b, d]),
+        (Keep::Short(3), vec![a, b, c, d]),
+    ] {
+        let mut table = used_table();
+        table.forget(keep);
+        assert_eq!(table.sets(), kept, "{keep}");
+        // What is kept still answers, and nothing else does; the uses start again, so that nothing kept by use
+        // survives a second forgetting at once.
+        for n in table.sets().to_vec() {
+            let first = n.max().expect("a member");
+            assert_eq!(table.conflict(&(n - set(&[first])), &set(&[first])), Some(set(&[first])), "{keep}");
+        }
+        for n in [a, b, c, d].into_iter().filter(|n| !kept.contains(n)) {
+            let first = n.max().expect("a member");
+            assert_eq!(table.conflict(&(n - set(&[first])), &set(&[first])), None, "{keep}: {n:?} is forgotten");
+        }
+        let mut again = used_table();
+        again.forget(keep);
+        again.forget(Keep::Used);
+        assert!(again.is_empty(), "{keep}: nothing is used between two forgettings");
+        let stats = table.take_stats();
+        assert_eq!((stats.forgettings, stats.size_before, stats.size_kept), (1, 4, kept.len() as u64), "{keep}");
+        assert_eq!((stats.learned, stats.evicted, stats.largest), (4, 0, 4), "{keep}");
+        assert_eq!(table.take_stats().largest, kept.len() as u64, "the largest table restarts from the table now");
+    }
+    assert_eq!(Keep::parse("top64"), Some(Keep::Top(64)));
+    for keep in [Keep::Nothing, Keep::Used, Keep::Short(3), Keep::Top(256)] {
+        assert_eq!(Keep::parse(&keep.to_string()), Some(keep));
+    }
+    for bad in ["", "all", "size", "size0", "top-1", "top 4", "hit3", "sizes3", "TOP4"] {
+        assert_eq!(Keep::parse(bad), None, "{bad:?}");
+    }
+}
+
+#[test]
+fn nogood_table_with_a_limit_drops_the_least_recently_used() {
+    let set = |xs: &[u32]| Bits::<1>::from_slice(xs);
+    let mut table = Nogoods::<1>::new(60, 100);
+    table.set_limit(Some(2));
+    table.insert(set(&[1, 2]));
+    table.insert(set(&[3, 4]));
+    // Using the first makes the second the least recently used.
+    assert_eq!(table.conflict(&set(&[1]), &set(&[2])), Some(set(&[2])));
+    table.insert(set(&[5, 6]));
+    assert_eq!(table.sets(), [set(&[1, 2]), set(&[5, 6])]);
+    // With no use since, the first learned goes.
+    table.insert(set(&[7, 8]));
+    assert_eq!(table.sets(), [set(&[5, 6]), set(&[7, 8])]);
+    // What a rule-out used counts as used too.
+    assert_eq!(table.ruled_out(&set(&[5]), &set(&[5]), &set(&[6])), set(&[6]));
+    table.insert(set(&[9, 10]));
+    assert_eq!(table.sets(), [set(&[5, 6]), set(&[9, 10])]);
+    let stats = table.take_stats();
+    assert_eq!((stats.learned, stats.evicted, stats.largest), (5, 3, 2));
+    // The lookups still follow the index of the table that was rebuilt.
+    assert_eq!(table.conflict(&set(&[9]), &set(&[10, 5, 6])), Some(set(&[10])));
+    assert_eq!(table.conflict(&set(&[]), &set(&[1, 2, 3, 4, 7, 8])), None);
+    // A limit of 1 holds the newest.
+    table.set_limit(Some(1));
+    table.insert(set(&[20, 21]));
+    assert_eq!(table.sets(), [set(&[20, 21])]);
+    // Without a limit the table grows again.
+    table.set_limit(None);
+    table.insert(set(&[22, 23]));
+    assert_eq!(table.len(), 2);
+}
+
+/// Under every policy the table answers as its definition says over the nogoods it holds, however it has been grown,
+/// forgotten from and limited, and a forgetting keeps a subsequence of what it held (in the order learned), at most
+/// `k` of them for `Top(k)`, exactly the short ones for `Short(s)`.
+#[test]
+fn nogood_table_answers_by_definition_under_every_policy() {
+    let mut rng = Rng(0x0DD5_77AA_0042_0001);
+    let keeps = [Keep::Nothing, Keep::Used, Keep::Short(1), Keep::Short(3), Keep::Top(1), Keep::Top(5)];
+    let (mut forgot, mut full, mut found) = (0, 0, 0);
+    for round in 0..30 {
+        let mut table = Nogoods::<4>::new(255, 1 << 12);
+        let limit = (round % 2 == 0).then(|| 1 + rng.below(12) as usize);
+        table.set_limit(limit);
+        for _ in 0..300 {
+            let size = 1 + rng.below(4);
+            let n: Bits<4> =
+                (0..size).map(|_| if rng.chance(70) { rng.below(24) } else { rng.below(250) } as u32).collect();
+            table.insert(n);
+            if let Some(limit) = limit {
+                assert!(table.len() <= limit, "{} nogoods under a limit of {limit}", table.len());
+                full += u32::from(table.len() == limit);
+            }
+            let held = table.sets().to_vec();
+            assert!(held.contains(&n), "the newest nogood is held");
+            for _ in 0..3 {
+                let crowd = Bits::from_range(0, 23) | (0..20).map(|_| rng.below(250) as u32).collect();
+                let promoted = rng.subset(&crowd, 10);
+                let set = rng.subset(&crowd, 60) - promoted;
+                let musts = rng.subset(&set, 15);
+                let expected = lookup_by_definition(&held, &promoted, &set, &musts);
+                assert_eq!(table.lookup(&promoted, &set, &musts), expected, "{held:?} {promoted:?} {set:?}");
+                found += u32::from(expected != Lookup::None);
+                let added = rng.subset(&promoted, 40);
+                let out = ruled_out_by_definition(&held, &added, &promoted, &set);
+                assert_eq!(table.ruled_out(&added, &promoted, &set), out, "{held:?} {added:?} {promoted:?}");
+            }
+            if rng.chance(10) {
+                let keep = keeps[rng.below(keeps.len() as u64) as usize];
+                table.forget(keep);
+                let kept = table.sets();
+                let mut rest = held.iter();
+                assert!(kept.iter().all(|k| rest.any(|h| h == k)), "{keep}: {kept:?} is not a subsequence of {held:?}");
+                match keep {
+                    Keep::Nothing => assert!(kept.is_empty()),
+                    Keep::Short(s) => {
+                        let short: Vec<_> = held.iter().filter(|h| h.len() <= s).copied().collect();
+                        assert_eq!(kept, short, "{keep}");
+                    }
+                    Keep::Top(k) => assert!(kept.len() <= k as usize, "{keep}: {} kept", kept.len()),
+                    Keep::Used => {}
+                }
+                forgot += 1;
+            }
+        }
+    }
+    assert!(forgot > 200 && full > 500 && found > 2000, "{forgot} forgettings, {full} full, {found} found");
+}
+
 #[test]
 fn worklist_pops_in_descending_order() {
     let set = Bits::<3>::from_slice(&[0, 5, 63, 64, 100, 191]);

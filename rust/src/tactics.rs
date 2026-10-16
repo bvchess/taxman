@@ -6,11 +6,12 @@
 //! sound and says what it does; this module is the one place in the code that knows their names.  The ones that act
 //! inside the search are [`SearchTactics`]; the others are only used by the per-game pipeline ([`crate::solver`]).
 //!
-//! A tactic has a value: an on/off switch, or the depth of `match_refine` ([`Setting`]).  [`Tactics::set`]
+//! A tactic has a value: an on/off switch, the depth of `match_refine`, a count, or the name of a policy ([`Setting`]).  [`Tactics::set`]
 //! reads `name=value` (what `--tactic` takes), [`Tactics::description`] writes the changes from the defaults in
 //! the same form, and a result line records both that and every value ([`Tactics::to_json`]).
 
 use crate::json::Json;
+use crate::model::Keep;
 use crate::search::SearchTactics;
 use std::fmt;
 
@@ -44,22 +45,28 @@ impl Default for Tactics {
 }
 
 /// The number of tactics.
-pub const TACTIC_COUNT: usize = 11;
+pub const TACTIC_COUNT: usize = 14;
 
-/// The value of a tactic: an on/off switch, or the depth of `match_refine`.
+/// The value of a tactic: an on/off switch, the depth of `match_refine`, a count, or the name of a policy.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Setting {
     Switch(bool),
     /// `match_refine`: 0 to [`SearchTactics::MAX_MATCH_REFINE`].
     MatchRefine(u8),
+    /// `nogood_period` and `nogood_limit`: a whole number.
+    Count(u64),
+    /// `nogood_keep`: what a forgetting of the nogoods keeps.
+    Keep(Keep),
 }
 
-/// The value as the command line spells it (`on`, `off`, `2`).
+/// The value as the command line spells it (`on`, `off`, `2`, `50000`, `top64`).
 impl fmt::Display for Setting {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Setting::Switch(on) => f.write_str(if *on { "on" } else { "off" }),
             Setting::MatchRefine(depth) => write!(f, "{depth}"),
+            Setting::Count(count) => write!(f, "{count}"),
+            Setting::Keep(keep) => write!(f, "{keep}"),
         }
     }
 }
@@ -69,6 +76,8 @@ impl Setting {
         match self {
             Setting::Switch(on) => Json::Bool(on),
             Setting::MatchRefine(depth) => Json::from(u32::from(depth)),
+            Setting::Count(count) => Json::from(count),
+            Setting::Keep(keep) => Json::from(keep.to_string()),
         }
     }
 }
@@ -77,6 +86,9 @@ impl Setting {
 enum Slot<'a> {
     Switch(&'a mut bool),
     MatchRefine(&'a mut u8),
+    /// A whole number of at least the second field.
+    Count(&'a mut u64, u64),
+    Keep(&'a mut Keep),
 }
 
 impl Slot<'_> {
@@ -84,6 +96,8 @@ impl Slot<'_> {
         match self {
             Slot::Switch(on) => Setting::Switch(**on),
             Slot::MatchRefine(depth) => Setting::MatchRefine(**depth),
+            Slot::Count(count, _) => Setting::Count(**count),
+            Slot::Keep(keep) => Setting::Keep(**keep),
         }
     }
 
@@ -102,6 +116,15 @@ impl Slot<'_> {
                 **depth = (text.parse().ok().filter(|&depth| depth <= max))
                     .ok_or_else(|| format!("expected a whole number from 0 to {max}, got {text:?}"))?;
             }
+            Slot::Count(count, min) => {
+                **count = (text.parse().ok().filter(|&n: &u64| n >= *min))
+                    .ok_or_else(|| format!("expected a whole number of at least {min}, got {text:?}"))?;
+            }
+            Slot::Keep(keep) => {
+                **keep = Keep::parse(text).ok_or_else(|| {
+                    format!("expected none, hit, sizeN (N at least 1) or topN (N at least 1), got {text:?}")
+                })?;
+            }
         }
         Ok(())
     }
@@ -118,6 +141,9 @@ impl Tactics {
             ("fix_forced", Slot::Switch(&mut self.search.fix_forced)),
             ("nogoods", Slot::Switch(&mut self.search.nogoods)),
             ("forget_nogoods", Slot::Switch(&mut self.search.forget_nogoods)),
+            ("nogood_period", Slot::Count(&mut self.search.nogood_period, 1)),
+            ("nogood_keep", Slot::Keep(&mut self.search.nogood_keep)),
+            ("nogood_limit", Slot::Count(&mut self.search.nogood_limit, 0)),
             ("lagrange", Slot::Switch(&mut self.search.lagrange)),
             ("gf2", Slot::Switch(&mut self.search.gf2)),
             ("symmetry", Slot::Switch(&mut self.search.symmetry)),
@@ -137,8 +163,9 @@ impl Tactics {
         Tactics::default().settings().map(|(name, _)| name)
     }
 
-    /// Applies `name=value`: `on` or `off` for a switch, `0` to `7` for `match_refine`.  Nothing changes if it is an
-    /// error.
+    /// Applies `name=value`: `on` or `off` for a switch, `0` to `7` for `match_refine`, a whole number for
+    /// `nogood_period` (at least 1) and `nogood_limit`, `none`, `hit`, `sizeN` or `topN` for `nogood_keep`.  Nothing
+    /// changes if it is an error.
     pub fn set(&mut self, assignment: &str) -> Result<(), String> {
         let (name, text) = assignment.split_once('=').ok_or_else(|| {
             format!("expected name=value, such as match_refine=0 or prev_cap=off, got {assignment:?}")
@@ -163,7 +190,8 @@ impl Tactics {
         }
     }
 
-    /// All tactics, by name, as a JSON object: booleans for the switches and a number for `match_refine`.
+    /// All tactics, by name, as a JSON object: booleans for the switches, numbers for `match_refine`, `nogood_period`
+    /// and `nogood_limit`, and a string for `nogood_keep`.
     pub fn to_json(&self) -> Json {
         Json::object(self.settings().map(|(name, value)| (name, value.to_json())))
     }
@@ -172,6 +200,7 @@ impl Tactics {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::search::Forgetting;
 
     #[test]
     fn tactics_defaults_and_settings() {
@@ -186,6 +215,9 @@ mod tests {
                 "fix_forced",
                 "nogoods",
                 "forget_nogoods",
+                "nogood_period",
+                "nogood_keep",
+                "nogood_limit",
                 "lagrange",
                 "gf2",
                 "symmetry",
@@ -194,7 +226,7 @@ mod tests {
             ]
         );
         let values: Vec<String> = t.settings().iter().map(|s| s.1.to_string()).collect();
-        let expected = ["on", "on", "1", "on", "on", "on", "off", "on", "on", "on", "on"];
+        let expected = ["on", "on", "1", "on", "on", "on", "50000", "none", "0", "off", "on", "on", "on", "on"];
         assert_eq!(values, expected);
         // The values of the search tactics are those of `SearchTactics::default()`, not copies of them.
         assert_eq!(t.search, SearchTactics::default());
@@ -252,6 +284,46 @@ mod tests {
     }
 
     #[test]
+    fn the_policy_of_keeping_nogoods_is_set_by_three_tactics() {
+        // The defaults forget everything after each 50,000 steps, as before the knobs.
+        assert_eq!(Tactics::default().search.forgetting(), Forgetting::DEFAULT);
+        let mut t = Tactics::default();
+        t.set("nogood_period=200000").unwrap();
+        t.set("nogood_keep=top64").unwrap();
+        t.set("nogood_limit=256").unwrap();
+        assert_eq!(t.description(), "nogood_period=200000,nogood_keep=top64,nogood_limit=256");
+        let expected = Forgetting { period: Some(200_000), keep: Keep::Top(64), limit: Some(256) };
+        assert_eq!(t.search.forgetting(), expected);
+        // `forget_nogoods=off` is never forgetting, whatever the period.
+        t.set("forget_nogoods=off").unwrap();
+        assert_eq!(t.search.forgetting(), Forgetting { period: None, ..expected });
+        let json = t.to_json();
+        assert_eq!(json.get("nogood_period").and_then(Json::as_u64), Some(200_000));
+        assert_eq!(json.get("nogood_keep").and_then(Json::as_str), Some("top64"));
+        assert_eq!(json.get("nogood_limit").and_then(Json::as_u64), Some(256));
+        // The policy is not what a checkpoint records, but a run can take another's.
+        let recorded = SearchTactics { nogood_keep: Keep::Used, ..SearchTactics::default() };
+        assert!(recorded.same_recorded(&SearchTactics::default()));
+        assert!(!recorded.same_recorded(&SearchTactics { nogoods: false, ..SearchTactics::default() }));
+        let resumed = SearchTactics::default().with_forgetting_of(&t.search);
+        assert_eq!(resumed, SearchTactics { forget_nogoods: true, ..t.search });
+        for (assignment, expected) in [
+            ("nogood_period=0", "tactic nogood_period: expected a whole number of at least 1"),
+            ("nogood_period=-1", "tactic nogood_period: expected a whole number of at least 1"),
+            ("nogood_period=often", "tactic nogood_period: expected a whole number of at least 1"),
+            ("nogood_limit=-3", "tactic nogood_limit: expected a whole number of at least 0"),
+            ("nogood_keep=most", "tactic nogood_keep: expected none, hit, sizeN"),
+            ("nogood_keep=size0", "tactic nogood_keep: expected none, hit, sizeN"),
+            ("nogood_keep=on", "tactic nogood_keep: expected none, hit, sizeN"),
+        ] {
+            let mut again = Tactics::default();
+            let err = again.set(assignment).unwrap_err();
+            assert!(err.starts_with(expected), "{assignment}: {err}");
+            assert_eq!(again, Tactics::default(), "{assignment} changed something");
+        }
+    }
+
+    #[test]
     fn every_setting_reads_back_as_it_is_shown() {
         // Setting each tactic to the value `settings` shows gives the tactics that show it, and so do the
         // changes in the description; the JSON holds the same values.
@@ -267,6 +339,9 @@ mod tests {
                 fix_forced: false,
                 nogoods: false,
                 forget_nogoods: false,
+                nogood_period: 200_000,
+                nogood_keep: Keep::Top(64),
+                nogood_limit: 256,
                 lagrange: false,
                 gf2: true,
                 symmetry: false,

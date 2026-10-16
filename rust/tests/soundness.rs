@@ -27,7 +27,7 @@ use taxman::engine::EngineConfig;
 use taxman::frames::{build_frames, ExtendedFrames};
 use taxman::game::Optimal;
 use taxman::gf2::{Gf2Bound, Gf2Graph};
-use taxman::model::{FrameGraph, FrameSet, Scratch};
+use taxman::model::{FrameGraph, FrameSet, Keep, Scratch};
 use taxman::numtheory::Tables;
 use taxman::search::lagrange::Refits;
 use taxman::search::symmetry::Symmetries;
@@ -37,7 +37,8 @@ use taxman::search::{search, Gf2Branching, SearchTactics};
 /// Every tactic that acts inside the search, alone and in the combinations that matter: first the matching path
 /// ([`SearchTactics::matching`], which is without the rule of the root's symmetric pairs, tactic `symmetry`; 0 to
 /// 18), then the default, the GF(2) bound with the rule (19 to 29), then the GF(2) bound without the rule (30 to 32),
-/// and the matching path with it (33).  The matching path with the
+/// and the matching path with it (33), then the policies of keeping nogoods (34 to 40: the table is a cache, so what
+/// the searchers keep, however often they forget and however small the limit, changes no answer).  The matching path with the
 /// forgetting of nogoods at the production period, every step, every third, and never; on one thread and two; and
 /// the GF(2) bound with each way of choosing the branch, with and without the matching bound as a first check,
 /// forced members, nogoods and the Lagrangian bound's early refits.  The Lagrangian
@@ -82,6 +83,13 @@ fn configs() -> Vec<Config> {
         Config { symmetry: false, threads: 2, ..g },
         Config { symmetry: false, period: Some(1), ..g },
         Config { symmetry: true, ..base },
+        Config { period: Some(3), keep: Keep::Used, ..g },
+        Config { period: Some(3), keep: Keep::Short(2), ..g },
+        Config { period: Some(5), keep: Keep::Top(4), ..g },
+        Config { period: None, limit: Some(2), ..g },
+        Config { period: Some(7), keep: Keep::Used, limit: Some(3), threads: 2, ..g },
+        Config { period: Some(3), keep: Keep::Used, ..base },
+        Config { period: None, limit: Some(1), ..base },
     ]
 }
 

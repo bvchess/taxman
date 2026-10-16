@@ -20,7 +20,7 @@ pub use taxman::playable::{peel, play_order, playable};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use taxman::bits::Bits;
 use taxman::board::Board;
@@ -28,12 +28,14 @@ use taxman::engine::{self, EngineConfig, Start};
 use taxman::gf2::Gf2Graph;
 use taxman::json::Json;
 use taxman::matchbound::MatchGraph;
-use taxman::model::{FrameGraph, FrameSet, Scratch};
+use taxman::model::{FrameGraph, FrameSet, Keep, Scratch};
 use taxman::numtheory::Tables;
 use taxman::results::Assumptions;
 use taxman::search::lagrange::Refits;
 use taxman::search::symmetry::{cofactors, Symmetries};
-use taxman::search::{search, Gf2Branching, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit, NOGOOD_PERIOD};
+use taxman::search::{
+    search, Forgetting, Gf2Branching, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit, NOGOOD_PERIOD,
+};
 use taxman::solver::{Prev, PrevSource, SolveOptions};
 
 /// A committed file under `testdata/`.
@@ -278,6 +280,9 @@ pub struct Config {
     pub nogoods: bool,
     /// After how many of its steps a searcher forgets its nogoods; `None` for never.
     pub period: Option<u64>,
+    /// What a forgetting keeps, and how many nogoods a table holds at most (`None`: no limit).
+    pub keep: Keep,
+    pub limit: Option<usize>,
     /// When a searcher refits the multipliers of its Lagrangian bound; `None` without that bound.
     pub refits: Option<Refits>,
     pub threads: usize,
@@ -309,6 +314,8 @@ impl Config {
             fix_forced: t.fix_forced,
             nogoods: t.nogoods,
             period: t.forget_nogoods.then_some(NOGOOD_PERIOD),
+            keep: Keep::Nothing,
+            limit: None,
             refits: (t.nogoods && t.lagrange).then_some(Refits::SEARCH),
             threads: 1,
             gf2: t.gf2,
@@ -408,7 +415,8 @@ impl<const W: usize> Game<W> {
             match_refine: cfg.refine,
             fix_forced: cfg.fix_forced,
             nogoods: cfg.nogoods,
-            nogood_period: cfg.period,
+            forgetting: Forgetting { period: cfg.period, keep: cfg.keep, limit: cfg.limit },
+            nogood_totals: Arc::default(),
             lagrange: cfg.refits.filter(|_| cfg.nogoods),
             candidates: self.candidates,
             root_max: self.root_max(),

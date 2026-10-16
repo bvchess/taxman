@@ -95,12 +95,12 @@ pub use setup::{
     extended_words, prepare, prepare_extended, prepare_extended_for_resume, prepare_for_resume, problem_of,
     problem_of_extended, PrepareTimings, Prepared, Problem, ProblemSize,
 };
-pub use tactics::SearchTactics;
+pub use tactics::{Forgetting, SearchTactics};
 
 use crate::bits::Bits;
-use crate::engine::{self, Control, Counters, EngineConfig, Start, Stats};
+use crate::engine::{self, Control, Counters, EngineConfig, ProgressNote, Start, Stats};
 use crate::matchbound::MatchGraph;
-use crate::model::Scratch;
+use crate::model::{NogoodStats, Scratch};
 use header::Header;
 use incumbent::{dive, surviving};
 use searcher::{get_bits, put_bits};
@@ -109,9 +109,10 @@ use std::path::Path;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
-/// With the tactic `forget_nogoods`, a searcher forgets its nogoods after each this many steps.  Every interval
-/// from 10,000 to 100,000 steps was about as good on one thread (22–26% less time than never forgetting on hard
-/// games near n = 1200, games of fewer steps unchanged); see docs/experiments/forgetting-nogoods-2026-10.md.
+/// With the tactic `forget_nogoods`, a searcher forgets its nogoods after each this many steps (the default of the
+/// tactic `nogood_period`).  Every interval from 10,000 to 100,000 steps was about as good on one thread (22–26% less
+/// time than never forgetting on hard games near n = 1200, games of fewer steps unchanged); see
+/// docs/experiments/forgetting-nogoods-2026-10.md.
 pub const NOGOOD_PERIOD: u64 = 50_000;
 
 /// The outcome of [`search`].
@@ -127,6 +128,9 @@ pub struct SearchResult<const W: usize> {
     /// Engine statistics; see [`stat`] for `extra`.
     pub stats: Stats,
     pub counters: Counters,
+    /// What the searchers' nogood tables did in this call (not in the runs before a resume), summed over the
+    /// searchers: see [`NogoodStats`].
+    pub nogoods: NogoodStats,
     /// Wall time of this call.
     pub time: Duration,
     /// Wall time of the search over all its runs: the engine's time in the runs before a resume (each counted up
@@ -184,12 +188,11 @@ pub fn search_with<const W: usize>(
     resume: bool,
     diagnostics: Option<&Mutex<Diagnostics>>,
 ) -> io::Result<SearchResult<W>> {
-    let period = prepared.tactics.forget_nogoods.then_some(NOGOOD_PERIOD);
-    search_forgetting(prepared, cfg, seed, cap, resume, diagnostics, period)
+    search_forgetting(prepared, cfg, seed, cap, resume, diagnostics, prepared.tactics.forgetting())
 }
 
-/// [`search_with`], the searchers forgetting their nogoods after each `period` steps (if any) whatever the tactic
-/// `forget_nogoods` says, so that tests can make them forget often.
+/// [`search_with`], the searchers keeping and forgetting their nogoods as `forgetting` says whatever the tactics say,
+/// so that tests can make them forget often.
 fn search_forgetting<const W: usize>(
     prepared: &Prepared<W>,
     cfg: &EngineConfig,
@@ -197,7 +200,7 @@ fn search_forgetting<const W: usize>(
     cap: Option<u64>,
     resume: bool,
     diagnostics: Option<&Mutex<Diagnostics>>,
-    nogood_period: Option<u64>,
+    forgetting: Forgetting,
 ) -> io::Result<SearchResult<W>> {
     let t0 = Instant::now();
     let control = cfg.control.clone().unwrap_or_else(Control::new);
@@ -232,6 +235,7 @@ fn search_forgetting<const W: usize>(
             reached_cap: true,
             stats: before,
             counters: Counters::default(),
+            nogoods: NogoodStats::default(),
             time: t0.elapsed(),
             time_all_runs: earlier + t0.elapsed(),
             found: None,
@@ -239,7 +243,11 @@ fn search_forgetting<const W: usize>(
         });
     }
 
-    let space = SearchSpace { nogood_period, diagnostics, began: t0, ..SearchSpace::new(prepared, &match_graph) };
+    let space = SearchSpace { forgetting, diagnostics, began: t0, ..SearchSpace::new(prepared, &match_graph) };
+    // The progress lines tell what the nogood tables have done.
+    let totals = Arc::clone(&space.nogood_totals);
+    let note = ProgressNote(Arc::new(move || totals.lock().unwrap_or_else(PoisonError::into_inner).summary()));
+    let cfg = &EngineConfig { progress_note: Some(note), ..cfg.clone() };
     let start = match checkpoint.filter(|_| resume) {
         Some(path) => Start::Resume(path.to_path_buf()),
         None => {
@@ -261,6 +269,7 @@ fn search_forgetting<const W: usize>(
     let promotions = set_of_payload(&outcome.payload);
     assert_eq!(promotions.sum(), outcome.best, "the incumbent's payload does not match its value");
     let time = t0.elapsed();
+    let nogoods = *space.nogood_totals.lock().unwrap_or_else(PoisonError::into_inner);
     Ok(SearchResult {
         promotions,
         sum: outcome.best,
@@ -268,6 +277,7 @@ fn search_forgetting<const W: usize>(
         reached_cap: outcome.optimal_declared,
         stats: outcome.stats,
         counters: outcome.counters,
+        nogoods,
         time,
         time_all_runs: time + earlier_runs,
         found: space.found.into_inner().unwrap_or_else(PoisonError::into_inner),

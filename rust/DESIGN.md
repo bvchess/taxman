@@ -334,7 +334,13 @@ is *forced*: every completion that beats the incumbent promotes it.
   slower and old nogoods cost more than they help: each searcher clears its table after every 50,000 of its own steps
   (`search::NOGOOD_PERIOD`).  The table is a cache, so this is sound; it is deterministic on one thread, and a game of
   fewer steps than the period is unchanged.  Carrying the tables from one game to the next, or storing them in
-  checkpoints, was measured and does not pay (EXPERIMENTS: "Carrying nogoods over").
+  checkpoints, was measured and does not pay (EXPERIMENTS: "Carrying nogoods over").  Which nogoods a searcher keeps,
+  and for how long, is a policy and nothing more, since any subset of the nogoods that hold is as sound as all of
+  them: three research knobs set it (`nogood_period`, `nogood_keep`, `nogood_limit`, section 5; the defaults are the
+  behaviour above, with trees unchanged), and the table counts what it did (nogoods learned, lookups and the share
+  answered, candidates ruled out, the table's size at each forgetting and what was kept, evictions), which the ladder
+  and the solver's progress lines print.  The policies are not recorded in a checkpoint (the answer does not depend on
+  them, and a resumed search starts with empty tables); the run that resumes says which.
 * **Single-member conflicts belong to the node.**  Many conflicts have one member, which looks like a candidate
   that cannot be promoted from the root at all and could be filtered once.  It is not: the frame builder's
   candidates all pass that test at the root for every game from 2 to 1230 (a test), and a single-member conflict is a
@@ -604,8 +610,8 @@ claims some O refuses (`m5_refused`).  `Board::extended(open, claims)` is the on
 ## 5. Tactics
 
 Each row is a tactic in `tactics::Tactics`, set from the CLI with `--tactic name=value` (`on` or `off`; `match_refine`
-`0`…`7`).  The ones that act inside the search are the fields of `search::SearchTactics`; `examples/ladder.rs` takes
-the same names for them.  Status words: *proven* (a theorem, given a premise) and *sound* (never prunes a promotable
+`0`…`7`; `nogood_period` and `nogood_limit` a whole number; `nogood_keep` a policy).  The ones that act inside the
+search are the fields of `search::SearchTactics`; `examples/ladder.rs` takes the same names for them.  Status words: *proven* (a theorem, given a premise) and *sound* (never prunes a promotable
 optimum); every tactic is one or the other, and switching one off changes how fast an answer comes, never the answer.
 A test (`tests/docs.rs`) checks that this table lists the tactics of `tactics::Tactics`, in order, with their
 defaults.
@@ -617,7 +623,10 @@ defaults.
 | `match_refine` | 1 | sound (see `search::refine::Refiner`) | refine the matching bound by branching on conflicts this many levels deep, where it does not prune (0 = off, at most 7); no effect with `gf2`, which does not use the matching bound |
 | `fix_forced` | on | sound (every completion that beats the incumbent promotes them) | a node's child promotes all its forced candidates; the node's loop ends after that child |
 | `nogoods` | on | sound (a nogood holds at every node; see `model::Nogoods`) | learn each conflict as a nogood of the root and use the table at every node, for the conflict to branch on and refine with and to rule candidates out of children |
-| `forget_nogoods` | on | sound (the table is a cache) | with `nogoods`, each searcher forgets every nogood it knows after each 50,000 of its steps |
+| `forget_nogoods` | on | sound (the table is a cache) | with `nogoods`, each searcher forgets every nogood it knows after each `nogood_period` of its steps, or keeps some (`nogood_keep`); off: never |
+| `nogood_period` | 50000 | sound (the table is a cache) | with `nogoods` and `forget_nogoods`, the steps of a searcher between its forgettings (a whole number from 1); a research knob, with the next two (section 4, "Forgetting nogoods") |
+| `nogood_keep` | none | sound (the table is a cache) | what a forgetting keeps: `none` (nothing), `hit` (the nogoods used since the last forgetting), `sizeN` (those of at most N members), `topN` (the N most used since the last forgetting, of those used at all) |
+| `nogood_limit` | 0 | sound (the table is a cache) | with `nogoods`, a searcher's table holds at most this many nogoods, the least recently used dropped to make room for a new one (0: no limit) |
 | `lagrange` | off | proven (weak duality, for any multipliers over valid nogoods; `matchbound::lagrange`) | with `nogoods`, where the node bound leaves a node open, bound it also by a Lagrangian relaxation of the searcher's nogoods kept along its path (over the matching bound), and (with `fix_forced`) force the members without which that bound would cut; the multipliers are refitted at the root as the searcher learns (section 4).  On by default until `gf2`; with `gf2` it changes no tree and costs 2-4% |
 | `gf2` | on | proven (heuristics/THEORY.md, Theorem 11; weak duality for the forced members) | bound every node by the GF(2) bound (section 4) instead of the matching bound and its refinement, branch on the conflicts of its heaviest set by exact strong branching, and (with `fix_forced`) force the members without which it would cut; the Lagrangian bound over nogoods, if on, applies after it |
 | `symmetry` | on | proven (heuristics/THEORY.md, Theorem 13) | cut a node whose completions all break a symmetric pair's inequality, and drop from a node's candidates those that no completion keeping the inequalities holds (section 4, "Prime exchanges") |
