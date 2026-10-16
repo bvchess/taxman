@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """The tables of the Graviton calibration, from the rows parse.py made:
-summary.py LAPTOP.jsonl MACHINE.jsonl... [-r STRICT]
+summary.py LAPTOP.jsonl MACHINE.jsonl... [-r STRICT] [-e LAST]
 
 The first file is the reference (the laptop); every table has a column per machine.  Speed is the reference's time over
 the machine's (above 1: faster than the reference's core).  The committed results file (-r, default
 ../../results/strict.jsonl) gives the seconds the chain's games took when the reference solved them, for the re-solved
-range.  Standard library only.
+range.  Its games 1..LAST count (-e, default CHAIN_END = 2175, the length of the chain when the entry was written; the
+file has grown since, to 3440, and its later games would add a row for the games that the chain run solved new).
+Standard library only.
 """
 
 import json
@@ -14,6 +16,9 @@ from collections import defaultdict
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+
+# The last game of the committed chain that the tables compare with: the chain ended here when the entry was written.
+CHAIN_END = 2175
 
 # The games whose one-thread proofs the speed table sums.
 PROOF_GAMES = (1215, 1232, 1287, 2170, 2172)
@@ -203,19 +208,26 @@ def chain(machines, strict):
 
 
 
+def take_option(args: list, flag: str, default):
+    """The value that follows `flag` in args, which both leave the list, or the default if the flag is not there."""
+    if flag not in args:
+        return default
+    i = args.index(flag)
+    value = args[i + 1]
+    del args[i : i + 2]
+    return value
+
+
 def main() -> None:
     args = sys.argv[1:]
-    strict_path = HERE / "../../results/strict.jsonl"
-    if "-r" in args:
-        i = args.index("-r")
-        strict_path = Path(args[i + 1])
-        del args[i : i + 2]
+    strict_path = Path(take_option(args, "-r", HERE / "../../results/strict.jsonl"))
+    last = int(take_option(args, "-e", CHAIN_END))
     machines = {Path(p).stem: load(p) for p in args}
     per_core(machines)
     contention(machines)
     scaling(machines)
     memory(machines)
-    chain(machines, load(str(strict_path)))
+    chain(machines, [g for g in load(str(strict_path)) if g["n"] <= last])
 
 
 if __name__ == "__main__":
