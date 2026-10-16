@@ -320,8 +320,42 @@ impl Gf2Graph {
 /// it leaves free that the search finds forced are within 15 of `need`, nine in ten within 53, at 1215), and the
 /// searches of the members it leaves free cost more than they save: over the quick set of one-thread proofs
 /// (936-1350) a window of 25 costs 20.6 G cycles, 40 18.2, 60 17.3, 80 16.9, 120 17.6, no window 18.0 (without
-/// the search 26.4; nodes 217,374 then 132,049, 108,856, 96,283, 89,751, 86,481, 85,349).
+/// the search 26.4; nodes 217,374 then 132,049, 108,856, 96,283, 89,751, 86,481, 85,349).  The default of the tactic
+/// `force_window` ([`ForceWindow`]).
 pub const FORCE_WINDOW: i64 = 80;
+
+/// Which members of the heaviest set that the weight split leaves free [`Gf2Bound::evaluate`] searches for being
+/// forced after all (`Levels::force_by_cycles`; the tactic `force_window`): any choice is sound, since a member is
+/// called forced only where the search shows it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ForceWindow {
+    /// Those whose split bound is less than this far above `need` (0: none).
+    Within(u32),
+    /// Those whose split bound is above `need` by less than this percentage of the node's slack, the bound less
+    /// `need`.
+    Share(u8),
+    /// All of them.
+    All,
+}
+
+impl Default for ForceWindow {
+    fn default() -> Self {
+        ForceWindow::Within(FORCE_WINDOW as u32)
+    }
+}
+
+impl ForceWindow {
+    /// Whether a member whose split bound is `above` more than `need`, at a node whose bound is `slack` more than
+    /// `need`, is searched.
+    #[inline]
+    fn admits(self, above: i64, slack: i64) -> bool {
+        match self {
+            ForceWindow::Within(window) => above < i64::from(window),
+            ForceWindow::Share(percent) => above * 100 < i64::from(percent) * slack,
+            ForceWindow::All => true,
+        }
+    }
+}
 
 /// The most block words supported: ranks up to 320, which every board up to 8191 stays within (all checked in
 /// 2026-10: 314 at 8174; four words from n = 4740, five from 6392).
@@ -457,6 +491,12 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
         } else {
             unreachable!("an engine of {words} words at {W} words")
         }
+    }
+
+    /// Which members the weight split leaves free [`evaluate`](Self::evaluate) searches for being forced (the tactic
+    /// `force_window`; [`ForceWindow::default`] until set).
+    pub fn set_force_window(&mut self, window: ForceWindow) {
+        dispatch!(self, l => l.force_window = window)
     }
 
     /// Starts over with level 0 at the state reached from the root by promoting `promoted`, with the candidates
@@ -679,6 +719,8 @@ struct Levels<'g, const W: usize, const R: usize> {
     live_idx: Vec<u32>,
     start_idx: Vec<u32>,
     stats: Gf2Stats,
+    /// Which free members are searched for being forced ([`ForceWindow`]).
+    force_window: ForceWindow,
 }
 
 impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
@@ -709,6 +751,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             live_idx: Vec::with_capacity(n),
             start_idx: Vec::with_capacity(n),
             stats: Gf2Stats::default(),
+            force_window: ForceWindow::default(),
         }
     }
 
@@ -867,7 +910,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
     /// the workspace's), at `need`, added to `forced`: a member is forced when every set without it weighs less than
     /// `need`, which holds when the sets of other sizes than the heaviest set's lose more than the slack `value −
     /// need` and its exchange graph has no cycle through the member that short (see `meet`'s module docs).  Only the
-    /// members whose split bound is within [`FORCE_WINDOW`] of `need` are searched.
+    /// members whose split bound the window admits are searched (the tactic `force_window`, [`ForceWindow`]).
     fn force_by_cycles(&mut self, cap: usize, need: u64, forced: &mut Bits<W>) {
         let graph = self.graph;
         let level = &mut self.levels[self.depth];
@@ -890,7 +933,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         // The members of a cycle found within the slack: that cycle passes through each, as long, so none is forced.
         let mut free = Bits::<W>::EMPTY;
         for &(x, bound) in &level.split {
-            let near = bound - (need as i64) < FORCE_WINDOW;
+            let near = self.force_window.admits(bound - need as i64, slack);
             if !near || forced.contains(x) || free.contains(x) {
                 continue;
             }

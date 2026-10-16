@@ -425,15 +425,17 @@ with three or more factors.  At the roots of 880–1300 its gap to the optimum i
 * **Forced members.**  The optimum's weight split (Frank: `w = w1 + w2` with the optimum heaviest in `A` for `w1` and
   in `B` for `w2`, from difference constraints by Bellman–Ford, each round from the vertices that changed) bounds the
   intersection without each member in one pass, by weak duality; a member without which it is below `need` is
-  forced, as the matching's are.  The split's bound is loose, so for the members it leaves free within `FORCE_WINDOW`
-  (80) of `need`, the exchange graph decides: a member is forced too when no cycle through it is shorter than the
-  slack `value − need` and the sets of other sizes lose more than that (`Meet::has_cycle_within`).
+  forced, as the matching's are.  The split's bound is loose, so for the members it leaves free within the tactic
+  `force_window` (80, `gf2::FORCE_WINDOW`) of `need`, the exchange graph decides: a member is forced too when no
+  cycle through it is shorter than the slack `value − need` and the sets of other sizes lose more than that
+  (`Meet::has_cycle_within`).
 * **Exact strong branching.**  The member of the conflict to branch on is the one without which the intersection
   is lowest, each bound read off the exchange graph where it is certified and solved where not (in the order of the
   split's bounds, each solve stopped once it reaches both the lowest so far and `need`, a greedy lower bound tried
   first); a member whose bound falls below `need` is forced too, and the chosen member's level, certified or solved,
   is what the node goes on with.  The cheaper choices (the split's bound alone, the largest member) take more nodes
-  and more time (EXPERIMENTS: "The GF(2) bound in the search").
+  and more time (EXPERIMENTS: "The GF(2) bound in the search"); the tactics `branching`, `strong_limit`,
+  `strong_depth`, `deep_branching` and `more_forced` choose among them, and how far strong branching goes (section 5).
 * **What it replaces.**  With `gf2` the matching bound is not computed (as a first check before the intersection it
   costs more than the cuts it saves), so `match_refine` has no effect; the conflicts, nogoods, forced members and
   exact sets are used as with the matching bound.  The Lagrangian bound over nogoods still applies after it when on,
@@ -615,9 +617,11 @@ claims some O refuses (`m5_refused`).  `Board::extended(open, claims)` is the on
 ## 5. Tactics
 
 Each row is a tactic in `tactics::Tactics`, set from the CLI with `--tactic name=value` (`on` or `off`; `match_refine`
-`0`…`7`).  The ones that act inside the search are the fields of `search::SearchTactics`; `examples/ladder.rs` takes
-the same names for them.  Status words: *proven* (a theorem, given a premise) and *sound* (never prunes a promotable
-optimum); every tactic is one or the other, and switching one off changes how fast an answer comes, never the answer.
+`0`…`7`; the tactics that tune the GF(2) search, `force_window` to `more_forced`, as their rows say).  The ones that
+act inside the search are the fields of `search::SearchTactics`; `examples/ladder.rs` takes the same names for them.
+A checkpoint records the search tactics in its header (section 6).  Status words: *proven* (a theorem, given a premise)
+and *sound* (never prunes a promotable optimum); every tactic is one or the other, and switching one off changes how
+fast an answer comes, never the answer.
 A test (`tests/docs.rs`) checks that this table lists the tactics of `tactics::Tactics`, in order, with their
 defaults.
 
@@ -632,6 +636,12 @@ defaults.
 | `lagrange` | off | proven (weak duality, for any multipliers over valid nogoods; `matchbound::lagrange`) | with `nogoods`, where the node bound leaves a node open, bound it also by a Lagrangian relaxation of the searcher's nogoods kept along its path (over the matching bound), and (with `fix_forced`) force the members without which that bound would cut; the multipliers are refitted at the root as the searcher learns (section 4).  On by default until `gf2`; with `gf2` it changes no tree and costs 2-4% |
 | `gf2` | on | proven (heuristics/THEORY.md, Theorem 11; weak duality for the forced members) | bound every node by the GF(2) bound (section 4) instead of the matching bound and its refinement, branch on the conflicts of its heaviest set by exact strong branching, and (with `fix_forced`) force the members without which it would cut; the Lagrangian bound over nogoods, if on, applies after it |
 | `symmetry` | on | proven (heuristics/THEORY.md, Theorem 13) | cut a node whose completions all break a symmetric pair's inequality, and drop from a node's candidates those that no completion keeping the inequalities holds (section 4, "Prime exchanges") |
+| `force_window` | 80 | sound (a member is called forced only where the exchange graph shows every completion without it short) | with `gf2` and `fix_forced`, which members of a node's heaviest set the weight split leaves free are searched for being forced by the exchange graph: those whose split bound is less than this far above the need (`0`: none), less than a percentage of the node's slack above it (`25%`), or `all`; a wider window forces more members (a smaller tree) for more searches (section 4, "Forced members") |
+| `branching` | exact | sound (every completion leaves out some member of the conflict) | with `gf2`, how a node chooses the member of its conflict to branch on: `exact` (the bound without each member, certified or solved), `forced` (each solved only as far as the need, the branch by the split's bound), `split` (the split's bound alone), `largest`; the cheaper choices take more nodes |
+| `strong_limit` | all | sound (as `branching`) | with `gf2`'s strong branching (`exact` or `forced`), the most members of a conflict whose bounds are found, the most promising by the split's bound first |
+| `strong_depth` | all | sound (as `branching`) | with `gf2`, a node with at least this many promotions branches as `deep_branching` says instead of `branching` (`all`: none does), so that the deep nodes, the most numerous, can choose more cheaply |
+| `deep_branching` | split | sound (as `branching`) | the choice of `branching` at the nodes `strong_depth` names |
+| `more_forced` | on | sound (as `fix_forced`) | with `gf2`'s strong branching and `fix_forced`: once a member is found forced, the bounds of the other members are still found, to find more forced members |
 | `prev_cap` | on | proven if opt(n−1) is optimal | stop as soon as the incumbent reaches n + opt(n−1) − in_the_bag (`FrameSolver.getMaxPromotionSum`) |
 | `seed_incumbent` | on | sound (any promotion set is a valid incumbent) | start from the better of greedy and the n−1 solution's promotions that are still promotable |
 
@@ -829,9 +839,11 @@ file it appends to.
 
 **What identifies a checkpoint.**  The header the search stores: a format version, the set width, n, digests of the root
 candidates, of the frames (every frame's moves, factors and freedoms, as built) and of the one-sided candidates of the
-extended problem (section 4, "Extended mode"), `max_total` and the tactics (format version 5).  This build also reads
-version 4, the format of the builds before the extended problem's search, whose headers lack the digest of the one-sided
-candidates:
+extended problem (section 4, "Extended mode"), `max_total` and the tactics (format version 5), and in format version
+6 the tactics that tune the GF(2) search (`force_window` to `more_forced`, section 5) after them: a search whose tuning
+is the default writes version 5, which implies it, so its checkpoint is the one the builds before those tactics wrote,
+and one whose tuning is not writes version 6.  This build also reads version 4, the format of the builds before the
+extended problem's search, whose headers lack the digest of the one-sided candidates:
 those builds searched no problem with one-sided candidates, so a version-4 header reads as version 5 with the digest of
 none, every other field is checked as for version 5, the run goes on under the header it was written with (the engine
 compares it byte for byte), and a version-4 checkpoint asked to resume a search with one-sided candidates is refused,
