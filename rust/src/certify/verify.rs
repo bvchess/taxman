@@ -8,14 +8,16 @@
 //! against the data it was made from: the prover's barred bounds (the board needs a certificate, with the line's open
 //! members and the line's score), the results' game (its score, the checks `certify` makes of the recorded game, at
 //! the set width [`certificate_width`] gives, [`check_recorded_game`]), and Π⁺(O) set up again, which must reproduce
-//! the line's digest and sizes ([`Posed::reproduces`](super::Posed::reproduces)).  A `certified` line has no
-//! `beaten_by` and no line for its board in the counterexample file beside the certificates
-//! ([`counterexample_path`]); a `certified` line with `same_problem` rests on the last final line of the game it names
-//! before it in the same file, which must be `certified` and among the last `SAME_SEARCH_WINDOW` board sizes, and the
-//! rule of the same problem ([`apply_rule`], the one `certify` applies) must give what the line records, with the two
-//! problems equal whole; a `beaten` line has a finished legal game scoring more than the recorded score, and an
-//! identical line in the counterexample file.  A board with final lines in several places must have only `certified`
-//! ones.  The first line to fail ends the check.
+//! the line's digest and sizes ([`Posed::reproduces`](super::Posed::reproduces)).  Each line is set up in its own
+//! formulation, the one it records (`claims`: with the claims of `unzip` that Lemma M5⁺ keeps, or without), for the
+//! width and for the problem.  A `certified` line has no `beaten_by` and no line for its board in the counterexample
+//! file beside the certificates ([`counterexample_path`]); a `certified` line with `same_problem` rests on the last
+//! final line of the game it names before it in the same file, which must be `certified` and among the last
+//! `SAME_SEARCH_WINDOW` board sizes, and the rule of the same problem ([`apply_rule`], the one `certify` applies) must
+//! give what the line records, with the two problems equal whole, in the formulation of the line that rests on the
+//! other (the game it rests on is set up again in that formulation if its own line is of the other); a `beaten` line
+//! has a finished legal game scoring more than the recorded score, and an identical line in the counterexample file.  A
+//! board with final lines in several places must have only `certified` ones.  The first line to fail ends the check.
 //!
 //! What it cannot check is that a search explored its whole tree: a `certified` line made by a search is taken on
 //! trust, as an exhausted proof is.
@@ -24,14 +26,15 @@
 //! results' scores, the prover's proofs and the boards certified.
 
 use super::{
-    apply_rule, certificate_width, check_recorded_game, counterexample_path, Certificate, Recorded, Rule, Upper,
-    Verdict,
+    apply_rule, certificate_width, check_recorded_game, counterexample_path, extended_problem, Certificate, Recorded,
+    Rule, Upper, Verdict,
 };
 use crate::game::{replay_finished, Optimal};
 use crate::json::Json;
 use crate::results::{in_parallel, CeilingProof};
 use crate::search::Problem;
 use crate::solver::{digest_text, MAX_N, SAME_SEARCH_WINDOW};
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fmt;
 use std::fs;
@@ -234,7 +237,7 @@ fn check_line(f: &Final, known: &Optimal, upper: &BTreeMap<u32, Upper>, keep: bo
     if score != c.score {
         return Err(f.fail(format!("its score is {}, that of the results' game {score}", c.score)));
     }
-    let (words, width) = certificate_width(n, &c.open).map_err(|e| f.refusal(e))?;
+    let (words, width) = certificate_width(n, &c.open, c.claims).map_err(|e| f.refusal(e))?;
     if width != Some(c.width) {
         let gives = width.map_or_else(|| "none".to_owned(), |width| width.to_string());
         return Err(
@@ -243,7 +246,7 @@ fn check_line(f: &Final, known: &Optimal, upper: &BTreeMap<u32, Upper>, keep: bo
     }
     let beyond = || format!("n={n} is beyond the largest supported board, n={MAX_N}");
     let posed = crate::with_words!(c.width, W => {
-        check_recorded_game::<W>(n, score, moves, &c.open, None).map(|recorded: Recorded<W>| recorded.posed)
+        check_recorded_game::<W>(n, score, moves, &c.open, c.claims, None).map(|recorded: Recorded<W>| recorded.posed)
     }, else Err(beyond()))
     .map_err(|e| f.refusal(e))?;
     if !posed.reproduces(c) {
@@ -295,15 +298,24 @@ fn check_line(f: &Final, known: &Optimal, upper: &BTreeMap<u32, Upper>, keep: bo
     Ok(keep.then_some(posed.problem))
 }
 
-/// The rule of the same problem applied again to the line `f`, which rests on `game`: the problems `ours` and `theirs`
-/// of the two are equal whole, and the rule gives the `same_problem` the line records.
+/// The rule of the same problem applied again to the line `f`, which rests on `game`, as `certify` applied it: in the
+/// formulation of `f`, whatever formulation `game`'s line was made in.  The problem `ours` of `f`, and `theirs` of
+/// `game`, as the checks of the two lines set them up (each in its line's formulation), are equal whole in that
+/// formulation (`game` set up again in it where its line is of the other), and the rule gives the `same_problem` the
+/// line records.
 fn check_rule(f: &Final, game: &Final, ours: &Problem, theirs: &Problem) -> Result<(), String> {
     let (c, m) = (&f.line.certificate, &game.line.certificate);
     let recorded = c.same_problem.as_ref().expect("a line that rests on a game");
     let (Some(worth), Some(best)) = (c.worth(), m.worth()) else {
         return Err(f.fail("a score below its in_the_bag cannot be a certificate"));
     };
-    match apply_rule(m, best, theirs, ours, worth).map_err(|e| f.fail(e))? {
+    let theirs = if m.claims == c.claims {
+        Cow::Borrowed(theirs)
+    } else {
+        let posed = extended_problem(m.n, &m.open, c.claims).map_err(|e| f.refusal(e))?;
+        Cow::Owned(posed.problem)
+    };
+    match apply_rule(m, best, &theirs, ours, worth).map_err(|e| f.fail(e))? {
         Rule::Other => Err(f.fail(format!("its problem is not that of n={}, which it rests on", m.n))),
         Rule::Searched => Err(f.fail(format!(
             "its recorded game is worth {worth}, less than the {best} that the certificate of n={} proved the most: it \

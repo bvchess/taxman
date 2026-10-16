@@ -404,7 +404,7 @@ fn a_committed_checkpoint_of_format_4_resumes_as_the_build_that_wrote_it_finishe
     // A search of the extended problem with open sources cannot be this checkpoint's, and is refused, saying why.
     let board = Board::<20>::for_n(1133);
     let open: Bits<20> = board.plain.iter().copied().filter(|&x| 2 * x > 1133 && board.tables.omega(x) >= 3).collect();
-    let refused = board.prepare_extended_for_resume(&open, &checkpoint).err().expect("refused");
+    let refused = board.prepare_extended_for_resume(&open, false, &checkpoint).err().expect("refused");
     assert!(refused.contains("format version 4") && refused.contains("one-sided candidates"), "{refused}");
 
     let r = solver::solve_game(1133, Some(&prev_of(&games, 1133)), &opts).unwrap();

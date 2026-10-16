@@ -23,3 +23,11 @@ the search"), and the files here are its run on that code (`structure 2 8191 --t
 boards): every line of the earlier file is in the new one, field for field but for `secs`, with `extended_frames`
 added, and the summary has two rows more.  The extended problem needs 9 frames on 2048..4095 and 10 on every board from
 4096, which a frame set (9 at most) cannot hold: certificates past 4095 wait for a tenth frame.
+
+Since Lemma M5⁺ (heuristics/THEORY.md; docs/EXPERIMENTS.md, "The claims of `unzip` in the extended problem") the
+census also checks that the extended problem with nothing open and the claims of `unzip` is the frame model's problem
+(check H), and records per board the back claims at risk of the lemma's check and those that some set of open sources
+refuses (`m5_at_risk`, `m5_refused`, with their counts).  The files here are its run on the code of that change
+(`structure 2 8191 --threads 1`, 1,271 s summed over the boards): every field of every line of the earlier file is
+reproduced, but for `secs`, with the four fields added; check H holds on every board; the summary has a row for it and
+four more.

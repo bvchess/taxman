@@ -44,6 +44,17 @@
 //!   down, a source is kept if the kept ones plus it *dismantle completely* (repeatedly remove a member that has a
 //!   maximal factor that no other remaining member lists; every member must go).  Item: `{"plain_only": [..],
 //!   "greedy_only": [..]}`, the numbers in one set and not the other.
+//! * **H** (the claims in Π⁺(∅)): the extended problem with nothing open and the claims of `unzip` given
+//!   ([`taxman::frames::build_extended`] with `Bits::EMPTY` and the search frames' claims; heuristics/THEORY.md, "The
+//!   claims of `unzip` in Π⁺(O)") is the frame model's problem: it refuses no claim, keeps every claim of the search's
+//!   frames in the order made, has the search's frames and candidates, and poses the same search problem
+//!   ([`taxman::search::problem_of_extended`] of its frames and candidates equals [`taxman::search::problem_of`] of
+//!   the search's).  Item, one for each thing that differs: `{"what": "refused", "count": k, "claims": [[s, f], ..]}`
+//!   (the first 20), `{"what": "claims", "at": i, "kept": k, "given": g}` (the first place where the claims kept
+//!   differ from those given, and how many each), `{"what": "frames", "count": k, "expected": e}` or `{"what":
+//!   "frames", "frame": h}` (a different number of frames, or frame `h` differs), `{"what": "candidates",
+//!   "extended_only": [..], "frame_model_only": [..]}`, `{"what": "problem"}`.  Every board to the largest the solver
+//!   supports can be checked: Π⁺(∅) never has more frames than the frame model.
 //!
 //! **A line.**  `n`; `w`, the set width; `secs`, the wall seconds for the board.  The counts: `frames` (as setup forms
 //! them, before any merge), `numbers` (the search's frames, one per number), `candidates`, `max_layer`.  By layer, as
@@ -60,25 +71,53 @@
 //! c]` with the smallest such `c`.  `merged_away`, `[reached, true]` (`BoardFrames::merged_away_reach`): how often
 //! `unzip`, asking whether a factor has a use outside its frame, met a number homed in a frame that has since been
 //! merged away, and how often that number counted as such a use.  `violations`: an object with a key for each failed
-//! check (`"A"`, `"C"`, `"D"`, `"E"`, `"F"`, `"G"`) whose value is the first 20 of its items, and `"A_count"`, ...
-//! with how many there are; `{}` when everything holds.  `extended_frames`, `[count, lowest, highest]`: the frames of
-//! the extended problem Π⁺(O) with every source of three or more prime factors open, the most frames any O gives
-//! (`taxman::frames::extended_frame_count`; heuristics/THEORY.md, "The extended problem"), and the layers they span
-//! (`[0, null, null]` when no frame has freedoms there); the search holds at most `MAX_FRAMES` = 9.
+//! check (`"A"`, `"C"`, `"D"`, `"E"`, `"F"`, `"G"`, `"H"`) whose value is the first 20 of its items, and `"A_count"`,
+//! ... with how many there are; `{}` when everything holds.  `extended_frames`, `[count, lowest, highest]`: the
+//! frames of the extended problem Π⁺(O) with every source of three or more prime factors open, the most frames any O
+//! gives (`taxman::frames::extended_frame_count`; heuristics/THEORY.md, "The extended problem"), and the layers they
+//! span (`[0, null, null]` when no frame has freedoms there); the search holds at most `MAX_FRAMES` = 9.
+//!
+//! **Lemma M5⁺'s check.**  Π⁺(O) keeps a back claim `(s, f)` of the search's frames only if `f` passes the check
+//! ([`taxman::frames::ClaimCheck`]): it is no two-sided candidate of Π⁺(O), and no two-sided candidate has it among its
+//! maximal factors (heuristics/THEORY.md, "The claims of `unzip` in Π⁺(O)"); a component that fails it for one back
+//! claim keeps none of its claims, front claims included; so does one that holds a source in O.  The candidates of
+//! Π⁺(O) only grow with O, so a back claim fails the check for some O exactly when it fails for the largest O that
+//! holds none of its component's sources: U\*_{≥3} (the kept sources of three or more prime factors) less the
+//! component's own sources, or all of U\*_{≥3} for a component of layer 1 or 2, which no O touches.
+//! Two pairs of fields count them, each a count and the first 20 as `[s, f]` (the source and the factor of the back
+//! claim, in the order the claims were made), all four `null` where Π⁺(U\*_{≥3}) needs more than `MAX_FRAMES` frames
+//! and so cannot be built (`extended_frames` above 9: every board from 4096):
+//!
+//! * `m5_at_risk_count` and `m5_at_risk`: the back claims of the search's frames *at risk*, whose factor fails the
+//!   check against the two-sided candidates of Π⁺(U\*_{≥3}).  Failing there is necessary for failing for any O (the
+//!   candidates of every O are among them), so no other back claim is ever refused.
+//! * `m5_refused_count` and `m5_refused`: the back claims *some O refuses*, exactly.  Only the components that hold an
+//!   at-risk back claim are built (`taxman::frames::build_extended` with the largest O free of the component and the
+//!   search frames' claims), and of the claims the build refuses, those of the component's back claims that fail the
+//!   check against that problem's candidates are listed: the claims the component loses along with them (its other
+//!   back claims that pass, its front claims) are not.  Every pair listed is at risk, which the census checks.
 //!
 //! **The summary** is computed from the lines of `FROM..=TO` (with `--out`, read again from FILE at the end, so a
 //! resumed run summarises everything; without it, from memory) and written as plain text to stdout (to stderr when the
-//! lines went to stdout): the boards checked; for each of A, C, D, E, F and G the boards that fail it, with the first
-//! items of the first 5; the sets of layers that frame 0 had, with the number of boards of each, and the boards where
-//! frame 0 includes a frame of layer 2, as ranges; the boards whose `layer_numbering` is false, those where a number's
-//! frames span several layers, and those whose `layer2_closed` is false; the totals of `claims_pre` and
+//! lines went to stdout): the boards checked; for each of A, C, D, E, F, G and H the boards that fail it, with the
+//! first items of the first 5; the sets of layers that frame 0 had, with the number of boards of each, and the boards
+//! where frame 0 includes a frame of layer 2, as ranges; the boards whose `layer_numbering` is false, those where a
+//! number's frames span several layers, and those whose `layer2_closed` is false; the totals of `claims_pre` and
 //! `claims_numbered`; the boards with back claims that have a composite among the factors; the boards where
 //! `merged_away` was reached, and the totals; the largest `frames`, `numbers`, `max_layer` and `candidates`; the
-//! boards by the frame count of `extended_frames`, and those where it is above `MAX_FRAMES`; the seconds, summed over
-//! the boards.  The last line is `PASS` or `FAIL`.
+//! boards by the frame count of `extended_frames`, and those where it is above `MAX_FRAMES`; for Lemma M5⁺'s check,
+//! the boards with back claims at risk (how many, the total of their claims, the first as ranges), the boards beyond
+//! the reach of the check (the fields are `null`), the boards where some O refuses a back claim (as ranges, and the
+//! items of the first 5), and the boards whose lines lack the fields; the seconds, summed over the boards.  The last
+//! line is `PASS` or `FAIL`.
 //!
-//! **Exit status**: 0 if every board of the range has a line and passes A, C, D, E, F and G; 1 if one does not, or a
-//! board could not be analysed (the message goes to stderr); 2 for a usage error.
+//! **Lines from an earlier version.**  A line of a file written before the census had check H lacks the four fields
+//! (`violations` lists only what failed, so the fields are the sign that H ran).  Resuming into such a file does not
+//! crash: those lines are left out of the three rows about Lemma M5⁺'s check, and the last row counts their boards.
+//! But check H did not run on them, so the run is a `FAIL` while any exists: run the range again into a new file.
+//!
+//! **Exit status**: 0 if every board of the range has a line with the Lemma M5⁺ fields and passes A, C, D, E, F, G and
+//! H; 1 if one does not, or a board could not be analysed (the message goes to stderr); 2 for a usage error.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File, OpenOptions};
@@ -90,18 +129,22 @@ use std::sync::mpsc;
 use std::time::Instant;
 use taxman::accelerate::solution_for_promotions;
 use taxman::bits::Bits;
-use taxman::frames::{extended_frame_count, numbering, ClaimKind, NumberedFrame, Numbering, SearchFrames};
+use taxman::frames::{
+    build_extended, extended_frame_count, numbering, Claim, ClaimCheck, ClaimKind, NumberedFrame, Numbering,
+    SearchFrames,
+};
 use taxman::json::Json;
 use taxman::model::{FrameGraph, MAX_FRAMES};
 use taxman::numtheory::Tables;
+use taxman::search::{problem_of, problem_of_extended};
 use taxman::solver::MAX_N;
 
 const USAGE: &str = "usage: structure FROM TO [--threads K] [--out FILE]   (2 <= FROM <= TO)";
 
 /// The checks, in the order of the summary.
-const CHECKS: [&str; 6] = ["A", "C", "D", "E", "F", "G"];
+const CHECKS: [&str; 7] = ["A", "C", "D", "E", "F", "G", "H"];
 
-/// How many items of a failed check, and how many back claims with a composite, a line keeps.
+/// How many items of a failed check, and how many back claims with a composite or at risk, a line keeps.
 const ITEM_LIMIT: usize = 20;
 
 /// What the command line asks for.
@@ -330,6 +373,113 @@ fn check_upper(t: &Tables, plain: &[u32]) -> Vec<Json> {
     vec![Json::object([("plain_only", Json::array(plain_only)), ("greedy_only", Json::array(greedy_only))])]
 }
 
+/// The count of `pairs` and its first `ITEM_LIMIT` members as `[s, f]`, the two fields of a line that list pairs
+/// (both `null` for none).
+fn count_and_pairs(pairs: Option<&[(u32, u32)]>) -> (Json, Json) {
+    pairs.map_or((Json::Null, Json::Null), |pairs| {
+        let first = pairs.iter().take(ITEM_LIMIT).map(|&(s, f)| Json::array([s, f]));
+        (Json::from(pairs.len()), Json::Arr(first.collect()))
+    })
+}
+
+/// An item of check H: what differs, and the details.
+fn differs(what: &str, details: impl IntoIterator<Item = (&'static str, Json)>) -> Json {
+    Json::object(std::iter::once(("what", Json::from(what))).chain(details))
+}
+
+/// Check H: the extended problem Π⁺(∅) with the claims of `unzip` is the frame model's problem.
+fn check_extended_is_frame_model<const W: usize>(t: &Tables, frames: &SearchFrames<W>) -> Result<Vec<Json>, String> {
+    let extended = build_extended::<W>(t, &Bits::EMPTY, &frames.claims)?;
+    let mut items = Vec::new();
+    if !extended.refused.is_empty() {
+        let refused: Vec<(u32, u32)> = extended.refused.iter().map(|&(s, f, _)| (s, f)).collect();
+        let (count, claims) = count_and_pairs(Some(&refused));
+        items.push(differs("refused", [("count", count), ("claims", claims)]));
+    }
+    let given: Vec<Claim> = frames.claims.iter().flatten().copied().collect();
+    if extended.claims != given {
+        let at = extended.claims.iter().zip(&given).take_while(|(kept, given)| kept == given).count();
+        let sizes = [("at", at), ("kept", extended.claims.len()), ("given", given.len())];
+        items.push(differs("claims", sizes.map(|(key, size)| (key, Json::from(size)))));
+    }
+    if extended.frames.len() != frames.frames.len() {
+        let sizes = [("count", extended.frames.len()), ("expected", frames.frames.len())];
+        items.push(differs("frames", sizes.map(|(key, size)| (key, Json::from(size)))));
+    } else {
+        let off = (extended.frames.iter().zip(&frames.frames)).enumerate().filter(|(_, (ours, theirs))| ours != theirs);
+        items.extend(off.map(|(h, _)| differs("frames", [("frame", Json::from(h))])));
+    }
+    if extended.candidates != frames.candidates {
+        let (ours, theirs) = (extended.candidates, frames.candidates);
+        items.push(differs(
+            "candidates",
+            [
+                ("extended_only", Json::array((ours - theirs).to_vec())),
+                ("frame_model_only", Json::array((theirs - ours).to_vec())),
+            ],
+        ));
+    }
+    let ours = problem_of_extended::<W>(t, &extended.columns(), &extended.one_sided, &extended.candidates)?;
+    if ours != problem_of::<W>(t, &frames.columns(), &frames.candidates)? {
+        items.push(differs("problem", []));
+    }
+    Ok(items)
+}
+
+/// What the check of Lemma M5⁺ could do to the back claims of the search's frames, as `(s, f)` pairs in the order the
+/// claims were made (see the module comment).
+struct ClaimRisk {
+    /// The back claims whose factor fails the check against the two-sided candidates of Π⁺(U\*_{≥3}).
+    at_risk: Vec<(u32, u32)>,
+    /// The back claims that fail the check for some O: a subset of those at risk.
+    refused: Vec<(u32, u32)>,
+}
+
+/// The `ClaimRisk` of the board `1..=t.n`, given its `numbered` frames as setup forms them with their `layers`, the
+/// search's `frames`, and `upper`, U\*_{≥3}, the sources of the frames of layer 3 or more.  The caller has seen that
+/// Π⁺(`upper`) has no more than `MAX_FRAMES` frames, so that it can be built.
+fn claim_risk<const W: usize>(
+    t: &Tables,
+    numbered: &Numbering<W>,
+    layers: &[usize],
+    frames: &SearchFrames<W>,
+    upper: &Bits<W>,
+) -> Result<ClaimRisk, String> {
+    let check = ClaimCheck::new(t, &build_extended::<W>(t, upper, &[])?.candidates);
+    let back_claims = frames.claims.iter().flatten().filter(|claim| claim.2 == ClaimKind::Back);
+    let at_risk: Vec<(u32, u32)> =
+        back_claims.filter(|&&(_, f, _)| !check.passes(f)).map(|&(s, f, _)| (s, f)).collect();
+
+    // The components that hold an at-risk back claim, each with the largest O free of it: a component of layer 1 or 2
+    // is free of every O, so those share the largest, all of U*_{>=3}.
+    let component_of = |s: u32| {
+        let found = numbered.frames.iter().position(|component| component.sources.contains(s));
+        found.ok_or_else(|| format!("{s} claims a factor and is the source of no frame"))
+    };
+    let components = at_risk.iter().map(|&(s, _)| component_of(s)).collect::<Result<BTreeSet<usize>, String>>()?;
+    let (low, high): (Vec<usize>, Vec<usize>) = components.into_iter().partition(|&i| layers[i] < 3);
+    let mut builds: Vec<(Bits<W>, Bits<W>)> = Vec::new();
+    if !low.is_empty() {
+        builds.push((*upper, low.iter().fold(Bits::EMPTY, |all, &i| all | numbered.frames[i].sources)));
+    }
+    builds.extend(high.iter().map(|&i| (*upper - numbered.frames[i].sources, numbered.frames[i].sources)));
+
+    // Of the claims a build refuses, the back claims of its components that fail the check against its candidates.
+    let mut refused = BTreeSet::new();
+    for (largest, sources) in builds {
+        let extended = build_extended::<W>(t, &largest, &frames.claims)?;
+        let check = ClaimCheck::new(t, &extended.candidates);
+        let failing = (extended.refused.iter())
+            .filter(|&&(s, f, kind)| kind == ClaimKind::Back && sources.contains(s) && !check.passes(f));
+        refused.extend(failing.map(|&(s, f, _)| (s, f)));
+    }
+    let refused_in_order: Vec<(u32, u32)> = at_risk.iter().copied().filter(|pair| refused.contains(pair)).collect();
+    if refused_in_order.len() != refused.len() {
+        return Err(format!("back claims refused for an O that are not at risk: {refused:?}"));
+    }
+    Ok(ClaimRisk { at_risk, refused: refused_in_order })
+}
+
 /// For each layer `0..=max_layer`, the sum of `value` over the frames of that layer.
 fn by_layer<const W: usize>(
     numbered: &Numbering<W>,
@@ -387,7 +537,7 @@ fn back_claims_with_composite<const W: usize>(
 
 /// The `violations` of a line: for each check that failed (`CHECKS` in order) its first `ITEM_LIMIT` items and, as
 /// `"<check>_count"`, how many there are.
-fn failed_checks(violations: &[Vec<Json>; 6]) -> Json {
+fn failed_checks(violations: &[Vec<Json>; CHECKS.len()]) -> Json {
     let mut failed = Vec::new();
     for (check, items) in CHECKS.iter().zip(violations).filter(|(_, items)| !items.is_empty()) {
         failed.push((check.to_string(), Json::Arr(items.iter().take(ITEM_LIMIT).cloned().collect())));
@@ -426,6 +576,7 @@ fn census<const W: usize>(n: u32) -> Result<Json, String> {
         check_candidates_not_in_front(&numbered, &frames),
         check_homes(&graph, &frames),
         check_upper(&t, &plain),
+        check_extended_is_frame_model(&t, &frames)?,
     ];
 
     // The layers of frame 0 and of each number.
@@ -438,14 +589,18 @@ fn census<const W: usize>(n: u32) -> Result<Json, String> {
     let frame_count = |value: fn(&NumberedFrame<W>) -> i64| by_layer(&numbered, &layers, max_layer, value);
     let (reached, answered) = numbered.merged_away_reach;
 
-    // The extended problem with every source of three or more prime factors open.
+    // The extended problem with every source of three or more prime factors open, and what Lemma M5⁺'s check does to
+    // the back claims there, where it can be built.
     let from_layer_3 = numbered.frames.iter().zip(&layers).filter(|&(_, &layer)| layer >= 3);
-    let open = from_layer_3.fold(Bits::<W>::EMPTY, |acc, (frame, _)| acc | frame.sources);
-    let (extended, span) = extended_frame_count::<W>(&t, &open)?;
+    let upper = from_layer_3.fold(Bits::<W>::EMPTY, |acc, (frame, _)| acc | frame.sources);
+    let (extended, span) = extended_frame_count::<W>(&t, &upper)?;
     let extended_frames = match span {
         Some((lowest, highest)) => Json::array([extended as u64, u64::from(lowest), u64::from(highest)]),
         None => Json::Arr(vec![Json::from(extended), Json::Null, Json::Null]),
     };
+    let risk = if extended <= MAX_FRAMES { Some(claim_risk(&t, &numbered, &layers, &frames, &upper)?) } else { None };
+    let (at_risk_count, at_risk) = count_and_pairs(risk.as_ref().map(|risk| risk.at_risk.as_slice()));
+    let (refused_count, refused) = count_and_pairs(risk.as_ref().map(|risk| risk.refused.as_slice()));
     Ok(Json::object([
         ("n", Json::from(n)),
         ("w", Json::from(W)),
@@ -470,6 +625,10 @@ fn census<const W: usize>(n: u32) -> Result<Json, String> {
         ("merged_away", Json::array([reached, answered])),
         ("violations", failed_checks(&violations)),
         ("extended_frames", extended_frames),
+        ("m5_at_risk_count", at_risk_count),
+        ("m5_at_risk", at_risk),
+        ("m5_refused_count", refused_count),
+        ("m5_refused", refused),
     ]))
 }
 
@@ -495,6 +654,13 @@ fn elements<'a>(line: &'a Json, key: &str) -> &'a [Json] {
 fn pair_of(line: &Json, key: &str) -> (u64, u64) {
     let at = |i| elements(line, key).get(i).and_then(Json::as_u64).unwrap_or(0);
     (at(0), at(1))
+}
+
+/// What a line says of a count of back claims for Lemma M5⁺'s check (`key`: `m5_at_risk_count` or `m5_refused_count`):
+/// `None` if the line lacks the field (an earlier version of the census wrote it), `Some(None)` if it is `null`
+/// (Π⁺ of every source of three or more prime factors cannot be built), else `Some(Some(count))`.
+fn claims_reported(line: &Json, key: &str) -> Option<Option<u64>> {
+    line.get(key).map(Json::as_u64)
 }
 
 /// The items of the check `check` that a line lists as failed.
@@ -530,6 +696,12 @@ fn first(boards: &[u32], k: usize) -> String {
     } else {
         format!("{}{more}", shown.join(", "))
     }
+}
+
+/// The first `k` of `boards` (ascending) as ranges, with `...` when there are more.
+fn first_ranges(boards: &[u32], k: usize) -> String {
+    let more = if boards.len() > k { ", ..." } else { "" };
+    format!("{}{more}", ranges(&boards[..boards.len().min(k)]))
 }
 
 /// The boards of `lines` for which `wanted` holds.
@@ -644,6 +816,48 @@ fn summary(lines: &[Json], from: u32, to: u32) -> (String, bool) {
         "boards where it needs more than {MAX_FRAMES} frames ({}): first {}",
         beyond.len(),
         first(&beyond, 10)
+    ));
+
+    // Lemma M5⁺'s check on the back claims; a line without the fields is left out.
+    let reported = |line: &Json, key: &str| claims_reported(line, key).flatten().filter(|&count| count > 0);
+    let number = |line: &Json| number_of(line, "n") as u32;
+    let at_risk: Vec<(u32, u64)> =
+        lines.iter().filter_map(|line| Some((number(line), reported(line, "m5_at_risk_count")?))).collect();
+    let at_risk_boards: Vec<u32> = at_risk.iter().map(|&(n, _)| n).collect();
+    rows.push(format!(
+        "boards with back claims at risk of Lemma M5⁺ ({}), {} claims: {}",
+        at_risk.len(),
+        at_risk.iter().map(|&(_, count)| count).sum::<u64>(),
+        first_ranges(&at_risk_boards, 30)
+    ));
+    let out_of_reach = boards_where(lines, |line| claims_reported(line, "m5_at_risk_count") == Some(None));
+    rows.push(format!(
+        "boards beyond the reach of Lemma M5⁺'s check, Π⁺ of every source of layer 3 or more needing more than \
+         {MAX_FRAMES} frames ({}): {}",
+        out_of_reach.len(),
+        first_ranges(&out_of_reach, 30)
+    ));
+    let refusing: Vec<&Json> = lines.iter().filter(|line| reported(line, "m5_refused_count").is_some()).collect();
+    let refusing_boards: Vec<u32> = refusing.iter().map(|line| number(line)).collect();
+    let shown: Vec<String> = (refusing.iter().take(5))
+        .map(|line| {
+            let items: Vec<String> = elements(line, "m5_refused").iter().take(3).map(Json::to_string).collect();
+            format!("n={}: {}", number(line), items.join(" "))
+        })
+        .collect();
+    let tail = if refusing.is_empty() { String::new() } else { format!("; first: {}", shown.join("; ")) };
+    rows.push(format!(
+        "boards where some O refuses a back claim ({}): {}{tail}",
+        refusing.len(),
+        first_ranges(&refusing_boards, 30)
+    ));
+    let lacking = boards_where(lines, |line| claims_reported(line, "m5_at_risk_count").is_none());
+    passes &= lacking.is_empty();
+    rows.push(format!(
+        "boards whose lines lack the Lemma M5⁺ fields (check H did not run on them), left out of the rows above \
+         ({}): {}",
+        lacking.len(),
+        first_ranges(&lacking, 30)
     ));
     let seconds: f64 = lines.iter().map(|line| line.get("secs").and_then(Json::as_f64).unwrap_or(0.0)).sum();
     rows.push(format!("seconds, summed over the boards: {seconds:.1}"));

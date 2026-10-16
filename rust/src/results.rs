@@ -401,6 +401,12 @@ impl<'a> Fields<'a> {
         self.get(name)?.as_bool().ok_or_else(|| Self::bad(name))
     }
 
+    /// A flag that older lines do not have: `default` where the field is absent, an error if it is there and is no
+    /// boolean.
+    pub(crate) fn bool_or(&self, name: &str, default: bool) -> Result<bool, String> {
+        self.0.get(name).map_or(Ok(default), |_| self.bool(name))
+    }
+
     fn str(&self, name: &str) -> Result<&'a str, String> {
         self.get(name)?.as_str().ok_or_else(|| Self::bad(name))
     }

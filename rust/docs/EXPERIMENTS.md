@@ -381,6 +381,8 @@ The work of [the prover](../prover/README.md) and the proofs of [THEORY.md](../.
 | S1: `certified (same problem as m)`: a game whose Π⁺(O) an earlier certified game of the 8 board sizes before it posed (digest, then the problems compared whole) and whose recorded game is worth what that certificate proved the most is certified with no search | [certificates past 2175](#certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10) | kept (proven: equal problems have equal heaviest promotion sets; THEORY.md under the certificate corollary) | 81 of the 377 games of 600..1300 that need a certificate, each equal to a search of it; the problems file finds 114 such games in 1301..2175 and 145 of the 708 in 2176..3440; five pairs past 2175 (2248 → 2249 to 2652 → 2653) equal to their searches, which take exactly the nodes of the game they rest on |
 | S2: the campaign of certificates on 2176-3440 planned (`tools/certify_plan.py`, `bench/certify/`), with the barred bounds of 3315-3440, `certify --list`, `taxman verify-certificates` and the proven end of the chain | [certificates past 2175](#certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10) | kept; the campaign waits for the owner's approval | 708 games need a certificate (3424, 3425 and 3440 among them), 145 settled by S1; priced by nodes at the run's own cost per node (the recorded seconds count the window 3.27 and 1.55 times): 3,300 thread-hours at twice the plain search (2,640-3,960 at 1.6-2.4), 52 hours of one `c8g.16xlarge`, $35 at spot or $132 on demand, 3440 alone 10.6 hours; the unshared repeats cost 361 thread-hours, 3427 alone 223 |
 | S4 preparation: the tooling of the campaign of certificates on 2176-3440 (`tools/cloud/certify.sh`, the phase lists in `bench/certify/lists/stage4`, `tools/certify_campaign.py`, `tools/certify_pilot.py` with the pilot's stop rule) and RUNBOOK section 11 | [RUNBOOK 11](../tools/cloud/RUNBOOK.md#11-certifying-u-stage-4) | kept; the campaign waits for the owner's approval, the pilot first | the 708 games in 7 lists: the pilot `pilot7` (7 games and the 3 that rest on them, 288 thread-hours, 4.5 hours of one `c8g.16xlarge`, $3 at spot), `dear_rest` (14 games led by 3440, 3424, 3425 and 2346, 1,837), `rest_1` to `rest_4` (567 games, 204 each), `deferred` (the 115 repeats the rule cannot settle and 2 games that share with them, 361; 0 if a build with Lemma M5⁺ settles them); the stop rule (median R at most 3 and none above 5, R = the certificate's thread-seconds over the chain's nodes times the stretch's cost per node, the plan's 2; stop on `beaten`) computed by `certify_pilot.py`, tested on real lines of 1301-2175; `certify.sh` rehearsed on the laptop (two lists at once, a SIGTERM and its resume, stand-ins for a counterexample, an error, a crash and the deadline; not on EC2) |
+| M5⁺: the claims of `unzip` in Π⁺(O) (`build_extended(t, open, claims)`): a frame (as setup forms it) keeps the frame model's claims if it holds no member of O ∪ R and the factor of each of its back claims is no two-sided candidate and listed by none (Lemma M5⁺); `certify` with claims by default, lines recording `"claims"`, the rule of the same problem comparing problems in the run's formulation | [claims in Π⁺](#the-claims-of-unzip-in-the-extended-problem-2026-10) | kept (proven: THEORY.md, Lemma M5⁺ and its corollary) | no mismatch with the oracle with the claims kept (5.9 million sets to 80, random sets to 1300); a mutant skipping the check caught (24..26); Π⁺(∅) with the claims is Π_n on every board to 8191 (the census's check H) and searches the tripwires' trees node for node; 600..1300: the same verdicts, the rule settling 101 games against 81; but past 1300 the frame of layer 3 that holds most sources always holds an open one and keeps nothing: 1 more repeat settled in 1301..3440, none of the 115 deferred ones (3427 neither), 2112 and 2156 the same problems and times |
+| The claims of Π⁺(O) kept claim by claim: in the order made, a claim (s, f) with s fixed is kept if, after the claims kept before it, s lists no factor but f (front) or no member that can be in an instance but s lists f and f passes the check (back), whatever else its frame holds | [claims in Π⁺](#the-claims-of-unzip-in-the-extended-problem-2026-10) | measured, not kept: a change of the design, for the next consultation | the oracle passes as for M5⁺ (every default and ignored test with the claims); 465 of the 1,575 games of 600..3440 settled by the rule against 361 (M5⁺) and 340 (none): 60 of the 115 deferred repeats, 278 of their 361 thread-hours, 3427 on 3425 among them; at 2112 and 2156 the same trees, 8.7% and 4.6% less time a certificate |
 | Certify U game by game: barred parity bounds with layers 1-2 fixed by Theorem B, then a search of the open members (or a search that treats the open sources as optional) | [THEORY: the upper part](../../heuristics/THEORY.md#the-upper-part) | open | the bounds close no game alone (E5, next row); the rest needs the integrated search, which leaves the open sources optional, and E6 measures what that costs the prover's search (prepared); its problem, the extended problem, has its theory and setup (the E8 rows above), and its search with the open sources one-sided is `taxman certify` (E8 stage 2): stage 3 measures it at the end of the chain |
 | E5: barred parity bounds on every game of 1301-3314 that rests on the frame model (`prover/src/bin/upper.rs`): layers 1 and 2 fixed by Theorem B, each member of U\*_{≥3} barred in turn, certified when the bound is at most the recorded score | [upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | kept (`prover/data/upper_*.jsonl`) | 7.5% of the members open over 1301-2175 (1 to 102 a game), 14.9% over the EC2 chain's 2176-3314 (15 to 317); no game closed by the bounds alone; the open share follows the root's gap (+2 to 3 points per 100), not n; the root's heaviest set plays all of U\*_{≥3} in all 1,125 games; 26 minutes on one thread; and on 3315-3440 (S2, `prover/data/upper_3315_3440.jsonl`): 73 games need it, 19.9% of the members open (172 to 271 a game), the root's heaviest set holding all of U\*_{≥3} in every one, 277 s |
 | E6: the prover's search with the sources of layer 3 and up free (`exact`, from Theorem B's roles) against the same with the upper part fixed to U\* (`--fix-upper 1`), with two counters, on 25 games of gap 364-603 | [upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | superseded (the fourth consultation, 2026-10-15; prepared, never run): E8 stage 2 measured directly what the free sources cost a search, the certificates taking the plain proof's nodes without the rule of symmetric pairs | criterion fixed in advance (B/D ≤ 1.2 on 90% of the games, never above 2, branching on those sources at ≤ 5% of the nodes); at 1575 and 1584 on the laptop B and D have the same nodes and neither counter fires; one `c8g.4xlarge` for one to one and a half hours, about $0.40 at spot ([RUNBOOK 10.1](../tools/cloud/RUNBOOK.md#101-e6-does-leaving-the-sources-free-cost-the-provers-search-anything)) |
@@ -449,6 +451,7 @@ single-sacrifice route) have their row above.
 | [Certificates past 2175: the same problem, the work list, the verifier](#certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10) | S1 and S2 of the fourth consultation: can a repeat be certified by the game it repeats, and what will certifying every game of 2176-3440 that rests on the frame model cost? | yes, when the two extended problems are equal whole (81 of 377 games of 600..1300, 145 of the 708 of 2176..3440); 3,300 thread-hours at twice the plain search, 52 hours of one `c8g.16xlarge`, $35 at spot, 3440 alone 10.6 hours; the work list, `certify --list`, `verify-certificates` and the proven end of the chain (2175 today) built | c5d585a (S1), ed526a4, 35c614b and the commit of the work list |
 | [A bound over GF(2) and GF(3) signed frame matroids](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) | does the LP over the GF(2) frame matroids and GF(3) signed frame matroids (signings made for the cores its columns meet) close a share of the root's GF(2) gap that holds with n (A1's E1, with E1n at the probe's nodes)? | yes: 0.62 of the gap at n ≥ 1700, no trend in n (+1.0 ± 2.6 points per 100 n), passing its kill criteria strongly; fixed signings close little; 86-98% of the probe's nodes GF(2) leaves open cut with node-fitted multipliers; Theorems 14-15 in THEORY.md | 7666072 to 1e12c77 and the entry (no solver change) |
 | [The A1 bound in a branch and bound](#the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10) | E3's pilot: with multipliers carried from parent to child and refits of 20 pricings, how much smaller are the trees of 1215 and 1472, at what cost, and how far does a refit get against the node's own master? | no kill: r2's tree 5 times smaller at both gaps (a constant factor, not a slope), at 23 GF(2) nodes of time a node; within 20 pricings the refits make 0.41 of the cuts of the node's own master, which cuts 95-100% of the open nodes; Knuth's estimator too heavy-tailed for the large trees; an overflow in L's evaluation fixed | 9e3ecae to the entry (no solver change) |
+| [The claims of `unzip` in the extended problem](#the-claims-of-unzip-in-the-extended-problem-2026-10) | 32.2 of the fifth consultation: can Π⁺(O) keep the claims of `unzip` where Lemma M5⁺'s check allows, so that Π⁺(∅) is Π_n and more repeats rest on the game they repeat? | yes, proven and built: Π⁺(∅) with the claims is Π_n on every board to 8191, and the rule settles 101 of the 377 games of 600..1300 against 81; but past 1300 the frame of layer 3 holding most sources always holds an open one, so the rule as designed settles none of the 115 deferred repeats and saves nothing at 2112 and 2156; kept claim by claim, the claims would settle 60 of them (3427 among them) and take 5-9% off a certificate | 8c833a1, 8b0d0d4, 3841753, cd959d1, 6146627 and the commit of the entry |
 | [R3 and the slope test](#r3-and-the-slope-test-u4-of-a1-2026-10) | U4 of A1: does a refit of the reference's strength at the nodes high in the tree make the A1 trees grow more slowly with the root's gap? | no: R3 at 1 s makes 0.60-0.66 of the reference's cuts at the dear nodes, and its trees are 14.5 times smaller than the plain ones at 987-1352, but the ratio falls with the gap (t −3.1): killed in the search, A1 stays a root-level tool; patch mode and the cost at 3300-3400 not run | 9f750a3 to the entry (no solver change) |
 
 ## The port and its first improvements
@@ -7086,6 +7089,99 @@ longest run, r2c at 1475), about $4-5; the 2170s (gap 767) and the games past 21
    the dive logs were deduplicated (every duplicate equal, the dives deterministic) and every dive equals the first
    attempt's.
 7. The core table of S3.4 (cores cached across nodes) was not built: it saves time only.
+
+## The claims of `unzip` in the extended problem (2026-10)
+
+*Question.*  32.2 of the fifth consultation of the theory track (2026-10-16): Π⁺(O) claims nothing, which costs time
+(stage 1 measured +11% time on Π⁺(∅)) and keeps repeats apart (3427 has 3425's search problem but another Π⁺,
+differing only by the pair (3426, 1713) that `unzip` claims in Π_n; 115 repeats of the work list, 361 thread-hours,
+3427 alone 223, are deferred for that reason).  Can Π⁺(O) keep the claims where they are still moves of every
+instance, so that Π⁺(∅) is Π_n and more repeats rest on the game they repeat?
+
+*The rule, as designed* (8c833a1).  `build_extended(t, open, claims)` takes the frame model's claims
+(`SearchFrames::claims`, in the order made) and gives each the frame, as setup forms it, of its source.  A frame keeps
+its claims if it holds no member of O ∪ R and the factor f of each of its back claims passes the check
+(`frames::ClaimCheck`): f is no two-sided candidate of Π⁺(O), and no candidate has f among its maximal factors; its
+pairs then leave the moves and the factors of its frame of Π⁺(O) before the root is reduced.  The candidates do not
+change (a claimed factor is none: debug-asserted), nor do the freedoms or in_the_bag⁺.  `ExtendedFrames` records the
+claims kept and those refused.  THEORY.md: Lemma M5⁺ (the claims kept are front and back moves of every instance of
+Π⁺(O), so Theorem M⁺ holds with them out), its corollary (the two formulations have the same promotion sets, so a
+certificate in one bounds the heaviest promotion set in the other), and Π⁺(∅) with the claims is Π_n.  The
+formulation is a parameter of `Board::extended` and of everything that sets Π⁺(O) up.
+
+*Tests* (8b0d0d4, 6146627).  Theorem M⁺ against the whole-board oracle with the claims kept, as before without them:
+every set both ways on every board 2..80 with O empty and three random O (1.66 million sets), 2..60 with every source
+open (4.2 million), and, ignored, 81..100 and 61..69; random sets at 300, 600, 1000, 1300, at 741, 1100 and 1200 (a
+rejected source in some sets) and, ignored, at 2000, 3000 and 4095; the search's optimum against the oracle on every
+board to 80 (60 with every source open): no mismatch.  The mutation that skips the check (the refused pairs taken out
+anyway) is caught on every problem to 80 where the check refuses a claim, 24, 25 and 26 with all of U\*_{≥3} open but
+one frame's sources (2 to 8 playable sets the mutant does not take: at 24 with 16, 20 and 24 open the candidate 12
+lists 6, which 18 claims, and the mutant loses {8, 12}), while the true problem agrees with the oracle on every set
+there.  Π⁺(∅) with the claims poses Π_n's problem (frames, candidates, root, greedy set, `max_total`) on every board
+to 300 in the unit tests and on every board 2..8191 in the census (check H, below), and its search reproduces every
+row of the tripwires' default table node for node, the matching rows too.
+
+*The census* (`examples/structure.rs`, one thread, 1,271 s summed; `bench/structure/`, replacing the earlier run, every
+field of which it reproduces).  Check H holds on every board 2..8191.  Where Π⁺(U\*_{≥3}) fits in nine frames (to
+4095) it records the back claims at risk (their factor fails the check against the candidates of Π⁺(U\*_{≥3}), the
+most any O has) and those refused for some O (exactly: for each frame holding one at risk, the largest O free of it,
+since the candidates only grow with O).  The check refuses claims on 10 boards to 500 (24-26 and 343-349), on most
+from 507 and on every one from 1501, and a growing share of them: 2.5% of the back claims of 501..1000, 5.3% of
+1501..2000, 9.2% of 3001..3500, 11.3% of 3501..4095 (at the worst O for each frame).
+
+*Certificates* (3841753).  Lines record `"claims": true|false` (absent: false, every line made before);
+`certify --no-claims` makes the old formulation.  The rule of the same problem compares the two problems whole in the
+run's formulation, whatever formulation m's line was made in (by the corollary m's certificate bounds the heaviest
+promotion set of either): a line of the other formulation is passed over unless its frames and candidates, which the
+claims do not change, are n's, and is otherwise set up again in its own formulation (it must reproduce its line) and
+then in the run's.  `verify-certificates` sets each line up in its own formulation and checks the rule in the
+formulation of the line that rests on the other.
+* *600..1300*, one thread, with the claims (`bench/certify/certificates_claims_600_1300.jsonl`): the 377 games
+  certified again, none otherwise; the rule settles 101 of them against 81 (the same 81 and 20 more, 611 on 609 to 1147
+  on 1145), each as a direct search of the game in the same formulation does; the 276 searched take exactly the nodes
+  they took without the claims (296,743) and 29.4 s against 30.5 s.  `verify-certificates` passes the file beside the
+  one without the claims, and a file that mixes the two.
+* *Past 1300* (`bench/certify/problems_claims_600_3440.jsonl`, every certificate's Π⁺(O) set up with the claims, 78
+  s): the claims change the problem of 346 of the 1,575 games that need a certificate (231 of 377 in 600..1300, 43 of
+  490 in 1301..2175, 72 of 708 in 2176..3440, none past 2688), and the rule finds 361 repeats against 340: one more
+  past 1300 (1371).  None of the 115 deferred repeats is settled, 3427 neither: 3425 and 3427 keep their problems of
+  before.  At 2112 and 2156 (|O| 69 and 70), certified three times each way, alternating, on one thread: the same
+  problem (digest) with and without the claims, so the same trees (15,119 and 43,599 nodes) and times (3.42 and 7.70
+  s).
+* *Why.*  The frame of layer 3 that holds most of a board's sources (joined through the factors 2p, 3p, 6, 9, 10, 15,
+  ...) holds open sources as soon as some are open, and then every claim of it is refused (no certificate's problem
+  keeps a claim past 2688), the pair (3426, 1713) among them,
+  although its check passes (1713 has no maximal composite but 3426, and layer 2 is closed): 3426 = 6 · 571 shares the
+  factor 6 with that frame, which at 3427 holds 1719 = 9 · 191, open (3426, 6, 1866 = 6 · 311, 933, 2799 = 9 · 311, 9,
+  1719 is a path of sources and their maximal factors).  The condition
+  "holds no member of O ∪ R" is what the lemma's proof uses to know which members of the instance list a claimed
+  factor; it does not need the whole frame free.
+
+*Kept claim by claim: measured, not kept* (a change of the design, for the next consultation).  The proof needs, for a
+back claim (s, f), only that no member that can be in an instance lists f but s, after the earlier pairs, and for a
+front claim only that s lists f alone after them.  So each claim can be checked on its own, in the order made: a claim
+(s, f) with s fixed (not open) is kept if, after the claims kept before it, (front) every maximal factor of s but f is
+the factor of a claim kept before it, or (back) f passes the check and every maximal composite of f other than s that
+is a source of s's frame or a member of R in it is the source of a claim kept before it.  The proof is Lemma M5⁺'s, by
+induction on the claims kept: a kept front claim's s, fixed, lists at most f once the earlier kept pairs are made, and
+f ∉ L as in the lemma; a kept back claim's f is not in L (the check), and of the members that can list it (the sources
+of s's frame in F, or in K with O ∪ R, the members of L, the members of K of other frames) every one but s is the
+source of an earlier kept claim, fixed and so already paired, or ruled out by the check or by its own frame.  With O
+empty the conditions are those under which `unzip` claimed, so every claim is kept and Π⁺(∅) is still Π_n.  It
+replaces the frame-wide test of `build_extended` (twenty lines; `max_factors` and `max_composites` of the tables) and
+was measured on this code, then taken out:
+* every default and ignored test of `tests/model_extended.rs` passes with it (the oracle both ways, the search, the
+  mutation caught);
+* the problems of 600..3440 with it: 465 repeats settled against 340 without claims and 361 with the rule as designed,
+  among them 60 of the 115 deferred, 278 of their 361 thread-hours, 3427 on 3425 (one problem, d0b64c26c38bf1b2), and
+  every problem changed by the claims;
+* 2112 and 2156, three times each way, alternating: the same trees, 3.22 s against 3.53 s (8.7% less) and 7.60 s
+  against 7.97 s (4.6% less) a certificate.
+
+*Checks.*  No tree of the default mode changed: the probe's fingerprints 7e8e724717d26545 and f3deaac0dbdc030a
+(`gf2=on`), the tripwires, `regress --to 1000 --threads 1` (9.2 s), the one-thread chain 1..1300 line for line equal,
+but for the times and the build, to the base commit's binary (ed09ac0; 290,503 nodes), both suites, clippy and fmt.
+The laptop ran one process at a time, on one thread, `nice`; nothing ran on AWS.
 
 ## R3 and the slope test: U4 of A1 (2026-10)
 

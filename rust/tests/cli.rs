@@ -30,6 +30,7 @@ fn help_lists_the_commands_and_every_tactic() {
             "extend-optimal RESULTS --out FILE",
             "certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE",
             "verify-certificates CERTS... --results FILE... --upper FILE...",
+            "--no-claims",
             "tables N K...",
             "--history FILE",
         ] {
@@ -123,6 +124,10 @@ fn certify_command_lines_are_usage_errors() {
     assert_usage_error(&with_files(&["certify", "1302", "--node-limit", "0"]), "--node-limit must be at least 1");
     assert_usage_error(&with_files(&["certify", "1302", "--time-limit", "-1"]), "not a number of seconds");
     assert_usage_error(&with_files(&["certify", "1302", "--checkpoint-interval", "0"]), "must be more than 0 seconds");
+    // `--no-claims` is a switch of `certify` alone: it takes no value, and `verify-certificates` has none (each line
+    // says its formulation).
+    assert_usage_error(&with_files(&["certify", "1302", "--no-claims=yes"]), "--no-claims takes no value");
+    assert_usage_error(&["verify-certificates", "c.jsonl", "--no-claims"], "unknown option --no-claims");
 }
 
 /// `certify` takes a range or a list file of boards, exactly one of them, and reads the list before it opens any other

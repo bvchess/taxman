@@ -785,7 +785,7 @@ fn a_search_of_the_extended_problem_from_a_handicapped_incumbent_finds_the_optim
         opens.extend(random_open_sets(&mut rng, &from_3, 3, 20));
         for open in opens {
             let (ext, prepared) = board
-                .prepare_extended_with(&Bits::from_slice(&open), SearchTactics::extended())
+                .prepare_extended_with(&Bits::from_slice(&open), false, SearchTactics::extended())
                 .unwrap_or_else(|e| panic!("n={n}: O={open:?}: {e}"));
             if prepared.candidates.is_empty() {
                 continue;
@@ -833,7 +833,7 @@ fn the_exhaustive_oracle_finds_the_optimum_of_the_extended_problem() {
         opens.extend(random_open_sets(&mut rng, &from_3, 2, 8));
         for open in opens {
             let (ext, prepared) =
-                board.prepare_extended_with(&Bits::from_slice(&open), SearchTactics::extended()).unwrap();
+                board.prepare_extended_with(&Bits::from_slice(&open), false, SearchTactics::extended()).unwrap();
             if prepared.candidates.is_empty() {
                 continue;
             }
@@ -876,7 +876,7 @@ fn a_search_of_the_extended_problem_resumed_over_and_over_finds_the_optimum() {
     open.truncate(20);
     open.sort_unstable();
     let open = Bits::<16>::from_slice(&open);
-    let (ext, prepared) = board.prepare_extended_with(&open, SearchTactics::extended()).unwrap();
+    let (ext, prepared) = board.prepare_extended_with(&open, false, SearchTactics::extended()).unwrap();
     assert!(prepared.model.has_one_sided() && ext.open == open, "n={n}: the open sources");
     let truth = extended_optimum(Optimal::built_in(), n, &ext);
 
@@ -897,7 +897,7 @@ fn a_search_of_the_extended_problem_resumed_over_and_over_finds_the_optimum() {
     let mut pieces = 1;
     while !result.completed {
         assert!(checkpoint.exists(), "n={n}: a stopped run leaves a checkpoint");
-        let (resumed_ext, resumed) = board.prepare_extended_for_resume(&open, &checkpoint).unwrap();
+        let (resumed_ext, resumed) = board.prepare_extended_for_resume(&open, false, &checkpoint).unwrap();
         assert_eq!((resumed_ext.one_sided, resumed.tactics), (ext.one_sided.clone(), prepared.tactics));
         assert_eq!(resumed.problem(), prepared.problem(), "n={n}: the problem set up from the checkpoint");
         result = search(&resumed, &cfg, None, None, true).unwrap();

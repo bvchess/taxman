@@ -24,15 +24,24 @@
 //! against more cover only the sets worth more than that), so a game whose `upper` line has a larger score is not
 //! certified; a promotion set that beats V is a counterexample whatever the line says.
 //!
+//! The extended problem has two *formulations* ([`Board::extended`]): with the claims of `unzip` that Lemma M5⁺ allows
+//! to keep (`claims`, the default), and without any, as every certificate made before that lemma was.  A run searches
+//! in one of them (`taxman certify --no-claims` in the second), and a certificate's line records which
+//! ([`Certificate::claims`]; a line with no such field is read as without).  The two have the same promotion sets and
+//! so the same heaviest promotion set (heuristics/THEORY.md, the corollary of Lemma M5⁺), so a certificate made in one
+//! bounds the heaviest promotion set of the problem in the other.
+//!
 //! Consecutive games often pose the same Π⁺ (the same [`search::Problem`], which has `n` nowhere in it), as they often
 //! pose the same search problem in the solver (`solver::SAME_SEARCH_WINDOW`).  If an earlier game m of the last
 //! `SAME_SEARCH_WINDOW` board sizes is certified, and Π⁺(n) equals Π⁺(m) whole, then the heaviest promotion set of
 //! Π⁺(n) is worth what m's certificate proved the heaviest worth, V(m) − `in_the_bag⁺`(m), and a recorded game of n
 //! that is worth the same has nothing above it: [`certify_game_with`] concludes `certified` with no search, recording
-//! the game m it rests on ([`SameProblem`]).  Equal problems have equal heaviest promotion sets, so the rule proves
-//! what a search of Π⁺(n) would, and n's own barred bounds then give opt(n) = V(n) by the corollary of Theorem M⁺.
-//! A game worth less than m's certificate says is searched (it is not optimal, and the search finds the better set);
-//! one worth more contradicts the certificate and is refused.  Research code: the solver does not use it.
+//! the game m it rests on ([`SameProblem`]).  The problems are compared whole in the run's formulation, whatever
+//! formulation m's certificate was made in (a line of the other formulation is set up again in the run's): m's
+//! certificate bounds the heaviest promotion set, which does not depend on the formulation, so the rule proves what a
+//! search of Π⁺(n) would, and n's own barred bounds then give opt(n) = V(n) by the corollary of Theorem M⁺.  A game
+//! worth less than m's certificate says is searched (it is not optimal, and the search finds the better set); one
+//! worth more contradicts the certificate and is refused.  Research code: the solver does not use it.
 //!
 //! The files `taxman certify` writes are checked again, line by line, by [`verify`] (`taxman verify-certificates`),
 //! which sets each certificate's problem up again, applies the same checks of the recorded game and the same rule of
@@ -204,8 +213,11 @@ pub struct Certificate {
     pub threads: usize,
     /// The set width the search ran at, in words: the board's own, or the widest where the GF(2) bound needs it.
     pub width: usize,
+    /// The formulation Π⁺(O) was set up in ([`Board::extended`]): true with the claims of `unzip` that Lemma M5⁺
+    /// keeps, false with none, as every certificate made before it (whose lines have no `claims`, and read as false).
+    pub claims: bool,
     pub verdict: Verdict,
-    /// The digest of Π⁺(O) as the search was given it ([`search::Problem::digest`]).
+    /// The digest of Π⁺(O) in that formulation, as the search was given it ([`search::Problem::digest`]).
     pub digest: u64,
     /// With [`Verdict::Certified`] by the rule of the module docs, no search (`nodes` and the seconds are 0), the
     /// earlier game it rests on.
@@ -240,6 +252,7 @@ impl Certificate {
             seconds_all_runs: f.f64("seconds_all_runs")?,
             threads: f.usize("threads")?,
             width: f.usize("width")?,
+            claims: f.bool_or("claims", false)?,
             verdict,
             digest: f.digest("digest")?,
             same_problem: None,
@@ -280,6 +293,7 @@ impl Certificate {
             ("seconds_all_runs", seconds(self.seconds_all_runs)),
             ("threads", Json::from(self.threads)),
             ("width", Json::from(self.width)),
+            ("claims", Json::Bool(self.claims)),
             ("digest", Json::from(digest_text(self.digest))),
         ];
         if let Some(same) = &self.same_problem {
@@ -302,9 +316,10 @@ impl Certificate {
             Some(same) => format!("{} (same problem as {})", self.verdict.as_str(), same.n),
             None => self.verdict.as_str().to_owned(),
         };
+        let formulation = if self.claims { "" } else { " (no claims)" };
         format!(
             "n={:<5} V={:<9} |O|={:<3} |R|={:<2} frames {} candidates {}+{}  nodes={:<12} {:9.3} s  {}{beaten}  \
-             problem {}",
+             problem {}{formulation}",
             self.n,
             self.score,
             self.open.len(),
@@ -323,6 +338,8 @@ impl Certificate {
 /// Certifies the recorded game of `n` (see the module docs): `known` gives the scores and games of `n` and `n − 1`
 /// (the results files, over the table of optimal games), `upper` the open members; the search runs with `opts`'
 /// threads, checkpoint (resumed if it exists), limits and progress, in extended mode whatever `opts`' tactics say.
+/// `claims` is the formulation of Π⁺(O) ([`Board::extended`]): with the claims of `unzip` that Lemma M5⁺ keeps, or
+/// without any.
 ///
 /// # Errors
 ///
@@ -330,15 +347,22 @@ impl Certificate {
 /// does not play U\* above n/2, or is not a promotion set of Π⁺(O)), if Π⁺(O) cannot be set up (an open member that
 /// is no kept source of three or more prime factors, more frames than a frame set holds), if the search fails, or if
 /// the search found nothing better but `upper`'s score is above the recorded one (no certificate then).
-pub fn certify_game(n: u32, known: &Optimal, upper: &Upper, opts: &SolveOptions) -> Result<Certificate, String> {
-    certify_game_with(n, known, upper, opts, &mut EarlierCertificates::default())
+pub fn certify_game(
+    n: u32,
+    known: &Optimal,
+    upper: &Upper,
+    claims: bool,
+    opts: &SolveOptions,
+) -> Result<Certificate, String> {
+    certify_game_with(n, known, upper, claims, opts, &mut EarlierCertificates::default())
 }
 
 /// [`certify_game`] with the certified games `earlier`, which a game may rest on instead of a search (the rule of the
 /// module docs): after the checks of the recorded game and before the search, a game whose problem an earlier game
 /// of the last `SAME_SEARCH_WINDOW` board sizes posed, and whose recorded game is worth what that game's certificate
-/// proved the most, is certified with no search, its [`Certificate::same_problem`] naming that game.  A certified game,
-/// by search or by the rule, is added to `earlier`.
+/// proved the most, is certified with no search, its [`Certificate::same_problem`] naming that game; the earlier game
+/// may have been certified in the other formulation.  A certified game, by search or by the rule, is added to
+/// `earlier`.
 ///
 /// # Errors
 ///
@@ -348,30 +372,32 @@ pub fn certify_game_with(
     n: u32,
     known: &Optimal,
     upper: &Upper,
+    claims: bool,
     opts: &SolveOptions,
     earlier: &mut EarlierCertificates,
 ) -> Result<Certificate, String> {
     let beyond = || format!("n={n} is beyond the largest supported board, n={MAX_N}");
     // A problem that no set width can search is set up at the widest, whose refusal says why.
-    let width = certificate_width(n, &upper.open)?.1.unwrap_or(WIDTHS[WIDTHS.len() - 1]);
-    crate::with_words!(width, W => certify_at::<W>(n, known, upper, opts, earlier), else Err(beyond()))
+    let width = certificate_width(n, &upper.open, claims)?.1.unwrap_or(WIDTHS[WIDTHS.len() - 1]);
+    crate::with_words!(width, W => certify_at::<W>(n, known, upper, claims, opts, earlier), else Err(beyond()))
 }
 
 /// The block words the GF(2) bound of Π⁺(`open`) of the board `1..=n` needs at its root ([`Board::extended_words`]: an
 /// open source adds one to its frame's rank), and the set width `taxman certify` searches the game at: the board's own
 /// width where its engines have that many words, else the widest, whose engines have the most ([`MAX_WORDS`]); `None`
-/// if no width does.  The width depends on nothing but the board and `open`, so a resumed search finds the width its
-/// checkpoint was made at, and a certificate's line records it (`width`).
+/// if no width does.  `claims` is the formulation of Π⁺(`open`) ([`Board::extended`]), which can change the words.  The
+/// width depends on nothing but the board, `open` and `claims`, so a resumed search finds the width its checkpoint was
+/// made at, and a certificate's line records it (`width`).
 ///
 /// # Errors
 ///
 /// If `n` is beyond the widest set, or the extended problem cannot be built ([`Board::extended_words`]); the message
 /// names `n`.
-pub fn certificate_width(n: u32, open: &[u32]) -> Result<(usize, Option<usize>), String> {
+pub fn certificate_width(n: u32, open: &[u32], claims: bool) -> Result<(usize, Option<usize>), String> {
     let beyond = || format!("n={n} is beyond the largest supported board, n={MAX_N}");
     let (words, own, fits) = crate::with_width!(n, W => {
         let open: Bits<W> = open.iter().copied().collect();
-        let words = Board::<W>::for_n(n).extended_words(&open).map_err(|e| format!("n={n}: {e}"))?;
+        let words = Board::<W>::for_n(n).extended_words(&open, claims).map_err(|e| format!("n={n}: {e}"))?;
         Ok((words, W, words <= Gf2Bound::<W>::MOST_WORDS))
     }, else Err(beyond()))?;
     let widest = WIDTHS[WIDTHS.len() - 1];
@@ -389,6 +415,7 @@ fn certify_at<const W: usize>(
     n: u32,
     known: &Optimal,
     upper: &Upper,
+    claims: bool,
     opts: &SolveOptions,
     earlier: &mut EarlierCertificates,
 ) -> Result<Certificate, String> {
@@ -402,11 +429,11 @@ fn certify_at<const W: usize>(
     let checkpoint = opts.checkpoint_file(n).filter(|path| path.exists());
     let resuming = checkpoint.is_some();
     let Recorded { board, extended, prepared, posed, start, worth } =
-        check_recorded_game::<W>(n, score, moves, &upper.open, checkpoint.as_deref())?;
+        check_recorded_game::<W>(n, score, moves, &upper.open, claims, checkpoint.as_deref())?;
     let cap = known.score(n - 1).and_then(|prev| promotion_cap(n, extended.in_the_bag, prev));
 
     // An earlier certified game that posed this very problem has settled it: no search.
-    let same = earlier.find(n, &posed.problem, worth).map_err(at)?;
+    let same = earlier.find(n, &posed.problem, claims, worth).map_err(at)?;
     let found = match &same {
         Some(_) => None,
         None => Some(search_from(n, opts, &prepared, &start, cap, resuming).map_err(at)?),
@@ -445,6 +472,7 @@ fn certify_at<const W: usize>(
         seconds_all_runs,
         threads: opts.threads,
         width: W,
+        claims,
         verdict,
         digest: posed.problem.digest(),
         same_problem: same,
@@ -472,18 +500,19 @@ struct Recorded<const W: usize> {
 
 /// The checks a certificate makes of the recorded game of `n` before it searches or settles anything, shared by
 /// [`certify_game_with`] and the verifier of a certificate's line (`verify`): the game replays to `score`, plays U\*
-/// above n/2 and is a promotion set of Π⁺(`open`) worth `score`, set up at the set width `W`.  The search is set up to
-/// resume the checkpoint `resume`, if there is one.
+/// above n/2 and is a promotion set of Π⁺(`open`) worth `score`, set up at the set width `W`, in the formulation
+/// `claims` ([`Board::extended`]).  The search is set up to resume the checkpoint `resume`, if there is one.
 ///
 /// # Errors
 ///
-/// If one of the checks fails, if Π⁺(`open`) cannot be set up, or the checkpoint does not belong to it; the message
-/// names `n`.
+/// If one of the checks fails, if Π⁺(`open`) cannot be set up, or the checkpoint does not belong to it (another
+/// formulation's does not); the message names `n`.
 fn check_recorded_game<const W: usize>(
     n: u32,
     score: u64,
     moves: &[u32],
     open: &[u32],
+    claims: bool,
     resume: Option<&Path>,
 ) -> Result<Recorded<W>, String> {
     let at = |e: String| format!("n={n}: {e}");
@@ -505,8 +534,8 @@ fn check_recorded_game<const W: usize>(
 
     let open: Bits<W> = open.iter().copied().collect();
     let (extended, prepared) = match resume {
-        Some(checkpoint) => board.prepare_extended_for_resume(&open, checkpoint),
-        None => board.prepare_extended_with(&open, SearchTactics::extended()),
+        Some(checkpoint) => board.prepare_extended_for_resume(&open, claims, checkpoint),
+        None => board.prepare_extended_with(&open, claims, SearchTactics::extended()),
     }
     .map_err(at)?;
     let posed = Posed::new(&extended, prepared.problem());
@@ -589,7 +618,8 @@ impl Posed {
     }
 
     /// Whether the problem and its sizes are those the certificate `line` records: its digest, frames, two-sided and
-    /// one-sided candidates, rejected sources and `in_the_bag⁺`.
+    /// one-sided candidates, rejected sources and `in_the_bag⁺`.  The problem must have been set up in the line's own
+    /// formulation ([`Certificate::claims`]), as the digest of the other would not be the line's.
     pub fn reproduces(&self, line: &Certificate) -> bool {
         self.problem.digest() == line.digest
             && (self.frames, self.two_sided, self.one_sided, self.rejected, self.in_the_bag)
@@ -597,22 +627,35 @@ impl Posed {
     }
 }
 
-/// Π⁺(`open`) of the board `1..=n`, set up without a search: the problem a certificate for `n` with the open members
-/// `open` poses.  The board is taken at its own set width, which the problem does not depend on (its form has game
-/// numbers only), so a game that was searched at the widest width has the same problem.
+/// Π⁺(`open`) of the board `1..=n` in the formulation `claims` ([`Board::extended`]), set up without a search: the
+/// problem a certificate for `n` with the open members `open` poses.  The board is taken at its own set width, which
+/// the problem does not depend on (its form has game numbers only), so a game that was searched at the widest width
+/// has the same problem.
 ///
 /// # Errors
 ///
 /// If `n` is beyond the widest set, or `open` holds a number that cannot be open or the problem cannot be built
 /// ([`Board::extended_problem`]); the message names `n`.
-pub fn extended_problem(n: u32, open: &[u32]) -> Result<Posed, String> {
+pub fn extended_problem(n: u32, open: &[u32], claims: bool) -> Result<Posed, String> {
     crate::with_width!(n, W => {
         let open: Bits<W> = open.iter().copied().collect();
         Board::<W>::for_n(n)
-            .extended_problem(&open)
+            .extended_problem(&open, claims)
             .map(|(extended, problem)| Posed::new(&extended, problem))
             .map_err(|e| format!("n={n}: {e}"))
     }, else Err(format!("n={n} is beyond the largest supported board, n={MAX_N}")))
+}
+
+/// The problem of the certified line `line` in the formulation `claims`, set up again from the line: first in the
+/// line's own formulation, where it must reproduce the line ([`Posed::reproduces`]), then, if `claims` is the other
+/// formulation, in that one.  `None` if either setup fails or the line is not reproduced: the line is no certificate
+/// of the problem it says.
+fn problem_in(line: &Certificate, claims: bool) -> Option<Problem> {
+    let posed = extended_problem(line.n, &line.open, line.claims).ok().filter(|posed| posed.reproduces(line))?;
+    if claims == line.claims {
+        return Some(posed.problem);
+    }
+    extended_problem(line.n, &line.open, claims).ok().map(|posed| posed.problem)
 }
 
 /// The certified games a game may rest on (the rule of the module docs): the certificates of the file `taxman certify`
@@ -621,8 +664,9 @@ pub fn extended_problem(n: u32, open: &[u32]) -> Result<Posed, String> {
 pub struct EarlierCertificates {
     /// The certificates with the verdict `certified`, by board size.
     games: BTreeMap<u32, Certificate>,
-    /// The problems of the games this run certified ([`record`](Self::record)), for the last `SAME_SEARCH_WINDOW`
-    /// board sizes: what a comparison with an earlier game needs, so that it need not set that game up again.
+    /// The problems of the games this run certified ([`record`](Self::record)), each in the formulation of its
+    /// game's certificate, for the last `SAME_SEARCH_WINDOW` board sizes: what a comparison with an earlier game needs,
+    /// so that it need not set that game up again.
     problems: BTreeMap<u32, Problem>,
 }
 
@@ -645,9 +689,9 @@ impl EarlierCertificates {
         }
     }
 
-    /// Adds the certificate of a game this run certified, with the problem it posed, and forgets the problems of the
-    /// boards more than `SAME_SEARCH_WINDOW` sizes before the latest one remembered: no game that follows looks that far
-    /// back.
+    /// Adds the certificate of a game this run certified, with the problem it posed (in the certificate's formulation),
+    /// and forgets the problems of the boards more than `SAME_SEARCH_WINDOW` sizes before the latest one remembered: no
+    /// game that follows looks that far back.
     fn record(&mut self, certificate: &Certificate, problem: Problem) {
         debug_assert_eq!(certificate.verdict, Verdict::Certified);
         self.games.insert(certificate.n, certificate.clone());
@@ -657,28 +701,37 @@ impl EarlierCertificates {
     }
 
     /// The latest certified game m of the last `SAME_SEARCH_WINDOW` board sizes before `n` whose problem is `ours`,
-    /// the problem of the recorded game of `n`, worth `worth`, and what that means for `n`: `Some` with the record of
-    /// m if `worth` is what m's certificate proved the most, `None` if there is no such game or if `worth` is less
-    /// (`n` is searched, then).  A game whose digest is not `ours`' is passed over; for one whose digest is, its
-    /// problem (the one this run set up when it certified it, else set up again from its board size and open members,
-    /// [`extended_problem`]) is compared with `ours` itself, so that the answer never rests on two digests alone.  The
-    /// first game whose problem is `ours` decides.  A game that cannot be set up again, or whose problem set up again is
-    /// not the one its line records (the digest and the sizes), or whose score is below its `in_the_bag⁺`, is
-    /// forgotten.
+    /// the problem of the recorded game of `n` in the formulation `claims`, worth `worth`, and what that means for `n`:
+    /// `Some` with the record of m if `worth` is what m's certificate proved the most, `None` if there is no such game
+    /// or if `worth` is less (`n` is searched, then).
+    ///
+    /// A game of the same formulation whose digest is not `ours`' is passed over.  A game of the other formulation has
+    /// a digest that says nothing of `ours`, so it is passed over unless the sizes that do not depend on the
+    /// formulation, the frames and the candidates, are those of `ours`.  For a game that is not passed over, its
+    /// problem in the formulation `claims` (the one this run set up when it certified it, if its formulation is
+    /// `claims`, else set up again from its board size and open members, [`problem_in`]) is compared with `ours`
+    /// itself, so that the answer never rests on two digests alone.  The first game whose problem is `ours` decides.  A
+    /// game that cannot be set up again, or whose problem set up again is not the one its line records (the
+    /// formulation, the digest and the sizes), or whose score is below its `in_the_bag⁺`, is forgotten.
     ///
     /// # Errors
     ///
     /// If `worth` is more than what the certificate of the game says the most is: one of the two is wrong.
-    fn find(&mut self, n: u32, ours: &Problem, worth: u64) -> Result<Option<SameProblem>, String> {
-        let digest = ours.digest();
+    fn find(&mut self, n: u32, ours: &Problem, claims: bool, worth: u64) -> Result<Option<SameProblem>, String> {
+        let (digest, size) = (ours.digest(), ours.size());
+        let (frames, candidates) = (size.frames as usize, size.candidates);
+        let may_pose = |line: &Certificate| {
+            if line.claims == claims {
+                line.digest == digest
+            } else {
+                (line.frames, line.two_sided + line.one_sided) == (frames, candidates)
+            }
+        };
         for m in (n.saturating_sub(SAME_SEARCH_WINDOW)..n).rev() {
-            let Some(line) = self.games.get(&m).filter(|line| line.digest == digest) else { continue };
+            let Some(line) = self.games.get(&m).filter(|line| may_pose(line)) else { continue };
             let theirs = match self.problems.get(&m) {
-                Some(problem) => Some(Cow::Borrowed(problem)),
-                None => extended_problem(m, &line.open)
-                    .ok()
-                    .filter(|posed| posed.reproduces(line))
-                    .map(|posed| Cow::Owned(posed.problem)),
+                Some(problem) if line.claims == claims => Some(Cow::Borrowed(problem)),
+                _ => problem_in(line, claims).map(Cow::Owned),
             };
             let (Some(best), Some(theirs)) = (line.worth(), theirs) else {
                 self.games.remove(&m);
@@ -709,7 +762,8 @@ enum Rule {
 }
 
 /// The rule of the module docs, for the certified line `m` (see [`Rule`]); the one place it is written, which
-/// [`EarlierCertificates::find`] applies and the verifier of a line applies again to check it.
+/// [`EarlierCertificates::find`] applies and the verifier of a line applies again to check it.  The problems `theirs`
+/// and `ours` are compared whole, so they must be in the same formulation, whichever `m`'s certificate was made in.
 ///
 /// # Errors
 ///
@@ -861,8 +915,8 @@ mod tests {
         })
     }
 
-    /// The certificate of board `n`, made by hand, whose problem is `posed` (set up with the open members `open`) and
-    /// whose game is worth `best` in it.
+    /// The certificate of board `n`, made by hand, whose problem is `posed` (set up with the open members `open`, with
+    /// the claims of `unzip`: the default formulation) and whose game is worth `best` in it.
     fn line(n: u32, posed: &Posed, open: &[u32], best: u64) -> Certificate {
         Certificate {
             n,
@@ -878,6 +932,7 @@ mod tests {
             seconds_all_runs: 0.5,
             threads: 1,
             width: 8,
+            claims: true,
             verdict: Verdict::Certified,
             digest: posed.problem.digest(),
             same_problem: None,
@@ -902,26 +957,34 @@ mod tests {
     /// the widest (five) beyond that, none past five.
     #[test]
     fn the_width_follows_the_block_words_the_open_sources_need() {
-        let width = |n: u32, open: &[u32]| certificate_width(n, open).unwrap();
-        assert_eq!(width(600, &from_3(600)), (2, Some(16)));
-        assert_eq!(width(1000, &from_3(1000)), (3, Some(16)));
-        assert_eq!(width(1500, &from_3(1500)), (4, Some(128)));
-        assert_eq!(width(2000, &from_3(2000)), (5, Some(128)));
-        assert_eq!(width(3000, &from_3(3000)), (7, None));
-        assert_eq!(width(1500, &[]).1, Some(24), "with nothing open the board's own width");
-        assert!(certificate_width(1 << 20, &[]).unwrap_err().contains("beyond the largest supported board"));
-        assert!(certificate_width(120, &[7]).unwrap_err().starts_with("n=120: "));
+        // The same in both formulations (the claims take pairs out of frames the open sources add to).
+        for claims in [false, true] {
+            let width = |n: u32, open: &[u32]| certificate_width(n, open, claims).unwrap();
+            assert_eq!(width(600, &from_3(600)), (2, Some(16)));
+            assert_eq!(width(1000, &from_3(1000)), (3, Some(16)));
+            assert_eq!(width(1500, &from_3(1500)), (4, Some(128)));
+            assert_eq!(width(2000, &from_3(2000)), (5, Some(128)));
+            assert_eq!(width(3000, &from_3(3000)), (7, None));
+            assert_eq!(width(1500, &[]).1, Some(24), "with nothing open the board's own width");
+            assert!(certificate_width(1 << 20, &[], claims)
+                .unwrap_err()
+                .contains("beyond the largest supported board"));
+            assert!(certificate_width(120, &[7], claims).unwrap_err().starts_with("n=120: "));
+        }
     }
 
     #[test]
     fn a_certificate_reads_back_as_it_was_written() {
         let open = from_3(120);
-        let posed = extended_problem(120, &open).unwrap();
+        let posed = extended_problem(120, &open, true).unwrap();
         let plain = line(120, &posed, &open, 77);
         let same = SameProblem { n: 119, digest: plain.digest, best: 77, worth: 77 };
         let beaten = Certificate { verdict: Verdict::Beaten, beaten_by: Some((1001, vec![7, 4, 6])), ..plain.clone() };
         let rule = Certificate { same_problem: Some(same), nodes: 0, ..plain.clone() };
-        for certificate in [plain, beaten, rule.clone(), Certificate { beaten_by: Some((5, vec![])), ..rule }] {
+        let without = Certificate { claims: false, ..plain.clone() };
+        let all = [plain, without, beaten, rule.clone(), Certificate { beaten_by: Some((5, vec![])), ..rule }];
+        assert!(all[0].claims && !all[1].claims, "both formulations are written");
+        for certificate in all {
             let json = Json::parse(&certificate.to_json().to_string()).unwrap();
             assert_eq!(Certificate::from_json(&json), Ok(certificate));
         }
@@ -930,7 +993,7 @@ mod tests {
     #[test]
     fn a_line_that_is_no_certificate_is_refused_naming_the_field() {
         let open = from_3(120);
-        let posed = extended_problem(120, &open).unwrap();
+        let posed = extended_problem(120, &open, true).unwrap();
         let same = SameProblem { n: 119, digest: posed.problem.digest(), best: 77, worth: 77 };
         let whole = Certificate {
             same_problem: Some(same),
@@ -955,6 +1018,16 @@ mod tests {
             assert_eq!(refused(without(key)), format!("missing \"{key}\""));
             assert_eq!(refused(with(key, Json::from("x"))), format!("bad \"{key}\""));
         }
+        // The formulation is written right after the width; a line without it is one made before the claims existed,
+        // and reads as without them, but one with a `claims` that is no boolean is refused.
+        let keys: Vec<&str> = pairs.iter().map(|(key, _)| key.as_str()).collect();
+        let at = keys.iter().position(|&key| key == "claims").expect("a line records its formulation");
+        assert_eq!((keys[at - 1], keys[at + 1]), ("width", "digest"));
+        assert!(whole.claims);
+        assert_eq!(Certificate::from_json(&without("claims")), Ok(Certificate { claims: false, ..whole.clone() }));
+        for bad in [Json::from("x"), Json::from(1u32), Json::Null] {
+            assert_eq!(refused(with("claims", bad)), "bad \"claims\"");
+        }
         assert_eq!(refused(with("digest", Json::from("feed"))), "bad \"digest\"", "a digest has 16 digits");
         assert_eq!(refused(with("same_problem", Json::Null)), "bad \"same_problem\"");
         assert_eq!(refused(with("same_problem", Json::object([("n", Json::from(119u32))]))), "bad \"same_problem\"");
@@ -966,9 +1039,9 @@ mod tests {
     #[test]
     fn a_problem_set_up_again_reproduces_its_line_and_nothing_else() {
         let open = from_3(120);
-        let posed = extended_problem(120, &open).unwrap();
+        let posed = extended_problem(120, &open, true).unwrap();
         let line = line(120, &posed, &open, 77);
-        assert!(extended_problem(120, &open).unwrap().reproduces(&line));
+        assert!(extended_problem(120, &open, true).unwrap().reproduces(&line));
         let others = [
             Certificate { digest: line.digest ^ 1, ..line.clone() },
             Certificate { frames: line.frames + 1, ..line.clone() },
@@ -979,33 +1052,33 @@ mod tests {
         ];
         assert!(others.iter().all(|other| !posed.reproduces(other)));
         // Other open members are another problem, and a number that cannot be open or a board that is too large an error.
-        assert!(!extended_problem(120, &open[1..]).unwrap().reproduces(&line));
-        assert!(extended_problem(120, &[7]).unwrap_err().starts_with("n=120: "));
-        assert!(extended_problem(1 << 20, &[]).unwrap_err().contains("beyond the largest supported board"));
+        assert!(!extended_problem(120, &open[1..], true).unwrap().reproduces(&line));
+        assert!(extended_problem(120, &[7], true).unwrap_err().starts_with("n=120: "));
+        assert!(extended_problem(1 << 20, &[], true).unwrap_err().contains("beyond the largest supported board"));
     }
 
     #[test]
     fn the_window_never_looks_past_the_last_eight_sizes() {
         let open = from_3(120);
-        let posed = extended_problem(120, &open).unwrap();
+        let posed = extended_problem(120, &open, true).unwrap();
         let (n, worth, digest) = (200, 77, posed.problem.digest());
         let found = |m: u32| Some(SameProblem { n: m, digest, best: worth, worth });
         for (m, expected) in [(n - 9, None), (n - 8, found(n - 8)), (n - 1, found(n - 1)), (n, None), (n + 1, None)] {
             let mut earlier = remembering(&[line(m, &posed, &open, worth)], &[(m, &posed.problem)]);
-            assert_eq!(earlier.find(n, &posed.problem, worth), Ok(expected), "the game of {m}");
+            assert_eq!(earlier.find(n, &posed.problem, true, worth), Ok(expected), "the game of {m}");
         }
         // A game this run did not certify is set up again from its line: the board of the line, with its open members.
         let mut earlier = EarlierCertificates::default();
         earlier.insert(line(120, &posed, &open, worth));
-        assert_eq!(earlier.find(121, &posed.problem, worth), Ok(found(120)));
-        assert_eq!(earlier.find(128, &posed.problem, worth), Ok(found(120)));
-        assert_eq!(earlier.find(129, &posed.problem, worth), Ok(None));
+        assert_eq!(earlier.find(121, &posed.problem, true, worth), Ok(found(120)));
+        assert_eq!(earlier.find(128, &posed.problem, true, worth), Ok(found(120)));
+        assert_eq!(earlier.find(129, &posed.problem, true, worth), Ok(None));
     }
 
     #[test]
     fn the_first_game_with_the_same_problem_decides() {
         let open = from_3(120);
-        let posed = extended_problem(120, &open).unwrap();
+        let posed = extended_problem(120, &open, true).unwrap();
         let (n, worth, digest) = (200, 77, posed.problem.digest());
         let lines = |latest: u64, before: u64| [line(n - 1, &posed, &open, latest), line(n - 2, &posed, &open, before)];
         let remembered = [(n - 1, &posed.problem), (n - 2, &posed.problem)];
@@ -1013,13 +1086,13 @@ mod tests {
         // The latest decides, whatever an earlier one says.
         let mut earlier = remembering(&lines(worth, worth + 1), &remembered);
         let same = SameProblem { n: n - 1, digest, best: worth, worth };
-        assert_eq!(earlier.find(n, &posed.problem, worth), Ok(Some(same)));
+        assert_eq!(earlier.find(n, &posed.problem, true, worth), Ok(Some(same)));
         // A game worth less than the certificate says is not settled by the rule (and the window is not searched on).
         let mut earlier = remembering(&lines(worth + 1, worth), &remembered);
-        assert_eq!(earlier.find(n, &posed.problem, worth), Ok(None));
+        assert_eq!(earlier.find(n, &posed.problem, true, worth), Ok(None));
         // A game worth more contradicts it: an error that names both games' values.
         let mut earlier = remembering(&lines(worth - 1, worth), &remembered);
-        let e = earlier.find(n, &posed.problem, worth).unwrap_err();
+        let e = earlier.find(n, &posed.problem, true, worth).unwrap_err();
         assert!(e.contains(&format!("n={}", n - 1)) && e.contains("contradicts the certificate"), "{e}");
         assert!(e.contains(&worth.to_string()) && e.contains(&(worth - 1).to_string()), "{e}");
     }
@@ -1027,8 +1100,8 @@ mod tests {
     #[test]
     fn a_game_that_cannot_be_used_is_passed_over_and_the_window_goes_on() {
         let open = from_3(120);
-        let posed = extended_problem(120, &open).unwrap();
-        let other = extended_problem(100, &from_3(100)).unwrap();
+        let posed = extended_problem(120, &open, true).unwrap();
+        let other = extended_problem(100, &from_3(100), true).unwrap();
         assert_ne!(other.problem, posed.problem);
         let (n, worth) = (200, 77);
         let good = line(n - 4, &posed, &open, worth);
@@ -1037,40 +1110,152 @@ mod tests {
         // Another digest: passed over.
         let elsewhere = Certificate { digest: other.problem.digest(), ..line(n - 1, &posed, &open, worth) };
         let mut earlier = remembering(&[elsewhere, good.clone()], &[(n - 1, &other.problem), (n - 4, &posed.problem)]);
-        assert_eq!(earlier.find(n, &posed.problem, worth), found);
+        assert_eq!(earlier.find(n, &posed.problem, true, worth), found);
         assert!(earlier.games.contains_key(&(n - 1)));
 
         // The digest of the problem but another problem (a collision of 64 bits): passed over, and the line kept.
         let forged = Certificate { digest: posed.problem.digest(), ..line(n - 1, &other, &from_3(100), worth) };
         let mut earlier =
             remembering(&[forged.clone(), good.clone()], &[(n - 1, &other.problem), (n - 4, &posed.problem)]);
-        assert_eq!(earlier.find(n, &posed.problem, worth), found);
+        assert_eq!(earlier.find(n, &posed.problem, true, worth), found);
         assert!(earlier.games.contains_key(&(n - 1)));
 
         // The same line, whose problem is not remembered, set up again from the line gives another digest than the
         // line records (the board 199 with these members open poses another problem, or cannot have them open):
         // dropped.
         let mut earlier = remembering(&[forged, good.clone()], &[(n - 4, &posed.problem)]);
-        assert_eq!(earlier.find(n, &posed.problem, worth), found);
+        assert_eq!(earlier.find(n, &posed.problem, true, worth), found);
         assert!(!earlier.games.contains_key(&(n - 1)), "a line that does not reproduce is forgotten");
 
         // The problem set up again from the line is the problem, but the line's sizes are not its: dropped.
         let mut earlier = EarlierCertificates::default();
         earlier.insert(Certificate { two_sided: posed.two_sided + 1, ..line(120, &posed, &open, worth) });
-        assert_eq!(earlier.find(125, &posed.problem, worth), Ok(None));
+        assert_eq!(earlier.find(125, &posed.problem, true, worth), Ok(None));
         assert!(earlier.games.is_empty(), "a line that does not reproduce is forgotten");
 
         // A score below its own in_the_bag⁺ cannot be a certificate: dropped.
         let below = Certificate { score: posed.in_the_bag - 1, ..line(n - 1, &posed, &open, worth) };
         let mut earlier = remembering(&[below, good], &[(n - 1, &posed.problem), (n - 4, &posed.problem)]);
-        assert_eq!(earlier.find(n, &posed.problem, worth), found);
+        assert_eq!(earlier.find(n, &posed.problem, true, worth), found);
         assert!(!earlier.games.contains_key(&(n - 1)));
+    }
+
+    /// What a line records of the problem besides its digest, as [`Posed`] has it.
+    fn sizes(posed: &Posed) -> (usize, u32, u32, u32, u64) {
+        (posed.frames, posed.two_sided, posed.one_sided, posed.rejected, posed.in_the_bag)
+    }
+
+    /// A small board and open members for which the two formulations pose different problems of the same sizes: the
+    /// claims take pairs out of the frames, and change neither the number of frames nor the candidates.
+    fn claims_change_the_problem() -> (u32, Vec<u32>) {
+        let mut boards = (60..=200).flat_map(|n| [(n, Vec::new()), (n, from_3(n))]);
+        boards
+            .find(|(n, open)| {
+                let (without, with) = (extended_problem(*n, open, false), extended_problem(*n, open, true));
+                let (without, with) = (without.unwrap(), with.unwrap());
+                without.problem != with.problem && sizes(&without) == sizes(&with)
+            })
+            .expect("a small board whose claims change its problem")
+    }
+
+    #[test]
+    fn a_problem_is_set_up_again_in_the_formulation_asked_for_whichever_the_line_is_of() {
+        let (n, open) = claims_change_the_problem();
+        let without = extended_problem(n, &open, false).unwrap();
+        let with = extended_problem(n, &open, true).unwrap();
+        let from_without = Certificate { claims: false, ..line(n, &without, &open, 77) };
+        let from_with = line(n, &with, &open, 77);
+        assert_eq!(problem_in(&from_without, false), Some(without.problem.clone()));
+        assert_eq!(problem_in(&from_without, true), Some(with.problem.clone()));
+        assert_eq!(problem_in(&from_with, true), Some(with.problem.clone()));
+        assert_eq!(problem_in(&from_with, false), Some(without.problem.clone()));
+
+        // A line that is not reproduced in its own formulation is no line of any problem: the digest of the other
+        // formulation, a size, a digest that is nothing's.
+        let others = [
+            Certificate { digest: with.problem.digest(), ..from_without.clone() },
+            Certificate { frames: from_without.frames + 1, ..from_without.clone() },
+            Certificate { digest: from_without.digest ^ 1, ..from_without.clone() },
+            Certificate { claims: true, ..from_without },
+        ];
+        for other in &others {
+            assert_eq!((problem_in(other, false), problem_in(other, true)), (None, None), "{other:?}");
+        }
+    }
+
+    #[test]
+    fn a_line_of_the_other_formulation_settles_a_game_whose_problem_in_the_runs_is_the_same() {
+        let (m, open) = claims_change_the_problem();
+        let without = extended_problem(m, &open, false).unwrap();
+        let with = extended_problem(m, &open, true).unwrap();
+        let (n, worth) = (m + 5, 77);
+        let found = |ours: &Posed| Ok(Some(SameProblem { n: m, digest: ours.problem.digest(), best: worth, worth }));
+
+        // A line made without the claims settles a game of the run with them, whether or not the run remembers the
+        // problem it set up for the line (the one without the claims, which is not the problem to compare).
+        let from_without = Certificate { claims: false, ..line(m, &without, &open, worth) };
+        for remembered in [vec![], vec![(m, &without.problem)]] {
+            let mut earlier = remembering(std::slice::from_ref(&from_without), &remembered);
+            assert_eq!(earlier.find(n, &with.problem, true, worth), found(&with), "{} remembered", remembered.len());
+            assert_eq!(earlier.find(n, &without.problem, true, worth), Ok(None), "not the problem with the claims");
+            assert_eq!(earlier.find(n, &without.problem, false, worth), found(&without), "the same formulation");
+        }
+        // And the other way round.
+        let from_with = line(m, &with, &open, worth);
+        for remembered in [vec![], vec![(m, &with.problem)]] {
+            let mut earlier = remembering(std::slice::from_ref(&from_with), &remembered);
+            assert_eq!(earlier.find(n, &without.problem, false, worth), found(&without));
+            assert_eq!(earlier.find(n, &with.problem, false, worth), Ok(None));
+        }
+        // A game worth more than the certificate allows contradicts it, whichever formulation the certificate is of.
+        let mut earlier = remembering(&[from_without], &[]);
+        let e = earlier.find(n, &with.problem, true, worth + 1).unwrap_err();
+        assert!(e.contains(&format!("contradicts the certificate of n={m}")), "{e}");
+    }
+
+    #[test]
+    fn a_line_of_the_other_formulation_is_passed_over_by_its_sizes_and_forgotten_if_it_does_not_reproduce() {
+        let (m, open) = claims_change_the_problem();
+        let without = extended_problem(m, &open, false).unwrap();
+        let with = extended_problem(m, &open, true).unwrap();
+        let (n, worth) = (m + 5, 77);
+        let line = Certificate { claims: false, ..line(m, &without, &open, worth) };
+        let digest = with.problem.digest();
+
+        // The frames or the candidates are not the problem's: passed over with no setup (the line is kept, even if it
+        // would not have reproduced), whatever its digest says.
+        let sized_apart = [
+            Certificate { frames: line.frames + 1, ..line.clone() },
+            Certificate { two_sided: line.two_sided + 1, ..line.clone() },
+            Certificate { one_sided: line.one_sided + 1, ..line.clone() },
+            Certificate { digest, frames: line.frames + 1, ..line.clone() },
+        ];
+        for apart in sized_apart {
+            let mut earlier = remembering(&[apart], &[]);
+            assert_eq!(earlier.find(n, &with.problem, true, worth), Ok(None));
+            assert!(earlier.games.contains_key(&m), "a line of the other formulation is kept when passed over");
+        }
+        // The sizes of the problem, but not a line of any problem: not reproduced in its own formulation, forgotten.
+        // The digest the problem has in the run's formulation is not its digest in the line's, so it is no line either.
+        for forged in [
+            Certificate { digest: line.digest ^ 1, ..line.clone() },
+            Certificate { digest, ..line.clone() },
+            Certificate { rejected: line.rejected + 1, ..line.clone() },
+            Certificate { in_the_bag: line.in_the_bag + 1, ..line.clone() },
+        ] {
+            let mut earlier = remembering(&[forged], &[]);
+            assert_eq!(earlier.find(n, &with.problem, true, worth), Ok(None));
+            assert!(earlier.games.is_empty(), "a line that does not reproduce is forgotten");
+        }
+        // The line as it is: used.
+        let mut earlier = remembering(&[line], &[]);
+        assert!(matches!(earlier.find(n, &with.problem, true, worth), Ok(Some(_))));
     }
 
     #[test]
     fn only_the_problems_of_the_last_eight_sizes_are_kept() {
         let open = from_3(120);
-        let posed = extended_problem(120, &open).unwrap();
+        let posed = extended_problem(120, &open, true).unwrap();
         let mut earlier = EarlierCertificates::default();
         for m in 100..=112 {
             earlier.record(&line(m, &posed, &open, 77), posed.problem.clone());
@@ -1086,7 +1271,7 @@ mod tests {
     #[test]
     fn only_certified_certificates_are_inserted() {
         let open = from_3(120);
-        let posed = extended_problem(120, &open).unwrap();
+        let posed = extended_problem(120, &open, true).unwrap();
         let certified = line(120, &posed, &open, 77);
         let mut earlier = EarlierCertificates::default();
         for verdict in [Verdict::Beaten, Verdict::Incomplete] {

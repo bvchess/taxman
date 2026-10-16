@@ -648,7 +648,7 @@ fn a_checkpoint_with_other_one_sided_candidates_is_refused() {
     let checkpoint = dir.join("n0200.ckpt");
     let board = Board::<8>::for_n(200);
     let open = Bits::<8>::from_slice(&common::upper_from_3(&board));
-    let (ext, prepared) = board.prepare_extended_with(&open, SearchTactics::extended()).unwrap();
+    let (ext, prepared) = board.prepare_extended_with(&open, false, SearchTactics::extended()).unwrap();
     assert!(!ext.one_sided.is_empty());
     let cfg = EngineConfig {
         threads: 1,
@@ -660,7 +660,7 @@ fn a_checkpoint_with_other_one_sided_candidates_is_refused() {
 
     forge_header(&checkpoint, |header| header[32] ^= 1);
     let wanted = "the checkpoint is of other one-sided candidates";
-    let err = board.prepare_extended_for_resume(&open, &checkpoint).err().expect("refused");
+    let err = board.prepare_extended_for_resume(&open, false, &checkpoint).err().expect("refused");
     assert!(err.starts_with(wanted), "{err}");
     // The search itself checks the header of the checkpoint it resumes, with the setup that does not.
     let err = search::search(&prepared, &cfg, None, None, true).unwrap_err();
@@ -669,7 +669,7 @@ fn a_checkpoint_with_other_one_sided_candidates_is_refused() {
     assert!(checkpoint.exists(), "a refused checkpoint is left alone");
 
     forge_header(&checkpoint, |header| header[32] ^= 1);
-    let (_, resumed) = board.prepare_extended_for_resume(&open, &checkpoint).unwrap();
+    let (_, resumed) = board.prepare_extended_for_resume(&open, false, &checkpoint).unwrap();
     let cfg = EngineConfig { time_limit: None, ..cfg };
     let result = search::search(&resumed, &cfg, None, None, true).unwrap();
     assert!(result.completed, "the checkpoint resumes with its own digest");
