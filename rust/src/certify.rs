@@ -33,13 +33,18 @@
 //! what a search of Π⁺(n) would, and n's own barred bounds then give opt(n) = V(n) by the corollary of Theorem M⁺.
 //! A game worth less than m's certificate says is searched (it is not optimal, and the search finds the better set);
 //! one worth more contradicts the certificate and is refused.  Research code: the solver does not use it.
+//!
+//! The files `taxman certify` writes are checked again, line by line, by [`verify`] (`taxman verify-certificates`),
+//! which sets each certificate's problem up again, applies the same checks of the recorded game and the same rule of
+//! the same problem, and says how far the proofs of the recorded scores reach (the prover's, the certificates' and the
+//! ceilings').
 
-use crate::bits::{words_for, Bits, WIDTHS};
+use crate::bits::{Bits, WIDTHS};
 use crate::board::{promotion_cap, Board};
 use crate::engine::EngineConfig;
 use crate::frames::ExtendedFrames;
 use crate::game::{legal_moves_left, replay, replay_finished, Optimal};
-use crate::gf2::Gf2Bound;
+use crate::gf2::{Gf2Bound, MAX_WORDS};
 use crate::json::Json;
 use crate::model::Scratch;
 use crate::numtheory::Tables;
@@ -52,6 +57,8 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
+
+pub mod verify;
 
 // ---------------------------------------------------------------------------------------------------------
 // The barred bounds
@@ -249,6 +256,13 @@ impl Certificate {
         Ok(certificate)
     }
 
+    /// What the recorded game is worth in Π⁺(O), V − `in_the_bag⁺` (which, for a certified line, is the most a
+    /// promotion set of the problem is worth); `None` for a score below its own `in_the_bag⁺`, which no certificate
+    /// has.
+    pub fn worth(&self) -> Option<u64> {
+        self.score.checked_sub(self.in_the_bag)
+    }
+
     pub fn to_json(&self) -> Json {
         let seconds = |s: f64| Json::from((s * 1e4).round() / 1e4);
         let mut pairs = vec![
@@ -338,17 +352,37 @@ pub fn certify_game_with(
     earlier: &mut EarlierCertificates,
 ) -> Result<Certificate, String> {
     let beyond = || format!("n={n} is beyond the largest supported board, n={MAX_N}");
-    // The set width: the board's own, unless the GF(2) bound of Π⁺(O) needs more block words than its engines have (an
-    // open source adds one to its frame's rank); then the widest, whose engines have the most.  The choice depends on
-    // nothing but the board and O, so a resumed search finds the width its checkpoint was made at.
-    let words = crate::with_width!(n, W => {
-        let open: Bits<W> = upper.open.iter().copied().collect();
-        Board::<W>::for_n(n).extended_words(&open)
-    }, else Err(beyond()))
-    .map_err(|e| format!("n={n}: {e}"))?;
-    let fits = crate::with_width!(n, W => words <= Gf2Bound::<W>::MOST_WORDS, else false);
-    let width = if fits { words_for(n) } else { WIDTHS[WIDTHS.len() - 1] };
+    // A problem that no set width can search is set up at the widest, whose refusal says why.
+    let width = certificate_width(n, &upper.open)?.1.unwrap_or(WIDTHS[WIDTHS.len() - 1]);
     crate::with_words!(width, W => certify_at::<W>(n, known, upper, opts, earlier), else Err(beyond()))
+}
+
+/// The block words the GF(2) bound of Π⁺(`open`) of the board `1..=n` needs at its root ([`Board::extended_words`]: an
+/// open source adds one to its frame's rank), and the set width `taxman certify` searches the game at: the board's own
+/// width where its engines have that many words, else the widest, whose engines have the most ([`MAX_WORDS`]); `None`
+/// if no width does.  The width depends on nothing but the board and `open`, so a resumed search finds the width its
+/// checkpoint was made at, and a certificate's line records it (`width`).
+///
+/// # Errors
+///
+/// If `n` is beyond the widest set, or the extended problem cannot be built ([`Board::extended_words`]); the message
+/// names `n`.
+pub fn certificate_width(n: u32, open: &[u32]) -> Result<(usize, Option<usize>), String> {
+    let beyond = || format!("n={n} is beyond the largest supported board, n={MAX_N}");
+    let (words, own, fits) = crate::with_width!(n, W => {
+        let open: Bits<W> = open.iter().copied().collect();
+        let words = Board::<W>::for_n(n).extended_words(&open).map_err(|e| format!("n={n}: {e}"))?;
+        Ok((words, W, words <= Gf2Bound::<W>::MOST_WORDS))
+    }, else Err(beyond()))?;
+    let widest = WIDTHS[WIDTHS.len() - 1];
+    let width = if fits {
+        Some(own)
+    } else if words <= MAX_WORDS {
+        Some(widest)
+    } else {
+        None
+    };
+    Ok((words, width))
 }
 
 fn certify_at<const W: usize>(
@@ -365,47 +399,10 @@ fn certify_at<const W: usize>(
     let (Some(score), Some(moves)) = (known.score(n), known.moves(n)) else {
         return Err(at("the results have no game of n".into()));
     };
-    let replayed = replay(n, moves).map_err(|e| at(format!("the recorded game is illegal: {e}")))?;
-    if replayed != score {
-        return Err(at(format!("the recorded game scores {replayed}, not the {score} recorded")));
-    }
-    let board = Board::<W>::for_n(n);
-    let kept: Bits<W> = board.plain.iter().copied().filter(|&x| 2 * x > n).collect();
-    let recorded: Bits<W> = moves.iter().copied().collect();
-    let above: Bits<W> = recorded.iter().filter(|&x| 2 * x > n).collect();
-    if above != kept {
-        let (more, fewer) = ((above - kept).to_vec(), (kept - above).to_vec());
-        return Err(at(format!(
-            "the recorded game does not play U*, the sources setup keeps, above n/2: it plays {more:?} besides, and \
-             not {fewer:?}"
-        )));
-    }
-
-    let open: Bits<W> = upper.open.iter().copied().collect();
-    let checkpoint = opts.checkpoint_file(n);
-    let resuming = checkpoint.as_ref().is_some_and(|path| path.exists());
-    let (extended, prepared) = match &checkpoint {
-        Some(path) if resuming => board.prepare_extended_for_resume(&open, path),
-        _ => board.prepare_extended_with(&open, SearchTactics::extended()),
-    }
-    .map_err(at)?;
-    let posed = Posed::new(&extended, prepared.problem());
-    debug_assert_eq!(posed.frames, prepared.root.len(), "n={n}: the problem's frames are the root's");
-
-    // The recorded game as a promotion set of Π⁺(O): the open sources, and its moves up to n/2.
-    let start = open | (recorded - kept);
-    let promotable = start.is_subset(&prepared.candidates)
-        && prepared.model.can_promote_all_using(&mut Scratch::new(), &prepared.root, &start);
-    if !promotable {
-        return Err(at("the recorded game is not a promotion set of Π⁺(O) (Theorem M⁺ says a playable one is)".into()));
-    }
-    let worth = start.sum();
-    if extended.in_the_bag + worth != score {
-        return Err(at(format!(
-            "the recorded game is worth {} in Π⁺(O), not its score {score}",
-            extended.in_the_bag + worth
-        )));
-    }
+    let checkpoint = opts.checkpoint_file(n).filter(|path| path.exists());
+    let resuming = checkpoint.is_some();
+    let Recorded { board, extended, prepared, posed, start, worth } =
+        check_recorded_game::<W>(n, score, moves, &upper.open, checkpoint.as_deref())?;
     let cap = known.score(n - 1).and_then(|prev| promotion_cap(n, extended.in_the_bag, prev));
 
     // An earlier certified game that posed this very problem has settled it: no search.
@@ -457,6 +454,78 @@ fn certify_at<const W: usize>(
         earlier.record(&certificate, posed.problem);
     }
     Ok(certificate)
+}
+
+/// What the checks of a recorded game ([`check_recorded_game`]) leave for the search, or for a verifier of the
+/// certificate: the board, the extended problem and the search set up for it, the problem as posed, the recorded game
+/// as a promotion set of it and what that is worth.
+struct Recorded<const W: usize> {
+    board: Board<W>,
+    extended: ExtendedFrames<W>,
+    prepared: Prepared<W>,
+    posed: Posed,
+    /// The recorded game as a promotion set of Π⁺(O): the open sources, and its moves up to n/2.
+    start: Bits<W>,
+    /// What `start` is worth, which with `in_the_bag⁺` is the recorded score.
+    worth: u64,
+}
+
+/// The checks a certificate makes of the recorded game of `n` before it searches or settles anything, shared by
+/// [`certify_game_with`] and the verifier of a certificate's line (`verify`): the game replays to `score`, plays U\*
+/// above n/2 and is a promotion set of Π⁺(`open`) worth `score`, set up at the set width `W`.  The search is set up to
+/// resume the checkpoint `resume`, if there is one.
+///
+/// # Errors
+///
+/// If one of the checks fails, if Π⁺(`open`) cannot be set up, or the checkpoint does not belong to it; the message
+/// names `n`.
+fn check_recorded_game<const W: usize>(
+    n: u32,
+    score: u64,
+    moves: &[u32],
+    open: &[u32],
+    resume: Option<&Path>,
+) -> Result<Recorded<W>, String> {
+    let at = |e: String| format!("n={n}: {e}");
+    let replayed = replay(n, moves).map_err(|e| at(format!("the recorded game is illegal: {e}")))?;
+    if replayed != score {
+        return Err(at(format!("the recorded game scores {replayed}, not the {score} recorded")));
+    }
+    let board = Board::<W>::for_n(n);
+    let kept: Bits<W> = board.plain.iter().copied().filter(|&x| 2 * x > n).collect();
+    let recorded: Bits<W> = moves.iter().copied().collect();
+    let above: Bits<W> = recorded.iter().filter(|&x| 2 * x > n).collect();
+    if above != kept {
+        let (more, fewer) = ((above - kept).to_vec(), (kept - above).to_vec());
+        return Err(at(format!(
+            "the recorded game does not play U*, the sources setup keeps, above n/2: it plays {more:?} besides, and \
+             not {fewer:?}"
+        )));
+    }
+
+    let open: Bits<W> = open.iter().copied().collect();
+    let (extended, prepared) = match resume {
+        Some(checkpoint) => board.prepare_extended_for_resume(&open, checkpoint),
+        None => board.prepare_extended_with(&open, SearchTactics::extended()),
+    }
+    .map_err(at)?;
+    let posed = Posed::new(&extended, prepared.problem());
+    debug_assert_eq!(posed.frames, prepared.root.len(), "n={n}: the problem's frames are the root's");
+
+    let start = open | (recorded - kept);
+    let promotable = start.is_subset(&prepared.candidates)
+        && prepared.model.can_promote_all_using(&mut Scratch::new(), &prepared.root, &start);
+    if !promotable {
+        return Err(at("the recorded game is not a promotion set of Π⁺(O) (Theorem M⁺ says a playable one is)".into()));
+    }
+    let worth = start.sum();
+    if extended.in_the_bag + worth != score {
+        return Err(at(format!(
+            "the recorded game is worth {} in Π⁺(O), not its score {score}",
+            extended.in_the_bag + worth
+        )));
+    }
+    Ok(Recorded { board, extended, prepared, posed, start, worth })
 }
 
 /// Searches the extended problem `prepared` from the recorded game `start`, with the ceiling `cap`, on `opts`' threads
@@ -604,7 +673,6 @@ impl EarlierCertificates {
         let digest = ours.digest();
         for m in (n.saturating_sub(SAME_SEARCH_WINDOW)..n).rev() {
             let Some(line) = self.games.get(&m).filter(|line| line.digest == digest) else { continue };
-            let best = line.score.checked_sub(line.in_the_bag);
             let theirs = match self.problems.get(&m) {
                 Some(problem) => Some(Cow::Borrowed(problem)),
                 None => extended_problem(m, &line.open)
@@ -612,24 +680,52 @@ impl EarlierCertificates {
                     .filter(|posed| posed.reproduces(line))
                     .map(|posed| Cow::Owned(posed.problem)),
             };
-            let (Some(best), Some(theirs)) = (best, theirs) else {
+            let (Some(best), Some(theirs)) = (line.worth(), theirs) else {
                 self.games.remove(&m);
                 continue;
             };
-            if *theirs != *ours {
-                continue;
+            match apply_rule(line, best, &theirs, ours, worth)? {
+                Rule::Other => continue,
+                Rule::Searched => return Ok(None),
+                Rule::Settled(same) => return Ok(Some(same)),
             }
-            return match worth.cmp(&best) {
-                Ordering::Equal => Ok(Some(SameProblem { n: m, digest, best, worth })),
-                Ordering::Less => Ok(None),
-                Ordering::Greater => Err(format!(
-                    "the recorded game is worth {worth} in Π⁺(O), which is the problem of n={m} too, and the certificate \
-                     of n={m} says no promotion set of it is worth more than {best}: it contradicts the certificate of \
-                     n={m}"
-                )),
-            };
         }
         Ok(None)
+    }
+}
+
+/// What the certified game m, whose problem is `theirs` and whose certificate proved the most a promotion set of it is
+/// worth, `best`, says of a later game: its problem `ours`, in which its recorded game is worth `worth`.
+#[derive(Debug, PartialEq, Eq)]
+enum Rule {
+    /// The problems differ: m says nothing of the game.
+    Other,
+    /// The same problem, and the recorded game is worth less than m's certificate proved the most: the game is
+    /// searched.
+    Searched,
+    /// The same problem, and the recorded game is worth what m's certificate proved the most: the game is certified
+    /// with no search, resting on m.
+    Settled(SameProblem),
+}
+
+/// The rule of the module docs, for the certified line `m` (see [`Rule`]); the one place it is written, which
+/// [`EarlierCertificates::find`] applies and the verifier of a line applies again to check it.
+///
+/// # Errors
+///
+/// If `worth` is more than `best` for the same problem: one of the two is wrong.
+fn apply_rule(m: &Certificate, best: u64, theirs: &Problem, ours: &Problem, worth: u64) -> Result<Rule, String> {
+    if theirs != ours {
+        return Ok(Rule::Other);
+    }
+    match worth.cmp(&best) {
+        Ordering::Equal => Ok(Rule::Settled(SameProblem { n: m.n, digest: ours.digest(), best, worth })),
+        Ordering::Less => Ok(Rule::Searched),
+        Ordering::Greater => Err(format!(
+            "the recorded game is worth {worth} in Π⁺(O), which is the problem of n={0} too, and the certificate of \
+             n={0} says no promotion set of it is worth more than {best}: it contradicts the certificate of n={0}",
+            m.n
+        )),
     }
 }
 
@@ -722,10 +818,10 @@ impl CertificateFile {
         Ok(())
     }
 
-    /// Where the certificates of the games that beat their recorded score go as well: `<out>.counterexample.jsonl`
-    /// (with a `.jsonl` ending of the file dropped first, as for a results file's rejected games).
+    /// Where the certificates of the games that beat their recorded score go as well: [`counterexample_path`] of the
+    /// file.
     pub fn counterexample_path(&self) -> PathBuf {
-        sibling_path(&self.path, "counterexample")
+        counterexample_path(&self.path)
     }
 
     /// Appends `certificate` to the file of [`counterexample_path`](Self::counterexample_path), synced.
@@ -739,6 +835,13 @@ impl CertificateFile {
     }
 }
 
+/// Where the certificates of the games that beat their recorded score go as well, for the file of certificates
+/// `certificates`: `<out>.counterexample.jsonl` (with a `.jsonl` ending of the file dropped first, as for a results
+/// file's rejected games).
+pub fn counterexample_path(certificates: &Path) -> PathBuf {
+    sibling_path(certificates, "counterexample")
+}
+
 /// Dropping releases the lock at once, as a results file's does.
 impl Drop for CertificateFile {
     fn drop(&mut self) {
@@ -750,10 +853,12 @@ impl Drop for CertificateFile {
 mod tests {
     use super::*;
 
-    /// All of U\*_{≥3} of the board `1..=n` (`n` below 512): the most open members `taxman certify` can have.
+    /// All of U\*_{≥3} of the board `1..=n`: the most open members `taxman certify` can have.
     fn from_3(n: u32) -> Vec<u32> {
-        let board = Board::<8>::for_n(n);
-        board.plain.iter().copied().filter(|&x| 2 * x > n && board.tables.omega(x) >= 3).collect()
+        crate::with_width!(n, W => {
+            let board = Board::<W>::for_n(n);
+            board.plain.iter().copied().filter(|&x| 2 * x > n && board.tables.omega(x) >= 3).collect()
+        })
     }
 
     /// The certificate of board `n`, made by hand, whose problem is `posed` (set up with the open members `open`) and
@@ -790,6 +895,22 @@ mod tests {
             earlier.problems.insert(m, problem.clone());
         }
         earlier
+    }
+
+    /// The block words the GF(2) bound needs grow with the open sources (each adds one to its frame's rank), and the
+    /// set width follows: the board's own while the engines of that width have as many words (three up to 64 words),
+    /// the widest (five) beyond that, none past five.
+    #[test]
+    fn the_width_follows_the_block_words_the_open_sources_need() {
+        let width = |n: u32, open: &[u32]| certificate_width(n, open).unwrap();
+        assert_eq!(width(600, &from_3(600)), (2, Some(16)));
+        assert_eq!(width(1000, &from_3(1000)), (3, Some(16)));
+        assert_eq!(width(1500, &from_3(1500)), (4, Some(128)));
+        assert_eq!(width(2000, &from_3(2000)), (5, Some(128)));
+        assert_eq!(width(3000, &from_3(3000)), (7, None));
+        assert_eq!(width(1500, &[]).1, Some(24), "with nothing open the board's own width");
+        assert!(certificate_width(1 << 20, &[]).unwrap_err().contains("beyond the largest supported board"));
+        assert!(certificate_width(120, &[7]).unwrap_err().starts_with("n=120: "));
     }
 
     #[test]

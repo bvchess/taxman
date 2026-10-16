@@ -9,11 +9,13 @@
 //! `--time-limit`, `--use-prev`, ...) are each command's own.  A usage error makes `main` print the usage and
 //! exit with status 2; a command that ran and failed exits with status 1 ([`CliError`]).
 
+use std::collections::BTreeMap;
 use std::fmt;
 use std::io::Write;
+use std::path::Path;
 use std::str::FromStr;
 use std::time::Duration;
-use taxman::solver::SolveOptions;
+use taxman::solver::{SolveOptions, MAX_N};
 
 /// Write one line, ignoring write errors: a closed pipe (EPIPE, say a `head` or a `tee` that has exited) must
 /// not kill a run whose results and checkpoints are safe on disk.  (`println!` panics on it, and release
@@ -190,6 +192,42 @@ pub fn parse_range(text: &str) -> Result<(u32, u32), CliError> {
     Ok((lo, hi))
 }
 
+/// The boards of a list file, `text`, in its order: one board size a line, from 1 to [`MAX_N`], none twice.  Blank
+/// lines and lines whose first non-blank character is `#` are skipped.  `name` is the file, for the messages, which
+/// also name the line.
+pub fn parse_board_list(name: &str, text: &str) -> Result<Vec<u32>, CliError> {
+    let mut first_line: BTreeMap<u32, usize> = BTreeMap::new();
+    let mut boards = Vec::new();
+    for (i, line) in text.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let at = |why: String| CliError::Usage(format!("{name}: line {}: {why}", i + 1));
+        let digits = line.bytes().all(|b| b.is_ascii_digit());
+        let n: u32 =
+            line.parse().ok().filter(|_| digits).ok_or_else(|| at(format!("expected a board size, got {line:?}")))?;
+        if !(1..=MAX_N).contains(&n) {
+            return Err(at(format!("{n} is not a board size from 1 to {MAX_N}")));
+        }
+        if let Some(first) = first_line.insert(n, i + 1) {
+            return Err(at(format!("the board {n} is listed again (first on line {first})")));
+        }
+        boards.push(n);
+    }
+    if boards.is_empty() {
+        return Err(CliError::Usage(format!("{name}: no board is listed")));
+    }
+    Ok(boards)
+}
+
+/// [`parse_board_list`] of the file at `path`.
+pub fn read_board_list(path: &Path) -> Result<Vec<u32>, CliError> {
+    let name = path.display().to_string();
+    let text = std::fs::read_to_string(path).map_err(|e| CliError::Usage(format!("{name}: {e}")))?;
+    parse_board_list(&name, &text)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -300,5 +338,40 @@ mod tests {
         for bad in ["", "0", "5-4", "a", "1-b", "1-2-3"] {
             assert!(parse_range(bad).is_err(), "{bad:?}");
         }
+    }
+
+    #[test]
+    fn a_list_of_boards_keeps_its_order_and_skips_comments_and_blank_lines() {
+        let list = |text: &str| parse_board_list("boards.txt", text).map_err(usage);
+        assert_eq!(list("1304\n1302\n1309\n"), Ok(vec![1304, 1302, 1309]));
+        assert_eq!(list("# these three\n\n  1304  \n\t# 99\n1302\n   \n1\n8191"), Ok(vec![1304, 1302, 1, 8191]));
+        assert_eq!(list("7\r\n5\r\n"), Ok(vec![7, 5]));
+    }
+
+    #[test]
+    fn a_list_of_boards_refuses_what_is_none_naming_the_file_and_the_line() {
+        let list = |text: &str| parse_board_list("boards.txt", text).map(|_| ()).map_err(usage);
+        for (text, why) in [
+            ("12\nx\n", "boards.txt: line 2: expected a board size, got \"x\""),
+            ("12\n13 14\n", "boards.txt: line 2: expected a board size, got \"13 14\""),
+            ("12\n1302 # a note\n", "boards.txt: line 2: expected a board size, got \"1302 # a note\""),
+            ("12\n-5\n", "boards.txt: line 2: expected a board size, got \"-5\""),
+            ("+5\n", "boards.txt: line 1: expected a board size, got \"+5\""),
+            ("12\n4294967296\n", "boards.txt: line 2: expected a board size, got \"4294967296\""),
+            ("0\n", "boards.txt: line 1: 0 is not a board size from 1 to 8191"),
+            ("# c\n12\n8192\n", "boards.txt: line 3: 8192 is not a board size from 1 to 8191"),
+            ("12\n\n30\n12\n", "boards.txt: line 4: the board 12 is listed again (first on line 1)"),
+            ("", "boards.txt: no board is listed"),
+            ("# only a comment\n\n", "boards.txt: no board is listed"),
+        ] {
+            assert_eq!(list(text), Err(why.to_owned()), "{text:?}");
+        }
+    }
+
+    #[test]
+    fn a_list_file_that_is_not_there_is_named() {
+        let missing = std::env::temp_dir().join("taxman-no-such-list.txt");
+        let message = usage(read_board_list(&missing).unwrap_err());
+        assert!(message.contains("taxman-no-such-list.txt"), "{message}");
     }
 }

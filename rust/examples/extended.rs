@@ -9,6 +9,7 @@
 //! ```text
 //! cargo run --release --example extended -- chain FROM TO [--compare] [--known FILE] [--out FILE]
 //! cargo run --release --example extended -- words FROM TO --upper FILE...
+//! cargo run --release --example extended -- problems FROM TO --upper FILE... [--known FILE] [--out FILE]
 //! ```
 //!
 //! For each board `n` in `FROM..=TO` (2 at least, `TO` at most the largest board the solver supports), one after the
@@ -42,28 +43,45 @@
 //! say needs a certificate, how many block words the GF(2) bound of Π⁺(O), O its open members, needs at its root
 //! (`Board::extended_words`): an open source adds one to its frame's rank, so `taxman certify` searches a game whose
 //! words exceed the engines of its set width (three up to 64 words, rank 192) at the widest width (128 words, five
-//! engine words, rank 320), and cannot search one that needs more.  One line a game (n, |O|, the words, the width
-//! `taxman certify` would use or `none`), then the games by words and the widths needed.
+//! engine words, rank 320), and cannot search one that needs more (`certify::certificate_width`).  One line a game (n,
+//! |O|, the words, the width `taxman certify` would use or `none`), then the games by words and the widths needed.
+//!
+//! **`problems`**: for each game of `FROM..=TO` that the barred bounds (`--upper`) say needs a certificate, one after
+//! the other on one thread, the extended problem Π⁺(O) set up without a search (`certify::extended_problem`) and the
+//! width it takes (`certify::certificate_width`), with V the recorded score (the table of optimal games, over the
+//! results file `--known` gives, for a board past its end; it must be the barred bounds' score).  One JSON line a game,
+//! on stdout and appended to `--out FILE` if given:
+//!
+//! ```text
+//! {"n":..,"score":V,"open":|O|,"rejected":|R|,"frames":..,"two_sided":..,"one_sided":..,"in_the_bag":..,
+//!  "worth":V-in_the_bag,"words":..,"width":W|null,"digest":"<16 hex>","same_as":m|null}
+//! ```
+//!
+//! `same_as` is the latest game m of the 8 board sizes before n (`SAME_SEARCH_WINDOW`) among the games of the run whose
+//! problem equals n's whole (the digest, then the problems), whatever the two games are worth: where the worths are
+//! equal as well, `taxman certify` settles n from m with no search.  At the end, on stderr: the games, those with a
+//! `same_as`, those of them with equal worth, the games by width, and the seconds.
 
 use std::collections::BTreeMap;
-use std::fs::OpenOptions;
+use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use taxman::accelerate::solution_for_promotions;
-use taxman::bits::Bits;
+use taxman::bits::{width_for, words_for, Bits};
 use taxman::board::Board;
-use taxman::certify::read_upper;
+use taxman::certify::{certificate_width, extended_problem, read_upper};
 use taxman::engine::EngineConfig;
 use taxman::game::{replay, Optimal};
-use taxman::gf2::{Gf2Bound, MAX_WORDS};
+use taxman::gf2::MAX_WORDS;
 use taxman::json::Json;
-use taxman::search::{search_with, Prepared, SearchTactics};
-use taxman::solver::MAX_N;
+use taxman::search::{search_with, Prepared, Problem, SearchTactics};
+use taxman::solver::{digest_text, MAX_N, SAME_SEARCH_WINDOW};
 
 const USAGE: &str = "usage: extended chain FROM TO [--compare] [--known FILE] [--out FILE]
-       extended words FROM TO --upper FILE...   (2 <= FROM <= TO)";
+       extended words FROM TO --upper FILE...
+       extended problems FROM TO --upper FILE... [--known FILE] [--out FILE]   (2 <= FROM <= TO)";
 
 /// The benchmark games, whose node counts the summary lists when they are in range.
 const BENCHMARK_GAMES: [u32; 7] = [936, 1215, 1050, 1100, 1133, 1170, 1184];
@@ -71,10 +89,17 @@ const BENCHMARK_GAMES: [u32; 7] = [936, 1215, 1050, 1100, 1133, 1170, 1184];
 /// How many games of each kind the summary lists.
 const LISTED: usize = 10;
 
+/// The subcommands.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Command {
+    Chain,
+    Words,
+    Problems,
+}
+
 /// What the command line asks for.
 struct Args {
-    /// `words` rather than `chain`.
-    words: bool,
+    command: Command,
     from: u32,
     to: u32,
     compare: bool,
@@ -86,9 +111,10 @@ struct Args {
 fn parse_args(args: &[String]) -> Result<Args, String> {
     let [command, from, to, flags @ ..] = args else { return Err(USAGE.to_owned()) };
     let board = |text: &String| text.parse::<u32>().map_err(|_| USAGE.to_owned());
-    let words = match command.as_str() {
-        "chain" => false,
-        "words" => true,
+    let command = match command.as_str() {
+        "chain" => Command::Chain,
+        "words" => Command::Words,
+        "problems" => Command::Problems,
         _ => return Err(USAGE.to_owned()),
     };
     let (from, to) = (board(from)?, board(to)?);
@@ -106,10 +132,32 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     if from < 2 || from > to || to > MAX_N {
         return Err(format!("{USAGE}\nthe boards must be from 2 to {MAX_N}"));
     }
-    if words != !upper.is_empty() || (words && (compare || known.is_some() || out.is_some())) {
+    // `chain` has no barred bounds; the others need them, and `words` takes no other flag.
+    let allowed = match command {
+        Command::Chain => upper.is_empty(),
+        Command::Words => !upper.is_empty() && !compare && known.is_none() && out.is_none(),
+        Command::Problems => !upper.is_empty() && !compare,
+    };
+    if !allowed {
         return Err(USAGE.to_owned());
     }
-    Ok(Args { words, from, to, compare, known, out, upper })
+    Ok(Args { command, from, to, compare, known, out, upper })
+}
+
+/// The file `--out` names, opened for appending.
+fn open_out(path: Option<&PathBuf>) -> Result<Option<File>, String> {
+    let open = |path: &PathBuf| {
+        OpenOptions::new().create(true).append(true).open(path).map_err(|e| format!("{}: {e}", path.display()))
+    };
+    path.map(open).transpose()
+}
+
+/// Appends `line` to the `--out` file, if there is one.
+fn append(out: &mut Option<File>, line: &Json) -> Result<(), String> {
+    match out {
+        Some(file) => writeln!(file, "{line}").and_then(|()| file.flush()).map_err(|e| format!("--out: {e}")),
+        None => Ok(()),
+    }
 }
 
 /// What a search cost.
@@ -334,20 +382,12 @@ fn run(args: &Args) -> Result<(), String> {
         (Some(score), Some(moves)) => Prev { score, moves: moves.to_vec() },
         _ => return Err(format!("the game of {before} is not known; --known FILE can give it")),
     };
-    let mut out = args
-        .out
-        .as_ref()
-        .map(|path| {
-            OpenOptions::new().create(true).append(true).open(path).map_err(|e| format!("{}: {e}", path.display()))
-        })
-        .transpose()?;
+    let mut out = open_out(args.out.as_ref())?;
     let mut games = Vec::new();
     for n in args.from..=args.to {
         let (game, next) = taxman::with_width!(n, W => play::<W>(n, &prev, args.compare, &optimal))?;
         println!("{}", describe(&game));
-        if let Some(file) = &mut out {
-            writeln!(file, "{}", json_line(&game)).and_then(|()| file.flush()).map_err(|e| format!("--out: {e}"))?;
-        }
+        append(&mut out, &json_line(&game))?;
         games.push(game);
         prev = next;
     }
@@ -361,27 +401,115 @@ fn words(args: &Args) -> Result<(), String> {
     let (mut by_words, mut widest, mut beyond) = (BTreeMap::<usize, usize>::new(), Vec::new(), Vec::new());
     for line in upper.range(args.from..=args.to).map(|(_, line)| line).filter(|line| line.needs) {
         let n = line.n;
-        let (words, natural, fits) = taxman::with_width!(n, W => {
-            let open: Bits<W> = line.open.iter().copied().collect();
-            let words = Board::<W>::for_n(n).extended_words(&open).map_err(|e| format!("n={n}: {e}"))?;
-            (words, W, words <= Gf2Bound::<W>::MOST_WORDS)
-        });
-        let width = if fits {
-            natural.to_string()
-        } else if words <= MAX_WORDS {
-            widest.push(n);
-            "128".to_owned()
-        } else {
-            beyond.push(n);
-            "none".to_owned()
+        let (words, width) = certificate_width(n, &line.open)?;
+        let own = width_for(words_for(n));
+        let shown = match width {
+            Some(width) if Some(width) == own => width.to_string(),
+            Some(width) => {
+                widest.push(n);
+                width.to_string()
+            }
+            None => {
+                beyond.push(n);
+                "none".to_owned()
+            }
         };
-        println!("n={n:5} |O|={:4} words {words} width {width}", line.open.len());
+        println!("n={n:5} |O|={:4} words {words} width {shown}", line.open.len());
         *by_words.entry(words).or_default() += 1;
     }
     let counts: Vec<String> = by_words.iter().map(|(words, games)| format!("{words}: {games}")).collect();
     println!("games by block words: {}", counts.join(", "));
     println!("at the widest width ({}): {widest:?}", widest.len());
     println!("beyond the {MAX_WORDS} words of any engine ({}): {beyond:?}", beyond.len());
+    Ok(())
+}
+
+/// A game of the run of `problems`, as a later game compares itself with it.
+struct Posing {
+    digest: u64,
+    problem: Problem,
+    /// The recorded game's worth in the problem, V − `in_the_bag⁺`.
+    worth: u64,
+}
+
+/// What `problems` counts over its run, for the summary.
+#[derive(Default)]
+struct Tally {
+    games: usize,
+    same_as: usize,
+    equal_worth: usize,
+    by_width: BTreeMap<Option<usize>, usize>,
+}
+
+impl Tally {
+    fn print(&self, start: Instant) {
+        let widths: Vec<String> = self
+            .by_width
+            .iter()
+            .map(|(width, games)| format!("{}: {games}", width.map_or("none".to_owned(), |width| width.to_string())))
+            .collect();
+        eprintln!(
+            "{} games, {} with a same_as, of them {} with equal worth (certify settles those with no search); \
+             by width: {}; {:.1} s",
+            self.games,
+            self.same_as,
+            self.equal_worth,
+            widths.join(", "),
+            start.elapsed().as_secs_f64()
+        );
+    }
+}
+
+/// The `problems` subcommand (see the module docs).
+fn problems(args: &Args) -> Result<(), String> {
+    let start = Instant::now();
+    let optimal = Optimal::built_in().with_results_files(args.known.as_slice())?;
+    let upper = read_upper(&args.upper)?;
+    let mut out = open_out(args.out.as_ref())?;
+    let (mut earlier, mut tally) = (BTreeMap::<u32, Posing>::new(), Tally::default());
+    for line in upper.range(args.from..=args.to).map(|(_, line)| line).filter(|line| line.needs) {
+        let n = line.n;
+        let score =
+            optimal.score(n).ok_or_else(|| format!("n={n}: the game is not known; --known FILE can give it"))?;
+        if score != line.score {
+            return Err(format!("n={n}: the recorded score is {score}, the barred bounds' is {}", line.score));
+        }
+        let posed = extended_problem(n, &line.open)?;
+        let (words, width) = certificate_width(n, &line.open)?;
+        let worth =
+            score.checked_sub(posed.in_the_bag).ok_or_else(|| format!("n={n}: the score is below in_the_bag"))?;
+        let digest = posed.problem.digest();
+        let same_as = (n.saturating_sub(SAME_SEARCH_WINDOW)..n)
+            .rev()
+            .find(|m| earlier.get(m).is_some_and(|m| m.digest == digest && m.problem == posed.problem));
+        let json = Json::object([
+            ("n", Json::from(n)),
+            ("score", Json::from(score)),
+            ("open", Json::from(line.open.len())),
+            ("rejected", Json::from(posed.rejected)),
+            ("frames", Json::from(posed.frames)),
+            ("two_sided", Json::from(posed.two_sided)),
+            ("one_sided", Json::from(posed.one_sided)),
+            ("in_the_bag", Json::from(posed.in_the_bag)),
+            ("worth", Json::from(worth)),
+            ("words", Json::from(words)),
+            ("width", width.map_or(Json::Null, Json::from)),
+            ("digest", Json::from(digest_text(digest))),
+            ("same_as", same_as.map_or(Json::Null, Json::from)),
+        ]);
+        println!("{json}");
+        append(&mut out, &json)?;
+
+        tally.games += 1;
+        *tally.by_width.entry(width).or_default() += 1;
+        if let Some(m) = same_as {
+            tally.same_as += 1;
+            tally.equal_worth += usize::from(earlier[&m].worth == worth);
+        }
+        earlier.insert(n, Posing { digest, problem: posed.problem, worth });
+        earlier.retain(|&m, _| n - m <= SAME_SEARCH_WINDOW);
+    }
+    tally.print(start);
     Ok(())
 }
 
@@ -394,7 +522,11 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let ran = if args.words { words(&args) } else { run(&args) };
+    let ran = match args.command {
+        Command::Chain => run(&args),
+        Command::Words => words(&args),
+        Command::Problems => problems(&args),
+    };
     match ran {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {

@@ -197,7 +197,7 @@ up:
 | engine | `engine` | the problem-independent parallel depth-first driver |
 | solving | `tactics`, `board`, `solver`, `results`, `paths` | the switchable tactics; a board prepared for a search; the per-game pipeline and the range driver; what a result records and the checks of a results file; the default files |
 | studies | `brute`, `sacrifice` | exhaustive search to certify small boards; the sacrifice bound and punctured games (not used by the solver) |
-| front end | `main.rs`, `cli.rs`, `commands.rs` | `solve`, `regress`, `bench`, `verify-optimal`, `verify-results`, `extend-optimal`, `tables` |
+| front end | `main.rs`, `cli.rs`, `commands.rs` | `solve`, `regress`, `bench`, `verify-optimal`, `verify-results`, `extend-optimal`, `tables`, `certify`, `verify-certificates` |
 
 On the path of a solve are all the layers but the studies.  `examples/` holds the ladder (standalone searches of hard
 games with time limits, thread scaling, diagnostics), the probe `perf` (the hot paths from fixtures, in cycles and
@@ -915,13 +915,13 @@ like an exhausted search, on trust.
 ### Certificates of U
 
 A score whose proof uses the frame model (`exhausted`, `trivial`, `same_search`) is the optimum on the whole board when
-U holds at n (section 2).  `taxman certify A-B --results FILE... --upper FILE... --out FILE` (`src/certify.rs`) proves
-that game by game, by the corollary of Theorem M⁺ (THEORY.md, "The extended problem").  For a game whose line in the
-prover's barred parity bounds (`prover/data/upper_*.jsonl`) says it needs one, it takes that line's open members O,
-sets up the extended problem Π⁺(O) in extended mode (section 4, "Extended mode"), the other members of U\*_{≥3}
-fixed, and searches it from the recorded game, as the promotion set (O, its moves up to n/2), with the ceiling
-n + score(n − 1) − in_the_bag⁺.  Before the search it checks that the game replays to its score, plays U\* above n/2
-and is a promotion set of Π⁺(O) worth the score (Theorem M⁺ says a playable one is).
+U holds at n (section 2).  `taxman certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE`
+(`src/certify.rs`) proves that game by game, by the corollary of Theorem M⁺ (THEORY.md, "The extended problem").  For
+a game whose line in the prover's barred parity bounds (`prover/data/upper_*.jsonl`) says it needs one, it takes that
+line's open members O, sets up the extended problem Π⁺(O) in extended mode (section 4, "Extended mode"), the other
+members of U\*_{≥3} fixed, and searches it from the recorded game, as the promotion set (O, its moves up to n/2),
+with the ceiling n + score(n − 1) − in_the_bag⁺.  Before the search it checks that the game replays to its score,
+plays U\* above n/2 and is a promotion set of Π⁺(O) worth the score (Theorem M⁺ says a playable one is).
 
 * *certified*: the search ends with nothing better, so opt(n) is the score, given that the members not open were
   certified against it; a line of the bounds whose score is above the recorded one certifies nothing against it, and
@@ -962,7 +962,64 @@ the frames and candidates of Π⁺(O), the nodes and seconds of the search, the 
 digest of Π⁺(O), the game it rests on if the rule settled it (`same_problem`) and the build.  A search stopped by a
 limit or a signal writes an `incomplete` line and keeps its checkpoint (the same flags as `solve`'s); a rerun skips the
 games with a verdict and resumes the others.  A problem whose GF(2) bound needs more block words than the engines of
-the board's set width have is searched at the widest set width (128 words, five words of engine).
+the board's set width have is searched at the widest set width (128 words, five words of engine).  The width is
+`certify::certificate_width`, the one place it is decided; the line records it.
+
+*A list of boards.*  `certify` takes the boards of a list file (`--list FILE`) in place of a range `A-B`, exactly one of
+the two: one board size a line, in the order to certify them, blank lines and lines whose first non-blank character is
+`#` skipped, no board twice.  A line that is none of these is a usage error that names the file and the line.  The games
+are taken in the file's order by the loop of the range, with the same rules: the game's line of the barred bounds must
+exist, a game that needs no certificate is counted (`not needing one`) and passed over, a final verdict in `--out` skips
+the game, and the rule of the same problem looks at the certified games of the file and of the run, whatever order they
+were made in.  The tally line reads `list FILE (K boards): ...` where a range gives `A..=B: ...`.
+
+*Verifying the certificates.*  `taxman verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...]
+[--threads K]` (`src/certify/verify.rs`) reads the files `certify --out` wrote, without changing them, and checks every
+line.  A last line without its newline is noted and ignored, as the file cuts it when it is opened; a complete line that
+is no certificate, or whose `build` lacks the commit (40 hexadecimal digits) or the `dirty` flag, is an error; an
+`incomplete` line is counted and skipped.  A line with a final verdict is checked in this order:
+
+1. the barred bounds have a line for the board, it says it needs a certificate, and its open members and its score are
+   the line's;
+2. the results have a game of the board with the line's score, the game passes the checks `certify` makes of it (it
+   replays to its score, plays U\* above n/2 and is a promotion set of Π⁺(O) worth the score: `check_recorded_game`,
+   shared by the two), and the line's `width` is the one `certificate_width` gives;
+3. Π⁺(O) set up again reproduces the line: its digest, frames, candidates, rejected sources and `in_the_bag⁺`;
+4. a `certified` line has no `beaten_by`, and the file of counterexamples beside the certificates
+   (`<certificates>.counterexample.jsonl`) has no line for its board;
+5. a `certified` line with `same_problem` {m, digest, best, worth} rests on a game m among the 8 board sizes before it
+   whose last final line before it in the same file is `certified`; the rule of the same problem (`apply_rule`, the
+   function `certify` applies, so that the rule is written once) is applied again to the two problems, which must be
+   equal whole, and must give exactly the `same_problem` the line records (the digest, `best` = score(m) −
+   `in_the_bag⁺`(m), `worth` = the line's score − `in_the_bag⁺`, equal);
+6. a `beaten` line has a finished legal game (`game::replay_finished`) that scores what the line says, which is more
+   than the recorded score, and the counterexample file has an identical line;
+7. a board with final lines in more than one place (one file or several) has only `certified` ones: a `beaten` line
+   beside another is a contradiction of verdicts.
+
+The first line to fail ends the command with status 1, naming the file, the line and the board; the dear checks (the
+problems set up again) run on K threads (default: all CPUs), and the first line to fail is the same for any K.  What
+it cannot check is that a search explored its whole tree: a `certified` line made by a search is taken on trust, as an
+exhausted proof is, and the summary says so.  The summary has, for each file, the lines, the final and `incomplete`
+ones, the `certified` ones by search and by the same problem, and the `beaten` ones; the boards certified; the
+counterexamples (the board, the recorded score, the score of the game that beats it); the builds that wrote the lines
+(commit, `dirty`, lines); and the proven end of the chain.
+
+*How far the proofs reach.*  A game n (1 to the largest board of the results) is *proven* when n = 1, or the prover
+proved it, or it has a certificate that passed, or its score reaches a proven ceiling and the game n − 1 is proven.  The
+prover's proofs are the lines of `--exact` (default every `rust/prover/data/exact_*.jsonl`, by name; a later file's
+line for a board replaces an earlier file's, and lines with `fix_upper` set are measurements and skipped), whose score
+must be the results' (a line with another score is an error naming the board and both scores).  A line proves its game
+by the rule of `exact_proofs` in `prover/tools/summarize.py`: its Franklín–Moniot bound or its parity bound is the
+score, or its search is `proven` (a search that used the segment cuts counts only if every smaller game is proven), or
+its relation is `chain` or `prime` and the game n − 1 is proven.  A ceiling is `results::CeilingProof`: the score
+n + score(n − 1), or the prime formula.  The command prints `proven frontier: every game to N is proven; the first that
+is not is M (reason)`, where the reason is that the results have no game of M or that it needs a certificate (the barred
+bounds say so) and the files given have none, and then how many games past M are proven all the same, which are those
+that no gap stops (a bound of the prover, a certificate); `verify::frontier` is that function of plain data (the
+results' scores, the prover's lines, the boards certified).  With the committed prover files and no certificate the end
+of the chain is 2175: the prover proved every game to there, and the first game past it that needs a certificate is
+2176.
 
 ## 9. Testing
 
@@ -1084,7 +1141,14 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   certified (ignored; a sample by default) and some past 1300; a planted wrong score beaten by a game the referee
   accepts, with status 2 and the counterexample file, and said again by a rerun; a certificate's search stopped every
   1,000 nodes and resumed to the same verdict; the games a certificate cannot be made for refused; the file of
-  certificates and the bounds' files read as they should be.
+  certificates and the bounds' files read as they should be; `--list` certifying the boards of a file in its order.
+  `taxman verify-certificates` (`tests/certify.rs`): a file `certify` wrote over 1312..=1317 (three games that rest
+  on the game before them) passes, on one thread and on two, with the summary's counts and the committed prover files'
+  proven end of the chain (2175); each doctored line (another digest, score, open members or width, a `same_problem`
+  with nothing to rest on or with its numbers changed, a certified line with a counterexample, a `build` without a
+  commit, a score the results do not have) is refused naming the line; a beaten line is verified with its
+  counterexample and cannot stand beside a certified one; the end of the chain on synthetic data (a gap stops what
+  rests on it) and on the committed chain.
 * **Engine** (`tests/engine.rs`, `tests/robustness.rs`, `tests/stop_signal.rs`): a toy problem with a known optimum
   (knapsack against dynamic programming), run with 1 and many threads, with a tiny `queue_mem_cap` to force spilling,
   and killed and resumed from checkpoints, must give the same answer; ignored tests do the same with 64 and 192 threads,

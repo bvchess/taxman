@@ -69,7 +69,7 @@
 //! | | [`board`] | a board analysed and prepared for a search: tables, frames, ceiling and seed |
 //! | | [`solver`] | the per-game pipeline, the options, the range driver |
 //! | | [`results`] | what a result line records about its proof, and the checks a results file passes |
-//! | | [`certify`] | `taxman certify`: a recorded score proven on the whole board by a search of the extended problem |
+//! | | [`certify`] | `taxman certify`: a recorded score proven on the whole board; `certify::verify` checks them |
 //! | | [`paths`] | where the default files are, found at run time |
 //! | studies | [`brute`] | exhaustive search without the frame model, to certify small boards |
 //! | | [`sacrifice`] | the sacrifice bound and punctured games; not used by the solver |
