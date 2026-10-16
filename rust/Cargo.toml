@@ -14,6 +14,12 @@ path = "src/lib.rs"
 name = "taxman"
 path = "src/main.rs"
 
+# The tuning benchmark's solver has tests of its own (units are solved the same every time; a root unit is the
+# whole search), which `cargo test` runs; no other example has any.
+[[example]]
+name = "tune"
+test = true
+
 [dependencies]
 
 [profile.release]
