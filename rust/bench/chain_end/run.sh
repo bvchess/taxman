@@ -1,8 +1,8 @@
 #!/bin/bash
 #
 # One run of the measurement at the end of the chain: resumes the checkpoint of game 3441 (a copy) on THREADS threads
-# for SECONDS seconds of search, as the chain does (its predecessors from a copy of results/strict.jsonl), under
-# nice -n 10, and keeps what the solver printed.  With PROFILE_SECONDS the run is sampled by macOS `sample` (every millisecond)
+# for SECONDS seconds of search, as the chain does (its predecessors from a copy of results/strict.jsonl), under nice -n
+# 10, and keeps what the solver printed.  With PROFILE_SECONDS the run is sampled by macOS `sample` (every millisecond)
 # from 25 s into the search instead of being timed with /usr/bin/time -l.
 #
 #   TAXMAN_BENCH_SRC=DIR TAXMAN_BENCH_OUT=DIR bench/chain_end/run.sh THREADS SECONDS TAG [PROFILE_SECONDS]
