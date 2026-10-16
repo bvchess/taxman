@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-# One run of the frontier measurement: resumes the checkpoint of game 3441 (a copy) on THREADS threads for SECONDS
-# seconds of search, as the chain does (its predecessors from a copy of results/strict.jsonl), under nice -n 10,
-# and keeps what the solver printed.  With PROFILE_SECONDS the run is sampled by macOS `sample` (every millisecond)
+# One run of the measurement at the end of the chain: resumes the checkpoint of game 3441 (a copy) on THREADS threads
+# for SECONDS seconds of search, as the chain does (its predecessors from a copy of results/strict.jsonl), under nice -n
+# 10, and keeps what the solver printed.  With PROFILE_SECONDS the run is sampled by macOS `sample` (every millisecond)
 # from 25 s into the search instead of being timed with /usr/bin/time -l.
 #
-#   TAXMAN_BENCH_SRC=DIR TAXMAN_BENCH_OUT=DIR bench/frontier/run.sh THREADS SECONDS TAG [PROFILE_SECONDS]
+#   TAXMAN_BENCH_SRC=DIR TAXMAN_BENCH_OUT=DIR bench/chain_end/run.sh THREADS SECONDS TAG [PROFILE_SECONDS]
 #
 # SECONDS 0 stops after the first batch of nodes (--node-limit 1): the setup alone, whose cycles and CPU time the
 # timed runs' are measured net of.  The search's clock starts when the workers do, after the setup (about 40 s on

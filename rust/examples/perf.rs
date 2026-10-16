@@ -32,7 +32,8 @@
 //!   the windows were first made (`make-window 936 4500` and `make-window 1215 600000`, with `--tactic gf2=off --tactic
 //!   lagrange=on --tactic symmetry=off` since; `make-window` takes `--tactic` as the probe does, on top of the
 //!   defaults), which `--tactic` changes (the search tactics only, as for the ladder): `--tactic lagrange=off`, say,
-//!   searches the same window without the Lagrangian bound.
+//!   searches the same window without the Lagrangian bound.  A game in `--fixtures` with a window and no nodes (a
+//!   copy of a chain's checkpoint at the end of the chain, renamed `nNNNN.window.ckpt`) has only the window.
 //!
 //! Each kernel runs `--reps` times (default 3; the window 2) and the fastest by cycles is reported, per
 //! operation and in all; the fingerprints of all runs must agree.  The incremental matching kernels (marked `+`)
@@ -708,10 +709,14 @@ fn run() -> Result<(), String> {
             let mut report = Report { brief, ..Report::default() };
             for n in games {
                 let gf2 = changes.iter().any(|c| c == "gf2=on");
+                // A game with a window and no nodes (a chain's checkpoint, say) has only the window.
+                let nodes = fixture(&dir, n, "nodes");
                 taxman::with_width!(n, W => {
-                    kernels::<W>(&fixture(&dir, n, "nodes"), reps, &mut report)?;
-                    if gf2 {
-                        gf2_kernels::<W>(&fixture(&dir, n, "nodes"), reps, &mut report)?;
+                    if nodes.exists() {
+                        kernels::<W>(&nodes, reps, &mut report)?;
+                        if gf2 {
+                            gf2_kernels::<W>(&nodes, reps, &mut report)?;
+                        }
                     }
                     window::<W>(n, &fixture(&dir, n, "window.ckpt"), steps, &changes, reps, &mut report)?;
                 });

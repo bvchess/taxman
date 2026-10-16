@@ -73,7 +73,7 @@ pub mod meet;
 
 use crate::bits::Bits;
 use crate::model::{FrameGraph, FrameSet};
-use meet::{bit, is_zero, lowest, xor, Meet, Problem, Vector};
+use meet::{bit, is_zero, lowest, xor, Meet, Problem, Snapshot, Vector};
 
 const NONE: u32 = u32::MAX;
 
@@ -320,8 +320,42 @@ impl Gf2Graph {
 /// it leaves free that the search finds forced are within 15 of `need`, nine in ten within 53, at 1215), and the
 /// searches of the members it leaves free cost more than they save: over the quick set of one-thread proofs
 /// (936-1350) a window of 25 costs 20.6 G cycles, 40 18.2, 60 17.3, 80 16.9, 120 17.6, no window 18.0 (without
-/// the search 26.4; nodes 217,374 then 132,049, 108,856, 96,283, 89,751, 86,481, 85,349).
+/// the search 26.4; nodes 217,374 then 132,049, 108,856, 96,283, 89,751, 86,481, 85,349).  The default of the tactic
+/// `force_window` ([`ForceWindow`]).
 pub const FORCE_WINDOW: i64 = 80;
+
+/// Which members of the heaviest set that the weight split leaves free [`Gf2Bound::evaluate`] searches for being
+/// forced after all (`Levels::force_by_cycles`; the tactic `force_window`): any choice is sound, since a member is
+/// called forced only where the search shows it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ForceWindow {
+    /// Those whose split bound is less than this far above `need` (0: none).
+    Within(u32),
+    /// Those whose split bound is above `need` by less than this percentage of the node's slack, the bound less
+    /// `need`.
+    Share(u8),
+    /// All of them.
+    All,
+}
+
+impl Default for ForceWindow {
+    fn default() -> Self {
+        ForceWindow::Within(FORCE_WINDOW as u32)
+    }
+}
+
+impl ForceWindow {
+    /// Whether a member whose split bound is `above` more than `need`, at a node whose bound is `slack` more than
+    /// `need`, is searched.
+    #[inline]
+    fn admits(self, above: i64, slack: i64) -> bool {
+        match self {
+            ForceWindow::Within(window) => above < i64::from(window),
+            ForceWindow::Share(percent) => above * 100 < i64::from(percent) * slack,
+            ForceWindow::All => true,
+        }
+    }
+}
 
 /// The most block words supported: ranks up to 320, which every board up to 8191 stays within (all checked in
 /// 2026-10: 314 at 8174; four words from n = 4740, five from 6392).
@@ -410,6 +444,11 @@ pub struct Gf2Stats {
     pub certified_children: u64,
     /// Members found forced by `Levels::force_by_cycles` where the split left them free.
     pub forced_by_cycles: u64,
+    /// Tableaux of solved levels made again ([`resolve`]): derived from a related one rather than built, of those
+    /// from a copy, and the blocks built in them all.
+    pub derived: u64,
+    pub derived_from_copies: u64,
+    pub blocks_built: u64,
 }
 
 impl<'g, const W: usize> Gf2Bound<'g, W> {
@@ -452,6 +491,12 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
         } else {
             unreachable!("an engine of {words} words at {W} words")
         }
+    }
+
+    /// Which members the weight split leaves free [`evaluate`](Self::evaluate) searches for being forced (the tactic
+    /// `force_window`; [`ForceWindow::default`] until set).
+    pub fn set_force_window(&mut self, window: ForceWindow) {
+        dispatch!(self, l => l.force_window = window)
     }
 
     /// Starts over with level 0 at the state reached from the root by promoting `promoted`, with the candidates
@@ -521,13 +566,37 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
         })
     }
 
+    /// In tests: from here on every tableau derived instead of built ([`meet::Meet::derive`]) is checked against the
+    /// one a solve builds, and a difference panics.
+    #[cfg(test)]
+    pub(crate) fn check_derivations(&mut self) {
+        dispatch!(self, l => l.meet.check = Some(Box::new(Meet::new(l.graph.len(), l.graph.blocks))))
+    }
+
+    /// In tests: the workspace's last search stamp, and setting it (to start just below the counter's wrap).
+    #[cfg(test)]
+    pub(crate) fn stamp_generation(&mut self) -> u32 {
+        dispatch!(self, l => l.meet.generation())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_stamp_generation(&mut self, generation: u32) {
+        dispatch!(self, l => l.meet.set_generation(generation))
+    }
+
+    /// In tests: the derived tableaux checked so far ([`check_derivations`](Self::check_derivations)).
+    #[cfg(test)]
+    pub(crate) fn derivations_checked(&mut self) -> u64 {
+        dispatch!(self, l => l.meet.checked)
+    }
+
     pub fn stats(&self) -> Gf2Stats {
         match &self.0 {
-            Engine::R1(l) => l.stats,
-            Engine::R2(l) => l.stats,
-            Engine::R3(l) => l.stats,
-            Engine::R4(l) => l.stats,
-            Engine::R5(l) => l.stats,
+            Engine::R1(l) => l.stats(),
+            Engine::R2(l) => l.stats(),
+            Engine::R3(l) => l.stats(),
+            Engine::R4(l) => l.stats(),
+            Engine::R5(l) => l.stats(),
         }
     }
 }
@@ -560,6 +629,28 @@ struct Level<const W: usize, const R: usize> {
     /// The workspace's solve count when this level was last solved, unchanged since (0 for none): if the workspace
     /// has made no solve since, it still holds the level's tableau.
     meet_solve: u64,
+    /// What the level's tableau can be derived from when it is made again ([`resolve`]).
+    source: Source<W, R>,
+}
+
+/// Where a solved level's tableau can be derived from instead of built ([`meet::Meet::derive`]): the workspace's solve
+/// count when it held a related tableau (0 for none), whose problem is the level's before the members `contracted`
+/// were promoted; and a copy of the level's own tableau, or of one it was certified from (with nothing contracted
+/// since), if `saved`.  Either serves while the level's set is the same and its live elements only lose members.
+#[derive(Clone, Default)]
+struct Source<const W: usize, const R: usize> {
+    held: u64,
+    contracted: Bits<W>,
+    snapshot: Snapshot<R>,
+    saved: bool,
+}
+
+impl<const W: usize, const R: usize> Source<W, R> {
+    fn clear(&mut self) {
+        self.held = 0;
+        self.contracted = Bits::EMPTY;
+        self.saved = false;
+    }
 }
 
 impl<const W: usize, const R: usize> Level<W, R> {
@@ -578,6 +669,7 @@ impl<const W: usize, const R: usize> Level<W, R> {
             has_pot: false,
             loss_floor: 0,
             meet_solve: 0,
+            source: Source::default(),
         }
     }
 
@@ -596,6 +688,7 @@ impl<const W: usize, const R: usize> Level<W, R> {
         self.cap = other.cap;
         self.settled = other.settled;
         self.value = other.value;
+        self.source.clear();
     }
 
     fn copy_from(&mut self, other: &Self) {
@@ -609,6 +702,7 @@ impl<const W: usize, const R: usize> Level<W, R> {
         self.has_split = false;
         self.has_pot = false;
         self.meet_solve = 0;
+        self.source.clear();
     }
 }
 
@@ -636,6 +730,8 @@ struct Levels<'g, const W: usize, const R: usize> {
     live_idx: Vec<u32>,
     start_idx: Vec<u32>,
     stats: Gf2Stats,
+    /// Which free members are searched for being forced ([`ForceWindow`]).
+    force_window: ForceWindow,
 }
 
 impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
@@ -666,6 +762,17 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             live_idx: Vec::with_capacity(n),
             start_idx: Vec::with_capacity(n),
             stats: Gf2Stats::default(),
+            force_window: ForceWindow::default(),
+        }
+    }
+
+    /// The counters, with the workspace's of the tableaux made again.
+    fn stats(&self) -> Gf2Stats {
+        Gf2Stats {
+            derived: self.meet.derived,
+            derived_from_copies: self.meet.restored,
+            blocks_built: self.meet.built,
+            ..self.stats
         }
     }
 
@@ -690,6 +797,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         level.has_split = false;
         level.has_pot = false;
         level.meet_solve = 0;
+        level.source.clear();
         for x in promoted.iter() {
             contract(self.graph, level, x);
         }
@@ -723,6 +831,9 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         }
         // The parent's heaviest set of all sizes, kept: the child's is that less the promoted.
         let whole = parent.solved && parent.settled && parent.history.last().is_some_and(keeps);
+        // The workspace's tableau, if it is the parent's, is the child's to derive its own from (the parent's
+        // problem with the promoted contracted, its set flipped along a cycle if the child is certified).
+        let held = if parent.meet_solve == self.meet.solves { parent.meet_solve } else { 0 };
         if whole {
             child.solved = true;
             child.settled = true;
@@ -730,8 +841,10 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             child.value = parent.value - added.sum();
             // The child's smaller sets, with the promoted, are smaller sets of the parent's.
             child.loss_floor = parent.loss_floor;
+            (child.source.held, child.source.contracted) = (held, *added);
             self.stats.inherited += 1;
         } else if certify_child(self.graph, &lower[d], parent, child, added, &mut self.meet, &mut self.live_idx) {
+            (child.source.held, child.source.contracted) = (held, *added);
             self.stats.certified_children += 1;
         }
         self.depth = d + 1;
@@ -763,9 +876,13 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             level.solved = false;
             level.settled = false;
         }
-        // Deleting a candidate outside the heaviest set leaves it the heaviest: the history still ends with it.
+        // Deleting a candidate outside the heaviest set leaves it the heaviest: the history still ends with it.  Its
+        // tableau, if the workspace holds it, is then the one to derive the level's from (a deletion).
         level.has_split = false;
         level.has_pot = false;
+        if level.solved && level.meet_solve == self.meet.solves && level.meet_solve != 0 {
+            (level.source.held, level.source.contracted) = (level.meet_solve, Bits::EMPTY);
+        }
         level.meet_solve = 0;
     }
 
@@ -804,7 +921,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
     /// the workspace's), at `need`, added to `forced`: a member is forced when every set without it weighs less than
     /// `need`, which holds when the sets of other sizes than the heaviest set's lose more than the slack `value −
     /// need` and its exchange graph has no cycle through the member that short (see `meet`'s module docs).  Only the
-    /// members whose split bound is within [`FORCE_WINDOW`] of `need` are searched.
+    /// members whose split bound the window admits are searched (the tactic `force_window`, [`ForceWindow`]).
     fn force_by_cycles(&mut self, cap: usize, need: u64, forced: &mut Bits<W>) {
         let graph = self.graph;
         let level = &mut self.levels[self.depth];
@@ -819,17 +936,22 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             vector: [&level.vec[0], &level.vec[1]],
             weight: &graph.weight,
         };
-        let mut losses = Losses::of(level, &self.meet, cap > size);
+        let mut losses = Losses::of(level, &mut self.meet, &problem, cap > size);
         if !losses.certify(slack + 1, &mut self.meet, &problem, &level.pot) {
             return;
         }
         level.loss_floor = losses.smaller;
+        // The members of a cycle found within the slack: that cycle passes through each, as long, so none is forced.
+        let mut free = Bits::<W>::EMPTY;
         for &(x, bound) in &level.split {
-            let near = bound - (need as i64) < FORCE_WINDOW;
-            if near
-                && !forced.contains(x)
-                && !self.meet.has_cycle_within(&problem, &level.pot, graph.index[x as usize], slack)
-            {
+            let near = self.force_window.admits(bound - need as i64, slack);
+            if !near || forced.contains(x) || free.contains(x) {
+                continue;
+            }
+            let e = graph.index[x as usize];
+            if self.meet.has_cycle_within(&problem, &level.pot, e, slack) {
+                self.meet.cycle_members(e, |z| free.insert(graph.elems[z as usize]));
+            } else {
                 forced.insert(x);
                 self.stats.forced_by_cycles += 1;
             }
@@ -895,7 +1017,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             weight: &graph.weight,
         };
         let last = level.history.last().copied().unwrap_or(Bits::EMPTY);
-        let mut losses = Losses::of(level, &self.meet, cap > size);
+        let mut losses = Losses::of(level, &mut self.meet, &problem, cap > size);
         let reach = losses.reach(&last);
         self.certified.clear();
         for &x in xs {
@@ -931,6 +1053,14 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         kept.value = value;
         // Without x the smaller sets weigh no more than with it.
         kept.loss_floor = (level.loss_floor - delta).max(0);
+        // The level's tableau, which the workspace holds (it certified the set), is the one to derive the kept
+        // level's from (the set flipped along the cycle, x deleted), copied because the child's subtree will use
+        // the workspace before the level goes on without x.
+        if level.meet_solve == self.meet.solves && level.meet_solve != 0 {
+            kept.source.held = level.meet_solve;
+            self.meet.save(&mut kept.source.snapshot);
+            kept.source.saved = true;
+        }
         self.kept_for = Some((self.depth, x));
         self.scratch_for = None;
     }
@@ -1015,6 +1145,7 @@ fn solve<const W: usize, const R: usize>(
     level.solved = !meet.stopped;
     level.settled = meet.settled;
     level.meet_solve = meet.solves;
+    level.source.clear();
     level.cap = cap;
     level.value = meet.value as u64;
     level.loss_floor = Losses::from_history(level).unwrap_or(0);
@@ -1053,7 +1184,7 @@ fn certify_child<const W: usize, const R: usize>(
         weight: &graph.weight,
     };
     // The child's heaviest set of all sizes: the parent's sets of every other size count.
-    let mut losses = Losses::of(parent, meet, true);
+    let mut losses = Losses::of(parent, meet, &problem, true);
     banned.clear();
     banned.extend((*added | (parent.live - last - child.live)).iter().map(|y| graph.index[y as usize]));
     let reach = losses.reach(&last);
@@ -1098,12 +1229,17 @@ impl Losses {
     }
 
     /// For `level`, whose tableau the workspace `meet` holds; the larger sets count if `larger`.
-    fn of<const W: usize, const R: usize>(level: &Level<W, R>, meet: &Meet<R>, larger: bool) -> Self {
+    fn of<const W: usize, const R: usize>(
+        level: &Level<W, R>,
+        meet: &mut Meet<R>,
+        problem: &Problem<'_, R>,
+        larger: bool,
+    ) -> Self {
         let exact = Self::from_history(level);
         Losses {
             smaller: exact.unwrap_or(level.loss_floor).max(level.loss_floor),
             exact: exact.is_some(),
-            larger: if larger { meet.gap } else { i64::MAX },
+            larger: if larger { meet.gap(problem) } else { i64::MAX },
         }
     }
 
@@ -1148,12 +1284,24 @@ fn resolve<const W: usize, const R: usize>(
     live_idx.extend(level.live.iter().map(|x| graph.index[x as usize]));
     start_idx.clear();
     start_idx.extend(chosen.iter().map(|x| graph.index[x as usize]));
+    let size = start_idx.len();
+    let source = &level.source;
+    start_idx.extend(source.contracted.iter().map(|x| graph.index[x as usize]));
+    let (start, contracted) = start_idx.split_at(size);
     let problem = Problem {
         block: [&graph.block[0], &graph.block[1]],
         vector: [&level.vec[0], &level.vec[1]],
         weight: &graph.weight,
     };
-    meet.solve(&problem, live_idx, start_idx, usize::MAX, i64::MAX, |_| {});
+    // The same tableau as the solve from the heaviest set would build (see `meet`, "Deriving a tableau"), derived
+    // from a related one where the level has one.
+    if source.held != 0 && source.held == meet.solves {
+        meet.derive(&problem, live_idx, start, contracted);
+    } else if source.saved {
+        meet.derive_from(&source.snapshot, &problem, live_idx, start, &[]);
+    } else {
+        meet.solve(&problem, live_idx, start, usize::MAX, i64::MAX, |_| {});
+    }
     debug_assert_eq!(meet.value as u64, level.value, "the heaviest set solved again changed");
     level.meet_solve = meet.solves;
 }

@@ -39,6 +39,45 @@ fn a_range_reproduces_optimal_json() {
     }
 }
 
+/// Settings of the tactics that tune the GF(2) search other than the defaults, each a list of `--tactic` assignments
+/// in the order of the tactics.
+const TUNINGS: [&str; 14] = [
+    "force_window=0",
+    "force_window=20",
+    "force_window=all",
+    "force_window=50%",
+    "branching=largest",
+    "branching=split",
+    "branching=forced",
+    "strong_limit=1",
+    "strong_limit=2",
+    "strong_depth=0",
+    "strong_depth=6",
+    "strong_depth=6,deep_branching=largest",
+    "strong_depth=6,deep_branching=exact",
+    "more_forced=off",
+];
+
+/// The tactics that tune the GF(2) search find the same scores at games that need longer searches than those to 300
+/// (931..=940, around the hard 936, on one thread, every game searched).
+#[test]
+fn every_tuning_of_the_gf2_search_gives_the_same_scores() {
+    let optimal = Optimal::built_in();
+    for assignments in std::iter::once("default").chain(TUNINGS) {
+        let mut opts = SolveOptions { force_search: true, ..options(1) };
+        if assignments != "default" {
+            for assignment in assignments.split(',') {
+                opts.tactics.set(assignment).unwrap();
+            }
+        }
+        for r in solve_all(931, 940, &opts) {
+            assert!(r.completed, "{assignments}: n={}", r.n);
+            assert_eq!(Some(r.score), optimal.score(r.n), "{assignments}: n={}", r.n);
+            assert_eq!(r.tactics.description(), assignments, "n={}", r.n);
+        }
+    }
+}
+
 #[test]
 fn every_tactic_gives_the_same_scores() {
     let optimal = Optimal::built_in();
@@ -67,6 +106,8 @@ fn every_tactic_gives_the_same_scores() {
             "match_refine=3,gf2=off",
             "fix_forced=off,lagrange=on,gf2=off",
         ]
+        .into_iter()
+        .chain(TUNINGS)
         .map(with),
     );
     for (name, opts) in variants {
