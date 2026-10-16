@@ -428,7 +428,11 @@ with three or more factors.  At the roots of 880–1300 its gap to the optimum i
   forced, as the matching's are.  The split's bound is loose, so for the members it leaves free within the tactic
   `force_window` (80, `gf2::FORCE_WINDOW`) of `need`, the exchange graph decides: a member is forced too when no
   cycle through it is shorter than the slack `value − need` and the sets of other sizes lose more than that
-  (`Meet::has_cycle_within`).
+  (`Meet::has_cycle_within`); a member on a cycle that the search for another found within the slack is not searched,
+  since that cycle passes through it.  The searches reach the elements free in `A` from the members, and the members
+  from the elements free in `B`, through one hub each (the least distance plus `w1`, less `w2`), which keeps their
+  distances, order and cycles; their queue is a radix heap of the packed (distance, vertex) keys, which come out in
+  the binary heap's order.
 * **Exact strong branching.**  The member of the conflict to branch on is the one without which the intersection
   is lowest, each bound read off the exchange graph where it is certified and solved where not (in the order of the
   split's bounds, each solve stopped once it reaches both the lowest so far and `need`, a greedy lower bound tried
@@ -1373,7 +1377,11 @@ to 2175 took 27 minutes on 8 ([results/README.md](results/README.md)); its cost 
 follow the root's GF(2) gap, with no growth that a fit over 1301–2175 resolves.  Past 2175 it grows, tenfold per about
 1,040 in n, and a day on one 64-CPU cloud machine took the chain from 2176 to 3440 (the [cloud
 run](docs/experiments/the-frontier-chain-to-3440-2026-10.md) sets it beside the projections of the day: near 4,100, and
-3,400 to 3,700 at their pessimistic end); the widths go to 8191.
+3,400 to 3,700 at their pessimistic end); the widths go to 8191.  At the end of that chain (3441 resumed from the cloud
+run's checkpoint, one thread) a step cost 888k cycles, 92% of it in the GF(2) bound; with its tableaux derived, a hub
+for the elements free in `B` and the other changes of [cheaper GF(2)
+nodes](docs/experiments/cheaper-gf2-nodes-same-trees-2026-10.md) it costs 543k, the same trees (3,570 to 5,865 nodes a
+CPU-second).
 
 **The matching path** (the default before the GF(2) bound; these are the build of commit 4b6ef38, on the M1 Max): the
 proof of 1215 takes 33 s on one thread (106 G cycles), and 1184 takes 3.2 G cycles.  The chain 1..1231 took 279 s of
