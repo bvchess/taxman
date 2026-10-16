@@ -1,16 +1,22 @@
-//! A chain of games searched on the extended problem Π⁺(∅): the frame model without `unzip`'s claims
+//! A chain of games searched on the extended problem Π⁺(∅): the frame model with or without `unzip`'s claims
 //! ([`taxman::frames::build_extended`], [`Board::prepare_extended`]).  Research code for the extended problem
 //! (heuristics/THEORY.md, "The extended problem"); the solver does not use it.  By Theorems M and M⁺ the promotion sets
 //! of Π⁺(∅) are those of the frame model, so a chain searched on it must score every game as `optimal.json` and
-//! `results/strict.jsonl` do.  Its root frames keep the pairs `unzip` would claim (only the root's reduction removes
+//! `results/strict.jsonl` do.  With the claims Lemma M5⁺ keeps, the default, Π⁺(∅) is the frame model's problem itself,
+//! so `--compare` shows the same trees (a ratio of 1).  With `--no-claims`, the formulation of the first certificates
+//! (the measurement of stage 1), its root frames keep the pairs `unzip` would claim (only the root's reduction removes
 //! some), so its trees can differ from the default problem's: how many nodes it takes against them is the
 //! measurement.
 //!
 //! ```text
-//! cargo run --release --example extended -- chain FROM TO [--compare] [--known FILE] [--out FILE]
-//! cargo run --release --example extended -- words FROM TO --upper FILE...
-//! cargo run --release --example extended -- problems FROM TO --upper FILE... [--known FILE] [--out FILE]
+//! cargo run --release --example extended -- chain FROM TO [--compare] [--no-claims] [--known FILE] [--out FILE]
+//! cargo run --release --example extended -- words FROM TO --upper FILE... [--no-claims]
+//! cargo run --release --example extended -- problems FROM TO --upper FILE... [--no-claims] [--known FILE] [--out FILE]
 //! ```
+//!
+//! `--no-claims` applies to all three modes: Π⁺ is set up without the claims of `unzip` (the formulation of the
+//! certificates made before Lemma M5⁺, `taxman certify --no-claims`) where the default keeps the claims that lemma
+//! allows (`Board::extended`).
 //!
 //! For each board `n` in `FROM..=TO` (2 at least, `TO` at most the largest board the solver supports), one after the
 //! other on one thread, each game built from the game before it: the game of `FROM − 1` is the one of `optimal.json`
@@ -54,13 +60,14 @@
 //!
 //! ```text
 //! {"n":..,"score":V,"open":|O|,"rejected":|R|,"frames":..,"two_sided":..,"one_sided":..,"in_the_bag":..,
-//!  "worth":V-in_the_bag,"words":..,"width":W|null,"digest":"<16 hex>","same_as":m|null}
+//!  "worth":V-in_the_bag,"words":..,"width":W|null,"claims":true|false,"digest":"<16 hex>","same_as":m|null}
 //! ```
 //!
-//! `same_as` is the latest game m of the 8 board sizes before n (`SAME_SEARCH_WINDOW`) among the games of the run whose
-//! problem equals n's whole (the digest, then the problems), whatever the two games are worth: where the worths are
-//! equal as well, `taxman certify` settles n from m with no search.  At the end, on stderr: the games, those with a
-//! `same_as`, those of them with equal worth, the games by width, and the seconds.
+//! `claims` is the formulation the problem, the words and the width are of.  `same_as` is the latest game m of the 8
+//! board sizes before n (`SAME_SEARCH_WINDOW`) among the games of the run whose problem equals n's whole (the digest,
+//! then the problems), whatever the two games are worth: where the worths are equal as well, `taxman certify` settles n
+//! from m with no search.  At the end, on stderr: the games, those with a `same_as`, those of them with equal worth,
+//! the games by width, and the seconds.
 
 use std::collections::BTreeMap;
 use std::fs::{File, OpenOptions};
@@ -79,9 +86,9 @@ use taxman::json::Json;
 use taxman::search::{search_with, Prepared, Problem, SearchTactics};
 use taxman::solver::{digest_text, MAX_N, SAME_SEARCH_WINDOW};
 
-const USAGE: &str = "usage: extended chain FROM TO [--compare] [--known FILE] [--out FILE]
-       extended words FROM TO --upper FILE...
-       extended problems FROM TO --upper FILE... [--known FILE] [--out FILE]   (2 <= FROM <= TO)";
+const USAGE: &str = "usage: extended chain FROM TO [--compare] [--no-claims] [--known FILE] [--out FILE]
+       extended words FROM TO --upper FILE... [--no-claims]
+       extended problems FROM TO --upper FILE... [--no-claims] [--known FILE] [--out FILE]   (2 <= FROM <= TO)";
 
 /// The benchmark games, whose node counts the summary lists when they are in range.
 const BENCHMARK_GAMES: [u32; 7] = [936, 1215, 1050, 1100, 1133, 1170, 1184];
@@ -103,6 +110,8 @@ struct Args {
     from: u32,
     to: u32,
     compare: bool,
+    /// The formulation of Π⁺ (`Board::extended`): with the claims of `unzip` that Lemma M5⁺ keeps unless `--no-claims`.
+    claims: bool,
     known: Option<PathBuf>,
     out: Option<PathBuf>,
     upper: Vec<PathBuf>,
@@ -118,11 +127,12 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
         _ => return Err(USAGE.to_owned()),
     };
     let (from, to) = (board(from)?, board(to)?);
-    let (mut compare, mut known, mut out, mut upper) = (false, None, None, Vec::new());
+    let (mut compare, mut claims, mut known, mut out, mut upper) = (false, true, None, None, Vec::new());
     let mut flags = flags.iter();
     while let Some(flag) = flags.next() {
         match flag.as_str() {
             "--compare" => compare = true,
+            "--no-claims" => claims = false,
             "--known" => known = Some(PathBuf::from(flags.next().ok_or(USAGE)?)),
             "--out" => out = Some(PathBuf::from(flags.next().ok_or(USAGE)?)),
             "--upper" => upper.push(PathBuf::from(flags.next().ok_or(USAGE)?)),
@@ -141,7 +151,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     if !allowed {
         return Err(USAGE.to_owned());
     }
-    Ok(Args { command, from, to, compare, known, out, upper })
+    Ok(Args { command, from, to, compare, claims, known, out, upper })
 }
 
 /// The file `--out` names, opened for appending.
@@ -232,11 +242,17 @@ struct Game {
     known: bool,
 }
 
-/// Plays game `n` of the chain after `prev`: settles Π⁺(∅) (and, with `compare`, the default problem), makes the game
-/// of the promotions and referees it.  The error says which check failed.
-fn play<const W: usize>(n: u32, prev: &Prev, compare: bool, optimal: &Optimal) -> Result<(Game, Prev), String> {
+/// Plays game `n` of the chain after `prev`: settles Π⁺(∅) in the formulation `claims` (and, with `compare`, the
+/// default problem), makes the game of the promotions and referees it.  The error says which check failed.
+fn play<const W: usize>(
+    n: u32,
+    prev: &Prev,
+    claims: bool,
+    compare: bool,
+    optimal: &Optimal,
+) -> Result<(Game, Prev), String> {
     let board = Board::<W>::for_n(n);
-    let (extended, prepared) = board.prepare_extended(SearchTactics::default())?;
+    let (extended, prepared) = board.prepare_extended(claims, SearchTactics::default())?;
     if extended.in_the_bag != board.in_the_bag {
         return Err(format!(
             "n={n}: Π⁺(∅) fixes {} but the game with no promotions scores {}",
@@ -385,7 +401,7 @@ fn run(args: &Args) -> Result<(), String> {
     let mut out = open_out(args.out.as_ref())?;
     let mut games = Vec::new();
     for n in args.from..=args.to {
-        let (game, next) = taxman::with_width!(n, W => play::<W>(n, &prev, args.compare, &optimal))?;
+        let (game, next) = taxman::with_width!(n, W => play::<W>(n, &prev, args.claims, args.compare, &optimal))?;
         println!("{}", describe(&game));
         append(&mut out, &json_line(&game))?;
         games.push(game);
@@ -401,7 +417,7 @@ fn words(args: &Args) -> Result<(), String> {
     let (mut by_words, mut widest, mut beyond) = (BTreeMap::<usize, usize>::new(), Vec::new(), Vec::new());
     for line in upper.range(args.from..=args.to).map(|(_, line)| line).filter(|line| line.needs) {
         let n = line.n;
-        let (words, width) = certificate_width(n, &line.open)?;
+        let (words, width) = certificate_width(n, &line.open, args.claims)?;
         let own = width_for(words_for(n));
         let shown = match width {
             Some(width) if Some(width) == own => width.to_string(),
@@ -474,8 +490,8 @@ fn problems(args: &Args) -> Result<(), String> {
         if score != line.score {
             return Err(format!("n={n}: the recorded score is {score}, the barred bounds' is {}", line.score));
         }
-        let posed = extended_problem(n, &line.open)?;
-        let (words, width) = certificate_width(n, &line.open)?;
+        let posed = extended_problem(n, &line.open, args.claims)?;
+        let (words, width) = certificate_width(n, &line.open, args.claims)?;
         let worth =
             score.checked_sub(posed.in_the_bag).ok_or_else(|| format!("n={n}: the score is below in_the_bag"))?;
         let digest = posed.problem.digest();
@@ -494,6 +510,7 @@ fn problems(args: &Args) -> Result<(), String> {
             ("worth", Json::from(worth)),
             ("words", Json::from(words)),
             ("width", width.map_or(Json::Null, Json::from)),
+            ("claims", Json::Bool(args.claims)),
             ("digest", Json::from(digest_text(digest))),
             ("same_as", same_as.map_or(Json::Null, Json::from)),
         ]);

@@ -154,19 +154,21 @@ const CERTIFY_FLAGS: [&str; 5] = ["--results", "--upper", "--out", "--threads", 
 /// open members from the prover's barred bounds (`upper` files).  A game whose line there does not say `needs` (a
 /// prime, or a score at its ceiling, which rest on n − 1) is passed over.  Each game's certificate is appended to
 /// `--out` as it is made, and a rerun skips the games the file has a certificate for and resumes a stopped search
-/// from its checkpoint.  A game whose extended problem a certified game of the last 8 board sizes (of this run, or of
-/// the file) posed, with a recorded game worth what that game's certificate proved the most, is certified with no
-/// search
-/// (`same_problem`; [`taxman::certify`]).  A game found to beat its recorded score is printed, written to
-/// `<out>.counterexample.jsonl` too, and ends the run with status 2, as does a rerun over a game the file records
-/// beaten.
+/// from its checkpoint.  The extended problem is searched with the claims of `unzip` that Lemma M5⁺ keeps, unless
+/// `--no-claims` says to search it without them (the formulation of the certificates made before that lemma); each
+/// certificate records its formulation.  A game whose extended problem a certified game of the last 8 board sizes (of
+/// this run, or of the file, made in either formulation) posed, with a recorded game worth what that game's
+/// certificate proved the most, is certified with no search (`same_problem`; [`taxman::certify`]).  A game found to
+/// beat its recorded score is printed, written to `<out>.counterexample.jsonl` too, and ends the run with status 2, as
+/// does a rerun over a game the file records beaten.
 pub fn certify(args: &[String]) -> CliResult {
     let usage = |why: &str| {
         CliError::Usage(format!(
             "{why}\nusage: certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE [options]"
         ))
     };
-    let args = Args::parse(args, &[&CERTIFY_FLAGS[..], &SEARCH_FLAGS[..]].concat(), &[])?;
+    let args = Args::parse(args, &[&CERTIFY_FLAGS[..], &SEARCH_FLAGS[..]].concat(), &["--no-claims"])?;
+    let claims = !args.has("--no-claims");
     // The boards in the order to certify them, and how the tally names them.
     let lists = args.values("--list");
     let (boards, label) = match (args.positional(), lists.as_slice()) {
@@ -223,7 +225,7 @@ pub fn certify(args: &[String]) -> CliResult {
             }
             None => {}
         }
-        let certificate = certify_game_with(n, &known, line, &opts, &mut earlier).map_err(failed)?;
+        let certificate = certify_game_with(n, &known, line, claims, &opts, &mut earlier).map_err(failed)?;
         file.append(&certificate).map_err(failed)?;
         outln!("{}", certificate.summary_line());
         let _ = std::io::stdout().flush();

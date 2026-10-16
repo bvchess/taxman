@@ -73,7 +73,9 @@ commands:
                           beats its score is also written to OUT.counterexample.jsonl and the run exits with
                           status 2.
                           Options: --threads K, --checkpoint-dir DIR, --checkpoint-interval S, --progress S,
-                          --time-limit S, --node-limit N, --mem-cap UNITS, as for solve; a rerun skips the games
+                          --time-limit S, --node-limit N, --mem-cap UNITS, as for solve; --no-claims, search the
+                          extended problem without the claims of `unzip` (the formulation of the certificates
+                          made before Lemma M5+; the default keeps the claims it allows).  A rerun skips the games
                           --out has a verdict for and resumes a stopped search from its checkpoint
   verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...] [--threads K]
                           check the files of certificates `certify --out` wrote, without changing them: every

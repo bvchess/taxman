@@ -21,8 +21,8 @@
 //!   [`NumberedFrame`] with its number, the frames in front of it and the pairs `unzip` settled in it; it is for the
 //!   census of the structure of the frames (`examples/structure.rs`), and the solver does not use it.
 //! * [`ExtendedFrames`] is the frames of the extended problem, in which some of the sources of three or more prime
-//!   factors are optional and `unzip` settles nothing ([`build_extended`]); research code, which the solver does not
-//!   use either.
+//!   factors are optional and only the claims of `unzip` that Lemma M5⁺ allows are kept ([`build_extended`]); research
+//!   code, which the solver does not use either.
 //!
 //! The Java has several names for the one idea (DESIGN.md, "The Java solver and the frame solver", maps them); this
 //! module calls it a frame throughout.  [`Frame`] has the name of [`crate::model::Frame`], the search's copy of it (a
@@ -184,7 +184,7 @@ mod board_frames;
 mod extended;
 
 pub use board_frames::{BoardFrames, ClaimKind, Frame};
-pub use extended::{build_extended, extended_frame_count, ExtendedFrames};
+pub use extended::{build_extended, extended_frame_count, Claim, ClaimCheck, ExtendedFrames};
 
 use crate::bits::Bits;
 use crate::model;
@@ -207,9 +207,10 @@ pub struct SearchFrames<const W: usize> {
     pub names: Vec<String>,
     /// For each of `frames`, the pairs `unzip` settled in the merged frame as the final `finish_setup` left it (the
     /// [`Frame::claims`] of the frame that `frames` takes its remaining moves and factors from), in the order made;
-    /// none for an empty frame.  For the census of the structure of the frames (`examples/structure.rs`); nothing in
-    /// the solver reads them.
-    pub claims: Vec<Vec<(u32, u32, ClaimKind)>>,
+    /// none for an empty frame.  For the census of the structure of the frames (`examples/structure.rs`) and the
+    /// extended problem, which keeps those Lemma M5⁺ allows ([`build_extended`]); the solver's search does not read
+    /// them.
+    pub claims: Vec<Vec<Claim>>,
     /// Every number that could be promoted, in any frame: for each frame with freedoms, the factors it could spare
     /// that a frame in front of it could take on as a source ([`BoardFrames::promotion_candidates_of`]), collected
     /// number by number before the frames with that number are merged.

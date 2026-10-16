@@ -126,7 +126,7 @@ fn extended_problem<const W: usize>(
     board: &Board<W>,
     open: &Bits<W>,
 ) -> Result<(ExtendedFrames<W>, Prepared<W>), String> {
-    let ext = build_extended::<W>(&board.tables, open)?;
+    let ext = build_extended::<W>(&board.tables, open, &[])?;
     let (model, root) = FrameGraph::build_extended::<W>(&board.tables, &ext.columns(), &ext.one_sided)?;
     let one_sided: Bits<W> = ext.one_sided.iter().map(|&(s, _)| s).collect();
     let candidates = ext.candidates | one_sided;

@@ -1396,7 +1396,8 @@ it, before any merge: a component of Lemma Ω, in one layer.
 * with ℓ₀ the lowest layer of a frame with freedoms⁺, frame h of Π⁺(O)
   is the union of the frames with freedoms⁺ of layer ℓ₀ + h, with their
   fixed sources as moves and all their factors (empty if there is
-  none).  Nothing is claimed;
+  none).  Nothing is claimed (Lemma M5⁺, below, says which claims of
+  `unzip` can be kept);
 * the *two-sided candidates* are the factors x of the frames h ≥ 1
   that pass setup's two tests with F in place of the remaining
   sources: (a) F ∩ C_x is playable against the factors of C_x less x
@@ -1486,6 +1487,85 @@ candidates too, each as a possible move of its frame
 peels of the unreduced frames) decides the promotion sets of Π⁺(O)
 for the tests.
 
+*The claims of `unzip` in Π⁺(O).*  They cannot be reused as they are:
+a back claim (s, f) of Π_n is safe because no candidate of Π_n lists f
+(M5), and Π⁺(O) has more candidates.  A frame of f's layer that holds
+an open source has more freedoms⁺, can take on composites of f that
+Π_n's frame could not, and so makes them candidates: the mechanism of
+n = 98 above.  So the claims are kept frame by frame, with a check.
+Take the claims of Π_n, the pairs (s, f) that `unzip` settled in the
+merged frames of the search as the last simplification left them, in
+the order made, and give each the frame C (as setup forms it, before
+any merge) of its source s, which holds f too (s lists only factors of
+its own frame).  C *keeps* its claims if it holds no member of O ∪ R
+and each of its back claims (s, f) passes the *check*: f is not a
+two-sided candidate of Π⁺(O), and no two-sided candidate of Π⁺(O) has
+f among its maximal factors.  *Π⁺(O) with claims* takes the pairs of
+the frames that keep them out of their frames of Π⁺(O) (s from the
+moves, f from the factors) before the root is reduced; everything
+else, the candidates and in_the_bag⁺ among it, is Π⁺(O)'s.  Let
+I_h(K, L) be frame h's instance in Theorem M⁺'s proof: its members are
+F ∩ frame h, the members of K of frame h and the members of L promoted
+into it, and its pool is frame h's factors less the members of L of
+home h.
+
+**Lemma M5⁺ (the claims kept are moves of the instances).**  Let C be
+a frame that keeps its claims, in frame h of Π⁺(O), and (K, L) with
+K ⊆ O ∪ R and L ⊆ the two-sided candidates such that either S = F ∪ K
+∪ L is playable (S as in Theorem M⁺) or (K, L) is a promotion set of
+Π⁺(O) with claims.  Then the claims of C, in the order made, are front
+and back moves of I_h(K, L), and no claimed factor is in L.
+
+*Proof.*  The members of I_h(K, L) that list factors of C are the
+sources of C, all of them fixed (C holds no member of O, so F ∩ C =
+U\* ∩ C), and members of L promoted into frame h: no member of K lies
+in C (C holds no member of O ∪ R), and a member of K lists only
+factors of its own frame.  The claims of other frames, made in
+between, touch none of C's sources and factors.  Take C's claims in
+order, the earlier ones made (front and back moves keep a playable
+instance playable, Theorem 3).
+
+*Back claim (s, f).*  When `unzip` made it, s was the only remaining
+source of its merged frame that wanted f, and the remaining sources of
+C were U\* ∩ C less the sources of the earlier claims (M1: the passes
+after the first keep every source).  In I_h(K, L) after the earlier
+moves, s is the only source of C that lists f, and no member of L
+lists f, by the check.  And f is in the pool: by the check f is no
+candidate, so f ∉ L.  It is a back move.
+
+*Front claim (s, f).*  When `unzip` made it, f was the only factor of
+s not claimed before, so after the earlier moves s lists f alone in
+I_h(K, L), or nothing if f ∈ L.  If S is playable, f ∈ L would leave s
+nothing in a residual that the earlier moves kept playable; if (K, L)
+is a promotion set, f is in no frame of the root, so it has no home,
+and every member of L has one.  So f ∉ L, and the claim is a front
+move.  ∎
+
+So Theorem M⁺ holds for Π⁺(O) with claims, with the same proof: (only
+if) by the lemma the claims kept are moves of each playable I_h(K, L)
+and take nothing from L, so what is left, the frame with claims with
+(K, L) applied, is playable (Theorem 3), and the reduction is M6's;
+(if) in each frame the claims kept, the reductions and a peel of what
+is left pair every member of I_h(K, L) by front and back moves (the
+lemma, for the claims), an acyclic scheme (Theorem 2), and the rest of
+the proof is unchanged.
+
+**Corollary (the formulation does not matter).**  Π⁺(O) and Π⁺(O)
+with claims have the same promotion sets, and so the same heaviest
+promotion set, worth the same: by Theorem M⁺ for each, the promotion
+sets of both are the (K, L) with F ∪ K ∪ L playable, and in_the_bag⁺ =
+ΣF in both.  So a certificate made in one formulation bounds the
+heaviest promotion set of the other.
+
+With O = ∅ every frame keeps its claims, and Π⁺(∅) with claims is
+Π_n: every back claim of Π_n passes the check (its factor cannot go
+forward, so it fails test (b) and is no candidate, and M5 shows that no
+candidate lists it), Π⁺(∅) has Π_n's candidates, and each frame of
+Π⁺(∅), the union of its parts' sources and factors less the pairs, is
+the merged frame's remaining sources and factors.  The census of the
+frames checks that the two problems the search is given are equal on
+every board to 8191 (`rust/examples/structure.rs`, check H).
+
 *Theorem 11 for Π⁺.*  Give each one-sided candidate s, of frame h,
 the vector v_h(s) of its maximal factors among frame h's factors in
 the matroid of frame h (A or B, by the parity of h), and make it a
@@ -1526,7 +1606,12 @@ worth V(m) − in_the_bag⁺(m), and V(n) − in_the_bag⁺(n) ≥ V(m) −
 in_the_bag⁺(m), then no promotion set of Π⁺ of n is worth more than
 V(n) − in_the_bag⁺(n), and with n's own certified members the corollary
 gives opt(n) = V(n) without a search (`taxman certify`'s
-`same_problem`).
+`same_problem`).  The two problems are compared in one formulation,
+with the claims of Lemma M5⁺ or without, whatever formulation m's
+certificate was made in: the heaviest promotion set of Π⁺ of m is the
+same in both (the corollary of Lemma M5⁺).  With the claims more
+consecutive games pose the same problem, since a claimed pair that
+only one of them has is no longer part of it.
 
 ## Signed frame matroids: the frame bound over other fields
 
@@ -2008,6 +2093,7 @@ and the adversarial experiments: `rust/prover/README.md`.
 | N: the numbering of the frames is clean; setup numbers them by layer, and the Java's breadth-first numbering is the same on every board the solver supports | N by construction (Lemma Ω); the two numberings equal on every board 2..8191 (the census, checks C and the numbering's fields: frame h is the frames with freedoms of layer 3 + h, 2 + h on 80 boards ≤ 186), and on every board to 400 and a sample to 8191 (the tests of `rust/src/frames/`); on boards with holes they differ (56 without 39; 32 without 4 has a number without frames) | proven (N); measured (the equality) |
 | U\* ∪ L is playable iff L is a promotion set of the frame solver's root problem, and weighs in_the_bag + ΣL (Theorem M) | every set of every board ≤ 100 both ways (11,635 sets; 101..120, 167,681, in an ignored test); random sets both ways on boards 60..1300 (and 2000..8191, ignored); no candidate lists a back claim's factor, none is in frame 0, every one has a home, U\* is an independent greedy's, on every board to 8191 (the census, checks D-G); the true near misses the candidate filter alone keeps out, 27 boards to 2000 (`rust/tests/model_exact.rs`) | proven |
 | With a set O of the sources of three or more prime factors left optional, a set S ⊇ U\* ∖ O is playable iff it is a promotion set (K, L) of the extended problem Π⁺(O), and weighs in_the_bag⁺ + ΣK + ΣL (Theorem M⁺); with O = ∅ its promotion sets are the frame model's | every set of every board ≤ 80 both ways for O = ∅ and three random O per board, ≤ 60 for O = U\*_{≥3} (6.4 million sets; 81..100 and 61..69, 24 million more, in ignored tests); random sets both ways for O of 20 random members, for O = U\*_{≥3} and for O = ∅ at 300..1300, at 741, 1100 and 1200 (where greedy rejects a source of layer 3) and, ignored, at 2000..4095; Π⁺(∅)'s frames, candidates, freedoms and promotion sets the frame model's on every board to 400 (to 100 for the sets); a chain 2..1300 searched on Π⁺(∅) gives every score of optimal.json (`rust/tests/model_extended.rs`, `rust/examples/extended.rs`) | proven |
+| The claims of `unzip` kept by a frame free of O ∪ R whose back claims pass the check are front and back moves of every instance, so Theorem M⁺ holds with them taken out, and Π⁺(O) has the same promotion sets with and without them (Lemma M5⁺ and its corollary); with O = ∅ every claim is kept and Π⁺(∅) is Π_n | Theorem M⁺ against the oracle with the claims kept, as without (every set both ways on every board ≤ 80, ≤ 60 with every source open, 5.9 million sets, and the ignored 81..100 and 61..69; random sets at 300..1300, 741, 1100, 1200 and, ignored, 2000..4095; the search's optimum on every board ≤ 80); a mutant that keeps the claims the check refuses is caught on every problem ≤ 80 where it refuses one (24..26); Π⁺(∅) with the claims poses Π_n's problem on every board 2..8191 (the census, check H) and searches the tripwires' trees node for node; all 377 certificates of 600..1300 certified in both formulations, the rule of the same problem settling 101 with the claims where 81 without, each as a search of it (`rust/tests/model_extended.rs`, `rust/tests/tripwires.rs`, `rust/tests/certify.rs`) | proven |
 | U: some optimal set contains U\*_{≥3}; the frame solver's answer is opt(n) iff U holds at n (the corollary) | every n ≤ 2175 (the prover's proofs on the whole board); the strong form in every game enumerated; barred parity bounds certify 84-99.7% of U\*_{≥3} per game to 2175 and 54-98% on the EC2 chain's 2176..3314, and close no game alone (`rust/prover/data/upper_*.jsonl`) | open; holds to 2175 |
 | opt(n) equals the recorded score: the frame model's answer is the true optimum | the prover's exact searches on the whole board (playability theorems, the Franklín–Moniot and parity bounds, the ceiling and the prime formula; `rust/prover`, section 3): every n = 2..2175, the committed chain to there (its games 2176..3440 are not yet proven on the whole board) | verified (exact, on the whole board) to 2175 |
 | Promotable sets are independent in every signed frame matroid, over any field and any nonzero entries; with the GF(2) matroids they make a Lagrangian bound L(λ) valid for every λ | every promotable set of every board with ≤ 22 candidates, and the optimal and 100 random maximal promotion sets of every non-prime board of 137-400, independent for the plain and five random GF(3) signings of every frame (6.4 million pairs); 14,472 promotion sets at every 25th board of 400-2175 independent in 4,320 signed matroids, column-sum signings among them; L never below P* at 309 roots of 2-400 (6,180 random multipliers) and 72 of 400-2175 (1,440), and equal to the GF(2) bound at zero; every bound of the fields study at least P* (66 roots, 330 families) and at least the best completion at the probe's nodes where it is known | proven (Thms 14, 15) |
