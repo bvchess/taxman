@@ -8,6 +8,7 @@
 //!
 //! ```text
 //! cargo run --release --example extended -- chain FROM TO [--compare] [--known FILE] [--out FILE]
+//! cargo run --release --example extended -- words FROM TO --upper FILE...
 //! ```
 //!
 //! For each board `n` in `FROM..=TO` (2 at least, `TO` at most the largest board the solver supports), one after the
@@ -36,7 +37,15 @@
 //! nodes than the default problem and those where it took more than 10% fewer (their count and the ten with the
 //! largest, and the smallest, ratios), and the benchmark games (README.md, DESIGN.md) that were in range.  Exit status:
 //! 0 if every game passed, 1 if one failed, 2 for a usage error.
+//!
+//! **`words`**: for each game of `FROM..=TO` that the prover's barred bounds (`--upper`, `prover/data/upper_*.jsonl`)
+//! say needs a certificate, how many block words the GF(2) bound of Π⁺(O), O its open members, needs at its root
+//! (`Board::extended_words`): an open source adds one to its frame's rank, so `taxman certify` searches a game whose
+//! words exceed the engines of its set width (three up to 64 words, rank 192) at the widest width (128 words, five
+//! engine words, rank 320), and cannot search one that needs more.  One line a game (n, |O|, the words, the width
+//! `taxman certify` would use or `none`), then the games by words and the widths needed.
 
+use std::collections::BTreeMap;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
@@ -45,13 +54,16 @@ use std::time::Duration;
 use taxman::accelerate::solution_for_promotions;
 use taxman::bits::Bits;
 use taxman::board::Board;
+use taxman::certify::read_upper;
 use taxman::engine::EngineConfig;
 use taxman::game::{replay, Optimal};
+use taxman::gf2::{Gf2Bound, MAX_WORDS};
 use taxman::json::Json;
 use taxman::search::{search_with, Prepared, SearchTactics};
 use taxman::solver::MAX_N;
 
-const USAGE: &str = "usage: extended chain FROM TO [--compare] [--known FILE] [--out FILE]   (2 <= FROM <= TO)";
+const USAGE: &str = "usage: extended chain FROM TO [--compare] [--known FILE] [--out FILE]
+       extended words FROM TO --upper FILE...   (2 <= FROM <= TO)";
 
 /// The benchmark games, whose node counts the summary lists when they are in range.
 const BENCHMARK_GAMES: [u32; 7] = [936, 1215, 1050, 1100, 1133, 1170, 1184];
@@ -61,34 +73,43 @@ const LISTED: usize = 10;
 
 /// What the command line asks for.
 struct Args {
+    /// `words` rather than `chain`.
+    words: bool,
     from: u32,
     to: u32,
     compare: bool,
     known: Option<PathBuf>,
     out: Option<PathBuf>,
+    upper: Vec<PathBuf>,
 }
 
 fn parse_args(args: &[String]) -> Result<Args, String> {
     let [command, from, to, flags @ ..] = args else { return Err(USAGE.to_owned()) };
     let board = |text: &String| text.parse::<u32>().map_err(|_| USAGE.to_owned());
-    if command != "chain" {
-        return Err(USAGE.to_owned());
-    }
+    let words = match command.as_str() {
+        "chain" => false,
+        "words" => true,
+        _ => return Err(USAGE.to_owned()),
+    };
     let (from, to) = (board(from)?, board(to)?);
-    let (mut compare, mut known, mut out) = (false, None, None);
+    let (mut compare, mut known, mut out, mut upper) = (false, None, None, Vec::new());
     let mut flags = flags.iter();
     while let Some(flag) = flags.next() {
         match flag.as_str() {
             "--compare" => compare = true,
             "--known" => known = Some(PathBuf::from(flags.next().ok_or(USAGE)?)),
             "--out" => out = Some(PathBuf::from(flags.next().ok_or(USAGE)?)),
+            "--upper" => upper.push(PathBuf::from(flags.next().ok_or(USAGE)?)),
             _ => return Err(USAGE.to_owned()),
         }
     }
     if from < 2 || from > to || to > MAX_N {
         return Err(format!("{USAGE}\nthe boards must be from 2 to {MAX_N}"));
     }
-    Ok(Args { from, to, compare, known, out })
+    if words != !upper.is_empty() || (words && (compare || known.is_some() || out.is_some())) {
+        return Err(USAGE.to_owned());
+    }
+    Ok(Args { words, from, to, compare, known, out, upper })
 }
 
 /// What a search cost.
@@ -334,6 +355,36 @@ fn run(args: &Args) -> Result<(), String> {
     Ok(())
 }
 
+/// The `words` subcommand (see the module docs).
+fn words(args: &Args) -> Result<(), String> {
+    let upper = read_upper(&args.upper)?;
+    let (mut by_words, mut widest, mut beyond) = (BTreeMap::<usize, usize>::new(), Vec::new(), Vec::new());
+    for line in upper.range(args.from..=args.to).map(|(_, line)| line).filter(|line| line.needs) {
+        let n = line.n;
+        let (words, natural, fits) = taxman::with_width!(n, W => {
+            let open: Bits<W> = line.open.iter().copied().collect();
+            let words = Board::<W>::for_n(n).extended_words(&open).map_err(|e| format!("n={n}: {e}"))?;
+            (words, W, words <= Gf2Bound::<W>::MOST_WORDS)
+        });
+        let width = if fits {
+            natural.to_string()
+        } else if words <= MAX_WORDS {
+            widest.push(n);
+            "128".to_owned()
+        } else {
+            beyond.push(n);
+            "none".to_owned()
+        };
+        println!("n={n:5} |O|={:4} words {words} width {width}", line.open.len());
+        *by_words.entry(words).or_default() += 1;
+    }
+    let counts: Vec<String> = by_words.iter().map(|(words, games)| format!("{words}: {games}")).collect();
+    println!("games by block words: {}", counts.join(", "));
+    println!("at the widest width ({}): {widest:?}", widest.len());
+    println!("beyond the {MAX_WORDS} words of any engine ({}): {beyond:?}", beyond.len());
+    Ok(())
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let args = match parse_args(&args) {
@@ -343,7 +394,8 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    match run(&args) {
+    let ran = if args.words { words(&args) } else { run(&args) };
+    match ran {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("error: {e}");

@@ -355,7 +355,10 @@ rest on the frame model need it
 Two files, one thread on the laptop: `data/upper_1301_2175.jsonl`, the committed chain (875 games, 490 of them
 needing it; 300 s), and `data/upper_2176_3314.jsonl`, the copy of the EC2 chain's results taken on 2026-10-15 that
 [the gap past 2175](../docs/EXPERIMENTS.md#the-gap-past-2175-2026-10) measured (1,139 games, 635 needing it; 1,272 s,
-4.1 s for the slowest game).  By band (the open members and the margins of each game; the share is of all members):
+4.1 s for the slowest game).  A third, `data/upper_2_1300.jsonl`, does the same for the table's games 2..1300 (1,299
+games, 665 needing it, 417 of those with nothing open, 1.0% of the members open; 65 s), for the tests of `taxman
+certify` (the frame solver's certificates of U, [DESIGN.md](../DESIGN.md#certificates-of-u)).  By band (the open
+members and the margins of each game; the share is of all members):
 
 | n | games | the root's gap (mean) | members of U\*_{≥3} | open (least, median, most) | open | margin (median, largest) |
 |---|---|---|---|---|---|---|

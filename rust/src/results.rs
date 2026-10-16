@@ -923,19 +923,7 @@ impl ResultsFile {
     /// The check runs on `threads` threads where it can ([`read_results`]).
     pub fn open(path: &Path, optimal: &Optimal, threads: usize) -> Result<ResultsFile, String> {
         let io_error = |e: std::io::Error| format!("{}: {e}", path.display());
-        let mut file = OpenOptions::new().create(true).read(true).append(true).open(path).map_err(io_error)?;
-        match file.try_lock() {
-            Ok(()) => {}
-            Err(TryLockError::WouldBlock) => {
-                return Err(format!(
-                    "{} is in use by another process (another run appending to it?): it is locked",
-                    path.display()
-                ))
-            }
-            Err(TryLockError::Error(e)) => return Err(io_error(e)),
-        }
-        let mut text = String::new();
-        file.read_to_string(&mut text).map_err(io_error)?;
+        let (mut file, text) = open_locked(path)?;
         let contents = read_results(&text, optimal, threads).map_err(|e| format!("{}: {e}", path.display()))?;
         if contents.torn {
             file.set_len(contents.valid_len as u64).map_err(io_error)?;
@@ -1015,13 +1003,40 @@ impl Drop for ResultsFile {
 /// Where the games that failed a check go: `<results>.rejected.jsonl`, with a `.jsonl` ending of the results
 /// file dropped (`default.jsonl` → `default.rejected.jsonl`).
 pub fn rejected_path(results: &Path) -> PathBuf {
-    let name = results.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    sibling_path(results, "rejected")
+}
+
+/// The file `<file>.<kind>.jsonl` beside `file`, with a `.jsonl` ending of `file` dropped first (`default.jsonl` and
+/// `rejected` give `default.rejected.jsonl`).
+pub(crate) fn sibling_path(file: &Path, kind: &str) -> PathBuf {
+    let name = file.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     let stem = name.strip_suffix(".jsonl").unwrap_or(&name);
-    results.with_file_name(format!("{stem}.rejected.jsonl"))
+    file.with_file_name(format!("{stem}.{kind}.jsonl"))
+}
+
+/// Opens the file at `path` for appending (creating it if need be), locks it against every other process and every
+/// other handle (`flock`; the lock goes when the file is unlocked or dropped, or the process ends), and reads it whole.
+/// A file another holds is refused, since two runs appending to one file would both append the same games.
+pub(crate) fn open_locked(path: &Path) -> Result<(File, String), String> {
+    let io_error = |e: std::io::Error| format!("{}: {e}", path.display());
+    let mut file = OpenOptions::new().create(true).read(true).append(true).open(path).map_err(io_error)?;
+    match file.try_lock() {
+        Ok(()) => {}
+        Err(TryLockError::WouldBlock) => {
+            return Err(format!(
+                "{} is in use by another process (another run appending to it?): it is locked",
+                path.display()
+            ))
+        }
+        Err(TryLockError::Error(e)) => return Err(io_error(e)),
+    }
+    let mut text = String::new();
+    file.read_to_string(&mut text).map_err(io_error)?;
+    Ok((file, text))
 }
 
 /// Writes one line and syncs it.
-fn append_line(file: &mut File, line: &Json) -> std::io::Result<()> {
+pub(crate) fn append_line(file: &mut File, line: &Json) -> std::io::Result<()> {
     file.write_all(format!("{line}\n").as_bytes())?;
     file.sync_data()
 }

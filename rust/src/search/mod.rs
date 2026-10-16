@@ -91,7 +91,10 @@ mod tactics;
 pub use diagnostics::{cut, Diagnostics, GAP_BUCKETS};
 pub use incumbent::Neighbourhood;
 pub use searcher::{stat, Found, Gf2Branching, SearchSpace, TaxSearcher, TaxUnit};
-pub use setup::{prepare, prepare_for_resume, problem_of, PrepareTimings, Prepared, Problem, ProblemSize};
+pub use setup::{
+    extended_words, prepare, prepare_extended, prepare_extended_for_resume, prepare_for_resume, problem_of,
+    PrepareTimings, Prepared, Problem, ProblemSize,
+};
 pub use tactics::SearchTactics;
 
 use crate::bits::Bits;
@@ -244,7 +247,13 @@ fn search_forgetting<const W: usize>(
             Start::Fresh { units: vec![root], best: incumbent.sum(), payload: payload_of(&incumbent) }
         }
     };
-    let header = Header::of(prepared).encode();
+    // A resumed run goes on under the header it was written with, which `resume_point` read and found to be this
+    // search's: the engine checks the stored header byte for byte, and one of an earlier format (version 4) is this
+    // search's without being this build's encoding of it.  So the checkpoints of a run keep its format.
+    let header = match &resumed {
+        Some((_, head)) => head.header.clone(),
+        None => Header::of(prepared).encode(),
+    };
     let engine_start = Instant::now();
     let outcome = engine::run(cfg, start, &header, |_| TaxSearcher::new(&space))?;
     // The engine's elapsed time includes the runs before a resume; what it counts beyond this call is theirs.

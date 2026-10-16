@@ -48,6 +48,8 @@ pub enum CliError {
     Usage(String),
     /// The command ran and failed: print the message, exit 1.
     Failed(String),
+    /// `taxman certify` found a game that beats a recorded score: print the message, exit 2.
+    Counterexample(String),
 }
 
 pub type CliResult = Result<(), CliError>;
@@ -165,7 +167,7 @@ pub fn range_options(args: &Args) -> Result<SolveOptions, CliError> {
 }
 
 /// The flag's value as a count, which must be at least 1.
-fn count(args: &Args, name: &str) -> Result<Option<usize>, CliError> {
+pub fn count(args: &Args, name: &str) -> Result<Option<usize>, CliError> {
     match args.parsed::<usize>(name)? {
         Some(0) => Err(CliError::Usage(format!("{name} must be at least 1"))),
         count => Ok(count),
@@ -199,7 +201,9 @@ mod tests {
     fn usage(e: CliError) -> String {
         match e {
             CliError::Usage(message) => message,
-            CliError::Failed(message) => panic!("expected a usage error, got failure {message:?}"),
+            CliError::Failed(message) | CliError::Counterexample(message) => {
+                panic!("expected a usage error, got {message:?}")
+            }
         }
     }
 

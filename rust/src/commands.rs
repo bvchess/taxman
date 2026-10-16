@@ -1,4 +1,5 @@
-//! The subcommands: `solve`, `regress`, `bench`, `verify-optimal`, `verify-results`, `extend-optimal` and `tables`.
+//! The subcommands: `solve`, `regress`, `bench`, `verify-optimal`, `verify-results`, `extend-optimal`, `tables` and
+//! `certify`.
 //!
 //! The ones that solve games read their flags with [`Args`], build [`SolveOptions`] from them ([`solver_options`],
 //! or [`range_options`] for those that solve a range) and call the library's pipeline ([`taxman::solver`]); what
@@ -9,7 +10,10 @@
 //! * `regress` solves in memory and compares every score with `optimal.json`;
 //! * `bench` solves a fixed set of hard games standalone and appends the run to a history file, so that
 //!   performance can be followed from commit to commit.  Its files are found in the repository
-//!   ([`taxman::paths`]) unless `--history` and `--known` name them.
+//!   ([`taxman::paths`]) unless `--history` and `--known` name them;
+//! * `certify` searches as `solve` does (the same flags for checkpoints, limits and progress, the same lock and
+//!   signals), appends a certificate a game to its `--out` file (locked while it is open), and exits with status 2 on
+//!   a game that beats a recorded score.
 //!
 //! The small ones: `verify-optimal` replays every game of the table of optimal games, `verify-results` checks results
 //! files without changing them, `extend-optimal` writes the table with the games of a results file that continue it
@@ -18,11 +22,14 @@
 //! ([`Optimal::built_in`]): no flag turns that off or points at another file.
 
 use crate::cli::{
-    errln, outln, parse_range, range_options, solver_options, Args, CliError, CliResult, SOLVER_FLAGS, WINDOW_FLAG,
+    count, errln, outln, parse_range, range_options, solver_options, Args, CliError, CliResult, SOLVER_FLAGS,
+    WINDOW_FLAG,
 };
+use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use taxman::certify::{certify_game, read_upper, CertificateFile, Verdict};
 use taxman::engine;
 use taxman::game::Optimal;
 use taxman::json::Json;
@@ -43,27 +50,13 @@ fn flags_with(own: &[&'static str]) -> Vec<&'static str> {
 // ---------------------------------------------------------------------------------------------------------
 // solve
 
-const SOLVE_FLAGS: [&str; 8] = [
-    "--out",
-    "--checkpoint-dir",
-    "--checkpoint-interval",
-    "--progress",
-    "--time-limit",
-    "--node-limit",
-    "--mem-cap",
-    WINDOW_FLAG,
-];
+/// The flags of a long search that `solve` and `certify` share, read by [`search_options`]: checkpoints, progress,
+/// limits and memory.
+const SEARCH_FLAGS: [&str; 6] =
+    ["--checkpoint-dir", "--checkpoint-interval", "--progress", "--time-limit", "--node-limit", "--mem-cap"];
 
-/// `solve N|A-B [options]`: solves one board size or a range, each from the one before (`solver::solve_range_each`).
-pub fn solve(args: &[String]) -> CliResult {
-    let usage = || CliError::Usage("usage: solve N|A-B [options]".into());
-    let args = Args::parse(args, &flags_with(&SOLVE_FLAGS), &["--force-search", "--use-prev", "--show"])?;
-    let [range] = args.positional() else { return Err(usage()) };
-    let (lo, hi) = parse_range(range)?;
-
-    let mut opts = range_options(&args)?;
-    opts.force_search = args.has("--force-search");
-    opts.use_prev = args.has("--use-prev");
+/// Reads [`SEARCH_FLAGS`] into `opts`.
+fn search_options(args: &Args, opts: &mut SolveOptions) -> Result<(), CliError> {
     opts.checkpoint_dir = args.value("--checkpoint-dir").map(PathBuf::from);
     if let Some(interval) = args.positive_seconds("--checkpoint-interval")? {
         opts.checkpoint_interval = interval;
@@ -79,22 +72,51 @@ pub fn solve(args: &[String]) -> CliResult {
     if let Some(cap) = args.parsed::<usize>("--mem-cap")? {
         opts.queue_mem_cap = cap;
     }
-    let out = args.value("--out").map(Path::new);
-    let show = args.has("--show");
+    Ok(())
+}
 
-    // Two processes in one checkpoint directory would overwrite each other's checkpoints.  (Opening the results
-    // file locks it too, against a second run appending to it.)
-    let _lock = match &opts.checkpoint_dir {
+/// What a run of long searches holds while it goes: its checkpoint directory locked, since two processes in one would
+/// overwrite each other's checkpoints (the file a run appends to is locked when it is opened), and SIGINT and SIGTERM
+/// made to stop a search with a final checkpoint and the best found so far, instead of killing it.
+fn guard_checkpoints(opts: &SolveOptions) -> Result<Option<engine::DirLock>, CliError> {
+    let lock = match &opts.checkpoint_dir {
         Some(dir) => {
             std::fs::create_dir_all(dir).map_err(|e| failed(format!("{}: {e}", dir.display())))?;
             Some(engine::lock_dir(dir).map_err(|e| failed(e.to_string()))?)
         }
         None => None,
     };
-    // A signal stops the search with a final checkpoint and the best game so far, instead of killing it.
     if let Err(e) = engine::stop_on_signals() {
         errln!("warning: SIGINT and SIGTERM will kill the run instead of stopping it: {e}");
     }
+    Ok(lock)
+}
+
+/// The line that says why the search of `n` stopped before it finished, and how to go on.
+fn stopped_line(n: u32, opts: &SolveOptions) -> String {
+    let resume =
+        if opts.checkpoint_dir.is_some() { "run the same command to resume it" } else { "it was not checkpointed" };
+    let why = if engine::stop_signal().is_some() { "was stopped by a signal" } else { "hit a limit" };
+    format!("stopped: the search for n={n} {why} before it finished; {resume}")
+}
+
+const SOLVE_FLAGS: [&str; 2] = ["--out", WINDOW_FLAG];
+
+/// `solve N|A-B [options]`: solves one board size or a range, each from the one before (`solver::solve_range_each`).
+pub fn solve(args: &[String]) -> CliResult {
+    let usage = || CliError::Usage("usage: solve N|A-B [options]".into());
+    let flags = [&SOLVE_FLAGS[..], &SEARCH_FLAGS[..]].concat();
+    let args = Args::parse(args, &flags_with(&flags), &["--force-search", "--use-prev", "--show"])?;
+    let [range] = args.positional() else { return Err(usage()) };
+    let (lo, hi) = parse_range(range)?;
+
+    let mut opts = range_options(&args)?;
+    opts.force_search = args.has("--force-search");
+    opts.use_prev = args.has("--use-prev");
+    search_options(&args, &mut opts)?;
+    let out = args.value("--out").map(Path::new);
+    let show = args.has("--show");
+    let _lock = guard_checkpoints(&opts)?;
 
     let summary = solver::solve_range_each(lo, hi, &opts, out, |result| {
         outln!("{}", result.summary_line());
@@ -111,11 +133,99 @@ pub fn solve(args: &[String]) -> CliResult {
         outln!("skipped {} games already done{file}", summary.skipped);
     }
     if let Some(n) = summary.stopped_at {
-        let resume =
-            if opts.checkpoint_dir.is_some() { "run the same command to resume it" } else { "it was not checkpointed" };
-        let why = if engine::stop_signal().is_some() { "was stopped by a signal" } else { "hit a limit" };
-        outln!("stopped: the search for n={n} {why} before it finished; {resume}");
+        outln!("{}", stopped_line(n, &opts));
     }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// certify
+
+const CERTIFY_FLAGS: [&str; 4] = ["--results", "--upper", "--out", "--threads"];
+
+/// `certify A-B --results FILE... --upper FILE... --out FILE [options]`: certifies, game by game, the recorded scores
+/// of A..B that rest on the frame model, by a search of the extended problem ([`taxman::certify`]).  The scores and
+/// games come from the results files (over the table of optimal games, which must agree with them), the open members
+/// from the prover's barred bounds (`upper` files).  A game whose line there does not say `needs` (a prime, or a score
+/// at its ceiling, which rest on n − 1) is passed over.  Each game's certificate is appended to `--out` as it is made,
+/// and a rerun skips the games the file has a certificate for and resumes a stopped search from its checkpoint.  A
+/// game found to beat its recorded score is printed, written to `<out>.counterexample.jsonl` too, and ends the run
+/// with status 2, as does a rerun over a game the file records beaten.
+pub fn certify(args: &[String]) -> CliResult {
+    let usage = |why: &str| {
+        CliError::Usage(format!("{why}\nusage: certify A-B --results FILE... --upper FILE... --out FILE [options]"))
+    };
+    let args = Args::parse(args, &[&CERTIFY_FLAGS[..], &SEARCH_FLAGS[..]].concat(), &[])?;
+    let [range] = args.positional() else { return Err(usage("certify takes one range A-B")) };
+    let (lo, hi) = parse_range(range)?;
+    let files = |flag: &str| args.values(flag).into_iter().map(PathBuf::from).collect::<Vec<_>>();
+    let (results, uppers) = (files("--results"), files("--upper"));
+    if results.is_empty() || uppers.is_empty() {
+        return Err(usage("certify needs --results FILE and --upper FILE"));
+    }
+    let out = PathBuf::from(args.value("--out").ok_or_else(|| usage("certify needs --out FILE"))?);
+    let mut opts = SolveOptions::default();
+    if let Some(threads) = count(&args, "--threads")? {
+        opts.threads = threads;
+    }
+    search_options(&args, &mut opts)?;
+
+    let known = Optimal::built_in().with_results_files(&results).map_err(failed)?;
+    let upper = read_upper(&uppers).map_err(failed)?;
+    let mut file = CertificateFile::open(&out).map_err(failed)?;
+    let _lock = guard_checkpoints(&opts)?;
+
+    let mut tally = BTreeMap::<&str, usize>::new();
+    for n in lo..=hi {
+        let line = upper.get(&n).ok_or_else(|| failed(format!("n={n}: the --upper files have no line for it")))?;
+        if !line.needs {
+            *tally.entry("not needing one").or_default() += 1;
+            continue;
+        }
+        match file.verdict(n) {
+            Some(Verdict::Beaten) => {
+                // A counterexample stays one: a rerun over it says so again, rather than pass it over.
+                let path = file.counterexample_path();
+                return Err(CliError::Counterexample(format!(
+                    "n={n}: --out already records a game that beats the recorded score (see {})",
+                    path.display()
+                )));
+            }
+            Some(_) => {
+                *tally.entry("already in --out").or_default() += 1;
+                continue;
+            }
+            None => {}
+        }
+        let certificate = certify_game(n, &known, line, &opts).map_err(failed)?;
+        file.append(&certificate).map_err(failed)?;
+        outln!("{}", certificate.summary_line());
+        let _ = std::io::stdout().flush();
+        match certificate.verdict {
+            Verdict::Incomplete => {
+                outln!("{}", stopped_line(n, &opts));
+                return Ok(());
+            }
+            Verdict::Beaten => {
+                // The line is safe in --out: the checkpoint can go.
+                solver::discard_checkpoint(&opts, n);
+                let path = file.append_counterexample(&certificate).map_err(failed)?;
+                let (score, moves) = certificate.beaten_by.as_ref().expect("a game that beats the score");
+                outln!("  the game of {score}: {moves:?}");
+                return Err(CliError::Counterexample(format!(
+                    "n={n}: a game of {score} beats the recorded score {} (written to {})",
+                    certificate.score,
+                    path.display()
+                )));
+            }
+            Verdict::Certified => {
+                solver::discard_checkpoint(&opts, n);
+                *tally.entry("certified").or_default() += 1;
+            }
+        }
+    }
+    let counts: Vec<String> = tally.iter().map(|(what, count)| format!("{what} {count}")).collect();
+    outln!("{lo}..={hi}: {}", counts.join(", "));
     Ok(())
 }
 

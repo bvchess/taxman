@@ -90,7 +90,8 @@ pub struct SearchSpace<'a, const W: usize> {
     pub lagrange: Option<Refits>,
     /// The root's candidates (where the Lagrangian bound's multipliers are fitted).
     pub candidates: Bits<W>,
-    /// The largest number in the root's frames.
+    /// The largest number in the root's frames and candidates (the one-sided candidates of the extended problem are
+    /// in no frame): what the nogoods hold.
     pub root_max: u32,
     /// The most promotions a promotion set can have (`maxTotalPromotions`; see [`Prepared::max_total`]).
     pub max_total: u32,
@@ -148,7 +149,14 @@ impl<'a, const W: usize> SearchSpace<'a, W> {
             nogood_period: tactics.forget_nogoods.then_some(NOGOOD_PERIOD),
             lagrange: (tactics.nogoods && tactics.lagrange).then_some(Refits::SEARCH),
             candidates: prepared.candidates,
-            root_max: prepared.root.frames().iter().filter_map(|f| (f.moves | f.factors).max()).max().unwrap_or(0),
+            root_max: prepared
+                .root
+                .frames()
+                .iter()
+                .filter_map(|f| (f.moves | f.factors).max())
+                .chain(prepared.candidates.max())
+                .max()
+                .unwrap_or(0),
             max_total: prepared.max_total,
             diagnostics: None,
             began: Instant::now(),
@@ -364,7 +372,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             .model
             .promote_all_using(&mut self.stepper.scratch, space.root, &unit.promoted)
             .unwrap_or_else(|| panic!("a unit's promotions {:?} cannot be promoted from the root", unit.promoted));
-        let max_add = max_additional(space.max_total, &state, &unit.promoted, &unit.cands);
+        let max_add = max_additional(space.model, space.max_total, &state, &unit.promoted, &unit.cands);
         let sum = unit.promoted.sum();
         let node =
             Node { state, promoted: unit.promoted, sum, cands: unit.cands, max_add, known_end: 0, checked: None };
@@ -471,7 +479,8 @@ impl<'a, const W: usize> Stepper<'a, W> {
             }
             return Next::Same;
         }
-        child.max_add = max_additional(self.space.max_total, &child.state, &child.promoted, &child.cands);
+        child.max_add =
+            max_additional(self.space.model, self.space.max_total, &child.state, &child.promoted, &child.cands);
         child.known_end = self.known.len();
         self.counts.children += 1;
         if let Some(p) = &mut self.probe {
@@ -620,8 +629,8 @@ impl<'a, const W: usize> Stepper<'a, W> {
         child.checked = None;
         let added = branch.added;
         // Several forced members are promoted together, each frame checked once (see `FrameGraph::promote_all_using`);
-        // one by one, each would take a freedom from its two frames, so together they fit exactly when no frame
-        // they touch ends with negative freedoms.
+        // one by one, each would take a freedom from the frames it touches (two, or its own frame for a one-sided
+        // candidate), so together they fit exactly when no frame they touch ends with negative freedoms.
         let promoted = if added.len() == 1 {
             child.state.assign(&node.state);
             model.promote_in_place_using(&mut self.scratch, &mut child.state, branch.n)
@@ -630,9 +639,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
                 Some(state) => {
                     child.state.assign(&state);
                     added.iter().all(|x| {
-                        let h = model.home(x);
+                        let (into, out) = model.frames_touched(x);
                         let frames = child.state.frames();
-                        frames[h].freedoms >= 0 && frames[h - 1].freedoms >= 0
+                        frames[into].freedoms >= 0 && out.is_none_or(|out| frames[out].freedoms >= 0)
                     })
                 }
                 None => false,
@@ -645,8 +654,8 @@ impl<'a, const W: usize> Stepper<'a, W> {
         child.promoted = node.promoted | added;
         child.sum = node.sum + added.sum();
         let rest = branch.left - added;
-        let max_next = max_additional(space.max_total, &child.state, &child.promoted, &rest);
-        let mut cands = child.state.narrow_candidates(&rest);
+        let max_next = max_additional(model, space.max_total, &child.state, &child.promoted, &rest);
+        let mut cands = model.narrow(&child.state, &rest);
         // Usually the child promotes one number, and a membership test is cheaper than a set intersection.
         let touched = |k: &Bits<W>| if added.len() == 1 { k.contains(branch.n) } else { k.intersects(&added) };
         for k in self.known.iter().filter(|k| touched(k)) {

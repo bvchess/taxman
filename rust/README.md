@@ -383,6 +383,14 @@ stopped at n = 2176: the results end at n = 2175
 Check the new file with `taxman verify-optimal /tmp/optimal.json` before it replaces `src/main/resources/optimal.json`;
 the binaries built after that carry the new table.
 
+`certify A-B --results FILE... --upper FILE... --out FILE` proves, game by game, that the recorded scores of A..B that
+rest on the frame model are the optima on the whole board (statement U at each n; section 1, "What optimal means"):
+for each game the prover's barred bounds (`--upper`, `prover/data/upper_*.jsonl`) say needs it, a search of the
+extended problem with the bounds' open members optional, started from the recorded game, ends `certified` (nothing
+beats it) or `beaten` (a game that does, written to `OUT.counterexample.jsonl` too; the run exits with status 2).  It
+takes `--threads`, the checkpoint flags and the limits of `solve`, and resumes like it.
+[DESIGN.md, "Certificates of U"](DESIGN.md#certificates-of-u) has what it checks and what a line holds.
+
 ## 4. Reading the output
 
 ### The summary line (stdout, one per game)
@@ -732,7 +740,9 @@ The code, in the order to read it, which is the order of the module map in `src/
 comment that is worth reading first; section 6 above is the map of how the pieces fit, so keep it open):
 
 1. `src/game.rs`: the rules as a referee, and `optimal.json`.
-2. `src/numtheory.rs`: maximal factors and composites.
+2. `src/numtheory.rs`: maximal factors and composites; and `src/playable.rs`, whether a set of numbers can all be played
+   on the whole board, with nothing of the frame model (the oracle of the tests of the model, and the referee of
+   `taxman certify`).
 3. `src/bits.rs`: `Bits<W>`, the fixed-width bitsets of game numbers that everything below is generic over, and the
    set widths.  The module comment is enough at first.
 4. `src/json.rs`: the small JSON reader and writer.  Skim; it matters once you read results lines.
@@ -758,9 +768,10 @@ comment that is worth reading first; section 6 above is the map of how the piece
 11. `src/bounds.rs`: two small functions the Java has too, the limit on a node's further promotions and the greedy
     incumbent.
 12. `src/engine.rs`: the protocol in the module comment (conservation, splitting, checkpoint, termination).
-13. `src/tactics.rs`, `src/board.rs`, `src/solver.rs`, `src/results.rs`, `src/paths.rs`: the switchable tactics, a board
-    prepared for a search, the per-game pipeline, provenance and verification, the default files.  The range driver is
-    `src/solver/window.rs`, the window of games in flight, and its child `window/allot.rs` how they share the threads.
+13. `src/tactics.rs`, `src/board.rs`, `src/solver.rs`, `src/results.rs`, `src/certify.rs`, `src/paths.rs`: the
+    switchable tactics, a board prepared for a search, the per-game pipeline, provenance and verification, the
+    certificates of `taxman certify`, the default files.  The range driver is `src/solver/window.rs`, the window of
+    games in flight, and its child `window/allot.rs` how they share the threads.
 14. `src/main.rs`, `src/cli.rs`, `src/commands.rs`: the command line.
 15. Studies, skipped on a first read: `src/brute.rs` (exhaustive search, the test oracle) and `src/sacrifice.rs` (the
     sacrifice bound).

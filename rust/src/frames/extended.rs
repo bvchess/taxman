@@ -3,9 +3,10 @@
 //! The frame solver searches Π_n: the frames with freedoms, their sources fixed to U\* (the sources setup keeps), the
 //! pairs `unzip` settled taken out.  Π⁺(O) makes a set O of the members of U\* in layers 3 and up optional, and
 //! settles nothing.  It is research code, for certifying that a game's optimum plays U\*_{≥3} (heuristics/THEORY.md,
-//! "The extended problem"); the solver does not use it.  The search can take Π⁺(∅) as it is
-//! ([`Board::prepare_extended`](crate::board::Board::prepare_extended)); the one-sided candidates below, which an open
-//! source needs, are not in the search yet, and only the reference predicate [`ExtendedFrames::promotable`] knows them.
+//! "The extended problem"; `taxman certify`, [`crate::certify`]); the solver does not use it.  The search takes it with
+//! its one-sided candidates ([`Board::prepare_extended_with`](crate::board::Board::prepare_extended_with); the model's
+//! "One-sided candidates", [`crate::model`]), and the reference predicate [`ExtendedFrames::promotable`] decides its
+//! promotion sets for the tests.
 //!
 //! # The problem
 //!
@@ -37,7 +38,7 @@
 
 use super::{columns_of, layer_of, BoardFrames};
 use crate::bits::Bits;
-use crate::model;
+use crate::model::{self, MAX_FRAMES};
 use crate::numtheory::Tables;
 
 /// The extended problem Π⁺(O) of a board (see the module documentation).
@@ -101,23 +102,76 @@ impl<const W: usize> ExtendedFrames<W> {
     }
 }
 
+/// The components of a board with what Π⁺(O) makes of them: each one's layer, whether it has freedoms⁺, and the
+/// layers of the frames (the lowest and the highest layer of a component with freedoms⁺, if there is one).
+struct Shape {
+    layers: Vec<u32>,
+    has_freedoms: Vec<bool>,
+    span: Option<(u32, u32)>,
+}
+
+impl Shape {
+    /// The shape of Π⁺(`open`) on the board whose components are `board`'s frames, after checking that every member
+    /// of `open` is a source of three or more prime factors that setup keeps.
+    fn of<const W: usize>(board: &BoardFrames<W>, t: &Tables, open: &Bits<W>) -> Result<Shape, String> {
+        let components = board.frames();
+        let layers: Vec<u32> = components.iter().map(|component| layer_of(component, t)).collect();
+        let upper = components.iter().fold(Bits::EMPTY, |acc, component| acc | component.sources());
+        let from_layer_3 = components.iter().zip(&layers).filter(|&(_, &layer)| layer >= 3);
+        let may_open = from_layer_3.fold(Bits::EMPTY, |acc, (component, _)| acc | component.sources());
+        if let Some(x) = open.iter().find(|&x| !may_open.contains(x)) {
+            let why =
+                if upper.contains(x) { "it has fewer than three prime factors" } else { "setup does not keep it" };
+            return Err(format!("{x} cannot be open on the board 1..={}: {why}", t.n));
+        }
+        let has_freedoms: Vec<bool> =
+            components.iter().map(|c| c.factors().len() > (c.sources() - *open).len()).collect();
+        let with_freedoms = || layers.iter().zip(&has_freedoms).filter(|&(_, &has)| has).map(|(&layer, _)| layer);
+        let span = with_freedoms().min().zip(with_freedoms().max());
+        Ok(Shape { layers, has_freedoms, span })
+    }
+
+    /// How many frames Π⁺ has: one per layer from the lowest to the highest with freedoms⁺.
+    fn frames(&self) -> usize {
+        self.span.map_or(0, |(lowest, highest)| (highest - lowest) as usize + 1)
+    }
+}
+
+/// How many frames the extended problem Π⁺(O) of the board `1..=t.n` with the open sources `open` has, whether or not
+/// a frame set holds them ([`build_extended`] refuses more than [`MAX_FRAMES`]), and the layers they span: for the
+/// census of the frames (`examples/structure.rs`), which counts them with every source of three or more prime factors
+/// open, the most any `open` gives (an open source only adds to its component's freedoms⁺).
+///
+/// # Errors
+///
+/// As [`build_extended`] for `open`.
+pub fn extended_frame_count<const W: usize>(t: &Tables, open: &Bits<W>) -> Result<(usize, Option<(u32, u32)>), String> {
+    let shape = Shape::of(&BoardFrames::<W>::new(t, Bits::EMPTY), t, open)?;
+    Ok((shape.frames(), shape.span))
+}
+
 /// The extended problem Π⁺(O) of the board `1..=t.n`, with the open sources `open`.
 ///
 /// # Errors
 ///
-/// If a member of `open` is not a source of three or more prime factors that setup keeps.
+/// If a member of `open` is not a source of three or more prime factors that setup keeps, or if the problem has more
+/// frames than a frame set holds ([`MAX_FRAMES`]; a board past 4095 can have ten, with every source open).
 pub fn build_extended<const W: usize>(t: &Tables, open: &Bits<W>) -> Result<ExtendedFrames<W>, String> {
     let board = BoardFrames::<W>::new(t, Bits::EMPTY);
     let components = board.frames();
-    let layers: Vec<u32> = components.iter().map(|component| layer_of(component, t)).collect();
-
-    let upper = components.iter().fold(Bits::EMPTY, |acc, component| acc | component.sources());
-    let from_layer_3 = components.iter().zip(&layers).filter(|&(_, &layer)| layer >= 3);
-    let may_open = from_layer_3.fold(Bits::EMPTY, |acc, (component, _)| acc | component.sources());
-    if let Some(x) = open.iter().find(|&x| !may_open.contains(x)) {
-        let why = if upper.contains(x) { "it has fewer than three prime factors" } else { "setup does not keep it" };
-        return Err(format!("{x} cannot be open on the board 1..={}: {why}", t.n));
+    let shape = Shape::of(&board, t, open)?;
+    let count = shape.frames();
+    let Shape { layers, has_freedoms, span } = shape;
+    if count > MAX_FRAMES {
+        let (lowest, highest) = span.expect("frames");
+        return Err(format!(
+            "the board 1..={}: Π⁺(O) with {} open sources needs {count} frames, for the layers {lowest} to {highest}, \
+             and a frame set holds at most {MAX_FRAMES}",
+            t.n,
+            open.len()
+        ));
     }
+    let upper = components.iter().fold(Bits::EMPTY, |acc, component| acc | component.sources());
     let fixed = upper - *open;
     let fixed_in = |i: usize| components[i].sources() - *open;
     let mut extended = ExtendedFrames {
@@ -131,13 +185,8 @@ pub fn build_extended<const W: usize>(t: &Tables, open: &Bits<W>) -> Result<Exte
         lowest_layer: None,
     };
 
-    // The components with freedoms, and the frames they make.
-    let mut has_freedoms = vec![false; components.len()];
-    for (i, component) in components.iter().enumerate() {
-        has_freedoms[i] = component.factors().len() > fixed_in(i).len();
-    }
-    let layers_with_freedoms = || (0..components.len()).filter(|&i| has_freedoms[i]).map(|i| layers[i]);
-    let (Some(lowest), Some(highest)) = (layers_with_freedoms().min(), layers_with_freedoms().max()) else {
+    // The frames the components with freedoms make.
+    let Some((lowest, highest)) = span else {
         return Ok(extended);
     };
     let mut parts = vec![(Bits::EMPTY, Bits::EMPTY); (highest - lowest) as usize + 1];
@@ -187,6 +236,7 @@ pub fn build_extended<const W: usize>(t: &Tables, open: &Bits<W>) -> Result<Exte
 mod tests {
     use super::*;
     use crate::board::Board;
+    use crate::frames::Frame;
 
     /// Π⁺(∅) of the board `1..=n` is the frame model of `build_frames` with the claims of `unzip` put back: the same
     /// number of frames, each with the moves of the search's frame and the sources that claim a factor, all its
@@ -275,15 +325,25 @@ mod tests {
         assert!(extended.one_sided.iter().any(|&(s, _)| s == 374));
     }
 
+    /// The components of layer 3 or more of `board`, the ones whose sources can be open.
+    fn upper_components<'a, const W: usize>(board: &'a BoardFrames<W>, t: &Tables) -> Vec<&'a Frame<W>> {
+        board.frames().iter().filter(|c| layer_of(c, t) >= 3).collect()
+    }
+
+    /// Every source of three or more prime factors open: the open set that gives Π⁺(O) the most frames (an open source
+    /// only adds to the freedoms of its component).
+    fn every_source_open<const W: usize>(board: &BoardFrames<W>, t: &Tables) -> Bits<W> {
+        upper_components(board, t).iter().fold(Bits::EMPTY, |acc, c| acc | c.sources())
+    }
+
     /// With every source of layer 3 or more open, the open and rejected sources are exactly the one-sided candidates,
     /// each with the frame of its layer (the frame numbered by its layer less the lowest layer of a component with
     /// freedoms), and the fixed sources are those of layers 1 and 2.
     fn check_every_open_source_is_one_sided<const W: usize>(n: u32) {
         let t = Tables::new(n);
         let board = BoardFrames::<W>::new(&t, Bits::EMPTY);
-        let components: Vec<_> = board.frames().iter().filter(|c| layer_of(c, &t) >= 3).collect();
-        let open = components.iter().fold(Bits::<W>::EMPTY, |acc, c| acc | c.sources());
-        let rejected = components.iter().fold(Bits::<W>::EMPTY, |acc, c| acc | c.impossible());
+        let open = every_source_open(&board, &t);
+        let rejected = upper_components(&board, &t).iter().fold(Bits::<W>::EMPTY, |acc, c| acc | c.impossible());
         let extended = build_extended::<W>(&t, &open).unwrap();
         assert_eq!((extended.open, extended.rejected), (open, rejected), "n={n}");
         assert!(extended.fixed.iter().all(|x| t.omega(x) <= 2), "n={n}: a fixed source of layer 3 or more");
@@ -299,6 +359,34 @@ mod tests {
         for n in [85, 120, 400, 741, 1000] {
             crate::with_width!(n, W => check_every_open_source_is_one_sided::<W>(n));
         }
+    }
+
+    /// The most frames Π⁺(O) has on the board `1..=n`, with every source of three or more prime factors open: how many
+    /// (`extended_frame_count`, and the frames `build_extended` makes when it can), the lowest and the highest layer
+    /// they span, and `build_extended`'s answer, the problem if it has no more frames than [`MAX_FRAMES`] and the
+    /// refusal if it has.
+    fn frames_with_every_source_open<const W: usize>(n: u32) -> (usize, Option<(u32, u32)>, Result<usize, String>) {
+        let t = Tables::new(n);
+        let open = every_source_open(&BoardFrames::<W>::new(&t, Bits::EMPTY), &t);
+        let (count, span) = extended_frame_count::<W>(&t, &open).unwrap();
+        (count, span, build_extended::<W>(&t, &open).map(|extended| extended.frames.len()))
+    }
+
+    /// `build_extended` refuses a problem of more frames than a frame set holds, and says which board and how many:
+    /// the board 4096 with every source of three or more prime factors open needs ten frames, one for each layer from
+    /// 3 to 12 (the layer of 4096 = 2¹²), where [`MAX_FRAMES`] is nine.  One board less, at 4095, nine are enough.
+    #[test]
+    fn a_problem_of_more_frames_than_a_frame_set_holds_is_refused() {
+        assert_eq!(MAX_FRAMES, 9, "the numbers of this test are for nine frames");
+        let (count, span, built) = crate::with_width!(4096, W => frames_with_every_source_open::<W>(4096));
+        assert_eq!((count, span), (10, Some((3, 12))));
+        let refused = built.unwrap_err();
+        assert!(refused.starts_with("the board 1..=4096"), "{refused}");
+        assert!(refused.contains("needs 10 frames"), "{refused}");
+        assert!(refused.contains("the layers 3 to 12"), "{refused}");
+
+        let (count, span, built) = crate::with_width!(4095, W => frames_with_every_source_open::<W>(4095));
+        assert_eq!((count, span, built), (9, Some((3, 11)), Ok(9)));
     }
 
     /// What has no frame to be promoted into is refused: a factor of frame 0 (4) or a number that is no factor (45)

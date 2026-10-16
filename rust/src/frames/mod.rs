@@ -184,7 +184,7 @@ mod board_frames;
 mod extended;
 
 pub use board_frames::{BoardFrames, ClaimKind, Frame};
-pub use extended::{build_extended, ExtendedFrames};
+pub use extended::{build_extended, extended_frame_count, ExtendedFrames};
 
 use crate::bits::Bits;
 use crate::model;

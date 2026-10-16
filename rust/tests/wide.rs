@@ -357,7 +357,7 @@ fn boards_past_4095_are_set_up_at_128_words() {
 
 /// A checkpoint that an earlier build wrote (`testdata/n1133_after_1000_nodes.ckpt`: game 1133 at W = 20 with
 /// the default tactics of that build, now those of the matching path (`SearchTactics::matching`), stopped after
-/// 1,023 nodes on one thread; search header format TXSH v4) still resumes and
+/// 1,023 nodes on one thread; search header format TXSH v5) still resumes and
 /// finishes with the committed score.  Every write/read test of the format uses the code's own constants, so a
 /// change of the layout that round-trips (the version, the byte order of a set, the order of the header's fields,
 /// the packing of the tactics) passes them and refuses this file.
@@ -381,6 +381,37 @@ fn a_committed_checkpoint_resumes() {
     assert_eq!(r.invocations, 2, "the game was resumed, not started over");
     assert!(r.assumes.is_empty(), "{:?}", r.assumes);
     assert!(r.nodes > 1000, "{} nodes in all, 1,000 of them before the checkpoint", r.nodes);
+    assert!(!checkpoint.exists(), "a finished game removes its checkpoint");
+}
+
+/// A checkpoint of the format before the extended problem's search (`testdata/n1133_after_1000_nodes_v4.ckpt`: the
+/// same search as the fixture above, written by the build of commit 2e8b851, whose headers are version 4, with no digest
+/// of the one-sided candidates) resumes with this build and finishes as the build that wrote it finishes it: the same
+/// score, two invocations and 3,058 nodes in all (the count that build's binary gave, finishing the same file).  Its
+/// header reads as a version-5 header with no one-sided candidates; asked to resume a search of the extended problem
+/// with open sources instead, it is refused, saying why.
+#[test]
+fn a_committed_checkpoint_of_format_4_resumes_as_the_build_that_wrote_it_finishes_it() {
+    let games = stored_games("strict.jsonl");
+    let dir = TempDir::new("committed-checkpoint-v4");
+    let opts = SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), ..matching_options(1) };
+    let checkpoint = opts.checkpoint_file(1133).unwrap();
+    std::fs::create_dir_all(checkpoint.parent().unwrap()).unwrap();
+    std::fs::copy(testdata("n1133_after_1000_nodes_v4.ckpt"), &checkpoint).unwrap();
+    let version = std::fs::read(&checkpoint).unwrap()[24..28].to_vec();
+    assert_eq!(version, 4u32.to_le_bytes(), "the fixture's header is of version 4");
+
+    // A search of the extended problem with open sources cannot be this checkpoint's, and is refused, saying why.
+    let board = Board::<20>::for_n(1133);
+    let open: Bits<20> = board.plain.iter().copied().filter(|&x| 2 * x > 1133 && board.tables.omega(x) >= 3).collect();
+    let refused = board.prepare_extended_for_resume(&open, &checkpoint).err().expect("refused");
+    assert!(refused.contains("format version 4") && refused.contains("one-sided candidates"), "{refused}");
+
+    let r = solver::solve_game(1133, Some(&prev_of(&games, 1133)), &opts).unwrap();
+    assert!(r.completed && r.method == Method::Search);
+    assert_eq!(r.score, games[&1133].0);
+    assert_eq!((r.invocations, r.nodes), (2, 3058), "the build that wrote the checkpoint finishes it so");
+    assert!(r.assumes.is_empty(), "{:?}", r.assumes);
     assert!(!checkpoint.exists(), "a finished game removes its checkpoint");
 }
 

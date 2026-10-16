@@ -12,9 +12,14 @@ use crate::model::FrameSet;
 /// search (the same game, frames, candidates and tactics).
 ///
 /// Encoded (little-endian) as the magic `TXSH`, the format [`Header::VERSION`] (u32), the width `W` (u32),
-/// `n` (u32), the digests of the candidates and of the frames (u64 each), `max_total` (u32) and the tactics' bits
-/// (u16, [`SearchTactics::bits`]).  This build reads version 4 only: the headers of older builds (magic `TXS2`, or
-/// `TXSH` with versions 3 and below) recorded tactics that are gone, and are refused with one message.
+/// `n` (u32), the digests of the candidates, of the frames and of the one-sided candidates (u64 each), `max_total`
+/// (u32) and the tactics' bits (u16, [`SearchTactics::bits`]).  This build writes version 5 and reads versions 5 and
+/// 4.  Version 4, the headers of the builds before the extended problem's search, has no digest of the one-sided
+/// candidates (`max_total` and the tactics follow the digest of the frames): those builds searched only problems
+/// without one-sided candidates, so a version-4 header reads as version 5 with the digest of none, and a checkpoint of a
+/// plain search resumes with every other check as for version 5; one asked to resume a search with one-sided candidates
+/// is refused, saying why.  Older headers (magic `TXS2`, or `TXSH` with versions 3 and below) recorded tactics that are
+/// gone, and are refused with one message.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct Header<const W: usize> {
     pub(super) n: u32,
@@ -22,22 +27,32 @@ pub(super) struct Header<const W: usize> {
     pub(super) candidates: u64,
     /// [`Header::digest_frames`] of the frames as built.
     pub(super) frames: u64,
+    /// [`Header::digest_one_sided`] of the one-sided candidates of the model (those of the extended problem), each
+    /// with its own frame: what tells a search of the extended problem from another with the same candidates.
+    pub(super) one_sided: u64,
     pub(super) max_total: u32,
     pub(super) tactics: SearchTactics,
+    /// The format the header was read from ([`Header::VERSION`] for one made by [`Header::of`]); not encoded.
+    pub(super) version: u32,
 }
 
 impl<const W: usize> Header<W> {
     pub(super) const MAGIC: &'static [u8; 4] = b"TXSH";
-    pub(super) const VERSION: u32 = 4;
-    pub(super) const LEN: usize = 4 + 4 + 4 + 4 + 8 + 8 + 4 + 2;
+    pub(super) const VERSION: u32 = 5;
+    pub(super) const LEN: usize = 4 + 4 + 4 + 4 + 8 + 8 + 8 + 4 + 2;
+    /// The format before the digest of the one-sided candidates, which this build still reads, and its length.
+    pub(super) const VERSION_4: u32 = 4;
+    pub(super) const LEN_4: usize = Self::LEN - 8;
 
     pub(super) fn of(prepared: &Prepared<W>) -> Self {
         Header {
             n: prepared.n,
             candidates: Self::digest_candidates(&prepared.candidates),
             frames: Self::digest_frames(&prepared.root),
+            one_sided: Self::digest_one_sided(prepared.model.one_sided()),
             max_total: prepared.max_total,
             tactics: prepared.tactics,
+            version: Self::VERSION,
         }
     }
 
@@ -58,6 +73,14 @@ impl<const W: usize> Header<W> {
         engine::checksum(&bytes)
     }
 
+    /// A digest of the one-sided candidates, each as its number and its own frame (u32 each); of none, the checksum of
+    /// nothing.
+    pub(super) fn digest_one_sided(one_sided: &[(u32, usize)]) -> u64 {
+        let bytes: Vec<u8> =
+            one_sided.iter().flat_map(|&(s, frame)| [s, frame as u32]).flat_map(u32::to_le_bytes).collect();
+        engine::checksum(&bytes)
+    }
+
     pub(super) fn encode(&self) -> Vec<u8> {
         let mut out = Self::MAGIC.to_vec();
         for word in [Self::VERSION, W as u32, self.n] {
@@ -65,6 +88,7 @@ impl<const W: usize> Header<W> {
         }
         out.extend_from_slice(&self.candidates.to_le_bytes());
         out.extend_from_slice(&self.frames.to_le_bytes());
+        out.extend_from_slice(&self.one_sided.to_le_bytes());
         out.extend_from_slice(&self.max_total.to_le_bytes());
         out.extend_from_slice(&self.tactics.bits().to_le_bytes());
         out
@@ -79,39 +103,66 @@ impl<const W: usize> Header<W> {
         } else {
             return Err("not a checkpoint of a Taxman search".into());
         };
-        if version != Some(Self::VERSION) {
-            let version = version.map_or_else(|| "unreadable".to_owned(), |v| v.to_string());
-            return Err(format!(
-                "the checkpoint's header has format version {version}, and this build reads version {} only: \
-                 finish the search with the build that made it, or delete the checkpoint",
-                Self::VERSION
-            ));
-        }
-        if bytes.len() != Self::LEN {
-            return Err(format!("the checkpoint's header has {} bytes, not {}", bytes.len(), Self::LEN));
+        // Where the fields after the digest of the frames start: version 4 has no digest of the one-sided candidates.
+        let (version, len, rest) = match version {
+            Some(Self::VERSION) => (Self::VERSION, Self::LEN, 40),
+            Some(Self::VERSION_4) => (Self::VERSION_4, Self::LEN_4, 32),
+            _ => {
+                let version = version.map_or_else(|| "unreadable".to_owned(), |v| v.to_string());
+                return Err(format!(
+                    "the checkpoint's header has format version {version}, and this build reads versions {} and {} \
+                     only: finish the search with the build that made it, or delete the checkpoint",
+                    Self::VERSION_4,
+                    Self::VERSION
+                ));
+            }
+        };
+        if bytes.len() != len {
+            return Err(format!("the checkpoint's header has {} bytes, not {len}", bytes.len()));
         }
         let width = u32_at(8).expect("length checked") as usize;
         if width != W {
             return Err(format!("the checkpoint was made with Bits<{width}>, not Bits<{W}>"));
         }
         let u64_at = |i: usize| u64::from_le_bytes(bytes[i..i + 8].try_into().expect("8 bytes"));
+        let one_sided = if version == Self::VERSION { u64_at(32) } else { Self::digest_one_sided(&[]) };
         Ok(Header {
             n: u32_at(12).expect("length checked"),
             candidates: u64_at(16),
             frames: u64_at(24),
-            max_total: u32_at(32).expect("length checked"),
-            tactics: SearchTactics::from_bits(u16::from_le_bytes([bytes[36], bytes[37]]))?,
+            one_sided,
+            max_total: u32_at(rest).expect("length checked"),
+            tactics: SearchTactics::from_bits(u16::from_le_bytes([bytes[rest + 4], bytes[rest + 5]]))?,
+            version,
         })
     }
 
-    /// What differs between a checkpoint's header (`self`) and the one the run expects, if anything.
+    /// Why a checkpoint with this header cannot resume a search with one-sided candidates, if it cannot: a header of
+    /// version 4 was written by a build before the extended problem's search, so for a search without them.
+    pub(super) fn one_sided_refusal(&self) -> Option<String> {
+        (self.version == Self::VERSION_4).then(|| {
+            "the checkpoint is of format version 4, made by a build before the search of the extended problem, so of \
+             a search without one-sided candidates: it cannot resume one with them (open sources)"
+                .into()
+        })
+    }
+
+    /// What differs between a checkpoint's header (`self`) and the one the run expects, if anything; for a run with
+    /// one-sided candidates, [`one_sided_refusal`](Self::one_sided_refusal) first.
     pub(super) fn mismatch(&self, expected: &Self) -> Option<String> {
+        if expected.one_sided != Self::digest_one_sided(&[]) {
+            if let Some(refusal) = self.one_sided_refusal() {
+                return Some(refusal);
+            }
+        }
         let what = if self.n != expected.n {
             format!("the game n={}, not n={}", self.n, expected.n)
         } else if self.candidates != expected.candidates {
             "other promotion candidates".into()
         } else if self.frames != expected.frames {
             "other frames (made by a build with another frame builder?)".into()
+        } else if self.one_sided != expected.one_sided {
+            "other one-sided candidates (another extended problem)".into()
         } else if self.max_total != expected.max_total {
             format!("max_total {}, not {}", self.max_total, expected.max_total)
         } else if self.tactics != expected.tactics {
