@@ -985,9 +985,9 @@ One line a game in `--out`: the board, the score, the open members, how many sou
 the frames and candidates of Π⁺(O), the nodes and seconds of the search, the threads and set width, the formulation
 (`claims`), the verdict, the digest of Π⁺(O), the game it rests on if the rule settled it (`same_problem`) and the
 build.  A search stopped by a limit or a signal writes an `incomplete` line and keeps its checkpoint (the same flags
-as `solve`'s); a rerun skips the games with a verdict and resumes the others.  A problem whose GF(2) bound needs more block words than the engines of
-the board's set width have is searched at the widest set width (128 words, five words of engine).  The width is
-`certify::certificate_width`, the one place it is decided; the line records it.
+as `solve`'s); a rerun skips the games with a verdict and resumes the others.  A problem whose GF(2) bound needs more
+block words than the engines of the board's set width have is searched at the widest set width (128 words, five words
+of engine).  The width is `certify::certificate_width`, the one place it is decided; the line records it.
 
 *A list of boards.*  `certify` takes the boards of a list file (`--list FILE`) in place of a range `A-B`, exactly one of
 the two: one board size a line, in the order to certify them, blank lines and lines whose first non-blank character is
