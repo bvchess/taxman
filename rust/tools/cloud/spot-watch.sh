@@ -12,6 +12,9 @@
 # spot interruption costs at most one checkpoint interval (300 s) of the chain's or the certificates' work, or one pass
 # (PASS_SECONDS) of prover.sh's; with it, nothing for the chain and the certificates.
 #
+# Its messages go to the terminal and to $LOGS/spot-watch.log, so the notice and the save leave a trace after the window
+# is gone (the output of save.sh goes to $LOGS/save.log, as when run.sh runs it).
+#
 # Not on EC2 (no metadata service) it says so and exits.
 
 set -u
@@ -19,6 +22,9 @@ set -u
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=env.sh
 . "$here/env.sh"
+
+mkdir -p "$LOGS"
+LOG_FILE="$LOGS/spot-watch.log"
 
 imds="http://169.254.169.254/latest"
 
@@ -58,7 +64,7 @@ while :; do
             fi
         done
         [ -n "$stopped" ] || log "no chain.sh, prover.sh, hunt.sh or certify.sh is running"
-        "$here/save.sh" || log "save.sh failed"
+        "$here/save.sh" >>"$LOGS/save.log" 2>&1 || log "save.sh failed (see $LOGS/save.log)"
         log "done; the instance will be taken away"
         exit 0
     fi
