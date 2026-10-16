@@ -43,7 +43,7 @@
 #   OUT             the output file
 #   HUNT_BIN        the hunt example, default rust/target/release/examples/hunt (built by setup.sh)
 #   EXTRA_ARGS      more flags for the hunt (for instance --list 3311:1771,3311:1749, or --results FILE, the solver's
-#                   results whose recorded games seed the start: rust/results/strict.jsonl has them to 2175)
+#                   results whose recorded games seed the start: rust/results/strict.jsonl has them to 3440)
 #   MAX_FAILS       default 5
 #   DEADLINE_HOURS, POWEROFF, S3_DEST, SAVE_EVERY: as in run.sh (POWEROFF=done powers off only when complete)
 

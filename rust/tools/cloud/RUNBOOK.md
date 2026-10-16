@@ -14,10 +14,15 @@ image after the `run.sh` split.  On EC2 (Amazon Linux 2023, Graviton) the calibr
 ([bench/cloud/](../../bench/cloud/README.md)) ran the solver and the prover on a `c7g.16xlarge` and a `c8g.16xlarge`
 with its own scripts, and the prover's run of section 9 (2026-10-14 and 15, to the end) used `setup.sh`
 (`PROVER_ONLY=1`), `prover.sh`, `save.sh` (with an instance role) and `spot-watch.sh`, all of which have run there; no
-spot interruption has yet tested `spot-watch.sh`, and the run's 15.9 hours had none.
+spot interruption has yet tested `spot-watch.sh`, and the run's 15.9 hours had none.  The chain's cloud run of
+2026-10-15 and 16 (games 2176 to 3440 on a `c8g.16xlarge`, 24 hours, in two instances; section 5, and the entry on
+[the cloud run to 3440](../../docs/EXPERIMENTS.md#the-frontier-chain-to-3440-2026-10)) used `setup.sh`,
+`chain.sh` (after a rehearsal of section 4.5 on the same machine type, which ran `verify.sh`), `save.sh` (with its
+restore on the second instance) and `spot-watch.sh`; no spot interruption came in it either, the first instance having
+been stopped on purpose.
 The scaling run on a `c8g.48xlarge` ran `setup.sh` in full (without the tests) and `verify.sh` there.  Not run on EC2:
-`chain.sh` and `scaling.sh` (the calibration and the scaling run did by hand what they do), and nothing has run on
-Ubuntu.  Sections 2 and 3 exist to find the problems that a macOS run cannot, on a machine that costs cents.  The speed
+`scaling.sh` (the calibration and the scaling run did by hand what it does), and nothing has run on Ubuntu.  Sections 2
+and 3 exist to find the problems that a macOS run cannot, on a machine that costs cents.  The speed
 of a Graviton core and the scaling of the solver to 64 and 192 threads are measured (the calibration and the
 [scaling run](../../docs/EXPERIMENTS.md#scaling-to-192-threads-2026-10)); what is not is in section 8.
 
@@ -83,7 +88,7 @@ calibration.  The sections below point here instead of repeating them.
 3. The production instance (section 1: mid-size), on spot, for the checks: the large-machine tests, the sweep to
    its CPU count, the cost of a checkpoint pause, and a rehearsal of the whole chain to 1231 with deliberate
    interruptions (section 4).
-4. The production chain, from n = 1 or from the committed `results/strict.jsonl` (which holds it to 2175), in
+4. The production chain, from n = 1 or from the committed `results/strict.jsonl` (which holds it to 3440), in
    tmux, on spot, with a deadline and a copy of the state kept off the machine (section 5).
 5. Verify, bring the results home, shut everything down (section 6).
 
@@ -114,10 +119,11 @@ All state lives in one directory, `$TAXMAN_WORK` (default `~/taxman-work`): `res
 
 `chain.sh N` runs `taxman solve 1-N` into one results file: every game from n = 1, each built from the one before.
 Nothing is taken from `optimal.json` (it is only compared with, to n = 1300), so nothing assumes it.  The committed
-`results/strict.jsonl` is exactly such a file for n = 1 to 2175, made on a laptop
-([results/README.md](../../results/README.md)): a run from n = 1 reproduces its scores (the run is checked against it by
-`verify.sh`), and the production chain can instead start from it, as section 5 says, so that only the games above 2175
-are new.  The solver is the same code as on a laptop; the machine only changes how long it takes.
+`results/strict.jsonl` is exactly such a file for n = 1 to 3440, its first 2175 games made on a laptop and the rest by
+the cloud run of section 5 ([results/README.md](../../results/README.md)): a run from n = 1 reproduces its scores (the
+run is checked against it by `verify.sh`), and the production chain can instead start from it, as section 5 says, so
+that only the games above 3440 are new.  The solver is the same code as on a laptop; the machine only changes how long
+it takes.
 
 **With the GF(2) bound** (the default since 2026-10;
 [docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#the-gf2-bound-in-the-search-2026-10)): a chain from `optimal.json`'s
@@ -126,7 +132,9 @@ cost in waves (bands of 25 n from 11 s to 850 s) that follow the root's GF(2) ga
 resolves.  Taking the 192-CPU machine as 43 to 86 times those 2 threads (an assumption; the scaling run, below, puts it
 near 60 on long searches), a day reaches n = 4095 (the end of the set widths then; they go to 8191 now, section 5)
 at every slope those data support, and even at the steepest any GF(2) measurement has shown (×10
-per 413 n), a day reaches about 3200 and a week about 3600.  How a search spreads over threads is measured to 64: the
+per 413 n), a day reaches about 3200 and a week about 3600.  The one day that has been run, on 64 CPUs, reached 3440
+([the cloud run](../../docs/EXPERIMENTS.md#the-frontier-chain-to-3440-2026-10)).  How a search spreads over threads is
+measured to 64: the
 proof of 2172 (1.4 million nodes in the calibration's build) ran 58.5 times as fast as on one thread on a
 `c8g.16xlarge`, and the same instance made the chain's games past 2175 at a rate and a price that the
 [calibration](../../docs/EXPERIMENTS.md#graviton-calibration-2026-10) gives.  At 192 threads, a `c8g.48xlarge` ran the
@@ -139,7 +147,7 @@ Cost grew by a factor of 10 for every 55 to 70 in n past 1200 ([bench/curve/READ
 From that file, the cost of extending the chain from 1231 to N on a 192-CPU machine, taking it to be 10 to 19 times
 the 8 M1 threads of the measurements (an assumption, not a measurement), and the prices it assumes ($3.33/h spot,
 $8.35/h on-demand for the 48xlarge; check the current ones).  Starting from a file that holds 1..1300 (the committed
-file did when this was written; it now holds 2175), the part of the cost up to 1300 is already paid:
+file did when this was written; it now holds 3440), the part of the cost up to 1300 is already paid:
 
 | N | time | spot | on-demand |
 |---|---|---|---|
@@ -216,6 +224,11 @@ rerunning `chain.sh` with a larger N later continues the same file.
   keep paying for something nobody watches.  If you use one, `DEADLINE_HOURS` and `POWEROFF` (section 5) are your
   protection, and the request is cancelled at the end like everything else
   ([Rules for every launch](#rules-for-every-launch)).
+* **The request names a price ceiling.**  `aws ec2 run-instances` needs `SpotOptions` with a `MaxPrice` in its market
+  options (`MarketType=spot,SpotOptions={MaxPrice=PRICE}`, PRICE in dollars an hour); the operators of the cloud run of
+  2026-10-15 found that `MarketType=spot` alone does not do.  The instance pays the spot price of the hour, never the
+  ceiling, which only bounds the price at which it is taken back; the cost estimate that Brian approves uses the spot
+  price (section 9.3), and the ceiling goes above it.  The launch command of section 9.4 shows where it goes.
 
 ### Storage
 
@@ -440,10 +453,19 @@ as `~/rehearsal2` in both tmux windows:
 
 ```
 rust/tools/cloud/chain.sh 1231                    # window 1
-kill -TERM $(cat ~/rehearsal2/chain.pid)          # window 2, a few seconds in: a clean stop (chain.sh exits with 143)
+until ls ~/rehearsal2/ckpt/n*.ckpt >/dev/null 2>&1; do sleep 1; done    # window 2: wait for a checkpoint to exist
+kill -TERM $(cat ~/rehearsal2/chain.pid)          # window 2: a clean stop (chain.sh exits with 143)
 rust/tools/cloud/chain.sh 1231                    # window 1: resumes where it stopped
-kill -KILL $(pgrep -x taxman)                     # window 2, a few seconds in: a crash
+until ls ~/rehearsal2/ckpt/n*.ckpt >/dev/null 2>&1; do sleep 1; done    # window 2: wait for a checkpoint again
+kill -KILL $(pgrep -x taxman)                     # window 2: a crash
 ```
+
+The stops wait for a checkpoint to exist, not for a number of seconds: the games past 2175 finish in seconds on a big
+machine.  The cloud run's first rehearsal (`chain.sh 2185` on a copy of the committed file, a stop at 45 seconds)
+finished before its stop came, and its second (`chain.sh 2300`, stops at 40 seconds) found no checkpoint at the KILL,
+so that resume tested nothing.  A checkpoint is a file `ckpt/n*.ckpt`; the solver writes one every
+`CHECKPOINT_INTERVAL` seconds (300 by default) and at a stop, so a short interval (`CHECKPOINT_INTERVAL=10`) keeps the
+wait brief.
 
 After the TERM the log says "stopped by a signal (a final checkpoint was written)"; after the KILL it says "the solver
 crashed (status 137)", `chain.sh` starts the solver again after 10 s, and the next pass resumes from the last
@@ -460,7 +482,14 @@ DEADLINE_HOURS=30 POWEROFF=always S3_DEST=s3://taxman-013764204840-us-east-1/cha
 ```
 
 (The bucket is the one of section 9.4, a prefix of its own for each run.)  In a second window, on spot:
-`rust/tools/cloud/spot-watch.sh`.  `chain.sh N` is the whole command: the chain 1..N into
+
+```
+rust/tools/cloud/spot-watch.sh 2>&1 | tee -a ~/taxman-work/logs/spot-watch.log
+```
+
+(`spot-watch.sh` logs only to its terminal, so tee it, or its notice and its save leave no trace after the window is
+gone; start it after `chain.sh` has made the directory, or `mkdir -p ~/taxman-work/logs` first.)  `chain.sh N` is the
+whole command: the chain 1..N into
 `~/taxman-work/results/strict.jsonl`, all CPUs, sixteen games in flight at once, a checkpoint every 300 s and a
 progress line every 60 s.  Its variables (all optional) are documented at the top of the script: `THREADS`, `WINDOW`,
 `CHECKPOINT_INTERVAL`, `PROGRESS`, `EXTRA_ARGS`, `DEADLINE_HOURS`, `POWEROFF`, `MAX_FAILS`, `S3_DEST`, `SAVE_EVERY`.
@@ -470,30 +499,38 @@ busy, so that a machine of many threads is not left idle by one game's search.  
 in order, with the scores, proofs and repeats of a window of 1, which solves them one after the other
 ([README](../../README.md#games-in-flight); [DESIGN.md](../../DESIGN.md#the-window-games-in-flight)).  On 64 and 192
 threads the [scaling run](../../docs/EXPERIMENTS.md#scaling-to-192-threads-2026-10) found a window of 4 the best of 1,
-4, 16 and 32 on the games past 2225, and the default of 16 a fifth slower than 1 on 64 threads: set `WINDOW=4` until
-the default changes.
+4, 16 and 32 on the games past 2225, and the default of 16 20 to 32% slower than 1 on 64 threads: `chain.sh`'s default
+is measured worse than 4 at 64 threads.  Set `WINDOW=4` until the default changes.
+The cloud run began with the default and moved to `WINDOW=4` at game 3310, on a fresh instance (the three games in
+flight at the move, 3311, 3312 and 3315, finished from their checkpoints under the new window).
 
 * **Where the chain starts.**  From an empty `~/taxman-work`, `chain.sh` solves from n = 1, which reproduces the
-  committed `rust/results/strict.jsonl` (n = 1 to 2175; the scores equal, the moves may differ) in minutes on the big
-  machine, and `verify.sh` then checks the machine and the build against it.  To skip those games, copy the committed
-  file in before the first run, once:
+  committed `rust/results/strict.jsonl` (n = 1 to 3440; the scores equal, the moves may differ): the first 2175 games in
+  minutes on the big machine (the cloud run's rehearsal made 2176 to 2300 in 11 minutes, with two interruptions), the
+  rest in the day that the cloud run took, and `verify.sh` then checks the machine and the build against it.  To skip
+  those games, copy the committed file in before the first run, once:
 
   ```
   mkdir -p ~/taxman-work/results && cp rust/results/strict.jsonl ~/taxman-work/results/strict.jsonl
-  rust/tools/cloud/chain.sh 2300                    # skips the 2175 games it holds and solves 2176 on
+  rust/tools/cloud/chain.sh 4095                    # skips the 3440 games it holds and solves 3441 on
   ```
 
-  The file is checked when `chain.sh` opens it, assumes nothing (a chain from n = 1), and its lines keep the build that
-  made them (commit feba6d0), as the lines added will keep the cloud's.  It was made in one invocation and holds no
-  incomplete line.  The comparison of `verify.sh` with the committed file is then trivial for 1..2175, so the games
-  above 2175 are checked by the referees alone (each game replayed, the chain bounds, Franklín–Moniot, the heuristic
-  chain); a run from n = 1 is the cross-check of the machine and the build.  On a replacement machine, restore the
-  saved state instead (below), never the committed file over it.
+  The file is checked when `chain.sh` opens it, assumes nothing (a chain from n = 1), and its lines keep the builds that
+  made them (commit feba6d0 for 1 to 2175, 55287ff for 2176 to 3440), as the lines added will keep the cloud's.  It
+  holds no incomplete line.  The comparison of `verify.sh` with the committed file is then trivial for 1..3440, so the
+  games above 3440 are checked by the referees alone (each game replayed, the chain bounds, Franklín–Moniot, the
+  heuristic chain); a run from n = 1 is the cross-check of the machine and the build.  On a replacement machine,
+  restore the saved state instead (below), never the committed file over it.  The cloud run left game 3441 at 626
+  million nodes, and 3444 begun; their checkpoints (format 4, which the present build reads: DESIGN's checkpoint
+  section, and a laptop resumed 3441 from the saved file at its 625,763,557 nodes) are in
+  `s3://taxman-013764204840-us-east-1/chain-2176/ckpt/`, and a run that restores them (`save.sh --restore`, below)
+  resumes those games instead of starting them over.
 
 * **Stop on purpose**: Ctrl-C in tmux, or `kill -TERM $(cat ~/taxman-work/chain.pid)`.  The solver writes a final
   checkpoint; `chain.sh` ends with status 143.  **Start again**: run the same command.  It skips every completed game
-  and resumes the game with a checkpoint.  The thread count, `S3_DEST`, `DEADLINE_HOURS` (the first deadline stays in
-  `~/taxman-work/deadline`; delete the file to set another) and N may differ between runs.
+  and resumes the game with a checkpoint.  The thread count, the window, `S3_DEST`, `DEADLINE_HOURS` (the first
+  deadline stays in `~/taxman-work/deadline`; delete the file to set another, and see below for a replacement machine)
+  and N may differ between runs.
 * **What it does by itself**: a crash (status other than 0, 1, 2, 124, 130 and 143) is retried after 10 s; an error
   status (1, 2: a refused checkpoint, a game that failed a check) is not, because it would repeat: read
   `~/taxman-work/logs/chain.err`.
@@ -544,15 +581,26 @@ smooth curve.
    priority is time: against 16 busy threads a save took about 80 s of wall time on a `c8g.4xlarge`, and the next waits
    `SAVE_EVERY` after it ends, so the copies are `SAVE_EVERY` plus the save apart (about 380 s for `prover.sh`, whose
    `SAVE_EVERY` is 300 s).  That is harmless: the final saves, at a stop or the end, run after the work has stopped.
+   The copy of `save.log` in S3 trails by one save: a save logs that it is done after it has uploaded the logs, so its
+   line reaches S3 with the next save (the file on the machine is current).
 3. On a replacement machine: `setup.sh` (same commit: `git checkout` it if the branch moved, or the checkpoint may be
    refused), then `S3_DEST=... rust/tools/cloud/save.sh --restore`, then `chain.sh N` again.  It refuses to restore over
    an existing results file unless `FORCE=1`.  With a separate EBS volume instead, attach it in the same availability
-   zone, mount it, and set `TAXMAN_WORK`.
+   zone, mount it, and set `TAXMAN_WORK`.  Two things of the old machine are not brought back, and the cloud run's
+   second instance had to see to both:
+   * **The logs.**  `--restore` copies the results and the checkpoints, not `logs/`.  Copy them back before the chain
+     starts (`aws s3 sync $S3_DEST/logs ~/taxman-work/logs`), or the first save of the new machine uploads its own
+     `chain.log`, `chain.out`, `chain.err` and `save.log` over the old machine's in S3, which share their names.
+   * **The deadline.**  `~/taxman-work/deadline` is not saved, so a replacement machine starts a new deadline at its
+     first start.  Give it `DEADLINE_HOURS` set to the hours that remain, so that the deadline falls where the first
+     one did (the second instance of the cloud run was given the remainder, and the deadline stopped it 24 hours after
+     the first instance started).
 
 ### Cost guardrails
 
-* `DEADLINE_HOURS`: after that many hours from the first start, `chain.sh` stops the solver cleanly (final checkpoint)
-  and ends with status 3.  `POWEROFF=done` powers the machine off when the range is complete, `POWEROFF=always`
+* `DEADLINE_HOURS`: after that many hours from the first start (on a replacement machine, from its own first start:
+  section 5, "Surviving a spot interruption"), `chain.sh` stops the solver cleanly (final checkpoint) and ends with
+  status 3.  `POWEROFF=done` powers the machine off when the range is complete, `POWEROFF=always`
   whenever `chain.sh` ends for any reason (needs passwordless `sudo`, as on both AMIs): the choice for an unattended
   run, since an idle machine after an error or a deadline costs as much as a busy one.  `chain.sh` saves to `S3_DEST`
   before it powers off, which matters because a shutdown terminates the instance.
@@ -645,14 +693,16 @@ on a Graviton4 core, and the chain's speed and cost a game on 64 and 192 threads
   before it ran anything.  The speed of its CPUs against Graviton4's (AWS says up to 25 %) is unmeasured.
 * **PGO and `target-cpu=native` on Graviton.**  `tools/pgo.sh` exists and was run on the M1 only; no gain from
   profile-guided builds is claimed for Graviton, and the calibration built with `native` without comparing generic code.
-* **The scripts on Linux and on EC2.**  See the status box: `chain.sh` and `scaling.sh` have not run on EC2, and
-  `spot-watch.sh` has not seen an interruption (the scaling run's instance had its notice two minutes before the end,
-  with no `spot-watch.sh` running).  The first run of each on a small instance is the test.
+* **The scripts on Linux and on EC2.**  See the status box: `scaling.sh` has not run on EC2 (`chain.sh` has, in the
+  cloud run), and `spot-watch.sh` has not seen an interruption (the scaling run's instance had its notice two minutes
+  before the end, with no `spot-watch.sh` running), so neither has the restore after one: the cloud run's was after a
+  stop on purpose.  The first run of `scaling.sh` on a small instance is the test of that one.
 
 ## 9. The prover's proofs of opt(n), 1301 to 2175
 
-The committed chain (`results/strict.jsonl`) reaches 2175, and the prover in `rust/prover` has proven opt(n) = V(n)
-without the frame model for every n to there: 1301..2175 in the run of 2026-10-14 and 15 that this section describes
+The committed chain (`results/strict.jsonl`) reached 2175 when the prover's run began (it reaches 3440 now, within the
+frame model), and the prover in `rust/prover` has proven opt(n) = V(n) without the frame model for every n to 2175:
+1301..2175 in the run of 2026-10-14 and 15 that this section describes
 ([the prover's README](../../prover/README.md#to-2175-on-a-cloud-machine) has the results and their cost).
 `prover.sh` runs the same program, `exact`, over a range of games on a cloud machine.  It is a small job next to the
 chain: the run took 226 thread-hours, 15.9 hours on 16 vCPUs, for $3.84.  Section 9.2 keeps the estimate it was planned
@@ -843,8 +893,11 @@ aws ec2 run-instances --instance-type c8g.4xlarge --placement AvailabilityZone=u
     --instance-initiated-shutdown-behavior terminate --user-data $'#!/bin/bash\nshutdown -h +2220' \
     --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=taxman-prover},$tags]" \
         "ResourceType=volume,Tags=[$tags]" "ResourceType=spot-instances-request,Tags=[$tags]" \
-    --instance-market-options 'MarketType=spot'      # on demand: leave out this line and the spot request's tags
+    --instance-market-options 'MarketType=spot,SpotOptions={MaxPrice=PRICE}'   # PRICE: a ceiling above the spot price
+# on demand: leave out the market options and the spot request's tags
 ```
+
+(`SpotOptions` with a `MaxPrice` is needed: `MarketType=spot` alone does not do; section 1, "Spot or on-demand".)
 
 **Steps through SSM.**  The instance is ready for commands when `aws ssm describe-instance-information --filters
 Key=InstanceIds,Values=$I --query 'InstanceInformationList[].PingStatus'` says `Online` (`$I` is the instance id that
@@ -874,7 +927,8 @@ PROVER_ONLY=1 rust/tools/cloud/setup.sh                              # 46 s on a
 # ... the rehearsal below ...
 cd ~/taxman && tmux new-session -d -s pv "DEADLINE_HOURS=36 POWEROFF=always \
     S3_DEST=s3://taxman-013764204840-us-east-1/prover-1301-2175 rust/tools/cloud/prover.sh 1301 2175"
-tmux new-session -d -s sw 'rust/tools/cloud/spot-watch.sh'           # on spot: stops the run and saves on a notice
+tmux new-session -d -s sw 'mkdir -p ~/taxman-work/logs; \
+    rust/tools/cloud/spot-watch.sh 2>&1 | tee -a ~/taxman-work/logs/spot-watch.log'   # on spot: stops the run, saves
 ```
 
 The prefix `prover-1301-2175` is this run's own (one prefix a run); the laptop-side commands of 9.5 and 9.6 reach it as
@@ -1024,7 +1078,7 @@ export D=s3://taxman-013764204840-us-east-1/e6 W=/home/ec2-user/taxman-work/resu
 cd ~/taxman && tmux new-session -d -s e6 "export DEADLINE_HOURS=3 S3_DEST=$D; \
     OUT=$W/e6_low.jsonl rust/tools/cloud/prover.sh --list $L; \
     POWEROFF=always OUT=$W/e6_upper.jsonl EXTRA_ARGS='--fix-upper 1' rust/tools/cloud/prover.sh --list $L"
-tmux new-session -d -s sw 'rust/tools/cloud/spot-watch.sh'
+tmux new-session -d -s sw 'mkdir -p ~/taxman-work/logs; rust/tools/cloud/spot-watch.sh 2>&1 | tee -a ~/taxman-work/logs/spot-watch.log'
 ```
 
 The two runs share the deadline (it is fixed at the first start), the second powers the machine off, and each is
@@ -1052,7 +1106,7 @@ over V, and the pairs of largest margin matter most (a counterexample needs the 
 below the margin) but will not finish.  So the pairs run in **decreasing margin**, so that a run cut short has done the
 informative ones; those of **margin up to 900 run to completion** under a limit of 10 minutes (`MINUTES`), and those
 **above 900 are probes**: the solver's own start on the board without u (greedy set, dive, local search; the seed too
-if `EXTRA_ARGS='--results FILE'` gives the recorded games, which the repository has to 2175 only) and then 3 minutes of
+if `EXTRA_ARGS='--results FILE'` gives the recorded games, which the repository has to 3440 only) and then 3 minutes of
 search (`PROBE_MINUTES`), recorded as `probed`, never as `none`.
 
 *Criterion.*  Any `found` line is a counterexample to U and to the chain's score at n: stop extending the chain,
@@ -1084,7 +1138,7 @@ which builds the solver's examples, `hunt` among them):
 export D=s3://taxman-013764204840-us-east-1/hunt
 cd ~/taxman && tmux new-session -d -s hunt "DEADLINE_HOURS=5 POWEROFF=always S3_DEST=$D \
     rust/tools/cloud/hunt.sh rust/prover/data/upper_2176_3314.jsonl"
-tmux new-session -d -s sw 'rust/tools/cloud/spot-watch.sh'
+tmux new-session -d -s sw 'mkdir -p ~/taxman-work/logs; rust/tools/cloud/spot-watch.sh 2>&1 | tee -a ~/taxman-work/logs/spot-watch.log'
 ```
 
 `hunt.sh` reruns the hunt after a crash and resumes it after a stop (finished pairs are in its output); exit status 2
