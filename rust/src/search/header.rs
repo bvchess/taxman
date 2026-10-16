@@ -177,7 +177,7 @@ impl<const W: usize> Header<W> {
             "other one-sided candidates (another extended problem)".into()
         } else if self.max_total != expected.max_total {
             format!("max_total {}, not {}", self.max_total, expected.max_total)
-        } else if self.tactics != expected.tactics {
+        } else if !self.tactics.same_recorded(&expected.tactics) {
             format!("the search tactics {:?}, not {:?}", self.tactics, expected.tactics)
         } else {
             return None;

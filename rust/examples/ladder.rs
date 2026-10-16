@@ -15,10 +15,14 @@
 //! games past the end of optimal.json get their n − 1.  One line per game and thread count: whether the search
 //! completed, its time and nodes, the incumbent against the known optimum, when the final incumbent was found,
 //! and the engine's activity ([`Counters::summary`]: effective parallelism, idle and lock-wait time, splits,
-//! steals, time to full occupancy).  `--diag` collects [`Diagnostics`] (slower) and prints a summary.
+//! steals, time to full occupancy), then the CPU seconds and the cycles of the process over the search (they move less
+//! with the load on the machine than wall time does; cycles on macOS only), the tactics that differ from the defaults,
+//! and what the nogood tables did ([`NogoodStats::summary`]: learned, lookups and the share answered, candidates ruled
+//! out, forgettings with the table's mean size before and after, evictions, the largest table).  `--diag` collects
+//! [`Diagnostics`] (slower) and prints a summary.
 //! `--tactic` sets a search tactic with the names and values of `taxman solve --tactic` (`nogoods=off`,
-//! `match_refine=0`, ...).  `--node-limit N` stops each search after N nodes (steps), for measuring a prefix of a
-//! search too long to finish.
+//! `match_refine=0`, `nogood_keep=top64`, ...).  `--node-limit N` stops each search after N nodes (steps), for
+//! measuring a prefix of a search too long to finish.
 //!
 //! Scaling: `--threads` takes a list of thread counts, and `--scaling` is 1, 2, 4, ... up to the available
 //! parallelism (which is included).  Each game is searched with each count in turn, and a table per game (and
@@ -64,6 +68,9 @@ use taxman::engine::{Counters, EngineConfig};
 use taxman::game::Optimal;
 use taxman::search::{cut, search_with, Diagnostics, SearchTactics};
 use taxman::tactics::Tactics;
+
+#[path = "common/counters.rs"]
+mod counters;
 
 struct Options {
     /// Thread counts to search each game with, in order.
@@ -299,7 +306,13 @@ fn run<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Vec<Row> {
             ..EngineConfig::default()
         };
         let diag = o.diag.then(|| Mutex::new(Diagnostics::default()));
+        let (cpu_before, cycles_before) = (counters::cpu_seconds(), counters::now());
         let r = search_with(&p, &cfg, seed.as_ref(), cap, false, diag.as_ref()).expect("search");
+        let (cpu_after, cycles_after) = (counters::cpu_seconds(), counters::now());
+        let cpu = cpu_before.zip(cpu_after).map_or("?".into(), |(a, b)| format!("{:.2}", b - a));
+        let gigacycles = cycles_before
+            .zip(cycles_after)
+            .map_or("?".into(), |((_, a), (_, b))| format!("{:.2}", b.saturating_sub(a) as f64 / 1e9));
         let found = match r.found {
             Some(f) => format!("start {}, found at {:.2} s, {} steps", r.start.sum(), secs(f.time), f.steps),
             None => format!("start incumbent {}", r.start.sum()),
@@ -313,7 +326,7 @@ fn run<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Vec<Row> {
         };
         println!(
             "n={n:4} T={threads} {status:6} search {:7.2} s nodes {:11} ({:6.0} k/s) best {} opt {} greedy {} cap {} \
-             | {found} | prep {:.2} s max_total {} | {}",
+             | {found} | prep {:.2} s max_total {} | cpu {cpu} s {gigacycles} Gcycles | tactics {} | {} | {}",
             secs(r.time),
             r.stats.nodes,
             r.stats.nodes as f64 / secs(r.time).max(1e-9) / 1e3,
@@ -323,7 +336,9 @@ fn run<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Vec<Row> {
             prev_cap.map_or("?".into(), |v| v.to_string()),
             secs(prep),
             p.max_total,
+            Tactics { search: o.tactics, ..Tactics::default() }.description(),
             r.counters.summary(),
+            r.nogoods.summary(),
         );
         if let Some(diag) = diag {
             print_diagnostics(&diag.into_inner().expect("diagnostics"), r.stats.nodes, r.found.map(|f| f.steps));

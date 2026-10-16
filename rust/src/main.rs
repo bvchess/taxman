@@ -29,8 +29,9 @@ commands:
       --window K               games of a range in flight at once, sharing the threads: game n+1 is set up, and
                                searched from n's best game so far, while n searches (default 1: one game after
                                another; always 1 with one thread).  Scores and proofs are those of a window of 1
-      --tactic NAME=VALUE      set a tactic (repeatable).  A switch is on or off, match_refine is 0-{max_refine}.
-                               Names: {tactics}
+      --tactic NAME=VALUE      set a tactic (repeatable).  A switch is on or off, match_refine is 0-{max_refine},
+                               nogood_period and nogood_limit are whole numbers, nogood_keep is none, hit, sizeN
+                               or topN.  Names: {tactics}
       --out FILE               append each result as a JSON line; games already completed in FILE are skipped
       --checkpoint-dir DIR     keep a resumable checkpoint nNNNN.ckpt per game in DIR
       --checkpoint-interval S  seconds between checkpoints (default 60)

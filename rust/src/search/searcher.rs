@@ -19,14 +19,14 @@ use super::refine::{strongest, Learning, Refiner, Seek, Verdict};
 use super::setup::Prepared;
 use super::symmetry::{RuleScratch, Symmetries};
 use super::tactics::Gf2Branching;
-use super::{Diagnostics, NOGOOD_PERIOD};
+use super::{Diagnostics, Forgetting};
 use crate::bits::Bits;
 use crate::bounds::max_additional;
 use crate::engine::{Ctx, Poll, Searcher, Stats, Unit};
 use crate::gf2::{ForceWindow, Gf2Bound, Gf2Graph, Gf2Stats};
 use crate::matchbound::{MatchBound, MatchGraph};
-use crate::model::{ConflictCache, FrameGraph, FrameSet, Lookup, Nogoods, Scratch};
-use std::sync::{Mutex, PoisonError};
+use crate::model::{ConflictCache, FrameGraph, FrameSet, Lookup, NogoodStats, Nogoods, Scratch};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 // ---------------------------------------------------------------------------------------------------------
@@ -83,9 +83,12 @@ pub struct SearchSpace<'a, const W: usize> {
     /// Tactics `fix_forced` and `nogoods`.
     pub fix_forced: bool,
     pub nogoods: bool,
-    /// After how many of its steps a searcher forgets the nogoods it knows (tactic `forget_nogoods`: every
-    /// [`NOGOOD_PERIOD`]), if ever.
-    pub nogood_period: Option<u64>,
+    /// When a searcher forgets the nogoods it knows, what it keeps, and how many it holds at most (tactics
+    /// `forget_nogoods`, `nogood_period`, `nogood_keep` and `nogood_limit`; sound whatever they say).
+    pub forgetting: Forgetting,
+    /// What the searchers' tables have done, as each publishes it (at the end of a unit, and every
+    /// [`PUBLISH_EVERY`] steps): the counters of the policy.
+    pub nogood_totals: Arc<Mutex<NogoodStats>>,
     /// With the Lagrangian bound over the nogoods (tactic `lagrange`, with `nogoods`), when each searcher refits
     /// its multipliers ([`Refits::SEARCH`]).
     pub lagrange: Option<Refits>,
@@ -137,7 +140,8 @@ impl<'a, const W: usize> SearchSpace<'a, W> {
             match_refine: u32::from(tactics.match_refine),
             fix_forced: tactics.fix_forced,
             nogoods: tactics.nogoods,
-            nogood_period: tactics.forget_nogoods.then_some(NOGOOD_PERIOD),
+            forgetting: tactics.forgetting(),
+            nogood_totals: Arc::default(),
             lagrange: (tactics.nogoods && tactics.lagrange).then_some(Refits::SEARCH),
             candidates: prepared.candidates,
             root_max: prepared
@@ -182,6 +186,10 @@ pub struct Found {
 /// Most nogoods a searcher keeps (tactic `nogoods`); it forgets them all when it has this many.  With
 /// `forget_nogoods` a table never gets near it (a few hundred nogoods are learned in a period near n = 1200).
 const NOGOOD_CAPACITY: usize = 1 << 16;
+
+/// A searcher publishes what its nogood table has done to [`SearchSpace::nogood_totals`] after each this many of its
+/// steps (and when a unit ends), so that a progress line shows them.
+pub const PUBLISH_EVERY: u64 = 1 << 15;
 
 /// Indexes into [`Stats::extra`]: the searchers' counters.
 pub mod stat {
@@ -351,7 +359,11 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 certified: Vec::new(),
                 known: Vec::new(),
                 conflict_cache: ConflictCache::default(),
-                nogoods: space.nogoods.then(|| Nogoods::new(space.root_max, NOGOOD_CAPACITY)),
+                nogoods: space.nogoods.then(|| {
+                    let mut table = Nogoods::new(space.root_max, NOGOOD_CAPACITY);
+                    table.set_limit(space.forgetting.limit);
+                    table
+                }),
                 steps_since_clear: 0,
                 lagrange: space.lagrange.map(|refits| Lagrangian::new(space.match_graph, refits)),
                 symmetry_scratch: space.symmetry.as_ref().map(Symmetries::scratch).unwrap_or_default(),
@@ -662,7 +674,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
                 cands -= rest;
             }
         }
-        if let Some(table) = &self.nogoods {
+        if let Some(table) = &mut self.nogoods {
             cands -= table.ruled_out(&added, &child.promoted, &cands);
         }
         if let Some(sym) = &space.symmetry {
@@ -1023,24 +1035,38 @@ impl<'a, const W: usize> Stepper<'a, W> {
         }
     }
 
-    /// With the tactic `forget_nogoods`, forgets the nogoods every [`SearchSpace::nogood_period`] steps; with the
-    /// tactic `lagrange`, refits the Lagrangian bound's multipliers when due, first.
+    /// With the tactic `forget_nogoods`, forgets the nogoods as the space's [`Forgetting`] says, after each of its
+    /// periods of steps; with the tactic `lagrange`, refits the Lagrangian bound's multipliers when due, first.  A
+    /// table publishes what it has done now and then ([`PUBLISH_EVERY`]).
     #[inline]
-    fn forget_nogoods_when_due(&mut self, ctx: &Ctx<'_, TaxUnit<W>>) {
+    fn forget_nogoods_when_due(&mut self, ctx: &mut Ctx<'_, TaxUnit<W>>) {
         if let (Some(l), Some(table)) = (&mut self.lagrange, &self.nogoods) {
             l.step(table, &self.space.candidates, ctx.best());
         }
-        if let (Some(table), Some(period)) = (&mut self.nogoods, self.space.nogood_period) {
+        if let (Some(table), Some(period)) = (&mut self.nogoods, self.space.forgetting.period) {
             self.steps_since_clear += 1;
             if self.steps_since_clear >= period {
-                table.clear();
+                table.forget(self.space.forgetting.keep);
                 self.steps_since_clear = 0;
             }
+        }
+        if ctx.stats().nodes.is_multiple_of(PUBLISH_EVERY) {
+            self.publish_nogood_stats();
+        }
+    }
+
+    /// Adds what the nogood table has done since it last published to [`SearchSpace::nogood_totals`].
+    #[cold]
+    fn publish_nogood_stats(&mut self) {
+        if let Some(table) = &mut self.nogoods {
+            let taken = table.take_stats();
+            self.space.nogood_totals.lock().unwrap_or_else(PoisonError::into_inner).add(&taken);
         }
     }
 
     /// Adds this searcher's counts to the worker's statistics (and diagnostics) and resets them.
     fn flush(&mut self, stats: &mut Stats) {
+        self.publish_nogood_stats();
         let counts = std::mem::take(&mut self.counts);
         let extra = [
             (stat::PROMOTE_ATTEMPTS, counts.attempts),

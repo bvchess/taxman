@@ -27,6 +27,21 @@ pub fn max_rss() -> Option<u64> {
     Some(if cfg!(target_os = "linux") { maxrss * 1024 } else { maxrss })
 }
 
+/// The CPU time this process has used so far, user plus system, in seconds (`getrusage`), if the system says.  Wall time
+/// changes with the load on the machine, and CPU time less, though it still moves with it (shared caches, other
+/// cores' heat); cycles ([`now`]) move least.
+#[allow(dead_code)] // only the ladder reads it
+pub fn cpu_seconds() -> Option<f64> {
+    const RUSAGE_SELF: i32 = 0;
+    let mut usage = Rusage { times: [[0; 2]; 2], longs: [0; 14] };
+    // SAFETY: `usage` is writable and has the layout of `struct rusage`, which `getrusage` fills in.
+    let rc = unsafe { getrusage(RUSAGE_SELF, &mut usage) };
+    // A `timeval` is seconds and microseconds: on macOS the microseconds are an `i32` in the low half of the second
+    // word, on Linux an `i64`; they are under a million, so the low 32 bits hold them on both.
+    let seconds = |[sec, usec]: [i64; 2]| sec as f64 + (usec & 0xFFFF_FFFF) as f64 * 1e-6;
+    (rc == 0).then(|| seconds(usage.times[0]) + seconds(usage.times[1]))
+}
+
 #[cfg(target_os = "macos")]
 mod imp {
     unsafe extern "C" {
