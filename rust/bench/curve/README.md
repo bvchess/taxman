@@ -36,7 +36,7 @@ first 2175 games of the committed `results/strict.jsonl` are a chain from n = 1 
 | `scaling.jsonl` | step 4, thread scaling of the proof of 1225 |
 | `recheck.jsonl` | four games repeated at the end, to see run-to-run and background-load noise |
 | `load.jsonl` | what the machine was doing apart from us, sampled before and after each invocation |
-| `slope_roots.jsonl`, `slope_proofs.jsonl`, `slope.py` | the later study of what drives the slope: `examples/slope.rs`'s root measurements of the non-prime games 880-1300 and of this study's games past 1300, its one-thread proofs (with margins), and the script that makes its tables ([docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#what-drives-the-slope-2026-10)) |
+| `slope_roots.jsonl`, `slope_proofs.jsonl`, `slope.py` | the later study of what drives the slope: `examples/slope.rs`'s root measurements of the non-prime games 880-1300 and of this study's games past 1300, its one-thread proofs (with margins), and the script that makes its tables, from `results/strict.jsonl` as of commit 2487671 (the 1..1300 chain of the older build, read from git; `--strict PATH` for another file) ([docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#what-drives-the-slope-2026-10)) |
 
 Regenerate the tables with `./analysis.py > analysis_output.md` (and the slope study's with `./slope.py`).
 

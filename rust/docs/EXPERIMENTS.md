@@ -1778,11 +1778,11 @@ candidates, `max_total`), or something else?  And so what would change it?
 *Method.*  No search code changed.  `examples/slope.rs` (commit db7faf1) measures the root of a game and runs proofs
 with the incumbent set by value, through the library's public interfaces (`Board`, `MatchBound`,
 `matchbound::lagrange`, `engine::run`); `bench/curve/slope.py` makes the tables below (and more) from its two data
-files, `bench/curve/slope_roots.jsonl` and `bench/curve/slope_proofs.jsonl`, and `results/strict.jsonl`.  The solver
-of 331eb09 with `--tactic revise_freedoms=off` (the strict tactics; the tactic has been removed since, and the
-commands below, which no longer pass it, run the same searches), one thread a process and at most two processes, on
-the laptop while another agent ran the test suite.  `P*` is a game's optimum promotion sum (its score minus
-`in_the_bag`).
+files, `bench/curve/slope_roots.jsonl` and `bench/curve/slope_proofs.jsonl`, and `results/strict.jsonl` as of 2487671
+(the 1..1300 chain of the older build, which the script reads from git).  The solver of 331eb09 with
+`--tactic revise_freedoms=off` (the strict tactics; the tactic has been removed since, and the commands below, which no
+longer pass it, run the same searches), one thread a process and at most two processes, on the laptop while another
+agent ran the test suite.  `P*` is a game's optimum promotion sum (its score minus `in_the_bag`).
 
 * *Roots* (`slope roots --known results/strict.jsonl --sums bench/curve/bands.jsonl 880-1300` and the games past 1300
   that `bands.jsonl` solved; about a second a game): the root's matching bound; the matching bound refined one to three

@@ -1,23 +1,52 @@
 #!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
 """What drives the slope of the cost curve: the tables of docs/EXPERIMENTS.md, "What drives the slope (2026-10)".
 
-Reads results/strict.jsonl (the recorded chain: nodes on 4 threads, proofs), slope_roots.jsonl (`slope roots`: the
-root of every non-prime game 880-1300 and of the games past 1300 that bands.jsonl solved) and slope_proofs.jsonl
-(`slope prove`: one-thread searches with the incumbent at the optimum plus a margin delta; delta = 0 for every
-searched game, more margins for some), joins them by n and prints markdown.  The commands that made the data files
-are in EXPERIMENTS.md.  Pure Python (no numpy); `./slope.py > slope_output.md`.
+Reads the recorded chain (nodes on 4 threads, proofs), slope_roots.jsonl (`slope roots`: the root of every non-prime
+game 880-1300 and of the games past 1300 that bands.jsonl solved) and slope_proofs.jsonl (`slope prove`: one-thread
+searches with the incumbent at the optimum plus a margin delta; delta = 0 for every searched game, more margins for
+some), joins them by n and prints markdown.  The commands that made the data files are in EXPERIMENTS.md.  Pure
+Python (no numpy); `./slope.py > slope_output.md`.
+
+The recorded chain is results/strict.jsonl as of commit 2487671 (STRICT_COMMIT), read from git: the 1..1300 chain of
+the older build, whose node counts EXPERIMENTS.md quotes.  The file was replaced by the GF(2) build's chain at 0133afe
+and 0b5a136, and with that one the script stops at its check of the caps of the games past 1300.  `--strict PATH`
+reads another file instead.
 """
+import argparse
 import json
 import math
+import subprocess
+import sys
 from collections import defaultdict
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-STRICT = HERE.parents[1] / "results/strict.jsonl"
+RUST = HERE.parents[1]
+STRICT_FILE = "results/strict.jsonl"
+# The chain whose node counts the section quotes; the file was replaced by the GF(2) build's chain at 0133afe/0b5a136.
+STRICT_COMMIT = "2487671c38c051958fee9b8e2f0e0edd07715878"
+
+
+def parse(text):
+    return [json.loads(line) for line in text.splitlines() if line.strip()]
 
 
 def load(path):
-    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    return parse(path.read_text())
+
+
+def recorded_chain(path):
+    """The lines of the recorded chain: the file `path` if given, else STRICT_FILE as of STRICT_COMMIT, from git."""
+    if path:
+        return load(path)
+    try:
+        shown = subprocess.run(["git", "show", f"{STRICT_COMMIT}:./{STRICT_FILE}"], cwd=RUST, check=True,
+                               capture_output=True, text=True)
+    except (OSError, subprocess.CalledProcessError) as error:
+        detail = error.stderr.strip() if isinstance(error, subprocess.CalledProcessError) else error
+        sys.exit(f"slope.py: cannot read {STRICT_FILE} as of commit {STRICT_COMMIT} with git ({detail}); "
+                 "run it inside the repository's checkout with that commit, or pass --strict PATH")
+    return parse(shown.stdout)
 
 
 def solve(a, b):
@@ -88,8 +117,11 @@ def gaps(r):
     }
 
 
-def main():
-    strict = {r["n"]: r for r in load(STRICT)}
+def main(argv):
+    parser = argparse.ArgumentParser(description="The tables of EXPERIMENTS.md, 'What drives the slope'.")
+    parser.add_argument("--strict", type=Path,
+                        help=f"the recorded chain (default: {STRICT_FILE} as of {STRICT_COMMIT[:7]}, from git)")
+    strict = {r["n"]: r for r in recorded_chain(parser.parse_args(argv).strict)}
     roots = {r["n"]: r for r in load(HERE / "slope_roots.jsonl")}
     proofs = defaultdict(dict)
     depths = {}
@@ -299,4 +331,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])
