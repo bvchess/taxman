@@ -1,19 +1,22 @@
 #!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
 """The tables of U4, the next step of A1 after the E3 pilot (the advisor's fourth consultation): R3 against the
 reference on saved states (Phase 1), the slope test (Phase 2), patch mode with R3 (Phase 3) and R3's cost at the
-frontier (Phase 4).
+end of the chain (Phase 4).
 
 Reads the output of `examples/fields.rs` in u4/ beside this script (`--dir`): trees.jsonl (`bnb` trees, a line per
-run), replay.jsonl (`replay`, a line per saved state and method), fits.jsonl (`fit`, a line per root fit) and
-dives.jsonl (`bnb --knuth`, the frontier's dives), and the plain branch and bound's trees and roots of the matroid study
-(../matroid/bnb.jsonl and roots.jsonl), whose trees are v0's.  A line that repeats the key of an earlier one (a rerun)
-replaces it; a missing file is noted and its sections skipped.  Prints Markdown: 1. each method's reach (the share of
-the reference's cuts it makes) by GF(2) excess band and its cost, and Phase 1's stop rule; 2. the trees, the
-regression of each variant's log ratio to v0 on the root gap, its effective share and Phase 2's criteria; 3. the patch
-arms' fits and trees, and Phase 3's criteria; 4. R3 at the frontier's nodes and the projection at a gap of 1,400.  The
-criteria are the design's, fixed before the runs.  Pure Python; `./u4.py > u4_output.md`.
+run), replay.jsonl (`replay`, a line per saved state and method), fits.jsonl (`fit`, a line per root fit),
+dives.jsonl (`bnb --knuth`, the dives at the end of the chain) and the per-node logs of r3's trees kept in logs/
+(gzipped), and the plain branch and bound's trees and roots of the matroid study (../matroid/bnb.jsonl and
+roots.jsonl), whose trees are v0's.  A line that repeats the key of an earlier one (a rerun) replaces it; a missing
+file is noted and its sections skipped.  Prints Markdown: 1. each method's reach (the share of the reference's cuts it
+makes) by GF(2) excess band and its cost, and Phase 1's stop rule; 2. the trees, the regression of each variant's log
+ratio to v0 on the root gap, its effective share and Phase 2's criteria, and where R3 cuts in the trees; 3. the patch
+arms' fits and trees, and Phase 3's criteria; 4. R3 at the nodes of games at the end of the chain and the projection
+at a gap of 1,400.  The criteria are the design's, fixed before the runs.  Pure Python; `./u4.py > u4_output.md`.
 """
 import argparse
+import gzip
+import json
 import math
 import statistics as st
 import sys
@@ -35,6 +38,8 @@ EXCESS_BANDS = [(0, 50), (51, 100), (101, 200), (201, 300), (301, None)]
 # Phase 2, fixed in advance.
 KILL_T, KILL_SHARE = 2.0, 0.3  # every R3 policy with t < 2 or s_eff < 0.3: A1 is killed in the search
 PASS_T, PASS_SHARE = 2.0, 0.45  # some policy with s_eff >= 0.45 and t >= 2: a pass
+FLOOR_CHECK = 2000  # the context's regression: games whose v0 tree has at least this many nodes
+PHASE2_R3 = "t1-p300-coresfirst"  # R3 as Phase 1 picked it (1 s, the reference's order): the criterion's variants
 
 # Phase 3, fixed in advance.
 ANCHORS = {1197, 1274, 990}
@@ -244,41 +249,77 @@ def section_phase2(trees, plain, gap):
     for name in names:
         header += [name, "ratio", "time"]
     table(header, rows)
-    results = {}
+    print("The regression of `y = log10(N_v0 / N_variant)` on the root gap `G` over the completed games: slope `β` (in "
+          "10⁻³ decades per unit of gap) with its `t`; `b₀` the slope of `log10 N_v0` on `G` over the same games; "
+          "*own slope* the variant's, of `log10 N_variant` on `G` (`b₀ − β`); `s_eff = β / b₀`, the share of the "
+          "tree's growth with the gap that the variant takes away; *mean y* the mean log ratio (a constant factor of "
+          "`10^y`).\n")
+    rows, results = regression(names, games, by, plain, gap, 0)
+    table(["variant", "games", "β", "t", "b₀", "own slope", "s_eff", "mean y", "mean f₃", "R3 ms a refit"], rows)
+    print(f"Context, not the criterion: the same over the games whose v0 tree has at least {FLOOR_CHECK:,} nodes (the "
+          "design's reason for a gap of at least 120: A1's trees not at their floor).\n")
+    rows, _ = regression(names, games, by, plain, gap, FLOOR_CHECK)
+    table(["variant", "games", "β", "t", "b₀", "own slope", "s_eff", "mean y", "mean f₃", "R3 ms a refit"], rows)
+    r3 = {k: v for k, v in results.items() if k.startswith("r3") and k.endswith(f"({PHASE2_R3})")}
+    if r3:
+        kill = all(v["t"] < KILL_T or (v["s_eff"] or 0) < KILL_SHARE for v in r3.values())
+        passed = [k for k, v in r3.items() if v["t"] >= PASS_T and (v["s_eff"] or 0) >= PASS_SHARE]
+        verdict = "pass" if passed else "kill" if kill else "weak"
+        print(f"**Criteria** (fixed), on the R3 policies of the slope test (R3 as Phase 1 picked it, `{PHASE2_R3}`; "
+              f"the others are context): kill if every one has `t < {KILL_T}` or `s_eff < {KILL_SHARE}`; pass if "
+              f"some has `s_eff ≥ {PASS_SHARE}` and `t ≥ {PASS_T}`; weak in between.  "
+              f"**{verdict}**{' (' + ', '.join(passed) + ')' if passed else ''}.\n")
+    return results
+
+
+def section_phase2_logs(logs):
+    """Where R3 cuts in the trees: from the per-node logs in `logs` (`n{N}-r3-...jsonl`, gzipped or not), per band of
+    GF(2) excess, the nodes R3 ran at and the share it cut."""
+    files = sorted(p for p in logs.glob("n*-r3-*.jsonl*")) if logs.is_dir() else []
+    if not files:
+        return
     rows = []
+    for path in files:
+        opener = gzip.open if path.suffix == ".gz" else open
+        got, cut = defaultdict(int), defaultdict(int)
+        with opener(path, "rt") as f:
+            for line in f:
+                r = json.loads(line)
+                if r.get("method") == "r3":
+                    got[band_of(r["excess_gf2"])] += 1
+                    cut[band_of(r["excess_gf2"])] += r["cut"] == "refit"
+        name = path.name.split(".jsonl")[0]
+        rows.append([name] + [f"{fmt(cut[b] / got[b], 2)} of {got[b]}" if got[b] else "-" for b in band_labels()])
+    print("Where R3 cuts in the trees (the per-node logs kept in `u4/logs`): per band of the node's GF(2) excess, the "
+          "share of the nodes R3 ran at that it cut, of how many.\n")
+    table(["run"] + band_labels(), rows)
+
+
+def regression(names, games, by, plain, gap, floor):
+    """Each variant's regression (see section 2) over the completed games whose v0 tree has at least `floor` nodes:
+    the table's rows, and the figures by variant."""
+    results, rows = {}, []
     for name in names:
         pts = []
         for n in games:
             r, v0 = by.get((n, name)), plain.get(n)
-            if r and v0 and r["completed"] and r["nodes"] and n in gap:
+            if r and v0 and v0["nodes"] >= floor and r["completed"] and r["nodes"] and n in gap:
                 pts.append((gap[n], math.log10(v0["nodes"] / r["nodes"]), math.log10(v0["nodes"]), r))
         fit = ols([p[0] for p in pts], [p[1] for p in pts])
         base = ols([p[0] for p in pts], [p[2] for p in pts])
         if fit is None or base is None:
-            rows.append([name, len(pts)] + ["-"] * 7)
+            rows.append([name, len(pts)] + ["-"] * 8)
             continue
         beta, se, t, _ = fit
-        b0, se0, t0, _ = base
+        b0, se0, _, _ = base
         s_eff = beta / b0 if b0 else None
         f3 = mean([p[3].get("r3_refits", 0) / p[3]["nodes"] for p in pts])
         r3ms = [p[3]["ms_r3"] / p[3]["r3_refits"] for p in pts if p[3].get("r3_refits")]
         results[name] = {"beta": beta, "t": t, "s_eff": s_eff, "f3": f3, "r3ms": mean(r3ms), "games": len(pts)}
         rows.append([name, len(pts), f"{1e3 * beta:+.2f} ± {1e3 * se:.2f}", f"{t:+.1f}",
-                     f"{1e3 * b0:.2f} ± {1e3 * se0:.2f}", fmt(s_eff, 3), fmt(mean(p[1] for p in pts), 2), fmt(f3, 3),
-                     ms(mean(r3ms))])
-    print("The regression of `y = log10(N_v0 / N_variant)` on the root gap `G` over the completed games: slope `β` (in "
-          "10⁻³ decades per unit of gap) with its `t`; `b₀` the slope of `log10 N_v0` on `G` over the same games; "
-          "`s_eff = β / b₀`, the share of the tree's growth with the gap that the variant takes away.\n")
-    table(["variant", "games", "β", "t", "b₀", "s_eff", "mean y", "mean f₃", "R3 ms a refit"], rows)
-    r3 = {k: v for k, v in results.items() if k.startswith("r3")}
-    if r3:
-        kill = all(v["t"] < KILL_T or (v["s_eff"] or 0) < KILL_SHARE for v in r3.values())
-        passed = [k for k, v in r3.items() if v["t"] >= PASS_T and (v["s_eff"] or 0) >= PASS_SHARE]
-        verdict = "pass" if passed else "kill" if kill else "weak"
-        print(f"**Criteria** (fixed): kill if every R3 policy has `t < {KILL_T}` or `s_eff < {KILL_SHARE}`; pass if "
-              f"some policy has `s_eff ≥ {PASS_SHARE}` and `t ≥ {PASS_T}`; weak in between.  "
-              f"**{verdict}**{' (' + ', '.join(passed) + ')' if passed else ''}.\n")
-    return results
+                     f"{1e3 * b0:.2f} ± {1e3 * se0:.2f}", f"{1e3 * (b0 - beta):.2f}", fmt(s_eff, 3),
+                     fmt(mean(p[1] for p in pts), 2), fmt(f3, 3), ms(mean(r3ms))])
+    return rows, results
 
 
 # ---------------------------------------------------------------------------------------------------------
@@ -338,13 +379,13 @@ def section_phase3(trees, fits, plain):
 
 
 # ---------------------------------------------------------------------------------------------------------
-# Phase 4: R3 at the frontier
+# Phase 4: R3 at the end of the chain
 
 def section_phase4(replays, dives, phase2):
-    print("## 4. What R3 costs at the frontier (Phase 4)\n")
+    print("## 4. What R3 costs at the end of the chain (Phase 4)\n")
     lines = [r for r in replays if r["host"] not in PHASE1_HOSTS]
     if not lines:
-        print("No frontier replays: skipped.\n")
+        print("No replays at the end of the chain: skipped.\n")
         return
     if dives:
         rows = [[d["n"], d.get("label"), d["dives"], d.get("max_depth"), d["tier1_open"], d["refits"],
@@ -355,7 +396,7 @@ def section_phase4(replays, dives, phase2):
     cost = {}
     for n in sorted({r["n"] for r in lines}) + [None]:
         got = [r for r in lines if n is None or r["n"] == n]
-        print(f"### {'n = ' + str(n) if n else 'all frontier states'}\n")
+        print(f"### {'n = ' + str(n) if n else 'all the states at the end of the chain'}\n")
         rows = []
         for m in methods:
             rs = [r for r in got if r["method"] == m]
@@ -382,7 +423,7 @@ def section_phase4(replays, dives, phase2):
             rows.append([name, fmt(v["s_eff"], 3), fmt(v["f3"], 3), m, ms(c), f"{c3:,.0f}", f"{gain:,.1f}",
                          f"{net:,.2f}", "yes" if net >= PROJECTION_LINE else "no"])
     print(f"The projection at a gap of 1,400 (design U4): `10^({DECADES:.2f} s_eff) / ({BASE_COST} + f₃ c₃)`, `c₃` "
-          f"R3's mean time a refit at the frontier in solver nodes of {SOLVER_NODE_MS} ms; E4 is designed only if it "
+          f"R3's mean time a refit there in solver nodes of {SOLVER_NODE_MS} ms; E4 is designed only if it "
           f"is at least {PROJECTION_LINE} for some policy and budget.\n")
     table(["policy", "s_eff", "f₃", "R3", "ms", "c₃", "tree factor", "net speed-up", f"≥ {PROJECTION_LINE}"], rows)
 
@@ -397,10 +438,11 @@ def main():
     fits = load(a.dir / "fits.jsonl", lambda r: (r["n"], r["label"])) or []
     dives = load(a.dir / "dives.jsonl", tree_key) or []
     plain, gap = plain_trees(a.matroid)
-    print("# U4: R3, the slope test, patch mode and the frontier\n")
+    print("# U4: R3, the slope test, patch mode and the end of the chain\n")
     print("Made by `bench/fields/u4.py` from `bench/fields/u4/` (see the README).\n")
     section_phase1(replays)
     phase2 = section_phase2(trees, plain, gap)
+    section_phase2_logs(a.dir / "logs")
     section_phase3(trees, fits, plain)
     section_phase4(replays, dives, phase2)
 

@@ -1,4 +1,4 @@
-# U4: R3, the slope test, patch mode and the frontier
+# U4: R3, the slope test, patch mode and the end of the chain
 
 Made by `bench/fields/u4.py` from `bench/fields/u4/` (see the README).
 
@@ -149,16 +149,93 @@ Replays with the host's own method that gave the host's refit exactly: 929 of 92
 
 v0's trees are the matroid study's (`bench/matroid/bnb.jsonl`); the v0 reruns below check them.  *ratio*: v0's nodes over the variant's; *f₃*: the share of the variant's nodes that got R3; *R3 ms*: its time a refit; *time*: the run's over v0's.
 
-| n | gap | v0 | r2 | ratio | time |
+| n | v0 rerun | bnb.jsonl | equal |
+|---|---|---|---|
+| 990 | 42,017 | 42,017 | yes |
+| 1112 | 813 | 813 | yes |
+| 1197 | 14,050 | 14,050 | yes |
+
+| n | gap | v0 | r2 | ratio | time | r3 r3-top:0.25 | ratio | time | r3 r3-top:0.25 (t1-p300-coresfirst) | ratio | time | r3 r3-top:0.5 (t1-p300-coresfirst) | ratio | time |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1250 | 126 | 2,543 | 131 | 19.41 | 0.2 | 15 | 169.53 | 0.6, f₃ 0.267, R3 295.3 ms | 31 | 82.03 | 0.5, f₃ 0.194, R3 166.1 ms | 31 | 82.03 | 0.5, f₃ 0.161, R3 197.5 ms |
+| 1112 | 134 | 813 | 270 | 3.01 | 1.3 | - | - | - | 101 | 8.05 | 8.7, f₃ 0.188, R3 227.3 ms | 187 | 4.35 | 7.4, f₃ 0.043, R3 428.6 ms |
+| 1184 | 139 | 1,093 | 33 | 33.12 | 0.2 | - | - | - | 17 | 64.29 | 0.1, f₃ 0.176, R3 19.9 ms | 17 | 64.29 | 0.1, f₃ 0.176, R3 19.9 ms |
+| 1188 | 145 | 2,316 | 142 | 16.31 | 0.3 | - | - | - | 34 | 68.12 | 0.9, f₃ 0.235, R3 164.3 ms | 34 | 68.12 | 0.9, f₃ 0.206, R3 187.8 ms |
+| 1105 | 146 | 1,018 | 438 | 2.32 | 1.3 | 161 | 6.32 | 5.6, f₃ 0.149, R3 141.1 ms | 192 | 5.30 | 5.4, f₃ 0.151, R3 112.0 ms | 366 | 2.78 | 4.3, f₃ 0.022, R3 265.6 ms |
+| 1035 | 149 | 3,919 | 974 | 4.02 | 0.9 | - | - | - | 314 | 12.48 | 8.2, f₃ 0.242, R3 290.4 ms | 572 | 6.85 | 6.1, f₃ 0.052, R3 514.7 ms |
+| 1221 | 151 | 7,933 | 2,061 | 3.85 | 1.0 | 513 | 15.46 | 9.5, f₃ 0.273, R3 426.2 ms | 307 | 25.84 | 5.3, f₃ 0.329, R3 329.0 ms | 887 | 8.94 | 3.9, f₃ 0.059, R3 425.8 ms |
+| 1235 | 164 | 21,847 | 4,271 | 5.12 | 0.9 | - | - | - | 1,099 | 19.88 | 5.6, f₃ 0.246, R3 363.1 ms | 1,961 | 11.14 | 4.2, f₃ 0.076, R3 459.2 ms |
+| 1290 | 174 | 18,754 | 9,345 | 2.01 | 1.7 | - | - | - | 2,901 | 6.46 | 12.8, f₃ 0.189, R3 419.4 ms | 5,766 | 3.25 | 8.6, f₃ 0.031, R3 782.3 ms |
+| 1192 | 180 | 4,139 | 452 | 9.16 | 0.4 | 151 | 27.41 | 1.2, f₃ 0.166, R3 125.4 ms | 124 | 33.38 | 1.4, f₃ 0.177, R3 163.9 ms | 133 | 31.12 | 1.3, f₃ 0.098, R3 269.9 ms |
+| 1044 | 194 | 26,290 | 9,730 | 2.70 | 1.5 | - | - | - | 2,958 | 8.89 | 12.6, f₃ 0.172, R3 329.7 ms | 6,417 | 4.10 | 5.2, f₃ 0.016, R3 559.7 ms |
+| 1024 | 199 | 46,847 | 14,851 | 3.15 | 1.1 | - | - | - | 5,952 | 7.87 | 11.7, f₃ 0.182, R3 283.9 ms | 10,377 | 4.51 | 6.6, f₃ 0.029, R3 519.9 ms |
+| 1197 | 201 | 14,050 | 3,748 | 3.75 | 0.8 | 536 | 26.21 | 3.4, f₃ 0.211, R3 296.5 ms | 466 | 30.15 | 2.1, f₃ 0.195, R3 223.4 ms | 774 | 18.15 | 1.9, f₃ 0.067, R3 343.4 ms |
+| 1254 | 204 | 18,956 | 3,583 | 5.29 | 0.6 | - | - | - | 636 | 29.81 | 2.9, f₃ 0.233, R3 303.1 ms | 2,103 | 9.01 | 2.3, f₃ 0.033, R3 455.0 ms |
+| 1274 | 206 | 12,686 | 4,890 | 2.59 | 1.3 | - | - | - | 1,182 | 10.73 | 3.9, f₃ 0.137, R3 268.1 ms | 2,298 | 5.52 | 3.1, f₃ 0.030, R3 437.3 ms |
+| 1281 | 206 | 13,354 | 3,699 | 3.61 | 1.0 | - | - | - | 1,040 | 12.84 | 5.3, f₃ 0.164, R3 360.6 ms | 2,164 | 6.17 | 3.4, f₃ 0.029, R3 534.1 ms |
+| 1215 | 213 | 24,516 | 6,080 | 4.03 | 1.1 | 1,768 | 13.87 | 8.6, f₃ 0.186, R3 456.8 ms | 1,486 | 16.50 | 7.4, f₃ 0.210, R3 412.6 ms | 4,373 | 5.61 | 3.6, f₃ 0.020, R3 581.7 ms |
+| 1000 | 214 | 10,120 | 2,950 | 3.43 | 1.4 | - | - | - | 964 | 10.50 | 15.7, f₃ 0.183, R3 437.6 ms | 1,851 | 5.47 | 9.1, f₃ 0.030, R3 746.1 ms |
+| 999 | 236 | 22,302 | 5,189 | 4.30 | 1.2 | 2,093 | 10.66 | 19.0, f₃ 0.204, R3 480.2 ms | 1,318 | 16.92 | 12.7, f₃ 0.260, R3 399.9 ms | 3,384 | 6.59 | 6.0, f₃ 0.019, R3 867.7 ms |
+| 987 | 251 | 6,890 | 1,851 | 3.72 | 1.5 | 720 | 9.57 | 24.6, f₃ 0.239, R3 424.6 ms | 612 | 11.26 | 18.7, f₃ 0.255, R3 355.1 ms | 1,469 | 4.69 | 9.5, f₃ 0.027, R3 624.3 ms |
+| 1352 | 251 | 49,144 | 17,637 | 2.79 | 1.2 | - | - | - | 3,849 | 12.77 | 6.6, f₃ 0.168, R3 527.6 ms | 8,395 | 5.85 | 3.7, f₃ 0.024, R3 810.3 ms |
+| 988 | 259 | 22,728 | 6,427 | 3.54 | 1.6 | 2,393 | 9.50 | 32.0, f₃ 0.283, R3 479.2 ms | 1,970 | 11.54 | 24.9, f₃ 0.293, R3 436.1 ms | 4,093 | 5.55 | 14.9, f₃ 0.048, R3 723.2 ms |
+| 1287 | 282 | 87,841 | 40,434 | 2.17 | 1.9 | - | - | - | 15,187 | 5.78 | 13.3, f₃ 0.118, R3 529.9 ms | 29,402 | 2.99 | 4.6, f₃ 0.009, R3 785.9 ms |
+| 1350 | 283 | 77,283 | 20,360 | 3.80 | 1.2 | - | - | - | 5,459 | 14.16 | 10.0, f₃ 0.223, R3 598.8 ms | 11,590 | 6.67 | 4.9, f₃ 0.031, R3 836.8 ms |
+| 992 | 318 | 77,567 | 20,339 | 3.81 | 1.5 | 10,500 | 7.39 | 22.9, f₃ 0.116, R3 611.8 ms | 8,892 | 8.72 | 19.0, f₃ 0.128, R3 541.7 ms | 16,519 | 4.70 | 4.8, f₃ 0.007, R3 963.8 ms |
+| 996 | 318 | 68,216 | 23,640 | 2.89 | 1.9 | - | - | - | 11,662 | 5.85 | 24.8, f₃ 0.109, R3 590.9 ms | 19,847 | 3.44 | 5.4, f₃ 0.006, R3 932.8 ms |
+| 990 | 323 | 42,017 | 16,522 | 2.54 | 2.2 | 7,867 | 5.34 | 36.4, f₃ 0.130, R3 597.6 ms | 7,589 | 5.54 | 31.4, f₃ 0.130, R3 530.4 ms | 13,032 | 3.22 | 9.6, f₃ 0.012, R3 820.3 ms |
+
+The regression of `y = log10(N_v0 / N_variant)` on the root gap `G` over the completed games: slope `β` (in 10⁻³ decades per unit of gap) with its `t`; `b₀` the slope of `log10 N_v0` on `G` over the same games; *own slope* the variant's, of `log10 N_variant` on `G` (`b₀ − β`); `s_eff = β / b₀`, the share of the tree's growth with the gap that the variant takes away; *mean y* the mean log ratio (a constant factor of `10^y`).
+
+| variant | games | β | t | b₀ | own slope | s_eff | mean y | mean f₃ | R3 ms a refit |
+|---|---|---|---|---|---|---|---|---|---|
+| r2 | 27 | -2.28 ± 0.88 | -2.6 | 8.15 ± 1.18 | 10.43 | -0.280 | 0.63 | 0.000 | - |
+| r3 r3-top:0.25 | 11 | -4.08 ± 1.62 | -2.5 | 7.10 ± 1.49 | 11.19 | -0.575 | 1.16 | 0.202 | 394.1 |
+| r3 r3-top:0.25 (t1-p300-coresfirst) | 27 | -2.98 ± 0.97 | -3.1 | 8.15 ± 1.18 | 11.13 | -0.366 | 1.16 | 0.196 | 347.6 |
+| r3 r3-top:0.5 (t1-p300-coresfirst) | 27 | -3.68 ± 1.20 | -3.1 | 8.15 ± 1.18 | 11.83 | -0.452 | 0.89 | 0.050 | 559.0 |
+
+Context, not the criterion: the same over the games whose v0 tree has at least 2,000 nodes (the design's reason for a gap of at least 120: A1's trees not at their floor).
+
+| variant | games | β | t | b₀ | own slope | s_eff | mean y | mean f₃ | R3 ms a refit |
+|---|---|---|---|---|---|---|---|---|---|
+| r2 | 24 | -2.26 ± 0.76 | -3.0 | 6.39 ± 1.08 | 8.65 | -0.353 | 0.61 | 0.000 | - |
+| r3 r3-top:0.25 | 10 | -5.46 ± 1.26 | -4.3 | 6.01 ± 1.32 | 11.47 | -0.908 | 1.20 | 0.207 | 419.4 |
+| r3 r3-top:0.25 (t1-p300-coresfirst) | 24 | -3.66 ± 0.88 | -4.1 | 6.39 ± 1.08 | 10.05 | -0.574 | 1.16 | 0.199 | 376.1 |
+| r3 r3-top:0.5 (t1-p300-coresfirst) | 24 | -4.24 ± 1.12 | -3.8 | 6.39 ± 1.08 | 10.63 | -0.664 | 0.88 | 0.047 | 599.1 |
+
+**Criteria** (fixed), on the R3 policies of the slope test (R3 as Phase 1 picked it, `t1-p300-coresfirst`; the others are context): kill if every one has `t < 2.0` or `s_eff < 0.3`; pass if some has `s_eff ≥ 0.45` and `t ≥ 2.0`; weak in between.  **kill**.
+
+Where R3 cuts in the trees (the per-node logs kept in `u4/logs`): per band of the node's GF(2) excess, the share of the nodes R3 ran at that it cut, of how many.
+
+| run | 0-50 | 51-100 | 101-200 | 201-300 | over 300 |
 |---|---|---|---|---|---|
-| 1215 | 213 | 24,516 | 6,080 | 4.03 | 1.1 |
-| 992 | 318 | 77,567 | 20,339 | 3.81 | 1.5 |
-
-The regression of `y = log10(N_v0 / N_variant)` on the root gap `G` over the completed games: slope `β` (in 10⁻³ decades per unit of gap) with its `t`; `b₀` the slope of `log10 N_v0` on `G` over the same games; `s_eff = β / b₀`, the share of the tree's growth with the gap that the variant takes away.
-
-| variant | games | β | t | b₀ | s_eff | mean y | mean f₃ | R3 ms a refit |
-|---|---|---|---|---|---|---|---|---|
-| r2 | 2 | - | - | - | - | - | - | - |
+| n1000-r3-r3-top:0.25-k20-t1-p300-coresfirst | - | 0.72 of 107 | 0.43 of 69 | - | - |
+| n1024-r3-r3-top:0.25-k20-t1-p300-coresfirst | 0.86 of 22 | 0.67 of 774 | 0.30 of 290 | - | - |
+| n1035-r3-r3-top:0.25-k20-t1-p300-coresfirst | 0.83 of 18 | 0.70 of 50 | 0.25 of 8 | - | - |
+| n1044-r3-r3-top:0.25-k20-t1-p300-coresfirst | 0.86 of 22 | 0.58 of 406 | 0.27 of 82 | - | - |
+| n1105-r3-r3-top:0.25-k20-t1-p300-coresfirst | 0.82 of 11 | 0.31 of 13 | 0.00 of 5 | - | - |
+| n1112-r3-r3-top:0.25-k20-t1-p300-coresfirst | 0.90 of 10 | 0.60 of 5 | 0.50 of 4 | - | - |
+| n1184-r3-r3-top:0.25-k20-t1-p300-coresfirst | - | 1.00 of 1 | 1.00 of 2 | - | - |
+| n1188-r3-r3-top:0.25-k20-t1-p300-coresfirst | - | 1.00 of 3 | 0.80 of 5 | - | - |
+| n1192-r3-r3-top:0.25-k20-t1-p300-coresfirst | 0.50 of 2 | 1.00 of 7 | 0.62 of 13 | - | - |
+| n1197-r3-r3-top:0.25-k20-t1-p300-coresfirst | - | 0.79 of 39 | 0.63 of 52 | - | - |
+| n1215-r3-r3-top:0.25-k20-t1-p300-coresfirst | - | 0.76 of 194 | 0.50 of 115 | 0.00 of 3 | - |
+| n1221-r3-r3-top:0.25-k20-t1-p300-coresfirst | 1.00 of 12 | 0.83 of 72 | 0.41 of 17 | - | - |
+| n1235-r3-r3-top:0.25-k20-t1-p300-coresfirst | 0.87 of 23 | 0.77 of 149 | 0.57 of 98 | - | - |
+| n1250-r3-r3-top:0.25-k20-t1-p300-coresfirst | 1.00 of 1 | 0.75 of 4 | 1.00 of 1 | - | - |
+| n1254-r3-r3-top:0.25-k20-t1-p300-coresfirst | - | 0.88 of 76 | 0.62 of 72 | - | - |
+| n1274-r3-r3-top:0.25-k20-t1-p300-coresfirst | - | 0.80 of 91 | 0.61 of 70 | 0.00 of 1 | - |
+| n1281-r3-r3-top:0.25-k20-t1-p300-coresfirst | - | 0.82 of 105 | 0.62 of 65 | 0.00 of 1 | - |
+| n1287-r3-r3-top:0.25-k20-t1-p300-coresfirst | - | 0.58 of 885 | 0.34 of 871 | 0.13 of 31 | - |
+| n1290-r3-r3-top:0.25-k20-t1-p300-coresfirst | 0.69 of 71 | 0.52 of 389 | 0.17 of 89 | - | - |
+| n1350-r3-r3-top:0.25-k20-t1-p300-coresfirst | - | 0.77 of 412 | 0.37 of 736 | 0.12 of 67 | - |
+| n1352-r3-r3-top:0.25-k20-t1-p300-coresfirst | - | 0.69 of 311 | 0.37 of 315 | 0.14 of 21 | - |
+| n987-r3-r3-top:0.25-k20-t1-p300-coresfirst | - | 0.79 of 85 | 0.54 of 68 | 0.00 of 3 | - |
+| n988-r3-r3-top:0.25-k20-t1-p300-coresfirst | - | 0.81 of 215 | 0.48 of 343 | 0.00 of 20 | - |
+| n990-r3-r3-top:0.25-k20-t1-p300-coresfirst | - | 0.59 of 320 | 0.39 of 616 | 0.06 of 47 | - |
+| n992-r3-r3-top:0.25-k20-t1-p300-coresfirst | - | 0.71 of 462 | 0.36 of 645 | 0.00 of 31 | 1.00 of 1 |
+| n996-r3-r3-top:0.25-k20-t1-p300-coresfirst | - | 0.63 of 525 | 0.33 of 709 | 0.03 of 32 | 1.00 of 1 |
+| n999-r3-r3-top:0.25-k20-t1-p300-coresfirst | - | 0.83 of 223 | 0.38 of 119 | 1.00 of 1 | - |
 
 ## 3. Patch mode with R3 (Phase 3)
 
@@ -199,7 +276,7 @@ The root fits (`fit`): *share* the share of the root's GF(2) gap the fit closes,
 | 1350 | own | 283 | 0.399 | - | - | 0 of 0 | 27 | no | 60.1 |
 | 1352 | own | 251 | 0.327 | - | - | 0 of 0 | 21 | yes | 0.3 |
 
-## 4. What R3 costs at the frontier (Phase 4)
+## 4. What R3 costs at the end of the chain (Phase 4)
 
-No frontier replays: skipped.
+No replays at the end of the chain: skipped.
 
