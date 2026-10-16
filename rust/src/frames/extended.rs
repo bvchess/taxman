@@ -1,12 +1,13 @@
 //! The extended problem Π⁺(O): the frame model with some of the sources of three or more prime factors optional.
 //!
 //! The frame solver searches Π_n: the frames with freedoms, their sources fixed to U\* (the sources setup keeps), the
-//! pairs `unzip` settled taken out.  Π⁺(O) makes a set O of the members of U\* in layers 3 and up optional, and
-//! settles nothing.  It is research code, for certifying that a game's optimum plays U\*_{≥3} (heuristics/THEORY.md,
-//! "The extended problem"; `taxman certify`, [`crate::certify`]); the solver does not use it.  The search takes it with
-//! its one-sided candidates ([`Board::prepare_extended_with`](crate::board::Board::prepare_extended_with); the model's
-//! "One-sided candidates", [`crate::model`]), and the reference predicate [`ExtendedFrames::promotable`] decides its
-//! promotion sets for the tests.
+//! pairs `unzip` settled taken out.  Π⁺(O) makes a set O of the members of U\* in layers 3 and up optional, and keeps
+//! only the pairs of `unzip` that Lemma M5⁺ shows are still moves of every instance (below), or none.  It is research
+//! code, for certifying that a game's optimum plays U\*_{≥3} (heuristics/THEORY.md, "The extended problem"; `taxman
+//! certify`, [`crate::certify`]); the solver does not use it.  The search takes it with its one-sided candidates
+//! ([`Board::prepare_extended_with`](crate::board::Board::prepare_extended_with); the model's "One-sided candidates",
+//! [`crate::model`]), and the reference predicate [`ExtendedFrames::promotable`] decides its promotion sets for the
+//! tests.
 //!
 //! # The problem
 //!
@@ -19,8 +20,8 @@
 //! * the freedoms of a component C are |factors(C)| − |F ∩ C|; a component with none is *inert*;
 //! * with ℓ₀ the lowest layer of a component with freedoms, frame h is the union of the components with freedoms
 //!   of layer ℓ₀ + h: its moves are their fixed sources and its factors all their factors (a layer with no such
-//!   component gives an empty frame).  Nothing is claimed, and the frames here are not reduced (the root the search
-//!   builds from them is, as for Π_n);
+//!   component gives an empty frame), less the pairs of the claims kept (below).  The frames here are not reduced (the
+//!   root the search builds from them is, as for Π_n);
 //! * a *two-sided* candidate is a factor x of a frame h ≥ 1 such that the fixed sources of its component stay playable
 //!   against the component's factors less x, and some component with freedoms that holds a maximal factor of x can take
 //!   x on beside its fixed sources;
@@ -35,17 +36,39 @@
 //! source of layer 1 or 2 outside F is a promotion set (K, L), K being its sources outside F and L its numbers up to
 //! n/2, and conversely, and then ΣS = `in_the_bag` + ΣK + ΣL: `tests/model_extended.rs` checks this against the whole
 //! board.
+//!
+//! # The claims of `unzip` (Lemma M5⁺)
+//!
+//! [`build_extended`] is given the claims of the frame model, the pairs (s, f) that `unzip` settled in the search's
+//! frames as the last `finish_setup` left them (`SearchFrames::claims`), or none.  Each pair belongs to the component
+//! of its source s, which also holds f.  A component *keeps* its claims if it holds no member of O ∪ R and each of its
+//! back claims (s, f) passes the check of Lemma M5⁺ ([`ClaimCheck`]): f is not a two-sided candidate, and no two-sided
+//! candidate has f among its maximal factors.  Then every pair of the component is taken out of its frame, s from the
+//! moves and f from the factors, before the root the search builds is reduced; the freedoms do not change.  A component
+//! that holds a member of O ∪ R keeps none, nor does one whose back claim fails the check (its claims are recorded as
+//! [`ExtendedFrames::refused`]).  The candidates do not change, as they are decided on the components with nothing
+//! claimed, and no claimed factor is one (a back claim's by the check, a front claim's because its source has nothing
+//! else left).  heuristics/THEORY.md, Lemma M5⁺: the claims kept are front and back moves of every instance of Π⁺(O),
+//! so Theorem M⁺ holds with them taken out, and with O = ∅ every claim is kept and Π⁺(∅) is Π_n
+//! (`examples/structure.rs` checks the problems equal on every board).  Without the check a back claim could hide a
+//! use of f by a promoted number, as at n = 98 in Π_n (THEORY.md, "Why the candidate filter matters"): a component of
+//! f's layer that holds an open source has more freedoms and can take on composites of f that were no candidates in
+//! Π_n.
 
-use super::{columns_of, layer_of, BoardFrames};
+use super::{columns_of, layer_of, BoardFrames, ClaimKind};
 use crate::bits::Bits;
 use crate::model::{self, MAX_FRAMES};
 use crate::numtheory::Tables;
+
+/// A pair that `unzip` settled: the source, the factor it claims, and which loop claimed it.
+pub type Claim = (u32, u32, ClaimKind);
 
 /// The extended problem Π⁺(O) of a board (see the module documentation).
 #[derive(Clone, Debug)]
 pub struct ExtendedFrames<const W: usize> {
     /// The frames, front first and unreduced: the moves are the fixed sources of the frame's components and the
-    /// factors all of theirs, so the freedoms of a frame are the sum of its components'.
+    /// factors all of theirs, less the pairs of [`claims`](Self::claims), so the freedoms of a frame are the sum of
+    /// its components'.
     pub frames: Vec<model::Frame<W>>,
     /// The two-sided candidates.
     pub candidates: Bits<W>,
@@ -62,6 +85,35 @@ pub struct ExtendedFrames<const W: usize> {
     /// The lowest layer of a component with freedoms, which frame 0 lies in; `None` (and no frames) when no
     /// component has freedoms.
     pub lowest_layer: Option<u32>,
+    /// The claims kept (Lemma M5⁺), in the order of the claims given: their pairs are not in `frames`.
+    pub claims: Vec<Claim>,
+    /// The claims of the components that hold no member of O ∪ R but have a back claim that fails the check of Lemma
+    /// M5⁺, in the order of the claims given: claims of Π_n that Π⁺(O) does not keep.  (The claims of a component
+    /// that holds a member of O ∪ R are kept by neither list.)
+    pub refused: Vec<Claim>,
+}
+
+/// The check of Lemma M5⁺ on a factor claimed by a back claim (heuristics/THEORY.md): the factor is not a two-sided
+/// candidate, and no two-sided candidate has it among its maximal factors.  The one place it is written, which
+/// [`build_extended`] applies and the census of the frames (`examples/structure.rs`) counts.
+#[derive(Clone, Debug)]
+pub struct ClaimCheck<const W: usize> {
+    candidates: Bits<W>,
+    /// The maximal factors of the candidates.
+    listed: Bits<W>,
+}
+
+impl<const W: usize> ClaimCheck<W> {
+    /// The check against the two-sided candidates `candidates` of the board `1..=t.n`.
+    pub fn new(t: &Tables, candidates: &Bits<W>) -> Self {
+        let listed = candidates.iter().flat_map(|x| t.max_factors[x as usize].iter().copied()).collect();
+        ClaimCheck { candidates: *candidates, listed }
+    }
+
+    /// Whether a back claim of the factor `f` passes.
+    pub fn passes(&self, f: u32) -> bool {
+        !self.candidates.contains(f) && !self.listed.contains(f)
+    }
 }
 
 impl<const W: usize> ExtendedFrames<W> {
@@ -150,13 +202,24 @@ pub fn extended_frame_count<const W: usize>(t: &Tables, open: &Bits<W>) -> Resul
     Ok((shape.frames(), shape.span))
 }
 
-/// The extended problem Π⁺(O) of the board `1..=t.n`, with the open sources `open`.
+/// The extended problem Π⁺(O) of the board `1..=t.n`, with the open sources `open`, keeping the pairs of `claims` that
+/// Lemma M5⁺ allows (see the module documentation).  `claims` is the frame model's (`SearchFrames::claims` of
+/// [`build_frames`](super::build_frames) on the same tables: for each of its frames, the pairs in the order made), or
+/// empty for the problem with nothing claimed.
 ///
 /// # Errors
 ///
 /// If a member of `open` is not a source of three or more prime factors that setup keeps, or if the problem has more
 /// frames than a frame set holds ([`MAX_FRAMES`]; a board past 4095 can have ten, with every source open).
-pub fn build_extended<const W: usize>(t: &Tables, open: &Bits<W>) -> Result<ExtendedFrames<W>, String> {
+///
+/// # Panics
+///
+/// If a claim is not a source and a factor of one component with freedoms (`claims` is not the frame model's).
+pub fn build_extended<const W: usize>(
+    t: &Tables,
+    open: &Bits<W>,
+    claims: &[Vec<Claim>],
+) -> Result<ExtendedFrames<W>, String> {
     let board = BoardFrames::<W>::new(t, Bits::EMPTY);
     let components = board.frames();
     let shape = Shape::of(&board, t, open)?;
@@ -183,19 +246,12 @@ pub fn build_extended<const W: usize>(t: &Tables, open: &Bits<W>) -> Result<Exte
         open: *open,
         rejected: Bits::EMPTY,
         lowest_layer: None,
+        claims: Vec::new(),
+        refused: Vec::new(),
     };
-
-    // The frames the components with freedoms make.
     let Some((lowest, highest)) = span else {
         return Ok(extended);
     };
-    let mut parts = vec![(Bits::EMPTY, Bits::EMPTY); (highest - lowest) as usize + 1];
-    for i in (0..components.len()).filter(|&i| has_freedoms[i]) {
-        let (moves, factors) = &mut parts[(layers[i] - lowest) as usize];
-        *moves |= fixed_in(i);
-        *factors |= components[i].factors();
-    }
-    extended.frames = parts.into_iter().map(|(moves, factors)| model::Frame::new(moves, factors)).collect();
     extended.lowest_layer = Some(lowest);
 
     // The two-sided candidates: the factors of the frames behind frame 0 that their component can spare and that a
@@ -229,6 +285,43 @@ pub fn build_extended<const W: usize>(t: &Tables, open: &Bits<W>) -> Result<Exte
         extended.one_sided.extend(sources.iter().map(|s| (s, frame)));
     }
     extended.one_sided.sort_unstable();
+
+    // The claims, each with the component of its source; a component keeps them if it holds no member of O ∪ R and
+    // its back claims pass the check of Lemma M5⁺.
+    let component_of = |&(s, f, _): &Claim| {
+        let i = board.frame_index_of(s).filter(|&i| components[i].sources().contains(s) && has_freedoms[i]);
+        let i = i.unwrap_or_else(|| panic!("n={}: the claiming {s} is no source of a component with freedoms", t.n));
+        assert!(components[i].factors().contains(f), "n={}: {s} claims {f}, which is no factor of its component", t.n);
+        i
+    };
+    let held = *open | extended.rejected;
+    let free: Vec<bool> = components.iter().map(|c| !(c.sources() | c.impossible()).intersects(&held)).collect();
+    let check = ClaimCheck::new(t, &extended.candidates);
+    let mut passes = vec![true; components.len()];
+    for &(s, f, kind) in claims.iter().flatten() {
+        passes[component_of(&(s, f, kind))] &= kind == ClaimKind::Front || check.passes(f);
+    }
+    let (mut claiming, mut claimed) = (Bits::EMPTY, Bits::EMPTY);
+    for &claim in claims.iter().flatten() {
+        let i = component_of(&claim);
+        if free[i] && passes[i] {
+            extended.claims.push(claim);
+            claiming.insert(claim.0);
+            claimed.insert(claim.1);
+        } else if free[i] {
+            extended.refused.push(claim);
+        }
+    }
+    debug_assert!(!claimed.intersects(&extended.candidates), "n={}: a factor of a claim kept is a candidate", t.n);
+
+    // The frames the components with freedoms make, without the pairs of the claims kept.
+    let mut parts = vec![(Bits::EMPTY, Bits::EMPTY); (highest - lowest) as usize + 1];
+    for i in (0..components.len()).filter(|&i| has_freedoms[i]) {
+        let (moves, factors) = &mut parts[(layers[i] - lowest) as usize];
+        *moves |= fixed_in(i) - claiming;
+        *factors |= components[i].factors() - claimed;
+    }
+    extended.frames = parts.into_iter().map(|(moves, factors)| model::Frame::new(moves, factors)).collect();
     Ok(extended)
 }
 
@@ -244,7 +337,7 @@ mod tests {
     /// rejected or one-sided.
     fn check_no_open_source_is_the_frame_model<const W: usize>(n: u32) {
         let board = Board::<W>::for_n(n);
-        let (found, extended) = (&board.frames, build_extended::<W>(&board.tables, &Bits::EMPTY).unwrap());
+        let (found, extended) = (&board.frames, build_extended::<W>(&board.tables, &Bits::EMPTY, &[]).unwrap());
         assert_eq!(extended.frames.len(), found.frames.len(), "n={n}: the number of frames");
         for (h, (ours, theirs)) in extended.frames.iter().zip(&found.frames).enumerate() {
             let claiming: Bits<W> = found.claims[h].iter().map(|&(source, _, _)| source).collect();
@@ -260,6 +353,15 @@ mod tests {
         let nothing = (extended.open, extended.rejected, extended.one_sided.len());
         assert_eq!(nothing, (Bits::EMPTY, Bits::EMPTY, 0), "n={n}: open, rejected, one-sided");
         assert_eq!(extended.lowest_layer.is_some(), !extended.frames.is_empty(), "n={n}: the lowest layer");
+        assert!(extended.claims.is_empty() && extended.refused.is_empty(), "n={n}: claims given none");
+
+        // With the frame model's claims (Lemma M5⁺), every one is kept and the frames are the search's.
+        let with_claims = build_extended::<W>(&board.tables, &Bits::EMPTY, &found.claims).unwrap();
+        assert_eq!(with_claims.frames, found.frames, "n={n}: the frames with claims");
+        assert_eq!(with_claims.candidates, found.candidates, "n={n}: the candidates with claims");
+        assert_eq!(with_claims.in_the_bag, board.in_the_bag, "n={n}: in the bag with claims");
+        let every: Vec<Claim> = found.claims.iter().flatten().copied().collect();
+        assert_eq!((with_claims.claims, with_claims.refused), (every, Vec::new()), "n={n}: the claims kept");
     }
 
     /// The board `1..=85` of the module `frames`: the frames hold the pairs `unzip` settles there, seven of them in
@@ -267,7 +369,7 @@ mod tests {
     /// search does not see.
     #[test]
     fn frames_of_85() {
-        let extended = build_extended::<2>(&Tables::new(85), &Bits::EMPTY).unwrap();
+        let extended = build_extended::<2>(&Tables::new(85), &Bits::EMPTY, &[]).unwrap();
         let shape: Vec<(Vec<u32>, Vec<u32>)> =
             extended.frames.iter().map(|f| (f.factors.to_vec(), f.moves.to_vec())).collect();
         assert_eq!(
@@ -296,6 +398,34 @@ mod tests {
         }
     }
 
+    /// The board of 24 with 16, 20 and 24 open, all of U\*_{≥3} but 18: the smallest board where a back claim fails the
+    /// check of Lemma M5⁺ for some O (the candidates only grow with O, so a frame's claims fail for some O free of it
+    /// exactly when they fail for all of U\*_{≥3} but its sources; a scan of the boards to 400 found 24-26 and 343-349,
+    /// none with every source open).  The frame model claims 6 for 18 (back: 6 is wanted by 18 alone, and 12, its other composite, is
+    /// a factor of the closed frame of 16 and 24).  With 16 and 24 open that frame has freedoms, 12 becomes a candidate
+    /// (the frame of 20, 20 open, can take it on with 4) and lists 6: the frame of 18 keeps nothing, and the frame of
+    /// layer 3 holds 18 and 6.  Taking the pair out anyway would lose the promotion set {8, 12}, in which 12 pays
+    /// with 6 (`tests/model_extended.rs` catches it).
+    #[test]
+    fn a_back_claim_that_fails_the_check_is_refused() {
+        let board = Board::<1>::for_n(24);
+        let claims = &board.frames.claims;
+        assert!(claims.iter().flatten().any(|&claim| claim == (18, 6, ClaimKind::Back)), "{claims:?}");
+        let open = Bits::from_slice(&[16, 20, 24]);
+        let extended = build_extended::<1>(&board.tables, &open, claims).unwrap();
+        assert!(extended.candidates.contains(12) && board.tables.max_factors[12].contains(&6));
+        assert_eq!(extended.refused, [(18, 6, ClaimKind::Back)]);
+        assert!(extended.claims.iter().all(|&(s, f, _)| s != 18 && f != 6), "{:?}", extended.claims);
+        let frame = &extended.frames[(board.tables.omega(18) - extended.lowest_layer.unwrap()) as usize];
+        assert!(frame.moves.contains(18) && frame.factors.contains(6));
+        // The check itself: 6 is listed by the candidate 12; 10, neither a candidate nor listed by one, passes.
+        let check = ClaimCheck::new(&board.tables, &extended.candidates);
+        assert!(!check.passes(6) && check.passes(10));
+        // With 18 open too the frame holds a member of O and keeps nothing either, but no claim of it is refused.
+        let all = build_extended::<1>(&board.tables, &open.with(18), claims).unwrap();
+        assert!(all.refused.is_empty() && all.claims.iter().all(|&(s, _, _)| s != 18));
+    }
+
     /// The same on every board to 400: the frames, candidates and freedoms of Π⁺(∅) are those of the frame model.
     #[test]
     fn no_open_source_is_the_frame_model_on_every_board_to_400() {
@@ -313,14 +443,14 @@ mod tests {
         let rejected = BoardFrames::<16>::new(&t, Bits::EMPTY).impossible();
         assert!(rejected.contains(374) && t.omega(374) == 3, "374 is not a rejected source of layer 3");
         for (n, x) in [(85, 4), (85, 85), (741, 374)] {
-            let refused = build_extended::<16>(&Tables::new(n), &Bits::from_slice(&[x])).unwrap_err();
+            let refused = build_extended::<16>(&Tables::new(n), &Bits::from_slice(&[x]), &[]).unwrap_err();
             assert!(refused.starts_with(&format!("{x} cannot be open on the board 1..={n}")), "{refused}");
         }
         // The kept sources of the frame of 374 can be open, and 374 is then one-sided with them.
         let board = BoardFrames::<16>::new(&t, Bits::EMPTY);
         let component = board.frames().iter().find(|c| c.impossible().contains(374)).expect("the frame of 374");
         let open = Bits::from_slice(&[component.sources().max().expect("a source")]);
-        let extended = build_extended::<16>(&t, &open).unwrap();
+        let extended = build_extended::<16>(&t, &open, &[]).unwrap();
         assert_eq!(extended.rejected, component.impossible());
         assert!(extended.one_sided.iter().any(|&(s, _)| s == 374));
     }
@@ -344,7 +474,7 @@ mod tests {
         let board = BoardFrames::<W>::new(&t, Bits::EMPTY);
         let open = every_source_open(&board, &t);
         let rejected = upper_components(&board, &t).iter().fold(Bits::<W>::EMPTY, |acc, c| acc | c.impossible());
-        let extended = build_extended::<W>(&t, &open).unwrap();
+        let extended = build_extended::<W>(&t, &open, &[]).unwrap();
         assert_eq!((extended.open, extended.rejected), (open, rejected), "n={n}");
         assert!(extended.fixed.iter().all(|x| t.omega(x) <= 2), "n={n}: a fixed source of layer 3 or more");
         let lowest = extended.lowest_layer.expect("a component has freedoms");
@@ -369,7 +499,7 @@ mod tests {
         let t = Tables::new(n);
         let open = every_source_open(&BoardFrames::<W>::new(&t, Bits::EMPTY), &t);
         let (count, span) = extended_frame_count::<W>(&t, &open).unwrap();
-        (count, span, build_extended::<W>(&t, &open).map(|extended| extended.frames.len()))
+        (count, span, build_extended::<W>(&t, &open, &[]).map(|extended| extended.frames.len()))
     }
 
     /// `build_extended` refuses a problem of more frames than a frame set holds, and says which board and how many:
@@ -395,7 +525,7 @@ mod tests {
     fn promotable_refuses_what_cannot_be_promoted() {
         let t = Tables::new(85);
         let board = BoardFrames::<2>::new(&t, Bits::EMPTY);
-        let extended = build_extended::<2>(&t, &Bits::EMPTY).unwrap();
+        let extended = build_extended::<2>(&t, &Bits::EMPTY, &[]).unwrap();
         let (none, set) = (Bits::EMPTY, |x: u32| Bits::from_slice(&[x]));
         assert!(extended.promotable(&board, &none, &none));
         assert!(extended.promotable(&board, &none, &set(8)));
@@ -405,7 +535,7 @@ mod tests {
         assert!(!extended.promotable(&board, &set(44), &none));
 
         // With 44 open it is one-sided, in frame 0, and playing it or not are both promotion sets.
-        let open = build_extended::<2>(&t, &set(44)).unwrap();
+        let open = build_extended::<2>(&t, &set(44), &[]).unwrap();
         assert_eq!(open.one_sided, [(44, 0)]);
         assert_eq!(open.in_the_bag, extended.in_the_bag - 44);
         assert_eq!(open.frames[0].freedoms, extended.frames[0].freedoms + 1);

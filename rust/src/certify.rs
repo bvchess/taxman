@@ -371,7 +371,7 @@ pub fn certificate_width(n: u32, open: &[u32]) -> Result<(usize, Option<usize>),
     let beyond = || format!("n={n} is beyond the largest supported board, n={MAX_N}");
     let (words, own, fits) = crate::with_width!(n, W => {
         let open: Bits<W> = open.iter().copied().collect();
-        let words = Board::<W>::for_n(n).extended_words(&open).map_err(|e| format!("n={n}: {e}"))?;
+        let words = Board::<W>::for_n(n).extended_words(&open, false).map_err(|e| format!("n={n}: {e}"))?;
         Ok((words, W, words <= Gf2Bound::<W>::MOST_WORDS))
     }, else Err(beyond()))?;
     let widest = WIDTHS[WIDTHS.len() - 1];
@@ -505,8 +505,8 @@ fn check_recorded_game<const W: usize>(
 
     let open: Bits<W> = open.iter().copied().collect();
     let (extended, prepared) = match resume {
-        Some(checkpoint) => board.prepare_extended_for_resume(&open, checkpoint),
-        None => board.prepare_extended_with(&open, SearchTactics::extended()),
+        Some(checkpoint) => board.prepare_extended_for_resume(&open, false, checkpoint),
+        None => board.prepare_extended_with(&open, false, SearchTactics::extended()),
     }
     .map_err(at)?;
     let posed = Posed::new(&extended, prepared.problem());
@@ -609,7 +609,7 @@ pub fn extended_problem(n: u32, open: &[u32]) -> Result<Posed, String> {
     crate::with_width!(n, W => {
         let open: Bits<W> = open.iter().copied().collect();
         Board::<W>::for_n(n)
-            .extended_problem(&open)
+            .extended_problem(&open, false)
             .map(|(extended, problem)| Posed::new(&extended, problem))
             .map_err(|e| format!("n={n}: {e}"))
     }, else Err(format!("n={n} is beyond the largest supported board, n={MAX_N}")))

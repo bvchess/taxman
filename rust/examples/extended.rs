@@ -236,7 +236,7 @@ struct Game {
 /// of the promotions and referees it.  The error says which check failed.
 fn play<const W: usize>(n: u32, prev: &Prev, compare: bool, optimal: &Optimal) -> Result<(Game, Prev), String> {
     let board = Board::<W>::for_n(n);
-    let (extended, prepared) = board.prepare_extended(SearchTactics::default())?;
+    let (extended, prepared) = board.prepare_extended(false, SearchTactics::default())?;
     if extended.in_the_bag != board.in_the_bag {
         return Err(format!(
             "n={n}: Π⁺(∅) fixes {} but the game with no promotions scores {}",

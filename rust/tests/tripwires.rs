@@ -176,7 +176,7 @@ fn searched<const W: usize>(p: &Prepared<W>) -> (u64, u64) {
 /// two setups pose the same problem, and (the problem has no one-sided candidate) the two searches are one search.
 fn extended_searches<const W: usize>(n: u32, tactics: SearchTactics) -> ((u64, u64), (u64, u64)) {
     let board = Board::<W>::for_n(n);
-    let (ext, prepared) = board.prepare_extended_with(&Bits::EMPTY, tactics).unwrap();
+    let (ext, prepared) = board.prepare_extended_with(&Bits::EMPTY, false, tactics).unwrap();
     assert!(!prepared.model.has_one_sided(), "n={n}: Π⁺(∅) has a one-sided candidate");
     let engine = prepare::<W>(&board.tables, &ext.columns(), &ext.candidates, tactics).unwrap();
     assert_eq!(prepared.problem(), engine.problem(), "n={n}: the two setups pose different problems");

@@ -737,8 +737,8 @@ fn the_header_of_an_extended_problem_records_its_one_sided_candidates() {
     let board = Board::<8>::for_n(300);
     let open = open_sources(&board);
     assert!(open.len() > 2, "{open:?}");
-    let (ext, prepared) = board.prepare_extended_with(&open, SearchTactics::extended()).unwrap();
-    let (_, empty) = board.prepare_extended(SearchTactics::extended()).unwrap();
+    let (ext, prepared) = board.prepare_extended_with(&open, false, SearchTactics::extended()).unwrap();
+    let (_, empty) = board.prepare_extended(false, SearchTactics::extended()).unwrap();
     assert!(prepared.model.has_one_sided() && !empty.model.has_one_sided());
 
     let header = Header::of(&prepared);
@@ -791,11 +791,11 @@ fn a_checkpoint_of_one_extended_problem_is_refused_for_another() {
     assert!(!fewer.is_empty() && fewer != open);
     let dir = TempDir::new("extended-other");
     let checkpoint = dir.0.join("ckpt.bin");
-    let (ext, prepared) = board.prepare_extended_with(&open, SearchTactics::extended()).unwrap();
+    let (ext, prepared) = board.prepare_extended_with(&open, false, SearchTactics::extended()).unwrap();
     root_checkpoint(&prepared, &checkpoint);
 
     // The same problem resumes, and finishes with the optimum.
-    let (_, resumed) = board.prepare_extended_for_resume(&open, &checkpoint).unwrap();
+    let (_, resumed) = board.prepare_extended_for_resume(&open, false, &checkpoint).unwrap();
     assert_eq!((resumed.problem(), resumed.tactics), (prepared.problem(), prepared.tactics));
     let cfg = EngineConfig { checkpoint: Some((checkpoint.clone(), Duration::from_secs(3600))), ..config(1) };
     let result = search(&resumed, &cfg, None, None, true).unwrap();
@@ -805,19 +805,20 @@ fn a_checkpoint_of_one_extended_problem_is_refused_for_another() {
     // Another problem is refused, naming what differs, and the checkpoint is left alone.
     root_checkpoint(&prepared, &checkpoint);
     for (what, other) in [("fewer open sources", fewer), ("no open source", Bits::EMPTY)] {
-        let err = board.prepare_extended_for_resume(&other, &checkpoint).err().expect(what);
+        let err = board.prepare_extended_for_resume(&other, false, &checkpoint).err().expect(what);
         assert!(err.starts_with("the checkpoint is of other promotion candidates"), "{what}: {err}");
     }
     let err = board.prepare_for_resume(&checkpoint).err().expect("the frame model");
     assert!(err.starts_with("the checkpoint is of other "), "the frame model: {err}");
     let next = Board::<8>::for_n(301);
-    let err = next.prepare_extended_for_resume(&open_sources(&next), &checkpoint).err().expect("another board");
+    let err = next.prepare_extended_for_resume(&open_sources(&next), false, &checkpoint).err().expect("another board");
     assert!(err.contains("the game n=300, not n=301"), "another board: {err}");
     assert!(checkpoint.exists(), "a refused checkpoint is left alone");
     // The tactics of a checkpoint that the problem refuses are refused when it is resumed, by the setup: a checkpoint
     // of Π⁺(∅) under the default tactics, with the rule of the symmetric pairs, resumed for Π⁺(O).
-    root_checkpoint(&board.prepare_extended(SearchTactics::default()).unwrap().1, &checkpoint);
-    let err = board.prepare_extended_for_resume(&open, &checkpoint).err().expect("tactics that cannot search it");
+    root_checkpoint(&board.prepare_extended(false, SearchTactics::default()).unwrap().1, &checkpoint);
+    let err =
+        board.prepare_extended_for_resume(&open, false, &checkpoint).err().expect("tactics that cannot search it");
     assert!(err.contains("one-sided") && err.contains("symmetry=on"), "{err}");
 }
 
@@ -834,7 +835,7 @@ fn a_problem_with_one_sided_candidates_is_set_up_only_for_the_tactics_that_know_
     assert_eq!(extended, SearchTactics { symmetry: false, ..SearchTactics::default() });
     assert_eq!(extended.refusal_with_one_sided(), None);
 
-    let (ext, prepared) = board.prepare_extended_with(&open, extended).unwrap();
+    let (ext, prepared) = board.prepare_extended_with(&open, false, extended).unwrap();
     assert!(prepared.model.has_one_sided() && prepared.tactics == extended);
     assert_eq!(prepared.candidates, ext.one_sided.iter().fold(ext.candidates, |set, &(s, _)| set.with(s)));
     assert_eq!(prepared.model.one_sided(), ext.one_sided.as_slice());
@@ -853,7 +854,8 @@ fn a_problem_with_one_sided_candidates_is_set_up_only_for_the_tactics_that_know_
         ),
     ];
     for &(what, tactics, ref wrong) in &cases {
-        let err = board.prepare_extended_with(&open, tactics).err().unwrap_or_else(|| panic!("{what}: accepted"));
+        let err =
+            board.prepare_extended_with(&open, false, tactics).err().unwrap_or_else(|| panic!("{what}: accepted"));
         assert!(err.contains("one-sided candidates (extended mode) cannot run with"), "{what}: {err}");
         assert_eq!(Some(err.clone()), tactics.refusal_with_one_sided(), "{what}");
         for tactic in [gf2, lagrange, symmetry] {
@@ -869,9 +871,9 @@ fn a_problem_with_one_sided_candidates_is_set_up_only_for_the_tactics_that_know_
 
     // With nothing open, any tactics: Π⁺(∅) is the frame model's problem.
     for &(what, tactics, _) in &cases {
-        let (empty, prepared) = board.prepare_extended(tactics).unwrap_or_else(|e| panic!("{what}: {e}"));
+        let (empty, prepared) = board.prepare_extended(false, tactics).unwrap_or_else(|e| panic!("{what}: {e}"));
         assert!(!prepared.model.has_one_sided() && empty.one_sided.is_empty(), "{what}");
-        let (_, same) = board.prepare_extended_with(&Bits::EMPTY, tactics).unwrap();
+        let (_, same) = board.prepare_extended_with(&Bits::EMPTY, false, tactics).unwrap();
         assert_eq!((same.problem(), same.tactics), (prepared.problem(), tactics), "{what}");
     }
 }
@@ -889,13 +891,13 @@ fn a_problem_whose_frame_needs_more_block_words_than_the_set_width_has_is_refuse
 
     // Below the boundary the problem fits the narrow engines (the rank is high, near 192).
     let board = Board::<20>::for_n(1265);
-    let (_, fits) = board.prepare_extended_with(&open_sources(&board), SearchTactics::extended()).unwrap();
+    let (_, fits) = board.prepare_extended_with(&open_sources(&board), false, SearchTactics::extended()).unwrap();
     assert_eq!(words(&fits), 3);
 
     for n in [1266, 1300] {
         let narrow = crate::with_width!(n, W => {
             let board = Board::<W>::for_n(n);
-            let err = board.prepare_extended_with(&open_sources(&board), SearchTactics::extended());
+            let err = board.prepare_extended_with(&open_sources(&board), false, SearchTactics::extended());
             (W, err.err().unwrap_or_else(|| panic!("n={n}: accepted at W={W}")))
         });
         let (width, err) = narrow;
@@ -908,7 +910,7 @@ fn a_problem_whose_frame_needs_more_block_words_than_the_set_width_has_is_refuse
 
         // The widest set holds engines of five words, and the engine of four is made for the problem it accepts.
         let wide = Board::<128>::for_n(n);
-        let (_, accepted) = wide.prepare_extended_with(&open_sources(&wide), SearchTactics::extended()).unwrap();
+        let (_, accepted) = wide.prepare_extended_with(&open_sources(&wide), false, SearchTactics::extended()).unwrap();
         assert_eq!(words(&accepted), 4, "n={n}: the words the problem needs");
         let graph = Gf2Graph::new(&accepted.model, &accepted.root, &accepted.candidates);
         let mut bound = Gf2Bound::<128>::new(&graph);
@@ -967,7 +969,7 @@ fn plain_part_of<const W: usize>(form: &[u32], prepared: &Prepared<W>) -> usize 
 fn the_problem_of_the_extended_problem_with_no_open_source_is_the_plain_problem() {
     fn check<const W: usize>(n: u32) {
         let board = Board::<W>::for_n(n);
-        let (ext, extended) = board.prepare_extended(SearchTactics::default()).unwrap();
+        let (ext, extended) = board.prepare_extended(false, SearchTactics::default()).unwrap();
         let plain = prepare::<W>(&board.tables, &ext.columns(), &ext.candidates, SearchTactics::default()).unwrap();
         let (problem, other) = (extended.problem(), plain.problem());
         assert_eq!(problem, other, "n={n}");
@@ -994,9 +996,9 @@ fn the_form_of_a_problem_with_one_sided_candidates_ends_with_them() {
         let board = Board::<W>::for_n(n);
         let open = open_sources(&board);
         let few: Bits<W> = open.iter().take(5).collect();
-        let (_, empty) = board.prepare_extended(SearchTactics::extended()).unwrap();
+        let (_, empty) = board.prepare_extended(false, SearchTactics::extended()).unwrap();
         for (what, set) in [("all of U*>=3", open), ("five sources", few)] {
-            let (_, prepared) = board.prepare_extended_with(&set, SearchTactics::extended()).unwrap();
+            let (_, prepared) = board.prepare_extended_with(&set, false, SearchTactics::extended()).unwrap();
             let one_sided = prepared.model.one_sided();
             assert!(one_sided.len() >= set.len() as usize, "n={n} {what}");
             let (problem, form) = (prepared.problem(), form_of(&prepared.problem()));
@@ -1023,7 +1025,7 @@ fn the_form_of_a_problem_with_one_sided_candidates_ends_with_them() {
             assert_ne!(problem, empty.problem(), "n={n} {what}");
             assert_ne!(problem.digest(), empty.problem().digest(), "n={n} {what}");
             // The same problem set up again is the same.
-            let (_, again) = board.prepare_extended_with(&set, SearchTactics::extended()).unwrap();
+            let (_, again) = board.prepare_extended_with(&set, false, SearchTactics::extended()).unwrap();
             assert_eq!((again.problem(), again.problem().digest()), (problem.clone(), problem.digest()));
         }
     }

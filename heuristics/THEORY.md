@@ -1396,7 +1396,8 @@ it, before any merge: a component of Lemma Ω, in one layer.
 * with ℓ₀ the lowest layer of a frame with freedoms⁺, frame h of Π⁺(O)
   is the union of the frames with freedoms⁺ of layer ℓ₀ + h, with their
   fixed sources as moves and all their factors (empty if there is
-  none).  Nothing is claimed;
+  none).  Nothing is claimed (Lemma M5⁺, below, says which claims of
+  `unzip` can be kept);
 * the *two-sided candidates* are the factors x of the frames h ≥ 1
   that pass setup's two tests with F in place of the remaining
   sources: (a) F ∩ C_x is playable against the factors of C_x less x
@@ -1485,6 +1486,85 @@ candidates too, each as a possible move of its frame
 (rust/DESIGN.md, "Extended mode"), and a reference predicate (plain
 peels of the unreduced frames) decides the promotion sets of Π⁺(O)
 for the tests.
+
+*The claims of `unzip` in Π⁺(O).*  They cannot be reused as they are:
+a back claim (s, f) of Π_n is safe because no candidate of Π_n lists f
+(M5), and Π⁺(O) has more candidates.  A frame of f's layer that holds
+an open source has more freedoms⁺, can take on composites of f that
+Π_n's frame could not, and so makes them candidates: the mechanism of
+n = 98 above.  So the claims are kept frame by frame, with a check.
+Take the claims of Π_n, the pairs (s, f) that `unzip` settled in the
+merged frames of the search as the last simplification left them, in
+the order made, and give each the frame C (as setup forms it, before
+any merge) of its source s, which holds f too (s lists only factors of
+its own frame).  C *keeps* its claims if it holds no member of O ∪ R
+and each of its back claims (s, f) passes the *check*: f is not a
+two-sided candidate of Π⁺(O), and no two-sided candidate of Π⁺(O) has
+f among its maximal factors.  *Π⁺(O) with claims* takes the pairs of
+the frames that keep them out of their frames of Π⁺(O) (s from the
+moves, f from the factors) before the root is reduced; everything
+else, the candidates and in_the_bag⁺ among it, is Π⁺(O)'s.  Let
+I_h(K, L) be frame h's instance in Theorem M⁺'s proof: its members are
+F ∩ frame h, the members of K of frame h and the members of L promoted
+into it, and its pool is frame h's factors less the members of L of
+home h.
+
+**Lemma M5⁺ (the claims kept are moves of the instances).**  Let C be
+a frame that keeps its claims, in frame h of Π⁺(O), and (K, L) with
+K ⊆ O ∪ R and L ⊆ the two-sided candidates such that either S = F ∪ K
+∪ L is playable (S as in Theorem M⁺) or (K, L) is a promotion set of
+Π⁺(O) with claims.  Then the claims of C, in the order made, are front
+and back moves of I_h(K, L), and no claimed factor is in L.
+
+*Proof.*  The members of I_h(K, L) that list factors of C are the
+sources of C, all of them fixed (C holds no member of O, so F ∩ C =
+U\* ∩ C), and members of L promoted into frame h: no member of K lies
+in C (C holds no member of O ∪ R), and a member of K lists only
+factors of its own frame.  The claims of other frames, made in
+between, touch none of C's sources and factors.  Take C's claims in
+order, the earlier ones made (front and back moves keep a playable
+instance playable, Theorem 3).
+
+*Back claim (s, f).*  When `unzip` made it, s was the only remaining
+source of its merged frame that wanted f, and the remaining sources of
+C were U\* ∩ C less the sources of the earlier claims (M1: the passes
+after the first keep every source).  In I_h(K, L) after the earlier
+moves, s is the only source of C that lists f, and no member of L
+lists f, by the check.  And f is in the pool: by the check f is no
+candidate, so f ∉ L.  It is a back move.
+
+*Front claim (s, f).*  When `unzip` made it, f was the only factor of
+s not claimed before, so after the earlier moves s lists f alone in
+I_h(K, L), or nothing if f ∈ L.  If S is playable, f ∈ L would leave s
+nothing in a residual that the earlier moves kept playable; if (K, L)
+is a promotion set, f is in no frame of the root, so it has no home,
+and every member of L has one.  So f ∉ L, and the claim is a front
+move.  ∎
+
+So Theorem M⁺ holds for Π⁺(O) with claims, with the same proof: (only
+if) by the lemma the claims kept are moves of each playable I_h(K, L)
+and take nothing from L, so what is left, the frame with claims with
+(K, L) applied, is playable (Theorem 3), and the reduction is M6's;
+(if) in each frame the claims kept, the reductions and a peel of what
+is left pair every member of I_h(K, L) by front and back moves (the
+lemma, for the claims), an acyclic scheme (Theorem 2), and the rest of
+the proof is unchanged.
+
+**Corollary (the formulation does not matter).**  Π⁺(O) and Π⁺(O)
+with claims have the same promotion sets, and so the same heaviest
+promotion set, worth the same: by Theorem M⁺ for each, the promotion
+sets of both are the (K, L) with F ∪ K ∪ L playable, and in_the_bag⁺ =
+ΣF in both.  So a certificate made in one formulation bounds the
+heaviest promotion set of the other.
+
+With O = ∅ every frame keeps its claims, and Π⁺(∅) with claims is
+Π_n: every back claim of Π_n passes the check (its factor cannot go
+forward, so it fails test (b) and is no candidate, and M5 shows that no
+candidate lists it), Π⁺(∅) has Π_n's candidates, and each frame of
+Π⁺(∅), the union of its parts' sources and factors less the pairs, is
+the merged frame's remaining sources and factors.  The census of the
+frames checks that the two problems the search is given are equal on
+every board to 8191 (`rust/examples/structure.rs`, check H).
 
 *Theorem 11 for Π⁺.*  Give each one-sided candidate s, of frame h,
 the vector v_h(s) of its maximal factors among frame h's factors in

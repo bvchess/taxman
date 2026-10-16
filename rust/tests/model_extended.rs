@@ -80,7 +80,7 @@ impl<'b, const W: usize> Case<'b, W> {
     fn new(board: &'b Board<W>, open: &[u32]) -> Self {
         let n = board.n();
         let fixed = upper(board).into_iter().filter(|x| !open.contains(x)).collect();
-        let extended = build_extended::<W>(&board.tables, &Bits::from_slice(open))
+        let extended = build_extended::<W>(&board.tables, &Bits::from_slice(open), &[])
             .unwrap_or_else(|e| panic!("n={n}: O={open:?}: {e}"));
         let components = BoardFrames::new(&board.tables, Bits::EMPTY);
         Case { board, components, extended, fixed, open: open.to_vec() }
@@ -253,7 +253,8 @@ fn the_extended_problem_with_no_open_source_is_the_frame_model() {
 
         let plain = board.prepare(SearchTactics::default()).unwrap_or_else(|e| panic!("n={n}: {e}"));
         let in_the_frame_model = promotion_sets_of(&plain);
-        let (_, searched) = board.prepare_extended(SearchTactics::default()).unwrap_or_else(|e| panic!("n={n}: {e}"));
+        let (_, searched) =
+            board.prepare_extended(false, SearchTactics::default()).unwrap_or_else(|e| panic!("n={n}: {e}"));
         let in_the_search = promotion_sets_of(&searched);
 
         let first_difference = |a: &BTreeSet<Vec<u32>>, b: &BTreeSet<Vec<u32>>| -> Vec<Vec<u32>> {
@@ -897,8 +898,9 @@ fn check_the_search(n: u32, open: &[u32], tactics: &[SearchTactics]) -> Searched
     let mut found = Searched { sets, ..Searched::default() };
     for &tactics in tactics {
         let what = format!("n={n}, O={open:?}, {tactics:?}");
-        let (ext, prepared) =
-            board.prepare_extended_with(&Bits::from_slice(open), tactics).unwrap_or_else(|e| panic!("{what}: {e}"));
+        let (ext, prepared) = board
+            .prepare_extended_with(&Bits::from_slice(open), false, tactics)
+            .unwrap_or_else(|e| panic!("{what}: {e}"));
         let result = search(&prepared, &config(1), None, None, false).unwrap_or_else(|e| panic!("{what}: {e}"));
         assert!(result.completed, "{what}: the search did not complete");
         let score = ext.in_the_bag + result.sum;
