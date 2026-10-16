@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Builds the tuning suite (suite.jsonl) from checkpoints of frontier searches.  Standard library only.
+"""Builds the tuning suite (suite.jsonl) from checkpoints of searches at the end of the chain.  Standard library only.
 
 The steps (README.md has the commands as run):
 
@@ -16,7 +16,8 @@ The steps (README.md has the commands as run):
      same way.
   3. `make_suite.py assemble` picks from the probes: the units that finished with LO to HI nodes, spread log-uniformly
      in size and evenly over the games, and the smallest whole games that took WHOLE_LO to WHOLE_HI nodes.
-  4. `make_suite.py candidates` lists the searched games of the chain that may be small enough for `--wholes`.
+  4. `make_suite.py refresh` puts the default's CPU seconds of a later build, measured by tune.py, into the suite.
+  5. `make_suite.py candidates` lists the searched games of the chain that may be small enough for `--wholes`.
 """
 
 import argparse
@@ -231,6 +232,31 @@ def assemble_command(args):
     print("whole games:", [(r["game"], r["nodes"]) for r in wholes])
 
 
+def refresh_command(args):
+    """Rewrites the CPU and wall seconds of each problem's `default` in the suite from the default's results in a
+    results file of tune.py (which ran the whole suite with the default alone, `--concurrency` jobs at a time): after a
+    change that makes the search faster without changing its trees, which the nodes and best sums must show."""
+    lines = read_jsonl(args.suite)
+    done = tune.read_results(args.results)
+    total = 0.0
+    for line in lines:
+        if line.get("kind") not in tune.PROBLEM_KINDS:
+            continue
+        found = done.get((tune.DEFAULT, line["id"]))
+        if found is None:
+            raise SystemExit(f"{args.results}: no result of the default on {line['id']}")
+        result, old = found["result"], line["default"]
+        if not result["completed"] or (result["nodes"], result["best"]) != (old["nodes"], old["best"]):
+            raise SystemExit(f"{line['id']}: the default now takes {result['nodes']} nodes and finds {result['best']}, "
+                             f"not the suite's {old['nodes']} and {old['best']}: other trees, so a new suite")
+        line["default"] = {**old, "cpu_s": result["cpu_s"], "wall_s": result["wall_s"]}
+        total += result["cpu_s"]
+    lines[0].update(default_cpu_s=round(total, 1), concurrency=args.concurrency)
+    lines[0]["commit"] = args.commit or lines[0]["commit"]
+    Path(args.suite).write_text("".join(json.dumps(line) + "\n" for line in lines))
+    print(f"{args.suite}: the default's CPU seconds from {args.results}, {total:.0f} s in all")
+
+
 def candidates_command(args):
     """The searched games of 3000-3440 whose search in the chain took the fewest nodes, from LO up."""
     rows = []
@@ -271,6 +297,11 @@ def parse(argv=None):
     assemble.add_argument("--whole-count", type=int, default=6, help="whole games to keep (default 6)")
     assemble.add_argument("--whole-lo", type=int, default=500_000, help="fewest nodes of a whole game (default 500k)")
     assemble.add_argument("--whole-hi", type=int, default=3_000_000, help="most nodes of a whole game (default 3M)")
+    refresh = sub.add_parser("refresh")
+    refresh.add_argument("--suite", required=True, help="the suite file, rewritten")
+    refresh.add_argument("--results", required=True, help="a results file of tune.py with the default on every problem")
+    refresh.add_argument("--concurrency", type=int, required=True, help="jobs that ran at once, to record")
+    refresh.add_argument("--commit", help="the commit of the build that measured, to record (default: the suite's)")
     cand = sub.add_parser("candidates")
     cand.add_argument("--strict", default=tune.CRATE / "results" / "strict.jsonl", type=Path)
     cand.add_argument("--lo", type=int, default=300_000, help="fewest nodes in the chain (default 300,000)")
@@ -280,7 +311,8 @@ def parse(argv=None):
 
 def main(argv=None):
     args = parse(argv)
-    {"probe": probe_command, "assemble": assemble_command, "candidates": candidates_command}[args.command](args)
+    {"probe": probe_command, "assemble": assemble_command, "refresh": refresh_command,
+     "candidates": candidates_command}[args.command](args)
 
 
 if __name__ == "__main__":

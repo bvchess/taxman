@@ -279,6 +279,33 @@ class Suite(unittest.TestCase):
             self.assertEqual(probes.failed_limit("3-3"), 3_000_000)
             self.assertEqual(probes.solved("3-4")["nodes"], 300_000)
 
+    def test_the_defaults_cpu_seconds_are_refreshed_only_for_the_same_trees(self):
+        with tempfile.TemporaryDirectory() as d:
+            suite, results = Path(d) / "suite.jsonl", Path(d) / "results.jsonl"
+            default = {"nodes": 1000, "cpu_s": 2.0, "wall_s": 2.5, "best": 7, "completed": True}
+            rows = [{"kind": "suite", "commit": "abc"}, {"kind": "game", "game": 3}]
+            rows += [{"kind": "unit", "game": 3, "id": "3-0", "default": default}]
+            rows += [{"kind": "whole", "game": 3, "id": "3-root", "default": {**default, "nodes": 5000}}]
+            suite.write_text("".join(json.dumps(r) + "\n" for r in rows))
+
+            def record(id, nodes, best=7):
+                result = {"nodes": nodes, "cpu_s": 1.5, "wall_s": 1.6, "best": best, "completed": True}
+                return {"config": "default", "problem": id, "ok": True, "result": result}
+
+            args = make_suite.parse(["refresh", "--suite", str(suite), "--results", str(results), "--concurrency", "8"])
+            results.write_text(json.dumps(record("3-0", 1000)) + "\n" + json.dumps(record("3-root", 5000)) + "\n")
+            captured(make_suite.refresh_command, args)
+            lines = [json.loads(line) for line in suite.read_text().splitlines()]
+            self.assertEqual([lines[2]["default"]["cpu_s"], lines[3]["default"]["cpu_s"]], [1.5, 1.5])
+            self.assertEqual((lines[0]["default_cpu_s"], lines[0]["concurrency"], lines[0]["commit"]), (3.0, 8, "abc"))
+            # Other trees (the nodes, or the best sum, differ) are refused, and the suite stays as it was.
+            before = suite.read_text()
+            for bad in (record("3-0", 999), record("3-0", 1000, best=8)):
+                results.write_text(json.dumps(bad) + "\n" + json.dumps(record("3-root", 5000)) + "\n")
+                with self.assertRaises(SystemExit):
+                    captured(make_suite.refresh_command, args)
+            self.assertEqual(suite.read_text(), before)
+
     def test_a_game_is_given_up_after_units_that_do_not_finish(self):
         with tempfile.TemporaryDirectory() as d:
             args = fake_world(d)

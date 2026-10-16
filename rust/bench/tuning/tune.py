@@ -5,9 +5,10 @@ Standard library only; run it as `python3 -I bench/tuning/tune.py` from rust/ (R
 
 A configuration is a name and a list of `NAME=VALUE` tactic settings (what `taxman solve --tactic` takes; the
 configurations file is a JSON object of them, and `default`, no settings, is always there).  A problem is a line of the
-suite (suite.jsonl): a subtree of a frontier search, or a whole game, which `examples/tune.rs` solves to completion on
-one thread.  A job is one configuration on one problem, one `tune solve` process, and its result line is appended to the
-results file as soon as it ends; a pair already in the results file is not run again, so a run that stops resumes.
+suite (suite.jsonl): a subtree of a search at the end of the chain, or a whole game, which `examples/tune.rs` solves
+to completion on one thread.  A job is one configuration on one problem, one `tune solve` process, and its result line
+is appended to the results file as soon as it ends; a pair already in the results file is not run again, so a run that
+stops resumes.
 
 The configurations are ranked by successive halving: rung 0 runs every configuration on a random third of the suite and
 keeps the best third (by the geometric mean of CPU seconds, relative to the default on the same problems), rung 1 runs
