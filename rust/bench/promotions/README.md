@@ -4,7 +4,7 @@
 each game, the root's *window* of total sizes that can still beat the optimum's promotion sum, and, for every node of
 the game's fixture, whether the total size of its heaviest completion lies below, inside or above it (one `node` line
 a node, one `game` line a game).  The entry is [Split by the number of
-promotions](../../docs/EXPERIMENTS.md#split-by-the-number-of-promotions-a3s-test-2026-10).
+promotions](../../docs/experiments/split-by-the-number-of-promotions-a3s-test-2026-10.md).
 
 * 936 and 1215 read the probe's fixtures (`testdata/perf`): `promotions --known results/strict.jsonl 936 1215`.
 * 2112 reads `n2112.nodes` here, made by `perf make-nodes 2112 --known results/strict.jsonl --every 500 --keep 300

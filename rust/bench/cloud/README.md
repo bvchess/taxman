@@ -1,9 +1,9 @@
 # The cloud measurements: the scripts and the data
 
 Two runs on EC2: the Graviton calibration (below; what it showed:
-[docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#graviton-calibration-2026-10)), and the scaling to 192 threads on a
+[docs/EXPERIMENTS.md](../../docs/experiments/graviton-calibration-2026-10.md)), and the scaling to 192 threads on a
 `c8g.48xlarge`, whose files are in `c8g48/` ([the last section](#scaling-to-192-threads-c8g48); what it showed:
-[docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#scaling-to-192-threads-2026-10)).  This directory holds the scripts that
+[docs/EXPERIMENTS.md](../../docs/experiments/scaling-to-192-threads-2026-10.md)).  This directory holds the scripts that
 made the measurements and the data they produced.
 
 ## Scripts

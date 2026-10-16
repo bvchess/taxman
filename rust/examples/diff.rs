@@ -1,5 +1,5 @@
 //! How the search problems of two boards differ: what changes from one game of the chain to the next.  The study that
-//! used it, with its findings, is in docs/EXPERIMENTS.md, "Carrying a search's learning to the next game (2026-10)".
+//! used it, with its findings, is in docs/experiments/carrying-a-searchs-learning-to-the-next-game-2026-10.md.
 //!
 //! ```text
 //! cargo run --release --example diff -- [--known FILE]... A:B ...

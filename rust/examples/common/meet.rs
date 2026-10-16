@@ -1,7 +1,6 @@
 //! Weighted matroid intersection for two linear matroids over GF(2) that are direct sums of blocks, and the two
 //! such matroids that every promotion set of a frame-model state is independent in.  Research code for
-//! `examples/matroid.rs`; the study and its numbers are in docs/EXPERIMENTS.md, "Matroid intersection bounds
-//! (2026-10)".
+//! `examples/matroid.rs`; the study and its numbers are in docs/experiments/matroid-intersection-bounds-2026-10.md.
 //!
 //! # The frame matroids
 //!

@@ -1,5 +1,5 @@
 #!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
-"""The tables of docs/EXPERIMENTS.md, "Dominance and symmetry (2026-10)", from the data in this directory.
+"""The tables of docs/experiments/dominance-and-symmetry-2026-10.md, from the data in this directory.
 
 Run from rust/: bench/dominance/dominance.py
 """

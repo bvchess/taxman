@@ -1,6 +1,6 @@
 //! The fields study: a bound on the promotions that adds GF(3) signed frame matroids to the two GF(2) frame matroids
 //! and couples them by Lagrangian decomposition (avenue A1 of `docs/AGENDA.md`, experiments E1 and E2; the record is
-//! `docs/EXPERIMENTS.md`, "A bound over GF(2) and GF(3) signed frame matroids").  `common/dw.rs` has the bound and
+//! `docs/experiments/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10.md`).  `common/dw.rs` has the bound and
 //! why it is valid (`heuristics/THEORY.md`, Theorems 14 and 15), `common/gf3.rs` the signed
 //! matroids, `common/cores.rs` the cores and their signings, `common/lp.rs` the master's simplex, `common/fit.rs`
 //! the fits saved to disk.

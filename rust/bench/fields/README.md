@@ -1,8 +1,8 @@
 # The fields study: the data and the commands
 
-What was measured and what it showed: [docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10), with E2
-as its last section, for the bound in a branch and bound (E3's pilot) [its entry](../../docs/EXPERIMENTS.md#the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10),
-and for R3 and the slope test (U4) [theirs](../../docs/EXPERIMENTS.md#r3-and-the-slope-test-u4-of-a1-2026-10).
+What was measured and what it showed: [docs/EXPERIMENTS.md](../../docs/experiments/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10.md), with E2
+as its last section, for the bound in a branch and bound (E3's pilot) [its entry](../../docs/experiments/the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10.md),
+and for R3 and the slope test (U4) [theirs](../../docs/experiments/r3-and-the-slope-test-u4-of-a1-2026-10.md).
 This directory holds the data that `examples/fields.rs` wrote (its module comment and `common/dw.rs`'s define the
 bound and every field), `fields.py`, which makes the first entry's tables from them (`./fields.py >
 fields_output.md`; `./fields.py --roots lite.jsonl --lite` for the quick look), `e2.py` (E2's), `e3.py` (the

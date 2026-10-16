@@ -1,12 +1,12 @@
 # The wall regime: the data and the commands
 
-What was measured and what it showed: [docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#the-wall-regime-2026-10).
+What was measured and what it showed: [docs/EXPERIMENTS.md](../../docs/experiments/the-wall-regime-2026-10.md).
 This directory holds the data that `examples/wall.rs` wrote (its module comment defines every field) and `wall.py`,
 which makes the entry's tables from them (`./wall.py > wall_output.md`).  Everything ran on the M1 Max, one process
 at a time under `nice -n 10`, one thread unless a line says otherwise, with other jobs on the machine (load 4 to 5), on
 the code of this branch at the merge of master 5252d5d (9c99ca1).  Times are wall seconds of one thread; the cycles
 and instructions of the `nodes` lines are the process's, and those of the start mode include the search's own setup.
-The files of [the gap past 2175](../../docs/EXPERIMENTS.md#the-gap-past-2175-2026-10) (`gaps_chain.jsonl` and the
+The files of [the gap past 2175](../../docs/experiments/the-gap-past-2175-2026-10.md) (`gaps_chain.jsonl` and the
 three after it, with `gap.py`) ran on master ee03872 with no change to the solver, in the same way.
 
 ## Files and the commands that made them
@@ -18,7 +18,7 @@ three after it, with `gap.py`) ran on master ee03872 with no change to the solve
 |---|---|---|
 | `setup.jsonl` | `wall setup K 1000 1300 1600 1900 2100 2175 2200 2500 2800 3100 3400 3700 4000 4095` | the fixed costs of a game piece by piece, the sizes, the root's GF(2) bound and the gap |
 | `setup_widths.jsonl` | `wall setup K --repeat 2 --width W N` for N = 2170 (W = 36, 48, 64) and 3000 (48, 64) | the same at other set widths |
-| `setup_c8g.jsonl` | `wall setup K $(seq 2200 25 4095)` on one thread of a `c8g.48xlarge` (Graviton4), the code of 55287ff: item 1 of the next section | the fixed costs of a game on Graviton, after round A ([docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#scaling-to-192-threads-2026-10)) |
+| `setup_c8g.jsonl` | `wall setup K $(seq 2200 25 4095)` on one thread of a `c8g.48xlarge` (Graviton4), the code of 55287ff: item 1 of the next section | the fixed costs of a game on Graviton, after round A ([docs/EXPERIMENTS.md](../../docs/experiments/scaling-to-192-threads-2026-10.md)) |
 | `start.jsonl` | `wall start K 1301 1306 ... 2171` (every fifth board) | the starting incumbent's local search: singles against pairs |
 | `nodes_start_low.jsonl`, `nodes_opt_low.jsonl` | `wall nodes K --no-seed --nodes 5000 1300 1600 1900 2170`, and with `--mode opt` | the cost of a node from the start incumbent and in the proof of the optimum |
 | `nodes_start_high.jsonl` | `wall nodes --no-seed --nodes 5000 2200 2500 2800 3100 3400 3700 4000 4095` | the cost of a node past 2175 |
@@ -29,7 +29,7 @@ three after it, with `gap.py`) ran on master ee03872 with no change to the solve
 | `gaps_chain_3313_3440.jsonl` | the same with `SNAPSHOT` the committed `results/strict.jsonl` (games 1..3440) and the games past 3312 only, `wall` built from 35c614b, one thread, 111 s | the rest of the committed chain in the same form, for the work list of the certificates (`../certify/`): the 58 searched games of 3315..3440 (48 `exhausted`, 10 `cap`), root gaps 1,103 to 1,555 (the exhausted ones' mean 1,265), equal to the barred bounds' gaps at the roles of Theorem B (`prover/data/upper_3315_3440.jsonl`) where both have the game |
 | `anatomy_chain.jsonl` | `matroid lagrange --known SNAPSHOT --limit 0 $(./gap.py games SNAPSHOT) > L`, `matroid cores $(./gap.py games SNAPSHOT) > C` (`cargo build --release -j 4 --example matroid`), then `./gap.py join-anatomy SNAPSHOT L C > anatomy_chain.jsonl`; 3 minutes | for the same games, the sizes of the successive conflicts of the root GF(2) bound's heaviest set (`matroid`'s research intersection, `common/meet.rs`, whose bound equals `wall`'s `root_bound` at all 509 games) and the cores that set runs into, frame by frame (movers, promoted, factors, movers with three or more live factors) |
 | `resolved_1301_2175.jsonl` | `head -n 1300 results/strict.jsonl > RESOLVE.jsonl`, `taxman solve 1301-2175 --threads 1 --out RESOLVE.jsonl --checkpoint-dir DIR --checkpoint-interval 300 --progress 600` (`nice -n 10`, `taxman` built from master ee03872), then `./gap.py join-resolved RESOLVE.jsonl > resolved_1301_2175.jsonl`; 24 minutes | the committed chain's searched games of 1301-2175 solved again by the EC2 chain's build, in order on one thread (every score and proof is the committed chain's): the game's root gap (`bench/gf2/roots.jsonl`), its nodes, seconds, method and proof from this run beside the committed chain's nodes, so that the two chains' games are on one build |
-| `gap.py`, `gap_output.md` | `./gap.py > gap_output.md` (a table at a time: `./gap.py bands trend arithmetic window build cost runs anatomy projection`) | the tables of [the gap past 2175](../../docs/EXPERIMENTS.md#the-gap-past-2175-2026-10) from `gaps_chain.jsonl`, `anatomy_chain.jsonl`, `resolved_1301_2175.jsonl`, `results/strict.jsonl`, `bench/gf2/roots.jsonl`, `bench/cloud/c8g48/games.jsonl`, `bench/cloud/c8g.chain-2176.jsonl` and `setup_c8g.jsonl`; the module comment says what each table is |
+| `gap.py`, `gap_output.md` | `./gap.py > gap_output.md` (a table at a time: `./gap.py bands trend arithmetic window build cost runs anatomy projection`) | the tables of [the gap past 2175](../../docs/experiments/the-gap-past-2175-2026-10.md) from `gaps_chain.jsonl`, `anatomy_chain.jsonl`, `resolved_1301_2175.jsonl`, `results/strict.jsonl`, `bench/gf2/roots.jsonl`, `bench/cloud/c8g48/games.jsonl`, `bench/cloud/c8g.chain-2176.jsonl` and `setup_c8g.jsonl`; the module comment says what each table is |
 | `widths_1300.jsonl`, `widths_2170.jsonl` | `wall nodes K --mode opt --nodes 5000 --width W N`, each width twice | the same proof at several set widths |
 | `widths_3000.jsonl` | `wall nodes --no-seed --nodes 5000 --width W 3000`, W = 48, 56, 64, twice | the same, past 2175 |
 | `ckpt_4000.jsonl` | `wall nodes --no-seed --nodes 5000 --ckpt-dir DIR --every 0 4000`, then `--every 1` | what checkpoints cost a thread at 4000 |
@@ -37,7 +37,7 @@ three after it, with `gap.py`) ran on master ee03872 with no change to the solve
 | `grow_1230_matching.jsonl`, `.progress` | `wall grow K --tactic gf2=off --tactic lagrange=on --nodes 15000000 --progress 2 --ckpt-dir DIR --every 10 1230` | a matching-path proof of 10.45 million nodes |
 | `grow_2170_t64c1.jsonl`, `.progress` | `wall grow K --threads 64 --cores 1 --seconds 90 --progress 10 --ckpt-dir DIR --every 10 2170` | 64 workers taking turns on one CPU: queue, checkpoint size, memory |
 | `frames.jsonl` | `wall frames 1024 2048 3000 4095 4096 4500 5000 5500 6000 6500 7000 7500 8000 8191` | the frames, sizes and ranks beyond the widest set |
-| `frames_all.jsonl` | `wall frames 2-8191` (the build of ee03872, in four processes), each line cut to `n`, `frames`, `max_freedoms`, `block_words`, `candidates`, `members` | every board to 8191: what bounds `MAX_FRAMES` (9) and the GF(2) bound's block words (5) ([docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#boards-past-4095-2026-10)) |
+| `frames_all.jsonl` | `wall frames 2-8191` (the build of ee03872, in four processes), each line cut to `n`, `frames`, `max_freedoms`, `block_words`, `candidates`, `members` | every board to 8191: what bounds `MAX_FRAMES` (9) and the GF(2) bound's block words (5) ([docs/EXPERIMENTS.md](../../docs/experiments/boards-past-4095-2026-10.md)) |
 | `past4095_setup.jsonl` | `wall setup 4000` by the builds before (`"build":"base"`, ee03872) and after (`"new"`) the boards past 4095, and `wall setup --width W 4100` for W = 72, 80, 96, 128 (a build whose `--width` list had 72, 80, 96 and 112 as well; add them to `at_width!` to run it again) | the fixed costs past 4095, by set width |
 | `past4095_standalone.jsonl` | `taxman solve N --threads 4 --time-limit 10 --out FILE` for N = 4096..4110, one invocation each (the build of 4316168, before its commit) | the first games past 4095, standalone (no seed, no ceiling) and stopped at the limit: incomplete lines, measurements and not results |
 | `past4095_nodes.jsonl` | `wall nodes --no-seed --nodes K 4000` (both builds) and `--width W 4100` (W = 72, 128; the same build), K = 1 and 20,000, twice (`rep`) | the cost of a node net of the setup (the difference of the two K), before and after, and by width |
@@ -54,7 +54,7 @@ say `other`; the innermost functions are the useful part, as truncated symbols: 
 ## For a cloud machine
 
 Items 1, 3, 4, 7 and 8 ran on a `c8g.48xlarge` on 2026-10-15, at 64 and 192 threads on the one machine: what they
-showed is the entry [Scaling to 192 threads](../../docs/EXPERIMENTS.md#scaling-to-192-threads-2026-10), their data and
+showed is the entry [Scaling to 192 threads](../../docs/experiments/scaling-to-192-threads-2026-10.md), their data and
 scripts are in [../cloud/](../cloud/README.md#scaling-to-192-threads-c8g48).  Items 2 and 6 have not run, and item 5
 only inside `tools/cloud/verify.sh` (its times are in `../cloud/c8g48/checks.txt`).
 
@@ -100,7 +100,7 @@ calibration found no contention among 64 copies).
    what is left in `µs/tree`, which is `µs/step` without the units' starts, is the step itself (caches, memory,
    nogoods learned by fewer steps a thread).  If the units' starts are the loss, the design to try is a unit that
    carries its node's heaviest common independent set and weight split, so that a rebuilt GF(2) level is checked
-   rather than solved (see docs/EXPERIMENTS.md, round B).
+   rather than solved (see [round B](../../docs/experiments/round-b-the-chain-on-many-threads-2026-10.md)).
 8. The window at 64 and 192 threads (`--window W`: W consecutive games in flight, sharing the threads).  On each
    machine, one process at a time, with the thread count in the shell variable `T` (`T=64` on the c8g.16xlarge,
    `T=192` on the c8g.48xlarge):

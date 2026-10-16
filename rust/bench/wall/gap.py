@@ -1,5 +1,5 @@
 #!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
-"""The gap past 2175: docs/EXPERIMENTS.md, "The gap past 2175 (2026-10)".
+"""The gap past 2175: docs/experiments/the-gap-past-2175-2026-10.md.
 
 The root GF(2) gap of a game (the root's bound less the chain's optimum) against the size of the tree that the
 EC2 chain made of it.  Inputs (this directory unless a path says otherwise):

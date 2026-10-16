@@ -1,7 +1,7 @@
 //! A3, split by the number of promotions: how many nodes of a proof could be closed by bounding them with the
 //! heaviest common independent set of *exactly* the size their completion needs, instead of the heaviest of all
-//! sizes.  The idea and the partition argument are in docs/AGENDA.md, A3; the numbers are in docs/EXPERIMENTS.md,
-//! "Split by the number of promotions: A3's test (2026-10)".
+//! sizes.  The idea and the partition argument are in docs/AGENDA.md, A3; the numbers are in
+//! docs/experiments/split-by-the-number-of-promotions-a3s-test-2026-10.md.
 //!
 //! ```text
 //! cargo run --release --example promotions -- [--known FILE]... [--fixtures DIR] N...

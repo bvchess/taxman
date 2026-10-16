@@ -2,6 +2,9 @@
 //!
 //! * DESIGN.md's table of tactics lists the tactics of `taxman::tactics::Tactics`, in order, with their defaults;
 //! * every relative link and `#anchor` of the markdown files under `rust/` and of the repository's README resolves;
+//! * the lab notebook keeps its register and index on one page, `docs/EXPERIMENTS.md`, and its entries in
+//!   `docs/experiments/`: every entry opens with its title and a link back, and the register or the index links to
+//!   it; `docs/STATUS.md` is short and dated;
 //! * README's table of the fields of a result line has the keys the code writes, and its example line shows them;
 //! * README's reading order is the module map of `src/lib.rs`, and `rust-version` is what the docs and the cloud
 //!   setup say;
@@ -219,6 +222,108 @@ fn anchors_follow_githubs_rules() {
 }
 
 // ---------------------------------------------------------------------------------------------------------
+// The lab notebook and the status page
+
+/// The second line of every entry of the lab notebook, after a blank one.
+const BACK_LINK: &str = "Part of the [lab notebook](../EXPERIMENTS.md).";
+
+/// The sections of the notebook's front page: the introduction's, and no entry.
+const FRONT_SECTIONS: [&str; 4] =
+    ["How this notebook is kept", "Terms changed (2026-10)", "Register of everything tried", "Index of rounds"];
+
+/// The files of `docs/experiments/` (the notebook's entries), by name.
+fn entry_files() -> Vec<PathBuf> {
+    let dir = crate_dir().join("docs/experiments");
+    let mut files: Vec<PathBuf> =
+        std::fs::read_dir(&dir).expect("docs/experiments/").map(|e| e.unwrap().path()).collect();
+    files.retain(|path| !path.file_name().unwrap().to_string_lossy().starts_with('.'));
+    files.sort();
+    files
+}
+
+#[test]
+fn every_entry_of_the_notebook_has_a_title_and_a_back_link_and_is_listed() {
+    // What the register and the index link to: `experiments/NAME.md`, with or without an anchor.
+    let front = read(crate_dir().join("docs/EXPERIMENTS.md"));
+    let mut listed = BTreeSet::new();
+    for heading in ["## Register of everything tried", "## Index of rounds"] {
+        for line in without_code(section(&front, heading)) {
+            for target in link_targets(&line) {
+                listed.insert(target.split('#').next().unwrap_or("").to_owned());
+            }
+        }
+    }
+    let files = entry_files();
+    assert!(files.len() > 40, "the check found only {} entries: has the layout changed?", files.len());
+    let mut problems = Vec::new();
+    for file in files {
+        let name = file.file_name().unwrap().to_string_lossy().into_owned();
+        let text = read(&file);
+        let top: Vec<&str> = text.lines().take(3).collect();
+        match top.first() {
+            Some(title) if title.starts_with("# ") => {
+                let named = format!("{}.md", anchors(title).into_iter().next().unwrap_or_default());
+                if named != name {
+                    problems.push(format!("{name}: named for its title's anchor, it would be {named}"));
+                }
+            }
+            _ => problems.push(format!("{name}: the first line is not a title (`# `)")),
+        }
+        if top.get(1) != Some(&"") || top.get(2) != Some(&BACK_LINK) {
+            problems.push(format!("{name}: the third line is not {BACK_LINK:?}, after a blank line"));
+        }
+        if !listed.contains(&format!("experiments/{name}")) {
+            problems.push(format!("{name}: neither the register nor the index of docs/EXPERIMENTS.md links to it"));
+        }
+    }
+    assert!(
+        problems.is_empty(),
+        "entries of docs/experiments/ that break the notebook's rules:\n{}",
+        problems.join("\n")
+    );
+}
+
+#[test]
+fn the_front_page_of_the_notebook_has_no_entries() {
+    let front = read(crate_dir().join("docs/EXPERIMENTS.md"));
+    let sections: Vec<String> =
+        without_code(&front).into_iter().filter_map(|line| line.strip_prefix("## ").map(str::to_owned)).collect();
+    assert_eq!(
+        sections, FRONT_SECTIONS,
+        "docs/EXPERIMENTS.md keeps the register and the index; an entry is a file in docs/experiments/"
+    );
+}
+
+/// Whether `line` is `Updated YYYY-MM-DD.`, a plausible date.
+fn is_update_line(line: &str) -> bool {
+    let Some(date) = line.strip_prefix("Updated ").and_then(|rest| rest.strip_suffix('.')) else { return false };
+    let parts: Vec<&str> = date.split('-').collect();
+    let [year, month, day] = parts.as_slice() else { return false };
+    let number = |part: &str, digits: usize| part.len() == digits && part.bytes().all(|b| b.is_ascii_digit());
+    number(year, 4)
+        && number(month, 2)
+        && number(day, 2)
+        && matches!(month.parse::<u32>(), Ok(1..=12))
+        && matches!(day.parse::<u32>(), Ok(1..=31))
+}
+
+#[test]
+fn status_is_short_and_dated() {
+    let status = read(crate_dir().join("docs/STATUS.md"));
+    let lines = status.lines().count();
+    assert!(lines <= 150, "docs/STATUS.md has {lines} lines; it stays at 150 or fewer (rewrite it, do not append)");
+    assert!(
+        status.lines().take(5).any(is_update_line),
+        "docs/STATUS.md says `Updated YYYY-MM-DD.` among its first lines"
+    );
+    assert!(
+        is_update_line("Updated 2026-10-16.")
+            && !is_update_line("Updated 2026-13-16.")
+            && !is_update_line("Updated 2026-10-16")
+    );
+}
+
+// ---------------------------------------------------------------------------------------------------------
 // The README against the code
 
 /// The backticked words in the first cell of each row of the markdown table in `text`.
@@ -332,7 +437,7 @@ fn the_minimum_rust_version_is_the_same_everywhere() {
 // ---------------------------------------------------------------------------------------------------------
 // Vocabulary
 
-/// The text files that explain the code: the guides and the comments.
+/// The text files that explain the code: the guides, the lab notebook with its entries, and the comments.
 fn prose_files() -> Vec<PathBuf> {
     fn rust_files(dir: &Path, found: &mut Vec<PathBuf>) {
         for entry in std::fs::read_dir(dir).expect("a directory") {
@@ -344,8 +449,11 @@ fn prose_files() -> Vec<PathBuf> {
             }
         }
     }
-    let mut files: Vec<PathBuf> =
-        ["README.md", "DESIGN.md", "docs/EXPERIMENTS.md"].iter().map(|name| crate_dir().join(name)).collect();
+    let mut files: Vec<PathBuf> = ["README.md", "DESIGN.md", "docs/EXPERIMENTS.md", "docs/STATUS.md"]
+        .iter()
+        .map(|name| crate_dir().join(name))
+        .collect();
+    files.extend(entry_files());
     rust_files(&crate_dir().join("src"), &mut files);
     files
 }
@@ -442,12 +550,22 @@ const RETIRED_NAMES: &[Retired] = &[
 ];
 
 /// Phrases that contain a retired word and stay: the heuristics' and the matroids' own meanings, and plain English
-/// that is not about the frame model.
-const STAYS: &[&str] =
-    &["frontier argument", "frontier jam", "odd core", "odd cores", "memory cap", "mem-cap", "cap reached"];
+/// that is not about the frame model, and the name of the entry "The frontier chain to 3440", which the guides use when
+/// they point to it.
+const STAYS: &[&str] = &[
+    "frontier argument",
+    "frontier jam",
+    "frontier chain",
+    "odd core",
+    "odd cores",
+    "memory cap",
+    "mem-cap",
+    "cap reached",
+];
 
-/// The files the check skips: this one, which lists the words.
-const SKIPPED: &[&str] = &["tests/docs.rs"];
+/// The files the check skips: this one, which lists the words, and the entries of the lab notebook, which are history
+/// and keep the words of their time.
+const SKIPPED: &[&str] = &["tests/docs.rs", "docs/experiments/"];
 
 /// `line` with the targets of its links (`](target)`) taken out: a target names a file or an anchor, not a word.
 fn without_link_targets(line: &str) -> String {
@@ -495,13 +613,12 @@ fn retired_in(lines: &[String], lists: &[&[Retired]]) -> Vec<(usize, &'static st
     found
 }
 
-/// The part of EXPERIMENTS.md that describes the present: its introduction, the register and the index of rounds.
-/// The dated entries after them are history and keep the words of their time, as does the note that maps those words,
-/// and so do the titles of the entries in the first column of the index.  The other lines are blanked, so that line
-/// numbers stay.
+/// The front page, EXPERIMENTS.md, describes the present: all of it, but for the note that maps the old words, which
+/// keeps them, and the titles of the entries in the first column of the index, which keep the words of their time.
+/// Those are blanked or cut, so that line numbers stay.  The entries themselves (`docs/experiments/`) are history and
+/// are skipped (see `SKIPPED`).
 fn experiments_now(text: &str) -> String {
-    let (now, history) = text.split_once("\n## The port and its first improvements").expect("the first round");
-    let (before, after) = now.split_once("## Terms changed (2026-10)").expect("the note on the terms changed");
+    let (before, after) = text.split_once("## Terms changed (2026-10)").expect("the note on the terms changed");
     let (note, register) = after.split_once("\n## Register of everything tried").expect("the register");
     let blank = |part: &str| vec![""; part.lines().count()].join("\n");
     let titles_out = |line: &str| match line.starts_with("| [") {
@@ -509,7 +626,7 @@ fn experiments_now(text: &str) -> String {
         false => line.to_owned(),
     };
     let register: Vec<String> = register.lines().map(titles_out).collect();
-    format!("{before}{}\n## Register of everything tried\n{}\n{}", blank(note), register.join("\n"), blank(history))
+    format!("{before}{}\n## Register of everything tried\n{}", blank(note), register.join("\n"))
 }
 
 /// The prose of a file as lines: a markdown file's text, a Rust file's comments, a shell script's comments, with code

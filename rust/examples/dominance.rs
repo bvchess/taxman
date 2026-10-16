@@ -1,6 +1,6 @@
 //! Dominance and symmetry among promotion sets: how much of a proof's tree could be pruned because another promotion
 //! set does at least as well with every completion.  Research code: nothing in the solver calls it.  The study is in
-//! docs/EXPERIMENTS.md, "Dominance and symmetry (2026-10)".
+//! docs/experiments/dominance-and-symmetry-2026-10.md.
 //!
 //! ```text
 //! cargo run --release --example dominance -- sample [--known FILE] [--count K] [--delta D] [--out DIR] N...

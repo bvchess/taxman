@@ -3,7 +3,7 @@
 What the hunt does and what each verdict is worth: the module comment of `examples/hunt.rs` and `sacrifice::hunt`
 (the board without one open source of U\*, searched by the frame solver from an incumbent worth the recorded score, so
 that it looks only for a better game).  Why: heuristics/THEORY.md, "The upper part" (U), and the entry
-["The upper part game by game"](../../docs/EXPERIMENTS.md#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10).
+["The upper part game by game"](../../docs/experiments/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10.md).
 The open sources and their margins come from the prover's `upper` (`../../prover/data/upper_*.jsonl`).
 
 | file | command | what it is |

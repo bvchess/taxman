@@ -1,7 +1,7 @@
 #!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
-"""Matroid intersection bounds: the tables of docs/EXPERIMENTS.md, "Matroid intersection bounds (2026-10)".
+"""Matroid intersection bounds: the tables of docs/experiments/matroid-intersection-bounds-2026-10.md.
 
-The data files here are the output of `examples/matroid.rs` (the commands are in EXPERIMENTS.md); this script joins
+The data files here are the output of `examples/matroid.rs` (the commands are in that entry); this script joins
 them with the slope study's ../curve/slope_roots.jsonl (the matching and Lagrangian bounds of every root) and
 ../curve/slope_proofs.jsonl (the solver's one-thread proofs) and prints markdown.  Pure Python;
 `./matroid.py > matroid_output.md`.

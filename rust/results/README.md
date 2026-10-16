@@ -56,14 +56,14 @@ How the first run, games 1–2175, was made:
 * The cost of the first 1300 games fell with the tactics that came after the earlier chains: the third took 1022.5 s of
   search and 332.0 M nodes (on 4 threads of a machine shared with four other jobs, which makes its times pessimistic),
   the second 1052 s and the first 3359 s.  `same_search` concludes 545 of them as repeats of an earlier game's search
-  ([EXPERIMENTS](../docs/EXPERIMENTS.md#same-search-2026-10)), the Lagrangian bound over the nogoods makes the searches
+  ([EXPERIMENTS](../docs/experiments/same-search-2026-10.md)), the Lagrangian bound over the nogoods makes the searches
   that remain shorter
-  ([EXPERIMENTS](../docs/EXPERIMENTS.md#a-lagrangian-bound-over-the-nogoods-2026-10)), and the GF(2) bound, which this
+  ([EXPERIMENTS](../docs/experiments/a-lagrangian-bound-over-the-nogoods-2026-10.md)), and the GF(2) bound, which this
   is the first committed chain made with, makes them shorter again
-  ([EXPERIMENTS](../docs/EXPERIMENTS.md#the-gf2-bound-in-the-search-2026-10)).  What the run adds to those entries is in
-  [EXPERIMENTS](../docs/EXPERIMENTS.md#the-committed-chain-to-2175-2026-10).
+  ([EXPERIMENTS](../docs/experiments/the-gf2-bound-in-the-search-2026-10.md)).  What the run adds to those entries is in
+  [EXPERIMENTS](../docs/experiments/the-committed-chain-to-2175-2026-10.md).
 
-How the second run, games 2176–3440, was made ([EXPERIMENTS](../docs/EXPERIMENTS.md#the-frontier-chain-to-3440-2026-10)
+How the second run, games 2176–3440, was made ([EXPERIMENTS](../docs/experiments/the-frontier-chain-to-3440-2026-10.md)
 has the run's story and cost; [the runbook](../tools/cloud/RUNBOOK.md) the procedure):
 
 * The command was `rust/tools/cloud/chain.sh 4095`, which runs `taxman solve 1-4095 --window W --out strict.jsonl
@@ -216,7 +216,7 @@ What that evidence amounts to:
    promotions: [the prover's README](../prover/README.md); [THEORY.md](../../heuristics/THEORY.md),
    Theorem 10), so `strict.jsonl`'s scores to 2175 do not rest on the frame model either: those 2175 are the optimum on
    the whole board (1301–2175 in the cloud run of 2026-10-14 and 15,
-   [EXPERIMENTS](../docs/EXPERIMENTS.md#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10)).  The 1265
+   [EXPERIMENTS](../docs/experiments/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10.md)).  The 1265
    games of 2176–3440 are proven within the frame model, which is exact given U ([THEORY.md, "The frame model: what is
    proven and what remains"](../../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains)), and U is
    not yet certified past 2175: `taxman certify` will check it game by game, with the prover's barred bounds

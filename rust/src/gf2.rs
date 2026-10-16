@@ -1,7 +1,8 @@
 //! The GF(2) bound: an upper bound on the sum of the promotions a search state can still make, from two linear
 //! matroids over GF(2) in which every promotable set is independent (tactic `gf2`).  It is never above the matching
 //! bound ([`crate::matchbound`]) and usually far below it; `heuristics/THEORY.md`, Theorem 11, has the proof, and
-//! `docs/EXPERIMENTS.md`, "Matroid intersection bounds" and "The GF(2) bound in the search", the measurements.
+//! `docs/experiments/matroid-intersection-bounds-2026-10.md` and
+//! `docs/experiments/the-gf2-bound-in-the-search-2026-10.md`, the measurements.
 //!
 //! # The matroids
 //!

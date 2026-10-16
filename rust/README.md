@@ -41,11 +41,11 @@ check it game by game).  The code can attempt any larger n up to 8191, the large
 GF(2) bound (the default since 2026-10), a chain from `optimal.json`'s game of 1300 reached 2175 in 92 minutes on two
 threads of a laptop, and the committed chain from n = 1 to 2175 in 27 minutes on eight
 ([results/README.md](results/README.md)), the cost in waves with no growth a fit over those games resolves
-([docs/EXPERIMENTS.md](docs/EXPERIMENTS.md#the-gf2-bound-in-the-search-2026-10)); before it, the cost of a game grew by a
+([docs/EXPERIMENTS.md](docs/experiments/the-gf2-bound-in-the-search-2026-10.md)); before it, the cost of a game grew by a
 factor of ten for every 55 to 70 in n past 1200 ([bench/curve/README.md](bench/curve/README.md)).  Past 2175 it grows:
 the search times of the games 2176 to 3440, which a day on one 64-thread cloud machine made for about $16, rise
 tenfold per about 1,040 in n, with about a decade of scatter
-([docs/EXPERIMENTS.md](docs/EXPERIMENTS.md#the-frontier-chain-to-3440-2026-10)).
+([docs/EXPERIMENTS.md](docs/experiments/the-frontier-chain-to-3440-2026-10.md)).
 
 ### How the solver sees the game (the frame model)
 
@@ -281,9 +281,10 @@ checked and recorded in order, and every line has the score, proof, repeat and a
 game after another gives it; the moves may be another optimal set, and the nodes and times differ (DESIGN.md, "The
 window: games in flight" and "What a window changes in the results").  The default is 1, one game after another, and
 with one thread the window is always 1.  On 4 threads of the laptop a window of 16 makes 1..1300 about 16% faster and
-the games past 2225, whose searches already keep 4 threads busy, no slower (docs/EXPERIMENTS.md, round B);
-`tools/cloud/chain.sh` runs with 16.  With the environment variable `TAXMAN_WINDOW_TRACE` set, the run prints the
-window's events on stderr (games set up, searches started, threads moved, deferrals, hints, conclusions).
+the games past 2225, whose searches already keep 4 threads busy, no slower ([round
+B](docs/experiments/round-b-the-chain-on-many-threads-2026-10.md)); `tools/cloud/chain.sh` runs with 16.  With the
+environment variable `TAXMAN_WINDOW_TRACE` set, the run prints the window's events on stderr (games set up, searches
+started, threads moved, deferrals, hints, conclusions).
 
 ### Checkpoints, resuming, signals
 
@@ -795,7 +796,8 @@ comment that is worth reading first; section 6 above is the map of how the piece
 |---|---|
 | this page | the user guide |
 | [DESIGN.md](DESIGN.md) | the design as it is now: goals, the game and the frame model, the architecture, the search, the tactics and their grades, the engine, the pipeline, the trust model, the tests, performance |
-| [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) | the register of everything tried, kept or not (check it before proposing an experiment), and the lab notebook: every round of improvements with its measurements |
+| [docs/STATUS.md](docs/STATUS.md) | the current state of the work: what is in flight, paused, decided, waiting on a decision (read it first) |
+| [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) | the register of everything tried, kept or not (check it before proposing an experiment), and the lab notebook: every round of improvements with its measurements, one file an entry in [docs/experiments/](docs/experiments/) |
 | [docs/IDEAS.md](docs/IDEAS.md) | ideas borrowed from other fields (SAT, MaxSAT, MIP, #SAT, ...), ranked, with pilot measurements, the profile of the hardest games and the study of nogoods at many threads |
 | [docs/AGENDA.md](docs/AGENDA.md) | the research agenda (2026-10): what limits the end of the chain, the avenues ranked, conjectures, and what the cloud runs should measure |
 | [results/README.md](results/README.md) | the committed results files and what supports their scores |

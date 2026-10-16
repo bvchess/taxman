@@ -4,7 +4,7 @@
 
 """The two open questions of the wiki's Questions page, measured on the committed games and by exhaustive search.
 
-rust/docs/EXPERIMENTS.md, "The wiki's open questions (2026-10)", has the method, the results and the proofs; this
+rust/docs/experiments/the-wikis-open-questions-2026-10.md has the method, the results and the proofs; this
 module computes every number there.  The games read are optimal.json (1..1300) and the committed chain
 rust/results/strict.jsonl (its games 1..2175, TOP, which the study was made on; the file has more now).
 

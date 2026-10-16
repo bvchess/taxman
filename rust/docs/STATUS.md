@@ -1,0 +1,77 @@
+# Status
+
+Updated 2026-10-16.
+
+What is in flight, what is paused, what is decided and what waits on a decision, as of the date above.  This page is
+the only place for the current state: it is rewritten, not appended to, whenever work lands or a decision is made
+(with the date), and it stays under 150 lines.  History goes to an entry of the [lab notebook](EXPERIMENTS.md); the
+results and how they are proven are in the [README](../README.md); the research avenues are in the
+[agenda](AGENDA.md).
+
+## The results
+
+* The committed chain, `results/strict.jsonl`, reaches 3440.  Games 2-2175 are proven on the whole board by the
+  prover; games 2176-3440 within the frame model, which is exact given statement U
+  ([README, "What optimal means"](../README.md#what-optimal-means)).  `optimal.json` stays at 1300; nothing is
+  published.
+* 3441 is unfinished: 626 million nodes after 5.9 hours on 64 threads, its checkpoint (format 4, which the present
+  build reads) in the project's bucket under `chain-2176/ckpt`
+  ([the frontier chain](experiments/the-frontier-chain-to-3440-2026-10.md)).
+
+## The priority: a larger n
+
+Brian's priority (2026-10-16) is a larger n, the end of the chain pushed further; certifying U past 2175 is not a priority for now.
+
+The cost of a searched game grows tenfold for about every 1,040 in n, in patches: the valley 2576-2975 cost minutes,
+the last forty games of the run held three of its four dearest (3440 alone 5 hours on 64 threads).  At the run's own
+trend, one `c8g.16xlarge` at spot ($0.68 an hour) reaches about:
+
+| more machine time | n reached | cost |
+|---|---|---|
+| 1 day | 3,740 | $16 |
+| 3 days | 4,050 | $49 |
+| 10 days | 4,500 | $160 |
+| a month | 5,000 | $530 |
+
+A single run can fall well short of its projection (the last one projected 4,100 and reached 3440).  Every doubling of
+speed or of spending is worth about 310 in n; only a tighter bound in the search changes the tenfold per 1,040.  The
+chain's launch is [RUNBOOK section 5](../tools/cloud/RUNBOOK.md#5-the-production-chain); it needs Brian's approval.
+
+What has been tried for the bound, and where it stands:
+
+* **A1, the multi-field bound in the search: closed.**  At the roots it closes 0.4-0.6 of the gap; in a branch and
+  bound its trees are smaller by a factor that falls as the gap grows
+  ([E3 pilot](experiments/the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10.md),
+  [R3 and the slope test](experiments/r3-and-the-slope-test-u4-of-a1-2026-10.md)).
+* **Carrying a search's work to the next game: closed.**  The trees of neighbours share 0.15% of their steps
+  ([carrying](experiments/carrying-a-searchs-learning-to-the-next-game-2026-10.md)).
+* **A3, splitting by the number of promotions: closed.**  At 936, 1215 and 2112 every node's heaviest completion
+  already has the root's size, so a bound by size equals the plain one
+  ([A3's test](experiments/split-by-the-number-of-promotions-a3s-test-2026-10.md)).
+* **A5, decomposing across the frames: not tried** (agenda A5; high risk).
+
+## Paused
+
+* **The claim-by-claim rule** (Lemma M5⁺ claim by claim, for the certificates): until after the weekly reset
+  (Brian, 2026-10-16: Monday night).  Its branch `worktree-agent-a2db9341d6d4e8cd9` holds two commits and an
+  uncommitted edit of THEORY.md in its worktree.
+* **Certifying 2176-3440** ([RUNBOOK section 11](../tools/cloud/RUNBOOK.md#11-certifying-u-stage-4)): ready, not
+  approved, shelved by Brian on 2026-10-16.  About 3,023 thread-hours, 47 hours of one `c8g.16xlarge`, $32 at spot
+  ($121 on demand), the pilot first ($3); phases A and B on the build of 14beb7a, phase C on the claim-by-claim build
+  ([certificates past 2175](experiments/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10.md),
+  [the claims](experiments/the-claims-of-unzip-in-the-extended-problem-2026-10.md)).
+
+## Dropped
+
+* E3 main (A1's large cloud run): dropped after the pilot.
+* E6 and E9(a) (the theory track's cloud measurements): superseded by the certificates.
+
+## Waiting on Brian
+
+* A chain run to push n (one to three days, $16-49 at spot).
+* Outside review of Theorems 1, 10 and 12 by Robert Moniot.
+* Publishing (`optimal.json` past 1300, OEIS).
+
+## In flight
+
+* Splitting the lab notebook into one file an entry, with this page.

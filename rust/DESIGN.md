@@ -6,9 +6,12 @@ that runs it on many threads, the per-game pipeline, how results are recorded an
 performance is measured.  Each term is defined where it first matters.
 
 * The [README](README.md) is the user guide (how to build, run and read the output) and has the glossary.
+* [docs/STATUS.md](docs/STATUS.md) is the current state of the work: what is in flight, paused, decided and waiting.
+  Read it first.
 * [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) is the lab notebook and the register of everything tried, kept or not:
-  every round of improvements with its measurements, and the ideas that were measured and not kept.  This page states
-  what the solver does and why; the notebook says what it was worth and what was tried instead.
+  every round of improvements with its measurements, one file an entry in [docs/experiments/](docs/experiments/), and
+  the ideas that were measured and not kept.  This page states what the solver does and why; the notebook says what it
+  was worth and what was tried instead.
 * Each module starts with a comment that says what it is for; [`src/lib.rs`](src/lib.rs) has the module map.
 
 * [1. Goals and constraints](#1-goals-and-constraints)
@@ -167,7 +170,7 @@ candidates, the greedy incumbent) defines the search space, and reproduces the J
 Java's loop (its `blameGame` bound, its depth-2 preclusion table and the promotability checks of its candidate lists,
 branching on the largest candidate), and each of those was replaced by something measured to be faster, then removed
 (the notebook has the rounds, and [which tactics earn their
-keep](docs/EXPERIMENTS.md#which-tactics-earn-their-keep-2026-10) the last measurements of what was removed).  Not
+keep](docs/experiments/which-tactics-earn-their-keep-2026-10.md) the last measurements of what was removed).  Not
 ported: `oldsearch/` (the 2021 disk-queue search), `frame.GreedySolver`, `util.Memo`, `WorkingFrame.fancyFit/fits`, the
 picklers and compressor.
 
@@ -182,7 +185,7 @@ wiki's *selection* is a move, its *front* and *back* are the same, and its upper
 One defect of the Java's bound was found in the port: `UpperBoundEstimator.getRunnerUp` replaces the failing number
 with the next candidate below the smallest bid member, and a skipped candidate from the failing number's frame can be
 larger, so the Java bound can be too low (at the root of n = 114: 358 against the best completion's 360; [the
-story](docs/EXPERIMENTS.md#the-port-and-its-first-improvements)).
+story](docs/experiments/the-port-and-its-first-improvements.md)).
 
 ## 3. Architecture
 
@@ -626,7 +629,7 @@ are the tactics that were removed: the Java's two conjectures, `reuse_prev` (acc
 with no search) and `revise_freedoms` (lower frame 0's freedoms by solving the two-frame game, assuming that the
 heaviest promotion set also has the most members, which is false at n = 833), and the tactics that lost, the Java's
 `blameGame` bound with its runner-up, its preclusion table, and the branchings other than strong branching
-([which tactics earn their keep](docs/EXPERIMENTS.md#which-tactics-earn-their-keep-2026-10)).
+([which tactics earn their keep](docs/experiments/which-tactics-earn-their-keep-2026-10.md)).
 
 **The frame model's own rules** are not tactics: greedy removal of impossible sources inside frames (the Java's
 `Hive.removeImpossible`); mandatory moves (its `Hive.unzip`); freedoms = factors − sources (its `freeFactorCount`, set
@@ -766,7 +769,7 @@ the ceiling, on every thread.
   their seeds and ceilings, workers given and taken back, hints, deferrals and conclusions.
 
 What it buys and what was tried on the way are in
-[docs/EXPERIMENTS.md](docs/EXPERIMENTS.md#round-b-the-chain-on-many-threads-2026-10).
+[docs/EXPERIMENTS.md](docs/experiments/round-b-the-chain-on-many-threads-2026-10.md).
 
 **optimal.json** is built into the binary (`include_str!`, `game::Optimal::built_in`): the table as it was when the
 crate was compiled, which a rebuild picks up when the file changes.  Every completed game's score is confirmed against
@@ -1254,11 +1257,14 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
 * **Command line** (`tests/cli.rs`): every subcommand's happy path and its usage errors through the real binary;
   `bench --history FILE` keeps the tracked `bench/history.jsonl` out of the tests.
 * **Documentation** (`tests/docs.rs`): the table of tactics in section 5 matches the code; every relative link and
-  `#anchor` in the markdown files resolves; the README's table of the fields of a result line, and its example line,
-  have the keys the code writes; its reading order is the module map of `src/lib.rs`; `rust-version` is what the README
-  and `setup.sh` say; the docs call `unzip`'s moves *mandatory*, never *forced*; and the guides and comments of the
-  repository do not use the words the project has retired (the list, with what to say instead, is in the test; the
-  dated entries of EXPERIMENTS.md and the note that maps their words are exempt).
+  `#anchor` in the markdown files resolves; each entry of the lab notebook (`docs/experiments/`) opens with its title
+  and a link back and is linked from the register or the index of `docs/EXPERIMENTS.md`, whose only sections are the
+  introduction's; `docs/STATUS.md` is dated and has at most 150 lines; the README's table of the fields of a result
+  line, and its example line, have the keys the code writes; its reading order is the module map of `src/lib.rs`;
+  `rust-version` is what the README and `setup.sh` say; the docs call `unzip`'s moves *mandatory*, never *forced*; and
+  the guides and comments of the repository do not use the words the project has retired (the list, with what to say
+  instead, is in the test; the entries of docs/experiments/ and the note of EXPERIMENTS.md that maps their words are
+  exempt).
 
 A few tests sample what an exhaustive run would cover (every 18th golden board for the peeling agreement, every sixth
 board above 511 for the root promotability of the frame builder's candidates, every second line of the Java fixtures);
@@ -1343,7 +1349,7 @@ optimal.json's game of 1300 reached 2175 in 92 minutes of game time on 2 threads
 to 2175 took 27 minutes on 8 ([results/README.md](results/README.md)); its cost comes in waves that
 follow the root's GF(2) gap, with no growth that a fit over 1301–2175 resolves.  Past 2175 it grows, tenfold per about
 1,040 in n, and a day on one 64-CPU cloud machine took the chain from 2176 to 3440 (the [cloud
-run](docs/EXPERIMENTS.md#the-frontier-chain-to-3440-2026-10) sets it beside the projections of the day: near 4,100, and
+run](docs/experiments/the-frontier-chain-to-3440-2026-10.md) sets it beside the projections of the day: near 4,100, and
 3,400 to 3,700 at their pessimistic end); the widths go to 8191.
 
 **The matching path** (the default before the GF(2) bound; these are the build of commit 4b6ef38, on the M1 Max): the
@@ -1374,7 +1380,7 @@ above, will check it game by game); `results/README.md` says what supports each 
 many-core machine can start from `strict.jsonl` (`tools/cloud/RUNBOOK.md`), and a chain from n = 1 reproduces its
 scores.  With the GF(2) bound (section 4), the chain goes past 1300 on a laptop (EXPERIMENTS, "The GF(2) bound in the
 search" and "The committed chain to 2175"), and a day on a 64-CPU cloud machine took it from 2176 to 3440 (the [cloud
-run](docs/EXPERIMENTS.md#the-frontier-chain-to-3440-2026-10)).  What is left to try: strong
+run](docs/experiments/the-frontier-chain-to-3440-2026-10.md)).  What is left to try: strong
 branching's solves, 70% of the intersection's work, which restart far below their answer (canceling the negative cycles
 of the optimum less the member would start them next to it); the removal of the matching path's search machinery that
 the GF(2) bound leaves idle (refinement, the Lagrangian bound in the search; EXPERIMENTS has the list), once a
