@@ -882,7 +882,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             vector: [&level.vec[0], &level.vec[1]],
             weight: &graph.weight,
         };
-        let mut losses = Losses::of(level, &self.meet, cap > size);
+        let mut losses = Losses::of(level, &mut self.meet, &problem, cap > size);
         if !losses.certify(slack + 1, &mut self.meet, &problem, &level.pot) {
             return;
         }
@@ -958,7 +958,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             weight: &graph.weight,
         };
         let last = level.history.last().copied().unwrap_or(Bits::EMPTY);
-        let mut losses = Losses::of(level, &self.meet, cap > size);
+        let mut losses = Losses::of(level, &mut self.meet, &problem, cap > size);
         let reach = losses.reach(&last);
         self.certified.clear();
         for &x in xs {
@@ -1125,7 +1125,7 @@ fn certify_child<const W: usize, const R: usize>(
         weight: &graph.weight,
     };
     // The child's heaviest set of all sizes: the parent's sets of every other size count.
-    let mut losses = Losses::of(parent, meet, true);
+    let mut losses = Losses::of(parent, meet, &problem, true);
     banned.clear();
     banned.extend((*added | (parent.live - last - child.live)).iter().map(|y| graph.index[y as usize]));
     let reach = losses.reach(&last);
@@ -1170,12 +1170,17 @@ impl Losses {
     }
 
     /// For `level`, whose tableau the workspace `meet` holds; the larger sets count if `larger`.
-    fn of<const W: usize, const R: usize>(level: &Level<W, R>, meet: &Meet<R>, larger: bool) -> Self {
+    fn of<const W: usize, const R: usize>(
+        level: &Level<W, R>,
+        meet: &mut Meet<R>,
+        problem: &Problem<'_, R>,
+        larger: bool,
+    ) -> Self {
         let exact = Self::from_history(level);
         Losses {
             smaller: exact.unwrap_or(level.loss_floor).max(level.loss_floor),
             exact: exact.is_some(),
-            larger: if larger { meet.gap } else { i64::MAX },
+            larger: if larger { meet.gap(problem) } else { i64::MAX },
         }
     }
 

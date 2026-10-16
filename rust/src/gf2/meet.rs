@@ -253,7 +253,9 @@ pub struct Meet<const R: usize> {
     /// The last augmenting path, from its source to its sink.
     path: Vec<u32>,
     /// Bellman–Ford's worklist: the outside elements and the members whose distance changed in the last phase,
-    /// the changed members' slots per block of each matroid, and the phase each vertex was last listed in.
+    /// the changed members' slots per block of each matroid, and the phase each vertex was last listed in (a
+    /// stamp, also of the other searches, `generation` the last one given; see
+    /// [`next_generation`](Self::next_generation)).
     changed_out: Vec<u32>,
     changed_in: Vec<u32>,
     changed_slots: [Vec<Vector<R>>; 2],
@@ -267,9 +269,11 @@ pub struct Meet<const R: usize> {
     /// Whether the last solve stopped at its `stop` weight, before the heaviest set.
     pub stopped: bool,
     /// After a solve that settled: how much lighter the heaviest common independent set one larger than the
-    /// heaviest set is (the last shortest path's length), `i64::MAX` if there is none.  The heaviest sets of all
-    /// larger sizes are lighter still (the weights by size are concave).
-    pub gap: i64,
+    /// heaviest set is (the last shortest path's length), `i64::MAX` if there is none ([`gap`](Self::gap)), for the
+    /// tableau `gap_for` (a derived tableau's is found when first asked for).  The heaviest sets of all larger sizes
+    /// are lighter still (the weights by size are concave).
+    gap: i64,
+    gap_for: u64,
     /// Solves made: a caller can tell whether the workspace still holds the tableau of a solve it made.
     pub solves: u64,
     /// The solve whose tableau the workspace holds (a greedy set counts as a solve and spoils it).
@@ -364,6 +368,7 @@ impl<const R: usize> Meet<R> {
             settled: false,
             stopped: false,
             gap: 0,
+            gap_for: 0,
             solves: 0,
             tableau: 0,
             value: 0,
@@ -495,14 +500,14 @@ impl<const R: usize> Meet<R> {
             }
             let Some(sink) = self.shortest_path(p) else {
                 self.settled = true;
-                self.gap = i64::MAX;
+                (self.gap, self.gap_for) = (i64::MAX, self.tableau);
                 return;
             };
             let gain = -self.dist[sink as usize].div_euclid(HOPS);
             if gain <= 0 {
                 // The heaviest set of all sizes (even if it has `cap` members).
                 self.settled = true;
-                self.gap = -gain;
+                (self.gap, self.gap_for) = (-gain, self.tableau);
                 return;
             }
             if self.members.len() >= cap {
@@ -526,6 +531,45 @@ impl<const R: usize> Meet<R> {
             self.value += gain;
             self.augmentations += 1;
             report(&self.members);
+        }
+    }
+
+    /// The next `k` stamps (`k` at most 2) for `seen` and `settled_at`, the last of them returned: a search compares a
+    /// stamp only for equality with its own, so none it finds may be left from an earlier one.  Before the counter
+    /// would wrap, every stamp is cleared (the stamps start over at 1); otherwise, after 2^32 stamps, one left from
+    /// that long ago would pass for a new one.
+    fn next_generation(&mut self, k: u32) -> u32 {
+        if self.generation > u32::MAX - k {
+            self.seen.fill(0);
+            self.settled_at.fill(0);
+            self.generation = 0;
+        }
+        self.generation += k;
+        self.generation
+    }
+
+    /// After a solve that settled, or a [`derive`](Self::derive), with the workspace still holding it: how much
+    /// lighter the heaviest common independent set one larger than the heaviest set is, `i64::MAX` if there is none.
+    /// The heaviest sets of all larger sizes are lighter still (the weights by size are concave).
+    pub fn gap(&mut self, p: &Problem<'_, R>) -> i64 {
+        if self.gap_for != self.tableau {
+            debug_assert!(self.settled && self.tableau == self.solves, "the gap of no settled tableau");
+            self.gap = self.find_gap(p);
+            self.gap_for = self.tableau;
+        }
+        self.gap
+    }
+
+    /// The gap of the tableau's set, the heaviest of all sizes: the length of the shortest augmenting path, which
+    /// gains nothing.
+    fn find_gap(&mut self, p: &Problem<'_, R>) -> i64 {
+        match self.shortest_path(p) {
+            None => i64::MAX,
+            Some(sink) => {
+                let gain = -self.dist[sink as usize].div_euclid(HOPS);
+                debug_assert!(gain <= 0, "a path gains on the heaviest set of all sizes");
+                -gain
+            }
         }
     }
 
@@ -617,12 +661,13 @@ impl<const R: usize> Meet<R> {
 
     /// The tableau that [`solve`](Self::solve) makes of the set `start` of the elements `live` (both ascending) of
     /// `p`, from `start` with no size limit nor stop, where `start` is the heaviest set of all sizes (so that the solve
-    /// starts from it and augments nothing): its value, `settled` and `gap` with it.  Where it can, it derives the
-    /// tableau from the one the workspace holds, of a set `S` of elements `L` of a problem `q`, instead of building
-    /// it (see "Deriving a tableau" in the docs of [`Meet`]); for that `p` must be `q` contracted by `contracted`
-    /// (members of `start ∪ contracted`, which must be common independent in `q`), and `L` must hold `start` and
-    /// `contracted` (an element of `live` outside `L`, a loop of `q` in one matroid, say, has its circuits found by
-    /// reduction).  If the workspace holds no tableau, or `L` does not hold those, every block is built.
+    /// starts from it and augments nothing): its value and `settled` with it, and its [`gap`](Self::gap) when asked
+    /// for.  Where it can, it derives the tableau from the one the workspace holds, of a set `S` of elements `L` of a
+    /// problem `q`, instead of building it (see "Deriving a tableau" in the docs of [`Meet`]); for that `p` must be
+    /// `q` contracted by `contracted` (members of `start ∪ contracted`, which must be common independent in `q`), and
+    /// `L` must hold `start` and `contracted` (an element of `live` outside `L`, a loop of `q` in one matroid, say,
+    /// has its circuits found by reduction).  If the workspace holds no tableau, or `L` does not hold those, every
+    /// block is built.
     pub fn derive(&mut self, p: &Problem<'_, R>, live: &[u32], start: &[u32], contracted: &[u32]) {
         const SOURCE: u8 = 1;
         const LIVE: u8 = 2;
@@ -730,10 +775,17 @@ impl<const R: usize> Meet<R> {
         }
         self.derived += 1;
         self.lists(p, live);
-        self.augment(p, usize::MAX, i64::MAX, |_| {});
+        // `start` is the heaviest set of all sizes: the solve would end with the shortest path that gains nothing, whose
+        // length is the gap, found when first asked for.
+        (self.settled, self.stopped) = (true, false);
         #[cfg(test)]
         if let Some(mut check) = self.check.take() {
             check.solve(p, live, start, usize::MAX, i64::MAX, |_| {});
+            // The gap found as `gap` would, without the count of rounds, which the tests compare across engines.
+            let rounds = self.rounds;
+            let gap = self.find_gap(p);
+            self.rounds = rounds;
+            assert_eq!(gap, check.gap, "a derived tableau's gap differs from the solve's");
             if let Err(e) = check.same_tableau(self, p, live) {
                 panic!("a derived tableau differs from the one a solve builds: {e}");
             }
@@ -744,12 +796,12 @@ impl<const R: usize> Meet<R> {
 
     /// Whether `other`'s tableau reads the same as this one's outside a solve (see "Deriving a tableau" in the docs
     /// of [`Meet`]) for the live elements `live` of `p`: the same set, lists, free elements, circuits and slots, and
-    /// the same value, `settled` and `gap`.
+    /// the same value and `settled`.
     #[cfg(test)]
     fn same_tableau(&self, other: &Meet<R>, p: &Problem<'_, R>, live: &[u32]) -> Result<(), String> {
         let same = |what: &str, a: String, b: String| if a == b { Ok(()) } else { Err(format!("{what}: {a} {b}")) };
         same("value", format!("{}", self.value), format!("{}", other.value))?;
-        same("settled", format!("{} {}", self.settled, self.gap), format!("{} {}", other.settled, other.gap))?;
+        same("settled", format!("{}", self.settled), format!("{}", other.settled))?;
         same("members", format!("{:?}", self.members), format!("{:?}", other.members))?;
         same("outside", format!("{:?}", self.out_a), format!("{:?}", other.out_a))?;
         for m in 0..2 {
@@ -1080,8 +1132,7 @@ impl<const R: usize> Meet<R> {
         while !self.changed_out.is_empty() {
             rounds += 1;
             assert!(rounds <= limit, "a negative cycle in the exchange graph of an extreme set");
-            self.generation = self.generation.wrapping_add(1);
-            let generation = self.generation;
+            let generation = self.next_generation(1);
             // Outside to members.
             self.changed_in.clear();
             let mut free_improved = false;
@@ -1224,8 +1275,7 @@ impl<const R: usize> Meet<R> {
             if rounds > limit {
                 return false;
             }
-            self.generation = self.generation.wrapping_add(1);
-            let generation = self.generation;
+            let generation = self.next_generation(1);
             self.changed_out.clear();
             let (pot, seen, next) = (&mut self.pot, &mut self.seen, &mut self.changed_out);
             let mut zero_fell = false;
@@ -1434,8 +1484,8 @@ impl<const R: usize> Meet<R> {
         let w1 = |e: u32| pot[e as usize];
         let w2 = |e: u32| w[e as usize] - pot[e as usize];
         // Two fresh stamps: reached (the distance in `reach` is current) and settled.
-        self.generation = self.generation.wrapping_add(2);
-        let (reached, settled) = (self.generation.wrapping_sub(1), self.generation);
+        let settled = self.next_generation(2);
+        let reached = settled - 1;
         let (reach, back, seen, stamp) = (&mut self.reach, &mut self.back, &mut self.seen, &mut self.settled_at);
         let (heap, offered_at, by_w2) = (&mut self.heap, &mut self.offered_at, &self.by_w2);
         heap.clear();
@@ -1608,8 +1658,8 @@ impl<const R: usize> Meet<R> {
         let w = p.weight;
         let w1 = |e: u32| pot[e as usize];
         let w2 = |e: u32| w[e as usize] - pot[e as usize];
-        self.generation = self.generation.wrapping_add(2);
-        let (reached, settled) = (self.generation.wrapping_sub(1), self.generation);
+        let settled = self.next_generation(2);
+        let reached = settled - 1;
         let (reach, seen, stamp) = (&mut self.reach, &mut self.seen, &mut self.settled_at);
         let heap = &mut self.heap;
         heap.clear();
@@ -1742,7 +1792,7 @@ impl<const R: usize> Meet<R> {
     /// Whether the current set flipped on `self.flip` is independent in both matroids: in each block a flipped
     /// element belongs to, the members there that stay and the outside elements that come in, inserted in a span.
     fn flipped_independent(&mut self, p: &Problem<'_, R>) -> bool {
-        self.generation = self.generation.wrapping_add(1);
+        self.next_generation(1);
         for &e in &self.flip {
             self.seen[e as usize] = self.generation;
         }
@@ -2006,9 +2056,10 @@ mod tests {
             .filter(|set| independent(p.block[0], p.vector[0], set) && independent(p.block[1], p.vector[1], set))
             .map(|set| set.iter().map(|&e| p.weight[e as usize]).sum::<i64>())
             .max();
-        assert_eq!(meet.gap, larger.map_or(i64::MAX, |w| meet.value - w), "trial {trial}: the gap");
+        let gap = meet.gap(&p);
+        assert_eq!(gap, larger.map_or(i64::MAX, |w| meet.value - w), "trial {trial}: the gap");
         for cap in size..=n {
-            let limit = if cap > size { loss.min(meet.gap) } else { loss };
+            let limit = if cap > size { loss.min(gap) } else { loss };
             for &x in &members {
                 counts.asked += 1;
                 counts.asked_one_sided += usize::from(one_sided[x as usize]);
@@ -2197,7 +2248,7 @@ mod tests {
                     assert!(meet.split_bounds(&p, &live, |x, b| bounds.push((x, b))), "n={n}: no split");
                     assert_eq!(bounds.len(), size);
                     let pot = meet.potentials().to_vec();
-                    let (loss, gap) = (meet.smaller_loss(&p, &pot), meet.gap);
+                    let (loss, gap) = (meet.smaller_loss(&p, &pot), meet.gap(&p));
                     let sample: Vec<u32> = chosen.iter().copied().filter(|_| rng.chance(15)).collect();
                     let rests: Vec<Vec<u32>> = sample.iter().map(|&x| greedy(&owned, random, &live, Some(x))).collect();
                     for &(x, bound) in &bounds {
