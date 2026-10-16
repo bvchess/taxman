@@ -490,11 +490,11 @@ DEADLINE_HOURS=30 POWEROFF=always S3_DEST=s3://taxman-013764204840-us-east-1/cha
 (The bucket is the one of section 9.4, a prefix of its own for each run.)  In a second window, on spot:
 
 ```
-rust/tools/cloud/spot-watch.sh 2>&1 | tee -a ~/taxman-work/logs/spot-watch.log
+rust/tools/cloud/spot-watch.sh
 ```
 
-(`spot-watch.sh` logs only to its terminal, so tee it, or its notice and its save leave no trace after the window is
-gone; start it after `chain.sh` has made the directory, or `mkdir -p ~/taxman-work/logs` first.)  `chain.sh N` is the
+(`spot-watch.sh` logs to `~/taxman-work/logs/spot-watch.log` as well as to its terminal, so its notice and its save
+leave a trace after the window is gone; the output of the save is in `save.log` beside it.)  `chain.sh N` is the
 whole command: the chain 1..N into
 `~/taxman-work/results/strict.jsonl`, all CPUs, sixteen games in flight at once, a checkpoint every 300 s and a
 progress line every 60 s.  Its variables (all optional) are documented at the top of the script: `THREADS`, `WINDOW`,
@@ -596,7 +596,8 @@ smooth curve.
    second instance had to see to both:
    * **The logs.**  `--restore` copies the results and the checkpoints, not `logs/`.  Copy them back before the chain
      starts (`aws s3 sync $S3_DEST/logs ~/taxman-work/logs`), or the first save of the new machine uploads its own
-     `chain.log`, `chain.out`, `chain.err` and `save.log` over the old machine's in S3, which share their names.
+     `chain.log`, `chain.out`, `chain.err`, `save.log` and `spot-watch.log` over the old machine's in S3, which share
+     their names.
    * **The deadline.**  `~/taxman-work/deadline` is not saved, so a replacement machine starts a new deadline at its
      first start.  Give it `DEADLINE_HOURS` set to the hours that remain, so that the deadline falls where the first
      one did (the second instance of the cloud run was given the remainder, and the deadline stopped it 24 hours after
@@ -933,8 +934,7 @@ PROVER_ONLY=1 rust/tools/cloud/setup.sh                              # 46 s on a
 # ... the rehearsal below ...
 cd ~/taxman && tmux new-session -d -s pv "DEADLINE_HOURS=36 POWEROFF=always \
     S3_DEST=s3://taxman-013764204840-us-east-1/prover-1301-2175 rust/tools/cloud/prover.sh 1301 2175"
-tmux new-session -d -s sw 'mkdir -p ~/taxman-work/logs; \
-    rust/tools/cloud/spot-watch.sh 2>&1 | tee -a ~/taxman-work/logs/spot-watch.log'   # on spot: stops the run, saves
+tmux new-session -d -s sw rust/tools/cloud/spot-watch.sh              # on spot: stops the run, saves
 ```
 
 The prefix `prover-1301-2175` is this run's own (one prefix a run); the laptop-side commands of 9.5 and 9.6 reach it as
@@ -1084,7 +1084,7 @@ export D=s3://taxman-013764204840-us-east-1/e6 W=/home/ec2-user/taxman-work/resu
 cd ~/taxman && tmux new-session -d -s e6 "export DEADLINE_HOURS=3 S3_DEST=$D; \
     OUT=$W/e6_low.jsonl rust/tools/cloud/prover.sh --list $L; \
     POWEROFF=always OUT=$W/e6_upper.jsonl EXTRA_ARGS='--fix-upper 1' rust/tools/cloud/prover.sh --list $L"
-tmux new-session -d -s sw 'mkdir -p ~/taxman-work/logs; rust/tools/cloud/spot-watch.sh 2>&1 | tee -a ~/taxman-work/logs/spot-watch.log'
+tmux new-session -d -s sw rust/tools/cloud/spot-watch.sh
 ```
 
 The two runs share the deadline (it is fixed at the first start), the second powers the machine off, and each is
@@ -1144,7 +1144,7 @@ which builds the solver's examples, `hunt` among them):
 export D=s3://taxman-013764204840-us-east-1/hunt
 cd ~/taxman && tmux new-session -d -s hunt "DEADLINE_HOURS=5 POWEROFF=always S3_DEST=$D \
     rust/tools/cloud/hunt.sh rust/prover/data/upper_2176_3314.jsonl"
-tmux new-session -d -s sw 'mkdir -p ~/taxman-work/logs; rust/tools/cloud/spot-watch.sh 2>&1 | tee -a ~/taxman-work/logs/spot-watch.log'
+tmux new-session -d -s sw rust/tools/cloud/spot-watch.sh
 ```
 
 `hunt.sh` reruns the hunt after a crash and resumes it after a stop (finished pairs are in its output); exit status 2
@@ -1331,7 +1331,7 @@ The rehearsal must end `ended: complete` with `verify-certificates` passing (sta
 ```
 cd ~/taxman && export D=s3://taxman-013764204840-us-east-1/certify-2176-3440
 tmux new-session -d -s cert "DEADLINE_HOURS=7 POWEROFF=done S3_DEST=$D/A rust/tools/cloud/certify.sh pilot7"
-tmux new-session -d -s sw 'mkdir -p ~/taxman-work/logs; rust/tools/cloud/spot-watch.sh 2>&1 | tee -a ~/taxman-work/logs/spot-watch.log'
+tmux new-session -d -s sw rust/tools/cloud/spot-watch.sh
 ```
 
 In about 4.5 hours the log says `ended: complete` and the machine shuts itself down; the results are in
@@ -1360,7 +1360,7 @@ rehearsal needed:
 cd ~/taxman && export D=s3://taxman-013764204840-us-east-1/certify-2176-3440
 tmux new-session -d -s cert "DEADLINE_HOURS=43 S3_DEST=$D/B rust/tools/cloud/certify.sh dear_rest && \
     DEADLINE_HOURS=19 POWEROFF=always S3_DEST=$D/B rust/tools/cloud/certify.sh rest_1 rest_2 rest_3 rest_4"
-tmux new-session -d -s sw 'mkdir -p ~/taxman-work/logs; rust/tools/cloud/spot-watch.sh 2>&1 | tee -a ~/taxman-work/logs/spot-watch.log'
+tmux new-session -d -s sw rust/tools/cloud/spot-watch.sh
 ```
 
 `dear_rest` goes first, the dearest games first (3440 alone takes 10.6 hours), on all threads, one game after the
@@ -1382,7 +1382,7 @@ mkdir -p $W && aws s3 cp $D/A/results/certificates_pilot7.jsonl $W/ && aws s3 sy
 cat $W/certificates_pilot7.jsonl $W/certificates_dear_rest.jsonl $W/certificates_rest_{1,2,3,4}.jsonl \
     >$W/certificates_deferred.jsonl                          # the order matters: a game follows the game it rests on
 tmux new-session -d -s cert "DEADLINE_HOURS=9 POWEROFF=done S3_DEST=$D/C rust/tools/cloud/certify.sh deferred"
-tmux new-session -d -s sw 'mkdir -p ~/taxman-work/logs; rust/tools/cloud/spot-watch.sh 2>&1 | tee -a ~/taxman-work/logs/spot-watch.log'
+tmux new-session -d -s sw rust/tools/cloud/spot-watch.sh
 ```
 
 `certify.sh` ends with `verify-certificates` over that file, which then holds all 708 games.  (The files of

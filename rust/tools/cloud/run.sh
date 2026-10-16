@@ -49,15 +49,6 @@ status=0
 deadline=""
 RUN_NAME=""
 
-# This script's messages go to the terminal and to $LOGS/NAME.log, written directly (not through a tee, which would
-# die with a Ctrl-C aimed at the whole foreground group and take the log with it).
-log() {
-    local line
-    line="$(printf '%s %s' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*")"
-    [ -n "$RUN_NAME" ] && printf '%s\n' "$line" >>"$LOGS/$RUN_NAME.log"
-    printf '%s\n' "$line" >&2
-}
-
 # Runs a command at the lowest CPU priority, and at the lowest I/O priority too where ionice(1) exists (Linux): the
 # saves to S3 (an `aws s3 sync` costs about 0.4 s of CPU, a save about 1.5 s) squander nothing, and this keeps them out
 # of the workers' way.
@@ -104,6 +95,7 @@ run_begin() {
     RUN_NAME="$1"
     shift
     mkdir -p "$CKPT" "$LOGS" "$@"
+    LOG_FILE="$LOGS/$RUN_NAME.log" # this script's messages (env.sh's log) go to it as well as the terminal
 
     # Job control: the command runs in its own process group, so a Ctrl-C, or a signal sent to the whole group, reaches
     # only this script, which forwards ONE SIGTERM.

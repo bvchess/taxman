@@ -44,8 +44,16 @@ if ! command -v cargo >/dev/null 2>&1 && [ -r "$HOME/.cargo/env" ]; then
     . "$HOME/.cargo/env"
 fi
 
+# A message goes to the terminal (stderr) and, when LOG_FILE is set, to that file, written directly (not through a tee,
+# which would die with a Ctrl-C aimed at the whole foreground group and take the log with it).  run_begin (run.sh) sets
+# LOG_FILE to $LOGS/NAME.log; spot-watch.sh sets it to $LOGS/spot-watch.log.  Not an environment setting: it starts
+# empty here and is not exported, so a script run by another (save.sh) keeps no log of its own.
+LOG_FILE=""
 log() {
-    printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >&2
+    local line
+    line="$(printf '%s %s' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*")"
+    [ -n "${LOG_FILE:-}" ] && printf '%s\n' "$line" >>"$LOG_FILE"
+    printf '%s\n' "$line" >&2
 }
 
 die() {
