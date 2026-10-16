@@ -887,12 +887,17 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             return;
         }
         level.loss_floor = losses.smaller;
+        // The members of a cycle found within the slack: that cycle passes through each, as long, so none is forced.
+        let mut free = Bits::<W>::EMPTY;
         for &(x, bound) in &level.split {
             let near = bound - (need as i64) < FORCE_WINDOW;
-            if near
-                && !forced.contains(x)
-                && !self.meet.has_cycle_within(&problem, &level.pot, graph.index[x as usize], slack)
-            {
+            if !near || forced.contains(x) || free.contains(x) {
+                continue;
+            }
+            let e = graph.index[x as usize];
+            if self.meet.has_cycle_within(&problem, &level.pot, e, slack) {
+                self.meet.cycle_members(e, |z| free.insert(graph.elems[z as usize]));
+            } else {
                 forced.insert(x);
                 self.stats.forced_by_cycles += 1;
             }

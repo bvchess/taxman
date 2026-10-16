@@ -305,6 +305,9 @@ pub struct Meet<const R: usize> {
     by_w2: Vec<u32>,
     sorted_for: u64,
     flip: Vec<u32>,
+    /// The element that closed the cycle the last [`has_cycle_within`](Self::has_cycle_within) found (`NONE` for
+    /// none).
+    found: u32,
     /// Counters of [`without`](Self::without): calls, and those it certified.
     pub withouts: u64,
     pub withouts_exact: u64,
@@ -389,6 +392,7 @@ impl<const R: usize> Meet<R> {
             by_w2: Vec::with_capacity(n),
             sorted_for: 0,
             flip: Vec::with_capacity(n),
+            found: NONE,
             withouts: 0,
             withouts_exact: 0,
             mark: vec![0; n],
@@ -923,6 +927,12 @@ impl<const R: usize> Meet<R> {
     /// each member there has a slot, and the circuit of each other live element in the span is carried over to the
     /// new numbers, less the slots of members that are no longer live elements (contracted).
     fn renumber(&mut self, m: usize, b: usize) {
+        // Members in increasing order in their slots, none of them gone (every member here had a slot): the
+        // numbering is already a rebuild's, and so are the circuits.
+        let slots = &self.slot_elem[m][b][..self.next_slot[m][b]];
+        if slots.iter().all(|&z| self.inside[z as usize]) && slots.windows(2).all(|pair| pair[0] < pair[1]) {
+            return;
+        }
         self.slot_map.fill(NO_SLOT);
         let mut k = 0u16;
         for &z in &self.block_live[m][b] {
@@ -1455,7 +1465,35 @@ impl<const R: usize> Meet<R> {
             && self.tableau == self.solves
             && self.inside[x as usize]
             && (0..i64::MAX / (2 * HOPS)).contains(&limit);
-        !searchable || self.shortest_cycle(p, pot, x, limit, &[], true).is_some()
+        self.found = NONE;
+        if !searchable {
+            return true;
+        }
+        let Some((_, end)) = self.shortest_cycle(p, pot, x, limit, &[], true) else { return false };
+        self.found = end;
+        true
+    }
+
+    /// After a [`has_cycle_within`](Self::has_cycle_within) through `x` that found a cycle: its members besides
+    /// `x`, each of which has that cycle through it too, as long.
+    pub fn cycle_members(&self, x: u32, mut f: impl FnMut(u32)) {
+        // The search's predecessors from the element that closed the cycle lead back to x (checked first).
+        let walk = |f: &mut dyn FnMut(u32)| {
+            let (mut v, mut steps) = (self.found, 0);
+            while v != x && v != NONE && steps <= self.pos.len() {
+                f(v);
+                v = self.back[v as usize];
+                steps += 1;
+            }
+            v == x
+        };
+        if walk(&mut |_| {}) {
+            walk(&mut |v| {
+                if self.inside[v as usize] {
+                    f(v);
+                }
+            });
+        }
     }
 
     /// The search of [`without`](Self::without): the shortest cycle's length and the element that closes it at `x`,
