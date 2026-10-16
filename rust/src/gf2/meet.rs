@@ -286,18 +286,20 @@ pub struct Meet<const R: usize> {
     pot: Vec<i64>,
     repl: [Vec<i64>; 2],
     /// [`without`](Self::without)'s scratch: its search's distances, predecessors (towards the member searched
-    /// from), settled stamps and heap; the elements outside the set in the span of A by the slots of their circuits
-    /// (`columns`, per block of A 64·R slots) and those free in A, both built for the tableau `columns_for` (and
-    /// shared with the split), the latter by decreasing `w1` for the tableau `free_sorted_for`; and the elements of
-    /// the cycle found.
+    /// from), settled stamps, when each was offered its distance, and heap; the elements outside the set in the span
+    /// of A by the slots of their circuits (`columns`, per block of A 64·R slots) and those free in A, both built for
+    /// the tableau `columns_for` (and shared with the split), the latter by decreasing `w1`, and the members by
+    /// increasing `w2`, for the tableau `sorted_for` and its split; and the elements of the cycle found.
     reach: Vec<Dist>,
     back: Vec<u32>,
     settled_at: Vec<u32>,
+    offered_at: Vec<u32>,
     heap: BinaryHeap<Reverse<(Dist, u32)>>,
     columns: Vec<Vec<u32>>,
     columns_for: u64,
     free_a: Vec<u32>,
-    free_sorted_for: u64,
+    by_w2: Vec<u32>,
+    sorted_for: u64,
     flip: Vec<u32>,
     /// Counters of [`without`](Self::without): calls, and those it certified.
     pub withouts: u64,
@@ -374,11 +376,13 @@ impl<const R: usize> Meet<R> {
             reach: vec![INF; n],
             back: vec![NONE; n],
             settled_at: vec![0; n],
+            offered_at: vec![0; n],
             heap: BinaryHeap::with_capacity(n),
             columns: vec![Vec::new(); blocks[0] * 64 * R],
             columns_for: 0,
             free_a: Vec::with_capacity(n),
-            free_sorted_for: 0,
+            by_w2: Vec::with_capacity(n),
+            sorted_for: 0,
             flip: Vec::with_capacity(n),
             withouts: 0,
             withouts_exact: 0,
@@ -1366,8 +1370,11 @@ impl<const R: usize> Meet<R> {
     /// distances packed with the number of arcs as for the augmenting paths, so that of the shortest cycles one with
     /// the fewest arcs is found.  An element free in `A` has an arc from every member, so all of them are reached
     /// through the member with the least distance plus `w1`, in decreasing order of their own `w1`; an element free
-    /// in `B` has an arc to every member, `x` included.  The search stops at the first distance that no cycle
-    /// within `limit` and shorter than the best found can pass.
+    /// in `B` has an arc to every member, `x` included, so the members are reached through the element free in `B`
+    /// with the least distance less `w2`, in increasing order of their own `w2`: the same distances, the same order
+    /// of the vertices settled, and each member's predecessor the element whose offer reached its distance first, as
+    /// if each arc were offered.  The search stops at the first distance that no cycle within `limit` and shorter
+    /// than the best found can pass.
     pub fn without(&mut self, p: &Problem<'_, R>, pot: &[i64], x: u32, limit: i64, banned: &[u32]) -> Option<i64> {
         self.withouts += 1;
         let (length, end) = self.shortest_cycle(p, pot, x, limit, banned, false)?;
@@ -1422,10 +1429,7 @@ impl<const R: usize> Meet<R> {
         if self.columns_for != self.tableau {
             self.build_columns();
         }
-        if self.free_sorted_for != self.tableau {
-            self.free_a.sort_unstable_by_key(|&y| (Reverse(pot[y as usize]), y));
-            self.free_sorted_for = self.tableau;
-        }
+        self.sort_by_split(p, pot);
         let w = p.weight;
         let w1 = |e: u32| pot[e as usize];
         let w2 = |e: u32| w[e as usize] - pot[e as usize];
@@ -1433,7 +1437,7 @@ impl<const R: usize> Meet<R> {
         self.generation = self.generation.wrapping_add(2);
         let (reached, settled) = (self.generation.wrapping_sub(1), self.generation);
         let (reach, back, seen, stamp) = (&mut self.reach, &mut self.back, &mut self.seen, &mut self.settled_at);
-        let heap = &mut self.heap;
+        let (heap, offered_at, by_w2) = (&mut self.heap, &mut self.offered_at, &self.by_w2);
         heap.clear();
         // A banned element counts as settled: never offered, nor reached as an element free in A.
         for &e in banned {
@@ -1446,6 +1450,15 @@ impl<const R: usize> Meet<R> {
         // reached (the least distance plus w1, packed).
         let mut next_free = 0;
         let mut through = (INF, NONE);
+        // The members as reached from the elements free in B (each has an arc to every member): the hub, the least
+        // distance less w2 (packed, with the arc) over those settled, the first that reached it and the vertex
+        // count when it did; and the members by increasing w2, of which the next one unsettled is queued at the
+        // hub's distance plus its w2.  A member's distance is the least of the hub's and its own offers', and its
+        // predecessor the one that offered that first, as if each element free in B offered every member.
+        let mut hub = (INF, NONE, 0u32);
+        let mut next_member = 0;
+        // The vertices settled so far, which orders the offers.
+        let mut tick = 0u32;
         // Offers the distance `d` to `v` from `from`.
         macro_rules! offer {
             ($v:expr, $d:expr, $from:expr) => {{
@@ -1455,7 +1468,22 @@ impl<const R: usize> Meet<R> {
                     seen[i] = reached;
                     reach[i] = d;
                     back[i] = $from;
+                    offered_at[i] = tick;
                     heap.push(Reverse((d, v)));
+                }
+            }};
+        }
+        // Queues the next member still unsettled, through the hub.
+        macro_rules! queue_member {
+            () => {{
+                while next_member < by_w2.len() && stamp[by_w2[next_member] as usize] == settled {
+                    next_member += 1;
+                }
+                if let (Some(&z), true) = (by_w2.get(next_member), hub.0 != INF) {
+                    let dz = hub.0 + w2(z) * HOPS;
+                    if dz < bound {
+                        heap.push(Reverse((dz, z)));
+                    }
                 }
             }};
         }
@@ -1497,12 +1525,35 @@ impl<const R: usize> Meet<R> {
                 queue_free!();
                 y
             } else {
-                if stamp[v as usize] == settled || d > reach[v as usize] {
+                let i = v as usize;
+                if stamp[i] == settled {
                     continue;
                 }
-                stamp[v as usize] = settled;
+                if self.inside[i] {
+                    let own = if seen[i] == reached { reach[i] } else { INF };
+                    let via_hub = if hub.0 == INF { INF } else { hub.0 + w2(v) * HOPS };
+                    let via_hub = if via_hub < bound { via_hub } else { INF };
+                    if d > own.min(via_hub) {
+                        continue;
+                    }
+                    if via_hub < own || (via_hub == own && hub.2 < offered_at[i]) {
+                        seen[i] = reached;
+                        reach[i] = via_hub;
+                        back[i] = hub.1;
+                    }
+                    stamp[i] = settled;
+                    if by_w2.get(next_member) == Some(&v) {
+                        queue_member!();
+                    }
+                } else {
+                    if d > reach[i] {
+                        continue;
+                    }
+                    stamp[i] = settled;
+                }
                 v
             };
+            tick += 1;
             let i = v as usize;
             if self.inside[i] {
                 // A member: arcs of A to the elements whose circuit holds it, and to every element free in A.
@@ -1515,14 +1566,13 @@ impl<const R: usize> Meet<R> {
                     queue_free!();
                 }
             } else if !is_zero(&self.res[1][i]) {
-                // Free in B: arcs to every member, x's closing a cycle.
+                // Free in B: arcs to every member, x's closing a cycle, the others' through the hub.
                 if d + (w2(x) - w2(v)) * HOPS + 1 < cycle.0 {
                     cycle = (d + (w2(x) - w2(v)) * HOPS + 1, v);
                 }
-                for &z in &self.members {
-                    if z != x {
-                        offer!(z, d + (w2(z) - w2(v)) * HOPS + 1, v);
-                    }
+                if d - w2(v) * HOPS + 1 < hub.0 {
+                    hub = (d - w2(v) * HOPS + 1, v, tick);
+                    queue_member!();
                 }
             } else {
                 // The members of its circuit in B.
@@ -1554,10 +1604,7 @@ impl<const R: usize> Meet<R> {
         if self.columns_for != self.tableau {
             self.build_columns();
         }
-        if self.free_sorted_for != self.tableau {
-            self.free_a.sort_unstable_by_key(|&y| (Reverse(pot[y as usize]), y));
-            self.free_sorted_for = self.tableau;
-        }
+        self.sort_by_split(p, pot);
         let w = p.weight;
         let w1 = |e: u32| pot[e as usize];
         let w2 = |e: u32| w[e as usize] - pot[e as usize];
@@ -1628,9 +1675,9 @@ impl<const R: usize> Meet<R> {
                     queue_free!();
                 }
             } else if !is_zero(&self.res[1][i]) {
-                for &z in &self.members {
-                    offer!(z, d + (w2(z) - w2(v)) * HOPS + 1);
-                }
+                // Free in B: its arcs to the members offer each `d − w2(v) + 1 + w2(z)`, at least `w2(z) + 1` (the
+                // distances are not negative, and the split makes `w2(v) ≤ 0` for an element free in B), while each
+                // member started at `w2(z)`: none is an improvement.
             } else {
                 let elems = &self.slot_elem[1][usize::from(p.block[1][i])];
                 each_bit(&self.mask[1][i], |s| {
@@ -1666,6 +1713,19 @@ impl<const R: usize> Meet<R> {
             }
         }
         self.columns_for = self.tableau;
+    }
+
+    /// For the searches of the exchange graph on the current tableau (its columns built) with the weight split `pot`:
+    /// the elements free in A by decreasing `w1` and the members by increasing `w2`, each then by element.
+    fn sort_by_split(&mut self, p: &Problem<'_, R>, pot: &[i64]) {
+        if self.sorted_for != self.tableau {
+            let w = p.weight;
+            self.free_a.sort_unstable_by_key(|&y| (Reverse(pot[y as usize]), y));
+            self.by_w2.clear();
+            self.by_w2.extend_from_slice(&self.members);
+            self.by_w2.sort_unstable_by_key(|&z| (w[z as usize] - pot[z as usize], z));
+            self.sorted_for = self.tableau;
+        }
     }
 
     /// The cycle through the member that the last [`without`](Self::without) that answered found: its elements.
