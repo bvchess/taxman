@@ -796,7 +796,8 @@ comment that is worth reading first; section 6 above is the map of how the piece
 |---|---|
 | this page | the user guide |
 | [DESIGN.md](DESIGN.md) | the design as it is now: goals, the game and the frame model, the architecture, the search, the tactics and their grades, the engine, the pipeline, the trust model, the tests, performance |
-| [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) | the register of everything tried, kept or not (check it before proposing an experiment), and the lab notebook: every round of improvements with its measurements |
+| [docs/STATUS.md](docs/STATUS.md) | the current state of the work: what is in flight, paused, decided, waiting on a decision (read it first) |
+| [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) | the register of everything tried, kept or not (check it before proposing an experiment), and the lab notebook: every round of improvements with its measurements, one file an entry in [docs/experiments/](docs/experiments/) |
 | [docs/IDEAS.md](docs/IDEAS.md) | ideas borrowed from other fields (SAT, MaxSAT, MIP, #SAT, ...), ranked, with pilot measurements, the profile of the hardest games and the study of nogoods at many threads |
 | [docs/AGENDA.md](docs/AGENDA.md) | the research agenda (2026-10): what limits the end of the chain, the avenues ranked, conjectures, and what the cloud runs should measure |
 | [results/README.md](results/README.md) | the committed results files and what supports their scores |

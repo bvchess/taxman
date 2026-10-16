@@ -20,7 +20,7 @@ results and how they are proven are in the [README](../README.md); the research 
 
 ## The priority: a larger n
 
-Brian's priority (2026-10-16) is to push the frontier; certifying U past 2175 is not a priority for now.
+Brian's priority (2026-10-16) is a larger n, the end of the chain pushed further; certifying U past 2175 is not a priority for now.
 
 The cost of a searched game grows tenfold for about every 1,040 in n, in patches: the valley 2576-2975 cost minutes,
 the last forty games of the run held three of its four dearest (3440 alone 5 hours on 64 threads).  At the run's own

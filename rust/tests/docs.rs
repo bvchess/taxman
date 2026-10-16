@@ -437,7 +437,7 @@ fn the_minimum_rust_version_is_the_same_everywhere() {
 // ---------------------------------------------------------------------------------------------------------
 // Vocabulary
 
-/// The text files that explain the code: the guides and the comments.
+/// The text files that explain the code: the guides, the lab notebook with its entries, and the comments.
 fn prose_files() -> Vec<PathBuf> {
     fn rust_files(dir: &Path, found: &mut Vec<PathBuf>) {
         for entry in std::fs::read_dir(dir).expect("a directory") {
@@ -453,6 +453,7 @@ fn prose_files() -> Vec<PathBuf> {
         .iter()
         .map(|name| crate_dir().join(name))
         .collect();
+    files.extend(entry_files());
     rust_files(&crate_dir().join("src"), &mut files);
     files
 }
