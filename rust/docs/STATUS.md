@@ -20,7 +20,8 @@ results and how they are proven are in the [README](../README.md); the research 
 
 ## The priority: a larger n
 
-Brian's priority (2026-10-16) is a larger n, the end of the chain pushed further; certifying U past 2175 is not a priority for now.
+Brian's priority (2026-10-16) is a larger n, the end of the chain pushed further; certifying U past 2175 is not a
+priority for now.
 
 The cost of a searched game grows tenfold for about every 1,040 in n, in patches: the valley 2576-2975 cost minutes,
 the last forty games of the run held three of its four dearest (3440 alone 5 hours on 64 threads).  At the run's own
@@ -36,6 +37,12 @@ trend, one `c8g.16xlarge` at spot ($0.68 an hour) reaches about:
 A single run can fall well short of its projection (the last one projected 4,100 and reached 3440).  Every doubling of
 speed or of spending is worth about 310 in n; only a tighter bound in the search changes the tenfold per 1,040.  The
 chain's launch is [RUNBOOK section 5](../tools/cloud/RUNBOOK.md#5-the-production-chain); it needs Brian's approval.
+
+**The wall** (Brian, 2026-10-16): the first n whose own search (not time spent waiting behind another game) takes
+more than 24 hours on one `c8g.16xlarge` with the run's build and settings.  The next run stops there, keeping the
+game's checkpoint, or when its budget (about $50) is spent.  On 64 threads the search loses nothing to threads (3.5
+thousand nodes a second a thread at 3441, the same on 16, 32 and 64), so what remains is cheaper nodes and smaller
+trees.
 
 What has been tried for the bound, and where it stands:
 
@@ -68,10 +75,16 @@ What has been tried for the bound, and where it stands:
 
 ## Waiting on Brian
 
-* A chain run to push n (one to three days, $16-49 at spot).
+* The run to the wall: its budget (about $50) and how it runs unattended (a spot instance that restarts itself, or
+  on demand), after the tuning campaign reports.
 * Outside review of Theorems 1, 10 and 12 by Robert Moniot.
 * Publishing (`optimal.json` past 1300, OEIS).
 
 ## In flight
 
-* Splitting the lab notebook into one file an entry, with this page.
+* An engineering pass before the run: a cheaper node with identical trees (the tableaux kept per level, cheaper cycle
+  searches), settings for nogood retention, the forcing window and strong branching, and a harness that tunes them
+  on subtrees of searches at the end of the chain, solved to completion on one thread
+  ([the profile at the end of the chain](../bench/chain_end/README.md)).
+* The tuning campaign on one `c8g.16xlarge` (approved by Brian, up to $10), once those are merged.
+* Then, for the run: a per-game limit of 24 hours in the chain's driver, and the unattended restart.

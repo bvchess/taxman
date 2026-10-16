@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Where the search workers' time goes, from a macOS `sample` profile of `taxman solve` (run.sh with a profile).
 
-usage: groups.py BINARY sample.txt [--top K] [--json]     (from rust/bench/frontier)
+usage: groups.py BINARY sample.txt [--top K] [--json]     (from rust/bench/chain_end)
 
 Only the engine worker threads (`engine-N`) are counted: the main thread and the game's setup thread wait or set the
 game up.  Every frame's return address is symbolicated with its inlined frames (`atos -i`, as tools/profile/attribute.py
