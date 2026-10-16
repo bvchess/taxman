@@ -16,10 +16,14 @@
 //! `taxman certify` takes the boards of a list file as well as a range, and `taxman verify-certificates` checks the
 //! files it wrote: a file made over a stretch with repeats passes, each doctored line is refused naming the file, the
 //! line and the board, and the proven end of the chain is found on synthetic data and on the committed chain.
+//!
+//! The work list of the campaign (`tools/certify_plan.py`) is tested on its own and against the committed certificates
+//! of 600..=1300 (`bench/certify/certificates_600_1300.jsonl`): it names the games that were certified, their open
+//! members and the repeats that the rule settled with no search; and those certificates verify.
 
 mod common;
 
-use common::{options, path, results_path, taxman, Run, TempDir};
+use common::{options, path, python, results_path, taxman, Run, TempDir};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -46,10 +50,14 @@ struct Fixtures {
     upper: BTreeMap<u32, Upper>,
 }
 
+/// A file of the crate, by its path from the crate's root.
+fn crate_file(relative: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
+}
+
 /// The prover's barred bounds that cover the chain, `prover/data/upper_*.jsonl`: boards 2 to 1300 and 1301 to 2175.
 fn upper_files() -> Vec<PathBuf> {
-    let data = Path::new(env!("CARGO_MANIFEST_DIR")).join("prover/data");
-    ["upper_2_1300.jsonl", "upper_1301_2175.jsonl"].iter().map(|name| data.join(name)).collect()
+    ["upper_2_1300.jsonl", "upper_1301_2175.jsonl"].iter().map(|name| crate_file("prover/data").join(name)).collect()
 }
 
 /// The recorded games (the built-in table, then `results/strict.jsonl`) and the barred bounds, read once.
@@ -1171,7 +1179,7 @@ fn the_committed_bounds_cover_the_chain() {
 /// The barred bounds to board 3314, which the first game the proofs do not reach is looked up in.
 fn upper_files_to_3314() -> Vec<PathBuf> {
     let mut files = upper_files();
-    files.push(Path::new(env!("CARGO_MANIFEST_DIR")).join("prover/data/upper_2176_3314.jsonl"));
+    files.push(crate_file("prover/data/upper_2176_3314.jsonl"));
     files
 }
 
@@ -1640,4 +1648,117 @@ fn the_width_a_certificate_takes_is_the_boards_own_where_the_block_words_fit() {
     let upper = Upper { n, score: known.score(n).unwrap(), needs: true, open };
     let e = certify_game(n, known, &upper, &options(1)).unwrap_err();
     assert!(e.starts_with("n=3000: ") && e.contains("block words of the GF(2) bound"), "{e}");
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// The work list of the campaign, and the committed certificates
+
+/// Every committed file of the prover's barred bounds, `prover/data/upper_*.jsonl`, ordered by name.
+fn committed_upper_files() -> Vec<PathBuf> {
+    let dir = crate_file("prover/data");
+    let entries = fs::read_dir(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
+    let mut files: Vec<PathBuf> = entries.map(|entry| entry.unwrap().path()).collect();
+    files.retain(|file| {
+        let name = file.file_name().and_then(|name| name.to_str()).unwrap_or_default();
+        name.starts_with("upper_") && name.ends_with(".jsonl")
+    });
+    files.sort();
+    files
+}
+
+/// The field `key` of a line, which it must have.
+fn field<'a>(line: &'a Json, key: &str) -> &'a Json {
+    line.get(key).unwrap_or_else(|| panic!("no field {key:?} in {line}"))
+}
+
+/// The work list's own tests (`tools/test_certify_plan.py`, standard library only) pass.
+#[test]
+fn the_work_list_tool_passes_its_own_tests() {
+    let run = python(&crate_file("tools/test_certify_plan.py"), &[]);
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+}
+
+/// The work list of 600..=1300, made from the games, the barred bounds and the problems file alone, agrees with the
+/// certificates that `taxman certify` made over the same boards (`bench/certify/certificates_600_1300.jsonl`): it
+/// names the games that were certified and no other, with the open members and the rejected sources of each, and it
+/// predicts the games that the rule of the same problem settled with no search, and no other.  Every other game that
+/// needs a certificate has a cost to plan with (or says that it has none to know), and a game that needs none costs
+/// nothing.
+#[test]
+fn the_work_list_on_600_to_1300_agrees_with_the_certificates() {
+    let dir = TempDir::new("work-list");
+    let results = results_path("strict.jsonl");
+    let upper = crate_file("prover/data/upper_2_1300.jsonl");
+    let problems = crate_file("bench/certify/problems_600_3440.jsonl");
+    let args = ["--results", path(&results), "--upper", path(&upper), "--problems", path(&problems)];
+    let range = ["--from", "600", "--to", "1300", "--era", "600-1300:1", "--out-dir", path(&dir)];
+    let run = python(&crate_file("tools/certify_plan.py"), &[&args[..], &range[..]].concat());
+    assert_eq!(run.code, Some(0), "{}{}", run.stdout, run.stderr);
+
+    let plan = json_lines(&dir.join("plan.jsonl"));
+    let boards: Vec<u32> = plan.iter().map(|game| board_of(game).expect("n")).collect();
+    assert_eq!(boards, (600..=1300).collect::<Vec<u32>>(), "the plan has a line for each board, in order");
+    let lines = json_lines(&crate_file("bench/certify/certificates_600_1300.jsonl"));
+    let certified: BTreeMap<u32, &Json> = lines.iter().map(|line| (board_of(line).expect("n"), line)).collect();
+    assert_eq!(certified.len(), lines.len(), "a board certified twice");
+
+    let needing: Vec<&Json> = plan.iter().filter(|game| field(game, "needs").as_u32() == Some(1)).collect();
+    let planned: Vec<u32> = needing.iter().map(|game| board_of(game).expect("n")).collect();
+    assert_eq!(planned, certified.keys().copied().collect::<Vec<u32>>(), "the games that need a certificate");
+    assert_eq!(planned.len(), 377);
+
+    let mut bases: BTreeMap<&str, usize> = BTreeMap::new();
+    for game in needing {
+        let n = board_of(game).expect("n");
+        let line = certified[&n];
+        let members = field(line, "open").as_arr().expect("the open members").len() as u64;
+        assert_eq!(field(game, "open").as_u64(), Some(members), "n={n}: |O|");
+        assert_eq!(field(game, "rejected").as_u64(), field(line, "rejected").as_u64(), "n={n}: |R|");
+        let rule = line.get("same_problem").map(|settled| field(settled, "n").as_u32().expect("the game it rests on"));
+        assert_eq!(field(game, "share").as_u32(), rule, "n={n}: the game whose certificate settles it");
+        let basis = field(game, "basis").as_str().expect("the basis");
+        *bases.entry(basis).or_default() += 1;
+        assert_eq!(basis == "shared", rule.is_some(), "n={n}: basis {basis}, settled by {rule:?}");
+        let hours = field(game, "expected_thread_hours").as_f64();
+        assert!(basis == "shared" || basis == "unknown" || hours.is_some_and(|h| h > 0.0), "n={n}: {basis}, {hours:?}");
+    }
+    let settled = lines.iter().filter(|line| line.get("same_problem").is_some()).count();
+    assert_eq!(bases.get("shared").copied().unwrap_or(0), settled);
+    for game in plan.iter().filter(|game| field(game, "needs").as_u32() != Some(1)) {
+        let hours = field(game, "expected_thread_hours").as_f64().unwrap_or(0.0);
+        assert!(hours <= 0.0, "n={:?}: needs no certificate, but costs {hours}", board_of(game));
+    }
+    println!(
+        "work list 600..=1300: {} games, {settled} shared, {} searched; by basis {bases:?}",
+        lines.len(),
+        lines.len() - settled
+    );
+}
+
+/// The committed certificates of 600..=1300 verify against the chain and every committed file of barred bounds: all
+/// 377 lines are final, the searched and the same-problem ones as the file counts them, none beaten, no
+/// counterexample; and the proven end of the chain is still 2175 (they are of games the prover proved already), the
+/// first game that is not proven being 2176.
+#[test]
+fn the_committed_certificates_verify() {
+    let certs = crate_file("bench/certify/certificates_600_1300.jsonl");
+    let lines = json_lines(&certs);
+    let settled = lines.iter().filter(|line| line.get("same_problem").is_some()).count();
+    let (total, searched) = (lines.len(), lines.len() - settled);
+    assert_eq!(total, 377);
+
+    let run = run_verify(&[&certs], &results_path("strict.jsonl"), &committed_upper_files(), &["--threads", "2"]);
+    assert_eq!(run.code, Some(0), "{}{}", run.stdout, run.stderr);
+    assert_eq!(run.stderr, "");
+    let out = &run.stdout;
+    let counts = format!(
+        "{total} lines, {total} final, 0 incomplete; certified by search {searched}, certified by the same problem \
+         {settled}, beaten 0"
+    );
+    assert!(out.contains(&format!("{}: {counts}", certs.display())), "{out}");
+    assert!(out.contains(&format!("boards certified: {total} (")), "{out}");
+    assert!(out.contains("counterexamples: none"), "{out}");
+    let end = "proven frontier: every game to 2175 is proven; the first that is not is 2176 (needs a certificate and \
+               has none in the files given)";
+    assert!(out.contains(end), "{out}");
 }

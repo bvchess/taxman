@@ -370,12 +370,14 @@ The work of [the prover](../prover/README.md) and the proofs of [THEORY.md](../.
 | E8 stage 1: the extended problem Π⁺(O), a set O of the sources of three or more prime factors optional and nothing claimed (`frames::build_extended`), Theorem M⁺ (S ⊇ U\* ∖ O playable iff it is a promotion set) and its certificate of U, tested against the whole-board oracle (`tests/model_extended.rs`) | [by layer](#the-frame-model-by-layer-and-the-extended-problem-2026-10) | kept (proven; research code) | no mismatch on every set of every board to 80 (60 with every source open; 100 and 69 ignored), 30 million sets, nor on random sets to 4095, rejected sources included |
 | Search Π⁺(∅), the frame model without `unzip`'s claims, with the existing engine (`Board::prepare_extended`, `examples/extended.rs`) | [by layer](#the-frame-model-by-layer-and-the-extended-problem-2026-10) | measured | a chain 2..1300 searching every game gives every score of optimal.json; 2.5% more nodes and 11% more time than the default problem searched the same way (1201-1300: 0.9% and 9%), 31 games more than 10% above (at most 1.24); the claims are worth a few percent |
 | E8 stage 2: the open sources as one-sided candidates of the search (the model, the GF(2) bound with free blocks, extended mode) and `taxman certify` | [one-sided](#one-sided-candidates-in-the-search-2026-10) | kept (research code; proven, THEORY.md Theorem 11 for Π⁺, and tested) | every game of 600..1300 that needs a certificate certified (377 in 45 s on one thread), a planted wrong score beaten by the real optimum; the first certificates past 1300 at the plain proof's nodes without the rule of symmetric pairs, 1.1 to 1.9 times its time with the rule (median 1.55); the default mode's trees unchanged |
+| S1: `certified (same problem as m)`: a game whose Π⁺(O) an earlier certified game of the 8 board sizes before it posed (digest, then the problems compared whole) and whose recorded game is worth what that certificate proved the most is certified with no search | [certificates past 2175](#certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10) | kept (proven: equal problems have equal heaviest promotion sets; THEORY.md under the certificate corollary) | 81 of the 377 games of 600..1300 that need a certificate, each equal to a search of it; the problems file finds 114 such games in 1301..2175 and 145 of the 708 in 2176..3440; five pairs past 2175 (2248 → 2249 to 2652 → 2653) equal to their searches, which take exactly the nodes of the game they rest on |
+| S2: the campaign of certificates on 2176-3440 planned (`tools/certify_plan.py`, `bench/certify/`), with the barred bounds of 3315-3440, `certify --list`, `taxman verify-certificates` and the proven end of the chain | [certificates past 2175](#certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10) | kept; the campaign waits for the owner's approval | 708 games need a certificate (3424, 3425 and 3440 among them), 145 settled by S1; priced by nodes at the run's own cost per node (the recorded seconds count the window 3.27 and 1.55 times): 3,300 thread-hours at twice the plain search (2,640-3,960 at 1.6-2.4), 52 hours of one `c8g.16xlarge`, $35 at spot or $132 on demand, 3440 alone 10.6 hours; the unshared repeats cost 361 thread-hours, 3427 alone 223 |
 | Certify U game by game: barred parity bounds with layers 1-2 fixed by Theorem B, then a search of the open members (or a search that treats the open sources as optional) | [THEORY: the upper part](../../heuristics/THEORY.md#the-upper-part) | open | the bounds close no game alone (E5, next row); the rest needs the integrated search, which leaves the open sources optional, and E6 measures what that costs the prover's search (prepared); its problem, the extended problem, has its theory and setup (the E8 rows above), and its search with the open sources one-sided is `taxman certify` (E8 stage 2): stage 3 measures it at the end of the chain |
-| E5: barred parity bounds on every game of 1301-3314 that rests on the frame model (`prover/src/bin/upper.rs`): layers 1 and 2 fixed by Theorem B, each member of U\*_{≥3} barred in turn, certified when the bound is at most the recorded score | [upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | kept (`prover/data/upper_*.jsonl`) | 7.5% of the members open over 1301-2175 (1 to 102 a game), 14.9% over the EC2 chain's 2176-3314 (15 to 317); no game closed by the bounds alone; the open share follows the root's gap (+2 to 3 points per 100), not n; the root's heaviest set plays all of U\*_{≥3} in all 1,125 games; 26 minutes on one thread |
-| E6: the prover's search with the sources of layer 3 and up free (`exact`, from Theorem B's roles) against the same with the upper part fixed to U\* (`--fix-upper 1`), with two counters, on 25 games of gap 364-603 | [upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | open: prepared, deferred to a later batch of AWS work (the owner's decision, 2026-10-15) | criterion fixed in advance (B/D ≤ 1.2 on 90% of the games, never above 2, branching on those sources at ≤ 5% of the nodes); at 1575 and 1584 on the laptop B and D have the same nodes and neither counter fires; one `c8g.4xlarge` for one to one and a half hours, about $0.40 at spot ([RUNBOOK 10.1](../tools/cloud/RUNBOOK.md#101-e6-does-leaving-the-sources-free-cost-the-provers-search-anything)) |
+| E5: barred parity bounds on every game of 1301-3314 that rests on the frame model (`prover/src/bin/upper.rs`): layers 1 and 2 fixed by Theorem B, each member of U\*_{≥3} barred in turn, certified when the bound is at most the recorded score | [upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | kept (`prover/data/upper_*.jsonl`) | 7.5% of the members open over 1301-2175 (1 to 102 a game), 14.9% over the EC2 chain's 2176-3314 (15 to 317); no game closed by the bounds alone; the open share follows the root's gap (+2 to 3 points per 100), not n; the root's heaviest set plays all of U\*_{≥3} in all 1,125 games; 26 minutes on one thread; and on 3315-3440 (S2, `prover/data/upper_3315_3440.jsonl`): 73 games need it, 19.9% of the members open (172 to 271 a game), the root's heaviest set holding all of U\*_{≥3} in every one, 277 s |
+| E6: the prover's search with the sources of layer 3 and up free (`exact`, from Theorem B's roles) against the same with the upper part fixed to U\* (`--fix-upper 1`), with two counters, on 25 games of gap 364-603 | [upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | superseded (the fourth consultation, 2026-10-15; prepared, never run): E8 stage 2 measured directly what the free sources cost a search, the certificates taking the plain proof's nodes without the rule of symmetric pairs | criterion fixed in advance (B/D ≤ 1.2 on 90% of the games, never above 2, branching on those sources at ≤ 5% of the nodes); at 1575 and 1584 on the laptop B and D have the same nodes and neither counter fires; one `c8g.4xlarge` for one to one and a half hours, about $0.40 at spot ([RUNBOOK 10.1](../tools/cloud/RUNBOOK.md#101-e6-does-leaving-the-sources-free-cost-the-provers-search-anything)) |
 | Theorem B's roles in the prover's proofs (`exact`, now by default, `--fix-low 0` for the plain root: the largest prime and U\*_2 forced, the other numbers of layers 1 and 2 barred, those of layer 2 up to n/2 too where the board's frames of layer 2 are closed) | [Theorem B by default](#theorem-b-by-default-in-the-prover-and-the-hunts-probes-2026-10); first measured in [upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | kept (the default) | the 391 searches of 2..999: 588,026 nodes and 357 s against the plain root's 614,900 and 712 s; at 1575 and 1584 within 2.1% of the nodes and half the time a node (19.8 s against 36.1 s for 1575): the parity solves have fewer free elements; a proof as before since Theorem B is a theorem, and it records `"fix_low"` and `fixed_bound` on every line; the recorded game obeys the roles on every game of 2..2175 |
 | 2B's certificates: the test recomputed at each claim T of V − 1, V − 2, V − 5, with a mutation check (a rule certifying also when the bound is at most T + 10) | [Theorem B by default](#theorem-b-by-default-in-the-prover-and-the-hunts-probes-2026-10) | kept (tests) | 1,403 (set, member) checks without a miss; the wrong rule is caught on 12 boards (15 misses), so the test can see an over-generous certificate |
-| E9(a): a counterexample hunt for U at the 20 games of largest gap past 2175: the frame solver on the board without each open source, from an incumbent worth the recorded score (`examples/hunt.rs`, `sacrifice::hunt`) | [upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | open: prepared, deferred to a later batch of AWS work (the owner's decision, 2026-10-15) | 4,499 pairs; a pair's cost follows its margin (under 6 s to 781, 1-3 minutes at 835-899, beyond 5 minutes from 959, one thread; `bench/hunt/`); the policy of the third consultation (pairs in decreasing margin, up to 900 to completion in at most 10 minutes, above it a probe of the solver's start and 3 minutes, `probed`, never `none`; [the entry](#theorem-b-by-default-in-the-prover-and-the-hunts-probes-2026-10)) makes it about 140 vCPU-hours instead of 400: a `c8g.16xlarge` for about 2.6 hours with the setup, about $2 at spot ([RUNBOOK 10.2](../tools/cloud/RUNBOOK.md#102-e9a-a-counterexample-hunt-at-the-games-of-largest-gap)); a hit is a counterexample |
+| E9(a): a counterexample hunt for U at the 20 games of largest gap past 2175: the frame solver on the board without each open source, from an incumbent worth the recorded score (`examples/hunt.rs`, `sacrifice::hunt`) | [upper part game by game](#the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10) | superseded (the fourth consultation, 2026-10-15; prepared, never run): the campaign of certificates settles each game exactly, where the hunt only probes | 4,499 pairs; a pair's cost follows its margin (under 6 s to 781, 1-3 minutes at 835-899, beyond 5 minutes from 959, one thread; `bench/hunt/`); the policy of the third consultation (pairs in decreasing margin, up to 900 to completion in at most 10 minutes, above it a probe of the solver's start and 3 minutes, `probed`, never `none`; [the entry](#theorem-b-by-default-in-the-prover-and-the-hunts-probes-2026-10)) makes it about 140 vCPU-hours instead of 400: a `c8g.16xlarge` for about 2.6 hours with the setup, about $2 at spot ([RUNBOOK 10.2](../tools/cloud/RUNBOOK.md#102-e9a-a-counterexample-hunt-at-the-games-of-largest-gap)); a hit is a counterexample |
 
 ### The Python heuristics project
 
@@ -435,6 +437,7 @@ single-sacrifice route) have their row above.
 | [Carrying a search's learning to the next game](#carrying-a-searchs-learning-to-the-next-game-2026-10) | in a bad patch of the chain, is the solver doing the same search over and over; what do consecutive games share, and can what one game's search learns be carried into the next? | the difficulty repeats, the work does not: each step is one local edit that moves the optimum (all but the two the ceiling settles, by 12 to 1,664), the trees share 0.15% of their steps (median of 14 pairs; Theorem D says why), the gap is autocorrelated 0.95 across games, carried nogoods cost ×1.31 to ×1.34 CPU, perfect reuse would save 18-29% of the nodes at most; the fields bound's signings and multipliers carry (a pilot at five roots: 0.75 of the next root's own share with no refit, 1.08 after a tenth of the budget) and are the carry to build, inside A1's E3 | 2e8b851 (the base of the scratch copy) and the entry (no solver change; `examples/diff.rs`) |
 | [One-sided candidates in the search](#one-sided-candidates-in-the-search-2026-10) | E8 stage 2 of the third consultation: can the search take the open sources as one-sided candidates, and `taxman certify` prove a recorded score on the whole board game by game, the default mode untouched? | yes: the model, the GF(2) bound (free blocks, Theorem 11 for Π⁺) and the search in extended mode, tested against the reference predicate and the whole-board oracle; every game of 600..1300 that needs it certified; the first certificates past 1300 at 1.55 times the plain proof (median), the open sources costing no nodes and the rule of symmetric pairs, which extended mode refuses, the rest | f747855 (18.1), 0c32d11 (18.2), 100eea1 (18.3) and the commit after it (18.4) |
 | [The frontier chain to 3440](#the-frontier-chain-to-3440-2026-10) | how far does a day on one `c8g.16xlarge` take the committed chain from 2175, with every game proven within the frame model and nothing assumed, and do the independent chains that cover it agree? | 3440: 1,265 games (448 exhausted searches, 119 at the ceiling, 543 repeats, 155 primes) for $16.46, both referees passing, the calibration's 101 games and a rehearsal's 125 equal to it move for move; the projection said about 4,100 and 3441 was left at 626 million nodes; search seconds ×10 per about 1,040 in n; six fixes to the runbook | 55287ff |
+| [Certificates past 2175: the same problem, the work list, the verifier](#certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10) | S1 and S2 of the fourth consultation: can a repeat be certified by the game it repeats, and what will certifying every game of 2176-3440 that rests on the frame model cost? | yes, when the two extended problems are equal whole (81 of 377 games of 600..1300, 145 of the 708 of 2176..3440); 3,300 thread-hours at twice the plain search, 52 hours of one `c8g.16xlarge`, $35 at spot, 3440 alone 10.6 hours; the work list, `certify --list`, `verify-certificates` and the proven end of the chain (2175 today) built | c5d585a (S1), ed526a4, 35c614b and the commit of the work list |
 
 ## The port and its first improvements
 
@@ -6790,3 +6793,108 @@ its 625,763,557 nodes on a laptop (20 seconds on 2 threads, to 625,901,481).
 of `optimal.json` into a scratch file, the resume of 3441).  The tests that pin the chain
 (`tests/results.rs`, `tests/board_layer.rs`, `tests/bottom_layers.rs`) are brought up to 3440, and the documents that
 said 2175 now say what is proven and by what (the prover to 2175, the frame model to 3440).
+
+## Certificates past 2175: the same problem, the work list, the verifier (2026-10)
+
+*Question.*  S1 and S2 of the fourth consultation of the theory track (2026-10-15), what the campaign of certificates
+on 2176-3440 needs before the owner approves it: can a game whose extended problem an earlier certified game posed be
+certified with no search, and what will certifying every game of 2176-3440 that rests on the frame model cost, game by
+game?  The games are the committed chain's (games 1..3440, merged before S2's runs).
+
+*S1, `certified (same problem as m)`* (c5d585a).  Equal problems have equal heaviest promotion sets, so a certificate of
+m, which shows the heaviest promotion set of Π⁺(O) worth best(m) = V(m) − in_the_bag⁺(m), settles a game n whose Π⁺ is
+the same and whose recorded game is worth as much in it; n's own barred bounds then give opt(n) = V(n) by Theorem M⁺'s
+corollary (THEORY.md, a paragraph under it).  `taxman certify` looks, after the checks of n's recorded game and before
+its search, at the certified games of the 8 board sizes before n (those of `--out` and of the run, latest first),
+compares the digests and then the problems whole (m's from memory, or set up again from its line, which must reproduce
+the line's digest, sizes and in_the_bag⁺), and the first equal one decides: worth(n) = best(m) gives a `certified` line
+with `"same_problem": {"n", "digest", "best", "worth"}` and no nodes; worth(n) < best(m) means n's game is not optimal,
+and n is searched (and beaten); worth(n) > best(m) contradicts m's certificate, and the run stops with an error.  (The
+design's condition is worth(n) ≥ best(m); with genuine data only equality can occur, since n's game is a promotion set
+of the very problem m's certificate bounds, so the strict case is treated as the inconsistency it is.)  DESIGN.md,
+"Certificates of U", has the rule.
+
+* *600..1300*, one thread, in order: 81 of the 377 games that need a certificate are settled by the rule (68,628 nodes
+  of search saved; 39 s for the whole range against 45 s), each equal to a search of it (verdict, digest, sizes,
+  score), each resting on the latest game of the window whose problem is the same (found independently in the test by
+  comparing the problems): 62 on n − 1, 17 on n − 2, 2 on n − 3, and 1260 → 1261 → 1263 a chain of them.  The file is
+  committed (`bench/certify/certificates_600_1300.jsonl`).
+* *Past 2175*, with the committed chain: the problems file (below) finds 114 such games in 1301..2175, 129 in 2176..3314
+  and 16 in 3315..3440, every one of equal worth.  Five pairs past 2175 certified both ways on one thread (2248 → 2249,
+  2610 → 2611, 2613 → 2615, 2622 → 2623, 2652 → 2653): the rule's certificate is the direct search's (digest, sizes,
+  verdict), and the direct search takes exactly the nodes of the game it rests on (36,398, 15,081, 15,237, 57,026 and
+  7,048), as one problem must; `verify-certificates` passes the files.
+* Tests (`tests/certify.rs`, the units of `src/certify.rs`): the rule against a direct search on 630..640 and 1312..1317
+  (all of 600..1300 ignored, 48 s); a planted wrong score on a repeat (1315, whose problem is 1314's) is beaten by the
+  chain's score; lines that are not what they say are not used (a verdict not `certified`, another game's line with
+  n's digest, m's line with an open member dropped or with a size or in_the_bag⁺ changed), a lowered score on m's line
+  is an error and a raised one makes n searched; the window never looks past 8 sizes.
+
+*S2.1, the barred bounds of 3315-3440* (ed526a4): `upper --from 3315 --to 3440` on the committed chain, one thread,
+277 s, into the new file `prover/data/upper_3315_3440.jsonl`: 126 games, 73 needing a certificate, 3424, 3425 and 3440
+among them (each an exhausted search below its ceiling, so each rests on the frame model); 19.9% of the members of
+U\*_{≥3} open (172 to 271 a game, against 14.9% on 2176-3314), the root's gap 1,103 to 1,555, the root's heaviest set
+holding all of U\*_{≥3} in every one.  The same games' root gaps from the solver's GF(2) bound (`wall nodes --nodes 1`,
+111 s, `bench/wall/gaps_chain_3313_3440.jsonl`: the 58 searched games of 3315..3440) equal the barred bounds' at all 48
+games both have.
+
+*S2.3-S2.5* (35c614b): `taxman certify --list FILE` takes the boards of a file in its order, so that the campaign can
+split its work by cost.  `taxman verify-certificates CERTS... --results --upper [--exact] [--threads K]` checks every
+line without changing the files: the barred bounds' line, the results' game by the checks `certify` makes (now one
+function), the width (now one function), Π⁺(O) set up again reproducing the digest and the sizes, a `certified` line
+with no counterexample, a `same_problem` line resting on an earlier certified line of its file with the rule applied
+again (the same function `certify` applies) and the two problems equal whole, a `beaten` line's game refereed and in
+the counterexample file, no contradictory verdicts; a search's verdict is taken on trust, as an exhausted proof is.
+Then how far the proofs reach: every game to N is proven by the prover (`prover/data/exact_*.jsonl`, the rule of
+`prover/tools/summarize.py`), by a certificate that passed, or by a ceiling or the prime formula above a proven game.
+On the committed files it is 2175, the first game that is not proven 2176 (it needs a certificate); the certificates of
+600..1300 change nothing (the prover proved those games already); the five pairs past 2175 above add 13 games past
+2176 (the ten certified and three at a ceiling above them).  `examples/extended.rs problems` sets each game's Π⁺(O) up
+without a search and writes its sizes, worth, width, digest and the latest game of the window with the same problem
+(`bench/certify/problems_600_3440.jsonl`, 1,575 games, 79 s; three need the widest set width: 3175, 3176 and 3440).
+
+*S2.2, the work list and the estimate* (`tools/certify_plan.py`, standard library only; `bench/certify/plan.md`, the
+summary for the approval, `plan.jsonl` and the list files).  The chain ran several searches at once (a window of 16 to
+3310, then 4), so a game's recorded search seconds are the time it shared the machine: summed, they are 3.27 times the
+run's wall time × 64 threads over 2176..3310 and 1.55 times over 3311..3440.  The plan prices a search by its nodes
+instead, at each stretch's own cost per node (the run's wall time × 64 / the stretch's nodes: 244 µs of a thread a node
+over 2176..3310 in 6.4 hours, 327 over 3311..3440 in the second instance's 17.4 hours less the 0.85 that the unfinished
+3441 took), and a certificate at twice that, the design's factor (stage 2 measured 1.1 to 1.9 at 1400..2156).  A
+repeat costs its source's search; a repeat of a game proven at its ceiling, whose problem no search has finished, costs
+what the cost model of AGENDA section 2 gives for the source's root gap (10^(2.30 + 0.0479 G / n^0.3), +0.06 decades for
+the window); a game the rule settles costs nothing.  On 2176..3440:
+
+| | games | need a certificate | settled by S1 | expected thread-hours |
+|---|---|---|---|---|
+| 2176-3314 | 1,139 | 635 (400 searches, 235 repeats) | 129 | 912 |
+| 3315-3440 | 126 | 73 (48 searches, 25 repeats) | 16 | 2,389 |
+| all | 1,265 | 708 | 145 | 3,301 |
+
+* *The estimate*: 3,301 thread-hours (2,641 to 3,961 for a factor of 1.6 to 2.4), 51.6 hours of one `c8g.16xlarge`
+  (41 to 62), $35 at the spot price paid on 2026-10-15 or $132 on demand; from the recorded seconds instead of nodes it
+  would be 6,702, the upper end that ignores the window.  It is above the consultation's 1,800-3,060 because of the end
+  of the chain: 3315-3440 is 72% of it.
+* *The dearest*: 3440 (3.72 billion nodes in the chain; 676 thread-hours, 10.6 hours on 64 threads, the floor on the
+  campaign's wall time), 3424 (235), 3425 (223), 3427 (223: a repeat of 3425 that the rule cannot settle), 2346 (155),
+  3430 (146), 3400 (95), 3300 (86).  2349, which the consultation's pilot named for its recorded 4,879 s, took 68
+  million nodes, 9 thread-hours: its seconds are mostly the window's (2346 and its neighbours ran beside it).
+* *The lists*: `pilot.txt` the five dearest (2346, 3424, 3425, 3427, 3440: 1,513 thread-hours, 24 hours of one
+  machine), `dear.txt` the next fifteen with the games that rest on them (835), and `rest_1..4.txt` the others in
+  increasing n, balanced (231 to 245 each).  A game the rule settles is in its source's list, after it.
+* *The repeats the rule cannot settle*: 115 of the 260, 361 thread-hours, 3427 alone 223.  3427 has 3425's search
+  problem, the same open members, sizes and worth, but another Π⁺: the two forms differ in exactly one pair.  On the
+  board of 3427 the new source 3426 = 2·3·571 and its factor 1713 = 3·571, whose only maximal composite it is, enter
+  frame 0; the frame model's `unzip` claims the pair (3426 takes 1713), so the plain problems are equal word for word,
+  but Π⁺ claims nothing, keeps both in frame 0 (with 3426 in the graph's lists of 6 and 1142), and so is another form,
+  though 3426 can always take 1713 and nothing else changes (the freedoms, the candidates and `max_total` are the same,
+  and in_the_bag⁺ is 4,212 more, 3426 and 3427 fixed and 2641 no longer, which is the difference in score).  The
+  claims in Π⁺ with the check of Lemma M5⁺ (the third consultation's 15(f), postponed then as an optimization worth
+  about 10%) would make the two problems equal, and the rule would settle 3427 and its like; a question for the next
+  consultation.
+
+*Checks.*  No tree of the default mode changed at any step: the probe's fingerprints 7e8e724717d26545 and
+f3deaac0dbdc030a, the tripwires, `regress --to 1000 --threads 1` (8.9 s), the one-thread chain 1..1300 line for line
+equal to the base commit's binary (4f1c35b), both suites, clippy and fmt.  The plan's prediction is checked against
+`certify`'s own lines on 600..1300 (the games that need one, their open and rejected sources, the 81 the rule settles),
+and `verify-certificates` passes the committed certificates.  The laptop only ran setups and searches of seconds, one
+thread at a time; nothing ran on AWS.

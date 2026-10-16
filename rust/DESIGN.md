@@ -971,7 +971,11 @@ the two: one board size a line, in the order to certify them, blank lines and li
 are taken in the file's order by the loop of the range, with the same rules: the game's line of the barred bounds must
 exist, a game that needs no certificate is counted (`not needing one`) and passed over, a final verdict in `--out` skips
 the game, and the rule of the same problem looks at the certified games of the file and of the run, whatever order they
-were made in.  The tally line reads `list FILE (K boards): ...` where a range gives `A..=B: ...`.
+were made in.  The tally line reads `list FILE (K boards): ...` where a range gives `A..=B: ...`.  The lists of the
+campaign on 2176-3440 and its estimate are made by `tools/certify_plan.py` (standard library only) from the results,
+the barred bounds, the extended problems of `examples/extended.rs problems` (which games the rule will settle) and the
+root gaps; a game the rule settles goes into the list of the game it rests on, after it, since the rule reads only its
+own `--out` (`bench/certify/`).
 
 *Verifying the certificates.*  `taxman verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...]
 [--threads K]` (`src/certify/verify.rs`) reads the files `certify --out` wrote, without changing them, and checks every

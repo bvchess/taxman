@@ -1,8 +1,8 @@
 //! Helpers shared by the integration tests: temporary directories and a random number generator (`support.rs`, which
-//! the unit tests share), a run of the `taxman` binary (`binary.rs`), the Java's golden data and the committed results
-//! files as oracles beyond `optimal.json`, one-thread searches at a chosen set width, the oracle for the playability of
-//! a set on the whole board (the library's `playable`, which uses nothing of the frame model), and a few small
-//! utilities.
+//! the unit tests share), a run of the `taxman` binary or of a Python tool (`binary.rs`), the Java's golden data and
+//! the committed results files as oracles beyond `optimal.json`, one-thread searches at a chosen set width, the oracle
+//! for the playability of a set on the whole board (the library's `playable`, which uses nothing of the frame model),
+//! and a few small utilities.
 //!
 //! Each test binary compiles this module for itself and uses only part of it.
 #![allow(dead_code)]
@@ -11,7 +11,7 @@ mod binary;
 mod support;
 
 #[allow(unused_imports)]
-pub use binary::{path, taxman, Run};
+pub use binary::{path, python, taxman, Run};
 #[allow(unused_imports)]
 pub use support::{Rng, TempDir};
 #[allow(unused_imports)]
