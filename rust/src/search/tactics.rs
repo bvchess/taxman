@@ -7,6 +7,8 @@
 use super::NOGOOD_PERIOD;
 use crate::model::Keep;
 
+pub use crate::gf2::ForceWindow;
+
 /// The tactics of DESIGN.md, section 5, that act inside the search.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SearchTactics {
@@ -58,6 +60,23 @@ pub struct SearchTactics {
     /// inequalities, so a search for one needs only the completions that do).  It acts with either node bound.  The
     /// rule is a function of the node's promotions and candidates alone, so the tree depends on nothing but the node.
     pub symmetry: bool,
+    /// With `gf2` and `fix_forced`: which members of a node's heaviest set that the weight split leaves free are
+    /// searched for being forced after all, by the exchange graph ([`ForceWindow`]; sound whatever it is: a member is
+    /// forced only where the search shows that every completion without it falls short).
+    pub force_window: ForceWindow,
+    /// With `gf2`: how a node chooses the member of its conflict to branch on ([`Gf2Branching`]; sound whatever it
+    /// is: every completion leaves out some member of the conflict, so the branches cover them all).
+    pub branching: Gf2Branching,
+    /// With `gf2`'s strong branching (`branching` exact or forced): the most members of a conflict whose bounds are
+    /// found, the most promising by their split bounds first (`u32::MAX`: all; sound, as for `branching`).
+    pub strong_limit: u32,
+    /// With `gf2`: a node with at least this many promotions chooses its branch by `deep_branching` instead of
+    /// `branching` (`u32::MAX`: none does; sound, as for `branching`).
+    pub strong_depth: u32,
+    pub deep_branching: Gf2Branching,
+    /// With `gf2`'s strong branching and `fix_forced`: once a member is found forced, whether the bounds of the others
+    /// are still found, to find more forced members (sound, as for `fix_forced`).
+    pub more_forced: bool,
 }
 
 impl Default for SearchTactics {
@@ -73,7 +92,53 @@ impl Default for SearchTactics {
             lagrange: false,
             gf2: true,
             symmetry: true,
+            force_window: ForceWindow::default(),
+            branching: Gf2Branching::Exact,
+            strong_limit: u32::MAX,
+            strong_depth: u32::MAX,
+            deep_branching: Gf2Branching::Split,
+            more_forced: true,
         }
+    }
+}
+
+/// How a node chooses the member of its conflict to branch on with the tactic `gf2` (strong branching asks what each
+/// member's removal does to the bound).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Gf2Branching {
+    /// The largest member.
+    Largest,
+    /// The member whose removal lowers the weight split's bound most (see [`crate::gf2::meet`]).
+    Split,
+    /// The member whose removal lowers the bound most, exactly: read off the heaviest set's exchange graph where it
+    /// certifies the bound, solved (warm-started) where not.
+    Exact,
+    /// Each member solved only as far as `need` (to find the forced ones), the branch the member with the lowest
+    /// weight-split bound.
+    Forced,
+}
+
+impl Gf2Branching {
+    /// Every choice, in the order of its code in a checkpoint's header.
+    pub const ALL: [Gf2Branching; 4] =
+        [Gf2Branching::Largest, Gf2Branching::Split, Gf2Branching::Exact, Gf2Branching::Forced];
+
+    /// The name `--tactic` gives it.
+    pub fn name(self) -> &'static str {
+        match self {
+            Gf2Branching::Largest => "largest",
+            Gf2Branching::Split => "split",
+            Gf2Branching::Exact => "exact",
+            Gf2Branching::Forced => "forced",
+        }
+    }
+
+    fn code(self) -> u8 {
+        Self::ALL.iter().position(|&b| b == self).expect("a choice") as u8
+    }
+
+    fn from_code(code: u8) -> Result<Self, String> {
+        Self::ALL.get(usize::from(code)).copied().ok_or_else(|| format!("unknown branching {code}"))
     }
 }
 
@@ -110,11 +175,11 @@ impl SearchTactics {
         }
     }
 
-    /// Whether `other` is the same search as these tactics make, as a checkpoint tells ([`bits`](Self::bits)): the
-    /// tactics a checkpoint does not record, the policy of keeping and forgetting nogoods, may differ (a resumed
-    /// search starts with no nogoods whichever policy made the first run's).
+    /// Whether `other` is the same search as these tactics make, as a checkpoint tells ([`bits`](Self::bits) and
+    /// [`tuning`](Self::tuning)): the tactics a checkpoint does not record, the policy of keeping and forgetting
+    /// nogoods, may differ (a resumed search starts with no nogoods whichever policy made the first run's).
     pub fn same_recorded(&self, other: &SearchTactics) -> bool {
-        self.bits() == other.bits()
+        self.bits() == other.bits() && self.tuning() == other.tuning()
     }
 
     /// These tactics with the policy of keeping and forgetting nogoods of `run`'s: a checkpoint does not record it,
@@ -186,6 +251,74 @@ impl SearchTactics {
             | u16::from(self.lagrange) << 6
             | u16::from(self.gf2) << 7
             | u16::from(self.symmetry) << 8
+    }
+
+    /// The length of [`tuning`](Self::tuning).
+    pub(super) const TUNING_LEN: usize = 16;
+
+    /// Whether the tactics that tune the GF(2) search (`force_window` to `more_forced`) are the defaults, which a
+    /// checkpoint's header of version 5 implies.  (The policy of keeping and forgetting nogoods is not recorded, so
+    /// it does not count.)
+    pub(super) fn tuning_is_default(&self) -> bool {
+        SearchTactics::default().with_switches_of(self) == *self
+    }
+
+    /// `self` with the switches and `match_refine` of `other`, and its policy of keeping and forgetting nogoods.
+    fn with_switches_of(self, other: &Self) -> Self {
+        SearchTactics {
+            match_refine: other.match_refine,
+            fix_forced: other.fix_forced,
+            nogoods: other.nogoods,
+            forget_nogoods: other.forget_nogoods,
+            lagrange: other.lagrange,
+            gf2: other.gf2,
+            symmetry: other.symmetry,
+            ..self.with_forgetting_of(other)
+        }
+    }
+
+    /// The tactics that tune the GF(2) search as a header of version 6 records them after the switches' bits, little
+    /// endian: `force_window` (its kind, 0 within, 1 share and 2 all, then its value, u32), `branching` and
+    /// `deep_branching` (u8 each: largest, split, exact, forced), `more_forced` (u8), `strong_limit` and
+    /// `strong_depth` (u32 each).
+    pub(super) fn tuning(&self) -> [u8; Self::TUNING_LEN] {
+        let (kind, value) = match self.force_window {
+            ForceWindow::Within(window) => (0u8, window),
+            ForceWindow::Share(percent) => (1, u32::from(percent)),
+            ForceWindow::All => (2, 0),
+        };
+        let mut out = [0u8; Self::TUNING_LEN];
+        out[0] = kind;
+        out[1..5].copy_from_slice(&value.to_le_bytes());
+        out[5] = self.branching.code();
+        out[6] = self.deep_branching.code();
+        out[7] = u8::from(self.more_forced);
+        out[8..12].copy_from_slice(&self.strong_limit.to_le_bytes());
+        out[12..16].copy_from_slice(&self.strong_depth.to_le_bytes());
+        out
+    }
+
+    /// `self` with the tuning that [`tuning`](Self::tuning) recorded in `bytes`, or an error if it is not one.
+    pub(super) fn with_tuning(self, bytes: &[u8]) -> Result<Self, String> {
+        let u32_at = |i: usize| u32::from_le_bytes(bytes[i..i + 4].try_into().expect("4 bytes"));
+        if bytes.len() != Self::TUNING_LEN || bytes[7] > 1 {
+            return Err("unknown tuning of the GF(2) search".into());
+        }
+        let force_window = match (bytes[0], u32_at(1)) {
+            (0, window) => ForceWindow::Within(window),
+            (1, percent) => ForceWindow::Share(u8::try_from(percent).map_err(|_| "a share above 255%")?),
+            (2, 0) => ForceWindow::All,
+            _ => return Err("unknown force_window".into()),
+        };
+        Ok(SearchTactics {
+            force_window,
+            branching: Gf2Branching::from_code(bytes[5])?,
+            deep_branching: Gf2Branching::from_code(bytes[6])?,
+            more_forced: bytes[7] == 1,
+            strong_limit: u32_at(8),
+            strong_depth: u32_at(12),
+            ..self
+        })
     }
 
     /// The tactics [`bits`](Self::bits) recorded, or an error if a bit that no tactic uses is set.

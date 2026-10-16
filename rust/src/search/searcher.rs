@@ -18,11 +18,12 @@ use super::lagrange::{Lagrangian, Refits};
 use super::refine::{strongest, Learning, Refiner, Seek, Verdict};
 use super::setup::Prepared;
 use super::symmetry::{RuleScratch, Symmetries};
+use super::tactics::Gf2Branching;
 use super::{Diagnostics, Forgetting};
 use crate::bits::Bits;
 use crate::bounds::max_additional;
 use crate::engine::{Ctx, Poll, Searcher, Stats, Unit};
-use crate::gf2::{Gf2Bound, Gf2Graph, Gf2Stats};
+use crate::gf2::{ForceWindow, Gf2Bound, Gf2Graph, Gf2Stats};
 use crate::matchbound::{MatchBound, MatchGraph};
 use crate::model::{ConflictCache, FrameGraph, FrameSet, Lookup, NogoodStats, Nogoods, Scratch};
 use std::sync::{Arc, Mutex, PoisonError};
@@ -115,25 +116,15 @@ pub struct SearchSpace<'a, const W: usize> {
     /// With [`Gf2Branching::Exact`] and `fix_forced`: once a member is found forced, whether the others are still
     /// solved (as far as the need) to find more forced members.
     pub gf2_more_forced: bool,
+    /// With `gf2`: a node with at least this many promotions chooses its branch as `gf2_deep_branching` says, not
+    /// as `gf2_branching` does (tactics `strong_depth` and `deep_branching`).
+    pub gf2_strong_depth: u32,
+    pub gf2_deep_branching: Gf2Branching,
+    /// With `gf2`: which free members are searched for being forced (tactic `force_window`).
+    pub gf2_force_window: ForceWindow,
     /// With the tactic `symmetry`: the root's symmetric pairs, whose inequalities the search keeps (`None` without
     /// the tactic, or when the root has no pair).
     pub symmetry: Option<Symmetries>,
-}
-
-/// How a node chooses the member of its conflict to branch on with the tactic `gf2` (strong branching asks what each
-/// member's removal does to the bound).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Gf2Branching {
-    /// The largest member.
-    Largest,
-    /// The member whose removal lowers the weight split's bound most (see [`crate::gf2::meet`]).
-    Split,
-    /// The member whose removal lowers the bound most, exactly: read off the heaviest set's exchange graph where it
-    /// certifies the bound, solved (warm-started) where not.
-    Exact,
-    /// Each member solved only as far as `need` (to find the forced ones), the branch the member with the lowest
-    /// weight-split bound.
-    Forced,
 }
 
 impl<'a, const W: usize> SearchSpace<'a, W> {
@@ -167,9 +158,12 @@ impl<'a, const W: usize> SearchSpace<'a, W> {
             found: Mutex::new(None),
             gf2: tactics.gf2.then(|| Gf2Graph::new(&prepared.model, &prepared.root, &prepared.candidates)),
             gf2_prefilter: false,
-            gf2_branching: Gf2Branching::Exact,
-            gf2_strong_limit: usize::MAX,
-            gf2_more_forced: true,
+            gf2_branching: tactics.branching,
+            gf2_strong_limit: tactics.strong_limit as usize,
+            gf2_more_forced: tactics.more_forced,
+            gf2_strong_depth: tactics.strong_depth,
+            gf2_deep_branching: tactics.deep_branching,
+            gf2_force_window: tactics.force_window,
             symmetry: tactics
                 .symmetry
                 .then(|| Symmetries::of(&prepared.model, &prepared.root, &prepared.candidates))
@@ -355,7 +349,11 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 scratch: Scratch::new(),
                 matching: MatchBound::new(space.match_graph),
                 matching_on: space.gf2.is_none() || space.gf2_prefilter,
-                gf2: space.gf2.as_ref().map(Gf2Bound::new),
+                gf2: space.gf2.as_ref().map(|graph| {
+                    let mut bound = Gf2Bound::new(graph);
+                    bound.set_force_window(space.gf2_force_window);
+                    bound
+                }),
                 order: Vec::new(),
                 tried: Vec::new(),
                 certified: Vec::new(),
@@ -898,16 +896,20 @@ impl<'a, const W: usize> Stepper<'a, W> {
 
     /// [`choose_branch`](Self::choose_branch) with the tactic `gf2`: the forced members if there are any (the child
     /// promotes them all, with `fix_forced`), else a member of the conflict of the GF(2) bound's heaviest set chosen
-    /// as [`SearchSpace::gf2_branching`] says.  With [`Gf2Branching::Exact`], each member's bound without it is found
-    /// exactly (certified or solved), which also finds forced members among them.
+    /// as [`SearchSpace::gf2_branching`] says (at a node of at least [`SearchSpace::gf2_strong_depth`] promotions, as
+    /// [`SearchSpace::gf2_deep_branching`] says).  With [`Gf2Branching::Exact`], each member's bound without it is
+    /// found exactly (certified or solved), which also finds forced members among them.
     fn choose_branch_gf2(&mut self, node: &mut Node<W>, open: Open<W>, need: u64) -> Option<Branch<W>> {
         let space = self.space;
         let g = self.gf2.as_mut().expect("the tactic gf2");
         let conflict = open.conflict.map(|k| k & node.cands).filter(|k| !k.is_empty());
         let mut forced = open.forced & node.cands;
+        // Below the depth of strong branching (tactic `strong_depth`), the choice of `deep_branching`.
+        let deep = node.promoted.len() >= space.gf2_strong_depth;
+        let branching = if deep { space.gf2_deep_branching } else { space.gf2_branching };
         let n = match conflict {
             Some(_) if !forced.is_empty() => forced.max(),
-            Some(k) if k.len() > 1 => match space.gf2_branching {
+            Some(k) if k.len() > 1 => match branching {
                 Gf2Branching::Largest => k.max(),
                 Gf2Branching::Split => {
                     let mut best = (i64::MAX, 0);
@@ -936,7 +938,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
                     self.tried.extend(order[..tried].iter().map(|&(_, key)| u32::MAX - key));
                     g.certified_excluding(&self.tried, node.max_add, &mut self.certified);
                     let mut best = (u64::MAX, 0);
-                    let to_need = space.gf2_branching == Gf2Branching::Forced;
+                    let to_need = branching == Gf2Branching::Forced;
                     if to_need {
                         best.1 = self.tried[0];
                     }

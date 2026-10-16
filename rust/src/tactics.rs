@@ -6,13 +6,15 @@
 //! sound and says what it does; this module is the one place in the code that knows their names.  The ones that act
 //! inside the search are [`SearchTactics`]; the others are only used by the per-game pipeline ([`crate::solver`]).
 //!
-//! A tactic has a value: an on/off switch, the depth of `match_refine`, a count, or the name of a policy ([`Setting`]).  [`Tactics::set`]
-//! reads `name=value` (what `--tactic` takes), [`Tactics::description`] writes the changes from the defaults in
-//! the same form, and a result line records both that and every value ([`Tactics::to_json`]).
+//! A tactic has a value: an on/off switch, the depth of `match_refine`, a count or the name of a policy of the
+//! nogood table, or a setting that tunes the GF(2) search: a window, a choice of branching, a count ([`Setting`]).
+//! [`Tactics::set`] reads `name=value` (what `--tactic` takes), [`Tactics::description`] writes the changes from the
+//! defaults in the same form, and a result line records both that and every value ([`Tactics::to_json`]).
 
+use crate::gf2::ForceWindow;
 use crate::json::Json;
 use crate::model::Keep;
-use crate::search::SearchTactics;
+use crate::search::{Gf2Branching, SearchTactics};
 use std::fmt;
 
 /// The value of every tactic.  The ones that act inside the search are [`SearchTactics`].  `tests/docs.rs` checks
@@ -45,16 +47,23 @@ impl Default for Tactics {
 }
 
 /// The number of tactics.
-pub const TACTIC_COUNT: usize = 14;
+pub const TACTIC_COUNT: usize = 20;
 
-/// The value of a tactic: an on/off switch, the depth of `match_refine`, a count, or the name of a policy.
+/// The value of a tactic: an on/off switch, the depth of `match_refine`, a count or the name of a policy of the nogood
+/// table, or one of the settings that tune the GF(2) search.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Setting {
     Switch(bool),
     /// `match_refine`: 0 to [`SearchTactics::MAX_MATCH_REFINE`].
     MatchRefine(u8),
+    /// `force_window`: a distance above `need` (`80`), a percentage of the slack (`25%`), or `all`.
+    Window(ForceWindow),
+    /// `branching` and `deep_branching`: `largest`, `split`, `exact` or `forced`.
+    Branching(Gf2Branching),
+    /// `strong_limit` and `strong_depth`: a whole number, or `all` (`u32::MAX`).
+    Count(u32),
     /// `nogood_period` and `nogood_limit`: a whole number.
-    Count(u64),
+    Number(u64),
     /// `nogood_keep`: what a forgetting of the nogoods keeps.
     Keep(Keep),
 }
@@ -65,7 +74,12 @@ impl fmt::Display for Setting {
         match self {
             Setting::Switch(on) => f.write_str(if *on { "on" } else { "off" }),
             Setting::MatchRefine(depth) => write!(f, "{depth}"),
+            Setting::Window(ForceWindow::Within(window)) => write!(f, "{window}"),
+            Setting::Window(ForceWindow::Share(percent)) => write!(f, "{percent}%"),
+            Setting::Window(ForceWindow::All) | Setting::Count(u32::MAX) => f.write_str("all"),
+            Setting::Branching(branching) => f.write_str(branching.name()),
             Setting::Count(count) => write!(f, "{count}"),
+            Setting::Number(number) => write!(f, "{number}"),
             Setting::Keep(keep) => write!(f, "{keep}"),
         }
     }
@@ -76,8 +90,12 @@ impl Setting {
         match self {
             Setting::Switch(on) => Json::Bool(on),
             Setting::MatchRefine(depth) => Json::from(u32::from(depth)),
-            Setting::Count(count) => Json::from(count),
-            Setting::Keep(keep) => Json::from(keep.to_string()),
+            Setting::Window(ForceWindow::Within(window)) => Json::from(window),
+            Setting::Count(count) if count != u32::MAX => Json::from(count),
+            Setting::Number(number) => Json::from(number),
+            Setting::Window(_) | Setting::Branching(_) | Setting::Count(_) | Setting::Keep(_) => {
+                Json::from(self.to_string())
+            }
         }
     }
 }
@@ -86,8 +104,11 @@ impl Setting {
 enum Slot<'a> {
     Switch(&'a mut bool),
     MatchRefine(&'a mut u8),
+    Window(&'a mut ForceWindow),
+    Branching(&'a mut Gf2Branching),
+    Count(&'a mut u32),
     /// A whole number of at least the second field.
-    Count(&'a mut u64, u64),
+    Number(&'a mut u64, u64),
     Keep(&'a mut Keep),
 }
 
@@ -96,7 +117,10 @@ impl Slot<'_> {
         match self {
             Slot::Switch(on) => Setting::Switch(**on),
             Slot::MatchRefine(depth) => Setting::MatchRefine(**depth),
-            Slot::Count(count, _) => Setting::Count(**count),
+            Slot::Window(window) => Setting::Window(**window),
+            Slot::Branching(branching) => Setting::Branching(**branching),
+            Slot::Count(count) => Setting::Count(**count),
+            Slot::Number(number, _) => Setting::Number(**number),
             Slot::Keep(keep) => Setting::Keep(**keep),
         }
     }
@@ -116,8 +140,34 @@ impl Slot<'_> {
                 **depth = (text.parse().ok().filter(|&depth| depth <= max))
                     .ok_or_else(|| format!("expected a whole number from 0 to {max}, got {text:?}"))?;
             }
-            Slot::Count(count, min) => {
-                **count = (text.parse().ok().filter(|&n: &u64| n >= *min))
+            Slot::Window(window) => {
+                let share = text.strip_suffix('%').map(|percent| percent.parse().ok().map(ForceWindow::Share));
+                **window = match (text, share) {
+                    ("all", _) => Some(ForceWindow::All),
+                    (_, Some(share)) => share,
+                    _ => text.parse().ok().map(ForceWindow::Within),
+                }
+                .ok_or_else(|| {
+                    format!("expected a whole number (80), a percentage from 0% to 255% (25%) or all, got {text:?}")
+                })?;
+            }
+            Slot::Branching(branching) => {
+                **branching = Gf2Branching::ALL
+                    .into_iter()
+                    .find(|b| b.name() == text)
+                    .ok_or_else(|| format!("expected largest, split, exact or forced, got {text:?}"))?;
+            }
+            Slot::Count(count) => {
+                **count =
+                    match text {
+                        "all" => u32::MAX,
+                        _ => text.parse().ok().filter(|&count| count < u32::MAX).ok_or_else(|| {
+                            format!("expected a whole number below {} or all, got {text:?}", u32::MAX)
+                        })?,
+                    };
+            }
+            Slot::Number(number, min) => {
+                **number = (text.parse().ok().filter(|&n: &u64| n >= *min))
                     .ok_or_else(|| format!("expected a whole number of at least {min}, got {text:?}"))?;
             }
             Slot::Keep(keep) => {
@@ -141,12 +191,18 @@ impl Tactics {
             ("fix_forced", Slot::Switch(&mut self.search.fix_forced)),
             ("nogoods", Slot::Switch(&mut self.search.nogoods)),
             ("forget_nogoods", Slot::Switch(&mut self.search.forget_nogoods)),
-            ("nogood_period", Slot::Count(&mut self.search.nogood_period, 1)),
+            ("nogood_period", Slot::Number(&mut self.search.nogood_period, 1)),
             ("nogood_keep", Slot::Keep(&mut self.search.nogood_keep)),
-            ("nogood_limit", Slot::Count(&mut self.search.nogood_limit, 0)),
+            ("nogood_limit", Slot::Number(&mut self.search.nogood_limit, 0)),
             ("lagrange", Slot::Switch(&mut self.search.lagrange)),
             ("gf2", Slot::Switch(&mut self.search.gf2)),
             ("symmetry", Slot::Switch(&mut self.search.symmetry)),
+            ("force_window", Slot::Window(&mut self.search.force_window)),
+            ("branching", Slot::Branching(&mut self.search.branching)),
+            ("strong_limit", Slot::Count(&mut self.search.strong_limit)),
+            ("strong_depth", Slot::Count(&mut self.search.strong_depth)),
+            ("deep_branching", Slot::Branching(&mut self.search.deep_branching)),
+            ("more_forced", Slot::Switch(&mut self.search.more_forced)),
             ("prev_cap", Slot::Switch(&mut self.prev_cap)),
             ("seed_incumbent", Slot::Switch(&mut self.seed_incumbent)),
         ]
@@ -163,9 +219,9 @@ impl Tactics {
         Tactics::default().settings().map(|(name, _)| name)
     }
 
-    /// Applies `name=value`: `on` or `off` for a switch, `0` to `7` for `match_refine`, a whole number for
-    /// `nogood_period` (at least 1) and `nogood_limit`, `none`, `hit`, `sizeN` or `topN` for `nogood_keep`.  Nothing
-    /// changes if it is an error.
+    /// Applies `name=value`: `on` or `off` for a switch, `0` to `7` for `match_refine`, for the settings that tune
+    /// the GF(2) search what [`Setting`] says, a whole number for `nogood_period` (at least 1) and `nogood_limit`,
+    /// and `none`, `hit`, `sizeN` or `topN` for `nogood_keep`.  Nothing changes if it is an error.
     pub fn set(&mut self, assignment: &str) -> Result<(), String> {
         let (name, text) = assignment.split_once('=').ok_or_else(|| {
             format!("expected name=value, such as match_refine=0 or prev_cap=off, got {assignment:?}")
@@ -190,8 +246,9 @@ impl Tactics {
         }
     }
 
-    /// All tactics, by name, as a JSON object: booleans for the switches, numbers for `match_refine`, `nogood_period`
-    /// and `nogood_limit`, and a string for `nogood_keep`.
+    /// All tactics, by name, as a JSON object: booleans for the switches, numbers for `match_refine`, a window
+    /// within a distance, a count, `nogood_period` and `nogood_limit`, and strings for the other settings (`25%`,
+    /// `all`, `split`, `top64`).
     pub fn to_json(&self) -> Json {
         Json::object(self.settings().map(|(name, value)| (name, value.to_json())))
     }
@@ -221,12 +278,21 @@ mod tests {
                 "lagrange",
                 "gf2",
                 "symmetry",
+                "force_window",
+                "branching",
+                "strong_limit",
+                "strong_depth",
+                "deep_branching",
+                "more_forced",
                 "prev_cap",
                 "seed_incumbent"
             ]
         );
         let values: Vec<String> = t.settings().iter().map(|s| s.1.to_string()).collect();
-        let expected = ["on", "on", "1", "on", "on", "on", "50000", "none", "0", "off", "on", "on", "on", "on"];
+        let expected = [
+            "on", "on", "1", "on", "on", "on", "50000", "none", "0", "off", "on", "on", "80", "exact", "all", "all",
+            "split", "on", "on", "on",
+        ];
         assert_eq!(values, expected);
         // The values of the search tactics are those of `SearchTactics::default()`, not copies of them.
         assert_eq!(t.search, SearchTactics::default());
@@ -274,6 +340,14 @@ mod tests {
             ("match_refine=", "tactic match_refine: expected a whole number from 0 to 7"),
             ("nogoods=2", "tactic nogoods: expected on or off"),
             ("nogoods=largest", "tactic nogoods: expected on or off"),
+            ("force_window=-1", "tactic force_window: expected a whole number (80), a percentage from 0% to 255%"),
+            ("force_window=300%", "tactic force_window: expected a whole number (80), a percentage"),
+            ("force_window=none", "tactic force_window: expected a whole number (80), a percentage"),
+            ("branching=best", "tactic branching: expected largest, split, exact or forced"),
+            ("deep_branching=on", "tactic deep_branching: expected largest, split, exact or forced"),
+            ("strong_limit=4294967295", "tactic strong_limit: expected a whole number below 4294967295 or all"),
+            ("strong_depth=-3", "tactic strong_depth: expected a whole number below 4294967295 or all"),
+            ("more_forced=all", "tactic more_forced: expected on or off"),
         ] {
             let err = t.set(assignment).unwrap_err();
             assert!(err.starts_with(expected), "{assignment}: {err}");
@@ -281,6 +355,29 @@ mod tests {
         }
         let err = t.set("match_refines=1").unwrap_err();
         assert!(err.contains("unknown tactic") && err.contains("same_search, match_refine"), "{err}");
+
+        // The settings that tune the GF(2) search, as `--tactic` spells them and as the JSON has them.
+        for (assignment, json) in [
+            ("force_window=0", Json::from(0u32)),
+            ("force_window=120", Json::from(120u32)),
+            ("force_window=25%", Json::from("25%")),
+            ("force_window=all", Json::from("all")),
+            ("branching=split", Json::from("split")),
+            ("strong_limit=2", Json::from(2u32)),
+            ("strong_depth=40", Json::from(40u32)),
+            ("deep_branching=largest", Json::from("largest")),
+        ] {
+            let mut t = Tactics::default();
+            t.set(assignment).unwrap();
+            assert_eq!(t.description(), assignment);
+            let (name, _) = assignment.split_once('=').unwrap();
+            assert_eq!(t.to_json().get(name), Some(&json), "{assignment}");
+        }
+        let mut t = Tactics::default();
+        t.set("strong_limit=3").unwrap();
+        t.set("strong_limit=all").unwrap();
+        assert_eq!(t.description(), "default");
+        assert_eq!(t.to_json().get("strong_limit"), Some(&Json::from("all")));
     }
 
     #[test]
@@ -345,12 +442,36 @@ mod tests {
                 lagrange: false,
                 gf2: true,
                 symmetry: false,
+                force_window: ForceWindow::Share(30),
+                branching: Gf2Branching::Forced,
+                strong_limit: 3,
+                strong_depth: 0,
+                deep_branching: Gf2Branching::Largest,
+                more_forced: false,
             },
             prime_shortcut: false,
             same_search: false,
             prev_cap: false,
             seed_incumbent: false,
         });
+        // Every value of the settings that tune the GF(2) search.
+        let search = SearchTactics::default();
+        for force_window in [ForceWindow::Within(0), ForceWindow::Within(250), ForceWindow::Share(0), ForceWindow::All]
+        {
+            all.push(Tactics { search: SearchTactics { force_window, ..search }, ..Tactics::default() });
+        }
+        for branching in Gf2Branching::ALL {
+            all.push(Tactics {
+                search: SearchTactics { branching, deep_branching: branching, ..search },
+                ..Tactics::default()
+            });
+        }
+        for count in [0, 1, 7, u32::MAX - 1] {
+            all.push(Tactics {
+                search: SearchTactics { strong_limit: count, strong_depth: count, ..search },
+                ..Tactics::default()
+            });
+        }
         for tactics in all {
             let mut again = Tactics::default();
             for (name, value) in tactics.settings() {

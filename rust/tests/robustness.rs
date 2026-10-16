@@ -607,10 +607,11 @@ fn a_checkpoint_made_with_other_tactics_names_them() {
 }
 
 /// A checkpoint whose header has a format version this build does not read (3, whose headers recorded tactics that
-/// are gone, and 6, a later one) is refused with one message, naming the file, and left alone.  Version 4, that of the
-/// builds before the extended problem's search, is read (`tests/wide.rs` resumes a real one), but not with the length
-/// of version 5, which is what forging the number gives.  The header of this build, version 5, is the one that the
-/// checkpoint was written with, so the same game resumes from it once the version is put back.
+/// are gone, and 7, a later one) is refused with one message, naming the file, and left alone.  Version 4, that of the
+/// builds before the extended problem's search, is read (`tests/wide.rs` resumes a real one), and so is version 6, that
+/// of a search whose tactics that tune the GF(2) search are not the defaults, but neither with the length of version 5,
+/// which is what forging the number gives.  The header of a default search, version 5, is the one that the checkpoint
+/// was written with, so the same game resumes from it once the version is put back; a tuned search writes version 6.
 #[test]
 fn a_checkpoint_of_another_format_is_refused() {
     let dir = TempDir::new("format");
@@ -619,22 +620,34 @@ fn a_checkpoint_of_another_format_is_refused() {
     let checkpoint = dir.join("n0600.ckpt");
     let version = |checkpoint: &Path| fs::read(checkpoint).unwrap()[20 + 4..20 + 8].to_vec();
     assert_eq!(version(&checkpoint), 5u32.to_le_bytes(), "this build writes the header's version 5");
-    for other in [3u32, 6] {
+    for other in [3u32, 7] {
         forge_header(&checkpoint, |header| header[4..8].copy_from_slice(&other.to_le_bytes()));
         let err = solver::solve_game(600, None, &opts).unwrap_err();
         let format = format!("format version {other}");
-        for part in ["n0600.ckpt", format.as_str(), "reads versions 4 and 5 only", "delete the checkpoint"] {
+        for part in ["n0600.ckpt", format.as_str(), "reads versions 4 to 6 only", "delete the checkpoint"] {
             assert!(err.contains(part), "{part}: {err}");
         }
         assert!(checkpoint.exists(), "a refused checkpoint is left alone");
     }
-    forge_header(&checkpoint, |header| header[4..8].copy_from_slice(&4u32.to_le_bytes()));
-    let err = solver::solve_game(600, None, &opts).unwrap_err();
-    assert!(err.contains("n0600.ckpt") && err.contains("46 bytes, not 38"), "{err}");
-    assert!(checkpoint.exists(), "a refused checkpoint is left alone");
+    for (other, length) in [(4u32, "46 bytes, not 38"), (6, "46 bytes, not 62")] {
+        forge_header(&checkpoint, |header| header[4..8].copy_from_slice(&other.to_le_bytes()));
+        let err = solver::solve_game(600, None, &opts).unwrap_err();
+        assert!(err.contains("n0600.ckpt") && err.contains(length), "{err}");
+        assert!(checkpoint.exists(), "a refused checkpoint is left alone");
+    }
     forge_header(&checkpoint, |header| header[4..8].copy_from_slice(&5u32.to_le_bytes()));
     let opts = SolveOptions { node_limit: None, ..opts };
     assert!(solver::solve_game(600, None, &opts).unwrap().completed, "the checkpoint resumes with its own version");
+
+    // A search tuned otherwise writes version 6, and resumes from it.
+    let tuned_dir = TempDir::new("format-tuned");
+    let mut tuned = SolveOptions { node_limit: Some(1500), ..options(&tuned_dir.0) };
+    tuned.tactics.set("force_window=40").unwrap();
+    assert!(!solver::solve_game(600, None, &tuned).unwrap().completed);
+    let checkpoint = tuned_dir.join("n0600.ckpt");
+    assert_eq!(version(&checkpoint), 6u32.to_le_bytes(), "a tuned search writes the header's version 6");
+    let tuned = SolveOptions { node_limit: None, ..tuned };
+    assert!(solver::solve_game(600, None, &tuned).unwrap().completed, "the checkpoint of version 6 resumes");
 }
 
 /// A checkpoint of the extended problem Π⁺(O) whose header has the digest of other one-sided candidates, and nothing

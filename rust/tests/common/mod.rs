@@ -25,7 +25,7 @@ use std::time::Instant;
 use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::engine::{self, EngineConfig, Start};
-use taxman::gf2::Gf2Graph;
+use taxman::gf2::{ForceWindow, Gf2Graph};
 use taxman::json::Json;
 use taxman::matchbound::MatchGraph;
 use taxman::model::{FrameGraph, FrameSet, Keep, Scratch};
@@ -435,6 +435,9 @@ impl<const W: usize> Game<W> {
             gf2_branching: cfg.gf2_branching,
             gf2_strong_limit: usize::MAX,
             gf2_more_forced: true,
+            gf2_strong_depth: u32::MAX,
+            gf2_deep_branching: Gf2Branching::Split,
+            gf2_force_window: ForceWindow::default(),
             symmetry: cfg.symmetry.then(|| self.symmetries()).filter(|pairs| !pairs.is_empty()),
         };
         let engine = engine.unwrap_or_else(|| config(cfg.threads));

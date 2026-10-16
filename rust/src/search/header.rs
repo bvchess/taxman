@@ -13,8 +13,10 @@ use crate::model::FrameSet;
 ///
 /// Encoded (little-endian) as the magic `TXSH`, the format [`Header::VERSION`] (u32), the width `W` (u32),
 /// `n` (u32), the digests of the candidates, of the frames and of the one-sided candidates (u64 each), `max_total`
-/// (u32) and the tactics' bits (u16, [`SearchTactics::bits`]).  This build writes version 5 and reads versions 5 and
-/// 4.  Version 4, the headers of the builds before the extended problem's search, has no digest of the one-sided
+/// (u32) and the tactics' bits (u16, [`SearchTactics::bits`]); in version 6, then the tactics that tune the GF(2) search
+/// (16 bytes, [`SearchTactics::tuning`]).  This build writes version 5 for a search whose tuning is the default, which a
+/// header of version 5 implies (so that a default search writes the header of the builds before those tactics), and
+/// version 6 for one whose tuning is not; it reads versions 4 to 6.  Version 4, the headers of the builds before the extended problem's search, has no digest of the one-sided
 /// candidates (`max_total` and the tactics follow the digest of the frames): those builds searched only problems
 /// without one-sided candidates, so a version-4 header reads as version 5 with the digest of none, and a checkpoint of a
 /// plain search resumes with every other check as for version 5; one asked to resume a search with one-sided candidates
@@ -32,7 +34,7 @@ pub(super) struct Header<const W: usize> {
     pub(super) one_sided: u64,
     pub(super) max_total: u32,
     pub(super) tactics: SearchTactics,
-    /// The format the header was read from ([`Header::VERSION`] for one made by [`Header::of`]); not encoded.
+    /// The format the header was read from (for one made by [`Header::of`], the one it is written in); not encoded.
     pub(super) version: u32,
 }
 
@@ -43,6 +45,9 @@ impl<const W: usize> Header<W> {
     /// The format before the digest of the one-sided candidates, which this build still reads, and its length.
     pub(super) const VERSION_4: u32 = 4;
     pub(super) const LEN_4: usize = Self::LEN - 8;
+    /// The format with the tactics that tune the GF(2) search, and its length.
+    pub(super) const VERSION_6: u32 = 6;
+    pub(super) const LEN_6: usize = Self::LEN + SearchTactics::TUNING_LEN;
 
     pub(super) fn of(prepared: &Prepared<W>) -> Self {
         Header {
@@ -52,7 +57,7 @@ impl<const W: usize> Header<W> {
             one_sided: Self::digest_one_sided(prepared.model.one_sided()),
             max_total: prepared.max_total,
             tactics: prepared.tactics,
-            version: Self::VERSION,
+            version: if prepared.tactics.tuning_is_default() { Self::VERSION } else { Self::VERSION_6 },
         }
     }
 
@@ -83,7 +88,8 @@ impl<const W: usize> Header<W> {
 
     pub(super) fn encode(&self) -> Vec<u8> {
         let mut out = Self::MAGIC.to_vec();
-        for word in [Self::VERSION, W as u32, self.n] {
+        let tuned = !self.tactics.tuning_is_default();
+        for word in [if tuned { Self::VERSION_6 } else { Self::VERSION }, W as u32, self.n] {
             out.extend_from_slice(&word.to_le_bytes());
         }
         out.extend_from_slice(&self.candidates.to_le_bytes());
@@ -91,6 +97,9 @@ impl<const W: usize> Header<W> {
         out.extend_from_slice(&self.one_sided.to_le_bytes());
         out.extend_from_slice(&self.max_total.to_le_bytes());
         out.extend_from_slice(&self.tactics.bits().to_le_bytes());
+        if tuned {
+            out.extend_from_slice(&self.tactics.tuning());
+        }
         out
     }
 
@@ -106,14 +115,15 @@ impl<const W: usize> Header<W> {
         // Where the fields after the digest of the frames start: version 4 has no digest of the one-sided candidates.
         let (version, len, rest) = match version {
             Some(Self::VERSION) => (Self::VERSION, Self::LEN, 40),
+            Some(Self::VERSION_6) => (Self::VERSION_6, Self::LEN_6, 40),
             Some(Self::VERSION_4) => (Self::VERSION_4, Self::LEN_4, 32),
             _ => {
                 let version = version.map_or_else(|| "unreadable".to_owned(), |v| v.to_string());
                 return Err(format!(
-                    "the checkpoint's header has format version {version}, and this build reads versions {} and {} \
+                    "the checkpoint's header has format version {version}, and this build reads versions {} to {} \
                      only: finish the search with the build that made it, or delete the checkpoint",
                     Self::VERSION_4,
-                    Self::VERSION
+                    Self::VERSION_6
                 ));
             }
         };
@@ -125,14 +135,16 @@ impl<const W: usize> Header<W> {
             return Err(format!("the checkpoint was made with Bits<{width}>, not Bits<{W}>"));
         }
         let u64_at = |i: usize| u64::from_le_bytes(bytes[i..i + 8].try_into().expect("8 bytes"));
-        let one_sided = if version == Self::VERSION { u64_at(32) } else { Self::digest_one_sided(&[]) };
+        let one_sided = if version == Self::VERSION_4 { Self::digest_one_sided(&[]) } else { u64_at(32) };
+        let tactics = SearchTactics::from_bits(u16::from_le_bytes([bytes[rest + 4], bytes[rest + 5]]))?;
+        let tactics = if version == Self::VERSION_6 { tactics.with_tuning(&bytes[Self::LEN..])? } else { tactics };
         Ok(Header {
             n: u32_at(12).expect("length checked"),
             candidates: u64_at(16),
             frames: u64_at(24),
             one_sided,
             max_total: u32_at(rest).expect("length checked"),
-            tactics: SearchTactics::from_bits(u16::from_le_bytes([bytes[rest + 4], bytes[rest + 5]]))?,
+            tactics,
             version,
         })
     }

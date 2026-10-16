@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """One line of runs.jsonl for each timed run of run.sh (the rate runs t1, t2, ... and the setup-only runs).
 
-usage: summarize.py RUNS_DIR CLOUD_RESULTS TAG [TAG ...] > runs.jsonl     (from rust/bench/frontier)
+usage: summarize.py RUNS_DIR CLOUD_RESULTS TAG [TAG ...] > runs.jsonl     (from rust/bench/chain_end)
 
 RUNS_DIR/TAG/ holds what run.sh kept.  CLOUD_RESULTS is the cloud run's results file, whose last line is the
 incomplete line of game 3441 at the checkpoint: the counts of a run are the incomplete line it appended to its own
