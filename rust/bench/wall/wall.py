@@ -1,5 +1,5 @@
 #!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
-"""The wall regime's tables: docs/EXPERIMENTS.md, "The wall regime (2026-10)".
+"""The wall regime's tables: docs/experiments/the-wall-regime-2026-10.md.
 
 What a game of the chain costs is its search, which grows with the size of the tree, plus everything around the search,
 which grows with the board size n alone.  `examples/wall.rs` measures the two apart; its output is in this directory

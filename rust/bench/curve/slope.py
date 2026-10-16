@@ -1,14 +1,14 @@
 #!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
-"""What drives the slope of the cost curve: the tables of docs/EXPERIMENTS.md, "What drives the slope (2026-10)".
+"""What drives the slope of the cost curve: the tables of docs/experiments/what-drives-the-slope-2026-10.md.
 
 Reads the recorded chain (nodes on 4 threads, proofs), slope_roots.jsonl (`slope roots`: the root of every non-prime
 game 880-1300 and of the games past 1300 that bands.jsonl solved) and slope_proofs.jsonl (`slope prove`: one-thread
 searches with the incumbent at the optimum plus a margin delta; delta = 0 for every searched game, more margins for
-some), joins them by n and prints markdown.  The commands that made the data files are in EXPERIMENTS.md.  Pure
+some), joins them by n and prints markdown.  The commands that made the data files are in that entry.  Pure
 Python (no numpy); `./slope.py > slope_output.md`.
 
 The recorded chain is results/strict.jsonl as of commit 2487671 (STRICT_COMMIT), read from git: the 1..1300 chain of
-the older build, whose node counts EXPERIMENTS.md quotes.  The file was replaced by the GF(2) build's chain at 0133afe
+the older build, whose node counts that entry quotes.  The file was replaced by the GF(2) build's chain at 0133afe
 and 0b5a136, and with that one the script stops at its check of the caps of the games past 1300.  `--strict PATH`
 reads another file instead.
 """
@@ -118,7 +118,7 @@ def gaps(r):
 
 
 def main(argv):
-    parser = argparse.ArgumentParser(description="The tables of EXPERIMENTS.md, 'What drives the slope'.")
+    parser = argparse.ArgumentParser(description="The tables of docs/experiments/what-drives-the-slope-2026-10.md.")
     parser.add_argument("--strict", type=Path,
                         help=f"the recorded chain (default: {STRICT_FILE} as of {STRICT_COMMIT[:7]}, from git)")
     strict = {r["n"]: r for r in recorded_chain(parser.parse_args(argv).strict)}

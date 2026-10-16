@@ -3,8 +3,8 @@
 //! search's bound is the crate's `taxman::gf2` (tactic `gf2`), which `prove` runs; the other commands are the study
 //! that led to it and use its research implementation, `common/meet.rs` (the matroids built afresh at each node, a
 //! reference algorithm and a fast one), which stays as an independent check of the crate's (`nodes` asserts that the
-//! crate's contraction gives the matroids built at the node).  The studies are in docs/EXPERIMENTS.md, "Matroid
-//! intersection bounds (2026-10)" and "The GF(2) bound in the search (2026-10)".
+//! crate's contraction gives the matroids built at the node).  The studies are in
+//! docs/experiments/matroid-intersection-bounds-2026-10.md and docs/experiments/the-gf2-bound-in-the-search-2026-10.md.
 //!
 //! ```text
 //! cargo run --release --example matroid -- roots [--known FILE] [--opts FILE] N|A-B...

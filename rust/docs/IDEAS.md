@@ -98,7 +98,7 @@ What follows for the ideas:
 
 A fourth game, 1295 (25 s), gives the same split to within two points (repairs 58.1%, peels 20.8%; strong branching
 29.0%, making children 25.5%, refinement 19.8%).  (This is the solver before the Lagrangian bound; with it, the
-profile of EXPERIMENTS.md, "Faster nodes with the Lagrangian bound, same trees", has the Lagrangian levels at a
+profile of experiments/faster-nodes-with-the-lagrangian-bound-same-trees-2026-10.md has the Lagrangian levels at a
 quarter of the time and strong branching at 11-20%.)  `tools/profile/profile.sh N SECONDS THREADS OUTDIR` reproduces any
 of them; the probe (`examples/perf.rs`) agrees on the hot kernels (a strong-branching exclusion costs 9-12 k cycles,
 a step 16-17 k).
@@ -235,13 +235,13 @@ it, replayed by the referee as always.  It needs a proof kind (a repeat of game 
 assumes), the digest in the result line or recomputed when the range starts, and the two verifiers.  The payoff is a
 constant fraction of the chain, at no risk, and it multiplies with everything else here.
 Implemented as the tactic and proof kind `same_search`
-([EXPERIMENTS, "Same search"](EXPERIMENTS.md#same-search-2026-10)).
+([EXPERIMENTS, "Same search"](experiments/same-search-2026-10.md)).
 
 ### 4.2 A Lagrangian bound over the nogoods (rank 2)
 
 Done since: kept incrementally, and with the forced members its potentials give, it is the tactic `lagrange`, on by
 default, about 3 times fewer cycles on the proofs of 1184-1300
-([EXPERIMENTS.md](EXPERIMENTS.md#a-lagrangian-bound-over-the-nogoods-2026-10)).
+([EXPERIMENTS.md](experiments/a-lagrangian-bound-over-the-nogoods-2026-10.md)).
 
 *Mechanism.*  The matching bound knows no nogood.  Every completion `F` of a node with promotions `P` promotes at most
 `|N − P| − 1` members of each nogood `N`; dualizing these inequalities with multipliers `λ_N ≥ 0` gives, for every
@@ -446,10 +446,10 @@ experiment.  "Pilot" refers to section 4.
   candidates with the same neighbourhoods) is rare, since a number's maximal factors determine it (up to those
   missing from the frame).  High cost, unknown payoff; not tried.  A first, cheap look would count pairs with
   nested neighbourhoods in a frame.  *Piloted later*: [EXPERIMENTS, "Dominance and
-  symmetry"](EXPERIMENTS.md#dominance-and-symmetry-2026-10) (no twins, literal dominance at a few percent of the nodes).
+  symmetry"](experiments/dominance-and-symmetry-2026-10.md) (no twins, literal dominance at a few percent of the nodes).
 * *Symmetry breaking*: none found here; there are symmetries after all, exchanges of primes that the frame builder
   treats alike, and breaking them is a constant factor ([the same
-  entry](EXPERIMENTS.md#dominance-and-symmetry-2026-10)).
+  entry](experiments/dominance-and-symmetry-2026-10.md)).
 * *Nogood recording on restarts*: subsumed by the existing nogoods.
 
 **From #SAT and model counting**

@@ -1135,7 +1135,7 @@ fn shared_spill_dir(opts: &SolveOptions) -> Option<PathBuf> {
 /// How far back a game looks for an earlier game whose search problem it repeats (tactic `same_search`): the board
 /// sizes `n − SAME_SEARCH_WINDOW` to `n − 1`.  A board's frames change a little with each number: each of the 1457
 /// games of the committed chain 1..3440 whose problem an earlier game posed repeats the last board size before it that
-/// set a search up, `n − 1`, or `n − 2` when `n − 1` is prime (docs/EXPERIMENTS.md, "Same search").  The window
+/// set a search up, `n − 1`, or `n − 2` when `n − 1` is prime (docs/experiments/same-search-2026-10.md).  The window
 /// keeps the setups a range starts with to a few, and makes the game repeated a function of the window's games alone.
 pub const SAME_SEARCH_WINDOW: u32 = 8;
 

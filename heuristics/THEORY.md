@@ -789,8 +789,8 @@ of times.  Over another field it would miss more: over GF(3) or the
 rationals the unsigned vectors of a triangle of moves are independent.
 The same construction, frame by frame, bounds the frame model's
 promotions (Theorem 11, below), and the two agree at every root
-measured ([rust/docs/EXPERIMENTS.md, "Matroid intersection
-bounds"](../rust/docs/EXPERIMENTS.md#matroid-intersection-bounds-2026-10)).
+measured ([Matroid intersection
+bounds](../rust/docs/experiments/matroid-intersection-bounds-2026-10.md)).
 What the bound buys the prover's search is in the evidence table
 below.
 
@@ -850,10 +850,10 @@ of 936-1300 hold 18-65 movers, and Lorea's matroid misses them too).  And
 Theorem 10's bound equals in_the_bag plus Theorem 11's at every root
 of 880-1300; its gap to opt(n) is a tenth of the Franklín–Moniot
 bound's to 1300.  The measurements are in
-rust/docs/EXPERIMENTS.md ("Matroid intersection bounds", "The GF(2)
-bound in the search"); the search's forced members rest on weak
-duality for a weight split, as Theorem 10's certificate does
-(`gf2::meet`).
+rust/docs/experiments/matroid-intersection-bounds-2026-10.md and
+rust/docs/experiments/the-gf2-bound-in-the-search-2026-10.md; the
+search's forced members rest on weak duality for a weight split, as
+Theorem 10's certificate does (`gf2::meet`).
 
 ## Prime exchanges: symmetries of the promotions
 
@@ -862,8 +862,9 @@ divisibility.  Where it maps the frame model's root onto itself, it
 maps promotion sets to promotion sets, and no optimal set is improved
 by it, which orders the two primes' shares in every optimal set at
 once.  This is the solver's tactic `symmetry` (rust/DESIGN.md,
-section 4, "Prime exchanges"; rust/docs/EXPERIMENTS.md, "Dominance
-and symmetry", found the exchanges and measured them).
+section 4, "Prime exchanges";
+rust/docs/experiments/dominance-and-symmetry-2026-10.md found the
+exchanges and measured them).
 
 For primes p < q let π = π_{p,q} send p^a q^b m (m prime to pq) to
 p^b q^a m.  For a set S of numbers and a prime r let
@@ -938,8 +939,8 @@ under w_μ (of members of positive weight, and no more than the node
 can still promote), plus μ (c_q(P) − c_p(P)), bounds every such
 completion: a Lagrangian relaxation of the inequality (weak duality,
 as for Theorem 11's weight split).  The solver uses the first two;
-the third was measured and not kept (rust/docs/EXPERIMENTS.md, "Prime
-exchanges in the search").
+the third was measured and not kept
+(rust/docs/experiments/prime-exchanges-in-the-search-2026-10.md).
 
 These hold for the search of the root's problem, whose subtrees all
 are; a search of one node's completions for their own best (as some
@@ -1621,8 +1622,9 @@ with a nonzero diagonal under every choice of nonzero entries, over
 every field.  Each such choice gives a matroid per frame in which
 every promotable set is independent, and the GF(2) bound and any
 number of them combine by Lagrangian multipliers into one bound
-(the fields study, rust/docs/EXPERIMENTS.md, "A bound over GF(2) and
-GF(3) signed frame matroids", which measured it).
+(the fields study,
+rust/docs/experiments/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10.md,
+which measured it).
 
 Fix a state and a frame h of it, with factors F_h and moves M_h; its
 *movers* are its moves and the candidates of home h + 1, and the
@@ -2011,7 +2013,7 @@ number.  Three consequences:
   half (members above the factors they list) and the frames are
   instances of the two-rank problem that their Theorem 2 shows hard in
   general, and the gap left by Theorem 11 is the odd cores of frames
-  1–3 (rust/docs/EXPERIMENTS.md, "The anatomy of the gap").  So
+  1–3 (rust/docs/experiments/the-anatomy-of-the-gap-2026-10.md).  So
   wherever (♦) or the parity bound is exact in Taxman, the exactness
   comes from the arithmetic, not the structure.  This matches what the
   adversarial experiments on (♦) found.

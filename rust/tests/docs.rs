@@ -344,8 +344,10 @@ fn prose_files() -> Vec<PathBuf> {
             }
         }
     }
-    let mut files: Vec<PathBuf> =
-        ["README.md", "DESIGN.md", "docs/EXPERIMENTS.md"].iter().map(|name| crate_dir().join(name)).collect();
+    let mut files: Vec<PathBuf> = ["README.md", "DESIGN.md", "docs/EXPERIMENTS.md", "docs/STATUS.md"]
+        .iter()
+        .map(|name| crate_dir().join(name))
+        .collect();
     rust_files(&crate_dir().join("src"), &mut files);
     files
 }
@@ -442,12 +444,22 @@ const RETIRED_NAMES: &[Retired] = &[
 ];
 
 /// Phrases that contain a retired word and stay: the heuristics' and the matroids' own meanings, and plain English
-/// that is not about the frame model.
-const STAYS: &[&str] =
-    &["frontier argument", "frontier jam", "odd core", "odd cores", "memory cap", "mem-cap", "cap reached"];
+/// that is not about the frame model, and the name of the entry "The frontier chain to 3440", which the guides use when
+/// they point to it.
+const STAYS: &[&str] = &[
+    "frontier argument",
+    "frontier jam",
+    "frontier chain",
+    "odd core",
+    "odd cores",
+    "memory cap",
+    "mem-cap",
+    "cap reached",
+];
 
-/// The files the check skips: this one, which lists the words.
-const SKIPPED: &[&str] = &["tests/docs.rs"];
+/// The files the check skips: this one, which lists the words, and the entries of the lab notebook, which are history
+/// and keep the words of their time.
+const SKIPPED: &[&str] = &["tests/docs.rs", "docs/experiments/"];
 
 /// `line` with the targets of its links (`](target)`) taken out: a target names a file or an anchor, not a word.
 fn without_link_targets(line: &str) -> String {
@@ -495,13 +507,12 @@ fn retired_in(lines: &[String], lists: &[&[Retired]]) -> Vec<(usize, &'static st
     found
 }
 
-/// The part of EXPERIMENTS.md that describes the present: its introduction, the register and the index of rounds.
-/// The dated entries after them are history and keep the words of their time, as does the note that maps those words,
-/// and so do the titles of the entries in the first column of the index.  The other lines are blanked, so that line
-/// numbers stay.
+/// The front page, EXPERIMENTS.md, describes the present: all of it, but for the note that maps the old words, which
+/// keeps them, and the titles of the entries in the first column of the index, which keep the words of their time.
+/// Those are blanked or cut, so that line numbers stay.  The entries themselves (`docs/experiments/`) are history and
+/// are skipped (see `SKIPPED`).
 fn experiments_now(text: &str) -> String {
-    let (now, history) = text.split_once("\n## The port and its first improvements").expect("the first round");
-    let (before, after) = now.split_once("## Terms changed (2026-10)").expect("the note on the terms changed");
+    let (before, after) = text.split_once("## Terms changed (2026-10)").expect("the note on the terms changed");
     let (note, register) = after.split_once("\n## Register of everything tried").expect("the register");
     let blank = |part: &str| vec![""; part.lines().count()].join("\n");
     let titles_out = |line: &str| match line.starts_with("| [") {
@@ -509,7 +520,7 @@ fn experiments_now(text: &str) -> String {
         false => line.to_owned(),
     };
     let register: Vec<String> = register.lines().map(titles_out).collect();
-    format!("{before}{}\n## Register of everything tried\n{}\n{}", blank(note), register.join("\n"), blank(history))
+    format!("{before}{}\n## Register of everything tried\n{}", blank(note), register.join("\n"))
 }
 
 /// The prose of a file as lines: a markdown file's text, a Rust file's comments, a shell script's comments, with code

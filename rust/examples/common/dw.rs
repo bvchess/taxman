@@ -32,15 +32,16 @@
 //! `z(S) ≤ r_k(S)` (Edmonds' description of a matroid's polytope) rather than by columns of independent sets linked
 //! element by element: that master (link rows `Σ_j α_j [x ∈ Q_j] − Σ_i β_{k,i} [x ∈ I_{k,i}] ≤ ε`, the design's) was
 //! built and measured first, and its simplex spent nearly all its pivots in steps of the size of the perturbation
-//! (docs/EXPERIMENTS.md).  A rank inequality's dual `μ_{k,S} ≥ 0` gives `λ_{k,x} = Σ_{S ∋ x} μ_{k,S}`, and then
-//! `G_k(λ_k) ≤ Σ_S μ_{k,S} r_k(S)`, so the master's dual is a Lagrangian bound's, and at the LP's optimal duals they
-//! coincide.  A pricing at multipliers `λ` is one evaluation of `L(λ)`, a valid bound, and its intersection's set
-//! is a column.  The inequalities are found from the master's point `z = Σ_j α_j 1_{Q_j}`: cheaply (in each matroid
-//! the most violated level set of `z`, and the dependent support sets), and when that finds none, exactly (for each
-//! matroid, the largest `y ≤ z` in its polytope, by a small column generation over its independent sets; `y = z`
-//! exactly when `z` is in the polytope, and otherwise a level set of its final duals is violated).  When every
-//! matroid's check passes, `ẑ = min(z, y_1, y_2, …)` lies in every polytope (all are down-closed), and its weight is
-//! a *certified* lower bound `LB` on the LP; with the lowest `L` found it brackets the LP.
+//! (docs/experiments/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10.md).  A rank inequality's dual
+//! `μ_{k,S} ≥ 0` gives `λ_{k,x} = Σ_{S ∋ x} μ_{k,S}`, and then `G_k(λ_k) ≤ Σ_S μ_{k,S} r_k(S)`, so the master's dual is
+//! a Lagrangian bound's, and at the LP's optimal duals they coincide.  A pricing at multipliers `λ` is one evaluation
+//! of `L(λ)`, a valid bound, and its intersection's set is a column.  The inequalities are found from the master's
+//! point `z = Σ_j α_j 1_{Q_j}`: cheaply (in each matroid the most violated level set of `z`, and the dependent support
+//! sets), and when that finds none, exactly (for each matroid, the largest `y ≤ z` in its polytope, by a small column
+//! generation over its independent sets; `y = z` exactly when `z` is in the polytope, and otherwise a level set of its
+//! final duals is violated).  When every matroid's check passes, `ẑ = min(z, y_1, y_2, …)` lies in every polytope (all
+//! are down-closed), and its weight is a *certified* lower bound `LB` on the LP; with the lowest `L` found it brackets
+//! the LP.
 //!
 //! Before the master, Polyak steps from `λ = 0` (or a given start) towards the target; then Wentges-stabilized
 //! pricing at `½ λ_best + ½ λ_master`, or at `λ_master` when that prices nothing out, until nothing prices out or

@@ -1,8 +1,8 @@
 # The certificates of U: the work list of 2176-3440, and the data it is made from
 
 What a certificate is and what it proves: DESIGN.md, ["Certificates of U"](../../DESIGN.md#certificates-of-u), and
-heuristics/THEORY.md, the corollary of Theorem M⁺.  What the files below showed: docs/EXPERIMENTS.md, ["Certificates
-past 2175"](../../docs/EXPERIMENTS.md#certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10).
+heuristics/THEORY.md, the corollary of Theorem M⁺.  What the files below showed: ["Certificates
+past 2175"](../../docs/experiments/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10.md).
 Everything ran on the M1 Max, one thread, `nice -n 10`, on the code of commit 35c614b, from `rust/`, against the
 committed chain (`results/strict.jsonl`, games 1..3440) and the prover's barred bounds (`prover/data/upper_*.jsonl`).
 `U` stands for the four `--upper` files (2..1300, 1301..2175, 2176..3314, 3315..3440).
@@ -12,7 +12,7 @@ committed chain (`results/strict.jsonl`, games 1..3440) and the prover's barred 
 | `problems_600_3440.jsonl` | `extended problems 600 3440 U --known results/strict.jsonl --out problems_600_3440.jsonl` (`cargo build --release --example extended`; 79 s) | one line per game of 600..3440 that needs a certificate (1,575): its extended problem Π⁺(O) set up without a search (frames, two-sided and one-sided candidates, rejected sources, in_the_bag⁺, the recorded game's worth, the GF(2) block words, the set width `certify` takes, the digest) and `same_as`, the latest game of the 8 board sizes before it with the same problem (340, every one of equal worth: the games `certify` settles with no search) |
 | `certificates_600_1300.jsonl` | `taxman certify 600-1300 --results results/strict.jsonl U --out certificates_600_1300.jsonl --threads 1 --progress 0` (39 s) | a certificate for each of the 377 games of 600..1300 that need one: 296 certified by a search, 81 by the same problem as an earlier game; `taxman verify-certificates` passes it (4.6 s) |
 | `certificates_claims_600_1300.jsonl` | `taxman certify 600-1300 --results results/strict.jsonl --upper prover/data/upper_2_1300.jsonl --out certificates_claims_600_1300.jsonl --threads 1 --progress 0` (code of commit cd959d1, the extended problem with the claims of `unzip` that Lemma M5⁺ keeps; 29 s of search) | the same 377 games, every one `certified` again, each line with `"claims": true`: 276 by a search (the very nodes of the searches above, 296,743) and 101 by the same problem, the 81 above and 20 more whose problems differ only by claims (611 on 609, ...); `verify-certificates` passes it beside the file above |
-| `problems_claims_600_3440.jsonl` | `extended problems 600 3440 U --known results/strict.jsonl --out problems_claims_600_3440.jsonl` (code of commit cd959d1, with the claims; 78 s) | `problems_600_3440.jsonl` again in the formulation with the claims (each line with `"claims": true`): 361 games with a `same_as` against 340 (the 20 of 600..1300 and 1371); the claims change the problem of 346 of the 1,575 games (231 of the 377 of 600..1300, 43 of the 490 of 1301..2175, 72 of the 708 of 2176..3440, none past 2688): the frame of layer 3 that holds most sources holds open ones and keeps no claim, so none of the 115 repeats the rule could not settle (3427 among them) is settled (docs/EXPERIMENTS.md, "The claims of `unzip` in the extended problem") |
+| `problems_claims_600_3440.jsonl` | `extended problems 600 3440 U --known results/strict.jsonl --out problems_claims_600_3440.jsonl` (code of commit cd959d1, with the claims; 78 s) | `problems_600_3440.jsonl` again in the formulation with the claims (each line with `"claims": true`): 361 games with a `same_as` against 340 (the 20 of 600..1300 and 1371); the claims change the problem of 346 of the 1,575 games (231 of the 377 of 600..1300, 43 of the 490 of 1301..2175, 72 of the 708 of 2176..3440, none past 2688): the frame of layer 3 that holds most sources holds open ones and keeps no claim, so none of the 115 repeats the rule could not settle (3427 among them) is settled (docs/experiments/the-claims-of-unzip-in-the-extended-problem-2026-10.md) |
 | `plan.jsonl`, `plan.md`, `lists/*.txt` | `tools/certify_plan.py --results results/strict.jsonl --upper prover/data/upper_2176_3314.jsonl prover/data/upper_3315_3440.jsonl --problems bench/certify/problems_600_3440.jsonl --gaps bench/wall/gaps_chain.jsonl bench/wall/gaps_chain_3313_3440.jsonl --from 2176 --to 3440 --era 2176-3310:6.396 --era 3311-3440:16.57 --out-dir bench/certify` | the work list of the campaign and its estimate: per game of 2176..3440 whether it needs a certificate, why it costs what it is expected to cost, and the list files `taxman certify --list` takes (`plan.md` is the summary the owner's approval reads) |
 
 The campaign itself (the owner's approval, the phases, the stop rule of the pilot) has its own files, made on the same
@@ -31,8 +31,8 @@ section 11](../../tools/cloud/RUNBOOK.md#11-certifying-u-stage-4).
 
 **The two eras.**  `certify_plan.py` prices a search by its nodes, at the thread-seconds per node that the chain's own
 run paid in each stretch of it, since the chain ran several searches at once and a game's recorded seconds are the
-time it shared the machine.  The wall times are the run's (docs/EXPERIMENTS.md, [the cloud run to
-3440](../../docs/EXPERIMENTS.md#the-frontier-chain-to-3440-2026-10)): games
+time it shared the machine.  The wall times are the run's ([the cloud run to
+3440](../../docs/experiments/the-frontier-chain-to-3440-2026-10.md)): games
 2176..3310 in 23,025 s on the first instance (window 16), and 3311..3440 on the second (window 4) in its 62,701 s less
 the 3,054 s that the unfinished 3441's 625.8 million nodes took at its measured 205 thousand nodes a second, 59,647 s.
 The recorded seconds over-count the first era 3.27 times and the second 1.55 times; `plan.md` gives the total from

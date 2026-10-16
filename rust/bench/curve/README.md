@@ -7,7 +7,7 @@ chain.
 This is the curve of the matching path, the search before the GF(2) bound.  The search with the GF(2) bound (the
 default since 2026-10) changes it: a chain from 1300 reached 2175 in 92 minutes on 2 threads, with no growth a fit
 resolves; its curve and projections are in
-[docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#the-gf2-bound-in-the-search-2026-10) and its data in `bench/gf2/`.  The
+[docs/EXPERIMENTS.md](../../docs/experiments/the-gf2-bound-in-the-search-2026-10.md) and its data in `bench/gf2/`.  The
 first 2175 games of the committed `results/strict.jsonl` are a chain from n = 1 made with it, in 27 minutes on 8 threads
 ([results/README.md](../../results/README.md)); the file reaches 3440 now.
 
@@ -36,7 +36,7 @@ first 2175 games of the committed `results/strict.jsonl` are a chain from n = 1 
 | `scaling.jsonl` | step 4, thread scaling of the proof of 1225 |
 | `recheck.jsonl` | four games repeated at the end, to see run-to-run and background-load noise |
 | `load.jsonl` | what the machine was doing apart from us, sampled before and after each invocation |
-| `slope_roots.jsonl`, `slope_proofs.jsonl`, `slope.py` | the later study of what drives the slope: `examples/slope.rs`'s root measurements of the non-prime games 880-1300 and of this study's games past 1300, its one-thread proofs (with margins), and the script that makes its tables, from `results/strict.jsonl` as of commit 2487671 (the 1..1300 chain of the older build, read from git; `--strict PATH` for another file) ([docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#what-drives-the-slope-2026-10)) |
+| `slope_roots.jsonl`, `slope_proofs.jsonl`, `slope.py` | the later study of what drives the slope: `examples/slope.rs`'s root measurements of the non-prime games 880-1300 and of this study's games past 1300, its one-thread proofs (with margins), and the script that makes its tables, from `results/strict.jsonl` as of commit 2487671 (the 1..1300 chain of the older build, read from git; `--strict PATH` for another file) ([docs/EXPERIMENTS.md](../../docs/experiments/what-drives-the-slope-2026-10.md)) |
 
 Regenerate the tables with `./analysis.py > analysis_output.md` (and the slope study's with `./slope.py`).
 
@@ -67,8 +67,8 @@ Regenerate the tables with `./analysis.py > analysis_output.md` (and the slope s
 * The thread-scaling step was cut down to one game (1225, 1-8 threads, no 10); the band sampling stopped after three
   games of band 1350 and no further bands.  For 1215 the proof-only scaling from the engine work (65.0 s on 1 thread,
   28.3 s on 2, 17.7 s on 4, 11.4 s on 8) is cited, not re-measured here.  It is a different run from the one in
-  [docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md) ("Benchmarks", 62.5, 24.6, 15.8 and 12.9 s on 1, 2, 4 and 6 threads,
-  an earlier build), and the two are not comparable thread for thread.
+  [Benchmarks](../../docs/experiments/benchmarks-the-probe-pgo-and-scaling.md) (62.5, 24.6, 15.8 and 12.9 s on 1, 2, 4
+  and 6 threads, an earlier build), and the two are not comparable thread for thread.
 * The stopping rule of step 3 ("stop after the first band where at least half time out") was **not reached**: the
   last band had no timeouts, and its games take 510-540 s, just under the limit.  Step 3 used 62 minutes of the 3
   hours the study was given (3241 s of recorded runs, 477 s discarded).
@@ -77,11 +77,11 @@ Regenerate the tables with `./analysis.py > analysis_output.md` (and the slope s
 
 ### Chain baseline (step 1)
 
-231 games in **318 s** on 8 threads (149 s for 1001-1217, which [docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md) gives
-as 164 s for an earlier build, and 169 s for 1218-1231).  34 primes cost 0.43 s together, 70 non-primes reach the
-ceiling with their seed (0 nodes; 6.9 s in all, i.e. setup), 117 small searches take 110 s, and 10 big ones (chain >= 5
-s) take 200 s.  The slowest: 1230 (91.5 s, 29% of the whole chain), 1227 (19.7 s), 1220 (19.6 s), 1025 (18.0 s), 1225
-(17.0 s).
+231 games in **318 s** on 8 threads (149 s for 1001-1217, which [the
+benchmarks](../../docs/experiments/benchmarks-the-probe-pgo-and-scaling.md) give as 164 s for an earlier build, and 169
+s for 1218-1231).  34 primes cost 0.43 s together, 70 non-primes reach the ceiling with their seed (0 nodes; 6.9 s in
+all, i.e. setup), 117 small searches take 110 s, and 10 big ones (chain >= 5 s) take 200 s.  The slowest: 1230 (91.5 s,
+29% of the whole chain), 1227 (19.7 s), 1220 (19.6 s), 1025 (18.0 s), 1225 (17.0 s).
 
 ### Calibration: standalone against chained (step 2)
 
@@ -262,7 +262,7 @@ still be better than this estimate.
   in the frame structure (a further frame, more candidates) could bend the curve; the data show a x18 step and
   x2 and x3 steps, so the single-step uncertainty is large.  Costs past ~1700 (years of 192-CPU time) are only an
   order-of-magnitude statement.  A later study
-  ([docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md#what-drives-the-slope-2026-10)) found that a proof's cost follows
+  ([docs/EXPERIMENTS.md](../../docs/experiments/what-drives-the-slope-2026-10.md)) found that a proof's cost follows
   the gap between the root's bound and the optimum, not n: for the proofs, the slope fitted here is the steep rise of
   that gap over 1190-1300, which did not go on in the games sampled past 1300 (these bands; the standalone cost of
   band 1350 is mostly finding its optimum).
@@ -272,8 +272,8 @@ still be better than this estimate.
 * **Hardware multiplier.**  The 19x / 10x factors are assumptions of the study.  Measured here: 5.7-8.4x on 8 threads
   over 1 thread, and a falling node rate per thread (-19% at 8); no data above 8 threads, none for Graviton5.  The
   ramp-up and tail of a 192-thread run are negligible for games of minutes (all workers are busy within 3 ms,
-  [docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md)), but the cheap games of a chain, each a second or less, cannot use
-  192 CPUs.
+  [the benchmarks](../../docs/experiments/benchmarks-the-probe-pgo-and-scaling.md)), but the cheap games of a chain,
+  each a second or less, cannot use 192 CPUs.
 * **Limit 585 s** instead of 600 s (see above); no run hit it, so it does not affect the data.
 * **Background load**, see above.  The timing of single multi-thread runs varies by +-10-25% from the search
   alone.

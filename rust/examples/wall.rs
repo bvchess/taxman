@@ -1,8 +1,7 @@
 //! The wall regime: how the solver's costs grow with the board size `n` and with the size of a search tree.  What a
 //! game of the chain costs is its search, which grows with the tree, plus everything around the search, which grows
 //! with `n` alone (the tables, the frames, the model, the GF(2) matroids of the root, the replays); the commands
-//! measure the two apart.  The study, its data and its conclusions are in docs/EXPERIMENTS.md, "The wall regime
-//! (2026-10)".
+//! measure the two apart.  The study, its data and its conclusions are in docs/experiments/the-wall-regime-2026-10.md.
 //!
 //! ```text
 //! cargo run --release --example wall -- setup [--known FILE] [--repeat R] [--width W] N|A-B...

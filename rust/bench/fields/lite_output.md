@@ -169,7 +169,7 @@ A node is cut when the mode's bound (the lower of it and the node's GF(2) bound)
 | 1215 | root | 300 | 167 | 209 | 42 of 133 (32%) | 58.6 | 5.2 |
 | 1215 | node | 300 | 167 | 281 | 114 of 133 (86%) | 31.4 | 577.3 |
 
-The recorded figures (rust/docs/EXPERIMENTS.md): GF(2) alone, "Matroid intersection bounds (2026-10)"; the LP over all conflicts, "How far can nogoods go (2026-10)"; the per-frame bound at every 10th node (the root's multipliers to 20 steps of the node's own), "The per-frame bound (2026-10)".  Here: cuts of the nodes in the data.
+The recorded figures (rust/docs/experiments/): GF(2) alone, "Matroid intersection bounds (2026-10)"; the LP over all conflicts, "How far can nogoods go (2026-10)"; the per-frame bound at every 10th node (the root's multipliers to 20 steps of the node's own), "The per-frame bound (2026-10)".  Here: cuts of the nodes in the data.
 
 | n | GF(2), recorded | GF(2), here | all conflicts, recorded | per-frame, recorded | root mode, here | node mode, here |
 |---|---|---|---|---|---|---|

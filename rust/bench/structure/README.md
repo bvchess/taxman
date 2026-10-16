@@ -13,18 +13,20 @@ structure`, from `rust/`).
 To resume or extend the run into the file, `gunzip -k structure_2_8191.jsonl.gz` first: `--out` appends to a file and
 skips the boards it already has.
 
-Setup has numbered the frames by layer since (docs/EXPERIMENTS.md, "The frame model by layer, and the extended
-problem"); the census run again on that code (one thread) reproduces every line of the file but for `secs`, and the
-summary but for the seconds, so the data stand for both numberings, which are the same on every board here.
+Setup has numbered the frames by layer since ([The frame model by layer, and the extended
+problem](../../docs/experiments/the-frame-model-by-layer-and-the-extended-problem-2026-10.md)); the census run again on
+that code (one thread) reproduces every line of the file but for `secs`, and the summary but for the seconds, so the
+data stand for both numberings, which are the same on every board here.
 
 The census has since recorded, per board, the frames of the extended problem with every source of three or more prime
-factors open (`extended_frames`, the most any set of open sources gives; docs/EXPERIMENTS.md, "One-sided candidates in
-the search"), and the files here are its run on that code (`structure 2 8191 --threads 1`, 814 s summed over the
-boards): every line of the earlier file is in the new one, field for field but for `secs`, with `extended_frames`
-added, and the summary has two rows more.  The extended problem needs 9 frames on 2048..4095 and 10 on every board from
-4096, which a frame set (9 at most) cannot hold: certificates past 4095 wait for a tenth frame.
+factors open (`extended_frames`, the most any set of open sources gives; [One-sided candidates in
+the search](../../docs/experiments/one-sided-candidates-in-the-search-2026-10.md)), and the files here are its run on
+that code (`structure 2 8191 --threads 1`, 814 s summed over the boards): every line of the earlier file is in the new
+one, field for field but for `secs`, with `extended_frames` added, and the summary has two rows more.  The extended
+problem needs 9 frames on 2048..4095 and 10 on every board from 4096, which a frame set (9 at most) cannot hold:
+certificates past 4095 wait for a tenth frame.
 
-Since Lemma M5⁺ (heuristics/THEORY.md; docs/EXPERIMENTS.md, "The claims of `unzip` in the extended problem") the
+Since Lemma M5⁺ (heuristics/THEORY.md; docs/experiments/the-claims-of-unzip-in-the-extended-problem-2026-10.md) the
 census also checks that the extended problem with nothing open and the claims of `unzip` is the frame model's problem
 (check H), and records per board the back claims at risk of the lemma's check and those that some set of open sources
 refuses (`m5_at_risk`, `m5_refused`, with their counts).  The files here are its run on the code of that change

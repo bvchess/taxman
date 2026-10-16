@@ -1,6 +1,6 @@
 //! What drives the slope of the cost curve: the root of each game measured against what its search cost, and
 //! proofs searched with every bound tightened by a known margin.  The study, its data and its conclusion are in
-//! docs/EXPERIMENTS.md, "What drives the slope (2026-10)".
+//! docs/experiments/what-drives-the-slope-2026-10.md.
 //!
 //! ```text
 //! cargo run --release --example slope -- roots [--known FILE] [--sums FILE] [--tactic NAME=VALUE]... [--depth D]

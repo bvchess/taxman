@@ -3,7 +3,7 @@
 #
 # It runs from a checkout whose solver (rust/) and prover (rust/prover/) are built in release mode, on Linux or
 # macOS, and writes the logs of every run to OUTDIR (timed.sh); parse.py turns a directory of them into one table.
-# The phases are the measurements of "Graviton calibration (2026-10)" in rust/docs/EXPERIMENTS.md:
+# The phases are the measurements of rust/docs/experiments/graviton-calibration-2026-10.md:
 #
 #   probe                    the solver's probe (examples/perf.rs), default and GF(2), three times each
 #   ladder [N...]            one-thread proof-only runs (ladder --seed-opt), default 1215 1232 1287 2170 2172

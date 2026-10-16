@@ -331,7 +331,7 @@ projection gave 1475, 1430, 1472 and 1521 1.7 to 2.5 million nodes and 1.5 hours
 and 0.89 million nodes, 4.9, 1.9, 3.0 and 0.6 hours; 1848–1851 took 5.33, 5.33, 4.51 and 4.50 million nodes, 3.0 to 3.6
 hours each, and 2060 and 2064 3.4 and 4.0 hours; 2160 and 1863, on the projection's list, took 0.2 and 0.6 hours.  The
 projection's order of the games put 12 of the 16 dearest among its first 16.
-[EXPERIMENTS.md](../docs/EXPERIMENTS.md#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10) has the
+[EXPERIMENTS.md](../docs/experiments/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10.md) has the
 run's account and what it says about the projection's model.
 
 ### The upper part, game by game
@@ -357,7 +357,7 @@ rest on the frame model need it
 Two files, one thread on the laptop: `data/upper_1301_2175.jsonl`, the committed chain's games 1301–2175 (875 games,
 490 of them needing it; 300 s), and `data/upper_2176_3314.jsonl`, the copy of the EC2 chain's results taken on
 2026-10-15 (games the committed chain now has) that
-[the gap past 2175](../docs/EXPERIMENTS.md#the-gap-past-2175-2026-10) measured (1,139 games, 635 needing it; 1,272 s,
+[the gap past 2175](../docs/experiments/the-gap-past-2175-2026-10.md) measured (1,139 games, 635 needing it; 1,272 s,
 4.1 s for the slowest game).  A third, `data/upper_2_1300.jsonl`, does the same for the table's games 2..1300 (1,299
 games, 665 needing it, 417 of those with nothing open, 1.0% of the members open; 65 s), for the tests of `taxman
 certify` (the frame solver's certificates of U, [DESIGN.md](../DESIGN.md#certificates-of-u)).  A fourth,
@@ -665,7 +665,7 @@ What the data shows:
   solves the two-frame game of frames 0 and 1 for its heaviest promotion set and lowers frame 0's freedoms to that
   set's size, which can cut sets with *more* promotions into frame 0, never fewer.  The frame solver ported it as the
   tactic `revise_freedoms`, measured it and removed it ([which tactics earn their
-  keep](../docs/EXPERIMENTS.md#which-tactics-earn-their-keep-2026-10)).  (`SearchManager.finalReport`, :185-188,
+  keep](../docs/experiments/which-tactics-earn-their-keep-2026-10.md)).  (`SearchManager.finalReport`, :185-188,
   reports an optimum with fewer promotions than `maxTotalPromotions` as "max promotions was over-estimated".)
 * **833 refutes the comment's "theorem" for the whole frame game.**  The exchange above is a promotable set: the
   optimal game promotes 48 numbers and the longest 49, which is the frame model's `max_total`
