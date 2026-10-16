@@ -1254,11 +1254,14 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
 * **Command line** (`tests/cli.rs`): every subcommand's happy path and its usage errors through the real binary;
   `bench --history FILE` keeps the tracked `bench/history.jsonl` out of the tests.
 * **Documentation** (`tests/docs.rs`): the table of tactics in section 5 matches the code; every relative link and
-  `#anchor` in the markdown files resolves; the README's table of the fields of a result line, and its example line,
-  have the keys the code writes; its reading order is the module map of `src/lib.rs`; `rust-version` is what the README
-  and `setup.sh` say; the docs call `unzip`'s moves *mandatory*, never *forced*; and the guides and comments of the
-  repository do not use the words the project has retired (the list, with what to say instead, is in the test; the
-  entries of docs/experiments/ and the note of EXPERIMENTS.md that maps their words are exempt).
+  `#anchor` in the markdown files resolves; each entry of the lab notebook (`docs/experiments/`) opens with its title
+  and a link back and is linked from the register or the index of `docs/EXPERIMENTS.md`, whose only sections are the
+  introduction's; `docs/STATUS.md` is dated and has at most 150 lines; the README's table of the fields of a result
+  line, and its example line, have the keys the code writes; its reading order is the module map of `src/lib.rs`;
+  `rust-version` is what the README and `setup.sh` say; the docs call `unzip`'s moves *mandatory*, never *forced*; and
+  the guides and comments of the repository do not use the words the project has retired (the list, with what to say
+  instead, is in the test; the entries of docs/experiments/ and the note of EXPERIMENTS.md that maps their words are
+  exempt).
 
 A few tests sample what an exhaustive run would cover (every 18th golden board for the peeling agreement, every sixth
 board above 511 for the root promotability of the frame builder's candidates, every second line of the Java fixtures);
