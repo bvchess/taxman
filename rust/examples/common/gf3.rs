@@ -16,6 +16,7 @@
 
 use std::cmp::Reverse;
 use std::collections::HashMap;
+use taxman::json::Json;
 use taxman::model::{Frame, FrameGraph, FrameSet};
 
 /// The marker of a number that has no coordinate, and of a coordinate that has no quotient coordinate.
@@ -279,7 +280,7 @@ pub fn seed(n: u32, frame: usize, index: usize, salt: u64) -> u64 {
 pub type CoreId = usize;
 
 /// A signing of one frame: values on incidences (mover, factor), a default for the others.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Signing {
     /// The frame it signs.
     pub frame: usize,
@@ -322,6 +323,50 @@ impl Signing {
                 1 + (splitmix64(seed ^ g) & 1) as u8
             }
         }
+    }
+
+    /// The signing as the fit files and the checkpoints keep it, frozen: `frame`; `default`, `"ones"` or `"random"`
+    /// with its `seed` as a decimal string (a seed uses all 64 bits, more than a JSON number reads back exactly);
+    /// `fixed`, the `[mover, factor, value]` triples ascending; `mergeable` false.  Its cores are not kept.
+    pub fn to_json(&self) -> Json {
+        let mut fixed: Vec<(u32, u32, u8)> = self.fixed.iter().map(|(&(u, f), &v)| (u, f, v)).collect();
+        fixed.sort_unstable();
+        let mut pairs = vec![("frame", Json::from(self.frame))];
+        match self.default {
+            Default3::Ones => pairs.push(("default", Json::Str("ones".into()))),
+            Default3::Random(seed) => {
+                pairs.push(("default", Json::Str("random".into())));
+                pairs.push(("seed", Json::Str(seed.to_string())));
+            }
+        }
+        let triples =
+            fixed.into_iter().map(|(u, f, v)| Json::Arr(vec![Json::from(u), Json::from(f), Json::from(u32::from(v))]));
+        pairs.push(("fixed", Json::Arr(triples.collect())));
+        pairs.push(("mergeable", Json::Bool(false)));
+        Json::object(pairs)
+    }
+
+    /// The signing of [`to_json`](Self::to_json)'s object, frozen: `mergeable` false, no cores.
+    pub fn from_json(json: &Json) -> Result<Signing, String> {
+        let frame = json.get("frame").and_then(Json::as_u64).ok_or("a signing has no frame")? as usize;
+        let default = match json.get("default").and_then(Json::as_str) {
+            Some("ones") => Default3::Ones,
+            Some("random") => {
+                let seed = json.get("seed").and_then(Json::as_str).ok_or("a random signing has no seed")?;
+                Default3::Random(seed.parse().map_err(|e| format!("seed {seed:?}: {e}"))?)
+            }
+            other => return Err(format!("unknown default {other:?}")),
+        };
+        let mut fixed = HashMap::new();
+        for t in json.get("fixed").and_then(Json::as_arr).ok_or("a signing has no fixed values")? {
+            match (t.at(0).and_then(Json::as_u32), t.at(1).and_then(Json::as_u32), t.at(2).and_then(Json::as_u32)) {
+                (Some(u), Some(f), Some(v @ (1 | 2))) => {
+                    fixed.insert((u, f), v as u8);
+                }
+                _ => return Err("a fixed value is not [mover, factor, 1 or 2]".into()),
+            }
+        }
+        Ok(Signing { frame, default, fixed, cores: Vec::new(), mergeable: false })
     }
 }
 
@@ -462,19 +507,19 @@ impl Matroid3 {
 
     /// max { μ(I) : I independent }, μ indexed like `elems`: the greedy algorithm over the elements of positive
     /// weight, by decreasing weight (ties: lower index first), keeping each element independent of those kept.
-    /// Returns the value and the kept indices, ascending.
+    /// Returns the value (`i64::MAX` if it is more) and the kept indices, ascending.
     pub fn greedy(&self, mu: &[i64]) -> (i64, Vec<usize>) {
         assert_eq!(mu.len(), self.vecs.len(), "a weight for every element");
         let mut order: Vec<usize> = (0..mu.len()).filter(|&i| mu[i] > 0).collect();
         order.sort_by_key(|&i| (Reverse(mu[i]), i));
         let mut basis = Basis3::new(self.rank);
-        let (mut value, mut kept) = (0, Vec::new());
+        let (mut value, mut kept) = (0i64, Vec::new());
         for i in order {
             if basis.rank() == self.rank {
                 break;
             }
             if basis.try_insert(self.vecs[i].clone()) {
-                value += mu[i];
+                value = value.saturating_add(mu[i]);
                 kept.push(i);
             }
         }
@@ -698,6 +743,7 @@ mod tests {
         assert!(!m.independent(&[3]) && !m.independent(&[5, 3]), "a loop");
         assert!(!m.independent(&[5, 5]), "a repeated element");
         assert_eq!(m.greedy(&[1, 5, 3]), (8, vec![1, 2]));
+        assert_eq!(m.greedy(&[i64::MAX, 1, i64::MAX - 1]), (i64::MAX, vec![0, 2]), "the value saturates");
     }
 
     /// The integer determinant by the permutation expansion.

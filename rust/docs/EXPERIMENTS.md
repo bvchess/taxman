@@ -195,7 +195,6 @@ those of the page the row points to; a game is named by its board size, and time
 | The committed chain's 391 searched games of 1301-2175 solved again by the EC2 chain's build (`taxman solve 1301-2175 --threads 1`, in order): trees against the committed chain's | [the gap past 2175](#the-gap-past-2175-2026-10) | measured | the same scores and proofs; 0.29 times the nodes (0.27 at 1301-1500, 0.41 at 2101-2175; the Graviton calibration's chain 0.44 on 2176-2276), 24 minutes of one thread; the committed chain's cost model (3.24 + G/255) is for a build with 3.4 times the trees |
 | The cost model refitted on one build, 1301-3312 (714 exhausted searches): the gap alone and scaled by a power of n, tested out of sample | [the gap past 2175](#the-gap-past-2175-2026-10), [agenda 2](AGENDA.md#2-the-diagnosis-of-the-wall) | measured | 2.67 + G/247 (R² 0.85, sd 0.47) and 2.30 + 0.0479 G/n^0.3 (R² 0.875, sd 0.44); a decade per 250 of gap as before; the gap alone overpredicts later stretches by 0.2-0.6 decades, p = 0.3 has the smallest worst bias (0.27) and 0 to 0.5 bracket it (the two chains disagree: 0-0.2 across 2175, 0.4-0.5 within 2176-3312) |
 | The cost of a game at 4000, 5000 and 6000 and the board that 24 hours on a `c8g.16xlarge` reach (Monte Carlo of the cost model, the gap's waves and the observed residuals) | [the gap past 2175](#the-gap-past-2175-2026-10), [agenda 2](AGENDA.md#2-the-diagnosis-of-the-wall) | measured; estimate | median searched game 3-6, 13-32 and 48-166 million nodes (90th percentile 40 times the median); a game costs ×10 per 1,050-1,250 n (830-1,500); a day reaches about 4,100 (3,700-4,850), 4000 in 13-20 hours past 3313, 5000 in 4-10 days; the old +57 regime would have reached 3,830-3,890 |
-| Other fields and signings beside GF(2): is the parity bound's heaviest set at the root dependent over GF(3), GF(5), GF(7) or the rationals, with 0/1 entries or Koszul signs (its peel residual's rank) | [agenda 7.2](AGENDA.md#72-other-fields-at-the-roots-of-the-whole-game) | measured; open as a bound ([agenda A1](AGENDA.md#a1-a-bound-over-several-fields-and-signings-a-change-of-slope-if-its-share-holds)) | of the 1,055 games of 78-1300 whose parity bound exceeds opt(n), 566 dependent in some field or signing (GF(3) with 0/1 entries 412), rising from 49% at 300-599 to 73% at 1100-1300; none over the rationals; 54% of the 658 square residuals have determinant ±1 under both entries |
 | Other fields and signings beside GF(2): is the parity bound's heaviest set at the root dependent over GF(3), GF(5), GF(7) or the rationals, with 0/1 entries or Koszul signs (its peel residual's rank) | [agenda 7.2](AGENDA.md#72-other-fields-at-the-roots-of-the-whole-game) | measured; as a bound, [the fields study](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) (next row) | of the 1,055 games of 78-1300 whose parity bound exceeds opt(n), 566 dependent in some field or signing (GF(3) with 0/1 entries 412), rising from 49% at 300-599 to 73% at 1100-1300; none over the rationals; 54% of the 658 square residuals have determinant ±1 under both entries |
 | A bound over the GF(2) frame matroids and GF(3) signed frame matroids (plain, random, and signings built from the cores of the LP's own columns, merged), coupled by Lagrangian multipliers fitted by column generation with a certified bracket (A1's E1, `examples/fields.rs`) | [fields](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) | measured: passes its kill criteria strongly; instrument kept, no solver change | the core-derived arm closes 0.62 of the root's GF(2) gap at n ≥ 1700 (18 converged roots), slope +1.0 ± 2.6 points per 100 n over 54 converged roots of 900-2175; fixed signings 2-9%; at the probe's nodes, with node-fitted multipliers, 86% (1215) and 98% (936) of the nodes GF(2) leaves open cut, the root's multipliers 0.37 of that; 36 s a root, 0.1-0.6 s a node |
 | The fields study's first master: GF(2) and independent-set columns tied by link rows `Σ α [x ∈ Q] − Σ β [x ∈ I] ≤ ε` (the design's), dense revised simplex | [fields](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) | not kept: replaced by rank inequalities with an exact certificate | 71% of the pivots steps of the perturbation's size; 1000 unconverged in 60 s (master 18,893 against L 24,382); the rank-inequality master converges there in 4-8 s |
@@ -204,6 +203,10 @@ those of the page the row points to; a game is named by its board size, and time
 | The fields bound past 2175: the main arm certified at 17 roots of 2200-3400, 600 s a root (A1's E2) | [E2](#e2-past-2175-2026-10) | measured: not killed (K1, K2), not a strong pass; the 17 root fits saved for E3 | 0.46 of the root's GF(2) gap (12 converged roots; 0.37-0.40 at the dearest games, gaps of 1,300-1,450), flat in n past 2200 but 0.15 below E1's 0.62; against the gap −3.8 ± 1.1 points per 100 of gap; over 900-3333 the slope is −1.00 ± 0.34 points per 100 n (t −2.9); 81 minutes of one thread |
 | Core-derived signings a frame: 16 against 8 (A1's E2) | [E2](#e2-past-2175-2026-10) | measured: the limit stays 8 | +0.047 of the gap at the 6 roots of gap ≤ 1,013, +0.006 at the 5 dear roots (the design asks 0.05): its rounds end in an exact check of twice as many matroids, so at the large gaps it completes 5-6 rounds in 600 s where 8 completes 12-14 |
 | Search mode for the fields bound (no exact checks, 60 s), and the main arm certified with a 60 s budget, against E1's certified bounds (A1's E2) | [E2](#e2-past-2175-2026-10) | search mode not kept; the certified fit with a budget is | search mode ends in under 4 s at 0.274 of the gap above E1's bound, within 5% of the gap at 0 of 54 roots (the cheap inequalities describe a relaxation of the LP); certified with 60 s: at 54 of 54, mean 0.002 of the gap; at the 17 roots past 2175, 0.038 of the gap above the 600 s run (worst 0.151) |
+| The A1 bound in a branch and bound (A1's E3 pilot, `fields bnb`): the plain branch and bound with Tier 1 (one evaluation of L at the inherited multipliers) and refits of at most 20 pricings at the Tier-1-open nodes (R1 deflected Polyak, R2 the warm master, R2c with node-local signings), multipliers carried from parent to child, at 1215 and 1472, audited against the node's own master | [E3 pilot](#the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10) | measured: no kill (the criterion fixed in advance); instrument kept, no solver change | r2's tree 4.95 (1215) and 5.04 (1472) times smaller than GF(2)'s: a constant factor, both trees a decade per 172 of gap; 23 GF(2) nodes of time a node (4.6 times v0's time at 1472); within 20 pricings R2 makes 0.41 of the cuts of the node's own master with exact checks and separation, which cuts 95-100% of the nodes r2 leaves open; v1 and r1 far weaker, r2c a little stronger |
+| Larger refit budgets (K = 50, 100, 200) and refit policies (`excess:50`, `tier1:0.5`) for R1 and R2 at 1215 | [E3 pilot](#the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10) | measured | R2 stops by itself after about 27 pricings (trees 4.95, 6.62, 6.89, 6.99 times smaller at 1.3-2.0 times v0's time); R1 creeps (1.99 to 2.48); the policies save refits but lose more tree (2.56 and 1.63) than time |
+| Knuth's estimator (paired dives) for the plain branch and bound's trees, against exact trees | [E3 pilot](#the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10) | measured: not good enough for counts | the dives follow the estimator's exact distribution, but its tail is so heavy that 2,000 dives underestimate: at 1472 0.74 million [0.39, 1.17] against 3.40, two dives 43% of the sum; ratios better but loose (r2 2.17 [1.48, 4.12] against 5.04); dive-by-dive comparisons of variants informative |
+| The fields study's integer evaluation of L at absurd multipliers (an R2 master that broke down: optimal at an infeasible basis, duals near 10^56) | [E3 pilot](#the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10) | not kept: wrapped around; the sums saturate now | wrapping gave the crate's intersection weights near 2^63 (its overflow guard stopped the first r2 run at 1472) and could make L wrong; saturating keeps L valid at any multipliers, bit for bit the same elsewhere; the master breaks down in 0.65% of R2's refits at 1472 |
 | Does the root's GF(2) heaviest set have the optimum's size? (`bench/gf2/roots.jsonl`'s `size` against `strict.jsonl`'s promotions, 1301-2175) | [agenda C4](AGENDA.md#4-conjectures) | measured | 758 of the 760 searched and repeated games; at 1320 and 1322 the heaviest set has 77 members and the optimum 78 (`max_total`) |
 | Barring each member of U\* in the parity bound at the root, against opt(n) (a certificate that every optimal set holds it) | [agenda 7.3](AGENDA.md#73-barred-bounds-on-the-upper-part) | measured; open ([agenda A2](AGENDA.md#a2-certify-the-frame-model-then-prove-with-its-facts-a-change-of-slope-for-the-proven-wall)) | certifies 207 of 224 (600), 339 of 377 (1000), 472 of 490 (1300); the open ones within the root's gap, the largest prime among them |
 
@@ -439,6 +442,8 @@ single-sacrifice route) have their row above.
 | [One-sided candidates in the search](#one-sided-candidates-in-the-search-2026-10) | E8 stage 2 of the third consultation: can the search take the open sources as one-sided candidates, and `taxman certify` prove a recorded score on the whole board game by game, the default mode untouched? | yes: the model, the GF(2) bound (free blocks, Theorem 11 for Π⁺) and the search in extended mode, tested against the reference predicate and the whole-board oracle; every game of 600..1300 that needs it certified; the first certificates past 1300 at 1.55 times the plain proof (median), the open sources costing no nodes and the rule of symmetric pairs, which extended mode refuses, the rest | f747855 (18.1), 0c32d11 (18.2), 100eea1 (18.3) and the commit after it (18.4) |
 | [The frontier chain to 3440](#the-frontier-chain-to-3440-2026-10) | how far does a day on one `c8g.16xlarge` take the committed chain from 2175, with every game proven within the frame model and nothing assumed, and do the independent chains that cover it agree? | 3440: 1,265 games (448 exhausted searches, 119 at the ceiling, 543 repeats, 155 primes) for $16.46, both referees passing, the calibration's 101 games and a rehearsal's 125 equal to it move for move; the projection said about 4,100 and 3441 was left at 626 million nodes; search seconds ×10 per about 1,040 in n; six fixes to the runbook | 55287ff |
 | [Certificates past 2175: the same problem, the work list, the verifier](#certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10) | S1 and S2 of the fourth consultation: can a repeat be certified by the game it repeats, and what will certifying every game of 2176-3440 that rests on the frame model cost? | yes, when the two extended problems are equal whole (81 of 377 games of 600..1300, 145 of the 708 of 2176..3440); 3,300 thread-hours at twice the plain search, 52 hours of one `c8g.16xlarge`, $35 at spot, 3440 alone 10.6 hours; the work list, `certify --list`, `verify-certificates` and the proven end of the chain (2175 today) built | c5d585a (S1), ed526a4, 35c614b and the commit of the work list |
+| [A bound over GF(2) and GF(3) signed frame matroids](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) | does the LP over the GF(2) frame matroids and GF(3) signed frame matroids (signings made for the cores its columns meet) close a share of the root's GF(2) gap that holds with n (A1's E1, with E1n at the probe's nodes)? | yes: 0.62 of the gap at n ≥ 1700, no trend in n (+1.0 ± 2.6 points per 100 n), passing its kill criteria strongly; fixed signings close little; 86-98% of the probe's nodes GF(2) leaves open cut with node-fitted multipliers; Theorems 14-15 in THEORY.md | 7666072 to 1e12c77 and the entry (no solver change) |
+| [The A1 bound in a branch and bound](#the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10) | E3's pilot: with multipliers carried from parent to child and refits of 20 pricings, how much smaller are the trees of 1215 and 1472, at what cost, and how far does a refit get against the node's own master? | no kill: r2's tree 5 times smaller at both gaps (a constant factor, not a slope), at 23 GF(2) nodes of time a node; within 20 pricings the refits make 0.41 of the cuts of the node's own master, which cuts 95-100% of the open nodes; Knuth's estimator too heavy-tailed for the large trees; an overflow in L's evaluation fixed | 9e3ecae to the entry (no solver change) |
 
 ## The port and its first improvements
 
@@ -5778,6 +5783,149 @@ first), and THEORY.md now proves the bound (Theorems 14 and 15).
 9. 66 roots, not 67 (1475 is a multiple of 25).  The census reports `det0` for square cores and the rank deficiency over
    GF(3) for all, and adds whether the plain signing sees each core.
 
+### E2: past 2175 (2026-10)
+
+*Question.*  The advisor's second consultation (S4): does the main arm's share hold on the games past 2175, where the
+chain stops and the root gaps are 440 to 1,440?  The kill criteria were fixed before any run, on `f1cores` certified at
+600 s a root: **K1** the mean share over the roots from 2200 on that converge (a bracket within 1% of the gap) below
+0.25; **K2** a slope of the share against n over 900 to the last root of −2 points per 100 n or worse with t ≤ −2; and
+if more than 30% of the roots from 2200 on fail to converge in 600 s, the mean over all of them decides (their shares
+are lower bounds on their LPs').  The same runs decide the limit on core-derived signings a frame (16 against 8, adopted
+at a gain of 0.05 of the gap or more at the dear roots), whether *search mode* (a fit with no exact checks, 60 s)
+reaches E1's certified bound within 5% of the gap at 80% of E1's 54 converged roots, and they write the root fits that
+E3 starts from.
+
+*Roots and data.*  The optima past 2175 are those of the EC2 chain, from a snapshot of its results to board 3423 (not
+yet in `results/`: `--known` takes the snapshot after `results/strict.jsonl`, and [the README of
+bench/fields](../bench/fields/README.md) names it by its hash).  The roots: every 100th game of 2200-3400 (13) and the
+*dear* games, the searched games (proof `exhausted`) past 2175 with the largest root GF(2) gaps: 3300 (1443), 3333, 3335
+and 3336 (1427 each) and 3176 (1388): 17 distinct roots, 3300 being both.  3333, 3335 and 3336 are neighbours of one
+search with nearly one root, three roots of one family and not three independent ones.  Two games of proof `cap` have
+gaps as large (3303: 1443, 3339: 1427); they were not searched, and are not among the dear roots.
+
+*Instrument* (32cccb3; the bound, its validity and E1's results are as they were, see the reproduction below).
+`--fit-mode search` skips the exact checks: a family's generation ends when no column prices out at the master's duals
+and no cheap inequality is violated, the run when the separation then finds no new core (`Stop::Fitted`); `lb` is 0, so
+the root does not count as converged.  `--save-fit DIR` writes the fit of each `f1cores` run as `DIR/n{N}.json`:
+`common/fit.rs` (its module comment is the format) holds the signings, the multipliers, the final master's columns and
+its rank inequalities, reads a file back, and gives its bound again at the root, which every run asserts before it
+writes.  The fit is that of the *lowest L the run evaluated*, not of the final family: merging cores into a signing
+changes its matroid, which is not a restriction of the old one, and then the final family's LP can be the higher; a
+certified lower bound above the run's bound proves it, and happened at 3335 (the final family's lower bound 254732.7,
+the bound 254722) and in 17 of E1's 132 core-arm runs.  An arm `f1cores16` is the main arm with 16 core-derived signings
+a frame.  `common/dw.rs` already dispatched the intersection to `Meet<3>` for blocks of 129 to 192 coordinates (it
+asserts at most 192; the largest frame matroid has rank 137 at 3423, 128 at 3200 and 132 at 3300); a test compares it
+with the reference at 3200, 3300 and 3400, and every run checks it every 50th pricing as before.  A test reads
+`bench/fields/fits` back and checks each file's bound at its root.
+
+**The main arm certified, 600 s a root.**  Share of the GF(2) gap closed (`*`: not converged in 600 s, the share a lower
+bound on the LP's), seconds, and the share with a limit of 16 signings a frame where run:
+
+| n | gap | share | s | limit 16 | | n | gap | share | s | limit 16 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 2200 | 573 | 0.529 | 27 | 0.614 | | 3000 | 734 | 0.496 | 96 | 0.522 |
+| 2300 | 721 | 0.320 | 40 | | | 3100 | 1181 | 0.633* | 600 | |
+| 2400 | 740 | 0.428 | 152 | 0.469* | | 3176 | 1388 | 0.465* | 600 | 0.441* |
+| 2500 | 1048 | 0.467 | 248 | | | 3200 | 1013 | 0.519 | 277 | 0.571* |
+| 2600 | 439 | 0.392 | 32 | 0.419 | | 3300 | 1443 | 0.398* | 600 | 0.377* |
+| 2700 | 731 | 0.539 | 43 | | | 3333 | 1427 | 0.391 | 396 | 0.404* |
+| 2800 | 774 | 0.616 | 122 | 0.667 | | 3335 | 1427 | 0.371 | 345 | 0.379* |
+| 2900 | 662 | 0.495 | 71 | | | 3336 | 1427 | 0.367* | 600 | 0.423* |
+| | | | | | | 3400 | 1320 | 0.488* | 600 | 0.360* |
+
+Twelve of the 17 roots converged (5 did not, 29.4%: under the 30% at which the rule changes), so the criteria are
+computed on the converged roots.  **K1**: the mean share over them is **0.464** (0.466 over all 17; killed below 0.25).
+**K2**: over the converged roots of 900-3333, E1's 54 and E2's 12, the slope is **−1.00 ± 0.34 points per 100 n, t =
+−2.9** (killed at −2 or worse with t ≤ −2); over all 83 roots −0.84 ± 0.27, t = −3.1.  So E2 is **not killed**; it does
+not pass strongly either (E1's measure: a mean of 0.5 and a slope above −1 point).  Past 2200 alone the share is flat:
+by 200 n from 2200 the means are 0.43, 0.45, 0.47, 0.56, 0.53, 0.41, 0.49 (−0.02 ± 0.69 points per 100 n over the 12
+converged roots), at a mean of 0.464, 0.155 ± 0.046 below E1's 0.619 at 1700-2175 (t = 3.4): the share fell as the games
+went from E1's to E2's, and then stopped falling.
+
+*The fall is the gap's.*  After the fact (not one of the criteria), over E1's and E2's 83 roots of the main arm,
+converged or not: the share against the root's GF(2) gap is 0.725 at gaps of 0-199, 0.571 at 200-399, 0.544 at 400-599,
+0.467 at 600-799, 0.540 at 1000-1249 (3 roots) and 0.413 at 1250-1499 (6 roots), and a least-squares fit of the share on
+n and the gap gives +0.9 ± 0.6 points per 100 n and **−3.8 ± 1.1 points per 100 of gap**.  The chain's gaps grow with n
+(+37 per 100 n over 1301-3312), so the share seems a function of the gap, not of n, and at the gaps of the dearest
+games, 1,300 to 1,450, it is 0.4 (0.37-0.40 at 3300 and 3333-3336).  E1's draw of roots had gaps of 70-770; E2's are
+440-1,443.  (The standard errors take the roots as independent, which they are not quite.)
+
+*The unconverged roots are near their LPs.*  At the five roots that did not converge, the lowest L is within 6.2-9.9 of
+the master's value, an uncertified estimate of the LP (1% of their gaps is 12-14): what is missing is the certificate,
+whose exact checks and separation take three quarters of the time (3300: 535 s of 600 outside the intersections and the
+master's simplex, 15.7 million pivots in the checks), not a bound that is still falling.  Their shares are probably
+within about 0.01 of the LPs'.  At 3100 the share (0.633) is the highest of the 17.
+
+*The limit of 16.*  With 16 core-derived signings a frame the shares at the six roots of gap 1,013 or less are higher by
+0.086, 0.041, 0.027, 0.050, 0.026 and 0.051 of the gap (mean 0.047; 2200 converged, in 471 s against 27 s); at the five
+dear roots the gains are −0.024, −0.021, +0.013, +0.008 and +0.056 (mean **0.006**; the design asks for 0.05), and at
+3400 −0.128.  Over all 12 roots the mean gain is 0.015 and three are worse.  At the large gaps the 16-signing fit does
+not finish in 600 s (all five dear roots end at the budget, with certified lower bounds far below), because its rounds
+end in an exact check of about twice as many matroids (49-63 against 28-36): at 3333, 3335, 3336 and 3400 it completes 5
+or 6 rounds where the main arm completes 12 to 14, and finds fewer cores (3400: 128 against 648).  By the rule **the
+limit stays 8**; whether 16 would gain at the dear roots with more time is not measured (its gain at the roots that
+converge, 0.03-0.09, suggests it would, and that the limit of 8 binds: every root has 8 core-derived signings on at
+least one of frames 1-4, and 57% of the cores found cannot be placed).
+
+*Search mode does not serve; a short certified budget does.*  Search mode as specified ends in under 4 s (the 60 s
+are not used: the separation finds no new core after 23 to 480 pricings, where E1's runs at the same roots took 133 to
+1,082) with a bound above E1's certified one by **0.274 of the gap** on average (median 0.252, worst 0.640; 0.26 to 0.33
+in every band of 500 n), within 5% of the gap at **0 of E1's 54 converged roots** (80% needed).  Its master has only the
+cheap inequalities (the most violated level set of its point, and the support sets, closed), which describe a relaxation
+of the LP: the exact checks find rank inequalities that those miss, so what they add is bound, not only certificate.  By
+the design's rule the fit is then *certified mode with a longer budget*, and a budget alone does it: the main arm
+certified with **60 s**, cut off wherever it is, is within 5% of the gap of E1's bound at **54 of 54** of E1's roots
+(mean difference 0.002 of the gap, worst 0.044, at 1950 and 1975, which need 88 and 114 s to converge) and, at the 17
+roots past 2175, above the 600 s run's by 0.038 of the gap on average (median 0.025), within 5% at 12 of the 17 (the
+other five, 2500, 3176, 3200, 3300 and 3400, are above it by 0.088, 0.058, 0.117, 0.051 and 0.151).  A fit of 60 s thus
+costs under 0.05 of the gap where the gap is under 800 and up to 0.15 at the frontier's gaps, where the design's budget
+that grows with the gap is the right shape.  The runs of the 54 roots with the new code reproduce E1's lines exactly
+where both converged within 60 s (48 of 48 roots: bound, lowest L, lower bound, pricings, rounds, cores, columns and
+cuts all equal): the changes to `dw.rs` did not touch the fit.
+
+*Fits, signings and cost.*  The 17 fits are in `bench/fields/fits` (14 MB; the README there says what each holds).  The
+main arm took 81 minutes of one thread for the 17 roots (the design's 5 hours were for 600 s at every root), 27 to 600 s
+a root; the 12 roots of the limit of 16, 96 minutes.  A pricing (one intersection and the greedies) costs 1.2 ms at 2200
+and 2.9 ms at 3400 (0.15-0.96 ms at 900-2175), 640 to 2,660 of them a root; over the 17 roots the intersections are 1%
+of the time, the master's simplex 24% and the rest, 75%, the exact checks (millions of pivots a root) and the
+separation, converged roots and others alike.  The cores come from more frames than E1's: frame 4 holds core-derived
+signings at every root from 2700 on, with 8 at 6 of the 12 (E1 had them on frames 1-3), and frames 5 and 6 at four
+roots; a root finds 150 to 663 distinct cores, 57% of them unplaced (E1: 48%).  No GF(3) loop occurred.
+
+*Conclusion.*  E2 does not kill A1 at the frontier, and does not repeat E1's strong pass.  The main arm closes 0.46 of
+the root GF(2) gap at 17 roots of 2200-3400 (12 certified; the master's value puts the other five within about 0.01 of
+their LPs): flat past 2200 (−0.02 ± 0.69 points per 100 n) but 0.15 below E1's 0.62, a fall that goes with the gap (−3.8
+± 1.1 points per 100 of gap, +0.9 ± 0.6 per 100 n beside it) and leaves 0.37-0.40 at the dearest games, gaps of 1,300 to
+1,450.  The advisor's table S2 (second consultation) puts a share of 0.3 at +210 of affordable gap and 0.5 at +930 for a
+node 20 times as dear as GF(2)'s; 0.4 lies between.  The limit of 8 core-derived signings a frame stays (16 gains
+0.03-0.09 where it converges, nothing at the dear roots in 600 s), and the family stays fragmented: every root fills the
+limit on some frame, and 57% of the cores found go unplaced.  For E3 and E4 the root fit should be the certified arm
+with a budget that grows with the gap, not search mode (60 s costs under 0.05 of the gap below a gap of 800 and up to
+0.15 above it, and the 17 certified fits are in `bench/fields/fits`).
+
+*Questions for the advisor and deviations from the design* (each resolved as stated, all sound):
+
+1. 17 distinct roots, not 18: 3300 is a multiple of 100 and a dear root.  The dear roots are the literal five largest
+   gaps among the chain's exhausted searches; 3333, 3335 and 3336 are neighbours (one root family), so the verdict on
+   the limit at "the dear roots" rests on three families, 3300, 3176 and 3333-3336.  3303 and 3339 (proof `cap`) were
+   left out.
+2. The saved fit is the lowest L the run evaluated, not the final family's, so that the file's `bound` is the run's
+   bound and reproducible; the cuts of the final master are kept for the signings the fit has and their ranks are the
+   final family's (a reader takes the ranks again).  `support` (how many leading columns are the master's support) is an
+   addition to the design's format.
+3. Runs beyond the design: the main arm certified with 60 s at E1's 54 roots and at the 17 roots (the design's fallback
+   "certified mode with a longer budget" needed to know what a budget buys), and the roots reproduction above.  The
+   search-mode criterion is measured on the bound each run reached (E1's `bound` against the search run's), the lowest L
+   over all families, not E1's `l_best` of the final family.
+4. The kill criteria were applied as written: K2 over the converged roots of 900-3333 (E1's 54 and E2's 12); the slope
+   over all roots is also given.  Its t of −2.9 with a slope of −1.0 is a significant fall that the criterion, set at
+   −2, does not count; the gap fit above is an after-the-fact reading of it and not a test.
+5. The limit-of-16 fits (12 MB) were not kept in the repository; the budgets are wall-clock, and the runs shared the
+   laptop with other jobs (the 1-minute load was 4 to 10), so the five unconverged roots might converge on an idle one.
+   No run overlapped the owner's pause of the machine's low-priority jobs (14:00-14:40), which would have eaten its
+   budget.
+6. `--known` already took several files (E1's code: `Known::load` gets all of them); no change was needed.
+
 ## The upper part game by game, and two cloud runs prepared (2026-10)
 
 *Question.*  Steps 2B to 2D of the theory track's second consultation (2026-10-15).  Since the entry above, the
@@ -6447,148 +6595,6 @@ refitted for a tenth of the budget, at 1.08.
   preloaded table, with the ladder's three options (record, check a nogood file against a root and load it, prove at a
   value) and a script for the overlap.  With the hooks off every tree must be unchanged (the probe's fingerprints, the
   tripwires and the one-thread chain 1..1300 are the gates).
-### E2: past 2175 (2026-10)
-
-*Question.*  The advisor's second consultation (S4): does the main arm's share hold on the games past 2175, where the
-chain stops and the root gaps are 440 to 1,440?  The kill criteria were fixed before any run, on `f1cores` certified at
-600 s a root: **K1** the mean share over the roots from 2200 on that converge (a bracket within 1% of the gap) below
-0.25; **K2** a slope of the share against n over 900 to the last root of −2 points per 100 n or worse with t ≤ −2; and
-if more than 30% of the roots from 2200 on fail to converge in 600 s, the mean over all of them decides (their shares
-are lower bounds on their LPs').  The same runs decide the limit on core-derived signings a frame (16 against 8, adopted
-at a gain of 0.05 of the gap or more at the dear roots), whether *search mode* (a fit with no exact checks, 60 s)
-reaches E1's certified bound within 5% of the gap at 80% of E1's 54 converged roots, and they write the root fits that
-E3 starts from.
-
-*Roots and data.*  The optima past 2175 are those of the EC2 chain, from a snapshot of its results to board 3423 (not
-yet in `results/`: `--known` takes the snapshot after `results/strict.jsonl`, and [the README of
-bench/fields](../bench/fields/README.md) names it by its hash).  The roots: every 100th game of 2200-3400 (13) and the
-*dear* games, the searched games (proof `exhausted`) past 2175 with the largest root GF(2) gaps: 3300 (1443), 3333, 3335
-and 3336 (1427 each) and 3176 (1388): 17 distinct roots, 3300 being both.  3333, 3335 and 3336 are neighbours of one
-search with nearly one root, three roots of one family and not three independent ones.  Two games of proof `cap` have
-gaps as large (3303: 1443, 3339: 1427); they were not searched, and are not among the dear roots.
-
-*Instrument* (32cccb3; the bound, its validity and E1's results are as they were, see the reproduction below).
-`--fit-mode search` skips the exact checks: a family's generation ends when no column prices out at the master's duals
-and no cheap inequality is violated, the run when the separation then finds no new core (`Stop::Fitted`); `lb` is 0, so
-the root does not count as converged.  `--save-fit DIR` writes the fit of each `f1cores` run as `DIR/n{N}.json`:
-`common/fit.rs` (its module comment is the format) holds the signings, the multipliers, the final master's columns and
-its rank inequalities, reads a file back, and gives its bound again at the root, which every run asserts before it
-writes.  The fit is that of the *lowest L the run evaluated*, not of the final family: merging cores into a signing
-changes its matroid, which is not a restriction of the old one, and then the final family's LP can be the higher; a
-certified lower bound above the run's bound proves it, and happened at 3335 (the final family's lower bound 254732.7,
-the bound 254722) and in 17 of E1's 132 core-arm runs.  An arm `f1cores16` is the main arm with 16 core-derived signings
-a frame.  `common/dw.rs` already dispatched the intersection to `Meet<3>` for blocks of 129 to 192 coordinates (it
-asserts at most 192; the largest frame matroid has rank 137 at 3423, 128 at 3200 and 132 at 3300); a test compares it
-with the reference at 3200, 3300 and 3400, and every run checks it every 50th pricing as before.  A test reads
-`bench/fields/fits` back and checks each file's bound at its root.
-
-**The main arm certified, 600 s a root.**  Share of the GF(2) gap closed (`*`: not converged in 600 s, the share a lower
-bound on the LP's), seconds, and the share with a limit of 16 signings a frame where run:
-
-| n | gap | share | s | limit 16 | | n | gap | share | s | limit 16 |
-|---|---|---|---|---|---|---|---|---|---|---|
-| 2200 | 573 | 0.529 | 27 | 0.614 | | 3000 | 734 | 0.496 | 96 | 0.522 |
-| 2300 | 721 | 0.320 | 40 | | | 3100 | 1181 | 0.633* | 600 | |
-| 2400 | 740 | 0.428 | 152 | 0.469* | | 3176 | 1388 | 0.465* | 600 | 0.441* |
-| 2500 | 1048 | 0.467 | 248 | | | 3200 | 1013 | 0.519 | 277 | 0.571* |
-| 2600 | 439 | 0.392 | 32 | 0.419 | | 3300 | 1443 | 0.398* | 600 | 0.377* |
-| 2700 | 731 | 0.539 | 43 | | | 3333 | 1427 | 0.391 | 396 | 0.404* |
-| 2800 | 774 | 0.616 | 122 | 0.667 | | 3335 | 1427 | 0.371 | 345 | 0.379* |
-| 2900 | 662 | 0.495 | 71 | | | 3336 | 1427 | 0.367* | 600 | 0.423* |
-| | | | | | | 3400 | 1320 | 0.488* | 600 | 0.360* |
-
-Twelve of the 17 roots converged (5 did not, 29.4%: under the 30% at which the rule changes), so the criteria are
-computed on the converged roots.  **K1**: the mean share over them is **0.464** (0.466 over all 17; killed below 0.25).
-**K2**: over the converged roots of 900-3333, E1's 54 and E2's 12, the slope is **−1.00 ± 0.34 points per 100 n, t =
-−2.9** (killed at −2 or worse with t ≤ −2); over all 83 roots −0.84 ± 0.27, t = −3.1.  So E2 is **not killed**; it does
-not pass strongly either (E1's measure: a mean of 0.5 and a slope above −1 point).  Past 2200 alone the share is flat:
-by 200 n from 2200 the means are 0.43, 0.45, 0.47, 0.56, 0.53, 0.41, 0.49 (−0.02 ± 0.69 points per 100 n over the 12
-converged roots), at a mean of 0.464, 0.155 ± 0.046 below E1's 0.619 at 1700-2175 (t = 3.4): the share fell as the games
-went from E1's to E2's, and then stopped falling.
-
-*The fall is the gap's.*  After the fact (not one of the criteria), over E1's and E2's 83 roots of the main arm,
-converged or not: the share against the root's GF(2) gap is 0.725 at gaps of 0-199, 0.571 at 200-399, 0.544 at 400-599,
-0.467 at 600-799, 0.540 at 1000-1249 (3 roots) and 0.413 at 1250-1499 (6 roots), and a least-squares fit of the share on
-n and the gap gives +0.9 ± 0.6 points per 100 n and **−3.8 ± 1.1 points per 100 of gap**.  The chain's gaps grow with n
-(+37 per 100 n over 1301-3312), so the share seems a function of the gap, not of n, and at the gaps of the dearest
-games, 1,300 to 1,450, it is 0.4 (0.37-0.40 at 3300 and 3333-3336).  E1's draw of roots had gaps of 70-770; E2's are
-440-1,443.  (The standard errors take the roots as independent, which they are not quite.)
-
-*The unconverged roots are near their LPs.*  At the five roots that did not converge, the lowest L is within 6.2-9.9 of
-the master's value, an uncertified estimate of the LP (1% of their gaps is 12-14): what is missing is the certificate,
-whose exact checks and separation take three quarters of the time (3300: 535 s of 600 outside the intersections and the
-master's simplex, 15.7 million pivots in the checks), not a bound that is still falling.  Their shares are probably
-within about 0.01 of the LPs'.  At 3100 the share (0.633) is the highest of the 17.
-
-*The limit of 16.*  With 16 core-derived signings a frame the shares at the six roots of gap 1,013 or less are higher by
-0.086, 0.041, 0.027, 0.050, 0.026 and 0.051 of the gap (mean 0.047; 2200 converged, in 471 s against 27 s); at the five
-dear roots the gains are −0.024, −0.021, +0.013, +0.008 and +0.056 (mean **0.006**; the design asks for 0.05), and at
-3400 −0.128.  Over all 12 roots the mean gain is 0.015 and three are worse.  At the large gaps the 16-signing fit does
-not finish in 600 s (all five dear roots end at the budget, with certified lower bounds far below), because its rounds
-end in an exact check of about twice as many matroids (49-63 against 28-36): at 3333, 3335, 3336 and 3400 it completes 5
-or 6 rounds where the main arm completes 12 to 14, and finds fewer cores (3400: 128 against 648).  By the rule **the
-limit stays 8**; whether 16 would gain at the dear roots with more time is not measured (its gain at the roots that
-converge, 0.03-0.09, suggests it would, and that the limit of 8 binds: every root has 8 core-derived signings on at
-least one of frames 1-4, and 57% of the cores found cannot be placed).
-
-*Search mode does not serve; a short certified budget does.*  Search mode as specified ends in under 4 s (the 60 s
-are not used: the separation finds no new core after 23 to 480 pricings, where E1's runs at the same roots took 133 to
-1,082) with a bound above E1's certified one by **0.274 of the gap** on average (median 0.252, worst 0.640; 0.26 to 0.33
-in every band of 500 n), within 5% of the gap at **0 of E1's 54 converged roots** (80% needed).  Its master has only the
-cheap inequalities (the most violated level set of its point, and the support sets, closed), which describe a relaxation
-of the LP: the exact checks find rank inequalities that those miss, so what they add is bound, not only certificate.  By
-the design's rule the fit is then *certified mode with a longer budget*, and a budget alone does it: the main arm
-certified with **60 s**, cut off wherever it is, is within 5% of the gap of E1's bound at **54 of 54** of E1's roots
-(mean difference 0.002 of the gap, worst 0.044, at 1950 and 1975, which need 88 and 114 s to converge) and, at the 17
-roots past 2175, above the 600 s run's by 0.038 of the gap on average (median 0.025), within 5% at 12 of the 17 (the
-other five, 2500, 3176, 3200, 3300 and 3400, are above it by 0.088, 0.058, 0.117, 0.051 and 0.151).  A fit of 60 s thus
-costs under 0.05 of the gap where the gap is under 800 and up to 0.15 at the frontier's gaps, where the design's budget
-that grows with the gap is the right shape.  The runs of the 54 roots with the new code reproduce E1's lines exactly
-where both converged within 60 s (48 of 48 roots: bound, lowest L, lower bound, pricings, rounds, cores, columns and
-cuts all equal): the changes to `dw.rs` did not touch the fit.
-
-*Fits, signings and cost.*  The 17 fits are in `bench/fields/fits` (14 MB; the README there says what each holds).  The
-main arm took 81 minutes of one thread for the 17 roots (the design's 5 hours were for 600 s at every root), 27 to 600 s
-a root; the 12 roots of the limit of 16, 96 minutes.  A pricing (one intersection and the greedies) costs 1.2 ms at 2200
-and 2.9 ms at 3400 (0.15-0.96 ms at 900-2175), 640 to 2,660 of them a root; over the 17 roots the intersections are 1%
-of the time, the master's simplex 24% and the rest, 75%, the exact checks (millions of pivots a root) and the
-separation, converged roots and others alike.  The cores come from more frames than E1's: frame 4 holds core-derived
-signings at every root from 2700 on, with 8 at 6 of the 12 (E1 had them on frames 1-3), and frames 5 and 6 at four
-roots; a root finds 150 to 663 distinct cores, 57% of them unplaced (E1: 48%).  No GF(3) loop occurred.
-
-*Conclusion.*  E2 does not kill A1 at the frontier, and does not repeat E1's strong pass.  The main arm closes 0.46 of
-the root GF(2) gap at 17 roots of 2200-3400 (12 certified; the master's value puts the other five within about 0.01 of
-their LPs): flat past 2200 (−0.02 ± 0.69 points per 100 n) but 0.15 below E1's 0.62, a fall that goes with the gap (−3.8
-± 1.1 points per 100 of gap, +0.9 ± 0.6 per 100 n beside it) and leaves 0.37-0.40 at the dearest games, gaps of 1,300 to
-1,450.  The advisor's table S2 (second consultation) puts a share of 0.3 at +210 of affordable gap and 0.5 at +930 for a
-node 20 times as dear as GF(2)'s; 0.4 lies between.  The limit of 8 core-derived signings a frame stays (16 gains
-0.03-0.09 where it converges, nothing at the dear roots in 600 s), and the family stays fragmented: every root fills the
-limit on some frame, and 57% of the cores found go unplaced.  For E3 and E4 the root fit should be the certified arm
-with a budget that grows with the gap, not search mode (60 s costs under 0.05 of the gap below a gap of 800 and up to
-0.15 above it, and the 17 certified fits are in `bench/fields/fits`).
-
-*Questions for the advisor and deviations from the design* (each resolved as stated, all sound):
-
-1. 17 distinct roots, not 18: 3300 is a multiple of 100 and a dear root.  The dear roots are the literal five largest
-   gaps among the chain's exhausted searches; 3333, 3335 and 3336 are neighbours (one root family), so the verdict on
-   the limit at "the dear roots" rests on three families, 3300, 3176 and 3333-3336.  3303 and 3339 (proof `cap`) were
-   left out.
-2. The saved fit is the lowest L the run evaluated, not the final family's, so that the file's `bound` is the run's
-   bound and reproducible; the cuts of the final master are kept for the signings the fit has and their ranks are the
-   final family's (a reader takes the ranks again).  `support` (how many leading columns are the master's support) is an
-   addition to the design's format.
-3. Runs beyond the design: the main arm certified with 60 s at E1's 54 roots and at the 17 roots (the design's fallback
-   "certified mode with a longer budget" needed to know what a budget buys), and the roots reproduction above.  The
-   search-mode criterion is measured on the bound each run reached (E1's `bound` against the search run's), the lowest L
-   over all families, not E1's `l_best` of the final family.
-4. The kill criteria were applied as written: K2 over the converged roots of 900-3333 (E1's 54 and E2's 12); the slope
-   over all roots is also given.  Its t of −2.9 with a slope of −1.0 is a significant fall that the criterion, set at
-   −2, does not count; the gap fit above is an after-the-fact reading of it and not a test.
-5. The limit-of-16 fits (12 MB) were not kept in the repository; the budgets are wall-clock, and the runs shared the
-   laptop with other jobs (the 1-minute load was 4 to 10), so the five unconverged roots might converge on an idle one.
-   No run overlapped the owner's pause of the machine's low-priority jobs (14:00-14:40), which would have eaten its
-   budget.
-6. `--known` already took several files (E1's code: `Known::load` gets all of them); no change was needed.
 
 ## One-sided candidates in the search (2026-10)
 
@@ -6899,3 +6905,178 @@ equal to the base commit's binary (4f1c35b), both suites, clippy and fmt.  The p
 `certify`'s own lines on 600..1300 (the games that need one, their open and rejected sources, the 81 the rule settles),
 and `verify-certificates` passes the committed certificates.  The laptop only ran setups and searches of seconds, one
 thread at a time; nothing ran on AWS.
+
+## The A1 bound in a branch and bound: the E3 pilot (2026-10)
+
+*Question.*  The pilot of experiment E3 of avenue A1 (the advisor's second consultation on A1, its sections S3-S5,
+after [E1](#a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10) passed strongly): in the matroid study's plain
+branch and bound (the GF(2) bound and its conflict branching), with the A1 bound at the nodes the GF(2) bound leaves
+open and its multipliers carried from parent to child, how much smaller are the trees, at what cost a node, and how
+many pricings does a node need from its parent's state?  *Variants*: `v0` (the GF(2) bound alone); `v1` (*Tier 1*: one
+evaluation of L at the root fit's multipliers, at every node the GF(2) bound leaves open); `r1`, `r2`, `r2c` (Tier 1 at
+the state the parent hands down, then, at every node Tier 1 leaves open, a *refit* of at most K = 20 pricings: R1
+deflected Polyak, R2 the warm master, R2c the warm master with node-local signings; the node's final state goes to
+its children).  Games 1215 (root GF(2) gap 213) and 1472 (gap 581).  An *audit* at a sample of the Tier-1-open nodes
+(chosen by a hash of the node): from the same inherited state, the *reference* (E1n's node mode: 100 Polyak steps, the
+certified master with separation, 10 s) and each method's bound after 1 to 20 pricings.  Kill criterion, fixed in
+advance: stop E3 if at 1472 the best variant's tree is less than 3 times smaller than v0's **and** the audit shows the
+best method reaching fewer than half of the reference's cuts within 20 pricings.
+
+*What was built* (research code; no solver change).  `examples/common/bnb.rs`: the plain branch and bound, moved out
+of `examples/matroid.rs` (9e3ecae) behind an extra-bound trait, with node records and paired dives of Knuth's
+estimator; `matroid bnb` prints the same lines as before (936, 1100, 1215 with `gf2` and `gf2warm`, 600, 700, 936 with
+`matching`).  `common/dw.rs` (0afde37): the column generation as phases that `bound` and the warm master share
+(`bound`'s results unchanged at 45 regression roots of 300-1100, every arm), `FitMode::Search` (no exact checks), the
+warm states (a child takes its parent's master columns that hold the members just promoted and avoid the one left
+out, those taken out; its rank inequalities restricted to the child's elements, ranks taken again in the child's
+matroids; its multipliers restricted likewise), root fits as files (E2's format since the merge with it:
+`common/fit.rs`), Tier 1, R1 (direction
+`g + β d_prev`, Camerini, Fratta and Maffioli, steps toward the target) and R2 (the master warm-started from the
+inherited columns and inequalities, Wentges-stabilized pricing from the inherited multipliers, cheap separation only).
+`fields bnb` (bc33638, 33fb719): the variants, refit policies (`all`, `excess:E`, `tier1:F`), the audit, per-node logs
+with subtree sizes, checkpoints that resume to the same tree, paired Knuth dives; `bench/fields/e3.py`, the tables.
+
+*Validity.*  Nothing new to prove: every evaluation of L is a bound at any multipliers and any signings
+([THEORY.md](../../heuristics/THEORY.md#signed-frame-matroids-the-frame-bound-over-other-fields), Theorems 14 and 15,
+at a node by Theorem 14 (2)), the bound is ⌊L⌋ evaluated in integers, and the master only proposes multipliers.  The
+tests (`cargo t --release --example fields`, 48 pass, one ignored and run once): a child's inherited columns common
+independent in its matroids and within `max_add`, and its inequalities, ranks taken again, holding for 20 random
+promotable completions, along 200 random paths of 300-700; every variant's bound at least `w(S* − promoted)` at every
+node of the optimum's path at 300, 350, ..., 1300; with the incumbent `P* − 1`, every variant finds a set worth `P*` at
+each of the 472 non-prime games of 30-600 with `P* > 0`; r2's and r2c's trees subtrees of v0's at 20 games of
+300-900; a run resumed from a checkpoint gives the tree and log of a run straight through; the fit's round trip; R1's
+and R2's traces; and (ignored, 148 s) Knuth's dives against the estimator's exact distribution, computed from the exact
+trees of 1000, 1100, 1215 and 1300 (Kolmogorov–Smirnov distances 0.012-0.027, below the 1% value 0.036).  Every run
+asserts that no completion beats `P*` and that a node the extra bound cuts has no promotable GF(2) heaviest set.
+
+*A defect found on the way: L could wrap around* (bb47db9).  The first attempt at r2's tree at 1472 stopped after
+509,112 nodes on the crate's guard "a negative cycle in the exchange graph of an extreme set".  The cause was the
+study's: an R2 master whose simplex returned *optimal* at a basis that is not primal feasible (1,922 rows, 1,921 of
+them inherited rank inequalities, duals near 10^56) proposed multipliers beyond 10^50; the grid took them as `i64::MAX`,
+and `c[e] −= λ` and `value += g` in `evaluate_grid` wrapped around, giving the intersection weights near 2^63 (and some
+just above `x·S`), on which the crate's distances overflowed.  Wrapping could also have made L wrong without a panic.
+The sums now saturate: bit for bit the same wherever nothing overflowed, and L is valid at any multipliers (the
+positive reweighted weights are exact and below 2^29; a saturated L is `i64::MAX`, still a bound).  Not ties, and not
+a defect of the crate: the search's own weights, the candidates' numbers, are far inside the crate's documented limit.
+Every figure below is the fixed build's (33fb719, which also counts the master's *breakdowns*, solves that end
+optimal at a basis that is not feasible): at 1215 the trees and per-node logs are line for line the first attempt's,
+at 1472 r2's tree was made again from the same root fit and its first 509,112 nodes are line for line the first
+attempt's, and the paired dives gave the same estimates dive for dive.  A breakdown wastes the pricings of its refit
+(every proposal saturates) and nothing else: 3 in 1,270 refits at 1215, 1,233 in 190,266 at 1472 (0.65%), where 2
+evaluations saturated.
+
+*The trees* (exact, one thread of the M1 Max under `nice`, other jobs on the machine; ms a node without the audit's
+time; *c* the design's cost model `2.5 + 3p`, `p` the refit pricings per Tier-1 evaluation, in v0 nodes; *measured*,
+the ms a node over v0's):
+
+| game | variant | nodes | v0 / nodes | Tier-1 evaluations | refits | pricings a refit | p | c | ms a node | measured | time against v0 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1215 | v0 | 24,516 | 1 | | | | | 1 | 0.67 | 1 | 1 |
+| 1215 | v1 | 18,774 | 1.31 | 4,059 | | | 0 | 2.5 | 1.13 | 1.69 | 1.30 |
+| 1215 | r1 | 12,307 | 1.99 | 3,289 | 2,554 | 17.7 | 13.8 | 43.8 | 2.93 | 4.38 | 2.20 |
+| 1215 | r2 | 4,955 | 4.95 | 1,856 | 1,270 | 14.7 | 10.0 | 32.6 | 4.27 | 6.38 | 1.29 |
+| 1215 | r2c | 3,818 | 6.42 | 1,540 | 1,069 | 18.4 | 12.8 | 40.8 | 6.80 | 10.16 | 1.58 |
+| 1472 | v0 | 3,401,305 | 1 | | | | | 1 | 0.94 | 1 | 1 |
+| 1472 | r2 | 675,502 | 5.04 | 245,314 | 190,266 | 16.9 | 13.1 | 41.8 | 21.75 | 23.2 | 4.61 |
+
+The r2 tree at 1472 took 4.1 hours of one thread, v0's 0.9; v1, r1 and r2c were not run as trees there, within the
+pilot's thread-hours: their paired Knuth estimates are below, and they cannot beat r2's tree by a factor that matters
+for the criterion (v1's dives estimate 1.01 times fewer nodes than v0's, r1's 1.23).  At 1472 a refit costs 67 ms
+(16.9 pricings): the simplex about 8 ms, the intersections about 6 and the greedies about 2; the rest, about 50 ms, is
+building the master from the inherited columns and up to two thousand inherited inequalities, and the cheap
+separation.  The GF(2) bound costs 0.94 ms a node there, a Tier-1 evaluation 2.8 ms (2.2 of it building the signed
+matroids).
+
+*The audit* (the reference from the inherited state against each method within 20 pricings; reach: the share of the
+reference's cuts the method also makes):
+
+| game | host | audited | reference cuts | its pricings, ms | r1 reach | r2 reach | r2c reach |
+|---|---|---|---|---|---|---|---|
+| 1215 | v1 | 127 | 127 (100%) | 106, 89 | 0.09 | 0.25 | 0.26 |
+| 1215 | r1 | 94 | 94 (100%) | 101, 98 | 0.18 | 0.59 | 0.59 |
+| 1215 | r2 | 40 | 40 (100%) | 144, 229 | 0.03 | 0.28 | 0.30 |
+| 1215 | r2c | 36 | 36 (100%) | 129, 269 | 0.14 | 0.44 | 0.44 |
+| 1472 | r2 | 387 | 366 (94.6%) | 177, 952 | 0.21 | 0.41 | 0.41 |
+
+(R2c separates only once R2 has stopped, so within 20 pricings it differs from R2 only where R2 stopped early.)  At
+1472 the reference cuts 100% of the audited nodes of GF(2) excess at most 50, 98% at 51-100, 92% at 101-200 and 65%
+above 200; r2 within 20 pricings 76%, 67%, 39%, 16% and 15%.  The nodes left open in r2's tree are the high-excess
+ones near the top: of the refits at GF(2) excess above 200 (10,083 nodes), 1.2% cut, their subtrees holding the whole
+tree.  The audit's sample is every 25th Tier-1-open node at 1215 and every 500th at 1472 (by the hash), so that the
+reference's 10 s did not swamp the run.
+
+*The pilot's criterion.*  At 1472 the best variant measured, r2, has a tree 5.04 times smaller than v0's, so **no
+kill**, although the best method reaches only 0.41 of the reference's cuts within 20 pricings (the design: "a weak
+audit with a strong ratio points at the method").
+
+*What the trees say beyond the criterion.*  The ratio is the same at both gaps: 4.95 at 213 and 5.04 at 581.  The plain
+branch and bound's tree grows a decade per 172 of gap (24,516 to 3,401,305) and r2's by the same law (4,955 to
+675,502, a decade per 172): with refits of 20 pricings the A1 bound is a constant factor of 5 at a cost of about 20 to
+40 v0 nodes a node, not a change of slope.  With the design's projection for E3 (`G_max = (9.5 − a − log10 c)/b`, b
+unchanged) that is a loss of about 110 to 160 of affordable gap, below its kill line of +200.  The audit says what is
+missing: from the same inherited states the reference cuts 95-100% of the nodes r2 leaves open, in 100-180 pricings
+(0.1-1 s); the high-excess nodes are where it matters.
+
+*Exploratory runs at 1215* (beyond the design; the same root fit; `fields bnb ... --refit K` and `--policy`):
+
+| variant | K | policy | nodes | v0 / nodes | pricings a refit | ms a node | time against v0 |
+|---|---|---|---|---|---|---|---|
+| r1 | 20, 50, 100, 200 | all | 12,307, 10,809, 10,225, 9,886 | 1.99, 2.27, 2.40, 2.48 | 17.7, 40.0, 64.0, 77.3 | 2.93, 5.40, 7.87, 9.08 | 2.20, 3.56, 4.90, 5.47 |
+| r2 | 20, 50, 100, 200 | all | 4,955, 3,703, 3,557, 3,508 | 4.95, 6.62, 6.89, 6.99 | 14.7, 24.7, 27.3, 27.8 | 4.27, 7.48, 9.28, 9.30 | 1.29, 1.69, 2.01, 1.99 |
+| r2 | 20 | excess:50 | 9,582 | 2.56 | 17.2 | 2.18 | 1.27 |
+| r2 | 20 | tier1:0.5 | 15,049 | 1.63 | 12.9 | 1.48 | 1.36 |
+
+A larger budget hardly helps: R2 stops on its own (nothing prices out and no cheap inequality is violated) after about
+27 pricings whatever K, R1 creeps.  What the reference has and R2 lacks is the exact checks and the separation (R2c's
+local signings gain a quarter of the nodes at 1215).  [E2](#e2-past-2175-2026-10) found the same at the roots: in
+search mode (R2's) the cheap inequalities describe a relaxation of the LP, and the fit stops above it (0.27 of the
+gap at E1's roots), where a certified fit of 60 s gets within 5% of it everywhere.  The policies save refits but lose
+more tree than time.
+
+*Knuth's estimator.*  Paired dives (2,000, the same dives for every variant) at 1472: the GF(2) tree's estimate is
+741,585 with a 90% interval of [389,979; 1,166,791], against an exact 3,401,305; r2's 341,789 [137,227; 637,208] against
+675,502.  The estimator follows its exact distribution (the ignored test), but that distribution is so heavy-tailed
+that 2,000 dives miss the mean: one dive's standard deviation is 1.4 billion at 1215 (24,516 nodes), where 2,000
+dives' 99% interval covers the count in 52-78% of samples; at 1472 two dives make 43% of the GF(2) sum.  The ratios
+were better (r2's 2.17 [1.48; 4.12] against 5.04; at 1000-1300 the four exact ratios inside), and the paired dives
+compare variants dive for dive (r2c's estimate below r2's on 345 dives, above on 11; r2's below r1's on 685, above on
+12, and below v1's on 935, never above).  For E3's games past what an exact tree allows, plain Knuth estimates are not
+good enough.
+
+*For E3 main* (the advisor's decision): the variants to carry are r2 and r2c (the smallest trees; r2c's dives at 1472
+say smaller than r2's), with the policy `all`; K = 20 is enough for R2 as it stands (K = 50 gains 1.3 in nodes at 1.3 in
+time at 1215).  Measured as they are, they will not pass E3's criterion (a constant factor of 5).  What the pilot points
+at, before E3 main: a reference-strength refit (the exact checks and the core separation at Tier-1-open nodes, within
+a budget), which the audit says cuts almost every node r2 leaves open; the master's breakdowns and its rebuild from
+every inherited inequality (about 50 of R2's 67 ms a refit at 1472; keep the inequalities binding at the parent); and
+an estimator validated against the exact trees of 1472 (v0's and r2's, with r2's per-node log) for the larger games.
+E3 main as designed (v0, v1 and two A1 variants, exact trees on the seven games of 1215-1521, Knuth beyond): at 1472
+the four take about 0.9 (v0), 1.5 (v1: v0's time and 2.8 ms of Tier 1 at each of its 720,000 open nodes), 4.1 (r2) and
+5 (r2c, from 1215's cost a node and tree) hours of one thread; with the trees' decade per 172 of gap the seven games
+(gaps 204-590) come to about 30 thread-hours, a `c8g.4xlarge` (16 threads, $0.64 an hour) for about 7 hours (its
+longest run, r2c at 1475), about $4-5; the 2170s (gap 767) and the games past 2175 only with a validated estimator
+(their exact r2 trees would take days).
+
+*Choices and deviations* (all sound; none changes a bound's validity):
+
+1. The root fits are the main arm's in certified mode, 300 s (1215 converged at 35,168 in 2.6 s; 1472 at 52,871 after
+   300 s, unconverged), not search mode, which is much weaker at the roots (here at 600, 840, 900, 1000, 1100 it
+   closed 0.38, 0.34, 0.65, 0.31, 0.25 of the gap against certified's 0.60, 0.57, 0.97, 0.48, 0.54; E2 measured it at
+   54 roots and did not keep it).  The root node's bound is Tier 1 at the fit (recomputed), not the fit file's.  The
+   two fit files were written in this branch's first format, holding the final family's lowest L, and converted at
+   the merge with E2 to `common/fit.rs`'s, every value kept (the 1215 runs come out the same from them:
+   [bench/fields](../bench/fields/README.md#the-fits-fits)); a fit `bnb` computes now is E2's, the lowest L evaluated.
+2. The audit samples by a hash of the node (every 25th at 1215, every 500th at 1472, not the design's every 25th at
+   1472, whose references would have taken over a day); it runs in the host variant's tree from that tree's states.
+3. Only v0's and r2's trees were run at 1472; v1, r1 and r2c only as paired dives (above).  r2's run had a budget of
+   10 hours (the design's 2 would have stopped it at 0.3 million nodes).  The first attempt ran as checkpointed pieces
+   around a pause of the machine (its times leave the pause out); the run reported, straight through.
+4. A child's inherited columns drop the members that are not the child's elements (as well as the design's taken-out
+   promotions); inherited inequalities whose rank equals their size are not added (redundant).  Node-local signings
+   are seeded past the root's, at most 2 a frame a node and 8 a frame a path.
+5. Knuth's test (S5.2's test 5) checks the dives against the exact distribution, not the counts against the 99%
+   intervals, which the counts at 1000 and 1215 miss although the dives are right (above).
+6. Two Knuth processes ran together for 20 minutes by mistake and wrote the same dives twice (one line interleaved);
+   the dive logs were deduplicated (every duplicate equal, the dives deterministic) and every dive equals the first
+   attempt's.
+7. The core table of S3.4 (cores cached across nodes) was not built: it saves time only.

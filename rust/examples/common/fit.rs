@@ -1,17 +1,17 @@
 //! A root fit on disk: what `dw::bound` found at a game's root, as one JSON object, for later experiments to start
-//! from (`examples/fields.rs`, `roots --save-fit DIR` writes `DIR/n{N}.json`).  Included with
-//! `#[path = "common/fit.rs"] mod fit;` beside `dw` and `gf3`.
+//! from (`examples/fields.rs`: `roots --save-fit DIR` writes `DIR/n{N}.json`, and `bnb --fit` starts from such a file,
+//! writing it if it is not there).  Included with `#[path = "common/fit.rs"] mod fit;` beside `dw` and `gf3`.
 //!
 //! ```text
 //! n, opt, gf2          the game, its optimum promotion sum P*, the GF(2) bound at its root
 //! bound                ⌊L⌋ of the fit below at the root (the lowest L the run evaluated): reproducible
 //! l_best               the lowest L of the run's final family of signings (at least `bound`)
 //! mode                 "certified" or "search" (`dw::FitMode`)
-//! signings             per extra matroid: {"frame", "default": "ones" | "random" + "seed" (a decimal string),
-//!                      "fixed": [[mover, factor, value]...] (value 1 or 2), "mergeable": false}
-//! lambda               per signing, [[candidate, multiplier]...] of the positive multipliers
-//! columns, support     the final master's columns, each a list of candidates (common independent sets of the two
-//!                      GF(2) matroids; at most `dw::SAVED_COLUMNS`), the first `support` of them its support
+//! signings             per extra matroid, its signing as `gf3::Signing::to_json` writes it
+//! lambda               per signing, its positive multipliers as `dw::multipliers_to_json` writes them
+//! support, columns     the final master's columns, each a list of candidates (common independent sets of the two
+//!                      GF(2) matroids; at most `dw::SAVED_COLUMNS`), the first `support` of them its support (null
+//!                      in the E3 pilot's two fits, written before the format had it)
 //! cuts                 the final master's rank inequalities [signing, [candidates], rank]; the signing is an index
 //!                      into `signings` (cuts of a matroid the fit does not have are left out), the rank that in the
 //!                      final family: a reader takes the ranks again in the signings it loads
@@ -20,9 +20,8 @@
 //! A loaded signing is frozen (`mergeable` false, no cores).  `SavedFit::bound` rebuilds the matroids at a root and
 //! evaluates `L` exactly as the run did, so a round trip checks itself.
 
-use crate::dw::{Ctx, Fit, Outcome, Stats};
-use crate::gf3::{Default3, Signing};
-use std::collections::HashMap;
+use crate::dw::{multipliers_from_json, multipliers_to_json, Ctx, Fit, Outcome, Stats};
+use crate::gf3::Signing;
 use std::path::Path;
 use taxman::json::Json;
 
@@ -36,7 +35,8 @@ pub struct SavedFit {
     pub mode: String,
     pub fit: Fit,
     pub columns: Vec<Vec<u32>>,
-    pub support: usize,
+    /// How many of `columns`, the first, are the master's support (`None` where the file does not say).
+    pub support: Option<usize>,
     pub cuts: Vec<(usize, Vec<u32>, usize)>,
 }
 
@@ -53,7 +53,7 @@ impl SavedFit {
             mode: mode.to_string(),
             fit: outcome.fit.clone(),
             columns: outcome.master_columns.clone(),
-            support: outcome.support.len().min(outcome.master_columns.len()),
+            support: Some(outcome.support.len().min(outcome.master_columns.len())),
             cuts: outcome.master_cuts.iter().filter(|(k, _, _)| *k < have).cloned().collect(),
         }
     }
@@ -63,14 +63,9 @@ impl SavedFit {
         self.fit.bound(ctx, &mut Stats::default())
     }
 
+    /// The fit as the file's object (see the module docs).
     pub fn to_json(&self) -> Json {
         let numbers = |v: &[u32]| Json::array(v.iter().copied());
-        let signings = self.fit.signings.iter().map(signing_to_json);
-        let lambda = self.fit.lambda.iter().map(|l| {
-            let mut pairs: Vec<(u32, f64)> = l.iter().map(|(&x, &v)| (x, v)).collect();
-            pairs.sort_unstable_by_key(|&(x, _)| x);
-            Json::Arr(pairs.into_iter().map(|(x, v)| Json::Arr(vec![Json::from(x), Json::Num(v)])).collect())
-        });
         let cuts =
             self.cuts.iter().map(|(k, set, rank)| Json::Arr(vec![Json::from(*k), numbers(set), Json::from(*rank)]));
         Json::object([
@@ -80,35 +75,25 @@ impl SavedFit {
             ("bound", Json::from(self.bound)),
             ("l_best", Json::Num(self.l_best)),
             ("mode", Json::Str(self.mode.clone())),
-            ("signings", Json::Arr(signings.collect())),
-            ("lambda", Json::Arr(lambda.collect())),
-            ("support", Json::from(self.support)),
+            ("signings", Json::Arr(self.fit.signings.iter().map(Signing::to_json).collect())),
+            ("lambda", multipliers_to_json(&self.fit.lambda)),
+            ("support", self.support.map_or(Json::Null, Json::from)),
             ("columns", Json::Arr(self.columns.iter().map(|c| numbers(c)).collect())),
             ("cuts", Json::Arr(cuts.collect())),
         ])
     }
 
+    /// The fit of the file's object ([`to_json`](Self::to_json)'s).
     pub fn from_json(json: &Json) -> Result<SavedFit, String> {
         let field = |name: &str| json.get(name).ok_or_else(|| format!("missing \"{name}\""));
         let number = |name: &str| field(name)?.as_i64().ok_or_else(|| format!("\"{name}\" is not an integer"));
         let list = |name: &str| field(name)?.as_arr().ok_or_else(|| format!("\"{name}\" is not an array"));
-        let signings = list("signings")?.iter().map(signing_from_json).collect::<Result<Vec<_>, _>>()?;
-        let lambda = list("lambda")?
-            .iter()
-            .map(|l| {
-                let pairs = l.as_arr().ok_or("a signing's multipliers are not an array")?;
-                pairs
-                    .iter()
-                    .map(|p| match (p.at(0).and_then(Json::as_u32), p.at(1).and_then(Json::as_f64)) {
-                        (Some(x), Some(v)) => Ok((x, v)),
-                        _ => Err("a multiplier is not [candidate, value]".to_string()),
-                    })
-                    .collect::<Result<HashMap<u32, f64>, String>>()
-            })
-            .collect::<Result<Vec<_>, String>>()?;
-        if lambda.len() != signings.len() {
-            return Err(format!("{} signings but {} multiplier lists", signings.len(), lambda.len()));
-        }
+        let signings = list("signings")?.iter().map(Signing::from_json).collect::<Result<Vec<_>, _>>()?;
+        let lambda = multipliers_from_json(field("lambda")?, signings.len())?;
+        let support = match json.get("support") {
+            None | Some(Json::Null) => None,
+            Some(s) => Some(s.as_u64().ok_or("\"support\" is not a count")? as usize),
+        };
         let columns = list("columns")?
             .iter()
             .map(|c| c.as_u32_vec().ok_or("a column is not a list of candidates"))
@@ -135,7 +120,7 @@ impl SavedFit {
             mode: field("mode")?.as_str().ok_or("\"mode\" is not a string")?.to_string(),
             fit: Fit { signings, lambda },
             columns,
-            support: number("support")? as usize,
+            support,
             cuts,
         })
     }
@@ -151,48 +136,8 @@ impl SavedFit {
         std::fs::rename(&temporary, path).map_err(err)
     }
 
+    /// The fit of the file `path`.
     pub fn load(path: &Path) -> Result<SavedFit, String> {
         SavedFit::from_json(&Json::from_file(path)?).map_err(|e| format!("{}: {e}", path.display()))
     }
-}
-
-fn signing_to_json(s: &Signing) -> Json {
-    let mut fixed: Vec<(u32, u32, u8)> = s.fixed.iter().map(|(&(u, f), &v)| (u, f, v)).collect();
-    fixed.sort_unstable();
-    let mut pairs = vec![("frame", Json::from(s.frame))];
-    match s.default {
-        Default3::Ones => pairs.push(("default", Json::Str("ones".into()))),
-        Default3::Random(seed) => {
-            pairs.push(("default", Json::Str("random".into())));
-            // A seed uses all 64 bits, more than a JSON integer reads back exactly.
-            pairs.push(("seed", Json::Str(seed.to_string())));
-        }
-    }
-    let triples =
-        fixed.into_iter().map(|(u, f, v)| Json::Arr(vec![Json::from(u), Json::from(f), Json::from(u32::from(v))]));
-    pairs.push(("fixed", Json::Arr(triples.collect())));
-    pairs.push(("mergeable", Json::Bool(false)));
-    Json::object(pairs)
-}
-
-fn signing_from_json(json: &Json) -> Result<Signing, String> {
-    let frame = json.get("frame").and_then(Json::as_u64).ok_or("a signing has no frame")? as usize;
-    let default = match json.get("default").and_then(Json::as_str) {
-        Some("ones") => Default3::Ones,
-        Some("random") => {
-            let seed = json.get("seed").and_then(Json::as_str).ok_or("a random signing has no seed")?;
-            Default3::Random(seed.parse().map_err(|e| format!("seed {seed:?}: {e}"))?)
-        }
-        other => return Err(format!("unknown default {other:?}")),
-    };
-    let mut fixed = HashMap::new();
-    for t in json.get("fixed").and_then(Json::as_arr).ok_or("a signing has no fixed values")? {
-        match (t.at(0).and_then(Json::as_u32), t.at(1).and_then(Json::as_u32), t.at(2).and_then(Json::as_u32)) {
-            (Some(u), Some(f), Some(v @ (1 | 2))) => {
-                fixed.insert((u, f), v as u8);
-            }
-            _ => return Err("a fixed value is not [mover, factor, 1 or 2]".into()),
-        }
-    }
-    Ok(Signing { frame, default, fixed, cores: Vec::new(), mergeable: false })
 }
