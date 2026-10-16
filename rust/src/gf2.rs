@@ -573,6 +573,17 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
         dispatch!(self, l => l.meet.check = Some(Box::new(Meet::new(l.graph.len(), l.graph.blocks))))
     }
 
+    /// In tests: the workspace's last search stamp, and setting it (to start just below the counter's wrap).
+    #[cfg(test)]
+    pub(crate) fn stamp_generation(&mut self) -> u32 {
+        dispatch!(self, l => l.meet.generation())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_stamp_generation(&mut self, generation: u32) {
+        dispatch!(self, l => l.meet.set_generation(generation))
+    }
+
     /// In tests: the derived tableaux checked so far ([`check_derivations`](Self::check_derivations)).
     #[cfg(test)]
     pub(crate) fn derivations_checked(&mut self) -> u64 {

@@ -479,6 +479,32 @@ fn levels_match_fresh_matroids_along_random_paths() {
     );
 }
 
+/// Along random paths of the boards 300 and 760 at W = 16 (`walk_random_paths`), engines whose search stamps start
+/// just below their 32-bit counter's wrap, so that they wrap on the way, give every result of an engine whose stamps
+/// start at 0 and do the same work: the counter's wrap changes nothing.  (Without the stamps cleared before the wrap,
+/// the counter came back to 0, which every stamp never written holds, and then to the stamps of 2^32 stamps before:
+/// see `meet`'s test of the same.)
+#[test]
+fn engines_agree_across_the_wrap_of_the_stamp_counter() {
+    const W: usize = 16;
+    let mut rng = Rng(0x57A3_9E11_0000_0002);
+    let mut walked = Walked::default();
+    for n in [300u32, 760] {
+        let p = Board::<W>::for_n(n).prepare(SearchTactics::default()).unwrap();
+        let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates);
+        let starts = [u32::MAX - 300, u32::MAX - 1_500, u32::MAX - 3_000];
+        let mut engines: Vec<Gf2Bound<'_, W>> = (0..=starts.len()).map(|_| Gf2Bound::<W>::new(&graph)).collect();
+        for (engine, &start) in engines[1..].iter_mut().zip(&starts) {
+            engine.set_stamp_generation(start);
+        }
+        walk_random_paths(&p, &mut rng, 6, usize::MAX, &mut engines, &mut walked);
+        for (engine, &start) in engines[1..].iter_mut().zip(&starts) {
+            let end = engine.stamp_generation();
+            assert!(end < start, "n={n}: the stamps from {start} did not wrap ({end})");
+        }
+    }
+}
+
 /// The most forced members per node that the walks of the extended problem check: with hundreds of one-sided
 /// candidates, most members of the heaviest set are forced when the need is close to the bound, and a fresh solve for
 /// each would take most of the walk's time.
