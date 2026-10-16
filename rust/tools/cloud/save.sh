@@ -11,7 +11,8 @@
 # valid copy of an earlier moment; the solver and the verifiers check what they read.
 #
 # The checkpoints are copied so that a replacement instance can resume a game that has taken hours, not start it
-# again.  `--delete` keeps the copy to the checkpoints that exist (a finished game's is removed).
+# again.  `--delete` keeps the copy to the checkpoints that exist (a finished game's is removed).  The spill and lock
+# files are left out at any depth: certify.sh keeps a checkpoint directory of its own for each list ($CKPT/NAME).
 
 set -eu
 set -o pipefail
@@ -47,6 +48,7 @@ fi
 [ -d "$LOGS" ] && "$AWS_CLI" s3 sync "$LOGS" "$S3_DEST/logs" --only-show-errors
 if [ -d "$CKPT" ]; then
     "$AWS_CLI" s3 sync "$CKPT" "$S3_DEST/ckpt" --delete --only-show-errors \
-        --exclude 'spill/*' --exclude '*.tmp' --exclude 'taxman.lock'
+        --exclude 'spill/*' --exclude '*.tmp' --exclude 'taxman.lock' \
+        --exclude '*/spill/*' --exclude '*/taxman.lock'
 fi
 log "saved to $S3_DEST"
