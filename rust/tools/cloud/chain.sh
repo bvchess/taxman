@@ -19,11 +19,19 @@
 #            is how to rehearse many interruptions and resumes (RUNBOOK.md)
 #   130/143  stopped by SIGINT/SIGTERM (this script forwards them, once, to the solver, which writes a final
 #            checkpoint): the script ends
-#   124      the deadline (DEADLINE_HOURS) stopped the solver, with a final checkpoint: the script ends
+#   124      the deadline (DEADLINE_HOURS, the budget BUDGET_HOURS or the date RUN_UNTIL, whichever came first) stopped
+#            the solver, with a final checkpoint: the script ends
+#   4        THE WALL: a game's own search passed GAME_HOURS (`taxman solve --game-hours`).  Every search was stopped
+#            with a final checkpoint and nothing was recorded for the game: the script logs "wall at N after H
+#            hours" and ends
 #   1, 2     the solver reported an error (a refused checkpoint, a game that failed a check, ...): the script ends,
 #            nothing is retried, because the error would repeat; read chain.err
 #   other    a crash (abort, SIGKILL by the OOM killer): run again after 10 s.  MAX_FAILS passes in a row that add
 #            no line to the results file and last under five minutes end the script
+#
+# The script exits with 0 when the range is complete, 143 when stopped, 3 for the deadline, 4 for the wall, 1 otherwise.
+# How it ended is also the one line of $TAXMAN_WORK/chain.outcome (complete, stopped, "wall at N after H hours", the
+# deadline's reason, failed), for a script that supervises it (wall-node.sh).
 #
 # Output: $LOGS/chain.out (the solver's result lines), chain.err (its progress lines), chain.log (this script).
 #
@@ -38,7 +46,11 @@
 #   EXTRA_ARGS           more flags for `taxman solve`, e.g. "--mem-cap 100000"
 #   MAX_FAILS            default 5
 #   CHAIN_TO             N, if not given as the argument (the solver goes up to 8191; RUNBOOK.md, "Past 4095")
-#   DEADLINE_HOURS, POWEROFF, S3_DEST, SAVE_EVERY: as in run.sh, which this script and prover.sh share
+#   GAME_HOURS           the wall: stop at the first game whose own search has taken more than this many hours in all,
+#                        over every run (`taxman solve --game-hours`; its clock is kept in the checkpoint directory,
+#                        so a run that resumes the game goes on from it).  Default: none
+#   DEADLINE_HOURS, BUDGET_HOURS, RUN_UNTIL, LEDGER_*, POWEROFF, S3_DEST, SAVE_EVERY: as in run.sh, which this script
+#                        and prover.sh share
 
 set -u
 set -o pipefail
@@ -59,19 +71,29 @@ esac
 # Without THREADS the solver uses every CPU it is allowed (in a container, the cgroup quota).
 thread_args=()
 [ -n "${THREADS:-}" ] && thread_args=(--threads "$THREADS")
+wall_args=()
+[ -n "${GAME_HOURS:-}" ] && wall_args=(--game-hours "$GAME_HOURS")
 WINDOW="${WINDOW:-16}"
 CHECKPOINT_INTERVAL="${CHECKPOINT_INTERVAL:-300}"
 PROGRESS="${PROGRESS:-60}"
 MAX_FAILS="${MAX_FAILS:-5}"
 
 run_begin chain "$(dirname "$RESULTS")"
+rm -f "$TAXMAN_WORK/chain.outcome"
+
+# How the script ended, for whatever supervises it.
+set_outcome() {
+    outcome_text="$*"
+    printf '%s\n' "$outcome_text" >"$TAXMAN_WORK/chain.outcome"
+}
 
 # The lines of the results file (0 if there is none yet).
 line_count() {
     if [ -r "$RESULTS" ]; then wc -l <"$RESULTS" | tr -d ' '; else echo 0; fi
 }
 
-log "chain 1-$to; threads: ${THREADS:-all available}; window $WINDOW; results $RESULTS; checkpoints $CKPT"
+log "chain 1-$to; threads: ${THREADS:-all available}; window $WINDOW; wall: ${GAME_HOURS:-none} hours;" \
+    "results $RESULTS; checkpoints $CKPT"
 env_report | tee -a "$LOGS/chain.log" >&2
 
 fails=0
@@ -88,8 +110,8 @@ while :; do
     # EXTRA_ARGS is a list of words on purpose.
     # shellcheck disable=SC2086
     run_child "$LOGS/chain.out" "$LOGS/chain.err" "$TAXMAN_BIN" solve "1-$to" ${thread_args[@]+"${thread_args[@]}"} \
-        --window "$WINDOW" --out "$RESULTS" --checkpoint-dir "$CKPT" --checkpoint-interval "$CHECKPOINT_INTERVAL" \
-        --progress "$PROGRESS" ${EXTRA_ARGS:-}
+        ${wall_args[@]+"${wall_args[@]}"} --window "$WINDOW" --out "$RESULTS" --checkpoint-dir "$CKPT" \
+        --checkpoint-interval "$CHECKPOINT_INTERVAL" --progress "$PROGRESS" ${EXTRA_ARGS:-}
     elapsed=$(($(date +%s) - started))
     log "the solver exited with status $status after ${elapsed}s"
 
@@ -100,24 +122,37 @@ while :; do
             if printf '%s\n' "$report" | grep -q "n = 1\.\.=$to (0 missing)"; then
                 log "the range 1-$to is complete"
                 outcome="complete"
+                set_outcome "complete: the range 1-$to"
                 break
             fi
             log "the solver ended before $to (a limit in EXTRA_ARGS?); going on"
             ;;
         124)
-            log "the deadline stopped the solver (a final checkpoint was written)"
+            log "stopped by $deadline_reason (a final checkpoint was written)"
             outcome="deadline"
+            set_outcome "deadline: $deadline_reason"
+            break
+            ;;
+        4)
+            # The solver's line, `wall at N after H hours: ...`, is the last of its kind in chain.out.
+            wall="$(sed -n 's/^\(wall at [0-9]* after [0-9.]* hours\):.*/\1/p' "$LOGS/chain.out" | tail -n 1)"
+            log "${wall:-wall} (all searches stopped with a final checkpoint; nothing recorded for the game)"
+            outcome="wall"
+            set_outcome "${wall:-wall}"
             break
             ;;
         130 | 143)
             log "the solver was stopped by a signal (a final checkpoint was written)"
             outcome="stopped"
+            set_outcome "stopped by a signal"
             break
             ;;
         1 | 2)
             log "the solver reported an error; not retrying.  The last lines of chain.err:"
             tail -n 5 "$LOGS/chain.err" >&2
             outcome="failed"
+            set_outcome "failed: the solver reported an error (status $status):" \
+                "$(tail -n 1 "$LOGS/chain.err" | cut -c1-200)"
             break
             ;;
         *)
@@ -132,6 +167,7 @@ while :; do
     if [ "$fails" -ge "$MAX_FAILS" ]; then
         log "giving up after $fails passes in a row without progress"
         outcome="failed"
+        set_outcome "failed: $fails passes in a row without progress (the solver last exited with status $status)"
         break
     fi
     [ "$crashed" = 1 ] && run_nap 10
@@ -139,11 +175,17 @@ done
 
 log "ended: $outcome"
 if [ "$outcome" = complete ]; then
-    "$here/verify.sh" "$RESULTS" 2>&1 | tee -a "$LOGS/verify.log" || outcome="failed"
+    if ! "$here/verify.sh" "$RESULTS" 2>&1 | tee -a "$LOGS/verify.log"; then
+        outcome="failed"
+        set_outcome "failed: verify.sh found a problem (see verify.log)"
+    fi
 fi
+# A stop by SIGTERM before the first pass ended, or any other way out of the loop, still says how.
+[ -s "$TAXMAN_WORK/chain.outcome" ] || set_outcome "$outcome"
 case "$outcome" in
     complete) exit 0 ;;
     stopped) exit 143 ;;
     deadline) exit 3 ;;
+    wall) exit 4 ;;
     *) exit 1 ;;
 esac
