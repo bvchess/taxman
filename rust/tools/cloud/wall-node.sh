@@ -26,7 +26,9 @@
 #      else an error
 #    Every ending but an interruption is the run's end: this script writes $S3_DEST/run/ended (the reason), sets the
 #    group's desired capacity to 0 (the permission of wall-policy.json), saves, and powers off, so that nothing is
-#    launched in its place.  A node script that dies on its own does the same: the run ends with the error.
+#    launched in its place.  A node script that dies on its own does the same: the run ends with the error.  A signal
+#    to the script (the shutdown that follows an interruption sends SIGTERM to every process, in the setup as well)
+#    is not an ending: it leaves the run as it is.
 #
 # Environment: S3_DEST, ASG (the group's name) and AWS_DEFAULT_REGION come from the user data.  SKIP_SETUP=1 leaves out
 # setup.sh (a machine that has been set up).  RETRY_SLEEP (default 10 s) is the wait between tries to set the capacity,
@@ -103,7 +105,7 @@ fail_run() {
     exit 0
 }
 
-# However this script ends without having ended the run or waited out an interruption, the run ends with the error.
+# However this script ends without having ended the run or been signalled, the run ends with the error.
 node_exit() {
     local code=$?
     trap - EXIT
@@ -112,12 +114,29 @@ node_exit() {
     fi
 }
 
+# A signal to this script is the machine being taken away (the shutdown of a spot interruption sends SIGTERM to every
+# process) or someone at the keyboard: not the run's end.  The group replaces the machine, or the timer ends it.
+on_signal() {
+    interrupted=1
+    log "signalled: leaving the run as it is"
+    exit 143
+}
+
+# Ctrl-C at the keyboard reaches this script alone (a job started with & ignores SIGINT), so it passes one SIGTERM to
+# chain.sh, which stops the solver cleanly.
+on_interrupt() {
+    [ -z "${chain:-}" ] || kill -TERM "$chain" 2>/dev/null
+    on_signal
+}
+
 mkdir -p "$TAXMAN_WORK" "$LOGS"
 if [ ! -e "$RESULTS" ]; then
     "$AWS_CLI" s3 sync "$S3_DEST/logs" "$LOGS" --only-show-errors
 fi
 LOG_FILE="$LOGS/wall-node.log"
 trap node_exit EXIT
+trap on_signal TERM HUP
+trap on_interrupt INT
 log "wall-node on $(hostname): $S3_DEST, group $ASG"
 
 config_load || fail_run "cannot read the run's config $S3_DEST/run/config"
@@ -166,18 +185,13 @@ until_text=none
 [ -z "${RUN_UNTIL:-}" ] || until_text="$(epoch_date "$RUN_UNTIL")"
 log "chain.sh $chain_to (commit ${COMMIT:-unknown}; wall ${GAME_HOURS:-none} h; budget ${BUDGET_HOURS:-none} h;" \
     "until $until_text)"
-# Its own process group (job control), so that a Ctrl-C in tmux reaches this script alone, which forwards one SIGTERM.
-set -m
+# A signal that reaches the whole machine (a shutdown) reaches chain.sh itself, which stops the solver cleanly; this
+# script does not forward it (that would be two), it only stays out of the end.
+chain=""
 "$here/chain.sh" "$chain_to" &
 chain=$!
-trap 'kill -TERM "$chain" 2>/dev/null' TERM INT
 wait "$chain"
 status=$?
-while kill -0 "$chain" 2>/dev/null; do
-    wait "$chain"
-    status=$?
-done
-trap - TERM INT
 pkill -P "$stopper" 2>/dev/null
 kill "$stopper" 2>/dev/null
 what="$(cat "$TAXMAN_WORK/chain.outcome" 2>/dev/null || echo 'no outcome recorded')"

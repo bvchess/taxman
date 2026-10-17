@@ -29,6 +29,10 @@ cloud="$tmp/cloud"
 mkdir -p "$cloud"
 cp "$real_cloud"/*.sh "$real_cloud/wall-policy.json" "$cloud/"
 printf '#!/usr/bin/env bash\necho "verify.sh (a stand-in): $*"\n' >"$cloud/verify.sh"
+# ... and setup.sh, which installs and builds: the stand-in records how it was called and may sleep a while.
+printf '%s\n' '#!/usr/bin/env bash' \
+    'echo "setup.sh: NO_PULL=${NO_PULL:-} SKIP_TESTS=${SKIP_TESTS:-}" >>"$TAXMAN_WORK/setup-stub.log"' \
+    '[ -z "${STUB_SETUP_SLEEP:-}" ] || sleep "$STUB_SETUP_SLEEP"' >"$cloud/setup.sh"
 chmod +x "$cloud"/*.sh
 export TAXMAN_ROOT="$(cd "$crate/.." && pwd)"
 export PATH="$here/bin:$PATH"
@@ -275,6 +279,34 @@ scenario_node() {
     check "a denied capacity: the end is recorded" matches "$(obj $name/run/ended)" '^reason=complete'
     check "five tries are made" equals "$(grep -c 'set-desired-capacity' "$FAKE_LOG")" 5
     check "and the machine powers off" matches "$FAKE_LOG" '^shutdown -h now$'
+
+    # The setup is run as a build and no tests, with the pinned checkout left as it is.
+    name=setup
+    node_config $name "CHAIN_TO=20"
+    echo 1 >"$FAKE_STATE/desired"
+    node $name SKIP_SETUP=
+    check "setup.sh is called with NO_PULL and SKIP_TESTS" matches "$tmp/n-$name/setup-stub.log" \
+        'setup.sh: NO_PULL=1 SKIP_TESTS=1'
+
+    # A signal in the setup (the shutdown of a spot interruption sends SIGTERM to every process) is not the run's end:
+    # no end is recorded, the group is left alone, and the machine does not power itself off.
+    name=sigsetup
+    node_config $name "CHAIN_TO=20"
+    echo 1 >"$FAKE_STATE/desired"
+    : >"$FAKE_LOG"
+    node $name SKIP_SETUP= STUB_SETUP_SLEEP=30 &
+    node_pid=$!
+    wait_for matches "$tmp/n-$name/logs/wall-node.log" 'Z setup.sh$' || echo "the setup did not start"
+    # As a shutdown does: the signal reaches the node and what it is running.
+    local node_script
+    node_script="$(pgrep -f "$cloud/wall-node.sh")"
+    kill -TERM $node_script
+    pkill -TERM -P "$node_script"
+    wait "$node_pid" 2>/dev/null
+    check "a signal in the setup does not end the run" absent "$(obj $name/run/ended)"
+    check "and leaves the group alone" has_line "$FAKE_STATE/desired" 1
+    check "and the machine does not power itself off" lacks "$FAKE_LOG" '^shutdown'
+    check "the node says it was signalled" matches "$tmp/n-$name/logs/wall-node.log" 'signalled: leaving the run'
 
     # A node that cannot read its config ends the run with the error.
     name=noconfig
