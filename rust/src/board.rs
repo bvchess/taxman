@@ -182,9 +182,12 @@ impl<const W: usize> Board<W> {
         promotion_cap(self.n(), self.in_the_bag, prev_score)
     }
 
-    /// The part of a game's moves that is a seed for the search: those that are promotion candidates here.
+    /// The part of a game's moves that is a seed for the search: those that are promotion candidates here.  The game
+    /// may be another board's, such as `n + 1`'s, so a move beyond this board is dropped before the set is made (it can
+    /// also lie beyond the set's width).
     pub fn seed(&self, moves: &[u32]) -> Bits<W> {
-        moves.iter().copied().collect::<Bits<W>>() & self.frames.candidates
+        let n = self.n();
+        moves.iter().copied().filter(|&m| m <= n).collect::<Bits<W>>() & self.frames.candidates
     }
 
     /// The search problem that [`prepare`](Self::prepare) poses, built again without a search, see
@@ -269,6 +272,27 @@ mod tests {
         assert_eq!(board.promotion_cap(0), (85u64).checked_sub(board.in_the_bag));
         let seed = board.seed(prev_moves);
         assert!(seed.is_subset(&board.candidates()) && seed.iter().all(|x| prev_moves.contains(&x)));
+    }
+
+    /// The ledger seeds `n` with the game of `n + 1`, whose move `n + 1` can be past the set's width: on boards 511
+    /// and 1023 it is exactly the capacity.  A move beyond the board is dropped, so the seed is the game's own, with
+    /// `n + 1` or a number far beyond appended.
+    #[test]
+    fn the_seed_drops_the_moves_beyond_the_board() {
+        let optimal = Optimal::built_in();
+        for n in [511, 1023] {
+            let moves = optimal.moves(n).unwrap();
+            let (mut with_next, mut with_far) = (moves.to_vec(), moves.to_vec());
+            with_next.push(n + 1);
+            with_far.push(n + 100);
+            crate::with_width!(n, W => {
+                let board = Board::<W>::for_n(n);
+                let seed = board.seed(moves);
+                assert!(!seed.is_empty(), "n={n}");
+                assert_eq!(board.seed(&with_next), seed, "n={n}: with n + 1");
+                assert_eq!(board.seed(&with_far), seed, "n={n}: with n + 100");
+            });
+        }
     }
 
     /// What `taxman verify-results` and `same_search` set up again from a results line (the board size) is the
