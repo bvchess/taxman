@@ -39,3 +39,8 @@ each of 60 games of 1301-2175 (`games.txt`), no seed and no ceiling, 300 s at mo
 | `N.txt` | its ladder line (`examples/ladder.rs`): the search's time and nodes, the game found against the known optimum, the start incumbent, and when the final game was found |
 | `games.txt` | the 60 games |
 | `ttb.py` | `./ttb.py`: the time at which the best game was found, as a share of the search's time, for each game and in all |
+
+## Seeding from a neighbour (`seeding/`)
+
+The start incumbents of 2176-3440 seeded from a neighbour's start incumbent (`wall chain`), against the standalone start
+and the start seeded from the proven game of n − 1: [seeding/README.md](seeding/README.md).
