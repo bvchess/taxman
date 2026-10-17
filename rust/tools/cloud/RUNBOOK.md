@@ -502,7 +502,7 @@ rust/tools/cloud/spot-watch.sh
 (`spot-watch.sh` logs to `~/taxman-work/logs/spot-watch.log` as well as to its terminal, so its notice and its save
 leave a trace after the window is gone; the output of the save is in `save.log` beside it.)  `chain.sh N` is the
 whole command: the chain 1..N into
-`~/taxman-work/results/strict.jsonl`, all CPUs, sixteen games in flight at once, a checkpoint every 300 s and a
+`~/taxman-work/results/strict.jsonl`, all CPUs, four games in flight at once (`WINDOW`), a checkpoint every 300 s and a
 progress line every 60 s.  Its variables (all optional) are documented at the top of the script: `THREADS`, `WINDOW`,
 `CHECKPOINT_INTERVAL`, `PROGRESS`, `EXTRA_ARGS`, `GAME_HOURS` (the wall), `DEADLINE_HOURS`, `BUDGET_HOURS` and
 `RUN_UNTIL` (a budget and a date that outlive the machine, section 12), `POWEROFF`, `MAX_FAILS`, `S3_DEST`,
@@ -513,10 +513,10 @@ busy, so that a machine of many threads is not left idle by one game's search.  
 in order, with the scores, proofs and repeats of a window of 1, which solves them one after the other
 ([README](../../README.md#games-in-flight); [DESIGN.md](../../DESIGN.md#the-window-games-in-flight)).  On 64 and 192
 threads the [scaling run](../../docs/experiments/scaling-to-192-threads-2026-10.md) found a window of 4 the best of 1,
-4, 16 and 32 on the games past 2225, and the default of 16 20 to 32% slower than 1 on 64 threads: `chain.sh`'s default
-is measured worse than 4 at 64 threads.  Set `WINDOW=4` until the default changes.
-The cloud run began with the default and moved to `WINDOW=4` at game 3310, on a fresh instance (the three games in
-flight at the move, 3311, 3312 and 3315, finished from their checkpoints under the new window).
+4, 16 and 32 on the games past 2225, and a window of 16 20 to 32% slower than 1 on 64 threads, so 4 is the default (of
+`chain.sh` and of `taxman solve --window`).
+The cloud run began with a window of 16, then the default, and moved to 4 at game 3310, on a fresh instance (the three
+games in flight at the move, 3311, 3312 and 3315, finished from their checkpoints under the new window).
 
 * **Where the chain starts.**  From an empty `~/taxman-work`, `chain.sh` solves from n = 1, which reproduces the
   committed `rust/results/strict.jsonl` (n = 1 to 3440; the scores equal, the moves may differ): the first 2175 games in

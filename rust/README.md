@@ -270,7 +270,7 @@ that game optimal.
 ### Games in flight
 
 ```
-$ taxman solve 1-2175 --threads 64 --window 16 --out strict.jsonl --checkpoint-dir ckpt
+$ taxman solve 1-2175 --threads 64 --window 4 --out strict.jsonl --checkpoint-dir ckpt
 ```
 
 With `--window K` a range keeps up to K consecutive games in flight, so that a machine of many threads is kept busy
@@ -279,10 +279,13 @@ game so far, without the ceiling, which it gets (with n's final game as a seed) 
 threads move between the searches while they run, to the oldest game that keeps them busy.  Games are still concluded,
 checked and recorded in order, and every line has the score, proof, repeat and assumptions that the range solved one
 game after another gives it; the moves may be another optimal set, and the nodes and times differ (DESIGN.md, "The
-window: games in flight" and "What a window changes in the results").  The default is 1, one game after another, and
-with one thread the window is always 1.  On 4 threads of the laptop a window of 16 makes 1..1300 about 16% faster and
+window: games in flight" and "What a window changes in the results").  The default is 4, and with one thread the window
+is always 1 (one game after another).  On 4 threads of the laptop a window of 16 makes 1..1300 about 16% faster and
 the games past 2225, whose searches already keep 4 threads busy, no slower ([round
-B](docs/experiments/round-b-the-chain-on-many-threads-2026-10.md)); `tools/cloud/chain.sh` runs with 16.  With the
+B](docs/experiments/round-b-the-chain-on-many-threads-2026-10.md)); on 64 threads a window of 16 makes the games past
+2225 20 to 32% slower than one game after another, and 4 is the best measured, so it is the default, and what
+`tools/cloud/chain.sh` runs with ([scaling to 192
+threads](docs/experiments/scaling-to-192-threads-2026-10.md)).  With the
 environment variable `TAXMAN_WINDOW_TRACE` set, the run prints the window's events on stderr (games set up, searches
 started, threads moved, deferrals, hints, conclusions).
 
@@ -333,7 +336,7 @@ counts them.
 | flag | meaning |
 |---|---|
 | `--threads K` | worker threads (default: all CPUs; honours affinity masks and cgroup limits) |
-| `--window K` | games of a range in flight at once (also for `regress`): game n + 1 is set up, and searched from n's best game so far, while n searches, and the threads move to the searches that keep them busy; games are still concluded and recorded in order, with the scores and proofs of a window of 1 (default 1: one game after another; always 1 with one thread) |
+| `--window K` | games of a range in flight at once (also for `regress`): game n + 1 is set up, and searched from n's best game so far, while n searches, and the threads move to the searches that keep them busy; games are still concluded and recorded in order, with the scores and proofs of a window of 1 (default 4; 1 is one game after another, and it is always 1 with one thread) |
 | `--tactic NAME=VALUE` | set a tactic, repeatable |
 | `--out FILE` | append result lines; skip games the file completed; the predecessor of the first game comes from it |
 | `--checkpoint-dir DIR`, `--checkpoint-interval S` | checkpoints (default every 60 s) |

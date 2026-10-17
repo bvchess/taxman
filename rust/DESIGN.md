@@ -770,7 +770,7 @@ none, the game is solved standalone, with no seed and no ceiling.
 A game of the chain needs two things of the game before it: its moves, for the seed, and its score, for the ceiling.
 Everything else (its board, its frames, its search problem, whether an earlier game settled that problem) is its own,
 and the ceiling only stops a search early.  So a range keeps a *window* of K consecutive games in flight (`--window K`,
-`SolveOptions::window`; 1 by default, and always 1 with one thread; `tools/cloud/chain.sh` runs with 16): game n + 1 is
+`SolveOptions::window`; 4 by default, as in `tools/cloud/chain.sh`, and always 1 with one thread): game n + 1 is
 set up while n searches, its search may start before n is proven (*speculatively*), seeded from n's best game so far
 and without a ceiling, and it takes n's ceiling and the seed of n's final game the moment n is concluded, through its
 engine's control (section 6).  `solver::window` is the driver.  With K = 1 it is the range solved in order, line for

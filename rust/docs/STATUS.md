@@ -67,6 +67,11 @@ What has been tried for the bound, and where it stands:
 
 ## Decided
 
+* **The window is 4** (2026-10-17), the default of `taxman solve --window` (it was 1) and of `chain.sh` (it was 16).
+  At 64 threads a window of 16 made the games past 2225 20 to 32% slower than 1, and 4 was the best measured
+  ([round B](experiments/round-b-the-chain-on-many-threads-2026-10.md); [scaling to 192
+  threads](experiments/scaling-to-192-threads-2026-10.md)).  It changes how threads are shared, never a score or a
+  proof.
 * **The forcing window is `all`** (2026-10-16; it was 80).  The tuning campaign (one `c8g.16xlarge`, 3.8 hours, about
   $2.50) measured it on subtrees of 3300, 3425, 3440 and 3441 and six whole games on one thread, and on complete
   proofs of seven games (3179-3395, 3300) on 64 threads: 0.60-0.63 of the CPU and 0.41-0.43 of the nodes on the
