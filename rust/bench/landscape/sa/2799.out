@@ -1,0 +1,2 @@
+note: no previous game for n=2799 (the game of 2798 is neither in this run nor in the results file): solving it standalone, with no seed and no ceiling, which costs more; to chain, give --out with the earlier games (optimal.json does not have it either)
+n=2799  score=2467042   search  nodes=77364          12.602 s  optimal unknown  proof=exhausted
