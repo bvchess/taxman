@@ -950,7 +950,10 @@ largest of its incumbent and the bounds of the open units of its final checkpoin
 as the search computes it when it starts the unit (`search::NodeBound`).  Its relations, applied to a fixpoint after
 every change, are monotonicity, the ceiling and the game below it, the prime formula both ways and repeats
 (heuristics/THEORY.md, "The ledger: bounds between boards", Lemmas L1 to L4 and D, with what each rests on).  Every
-game a relation makes is replayed before it counts, and an L above a U stops the run as an error.  A proven board of the
+game a relation makes that could raise a board's L is replayed before it counts (one that cannot is not shown to the
+referee, or not made), and an L above a U stops the run as an error.  The maps of all the boards come first, on the
+workers, and the relations carry their bounds once, when the last is in; the main thread, which applies every result
+while the workers whose searches ended wait for it, does little for each.  A proven board of the
 ledger is proven within the frame model like a game of the chain past 2175 (given U at the boards its upper bound came
 through); the ledger is not a results file and nothing of it goes into `results/strict.jsonl`.
 
