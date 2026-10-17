@@ -9,7 +9,7 @@ where a root's gap is 130 to 300.  The end of the chain (n above 3,400) has gaps
 nodes.  Which setting makes the search there cheapest, and does it hold for a whole proof on 64 threads, not only for
 a piece of one on a single thread?
 
-*Status.*  Done.  One setting changed: **`force_window` is `all` by default** (it was 80; commit COMMIT).  Nothing
+*Status.*  Done.  One setting changed: **`force_window` is `all` by default** (it was 80; commit 5d9c243).  Nothing
 else was adopted; the rest of the findings are below.
 
 *How it was run* (2026-10-16, one `c8g.16xlarge`, 64 Graviton4 threads, on spot at $0.68 an hour; Brian approved up to
@@ -208,13 +208,16 @@ and -0.5% (`more_forced=off`) on the 31 problems they share.  The subtrees of 34
 of its checkpoint), so a subtree could hold something heavier; none of the settings found a different best sum on any
 problem.  Windows narrower than 80 were tried only as 20, 40 and percentages; nothing is wider than `all`.
 
-*What changed in the solver* (COMMIT): `ForceWindow::default()` is `All`.  The trees of the default change, never the
+*What changed in the solver* (5d9c243): `ForceWindow::default()` is `All`.  The trees of the default change, never the
 answers: the node counts of the tripwires for 660, 760, 936 and 1000 (1000: 2,172 to 2,026 nodes; the matching path's
 rows and `fix_forced=off`, which has no forced members to search, are the same), the extended problem's, the probe's
 fingerprint with `--tactic gf2=on` (f3deaac0dbdc030a to a58ade4629ab6186, which `--tactic gf2=on --tactic
 force_window=80` still gives exactly: the window is the only difference; 7e8e724717d26545 and 5b83bbebf0bb2899 with
 `lagrange=off`, the matching path's, are unchanged), the probe's two windows (made again, as headers of version 6), the
-suite's `default` lines (nodes, CPU seconds, best sum measured again; the campaign's data keep the old default).
+suite's `default` lines (measured again with `make_suite.py refresh --new-trees`: the same best sum on all 46
+problems, 16.1 million nodes against 36.2 and 4,250 CPU seconds against 7,160, 8 jobs at a time on the M1 Max; the
+31 problems that the campaign ran with `force_window=all` have the same nodes and best sums on this laptop as on the
+Graviton machine; the campaign's data keep the old default).
 `taxman regress --to 1000 --threads 1` scores all equal; the one-thread chain 1..1300 has the committed chain's
 score, proof, method and `completed` for every game and the committed moves for every game but 1215, whose game of
 the committed chain is another optimal set (it is the same set that the build before this change finds on one
@@ -223,8 +226,9 @@ tuned that way (`--tactic force_window=80`) still writes version 5, the default'
 version 6, and the default's search resumes a checkpoint of an older build only as `--tactic force_window=80` (3441's
 checkpoint, made before the change, is one).
 
-*Commits.*  The campaign ran on c70f8f1; COMMIT (the default, the tripwires, the headers, the probe's windows); the
-commit of this entry, with the data in `bench/tuning/campaign-2026-10/`.
+*Commits.*  The campaign ran on c70f8f1; be6a618 (this entry, with the data in `bench/tuning/campaign-2026-10/`);
+5d9c243 (the default, the headers, the tripwires, the probe's windows); and the commit after them, with the suite's
+`default` lines measured again.
 
 *Open.*  `strong_limit=4` (5% better on one thread, 2% worse at 64 threads, each from one run) wants repeated 64-thread
 runs to be decided; so does the nogood period near 20,000, which took 3% off the CPU and 5% off the nodes against 80
