@@ -624,11 +624,23 @@ mod tests {
     /// optimum for every n, and each punctured game is exact.  Up to 200 (the punctured searches of W = 8), and a
     /// sample of boards that need W = 16 (0.5 s in all).
     #[test]
+    #[cfg_attr(debug_assertions, ignore = "long: the quick check is the_bound_holds_and_is_tight_for_primes_to_100")]
     fn the_bound_holds_and_is_tight_for_primes() {
+        the_bound_holds_and_is_tight_for_primes_on((2..=200u32).chain([500, 600, 609, 611, 660, 700]), 100);
+    }
+
+    /// [`the_bound_holds_and_is_tight_for_primes`] on the boards 2 to 100 and 500.
+    #[test]
+    fn the_bound_holds_and_is_tight_for_primes_to_100() {
+        the_bound_holds_and_is_tight_for_primes_on((2..=100u32).chain([500]), 40);
+    }
+
+    /// The bound holds on the boards `ns`, and is tight at more than `fewest` of them.
+    fn the_bound_holds_and_is_tight_for_primes_on(ns: impl Iterator<Item = u32>, fewest: u32) {
         let optimal = Optimal::built_in();
         let opts = PuncturedOptions::default();
         let mut tight = 0;
-        for n in (2..=200u32).chain([500, 600, 609, 611, 660, 700]) {
+        for n in ns {
             let (prev, prev_score) = (optimal.moves(n - 1).unwrap(), optimal.score(n - 1).unwrap());
             let b = sacrifice_bound(n, prev, prev_score, None, &opts).unwrap();
             let opt = optimal.score(n).unwrap();
@@ -641,7 +653,7 @@ mod tests {
             assert_eq!(decided.proves(opt), b.value == opt, "n={n}");
             tight += u32::from(b.value == opt);
         }
-        assert!(tight > 100, "the bound is tight at {tight} boards");
+        assert!(tight > fewest, "the bound is tight at {tight} boards");
     }
 
     /// The game that a hunt found, checked: it beats the claim, plays no hole, and referees on the punctured board to
@@ -660,11 +672,27 @@ mod tests {
     /// known exactly ([`punctured`]), worth `s`: a hunt with the claim `s − 1` must find a game (the best one, which
     /// replays on `[n]` to the same score), and a hunt with the claim `s` must find nothing.
     #[test]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is a_hunt_finds_the_best_game_of_some_punctured_boards_and_nothing_above_it"
+    )]
     fn a_hunt_finds_the_best_game_of_a_punctured_board_and_nothing_above_it() {
+        a_hunt_finds_the_best_game_of_the_punctured_boards_of(7, 500);
+    }
+
+    /// [`a_hunt_finds_the_best_game_of_a_punctured_board_and_nothing_above_it`] for the boards 30 to 150 (every 28th).
+    #[test]
+    fn a_hunt_finds_the_best_game_of_some_punctured_boards_and_nothing_above_it() {
+        a_hunt_finds_the_best_game_of_the_punctured_boards_of(28, 100);
+    }
+
+    /// The hunts for the punctured boards of the boards 30 to 150, every `step`th; more than `fewest` pairs of a board
+    /// and a source.
+    fn a_hunt_finds_the_best_game_of_the_punctured_boards_of(step: usize, fewest: usize) {
         let optimal = Optimal::built_in();
         let opts = PuncturedOptions::default();
         let (mut pairs, mut searched, mut proved_by_search) = (0, 0, 0);
-        for n in (30..=150u32).step_by(7) {
+        for n in (30..=150u32).step_by(step) {
             let (full, full_score) = (optimal.moves(n).unwrap(), optimal.score(n).unwrap());
             let sources: Vec<u32> = Board::<8>::for_n(n).plain.into_iter().filter(|&u| 2 * u > n).collect();
             assert!(!sources.is_empty(), "n={n}");
@@ -691,7 +719,7 @@ mod tests {
         // no promotions, or a board with no candidates, is settled without).
         let most = pairs / 2;
         assert!(
-            pairs > 500 && searched > most && proved_by_search > most,
+            pairs > fewest && searched > most && proved_by_search > most,
             "{pairs} pairs: {searched}, {proved_by_search}"
         );
     }
@@ -702,10 +730,25 @@ mod tests {
     /// best one.  It settles most of these hunts with no search, seeded or not.  Sources of the boards 30 to 150 (every
     /// 14th), as the test above.
     #[test]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is a_hunt_with_the_start_agrees_with_the_hunt_without_on_some_boards"
+    )]
     fn a_hunt_with_the_start_agrees_with_the_hunt_without() {
+        a_hunt_with_the_start_agrees_with_the_hunt_without_on_every(14);
+    }
+
+    /// [`a_hunt_with_the_start_agrees_with_the_hunt_without`] for the boards 30 to 150 (every 42nd).
+    #[test]
+    fn a_hunt_with_the_start_agrees_with_the_hunt_without_on_some_boards() {
+        a_hunt_with_the_start_agrees_with_the_hunt_without_on_every(42);
+    }
+
+    /// The hunts with the start and without agree on the boards 30 to 150, every `step`th.
+    fn a_hunt_with_the_start_agrees_with_the_hunt_without_on_every(step: usize) {
         let optimal = Optimal::built_in();
         let (mut pairs, mut by_start, mut by_seeded_start) = (0, 0, 0);
-        for n in (30..=150u32).step_by(14) {
+        for n in (30..=150u32).step_by(step) {
             let (full, full_score) = (optimal.moves(n).unwrap(), optimal.score(n).unwrap());
             let sources: Vec<u32> = Board::<8>::for_n(n).plain.into_iter().filter(|&u| 2 * u > n).collect();
             for u in sources {

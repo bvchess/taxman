@@ -273,6 +273,10 @@ fn check_setup_keeps(boards: &[u32]) {
 /// 100th to 4000, every 500th to 8000, and the boards 4095, 4096 (the last at a width of 64 words and the first at 128)
 /// and 8191.  A board costs about as much as n² (0.2 s at 8000), so the boards past 2200 are thinned.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is layer_2_greedy_is_what_setup_keeps_on_the_boards_to_400"
+)]
 fn layer_2_greedy_is_what_setup_keeps() {
     let sampled = |n: u32| {
         n <= 400
@@ -282,6 +286,13 @@ fn layer_2_greedy_is_what_setup_keeps() {
             || [4095, 4096, 8191].contains(&n)
     };
     let boards: Vec<u32> = (2..=8191).filter(|&n| sampled(n)).collect();
+    check_setup_keeps(&boards);
+}
+
+/// [`layer_2_greedy_is_what_setup_keeps`] on every board to 400 and on 4096, the first board at the width of 128 words.
+#[test]
+fn layer_2_greedy_is_what_setup_keeps_on_the_boards_to_400() {
+    let boards: Vec<u32> = (2..=400).chain([4096]).collect();
     check_setup_keeps(&boards);
 }
 
@@ -333,7 +344,19 @@ fn check_games(source: &str, games: &[(u32, Vec<u32>)]) -> Vec<String> {
 /// Theorem B on the games of the table `optimal.json`, of the committed chain `results/strict.jsonl` and of the chain
 /// 2176 to 2276 of the Graviton calibration.
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is theorem_b_holds_for_every_20th_recorded_game")]
 fn theorem_b_holds_for_every_recorded_game() {
+    theorem_b_holds_for_the_recorded_games(1);
+}
+
+/// [`theorem_b_holds_for_every_recorded_game`] for every 20th game of each source.
+#[test]
+fn theorem_b_holds_for_every_20th_recorded_game() {
+    theorem_b_holds_for_the_recorded_games(20);
+}
+
+/// Theorem B on every `every`th game of the table, the chain and the calibration's chain.
+fn theorem_b_holds_for_the_recorded_games(every: usize) {
     let table: Vec<(u32, Vec<u32>)> =
         Optimal::built_in().games().filter(|&(n, _, _)| n >= 2).map(|(n, _, moves)| (n, moves.to_vec())).collect();
     let chain = completed_games(&results_path("strict.jsonl"));
@@ -341,10 +364,11 @@ fn theorem_b_holds_for_every_recorded_game() {
     assert!(table.len() >= 1299, "the table has the games of 2 to 1300, not {}", table.len());
     assert!(chain.len() >= 3439, "the chain has the games of 2 to 3440, not {}", chain.len());
     assert!(ec2.len() >= 101, "the calibration's chain has the games of 2176 to 2276, not {}", ec2.len());
+    let thin = |games: Vec<(u32, Vec<u32>)>| games.into_iter().step_by(every).collect::<Vec<_>>();
 
-    let mut failures = check_games("optimal.json", &table);
-    failures.extend(check_games("results/strict.jsonl", &chain));
-    failures.extend(check_games("bench/cloud/c8g.chain-2176.jsonl", &ec2));
+    let mut failures = check_games("optimal.json", &thin(table));
+    failures.extend(check_games("results/strict.jsonl", &thin(chain)));
+    failures.extend(check_games("bench/cloud/c8g.chain-2176.jsonl", &thin(ec2)));
     assert!(failures.is_empty(), "Theorem B fails on {} recorded games:\n{}", failures.len(), failures.join("\n"));
 }
 
@@ -592,6 +616,9 @@ fn check_small_boards(boards: RangeInclusive<u32>) -> Vec<String> {
     failures
 }
 
+/// The largest board of the quick test of the small boards: the search takes a few tenths of a second to here.
+const QUICK_SMALL_BOARDS_TO: u32 = 36;
+
 /// The largest board of the default test of the small boards: the search takes a few seconds to here.
 const SMALL_BOARDS_TO: u32 = 48;
 
@@ -599,8 +626,19 @@ const SMALL_BOARDS_TO: u32 = 48;
 /// a number of layer 2 up to n/2 (the next such board is 70).
 const MORE_SMALL_BOARDS_TO: u32 = 54;
 
+/// Theorem B on every optimal set of every board from 2 to [`QUICK_SMALL_BOARDS_TO`], found by exhaustive search.
+#[test]
+fn theorem_b_holds_for_every_optimal_set_of_the_smallest_boards() {
+    let failures = check_small_boards(2..=QUICK_SMALL_BOARDS_TO);
+    assert!(failures.is_empty(), "Theorem B fails on {} small boards:\n{}", failures.len(), failures.join("\n"));
+}
+
 /// Theorem B on every optimal set of every board from 2 to [`SMALL_BOARDS_TO`], found by exhaustive search.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is theorem_b_holds_for_every_optimal_set_of_the_smallest_boards"
+)]
 fn theorem_b_holds_for_every_optimal_set_of_the_small_boards() {
     let failures = check_small_boards(2..=SMALL_BOARDS_TO);
     assert!(failures.is_empty(), "Theorem B fails on {} small boards:\n{}", failures.len(), failures.join("\n"));

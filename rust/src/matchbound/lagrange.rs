@@ -554,9 +554,25 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is incremental_solver_matches_the_reference_on_a_sample"
+    )]
     fn incremental_solver_matches_the_reference() {
+        incremental_solver_matches_the_reference_on_every(1);
+    }
+
+    /// [`incremental_solver_matches_the_reference`] on every third of its golden games.
+    #[test]
+    fn incremental_solver_matches_the_reference_on_a_sample() {
+        incremental_solver_matches_the_reference_on_every(3);
+    }
+
+    /// The incremental Lagrangian solver matches the reference on every `every`th of the golden games.
+    fn incremental_solver_matches_the_reference_on_every(every: usize) {
         let mut checks = 0;
-        for n in golden_ns().into_iter().filter(|&n| n >= 30 && (n % 26 == 0 || [480, 760].contains(&n))) {
+        let ns = golden_ns().into_iter().filter(|&n| n >= 30 && (n % 26 == 0 || [480, 760].contains(&n)));
+        for n in ns.step_by(every) {
             let g = load(n);
             let (paths, budget) = if n < 300 { (6, 150) } else { (2, 60) };
             if n < 512 {
@@ -566,7 +582,7 @@ mod tests {
             }
         }
         eprintln!("the Lagrangian bound, incremental against the reference: {checks} evaluations");
-        assert!(checks > 2000);
+        assert!(checks > 2000 / every as u64);
     }
 
     /// Walks the search paths of `g` with a random relaxation (changed now and then), checking every evaluation of
@@ -627,9 +643,21 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(debug_assertions, ignore = "long: the quick check is bound_is_sound_on_a_sample")]
     fn bound_is_sound() {
+        bound_is_sound_on_every(1);
+    }
+
+    /// [`bound_is_sound`] on every sixth of its golden games.
+    #[test]
+    fn bound_is_sound_on_a_sample() {
+        bound_is_sound_on_every(6);
+    }
+
+    /// The Lagrangian bound is sound on every `every`th of the golden games.
+    fn bound_is_sound_on_every(every: usize) {
         let (mut checks, mut below_plain) = (0, 0);
-        for n in golden_ns().into_iter().filter(|&n| (40..=220).contains(&n)) {
+        for n in golden_ns().into_iter().filter(|&n| (40..=220).contains(&n)).step_by(every) {
             let g = load(n);
             let (model, root, all) = setup::<4>(&g);
             let graph = MatchGraph::new(&model, &root);
@@ -655,7 +683,7 @@ mod tests {
             }
         }
         eprintln!("Lagrangian bound soundness: {checks} states, below the matching bound at {below_plain}");
-        assert!(checks > 3000 && below_plain > 0);
+        assert!(checks > 3000 / every && below_plain > 0);
     }
 
     // ---- micro-benchmark: cargo test --release bench_lagrange -- --ignored --nocapture --test-threads=1 ----

@@ -176,12 +176,28 @@ struct ExtendedTally {
 /// of them; and since the optimal game of these boards plays U\*_{≥3} (the table of optimal games has its score), the
 /// bound is at least that score less what the fixed sources bring.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is bound_and_independence_in_the_extended_problem_of_the_small_boards"
+)]
 fn bound_and_independence_in_the_extended_problem() {
+    bound_and_independence_in_extended_problems(2..=120, 100);
+}
+
+/// [`bound_and_independence_in_the_extended_problem`] on the boards 2 to 46.
+#[test]
+fn bound_and_independence_in_the_extended_problem_of_the_small_boards() {
+    bound_and_independence_in_extended_problems(2..=46, 2);
+}
+
+/// The checks of [`bound_and_independence_in_the_extended_problem`] on the boards `ns`, which must reach `percent`
+/// percent of what it asks.
+fn bound_and_independence_in_extended_problems(ns: std::ops::RangeInclusive<u32>, percent: usize) {
     const W: usize = 8;
     let optimal = crate::game::Optimal::built_in();
     let mut rng = Rng(0xE87E_ADED_0000_0001);
     let (mut tally, start) = (ExtendedTally::default(), Instant::now());
-    for n in 2..=120 {
+    for n in ns {
         let board = Board::<W>::for_n(n);
         let all = upper_from_3(&board);
         let mut opens: Vec<Bits<W>> = vec![all.iter().copied().collect()];
@@ -237,12 +253,13 @@ fn bound_and_independence_in_the_extended_problem() {
         "{enumerated} enumerated ({capped} stopped at the limit): {sets} promotion sets, {sets_with_one_sided} with a \
          one-sided member"
     );
+    let at_least = |count: usize, most: usize| count * 100 >= most * percent;
     assert!(
-        problems > 300 && with_one_sided > 300 && optimum_checks > 300,
+        at_least(problems, 300) && at_least(with_one_sided, 300) && at_least(optimum_checks, 300),
         "{problems} {with_one_sided} {optimum_checks}"
     );
     assert!(
-        enumerated > 150 && sets > 1_000_000 && sets_with_one_sided > 1_000_000,
+        at_least(enumerated, 150) && at_least(sets, 1_000_000) && at_least(sets_with_one_sided, 1_000_000),
         "{enumerated} {sets} {sets_with_one_sided}"
     );
 }
@@ -448,35 +465,52 @@ fn walk_random_paths<const W: usize>(
     }
 }
 
-/// Along random paths of the boards from 60 to 1000 at W = 16 (`walk_random_paths`, with the one engine a board
-/// needs), the bound of every node equals the bound of the matroids built afresh from its state, and the forced
-/// members, the certified bounds and the solved bounds without a candidate are right.
-#[test]
-fn levels_match_fresh_matroids_along_random_paths() {
+/// Walks `paths` random paths of each of `boards` at W = 16 (`walk_random_paths`, with the one engine a board needs),
+/// and checks that the walks reached at least `percent` percent of what [`levels_match_fresh_matroids_along_random_paths`]
+/// asks: the bound of every node equals the bound of the matroids built afresh from its state, and the forced members,
+/// the certified bounds and the solved bounds without a candidate are right.
+fn walk_real_games(boards: &[u32], paths: usize, rng: &mut Rng, percent: u64) {
     const W: usize = 16;
-    let mut rng = Rng(0xA5A5_0123_4567_89AB);
     let mut walked = Walked::default();
-    for &n in &[60u32, 90, 120, 150, 200, 260, 330, 420, 520, 640, 760, 900, 1000] {
+    for &n in boards {
         let p = Board::<W>::for_n(n).prepare(SearchTactics::default()).unwrap();
         let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates);
-        walk_random_paths(&p, &mut rng, 12, usize::MAX, &mut [Gf2Bound::<W>::new(&graph)], &mut walked);
+        walk_random_paths(&p, rng, paths, usize::MAX, &mut [Gf2Bound::<W>::new(&graph)], &mut walked);
     }
     let Walked { checks, inherited, forced_checked, certified_checked, excluded_checked, children, .. } = walked;
+    println!("{checks} {inherited} {forced_checked} {certified_checked} {children} {excluded_checked}");
+    let at_least = |count: u64, most: u64| count * 100 >= most * percent;
     assert!(
-        checks > 3000
-            && inherited > 300
-            && forced_checked > 1000
-            && certified_checked > 300
-            && children > 100
-            && excluded_checked > 300,
+        at_least(checks, 3000)
+            && at_least(inherited, 300)
+            && at_least(forced_checked, 1000)
+            && at_least(certified_checked, 300)
+            && at_least(children, 100)
+            && at_least(excluded_checked, 300),
         "{checks} {inherited} {forced_checked} {certified_checked} {children} {excluded_checked}"
     );
     let Walked { derived, derived_from_copies, derivations_checked, .. } = walked;
     println!("{derived} tableaux derived, {derived_from_copies} from a copy, {derivations_checked} checked");
     assert!(
-        derived > 900 && derived_from_copies > 150 && derivations_checked == derived,
+        at_least(derived, 900) && at_least(derived_from_copies, 150) && derivations_checked == derived,
         "{derived} {derived_from_copies} {derivations_checked}"
     );
+}
+
+/// [`levels_match_fresh_matroids_along_random_paths`] along 3 paths of the boards 60, 120, 200 and 330.
+#[test]
+fn levels_match_fresh_matroids_along_a_few_random_paths() {
+    walk_real_games(&[60, 120, 200, 330], 3, &mut Rng(0xA5A5_0123_4567_89AC), 5);
+}
+
+/// Along random paths of the boards from 60 to 1000 at W = 16 (`walk_random_paths`, with the one engine a board
+/// needs), the bound of every node equals the bound of the matroids built afresh from its state, and the forced
+/// members, the certified bounds and the solved bounds without a candidate are right.
+#[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is levels_match_fresh_matroids_along_a_few_random_paths")]
+fn levels_match_fresh_matroids_along_random_paths() {
+    let boards = [60u32, 90, 120, 150, 200, 260, 330, 420, 520, 640, 760, 900, 1000];
+    walk_real_games(&boards, 12, &mut Rng(0xA5A5_0123_4567_89AB), 100);
 }
 
 /// Along random paths of the boards 300 and 760 at W = 16 (`walk_random_paths`), engines whose search stamps start
@@ -529,10 +563,11 @@ fn walk_extended_problems<const W: usize>(boards: &[u32], paths: usize, rng: &mu
     assert!(walks >= boards.len(), "{walks} problems walked on {} boards", boards.len());
 }
 
-/// What the walks of the extended problem reached, and the assertions that they reached enough of it: nodes checked,
-/// children that inherited, forced members, certified and solved bounds without a member, and, of the one-sided
-/// candidates, the nodes that had one among their candidates, the forced members and the promotions.
-fn assert_walks_reached(walked: &Walked, scale: u64) {
+/// What the walks of the extended problem reached, and the assertions that they reached enough of it (`percent` percent
+/// of what the default walk of [`levels_match_fresh_matroids_along_random_paths_in_the_extended_problem`] must): nodes
+/// checked, children that inherited, forced members, certified and solved bounds without a member, and, of the
+/// one-sided candidates, the nodes that had one among their candidates, the forced members and the promotions.
+fn assert_walks_reached(walked: &Walked, percent: u64) {
     let Walked {
         checks,
         inherited,
@@ -546,26 +581,36 @@ fn assert_walks_reached(walked: &Walked, scale: u64) {
         ..
     } = *walked;
     println!(
-        "{checks} nodes checked, {checks_with_one_sided} with a one-sided candidate; {inherited} inherited, \
-         {forced_checked} forced ({forced_one_sided} one-sided), {certified_checked} certified, \
-         {excluded_checked} solved, {children} certified children; {one_sided_promoted} one-sided promotions"
+        "{checks} nodes checked, {checks_with_one_sided} with a one-sided candidate; {inherited} inherited,          {forced_checked} forced ({forced_one_sided} one-sided), {certified_checked} certified,          {excluded_checked} solved, {children} certified children; {one_sided_promoted} one-sided promotions"
     );
+    let at_least = |count: u64, most: u64| count * 100 >= most * percent;
     assert!(
-        checks > 4000 * scale
-            && inherited > 300 * scale
-            && forced_checked > 30_000 * scale
-            && certified_checked > 2500 * scale
-            && children > 20 * scale
-            && excluded_checked > 1200 * scale,
+        at_least(checks, 4000)
+            && at_least(inherited, 300)
+            && at_least(forced_checked, 30_000)
+            && at_least(certified_checked, 2500)
+            && at_least(children, 20)
+            && at_least(excluded_checked, 1200),
         "{checks} {inherited} {forced_checked} {certified_checked} {children} {excluded_checked}"
     );
     assert!(
-        checks_with_one_sided > 4000 * scale && forced_one_sided > 20_000 * scale && one_sided_promoted > 1000 * scale,
+        at_least(checks_with_one_sided, 4000)
+            && at_least(forced_one_sided, 20_000)
+            && at_least(one_sided_promoted, 1000),
         "{checks_with_one_sided} {forced_one_sided} {one_sided_promoted}"
     );
     let Walked { derived, derived_from_copies, derivations_checked, .. } = *walked;
     println!("{derived} tableaux derived, {derived_from_copies} from a copy, {derivations_checked} checked");
-    assert!(derived > 500 * scale && derivations_checked == derived, "{derived} {derivations_checked}");
+    assert!(at_least(derived, 500) && derivations_checked == derived, "{derived} {derivations_checked}");
+}
+
+/// [`levels_match_fresh_matroids_along_random_paths_in_the_extended_problem`] along 3 paths of the boards 60, 120 and
+/// 200 at W = 16.
+#[test]
+fn levels_match_fresh_matroids_along_a_few_random_paths_in_the_extended_problem() {
+    let (mut rng, mut walked) = (Rng(0x0E87_5EED_C0FF_EE03), Walked::default());
+    walk_extended_problems::<16>(&[60, 120, 200], 3, &mut rng, &mut walked);
+    assert_walks_reached(&walked, 3);
 }
 
 /// Along random paths of the extended problem Π⁺(O) on the boards from 60 to 1000 at W = 16, with O = U\*_{≥3} and with
@@ -575,6 +620,10 @@ fn assert_walks_reached(walked: &Walked, scale: u64) {
 /// frames of Π⁺(U\*_{≥3}) are too wide for the engines of three words that the narrower sets have, and need that of
 /// four.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is levels_match_fresh_matroids_along_a_few_random_paths_in_the_extended_problem"
+)]
 fn levels_match_fresh_matroids_along_random_paths_in_the_extended_problem() {
     let mut rng = Rng(0x0E87_5EED_C0FF_EE01);
     let (mut walked, start) = (Walked::default(), Instant::now());
@@ -582,7 +631,7 @@ fn levels_match_fresh_matroids_along_random_paths_in_the_extended_problem() {
     walk_extended_problems::<16>(&boards, 12, &mut rng, &mut walked);
     walk_extended_problems::<128>(&[1300], 4, &mut rng, &mut walked);
     println!("walked in {:.1?}", start.elapsed());
-    assert_walks_reached(&walked, 1);
+    assert_walks_reached(&walked, 100);
 }
 
 /// The same walks, longer: more paths on more boards, with the boards 1300 and 1500 at W = 128 as well.
@@ -595,7 +644,7 @@ fn levels_match_fresh_matroids_along_many_random_paths_in_the_extended_problem()
     walk_extended_problems::<16>(&boards, 40, &mut rng, &mut walked);
     walk_extended_problems::<128>(&[1300, 1500], 10, &mut rng, &mut walked);
     println!("walked in {:.1?}", start.elapsed());
-    assert_walks_reached(&walked, 3);
+    assert_walks_reached(&walked, 300);
 }
 
 /// The free blocks of a graph of the extended problem are as described (`Gf2Graph`, "One-sided candidates"), on a
@@ -724,11 +773,27 @@ fn free_blocks_hold_the_coloops_of_the_one_sided_candidates() {
 /// Only the sets of 128 words have the engines of four and five words, and the boards that need them (from 4740 and
 /// 6392) are too large to walk, so this is where they run along paths, against the engines of one and two words.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is engines_of_every_word_count_agree_along_a_few_random_paths"
+)]
 fn engines_of_every_word_count_agree_along_random_paths() {
+    engines_of_every_word_count_agree_along(&[120, 300, 760, 1000], 5, 100);
+}
+
+/// [`engines_of_every_word_count_agree_along_random_paths`] along 2 paths of the boards 120 and 300.
+#[test]
+fn engines_of_every_word_count_agree_along_a_few_random_paths() {
+    engines_of_every_word_count_agree_along(&[120, 300], 2, 5);
+}
+
+/// The engines of every word count agree along `paths` random paths of each of `boards`, which reach at least
+/// `percent` percent of what [`engines_of_every_word_count_agree_along_random_paths`] asks.
+fn engines_of_every_word_count_agree_along(boards: &[u32], paths: usize, percent: u64) {
     const W: usize = 128;
     let mut rng = Rng(0x7E57_ED64_0000_0005);
     let mut walked = Walked::default();
-    for n in [120u32, 300, 760, 1000] {
+    for &n in boards {
         let p = Board::<W>::for_n(n).prepare(SearchTactics::default()).unwrap();
         let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates);
         let natural = graph.words();
@@ -741,11 +806,12 @@ fn engines_of_every_word_count_agree_along_random_paths() {
             engines.push(Gf2Bound::<W>::new(padded));
         }
         assert_eq!(engines.len(), 1 + 2 * (MAX_WORDS - natural), "n={n}");
-        walk_random_paths(&p, &mut rng, 5, usize::MAX, &mut engines, &mut walked);
+        walk_random_paths(&p, &mut rng, paths, usize::MAX, &mut engines, &mut walked);
     }
     let Walked { checks, excluded_checked, splits_compared, .. } = walked;
+    let at_least = |count: u64, most: u64| count * 100 >= most * percent;
     assert!(
-        checks > 600 && excluded_checked > 100 && splits_compared > 5000,
+        at_least(checks, 600) && at_least(excluded_checked, 100) && at_least(splits_compared, 5000),
         "{checks} {excluded_checked} {splits_compared}"
     );
 }

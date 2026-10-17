@@ -1643,10 +1643,23 @@ mod tests {
     // ---- correctness ----
 
     #[test]
+    #[cfg_attr(debug_assertions, ignore = "long: the quick check is reference_meets_the_definition_on_a_sample")]
     fn reference_meets_the_definition() {
+        reference_meets_the_definition_on_every(1);
+    }
+
+    /// [`reference_meets_the_definition`] on every sixth of its golden games.
+    #[test]
+    fn reference_meets_the_definition_on_a_sample() {
+        reference_meets_the_definition_on_every(6);
+    }
+
+    /// The reference bound meets the definition on every `every`th of the golden games.
+    fn reference_meets_the_definition_on_every(every: usize) {
         let mut rng = Rng(0x0BAD_F00D_1234_5678);
         let mut checks = 0;
-        for n in golden_ns().into_iter().filter(|&n| (30..=200).contains(&n) && n % 6 == 0) {
+        let ns = golden_ns().into_iter().filter(|&n| (30..=200).contains(&n) && n % 6 == 0);
+        for n in ns.step_by(every) {
             let g = load(n);
             let (model, ..) = setup::<4>(&g);
             walks::<4>(&g, n.into(), 3, 60, &mut |_, state, _, cands| {
@@ -1666,14 +1679,30 @@ mod tests {
             });
         }
         eprintln!("reference against the definition: {checks} candidate sets");
-        assert!(checks > 1000);
+        assert!(checks > 1000 / every);
     }
 
     #[test]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is incremental_solver_matches_the_reference_on_a_sample"
+    )]
     fn incremental_solver_matches_the_reference() {
+        incremental_solver_matches_the_reference_on_every(1);
+    }
+
+    /// [`incremental_solver_matches_the_reference`] on every third of its golden games.
+    #[test]
+    fn incremental_solver_matches_the_reference_on_a_sample() {
+        incremental_solver_matches_the_reference_on_every(3);
+    }
+
+    /// The incremental solver matches the reference on every `every`th of the golden games.
+    fn incremental_solver_matches_the_reference_on_every(every: usize) {
         let mut checks = 0;
         let mut stats = MatchStats::default();
-        for n in golden_ns().into_iter().filter(|&n| n >= 30 && (n % 26 == 0 || [480, 760].contains(&n))) {
+        let ns = golden_ns().into_iter().filter(|&n| n >= 30 && (n % 26 == 0 || [480, 760].contains(&n)));
+        for n in ns.step_by(every) {
             let g = load(n);
             let (paths, budget) = if n < 300 { (6, 150) } else { (2, 60) };
             if n < 512 {
@@ -1683,7 +1712,7 @@ mod tests {
             }
         }
         eprintln!("incremental against the reference: {checks} evaluations, {stats:?}");
-        assert!(checks > 2000);
+        assert!(checks > 2000 / every as u64);
     }
 
     /// Walks the search paths of `g`, checking every evaluation against the reference, the optimality
@@ -1731,9 +1760,21 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(debug_assertions, ignore = "long: the quick check is bound_is_sound_on_a_sample")]
     fn bound_is_sound() {
+        bound_is_sound_on_every(1);
+    }
+
+    /// [`bound_is_sound`] on every sixth of its golden games.
+    #[test]
+    fn bound_is_sound_on_a_sample() {
+        bound_is_sound_on_every(6);
+    }
+
+    /// The matching bound is sound on every `every`th of the golden games.
+    fn bound_is_sound_on_every(every: usize) {
         let (mut checks, mut tight, mut everything) = (0, 0, 0);
-        for n in golden_ns().into_iter().filter(|&n| (40..=220).contains(&n)) {
+        for n in golden_ns().into_iter().filter(|&n| (40..=220).contains(&n)).step_by(every) {
             let g = load(n);
             let (model, ..) = setup::<4>(&g);
             walks::<4>(&g, u64::from(n) << 8, 6, 80, &mut |mb, state, promoted, cands| {
@@ -1756,7 +1797,7 @@ mod tests {
         eprintln!(
             "matching bound soundness: {checks} states, exact at {tight}, all candidates promotable at {everything}"
         );
-        assert!(checks > 3000);
+        assert!(checks > 3000 / every);
     }
 
     // ---- micro-benchmarks: cargo test --release bench_matchbound -- --ignored --nocapture --test-threads=1 ----

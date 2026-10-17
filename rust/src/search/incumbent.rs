@@ -328,9 +328,24 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is improve_on_threads_gives_the_sequential_answer_of_small_games"
+    )]
     fn improve_on_threads_gives_the_sequential_answer() {
+        improve_on_threads_gives_the_sequential_answer_of(&[300, 600, 960, 1215]);
+    }
+
+    /// [`improve_on_threads_gives_the_sequential_answer`] for the games 300 and 600.
+    #[test]
+    fn improve_on_threads_gives_the_sequential_answer_of_small_games() {
+        improve_on_threads_gives_the_sequential_answer_of(&[300, 600]);
+    }
+
+    /// The local search on any number of threads gives the sequential answer, for the games `ns`.
+    fn improve_on_threads_gives_the_sequential_answer_of(ns: &[u32]) {
         let mut improved = 0;
-        for n in [300, 600, 960, 1215] {
+        for &n in ns {
             improved += crate::with_width!(n, W => same_answers::<W>(n));
         }
         assert!(improved > 0, "no local search improved its start, so the comparison showed nothing");

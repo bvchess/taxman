@@ -27,7 +27,7 @@
 
 mod common;
 
-use common::{kept_subsets, play_order, playable, shuffle, Rng};
+use common::{kept_subsets, play_order, playable, shuffle, Rng, QUICK};
 use std::collections::BTreeSet;
 use std::time::Instant;
 use taxman::accelerate::solution_for_promotions;
@@ -72,11 +72,12 @@ fn playable_by_the_rules(n: u32) -> Vec<bool> {
 /// The oracle decides playability as the rules do, on every board up to 20: for every subset of the numbers it agrees
 /// with the rules' own account of which sets are the moves of a legal game, every playable set in the order it gives
 /// is a legal game that scores the sum of the set, and the largest sum is the optimal score (the brute force's, and
-/// the table's).
+/// the table's).  (A quick run stops at 17.)
 #[test]
 fn the_oracle_agrees_with_brute_force() {
     let optimal = Optimal::built_in();
-    for n in 2..=20 {
+    // The sets of a board are 2^(n−1): a quick run stops at 17, an eighth of the work.
+    for n in 2..=if QUICK { 17 } else { 20 } {
         let t = Tables::new(n);
         let by_the_rules = playable_by_the_rules(n);
         for (moves, &legal) in by_the_rules.iter().enumerate() {
@@ -337,8 +338,15 @@ fn check_random_boards(boards: &[u32], sets: usize, seed: u64) {
     println!("{} boards, {sets} sets of each kind: {:.1?}", boards.len(), start.elapsed());
 }
 
+/// Theorem M on a few random sets of the boards 60 to 500.
+#[test]
+fn theorem_m_on_a_few_random_sets_to_500() {
+    check_random_boards(&[60, 100, 200, 300, 500], 20, 0xE220_A839_7B1D_CDAF);
+}
+
 /// Theorem M on random sets of the boards from 60 to 1300.
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is theorem_m_on_a_few_random_sets_to_500")]
 fn theorem_m_on_random_sets_to_1300() {
     check_random_boards(&[60, 100, 200, 300, 500, 760, 1000, 1300], 100, 0x9E37_79B9_7F4A_7C15);
 }

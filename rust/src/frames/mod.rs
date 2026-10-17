@@ -659,9 +659,22 @@ mod tests {
     /// those): every 199th board from 401, the boards where the count of frames steps up (512, 1024, 2048, 4096) and
     /// the largest.
     #[test]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is the_numbering_by_layer_is_the_breadth_first_one_on_a_sample"
+    )]
     fn the_numbering_by_layer_is_the_breadth_first_one() {
         let sample = (401..=8191).step_by(199).chain([512, 1024, 2048, 4096, 8191]);
         for n in (2..=400).chain(sample) {
+            crate::with_width!(n, W => check_the_numbering_by_layer_is_the_breadth_first_one::<W>(&Tables::new(n)));
+        }
+    }
+
+    /// [`the_numbering_by_layer_is_the_breadth_first_one`] on every board to 200, every 5th to 400 and the boards where
+    /// the count of frames steps up.
+    #[test]
+    fn the_numbering_by_layer_is_the_breadth_first_one_on_a_sample() {
+        for n in (2..=200).chain((205..=400).step_by(5)).chain([512, 1024, 2048, 4096]) {
             crate::with_width!(n, W => check_the_numbering_by_layer_is_the_breadth_first_one::<W>(&Tables::new(n)));
         }
     }

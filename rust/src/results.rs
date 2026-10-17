@@ -1553,12 +1553,12 @@ mod tests {
         assert_eq!(table.max_n(), 3, "nothing was appended");
     }
 
-    /// The first 700 lines of the committed chain, which include hundreds of repeats, whose checks set search
-    /// problems up.
-    fn committed_lines() -> Vec<Json> {
+    /// The first `count` lines of the committed chain, which include hundreds of repeats (107 in the first 300), whose
+    /// checks set search problems up.
+    fn committed_lines(count: usize) -> Vec<Json> {
         let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("results/strict.jsonl");
         let text = fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-        text.lines().take(700).map(|line| Json::parse(line).unwrap()).collect()
+        text.lines().take(count).map(|line| Json::parse(line).unwrap()).collect()
     }
 
     /// The error that `lines` give on one thread, which they give on three as well (nothing else is checked of it).
@@ -1569,13 +1569,29 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is the_checks_give_the_same_result_on_one_thread_and_on_several_for_300_games"
+    )]
     fn the_checks_give_the_same_result_on_one_thread_and_on_several() {
-        let lines = committed_lines();
+        the_checks_give_the_same_result_on_one_thread_and_on_several_for(700);
+    }
+
+    /// [`the_checks_give_the_same_result_on_one_thread_and_on_several`] for the first 300 games.
+    #[test]
+    fn the_checks_give_the_same_result_on_one_thread_and_on_several_for_300_games() {
+        the_checks_give_the_same_result_on_one_thread_and_on_several_for(300);
+    }
+
+    /// The checks of the first `count` games of the committed chain give the same result on one thread and on
+    /// several, and its tampered lines the same errors.
+    fn the_checks_give_the_same_result_on_one_thread_and_on_several_for(count: usize) {
+        let lines = committed_lines(count);
         let repeats: Vec<usize> =
             (0..lines.len()).filter(|&i| lines[i].get("method").and_then(Json::as_str) == Some("repeat")).collect();
         assert!(repeats.len() > 100, "the test needs repeats to set problems up for");
         let one = read_results(&text(&lines), Optimal::built_in(), 1).unwrap();
-        assert_eq!(one.games.len(), 700);
+        assert_eq!(one.games.len(), count);
         for threads in [2, 3] {
             assert_eq!(read_results(&text(&lines), Optimal::built_in(), threads).unwrap(), one, "{threads} threads");
         }

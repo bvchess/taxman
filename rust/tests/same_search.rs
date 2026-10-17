@@ -91,12 +91,27 @@ fn lines(path: &Path) -> Vec<Json> {
 }
 
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_chain_from_1_to_60_repeats_exactly_the_searches_that_repeat"
+)]
 fn a_chain_from_1_repeats_exactly_the_searches_that_repeat() {
-    let on = solver::solve_range(1, 300, &options(true), None).unwrap();
-    let off = solver::solve_range(1, 300, &options(false), None).unwrap();
     // 107 of the 300, from 22 (which repeats 21) on.
-    let expected = repeats_by_problem(1, 300);
-    assert_eq!((expected.len(), expected[0]), (107, (22, 21)));
+    a_chain_from_1_repeats_exactly_the_searches_that_repeat_to(300, 107);
+}
+
+/// [`a_chain_from_1_repeats_exactly_the_searches_that_repeat`] for the games 1..=60.
+#[test]
+fn a_chain_from_1_to_60_repeats_exactly_the_searches_that_repeat() {
+    a_chain_from_1_repeats_exactly_the_searches_that_repeat_to(60, 11);
+}
+
+/// A chain 1..=`hi` repeats `repeats` games, exactly the searches that repeat, from 22 (which repeats 21) on.
+fn a_chain_from_1_repeats_exactly_the_searches_that_repeat_to(hi: u32, repeats: usize) {
+    let on = solver::solve_range(1, hi, &options(true), None).unwrap();
+    let off = solver::solve_range(1, hi, &options(false), None).unwrap();
+    let expected = repeats_by_problem(1, hi);
+    assert_eq!((expected.len(), expected[0]), (repeats, (22, 21)));
     compare(&on, &off, &expected);
     // The proofs of the games repeated: a search to exhaustion, one that reached its ceiling, or a repeat again.
     let proof_of = |n: u32| on.iter().find(|g| g.n == n).and_then(|g| g.proof).unwrap();
@@ -109,29 +124,45 @@ fn a_chain_from_1_repeats_exactly_the_searches_that_repeat() {
     fs::write(&path, on.iter().map(|g| format!("{}\n", g.to_json())).collect::<String>()).unwrap();
     let report = verify_files(std::slice::from_ref(&path), Optimal::built_in(), 1).unwrap_or_else(|e| panic!("{e}"));
     let games = &report.files[0].contents.games;
-    assert_eq!(games.values().filter(|g| g.proof == Proof::SameSearch).count(), 107);
+    assert_eq!(games.values().filter(|g| g.proof == Proof::SameSearch).count(), repeats);
 }
 
 /// A range stopped and run again finds the earlier games of the first run in its results file, by the digests its
 /// lines record: the same repeats as a chain in one piece.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_range_run_again_repeats_the_searches_of_its_results_file_to_60"
+)]
 fn a_range_run_again_repeats_the_searches_of_its_results_file() {
+    a_range_run_again_repeats_the_searches_of_its_results_file_to(64, 120);
+}
+
+/// [`a_range_run_again_repeats_the_searches_of_its_results_file`] for the games 1..=60, the first run of 1..=48.
+#[test]
+fn a_range_run_again_repeats_the_searches_of_its_results_file_to_60() {
+    a_range_run_again_repeats_the_searches_of_its_results_file_to(48, 60);
+}
+
+/// The second run, of the games 1..=`hi`, repeats the searches of the first run's games 1..=`first_hi`, where
+/// `first_hi + 1` repeats `first_hi` and `first_hi + 2` repeats `first_hi + 1`.
+fn a_range_run_again_repeats_the_searches_of_its_results_file_to(first_hi: u32, hi: u32) {
     let dir = TempDir::new("same-search-resumed");
     let path = dir.join("r.jsonl");
-    // The first run searches everything; 65 repeats 64 of it, and 66 repeats 65 of the second run.
-    let first = solver::solve_range(1, 64, &options(false), Some(&path)).unwrap();
+    // The first run searches everything; the next game repeats its last, and the one after that repeats it.
+    let first = solver::solve_range(1, first_hi, &options(false), Some(&path)).unwrap();
     assert!(first.iter().all(|g| g.method != Method::Repeat));
     assert!(lines(&path)
         .iter()
         .all(|line| line.get("setup").is_some_and(|s| s.is_null() || s.get("digest").is_some())));
-    let second = solver::solve_range(1, 120, &options(true), Some(&path)).unwrap();
-    assert_eq!(second.first().map(|g| g.n), Some(65));
-    let expected = repeats_by_problem(65, 120);
-    assert_eq!(&expected[..2], [(65, 64), (66, 65)]);
+    let second = solver::solve_range(1, hi, &options(true), Some(&path)).unwrap();
+    assert_eq!(second.first().map(|g| g.n), Some(first_hi + 1));
+    let expected = repeats_by_problem(first_hi + 1, hi);
+    assert_eq!(&expected[..2], [(first_hi + 1, first_hi), (first_hi + 2, first_hi + 1)]);
     assert_eq!(repeats_of(&second), expected);
-    let in_one_piece = solver::solve_range(1, 120, &options(true), None).unwrap();
-    assert_eq!(repeats_of(&in_one_piece[64..]), expected);
-    assert!(second.iter().zip(&in_one_piece[64..]).all(|(a, b)| (a.n, a.score) == (b.n, b.score)));
+    let in_one_piece = solver::solve_range(1, hi, &options(true), None).unwrap();
+    assert_eq!(repeats_of(&in_one_piece[first_hi as usize..]), expected);
+    assert!(second.iter().zip(&in_one_piece[first_hi as usize..]).all(|(a, b)| (a.n, a.score) == (b.n, b.score)));
     verify_files(std::slice::from_ref(&path), Optimal::built_in(), 1).unwrap_or_else(|e| panic!("{e}"));
 }
 
@@ -139,33 +170,47 @@ fn a_range_run_again_repeats_the_searches_of_its_results_file() {
 /// problem: 265 repeats 264, but its checkpoint (made with the tactic off) is resumed; 266, 267 and 268 then repeat
 /// 265, 266 and 267.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_game_with_a_checkpoint_is_resumed_not_repeated_at_49"
+)]
 fn a_game_with_a_checkpoint_is_resumed_not_repeated() {
+    a_game_with_a_checkpoint_is_resumed_not_repeated_from(265, 268);
+}
+
+/// [`a_game_with_a_checkpoint_is_resumed_not_repeated`] for 49, which repeats 48, and 50, which repeats 49.
+#[test]
+fn a_game_with_a_checkpoint_is_resumed_not_repeated_at_49() {
+    a_game_with_a_checkpoint_is_resumed_not_repeated_from(49, 50);
+}
+
+/// The games `first..=last` each repeat the one before, and the one before `first` is solved: `first`, whose search was
+/// stopped with a checkpoint (made with the tactic off), is resumed and not repeated; the others repeat it.
+fn a_game_with_a_checkpoint_is_resumed_not_repeated_from(first: u32, last: u32) {
     let dir = TempDir::new("same-search-checkpoint");
     let path = dir.join("r.jsonl");
     let checkpoints = dir.join("ckpt");
-    solver::solve_range(1, 264, &options(true), Some(&path)).unwrap();
-    assert_eq!(repeats_by_problem(265, 268), [(265, 264), (266, 265), (267, 266), (268, 267)]);
+    solver::solve_range(1, first - 1, &options(true), Some(&path)).unwrap();
+    let repeats: Vec<(u32, u32)> = (first..=last).map(|n| (n, n - 1)).collect();
+    assert_eq!(repeats_by_problem(first, last), repeats);
     // A time limit that has run out stops the search before it starts, with every unit in its checkpoint.
     let stopped =
         SolveOptions { checkpoint_dir: Some(checkpoints.clone()), time_limit: Some(Duration::ZERO), ..options(false) };
-    let summary = solver::solve_range_each(265, 268, &stopped, Some(&path), |_| {}).unwrap();
-    assert_eq!(summary.stopped_at, Some(265));
-    assert!(checkpoints.join("n0265.ckpt").exists());
+    let summary = solver::solve_range_each(first, last, &stopped, Some(&path), |_| {}).unwrap();
+    assert_eq!(summary.stopped_at, Some(first));
+    assert!(checkpoints.join(format!("n{first:04}.ckpt")).exists());
 
     let resumed = SolveOptions { checkpoint_dir: Some(checkpoints.clone()), ..options(true) };
-    let games = solver::solve_range(265, 268, &resumed, Some(&path)).unwrap();
+    let games = solver::solve_range(first, last, &resumed, Some(&path)).unwrap();
     let methods: Vec<(u32, Method, Option<u32>)> =
         games.iter().map(|g| (g.n, g.method, g.same_search.as_ref().map(|s| s.n))).collect();
-    let expected = [
-        (265, Method::Search, None),
-        (266, Method::Repeat, Some(265)),
-        (267, Method::Repeat, Some(266)),
-        (268, Method::Repeat, Some(267)),
-    ];
+    let expected: Vec<(u32, Method, Option<u32>)> = (first..=last)
+        .map(|n| if n == first { (n, Method::Search, None) } else { (n, Method::Repeat, Some(n - 1)) })
+        .collect();
     assert_eq!(methods, expected);
-    assert_eq!((games[0].invocations, games[0].proof), (2, Some(Proof::Exhausted)), "265 was resumed");
+    assert_eq!((games[0].invocations, games[0].proof), (2, Some(Proof::Exhausted)), "{first} was resumed");
     assert!(games.iter().all(|g| g.assumes.is_empty()));
-    assert!(!checkpoints.join("n0265.ckpt").exists());
+    assert!(!checkpoints.join(format!("n{first:04}.ckpt")).exists());
     verify_files(std::slice::from_ref(&path), Optimal::built_in(), 1).unwrap_or_else(|e| panic!("{e}"));
 }
 

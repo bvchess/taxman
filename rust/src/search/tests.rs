@@ -152,10 +152,22 @@ fn refinement_soundness<const W: usize>(g: &Golden, rng: &mut Rng) -> [u64; 3] {
 }
 
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is refined_matching_bound_is_sound_on_a_sample")]
 fn refined_matching_bound_is_sound() {
+    refined_matching_bound_is_sound_on_every(1);
+}
+
+/// [`refined_matching_bound_is_sound`] on every sixth of its golden games.
+#[test]
+fn refined_matching_bound_is_sound_on_a_sample() {
+    refined_matching_bound_is_sound_on_every(6);
+}
+
+/// The refined matching bound is sound on every `every`th of the golden games.
+fn refined_matching_bound_is_sound_on_every(every: usize) {
     let mut rng = Rng(0x5EED_C0F1_1C75_0001);
     let mut checks = [0; 3];
-    for n in golden_ns().into_iter().filter(|&n| (40..=220).contains(&n)) {
+    for n in golden_ns().into_iter().filter(|&n| (40..=220).contains(&n)).step_by(every) {
         let more = refinement_soundness::<4>(&load(n), &mut rng);
         for (a, b) in checks.iter_mut().zip(more) {
             *a += b;
@@ -163,7 +175,7 @@ fn refined_matching_bound_is_sound() {
     }
     let [verdicts, refined, exact] = checks;
     eprintln!("refined matching bound: {verdicts} verdicts, {refined} refined prunings, {exact} exact completions");
-    assert!(verdicts > 5000 && refined > 500 && exact > 500);
+    assert!(verdicts > 5000 / every as u64 && refined > 500 / every as u64 && exact > 500 / every as u64);
 }
 
 /// Checks the forced members of strong branching (tactic `fix_forced`) along random search paths of `g`: at a
@@ -241,10 +253,25 @@ fn forced_soundness<const W: usize>(g: &Golden, rng: &mut Rng) -> [u64; 2] {
 }
 
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is forced_members_are_in_every_good_completion_of_a_sample"
+)]
 fn forced_members_are_in_every_good_completion() {
+    forced_members_are_in_every_good_completion_on_every(1);
+}
+
+/// [`forced_members_are_in_every_good_completion`] on every sixth of its golden games.
+#[test]
+fn forced_members_are_in_every_good_completion_of_a_sample() {
+    forced_members_are_in_every_good_completion_on_every(6);
+}
+
+/// The forced members are in every good completion on every `every`th of the golden games.
+fn forced_members_are_in_every_good_completion_on_every(every: usize) {
     let mut rng = Rng(0xF0BC_ED00_1234_5678);
     let mut checks = [0; 2];
-    for n in golden_ns().into_iter().filter(|&n| (40..=220).contains(&n)) {
+    for n in golden_ns().into_iter().filter(|&n| (40..=220).contains(&n)).step_by(every) {
         let more = forced_soundness::<4>(&load(n), &mut rng);
         for (a, b) in checks.iter_mut().zip(more) {
             *a += b;
@@ -252,7 +279,7 @@ fn forced_members_are_in_every_good_completion() {
     }
     let [nodes, forced] = checks;
     eprintln!("forced members: {nodes} nodes with a conflict to branch on, {forced} forced members");
-    assert!(nodes > 500 && forced > 300);
+    assert!(nodes > 500 / every as u64 && forced > 300 / every as u64);
 }
 
 #[test]
@@ -310,9 +337,21 @@ fn sums_by_tactics<const W: usize>(g: &Golden) -> Vec<(SearchTactics, u64)> {
 }
 
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is tactics_do_not_change_answers_on_a_sample")]
 fn tactics_do_not_change_answers() {
+    tactics_do_not_change_answers_on_every(1);
+}
+
+/// [`tactics_do_not_change_answers`] on every fifth of its golden games.
+#[test]
+fn tactics_do_not_change_answers_on_a_sample() {
+    tactics_do_not_change_answers_on_every(5);
+}
+
+/// No tactic changes the answers on every `every`th of the golden games.
+fn tactics_do_not_change_answers_on_every(every: usize) {
     let mut differences = Vec::new();
-    for g in &searched_games(400) {
+    for g in searched_games(400).iter().step_by(every) {
         let sums = sums_by_tactics::<8>(g);
         for &(tactics, sum) in &sums[1..] {
             if sum != sums[0].1 {
@@ -343,7 +382,22 @@ fn forgetting_nogoods_often_does_not_change_answers() {
 /// so whatever the searchers keep, however often they forget and however small the table's limit, the optimum is the
 /// same.  The periods are short, to make the policies act in searches of a few thousand steps.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is every_policy_of_keeping_nogoods_gives_the_same_optimum_of_a_sample"
+)]
 fn every_policy_of_keeping_nogoods_gives_the_same_optimum() {
+    every_policy_of_keeping_nogoods_gives_the_same_optimum_on_every(1);
+}
+
+/// [`every_policy_of_keeping_nogoods_gives_the_same_optimum`] on every fifth of its golden games.
+#[test]
+fn every_policy_of_keeping_nogoods_gives_the_same_optimum_of_a_sample() {
+    every_policy_of_keeping_nogoods_gives_the_same_optimum_on_every(5);
+}
+
+/// Every policy of keeping nogoods gives the same optimum on every `every`th of the golden games.
+fn every_policy_of_keeping_nogoods_gives_the_same_optimum_on_every(every: usize) {
     let policies = [
         Forgetting { period: None, keep: Keep::Nothing, limit: None },
         Forgetting { period: Some(7), keep: Keep::Used, limit: None },
@@ -357,7 +411,7 @@ fn every_policy_of_keeping_nogoods_gives_the_same_optimum() {
         Forgetting { period: None, keep: Keep::Nothing, limit: Some(4) },
         Forgetting { period: Some(50), keep: Keep::Top(3), limit: Some(5) },
     ];
-    for g in &searched_games(400) {
+    for g in searched_games(400).iter().step_by(every) {
         let p = prepare_golden::<8>(g, SearchTactics::default());
         for forgetting in policies {
             for threads in [1, 2] {
@@ -434,14 +488,31 @@ fn checkpoint_and_resume_four_threads() {
 /// engine checks the node limit every 1024 nodes of a searcher), and so are those of 1000 on two threads since the
 /// window of the forced members became `all` (2,026 nodes).
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is checkpoint_and_resume_with_the_gf2_bound_of_a_small_game"
+)]
 fn checkpoint_and_resume_with_the_gf2_bound() {
-    let n = 992;
+    let default = SearchTactics::default();
+    let cases = [(default, 1000), (SearchTactics { symmetry: false, ..default }, 1500)];
+    resume_the_gf2_search(992, &cases, &[1, 2]);
+}
+
+/// [`checkpoint_and_resume_with_the_gf2_bound`] for game 1000 (2,026 nodes by the default) on one thread, stopped
+/// every 1,000 nodes.
+#[test]
+fn checkpoint_and_resume_with_the_gf2_bound_of_a_small_game() {
+    resume_the_gf2_search(1000, &[(SearchTactics::default(), 1000)], &[1]);
+}
+
+/// The search of game `n` under each of `cases` (tactics and the node limit that stops it), on each of `threads`,
+/// stopped and resumed from its checkpoint until it finishes with the optimum.
+fn resume_the_gf2_search(n: u32, cases: &[(SearchTactics, u64)], threads: &[usize]) {
     let board = crate::board::Board::<16>::for_n(n);
     let opt = crate::game::Optimal::built_in().score(n).unwrap() - board.in_the_bag;
-    let default = SearchTactics::default();
-    for (tactics, node_limit) in [(default, 1000), (SearchTactics { symmetry: false, ..default }, 1500)] {
+    for &(tactics, node_limit) in cases {
         let p = board.prepare(tactics).unwrap();
-        for threads in [1, 2] {
+        for &threads in threads {
             let what = format!("{threads} threads, symmetry {}", tactics.symmetry);
             let dir = TempDir::new(&format!("resume-gf2-{threads}-{}", tactics.bits()));
             let ckpt = dir.0.join("ckpt.bin");
@@ -592,8 +663,24 @@ fn the_start_is_the_same_on_every_number_of_threads() {
 /// 155 below its optimum, which the search finds at its step 4,614 of 6,287, a third of a second after it starts
 /// (the other thread has that long to give the ceiling).
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_ceiling_given_before_the_search_to_the_control_ends_it"
+)]
 fn a_ceiling_given_to_the_control_ends_the_search() {
-    let n = 988;
+    a_ceiling_given_to_the_control_ends_the_search_of(988, true);
+}
+
+/// [`a_ceiling_given_to_the_control_ends_the_search`] for game 1000, whose search is too short to give the ceiling to
+/// while it runs: given before the search, in the control or as `cap`.
+#[test]
+fn a_ceiling_given_before_the_search_to_the_control_ends_it() {
+    a_ceiling_given_to_the_control_ends_the_search_of(1000, false);
+}
+
+/// A ceiling given to the control of the search of game `n` ends it, before it starts and, if `live`, from another
+/// thread while it runs.
+fn a_ceiling_given_to_the_control_ends_the_search_of(n: u32, live: bool) {
     let board = crate::board::Board::<16>::for_n(n);
     let p = board.prepare(SearchTactics::default()).unwrap();
     let optimum = crate::game::Optimal::built_in().score(n).unwrap() - board.in_the_bag;
@@ -611,6 +698,9 @@ fn a_ceiling_given_to_the_control_ends_the_search() {
     assert_eq!((given.sum, given.stats.nodes), (capped.sum, capped.stats.nodes));
     assert!(given.stats.nodes < whole.stats.nodes, "{} steps, as many as without the ceiling", given.stats.nodes);
 
+    if !live {
+        return;
+    }
     // Given from another thread once the run goes.
     let control = Control::new();
     let cfg = EngineConfig { control: Some(Arc::clone(&control)), ..config(1) };

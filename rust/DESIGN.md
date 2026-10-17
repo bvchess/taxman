@@ -1116,11 +1116,18 @@ of the chain is 2175: the prover proved every game to there, and the first game 
 
 ## 9. Testing
 
+**Two runs.**  The *quick check* is a non-release `cargo test` in `rust/`, with `cargo clippy --all-targets` and `cargo
+fmt --check`: about 12 s to rebuild after a one-line change and about 16 s of tests on a laptop of ten cores.  It
+verifies most merges, a refactoring included.  The *full suite* is `cargo test --release`: every test, the long ones
+too (about 3 minutes of tests, after a build of 6 minutes).  It runs before a cloud run, after any change that changes
+search trees or results, and in the gates (the one-thread re-solve of 1301-2175).
+
 **Before a change is merged** (what a reviewer of a subagent's work runs, besides reading it; the tests are described
 below, the probe in section 10):
 
-* every change: `cargo test --release` in `rust/` and in `rust/prover/`, then `cargo clippy --all-targets` and
-  `cargo fmt --check` in both;
+* every change: the quick check in `rust/`, and `cargo test --release` in `rust/prover/`, then `cargo clippy
+  --all-targets` and `cargo fmt --check` in both;
+* a change that can change a search tree or a result (the next three items): the full suite in `rust/` besides;
 * a bound, or anything that prunes: the bound-soundness tests and the soundness harness pass, and a bound never falls
   below the best completion of its node;
 * a pure speedup: every search tree identical, so the probe's fingerprints and the node-count tripwires do not move;
@@ -1132,8 +1139,15 @@ below, the probe in section 10):
 
 Correctness, all on games that finish in seconds: the fast fixtures and small boards stand in for the large boards
 that cannot be run in a test, and the tripwires and soundness tests catch the failures that no assertion on an
-answer sees.  `cargo test` takes about half a minute after compiling, with two test threads, in the test profile
-(`opt-level = 2`, because the tests replay real games); the engine's heavy tests are ignored by default.
+answer sees.  The tests run in the test profile (`opt-level = 2`, because they replay real games; debug assertions on,
+which the release profile does not have), and there are two sizes of suite.  A test that takes more than about a second
+there is *long*: `#[cfg_attr(debug_assertions, ignore = "long: the quick check is quick_one")]` skips it in a
+non-release run, where debug assertions are on, and `--release` runs it.  `quick_one` is the quick test that checks the
+same property at a small size: a prefix of the range the long test walks (which then takes the rest of it), a sample of
+the chain or of the golden games, fewer random draws, a smaller board or game.  A few tests that draw a count, or build
+an instance that must outlast a script, take a smaller one in a non-release run (`QUICK` in `tests/common/support.rs`,
+shared with the unit tests: the engine's instances, the random configurations of `robustness`).  Tests with a plain
+`#[ignore]` are ignored in both.  The descriptions below are of the full suite.
 
 * **Unit tests** per module, including the Java tests' cases (`FactorTableTest`, `FrameTest`, `FrameSetTest` for n =
   85). Helpers shared by the unit and integration tests (temporary directories, a random generator) are one file,
@@ -1218,8 +1232,9 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   of game 600 on the matching path with the searchers forgetting their nogoods every 500 steps; the matching path's
   rows are the default's trees before the GF(2) bound, its rows with `lagrange=off` those of the build before
   that tactic, and the rows `symmetry=off` the default's before the rule of symmetric pairs.  **A change that alters
-  the tree on purpose fails them.**  Run `cargo test --test tripwires
-  -- --nocapture`: it prints the rows as observed, in the layout of the table at the top of the file; check that the
+  the tree on purpose fails them.**  Run `cargo test --release --test tripwires
+  -- --nocapture` (the quick tests check only the rows of trees of 400 nodes or fewer): it prints the rows as observed, in
+  the layout of the table at the top of the file; check that the
   promotion sums (the answers) have not moved, paste the rows in, and update any node counts quoted in the docs.
   The table `EXTENDED` does the same for the extended problem with nothing open, Π⁺(∅), without the claims of
   `unzip`, whose search must also be the default engine's on the same problem, node for node; with the claims, Π⁺(∅)

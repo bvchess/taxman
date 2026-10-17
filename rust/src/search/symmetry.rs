@@ -442,6 +442,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(debug_assertions, ignore = "long: the quick check is root_pairs_is_the_definition_on_the_small_boards")]
     fn root_pairs_is_the_definition() {
         let (mut games, mut pairs) = (0, 0);
         for n in (2..=300).chain((301..=2200).step_by(53)).chain([1300, 2175]) {
@@ -450,6 +451,18 @@ mod tests {
             pairs += found;
         }
         assert!(games > 150 && pairs > 500, "{pairs} pairs in {games} games");
+    }
+
+    /// [`root_pairs_is_the_definition`] on the boards 2 to 150 and 1300.
+    #[test]
+    fn root_pairs_is_the_definition_on_the_small_boards() {
+        let (mut games, mut pairs) = (0, 0);
+        for n in (2..=150).chain([1300]) {
+            let found = crate::with_width!(n, W => pairs_agree::<W>(n));
+            games += usize::from(found > 0);
+            pairs += found;
+        }
+        assert!(games > 25 && pairs > 50, "{pairs} pairs in {games} games");
     }
 
     #[test]
@@ -561,6 +574,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is images_are_promotable_and_worth_the_formula_on_the_small_boards"
+    )]
     fn images_are_promotable_and_worth_the_formula() {
         let (optimal, mut covered) = (Optimal::built_in(), Covered::default());
         for n in (2..=400).chain((401..=1300).step_by(25)) {
@@ -568,6 +585,21 @@ mod tests {
         }
         assert!(
             covered.games > 150 && covered.enumerated > 10,
+            "{} games, {} enumerated",
+            covered.games,
+            covered.enumerated
+        );
+    }
+
+    /// [`images_are_promotable_and_worth_the_formula`] on the boards 2 to 150, and every 100th to 1300.
+    #[test]
+    fn images_are_promotable_and_worth_the_formula_on_the_small_boards() {
+        let (optimal, mut covered) = (Optimal::built_in(), Covered::default());
+        for n in (2..=150).chain((400..=1300).step_by(100)) {
+            crate::with_width!(n, W => images_on::<W>(n, optimal, &mut covered));
+        }
+        assert!(
+            covered.games > 30 && covered.enumerated > 10,
             "{} games, {} enumerated",
             covered.games,
             covered.enumerated

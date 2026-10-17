@@ -2236,16 +2236,33 @@ mod tests {
     /// Against brute force: the heaviest set under every size limit, from the empty start and from every set
     /// a solve reported (dominant), with a member deleted; and the split's bound without each member.
     #[test]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is some_intersection_warm_starts_and_splits_against_brute_force"
+    )]
     fn intersection_warm_starts_and_split_against_brute_force() {
+        warm_starts_and_split(3000, 100);
+    }
+
+    /// [`intersection_warm_starts_and_split_against_brute_force`] for the first 100 problems.
+    #[test]
+    fn some_intersection_warm_starts_and_splits_against_brute_force() {
+        warm_starts_and_split(100, 2);
+    }
+
+    /// The first `trials` problems of [`intersection_warm_starts_and_split_against_brute_force`], which must reach
+    /// `percent` percent of the counts that it asks.
+    fn warm_starts_and_split(trials: usize, percent: usize) {
         let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
         let mut counts = Counts::default();
-        for trial in 0..3000 {
+        for trial in 0..trials {
             let n = 1 + rng.below(11) as usize;
             let owned = random(&mut rng, n, 5);
             check_warm_starts_and_split(&mut rng, &owned, &vec![false; n], trial, &mut counts);
         }
         let Counts { warm, splits, .. } = counts;
-        assert!(warm > 10_000 && splits > 2_000, "{warm} warm starts, {splits} splits");
+        let at_least = |count: usize, most: usize| count * 100 >= most * percent;
+        assert!(at_least(warm, 10_000) && at_least(splits, 2_000), "{warm} warm starts, {splits} splits");
     }
 
     /// The same checks on problems with one-sided elements, whose coloops are in free blocks after the random blocks
@@ -2254,10 +2271,26 @@ mod tests {
     /// without them.  Many of the heaviest sets must hold coloops, and many of the warm starts start from, or delete,
     /// a one-sided element.
     #[test]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is some_intersection_warm_starts_and_splits_with_free_blocks_against_brute_force"
+    )]
     fn intersection_warm_starts_and_split_with_free_blocks_against_brute_force() {
+        warm_starts_and_split_with_free_blocks(3000, 100);
+    }
+
+    /// [`intersection_warm_starts_and_split_with_free_blocks_against_brute_force`] for the first 100 problems.
+    #[test]
+    fn some_intersection_warm_starts_and_splits_with_free_blocks_against_brute_force() {
+        warm_starts_and_split_with_free_blocks(100, 2);
+    }
+
+    /// The first `trials` problems of [`intersection_warm_starts_and_split_with_free_blocks_against_brute_force`],
+    /// which must reach `percent` percent of the counts that it asks.
+    fn warm_starts_and_split_with_free_blocks(trials: usize, percent: usize) {
         let mut rng = Rng(0x51DE_D00D_0F5E_ED01);
         let mut counts = Counts::default();
-        for trial in 0..3000 {
+        for trial in 0..trials {
             let n = 1 + rng.below(11) as usize;
             let (owned, one_sided) = random_one_sided(&mut rng, n, 5, trial % 2 == 0);
             check_warm_starts_and_split(&mut rng, &owned, &one_sided, trial, &mut counts);
@@ -2265,7 +2298,8 @@ mod tests {
         let Counts { warm, splits, heaviest, heaviest_with_one_sided, warm_with_one_sided, .. } = counts;
         println!("{heaviest} problems, {heaviest_with_one_sided} with a one-sided element in the heaviest set");
         println!("{warm} warm starts, {warm_with_one_sided} from or without a one-sided element, {splits} splits");
-        assert!(warm > 10_000 && splits > 2_000, "{warm} warm starts, {splits} splits");
+        let at_least = |count: usize, most: usize| count * 100 >= most * percent;
+        assert!(at_least(warm, 10_000) && at_least(splits, 2_000), "{warm} warm starts, {splits} splits");
         assert!(heaviest_with_one_sided > heaviest / 2, "{heaviest_with_one_sided} of {heaviest} heaviest sets");
         assert!(warm_with_one_sided > warm / 2, "{warm_with_one_sided} of {warm} warm starts");
     }
@@ -2275,26 +2309,59 @@ mod tests {
     /// its exchange graph where they certify it ([`Meet::without`]), under every size limit from the heaviest set's
     /// size up, against brute force.
     #[test]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is the_heaviest_set_without_a_member_of_some_problems_against_brute_force"
+    )]
     fn heaviest_set_without_a_member_against_brute_force() {
+        heaviest_set_without_a_member(4000, 100);
+    }
+
+    /// [`heaviest_set_without_a_member_against_brute_force`] for the first 120 problems.
+    #[test]
+    fn the_heaviest_set_without_a_member_of_some_problems_against_brute_force() {
+        heaviest_set_without_a_member(120, 2);
+    }
+
+    /// The first `trials` problems of [`heaviest_set_without_a_member_against_brute_force`], which must reach
+    /// `percent` percent of the counts that it asks.
+    fn heaviest_set_without_a_member(trials: usize, percent: usize) {
         let mut rng = Rng(0x2545_F491_4F6C_DD1D);
         let mut counts = Counts::default();
-        for trial in 0..4000 {
+        for trial in 0..trials {
             let n = 2 + rng.below(10) as usize;
             let owned = random(&mut rng, n, 4);
             check_heaviest_set_without_a_member(&owned, &vec![false; n], trial, &mut counts);
         }
         let Counts { exact_losses, asked, certified, .. } = counts;
-        assert!(exact_losses > 3000, "{exact_losses} exact losses");
-        assert!(asked > 10_000 && certified > asked / 4, "{certified} of {asked} certified");
+        let at_least = |count: usize, most: usize| count * 100 >= most * percent;
+        assert!(at_least(exact_losses, 3000), "{exact_losses} exact losses");
+        assert!(at_least(asked, 10_000) && certified > asked / 4, "{certified} of {asked} certified");
     }
 
     /// The same checks on problems with one-sided elements, as for the warm starts above.  The heaviest sets must hold
     /// coloops, and the bounds without a member must be asked for, and certified for, one-sided members.
     #[test]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is the_heaviest_set_without_a_member_of_some_problems_with_free_blocks_against_brute_force"
+    )]
     fn heaviest_set_without_a_member_with_free_blocks_against_brute_force() {
+        heaviest_set_without_a_member_with_free_blocks(4000, 100);
+    }
+
+    /// [`heaviest_set_without_a_member_with_free_blocks_against_brute_force`] for the first 120 problems.
+    #[test]
+    fn the_heaviest_set_without_a_member_of_some_problems_with_free_blocks_against_brute_force() {
+        heaviest_set_without_a_member_with_free_blocks(120, 2);
+    }
+
+    /// The first `trials` problems of [`heaviest_set_without_a_member_with_free_blocks_against_brute_force`], which must
+    /// reach `percent` percent of the counts that it asks.
+    fn heaviest_set_without_a_member_with_free_blocks(trials: usize, percent: usize) {
         let mut rng = Rng(0x7A3C_91E5_B0D2_4F68);
         let mut counts = Counts::default();
-        for trial in 0..4000 {
+        for trial in 0..trials {
             let n = 2 + rng.below(10) as usize;
             let (owned, one_sided) = random_one_sided(&mut rng, n, 4, trial % 2 == 0);
             check_heaviest_set_without_a_member(&owned, &one_sided, trial, &mut counts);
@@ -2303,9 +2370,10 @@ mod tests {
         let (asked_one_sided, certified_one_sided) = (counts.asked_one_sided, counts.certified_one_sided);
         println!("{heaviest} problems, {heaviest_with_one_sided} with a one-sided element in the heaviest set");
         println!("{certified} of {asked} certified, {certified_one_sided} of {asked_one_sided} for one-sided members");
+        let at_least = |count: usize, most: usize| count * 100 >= most * percent;
         assert!(heaviest_with_one_sided > heaviest / 2, "{heaviest_with_one_sided} of {heaviest} heaviest sets");
-        assert!(exact_losses > 3000, "{exact_losses} exact losses");
-        assert!(asked > 10_000 && certified > asked / 6, "{certified} of {asked} certified");
+        assert!(at_least(exact_losses, 3000), "{exact_losses} exact losses");
+        assert!(at_least(asked, 10_000) && certified > asked / 6, "{certified} of {asked} certified");
         assert!(asked_one_sided > asked / 4, "{asked_one_sided} of {asked} asked about are one-sided");
         assert!(certified_one_sided > asked_one_sided / 8, "{certified_one_sided} of {asked_one_sided} certified");
     }

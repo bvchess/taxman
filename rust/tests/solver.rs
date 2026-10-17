@@ -58,10 +58,9 @@ const TUNINGS: [&str; 14] = [
     "more_forced=off",
 ];
 
-/// The tactics that tune the GF(2) search find the same scores at games that need longer searches than those to 300
-/// (931..=940, around the hard 936, on one thread, every game searched).
-#[test]
-fn every_tuning_of_the_gf2_search_gives_the_same_scores() {
+/// The tactics that tune the GF(2) search find the same scores at the games `games`, on one thread, every game
+/// searched.
+fn every_tuning_gives_the_same_scores_at(games: std::ops::RangeInclusive<u32>) {
     let optimal = Optimal::built_in();
     for assignments in std::iter::once("default").chain(TUNINGS) {
         let mut opts = SolveOptions { force_search: true, ..options(1) };
@@ -70,7 +69,7 @@ fn every_tuning_of_the_gf2_search_gives_the_same_scores() {
                 opts.tactics.set(assignment).unwrap();
             }
         }
-        for r in solve_all(931, 940, &opts) {
+        for r in solve_all(*games.start(), *games.end(), &opts) {
             assert!(r.completed, "{assignments}: n={}", r.n);
             assert_eq!(Some(r.score), optimal.score(r.n), "{assignments}: n={}", r.n);
             assert_eq!(r.tactics.description(), assignments, "n={}", r.n);
@@ -78,8 +77,25 @@ fn every_tuning_of_the_gf2_search_gives_the_same_scores() {
     }
 }
 
+/// [`every_tuning_of_the_gf2_search_gives_the_same_scores`] at the games 600..=601.
 #[test]
-fn every_tactic_gives_the_same_scores() {
+fn every_tuning_of_the_gf2_search_gives_the_same_scores_at_a_few_games() {
+    every_tuning_gives_the_same_scores_at(600..=601);
+}
+
+/// The tactics that tune the GF(2) search find the same scores at games that need longer searches than those to 300
+/// (931..=940, around the hard 936, on one thread, every game searched).
+#[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is every_tuning_of_the_gf2_search_gives_the_same_scores_at_a_few_games"
+)]
+fn every_tuning_of_the_gf2_search_gives_the_same_scores() {
+    every_tuning_gives_the_same_scores_at(931..=940);
+}
+
+/// Every tactic, alone and in the combinations that matter, finds the scores of `optimal.json` at the games `games`.
+fn every_tactic_gives_the_same_scores_at(games: std::ops::RangeInclusive<u32>) {
     let optimal = Optimal::built_in();
     // Each variant is a list of `--tactic` assignments, in the order of the tactics (that of its description).
     let with = |assignments: &str| {
@@ -111,7 +127,7 @@ fn every_tactic_gives_the_same_scores() {
         .map(with),
     );
     for (name, opts) in variants {
-        for r in solve_all(1, 300, &opts) {
+        for r in solve_all(*games.start(), *games.end(), &opts) {
             assert!(r.completed, "{name}: n={}", r.n);
             assert_eq!(Some(r.score), optimal.score(r.n), "{name}: n={}", r.n);
             assert_ne!(r.method, Method::Prime, "{name}: force_search skips the shortcuts (n={})", r.n);
@@ -119,6 +135,19 @@ fn every_tactic_gives_the_same_scores() {
             assert_eq!(r.tactics.description(), name, "n={}", r.n);
         }
     }
+}
+
+/// [`every_tactic_gives_the_same_scores`] at the games 100..=120.
+#[test]
+fn every_tactic_gives_the_same_scores_at_a_few_games() {
+    every_tactic_gives_the_same_scores_at(100..=120);
+}
+
+/// Every tactic, alone and in the combinations that matter, finds the scores of `optimal.json` at the games 1..=300.
+#[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is every_tactic_gives_the_same_scores_at_a_few_games")]
+fn every_tactic_gives_the_same_scores() {
+    every_tactic_gives_the_same_scores_at(1..=300);
 }
 
 #[test]
@@ -314,24 +343,36 @@ fn a_range_stops_at_an_unfinished_game_and_picks_up_where_it_left_off() {
 /// the boards past 4095 with the board layer's invariants.  The setup's cost is mostly the local search for a better
 /// first incumbent.
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is a_big_board_gets_through_setup")]
 fn big_boards_get_through_setup() {
     for n in [1500, 2050, 3600, 4100] {
-        // Setup is the cost here, mostly the starting incumbent's local search, which runs on one thread.
-        let opts = SolveOptions { node_limit: Some(1), force_search: true, ..options(2) };
-        let r = solver::solve_game(n, None, &opts).unwrap_or_else(|e| panic!("{e}"));
-        assert_eq!(r.n, n);
-        assert!(!r.completed, "n={n}: one node cannot finish the search");
-        assert_eq!((r.method, r.optimal_match), (Method::Search, None), "n={n}");
-        // The engine checks its node limit only every so often.
-        assert!(r.nodes < 10_000, "n={n}: {} nodes", r.nodes);
-        // The best game so far is the greedy one: legal (the solver replays it) and not empty.
-        let setup = r.setup.expect("a searched game has a setup");
-        assert!(setup.frames > 0 && setup.candidates > 0 && setup.greedy_sum > 0, "n={n}: {setup:?}");
-        assert!(r.score > 0 && !r.moves.is_empty(), "n={n}");
-        assert_eq!(r.moves.first().copied(), largest_prime_at_most(n), "n={n}: the game opens with the largest prime");
-        assert_eq!(replay_finished(n, &r.moves), Ok(r.score), "n={n}: the game is legal, over, and scores as claimed");
-        let json = r.to_json();
-        assert_eq!(json.get("completed").and_then(Json::as_bool), Some(false));
-        assert_eq!(json.get("optimal_match"), Some(&Json::Null));
+        a_big_board_gets_through_setup_at(n);
     }
+}
+
+/// [`big_boards_get_through_setup`] for the board 1500, `W = 24`.
+#[test]
+fn a_big_board_gets_through_setup() {
+    a_big_board_gets_through_setup_at(1500);
+}
+
+/// The pipeline takes the board `n` through its setup and one node of its search.
+fn a_big_board_gets_through_setup_at(n: u32) {
+    // Setup is the cost here, mostly the starting incumbent's local search, which runs on one thread.
+    let opts = SolveOptions { node_limit: Some(1), force_search: true, ..options(2) };
+    let r = solver::solve_game(n, None, &opts).unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(r.n, n);
+    assert!(!r.completed, "n={n}: one node cannot finish the search");
+    assert_eq!((r.method, r.optimal_match), (Method::Search, None), "n={n}");
+    // The engine checks its node limit only every so often.
+    assert!(r.nodes < 10_000, "n={n}: {} nodes", r.nodes);
+    // The best game so far is the greedy one: legal (the solver replays it) and not empty.
+    let setup = r.setup.expect("a searched game has a setup");
+    assert!(setup.frames > 0 && setup.candidates > 0 && setup.greedy_sum > 0, "n={n}: {setup:?}");
+    assert!(r.score > 0 && !r.moves.is_empty(), "n={n}");
+    assert_eq!(r.moves.first().copied(), largest_prime_at_most(n), "n={n}: the game opens with the largest prime");
+    assert_eq!(replay_finished(n, &r.moves), Ok(r.score), "n={n}: the game is legal, over, and scores as claimed");
+    let json = r.to_json();
+    assert_eq!(json.get("completed").and_then(Json::as_bool), Some(false));
+    assert_eq!(json.get("optimal_match"), Some(&Json::Null));
 }

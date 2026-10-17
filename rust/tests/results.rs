@@ -400,8 +400,13 @@ const FIRST_BUILD: &str = "feba6d0";
 const SECOND_BUILD: &str = "55287ff";
 const RESUMED: [u32; 3] = [3311, 3312, 3315];
 
-#[test]
-fn the_committed_results_pass_the_verifier() {
+/// The games of the committed chain that the quick check verifies: the first of them, which cost little to set up.
+const QUICK_LAST: u32 = 400;
+
+/// The games 1..=`last` of the committed chain pass the verifier and the checks that follow, which hold of any prefix
+/// of the chain (a file of its first `last` lines is a chain from n = 1 itself); the counts that `results/README.md`
+/// quotes, and the last scores, are checked where the games reach them.
+fn check_the_committed_results_to(last: u32) {
     let mut paths: Vec<PathBuf> = std::fs::read_dir(crate_path("results"))
         .unwrap()
         .map(|entry| entry.unwrap().path())
@@ -410,23 +415,32 @@ fn the_committed_results_pass_the_verifier() {
     paths.sort();
     let names: Vec<_> = paths.iter().map(|p| p.file_name().unwrap().to_string_lossy().into_owned()).collect();
     assert_eq!(names, ["strict.jsonl"], "a new results file needs its counts here and in the README");
+    let whole = fs::read_to_string(&paths[0]).unwrap();
+    let text: String = whole.split_inclusive('\n').take(last as usize).collect();
 
+    // The verifier reads a file, so a prefix is written to one.
+    let dir = TempDir::new("committed-prefix");
+    if last < LAST {
+        let prefix = dir.join("strict.jsonl");
+        fs::write(&prefix, &text).unwrap();
+        paths = vec![prefix];
+    }
     let optimal = Optimal::built_in();
     let report = verify_files(&paths, optimal, 1).unwrap_or_else(|e| panic!("{e}"));
     println!("{report}");
     let [strict] = &report.files[..] else { panic!("one file") };
     // strict.jsonl is a chain from n = 1: it holds no line of a stopped search.
     let games = &strict.contents.games;
-    assert!(games.keys().copied().eq(1..=LAST), "{}: not the games 1..={LAST}", strict.path.display());
+    assert!(games.keys().copied().eq(1..=last), "{}: not the games 1..={last}", strict.path.display());
     assert_eq!((strict.contents.incomplete_lines, strict.contents.torn), (0, false), "{}", strict.path.display());
     assert!(strict.contents.runs.is_empty(), "{}: a game left unfinished", strict.path.display());
-    assert_eq!(games[&LAST_OF_FIRST_RUN].score, 1_492_209);
-    assert_eq!(games[&LAST].score, 3_727_726);
+    for (n, score) in [(LAST_OF_FIRST_RUN, 1_492_209), (LAST, 3_727_726)] {
+        assert!(n > last || games[&n].score == score, "n={n}");
+    }
     // Every line records the one clean build that made its part of the file (the first run's to 2175, the second's
     // after), a single invocation but at the games of the second run that the move to another instance interrupted,
     // and the verdict on optimal.json, which has the games to 1300 and none beyond: `optimal_match` is true where it
     // has the game and null where it has not.
-    let text = fs::read_to_string(&paths[0]).unwrap();
     for (k, line) in text.lines().enumerate() {
         let (n, line) = (k as u32 + 1, Json::parse(line).unwrap_or_else(|e| panic!("line {}: {e:?}", k + 1)));
         let build = line.get("build").unwrap_or_else(|| panic!("n={n}: no build"));
@@ -441,7 +455,8 @@ fn the_committed_results_pass_the_verifier() {
     }
     // The chain from n = 1 reproduces optimal.json: its scores are the table's, which are the Java's to 1000 and
     // those of an earlier chain of this solver from 1001 to 1300.
-    for n in 1..=LAST_OF_TABLE {
+    let in_table = 1..=LAST_OF_TABLE.min(last);
+    for n in in_table.clone() {
         assert_eq!(Some(strict.contents.games[&n].score), optimal.score(n), "n={n}");
     }
     // And its sets of moves are the table's but at six games, 539, 770 to 773 and 1215, where the chain found another
@@ -453,13 +468,13 @@ fn the_committed_results_pass_the_verifier() {
         moves.sort_unstable();
         moves
     };
-    let other_set: Vec<u32> = (1..=LAST_OF_TABLE)
-        .filter(|&n| sorted(&strict.contents.games[&n].moves) != sorted(optimal.moves(n).unwrap()))
-        .collect();
-    assert_eq!(other_set, [539, 770, 771, 772, 773, 1215]);
+    let other_set: Vec<u32> =
+        in_table.filter(|&n| sorted(&strict.contents.games[&n].moves) != sorted(optimal.moves(n).unwrap())).collect();
+    let expected: Vec<u32> = [539, 770, 771, 772, 773, 1215].into_iter().filter(|&n| n <= last).collect();
+    assert_eq!(other_set, expected);
     // The games the table holds past 1000 were copied from that earlier chain (`taxman extend-optimal`), and this
     // one has them move for move but at 1215.
-    for (n, score, moves) in optimal.games().filter(|&(n, _, _)| n > 1000 && n != 1215) {
+    for (n, score, moves) in optimal.games().filter(|&(n, _, _)| n > 1000 && n != 1215 && n <= last) {
         let game =
             strict.contents.games.get(&n).unwrap_or_else(|| panic!("optimal.json has a game of {n}, strict.jsonl not"));
         assert_eq!((score, moves, game.assumes.is_empty()), (game.score, &game.moves[..], true), "n={n}");
@@ -470,12 +485,32 @@ fn the_committed_results_pass_the_verifier() {
     // of them), and past it, in the first run's and in the second's.
     let kinds = [Proof::Trivial, Proof::PrimeFormula, Proof::Cap, Proof::Exhausted, Proof::SameSearch];
     let by = |range: RangeInclusive<u32>| kinds.map(|p| proofs(strict, range.clone(), p));
-    assert_eq!(by(1..=LAST), [13, 481, 311, 1178, 1457]);
-    assert_eq!(by(1..=LAST_OF_TABLE), [13, 211, 115, 416, 545]);
-    assert_eq!(by(LAST_OF_TABLE + 1..=LAST_OF_FIRST_RUN), [0, 115, 77, 314, 369]);
-    assert_eq!(by(LAST_OF_FIRST_RUN + 1..=LAST), [0, 155, 119, 448, 543]);
-    assert_eq!(clean(strict), LAST as usize);
-    // Scores at a proven ceiling given the game of n − 1 (what certifies a game whatever found it).
-    let ceilings = [CeilingProof::NPlusPrev, CeilingProof::PrimeFormula].map(|c| ceiling_proofs(strict, c));
-    assert_eq!(ceilings, [1096, 480]);
+    assert_eq!(by(1..=last).iter().sum::<usize>(), last as usize, "every game has one of the proofs");
+    assert_eq!(clean(strict), last as usize);
+    if last == LAST {
+        assert_eq!(by(1..=LAST), [13, 481, 311, 1178, 1457]);
+        assert_eq!(by(1..=LAST_OF_TABLE), [13, 211, 115, 416, 545]);
+        assert_eq!(by(LAST_OF_TABLE + 1..=LAST_OF_FIRST_RUN), [0, 115, 77, 314, 369]);
+        assert_eq!(by(LAST_OF_FIRST_RUN + 1..=LAST), [0, 155, 119, 448, 543]);
+        // Scores at a proven ceiling given the game of n − 1 (what certifies a game whatever found it).
+        let ceilings = [CeilingProof::NPlusPrev, CeilingProof::PrimeFormula].map(|c| ceiling_proofs(strict, c));
+        assert_eq!(ceilings, [1096, 480]);
+    }
+}
+
+/// The first games of the committed chain pass the verifier and the checks of
+/// [`the_committed_results_pass_the_verifier`] that hold of a prefix; the counts of the whole file are for that test.
+#[test]
+fn the_start_of_the_committed_results_passes_the_verifier() {
+    check_the_committed_results_to(QUICK_LAST);
+}
+
+/// All 3440 games of the committed chain pass the verifier, with the counts `results/README.md` quotes.
+#[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_start_of_the_committed_results_passes_the_verifier"
+)]
+fn the_committed_results_pass_the_verifier() {
+    check_the_committed_results_to(LAST);
 }

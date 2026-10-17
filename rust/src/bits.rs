@@ -61,10 +61,13 @@ pub const fn width_for(words: usize) -> Option<usize> {
 /// Runs `$body` with the const `$w` set to the set width for the board `1..=$n`, `width_for(words_for($n))`, and
 /// panics for a board no width holds; with `else $beyond`, evaluates that instead.
 ///
-/// ```
+/// ```text
 /// let words = taxman::with_width!(1215, W => W);
 /// assert_eq!(words, 20);
 /// ```
+///
+/// (Not a doc-test: rustdoc links a doc-test with the crate's fat LTO, 7 s in a release build for these three lines.
+/// The unit test `the_width_dispatch_follows_the_widths` checks that the board 1215 gets 20 words.)
 #[macro_export]
 macro_rules! with_width {
     ($n:expr, $w:ident => $body:expr) => {{
@@ -730,15 +733,30 @@ mod tests {
     /// widths), which no other unit test reaches: a loop that stops at a fixed word (a `len` that sums only the first
     /// 32, say) passes everything below.
     #[test]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is a_few_random_agreements_with_model_at_the_widths_of_large_boards"
+    )]
     fn random_agreement_with_model_at_the_widths_of_large_boards() {
-        random_agreement_rounds::<16>(0x0123_4567_89AB_CDEF, 60);
-        random_agreement_rounds::<32>(0xFEDC_BA98_7654_3210, 30);
-        random_agreement_rounds::<36>(0x1357_9BDF_0246_8ACE, 25);
-        random_agreement_rounds::<40>(0x2468_ACE0_1357_9BDF, 20);
-        random_agreement_rounds::<48>(0x0F1E_2D3C_4B5A_6978, 20);
-        random_agreement_rounds::<56>(0x8796_A5B4_C3D2_E1F0, 15);
-        random_agreement_rounds::<64>(0xA5A5_5A5A_C3C3_3C3C, 15);
-        random_agreement_rounds::<128>(0x3C3C_A5A5_5A5A_C3C3, 8);
+        random_agreements_at_the_widths_of_large_boards(1);
+    }
+
+    /// [`random_agreement_with_model_at_the_widths_of_large_boards`] with a sixth of the rounds.
+    #[test]
+    fn a_few_random_agreements_with_model_at_the_widths_of_large_boards() {
+        random_agreements_at_the_widths_of_large_boards(6);
+    }
+
+    /// The rounds of [`random_agreement_with_model_at_the_widths_of_large_boards`], each divided by `divisor`.
+    fn random_agreements_at_the_widths_of_large_boards(divisor: usize) {
+        random_agreement_rounds::<16>(0x0123_4567_89AB_CDEF, 60 / divisor);
+        random_agreement_rounds::<32>(0xFEDC_BA98_7654_3210, 30 / divisor);
+        random_agreement_rounds::<36>(0x1357_9BDF_0246_8ACE, 25 / divisor);
+        random_agreement_rounds::<40>(0x2468_ACE0_1357_9BDF, 20 / divisor);
+        random_agreement_rounds::<48>(0x0F1E_2D3C_4B5A_6978, 20 / divisor);
+        random_agreement_rounds::<56>(0x8796_A5B4_C3D2_E1F0, 15 / divisor);
+        random_agreement_rounds::<64>(0xA5A5_5A5A_C3C3_3C3C, 15 / divisor);
+        random_agreement_rounds::<128>(0x3C3C_A5A5_5A5A_C3C3, 8 / divisor);
     }
 
     /// Every word holds numbers, including its first and last bit: the sums, counts, extremes and neighbours across
@@ -832,7 +850,8 @@ mod tests {
             assert!(picked.is_none_or(|w| w >= words && WIDTHS.contains(&w)), "{words} words");
         }
         // The last board of each width, and the first of the next.
-        let edges = [(1, 8), (511, 8), (512, 16), (1023, 16), (1024, 20), (1279, 20), (1280, 24), (1535, 24)];
+        let edges =
+            [(1, 8), (511, 8), (512, 16), (1023, 16), (1024, 20), (1215, 20), (1279, 20), (1280, 24), (1535, 24)];
         let more = [(1536, 28), (1791, 28), (1792, 32), (2047, 32), (2048, 36), (2303, 36), (2304, 40), (2559, 40)];
         let most = [(2560, 48), (3071, 48), (3072, 56), (3583, 56), (3584, 64), (4095, 64), (4096, 128), (8191, 128)];
         for (n, width) in edges.into_iter().chain(more).chain(most) {

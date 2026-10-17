@@ -102,15 +102,14 @@ fn optimal_sum<const W: usize>(optimal: &Optimal, n: u32) -> Option<u64> {
 // ---------------------------------------------------------------------------------------------------------
 // Real games
 
-/// Every game 2..=300 that has candidates, from an incumbent worth 1 or 5 less than `optimal.json`'s promotion sum,
-/// under each tactic: the search must come back with exactly that sum, and with a set that is promotable.  Unlike
-/// the golden tests, which start from the greedy set, this starts from a weak incumbent.
-#[test]
-fn a_search_from_a_handicapped_incumbent_finds_the_optimum() {
+/// Every game of `ns` that has candidates, from an incumbent worth 1 or 5 less than `optimal.json`'s promotion sum,
+/// under each tactic (past the board 200 one in three): the search must come back with exactly that sum, and with a
+/// set that is promotable.  More than `fewest` searches are made.
+fn searches_from_a_handicapped_incumbent(ns: std::ops::RangeInclusive<u32>, fewest: usize) {
     let optimal = Optimal::built_in();
     let configs = configs();
     let mut runs = 0;
-    for n in 2..=300 {
+    for n in ns {
         let Some(game) = Game::<8>::of_board(n) else { continue };
         let truth = optimal_sum::<8>(optimal, n).unwrap();
         // The big trees are for one configuration of each kind; the small ones for all.
@@ -126,7 +125,25 @@ fn a_search_from_a_handicapped_incumbent_finds_the_optimum() {
             }
         }
     }
-    assert!(runs > 4000, "{runs} runs");
+    assert!(runs > fewest, "{runs} runs");
+}
+
+/// The games 2..=90, under each tactic, from an incumbent worth 1 or 5 less than `optimal.json`'s promotion sum.
+#[test]
+fn a_search_from_a_handicapped_incumbent_finds_the_optimum_of_the_small_games() {
+    searches_from_a_handicapped_incumbent(2..=90, 300);
+}
+
+/// Every game 2..=300 that has candidates, from an incumbent worth 1 or 5 less than `optimal.json`'s promotion sum,
+/// under each tactic: the search must come back with exactly that sum, and with a set that is promotable.  Unlike
+/// the golden tests, which start from the greedy set, this starts from a weak incumbent.
+#[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_search_from_a_handicapped_incumbent_finds_the_optimum_of_the_small_games"
+)]
+fn a_search_from_a_handicapped_incumbent_finds_the_optimum() {
+    searches_from_a_handicapped_incumbent(2..=300, 4000);
 }
 
 /// Games 301 to 600 (every tenth), whose searches take a few hundred to a few thousand steps, from an incumbent
@@ -134,19 +151,36 @@ fn a_search_from_a_handicapped_incumbent_finds_the_optimum() {
 /// the nogoods forgotten at the same time, and on two threads): in the games above, few searches are long enough
 /// for its multipliers to have much to fit.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_search_with_the_lagrangian_bound_from_a_handicapped_incumbent_finds_the_optimum_of_four_games"
+)]
 fn a_search_with_the_lagrangian_bound_from_a_handicapped_incumbent_finds_the_optimum() {
     let optimal = Optimal::built_in();
-    // Over the matching bound, and over the GF(2) bound.
+    let configs = lagrangian_configs();
+    let runs = lagrangian_runs::<8>(optimal, 301..=511, &configs) + lagrangian_runs::<16>(optimal, 512..=600, &configs);
+    assert!(runs > 250, "{runs} runs");
+}
+
+/// [`a_search_with_the_lagrangian_bound_from_a_handicapped_incumbent_finds_the_optimum`] of the games 301, 311, 321
+/// and 331.
+#[test]
+fn a_search_with_the_lagrangian_bound_from_a_handicapped_incumbent_finds_the_optimum_of_four_games() {
+    let runs = lagrangian_runs::<8>(Optimal::built_in(), 301..=340, &lagrangian_configs());
+    assert!(runs >= 40, "{runs} runs");
+}
+
+/// The configurations that refit the Lagrangian bound early and often: over the matching bound, and over the GF(2)
+/// bound.
+fn lagrangian_configs() -> [Config; 5] {
     let (base, g) = (Config::matching(), Config::standard());
-    let configs = [
+    [
         Config { refits: Some(Refits { first: 10, every: 60 }), ..base },
         Config { refits: Some(Refits { first: 25, every: 100 }), period: Some(100), ..base },
         Config { refits: Some(Refits { first: 10, every: 60 }), threads: 2, ..base },
         Config { refits: Some(Refits { first: 10, every: 60 }), ..g },
         Config { refits: Some(Refits { first: 25, every: 100 }), period: Some(100), threads: 2, ..g },
-    ];
-    let runs = lagrangian_runs::<8>(optimal, 301..=511, &configs) + lagrangian_runs::<16>(optimal, 512..=600, &configs);
-    assert!(runs > 250, "{runs} runs");
+    ]
 }
 
 /// The searches of [`a_search_with_the_lagrangian_bound_from_a_handicapped_incumbent_finds_the_optimum`] of the
@@ -257,13 +291,28 @@ impl<'a, const W: usize> Searched<'a, W> {
 /// the root's heaviest set keeps the inequalities, so a search from the root loses nothing).  For the boards to 40 the
 /// optimum is also checked against the exhaustive search without the frame model.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_symmetry_rule_finds_the_optimum_of_the_small_boards_with_pairs"
+)]
 fn the_symmetry_rule_finds_the_optimum_of_the_boards_with_pairs() {
     let optimal = Optimal::built_in();
-    let (base, g) = (Config::matching(), Config::standard());
-    let configs = [g, Config { symmetry: true, ..base }];
+    let configs = symmetry_configs();
     let boards =
         boards_with_pairs::<8>(optimal, 2..=511, &configs) + boards_with_pairs::<16>(optimal, 512..=600, &configs);
     assert!(boards >= 450, "{boards} boards with pairs");
+}
+
+/// [`the_symmetry_rule_finds_the_optimum_of_the_boards_with_pairs`] on the boards 2..=220.
+#[test]
+fn the_symmetry_rule_finds_the_optimum_of_the_small_boards_with_pairs() {
+    let boards = boards_with_pairs::<8>(Optimal::built_in(), 2..=220, &symmetry_configs());
+    assert!(boards >= 40, "{boards} boards with pairs");
+}
+
+/// The rule of the symmetric pairs over the GF(2) bound and over the matching bound.
+fn symmetry_configs() -> [Config; 2] {
+    [Config::standard(), Config { symmetry: true, ..Config::matching() }]
 }
 
 /// The searches of [`the_symmetry_rule_finds_the_optimum_of_the_boards_with_pairs`] of the boards `ns` at width `W`;
@@ -350,6 +399,10 @@ fn handicapped_units<const W: usize>(n: u32, rng: &mut Rng, units: usize, config
 /// Units of real games at W = 20 to 64, the widths of the hardest games and beyond, from a handicapped incumbent under
 /// every configuration: the game tests above stop at W = 8, the perturbed games below at W = 4.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_few_units_of_wide_games_from_a_handicapped_incumbent_find_the_optimum"
+)]
 fn units_of_wide_games_from_a_handicapped_incumbent_find_the_optimum() {
     let configs = configs();
     let mut rng = Rng(0x3D1D_E000_0000_0077);
@@ -364,6 +417,17 @@ fn units_of_wide_games_from_a_handicapped_incumbent_find_the_optimum() {
         + handicapped_units::<64>(2050, &mut rng, 40, &configs)
         + handicapped_units::<64>(3100, &mut rng, 40, &configs);
     assert!(runs > 1000, "{runs} runs");
+}
+
+/// [`units_of_wide_games_from_a_handicapped_incumbent_find_the_optimum`] with a few units of the games 1100 at W = 20
+/// and 2050 at W = 64, the narrowest and the widest of them.
+#[test]
+fn a_few_units_of_wide_games_from_a_handicapped_incumbent_find_the_optimum() {
+    let mut rng = Rng(0x3D1D_E000_0000_0078);
+    let configs = configs();
+    let runs =
+        handicapped_units::<20>(1100, &mut rng, 4, &configs) + handicapped_units::<64>(2050, &mut rng, 4, &configs);
+    assert!(runs > 20, "{runs} runs");
 }
 
 /// Units on the path to an optimal promotion set `S*` of game `n` at width `W`: the promotions are `S*` less a random
@@ -405,13 +469,33 @@ fn optimum_units<const W: usize>(optimal: &Optimal, n: u32, rng: &mut Rng, units
 /// The searches of the units on the way to an optimal set ([`optimum_units`]) of the games 600 to 1000 (every 23rd)
 /// under the rule of the symmetric pairs, over the GF(2) bound on one thread and on two, and over the matching path.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_few_units_on_the_way_to_the_optimum_find_it_with_the_symmetry_rule"
+)]
 fn units_on_the_way_to_the_optimum_find_it_with_the_symmetry_rule() {
     let optimal = Optimal::built_in();
-    let (base, g) = (Config::matching(), Config::standard());
-    let configs = [g, Config { threads: 2, ..g }, Config { symmetry: true, ..base }];
     let mut rng = Rng(0x5B0D_1E57_C0DE_0003);
-    let runs: usize = (600..=1000).step_by(23).map(|n| optimum_units::<16>(optimal, n, &mut rng, 6, &configs)).sum();
+    let runs: usize =
+        (600..=1000).step_by(23).map(|n| optimum_units::<16>(optimal, n, &mut rng, 6, &on_the_way_configs())).sum();
     assert!(runs > 200, "{runs} runs");
+}
+
+/// [`units_on_the_way_to_the_optimum_find_it_with_the_symmetry_rule`] for the games 600, 700, 800, 900 and 1000, two
+/// units each.
+#[test]
+fn a_few_units_on_the_way_to_the_optimum_find_it_with_the_symmetry_rule() {
+    let optimal = Optimal::built_in();
+    let mut rng = Rng(0x5B0D_1E57_C0DE_0004);
+    let runs: usize =
+        (600..=1000).step_by(100).map(|n| optimum_units::<16>(optimal, n, &mut rng, 2, &on_the_way_configs())).sum();
+    assert!(runs > 10, "{runs} runs");
+}
+
+/// The rule of the symmetric pairs over the GF(2) bound on one thread and on two, and over the matching path.
+fn on_the_way_configs() -> [Config; 3] {
+    let (base, g) = (Config::matching(), Config::standard());
+    [g, Config { threads: 2, ..g }, Config { symmetry: true, ..base }]
 }
 
 /// A search interrupted every `node_limit` nodes or so and resumed (two threads, a checkpoint every millisecond, a
@@ -452,7 +536,23 @@ fn resumed_over_and_over<const W: usize>(
     resumes
 }
 
+/// [`a_search_resumed_over_and_over_finds_the_optimum`] of game 600 on the matching path in its first configuration.
+/// (The GF(2) bound's resumes need a search of ten thousand nodes to be stopped on two threads; the quick check of
+/// those is `checkpoint_and_resume_with_the_gf2_bound_of_a_small_game`, on one thread, in the unit tests, and
+/// `a_small_search_of_the_extended_problem_resumed_over_and_over_finds_the_optimum`.)
 #[test]
+fn a_small_search_resumed_over_and_over_finds_the_optimum() {
+    let dir = TempDir::new("churn-small");
+    let truth = optimal_sum::<16>(Optimal::built_in(), 600).unwrap();
+    let resumes = resumed_over_and_over::<16>(600, truth, 30, 1000, &dir, &[0]);
+    assert!(resumes >= 1, "only {resumes} resumes");
+}
+
+#[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_small_search_resumed_over_and_over_finds_the_optimum"
+)]
 fn a_search_resumed_over_and_over_finds_the_optimum() {
     let optimal = Optimal::built_in();
     let dir = TempDir::new("churn");
@@ -472,11 +572,29 @@ fn a_search_resumed_over_and_over_finds_the_optimum() {
     assert!(resumes >= 8, "the GF(2) bound: only {resumes} resumes");
 }
 
-/// The same at W = 20, 24 and 64: on the matching path, game 1133 (its truth from `results/strict.jsonl`) from an
+/// [`a_wide_search_resumed_over_and_over_finds_the_optimum`] on the matching path in its first configuration at W = 20
+/// and 24 and in its third at W = 64, without the configurations that refit the Lagrangian bound every four steps (a
+/// piece of them takes seconds at these widths) and without the GF(2) bound of game 992 (ten thousand nodes).
+#[test]
+fn a_wide_search_resumed_over_and_over_finds_the_optimum_in_a_quick_run() {
+    let n = 1133;
+    let truth = stored_games("strict.jsonl")[&n].0 - Board::<20>::for_n(n).in_the_bag;
+    let dir = TempDir::new("churn-wide-quick");
+    let resumes = resumed_over_and_over::<20>(n, truth, 400, 60, &dir, &[0])
+        + resumed_over_and_over::<24>(n, truth, 400, 60, &dir, &[0])
+        + resumed_over_and_over::<64>(n, truth, 400, 60, &dir, &[2]);
+    assert!(resumes > 2, "only {resumes} resumes");
+}
+
+/// [`a_search_resumed_over_and_over_finds_the_optimum`] at W = 20, 24 and 64: on the matching path, game 1133 (its truth from `results/strict.jsonl`) from an
 /// incumbent 400 below it, stopped every 60 nodes or so (the engine checks every 1,024 steps of a searcher): its
 /// tactics, forgetting the nogoods every two or three steps, and refitting the Lagrangian bound every four; with the
 /// GF(2) bound, whose search of 1133 is too short to stop, game 992 (some ten thousand nodes) at those widths.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_wide_search_resumed_over_and_over_finds_the_optimum_in_a_quick_run"
+)]
 fn a_wide_search_resumed_over_and_over_finds_the_optimum() {
     let n = 1133;
     let truth = stored_games("strict.jsonl")[&n].0 - Board::<20>::for_n(n).in_the_bag;
@@ -502,15 +620,26 @@ fn a_wide_search_resumed_over_and_over_finds_the_optimum() {
 /// matching path, started from the bound, finds no completion above it (where it ends within its time limit, it
 /// proves the bound is at least the best completion).
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_gf2_bound_holds_at_a_sample_of_the_nodes_of_the_probe"
+)]
 fn the_gf2_bound_holds_at_the_nodes_of_the_probe() {
     // All but 3 of the 600 searches end within 200 ms on an idle machine.
-    let proved = gf2_at_probe_nodes::<16>("n0936.nodes") + gf2_at_probe_nodes::<20>("n1215.nodes");
+    let proved = gf2_at_probe_nodes::<16>("n0936.nodes", 1) + gf2_at_probe_nodes::<20>("n1215.nodes", 1);
     assert!(proved >= 550, "only {proved} nodes proved by a search");
 }
 
-/// [`the_gf2_bound_holds_at_the_nodes_of_the_probe`] at the nodes of `fixture`: returns the nodes at which the
-/// search of the matching path ended.
-fn gf2_at_probe_nodes<const W: usize>(fixture: &str) -> usize {
+/// [`the_gf2_bound_holds_at_the_nodes_of_the_probe`] at every 30th node of each fixture.
+#[test]
+fn the_gf2_bound_holds_at_a_sample_of_the_nodes_of_the_probe() {
+    let proved = gf2_at_probe_nodes::<16>("n0936.nodes", 30) + gf2_at_probe_nodes::<20>("n1215.nodes", 30);
+    assert!(proved >= 18, "only {proved} nodes proved by a search");
+}
+
+/// [`the_gf2_bound_holds_at_the_nodes_of_the_probe`] at every `every`th node of `fixture`: returns the nodes at
+/// which the search of the matching path ended.
+fn gf2_at_probe_nodes<const W: usize>(fixture: &str, every: usize) -> usize {
     let (n, _, units) = fixtures::read_nodes::<W>(&testdata(&format!("perf/{fixture}"))).unwrap();
     let game = Game::<W>::of_board(n).unwrap();
     let graph = Gf2Graph::new(&game.model, &game.root, &game.candidates);
@@ -518,7 +647,7 @@ fn gf2_at_probe_nodes<const W: usize>(fixture: &str) -> usize {
     let mut scratch = Scratch::<W>::new();
     let mut rng = Rng(0x6F2B_C0DE_0000_0000 ^ u64::from(n));
     let mut proved = 0;
-    for unit in units.iter().filter(|u| !u.cands.is_empty()) {
+    for unit in units.iter().filter(|u| !u.cands.is_empty()).step_by(every) {
         let state = game.model.promote_all_using(&mut scratch, &game.root, &unit.promoted).expect("a node");
         let max_add = (game.max_total - unit.promoted.len()).min(state.max_promotions_among(&unit.cands).max(0) as u32);
         bound.reset(&unit.promoted, &unit.cands);
@@ -624,14 +753,13 @@ fn path<const W: usize>(rng: &mut Rng, game: &Game<W>) -> Vec<(Bits<W>, Bits<W>,
     units
 }
 
-/// Perturbed games, their roots and some units below them, with the truth found exhaustively, under random
-/// tactics, from an incumbent worth `k` less.
-#[test]
-fn perturbed_frame_sets_are_searched_exactly() {
-    let mut rng = Rng(0x5EED_0001_C0DE_F00D);
+/// `count` perturbed games, their roots and some units below them, with the truth found exhaustively, under random
+/// tactics, from an incumbent worth `k` less, drawn with `seed`: more than 16 searches for each game are made.
+fn perturbed_games_are_searched_exactly(count: usize, seed: u64) {
+    let mut rng = Rng(seed);
     let configs = configs();
     let (mut games, mut runs) = (0, 0);
-    while games < 500 {
+    while games < count {
         let n = 30 + rng.below(220) as u32;
         let (frames, density) = (2 + rng.below(6), 94 + rng.below(7));
         let Some(game) = perturbed(&mut rng, n, frames, density) else { continue };
@@ -652,7 +780,21 @@ fn perturbed_frame_sets_are_searched_exactly() {
             }
         }
     }
-    assert!(runs > 8000, "{runs} runs");
+    assert!(runs > 16 * count, "{runs} runs");
+}
+
+/// Sixty perturbed games, their roots and some units below them, searched exactly.
+#[test]
+fn some_perturbed_frame_sets_are_searched_exactly() {
+    perturbed_games_are_searched_exactly(60, 0x5EED_0003_C0DE_F00D);
+}
+
+/// Perturbed games, their roots and some units below them, with the truth found exhaustively, under random
+/// tactics, from an incumbent worth `k` less.
+#[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is some_perturbed_frame_sets_are_searched_exactly")]
+fn perturbed_frame_sets_are_searched_exactly() {
+    perturbed_games_are_searched_exactly(500, 0x5EED_0001_C0DE_F00D);
 }
 
 /// On perturbed games: promoting a set at once is promoting it one by one in any order (success and the state it
@@ -778,12 +920,30 @@ fn extended_optimum<const W: usize>(optimal: &Optimal, n: u32, ext: &ExtendedFra
 /// Past the board 200 one configuration in three runs, as in the game tests above.  Unlike them it searches games whose
 /// candidates are not all numbers of a frame: the one-sided candidates, each a move of its own frame.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_search_of_the_small_extended_problems_from_a_handicapped_incumbent_finds_the_optimum"
+)]
 fn a_search_of_the_extended_problem_from_a_handicapped_incumbent_finds_the_optimum() {
+    // There were 1,258 problems, 978 of them with one-sided candidates, and 16,128 runs, 12,648 of them on those.
+    extended_searches_from_a_handicapped_incumbent(2..=300, 0xE87E_4DED_5EED_0001, [1100, 850, 14_000, 11_000]);
+}
+
+/// [`a_search_of_the_extended_problem_from_a_handicapped_incumbent_finds_the_optimum`] on the boards 2..=70.
+#[test]
+fn a_search_of_the_small_extended_problems_from_a_handicapped_incumbent_finds_the_optimum() {
+    extended_searches_from_a_handicapped_incumbent(2..=70, 0xE87E_4DED_5EED_0002, [150, 100, 1000, 800]);
+}
+
+/// The searches of the extended problems of the boards `ns`, drawn with `seed` (see
+/// [`a_search_of_the_extended_problem_from_a_handicapped_incumbent_finds_the_optimum`]); more than `fewest` problems,
+/// of them with one-sided candidates, searches, and searches on those.
+fn extended_searches_from_a_handicapped_incumbent(ns: std::ops::RangeInclusive<u32>, seed: u64, fewest: [usize; 4]) {
     let optimal = Optimal::built_in();
     let configs = extended_configs();
-    let mut rng = Rng(0xE87E_4DED_5EED_0001);
+    let mut rng = Rng(seed);
     let (mut problems, mut with_one_sided, mut runs, mut one_sided_runs) = (0, 0, 0, 0);
-    for n in 2..=300 {
+    for n in ns {
         let board = Board::<8>::for_n(n);
         let from_3 = upper_from_3(&board);
         let mut opens = vec![Vec::new()];
@@ -819,9 +979,12 @@ fn a_search_of_the_extended_problem_from_a_handicapped_incumbent_finds_the_optim
         }
     }
     println!("{problems} problems, {with_one_sided} with one-sided candidates, {runs} runs, {one_sided_runs} of them");
-    // There were 1,258 problems, 978 of them with one-sided candidates, and 16,128 runs, 12,648 of them on those.
-    assert!(problems > 1100 && with_one_sided > 850, "{problems} problems, {with_one_sided} with one-sided candidates");
-    assert!(runs > 14_000 && one_sided_runs > 11_000, "{runs} runs, {one_sided_runs} on problems with one-sided ones");
+    let [few_problems, few_one_sided, few_runs, few_one_sided_runs] = fewest;
+    assert!(
+        problems > few_problems && with_one_sided > few_one_sided,
+        "{problems} problems, {with_one_sided} one-sided"
+    );
+    assert!(runs > few_runs && one_sided_runs > few_one_sided_runs, "{runs} runs, {one_sided_runs} on one-sided ones");
 }
 
 /// The harness's own exhaustive oracle on the extended problem: [`Game::exhaustive`] on the game of Π⁺(O), whose counts
@@ -869,6 +1032,9 @@ fn the_exhaustive_oracle_finds_the_optimum_of_the_extended_problem() {
 /// to 1000 only 990 to 998 take more than 10,000; the search of 1000 takes 2,293 steps, that of 988 6,273).
 const EXTENDED_RESUME: (u32, u64) = (992, 0x5EED_0E27_E4DE_D001);
 
+/// The same for [`a_small_search_of_the_extended_problem_resumed_over_and_over_finds_the_optimum`].
+const QUICK_RESUME: (u32, u64) = (800, 0x5EED_0E27_E4DE_D001);
+
 /// The extended problem of game `EXTENDED_RESUME.0`, with a random 20 of its U\*_{≥3} open, searched on one thread in
 /// pieces of 1,000 nodes, each resumed from the checkpoint the one before it left, ends with the sum of an
 /// uninterrupted search, which is `optimal.json`'s.  The sets are the search's own (`Board::prepare_extended_with`,
@@ -876,8 +1042,26 @@ const EXTENDED_RESUME: (u32, u64) = (992, 0x5EED_0E27_E4DE_D001);
 /// their header records the one-sided candidates, and the resume checks them.  The engine checks a node limit every
 /// 1,024 steps of a searcher, so a piece is at least that long.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_small_search_of_the_extended_problem_resumed_over_and_over_finds_the_optimum"
+)]
 fn a_search_of_the_extended_problem_resumed_over_and_over_finds_the_optimum() {
     let (n, seed) = EXTENDED_RESUME;
+    an_extended_search_resumed_over_and_over(n, seed, 10_000);
+}
+
+/// [`a_search_of_the_extended_problem_resumed_over_and_over_finds_the_optimum`] of a smaller game, `QUICK_RESUME`.
+#[test]
+fn a_small_search_of_the_extended_problem_resumed_over_and_over_finds_the_optimum() {
+    let (n, seed) = QUICK_RESUME;
+    an_extended_search_resumed_over_and_over(n, seed, 1_200);
+}
+
+/// The extended problem of game `n`, with a random 20 of its U\*_{≥3} open drawn with `seed`, searched in pieces of
+/// 1,000 nodes (see [`a_search_of_the_extended_problem_resumed_over_and_over_finds_the_optimum`]); its search takes
+/// more than `most_nodes` nodes uninterrupted, so that the limit stops it.
+fn an_extended_search_resumed_over_and_over(n: u32, seed: u64, most_nodes: u64) {
     let board = Board::<16>::for_n(n);
     let mut open = upper_from_3(&board);
     common::shuffle(&mut Rng(seed), &mut open);
@@ -890,7 +1074,11 @@ fn a_search_of_the_extended_problem_resumed_over_and_over_finds_the_optimum() {
 
     let whole = search(&prepared, &config(1), None, None, false).unwrap();
     assert!(whole.completed && whole.sum == truth, "n={n}: uninterrupted: {} not {truth}", whole.sum);
-    assert!(whole.stats.nodes > 10_000, "n={n}: only {} nodes, too few for the limit to stop it", whole.stats.nodes);
+    assert!(
+        whole.stats.nodes > most_nodes,
+        "n={n}: only {} nodes, too few for the limit to stop it",
+        whole.stats.nodes
+    );
 
     let dir = TempDir::new("extended-resume");
     let checkpoint = dir.join("n.ckpt");

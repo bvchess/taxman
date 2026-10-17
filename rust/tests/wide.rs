@@ -37,29 +37,14 @@ use taxman::{accelerate, game, with_width};
 /// mask that is wrong at the top, a width that is not a power of two) shows as a different tree: the widths above
 /// the ones the boards below need are otherwise reached by no test.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_search_of_a_small_board_does_not_depend_on_the_width"
+)]
 fn the_search_does_not_depend_on_the_width() {
     let default = SearchTactics::default();
     // Boards that W = 8 holds, at every width.
-    for n in [300, 400] {
-        let at8 = profile_at_width::<8>(n, default, None);
-        assert!(at8.completed && at8.sum > 0, "n={n}");
-        let others = [
-            (16, profile_at_width::<16>(n, default, None)),
-            (20, profile_at_width::<20>(n, default, None)),
-            (24, profile_at_width::<24>(n, default, None)),
-            (28, profile_at_width::<28>(n, default, None)),
-            (32, profile_at_width::<32>(n, default, None)),
-            (36, profile_at_width::<36>(n, default, None)),
-            (40, profile_at_width::<40>(n, default, None)),
-            (48, profile_at_width::<48>(n, default, None)),
-            (56, profile_at_width::<56>(n, default, None)),
-            (64, profile_at_width::<64>(n, default, None)),
-            (128, profile_at_width::<128>(n, default, None)),
-        ];
-        for (w, profile) in others {
-            assert_eq!(profile, at8, "n={n} at W={w}");
-        }
-    }
+    small_boards_at_every_width(&[300, 400]);
     // Boards that W = 16 holds, with trees of more than 1,000 nodes: on the matching path and with the GF(2) bound.
     let matching = SearchTactics::matching();
     for (n, tactics) in [(760, matching), (1000, default)] {
@@ -80,6 +65,38 @@ fn the_search_does_not_depend_on_the_width() {
         assert_eq!(profile_at_width::<64>(n, tactics, None), at20, "{name}: n={n} at W=64");
         assert_eq!(profile_at_width::<128>(n, tactics, None), at20, "{name}: n={n} at W=128");
     }
+}
+
+/// [`the_search_does_not_depend_on_the_width`] for the boards `boards` that W = 8 holds, at every width: each
+/// completes in the same tree at all twelve.
+fn small_boards_at_every_width(boards: &[u32]) {
+    let default = SearchTactics::default();
+    for &n in boards {
+        let at8 = profile_at_width::<8>(n, default, None);
+        assert!(at8.completed && at8.sum > 0, "n={n}");
+        let others = [
+            (16, profile_at_width::<16>(n, default, None)),
+            (20, profile_at_width::<20>(n, default, None)),
+            (24, profile_at_width::<24>(n, default, None)),
+            (28, profile_at_width::<28>(n, default, None)),
+            (32, profile_at_width::<32>(n, default, None)),
+            (36, profile_at_width::<36>(n, default, None)),
+            (40, profile_at_width::<40>(n, default, None)),
+            (48, profile_at_width::<48>(n, default, None)),
+            (56, profile_at_width::<56>(n, default, None)),
+            (64, profile_at_width::<64>(n, default, None)),
+            (128, profile_at_width::<128>(n, default, None)),
+        ];
+        for (w, profile) in others {
+            assert_eq!(profile, at8, "n={n} at W={w}");
+        }
+    }
+}
+
+/// [`the_search_does_not_depend_on_the_width`] for the board 300 alone.
+#[test]
+fn the_search_of_a_small_board_does_not_depend_on_the_width() {
+    small_boards_at_every_width(&[300]);
 }
 
 /// What a search starts from at width `W`, before its first node: the frames, candidates, greedy set and `max_total`
@@ -109,6 +126,7 @@ fn setup_at_width<const W: usize>(n: u32) -> Setup {
 /// nodes) is the same at the width the board dispatches to and at the next one.  (The boards just above 511, 1023 and
 /// 2047 are in `testdata/golden_wide` at their own widths.)
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is the_setups_at_the_edges_of_the_widths_hold")]
 fn the_edges_of_the_widths_hold() {
     let default = SearchTactics::default();
     let limit = Some(1);
@@ -119,7 +137,20 @@ fn the_edges_of_the_widths_hold() {
     check([profile_at_width::<24>(1535, default, limit), profile_at_width::<28>(1535, default, limit)], 1535);
     check([profile_at_width::<28>(1791, default, limit), profile_at_width::<32>(1791, default, limit)], 1791);
     check([profile_at_width::<32>(2047, default, limit), profile_at_width::<36>(2047, default, limit)], 2047);
+    the_setups_at_the_edges_of_the_widths_hold();
+}
+
+/// [`the_edges_of_the_widths_hold`] for the setup of every edge (the frames, candidates, greedy set and `max_total`,
+/// without the first nodes of a search, which take most of the time of the boards past 1023).
+#[test]
+fn the_setups_at_the_edges_of_the_widths_hold() {
     let check_setup = |setups: [Setup; 2], n: u32| assert_eq!(setups[0], setups[1], "n={n}");
+    check_setup([setup_at_width::<8>(511), setup_at_width::<16>(511)], 511);
+    check_setup([setup_at_width::<16>(1023), setup_at_width::<20>(1023)], 1023);
+    check_setup([setup_at_width::<20>(1279), setup_at_width::<24>(1279)], 1279);
+    check_setup([setup_at_width::<24>(1535), setup_at_width::<28>(1535)], 1535);
+    check_setup([setup_at_width::<28>(1791), setup_at_width::<32>(1791)], 1791);
+    check_setup([setup_at_width::<32>(2047), setup_at_width::<36>(2047)], 2047);
     check_setup([setup_at_width::<36>(2303), setup_at_width::<40>(2303)], 2303);
     check_setup([setup_at_width::<40>(2559), setup_at_width::<48>(2559)], 2559);
     check_setup([setup_at_width::<48>(3071), setup_at_width::<56>(3071)], 3071);
@@ -134,6 +165,10 @@ fn the_edges_of_the_widths_hold() {
 /// exact solves make the first 1,023 nodes of a search cost 0.6 s at 2050, 3 s at 3100 and 7 s at 3300, so the boards
 /// stay low in their widths, and only the cheapest is searched at 128 too.)
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_setups_of_boards_past_2047_are_the_same_at_their_width_at_64_and_at_128"
+)]
 fn boards_past_2047_give_the_same_search_at_their_width_at_64_and_at_128() {
     let default = SearchTactics::default();
     let limit = Some(2000);
@@ -149,6 +184,21 @@ fn boards_past_2047_give_the_same_search_at_their_width_at_64_and_at_128() {
     }
 }
 
+/// [`boards_past_2047_give_the_same_search_at_their_width_at_64_and_at_128`] without the search: the setup (frames,
+/// candidates, greedy set and `max_total`) of each board, which costs a fiftieth of the first nodes.
+#[test]
+fn the_setups_of_boards_past_2047_are_the_same_at_their_width_at_64_and_at_128() {
+    for (n, width) in [(2050, 36), (2400, 40), (2800, 48), (3100, 56)] {
+        assert_eq!(with_width!(n, W => W), width, "n={n}: the width the board dispatches to");
+        let at_its_width = with_width!(n, W => setup_at_width::<W>(n));
+        assert!(at_its_width.candidates.len() > 500 && at_its_width.max_total > 0, "n={n}: {at_its_width:?}");
+        assert_eq!(setup_at_width::<64>(n), at_its_width, "n={n} at W=64 and W={width}");
+        if n == 2050 {
+            assert_eq!(setup_at_width::<128>(n), at_its_width, "n={n} at W=128 and W={width}");
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------------------------------------
 // Games of 1100 and more, against the committed results
 
@@ -156,10 +206,22 @@ fn boards_past_2047_give_the_same_search_at_their_width_at_64_and_at_128() {
 /// give the score of `results/strict.jsonl`, on one thread, and the default also on two.  Nothing else searches at
 /// a width of 20 or more and checks the answer.
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is some_tactics_give_the_recorded_score_at_w20")]
 fn every_tactic_gives_the_recorded_score_at_w20() {
+    tactics_give_the_recorded_score_at_w20(1);
+}
+
+/// [`every_tactic_gives_the_recorded_score_at_w20`] for every fourth of the variants (the default among them).
+#[test]
+fn some_tactics_give_the_recorded_score_at_w20() {
+    tactics_give_the_recorded_score_at_w20(4);
+}
+
+/// Every `every`th of the variants of the tactics gives the recorded score of game 1133.
+fn tactics_give_the_recorded_score_at_w20(every: usize) {
     let games = stored_games("strict.jsonl");
     let prev = prev_of(&games, 1133);
-    for (name, tactics) in variants() {
+    for (name, tactics) in variants().into_iter().step_by(every) {
         for threads in if name == "default" { vec![1, 2] } else { vec![1] } {
             let mut opts = options(threads);
             opts.tactics.search = tactics;
@@ -310,9 +372,22 @@ fn the_gf2_engines_of_four_and_five_words_search_the_same_tree() {
 /// most the matching bound, and an engine of five words gives the same as the one the board needs.  (The setup's
 /// local search is left out: this is the board layer's invariants, not the solver's.)
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is the_first_board_past_4095_is_set_up_at_128_words")]
 fn boards_past_4095_are_set_up_at_128_words() {
+    boards_are_set_up_at_128_words(&[(4096, 3), (4100, 3), (4740, 4), (6000, 4), (6392, 5), (8191, 5)]);
+}
+
+/// [`boards_past_4095_are_set_up_at_128_words`] for the first board past 4095.
+#[test]
+fn the_first_board_past_4095_is_set_up_at_128_words() {
+    boards_are_set_up_at_128_words(&[(4096, 3)]);
+}
+
+/// The boards `boards` (each with the block words its frames' GF(2) vectors need) are set up at 128 words and agree
+/// with the board layer's invariants.
+fn boards_are_set_up_at_128_words(boards: &[(u32, usize)]) {
     let mut rng = Rng(0x4096_8191_0000_0001);
-    for (n, words) in [(4096, 3), (4100, 3), (4740, 4), (6000, 4), (6392, 5), (8191, 5)] {
+    for &(n, words) in boards {
         assert_eq!(with_width!(n, W => W), 128, "n={n}");
         let board = Board::<128>::for_n(n);
         let columns = board.frames.columns();
@@ -428,10 +503,26 @@ fn a_committed_checkpoint_of_format_4_resumes_as_the_build_that_wrote_it_finishe
 /// bound's search of 1133 is too short to stop, and `tests/soundness.rs` resumes it on game 1000 at W = 20).  The
 /// unit tests resume only at W = 16.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_w20_search_interrupted_and_resumed_once_gives_the_same_answer"
+)]
 fn a_w20_search_interrupted_and_resumed_gives_the_same_answer() {
+    a_w20_search_interrupted_and_resumed_under(2);
+}
+
+/// [`a_w20_search_interrupted_and_resumed_gives_the_same_answer`] under the first set of tactics alone.
+#[test]
+fn a_w20_search_interrupted_and_resumed_once_gives_the_same_answer() {
+    a_w20_search_interrupted_and_resumed_under(1);
+}
+
+/// The W = 20 search of game 1133 interrupted and resumed gives the answer, under the first `sets` sets of tactics of
+/// the matching path.
+fn a_w20_search_interrupted_and_resumed_under(sets: usize) {
     let games = stored_games("strict.jsonl");
     let prev = prev_of(&games, 1133);
-    for (name, tactics) in variants().into_iter().filter(|(name, _)| name.starts_with("matching")).take(2) {
+    for (name, tactics) in variants().into_iter().filter(|(name, _)| name.starts_with("matching")).take(sets) {
         let dir = TempDir::new(&format!("resume-{}", name.replace(['=', ','], "-")));
         let mut opts = options(1);
         opts.tactics.search = tactics;
@@ -528,7 +619,19 @@ fn deep_units() -> (u64, Vec<TaxUnit<32>>) {
 /// `symmetry` and among those with it: a search of a unit below the root with the rule finds the best completion
 /// that keeps the symmetric pairs' inequalities, which can be lighter than the unit's best.
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is deep_levels_of_a_large_game_below_a_few_units")]
 fn deep_levels_of_a_large_game() {
+    deep_levels_of_a_large_game_below(8);
+}
+
+/// [`deep_levels_of_a_large_game`] with the subtrees below 2 units searched under every tactic.
+#[test]
+fn deep_levels_of_a_large_game_below_a_few_units() {
+    deep_levels_of_a_large_game_below(2);
+}
+
+/// The deep levels of game 1215, and the subtrees below `subtrees` of its deepest units searched under every tactic.
+fn deep_levels_of_a_large_game_below(subtrees: usize) {
     let (best, units) = deep_units();
     assert!(units.len() >= 20, "{} units", units.len());
     let game = Game::<32>::of_board(1215).unwrap();
@@ -581,7 +684,7 @@ fn deep_levels_of_a_large_game() {
                 all.push((name, tactics));
             }
         }
-        for unit in units.iter().filter(|u| u.promoted.len() >= 13).take(8) {
+        for unit in units.iter().filter(|u| u.promoted.len() >= 13).take(subtrees) {
             for start in [best, best - 25] {
                 let expected = search_unit(&all[0].1, *unit, start);
                 for (name, tactics) in &all[1..] {
@@ -592,5 +695,5 @@ fn deep_levels_of_a_large_game() {
             }
         }
     }
-    assert!(compared >= 20, "{compared}");
+    assert!(compared >= 4 * subtrees, "{compared}");
 }

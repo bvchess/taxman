@@ -168,11 +168,12 @@ profile-guided build in `target/pgo/release` (0-2% fewer cycles on the M1, the s
 how, and DESIGN.md "Performance" what it gains); `examples/perf.rs` measures the hot paths.
 
 ```
-cargo test                         # the whole suite: about 1.5 minutes to compile, then about 30 s to run
+cargo test                         # the quick check: the long tests are skipped
+cargo test --release               # the full suite
 ```
 
-`cargo test` runs as many test threads as the machine has CPUs; the timings here and in DESIGN.md are with
-`-- --test-threads=2`.
+Both run as many test threads as the machine has CPUs.  What each takes, and when each is run, is in
+[DESIGN.md](DESIGN.md#9-testing).
 
 The ignored tests are for large machines and long runs: `cargo test --release --test engine -- --ignored
 many_threads` (64 and 192 worker threads), `TXENGINE_STRESS=2000 cargo test --release --test engine -- --ignored
