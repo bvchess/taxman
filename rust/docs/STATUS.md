@@ -1,6 +1,6 @@
 # Status
 
-Updated 2026-10-16.
+Updated 2026-10-17.
 
 What is in flight, what is paused, what is decided and what waits on a decision, as of the date above.  This page is
 the only place for the current state: it is rewritten, not appended to, whenever work lands or a decision is made
@@ -94,8 +94,7 @@ What has been tried for the bound, and where it stands:
 
 ## Waiting on Brian
 
-* Nothing for the run itself: Brian approved the rehearsal and the run (2026-10-16).  The run starts from n = 1, so the
-  checkpoint of 3441 that the forcing window of `all` would refuse is not needed.
+* Nothing for the run itself: Brian approved it (2026-10-16); periodic updates need his AWS session (12 hours each).
 * Outside review of Theorems 1, 10 and 12 by Robert Moniot.
 * Publishing (`optimal.json` past 1300, OEIS).
 
@@ -105,9 +104,11 @@ What has been tried for the bound, and where it stands:
   cheaper cycle searches), the knobs for nogood retention, the forcing window and strong branching, the harness that
   tunes them on subtrees of searches at the end of the chain, and the campaign that used it (see "Decided";
   [the profile at the end of the chain](../bench/chain_end/README.md)).
-* The run to the wall: the rehearsal of [RUNBOOK 12.5](../tools/cloud/RUNBOOK.md#125-the-rehearsal-designed-not-run) on
-  a `c8g.large` (about $0.04), then the run itself (12.4).  Built and tested against a stand-in for aws, not yet run on
-  EC2: the wall in the solver (`solve --game-hours`), the budget and the date across machines (the ledger in S3), and
-  the group that restarts the machine and ends by taking itself to capacity 0
-  ([RUNBOOK section 12](../tools/cloud/RUNBOOK.md#12-the-unattended-run-to-the-wall)).  Before the wall's data count, 3440
-  is re-solved with the fixed build by the run itself (it starts from n = 1).
+* **The run to the wall**, launched 2026-10-17 00:15 PDT: `RUN=to-the-wall rust/tools/cloud/wall.sh status`
+  ([RUNBOOK section 12](../tools/cloud/RUNBOOK.md#12-the-unattended-run-to-the-wall)).  The chain from n = 1 with
+  commit eb84a6f (`force_window=all`, the cheaper node), on one `c8g.16xlarge` at spot (at most $0.75 an hour) in an
+  Auto Scaling group that replaces an interrupted machine; it ends at the wall (a game past 24 hours), at 72
+  instance-hours (about $49), or on 2026-10-22.  Its games 1..3440 are compared with the committed chain (3440 is
+  re-proven by the fixed build), and the games past 3440 are appended once verified.  The rehearsal of
+  [RUNBOOK 12.5](../tools/cloud/RUNBOOK.md#125-the-rehearsal-designed-not-run) passed (the wall, a replacement, the
+  budget).

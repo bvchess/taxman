@@ -1606,6 +1606,16 @@ keeps the ledger, the results and the checkpoints.
 
 ### 12.5 The rehearsal (designed, not run)
 
+*Run on 2026-10-17* (commit eb84a6f; about $0.15 in all).  A `c8g.large` (2 vCPUs, 4 GiB) cannot build the solver: its
+first machine stopped answering Systems Manager three minutes after boot and sat at half its CPU for 35 minutes with
+the chain not started, so it was stopped and the rehearsal moved to a `c8g.2xlarge` (8 vCPUs, 16 GiB, about $0.13 an
+hour), whose machines build in about 7 minutes; the commands below use it.  Run 1 ended `wall at 992 after 0.00100
+hours` with the group at 0, the checkpoint and clock of 992 in S3 and the results 1..991 equal to the committed scores.
+Run 2: the machine terminated without notice at game 1289 was replaced by the group 2 seconds later, the replacement
+resumed from S3 (`games done so far: 1289`, the ledger's `base` the first machine's hours) and the chain ended
+`complete: the range 1-1300` before the budget, the group at 0.  A third run with a budget of 0.2 hours ended
+`deadline: the budget of 0.2 instance-hours` at 0.18, the group at 0.
+
 The whole mechanism on the smallest machine of the family, `c8g.large` (2 vCPUs; $0.024 to $0.039 an hour at spot in
 us-east-1 on 2026-10-17), with the chain to 1300 instead of 3440 and the limits tiny.  Two runs, because the wall is
 the end of a run: the first shows the wall and the end that takes the group to 0, the second the replacement and the
@@ -1633,11 +1643,11 @@ little slower), so at 988, or at 989 or 990 if the head had less than 3.6 s of t
 
 ```
 export RUN=rehearsal-1
-DRY_RUN=1 rust/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --instance-type c8g.large --volume-gb 20 \
-    --spot-max 0.12 --budget-hours 0.3 --game-hours 0.001 --chain-to 1300 --margin 60 --max-instances 4 \
+DRY_RUN=1 rust/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --instance-type c8g.2xlarge --volume-gb 20 \
+    --spot-max 0.40 --budget-hours 0.3 --game-hours 0.001 --chain-to 1300 --margin 60 --max-instances 4 \
     --extra-args "--tactic gf2=off --tactic lagrange=on --tactic symmetry=off"
-rust/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --instance-type c8g.large --volume-gb 20 \
-    --spot-max 0.12 --budget-hours 0.3 --game-hours 0.001 --chain-to 1300 --margin 60 --max-instances 4 \
+rust/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --instance-type c8g.2xlarge --volume-gb 20 \
+    --spot-max 0.40 --budget-hours 0.3 --game-hours 0.001 --chain-to 1300 --margin 60 --max-instances 4 \
     --extra-args "--tactic gf2=off --tactic lagrange=on --tactic symmetry=off"
 rust/tools/cloud/wall.sh status          # every few minutes
 ```
@@ -1665,8 +1675,8 @@ hours); copies to S3 every 2 minutes and checkpoints every minute give the repla
 
 ```
 export RUN=rehearsal-2
-rust/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --instance-type c8g.large --volume-gb 20 \
-    --spot-max 0.12 --budget-hours 0.6 --game-hours 24 --chain-to 1300 --margin 60 --max-instances 4 \
+rust/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --instance-type c8g.2xlarge --volume-gb 20 \
+    --spot-max 0.40 --budget-hours 0.6 --game-hours 24 --chain-to 1300 --margin 60 --max-instances 4 \
     --save-every 120 --checkpoint-interval 60 --extra-args "--tactic gf2=off --tactic lagrange=on --tactic symmetry=off"
 rust/tools/cloud/wall.sh status          # until "latest progress line" shows a game and "last save of the results" is recent
 ```
