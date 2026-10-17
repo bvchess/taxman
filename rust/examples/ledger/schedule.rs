@@ -5,7 +5,7 @@ use crate::book::{facts, Book, Change, Entry, Facts, Lower, Rule, Upper};
 use crate::counters;
 use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
-use std::io::Write;
+use std::io::{BufWriter, Write};
 use std::panic::AssertUnwindSafe;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -116,12 +116,14 @@ struct Attempt {
     seconds: f64,
 }
 
-/// A search that has ended, with what it was asked.
+/// A search that has ended, with what it was asked, and when it ended (how long its result waited for the main thread
+/// is how long its worker did).
 struct Done {
     n: u32,
     kind: Kind,
     limit: f64,
     result: Result<Attempt, String>,
+    sent: Instant,
 }
 
 /// Makes the search of `job` on its board, at the set width the board needs.
@@ -252,7 +254,20 @@ pub fn open_book(
 
 /// A search on its way, as the main thread steers it.
 struct Running {
+    kind: Kind,
     control: Arc<Control>,
+}
+
+/// What the main thread did with its time: it is the one thread that applies results, and while it is busy the workers
+/// whose searches ended wait for it.
+#[derive(Default)]
+struct MainThread {
+    /// Seconds applying results, carrying the maps' bounds, and saving.
+    busy: f64,
+    /// The longest single piece of that.
+    longest: f64,
+    /// Seconds that results waited for it, in all.
+    waited: f64,
 }
 
 /// A run of the scheduler.
@@ -260,14 +275,18 @@ struct Scheduler {
     book: Book,
     dir: PathBuf,
     settings: Settings,
-    events: File,
+    events: BufWriter<File>,
     t0: Instant,
     /// The CPU seconds of the earlier runs, and of this process when the run began.
     cpu_before: f64,
     cpu_at_start: f64,
     running: HashMap<u32, Running>,
+    /// The boards whose maps came in, whose bounds the relations have not carried to the other boards yet: that is done
+    /// once, when the last map is in (`settle`).
+    pending: Vec<u32>,
     last_save: Instant,
     last_status: Instant,
+    main: MainThread,
 }
 
 /// The CPU seconds of the earlier runs: the last `cpu` of the events file.
@@ -286,11 +305,27 @@ impl Scheduler {
         self.cpu_before + (process_cpu() - self.cpu_at_start)
     }
 
-    /// Appends an event, with the time and the CPU seconds so far.
-    fn event(&mut self, action: &str, n: Option<u32>, mut fields: Vec<(&str, Json)>) -> Result<(), String> {
+    /// The seconds since the run began and the CPU seconds so far, as an event is stamped.
+    fn stamp(&self) -> (f64, f64) {
+        (self.t0.elapsed().as_secs_f64(), self.cpu())
+    }
+
+    /// Appends an event, with the time and the CPU seconds so far (buffered: `flush_events` writes them out).
+    fn event(&mut self, action: &str, n: Option<u32>, fields: Vec<(&str, Json)>) -> Result<(), String> {
+        let stamp = self.stamp();
+        self.event_at(stamp, action, n, fields)
+    }
+
+    fn event_at(
+        &mut self,
+        (t, cpu): (f64, f64),
+        action: &str,
+        n: Option<u32>,
+        mut fields: Vec<(&str, Json)>,
+    ) -> Result<(), String> {
         let mut pairs = vec![
-            ("t", Json::from((self.t0.elapsed().as_secs_f64() * 1000.0).round() / 1000.0)),
-            ("cpu", Json::from((self.cpu() * 1000.0).round() / 1000.0)),
+            ("t", Json::from((t * 1000.0).round() / 1000.0)),
+            ("cpu", Json::from((cpu * 1000.0).round() / 1000.0)),
             ("action", Json::from(action)),
         ];
         if let Some(n) = n {
@@ -300,8 +335,14 @@ impl Scheduler {
         writeln!(self.events, "{}", Json::object(pairs)).map_err(|e| format!("the events file: {e}"))
     }
 
-    /// Records the changes of bounds that the relations made.
+    fn flush_events(&mut self) -> Result<(), String> {
+        self.events.flush().map_err(|e| format!("the events file: {e}"))
+    }
+
+    /// Records the changes of bounds that the relations made (all with the one stamp: the thousands of a map's
+    /// cascade are made in one go).
     fn log_changes(&mut self, changes: &[Change]) -> Result<(), String> {
+        let stamp = self.stamp();
         for c in changes {
             let fields = vec![
                 ("side", Json::from(c.side.name())),
@@ -310,7 +351,7 @@ impl Scheduler {
                 ("before", c.before.map_or(Json::Null, Json::from)),
                 ("after", Json::from(c.after)),
             ];
-            self.event("derive", Some(c.n), fields)?;
+            self.event_at(stamp, "derive", Some(c.n), fields)?;
         }
         Ok(())
     }
@@ -325,7 +366,7 @@ impl Scheduler {
             text.push('\n');
         }
         fs::write(&tmp, text).and_then(|()| fs::rename(&tmp, &path)).map_err(|e| format!("{}: {e}", path.display()))?;
-        self.events.flush().map_err(|e| format!("the events file: {e}"))?;
+        self.flush_events()?;
         self.last_save = Instant::now();
         Ok(())
     }
@@ -334,16 +375,31 @@ impl Scheduler {
         self.book.entries.values().filter(|e| e.proven()).count()
     }
 
-    /// The next search to start, if any: a board to set up first (the map's bounds), else the boards whose bounds a
-    /// proven neighbour has just changed, smallest gap first, else the board of least `level + gap / gap_unit`.  Only
-    /// one board of a repeat class is searched, and no prime whose board before it the ledger has.
-    fn next_job(&self, cpu: f64) -> Option<Job> {
-        let s = &self.settings;
-        let eligible = self
-            .book
+    /// The boards that may be searched: not proven, not on their way, and the board of their repeat class that is
+    /// searched (no prime whose board before it the ledger has).
+    fn eligible(&self) -> impl Iterator<Item = &Entry> {
+        self.book
             .entries
             .values()
-            .filter(|e| !e.proven() && !self.running.contains_key(&e.n) && self.book.searched(e.n));
+            .filter(|e| !e.proven() && !self.running.contains_key(&e.n) && self.book.searched(e.n))
+    }
+
+    fn maps_running(&self) -> bool {
+        self.running.values().any(|r| r.kind == Kind::Init)
+    }
+
+    /// Whether the maps are still to come: one on its way, or a board to set up (`stopping`: none is set up any
+    /// more).  No search starts before they are all in.
+    fn mapping(&self, stopping: bool) -> bool {
+        self.maps_running() || (!stopping && self.eligible().any(|e| !e.mapped))
+    }
+
+    /// The next search to start, if any: a board to set up first (the map's bounds), and only when every map is in and
+    /// the relations have carried them (`settle`) the boards whose bounds a proven neighbour has just changed,
+    /// smallest gap first, else the board of least `level + gap / gap_unit`.  Only one board of a repeat class is
+    /// searched, and no prime whose board before it the ledger has.
+    fn next_job(&self, cpu: f64) -> Option<Job> {
+        let s = &self.settings;
         let key = |e: &Entry| -> (u8, f64, u32) {
             match e.gap() {
                 _ if !e.mapped => (0, 0.0, e.n),
@@ -352,10 +408,13 @@ impl Scheduler {
                 None => unreachable!("a board mapped has both bounds"),
             }
         };
-        let entry = eligible.min_by(|a, b| key(a).partial_cmp(&key(b)).expect("no NaN"))?;
+        let entry = self.eligible().min_by(|a, b| key(a).partial_cmp(&key(b)).expect("no NaN"))?;
         let n = entry.n;
         if !entry.mapped {
             return Some(Job { n, kind: Kind::Init, limit: Duration::ZERO, seeds: Vec::new(), cap: None });
+        }
+        if !self.pending.is_empty() || self.maps_running() {
+            return None;
         }
         let remaining = (s.cpu_budget - cpu) / s.workers as f64;
         let limit = (s.base * 2f64.powi(entry.level.min(60) as i32)).min(s.max_limit).min(remaining.max(1.0));
@@ -370,16 +429,22 @@ impl Scheduler {
     /// Starts `job` on a thread of its own.
     fn launch(&mut self, job: Job, tx: Sender<Done>) {
         let control = Control::new();
-        self.running.insert(job.n, Running { control: Arc::clone(&control) });
+        self.running.insert(job.n, Running { kind: job.kind, control: Arc::clone(&control) });
         let (dir, every) = (self.dir.clone(), Duration::from_secs_f64(self.settings.checkpoint_every));
         std::thread::spawn(move || {
             let result = std::panic::catch_unwind(AssertUnwindSafe(|| attempt(&job, &control, &dir, every)))
                 .unwrap_or_else(|_| Err(format!("n={}: the search panicked", job.n)));
-            let _ = tx.send(Done { n: job.n, kind: job.kind, limit: job.limit.as_secs_f64(), result });
+            let _ = tx.send(Done {
+                n: job.n,
+                kind: job.kind,
+                limit: job.limit.as_secs_f64(),
+                result,
+                sent: Instant::now(),
+            });
         });
     }
 
-    /// Applies what a search gave, and the relations from it.
+    /// Applies what a search gave, and the relations from it (a map's are left for `settle`, when the last map is in).
     fn finish(&mut self, done: Done) -> Result<(), String> {
         self.running.remove(&done.n);
         let a = done.result?;
@@ -423,16 +488,38 @@ impl Scheduler {
         };
         fields.extend([("before", pair(before)), ("after", pair(after))]);
         self.event(done.kind.name(), Some(n), fields)?;
-        let derived = self.book.propagate([n])?;
-        self.log_changes(&derived)?;
-        changes.extend(derived);
+        if done.kind == Kind::Init {
+            self.pending.push(n);
+        } else {
+            let derived = self.book.propagate([n])?;
+            self.log_changes(&derived)?;
+            changes.extend(derived);
+        }
         self.after_changes(&changes)?;
         // A board proven while its search went on (by a relation, which stopped the search) leaves the checkpoint
         // that the stopped search wrote.
         if self.book.entries[&n].proven() {
             let _ = engine::remove_checkpoint(&checkpoint_path(&self.dir, n));
         }
-        Ok(())
+        self.flush_events()
+    }
+
+    /// Carries the bounds of the maps that came in to the other boards, once for all of them: a map applied to the
+    /// boards one at a time, each followed by its cascade through the boards that have no map yet, makes every board
+    /// many times over what once does.
+    fn settle(&mut self) -> Result<(), String> {
+        let t = Instant::now();
+        let pending = std::mem::take(&mut self.pending);
+        let changes = self.book.propagate(pending.iter().copied())?;
+        self.log_changes(&changes)?;
+        self.after_changes(&changes)?;
+        let fields = vec![
+            ("boards", Json::from(pending.len())),
+            ("changes", Json::from(changes.len())),
+            ("seconds", Json::from((t.elapsed().as_secs_f64() * 1000.0).round() / 1000.0)),
+        ];
+        self.event("settle", None, fields)?;
+        self.flush_events()
     }
 
     /// What follows changes of bounds: boards changed through a proven neighbour go first; a board that is proven is
@@ -484,23 +571,51 @@ impl Scheduler {
     fn status(&mut self) {
         let (proven, total) = (self.proven(), self.book.entries.len());
         eprintln!(
-            "ledger: {:.0} s, {:.0} CPU s of {:.0}: {proven} of {total} proven, {} searching",
+            "ledger: {:.0} s, {:.0} CPU s of {:.0}: {proven} of {total} proven, {} searching; main thread busy {:.1} s, \
+             results waited {:.1} s",
             self.t0.elapsed().as_secs_f64(),
             self.cpu(),
             self.settings.cpu_budget,
-            self.running.len()
+            self.running.len(),
+            self.main.busy,
+            self.main.waited,
         );
         self.last_status = Instant::now();
     }
 
+    /// Runs `step`, whose time is the main thread's busy time.
+    fn timed<T>(&mut self, step: impl FnOnce(&mut Self) -> T) -> T {
+        let t = Instant::now();
+        let out = step(self);
+        let seconds = t.elapsed().as_secs_f64();
+        self.main.busy += seconds;
+        self.main.longest = self.main.longest.max(seconds);
+        out
+    }
+
+    /// Stops the other searches (each writes its checkpoint) and notes the first error, which the run ends with.
+    fn fail(&self, failure: &mut Option<String>, error: String) {
+        for run in self.running.values() {
+            run.control.stop();
+        }
+        failure.get_or_insert(error);
+    }
+
     /// The loop: start searches while there are workers free, work to do and budget left; apply each result; stop
-    /// when every board is proven, the budget is spent, a signal came, or a search failed.
+    /// when every board is proven, the budget is spent, a signal came, or a search failed.  The maps go first, all
+    /// of them at once; the relations carry their bounds when the last is in (`settle`), and then the searches start.
     fn run(&mut self) -> Result<String, String> {
         let (tx, rx) = mpsc::channel::<Done>();
         let mut failure: Option<String> = None;
         loop {
             let cpu = self.cpu();
-            let stopping = failure.is_some() || engine::stop_signal().is_some() || cpu >= self.settings.cpu_budget;
+            let mut stopping = failure.is_some() || engine::stop_signal().is_some() || cpu >= self.settings.cpu_budget;
+            if failure.is_none() && !self.pending.is_empty() && !self.mapping(stopping) {
+                if let Err(e) = self.timed(Scheduler::settle) {
+                    self.fail(&mut failure, e);
+                    stopping = true;
+                }
+            }
             while !stopping && self.running.len() < self.settings.workers {
                 match self.next_job(cpu) {
                     Some(job) => self.launch(job, tx.clone()),
@@ -512,19 +627,16 @@ impl Scheduler {
             }
             match rx.recv_timeout(Duration::from_secs(5)) {
                 Ok(done) => {
-                    if let Err(e) = self.finish(done) {
-                        // Stop the other searches (each writes its checkpoint) and end with the error.
-                        for run in self.running.values() {
-                            run.control.stop();
-                        }
-                        failure.get_or_insert(e);
+                    self.main.waited += done.sent.elapsed().as_secs_f64();
+                    if let Err(e) = self.timed(|s| s.finish(done)) {
+                        self.fail(&mut failure, e);
                     }
                 }
                 Err(RecvTimeoutError::Timeout) => {}
                 Err(RecvTimeoutError::Disconnected) => return Err("the searches' channel closed".into()),
             }
             if self.last_save.elapsed().as_secs_f64() >= self.settings.save_every {
-                self.save()?;
+                self.timed(Scheduler::save)?;
             }
             if self.last_status.elapsed().as_secs_f64() >= 60.0 {
                 self.status();
@@ -545,6 +657,9 @@ impl Scheduler {
             ("reason", Json::from(reason.as_str())),
             ("proven", Json::from(self.proven())),
             ("games", Json::from(self.book.entries.len())),
+            ("main_s", Json::from((self.main.busy * 1000.0).round() / 1000.0)),
+            ("main_longest_s", Json::from((self.main.longest * 1000.0).round() / 1000.0)),
+            ("waited_s", Json::from((self.main.waited * 1000.0).round() / 1000.0)),
         ];
         self.event("end", None, fields)?;
         self.save()?;
@@ -577,13 +692,15 @@ pub fn run(first: u32, last: u32, dir: &Path, settings: &Settings, proven: Optio
         book,
         dir: dir.to_path_buf(),
         settings: settings.clone(),
-        events,
+        events: BufWriter::new(events),
         t0,
         cpu_before,
         cpu_at_start,
         running: HashMap::new(),
+        pending: Vec::new(),
         last_save: now,
         last_status: now,
+        main: MainThread::default(),
     };
     let s = settings;
     let fields = vec![

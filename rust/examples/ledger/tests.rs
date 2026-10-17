@@ -1,13 +1,14 @@
 //! The ledger's tests: the relations on the boards of optimal.json (every bound they derive brackets the optimum, and
 //! every game they make is legal), a violation, and runs of the scheduler checked against optimal.json.
 
-use super::book::{Book, Lower, Rule, Upper};
+use super::book::{ceiling_game, monotone_game, prime_down, prime_up, Book, Lower, Rule, Upper};
 use super::report;
 use super::schedule::{self, read_ledger, Settings};
 use super::support::TempDir;
 use std::collections::BTreeMap;
 use taxman::board::Board;
-use taxman::game::{replay_finished, Optimal};
+use taxman::game::{largest_prime_at_most, replay_finished, Optimal};
+use taxman::json::Json;
 
 fn opt(n: u32) -> u64 {
     Optimal::built_in().score(n).expect("a board of optimal.json")
@@ -112,6 +113,35 @@ fn loose_bounds_and_the_relations_bracket_the_optimum() {
     assert!(derived("lower") > 100 && derived("upper") > 30, "{rules:?}");
 }
 
+/// The games the relations make from the optimal game of a neighbour are finished and score what the lemmas say: the
+/// exchange of the opening primes by exactly p - q, the game of n - 1 followed by n by its sum or n more, the game
+/// below that of n + 1 by at least its sum less n + 1 and at most opt(n).  The ledger relies on the first and the
+/// second to leave a game unmade or unrefereed when it cannot beat the target's.
+#[test]
+fn the_games_the_relations_make_score_as_the_lemmas_say() {
+    let q_of = |p: u32| u64::from(largest_prime_at_most(p - 1).expect("a prime below"));
+    for n in 3..=1299 {
+        let prime = largest_prime_at_most(n) == Some(n);
+        if prime {
+            let q = q_of(n);
+            let up = prime_up(n, &opt_game(n - 1));
+            assert_eq!(replay_finished(n, &up), Ok(opt(n - 1) + u64::from(n) - q), "n={n}: the exchange up");
+            let down = prime_down(n - 1, &opt_game(n));
+            assert_eq!(replay_finished(n - 1, &down), Ok(opt(n) + q - u64::from(n)), "n={n}: the exchange down");
+        } else {
+            let up = monotone_game(n, &opt_game(n - 1)).unwrap();
+            let score = replay_finished(n, &up).unwrap_or_else(|e| panic!("n={n}: the game of n - 1 and n: {e}"));
+            assert!(score == opt(n - 1) || score == opt(n - 1) + u64::from(n), "n={n}: scores {score}");
+        }
+        // The game of n below the game of n + 1, when n + 1 is composite.
+        if largest_prime_at_most(n + 1) != Some(n + 1) {
+            let below = ceiling_game(n, &opt_game(n + 1)).unwrap();
+            let score = replay_finished(n, &below).unwrap_or_else(|e| panic!("n={n}: the game below n + 1: {e}"));
+            assert!(opt(n + 1) <= score + u64::from(n + 1) && score <= opt(n), "n={n}: scores {score}");
+        }
+    }
+}
+
 /// A lower bound above an upper bound is refused as a violation, whether offered or derived.
 #[test]
 fn a_lower_bound_above_an_upper_bound_is_a_violation() {
@@ -122,7 +152,7 @@ fn a_lower_bound_above_an_upper_bound_is_a_violation() {
     assert!(book.offer_lower(1001, lower, true).unwrap_err().contains("violation at n=1001"));
 
     // The lower bound the relations derive for 1000 from a proven 1002, and the same with a wrong upper bound of 1000
-    // one below it.
+    // one below it: found at 1000, or at a board the wrong bound reaches first (the sweep goes up from 1000).
     let derived = |upper: Option<u64>| {
         let mut book = book_of(1000..=1002);
         give(&mut book, 1002);
@@ -133,7 +163,7 @@ fn a_lower_bound_above_an_upper_bound_is_a_violation() {
     };
     let lower = derived(None).unwrap();
     let err = derived(Some(lower - 1)).unwrap_err();
-    assert!(err.contains("violation at n=1000"), "{err}");
+    assert!((1000..=1002).any(|n| err.contains(&format!("violation at n={n}"))), "{err}");
 }
 
 /// A run of the scheduler on 901..960 with searches of a few milliseconds at first: every board is proven at its
@@ -154,6 +184,16 @@ fn a_run_proves_a_stretch_at_the_optimum_and_goes_on_from_its_ledger() {
     assert!(rule_count(Rule::Prime) > 0 && rule_count(Rule::Repeat) > 0, "{entries:?}");
     let events = std::fs::read_to_string(schedule::events_path(&dir)).unwrap();
     assert!(events.contains("\"action\":\"search\"") && events.contains("\"completed\":false"), "no search stopped");
+    // The maps come first, all of them; the relations carry their bounds once (`settle`); then the searches.
+    let actions: Vec<String> = events
+        .lines()
+        .map(|line| Json::parse(line).unwrap().get("action").and_then(Json::as_str).unwrap().to_owned())
+        .collect();
+    let first = |action: &str| actions.iter().position(|a| a == action);
+    let last_init = actions.iter().rposition(|a| a == "init");
+    assert!(last_init.is_some() && last_init < first("settle") && first("settle") < first("search"), "{actions:?}");
+    assert_eq!(actions.iter().filter(|a| *a == "settle").count(), 1);
+    assert_eq!(actions.last().map(String::as_str), Some("end"));
     assert!(!dir.join("ckpt").read_dir().unwrap().any(|_| true), "the checkpoints of proven boards are deleted");
 
     let again = schedule::run(901, 960, &dir, &settings, None).unwrap();

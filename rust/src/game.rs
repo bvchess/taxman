@@ -43,14 +43,35 @@ pub fn replay(n: u32, moves: &[u32]) -> Result<u64, String> {
 /// The moves still legal after `moves` (which must be legal): the numbers in the pot with a proper divisor in
 /// the pot, ascending.
 pub fn legal_moves_left(n: u32, moves: &[u32]) -> Result<Vec<u32>, String> {
-    let (_, in_pot) = play(n, moves)?;
+    play(n, moves).map(|(_, in_pot)| legal_in(n, &in_pot))
+}
+
+/// `moves` followed by legal moves for as long as there are any, the largest each time: the game over.  One descending
+/// pass finds them all, for a move only takes numbers out of the pot, so a number that is not legal now never
+/// becomes legal.  (After a game of n − 1 followed by n, or a game of n + 1 less its move n + 1, these are the
+/// completions of the ledger's Lemmas L1 and L2, heuristics/THEORY.md.)
+pub fn complete(n: u32, moves: &[u32]) -> Result<Vec<u32>, String> {
+    let (_, mut in_pot) = play(n, moves)?;
+    let mut game = moves.to_vec();
+    for m in (2..=n).rev() {
+        if in_pot[m as usize] && proper_divisors(m).any(|d| in_pot[d as usize]) {
+            proper_divisors(m).for_each(|d| in_pot[d as usize] = false);
+            in_pot[m as usize] = false;
+            game.push(m);
+        }
+    }
+    Ok(game)
+}
+
+/// The numbers of the pot `in_pot` that have a proper divisor in it, ascending.
+fn legal_in(n: u32, in_pot: &[bool]) -> Vec<u32> {
     let mut legal = vec![false; in_pot.len()];
     for d in (1..=n).filter(|&d| in_pot[d as usize]) {
         for m in (2 * d..=n).step_by(d as usize) {
             legal[m as usize] |= in_pot[m as usize];
         }
     }
-    Ok((1..=n).filter(|&m| legal[m as usize]).collect())
+    (1..=n).filter(|&m| legal[m as usize]).collect()
 }
 
 /// Referees `moves` as a finished game of `n` and returns its score.  Besides being legal, the game must have
@@ -61,8 +82,8 @@ pub fn legal_moves_left(n: u32, moves: &[u32]) -> Result<Vec<u32>, String> {
 ///   only as the first move, and an optimal game plays the largest one (a short exchange argument, proved with
 ///   the prime shortcut it supports in [`crate::accelerate::prime_shortcut`]).
 pub fn replay_finished(n: u32, moves: &[u32]) -> Result<u64, String> {
-    let score = replay(n, moves)?;
-    let left = legal_moves_left(n, moves)?;
+    let (score, in_pot) = play(n, moves)?;
+    let left = legal_in(n, &in_pot);
     if !left.is_empty() {
         let shown: Vec<String> = left.iter().take(8).map(u32::to_string).collect();
         let more = if left.len() > shown.len() { ", ..." } else { "" };
@@ -98,7 +119,7 @@ fn play(n: u32, moves: &[u32]) -> Result<(u64, Vec<bool>), String> {
         // The taxman takes every proper divisor still in the pot; the move is legal only if there was one.
         // (Clearing before the check is harmless: an illegal move ends the replay.)
         let mut pays_tax = false;
-        for d in (1..m).filter(|d| m % d == 0) {
+        for d in proper_divisors(m) {
             pays_tax |= in_pot[d as usize];
             in_pot[d as usize] = false;
         }
@@ -109,6 +130,17 @@ fn play(n: u32, moves: &[u32]) -> Result<(u64, Vec<bool>), String> {
         score += u64::from(m);
     }
     Ok((score, in_pot))
+}
+
+/// The proper divisors of `m` (those below it that divide it), in no particular order: by trial division up to √m, each
+/// divisor found with its partner `m / d`.  Plain divisibility, as the rest of the referee, but a move costs √m
+/// divisions rather than m, which a board of thousands of numbers feels (the ledger replays a game per board).
+fn proper_divisors(m: u32) -> impl Iterator<Item = u32> {
+    (1..)
+        .take_while(move |&d| u64::from(d) * u64::from(d) <= u64::from(m))
+        .filter(move |&d| m.is_multiple_of(d))
+        .flat_map(move |d| [Some(d), Some(m / d).filter(|&partner| partner != d)].into_iter().flatten())
+        .filter(move |&d| d < m)
 }
 
 /// Plays `moves` on the board `1..=n` without `holes` under the *maximal-factor rule*, and returns the score.
@@ -424,6 +456,112 @@ mod tests {
             (largest_prime_at_most(1), largest_prime_at_most(2), largest_prime_at_most(90)),
             (None, Some(2), Some(89))
         );
+    }
+
+    /// The proper divisors of `m` by a sweep over every number below it: the referee's divisor sweep before it went up
+    /// to √m, kept to hold the fast one to.
+    fn proper_divisors_naive(m: u32) -> Vec<u32> {
+        (1..m).filter(|&d| m.is_multiple_of(d)).collect()
+    }
+
+    #[test]
+    fn the_divisors_up_to_the_root_are_the_proper_divisors() {
+        for m in 0..=3000 {
+            let mut fast: Vec<u32> = proper_divisors(m).collect();
+            fast.sort_unstable();
+            assert_eq!(fast, proper_divisors_naive(m), "m={m}");
+        }
+        // A square (4 is the partner of itself) and a number near the end of the range.
+        assert_eq!(proper_divisors(36).count(), 8);
+        assert_eq!(proper_divisors(u32::MAX).count(), 31);
+    }
+
+    /// [`play`] with the divisor sweep of every number below the move, as it was before: its scores, pots and errors
+    /// are the fast one's, on the games of the table and on those games with their moves swapped, dropped, repeated and
+    /// replaced (most of them illegal).
+    #[test]
+    fn the_fast_referee_plays_as_the_slow_one_did() {
+        fn play_slow(n: u32, moves: &[u32]) -> Result<(u64, Vec<bool>), String> {
+            let mut in_pot = vec![true; n as usize + 1];
+            in_pot[0] = false;
+            let mut score = 0u64;
+            for (i, &m) in moves.iter().enumerate() {
+                let turn = i + 1;
+                if m < 1 || m > n {
+                    return Err(format!("move {turn} ({m}): not on the board 1..={n}"));
+                }
+                if !in_pot[m as usize] {
+                    return Err(format!("move {turn} ({m}): already taken"));
+                }
+                let mut pays_tax = false;
+                for d in proper_divisors_naive(m) {
+                    pays_tax |= in_pot[d as usize];
+                    in_pot[d as usize] = false;
+                }
+                if !pays_tax {
+                    return Err(format!("move {turn} ({m}): no proper divisor left in the pot, so it pays no tax"));
+                }
+                in_pot[m as usize] = false;
+                score += u64::from(m);
+            }
+            Ok((score, in_pot))
+        }
+        let opt = Optimal::built_in();
+        let mut seed = 12345u64;
+        let mut random = |bound: usize| {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            (seed >> 33) as usize % bound
+        };
+        let (mut legal, mut illegal) = (0, 0);
+        for n in (2..=opt.max_n()).step_by(37).chain([60, 61, 64, 120]) {
+            let game = opt.moves(n).unwrap().to_vec();
+            let mut games = vec![game.clone(), game[..game.len() / 2].to_vec()];
+            for _ in 0..6 {
+                let (i, j) = (random(game.len()), random(game.len()));
+                let mut swapped = game.clone();
+                swapped.swap(i, j);
+                let mut dropped = game.clone();
+                dropped.remove(i);
+                let mut repeated = game.clone();
+                repeated.insert(j, game[i]);
+                let mut replaced = game.clone();
+                replaced[i] = random(n as usize + 2) as u32;
+                games.extend([swapped, dropped, repeated, replaced]);
+            }
+            for moves in games {
+                let (fast, slow) = (play(n, &moves), play_slow(n, &moves));
+                assert_eq!(fast, slow, "n={n}, moves {moves:?}");
+                if fast.is_ok() {
+                    legal += 1;
+                } else {
+                    illegal += 1;
+                }
+            }
+        }
+        assert!(legal > 100 && illegal > 100, "{legal} legal and {illegal} illegal games");
+    }
+
+    /// `complete` is the largest legal move, again and again: it finishes every prefix of a table game the way the
+    /// slow loop (the moves left, recomputed after each) does, to a game that is over.
+    #[test]
+    fn a_game_is_completed_by_the_largest_legal_moves() {
+        let opt = Optimal::built_in();
+        for n in (2..=400).step_by(7) {
+            let game = opt.moves(n).unwrap();
+            for len in [1, game.len() / 3, game.len() / 2, game.len()] {
+                let prefix = &game[..len.max(1)];
+                let mut slow = prefix.to_vec();
+                while let Some(&m) = legal_moves_left(n, &slow).unwrap().last() {
+                    slow.push(m);
+                }
+                let fast = complete(n, prefix).unwrap();
+                assert_eq!(fast, slow, "n={n}, prefix of {len} moves");
+                assert!(replay_finished(n, &fast).is_ok(), "n={n}, prefix of {len} moves");
+            }
+        }
+        // After 7 (which takes 1) the legal moves are 4 and 6; the largest, 6, takes 2 and 3 and leaves 4 without a divisor.
+        assert_eq!(complete(7, &[7]), Ok(vec![7, 6]));
+        assert!(complete(4, &[1]).is_err(), "an illegal prefix is refused");
     }
 
     #[test]

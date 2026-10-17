@@ -1865,8 +1865,10 @@ re-proved it in about 4.4 hours of 64 threads, about 280 core-hours), one `c8g.1
 64 CPUs: `bench/ledger/cloud.sh 2176-3440` (its comment has the environment), which runs `ledger run` with no proven
 game, then `ledger report --known results/strict.jsonl`, which exits with status 1 if a bound is on the wrong side of
 the chain's optimum or a game does not replay (a bug: stop and report).  The laptop's dry run of 1301..1500 is
-[the entry](../../docs/experiments/the-ledger-bounds-from-both-sides-2026-10.md).  Not yet run on EC2; a launch needs
-Brian's approval (the [rules for every launch](#rules-for-every-launch)).
+[the entry](../../docs/experiments/the-ledger-bounds-from-both-sides-2026-10.md).  A first launch (2026-10-17) was stopped
+after 9 minutes with the machine 95% idle, the main thread of the ledger the bottleneck; that is fixed ([the entry's
+section on it](../../docs/experiments/the-ledger-bounds-from-both-sides-2026-10.md#later-2026-10-17-the-first-cloud-attempt-stopped-and-the-fix)),
+and a second launch needs Brian's approval (the [rules for every launch](#rules-for-every-launch)).
 
 **Cost.**  The build of `setup.sh` (about 10 minutes), the run (`CPU_HOURS` 64, an hour of the 64 CPUs, and the
 searches still going when it is spent, each limited to the budget left over the workers), the report (a minute):
@@ -1889,7 +1891,9 @@ sudo -u ec2-user tmux new-session -d -s ledger -c /home/ec2-user/taxman/rust \
 ```
 
 **Watch, stop, results home.**  `tail ~/ledger/run.err` (a status line a minute: the CPU spent, the boards proven, the
-searches going) and `~/ledger/log`.  `pkill -TERM -f 'examples/ledger run'` stops the run cleanly (each search writes
+searches going, and how long the main thread has been busy and results waited for it; after the maps the CPU spent
+should rise by nearly 64 a second, and if it does not, look at those two numbers before anything else) and
+`~/ledger/log`.  `pkill -TERM -f 'examples/ledger run'` stops the run cleanly (each search writes
 its checkpoint, the ledger is saved) and the script goes on to the report; the same command again resumes (on a
 replacement machine, with `S3_DEST/out` copied back to `~/ledger` first).  Home: `aws s3 sync S3_DEST/out
 bench/ledger/cloud-DATE/ --exclude 'run/ckpt/*'`, then on the laptop `target/debug/examples/ledger report

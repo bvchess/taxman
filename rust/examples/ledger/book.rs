@@ -2,7 +2,8 @@
 //! bound U(n) on opt(n), each with its derivation (the rule and the board it came from), and the relations between
 //! board sizes, applied to a fixpoint.  The relations are proven in heuristics/THEORY.md, "The ledger: bounds between
 //! boards"; each lemma there gives an L direction (a game of one board made from a game of another, which the
-//! referee replays here before it counts) and a U direction (an inequality between the optima):
+//! referee replays here before it counts, and which is made and replayed only if it can beat the board's own) and a
+//! U direction (an inequality between the optima):
 //!
 //! * `monotone` (Lemma L1): opt(n − 1) ≤ opt(n).  L(n) from the game of n − 1, followed by n when it is still legal
 //!   (n composite); U(n − 1) ≤ U(n).
@@ -19,11 +20,11 @@
 //! falls, and a board is proven when they meet.  L > U anywhere is a violation, which [`Book::propagate`] reports as an
 //! error: a bug, or, since the U of the frame model rests on statement U, a counterexample to it.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use taxman::accelerate::solution_for_promotions;
 use taxman::bits::Bits;
 use taxman::board::Board;
-use taxman::game::{largest_prime_at_most, legal_moves_left, replay_finished};
+use taxman::game::{complete, largest_prime_at_most, replay_finished};
 use taxman::json::Json;
 use taxman::numtheory::Tables;
 use taxman::search::Problem;
@@ -409,14 +410,18 @@ impl Book {
 
     /// Applies the relations from the boards `changed` (whose bounds changed) to a fixpoint: every board a relation
     /// reaches from a changed board gets the bounds it derives, if they are better, and is a changed board in turn.
+    /// The changed boards go in sweeps, up from the lowest and then from the lowest again, so that a chain of changes up
+    /// the boards (each one's ceiling from the one before) is passed on in one sweep and a chain down them in the
+    /// next, and a board is not improved again by every source that happens to reach it first.
     /// Returns the changes, in order.  An error is a violation (L > U), or a game a relation made that the referee
     /// refuses: either is a bug, or a counterexample to statement U (THEORY.md, "The ledger").
     pub fn propagate(&mut self, changed: impl IntoIterator<Item = u32>) -> Result<Vec<Change>, String> {
-        let mut queue: Vec<u32> = changed.into_iter().collect();
-        let mut queued: HashSet<u32> = queue.iter().copied().collect();
+        let mut pending: BTreeSet<u32> = changed.into_iter().collect();
+        let mut cursor = 0;
         let mut changes = Vec::new();
-        while let Some(source) = queue.pop() {
-            queued.remove(&source);
+        while let Some(source) = pending.range(cursor..).next().or_else(|| pending.first()).copied() {
+            pending.remove(&source);
+            cursor = source + 1;
             let mut links = vec![(source + 1, Link::Up)];
             links.extend(source.checked_sub(1).map(|below| (below, Link::Down)));
             links.extend(self.class(source).into_iter().filter(|&m| m != source).map(|m| (m, Link::Repeat)));
@@ -424,35 +429,53 @@ impl Book {
             for (target, link) in links {
                 let before = changes.len();
                 self.derive(source, target, link, &mut changes)?;
-                if changes.len() > before && queued.insert(target) {
-                    queue.push(target);
+                if changes.len() > before {
+                    pending.insert(target);
                 }
             }
         }
         Ok(changes)
     }
 
-    /// The bounds of `target` that the relation `link` derives from `source`'s.
+    /// The bounds of `target` that the relation `link` derives from `source`'s.  The upper bound is arithmetic.  The
+    /// lower bound is a game: made once for each lower bound its source has (and not at all if the target's cannot be
+    /// beaten by it), and shown to the referee only if its score, the sum of its moves, is more than the target's.
     fn derive(&mut self, source: u32, target: u32, link: Link, changes: &mut Vec<Change>) -> Result<(), String> {
         let s = &self.entries[&source];
-        let (s_lower, s_upper, s_bag, s_prime, s_proven) = (s.lower.clone(), s.upper, s.bag, s.prime, s.proven());
-        let (t_bag, t_prime) = (self.entries[&target].bag, self.entries[&target].prime);
-        // The relation, and the upper bound it gives the target.
-        let (relation, upper) = match link {
-            // Lemma L3 (prime): U(p) <= U(p - 1) + p - q; Lemma L2 (the ceiling): U(n) <= U(n - 1) + n.
+        let (s_upper, s_bag, s_prime, s_proven) = (s.upper, s.bag, s.prime, s.proven());
+        let s_value = s.lower.as_ref().map(|l| l.value);
+        let t = &self.entries[&target];
+        let (t_bag, t_prime, t_value) = (t.bag, t.prime, t.lower.as_ref().map_or(0, |l| l.value));
+        // The relation, the upper bound it gives the target, and the most that the game it makes can score, where that
+        // is known without making the game: one function (`gain`) carries the source's upper bound and its score.
+        let (relation, upper, at_most) = match link {
+            // Lemma L3 (prime): U(p) <= U(p - 1) + p - q, and the game's exchange of the opening q for p scores that
+            // much more; Lemma L2 (the ceiling): U(n) <= U(n - 1) + n; Lemma L1 (monotone): the game of n - 1 scores
+            // as it did, or n more.
             Link::Up if t_prime => {
                 let q = largest_prime_at_most(source).map_or(0, u64::from);
-                (Rule::Prime, s_upper.map(|u| (u.value + u64::from(target)).saturating_sub(q)))
+                let gain = |value: u64| (value + u64::from(target)).saturating_sub(q);
+                (Rule::Prime, s_upper.map(|u| gain(u.value)), s_value.map(gain))
             }
-            Link::Up => (Rule::Monotone, s_upper.map(|u| u.value + u64::from(target))),
-            // Lemma L3 (prime): U(p - 1) <= U(p) - p + q; Lemma L1 (monotone): U(n - 1) <= U(n).
+            Link::Up => {
+                let gain = |value: u64| value + u64::from(target);
+                (Rule::Monotone, s_upper.map(|u| gain(u.value)), s_value.map(gain))
+            }
+            // Lemma L3 (prime): U(p - 1) <= U(p) - p + q, and the exchange of p for q scores that much less; Lemma L1
+            // (monotone): U(n - 1) <= U(n); Lemma L2 (the ceiling): the game of n + 1 less the move n + 1, completed.
             Link::Down if s_prime => {
                 let q = largest_prime_at_most(target).map_or(0, u64::from);
-                (Rule::Prime, s_upper.map(|u| (u.value + q).saturating_sub(u64::from(source))))
+                let gain = |value: u64| (value + q).saturating_sub(u64::from(source));
+                (Rule::Prime, s_upper.map(|u| gain(u.value)), s_value.map(gain))
             }
-            Link::Down => (Rule::Ceiling, s_upper.map(|u| u.value)),
-            // Lemma L4: U(n) - bag(n) <= U(m) - bag(m).
-            Link::Repeat => (Rule::Repeat, s_upper.map(|u| (u.value + t_bag).saturating_sub(s_bag))),
+            Link::Down => (Rule::Ceiling, s_upper.map(|u| u.value), None),
+            // Lemma L4: U(n) - bag(n) <= U(m) - bag(m), and the promotions of the source's game on the target's board
+            // score its bag and their sum.  (A game that was not made from promotions is made only if it has more
+            // to give than the target's, on the same terms.)
+            Link::Repeat => {
+                let gain = |value: u64| (value + t_bag).saturating_sub(s_bag);
+                (Rule::Repeat, s_upper.map(|u| gain(u.value)), s_value.map(gain))
+            }
         };
         // The upper bound's rule names the lemma's inequality: up a board it is the ceiling, down a board monotonicity.
         let upper_rule = match (link, relation) {
@@ -467,71 +490,65 @@ impl Book {
                 changes.push(change);
             }
         }
-        let Some(lower) = s_lower else { return Ok(()) };
-        if self.transferred.insert((source, target, link), lower.value) == Some(lower.value) {
+        let Some(s_value) = s_value else { return Ok(()) };
+        if self.transferred.insert((source, target, link), s_value) == Some(s_value) {
             return Ok(());
         }
-        let t_value = self.entries[&target].lower.as_ref().map_or(0, |l| l.value);
-        let made = match relation {
-            Rule::Prime if link == Link::Up => Some((prime_up(target, &lower.moves), None)),
-            Rule::Prime => Some((prime_down(target, &lower.moves), None)),
-            Rule::Monotone => Some((monotone_game(target, &lower.moves)?, None)),
-            Rule::Ceiling => Some((ceiling_game(target, &lower.moves)?, None)),
+        if at_most.is_some_and(|most| most <= t_value) {
+            return Ok(());
+        }
+        let lower = self.entries[&source].lower.as_ref().expect("a source with a score has its lower bound");
+        let from_promotions = lower.promotions.is_some();
+        let (moves, promotions) = match relation {
+            Rule::Prime if link == Link::Up => (prime_up(target, &lower.moves), None),
+            Rule::Prime => (prime_down(target, &lower.moves), None),
+            Rule::Monotone => (monotone_game(target, &lower.moves)?, None),
+            Rule::Ceiling => (ceiling_game(target, &lower.moves)?, None),
             _ => {
-                // A repeat is worth making only if the source's game has more promotions to give than the target's.
-                let more = lower.value as i64 - s_bag as i64 > t_value as i64 - t_bag as i64;
-                more.then(|| {
-                    let promotions = lower.promotions.clone().unwrap_or_else(|| {
-                        let cands: HashSet<u32> = self.candidates[&source].iter().copied().collect();
-                        lower.moves.iter().copied().filter(|m| cands.contains(m)).collect()
-                    });
-                    (repeat_game(target, &promotions), Some(promotions))
-                })
+                let promotions = lower.promotions.clone().unwrap_or_else(|| {
+                    let cands: HashSet<u32> = self.candidates[&source].iter().copied().collect();
+                    lower.moves.iter().copied().filter(|m| cands.contains(m)).collect()
+                });
+                (repeat_game(target, &promotions), Some(promotions))
             }
         };
-        let Some((moves, promotions)) = made else { return Ok(()) };
         let what = || format!("the {} game of {target} from the game of {source}", relation.name());
-        let value = match replay_finished(target, &moves) {
-            Ok(value) => value,
-            // Moves of a game that was not made from promotions need not be a promotion set of the frame model.
-            Err(_) if relation == Rule::Repeat && lower.promotions.is_none() => return Ok(()),
-            Err(e) => return Err(format!("{}: {e}", what())),
-        };
-        if let (Rule::Repeat, Some(_), Some(promotions)) = (relation, &lower.promotions, &promotions) {
+        let value: u64 = moves.iter().map(|&m| u64::from(m)).sum();
+        if let (Rule::Repeat, true, Some(promotions)) = (relation, from_promotions, &promotions) {
             let sum: u64 = promotions.iter().map(|&x| u64::from(x)).sum();
             if value != t_bag + sum {
                 return Err(format!("{}: scores {value}, not the bag {t_bag} and the promotions' {sum}", what()));
             }
         }
-        if value > t_value {
-            let promotions = promotions.filter(|_| lower.promotions.is_some());
-            let lower = Lower { value, moves, promotions, rule: relation, from: Some(source) };
-            if let Some(change) = self.offer_lower(target, lower, s_proven)? {
-                changes.push(change);
-            }
+        if value <= t_value {
+            return Ok(());
+        }
+        match replay_finished(target, &moves) {
+            Ok(score) => debug_assert_eq!(score, value, "{}: the score of a game is the sum of its moves", what()),
+            // Moves of a game that was not made from promotions need not be a promotion set of the frame model.
+            Err(_) if relation == Rule::Repeat && !from_promotions => return Ok(()),
+            Err(e) => return Err(format!("{}: {e}", what())),
+        }
+        let promotions = promotions.filter(|_| from_promotions);
+        let lower = Lower { value, moves, promotions, rule: relation, from: Some(source) };
+        if let Some(change) = self.offer_lower(target, lower, s_proven)? {
+            changes.push(change);
         }
         Ok(())
     }
 }
 
 /// Lemma L1: the game of `n` (composite) that the finished game `moves` of n − 1 gives: the same moves, then n if it is
-/// still legal.
+/// still legal.  (n is the only move that can be left: the legal moves that `complete` adds are n, or none.)
 pub fn monotone_game(n: u32, moves: &[u32]) -> Result<Vec<u32>, String> {
-    let mut game = moves.to_vec();
-    if legal_moves_left(n, moves)?.contains(&n) {
-        game.push(n);
-    }
-    Ok(game)
+    complete(n, moves)
 }
 
 /// Lemma L2: the game of `n` that the finished game `moves` of n + 1 (composite) gives: its moves without n + 1, which
 /// stay legal, then the largest legal move as long as there is one.
 pub fn ceiling_game(n: u32, moves: &[u32]) -> Result<Vec<u32>, String> {
-    let mut game: Vec<u32> = moves.iter().copied().filter(|&m| m != n + 1).collect();
-    while let Some(&m) = legal_moves_left(n, &game)?.last() {
-        game.push(m);
-    }
-    Ok(game)
+    let without: Vec<u32> = moves.iter().copied().filter(|&m| m != n + 1).collect();
+    complete(n, &without)
 }
 
 /// Lemma L3: the game of the prime `p` that the finished game `moves` of p − 1 gives: its opening move, the largest

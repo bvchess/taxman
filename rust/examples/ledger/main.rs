@@ -31,14 +31,22 @@
 //!   so that a game that reaches U proves itself, and limited in time: `--base` seconds (default 2) the first time,
 //!   twice as long each time after, at most `--max-limit` (default 3600) and at most the budget left over the workers.
 //!   Each search goes on from the checkpoint of the last (DIR/ckpt/nN.ckpt), so its work adds up.
-//! * **The order** (`schedule.rs`): first the map of every board searched; then the boards whose bounds a proven
-//!   neighbour has changed since their last search (the ceiling and the prime formula of a board next to a proven one
-//!   are exact: such a board is often proven by a search at its ceiling in a few steps), smallest gap first; then the
-//!   board of least `level + gap / gap_unit`, where `level` counts its searches (each doubles the limit) and
-//!   `--gap-unit` (default 175) is the gap worth one doubling of the cost (the chain's steps rise a decade with about
-//!   580 of the standalone gap, `bench/landscape/`).  `--workers` searches at once (default all CPUs).  When a board
-//!   is proven, its search is stopped if one is going, and its checkpoint deleted; a search whose U falls is given the
-//!   lower ceiling.
+//! * **The order** (`schedule.rs`): first the map of every board searched, all of them on the workers at once, their
+//!   bounds kept as they come, and when the last is in the relations carry them to the other boards in one go
+//!   (`settle`: a map's cascade through the boards, one map at a time, would make every board many times over);
+//!   then the boards whose bounds a proven neighbour has changed since their last search (the ceiling and the prime
+//!   formula of a board next to a proven one are exact: such a board is often proven by a search at its ceiling in a
+//!   few steps), smallest gap first; then the board of least `level + gap / gap_unit`, where `level` counts its
+//!   searches (each doubles the limit) and `--gap-unit` (default 175) is the gap worth one doubling of the cost (the
+//!   chain's steps rise a decade with about 580 of the standalone gap, `bench/landscape/`).  `--workers` searches at
+//!   once (default all CPUs).  When a board is proven, its search is stopped if one is going, and its checkpoint
+//!   deleted; a search whose U falls is given the lower ceiling.
+//! * **The main thread** applies every result, and a worker whose search has ended waits for it: so what it does for a
+//!   result is small beside a search, `settle` aside.  A relation's upper bound is arithmetic; its lower bound is a game,
+//!   made once for each lower bound of its source, not at all when its score cannot beat the target's (the prime
+//!   exchange scores exactly p − q more or less, the game of n − 1 followed by n at most n more), and shown to the
+//!   referee only if the sum of its moves beats the target's.  The run's status line and its `end` event say how long
+//!   the main thread was busy and how long results waited for it.
 //!
 //! The files of DIR: `ledger.jsonl`, one line a board in increasing n, written every `--save-every` seconds (default
 //! 30) and at the end: `n`, `in_the_bag`, `prime`, `class` (the smallest board of its repeat class, or null), `lower`
@@ -51,9 +59,12 @@
 //! run's `start` (its settings), an `init` or `search` of board `n` (`limit_s`, `seconds`, `nodes` of this search,
 //! `completed`, `reached_cap`, `found` (the score of its game), `dual` (its dual bound, null if it completed), the
 //! bounds `before` and `after`, each [L, U]), a `derive` (a relation changed `side`, `lower` or `upper`, of board
-//! `n` from `before` to `after`, by `rule` from the board `from`), a `proven` board (`value`, and the rules and
-//! sources of its two bounds), and the run's `end` (`reason`, `proven`, `games`).  `ckpt/`: the checkpoints of the
-//! searches that have not finished.  One run at a time uses DIR (`taxman.lock`).
+//! `n` from `before` to `after`, by `rule` from the board `from`; those of a result all carry its time), a `settle`
+//! (the relations carried the `boards` of the maps to the others: `changes`, `seconds`), a `proven` board (`value`, and
+//! the rules and sources of its two bounds), and the run's `end` (`reason`, `proven`, `games`, and the main thread's
+//! `main_s` busy, `main_longest_s` for the longest piece, and `waited_s`: the seconds that results waited in all).
+//! The events are written out after each result.  `ckpt/`: the checkpoints of the searches that have not finished.
+//! One run at a time uses DIR (`taxman.lock`).
 //!
 //! A bound that the relations make is checked as it is made: a game must pass the referee (`replay_finished`), and
 //! L > U anywhere ends the run with an error (a bug, or a counterexample to statement U, on which every U of the frame
