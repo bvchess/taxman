@@ -355,12 +355,20 @@ fn boards_past_4095_are_set_up_at_128_words() {
 // ---------------------------------------------------------------------------------------------------------
 // Resuming
 
+/// `opts` with the window of `force_window` that the headers of versions 4 and 5 imply (80; the default is `all`
+/// now), as a run resumes a checkpoint of the builds before the default changed.
+fn old_window(mut opts: SolveOptions) -> SolveOptions {
+    opts.tactics.set("force_window=80").unwrap();
+    opts
+}
+
 /// A checkpoint that an earlier build wrote (`testdata/n1133_after_1000_nodes.ckpt`: game 1133 at W = 20 with
 /// the default tactics of that build, now those of the matching path (`SearchTactics::matching`), stopped after
 /// 1,023 nodes on one thread; search header format TXSH v5) still resumes and
 /// finishes with the committed score.  Every write/read test of the format uses the code's own constants, so a
 /// change of the layout that round-trips (the version, the byte order of a set, the order of the header's fields,
-/// the packing of the tactics) passes them and refuses this file.
+/// the packing of the tactics) passes them and refuses this file.  Its header implies the window of 80 for the forced
+/// members, which the default (`all`) is not, so the run says `--tactic force_window=80`.
 ///
 /// A deliberate change of the format (a new header version, say, which refuses older checkpoints) fails this test.
 /// To make the file again with the new build: `taxman solve 1133 --use-prev --threads 1 --node-limit 1000 --out R
@@ -370,7 +378,7 @@ fn boards_past_4095_are_set_up_at_128_words() {
 fn a_committed_checkpoint_resumes() {
     let games = stored_games("strict.jsonl");
     let dir = TempDir::new("committed-checkpoint");
-    let opts = SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), ..matching_options(1) };
+    let opts = old_window(SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), ..matching_options(1) });
     let checkpoint = opts.checkpoint_file(1133).unwrap();
     std::fs::create_dir_all(checkpoint.parent().unwrap()).unwrap();
     std::fs::copy(testdata("n1133_after_1000_nodes.ckpt"), &checkpoint).unwrap();
@@ -394,7 +402,7 @@ fn a_committed_checkpoint_resumes() {
 fn a_committed_checkpoint_of_format_4_resumes_as_the_build_that_wrote_it_finishes_it() {
     let games = stored_games("strict.jsonl");
     let dir = TempDir::new("committed-checkpoint-v4");
-    let opts = SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), ..matching_options(1) };
+    let opts = old_window(SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), ..matching_options(1) });
     let checkpoint = opts.checkpoint_file(1133).unwrap();
     std::fs::create_dir_all(checkpoint.parent().unwrap()).unwrap();
     std::fs::copy(testdata("n1133_after_1000_nodes_v4.ckpt"), &checkpoint).unwrap();

@@ -430,11 +430,12 @@ fn checkpoint_and_resume_four_threads() {
 
 /// The default search (tactic `gf2`, with the rule of the symmetric pairs, tactic `symmetry`), and without the rule
 /// (whose tree is larger, so its limit is), stopped every few hundred nodes and resumed from its checkpoint, on one
-/// thread and on two, until it finishes with game 1000's optimum: its searches of 760 are too short to interrupt (the
-/// engine checks the node limit every 1024 nodes).
+/// thread and on two, until it finishes with game 992's optimum: its searches of 760 are too short to interrupt (the
+/// engine checks the node limit every 1024 nodes of a searcher), and so are those of 1000 on two threads since the
+/// window of the forced members became `all` (2,026 nodes).
 #[test]
 fn checkpoint_and_resume_with_the_gf2_bound() {
-    let n = 1000;
+    let n = 992;
     let board = crate::board::Board::<16>::for_n(n);
     let opt = crate::game::Optimal::built_in().score(n).unwrap() - board.in_the_bag;
     let default = SearchTactics::default();
@@ -664,7 +665,9 @@ fn units_and_headers_round_trip() {
     assert_eq!(bytes.len(), 48);
     assert_eq!(TaxUnit::<3>::decode(&bytes), unit);
 
-    let p = prepare_golden::<8>(&load(300), SearchTactics { match_refine: 3, ..SearchTactics::default() });
+    // The header of version 5 is the one of a search tuned as the builds before the tactics that tune the GF(2) search
+    // were (`force_window` 80), which it implies; the default's `force_window` is `all`.
+    let p = prepare_golden::<8>(&load(300), SearchTactics { match_refine: 3, ..SearchTactics::legacy_tuning() });
     let header = Header::of(&p);
     let bytes = header.encode();
     assert_eq!(bytes.len(), Header::<8>::LEN);
@@ -706,10 +709,11 @@ fn units_and_headers_round_trip() {
         let message = format!("format version {version}, and this build reads versions 4 to 6 only");
         assert!(err.contains(&message), "{err}");
     }
-    // A search whose tactics that tune the GF(2) search are not the defaults writes version 6, which records them
-    // after the switches' bits; one whose are writes version 5, which implies them.  Version 6's number with version
-    // 5's length is refused for its length.
+    // A search whose tactics that tune the GF(2) search are not those of the builds before them writes version 6, which
+    // records them after the switches' bits; one whose are writes version 5, which implies them.  Version 6's number
+    // with version 5's length is refused for its length.
     assert_eq!(header.version, 5);
+    assert_eq!(header.tactics.force_window, ForceWindow::Within(80));
     let tuned = Header {
         tactics: SearchTactics {
             force_window: ForceWindow::Share(40),
@@ -728,6 +732,16 @@ fn units_and_headers_round_trip() {
     assert_eq!(bytes6[..bytes.len()], [&bytes[..4], &6u32.to_le_bytes(), &bytes[8..]].concat()[..]);
     assert_eq!(Header::<8>::decode(&bytes6), Ok(tuned));
     assert!(tuned.mismatch(&header).unwrap().contains("tactics"));
+    // The default's tuning is not the builds before's (`force_window` is `all`, it was 80), so its header is version 6;
+    // a checkpoint of version 5 is of a search with the window of 80 and is not resumed by one with the default's.
+    let current =
+        Header::of(&prepare_golden::<8>(&load(300), SearchTactics { match_refine: 3, ..SearchTactics::default() }));
+    assert_eq!(current.version, 6);
+    assert_eq!(current.tactics.force_window, ForceWindow::All);
+    assert_eq!(Header::<8>::decode(&current.encode()), Ok(current));
+    assert_eq!(current.encode().len(), Header::<8>::LEN_6);
+    assert!(header.mismatch(&current).unwrap().contains("tactics"));
+    assert_eq!(Header::<8>::decode(&bytes).unwrap().tactics.force_window, ForceWindow::Within(80));
     let err = Header::<8>::decode(&versioned(6)).unwrap_err();
     assert!(err.contains(&format!("{} bytes, not {}", Header::<8>::LEN, Header::<8>::LEN_6)), "{err}");
     for window in [ForceWindow::Within(0), ForceWindow::Within(200), ForceWindow::All] {
@@ -772,7 +786,7 @@ fn units_and_headers_round_trip() {
                 lagrange: off,
                 gf2: on,
                 symmetry: off,
-                ..SearchTactics::default()
+                ..SearchTactics::legacy_tuning()
             };
             assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
             let t = SearchTactics { symmetry: on, ..t };
@@ -781,8 +795,8 @@ fn units_and_headers_round_trip() {
         }
     }
     assert_eq!(SearchTactics::default().bits(), 0x1B9);
-    assert_eq!(SearchTactics::from_bits(0x1B9), Ok(SearchTactics::default()));
-    assert_eq!(SearchTactics::from_bits(0xB9), Ok(SearchTactics { symmetry: false, ..SearchTactics::default() }));
+    assert_eq!(SearchTactics::from_bits(0x1B9), Ok(SearchTactics::legacy_tuning()));
+    assert_eq!(SearchTactics::from_bits(0xB9), Ok(SearchTactics { symmetry: false, ..SearchTactics::legacy_tuning() }));
     assert!(SearchTactics::from_bits(1 << 9).unwrap_err().contains("unknown tactics"));
 }
 
@@ -820,7 +834,9 @@ fn the_header_of_an_extended_problem_records_its_one_sided_candidates() {
 
     let header = Header::of(&prepared);
     let bytes = header.encode();
-    assert_eq!(bytes.len(), Header::<8>::LEN);
+    // The default's tuning of the GF(2) search is recorded after the tactics' bits (version 6): the layout up to them
+    // is version 5's.
+    assert_eq!(bytes.len(), Header::<8>::LEN_6);
     assert_eq!(Header::<8>::decode(&bytes), Ok(header));
     // Magic, version, width, n, then the digests of the candidates, of the frames and of the one-sided candidates.
     let digest_at = |at: usize| u64::from_le_bytes(bytes[at..at + 8].try_into().unwrap());

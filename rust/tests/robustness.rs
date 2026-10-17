@@ -609,17 +609,19 @@ fn a_checkpoint_made_with_other_tactics_names_them() {
 /// A checkpoint whose header has a format version this build does not read (3, whose headers recorded tactics that
 /// are gone, and 7, a later one) is refused with one message, naming the file, and left alone.  Version 4, that of the
 /// builds before the extended problem's search, is read (`tests/wide.rs` resumes a real one), and so is version 6, that
-/// of a search whose tactics that tune the GF(2) search are not the defaults, but neither with the length of version 5,
-/// which is what forging the number gives.  The header of a default search, version 5, is the one that the checkpoint
-/// was written with, so the same game resumes from it once the version is put back; a tuned search writes version 6.
+/// of a search whose tactics that tune the GF(2) search are not those of the builds before them, but neither with the
+/// length of version 5, which is what forging the number gives.  The header of a search tuned as those builds were
+/// (`force_window=80`), version 5, is the one that the checkpoint was written with, so the same game resumes from it
+/// once the version is put back; any other tuning, the default's among them, writes version 6.
 #[test]
 fn a_checkpoint_of_another_format_is_refused() {
     let dir = TempDir::new("format");
-    let opts = SolveOptions { node_limit: Some(1500), ..options(&dir.0) };
+    let mut opts = SolveOptions { node_limit: Some(1500), ..options(&dir.0) };
+    opts.tactics.set("force_window=80").unwrap();
     assert!(!solver::solve_game(600, None, &opts).unwrap().completed);
     let checkpoint = dir.join("n0600.ckpt");
     let version = |checkpoint: &Path| fs::read(checkpoint).unwrap()[20 + 4..20 + 8].to_vec();
-    assert_eq!(version(&checkpoint), 5u32.to_le_bytes(), "this build writes the header's version 5");
+    assert_eq!(version(&checkpoint), 5u32.to_le_bytes(), "a search tuned as the old builds were writes version 5");
     for other in [3u32, 7] {
         forge_header(&checkpoint, |header| header[4..8].copy_from_slice(&other.to_le_bytes()));
         let err = solver::solve_game(600, None, &opts).unwrap_err();
@@ -639,15 +641,33 @@ fn a_checkpoint_of_another_format_is_refused() {
     let opts = SolveOptions { node_limit: None, ..opts };
     assert!(solver::solve_game(600, None, &opts).unwrap().completed, "the checkpoint resumes with its own version");
 
-    // A search tuned otherwise writes version 6, and resumes from it.
-    let tuned_dir = TempDir::new("format-tuned");
-    let mut tuned = SolveOptions { node_limit: Some(1500), ..options(&tuned_dir.0) };
-    tuned.tactics.set("force_window=40").unwrap();
-    assert!(!solver::solve_game(600, None, &tuned).unwrap().completed);
-    let checkpoint = tuned_dir.join("n0600.ckpt");
-    assert_eq!(version(&checkpoint), 6u32.to_le_bytes(), "a tuned search writes the header's version 6");
-    let tuned = SolveOptions { node_limit: None, ..tuned };
-    assert!(solver::solve_game(600, None, &tuned).unwrap().completed, "the checkpoint of version 6 resumes");
+    // The default's tuning (`force_window=all`) is not that of the old builds, so the default writes version 6, and
+    // resumes from it; a search tuned otherwise does too.
+    for tuning in [None, Some("force_window=40")] {
+        let tuned_dir = TempDir::new("format-tuned");
+        let mut tuned = SolveOptions { node_limit: Some(1500), ..options(&tuned_dir.0) };
+        if let Some(assignment) = tuning {
+            tuned.tactics.set(assignment).unwrap();
+        }
+        assert!(!solver::solve_game(600, None, &tuned).unwrap().completed);
+        let checkpoint = tuned_dir.join("n0600.ckpt");
+        assert_eq!(version(&checkpoint), 6u32.to_le_bytes(), "{tuning:?}: writes the header's version 6");
+        let tuned = SolveOptions { node_limit: None, ..tuned };
+        assert!(solver::solve_game(600, None, &tuned).unwrap().completed, "{tuning:?}: version 6 resumes");
+    }
+
+    // A checkpoint of version 5 is of a search with the window of 80: the default's search (window `all`) does not
+    // resume it, saying which flag does.
+    let old_dir = TempDir::new("format-old-window");
+    let mut old = SolveOptions { node_limit: Some(1500), ..options(&old_dir.0) };
+    old.tactics.set("force_window=80").unwrap();
+    assert!(!solver::solve_game(600, None, &old).unwrap().completed);
+    let default = SolveOptions { tactics: options(&old_dir.0).tactics, ..old };
+    let err = solver::solve_game(600, None, &default).unwrap_err();
+    for part in ["n0600.ckpt", "force_window is 80, not all", "--tactic force_window=80"] {
+        assert!(err.contains(part), "{part}: {err}");
+    }
+    assert!(old_dir.join("n0600.ckpt").exists(), "a refused checkpoint is left alone");
 }
 
 /// A checkpoint of the extended problem Π⁺(O) whose header has the digest of other one-sided candidates, and nothing

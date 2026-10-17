@@ -14,9 +14,12 @@ use crate::model::FrameSet;
 /// Encoded (little-endian) as the magic `TXSH`, the format [`Header::VERSION`] (u32), the width `W` (u32),
 /// `n` (u32), the digests of the candidates, of the frames and of the one-sided candidates (u64 each), `max_total`
 /// (u32) and the tactics' bits (u16, [`SearchTactics::bits`]); in version 6, then the tactics that tune the GF(2) search
-/// (16 bytes, [`SearchTactics::tuning`]).  This build writes version 5 for a search whose tuning is the default, which a
-/// header of version 5 implies (so that a default search writes the header of the builds before those tactics), and
-/// version 6 for one whose tuning is not; it reads versions 4 to 6.  Version 4, the headers of the builds before the extended problem's search, has no digest of the one-sided
+/// (16 bytes, [`SearchTactics::tuning`]).  This build writes version 5 for a search whose tuning is that of the builds
+/// before those tactics ([`SearchTactics::legacy_tuning`]: `force_window=80` and the other tuning tactics at their
+/// defaults), which a header of version 5 implies, so that such a search writes the header of those builds; and
+/// version 6 for one whose tuning is not, the default's since `force_window` became `all`.  It reads versions 4 to 6,
+/// and a checkpoint of version 4 or 5 resumes only a search with the tuning it implies (`--tactic force_window=80`).
+/// Version 4, the headers of the builds before the extended problem's search, has no digest of the one-sided
 /// candidates (`max_total` and the tactics follow the digest of the frames): those builds searched only problems
 /// without one-sided candidates, so a version-4 header reads as version 5 with the digest of none, and a checkpoint of a
 /// plain search resumes with every other check as for version 5; one asked to resume a search with one-sided candidates
@@ -57,7 +60,7 @@ impl<const W: usize> Header<W> {
             one_sided: Self::digest_one_sided(prepared.model.one_sided()),
             max_total: prepared.max_total,
             tactics: prepared.tactics,
-            version: if prepared.tactics.tuning_is_default() { Self::VERSION } else { Self::VERSION_6 },
+            version: if prepared.tactics.tuning_is_legacy() { Self::VERSION } else { Self::VERSION_6 },
         }
     }
 
@@ -88,7 +91,7 @@ impl<const W: usize> Header<W> {
 
     pub(super) fn encode(&self) -> Vec<u8> {
         let mut out = Self::MAGIC.to_vec();
-        let tuned = !self.tactics.tuning_is_default();
+        let tuned = !self.tactics.tuning_is_legacy();
         for word in [if tuned { Self::VERSION_6 } else { Self::VERSION }, W as u32, self.n] {
             out.extend_from_slice(&word.to_le_bytes());
         }

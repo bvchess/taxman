@@ -44,7 +44,7 @@ fn a_range_reproduces_optimal_json() {
 const TUNINGS: [&str; 14] = [
     "force_window=0",
     "force_window=20",
-    "force_window=all",
+    "force_window=80",
     "force_window=50%",
     "branching=largest",
     "branching=split",
