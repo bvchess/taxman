@@ -65,6 +65,12 @@ What has been tried for the bound, and where it stands:
   ([A3's test](experiments/split-by-the-number-of-promotions-a3s-test-2026-10.md)).
 * **A5, decomposing across the frames: not tried** (agenda A5; high risk).
 
+**The landscape past the chain** (2026-10-17): the standalone bounds of every game of 3441-8191 are measured
+([bench/landscape/](../bench/landscape/README.md), for $1.10).  None meets, the smallest standalone gap is 1,196
+(4176-4179) and the median rises from about 1,800 at 3441-4440 to 4,600-8,300 from 5441, so with today's heuristic no
+game past 3440 is within a few minutes of one-thread search
+([the entry](experiments/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10.md)).
+
 ## Decided
 
 * **The window is 4** (2026-10-17), the default of `taxman solve --window` (it was 1) and of `chain.sh` (it was 16).
