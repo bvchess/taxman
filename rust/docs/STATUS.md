@@ -104,6 +104,7 @@ game past 3440 is within a few minutes of one-thread search
 * Nothing for the run itself: Brian approved it (2026-10-16); periodic updates need his AWS session (12 hours each).
 * Outside review of Theorems 1, 10 and 12 by Robert Moniot.
 * Publishing (`optimal.json` past 1300, OEIS).
+* The ledger's experiment on 2176..3440 (an hour of a `c8g.16xlarge`, about $0.9 at spot; "In flight").
 
 ## In flight
 
@@ -126,3 +127,10 @@ game past 3440 is within a few minutes of one-thread search
   ([RUNBOOK section 13](../tools/cloud/RUNBOOK.md#13-the-sweep); `taxman solve --keep-going`).  3441..8191 at 180 s a
   game is at most 314 core-hours: 4.9 hours of a `c8g.16xlarge`, about $3.3 at spot; a launch needs Brian's approval.
   The file is not a chain and never goes into `strict.jsonl`.
+* **The ledger**, built 2026-10-17 (Brian's idea: L and U for every board of a stretch at once, limited searches with
+  the dual bound of a stopped search, the relations between boards proven in THEORY.md, the effort where a proof looks
+  cheapest; `examples/ledger/`).  The laptop's dry run of 1301..1500 with the truth hidden proved all 200 boards at
+  the optimum, 0 violations, for 1.33 times the one-thread chain's CPU in a third of its wall time on six workers
+  ([the entry](experiments/the-ledger-bounds-from-both-sides-2026-10.md)).  The experiment of the design, 2176..3440
+  for an hour of a `c8g.16xlarge` (about $0.9 at spot), is ready, not run, and needs Brian's approval
+  ([RUNBOOK section 14](../tools/cloud/RUNBOOK.md#14-the-ledgers-experiment)).

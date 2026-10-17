@@ -61,11 +61,10 @@ use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::engine::{self, Control, Ctx, EngineConfig, Searcher, Start, Stats, Unit};
 use taxman::game::Optimal;
-use taxman::gf2::{Gf2Bound, Gf2Graph};
+use taxman::gf2::Gf2Graph;
 use taxman::json::Json;
 use taxman::matchbound::MatchGraph;
-use taxman::model::Scratch;
-use taxman::search::{self, stat, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
+use taxman::search::{self, stat, NodeBound, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
 use taxman::tactics::Tactics;
 
 // ---------------------------------------------------------------------------------------------------------
@@ -341,14 +340,10 @@ fn sample_units<const W: usize>(
     // The bound of each unit's node against what it needs, the best predictor of its size that costs nothing: the
     // trees of nodes with large gaps are the large ones.
     let graph = Gf2Graph::new(&prepared.model, &prepared.root, &prepared.candidates);
-    let (mut bound, mut scratch) = (Gf2Bound::<W>::new(&graph), Scratch::<W>::new());
+    let mut bound = NodeBound::new(&prepared, &graph);
     let best = opt.unwrap_or(head.best);
     for (index, unit) in reservoir.into_sorted() {
-        let state = prepared.model.promote_all_using(&mut scratch, &prepared.root, &unit.promoted);
-        let gap = state.map(|state| {
-            let room = state.max_promotions_among(&unit.cands).max(0) as u32;
-            bound.reset(&unit.promoted, &unit.cands);
-            let value = bound.evaluate(prepared.max_total.saturating_sub(unit.promoted.len()).min(room), None).value;
+        let gap = bound.completions(&unit).map(|value| {
             let need = (best + 1).saturating_sub(unit.promoted.sum());
             (value, need)
         });

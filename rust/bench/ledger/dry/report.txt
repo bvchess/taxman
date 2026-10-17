@@ -1,0 +1,28 @@
+boards 1301..1500: 200 in the ledger, 200 proven
+CPU 595 s (0.17 core-hours); 182 searches, 566 s of them
+proven by (lower rule, upper rule):
+  ceiling    exhausted  1
+  ceiling    repeat     2
+  monotone   ceiling    14
+  prime      prime      17
+  repeat     ceiling    2
+  repeat     exhausted  1
+  repeat     repeat     77
+  search     ceiling    5
+  search     exhausted  69
+  start      exhausted  12
+by the upper bound: search 83 (exhausted 83, dual 0), relations 117 (ceiling 21, prime 17, repeat 79, monotone 0), other 0
+proven against CPU seconds:
+         60 s  40
+        119 s  90
+        179 s  112
+        238 s  127
+        298 s  142
+        357 s  164
+        417 s  182
+        476 s  189
+        536 s  195
+        595 s  200
+U - L of the 0 unproven boards: none
+U - L summed: 0
+check: 200 boards with a known optimum, 200 proven at it; 0 violations

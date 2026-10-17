@@ -47,6 +47,7 @@ of a Graviton core and the scaling of the solver to 64 and 192 threads are measu
 * [11. Certifying U (stage 4)](#11-certifying-u-stage-4)
 * [12. The unattended run to the wall](#12-the-unattended-run-to-the-wall)
 * [13. The sweep](#13-the-sweep)
+* [14. The ledger's experiment](#14-the-ledgers-experiment)
 
 ## Rules for every launch
 
@@ -1854,4 +1855,44 @@ the [rules for every launch](#rules-for-every-launch)'s checks, and the bucket p
 The tests of the script are `test/run.sh sweep` (with `TAXMAN_BIN` set to a non-release build, if there is none of the
 release; it runs `verify.sh`, so it replays the committed games three times) and, for the planner, `python3 -I
 tools/test_sweep_plan.py`.
+
+## 14. The ledger's experiment
+
+Does the ledger (`examples/ledger/`; [README, "Keeping going past
+limits"](../../README.md#keeping-going-past-limits-and-the-sweep)) prove much of a stretch the chain has proven, for a
+small share of what the chain spent there, with the truth hidden from it?  On 2176..3440 (the run to the wall
+re-proved it in about 4.4 hours of 64 threads, about 280 core-hours), one `c8g.16xlarge` at spot for an hour of its
+64 CPUs: `bench/ledger/cloud.sh 2176-3440` (its comment has the environment), which runs `ledger run` with no proven
+game, then `ledger report --known results/strict.jsonl`, which exits with status 1 if a bound is on the wrong side of
+the chain's optimum or a game does not replay (a bug: stop and report).  The laptop's dry run of 1301..1500 is
+[the entry](../../docs/experiments/the-ledger-bounds-from-both-sides-2026-10.md).  Not yet run on EC2; a launch needs
+Brian's approval (the [rules for every launch](#rules-for-every-launch)).
+
+**Cost.**  The build of `setup.sh` (about 10 minutes), the run (`CPU_HOURS` 64, an hour of the 64 CPUs, and the
+searches still going when it is spent, each limited to the budget left over the workers), the report (a minute):
+about 1.3 instance-hours, **about $0.9 at spot** ($0.68 an hour), about $3.3 on demand; the timer of 150 minutes bounds
+it at about $1.7 at spot.  The 40 GB volume is a few cents.
+
+**Launch** as in section 13.3, with `Purpose=ledger` and this user data (`COMMIT` the pushed master that has the
+ledger, `DATE` the day):
+
+```
+#!/bin/bash
+shutdown -h +150
+export AWS_DEFAULT_REGION=us-east-1
+dnf install -y -q git tmux
+sudo -u ec2-user bash -lc 'cd ~ && git clone -q https://github.com/bvchess/taxman.git && cd taxman &&
+    git checkout -q COMMIT && SKIP_TESTS=1 rust/tools/cloud/setup.sh > ~/setup.log 2>&1'
+sudo -u ec2-user tmux new-session -d -s ledger -c /home/ec2-user/taxman/rust \
+    'S3_DEST=s3://taxman-013764204840-us-east-1/ledger-DATE POWEROFF=1 bench/ledger/cloud.sh 2176-3440;
+     sudo shutdown -h now'
+```
+
+**Watch, stop, results home.**  `tail ~/ledger/run.err` (a status line a minute: the CPU spent, the boards proven, the
+searches going) and `~/ledger/log`.  `pkill -TERM -f 'examples/ledger run'` stops the run cleanly (each search writes
+its checkpoint, the ledger is saved) and the script goes on to the report; the same command again resumes (on a
+replacement machine, with `S3_DEST/out` copied back to `~/ledger` first).  Home: `aws s3 sync S3_DEST/out
+bench/ledger/cloud-DATE/ --exclude 'run/ckpt/*'`, then on the laptop `target/debug/examples/ledger report
+bench/ledger/cloud-DATE/run --known results/strict.jsonl` and `bench/ledger/events.py bench/ledger/cloud-DATE/run`;
+then the end of the rules for every launch.
 

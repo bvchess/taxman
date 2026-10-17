@@ -1614,6 +1614,128 @@ same in both (the corollary of Lemma M5⁺).  With the claims more
 consecutive games pose the same problem, since a claimed pair that
 only one of them has is no longer part of it.
 
+## The ledger: bounds between boards
+
+The chain proves the game of n from the game of n − 1 (the ceiling,
+the prime formula) or by a search of its own.  The ledger
+(`rust/examples/ledger/`) keeps, for many boards at once, a lower bound
+L(n), the score of a game it holds, and an upper bound U(n) ≥ opt(n),
+and passes bounds between boards by the lemmas below; a board is
+proven when the two meet.  Each lemma is an inequality between optima,
+with the games that carry the lower bound across; the upper bounds
+cross by the inequality alone.  A *finished game* of n is one the
+referee (`replay_finished`) accepts: legal, over (no legal move left),
+and opening with the largest prime ≤ n.  Every optimal game is
+finished (Lemma A of `accelerate::prime_shortcut`), so opt(n) is the
+best score of a finished game, and every lower bound of the ledger is
+the score of a finished game, replayed before it counts.
+
+**Lemma L1 (monotone).**  opt(n − 1) ≤ opt(n).  If n is composite and
+G is a finished game of n − 1, then G, followed by n if n is still
+legal after it, is a finished game of n scoring at least ΣG.
+
+*Proof.*  n divides no other number of the board 1..n, so G's moves
+are legal there with the same taxes and leave the same pot with n
+added.  No number below n has a divisor in that pot (G is over, and n
+divides none of them), so n is the only move that can be left, and
+playing it only takes numbers out of the pot: after it, or without it,
+the game is over.  G opens with the largest prime ≤ n − 1, which is the
+largest ≤ n since n is composite.  For a prime n the inequality holds
+too (Lemma L3 gives more).  ∎
+
+**Lemma L2 (the ceiling, and the game below it).**  opt(n) ≤ opt(n − 1)
++ n.  If n is composite and G is a finished game of n, then G without
+the move n, followed by legal moves for as long as there are any, is a
+finished game of n − 1 scoring at least ΣG − n (ΣG if G does not play
+n).
+
+*Proof.*  Call G' the moves of G other than n.  Before each move of
+G', its pot holds the pot of G before the same move, less n: both
+start full; a move of both takes the same number and its divisors out
+of each pot; G's move n takes numbers out of G's pot only.  So a move
+of G', which paid in G with a divisor in G's pot, has that divisor in
+its own: G' is legal on 1..n − 1.  The moves added after it are legal
+by choice and leave the game over.  It opens as G does, with the
+largest prime ≤ n, which is not n and so is the largest prime
+≤ n − 1.  Applied to an optimal game of n this is opt(n − 1) ≥
+opt(n) − n, the ceiling of Theorem 9 and `board::promotion_cap`.  ∎
+
+**Lemma L3 (the prime formula, both ways).**  Let p be prime and q the
+largest prime below it.  opt(p) = opt(p − 1) + p − q.  A finished game
+of p − 1 with its first move q exchanged for p is a finished game of p,
+and a finished game of p with its first move p exchanged for q is a
+finished game of p − 1; the score changes by p − q and by q − p.
+
+*Proof.*  The equality is Theorem 9 (prime), proven again with the
+exchange in `accelerate::prime_shortcut` (Lemmas A and B there).  The
+exchange needs of the game only that it opens with q (with p), which a
+finished game does, not that it is optimal: p and q are inert on both
+boards (2q > p by Bertrand's postulate, p being the next prime after
+q, and p is the largest number),
+each takes only 1 when it opens, so every later move keeps its payer,
+and at the end the pots differ only in q and p, which have no divisor
+left once 1 is gone, so the game stays over.  (p = 2: the game of 1 has
+no move, and [2] is the game of 2.)  ∎
+
+The design of the ledger stated the formula as opt(p − 1) + p − 1; it
+is + p − q, and the construction needs no optimal game, only a
+finished one.
+
+**Lemma L4 (repeats).**  If boards n and m pose the same search
+problem, Π_n = Π_m (rust/DESIGN.md, "Same search"), then every
+promotion set S of it, played on the board of n
+(`solution_for_promotions`), is a legal game of n scoring
+in_the_bag(n) + ΣS; and, given U at n, opt(n) − in_the_bag(n) ≤
+opt(m) − in_the_bag(m).
+
+*Proof.*  The first is the soundness half of Theorem M, which every
+search relies on when it offers an incumbent.  For the second, equal
+problems have the same promotion sets, so P\*(Π_n) = P\*(Π_m); by the
+soundness at m, in_the_bag(m) + P\*(Π_m) ≤ opt(m); and given U at n,
+opt(n) = in_the_bag(n) + P\*(Π_n) (the corollary of "The upper
+part").  ∎
+
+So the lower bound crosses a repeat only as the promotions of a game
+that was made from them (a search's or the start's game); the ledger
+also tries the moves of any other game that are candidates, and keeps
+the result only if the referee accepts it, as any game.  The upper
+bound crosses as U(n) ≤ U(m) − in_the_bag(m) + in_the_bag(n), and rests
+on U at n besides what U(m) rests on.
+
+**Lemma D (the dual bound of a stopped search).**  Let a search of
+Π_n that a limit stopped have the incumbent worth I (a promotion sum)
+and, in its final checkpoint, the open units u = (P_u, C_u): the
+promotions of a node and the candidates its loop has still to try.
+Then P\*(Π_n) ≤ max(I, max_u (ΣP_u + B_u)), where B_u is the heaviest
+common independent set over C_u of Theorem 11's matroids contracted by
+P_u, of at most `max_additional` members.
+
+*Proof.*  The search is exact (rust/DESIGN.md, section 4): each
+pruning drops only sets no heavier than the incumbent of its time
+(at most I), sets that cannot be promoted, and, with the tactic
+`symmetry`, sets that break an inequality every heaviest set keeps
+(Theorem 13).  The checkpoint's units are the roots of every subtree
+not yet explored, which is what makes a resume from it exact.  So a
+heaviest promotion set H that keeps the inequalities is either no
+heavier than I, or is P_u ∪ F with F ⊆ C_u for an open unit u.  Then
+F is a completion of u's node: by Theorem 11 it is common-independent
+in the contractions, and it has no more members than the freedoms
+allow (`bounds::max_additional`), so ΣF ≤ B_u.  ∎
+
+The root's GF(2) bound, the upper end of `wall landscape`, is the case
+of a search stopped before its first node (one unit, the root).
+
+*In the ledger.*  Every lower bound is a finished game, so L(n) ≤
+opt(n) holds by the referee alone.  Every upper bound is a bound of
+the frame model at some board (a root bound, a dual bound, a completed
+search: each bounds in_the_bag + P\*, which is opt given U at that
+board, by the corollary of "The upper part"), carried by the lemmas,
+which hold unconditionally but for L4's upper half (U at the board it
+is carried to).  So a board whose bounds meet is proven within the
+frame model, as the chain past 2175 is, given U at the boards its upper
+bound came through.  An L above a U would be a bug, or a counterexample
+to U at one of those boards, since L is a real game.
+
 ## Signed frame matroids: the frame bound over other fields
 
 Theorem 11's argument never uses that its entries are 1 or that the
@@ -2098,6 +2220,7 @@ and the adversarial experiments: `rust/prover/README.md`.
 | The claims of `unzip` kept by a frame free of O ∪ R whose back claims pass the check are front and back moves of every instance, so Theorem M⁺ holds with them taken out, and Π⁺(O) has the same promotion sets with and without them (Lemma M5⁺ and its corollary); with O = ∅ every claim is kept and Π⁺(∅) is Π_n | Theorem M⁺ against the oracle with the claims kept, as without (every set both ways on every board ≤ 80, ≤ 60 with every source open, 5.9 million sets, and the ignored 81..100 and 61..69; random sets at 300..1300, 741, 1100, 1200 and, ignored, 2000..4095; the search's optimum on every board ≤ 80); a mutant that keeps the claims the check refuses is caught on every problem ≤ 80 where it refuses one (24..26); Π⁺(∅) with the claims poses Π_n's problem on every board 2..8191 (the census, check H) and searches the tripwires' trees node for node; all 377 certificates of 600..1300 certified in both formulations, the rule of the same problem settling 101 with the claims where 81 without, each as a search of it (`rust/tests/model_extended.rs`, `rust/tests/tripwires.rs`, `rust/tests/certify.rs`) | proven |
 | U: some optimal set contains U\*_{≥3}; the frame solver's answer is opt(n) iff U holds at n (the corollary) | every n ≤ 2175 (the prover's proofs on the whole board); the strong form in every game enumerated; barred parity bounds certify 84-99.7% of U\*_{≥3} per game to 2175 and 54-98% on the EC2 chain's 2176..3314, and close no game alone (`rust/prover/data/upper_*.jsonl`) | open; holds to 2175 |
 | opt(n) equals the recorded score: the frame model's answer is the true optimum | the prover's exact searches on the whole board (playability theorems, the Franklín–Moniot and parity bounds, the ceiling and the prime formula; `rust/prover`, section 3): every n = 2..2175, the committed chain to there (its games 2176..3440 are not yet proven on the whole board) | verified (exact, on the whole board) to 2175 |
+| The ledger's relations between boards (monotone, the ceiling and the game below it, the prime formula both ways from any finished game, repeats) and the dual bound of a stopped search (Lemmas L1-L4, D) | from proven games every tenth board of 2..1300 the relations give every board both bounds, every one on its side of the optimum and every game they make legal, exact at the primes and repeats of the proven boards; so from loose bounds at 1001..1300; the dual bound of stopped one-thread searches of 996, 1020 and 1218 between the optimum and the root's bound and never rising as the node limit doubles, the root's bound at zero steps on 14 boards of 60..1300; the laptop's run of 1301..1500 with the truth hidden proves every board at the optimum (`rust/examples/ledger/`, `rust/src/search/dual.rs`) | proven |
 | Promotable sets are independent in every signed frame matroid, over any field and any nonzero entries; with the GF(2) matroids they make a Lagrangian bound L(λ) valid for every λ | every promotable set of every board with ≤ 22 candidates, and the optimal and 100 random maximal promotion sets of every non-prime board of 137-400, independent for the plain and five random GF(3) signings of every frame (6.4 million pairs); 14,472 promotion sets at every 25th board of 400-2175 independent in 4,320 signed matroids, column-sum signings among them; L never below P* at 309 roots of 2-400 (6,180 random multipliers) and 72 of 400-2175 (1,440), and equal to the GF(2) bound at zero; every bound of the fields study at least P* (66 roots, 330 families) and at least the best completion at the probe's nodes where it is known | proven (Thms 14, 15) |
 | An optimal game has the most moves, M(n) | one move short at n = 833, 834 and 835, proven by the prover; a longest game for every other n ≤ 1300, 1,293 of them by the matching certificate (`rust/prover`, section 6) | **false** (n = 833); the gap is at most one to 1300, open beyond |
 | (★) on rejection-bearing components | every threshold of every game n = 2..20,000 certified by bounds; the earlier 5 undecided settled | certified per game; open in general |
