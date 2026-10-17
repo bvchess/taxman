@@ -5,9 +5,10 @@
 //! Python referee, refuse lines that a hand edit made contradict themselves, and derive assumptions by the same
 //! rules.
 
+#[macro_use]
 mod common;
 
-use common::{long, TempDir};
+use common::TempDir;
 use std::fs;
 use std::ops::RangeInclusive;
 use std::path::PathBuf;

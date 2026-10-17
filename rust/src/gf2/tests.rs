@@ -3,7 +3,7 @@ use crate::board::Board;
 use crate::frames::{build_extended, ExtendedFrames};
 use crate::model::Scratch;
 use crate::search::{Prepared, SearchTactics};
-use crate::test_support::{long, Rng};
+use crate::test_support::Rng;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -767,11 +767,24 @@ fn free_blocks_hold_the_coloops_of_the_one_sided_candidates() {
 /// Only the sets of 128 words have the engines of four and five words, and the boards that need them (from 4740 and
 /// 6392) are too large to walk, so this is where they run along paths, against the engines of one and two words.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(engines_of_every_word_count_agree_along_a_few_random_paths))]
 fn engines_of_every_word_count_agree_along_random_paths() {
+    engines_of_every_word_count_agree_along(&[120, 300, 760, 1000], 5, 100);
+}
+
+/// [`engines_of_every_word_count_agree_along_random_paths`] along 2 paths of the boards 120 and 300.
+#[test]
+fn engines_of_every_word_count_agree_along_a_few_random_paths() {
+    engines_of_every_word_count_agree_along(&[120, 300], 2, 5);
+}
+
+/// The engines of every word count agree along `paths` random paths of each of `boards`, which reach at least
+/// `percent` percent of what [`engines_of_every_word_count_agree_along_random_paths`] asks.
+fn engines_of_every_word_count_agree_along(boards: &[u32], paths: usize, percent: u64) {
     const W: usize = 128;
     let mut rng = Rng(0x7E57_ED64_0000_0005);
     let mut walked = Walked::default();
-    for n in [120u32, 300, 760, 1000] {
+    for &n in boards {
         let p = Board::<W>::for_n(n).prepare(SearchTactics::default()).unwrap();
         let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates);
         let natural = graph.words();
@@ -784,11 +797,12 @@ fn engines_of_every_word_count_agree_along_random_paths() {
             engines.push(Gf2Bound::<W>::new(padded));
         }
         assert_eq!(engines.len(), 1 + 2 * (MAX_WORDS - natural), "n={n}");
-        walk_random_paths(&p, &mut rng, 5, usize::MAX, &mut engines, &mut walked);
+        walk_random_paths(&p, &mut rng, paths, usize::MAX, &mut engines, &mut walked);
     }
     let Walked { checks, excluded_checked, splits_compared, .. } = walked;
+    let at_least = |count: u64, most: u64| count * 100 >= most * percent;
     assert!(
-        checks > 600 && excluded_checked > 100 && splits_compared > 5000,
+        at_least(checks, 600) && at_least(excluded_checked, 100) && at_least(splits_compared, 5000),
         "{checks} {excluded_checked} {splits_compared}"
     );
 }

@@ -52,11 +52,12 @@
 //!   is also the table's score, and the set it returns is a promotion set of the reference predicate that F makes
 //!   playable.
 
+#[macro_use]
 mod common;
 
 use common::{
-    config, for_each_kept_subset, kept_subsets, long, play_order, playable, random_open_sets, random_subset, shuffle,
-    upper, upper_from_3, Rng,
+    config, for_each_kept_subset, kept_subsets, play_order, playable, random_open_sets, random_subset, shuffle, upper,
+    upper_from_3, Rng,
 };
 use std::collections::BTreeSet;
 use std::fmt::Debug;

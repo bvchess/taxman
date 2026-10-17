@@ -382,10 +382,22 @@ fn random_agreement<const W: usize>(g: &Golden, rng: &mut Rng, stats: &mut PeelS
 /// board and all those from 480, six walks each) is 225,000 checks and 9 s; to run it, change the filter and the
 /// number of walks (`0..6`).
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(fast_peeling_and_reduction_agree_with_reference_on_a_sample))]
 fn fast_peeling_and_reduction_agree_with_reference() {
+    fast_peeling_and_reduction_agree_with_reference_on_every(1);
+}
+
+/// [`fast_peeling_and_reduction_agree_with_reference`] on every fifth of its golden games.
+#[test]
+fn fast_peeling_and_reduction_agree_with_reference_on_a_sample() {
+    fast_peeling_and_reduction_agree_with_reference_on_every(5);
+}
+
+/// The fast peeling and reduction agree with the reference on every `every`th of the golden games.
+fn fast_peeling_and_reduction_agree_with_reference_on_every(every: usize) {
     let mut rng = Rng(0x5EED_1234_ABCD_0001);
     let mut stats = PeelStats::default();
-    for n in golden_ns().into_iter().filter(|&n| n >= 20 && (n % 18 == 0 || n % 120 == 0)) {
+    for n in golden_ns().into_iter().filter(|&n| n >= 20 && (n % 18 == 0 || n % 120 == 0)).step_by(every) {
         let g = load(n);
         if n < 512 {
             random_agreement::<8>(&g, &mut rng, &mut stats);
@@ -394,7 +406,7 @@ fn fast_peeling_and_reduction_agree_with_reference() {
         }
     }
     eprintln!("peel agreement: {stats:?}");
-    assert!(stats.checks > 10_000 && stats.winnable > 1_000);
+    assert!(stats.checks > 10_000 / every as u64 && stats.winnable > 1_000 / every as u64);
 }
 
 /// Promoting the same numbers in different orders reaches the same state whenever every step succeeds.

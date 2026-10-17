@@ -6,7 +6,7 @@
 
 mod common;
 
-use common::{Rng, TempDir};
+use common::{Rng, TempDir, QUICK};
 use std::fs;
 use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
@@ -267,15 +267,17 @@ fn instance() -> Instance {
 /// Items of [`big_instance`], also the benchmark's default.
 const BIG_ITEMS: usize = 56;
 
-/// A bigger instance (about 200 million nodes, under a second on one thread), for tests that need a search to
-/// last a while on many threads.
+/// A bigger instance (about 200 million nodes, under a second on one thread; 20 million in a quick run, 50 items, so
+/// that the engine's tests take a few seconds of the quick suite), for tests that need a search to last a while on many
+/// threads.
 fn big_instance() -> Instance {
-    Instance::new(BIG_ITEMS, 10_000, 99)
+    Instance::new(if QUICK { 50 } else { BIG_ITEMS }, 10_000, 99)
 }
 
-/// A longer one (about 0.65 G nodes), far more than a run explores before a script on another thread has acted on it.
+/// A longer one (about 0.65 G nodes; 25 million in a quick run, 52 items), far more than a run explores before a
+/// script on another thread has acted on it.
 fn long_instance() -> Instance {
-    Instance::new(64, 10_000, 99)
+    Instance::new(if QUICK { 52 } else { 64 }, 10_000, 99)
 }
 
 const HEADER: &[u8] = b"knapsack n=48 range=10000 seed=99";

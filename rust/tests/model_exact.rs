@@ -25,6 +25,7 @@
 //!
 //! The oracle is itself tested first, against the rules of the game, the brute force and the table of optimal games.
 
+#[macro_use]
 mod common;
 
 use common::{kept_subsets, play_order, playable, shuffle, Rng};
@@ -337,8 +338,15 @@ fn check_random_boards(boards: &[u32], sets: usize, seed: u64) {
     println!("{} boards, {sets} sets of each kind: {:.1?}", boards.len(), start.elapsed());
 }
 
+/// Theorem M on a few random sets of the boards 60 to 500.
+#[test]
+fn theorem_m_on_a_few_random_sets_to_500() {
+    check_random_boards(&[60, 100, 200, 300, 500], 20, 0xE220_A839_7B1D_CDAF);
+}
+
 /// Theorem M on random sets of the boards from 60 to 1300.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(theorem_m_on_a_few_random_sets_to_500))]
 fn theorem_m_on_random_sets_to_1300() {
     check_random_boards(&[60, 100, 200, 300, 500, 760, 1000, 1300], 100, 0x9E37_79B9_7F4A_7C15);
 }

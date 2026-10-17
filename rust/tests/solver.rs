@@ -1,9 +1,10 @@
 //! End-to-end tests of the per-game pipeline: whole ranges against `optimal.json`, tactic invariance, checkpoint and
 //! resume through the solver, and boards beyond `optimal.json`.
 
+#[macro_use]
 mod common;
 
-use common::{long, matching_options, options, TempDir};
+use common::{matching_options, options, TempDir};
 use std::fs;
 use std::time::Duration;
 use taxman::bits::Bits;

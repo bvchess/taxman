@@ -11,13 +11,14 @@
 //! under the tactics of extended mode): every board to 300 from the root, and one large game resumed from
 //! checkpoints.
 
+#[macro_use]
 mod common;
 #[allow(dead_code)]
 #[path = "../examples/common/fixtures.rs"]
 mod fixtures;
 
 use common::{
-    config, long, random_open_sets, random_subset, stored_games, testdata, upper_from_3, Config, Game, Rng, TempDir,
+    config, random_open_sets, random_subset, stored_games, testdata, upper_from_3, Config, Game, Rng, TempDir,
 };
 use std::cell::OnceCell;
 use std::time::Duration;

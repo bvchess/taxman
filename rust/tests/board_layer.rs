@@ -7,6 +7,7 @@
 //! the chain is enough to catch a change of any decision (the boards differ in what their frames hold), and costs a
 //! few seconds.
 
+#[macro_use]
 mod common;
 
 use common::results_path;
@@ -22,6 +23,9 @@ use taxman::with_width;
 /// from the first.
 const EVERY: usize = 25;
 
+/// Every this many in the quick test, which stops at the board 1300: a board costs about as much as n² to set up.
+const QUICK_EVERY: usize = 10;
+
 /// A searched game of the chain, as its results line records it.
 struct Line {
     n: u32,
@@ -30,8 +34,9 @@ struct Line {
     digest: String,
 }
 
-/// The searched games of `results/strict.jsonl`: every [`EVERY`]th one, and the last.
-fn sampled_lines() -> Vec<Line> {
+/// The searched games of `results/strict.jsonl`: every `every`th one, and the last (if the board is at most
+/// `up_to`).
+fn sampled_lines(every: usize, up_to: u32) -> Vec<Line> {
     let text = std::fs::read_to_string(results_path("strict.jsonl")).expect("results file");
     let searched: Vec<Json> = text
         .lines()
@@ -51,7 +56,8 @@ fn sampled_lines() -> Vec<Line> {
             digest: digest.to_owned(),
         }
     };
-    (0..=last).filter(|i| i % EVERY == 0 || *i == last).map(|i| line(&searched[i])).collect()
+    let sampled = (0..=last).filter(|i| i % every == 0 || *i == last).map(|i| line(&searched[i]));
+    sampled.filter(|line| line.n <= up_to).collect()
 }
 
 /// The game the line's promotions make, as the board layer plays it now, at the set width the solver picks.
@@ -65,10 +71,26 @@ fn moves_of(line: &Line) -> Vec<u32> {
 /// The moves of the games a promotion set makes, and the digest of the search problem of a board, are those of the
 /// committed chain: at a sample of boards from 18 to 3440, the sets of 8 to 56 words.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(the_board_layer_reproduces_the_chains_moves_and_problems_to_1300))]
 fn the_board_layer_reproduces_the_chains_moves_and_problems() {
-    let lines = sampled_lines();
+    let lines = sampled_lines(EVERY, u32::MAX);
     assert!(lines.len() > 100 && lines.last().is_some_and(|l| l.n == 3440), "{} lines", lines.len());
-    for line in &lines {
+    the_board_layer_reproduces(&lines);
+}
+
+/// [`the_board_layer_reproduces_the_chains_moves_and_problems`] for every tenth of the searched games to the board
+/// 1300.
+#[test]
+fn the_board_layer_reproduces_the_chains_moves_and_problems_to_1300() {
+    let lines = sampled_lines(QUICK_EVERY, 1300);
+    assert!(lines.len() >= 20, "{} lines", lines.len());
+    the_board_layer_reproduces(&lines);
+}
+
+/// The moves of the games the promotions of each of `lines` make, and the digest of the search problem of each board,
+/// are those of the committed chain.
+fn the_board_layer_reproduces(lines: &[Line]) {
+    for line in lines {
         assert_eq!(moves_of(line), line.moves, "n={}: the game the promotions make", line.n);
         let (problem, _in_the_bag) = search_problem(line.n).expect("a problem");
         assert_eq!(digest_text(problem.digest()), line.digest, "n={}: the search problem's digest", line.n);

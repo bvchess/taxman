@@ -8,6 +8,11 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+/// Whether this is a quick run, a non-release `cargo test` (debug assertions are on in the test profile and off in the
+/// release profile): a test that draws or walks a count that can be changed (random configurations, an instance that
+/// must last) uses a smaller one, and `cargo test --release` uses the full one (DESIGN.md, "Testing").
+pub const QUICK: bool = cfg!(debug_assertions);
+
 /// The reason a long test gives for being ignored in a non-release run, where it is skipped (debug assertions are on in
 /// the test profile and off in the release profile, so `cargo test` runs the quick suite and `cargo test --release`
 /// everything; DESIGN.md, "Testing"): `#[cfg_attr(debug_assertions, ignore = long!(quick_one))]`, with `quick_one`
@@ -18,7 +23,6 @@ macro_rules! long {
         concat!("long: runs under cargo test --release; the quick check is ", stringify!($quick))
     };
 }
-pub(crate) use long;
 
 /// A fresh, empty directory under the system temp dir, removed when dropped.  It derefs to its [`Path`], so
 /// `dir.join("file")` is a path inside it.  Each one has a name of its own within the process, so tests that run

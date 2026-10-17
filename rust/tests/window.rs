@@ -8,6 +8,7 @@
 //! with the lines before it, as a window of one does.  The policy that shares the threads is tested on its own in
 //! `src/solver/window/allot.rs`.  Small boards, at most 4 threads.
 
+#[macro_use]
 mod common;
 
 use common::{matching_options, options, results_path, TempDir};
@@ -67,15 +68,28 @@ fn committed(hi: u32) -> BTreeMap<u32, String> {
 }
 
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(a_short_chain_has_the_proofs_of_the_committed_chain_with_any_window))]
 fn a_chain_has_the_proofs_of_the_committed_chain_with_any_window() {
-    let expected = committed(600);
-    assert_eq!(expected.len(), 600);
+    a_chain_has_the_proofs_of_the_committed_chain_with_any_window_to(600);
+}
+
+/// [`a_chain_has_the_proofs_of_the_committed_chain_with_any_window`] for the games 1..=150.
+#[test]
+fn a_short_chain_has_the_proofs_of_the_committed_chain_with_any_window() {
+    a_chain_has_the_proofs_of_the_committed_chain_with_any_window_to(150);
+}
+
+/// Chains 1..=`hi` with windows of 1, 2, 4 and 8 on 4 threads have the committed chain's provenance and pass the
+/// verifier.
+fn a_chain_has_the_proofs_of_the_committed_chain_with_any_window_to(hi: u32) {
+    let expected = committed(hi);
+    assert_eq!(expected.len(), hi as usize);
     for window in [1, 2, 4, 8] {
         let opts = SolveOptions { window, ..options(4) };
-        let games = solver::solve_range(1, 600, &opts, None).unwrap_or_else(|e| panic!("window {window}: {e}"));
+        let games = solver::solve_range(1, hi, &opts, None).unwrap_or_else(|e| panic!("window {window}: {e}"));
         // Every game once, in order, with the committed chain's provenance.
         let chain: Vec<Json> = games.iter().map(|game| game.to_json()).collect();
-        assert_eq!(chain.iter().map(n_of).collect::<Vec<_>>(), (1..=600).collect::<Vec<_>>(), "window {window}");
+        assert_eq!(chain.iter().map(n_of).collect::<Vec<_>>(), (1..=hi).collect::<Vec<_>>(), "window {window}");
         for line in &chain {
             assert_eq!(provenance(line), expected[&n_of(line)], "window {window}");
         }
@@ -90,13 +104,25 @@ fn a_chain_has_the_proofs_of_the_committed_chain_with_any_window() {
 }
 
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(with_one_thread_any_window_is_a_window_of_one_for_a_short_chain))]
 fn with_one_thread_any_window_is_a_window_of_one() {
+    with_one_thread_any_window_is_a_window_of_one_to(600);
+}
+
+/// [`with_one_thread_any_window_is_a_window_of_one`] for the games 1..=150.
+#[test]
+fn with_one_thread_any_window_is_a_window_of_one_for_a_short_chain() {
+    with_one_thread_any_window_is_a_window_of_one_to(150);
+}
+
+/// With one thread the lines of a chain 1..=`hi` are those of a window of one, whatever the window.
+fn with_one_thread_any_window_is_a_window_of_one_to(hi: u32) {
     let chain = |window: usize| {
-        let games = solver::solve_range(1, 600, &SolveOptions { window, ..options(1) }, None).unwrap();
+        let games = solver::solve_range(1, hi, &SolveOptions { window, ..options(1) }, None).unwrap();
         games.iter().map(|game| without_times(&game.to_json())).collect::<Vec<_>>()
     };
     let (one, eight) = (chain(1), chain(8));
-    assert_eq!(one.len(), 600);
+    assert_eq!(one.len(), hi as usize);
     for (a, b) in one.iter().zip(&eight) {
         assert_eq!(a, b);
     }
@@ -127,7 +153,20 @@ fn a_game_repeats_the_search_of_a_game_still_in_flight() {
 /// seed and no ceiling, and every game is searched, so that the games ahead start at once and run long enough for the
 /// limit (the engine checks it every 1,024 steps of a worker).
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(a_short_range_stopped_by_a_limit_ends_at_its_first_unfinished_game_and_completes_when_run_again))]
 fn a_range_stopped_by_a_limit_ends_at_its_first_unfinished_game_and_completes_when_run_again() {
+    a_range_stopped_by_a_limit_completes_when_run_again(598, 612);
+}
+
+/// [`a_range_stopped_by_a_limit_ends_at_its_first_unfinished_game_and_completes_when_run_again`] for the games
+/// 599..=601 (600 takes more than the 1,024 steps that the limit is looked at after).
+#[test]
+fn a_short_range_stopped_by_a_limit_ends_at_its_first_unfinished_game_and_completes_when_run_again() {
+    a_range_stopped_by_a_limit_completes_when_run_again(599, 601);
+}
+
+/// The range `lo..=hi` under a node limit stops at its first unfinished game, and completes when run again.
+fn a_range_stopped_by_a_limit_completes_when_run_again(lo: u32, hi: u32) {
     let dir = TempDir::new("window-limit");
     let results = dir.join("r.jsonl");
     let checkpoints = dir.join("ckpt");
@@ -141,7 +180,6 @@ fn a_range_stopped_by_a_limit_ends_at_its_first_unfinished_game_and_completes_wh
     };
     limited.tactics.seed_incumbent = false;
     limited.tactics.prev_cap = false;
-    let (lo, hi) = (598, 612);
     let mut seen = Vec::new();
     let summary =
         solver::solve_range_each(lo, hi, &limited, Some(&results), |game| seen.push((game.n, game.completed))).unwrap();
@@ -190,7 +228,19 @@ fn clock_of(checkpoints: &Path, n: u32) -> f64 {
 /// walls again at the same game at once, from the clock it was left with (which is never smaller); and a run with no
 /// limit completes every game and leaves no clock behind.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(a_lone_game_that_passes_the_wall_ends_the_range_with_no_line_and_goes_on_from_its_clock))]
 fn a_game_that_passes_the_wall_ends_the_range_with_no_line_and_goes_on_from_its_clock() {
+    a_game_that_passes_the_wall_goes_on_from_its_clock(800, 801);
+}
+
+/// [`a_game_that_passes_the_wall_ends_the_range_with_no_line_and_goes_on_from_its_clock`] for the game 800 alone.
+#[test]
+fn a_lone_game_that_passes_the_wall_ends_the_range_with_no_line_and_goes_on_from_its_clock() {
+    a_game_that_passes_the_wall_goes_on_from_its_clock(800, 800);
+}
+
+/// The head `lo` of the range `lo..=hi` passes a wall of 3 ms, and the range goes on from its clock.
+fn a_game_that_passes_the_wall_goes_on_from_its_clock(lo: u32, hi: u32) {
     let dir = TempDir::new("window-wall");
     let results = dir.join("r.jsonl");
     let checkpoints = dir.join("ckpt");
@@ -204,7 +254,6 @@ fn a_game_that_passes_the_wall_ends_the_range_with_no_line_and_goes_on_from_its_
     };
     walled.tactics.seed_incumbent = false;
     walled.tactics.prev_cap = false;
-    let (lo, hi) = (800, 801);
     let mut seen = Vec::new();
     let summary = solver::solve_range_each(lo, hi, &walled, Some(&results), |game| seen.push(game.n)).unwrap();
     let wall = summary.walled.expect("the head's search takes longer than the limit");
@@ -212,7 +261,7 @@ fn a_game_that_passes_the_wall_ends_the_range_with_no_line_and_goes_on_from_its_
     assert!(wall.held >= Duration::from_millis(3), "{wall:?}");
     assert!(summary.stopped_at.is_none() && summary.solved == 0 && seen.is_empty(), "{summary:?} {seen:?}");
     assert_eq!(fs::read_to_string(&results).unwrap(), "", "nothing is recorded for the game, or any other");
-    assert!(checkpoints.join("n0800.ckpt").exists());
+    assert!(checkpoints.join(format!("n{lo:04}.ckpt")).exists());
     let kept = clock_of(&checkpoints, lo);
     assert!(kept >= 0.0029 && kept <= wall.held.as_secs_f64() + 0.001, "{kept} {wall:?}");
 

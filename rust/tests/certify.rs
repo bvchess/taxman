@@ -31,9 +31,10 @@
 //! every game that needs a certificate once and `taxman certify --list` reads them, and the real lines of the pilot
 //! tool's tests verify.
 
+#[macro_use]
 mod common;
 
-use common::{long, options, path, python, results_path, taxman, Run, TempDir};
+use common::{options, path, python, results_path, taxman, Run, TempDir};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, OpenOptions};
 use std::io::Write;

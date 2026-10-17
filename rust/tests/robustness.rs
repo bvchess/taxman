@@ -7,7 +7,7 @@
 
 mod common;
 
-use common::TempDir;
+use common::{TempDir, QUICK};
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::panic::{self, AssertUnwindSafe};
@@ -185,7 +185,8 @@ fn within<T: Send + 'static>(limit: Duration, what: &str, f: impl FnOnce() -> T 
 
 #[test]
 fn conservation_is_exact_under_random_configurations() {
-    let iterations: u64 = std::env::var("TXENGINE_CONSERVATION").ok().and_then(|s| s.parse().ok()).unwrap_or(40);
+    let default = if QUICK { 5 } else { 40 };
+    let iterations: u64 = std::env::var("TXENGINE_CONSERVATION").ok().and_then(|s| s.parse().ok()).unwrap_or(default);
     let mut rng = 0x1234_5678_9abc_def1u64;
     let mut pick = |options: &[u64]| {
         rng = mix(rng.wrapping_add(0x9e37_79b9_7f4a_7c15));
@@ -234,7 +235,8 @@ fn conservation_is_exact_under_random_configurations() {
 /// runs suspended: told 0, with no worker left and units queued.
 #[test]
 fn conservation_is_exact_while_workers_come_and_go() {
-    let iterations: u64 = std::env::var("TXENGINE_CONSERVATION").ok().and_then(|s| s.parse().ok()).unwrap_or(8);
+    let default = if QUICK { 1 } else { 8 };
+    let iterations: u64 = std::env::var("TXENGINE_CONSERVATION").ok().and_then(|s| s.parse().ok()).unwrap_or(default);
     let mut rng = 0x5eed_c0de_2468_ace1u64;
     let mut next = || {
         rng = mix(rng.wrapping_add(0x9e37_79b9_7f4a_7c15));

@@ -8,12 +8,13 @@
 #![allow(dead_code)]
 
 mod binary;
+#[macro_use]
 mod support;
 
 #[allow(unused_imports)]
 pub use binary::{path, python, taxman, Run};
 #[allow(unused_imports)]
-pub(crate) use support::long;
+pub use support::QUICK;
 #[allow(unused_imports)]
 pub use support::{Rng, TempDir};
 #[allow(unused_imports)]

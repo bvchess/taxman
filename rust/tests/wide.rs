@@ -9,11 +9,12 @@
 //! nodes against the committed results, boards of 2048 and more through their setup, and the boards past 4095
 //! (128 words, and the GF(2) bound's engines of four and five block words) through theirs.
 
+#[macro_use]
 mod common;
 
 use common::{
-    config, long, matching_options, options, prev_of, profile_at_width, random_subset, stored_games, testdata,
-    variants, Config, Game, Profile, Rng, TempDir,
+    config, matching_options, options, prev_of, profile_at_width, random_subset, stored_games, testdata, variants,
+    Config, Game, Profile, Rng, TempDir,
 };
 use std::time::Duration;
 use taxman::bits::Bits;
@@ -200,10 +201,22 @@ fn the_setups_of_boards_past_2047_are_the_same_at_their_width_at_64_and_at_128()
 /// give the score of `results/strict.jsonl`, on one thread, and the default also on two.  Nothing else searches at
 /// a width of 20 or more and checks the answer.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(some_tactics_give_the_recorded_score_at_w20))]
 fn every_tactic_gives_the_recorded_score_at_w20() {
+    tactics_give_the_recorded_score_at_w20(1);
+}
+
+/// [`every_tactic_gives_the_recorded_score_at_w20`] for every fourth of the variants (the default among them).
+#[test]
+fn some_tactics_give_the_recorded_score_at_w20() {
+    tactics_give_the_recorded_score_at_w20(4);
+}
+
+/// Every `every`th of the variants of the tactics gives the recorded score of game 1133.
+fn tactics_give_the_recorded_score_at_w20(every: usize) {
     let games = stored_games("strict.jsonl");
     let prev = prev_of(&games, 1133);
-    for (name, tactics) in variants() {
+    for (name, tactics) in variants().into_iter().step_by(every) {
         for threads in if name == "default" { vec![1, 2] } else { vec![1] } {
             let mut opts = options(threads);
             opts.tactics.search = tactics;
@@ -485,10 +498,23 @@ fn a_committed_checkpoint_of_format_4_resumes_as_the_build_that_wrote_it_finishe
 /// bound's search of 1133 is too short to stop, and `tests/soundness.rs` resumes it on game 1000 at W = 20).  The
 /// unit tests resume only at W = 16.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(a_w20_search_interrupted_and_resumed_once_gives_the_same_answer))]
 fn a_w20_search_interrupted_and_resumed_gives_the_same_answer() {
+    a_w20_search_interrupted_and_resumed_under(2);
+}
+
+/// [`a_w20_search_interrupted_and_resumed_gives_the_same_answer`] under the first set of tactics alone.
+#[test]
+fn a_w20_search_interrupted_and_resumed_once_gives_the_same_answer() {
+    a_w20_search_interrupted_and_resumed_under(1);
+}
+
+/// The W = 20 search of game 1133 interrupted and resumed gives the answer, under the first `sets` sets of tactics of
+/// the matching path.
+fn a_w20_search_interrupted_and_resumed_under(sets: usize) {
     let games = stored_games("strict.jsonl");
     let prev = prev_of(&games, 1133);
-    for (name, tactics) in variants().into_iter().filter(|(name, _)| name.starts_with("matching")).take(2) {
+    for (name, tactics) in variants().into_iter().filter(|(name, _)| name.starts_with("matching")).take(sets) {
         let dir = TempDir::new(&format!("resume-{}", name.replace(['=', ','], "-")));
         let mut opts = options(1);
         opts.tactics.search = tactics;
@@ -585,7 +611,19 @@ fn deep_units() -> (u64, Vec<TaxUnit<32>>) {
 /// `symmetry` and among those with it: a search of a unit below the root with the rule finds the best completion
 /// that keeps the symmetric pairs' inequalities, which can be lighter than the unit's best.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(deep_levels_of_a_large_game_below_a_few_units))]
 fn deep_levels_of_a_large_game() {
+    deep_levels_of_a_large_game_below(8);
+}
+
+/// [`deep_levels_of_a_large_game`] with the subtrees below 2 units searched under every tactic.
+#[test]
+fn deep_levels_of_a_large_game_below_a_few_units() {
+    deep_levels_of_a_large_game_below(2);
+}
+
+/// The deep levels of game 1215, and the subtrees below `subtrees` of its deepest units searched under every tactic.
+fn deep_levels_of_a_large_game_below(subtrees: usize) {
     let (best, units) = deep_units();
     assert!(units.len() >= 20, "{} units", units.len());
     let game = Game::<32>::of_board(1215).unwrap();
@@ -638,7 +676,7 @@ fn deep_levels_of_a_large_game() {
                 all.push((name, tactics));
             }
         }
-        for unit in units.iter().filter(|u| u.promoted.len() >= 13).take(8) {
+        for unit in units.iter().filter(|u| u.promoted.len() >= 13).take(subtrees) {
             for start in [best, best - 25] {
                 let expected = search_unit(&all[0].1, *unit, start);
                 for (name, tactics) in &all[1..] {
@@ -649,5 +687,5 @@ fn deep_levels_of_a_large_game() {
             }
         }
     }
-    assert!(compared >= 20, "{compared}");
+    assert!(compared >= 4 * subtrees, "{compared}");
 }

@@ -1986,7 +1986,7 @@ impl<const R: usize> Meet<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_support::{long, Rng};
+    use crate::test_support::Rng;
 
     /// What a [`Problem`] of `R` words borrows: the blocks and vectors of both matroids, and the weights.
     struct Owned<const R: usize> {
