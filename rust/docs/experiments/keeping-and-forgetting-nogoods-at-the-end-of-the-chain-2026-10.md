@@ -126,3 +126,12 @@ here, which can only shrink the differences between policies.
 
 *Commits.*  ea0eda6 (the knobs, the counters, the tests), the merges of master that followed, and the commit of this
 entry with `bench/nogoods/`.
+
+## Later (2026-10): the tuning campaign's runs
+
+The sweep went on in the [tuning campaign](the-tuning-campaign-at-the-end-of-the-chain-2026-10.md), on the suite of
+subtrees of 3300, 3425, 3440 and 3441 and six whole games, one thread each.  It agrees with this entry: against the
+default (9 problems, stage A) the periods 5,000, 10,000, 20,000, 30,000 and 200,000 took 0.998, 1.007, 0.970, 0.996 and
+1.036 of the CPU and 0.919, 0.959, 0.950, 0.984 and 1.055 of the nodes, `nogood_keep=top64` 1.131 and 1.168 and
+`nogood_limit=256` 1.096 and 1.098; and on top of `force_window=all` (16 problems) the periods 5,000, 10,000 and 20,000
+took 1.036, 1.044 and 1.018 of `all`'s CPU.  No policy was adopted.
