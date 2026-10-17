@@ -24,9 +24,9 @@
 #      0    the range is complete                  3  the budget, the date or DEADLINE_HOURS
 #      4    the wall: a game's own search passed GAME_HOURS (the checkpoint is kept)
 #      else an error
-#    Every ending but an interruption is the run's end: this script writes $S3_DEST/run/ended (the reason), sets the
-#    group's desired capacity to 0 (the permission of wall-policy.json), saves, and powers off, so that nothing is
-#    launched in its place.  A node script that dies on its own does the same: the run ends with the error.  A signal
+#    Every ending but an interruption is the run's end: this script writes $S3_DEST/run/ended (the reason), saves, sets
+#    the group's desired capacity to 0 (the permission of wall-policy.json; the group then terminates the machine) and
+#    powers off, so that nothing is launched in its place.  A node script that dies on its own does the same: the run ends with the error.  A signal
 #    to the script (the shutdown that follows an interruption sends SIGTERM to every process, in the setup as well)
 #    is not an ending: it leaves the run as it is.
 #
@@ -84,6 +84,8 @@ end_run() {
         printf 'time=%s\nreason=%s\n' "$(date +%s)" "$reason" |
             "$AWS_CLI" s3 cp - "$S3_DEST/run/ended" --only-show-errors || log "could not write $S3_DEST/run/ended"
     fi
+    # The save first: taking the group to 0 has it terminate this machine within seconds.
+    "$here/save.sh" >>"$LOGS/save.log" 2>&1 || log "the last save failed (see save.log)"
     for try in 1 2 3 4 5; do
         if "$AWS_CLI" autoscaling set-desired-capacity --auto-scaling-group-name "$ASG" --desired-capacity 0; then
             now="$("$AWS_CLI" autoscaling describe-auto-scaling-groups --auto-scaling-group-names "$ASG" \
@@ -94,7 +96,6 @@ end_run() {
         log "could not set the desired capacity of $ASG to 0 (try $try of 5)"
         [ "$try" = 5 ] || sleep "$RETRY_SLEEP"
     done
-    "$here/save.sh" >>"$LOGS/save.log" 2>&1 || log "the last save failed (see save.log)"
     log "powering off"
     sudo -n shutdown -h now || log "could not shut down: $?"
 }

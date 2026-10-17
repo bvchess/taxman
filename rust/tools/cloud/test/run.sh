@@ -58,9 +58,9 @@ obj() {
 }
 
 # Whether the file $1 holds the line (fixed text) $2 / the pattern $2.
-has_line() { grep -qxF -- "$2" "$1"; }
-matches() { grep -q -- "$2" "$1"; }
-lacks() { ! grep -q -- "$2" "$1"; }
+has_line() { grep -qxF -- "$2" "$1" 2>/dev/null; }
+matches() { grep -q -- "$2" "$1" 2>/dev/null; }
+lacks() { [ -e "$1" ] && ! grep -q -- "$2" "$1"; }
 exists() { [ -e "$1" ]; }
 absent() { [ ! -e "$1" ]; }
 equals() { [ "$1" = "$2" ]; }
@@ -426,9 +426,12 @@ print(base64.b64decode(json.load(open(sys.argv[1]))["UserData"]).decode(), end="
 
     "$wall" launch --commit "$commit" --until 2099-01-01 >"$tmp/relaunch.out" 2>&1
     check "a launch over an existing run's state is refused" matches "$tmp/relaunch.out" 'run/config exists'
+    mkdir -p "$(wobj wall-test/run/boots)"
+    touch "$(wobj wall-test/run/boots)/1"
     "$wall" launch --commit "$commit" --until 2099-01-01 --continue >"$tmp/continue.out" 2>&1
     check "--continue goes on with it" equals $? 0
     check "and removes the end" absent "$(wobj wall-test/run/ended)"
+    check "and the count of the machines so far" absent "$(wobj wall-test/run/boots)/1"
     check "and the stop" absent "$(wobj wall-test/run/stop)"
     "$wall" cleanup >"$tmp/cleanup2.out" 2>&1
     check "cleanup refuses a run that has not ended" matches "$tmp/cleanup2.out" 'has not ended'

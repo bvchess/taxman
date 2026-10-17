@@ -1464,8 +1464,9 @@ nothing of the project remains, delete the launch's security group.
 The chain from n = 1 on one `c8g.16xlarge` (64 threads, window 4) at spot, with the build of a pinned commit of master,
 re-solving 1 to 3440 (to be compared with the committed `results/strict.jsonl` at home, section 6) and going on past it,
 without anyone: it stops by itself at the wall, when its budget is used, or on a date, and a spot interruption is
-mended by the machine that replaces the one taken away.  Built, tested against a stand-in for aws and **not run**: it
-waits for Brian's approval of the account changes in 12.3, and the rehearsal of 12.5 comes first.  The decision
+mended by the machine that replaces the one taken away.  Built, tested against a stand-in for aws and **not yet run on
+EC2**: Brian approved the rehearsal of 12.5 and the run of 12.4 on 2026-10-16 (the account changes are those of 12.3),
+and the rehearsal comes first.  The decision
 (Brian, 2026-10-16) and the reasons for the wall are in [docs/STATUS.md](../../docs/STATUS.md).
 
 ### 12.1 How it ends
@@ -1550,11 +1551,12 @@ the machines ran, which the console or `describe-spot-price-history` gives after
 ### 12.4 Launch, watch, stop, clean up
 
 ```
+cd ~/dev/taxman_work/taxman
 export AWS_PROFILE=bvc AWS_DEFAULT_REGION=us-east-1                 # after: aws login --profile bvc
-git fetch && COMMIT=$(git rev-parse origin/master)                    # pushed: the machines clone it from GitHub
-export RUN=chain-wall
-DRY_RUN=1 rust/tools/cloud/wall.sh launch --commit $COMMIT --until 2026-10-27    # reads, prints what it would do
-rust/tools/cloud/wall.sh launch --commit $COMMIT --until 2026-10-27             # after Brian's yes
+git fetch && git rev-parse origin/master                              # the merged master, pushed: the machines clone it
+export COMMIT=THE-40-DIGIT-ID-IT-PRINTED RUN=chain-wall UNTIL=2026-10-27
+DRY_RUN=1 rust/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL      # reads, prints what it would do
+rust/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL               # Brian approved this on 2026-10-16
 ```
 
 The defaults are the run: `c8g.16xlarge`, window 4, wall 24 hours, budget 74 instance-hours, the chain to 8191, the
@@ -1605,50 +1607,66 @@ keeps the ledger, the results and the checkpoints.
 ### 12.5 The rehearsal (designed, not run)
 
 The whole mechanism on the smallest machine of the family, `c8g.large` (2 vCPUs; $0.024 to $0.039 an hour at spot in
-us-east-1 on 2026-10-17), with the chain to 1300 instead of 3440 and the limits tiny.  Two runs, because the first run's end (the wall) is the end of the run: one shows the wall and the end,
-the other the replacement and the budget.  A chain to 400 cannot show the wall: no game up to 1300 takes a second on
-the laptop's 8 threads except the committed chain's 1232 (1.4 s), 1287 (1.6 s) and a few near 1000, and none up to 400
-takes 10 ms.  On 2 Graviton4 threads the games 990, 992, 1025, 1232 and 1287 take 3 to 7 seconds, so a wall of 2.5
-seconds (`--game-hours 0.0007`) falls at the first of them.  The setup of `c8g.large` takes the longest: expect 5 to 8
-minutes of building before the chain starts, on every machine (`SKIP_TESTS` is on, the smoke checks run).
+us-east-1 on 2026-10-17), with the chain to 1300 instead of 3440 and the limits tiny.  Two runs, because the wall is
+the end of a run: the first shows the wall and the end that takes the group to 0, the second the replacement and the
+budget.  The setup of a `c8g.large` takes the longest of anything: expect 5 to 8 minutes of building before the chain
+starts, on every machine (`SKIP_TESTS` is on, the smoke checks run).
+
+**The chain is slowed on purpose.**  No game up to 1300 takes a second under the default search (2 threads of an M1
+Max: 1232 takes 1.0 s, 1287 0.7 s, none up to 400 takes 10 ms), so neither a wall of seconds nor a chain that outlasts
+the budget would come.  Both runs pass `--extra-args "--tactic gf2=off --tactic lagrange=on --tactic symmetry=off"`, the
+matching path (the search before the GF(2) bound), whose games are slower and the same in answers.  On 2 threads of the
+M1 Max it takes 2.1 s for game 950, 4.1 s for 988 and 989, 9.1 s for 990, 2.0 s for 1200, and hours for 1232 to 1300.
 
 ```
+cd ~/dev/taxman_work/taxman
 export AWS_PROFILE=bvc AWS_DEFAULT_REGION=us-east-1                 # after: aws login --profile bvc
-git fetch && COMMIT=$(git rev-parse origin/master)                    # the commit with these scripts, pushed
-small="--instance-type c8g.large --volume-gb 20 --spot-max 0.12 --until $(date -u -v+2d +%F) --margin 60 --max-instances 4"
-                                                                     # GNU date: -d '2 days'.  Check the date it prints.
+git fetch && git rev-parse origin/master                              # the merged master with these scripts, pushed
+export COMMIT=THE-40-DIGIT-ID-IT-PRINTED
+export UNTIL=$(date -u -v+2d +%F)                                     # GNU date: date -u -d '2 days' +%F.  Check it.
 ```
 
-**Run 1: the wall, and the end that takes the group to 0** (budget 0.3 hours, as designed; about 15 minutes):
+**Run 1: the wall, and the end that takes the group to 0** (budget 0.3 hours; about 15 minutes).  A wall of 3.6 seconds
+(`--game-hours 0.001`) falls at the first game whose search is longer as the head of the window: no game from 400 to
+987 takes more than 2.1 s on 2 threads of the M1 Max, 988 and 989 take 4.1 s and 990 9.3 s (a Graviton4 core is a
+little slower), so at 988, or at 989 or 990 if the head had less than 3.6 s of the search to do:
 
 ```
 export RUN=rehearsal-1
-DRY_RUN=1 rust/tools/cloud/wall.sh launch --commit $COMMIT $small --budget-hours 0.3 --game-hours 0.0007 --chain-to 1300
-rust/tools/cloud/wall.sh launch --commit $COMMIT $small --budget-hours 0.3 --game-hours 0.0007 --chain-to 1300
+DRY_RUN=1 rust/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --instance-type c8g.large --volume-gb 20 \
+    --spot-max 0.12 --budget-hours 0.3 --game-hours 0.001 --chain-to 1300 --margin 60 --max-instances 4 \
+    --extra-args "--tactic gf2=off --tactic lagrange=on --tactic symmetry=off"
+rust/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --instance-type c8g.large --volume-gb 20 \
+    --spot-max 0.12 --budget-hours 0.3 --game-hours 0.001 --chain-to 1300 --margin 60 --max-instances 4 \
+    --extra-args "--tactic gf2=off --tactic lagrange=on --tactic symmetry=off"
 rust/tools/cloud/wall.sh status          # every few minutes
 ```
 
-It passes if `status` ends in `ENDED ...: wall at N after H hours` with N one of 990, 992, 1025, 1232, 1287 or near
-them and H at least 0.0007, within about 15 minutes of the launch, and:
+It passes if `status` ends in `ENDED ...: wall at N after H hours` with N between 988 and 990 and H at least 0.001,
+within about 15 minutes of the launch, and:
 
 * `aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names taxman-wall --query
   'AutoScalingGroups[0].DesiredCapacity'` says 0 and no instance is left (`describe-instances` of the end checks): the
   end took the group to 0 and nothing replaced the machine.  Check again 5 minutes later.
 * `aws s3 ls s3://taxman-013764204840-us-east-1/wall-rehearsal-1/ckpt/` has `nN.ckpt` and `nN.clock`, and the last line
   of `results/strict.jsonl` there is game N − 1 (no line for N).
-* `rust/tools/cloud/verify.sh` on the pulled results says the N − 1 board sizes agree with the committed file.
+* The results pulled home agree with the committed chain:
+  `aws s3 sync s3://taxman-013764204840-us-east-1/wall-rehearsal-1/results results-rehearsal-1/` and
+  `rust/tools/cloud/verify.sh results-rehearsal-1/strict.jsonl` says N − 1 board sizes are in more than one file, with
+  equal scores in all.
 * If the build was slow enough that the budget of 0.3 hours came first, the end says `deadline: the budget of 0.3
   instance-hours`: that is the budget mechanism, and the wall is run again with `--budget-hours 0.6`.
 
 Then `rust/tools/cloud/wall.sh cleanup`, which ends with the checks.
 
-**Run 2: a forced replacement, and the budget** (budget 0.6 hours, about 40 minutes).  A slow chain, so that it is still
-going when the machine is terminated and when the budget ends: the matching path's tactics, with copies to S3 every 2
-minutes and checkpoints every minute:
+**Run 2: a forced replacement, and the budget** (budget 0.6 hours, about 40 minutes).  The matching path's chain is
+still going when the machine is terminated and when the budget ends (it reaches 1231 in minutes and is then in games of
+hours); copies to S3 every 2 minutes and checkpoints every minute give the replacement something recent to restore:
 
 ```
 export RUN=rehearsal-2
-rust/tools/cloud/wall.sh launch --commit $COMMIT $small --budget-hours 0.6 --game-hours 24 --chain-to 1300 \
+rust/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --instance-type c8g.large --volume-gb 20 \
+    --spot-max 0.12 --budget-hours 0.6 --game-hours 24 --chain-to 1300 --margin 60 --max-instances 4 \
     --save-every 120 --checkpoint-interval 60 --extra-args "--tactic gf2=off --tactic lagrange=on --tactic symmetry=off"
 rust/tools/cloud/wall.sh status          # until "latest progress line" shows a game and "last save of the results" is recent
 ```
@@ -1671,7 +1689,13 @@ shows a second `starting the solver` whose `games done so far` is at least the f
 the game in progress continuing from its checkpoint (a node count above zero at its first progress line); `run/ledger`
 shows `base` equal to the first machine's `hours`; and the run ends within a few minutes of 0.6 instance-hours with
 `deadline: the budget of 0.6 instance-hours`, the group at 0, no instance, and `hours` in the ledger between 0.55 and
-0.65.  Then `wall.sh cleanup`, and `aws s3 rm --recursive` on the two prefixes once the logs are read.
+0.65.  Then `rust/tools/cloud/wall.sh cleanup`, and, once the logs are read, the two prefixes can go (a deletion in the
+bucket: Brian's yes first, like everything else here):
+
+```
+aws s3 rm --recursive s3://taxman-013764204840-us-east-1/wall-rehearsal-1/
+aws s3 rm --recursive s3://taxman-013764204840-us-east-1/wall-rehearsal-2/
+```
 
 **Cost.**  About 0.25 instance-hours for run 1 and 0.6 for run 2 at $0.024 to $0.039 an hour (0.85 hours, $0.03), a
 20 GB gp3 volume for as long (under a cent), and a few thousand requests to S3: **about $0.04 in all, and under $0.10

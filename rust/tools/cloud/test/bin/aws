@@ -86,7 +86,10 @@ case "$service $command" in
         true
         ;;
     "s3 rm")
-        rm -f "$(path_of "${args[0]}")"
+        case " ${args[*]} " in
+            *" --recursive "*) rm -rf "$(path_of "${args[0]}")" ;;
+            *) rm -f "$(path_of "${args[0]}")" ;;
+        esac
         ;;
     "sts get-caller-identity")
         echo 013764204840

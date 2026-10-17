@@ -402,6 +402,8 @@ launch() {
     if [ "$continuing" = 1 ]; then
         has_object ended && change_aws s3 rm "$S3_DEST/run/ended"
         has_object stop && change_aws s3 rm "$S3_DEST/run/stop"
+        # The machines of the run so far are not a boot loop of this one.
+        change_aws s3 rm "$S3_DEST/run/boots/" --recursive --only-show-errors
     fi
     change_aws s3 cp "$work/config" "$S3_DEST/run/config" --only-show-errors || die "cannot write the config"
     # 2. The permission the machines need at the end.
