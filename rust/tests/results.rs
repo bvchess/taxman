@@ -5,7 +5,6 @@
 //! Python referee, refuse lines that a hand edit made contradict themselves, and derive assumptions by the same
 //! rules.
 
-#[macro_use]
 mod common;
 
 use common::TempDir;
@@ -508,7 +507,10 @@ fn the_start_of_the_committed_results_passes_the_verifier() {
 
 /// All 3440 games of the committed chain pass the verifier, with the counts `results/README.md` quotes.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(the_start_of_the_committed_results_passes_the_verifier))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_start_of_the_committed_results_passes_the_verifier"
+)]
 fn the_committed_results_pass_the_verifier() {
     check_the_committed_results_to(LAST);
 }

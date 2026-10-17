@@ -382,7 +382,10 @@ fn random_agreement<const W: usize>(g: &Golden, rng: &mut Rng, stats: &mut PeelS
 /// board and all those from 480, six walks each) is 225,000 checks and 9 s; to run it, change the filter and the
 /// number of walks (`0..6`).
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(fast_peeling_and_reduction_agree_with_reference_on_a_sample))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is fast_peeling_and_reduction_agree_with_reference_on_a_sample"
+)]
 fn fast_peeling_and_reduction_agree_with_reference() {
     fast_peeling_and_reduction_agree_with_reference_on_every(1);
 }

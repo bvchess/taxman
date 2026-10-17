@@ -7,7 +7,6 @@
 //! what the game it repeats rests on.  The forged repeats that both verifiers refuse are in `tests/results.rs`.
 //! Small boards, one thread.
 
-#[macro_use]
 mod common;
 
 use common::TempDir;
@@ -92,16 +91,19 @@ fn lines(path: &Path) -> Vec<Json> {
 }
 
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(a_chain_from_1_to_100_repeats_exactly_the_searches_that_repeat))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_chain_from_1_to_60_repeats_exactly_the_searches_that_repeat"
+)]
 fn a_chain_from_1_repeats_exactly_the_searches_that_repeat() {
     // 107 of the 300, from 22 (which repeats 21) on.
     a_chain_from_1_repeats_exactly_the_searches_that_repeat_to(300, 107);
 }
 
-/// [`a_chain_from_1_repeats_exactly_the_searches_that_repeat`] for the games 1..=100.
+/// [`a_chain_from_1_repeats_exactly_the_searches_that_repeat`] for the games 1..=60.
 #[test]
-fn a_chain_from_1_to_100_repeats_exactly_the_searches_that_repeat() {
-    a_chain_from_1_repeats_exactly_the_searches_that_repeat_to(100, 26);
+fn a_chain_from_1_to_60_repeats_exactly_the_searches_that_repeat() {
+    a_chain_from_1_repeats_exactly_the_searches_that_repeat_to(60, 11);
 }
 
 /// A chain 1..=`hi` repeats `repeats` games, exactly the searches that repeat, from 22 (which repeats 21) on.
@@ -128,35 +130,39 @@ fn a_chain_from_1_repeats_exactly_the_searches_that_repeat_to(hi: u32, repeats: 
 /// A range stopped and run again finds the earlier games of the first run in its results file, by the digests its
 /// lines record: the same repeats as a chain in one piece.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(a_range_run_again_repeats_the_searches_of_its_results_file_to_90))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_range_run_again_repeats_the_searches_of_its_results_file_to_60"
+)]
 fn a_range_run_again_repeats_the_searches_of_its_results_file() {
-    a_range_run_again_repeats_the_searches_of_its_results_file_to(120);
+    a_range_run_again_repeats_the_searches_of_its_results_file_to(64, 120);
 }
 
-/// [`a_range_run_again_repeats_the_searches_of_its_results_file`] for the games 1..=90.
+/// [`a_range_run_again_repeats_the_searches_of_its_results_file`] for the games 1..=60, the first run of 1..=48.
 #[test]
-fn a_range_run_again_repeats_the_searches_of_its_results_file_to_90() {
-    a_range_run_again_repeats_the_searches_of_its_results_file_to(90);
+fn a_range_run_again_repeats_the_searches_of_its_results_file_to_60() {
+    a_range_run_again_repeats_the_searches_of_its_results_file_to(48, 60);
 }
 
-/// The second run, of the games 1..=`hi`, repeats the searches of the first run's games 1..=64.
-fn a_range_run_again_repeats_the_searches_of_its_results_file_to(hi: u32) {
+/// The second run, of the games 1..=`hi`, repeats the searches of the first run's games 1..=`first_hi`, where
+/// `first_hi + 1` repeats `first_hi` and `first_hi + 2` repeats `first_hi + 1`.
+fn a_range_run_again_repeats_the_searches_of_its_results_file_to(first_hi: u32, hi: u32) {
     let dir = TempDir::new("same-search-resumed");
     let path = dir.join("r.jsonl");
-    // The first run searches everything; 65 repeats 64 of it, and 66 repeats 65 of the second run.
-    let first = solver::solve_range(1, 64, &options(false), Some(&path)).unwrap();
+    // The first run searches everything; the next game repeats its last, and the one after that repeats it.
+    let first = solver::solve_range(1, first_hi, &options(false), Some(&path)).unwrap();
     assert!(first.iter().all(|g| g.method != Method::Repeat));
     assert!(lines(&path)
         .iter()
         .all(|line| line.get("setup").is_some_and(|s| s.is_null() || s.get("digest").is_some())));
     let second = solver::solve_range(1, hi, &options(true), Some(&path)).unwrap();
-    assert_eq!(second.first().map(|g| g.n), Some(65));
-    let expected = repeats_by_problem(65, hi);
-    assert_eq!(&expected[..2], [(65, 64), (66, 65)]);
+    assert_eq!(second.first().map(|g| g.n), Some(first_hi + 1));
+    let expected = repeats_by_problem(first_hi + 1, hi);
+    assert_eq!(&expected[..2], [(first_hi + 1, first_hi), (first_hi + 2, first_hi + 1)]);
     assert_eq!(repeats_of(&second), expected);
     let in_one_piece = solver::solve_range(1, hi, &options(true), None).unwrap();
-    assert_eq!(repeats_of(&in_one_piece[64..]), expected);
-    assert!(second.iter().zip(&in_one_piece[64..]).all(|(a, b)| (a.n, a.score) == (b.n, b.score)));
+    assert_eq!(repeats_of(&in_one_piece[first_hi as usize..]), expected);
+    assert!(second.iter().zip(&in_one_piece[first_hi as usize..]).all(|(a, b)| (a.n, a.score) == (b.n, b.score)));
     verify_files(std::slice::from_ref(&path), Optimal::built_in(), 1).unwrap_or_else(|e| panic!("{e}"));
 }
 
@@ -164,15 +170,18 @@ fn a_range_run_again_repeats_the_searches_of_its_results_file_to(hi: u32) {
 /// problem: 265 repeats 264, but its checkpoint (made with the tactic off) is resumed; 266, 267 and 268 then repeat
 /// 265, 266 and 267.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(a_game_with_a_checkpoint_is_resumed_not_repeated_at_65))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_game_with_a_checkpoint_is_resumed_not_repeated_at_49"
+)]
 fn a_game_with_a_checkpoint_is_resumed_not_repeated() {
     a_game_with_a_checkpoint_is_resumed_not_repeated_from(265, 268);
 }
 
-/// [`a_game_with_a_checkpoint_is_resumed_not_repeated`] for 65, which repeats 64, and 66, which repeats 65.
+/// [`a_game_with_a_checkpoint_is_resumed_not_repeated`] for 49, which repeats 48, and 50, which repeats 49.
 #[test]
-fn a_game_with_a_checkpoint_is_resumed_not_repeated_at_65() {
-    a_game_with_a_checkpoint_is_resumed_not_repeated_from(65, 66);
+fn a_game_with_a_checkpoint_is_resumed_not_repeated_at_49() {
+    a_game_with_a_checkpoint_is_resumed_not_repeated_from(49, 50);
 }
 
 /// The games `first..=last` each repeat the one before, and the one before `first` is solved: `first`, whose search was

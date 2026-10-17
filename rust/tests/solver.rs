@@ -1,7 +1,6 @@
 //! End-to-end tests of the per-game pipeline: whole ranges against `optimal.json`, tactic invariance, checkpoint and
 //! resume through the solver, and boards beyond `optimal.json`.
 
-#[macro_use]
 mod common;
 
 use common::{matching_options, options, TempDir};
@@ -78,16 +77,19 @@ fn every_tuning_gives_the_same_scores_at(games: std::ops::RangeInclusive<u32>) {
     }
 }
 
-/// [`every_tuning_of_the_gf2_search_gives_the_same_scores`] at the games 600..=602.
+/// [`every_tuning_of_the_gf2_search_gives_the_same_scores`] at the games 600..=601.
 #[test]
 fn every_tuning_of_the_gf2_search_gives_the_same_scores_at_a_few_games() {
-    every_tuning_gives_the_same_scores_at(600..=602);
+    every_tuning_gives_the_same_scores_at(600..=601);
 }
 
 /// The tactics that tune the GF(2) search find the same scores at games that need longer searches than those to 300
 /// (931..=940, around the hard 936, on one thread, every game searched).
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(every_tuning_of_the_gf2_search_gives_the_same_scores_at_a_few_games))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is every_tuning_of_the_gf2_search_gives_the_same_scores_at_a_few_games"
+)]
 fn every_tuning_of_the_gf2_search_gives_the_same_scores() {
     every_tuning_gives_the_same_scores_at(931..=940);
 }
@@ -143,7 +145,7 @@ fn every_tactic_gives_the_same_scores_at_a_few_games() {
 
 /// Every tactic, alone and in the combinations that matter, finds the scores of `optimal.json` at the games 1..=300.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(every_tactic_gives_the_same_scores_at_a_few_games))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is every_tactic_gives_the_same_scores_at_a_few_games")]
 fn every_tactic_gives_the_same_scores() {
     every_tactic_gives_the_same_scores_at(1..=300);
 }
@@ -341,7 +343,7 @@ fn a_range_stops_at_an_unfinished_game_and_picks_up_where_it_left_off() {
 /// the boards past 4095 with the board layer's invariants.  The setup's cost is mostly the local search for a better
 /// first incumbent.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(a_big_board_gets_through_setup))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is a_big_board_gets_through_setup")]
 fn big_boards_get_through_setup() {
     for n in [1500, 2050, 3600, 4100] {
         a_big_board_gets_through_setup_at(n);

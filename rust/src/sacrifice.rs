@@ -624,7 +624,7 @@ mod tests {
     /// optimum for every n, and each punctured game is exact.  Up to 200 (the punctured searches of W = 8), and a
     /// sample of boards that need W = 16 (0.5 s in all).
     #[test]
-    #[cfg_attr(debug_assertions, ignore = long!(the_bound_holds_and_is_tight_for_primes_to_100))]
+    #[cfg_attr(debug_assertions, ignore = "long: the quick check is the_bound_holds_and_is_tight_for_primes_to_100")]
     fn the_bound_holds_and_is_tight_for_primes() {
         the_bound_holds_and_is_tight_for_primes_on((2..=200u32).chain([500, 600, 609, 611, 660, 700]), 100);
     }
@@ -672,7 +672,10 @@ mod tests {
     /// known exactly ([`punctured`]), worth `s`: a hunt with the claim `s − 1` must find a game (the best one, which
     /// replays on `[n]` to the same score), and a hunt with the claim `s` must find nothing.
     #[test]
-    #[cfg_attr(debug_assertions, ignore = long!(a_hunt_finds_the_best_game_of_some_punctured_boards_and_nothing_above_it))]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is a_hunt_finds_the_best_game_of_some_punctured_boards_and_nothing_above_it"
+    )]
     fn a_hunt_finds_the_best_game_of_a_punctured_board_and_nothing_above_it() {
         a_hunt_finds_the_best_game_of_the_punctured_boards_of(7, 500);
     }
@@ -727,7 +730,10 @@ mod tests {
     /// best one.  It settles most of these hunts with no search, seeded or not.  Sources of the boards 30 to 150 (every
     /// 14th), as the test above.
     #[test]
-    #[cfg_attr(debug_assertions, ignore = long!(a_hunt_with_the_start_agrees_with_the_hunt_without_on_some_boards))]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is a_hunt_with_the_start_agrees_with_the_hunt_without_on_some_boards"
+    )]
     fn a_hunt_with_the_start_agrees_with_the_hunt_without() {
         a_hunt_with_the_start_agrees_with_the_hunt_without_on_every(14);
     }

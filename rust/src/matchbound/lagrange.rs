@@ -554,7 +554,10 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(debug_assertions, ignore = long!(incremental_solver_matches_the_reference_on_a_sample))]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is incremental_solver_matches_the_reference_on_a_sample"
+    )]
     fn incremental_solver_matches_the_reference() {
         incremental_solver_matches_the_reference_on_every(1);
     }
@@ -640,7 +643,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(debug_assertions, ignore = long!(bound_is_sound_on_a_sample))]
+    #[cfg_attr(debug_assertions, ignore = "long: the quick check is bound_is_sound_on_a_sample")]
     fn bound_is_sound() {
         bound_is_sound_on_every(1);
     }

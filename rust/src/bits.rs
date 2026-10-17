@@ -733,7 +733,10 @@ mod tests {
     /// widths), which no other unit test reaches: a loop that stops at a fixed word (a `len` that sums only the first
     /// 32, say) passes everything below.
     #[test]
-    #[cfg_attr(debug_assertions, ignore = long!(a_few_random_agreements_with_model_at_the_widths_of_large_boards))]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is a_few_random_agreements_with_model_at_the_widths_of_large_boards"
+    )]
     fn random_agreement_with_model_at_the_widths_of_large_boards() {
         random_agreements_at_the_widths_of_large_boards(1);
     }

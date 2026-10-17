@@ -33,7 +33,6 @@
 //!   optimum of the table.  The brute force of the rules has the optimum itself on the boards it reaches, and the
 //!   number of optimal sets is the prover's.
 
-#[macro_use]
 mod common;
 
 use common::{playable, results_path};
@@ -274,7 +273,10 @@ fn check_setup_keeps(boards: &[u32]) {
 /// 100th to 4000, every 500th to 8000, and the boards 4095, 4096 (the last at a width of 64 words and the first at 128)
 /// and 8191.  A board costs about as much as n² (0.2 s at 8000), so the boards past 2200 are thinned.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(layer_2_greedy_is_what_setup_keeps_on_the_boards_to_400))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is layer_2_greedy_is_what_setup_keeps_on_the_boards_to_400"
+)]
 fn layer_2_greedy_is_what_setup_keeps() {
     let sampled = |n: u32| {
         n <= 400
@@ -342,7 +344,7 @@ fn check_games(source: &str, games: &[(u32, Vec<u32>)]) -> Vec<String> {
 /// Theorem B on the games of the table `optimal.json`, of the committed chain `results/strict.jsonl` and of the chain
 /// 2176 to 2276 of the Graviton calibration.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(theorem_b_holds_for_every_20th_recorded_game))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is theorem_b_holds_for_every_20th_recorded_game")]
 fn theorem_b_holds_for_every_recorded_game() {
     theorem_b_holds_for_the_recorded_games(1);
 }
@@ -633,7 +635,10 @@ fn theorem_b_holds_for_every_optimal_set_of_the_smallest_boards() {
 
 /// Theorem B on every optimal set of every board from 2 to [`SMALL_BOARDS_TO`], found by exhaustive search.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(theorem_b_holds_for_every_optimal_set_of_the_smallest_boards))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is theorem_b_holds_for_every_optimal_set_of_the_smallest_boards"
+)]
 fn theorem_b_holds_for_every_optimal_set_of_the_small_boards() {
     let failures = check_small_boards(2..=SMALL_BOARDS_TO);
     assert!(failures.is_empty(), "Theorem B fails on {} small boards:\n{}", failures.len(), failures.join("\n"));

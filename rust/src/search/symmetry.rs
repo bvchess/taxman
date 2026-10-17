@@ -442,7 +442,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(debug_assertions, ignore = long!(root_pairs_is_the_definition_on_the_small_boards))]
+    #[cfg_attr(debug_assertions, ignore = "long: the quick check is root_pairs_is_the_definition_on_the_small_boards")]
     fn root_pairs_is_the_definition() {
         let (mut games, mut pairs) = (0, 0);
         for n in (2..=300).chain((301..=2200).step_by(53)).chain([1300, 2175]) {
@@ -574,7 +574,10 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(debug_assertions, ignore = long!(images_are_promotable_and_worth_the_formula_on_the_small_boards))]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is images_are_promotable_and_worth_the_formula_on_the_small_boards"
+    )]
     fn images_are_promotable_and_worth_the_formula() {
         let (optimal, mut covered) = (Optimal::built_in(), Covered::default());
         for n in (2..=400).chain((401..=1300).step_by(25)) {

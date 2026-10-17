@@ -328,7 +328,10 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(debug_assertions, ignore = long!(improve_on_threads_gives_the_sequential_answer_of_small_games))]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is improve_on_threads_gives_the_sequential_answer_of_small_games"
+    )]
     fn improve_on_threads_gives_the_sequential_answer() {
         improve_on_threads_gives_the_sequential_answer_of(&[300, 600, 960, 1215]);
     }

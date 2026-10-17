@@ -8,7 +8,6 @@
 //! with the lines before it, as a window of one does.  The policy that shares the threads is tested on its own in
 //! `src/solver/window/allot.rs`.  Small boards, at most 4 threads.
 
-#[macro_use]
 mod common;
 
 use common::{matching_options, options, results_path, TempDir};
@@ -63,12 +62,15 @@ fn without_times(line: &Json) -> Json {
 /// The committed chain's games of `1..=hi`, by n, as [`provenance`] has them.
 fn committed(hi: u32) -> BTreeMap<u32, String> {
     let text = fs::read_to_string(results_path("strict.jsonl")).unwrap();
-    let chain = text.lines().map(|line| Json::parse(line).unwrap());
+    let chain = text.lines().take(hi as usize).map(|line| Json::parse(line).unwrap());
     chain.filter(|line| n_of(line) <= hi).map(|line| (n_of(&line), provenance(&line))).collect()
 }
 
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(a_short_chain_has_the_proofs_of_the_committed_chain_with_any_window))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_short_chain_has_the_proofs_of_the_committed_chain_with_any_window"
+)]
 fn a_chain_has_the_proofs_of_the_committed_chain_with_any_window() {
     a_chain_has_the_proofs_of_the_committed_chain_with_any_window_to(600);
 }
@@ -104,7 +106,10 @@ fn a_chain_has_the_proofs_of_the_committed_chain_with_any_window_to(hi: u32) {
 }
 
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(with_one_thread_any_window_is_a_window_of_one_for_a_short_chain))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is with_one_thread_any_window_is_a_window_of_one_for_a_short_chain"
+)]
 fn with_one_thread_any_window_is_a_window_of_one() {
     with_one_thread_any_window_is_a_window_of_one_to(600);
 }
@@ -153,7 +158,10 @@ fn a_game_repeats_the_search_of_a_game_still_in_flight() {
 /// seed and no ceiling, and every game is searched, so that the games ahead start at once and run long enough for the
 /// limit (the engine checks it every 1,024 steps of a worker).
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(a_short_range_stopped_by_a_limit_ends_at_its_first_unfinished_game_and_completes_when_run_again))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_short_range_stopped_by_a_limit_ends_at_its_first_unfinished_game_and_completes_when_run_again"
+)]
 fn a_range_stopped_by_a_limit_ends_at_its_first_unfinished_game_and_completes_when_run_again() {
     a_range_stopped_by_a_limit_completes_when_run_again(598, 612);
 }
@@ -228,7 +236,10 @@ fn clock_of(checkpoints: &Path, n: u32) -> f64 {
 /// walls again at the same game at once, from the clock it was left with (which is never smaller); and a run with no
 /// limit completes every game and leaves no clock behind.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(a_lone_game_that_passes_the_wall_ends_the_range_with_no_line_and_goes_on_from_its_clock))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_lone_game_that_passes_the_wall_ends_the_range_with_no_line_and_goes_on_from_its_clock"
+)]
 fn a_game_that_passes_the_wall_ends_the_range_with_no_line_and_goes_on_from_its_clock() {
     a_game_that_passes_the_wall_goes_on_from_its_clock(800, 801);
 }

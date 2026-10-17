@@ -659,7 +659,10 @@ mod tests {
     /// those): every 199th board from 401, the boards where the count of frames steps up (512, 1024, 2048, 4096) and
     /// the largest.
     #[test]
-    #[cfg_attr(debug_assertions, ignore = long!(the_numbering_by_layer_is_the_breadth_first_one_on_a_sample))]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is the_numbering_by_layer_is_the_breadth_first_one_on_a_sample"
+    )]
     fn the_numbering_by_layer_is_the_breadth_first_one() {
         let sample = (401..=8191).step_by(199).chain([512, 1024, 2048, 4096, 8191]);
         for n in (2..=400).chain(sample) {

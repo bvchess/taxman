@@ -20,7 +20,9 @@
 //! counterexample to the theorem.
 //!
 //! * On every board up to 80 (and, in ignored tests, to 100; with every source open the default test goes to 60 and
-//!   an ignored one to 69) both directions are checked on every set, in either formulation, for O empty, for random
+//!   an ignored one to 69; the quick run does the first 48 boards, 44 with every source open, and `--release` the
+//!   rest in the long tests next to them) both directions are checked on every set, in either formulation, for O
+//!   empty, for random
 //!   subsets of U\*_{≥3} and for O = U\*_{≥3}: the sets X = K ∪ L with F ∪ X playable (family A, found depth first),
 //!   all promotion sets (family B, found the same way), and the two families must be equal; the heaviest set weighs
 //!   what the table of optimal games has for n, and the oracle's order for it is a legal game of that score.
@@ -52,7 +54,6 @@
 //!   is also the table's score, and the set it returns is a promotion set of the reference predicate that F makes
 //!   playable.
 
-#[macro_use]
 mod common;
 
 use common::{
@@ -328,7 +329,7 @@ fn theorem_m_plus_with_open_sources() {
 
 /// [`theorem_m_plus_with_open_sources`] on the boards 49 to 80.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(theorem_m_plus_with_open_sources))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is theorem_m_plus_with_open_sources")]
 fn theorem_m_plus_with_open_sources_49_to_80() {
     let mut rng = Rng(0x6A09_E667_F3BC_C909);
     check_every_board(49..=80, false, |_, from_3| random_open_sets(&mut rng, from_3, 3, 8));
@@ -343,7 +344,7 @@ fn theorem_m_plus_with_open_sources_with_claims() {
 
 /// [`theorem_m_plus_with_open_sources_49_to_80`] with the claims of `unzip`.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(theorem_m_plus_with_open_sources_with_claims))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is theorem_m_plus_with_open_sources_with_claims")]
 fn theorem_m_plus_with_open_sources_49_to_80_with_claims() {
     let mut rng = Rng(0xBB67_AE85_84CA_A73B);
     check_every_board(49..=80, true, |_, from_3| random_open_sets(&mut rng, from_3, 3, 8));
@@ -358,7 +359,7 @@ fn theorem_m_plus_with_every_source_open() {
 
 /// [`theorem_m_plus_with_every_source_open`] on the boards 45 to 60.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(theorem_m_plus_with_every_source_open))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is theorem_m_plus_with_every_source_open")]
 fn theorem_m_plus_with_every_source_open_45_to_60() {
     check_every_board(45..=60, false, |_, from_3| vec![from_3.to_vec()]);
 }
@@ -372,7 +373,7 @@ fn theorem_m_plus_with_every_source_open_with_claims() {
 
 /// [`theorem_m_plus_with_every_source_open_45_to_60`] with the claims of `unzip`.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(theorem_m_plus_with_every_source_open_with_claims))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is theorem_m_plus_with_every_source_open_with_claims")]
 fn theorem_m_plus_with_every_source_open_45_to_60_with_claims() {
     check_every_board(45..=60, true, |_, from_3| vec![from_3.to_vec()]);
 }
@@ -729,14 +730,14 @@ fn theorem_m_plus_on_a_few_random_sets_with_claims() {
 
 /// Theorem M⁺ on random sets of the boards 300, 600, 1000 and 1300.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(theorem_m_plus_on_a_few_random_sets))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is theorem_m_plus_on_a_few_random_sets")]
 fn theorem_m_plus_on_random_sets() {
     check_random_boards(&[300, 600, 1000, 1300], false, 100, 0xA076_1D64_78BD_642F);
 }
 
 /// [`theorem_m_plus_on_random_sets`] with the claims of `unzip`, for other random sets.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(theorem_m_plus_on_a_few_random_sets_with_claims))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is theorem_m_plus_on_a_few_random_sets_with_claims")]
 fn theorem_m_plus_on_random_sets_with_claims() {
     check_random_boards(&[300, 600, 1000, 1300], true, 100, 0x5851_F42D_4C95_7F2D);
 }
@@ -759,7 +760,7 @@ fn theorem_m_plus_on_random_sets_past_1300_with_claims() {
 /// it can let in: 741 (374 is rejected), 1100 (578) and 1200 (605).  Greedy rejects no source of layer 3 or more on
 /// the boards to 740, nor on 1000 or 1300, so the other tests never meet one; some of the sets here have one in them.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(theorem_m_plus_with_a_few_sets_of_a_rejected_source))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is theorem_m_plus_with_a_few_sets_of_a_rejected_source")]
 fn theorem_m_plus_with_a_rejected_source() {
     let tally = check_random_boards(&[741, 1100, 1200], false, 100, 0x8EBC_6AF0_9C88_C6E3);
     assert!(tally.with_rejected > 0, "no set has a rejected source: {tally:?}");
@@ -768,7 +769,10 @@ fn theorem_m_plus_with_a_rejected_source() {
 /// [`theorem_m_plus_with_a_rejected_source`] with the claims of `unzip` (which the components that hold an open or a
 /// rejected source do not keep).
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(theorem_m_plus_with_a_few_sets_of_a_rejected_source_with_claims))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is theorem_m_plus_with_a_few_sets_of_a_rejected_source_with_claims"
+)]
 fn theorem_m_plus_with_a_rejected_source_with_claims() {
     let tally = check_random_boards(&[741, 1100, 1200], true, 100, 0x2F72_B4B7_F3A9_C5D1);
     assert!(tally.with_rejected > 0, "no set has a rejected source: {tally:?}");
@@ -1155,21 +1159,30 @@ fn the_model_with_one_sided_candidates_on_a_sample_of_the_boards() {
 /// The model of Π⁺(O) with one-sided candidates, against the reference predicate, on the boards 2 to 100: promoting a
 /// set at once or one member at a time, its conflicts and nogoods, narrowing and count.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(the_model_with_one_sided_candidates_on_a_sample_of_the_boards))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_model_with_one_sided_candidates_on_a_sample_of_the_boards"
+)]
 fn the_model_with_one_sided_candidates_2_to_100() {
     assert_reached(&check_model_on_boards(2..=100, DRAWS, 0x2545_F491_4F6C_DD1D));
 }
 
 /// The same on the boards 101 to 200.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(the_model_with_one_sided_candidates_on_a_sample_of_the_boards))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_model_with_one_sided_candidates_on_a_sample_of_the_boards"
+)]
 fn the_model_with_one_sided_candidates_101_to_200() {
     assert_reached(&check_model_on_boards(101..=200, DRAWS, 0x9E37_79B1_85EB_CA87));
 }
 
 /// The same on the boards 201 to 300.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(the_model_with_one_sided_candidates_on_a_sample_of_the_boards))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_model_with_one_sided_candidates_on_a_sample_of_the_boards"
+)]
 fn the_model_with_one_sided_candidates_201_to_300() {
     assert_reached(&check_model_on_boards(201..=300, DRAWS, 0xC2B2_AE3D_27D4_EB4F));
 }
@@ -1332,7 +1345,7 @@ fn the_search_with_open_sources_finds_the_heaviest_set() {
 
 /// [`the_search_with_open_sources_finds_the_heaviest_set`] on the boards 61 to 80.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(the_search_with_open_sources_finds_the_heaviest_set))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is the_search_with_open_sources_finds_the_heaviest_set")]
 fn the_search_with_open_sources_finds_the_heaviest_set_61_to_80() {
     check_the_search_with_open_sources(61..=80, false, 0x1F83_D9AB_FB41_BD6B, 30);
 }
@@ -1345,7 +1358,10 @@ fn the_search_with_open_sources_finds_the_heaviest_set_with_claims() {
 
 /// [`the_search_with_open_sources_finds_the_heaviest_set_61_to_80`] with the claims of `unzip`.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(the_search_with_open_sources_finds_the_heaviest_set_with_claims))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_search_with_open_sources_finds_the_heaviest_set_with_claims"
+)]
 fn the_search_with_open_sources_finds_the_heaviest_set_61_to_80_with_claims() {
     check_the_search_with_open_sources(61..=80, true, 0x5BE0_CD19_137E_2179, 30);
 }
@@ -1359,7 +1375,10 @@ fn the_search_with_every_source_open_finds_the_heaviest_set() {
 
 /// [`the_search_with_every_source_open_finds_the_heaviest_set`] on the boards 46 to 60.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(the_search_with_every_source_open_finds_the_heaviest_set))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_search_with_every_source_open_finds_the_heaviest_set"
+)]
 fn the_search_with_every_source_open_finds_the_heaviest_set_46_to_60() {
     check_the_search_with_every_source_open(46..=60, false, 5);
 }
@@ -1372,7 +1391,10 @@ fn the_search_with_every_source_open_finds_the_heaviest_set_with_claims() {
 
 /// [`the_search_with_every_source_open_finds_the_heaviest_set_46_to_60`] with the claims of `unzip`.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(the_search_with_every_source_open_finds_the_heaviest_set_with_claims))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_search_with_every_source_open_finds_the_heaviest_set_with_claims"
+)]
 fn the_search_with_every_source_open_finds_the_heaviest_set_46_to_60_with_claims() {
     check_the_search_with_every_source_open(46..=60, true, 5);
 }

@@ -2236,7 +2236,10 @@ mod tests {
     /// Against brute force: the heaviest set under every size limit, from the empty start and from every set
     /// a solve reported (dominant), with a member deleted; and the split's bound without each member.
     #[test]
-    #[cfg_attr(debug_assertions, ignore = long!(some_intersection_warm_starts_and_splits_against_brute_force))]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is some_intersection_warm_starts_and_splits_against_brute_force"
+    )]
     fn intersection_warm_starts_and_split_against_brute_force() {
         warm_starts_and_split(3000, 100);
     }
@@ -2268,7 +2271,10 @@ mod tests {
     /// without them.  Many of the heaviest sets must hold coloops, and many of the warm starts start from, or delete,
     /// a one-sided element.
     #[test]
-    #[cfg_attr(debug_assertions, ignore = long!(some_intersection_warm_starts_and_splits_with_free_blocks_against_brute_force))]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is some_intersection_warm_starts_and_splits_with_free_blocks_against_brute_force"
+    )]
     fn intersection_warm_starts_and_split_with_free_blocks_against_brute_force() {
         warm_starts_and_split_with_free_blocks(3000, 100);
     }
@@ -2303,7 +2309,10 @@ mod tests {
     /// its exchange graph where they certify it ([`Meet::without`]), under every size limit from the heaviest set's
     /// size up, against brute force.
     #[test]
-    #[cfg_attr(debug_assertions, ignore = long!(the_heaviest_set_without_a_member_of_some_problems_against_brute_force))]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is the_heaviest_set_without_a_member_of_some_problems_against_brute_force"
+    )]
     fn heaviest_set_without_a_member_against_brute_force() {
         heaviest_set_without_a_member(4000, 100);
     }
@@ -2333,7 +2342,10 @@ mod tests {
     /// The same checks on problems with one-sided elements, as for the warm starts above.  The heaviest sets must hold
     /// coloops, and the bounds without a member must be asked for, and certified for, one-sided members.
     #[test]
-    #[cfg_attr(debug_assertions, ignore = long!(the_heaviest_set_without_a_member_of_some_problems_with_free_blocks_against_brute_force))]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is the_heaviest_set_without_a_member_of_some_problems_with_free_blocks_against_brute_force"
+    )]
     fn heaviest_set_without_a_member_with_free_blocks_against_brute_force() {
         heaviest_set_without_a_member_with_free_blocks(4000, 100);
     }

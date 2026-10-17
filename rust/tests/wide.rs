@@ -9,7 +9,6 @@
 //! nodes against the committed results, boards of 2048 and more through their setup, and the boards past 4095
 //! (128 words, and the GF(2) bound's engines of four and five block words) through theirs.
 
-#[macro_use]
 mod common;
 
 use common::{
@@ -38,7 +37,10 @@ use taxman::{accelerate, game, with_width};
 /// mask that is wrong at the top, a width that is not a power of two) shows as a different tree: the widths above
 /// the ones the boards below need are otherwise reached by no test.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(the_search_of_a_small_board_does_not_depend_on_the_width))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_search_of_a_small_board_does_not_depend_on_the_width"
+)]
 fn the_search_does_not_depend_on_the_width() {
     let default = SearchTactics::default();
     // Boards that W = 8 holds, at every width.
@@ -124,7 +126,7 @@ fn setup_at_width<const W: usize>(n: u32) -> Setup {
 /// nodes) is the same at the width the board dispatches to and at the next one.  (The boards just above 511, 1023 and
 /// 2047 are in `testdata/golden_wide` at their own widths.)
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(the_setups_at_the_edges_of_the_widths_hold))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is the_setups_at_the_edges_of_the_widths_hold")]
 fn the_edges_of_the_widths_hold() {
     let default = SearchTactics::default();
     let limit = Some(1);
@@ -163,7 +165,10 @@ fn the_setups_at_the_edges_of_the_widths_hold() {
 /// exact solves make the first 1,023 nodes of a search cost 0.6 s at 2050, 3 s at 3100 and 7 s at 3300, so the boards
 /// stay low in their widths, and only the cheapest is searched at 128 too.)
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(the_setups_of_boards_past_2047_are_the_same_at_their_width_at_64_and_at_128))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_setups_of_boards_past_2047_are_the_same_at_their_width_at_64_and_at_128"
+)]
 fn boards_past_2047_give_the_same_search_at_their_width_at_64_and_at_128() {
     let default = SearchTactics::default();
     let limit = Some(2000);
@@ -201,7 +206,7 @@ fn the_setups_of_boards_past_2047_are_the_same_at_their_width_at_64_and_at_128()
 /// give the score of `results/strict.jsonl`, on one thread, and the default also on two.  Nothing else searches at
 /// a width of 20 or more and checks the answer.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(some_tactics_give_the_recorded_score_at_w20))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is some_tactics_give_the_recorded_score_at_w20")]
 fn every_tactic_gives_the_recorded_score_at_w20() {
     tactics_give_the_recorded_score_at_w20(1);
 }
@@ -367,7 +372,7 @@ fn the_gf2_engines_of_four_and_five_words_search_the_same_tree() {
 /// most the matching bound, and an engine of five words gives the same as the one the board needs.  (The setup's
 /// local search is left out: this is the board layer's invariants, not the solver's.)
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(the_first_board_past_4095_is_set_up_at_128_words))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is the_first_board_past_4095_is_set_up_at_128_words")]
 fn boards_past_4095_are_set_up_at_128_words() {
     boards_are_set_up_at_128_words(&[(4096, 3), (4100, 3), (4740, 4), (6000, 4), (6392, 5), (8191, 5)]);
 }
@@ -498,7 +503,10 @@ fn a_committed_checkpoint_of_format_4_resumes_as_the_build_that_wrote_it_finishe
 /// bound's search of 1133 is too short to stop, and `tests/soundness.rs` resumes it on game 1000 at W = 20).  The
 /// unit tests resume only at W = 16.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(a_w20_search_interrupted_and_resumed_once_gives_the_same_answer))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_w20_search_interrupted_and_resumed_once_gives_the_same_answer"
+)]
 fn a_w20_search_interrupted_and_resumed_gives_the_same_answer() {
     a_w20_search_interrupted_and_resumed_under(2);
 }
@@ -611,7 +619,7 @@ fn deep_units() -> (u64, Vec<TaxUnit<32>>) {
 /// `symmetry` and among those with it: a search of a unit below the root with the rule finds the best completion
 /// that keeps the symmetric pairs' inequalities, which can be lighter than the unit's best.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(deep_levels_of_a_large_game_below_a_few_units))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is deep_levels_of_a_large_game_below_a_few_units")]
 fn deep_levels_of_a_large_game() {
     deep_levels_of_a_large_game_below(8);
 }

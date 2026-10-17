@@ -11,14 +11,14 @@
 //! fails these tests; that is what they are for.  To update them, run
 //!
 //! ```text
-//! cargo test --test tripwires -- --nocapture
+//! cargo test --release --test tripwires -- --nocapture
 //! ```
 //!
-//! which prints, on failure, the rows of the failing boards as observed, in the layout of [`EXPECTED`].  A
-//! non-release run checks only the rows of the small trees ([`QUICK_NODES`] nodes or fewer, the quick tests); update
-//! the table from `cargo test --release --test tripwires -- --nocapture`, which checks every row.  Check that
-//! the changes are the intended ones (the promotion sum, which is the answer, never moves), paste the rows in, and
-//! change the node counts quoted in DESIGN.md and docs/experiments/ if they are affected.  The same goes for
+//! which prints, on failure, the rows of the failing boards as observed, in the layout of [`EXPECTED`].  (Release,
+//! because a non-release run checks only the rows of the trees of [`QUICK_NODES`] nodes or fewer, in the quick
+//! tests.)  Check that the changes are the intended ones (the promotion sum, which is the answer, never moves), paste
+//! the rows in, and change the node counts quoted in DESIGN.md and docs/experiments/ if they are affected.  The same
+//! goes for
 //! [`FORGETTING`] and for [`EXTENDED`], the table of the search of the extended problem Π⁺(∅) in its formulation
 //! without the claims of `unzip` (the frame model with the claims put back and no source open;
 //! `Board::prepare_extended_with` with `claims` unset), whose rows are checked the same way.  Besides its table, Π⁺(∅)
@@ -27,7 +27,6 @@
 //! of them, Π⁺(∅) is the frame model's problem itself, so its search reproduces every tree of [`EXPECTED`], the
 //! matching rows too, which no table needs to say.
 
-#[macro_use]
 mod common;
 
 use common::{search_at_width, Config, Game};
@@ -153,9 +152,9 @@ fn tactics(assignments: &str) -> SearchTactics {
     tactics.search
 }
 
-/// The most nodes a row has for the quick tests to check it: the trees of 400 nodes or fewer take a few milliseconds
+/// The most nodes a row has for the quick tests to check it: the trees of 250 nodes or fewer take a few milliseconds
 /// each.
-const QUICK_NODES: u64 = 400;
+const QUICK_NODES: u64 = 250;
 
 /// Checks the rows of `table` ([`EXPECTED`] or [`EXTENDED`]) for the boards `ns` whose trees have `most_nodes` nodes or
 /// fewer against `tree`, the function that computes the (promotion sum, nodes) of a row's board and tactics; `what`
@@ -266,37 +265,37 @@ fn the_small_search_trees_with_claims_are_the_default_ones() {
 }
 
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(the_small_search_trees_have_not_changed))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is the_small_search_trees_have_not_changed")]
 fn the_search_trees_of_480_600_and_640_have_not_changed() {
     check_trees(&EXPECTED, GROUPS[0], u64::MAX, "search trees", default_tree);
 }
 
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(the_small_search_trees_have_not_changed))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is the_small_search_trees_have_not_changed")]
 fn the_search_trees_of_660_760_and_1000_have_not_changed() {
     check_trees(&EXPECTED, GROUPS[1], u64::MAX, "search trees", default_tree);
 }
 
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(the_small_search_trees_have_not_changed))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is the_small_search_trees_have_not_changed")]
 fn the_search_trees_of_936_and_1133_have_not_changed() {
     check_trees(&EXPECTED, GROUPS[2], u64::MAX, "search trees", default_tree);
 }
 
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(the_small_extended_search_trees_have_not_changed))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is the_small_extended_search_trees_have_not_changed")]
 fn the_extended_search_trees_of_480_600_and_640_have_not_changed() {
     check_trees(&EXTENDED, GROUPS[0], u64::MAX, "search trees of Π⁺(∅)", extended_tree);
 }
 
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(the_small_extended_search_trees_have_not_changed))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is the_small_extended_search_trees_have_not_changed")]
 fn the_extended_search_trees_of_660_760_and_1000_have_not_changed() {
     check_trees(&EXTENDED, GROUPS[1], u64::MAX, "search trees of Π⁺(∅)", extended_tree);
 }
 
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(the_small_extended_search_trees_have_not_changed))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is the_small_extended_search_trees_have_not_changed")]
 fn the_extended_search_trees_of_936_and_1133_have_not_changed() {
     check_trees(&EXTENDED, GROUPS[2], u64::MAX, "search trees of Π⁺(∅)", extended_tree);
 }
@@ -308,19 +307,28 @@ fn the_extended_search_trees_of_936_and_1133_have_not_changed() {
 const WITH_CLAIMS: &str = "search trees of Π⁺(∅) with the claims of unzip";
 
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(the_small_search_trees_with_claims_are_the_default_ones))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_small_search_trees_with_claims_are_the_default_ones"
+)]
 fn the_search_trees_of_480_600_and_640_with_claims_are_the_default_ones() {
     check_trees(&EXPECTED, GROUPS[0], u64::MAX, WITH_CLAIMS, tree_with_claims);
 }
 
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(the_small_search_trees_with_claims_are_the_default_ones))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_small_search_trees_with_claims_are_the_default_ones"
+)]
 fn the_search_trees_of_660_760_and_1000_with_claims_are_the_default_ones() {
     check_trees(&EXPECTED, GROUPS[1], u64::MAX, WITH_CLAIMS, tree_with_claims);
 }
 
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(the_small_search_trees_with_claims_are_the_default_ones))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_small_search_trees_with_claims_are_the_default_ones"
+)]
 fn the_search_trees_of_936_and_1133_with_claims_are_the_default_ones() {
     check_trees(&EXPECTED, GROUPS[2], u64::MAX, WITH_CLAIMS, tree_with_claims);
 }
@@ -360,7 +368,10 @@ fn the_tactics_of_extended_mode_are_the_default_without_the_symmetry_rule() {
 /// DESIGN.md (section 4): deterministic on one thread (nogoods, forgetting and all); nothing else asserts it for the
 /// search.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(a_search_of_a_small_game_on_one_thread_is_deterministic))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_search_of_a_small_game_on_one_thread_is_deterministic"
+)]
 fn a_search_on_one_thread_is_deterministic() {
     for (n, t) in [(1000, SearchTactics::default()), (760, SearchTactics::matching())] {
         assert_eq!(search_at_width::<16>(n, t), search_at_width::<16>(n, t), "n={n}");

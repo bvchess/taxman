@@ -8,7 +8,6 @@
 #![allow(dead_code)]
 
 mod binary;
-#[macro_use]
 mod support;
 
 #[allow(unused_imports)]
@@ -81,8 +80,18 @@ pub fn results_path(name: &str) -> PathBuf {
 pub type StoredGames = BTreeMap<u32, (u64, Vec<u32>)>;
 
 /// The completed games of a committed results file, by n.  Read-only (unlike `ResultsFile::open`, which repairs the
-/// file), so a test never touches a tracked file.
+/// file), so a test never touches a tracked file.  The file (17 MB for `strict.jsonl`) is parsed once for all the tests
+/// of a binary.
 pub fn stored_games(name: &str) -> StoredGames {
+    static READ: Mutex<BTreeMap<String, StoredGames>> = Mutex::new(BTreeMap::new());
+    READ.lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .entry(name.to_owned())
+        .or_insert_with(|| read_stored_games(name))
+        .clone()
+}
+
+fn read_stored_games(name: &str) -> StoredGames {
     let text = fs::read_to_string(results_path(name)).expect("results file");
     let mut games = BTreeMap::new();
     for line in text.lines().filter(|l| !l.trim().is_empty()) {

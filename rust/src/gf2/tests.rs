@@ -176,7 +176,10 @@ struct ExtendedTally {
 /// of them; and since the optimal game of these boards plays U\*_{≥3} (the table of optimal games has its score), the
 /// bound is at least that score less what the fixed sources bring.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(bound_and_independence_in_the_extended_problem_of_the_small_boards))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is bound_and_independence_in_the_extended_problem_of_the_small_boards"
+)]
 fn bound_and_independence_in_the_extended_problem() {
     bound_and_independence_in_extended_problems(2..=120, 100);
 }
@@ -504,7 +507,7 @@ fn levels_match_fresh_matroids_along_a_few_random_paths() {
 /// needs), the bound of every node equals the bound of the matroids built afresh from its state, and the forced
 /// members, the certified bounds and the solved bounds without a candidate are right.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(levels_match_fresh_matroids_along_a_few_random_paths))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is levels_match_fresh_matroids_along_a_few_random_paths")]
 fn levels_match_fresh_matroids_along_random_paths() {
     let boards = [60u32, 90, 120, 150, 200, 260, 330, 420, 520, 640, 760, 900, 1000];
     walk_real_games(&boards, 12, &mut Rng(0xA5A5_0123_4567_89AB), 100);
@@ -617,7 +620,10 @@ fn levels_match_fresh_matroids_along_a_few_random_paths_in_the_extended_problem(
 /// frames of Π⁺(U\*_{≥3}) are too wide for the engines of three words that the narrower sets have, and need that of
 /// four.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(levels_match_fresh_matroids_along_a_few_random_paths_in_the_extended_problem))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is levels_match_fresh_matroids_along_a_few_random_paths_in_the_extended_problem"
+)]
 fn levels_match_fresh_matroids_along_random_paths_in_the_extended_problem() {
     let mut rng = Rng(0x0E87_5EED_C0FF_EE01);
     let (mut walked, start) = (Walked::default(), Instant::now());
@@ -767,7 +773,10 @@ fn free_blocks_hold_the_coloops_of_the_one_sided_candidates() {
 /// Only the sets of 128 words have the engines of four and five words, and the boards that need them (from 4740 and
 /// 6392) are too large to walk, so this is where they run along paths, against the engines of one and two words.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(engines_of_every_word_count_agree_along_a_few_random_paths))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is engines_of_every_word_count_agree_along_a_few_random_paths"
+)]
 fn engines_of_every_word_count_agree_along_random_paths() {
     engines_of_every_word_count_agree_along(&[120, 300, 760, 1000], 5, 100);
 }

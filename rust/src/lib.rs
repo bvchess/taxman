@@ -81,13 +81,6 @@
 //! the list of games whose search repeats an earlier game's, and the slope study (the gaps of a game's root, and
 //! proofs with every bound lowered by a margin); `tests/` the integration tests.
 
-/// Helpers the unit tests share with the integration tests (`tests/common/support.rs`: temporary directories, a random
-/// number generator and the macro `long!` that the long tests use), declared first so that every module sees the macro.
-#[cfg(test)]
-#[macro_use]
-#[path = "../tests/common/support.rs"]
-pub(crate) mod test_support;
-
 pub mod accelerate;
 pub mod bits;
 pub mod board;
@@ -109,3 +102,9 @@ pub mod sacrifice;
 pub mod search;
 pub mod solver;
 pub mod tactics;
+
+/// Helpers the unit tests share with the integration tests (`tests/common/support.rs`: temporary directories and a
+/// random number generator).
+#[cfg(test)]
+#[path = "../tests/common/support.rs"]
+pub(crate) mod test_support;

@@ -1569,7 +1569,10 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(debug_assertions, ignore = long!(the_checks_give_the_same_result_on_one_thread_and_on_several_for_300_games))]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is the_checks_give_the_same_result_on_one_thread_and_on_several_for_300_games"
+    )]
     fn the_checks_give_the_same_result_on_one_thread_and_on_several() {
         the_checks_give_the_same_result_on_one_thread_and_on_several_for(700);
     }

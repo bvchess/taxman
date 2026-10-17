@@ -152,7 +152,7 @@ fn refinement_soundness<const W: usize>(g: &Golden, rng: &mut Rng) -> [u64; 3] {
 }
 
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(refined_matching_bound_is_sound_on_a_sample))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is refined_matching_bound_is_sound_on_a_sample")]
 fn refined_matching_bound_is_sound() {
     refined_matching_bound_is_sound_on_every(1);
 }
@@ -253,7 +253,10 @@ fn forced_soundness<const W: usize>(g: &Golden, rng: &mut Rng) -> [u64; 2] {
 }
 
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(forced_members_are_in_every_good_completion_of_a_sample))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is forced_members_are_in_every_good_completion_of_a_sample"
+)]
 fn forced_members_are_in_every_good_completion() {
     forced_members_are_in_every_good_completion_on_every(1);
 }
@@ -334,7 +337,7 @@ fn sums_by_tactics<const W: usize>(g: &Golden) -> Vec<(SearchTactics, u64)> {
 }
 
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(tactics_do_not_change_answers_on_a_sample))]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is tactics_do_not_change_answers_on_a_sample")]
 fn tactics_do_not_change_answers() {
     tactics_do_not_change_answers_on_every(1);
 }
@@ -379,7 +382,10 @@ fn forgetting_nogoods_often_does_not_change_answers() {
 /// so whatever the searchers keep, however often they forget and however small the table's limit, the optimum is the
 /// same.  The periods are short, to make the policies act in searches of a few thousand steps.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(every_policy_of_keeping_nogoods_gives_the_same_optimum_of_a_sample))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is every_policy_of_keeping_nogoods_gives_the_same_optimum_of_a_sample"
+)]
 fn every_policy_of_keeping_nogoods_gives_the_same_optimum() {
     every_policy_of_keeping_nogoods_gives_the_same_optimum_on_every(1);
 }
@@ -482,7 +488,10 @@ fn checkpoint_and_resume_four_threads() {
 /// engine checks the node limit every 1024 nodes of a searcher), and so are those of 1000 on two threads since the
 /// window of the forced members became `all` (2,026 nodes).
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(checkpoint_and_resume_with_the_gf2_bound_of_a_small_game))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is checkpoint_and_resume_with_the_gf2_bound_of_a_small_game"
+)]
 fn checkpoint_and_resume_with_the_gf2_bound() {
     let default = SearchTactics::default();
     let cases = [(default, 1000), (SearchTactics { symmetry: false, ..default }, 1500)];
@@ -654,7 +663,10 @@ fn the_start_is_the_same_on_every_number_of_threads() {
 /// 155 below its optimum, which the search finds at its step 4,614 of 6,287, a third of a second after it starts
 /// (the other thread has that long to give the ceiling).
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(a_ceiling_given_before_the_search_to_the_control_ends_it))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_ceiling_given_before_the_search_to_the_control_ends_it"
+)]
 fn a_ceiling_given_to_the_control_ends_the_search() {
     a_ceiling_given_to_the_control_ends_the_search_of(988, true);
 }

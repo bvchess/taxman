@@ -235,8 +235,7 @@ fn conservation_is_exact_under_random_configurations() {
 /// runs suspended: told 0, with no worker left and units queued.
 #[test]
 fn conservation_is_exact_while_workers_come_and_go() {
-    let default = if QUICK { 1 } else { 8 };
-    let iterations: u64 = std::env::var("TXENGINE_CONSERVATION").ok().and_then(|s| s.parse().ok()).unwrap_or(default);
+    let iterations: u64 = std::env::var("TXENGINE_CONSERVATION").ok().and_then(|s| s.parse().ok()).unwrap_or(8);
     let mut rng = 0x5eed_c0de_2468_ace1u64;
     let mut next = || {
         rng = mix(rng.wrapping_add(0x9e37_79b9_7f4a_7c15));
@@ -833,9 +832,11 @@ fn a_signal_stops_the_search_with_a_checkpoint_to_resume() {
     let dir = TempDir::new("signal");
     let ckpt = dir.join("ckpt").join("n0944.ckpt");
     let mut nodes = 0;
-    for (signal, code) in [("-INT", 130), ("-TERM", 143)] {
-        let (status, stdout) = solve_944(&dir, Some(signal));
-        assert_eq!(status.code(), Some(code), "{signal}: {stdout}");
+    // SIGINT and SIGTERM stop the search alike; a quick run sends the first.
+    let signals = [("-INT", 130), ("-TERM", 143)];
+    for (signal, code) in &signals[..if QUICK { 1 } else { 2 }] {
+        let (status, stdout) = solve_944(&dir, Some(*signal));
+        assert_eq!(status.code(), Some(*code), "{signal}: {stdout}");
         assert!(stdout.contains("stopped by a signal"), "{signal}: {stdout}");
         assert!(ckpt.exists(), "{signal}: the final checkpoint");
         let lines = results(&dir.join("results.jsonl"));
@@ -850,7 +851,7 @@ fn a_signal_stops_the_search_with_a_checkpoint_to_resume() {
     let (status, stdout) = solve_944(&dir, None);
     assert!(status.success(), "{stdout}");
     let lines = results(&dir.join("results.jsonl"));
-    assert_eq!(lines.len(), 3);
+    assert_eq!(lines.len(), if QUICK { 2 } else { 3 });
     let last = lines.last().unwrap();
     assert!(completed(last) && last.get("optimal_match") == Some(&Json::Bool(true)), "{stdout}");
     assert!(last.get("nodes").and_then(Json::as_u64).unwrap() > nodes);

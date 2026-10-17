@@ -7,7 +7,6 @@
 //! the chain is enough to catch a change of any decision (the boards differ in what their frames hold), and costs a
 //! few seconds.
 
-#[macro_use]
 mod common;
 
 use common::results_path;
@@ -24,7 +23,7 @@ use taxman::with_width;
 const EVERY: usize = 25;
 
 /// Every this many in the quick test, which stops at the board 1300: a board costs about as much as n² to set up.
-const QUICK_EVERY: usize = 10;
+const QUICK_EVERY: usize = 20;
 
 /// A searched game of the chain, as its results line records it.
 struct Line {
@@ -38,8 +37,10 @@ struct Line {
 /// `up_to`).
 fn sampled_lines(every: usize, up_to: u32) -> Vec<Line> {
     let text = std::fs::read_to_string(results_path("strict.jsonl")).expect("results file");
+    // Line k is the game k, so the lines up to the board `up_to` are the first `up_to`.
     let searched: Vec<Json> = text
         .lines()
+        .take(up_to as usize)
         .filter(|l| !l.trim().is_empty())
         .map(|l| Json::parse(l).expect("a results line"))
         .filter(|j| matches!(j.get("method").and_then(Json::as_str), Some("search" | "repeat")))
@@ -71,19 +72,22 @@ fn moves_of(line: &Line) -> Vec<u32> {
 /// The moves of the games a promotion set makes, and the digest of the search problem of a board, are those of the
 /// committed chain: at a sample of boards from 18 to 3440, the sets of 8 to 56 words.
 #[test]
-#[cfg_attr(debug_assertions, ignore = long!(the_board_layer_reproduces_the_chains_moves_and_problems_to_1300))]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_board_layer_reproduces_the_chains_moves_and_problems_to_1300"
+)]
 fn the_board_layer_reproduces_the_chains_moves_and_problems() {
     let lines = sampled_lines(EVERY, u32::MAX);
     assert!(lines.len() > 100 && lines.last().is_some_and(|l| l.n == 3440), "{} lines", lines.len());
     the_board_layer_reproduces(&lines);
 }
 
-/// [`the_board_layer_reproduces_the_chains_moves_and_problems`] for every tenth of the searched games to the board
+/// [`the_board_layer_reproduces_the_chains_moves_and_problems`] for every twentieth of the searched games to the board
 /// 1300.
 #[test]
 fn the_board_layer_reproduces_the_chains_moves_and_problems_to_1300() {
     let lines = sampled_lines(QUICK_EVERY, 1300);
-    assert!(lines.len() >= 20, "{} lines", lines.len());
+    assert!(lines.len() >= 10, "{} lines", lines.len());
     the_board_layer_reproduces(&lines);
 }
 
