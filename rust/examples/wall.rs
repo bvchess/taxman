@@ -41,16 +41,16 @@
 //! * **nodes**: a one-thread search of each game, stopped after `--nodes K` steps (default 5000) or `--seconds S`,
 //!   for the cost per node at the root-sized part of a tree.  `--mode start` (the default) is the solver's own
 //!   search from its start incumbent (greedy set, seed from the game of `n - 1`, dive, local search; `--no-seed`
-//!   drops the seed and the ceiling).  `--mode opt` is the proof of `matroid prove`: the engine's incumbent is the
-//!   value `opt + delta` (`--delta`, default 0) with no set behind it, no seed and no ceiling, so it needs the known
-//!   optimum.  `--width W` runs the search at a set width of the list the solver is built for, instead of the one
-//!   `with_width!` picks, to show that the width changes the time and nothing else: the same search at several
-//!   widths has to give the same nodes and GF(2) counters.  `--ckpt-dir DIR --every SECONDS` checkpoints to
-//!   `DIR/wall_n<N>_w<W>.ckpt` as often as that, and reports the size of the last checkpoint (`ckpt_bytes`; the
-//!   final one, as a node limit stops the run) before deleting it.  Each line reports the sizes, the root's GF(2)
-//!   bound (computed after the search, apart from it), the outcome and the search's cost: wall seconds, the
-//!   engine's busy time, the cycles and instructions of the process, the promotion and GF(2) counters, the cost
-//!   per node and per augmentation, and the engine's counters (below).
+//!   drops the seed and the ceiling).  `--mode opt` is the proof that `prove` of the example `matroid` (removed from
+//!   master) ran: the engine's incumbent is the value `opt + delta` (`--delta`, default 0) with no set behind it, no
+//!   seed and no ceiling, so it needs the known optimum.  `--width W` runs the search at a set width of the list the
+//!   solver is built for, instead of the one `with_width!` picks, to show that the width changes the time and nothing
+//!   else: the same search at several widths has to give the same nodes and GF(2) counters.  `--ckpt-dir DIR --every
+//!   SECONDS` checkpoints to `DIR/wall_n<N>_w<W>.ckpt` as often as that, and reports the size of the last checkpoint
+//!   (`ckpt_bytes`; the final one, as a node limit stops the run) before deleting it.  Each line reports the sizes,
+//!   the root's GF(2) bound (computed after the search, apart from it), the outcome and the search's cost: wall
+//!   seconds, the engine's busy time, the cycles and instructions of the process, the promotion and GF(2) counters,
+//!   the cost per node and per augmentation, and the engine's counters (below).
 //! * **grow**: the emulation of a large tree.  A search whose incumbent starts `--delta D` below a known optimum
 //!   (`D <= 0` usually) behaves like a search with a larger gap, so it makes a much larger tree on a known game:
 //!   the proof of `nodes --mode opt` with the incumbent at `opt + D`, on `--threads T` threads (default 1; `--cores
@@ -492,8 +492,9 @@ struct Run {
     call: Call,
 }
 
-/// The proof of `matroid prove`: the engine searches `p` from the incumbent value `best`, which has no set behind
-/// it, with no seed and no ceiling.  Only the engine's run is timed, not the graphs it starts from.
+/// The proof that `prove` of the example `matroid` (removed from master) ran: the engine searches `p` from the
+/// incumbent value `best`, which has no set behind it, with no seed and no ceiling.  Only the engine's run is timed,
+/// not the graphs it starts from.
 fn proof<const W: usize>(p: &Prepared<W>, cfg: &EngineConfig, best: u64) -> Run {
     let graph = MatchGraph::new(&p.model, &p.root);
     let space = SearchSpace::new(p, &graph);

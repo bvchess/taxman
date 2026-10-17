@@ -39,7 +39,8 @@
 //! A state reached by promoting `x` has `x` among its moves: its matroids are the parent's contracted by `x` in both
 //! of its frames (each vector of the frame reduced by `x`'s, one pivot), and a candidate that the state's reduction
 //! consumed becomes a loop (a zero vector) there.  (Checked against the matroids built from the state itself at
-//! every node of the probe's fixtures: `examples/matroid.rs`, `nodes`.)  Candidates dropped from a node are deleted:
+//! every node of the probe's fixtures by `nodes` of the example `matroid`, removed from master: it builds at commit
+//! 8753189.)  Candidates dropped from a node are deleted:
 //! they leave its *live* set.
 //!
 //! # Warm starts
