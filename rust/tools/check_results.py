@@ -29,6 +29,12 @@ For every completed game:
   provenance  the game of n-1 a line names (prev) is the file's game of n-1 (source run or results) or optimal.json's
               (source optimal), and the line's record of it matches that game (score, FNV-1a digest of the moves,
               proof, assumptions); the recorded proof and assumptions are the ones the rules below give
+  unfinished  an incomplete line that records its game (best_so_far, moves, promotions) is legal, scores the
+              best_so_far, has ascending promotions that are moves, and is no better than optimal.json's score; it need
+              not be over.  A line whose prev has source run or results and no proof was built on such a game
+              (`solve --keep-going`): an earlier incomplete line of n-1 has that score and those moves.  That game seeded
+              the line and proves nothing, so the line has no ceiling (setup.cap), no cap or prime_formula proof, and
+              scores no less than it.  A file may have holes (board sizes with no line, or only incomplete lines)
   repeat      a repeat (method "repeat", proof same_search) names a game m that is a completed game of the same file
               on an earlier line, whose proof is exhausted, cap or same_search; the record's proof and assumptions are
               m's; the repeat's setup.digest, its record's digest and m's setup.digest agree, and so do the two
@@ -215,11 +221,42 @@ def repeat_problems(n, number, row, done):
     return found
 
 
+def check_unfinished(path, number, row, optimal, divisors, unfinished, problems):
+    """An incomplete line that records its game (best_so_far, moves, promotions): the game is legal, scores the
+    best_so_far, has ascending promotions that are moves, and is no better than optimal.json's score.  It need not be
+    over, which only a completed game claims.  The line is kept for the games built on it."""
+    best = row.get("best_so_far")
+    if best is None:
+        return  # a line made by hand, with no game: it counts and seeds nothing
+
+    def fail(message):
+        problems.append(f"{path.name} line {number} (n={n}): {message}")
+
+    n, moves, promotions = row["n"], row.get("moves"), row.get("promotions")
+    if not isinstance(moves, list) or not isinstance(promotions, list):
+        fail("best_so_far without its moves and promotions")
+        return
+    try:
+        score, _left = referee(n, moves, divisors)
+    except ValueError as e:
+        fail(f"illegal: {e}")
+        return
+    if score != best:
+        fail(f"replays to {score}, not the recorded best_so_far {best}")
+    if promotions != sorted(set(promotions)) or not set(promotions) <= set(moves):
+        fail("the promotions are not moves in ascending order")
+    if n in optimal and best > optimal[n]["score"]:
+        fail(f"best_so_far {best} is above optimal.json's {optimal[n]['score']}")
+    unfinished.setdefault(n, []).append((number, best, digest(moves), moves))
+
+
 def check_file(path, optimal, fm, heuristic, divisors, problems):
-    """Checks one file; returns {n: (score, moves, proof, assumptions, line, row)} of its completed games and the
-    report's counters."""
+    """Checks one file; returns {n: (score, moves, proof, assumptions, line, row)} of its completed games, the
+    report's counters, and the board sizes that only an unfinished search is recorded for."""
     rows = read_lines(path, problems)
     games = {}
+    unfinished = {}  # n -> [(line, best_so_far, digest of the moves)] of the incomplete lines that record their game
+    stopped = set()  # the board sizes with an incomplete line
     for number, row in rows:
         if row.get("schema") != SCHEMA:
             problems.append(
@@ -228,6 +265,8 @@ def check_file(path, optimal, fm, heuristic, divisors, problems):
             )
             continue
         if not row.get("completed"):
+            stopped.add(row["n"])
+            check_unfinished(path, number, row, optimal, divisors, unfinished, problems)
             continue
         n = row["n"]
         if n in games:
@@ -282,7 +321,24 @@ def check_file(path, optimal, fm, heuristic, divisors, problems):
         record = row["prev"]
         source = record["source"] if record is not None else None
         prev = None  # (score, moves, proof, assumptions)
-        if source in ("run", "results"):
+        proven = True  # whether the game of n-1 is optimal (given its assumptions); not the best game of a stopped search
+        if source in ("run", "results") and record["proof"] is None:
+            # The best game of an unfinished search of n-1 (`solve --keep-going`): an earlier incomplete line of n-1
+            # with that score and those moves.
+            found = [
+                u
+                for u in unfinished.get(n - 1, [])
+                if u[0] < number and u[1] == record["score"] and u[2] == record["moves_digest"]
+            ]
+            if not found:
+                fail("built on the best game of an unfinished search of n-1, and no earlier line records one with that "
+                     "score and those moves")
+                continue
+            prev = (found[0][1], found[0][3], None, set())
+            proven = False
+            if score < prev[0]:
+                fail(f"scores {score}, less than the {prev[0]} of the unfinished search of n-1 it was built on")
+        elif source in ("run", "results"):
             if below is None:
                 fail(f"built from game {n - 1} of this file, which it does not hold")
                 continue
@@ -306,14 +362,16 @@ def check_file(path, optimal, fm, heuristic, divisors, problems):
             if not same:
                 fail("its record of the game of n-1 does not match that game")
 
-        # Arithmetic.
-        prev_score = prev[0] if prev else None
+        # Arithmetic.  What rests on the game of n-1 (the ceiling, the prime formula) needs it proven.
+        prev_score = prev[0] if prev and proven else None
         total = sum(promotions)
         setup = row.get("setup") or {}
         cap = setup.get("cap")
         bag = row.get("in_the_bag")
         if bag is not None and score != bag + total:
             fail(f"scores {score}, not in_the_bag {bag} + promotions {total}")
+        if cap is not None and prev_score is None:
+            fail("it has a ceiling (a cap in its setup), which needs a proven game of n-1 it names")
         if cap is not None:
             if total > cap:
                 fail(f"promotions {total} exceed the cap {cap}")
@@ -340,6 +398,9 @@ def check_file(path, optimal, fm, heuristic, divisors, problems):
         # Proof and assumptions.
         if proof in RESTS_ON_PREV and prev is None:
             fail(f"its proof ({proof}) rests on a game of n-1 it does not name")
+        elif proof in RESTS_ON_PREV and not proven:
+            fail(f"its proof ({proof}) rests on the game of n-1, which it records as the best game of an unfinished "
+                 "search")
         if repeated is not None:
             assumes = repeated[3]
         else:
@@ -359,7 +420,7 @@ def check_file(path, optimal, fm, heuristic, divisors, problems):
                 certificates["n + score(n-1)"] += 1
             elif is_prime(n) and score == prev_score + n - replaced:
                 certificates["prime formula"] += 1
-    return done, counts, assumed, certificates
+    return done, counts, assumed, certificates, sorted(stopped - set(games))
 
 
 def listing(counter):
@@ -392,10 +453,13 @@ def main():
     shared = set()
     for path in files:
         print(f"{path}:")
-        done, counts, assumed, certificates = check_file(path, optimal, fm, heuristic, divisors, problems)
+        done, counts, assumed, certificates, unfinished = check_file(path, optimal, fm, heuristic, divisors, problems)
         if done:
             missing = sum(1 for n in range(min(done), max(done) + 1) if n not in done)
             print(f"  {len(done)} completed games, n = {min(done)}..{max(done)} ({missing} missing)")
+        if unfinished:
+            print(f"  unfinished: {len(unfinished)} board sizes have only an unfinished search "
+                  f"(n = {unfinished[0]} to {unfinished[-1]}); they are not proven")
         print("  proof: " + listing(counts))
         print("  assumed: " + listing(assumed))
         print("  arithmetic certificates: " + listing(certificates))

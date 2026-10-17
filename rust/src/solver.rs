@@ -67,7 +67,9 @@
 //! the results file (one JSON object per line) as soon as it is concluded, so that a restarted run skips what is
 //! finished; the file is checked when it is opened ([`ResultsFile::open`]).  A game whose search a limit or a signal
 //! stopped is recorded as incomplete, keeps its checkpoint, and ends the range; so does one that passes the wall
-//! ([`SolveOptions::game_limit`]), but with no line.  The games a game of the range may
+//! ([`SolveOptions::game_limit`]), but with no line.  (With [`SolveOptions::keep_going`] a limit does not end the
+//! range: the next game goes on from the unfinished game's best game as a seed alone, see `window`, "Past limits".)
+//! The games a game of the range may
 //! repeat the search of are the file's and the range's own (a single game solved with [`solve_game`] has none).
 //!
 //! Up to [`SolveOptions::window`] consecutive games are in flight at once: game `n + 1` is set up while `n`
@@ -139,6 +141,27 @@ pub struct SolveOptions {
     /// has it (`--use-prev`); the results whose proofs rest on it record that they assume it optimal.  Without it
     /// such a game is solved standalone.
     pub use_prev: bool,
+    /// A game whose search a time or node limit stops does not end the range (`--keep-going`): its best game so far
+    /// is recorded as an unfinished line, and the next game goes on from it as a seed and nothing more.  The unfinished
+    /// game is not known to be optimal, so the next game gets no ceiling from it, no prime formula and no repeat that
+    /// rests on it ([`Prev::proven`]).  A rerun passes over the games the file holds only unfinished lines of
+    /// ([`retry`](Self::retry) searches them again), and a stop by a signal still ends the range, with nothing
+    /// recorded for the game it stopped, so that a rerun resumes it.  Such a range is solved one game at a time
+    /// (`window` is 1): a game that goes on from a game still in flight could not tell whether it was proven.
+    pub keep_going: bool,
+    /// A number recorded in `options.pass` of every line this run writes (`--pass N`): which pass over the games made
+    /// it, when a script (`rust/tools/cloud/sweep.sh`) goes over them more than once.  It changes nothing else.
+    pub pass: Option<u32>,
+    /// With [`keep_going`](Self::keep_going), search again the games the results file holds only unfinished lines of
+    /// (`--retry`; each resumes from its checkpoint if it has one), instead of passing over them.  A pass with a longer
+    /// limit retries the failures of an earlier one this way.
+    pub retry: bool,
+    /// With [`keep_going`](Self::keep_going), search again only the unfinished games whose game of `n − 1` now has more
+    /// to give than it had when the game was last tried (`--retry-improved`): it is proven and the line's was not, or
+    /// it has a better best game than the line's seed, or the line had no game of `n − 1`.  The others are passed over.
+    /// One pass of a script (`rust/tools/cloud/sweep.sh`) that goes over blocks of games made apart, so that every
+    /// game sees the one before it whichever block made it.
+    pub retry_improved: bool,
     /// The games of a range in flight at once (`--window`, at least 1, 4 by default: the best measured at 64 threads,
     /// see `window`), which share the `threads`.  With one thread it is 1 whatever it says: there is no thread to run
     /// a second game on.
@@ -161,6 +184,10 @@ impl Default for SolveOptions {
             spill_dir: None,
             force_search: false,
             use_prev: false,
+            keep_going: false,
+            pass: None,
+            retry: false,
+            retry_improved: false,
             window: 4,
         }
     }
@@ -215,10 +242,15 @@ pub struct Prev {
     pub moves: Vec<u32>,
     pub score: u64,
     pub source: PrevSource,
-    /// How its optimality is established; `None` if that is not known (`optimal.json` does not say).
+    /// How its optimality is established; `None` if that is not known (`optimal.json` does not say), and for the best
+    /// game of a search that a limit stopped ([`proven`](Self::proven) false).
     pub proof: Option<Proof>,
     /// What its proof assumes (see [`crate::results`]).
     pub assumes: Assumptions,
+    /// Whether the game is optimal, given what it assumes: false for the best game found by a search that a limit
+    /// stopped (`--keep-going`), which can seed the next game and do no more.  Only a proven game gives the next game
+    /// its ceiling `n + score(n − 1)` and the prime formula ([`cap_score`](Self::cap_score)).
+    pub proven: bool,
 }
 
 impl Prev {
@@ -227,10 +259,10 @@ impl Prev {
     pub fn from_optimal(optimal: &Optimal, n: u32) -> Option<Prev> {
         let (moves, score) = (optimal.moves(n)?, optimal.score(n)?);
         let assumes = Assumptions::from([assumed_optimal(n)]);
-        Some(Prev { moves: moves.to_vec(), score, source: PrevSource::Optimal, proof: None, assumes })
+        Some(Prev { moves: moves.to_vec(), score, source: PrevSource::Optimal, proof: None, assumes, proven: true })
     }
 
-    /// A completed result of this run.
+    /// A result of this run: a completed game, or the best game of a search that a limit stopped, which is not proven.
     fn from_result(result: &GameResult) -> Prev {
         Prev {
             moves: result.moves.clone(),
@@ -238,7 +270,13 @@ impl Prev {
             source: PrevSource::Run,
             proof: result.proof,
             assumes: result.assumes.clone(),
+            proven: result.completed,
         }
+    }
+
+    /// The score that gives the next game its ceiling: the game's, if it is proven.
+    pub fn cap_score(&self) -> Option<u64> {
+        self.proven.then_some(self.score)
     }
 
     /// What a result records about the previous game it was built from.
@@ -254,7 +292,8 @@ impl Prev {
     }
 
     /// Checks that the game can be an optimal game of `n − 1`: legal, scoring what it is given as, over, and
-    /// opening with the largest prime.  (Optimal itself cannot be checked; see the tripwires in [`conclude`].)
+    /// opening with the largest prime.  (Optimal itself cannot be checked; see the tripwires in [`conclude`].)  The
+    /// best game of a stopped search is checked for the first two only, as `conclude` checks it.
     fn check(&self, n: u32) -> Result<(), String> {
         let before = n - 1;
         let whence = self.source.whence();
@@ -264,6 +303,9 @@ impl Prev {
                 return Err(format!("the previous game scores {score}, not the {} it is given as", self.score))
             }
             Err(e) => return Err(format!("the previous game is not a legal game of n={before}: {e}")),
+        }
+        if !self.proven {
+            return Ok(());
         }
         replay_finished(before, &self.moves)
             .map(|_| ())
@@ -468,6 +510,10 @@ pub struct GameResult {
     pub node_limit: Option<u64>,
     pub force_search: bool,
     pub use_prev: bool,
+    pub keep_going: bool,
+    pub retry: bool,
+    pub retry_improved: bool,
+    pub pass: Option<u32>,
     /// `Some(true)` when `optimal.json` has the game, whose score the game's equals (else it is rejected); `None`
     /// if the game is incomplete or the table lacks `n`.
     pub optimal_match: Option<bool>,
@@ -502,6 +548,10 @@ impl GameResult {
             node_limit: opts.node_limit,
             force_search: opts.force_search,
             use_prev: opts.use_prev,
+            keep_going: opts.keep_going,
+            retry: opts.retry,
+            retry_improved: opts.retry_improved,
+            pass: opts.pass,
             optimal_match: None,
             prev: prev.map(|p| p.info(n)),
             same_search: None,
@@ -547,8 +597,20 @@ impl GameResult {
             ("seconds", self.time_limit.map_or(Json::Null, |d| Json::Num(d.as_secs_f64()))),
             ("nodes", self.node_limit.map_or(Json::Null, Json::from)),
         ]);
-        let options =
-            Json::object([("force_search", Json::Bool(self.force_search)), ("use_prev", Json::Bool(self.use_prev))]);
+        // The flags of a `--keep-going` run, and its pass, are there only when given: the lines of any other run are what
+        // they were.
+        let keep_going = self.keep_going.then_some(("keep_going", Json::Bool(true)));
+        let retry = self.retry.then_some(("retry", Json::Bool(true)));
+        let improved = self.retry_improved.then_some(("retry_improved", Json::Bool(true)));
+        let pass = self.pass.map(|pass| ("pass", Json::from(pass)));
+        let options = Json::object(
+            [("force_search", Json::Bool(self.force_search)), ("use_prev", Json::Bool(self.use_prev))]
+                .into_iter()
+                .chain(keep_going)
+                .chain(retry)
+                .chain(improved)
+                .chain(pass),
+        );
         let fields = [("schema", Json::from(SCHEMA)), ("n", Json::from(self.n)), ("score", score)]
             .into_iter()
             .chain(best_so_far)
@@ -595,8 +657,15 @@ impl GameResult {
         } else {
             format!("  assumes {}", self.assumes.iter().cloned().collect::<Vec<_>>().join("; "))
         };
+        // A game built on the best game of an unfinished search is said to be: it had a seed and no ceiling.
+        let seeded = match &self.prev {
+            Some(prev) if prev.proof.is_none() && prev.source != PrevSource::Optimal => {
+                format!("  seeded by the unfinished game of {} (no ceiling)", prev.n)
+            }
+            _ => String::new(),
+        };
         format!(
-            "n={:<5} score={:<9} {:<7} nodes={:<11} {:>9.3} s  {optimal}{proof}{assumes}",
+            "n={:<5} score={:<9} {:<7} nodes={:<11} {:>9.3} s  {optimal}{proof}{assumes}{seeded}",
             self.n,
             self.score,
             self.method.as_str(),
@@ -683,6 +752,19 @@ enum Before {
     Run,
     /// None: the game is solved standalone, with no seed and no ceiling.
     None,
+}
+
+impl Before {
+    /// Whether the game of `n − 1` is one the prime formula may build on: there is one, and it is proven.  (A game
+    /// made by this run is proven, unless the range keeps going past limits, and then its game is given whole:
+    /// `Given`.)
+    fn proven(&self) -> bool {
+        match self {
+            Before::Given(prev) => prev.proven,
+            Before::Run => true,
+            Before::None => false,
+        }
+    }
 }
 
 /// What the setup of a game (its first phase, [`set_up`]) made of it.
@@ -879,7 +961,7 @@ fn set_up_with_width<const W: usize>(n: u32, before: &Before, opts: &SolveOption
     let checkpoint = opts.checkpoint_file(n).filter(|path| path.exists());
     let derive = !opts.force_search && checkpoint.is_none();
 
-    if derive && tactics.prime_shortcut && tables.is_prime(n) && !matches!(before, Before::None) {
+    if derive && tactics.prime_shortcut && tables.is_prime(n) && before.proven() {
         let candidates = BoardFrames::<W>::new(&tables, Bits::EMPTY).promotion_candidates();
         return Ok(SetUp::Derived(Derived::Prime { candidates: candidates.to_vec() }));
     }
@@ -975,7 +1057,7 @@ fn conclude_game(
         }
         Found::Searched(set, searched) => {
             set.fill(&mut result);
-            let cap = ceiling(n, set.in_the_bag, context.prev.map(|prev| prev.score), opts);
+            let cap = ceiling(n, set.in_the_bag, context.prev.and_then(Prev::cap_score), opts);
             let setup = SearchSetup { cap, ..set.setup };
             result.setup = Some(setup);
             let sum: u64 = searched.promotions.iter().map(|&p| u64::from(p)).sum();
@@ -1057,7 +1139,8 @@ fn conclude(
     if let Some(prev) = context.prev {
         let ceiling = prev.score + u64::from(n);
         let whence = prev.source.whence();
-        if score > ceiling {
+        // Only an optimal game of n − 1 bounds the game of n; the best game of a stopped search proves nothing.
+        if prev.proven && score > ceiling {
             return reject(
                 result,
                 format!(
@@ -1297,7 +1380,15 @@ pub struct RangeSummary {
     pub solved: usize,
     /// Games already in the results file.
     pub skipped: usize,
-    /// The game whose search stopped at a limit; the range ends there.
+    /// With [`SolveOptions::keep_going`], the games of the results file that only an unfinished search is recorded
+    /// for, which the range passed over (not counted in `skipped`).
+    pub passed_over: usize,
+    /// With [`SolveOptions::keep_going`], the games solved in this run whose search a limit stopped (counted in
+    /// `solved`): unfinished lines, with their checkpoints kept.
+    pub unfinished: usize,
+    /// The game whose search stopped at a limit, or at a signal; the range ends there.  (With
+    /// [`SolveOptions::keep_going`] a limit does not end the range, only a signal does, and nothing is recorded for
+    /// that game.)
     pub stopped_at: Option<u32>,
     /// The game that passed the wall ([`SolveOptions::game_limit`]); the range ends there, with nothing recorded for it.
     pub walled: Option<Wall>,
@@ -1320,14 +1411,31 @@ fn stored_prev(results: &ResultsFile, n: u32) -> Option<Prev> {
         source: PrevSource::Results,
         proof: Some(game.proof),
         assumes: game.assumes.clone(),
+        proven: true,
     })
 }
 
-/// The solution of game `n − 1` from the results file, else, with `use_prev`, from `optimal.json`.
-fn previous_game(n: u32, results: Option<&ResultsFile>, optimal: &Optimal, use_prev: bool) -> Option<Prev> {
+/// The best game of the last unfinished search of `n` in the results file (a board size it has no completed game of),
+/// as the previous game of `n + 1`: a seed, not a proven game.
+fn stored_unfinished(results: &ResultsFile, n: u32) -> Option<Prev> {
+    let game = results.unfinished(n)?;
+    Some(Prev {
+        moves: game.moves.clone(),
+        score: game.score,
+        source: PrevSource::Results,
+        proof: None,
+        assumes: Assumptions::new(),
+        proven: false,
+    })
+}
+
+/// The solution of game `n − 1` from the results file, else (when the range keeps going past limits) the best game of
+/// an unfinished search of it, as a seed, else, with `use_prev`, from `optimal.json`.
+fn previous_game(n: u32, results: Option<&ResultsFile>, optimal: &Optimal, opts: &SolveOptions) -> Option<Prev> {
     let before = n.checked_sub(1).filter(|&before| before >= 1)?;
-    let from_table = || use_prev.then(|| Prev::from_optimal(optimal, before)).flatten();
-    results.and_then(|r| stored_prev(r, before)).or_else(from_table)
+    let from_table = || opts.use_prev.then(|| Prev::from_optimal(optimal, before)).flatten();
+    let unfinished = |r: &ResultsFile| opts.keep_going.then(|| stored_unfinished(r, before)).flatten();
+    results.and_then(|r| stored_prev(r, before).or_else(|| unfinished(r))).or_else(from_table)
 }
 
 /// Says on stderr that game `n` has no previous game, so that it is solved standalone: correct, but without the
@@ -1398,8 +1506,12 @@ pub fn solve_range_each_with(
             }
         }
     }
-    let first = previous_game(lo, results.as_ref(), optimal, opts.use_prev);
-    if lo > 1 && first.is_none() && !results.as_ref().is_some_and(|file| file.completed(lo).is_some()) {
+    let first = previous_game(lo, results.as_ref(), optimal, opts);
+    // A first game the file settles, or a retry does not search, is not solved standalone by this run.
+    let passes_unfinished = opts.keep_going && !opts.retry;
+    let settled =
+        |file: &ResultsFile| file.completed(lo).is_some() || (passes_unfinished && file.unfinished(lo).is_some());
+    if lo > 1 && first.is_none() && !results.as_ref().is_some_and(settled) {
         note_standalone(lo, optimal.score(lo - 1).is_some());
     }
     let mut earlier = results.as_ref().map(Earlier::of_file).unwrap_or_default();
@@ -1511,6 +1623,7 @@ mod tests {
             source,
             proof: Some(Proof::Exhausted),
             assumes: Assumptions::new(),
+            proven: true,
         };
         // [5, 4, 6] is the game for 6, scoring 15.
         for source in [PrevSource::Results, PrevSource::Optimal] {

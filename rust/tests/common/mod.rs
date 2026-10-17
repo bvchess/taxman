@@ -111,7 +111,14 @@ fn read_stored_games(name: &str) -> StoredGames {
 /// assume nothing (`results/README.md`); the proof only matters to the results lines.
 pub fn prev_of(games: &StoredGames, n: u32) -> Prev {
     let (score, moves) = &games[&(n - 1)];
-    Prev { moves: moves.clone(), score: *score, source: PrevSource::Results, proof: None, assumes: Assumptions::new() }
+    Prev {
+        moves: moves.clone(),
+        score: *score,
+        source: PrevSource::Results,
+        proof: None,
+        assumes: Assumptions::new(),
+        proven: true,
+    }
 }
 
 /// The default options on `threads` threads.

@@ -52,7 +52,12 @@
 //!   cannot pass for an exhausted search, which does not rest on the game of `n − 1`); a prime game scores
 //!   `n + score(n − 1) − P`, `P` the largest prime below `n`;
 //! * the predecessor the line names is the game the file (or `optimal.json`) holds for `n − 1`: same score,
-//!   same moves (by digest, [`moves_digest`]), same proof and assumptions;
+//!   same moves (by digest, [`moves_digest`]), same proof and assumptions.  A predecessor of a run or file with no
+//!   proof is the best game of an unfinished search (`solve --keep-going`): an earlier incomplete line of `n − 1`
+//!   with that score and those moves.  Such a game seeds the line and proves nothing, so the line has no ceiling
+//!   (`setup.cap`) and no proof that rests on `n − 1` (`cap`, `prime_formula`), and scores no less than that game;
+//!   the proofs that rest on nothing of `n − 1` (`exhausted`, `trivial`, and `same_search` on a completed game of
+//!   the file) stand;
 //! * a repeat: the game `m` it names is a completed game of the file, on an earlier line, whose proof settles its
 //!   search ([`Proof::settles_search`]) and whose proof and assumptions the record gives; the search problems of
 //!   both games, set up again from their board sizes ([`search_problem`]), are as large as their lines record
@@ -60,6 +65,12 @@
 //!   and both games score their own `in_the_bag` (from the boards set up again) plus the recorded promotion sum;
 //! * the recorded proof and assumptions are the ones derived from the line and the game its proof rests on;
 //! * no board size has two completed lines.
+//!
+//! An incomplete line that records its game (`best_so_far`, with `moves` and `promotions`: the solver always writes
+//! them) is checked as far as it goes: the game is legal, scores the `best_so_far`, has ascending promotions that are
+//! moves, and is no better than `optimal.json`'s score.  A file may have holes, board sizes with no line or only
+//! incomplete ones (the file of a `--keep-going` run, or the sweep's `explore.jsonl`, which merges many); each line is
+//! checked against what it rests on in the same file, and a proof that rests on a game the file lacks is refused.
 //!
 //! The digest a line that is not a repeat records is not checked against its problem: it is how the solver finds
 //! an earlier game to repeat, which it then sets up again and compares problem for problem, as the check of the
@@ -95,7 +106,7 @@
 //! The fields of a line are described in README.md ("A results line"); [`SCHEMA`] is the version of the format.
 
 use crate::board::search_problem;
-use crate::game::{largest_prime_at_most, replay_finished, Optimal};
+use crate::game::{largest_prime_at_most, replay, replay_finished, Optimal};
 use crate::json::Json;
 use crate::search::{Problem, ProblemSize};
 use crate::solver::{parse_digest, GameResult, Method, PrevSource, SameSearch, MAX_N};
@@ -292,10 +303,42 @@ fn replaced_by_prime(n: u32) -> u64 {
     u64::from(n.checked_sub(1).and_then(largest_prime_at_most).unwrap_or(0))
 }
 
+/// The best game of a search that a limit stopped, from its incomplete line, checked: legal, and scoring what the line
+/// says.  It seeds the next game (`taxman solve --keep-going`) and proves nothing.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UnfinishedGame {
+    pub n: u32,
+    /// Its line in the file, counting from 1.
+    pub line: usize,
+    /// The line's `best_so_far`.
+    pub score: u64,
+    pub moves: Vec<u32>,
+    /// The numbers promoted, ascending.
+    pub promotions: Vec<u32>,
+    /// [`moves_digest`] of the moves, which the line of a game built on this one records.
+    pub digest: String,
+    /// What the search had from the game of `n − 1` (the line's `prev`); `None` if it had none.
+    pub built_on: Option<BuiltOn>,
+}
+
+/// What a search had from the game of `n − 1`, as its line records it: a seed (the game's score), and a ceiling and a
+/// prime formula too if the game was proven.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BuiltOn {
+    pub score: u64,
+    /// The game was optimal, given what it assumed (a completed game, or `optimal.json`'s): not the best game of an
+    /// unfinished search.
+    pub proven: bool,
+}
+
 /// What [`read_results`] found in a results file.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Contents {
     pub games: BTreeMap<u32, StoredGame>,
+    /// Every incomplete line that records its game, by board size, in the order of the file (a board size can have
+    /// several, and a completed game as well: a search stopped, then resumed).  An incomplete line without the game
+    /// (one made by hand) counts in `incomplete_lines` and `runs` only.
+    pub unfinished: BTreeMap<u32, Vec<UnfinishedGame>>,
     /// For each board size whose search was stopped by a limit and not yet completed: how many invocations its
     /// incomplete lines record.
     pub runs: BTreeMap<u32, u32>,
@@ -355,10 +398,11 @@ struct Entry {
 /// A line of a results file.
 enum Line {
     Completed(Box<Entry>),
-    /// A search a limit stopped, with the number of invocations it records.
+    /// A search a limit stopped, with the number of invocations it records and its best game, if the line has one.
     Incomplete {
         n: u32,
         invocations: u32,
+        best: Option<UnfinishedGame>,
     },
 }
 
@@ -450,6 +494,46 @@ fn parse_source(text: &str) -> Option<PrevSource> {
     [PrevSource::Run, PrevSource::Results, PrevSource::Optimal].into_iter().find(|s| s.as_str() == text)
 }
 
+/// The best game an incomplete line records (`best_so_far`, `moves`, `promotions`), if it has one.  The solver always
+/// writes it; a line made by hand may lack it, and then counts but seeds nothing.
+fn parse_unfinished(f: &Fields, n: u32, line: usize) -> Result<Option<UnfinishedGame>, String> {
+    let Some(best) = f.0.get("best_so_far").filter(|best| !matches!(best, Json::Null)) else { return Ok(None) };
+    let score = best.as_u64().ok_or_else(|| Fields::bad("best_so_far"))?;
+    let (moves, promotions) = (f.u32s("moves")?, f.u32s("promotions")?);
+    let digest = moves_digest(&moves);
+    let built_on = match f.0.get("prev") {
+        None | Some(Json::Null) => None,
+        Some(prev) => {
+            let p = Fields(prev);
+            let source = parse_source(p.str("source")?).ok_or("bad \"prev.source\"")?;
+            let proven = p.proof("proof")?.is_some() || source == PrevSource::Optimal;
+            Some(BuiltOn { score: p.u64("score")?, proven })
+        }
+    };
+    Ok(Some(UnfinishedGame { n, line, score, moves, promotions, digest, built_on }))
+}
+
+/// The checks of an incomplete line's game: legal, scoring the `best_so_far` it records (it need not be over, which
+/// only a completed game claims), promotions that are moves in ascending order, and no more than `optimal.json`'s
+/// score where the table has the game.
+fn check_unfinished(game: &UnfinishedGame, optimal: &Optimal) -> Result<(), String> {
+    let replayed = replay(game.n, &game.moves)?;
+    if replayed != game.score {
+        return Err(format!("the moves score {replayed}, not the recorded best_so_far {}", game.score));
+    }
+    if !game.promotions.windows(2).all(|pair| pair[0] < pair[1]) {
+        return Err("the promotions are not in ascending order".into());
+    }
+    let moves: BTreeSet<u32> = game.moves.iter().copied().collect();
+    if let Some(p) = game.promotions.iter().find(|p| !moves.contains(p)) {
+        return Err(format!("promotion {p} is not a move"));
+    }
+    match optimal.score(game.n) {
+        Some(best) if game.score > best => Err(format!("best_so_far {} is above optimal.json's {best}", game.score)),
+        _ => Ok(()),
+    }
+}
+
 /// Parses a line that is valid JSON.
 fn parse_line(json: &Json, line: usize) -> Result<Line, String> {
     let f = Fields(json);
@@ -463,7 +547,7 @@ fn parse_line(json: &Json, line: usize) -> Result<Line, String> {
         return Err(format!("n={n} is not a board size from 1 to {MAX_N}"));
     }
     if !f.bool("completed")? {
-        return Ok(Line::Incomplete { n, invocations: f.u32("invocations")? });
+        return Ok(Line::Incomplete { n, invocations: f.u32("invocations")?, best: parse_unfinished(&f, n, line)? });
     }
     let method = Method::parse(f.str("method")?).ok_or("bad \"method\"")?;
     let promotions = f.u32s("promotions")?;
@@ -542,9 +626,13 @@ pub fn read_results(text: &str, optimal: &Optimal, threads: usize) -> Result<Con
             };
             match parse_line(&json, number).map_err(|e| format!("line {number}: {e}"))? {
                 Line::Completed(entry) => entries.push(*entry),
-                Line::Incomplete { n, invocations } => {
+                Line::Incomplete { n, invocations, best } => {
                     contents.incomplete_lines += 1;
                     contents.runs.insert(n, invocations);
+                    if let Some(game) = best {
+                        check_unfinished(&game, optimal).map_err(|e| format!("line {number} (n={n}): {e}"))?;
+                        contents.unfinished.entry(n).or_default().push(game);
+                    }
                 }
             }
         }
@@ -565,7 +653,7 @@ pub fn read_results(text: &str, optimal: &Optimal, threads: usize) -> Result<Con
     let mut problems = if threads > 1 { set_up_boards(&repeat_boards(&entries), threads) } else { Problems::new() };
     for entry in entries {
         contents.runs.remove(&entry.n);
-        let game = check_entry(entry, &contents.games, optimal, &mut problems)?;
+        let game = check_entry(entry, &contents.games, &contents.unfinished, optimal, &mut problems)?;
         contents.games.insert(game.n, game);
     }
     Ok(contents)
@@ -653,10 +741,13 @@ pub fn read_results_file(path: &Path, optimal: &Optimal, threads: usize) -> Resu
 struct Pred<'a> {
     score: u64,
     moves: Option<&'a [u32]>,
-    /// The file's game; `None` for `optimal.json`'s.
+    /// The file's completed game; `None` for `optimal.json`'s and for an unfinished search's.
     stored: Option<&'a StoredGame>,
     assumes: Assumptions,
     whence: String,
+    /// Whether the game is optimal, given what it assumes (the file's completed game, `optimal.json`'s); false for the
+    /// best game of an unfinished search, which a line can have been seeded with and nothing more.
+    proven: bool,
 }
 
 /// What the fields of a line say against each other, if anything: combinations the solver never writes, through
@@ -772,6 +863,7 @@ fn check_repeat<'a>(
 fn check_entry(
     e: Entry,
     games: &BTreeMap<u32, StoredGame>,
+    unfinished: &BTreeMap<u32, Vec<UnfinishedGame>>,
     optimal: &Optimal,
     problems: &mut Problems,
 ) -> Result<StoredGame, String> {
@@ -801,6 +893,7 @@ fn check_entry(
         stored: Some(g),
         assumes: g.assumes.clone(),
         whence: format!("line {}", g.line),
+        proven: true,
     });
     let in_optimal = n.checked_sub(1).and_then(|before| {
         Some(Pred {
@@ -809,6 +902,7 @@ fn check_entry(
             stored: None,
             assumes: Assumptions::from([assumed_optimal(before)]),
             whence: "optimal.json".to_owned(),
+            proven: true,
         })
     });
 
@@ -835,7 +929,30 @@ fn check_entry(
     let pred = match &e.named {
         None => None,
         Some(named) => {
+            let record = &named.record;
             let pred = match named.source {
+                // The record of a game of this run or file with no proof is the best game of an unfinished search
+                // (`--keep-going`): any earlier line of n − 1 with its score and moves.
+                PrevSource::Run | PrevSource::Results if record.proof.is_none() => {
+                    let earlier =
+                        |g: &&UnfinishedGame| g.line < e.line && g.score == record.score && g.digest == record.digest;
+                    let found = n.checked_sub(1).and_then(|before| unfinished.get(&before)?.iter().find(earlier));
+                    let g = found.ok_or_else(|| {
+                        fail(
+                            "it was built on the best game of an unfinished search of n − 1, and no earlier line of \
+                             the file records one with that score and those moves"
+                                .to_owned(),
+                        )
+                    })?;
+                    Pred {
+                        score: g.score,
+                        moves: Some(&g.moves),
+                        stored: None,
+                        assumes: Assumptions::new(),
+                        whence: format!("line {}", g.line),
+                        proven: false,
+                    }
+                }
                 PrevSource::Run | PrevSource::Results => in_file.ok_or_else(|| {
                     fail("it was built from the game of n − 1 in this file, which the file does not hold".to_owned())
                 })?,
@@ -845,9 +962,9 @@ fn check_entry(
                     stored: None,
                     assumes: Assumptions::from([assumed_optimal(n - 1)]),
                     whence: "optimal.json".to_owned(),
+                    proven: true,
                 }),
             };
-            let record = &named.record;
             let same = record.n + 1 == n
                 && pred.score == record.score
                 && pred.moves.is_none_or(|moves| moves_digest(moves) == record.digest)
@@ -856,19 +973,34 @@ fn check_entry(
             if !same {
                 return Err(fail(format!("its record of the game of n − 1 does not match {}", pred.whence)));
             }
+            // A game of n − 1 is a game of n, so no game of n scores less than the best game of an unfinished search
+            // of n − 1.  (The score is not bounded above by it: it is not known to be optimal.)
+            if !pred.proven && e.score < pred.score {
+                return Err(fail(format!(
+                    "scores {}, less than the {} of the unfinished search of n − 1 it was built on ({}); a game of \
+                     n − 1 is a game of n, so this one is not optimal",
+                    e.score, pred.score, pred.whence
+                )));
+            }
             Some(pred)
         }
     };
 
-    // The line's own arithmetic.
+    // The line's own arithmetic.  What rests on the game of n − 1 (the ceiling, the prime formula) needs it proven.
     let sum: u64 = e.promotions.iter().map(|&p| u64::from(p)).sum();
-    let prev_score = pred.as_ref().map(|p| p.score);
+    let proven_pred = pred.as_ref().filter(|p| p.proven);
+    let prev_score = proven_pred.map(|p| p.score);
     if let Some(bag) = e.in_the_bag {
         if e.score != bag + sum {
             return Err(fail(format!("scores {}, not in_the_bag {bag} + the promotions' {sum}", e.score)));
         }
     }
     let cap = e.setup.and_then(|s| s.cap);
+    if cap.is_some() && proven_pred.is_none() {
+        return Err(fail(
+            "it has a ceiling (a cap in its setup), which needs a proven game of n − 1 it names".to_owned(),
+        ));
+    }
     if let Some(cap) = cap {
         if sum > cap {
             return Err(fail(format!(
@@ -895,6 +1027,12 @@ fn check_entry(
     let proof = Proof::of(e.method, true, e.reached_cap).expect("a completed game has a proof");
     if proof.rests_on_prev() && pred.is_none() {
         return Err(fail(format!("its proof ({}) rests on a game of n − 1 that it does not name", proof.as_str())));
+    }
+    if proof.rests_on_prev() && proven_pred.is_none() {
+        return Err(fail(format!(
+            "its proof ({}) rests on the game of n − 1, which it records as the best game of an unfinished search",
+            proof.as_str()
+        )));
     }
     let repeated = match &e.same_search {
         Some(record) => Some(check_repeat(&e, record, games, problems).map_err(fail)?),
@@ -973,6 +1111,26 @@ impl ResultsFile {
         self.contents.games.values()
     }
 
+    /// The best game of the unfinished searches of `n` the file records (the highest score, the later of equals): none if
+    /// the file has a completed game of `n`.  The file holds only searches that a limit stopped, and their best game
+    /// can seed the game after it.  (A search started again can end below an earlier one, so it is the best of the
+    /// lines, not the last, that seeds.)
+    pub fn unfinished(&self, n: u32) -> Option<&UnfinishedGame> {
+        if self.contents.games.contains_key(&n) {
+            return None;
+        }
+        self.contents.unfinished.get(&n)?.iter().max_by_key(|game| (game.score, game.line))
+    }
+
+    /// The last unfinished search of `n` the file records (the last line), if it has no completed game of `n`: the latest
+    /// attempt, whatever it scored, which says what the game had from the game of `n − 1` when it was last tried.
+    pub fn last_attempt(&self, n: u32) -> Option<&UnfinishedGame> {
+        if self.contents.games.contains_key(&n) {
+            return None;
+        }
+        self.contents.unfinished.get(&n)?.last()
+    }
+
     /// The invocations the file records for an unfinished search of `n` (0 if none).
     pub fn earlier_runs(&self, n: u32) -> u32 {
         self.contents.runs.get(&n).copied().unwrap_or(0)
@@ -1001,6 +1159,22 @@ impl ResultsFile {
             }
             None => {
                 self.contents.runs.insert(result.n, result.invocations);
+                let (moves, promotions) = (result.moves.clone(), result.promotions.clone());
+                let digest = moves_digest(&moves);
+                let built_on = result.prev.as_ref().map(|prev| BuiltOn {
+                    score: prev.score,
+                    proven: prev.proof.is_some() || prev.source == PrevSource::Optimal,
+                });
+                let game = UnfinishedGame {
+                    n: result.n,
+                    line: self.contents.lines,
+                    score: result.score,
+                    moves,
+                    promotions,
+                    digest,
+                    built_on,
+                };
+                self.contents.unfinished.entry(result.n).or_default().push(game);
             }
         }
         Ok(())
@@ -1147,6 +1321,15 @@ impl fmt::Display for FileReport {
             self.contents.incomplete_lines,
             if self.contents.torn { ", a torn last line (ignored)" } else { "" }
         )?;
+        let unfinished: Vec<u32> = self.contents.runs.keys().copied().filter(|n| !games.contains_key(n)).collect();
+        if let (Some(first), Some(last)) = (unfinished.first(), unfinished.last()) {
+            writeln!(
+                f,
+                "  unfinished: {} board sizes have only an unfinished search (n = {first} to {last}); they are not \
+                 proven",
+                unfinished.len()
+            )?;
+        }
         writeln!(f, "  proof: {}", counts(games.values().map(|g| g.proof), |p| p.as_str().to_owned()))?;
         let plain = games.values().filter(|g| g.assumes.is_empty()).count();
         write!(f, "  assumptions: none in {plain} of {} games", games.len())?;
