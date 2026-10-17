@@ -8,6 +8,7 @@ use super::NOGOOD_PERIOD;
 use crate::model::Keep;
 
 pub use crate::gf2::ForceWindow;
+use crate::gf2::LEGACY_FORCE_WINDOW;
 
 /// The tactics of DESIGN.md, section 5, that act inside the search.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -256,11 +257,27 @@ impl SearchTactics {
     /// The length of [`tuning`](Self::tuning).
     pub(super) const TUNING_LEN: usize = 16;
 
-    /// Whether the tactics that tune the GF(2) search (`force_window` to `more_forced`) are the defaults, which a
-    /// checkpoint's header of version 5 implies.  (The policy of keeping and forgetting nogoods is not recorded, so
-    /// it does not count.)
-    pub(super) fn tuning_is_default(&self) -> bool {
-        SearchTactics::default().with_switches_of(self) == *self
+    /// The tactics that tune the GF(2) search (`force_window` to `more_forced`) as every search of the builds before
+    /// them had them, which a checkpoint's header of version 5 (or 4) implies, with the other tactics at their
+    /// defaults.  Pinned here, apart from the defaults, because the defaults move: `force_window` was `80` then and is
+    /// `all` now.
+    pub(super) fn legacy_tuning() -> Self {
+        SearchTactics {
+            force_window: ForceWindow::Within(LEGACY_FORCE_WINDOW),
+            branching: Gf2Branching::Exact,
+            strong_limit: u32::MAX,
+            strong_depth: u32::MAX,
+            deep_branching: Gf2Branching::Split,
+            more_forced: true,
+            ..SearchTactics::default()
+        }
+    }
+
+    /// Whether the tactics that tune the GF(2) search (`force_window` to `more_forced`) are those of
+    /// [`legacy_tuning`](Self::legacy_tuning), which a checkpoint's header of version 5 implies and writes.  (The
+    /// policy of keeping and forgetting nogoods is not recorded, so it does not count.)
+    pub(super) fn tuning_is_legacy(&self) -> bool {
+        Self::legacy_tuning().with_switches_of(self) == *self
     }
 
     /// `self` with the switches and `match_refine` of `other`, and its policy of keeping and forgetting nogoods.
@@ -321,7 +338,8 @@ impl SearchTactics {
         })
     }
 
-    /// The tactics [`bits`](Self::bits) recorded, or an error if a bit that no tactic uses is set.
+    /// The tactics [`bits`](Self::bits) recorded, with the tuning a header of version 5 implies
+    /// ([`legacy_tuning`](Self::legacy_tuning)), or an error if a bit that no tactic uses is set.
     pub(super) fn from_bits(bits: u16) -> Result<Self, String> {
         if bits >> 9 != 0 {
             return Err(format!("unknown tactics {bits:#x}"));
@@ -334,7 +352,7 @@ impl SearchTactics {
             lagrange: bits & 1 << 6 != 0,
             gf2: bits & 1 << 7 != 0,
             symmetry: bits & 1 << 8 != 0,
-            ..SearchTactics::default()
+            ..SearchTactics::legacy_tuning()
         })
     }
 }

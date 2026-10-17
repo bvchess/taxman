@@ -31,7 +31,8 @@
 //!   is read-only.  The window searches with the tactics the checkpoint records, the matching path's, the defaults when
 //!   the windows were first made (`make-window 936 4500` and `make-window 1215 600000`, with `--tactic gf2=off --tactic
 //!   lagrange=on --tactic symmetry=off` since; `make-window` takes `--tactic` as the probe does, on top of the
-//!   defaults), which `--tactic` changes (the search tactics only, as for the ladder): `--tactic lagrange=off`, say,
+//!   defaults, so the windows record the default window of the forced members, `force_window=all`, as a header of
+//!   version 6), which `--tactic` changes (the search tactics only, as for the ladder): `--tactic lagrange=off`, say,
 //!   searches the same window without the Lagrangian bound.  A game in `--fixtures` with a window and no nodes (a
 //!   copy of a chain's checkpoint at the end of the chain, renamed `nNNNN.window.ckpt`) has only the window.
 //!
@@ -61,7 +62,7 @@ use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::engine::{self, Ctx, EngineConfig, Searcher, Start};
 use taxman::game::Optimal;
-use taxman::gf2::{Gf2Bound, Gf2Graph};
+use taxman::gf2::{ForceWindow, Gf2Bound, Gf2Graph};
 use taxman::matchbound::{MatchBound, MatchGraph};
 use taxman::model::{FrameGraph, Lookup, Nogoods, Scratch};
 use taxman::search::{search, stat, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
@@ -394,8 +395,9 @@ fn kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> Resul
 /// The GF(2) bound's kernels at the nodes of the F1 fixture `path` ([`taxman::gf2::Gf2Bound`]), each over all the
 /// nodes: a node's level from the root and its bound from scratch; the same with its forced members (the weight
 /// split); and the bound without each member of the conflict of its heaviest set (strong branching's solves,
-/// warm-started from the level's history, to the end).  Fingerprinted by the values.
-fn gf2_kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> Result<(), String> {
+/// warm-started from the level's history, to the end).  Fingerprinted by the values.  The forced members are searched
+/// as `window` says (the tactic `force_window`).
+fn gf2_kernels<const W: usize>(path: &Path, reps: u32, window: ForceWindow, report: &mut Report) -> Result<(), String> {
     let (n, incumbent, units) = read_nodes::<W>(path)?;
     let p = setup::<W>(n);
     let model: &FrameGraph = &p.model;
@@ -423,6 +425,7 @@ fn gf2_kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> R
         members as f64 / count.max(1) as f64
     ));
     let mut b = Gf2Bound::<W>::new(&graph);
+    b.set_force_window(window);
     let (cost, fp) = measure(reps, |fp| {
         for &(promoted, cands, cap, _, _) in &nodes {
             b.reset(&promoted, &cands);
@@ -707,6 +710,10 @@ fn run() -> Result<(), String> {
             let games: Vec<u32> =
                 if games.is_empty() { GAMES.to_vec() } else { games.iter().map(|&n| n as u32).collect() };
             let mut report = Report { brief, ..Report::default() };
+            let mut tactics = Tactics::default();
+            for change in &changes {
+                tactics.set(change).map_err(|e| format!("--tactic: {e}"))?;
+            }
             for n in games {
                 let gf2 = changes.iter().any(|c| c == "gf2=on");
                 // A game with a window and no nodes (a chain's checkpoint, say) has only the window.
@@ -715,7 +722,7 @@ fn run() -> Result<(), String> {
                     if nodes.exists() {
                         kernels::<W>(&nodes, reps, &mut report)?;
                         if gf2 {
-                            gf2_kernels::<W>(&nodes, reps, &mut report)?;
+                            gf2_kernels::<W>(&nodes, reps, tactics.search.force_window, &mut report)?;
                         }
                     }
                     window::<W>(n, &fixture(&dir, n, "window.ckpt"), steps, &changes, reps, &mut report)?;

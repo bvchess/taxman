@@ -1,0 +1,15 @@
+46 problems in the suite, the default has run 46 of them
+configuration                  n cpu ratio nodes ratio   worst  worst problem  cut     cpu s
+all_sl4                       46     0.601       0.414    1.04  3425-2           0    4866.5
+all_more_forced_off           46     0.611       0.419    1.05  3441-1262        0    4686.5
+fw_all                        31     0.629       0.431    1.02  3300-39          0    3156.1
+all_ng_p20k                   16     0.638       0.457    1.05  3441-5231        0    1973.5
+fw240                         31     0.643       0.492    1.45  3213-root        0    3317.1
+all_ng_p20k_sl8               16     0.644       0.459    1.05  3441-5231        0    1947.3
+all_ng_p5k                    16     0.650       0.468    1.02  3441-5231        0    2019.8
+all_lagrange_on               16     0.650       0.442    1.06  3300-39          0    1941.8
+all_ng_p10k                   16     0.655       0.471    1.06  3441-5231        0    1993.1
+fw400                         16     0.656       0.468    1.05  3440-89          0    1973.9
+all_sl8                       16     0.663       0.468    1.07  3300-39          0    1984.3
+default                       46     1.000       1.000    1.00  3441-571         0    7254.3
+ratios are geometric means over the problems both the configuration and the default ran (below 1 is faster than the default); cut: jobs stopped at the cutoff, whose ratios are lower bounds

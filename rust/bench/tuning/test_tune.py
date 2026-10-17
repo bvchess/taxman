@@ -305,6 +305,20 @@ class Suite(unittest.TestCase):
                 with self.assertRaises(SystemExit):
                     captured(make_suite.refresh_command, args)
             self.assertEqual(suite.read_text(), before)
+            # With --new-trees other nodes are taken (and recorded), but not another best sum.
+            args = make_suite.parse(["refresh", "--suite", str(suite), "--results", str(results), "--concurrency", "8",
+                                     "--new-trees", "--commit", "def"])
+            results.write_text(json.dumps(record("3-0", 600)) + "\n" + json.dumps(record("3-root", 4000)) + "\n")
+            captured(make_suite.refresh_command, args)
+            lines = [json.loads(line) for line in suite.read_text().splitlines()]
+            self.assertEqual([lines[2]["default"]["nodes"], lines[3]["default"]["nodes"]], [600, 4000])
+            self.assertEqual((lines[0]["commit"], lines[2]["default"]["best"]), ("def", 7))
+            before = suite.read_text()
+            wrong = json.dumps(record("3-0", 600, best=8))
+            results.write_text(wrong + "\n" + json.dumps(record("3-root", 4000)) + "\n")
+            with self.assertRaises(SystemExit):
+                captured(make_suite.refresh_command, args)
+            self.assertEqual(suite.read_text(), before)
 
     def test_a_game_is_given_up_after_units_that_do_not_finish(self):
         with tempfile.TemporaryDirectory() as d:

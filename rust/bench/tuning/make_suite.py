@@ -235,7 +235,10 @@ def assemble_command(args):
 def refresh_command(args):
     """Rewrites the CPU and wall seconds of each problem's `default` in the suite from the default's results in a
     results file of tune.py (which ran the whole suite with the default alone, `--concurrency` jobs at a time): after a
-    change that makes the search faster without changing its trees, which the nodes and best sums must show."""
+    change that makes the search faster without changing its trees, which the nodes and best sums must show.  With
+    `--new-trees`, after a change of the default that changes the trees on purpose (a tactic's default): the nodes are
+    rewritten too, and the best sums must still be the suite's, since a sound setting changes the tree, not the answer.
+    """
     lines = read_jsonl(args.suite)
     done = tune.read_results(args.results)
     total = 0.0
@@ -246,10 +249,12 @@ def refresh_command(args):
         if found is None:
             raise SystemExit(f"{args.results}: no result of the default on {line['id']}")
         result, old = found["result"], line["default"]
-        if not result["completed"] or (result["nodes"], result["best"]) != (old["nodes"], old["best"]):
+        same_trees = result["nodes"] == old["nodes"]
+        if not result["completed"] or result["best"] != old["best"] or not (same_trees or args.new_trees):
             raise SystemExit(f"{line['id']}: the default now takes {result['nodes']} nodes and finds {result['best']}, "
-                             f"not the suite's {old['nodes']} and {old['best']}: other trees, so a new suite")
-        line["default"] = {**old, "cpu_s": result["cpu_s"], "wall_s": result["wall_s"]}
+                             f"not the suite's {old['nodes']} and {old['best']}: other trees, so a new suite "
+                             "(or --new-trees, if the best sum is the suite's and the trees changed on purpose)")
+        line["default"] = {**old, "nodes": result["nodes"], "cpu_s": result["cpu_s"], "wall_s": result["wall_s"]}
         total += result["cpu_s"]
     lines[0].update(default_cpu_s=round(total, 1), concurrency=args.concurrency)
     lines[0]["commit"] = args.commit or lines[0]["commit"]
@@ -302,6 +307,9 @@ def parse(argv=None):
     refresh.add_argument("--results", required=True, help="a results file of tune.py with the default on every problem")
     refresh.add_argument("--concurrency", type=int, required=True, help="jobs that ran at once, to record")
     refresh.add_argument("--commit", help="the commit of the build that measured, to record (default: the suite's)")
+    refresh.add_argument("--new-trees", action="store_true",
+                         help="accept other nodes than the suite's (the default's trees changed on purpose), if the "
+                              "best sums are the suite's, and record them")
     cand = sub.add_parser("candidates")
     cand.add_argument("--strict", default=tune.CRATE / "results" / "strict.jsonl", type=Path)
     cand.add_argument("--lo", type=int, default=300_000, help="fewest nodes in the chain (default 300,000)")
