@@ -92,6 +92,19 @@ pub fn report(dir: &Path, known: &[PathBuf]) -> Result<(String, bool), String> {
     let search_s: f64 = entries.iter().map(|e| e.search_s).sum();
     let _ =
         writeln!(w, "CPU {cpu:.0} s ({:.2} core-hours); {searches} searches, {search_s:.0} s of them", cpu / 3600.0);
+    let climbs: Vec<&Json> = events.iter().filter(|e| e.get("job").and_then(Json::as_str) == Some("climb")).collect();
+    let by_outcome =
+        |name: &str| climbs.iter().filter(|e| e.get("outcome").and_then(Json::as_str) == Some(name)).count();
+    let climb_s: f64 = climbs.iter().filter_map(|e| e.get("seconds")?.as_f64()).sum();
+    let _ = writeln!(
+        w,
+        "climbs: {} among the searches, {climb_s:.0} s of them: {} proved their board, {} parked, {} moot (the board \
+         was proven meanwhile)",
+        climbs.len(),
+        by_outcome("proved"),
+        by_outcome("parked"),
+        by_outcome("moot"),
+    );
 
     // How the proven boards were proven: the rules of their two bounds.
     let mut pairs: BTreeMap<(&str, &str), usize> = BTreeMap::new();
