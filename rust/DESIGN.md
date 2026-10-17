@@ -200,7 +200,7 @@ up:
 |---|---|---|
 | foundations | `game`, `numtheory`, `bits`, `json` | the rules as a referee and the table of optimal games; maximal factors and composites; fixed-width bitsets; a small JSON reader and writer |
 | frame model | `frames`, `model`, `accelerate` | the board as frames (`frames` forms and simplifies them, numbers and merges them); the search state (frames, winnability, promotion, conflicts, nogoods); deriving a game from the previous one |
-| search | `matchbound`, `gf2`, `search`, `bounds` | the matching bound, and the Lagrangian bound over nogoods built on it; the GF(2) bound, the default node bound; the branch-and-bound searcher with its setup and checkpoint header; the greedy incumbent and the count of promotions a node can still make |
+| search | `matchbound`, `gf2`, `search`, `bounds` | the matching bound, and the Lagrangian bound over nogoods built on it; the GF(2) bound, the default node bound; the branch-and-bound searcher with its setup and checkpoint header, and the dual bound of a stopped search; the greedy incumbent and the count of promotions a node can still make |
 | engine | `engine` | the problem-independent parallel depth-first driver |
 | solving | `tactics`, `board`, `solver`, `results`, `paths` | the switchable tactics; a board prepared for a search; the per-game pipeline and the range driver; what a result records and the checks of a results file; the default files |
 | studies | `brute`, `sacrifice` | exhaustive search to certify small boards; the sacrifice bound and punctured games (not used by the solver) |
@@ -212,7 +212,9 @@ instructions), `tune` (the tuning benchmark: units of a search at the end of the
 `structure` (the census of the frames' structure, board by board), `extended` (chains and problems of the extended
 problem) and `wall` (what grows with n and with a tree: a game's fixed costs piece by piece, a node's cost at any set
 width, large trees with their memory and checkpoints, the frames of any board, and the `landscape` of a range of
-boards: each standalone, the root's GF(2) bound over the incumbent a search starts from); `tests/` the integration
+boards: each standalone, the root's GF(2) bound over the incumbent a search starts from), and the `ledger` (bounds on
+opt(n) for many boards at once, tightened by limited searches and the relations between boards: section 8, "The
+ledger"); `tests/` the integration
 tests (section 9); `tools/` the results referee in Python, the PGO build, the Java golden export and the cloud scripts.  The
 programs of finished studies (`fields`, `matroid`, `dominance`, `slope`, `repeats`, `promotions`, `diff`, `hunt` and
 `sacrifice`) were removed from master; [the notebook](docs/EXPERIMENTS.md#how-this-notebook-is-kept) says where they
@@ -935,6 +937,22 @@ null and no `cap` or `prime_formula` proof, and both referees refuse a line that
 except that `options` also names `keep_going`, `retry`, `retry_improved` and `pass` where they were given.  The games of
 such a range are solved one at a time because a game that went on from a game in flight would not know whether to take
 its ceiling.
+
+### The ledger
+
+`examples/ledger/` (its module comment has the commands and the files) keeps for every board of a stretch a lower bound
+L(n), the score of a finished game the referee replays, and an upper bound U(n), each with its derivation, and proves a
+board when they meet.  It reads nothing of the truth (optimal.json, the results files) unless it is given proven games.
+Its sources are the map (a search stopped before its first node: the start incumbent and the root's GF(2) bound),
+limited one-thread searches, each resumed from its checkpoint and seeded with the games of n − 1, n and n + 1, with
+U(n) as its ceiling, and given games; a stopped search's upper bound is its *dual bound*, `search::dual_bound`: the
+largest of its incumbent and the bounds of the open units of its final checkpoint, each the GF(2) bound of the node
+as the search computes it when it starts the unit (`search::NodeBound`).  Its relations, applied to a fixpoint after
+every change, are monotonicity, the ceiling and the game below it, the prime formula both ways and repeats
+(heuristics/THEORY.md, "The ledger: bounds between boards", Lemmas L1 to L4 and D, with what each rests on).  Every
+game a relation makes is replayed before it counts, and an L above a U stops the run as an error.  A proven board of the
+ledger is proven within the frame model like a game of the chain past 2175 (given U at the boards its upper bound came
+through); the ledger is not a results file and nothing of it goes into `results/strict.jsonl`.
 
 ### Same search
 

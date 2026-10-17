@@ -1,0 +1,10 @@
+boards 200, proven 200, CPU 595 s, wall 145 s (all proven)
+setup (the boards' facts and problems): 1.8 CPU s
+maps: 89, 20.1 s
+searches: 182 of 89 boards, 565.6 s; completed 87 (3 at their ceiling), stopped 95
+a stopped search's seconds beyond its limit: median 0.14, max 0.23
+stopped searches whose dual bound lowered U: 51, by 3833 in all (median 74)
+a stopped search's dual bound below its board's root bound: median 96, max 297
+changes the relations made: lower ceiling 168, lower monotone 694, lower prime 192, lower repeat 641, upper ceiling 2853, upper monotone 13, upper prime 573, upper repeat 2212
+boards by their number of searches: {0: 111, 1: 36, 2: 26, 3: 18, 4: 6, 5: 2, 6: 1}
+the chain: 200 games, 447.5 s (445.5 s of search), {'search': 89, 'prime': 27, 'repeat': 84}

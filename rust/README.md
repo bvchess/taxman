@@ -144,8 +144,8 @@ Python 3 (standard library only) for `tools/check_results.py`.
 cd rust
 cargo build --release              # about 100 seconds on an M1 Max; the binary is target/release/taxman
 cargo build --release --examples   # also the ladder (scaling and progress harness), the probe, the tuning
-                                   # benchmark, the census of the frames, the extended problem's chain and the wall
-                                   # regime's measurements
+                                   # benchmark, the census of the frames, the extended problem's chain, the wall
+                                   # regime's measurements and the ledger
 ./target/release/taxman help
 ```
 
@@ -361,6 +361,17 @@ file, so that each game sees the game before it whichever block made it, until a
 `explore.jsonl`, holds every line of every block and pass.  It is **not a chain** and never goes into
 `results/strict.jsonl`: it has board sizes with only an unfinished search, or none, and each proof in it rests only
 on the games it holds.  Both referees accept it (section 5).
+
+**The ledger** (`cargo run --release --example ledger -- run A-B --dir DIR --cpu-hours H --workers P`, then `ledger
+report DIR --known FILE`; the module comment of `examples/ledger/main.rs` has the flags and the files) works on a
+whole stretch at once instead of in order: for every board a lower bound, a game it holds, and an upper bound, each
+with how it was derived, tightened by limited one-thread searches (P at once, each going on from its checkpoint, with
+its upper bound read from the checkpoint: the *dual bound*) and by the relations between boards (the ceiling, the
+prime formula, repeats, monotonicity, both ways), where a proof looks cheapest; a board is proven when its bounds
+meet.  It never reads the known optima unless it is given proven games (`--proven FILE`), so a run on a stretch the
+chain has proven is a fair test, which `report --known` checks.  Its files are its own, not results lines
+([DESIGN.md, "The ledger"](DESIGN.md#the-ledger); the experiment: [the
+ledger](docs/experiments/the-ledger-bounds-from-both-sides-2026-10.md)).
 
 ### All flags of `solve`
 
@@ -769,6 +780,9 @@ the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#t
   `(q − p)(c_p − c_q)` more (`c_r` the sum of a set's cofactors `x / r`), so every heaviest set keeps `c_p ≤ c_q`
   for every symmetric pair (heuristics/THEORY.md, Theorem 13).  The search cuts a node none of whose completions
   can keep them, and drops the candidates none that does holds (tactic `symmetry`; DESIGN.md, section 4).
+* **dual bound**: what a search that a limit stopped proves from above: the largest of its incumbent and, over the
+  open units of its final checkpoint, each node's promotions plus its GF(2) bound (`search::dual_bound`;
+  heuristics/THEORY.md, Lemma D).  Stopped before its first node, it is the root's bound.
 
 ### Results and trust
 
