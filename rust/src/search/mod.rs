@@ -73,12 +73,15 @@
 //! * [`lagrange`]: the Lagrangian bound in the search: where it is tried, its forced members, its refits.
 //! * `header`: the checkpoint's header.
 //! * `diagnostics`: [`Diagnostics`], for tuning.
+//! * `dual`: [`dual_bound`], the upper bound that a stopped search's checkpoint proves, and [`NodeBound`], the bound
+//!   of a unit's node as the search computes it when it starts the unit.
 //! * [`symmetry`]: the root's prime exchanges (symmetric pairs of primes) and the rule they give the search.
 //! * here: [`search`], which starts or resumes the engine on a prepared game; [`start_incumbent`], the incumbent it
 //!   starts from, which the hunt (`sacrifice::hunt`) also makes without a search; [`offer_seed`], [`best_so_far`] and
 //!   [`seed_survivors_sum`], for a caller that steers searches through their [`Control`] (`EngineConfig::control`).
 
 mod diagnostics;
+mod dual;
 mod header;
 mod incumbent;
 pub mod lagrange;
@@ -89,6 +92,7 @@ pub mod symmetry;
 mod tactics;
 
 pub use diagnostics::{cut, Diagnostics, GAP_BUCKETS};
+pub use dual::{dual_bound, DualBound, NodeBound};
 pub use incumbent::Neighbourhood;
 pub use searcher::{stat, Found, SearchSpace, TaxSearcher, TaxUnit};
 pub use setup::{
