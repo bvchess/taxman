@@ -42,6 +42,28 @@ pub fn cpu_seconds() -> Option<f64> {
     (rc == 0).then(|| seconds(usage.times[0]) + seconds(usage.times[1]))
 }
 
+/// `struct timespec` as `clock_gettime` fills it in on 64-bit Linux and macOS: seconds and nanoseconds, each a `long`.
+#[repr(C)]
+struct Timespec {
+    sec: i64,
+    nsec: i64,
+}
+
+unsafe extern "C" {
+    fn clock_gettime(clock: i32, time: *mut Timespec) -> i32;
+}
+
+/// The CPU time the calling thread has used so far, in seconds (`CLOCK_THREAD_CPUTIME_ID`), if the system says: the
+/// cost of one game of several running on threads, where [`cpu_seconds`] counts the whole process.
+#[allow(dead_code)] // only `wall landscape` reads it
+pub fn thread_cpu_seconds() -> Option<f64> {
+    const CLOCK_THREAD_CPUTIME_ID: i32 = if cfg!(target_os = "macos") { 16 } else { 3 };
+    let mut time = Timespec { sec: 0, nsec: 0 };
+    // SAFETY: `time` is writable and has the layout of `struct timespec`, which `clock_gettime` fills in.
+    let rc = unsafe { clock_gettime(CLOCK_THREAD_CPUTIME_ID, &mut time) };
+    (rc == 0).then_some(time.sec as f64 + time.nsec as f64 * 1e-9)
+}
+
 #[cfg(target_os = "macos")]
 mod imp {
     unsafe extern "C" {
