@@ -139,8 +139,9 @@ pub struct SolveOptions {
     /// has it (`--use-prev`); the results whose proofs rest on it record that they assume it optimal.  Without it
     /// such a game is solved standalone.
     pub use_prev: bool,
-    /// The games of a range in flight at once (`--window`, at least 1; see `window`), which share the `threads`.
-    /// With one thread it is 1 whatever it says: there is no thread to run a second game on.
+    /// The games of a range in flight at once (`--window`, at least 1, 4 by default: the best measured at 64 threads,
+    /// see `window`), which share the `threads`.  With one thread it is 1 whatever it says: there is no thread to run
+    /// a second game on.
     pub window: usize,
 }
 
@@ -160,7 +161,7 @@ impl Default for SolveOptions {
             spill_dir: None,
             force_search: false,
             use_prev: false,
-            window: 1,
+            window: 4,
         }
     }
 }

@@ -322,7 +322,7 @@ mod tests {
         let options = |items: &[&str]| range_options(&Args::parse(&strings(items), &flags, &[]).unwrap());
         let opts = options(&["--window", "8", "--threads", "4"]).unwrap();
         assert_eq!((opts.window, opts.threads), (8, 4));
-        assert_eq!(options(&[]).unwrap().window, 1);
+        assert_eq!(options(&[]).unwrap().window, 4);
         assert!(usage(options(&["--window", "0"]).unwrap_err()).contains("--window must be at least 1"));
         assert!(usage(options(&["--window", "x"]).unwrap_err()).contains("--window: cannot read"));
         // A command that does not solve a range does not take it.

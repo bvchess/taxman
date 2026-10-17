@@ -160,6 +160,7 @@ calibration found no contention among 64 copies).
      ' w16.jsonl bench/cloud/c8g.chain-2176.jsonl
      ```
 
-   * What to set `WINDOW` to in `tools/cloud/chain.sh` (default 16): the W with the most games an hour in (b) at the
-     thread count of the machine that will run the chain, if (a) points the same way; 1 if no W beats 1 by more than
-     the difference between the two runs of one W in (a); and if 16 is still gaining on 8, try 32 in (b) first.
+   * What to set `WINDOW` to in `tools/cloud/chain.sh` (default 4; it was 16 until 2026-10-17): the W with the most
+     games an hour in (b) at the thread count of the machine that will run the chain, if (a) points the same way; 1 if
+     no W beats 1 by more than the difference between the two runs of one W in (a); and if 16 is still gaining on 8,
+     try 32 in (b) first.

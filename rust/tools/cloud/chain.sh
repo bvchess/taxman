@@ -37,9 +37,10 @@
 #
 # Environment (all optional):
 #   THREADS              worker threads, default all CPUs the solver may use
-#   WINDOW               the games in flight at once, default 16; 1 solves them one after the other; see
-#                        `taxman solve --window`.  On 64 threads the default is measured worse than 4 (20 to 32%
-#                        slower than 1 past 2225): set WINDOW=4 (RUNBOOK.md, section 5)
+#   WINDOW               the games in flight at once, default 4 (as `taxman solve --window`'s); 1 solves them one
+#                        after the other.  4 is the best measured on 64 threads past 2225, where 16 is 20 to 32%
+#                        slower than 1 (RUNBOOK.md, section 5; the notebook entries round-b-the-chain-on-many-threads
+#                        and scaling-to-192-threads, both 2026-10)
 #   CHECKPOINT_INTERVAL  seconds, default 300       PROGRESS  seconds between progress lines, default 60
 #                        (a checkpoint stops every worker for the slowest one's step, up to 0.4 s near n = 4000: 0.15%
 #                        of the machine at 300 s, 0.7% at 60 s; SIGTERM still writes a final one)
@@ -73,7 +74,7 @@ thread_args=()
 [ -n "${THREADS:-}" ] && thread_args=(--threads "$THREADS")
 wall_args=()
 [ -n "${GAME_HOURS:-}" ] && wall_args=(--game-hours "$GAME_HOURS")
-WINDOW="${WINDOW:-16}"
+WINDOW="${WINDOW:-4}"
 CHECKPOINT_INTERVAL="${CHECKPOINT_INTERVAL:-300}"
 PROGRESS="${PROGRESS:-60}"
 MAX_FAILS="${MAX_FAILS:-5}"
