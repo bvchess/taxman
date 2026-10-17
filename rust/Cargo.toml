@@ -15,9 +15,14 @@ name = "taxman"
 path = "src/main.rs"
 
 # The tuning benchmark's solver has tests of its own (units are solved the same every time; a root unit is the
-# whole search), which `cargo test` runs; no other example has any.
+# whole search), and so has the wall study's landscape (the ends of a game are what `solve` starts from and finds, and
+# its output file resumes), which `cargo test` runs; no other example has any.
 [[example]]
 name = "tune"
+test = true
+
+[[example]]
+name = "wall"
 test = true
 
 [dependencies]

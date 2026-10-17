@@ -209,9 +209,10 @@ instructions), the sacrifice study, `repeats` (the games whose search repeats an
 and what a results file spent on them), `slope` (the gaps of a game's root, and proofs with every bound lowered by a
 margin), `matroid` (the study of the GF(2) bound: at roots and nodes, as a plain branch and bound, and the search's
 proofs with it, `matroid prove`) and `wall` (what grows with n and with a tree: a game's fixed costs piece by piece, a
-node's cost at any set width, large trees with their memory and checkpoints, the frames of any board); `tests/` the
-integration tests (section 9); `tools/` the results referee in Python, the PGO build, the Java golden export and the
-cloud scripts.
+node's cost at any set width, large trees with their memory and checkpoints, the frames of any board, and the
+`landscape` of a range of boards: each standalone, the root's GF(2) bound over the incumbent a search starts from);
+`tests/` the integration tests (section 9); `tools/` the results referee in Python, the PGO build, the Java golden
+export and the cloud scripts.
 
 **Width dispatch.**  Everything that holds sets of game numbers is generic over `const W: usize`, the number of 64-bit
 words, and the macro `with_width!` (in `bits`, used by the solver, the examples and the tests) picks the narrowest of

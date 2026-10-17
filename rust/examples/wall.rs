@@ -11,6 +11,7 @@
 //!     [--tactic NAME=VALUE]... [--ckpt-dir DIR --every SECONDS] [--threads T] [--cores C] [--mem-cap UNITS] N
 //! cargo run --release --example wall -- start [--known FILE] N|A-B...
 //! cargo run --release --example wall -- frames N|A-B...
+//! cargo run --release --example wall -- landscape [--threads K] [--known FILE] [--out FILE] N|A-B...
 //! ```
 //!
 //! Games are set up as `taxman solve` sets them up (`taxman::board::Board` at the set width `with_width!` picks for
@@ -18,8 +19,8 @@
 //! `{"n":N,"trivial":true}` and is skipped.  `--known FILE` (every command but `frames`) is a results file, such as
 //! `results/strict.jsonl`, whose completed games extend the known games beyond optimal.json (as the ladder's
 //! `--known` does), which is how a game gets its optimum, and the game of `n - 1` for its seed and ceiling.  A range
-//! `A-B` stands for every `n` in it, none filtered out (`setup`, `start` and `frames`).  Each command prints one JSON
-//! object per line on stdout; a mistake in the arguments is an error on stderr and exit status 2.
+//! `A-B` stands for every `n` in it, none filtered out (`setup`, `start`, `frames` and `landscape`).  Each command
+//! prints one JSON object per line on stdout; a mistake in the arguments is an error on stderr and exit status 2.
 //!
 //! * **setup**: what a game of the chain costs besides its search, piece by piece, each timed `--repeat` times
 //!   (default 1) and reported as the fastest, for every `n` (primes too, `prime` says which).  The pieces: the
@@ -77,6 +78,24 @@
 //!   board builder makes (before `FrameGraph::build` reduces them, which keeps every frame's freedoms), the time it
 //!   took, and the sizes the later stages would need: per frame the factors, moves and freedoms, `max_freedoms`
 //!   and the `block_words` of the GF(2) bound's vectors it needs (`max_freedoms.div_ceil(64)`).
+//! * **landscape**: which games are easy and which will be expensive, game by game and without solving a chain in
+//!   order.  Each game is taken standalone, as `taxman solve N` takes it: no game of `n - 1`, so no seed, no ceiling
+//!   and no prime formula.  The line has the two ends of what its search would have to close, as scores: `upper`,
+//!   `in_the_bag` plus the root's GF(2) bound with the default tactics, which is the bound the search computes at its
+//!   first node before it branches; and `lower`, the game the search starts from (the better of the greedy set, whose
+//!   score is `greedy`, and the matching dive, improved by the local search: `search::start_incumbent`).  Their
+//!   difference is `gap`, the standalone root gap, and `meets` says whether they are equal, which settles the game at
+//!   the first node.  Besides: `prime`, `trivial` (nothing to promote: both ends are `in_the_bag`), `frames`,
+//!   `candidates` and `max_total`, as the setup line of `solve` counts them, and the times in seconds: `setup_s` (the
+//!   tables, the frames, the model and the greedy set, `greedy_s` of it), `start_s` (the matching graph, the dive and
+//!   the local search), `bound_s` (the GF(2) graph, `graph_s` of it, and the bound), `total_s` and `cpu_s` (the CPU
+//!   time of the game's thread, which a load on the other threads moves less than the wall time).  Of a game with a
+//!   known optimum (optimal.json, and `--known FILE`'s completed games), `opt` is its score, `opt_proof` the proof of
+//!   its line in `--known FILE` (null if that has none), `root_gap` is `upper - opt` and `shortfall` is `opt - lower`
+//!   (the gap is their sum); all four are null for a game with no known optimum.  `--threads K` plays K games at
+//!   once, one a thread (default 1), in the order given.  Each line is printed, and with `--out FILE` appended to it,
+//!   as its game finishes, so in the order of finishing; the games that FILE has are skipped, so a run that was
+//!   interrupted goes on where it was (a line cut short at the end of FILE is cut off).
 //!
 //! **The sizes** (`setup`, `nodes` and `frames`): `frames` (the root's frame count), `candidates`, `max_total`
 //! (the most promotions a set can have), `members` (the distinct numbers in the moves and factors of the root's
@@ -101,34 +120,45 @@
 
 #[path = "common/counters.rs"]
 mod counters;
+/// The helpers of the tests (temporary directories), shared with the other tests.
+#[cfg(test)]
+#[path = "../tests/common/support.rs"]
+mod support;
 
+use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Mutex, PoisonError};
 use std::time::{Duration, Instant};
 use taxman::accelerate::solution_for_promotions;
 use taxman::bits::{words_for, Bits};
 use taxman::board::{search_problem, Board};
-use taxman::engine::{self, Counters, EngineConfig, Start, Stats};
+use taxman::engine::{self, Control, Counters, EngineConfig, Start, Stats};
 use taxman::frames::{build_frames, BoardFrames};
 use taxman::game::{replay_finished, Optimal};
-use taxman::gf2::{Gf2Bound, Gf2Graph};
+use taxman::gf2::{Eval, Gf2Bound, Gf2Graph};
+use taxman::json::Json;
 use taxman::matchbound::MatchGraph;
 use taxman::model::Scratch;
 use taxman::numtheory::Tables;
-use taxman::search::{search, stat, Neighbourhood, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
+use taxman::search::{
+    search, start_incumbent, stat, Diagnostics, Neighbourhood, Prepared, SearchSpace, SearchTactics, TaxSearcher,
+    TaxUnit,
+};
 use taxman::solver::MAX_N;
 use taxman::tactics::Tactics;
 
 // ---------------------------------------------------------------------------------------------------------
 // Arguments
 
-const COMMANDS: [&str; 5] = ["setup", "nodes", "grow", "start", "frames"];
+const COMMANDS: [&str; 6] = ["setup", "nodes", "grow", "start", "frames", "landscape"];
 
 /// The options, with the commands each applies to (an option given to another command is an error).
-const OPTIONS: [(&str, &[&str]); 15] = [
-    ("--known", &["setup", "nodes", "grow", "start"]),
+const OPTIONS: [(&str, &[&str]); 16] = [
+    ("--known", &["setup", "nodes", "grow", "start", "landscape"]),
     ("--repeat", &["setup"]),
     ("--nodes", &["nodes", "grow"]),
     ("--seconds", &["nodes", "grow"]),
@@ -140,7 +170,8 @@ const OPTIONS: [(&str, &[&str]); 15] = [
     ("--ckpt-dir", &["nodes", "grow"]),
     ("--every", &["nodes", "grow"]),
     ("--progress", &["grow"]),
-    ("--threads", &["grow"]),
+    ("--threads", &["grow", "landscape"]),
+    ("--out", &["landscape"]),
     ("--cores", &["grow"]),
     ("--mem-cap", &["grow"]),
 ];
@@ -183,7 +214,35 @@ struct Options {
     threads: usize,
     cores: Option<usize>,
     mem_cap: Option<usize>,
+    /// The file `landscape` appends its lines to.
+    out: Option<PathBuf>,
     games: Vec<u32>,
+}
+
+impl Options {
+    /// The options of `command` with every option at its default and no games.
+    fn new(command: String) -> Options {
+        Options {
+            command,
+            known: None,
+            repeat: 1,
+            nodes: None,
+            seconds: None,
+            mode: Mode::Start,
+            delta: None,
+            width: None,
+            no_seed: false,
+            tactics: SearchTactics::default(),
+            ckpt_dir: None,
+            every: None,
+            progress: Duration::from_secs(2),
+            threads: 1,
+            cores: None,
+            mem_cap: None,
+            out: None,
+            games: Vec::new(),
+        }
+    }
 }
 
 fn number<T: std::str::FromStr>(name: &str, text: String) -> Result<T, String>
@@ -201,7 +260,7 @@ fn duration(name: &str, text: String) -> Result<Duration, String> {
 
 /// The board sizes of the arguments: numbers, and for `setup`, `start` and `frames` also ranges `A-B`.
 fn games(command: &str, texts: &[String]) -> Result<Vec<u32>, String> {
-    let ranges = matches!(command, "setup" | "start" | "frames");
+    let ranges = matches!(command, "setup" | "start" | "frames" | "landscape");
     let mut games = Vec::new();
     for text in texts {
         let number = |part: &str| part.parse::<u32>().map_err(|e| format!("{text}: {e}"));
@@ -231,25 +290,7 @@ fn parse() -> Result<Options, String> {
     if !COMMANDS.contains(&command.as_str()) {
         return Err(format!("unknown command {command:?}: {}", COMMANDS.join(", ")));
     }
-    let mut o = Options {
-        command,
-        known: None,
-        repeat: 1,
-        nodes: None,
-        seconds: None,
-        mode: Mode::Start,
-        delta: None,
-        width: None,
-        no_seed: false,
-        tactics: SearchTactics::default(),
-        ckpt_dir: None,
-        every: None,
-        progress: Duration::from_secs(2),
-        threads: 1,
-        cores: None,
-        mem_cap: None,
-        games: Vec::new(),
-    };
+    let mut o = Options::new(command);
     let mut texts = Vec::new();
     while let Some(arg) = args.next() {
         if arg.starts_with("--") {
@@ -293,6 +334,7 @@ fn parse() -> Result<Options, String> {
             "--threads" => o.threads = number::<usize>("--threads", value("--threads")?)?.max(1),
             "--cores" => o.cores = Some(number("--cores", value("--cores")?)?),
             "--mem-cap" => o.mem_cap = Some(number("--mem-cap", value("--mem-cap")?)?),
+            "--out" => o.out = Some(value("--out")?.into()),
             _ => texts.push(arg.clone()),
         }
     }
@@ -350,6 +392,10 @@ macro_rules! at_width {
 fn main() {
     let o = parse().unwrap_or_else(|e| fail(&e));
     let optimal = Optimal::built_in().with_results_files(o.known.as_slice()).unwrap_or_else(|e| fail(&e));
+    if o.command == "landscape" {
+        landscape(&o, &optimal).unwrap_or_else(|e| fail(&e));
+        return;
+    }
     for &n in &o.games {
         let done = match o.command.as_str() {
             "setup" => at_width!(setup, n, &o, &optimal),
@@ -413,8 +459,13 @@ impl Line {
         self.field(name, format!("[{}]", items.join(",")))
     }
 
+    /// The line as JSON text.
+    fn render(&self) -> String {
+        format!("{{{}}}", self.0.join(","))
+    }
+
     fn print(&self) {
-        println!("{{{}}}", self.0.join(","));
+        println!("{}", self.render());
     }
 }
 
@@ -495,8 +546,18 @@ struct Run {
 /// The proof of `matroid prove`: the engine searches `p` from the incumbent value `best`, which has no set behind
 /// it, with no seed and no ceiling.  Only the engine's run is timed, not the graphs it starts from.
 fn proof<const W: usize>(p: &Prepared<W>, cfg: &EngineConfig, best: u64) -> Run {
+    proof_collecting(p, cfg, best, None)
+}
+
+/// [`proof`], collecting the search's [`Diagnostics`] into `diagnostics` if given (which slows the search).
+fn proof_collecting<const W: usize>(
+    p: &Prepared<W>,
+    cfg: &EngineConfig,
+    best: u64,
+    diagnostics: Option<&Mutex<Diagnostics>>,
+) -> Run {
     let graph = MatchGraph::new(&p.model, &p.root);
-    let space = SearchSpace::new(p, &graph);
+    let space = SearchSpace { diagnostics, ..SearchSpace::new(p, &graph) };
     let units = vec![TaxUnit { promoted: Bits::<W>::EMPTY, cands: p.candidates }];
     // The incumbent is a value only: its payload, an empty set, is never read back here.
     let start = Start::Fresh { units, best, payload: vec![0u8; 8 * W] };
@@ -564,18 +625,30 @@ impl Sizes {
     }
 }
 
+/// The root's GF(2) graph (the matroids of the root's frames over the candidates), and the time it took to build.
+fn root_graph<const W: usize>(p: &Prepared<W>) -> (Gf2Graph, Duration) {
+    let t0 = Instant::now();
+    let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates);
+    (graph, t0.elapsed())
+}
+
+/// The root's GF(2) bound with no incumbent, as the search computes it at its first node, before any branching
+/// (`Stepper::check_gf2` at the root unit: the bound of the root with all the candidates and at most `max_total`
+/// promotions; the rule of the tactic `symmetry` drops nothing there, as a test checks), the engine's work for it
+/// (augmentations), and the time of the reset and the evaluation.
+fn root_bound<const W: usize>(p: &Prepared<W>, graph: &Gf2Graph) -> (Eval<W>, u64, Duration) {
+    let mut bound = Gf2Bound::<W>::new(graph);
+    let t0 = Instant::now();
+    bound.reset(&Bits::EMPTY, &p.candidates);
+    let eval = bound.evaluate(p.max_total, None);
+    (eval, bound.stats().augmentations, t0.elapsed())
+}
+
 /// The root's GF(2) bound: building the matroids, the bound with no incumbent, and the same evaluation asked for the
 /// members forced by an incumbent worth `start`.  Adds the gaps of the bound over `start` and over `opt`.
 fn root_gf2<const W: usize>(line: &mut Line, p: &Prepared<W>, start: u64, opt: Option<u64>) {
-    let t0 = Instant::now();
-    let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates);
-    let graph_time = t0.elapsed();
-
-    let mut bound = Gf2Bound::<W>::new(&graph);
-    let t1 = Instant::now();
-    bound.reset(&Bits::EMPTY, &p.candidates);
-    let eval = bound.evaluate(p.max_total, None);
-    let bound_time = t1.elapsed();
+    let (graph, graph_time) = root_graph(p);
+    let (eval, augmentations, bound_time) = root_bound(p, &graph);
 
     let mut split = Gf2Bound::<W>::new(&graph);
     let t2 = Instant::now();
@@ -591,7 +664,7 @@ fn root_gf2<const W: usize>(line: &mut Line, p: &Prepared<W>, start: u64, opt: O
         .seconds("root_bound_s", bound_time.as_secs_f64())
         .field("root_bound", eval.value)
         .field("root_chosen", eval.chosen.len())
-        .field("root_augmentations", bound.stats().augmentations)
+        .field("root_augmentations", augmentations)
         .seconds("root_split_s", split_time.as_secs_f64())
         .field("root_forced", forced.len())
         .field("gap_start", gap(start))
@@ -926,4 +999,410 @@ fn frames<const W: usize>(n: u32) {
     sizes.add_to(&mut line, "");
     line.field("max_freedoms", sizes.max_freedoms()).field("block_words", sizes.max_freedoms().div_ceil(64));
     line.print();
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// landscape
+
+/// A game standalone: the two ends of what its search has to close, and what finding them cost.  The sums are
+/// promotion sums; the line reports scores.
+#[derive(Default)]
+struct Landscape {
+    n: u32,
+    prime: bool,
+    /// Nothing to promote: the game with no promotions is the only game.
+    trivial: bool,
+    in_the_bag: u64,
+    /// The board's frames and candidates, as `solve`'s setup line counts them, and `max_total`.
+    frames: usize,
+    candidates: u32,
+    max_total: u32,
+    /// The greedy set's sum, the start incumbent's (the lower end) and the root's GF(2) bound (the upper end).
+    greedy: u64,
+    start: u64,
+    bound: u64,
+    /// Seconds: the board and the search's setup (`greedy_s`, the greedy set, is part of it), the start incumbent,
+    /// the GF(2) graph (`graph_s`) and the bound with it, and the game as a whole; and the CPU seconds of its thread.
+    setup_s: f64,
+    greedy_s: f64,
+    start_s: f64,
+    graph_s: f64,
+    bound_s: f64,
+    total_s: f64,
+    cpu_s: Option<f64>,
+}
+
+impl Landscape {
+    /// The upper end as a score: no game of the board scores more.
+    fn upper(&self) -> u64 {
+        self.in_the_bag + self.bound
+    }
+
+    /// The lower end as a score: the game a standalone `solve` starts from.
+    fn lower(&self) -> u64 {
+        self.in_the_bag + self.start
+    }
+
+    /// The standalone root gap, which can be negative only if a bound is wrong.
+    fn gap(&self) -> i64 {
+        self.upper() as i64 - self.lower() as i64
+    }
+
+    /// Whether the two ends meet, which settles the game at the search's first node.
+    fn meets(&self) -> bool {
+        self.upper() == self.lower()
+    }
+
+    /// The line of the game; `opt` is its known optimum score, and `proof` how its results line proves it.
+    fn line(&self, opt: Option<u64>, proof: Option<&str>) -> Line {
+        let mut line = Line::of(self.n);
+        line.field("prime", self.prime)
+            .field("trivial", self.trivial)
+            .field("in_the_bag", self.in_the_bag)
+            .field("upper", self.upper())
+            .field("lower", self.lower())
+            .field("gap", self.gap())
+            .field("meets", self.meets())
+            .field("greedy", self.in_the_bag + self.greedy)
+            .field("frames", self.frames)
+            .field("candidates", self.candidates)
+            .field("max_total", self.max_total)
+            .seconds("setup_s", self.setup_s)
+            .seconds("greedy_s", self.greedy_s)
+            .seconds("start_s", self.start_s)
+            .seconds("graph_s", self.graph_s)
+            .seconds("bound_s", self.bound_s)
+            .seconds("total_s", self.total_s)
+            .maybe("cpu_s", self.cpu_s.map(|cpu| format!("{cpu:.6}")))
+            .maybe("opt", opt);
+        match proof {
+            Some(proof) => line.text("opt_proof", proof),
+            None => line.field("opt_proof", "null"),
+        };
+        line.maybe("root_gap", opt.map(|opt| self.upper() as i64 - opt as i64))
+            .maybe("shortfall", opt.map(|opt| opt as i64 - self.lower() as i64));
+        line
+    }
+}
+
+/// Game `n` standalone, at the set width `W` that `solve` picks for it: set up as `solve` sets it up (the board and
+/// `prepare` with the default tactics), the start incumbent as the search makes it with no seed and no ceiling
+/// (`start_incumbent`: the better of the greedy set and the matching dive, improved by the local search), and the
+/// root's GF(2) bound.
+fn landscape_of<const W: usize>(n: u32) -> Landscape {
+    let (cpu0, t0) = (counters::thread_cpu_seconds(), Instant::now());
+    let board = Board::<W>::for_n(n);
+    let mut land = Landscape {
+        n,
+        prime: board.tables.is_prime(n),
+        trivial: board.is_trivial(),
+        in_the_bag: board.in_the_bag,
+        frames: board.frames.frames.len(),
+        candidates: board.candidates().len(),
+        ..Landscape::default()
+    };
+    if !land.trivial {
+        let p = board.prepare(SearchTactics::default()).expect("prepare");
+        land.setup_s = t0.elapsed().as_secs_f64();
+        (land.greedy_s, land.greedy, land.max_total) = (p.timings.greedy.as_secs_f64(), p.greedy.sum(), p.max_total);
+
+        let t1 = Instant::now();
+        let graph = MatchGraph::new(&p.model, &p.root);
+        land.start = start_incumbent(&p, &graph, &Control::new(), 1, None).sum();
+        land.start_s = t1.elapsed().as_secs_f64();
+
+        let (gf2, graph_time) = root_graph(&p);
+        let (eval, _, eval_time) = root_bound(&p, &gf2);
+        land.bound = eval.value;
+        land.graph_s = graph_time.as_secs_f64();
+        land.bound_s = (graph_time + eval_time).as_secs_f64();
+    }
+    land.total_s = t0.elapsed().as_secs_f64();
+    land.cpu_s = cpu0.zip(counters::thread_cpu_seconds()).map(|(before, after)| after - before);
+    land
+}
+
+/// Game `n` standalone, at the set width `with_width!` picks for it.
+fn landscape_at(n: u32) -> Result<Landscape, String> {
+    taxman::with_width!(n, W => Ok(landscape_of::<W>(n)), else Err(beyond(n)))
+}
+
+/// The proof of each game that the completed lines of the results file `path` have (the last line of a game counts).
+fn known_proofs(path: &Path) -> Result<HashMap<u32, String>, String> {
+    let text = fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let mut proofs = HashMap::new();
+    for (i, line) in text.lines().enumerate().filter(|(_, line)| !line.trim().is_empty()) {
+        let game = Json::parse(line).map_err(|e| format!("{}: line {}: {e}", path.display(), i + 1))?;
+        let field = |name: &str| game.get(name);
+        if field("completed").and_then(Json::as_bool) == Some(true) {
+            if let (Some(n), Some(proof)) = (field("n").and_then(Json::as_u32), field("proof").and_then(Json::as_str)) {
+                proofs.insert(n, proof.to_owned());
+            }
+        }
+    }
+    Ok(proofs)
+}
+
+/// The board sizes of the lines of an output file's text, and the length in bytes of its whole lines.  A text that does
+/// not end in a newline ends in a line cut short (a run was killed in the middle of writing it), which counts for
+/// nothing and is cut off before a run goes on.
+fn finished_games(text: &str) -> Result<(HashSet<u32>, usize), String> {
+    let whole = text.rfind('\n').map_or(0, |at| at + 1);
+    let mut games = HashSet::new();
+    for (i, line) in text[..whole].lines().enumerate().filter(|(_, line)| !line.trim().is_empty()) {
+        let n = Json::parse(line).ok().and_then(|game| game.get("n").and_then(Json::as_u32));
+        games.insert(n.ok_or_else(|| format!("line {}: not a game's line", i + 1))?);
+    }
+    Ok((games, whole))
+}
+
+/// `landscape`: the games of `o.games` that `--out` does not have yet, `--threads` at a time, one game a thread, each
+/// line printed and appended as its game finishes.
+fn landscape(o: &Options, optimal: &Optimal) -> Result<(), String> {
+    let proofs = o.known.as_deref().map(known_proofs).transpose()?.unwrap_or_default();
+    // The games the output file has, and the length to cut it to if it ends in a line cut short.
+    let (mut done, mut cut_to) = (HashSet::new(), None);
+    if let Some(path) = o.out.as_deref().filter(|path| path.exists()) {
+        let text = fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+        let (games, whole) = finished_games(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+        (done, cut_to) = (games, Some(whole).filter(|&whole| whole < text.len()));
+    }
+    let mut seen = HashSet::new();
+    let todo: Vec<u32> = o.games.iter().copied().filter(|n| seen.insert(*n)).collect();
+    let todo: Vec<u32> = todo.into_iter().filter(|n| !done.contains(n)).collect();
+    if let Some(path) = &o.out {
+        let skipped = seen.len() - todo.len();
+        if skipped > 0 {
+            eprintln!("skipped {skipped} games already done in {}", path.display());
+        }
+    }
+    let sink = match &o.out {
+        Some(path) => {
+            let at = |e: std::io::Error| format!("{}: {e}", path.display());
+            let file = fs::OpenOptions::new().append(true).create(true).open(path).map_err(at)?;
+            if let Some(length) = cut_to {
+                eprintln!("cut off a line cut short at the end of {}", path.display());
+                file.set_len(length as u64).map_err(at)?;
+            }
+            Some(Mutex::new(file))
+        }
+        None => None,
+    };
+
+    let next = AtomicUsize::new(0);
+    let failure = Mutex::new(None);
+    std::thread::scope(|scope| {
+        for _ in 0..o.threads.min(todo.len()) {
+            scope.spawn(|| {
+                while let Some(&n) = todo.get(next.fetch_add(1, Ordering::Relaxed)) {
+                    let land = landscape_at(n).unwrap_or_else(|e| fail(&e));
+                    let line = land.line(optimal.score(n), proofs.get(&n).map(String::as_str)).render();
+                    println!("{line}");
+                    if let Some(sink) = &sink {
+                        let mut file = sink.lock().unwrap_or_else(PoisonError::into_inner);
+                        if let Err(e) = file.write_all(format!("{line}\n").as_bytes()) {
+                            failure.lock().unwrap_or_else(PoisonError::into_inner).get_or_insert(e.to_string());
+                        }
+                    }
+                }
+            });
+        }
+    });
+    match failure.into_inner().unwrap_or_else(PoisonError::into_inner) {
+        Some(e) => Err(format!("--out: {e}")),
+        None => Ok(()),
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Tests: `landscape`'s (cargo test runs them: the example is `test = true` in Cargo.toml)
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use taxman::search::cut;
+    use taxman::search::symmetry::Symmetries;
+    use taxman::solver::{self, GameResult, SolveOptions};
+
+    /// The board sizes from 2 to `to`, every `step`-th.
+    fn sample(step: usize, to: u32) -> impl Iterator<Item = u32> {
+        (2..=to).step_by(step)
+    }
+
+    /// `solve` on game `n` alone (no previous game: standalone), on one thread, with the time limit given.
+    fn solve_alone(n: u32, time_limit: Option<Duration>) -> GameResult {
+        let opts = SolveOptions { threads: 1, window: 1, time_limit, ..SolveOptions::default() };
+        let mut result = None;
+        solver::solve_range_each(n, n, &opts, None, |game| result = Some(game.clone())).expect("solve");
+        result.expect("a result for the game")
+    }
+
+    /// The ends of game `n` are what `solve` reports of it: its setup line's sizes and greedy sum, the start incumbent
+    /// that a search stopped at once is left with (`best_so_far`), and with `full` the optimum of a search to the end,
+    /// which lies between the ends, and which takes no more than the first node if they meet.
+    fn agree_with_solve(n: u32, full: bool) {
+        let land = landscape_at(n).expect("a board the solver supports");
+        let stopped = solve_alone(n, Some(Duration::ZERO));
+        let setup = stopped.setup.expect("a game that is searched");
+        let sizes = (setup.frames, setup.candidates, setup.max_total, setup.greedy_sum);
+        assert_eq!(sizes, (land.frames, land.candidates, land.max_total, land.greedy), "n={n}: solve's setup line");
+        assert!(!stopped.completed, "n={n}: a search stopped before its first node is not complete");
+        assert_eq!(stopped.score, land.lower(), "n={n}: the incumbent a standalone search starts from");
+        if full {
+            let done = solve_alone(n, None);
+            assert!(done.completed && land.lower() <= done.score && done.score <= land.upper(), "n={n}");
+            assert!(!land.meets() || done.nodes <= 1, "n={n}: the ends meet, and the search took {} steps", done.nodes);
+        }
+    }
+
+    #[test]
+    fn the_ends_of_a_few_small_games_are_what_solve_starts_from_and_finds() {
+        for n in [18, 20, 60, 98, 120, 250] {
+            agree_with_solve(n, true);
+        }
+    }
+
+    #[test]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is the_ends_of_a_few_small_games_are_what_solve_starts_from_and_finds"
+    )]
+    fn the_ends_of_medium_games_are_what_solve_starts_from_and_finds() {
+        for n in [480, 700] {
+            agree_with_solve(n, true);
+        }
+        for n in [936, 1215, 1300] {
+            agree_with_solve(n, false);
+        }
+    }
+
+    /// The root bound is the first node's: a search from an incumbent worth the bound is over at its first step, which
+    /// a bound ends (the node needs more than the GF(2) bound, or than the sum of its largest candidates, which no
+    /// GF(2) bound exceeds); and one from an incumbent worth one less does not end at its first step by a bound (the
+    /// bounds reach what the node needs; the first step can still end by the forced members or the nogoods, or the
+    /// node can be branched on).  And the rule of the tactic `symmetry`, which the first step applies before the
+    /// bound, drops no candidate at the root.
+    fn first_node<const W: usize>(n: u32) {
+        let p = Board::<W>::for_n(n).prepare(SearchTactics::default()).expect("prepare");
+        let (graph, _) = root_graph(&p);
+        let bound = root_bound(&p, &graph).0.value;
+        let cfg = EngineConfig { threads: 1, node_limit: Some(2048), ..EngineConfig::default() };
+        // The search from `best`, and how many node loops a bound ended.
+        let from = |best: u64| {
+            let diagnostics = Mutex::new(Diagnostics::default());
+            let run = proof_collecting(&p, &cfg, best, Some(&diagnostics));
+            let ends = diagnostics.into_inner().unwrap_or_else(PoisonError::into_inner).loop_ends;
+            (run.completed, run.stats.nodes, ends[cut::GF2] + ends[cut::LARGEST])
+        };
+        assert_eq!(from(bound), (true, 1, 1), "n={n}: a bound of {bound} does not end the first node at {bound}");
+        let (_, nodes, ended) = from(bound - 1);
+        assert!(nodes > 1 || ended == 0, "n={n}: the first node's bound is below {bound}");
+
+        let symmetries = Symmetries::of(&p.model, &p.root, &p.candidates);
+        let mut candidates = p.candidates;
+        assert!(!symmetries.exclude(&mut symmetries.scratch(), &Bits::EMPTY, &mut candidates), "n={n}");
+        assert_eq!(candidates, p.candidates, "n={n}: the rule drops candidates at the root");
+    }
+
+    fn first_nodes(games: &[u32]) {
+        for &n in games {
+            taxman::with_width!(n, W => first_node::<W>(n), else panic!("{}", beyond(n)));
+        }
+    }
+
+    #[test]
+    fn the_root_bound_is_the_bound_of_the_searchs_first_node() {
+        first_nodes(&[18, 30, 60, 98, 120, 250, 480]);
+    }
+
+    #[test]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is the_root_bound_is_the_bound_of_the_searchs_first_node"
+    )]
+    fn the_root_bound_is_the_bound_of_the_searchs_first_node_of_larger_games() {
+        first_nodes(&[700, 936, 1215, 1300, 1400, 2112]);
+    }
+
+    /// Every sampled game's ends hold the known optimum: lower at most the optimum, upper at least.
+    fn bracket_the_optimum(games: impl Iterator<Item = u32>) {
+        for n in games {
+            let land = landscape_at(n).expect("a board the solver supports");
+            let opt = Optimal::built_in().score(n).unwrap_or_else(|| panic!("n={n}: optimal.json has no game"));
+            let ends = (land.lower(), land.upper());
+            assert!(ends.0 <= opt && opt <= ends.1, "n={n}: lower {} optimum {opt} upper {}", ends.0, ends.1);
+        }
+    }
+
+    #[test]
+    fn the_ends_bracket_the_optimum_of_games_to_300() {
+        bracket_the_optimum(sample(7, 300));
+    }
+
+    #[test]
+    #[cfg_attr(debug_assertions, ignore = "long: the quick check is the_ends_bracket_the_optimum_of_games_to_300")]
+    fn the_ends_bracket_the_optimum_of_games_to_1300() {
+        bracket_the_optimum(sample(5, 1300));
+    }
+
+    /// The lines of a `landscape` output file as JSON.
+    fn lines(path: &Path) -> Vec<Json> {
+        fs::read_to_string(path).unwrap().lines().map(|line| Json::parse(line).unwrap()).collect()
+    }
+
+    fn board_sizes(lines: &[Json]) -> Vec<u32> {
+        lines.iter().map(|line| line.get("n").and_then(Json::as_u32).expect("n")).collect()
+    }
+
+    #[test]
+    fn the_output_file_is_appended_to_and_a_rerun_skips_what_it_has() {
+        let dir = support::TempDir::new("wall-landscape");
+        let out = dir.join("landscape.jsonl");
+        let known = Path::new(env!("CARGO_MANIFEST_DIR")).join("results/strict.jsonl");
+        let optimal = Optimal::built_in().with_results_files(std::slice::from_ref(&known)).expect("the chain");
+        let mut o = Options::new("landscape".to_owned());
+        (o.out, o.known, o.threads) = (Some(out.clone()), Some(known), 3);
+
+        // Thirteen games on three threads, in the order they finish.
+        o.games = (18..=30).collect();
+        landscape(&o, &optimal).expect("landscape");
+        let first = fs::read_to_string(&out).unwrap();
+        let mut seen = board_sizes(&lines(&out));
+        seen.sort_unstable();
+        assert_eq!(seen, (18..=30).collect::<Vec<u32>>());
+        for line in lines(&out) {
+            let field = |name: &str| line.get(name).and_then(Json::as_i64).expect(name);
+            let (lower, upper, opt) = (field("lower"), field("upper"), field("opt"));
+            assert!(lower <= opt && opt <= upper && field("gap") == upper - lower, "{line}");
+            assert_eq!((field("root_gap"), field("shortfall")), (upper - opt, opt - lower), "{line}");
+            let proven = line.get("opt_proof").and_then(Json::as_str);
+            assert!(proven.is_some(), "{line}: the chain has the proof of every game");
+        }
+
+        // The same games again add nothing; more games add only themselves.
+        landscape(&o, &optimal).expect("landscape");
+        assert_eq!(fs::read_to_string(&out).unwrap(), first);
+        o.games = (18..=34).collect();
+        landscape(&o, &optimal).expect("landscape");
+        let more = fs::read_to_string(&out).unwrap();
+        assert!(more.starts_with(&first) && lines(&out).len() == 17);
+
+        // A run killed in the middle of a line leaves a piece of it, which the next run cuts off.
+        fs::write(&out, format!("{more}{{\"n\":35,\"up")).unwrap();
+        o.games = (18..=36).collect();
+        landscape(&o, &optimal).expect("landscape");
+        let mut seen = board_sizes(&lines(&out));
+        seen.sort_unstable();
+        assert_eq!(seen, (18..=36).collect::<Vec<u32>>());
+        assert!(fs::read_to_string(&out).unwrap().starts_with(&more));
+    }
+
+    #[test]
+    fn a_game_without_a_known_optimum_has_null_where_the_optimum_is_needed() {
+        let line = Json::parse(&landscape_at(250).expect("a board").line(None, None).render()).expect("JSON");
+        for name in ["opt", "opt_proof", "root_gap", "shortfall"] {
+            assert!(matches!(line.get(name), Some(Json::Null)), "{name}");
+        }
+        assert!(line.get("upper").and_then(Json::as_u64) >= line.get("lower").and_then(Json::as_u64));
+    }
 }
