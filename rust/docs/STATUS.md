@@ -46,8 +46,9 @@ speed or of spending is worth about 310 in n; only a tighter bound in the search
 chain's launch is [RUNBOOK section 5](../tools/cloud/RUNBOOK.md#5-the-production-chain); it needs Brian's approval.
 
 **The wall** (Brian, 2026-10-16): the first n whose own search (not time spent waiting behind another game) takes
-more than 24 hours on one `c8g.16xlarge` with the run's build and settings.  The next run stops there, keeping the
-game's checkpoint, or when its budget (about $50) is spent.  On 64 threads the search loses nothing to threads (3.5
+more than 24 hours on one `c8g.16xlarge` with the run's build and settings (`solve --game-hours 24`: the hours the game
+has been the oldest of the window with its search running).  The next run stops there, keeping the game's checkpoint,
+or when its budget (about $50) is spent.  On 64 threads the search loses nothing to threads (3.5
 thousand nodes a second a thread at 3441, the same on 16, 32 and 64), so what remains is cheaper nodes and smaller
 trees.
 
@@ -93,10 +94,8 @@ What has been tried for the bound, and where it stands:
 
 ## Waiting on Brian
 
-* The run to the wall: its budget (about $50) and how it runs unattended (a spot instance that restarts itself, or
-  on demand).  The tuning campaign has reported.
-* 3441: whether it resumes from its checkpoint as `--tactic force_window=80` (the window it was made with, so the
-  tree of its 626 million nodes goes on as it was) or starts again under the default.
+* Nothing for the run itself: Brian approved the rehearsal and the run (2026-10-16).  The run starts from n = 1, so the
+  checkpoint of 3441 that the forcing window of `all` would refuse is not needed.
 * Outside review of Theorems 1, 10 and 12 by Robert Moniot.
 * Publishing (`optimal.json` past 1300, OEIS).
 
@@ -106,5 +105,9 @@ What has been tried for the bound, and where it stands:
   cheaper cycle searches), the knobs for nogood retention, the forcing window and strong branching, the harness that
   tunes them on subtrees of searches at the end of the chain, and the campaign that used it (see "Decided";
   [the profile at the end of the chain](../bench/chain_end/README.md)).
-* The run to the wall comes next.  Before it: 3440 re-solved with the fixed build (see "The results"), a per-game
-  limit of 24 hours in the chain's driver, and the unattended restart.
+* The run to the wall: the rehearsal of [RUNBOOK 12.5](../tools/cloud/RUNBOOK.md#125-the-rehearsal-designed-not-run) on
+  a `c8g.large` (about $0.04), then the run itself (12.4).  Built and tested against a stand-in for aws, not yet run on
+  EC2: the wall in the solver (`solve --game-hours`), the budget and the date across machines (the ledger in S3), and
+  the group that restarts the machine and ends by taking itself to capacity 0
+  ([RUNBOOK section 12](../tools/cloud/RUNBOOK.md#12-the-unattended-run-to-the-wall)).  Before the wall's data count, 3440
+  is re-solved with the fixed build by the run itself (it starts from n = 1).

@@ -61,6 +61,11 @@ die() {
     exit 1
 }
 
+# A time in seconds since the epoch as a UTC date (GNU date takes -d @N, BSD date -r N).
+epoch_date() {
+    date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -r "$1" +%Y-%m-%dT%H:%M:%SZ
+}
+
 # The number of CPUs the OS offers (what `taxman solve` uses when given no --threads).
 ncpu() {
     nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1

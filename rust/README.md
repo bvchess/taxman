@@ -317,6 +317,12 @@ counts them.
 * **Limits.**  `--time-limit S` and `--node-limit N` bound one game's search in one invocation (not the whole
   range).  A game stopped by a limit gets an incomplete result line (`completed` false, `best_so_far`), and the range
   stops there, exit status 0.
+* **The wall.**  `--game-hours H` ends the range at the first game whose own search passes H hours, summed over every
+  invocation and counted only while the game is the oldest of the window with its search running (not while it
+  waits behind another).  Every search in flight stops with a final checkpoint, nothing is recorded for that game, not
+  even an incomplete line, `solve` prints `wall at N after H hours` and exits with status 4; the game's clock is kept
+  beside its checkpoint (`nNNNN.clock`), so the same command with a larger H goes on from both
+  ([DESIGN.md](DESIGN.md#the-window-games-in-flight)).
 * **The result is recorded before the checkpoint is deleted**, so a crash never loses a finished game; at worst the
   checkpoint of a finished game is left over, and the next run deletes it.
 * **Memory.**  Searcher state is bounded; the shared queue of work units spills to `DIR/spill` beyond `--mem-cap` units
@@ -333,6 +339,7 @@ counts them.
 | `--checkpoint-dir DIR`, `--checkpoint-interval S` | checkpoints (default every 60 s) |
 | `--progress S` | seconds between progress lines on stderr (default 60; 0: none) |
 | `--time-limit S`, `--node-limit N` | stop one game's search, keeping its checkpoint |
+| `--game-hours H` | the wall: end the range, with exit status 4 and nothing recorded for the game, at the first game whose own search has passed H hours in all (above) |
 | `--mem-cap UNITS` | work units kept in memory before spilling to disk |
 | `--force-search` | search where the previous game or an earlier search would give the answer (skips `prime_shortcut` and `same_search`) |
 | `--use-prev` | take the game of n - 1 from `optimal.json` when neither the run nor `--out` has it; a result whose proof rests on it records that it assumes it optimal |

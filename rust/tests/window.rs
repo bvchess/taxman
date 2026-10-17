@@ -3,9 +3,10 @@
 //! thread the window is one, and the lines are those of a window of one but for the times and the build; a repeat of
 //! a game still in flight names it, on a later line; a range stopped by a limit stops at its first unfinished game with
 //! the lines before it in order, keeps the checkpoints of the games searched ahead of it and completes when run again;
-//! and a score that is not the table's fails the range at that game, with the lines before it, as a window of one
-//! does.  The policy that shares the threads is tested on its own in `src/solver/window/allot.rs`.  Small boards, at
-//! most 4 threads.
+//! a game that passes the wall (`SolveOptions::game_limit`) ends the range with no line for it, its checkpoint and its
+//! clock kept, and goes on from them when run again; and a score that is not the table's fails the range at that game,
+//! with the lines before it, as a window of one does.  The policy that shares the threads is tested on its own in
+//! `src/solver/window/allot.rs`.  Small boards, at most 4 threads.
 
 mod common;
 
@@ -13,6 +14,7 @@ use common::{matching_options, options, results_path, TempDir};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
+use std::time::Duration;
 use taxman::game::Optimal;
 use taxman::json::Json;
 use taxman::results::{rejected_path, verify_files};
@@ -174,6 +176,65 @@ fn a_range_stopped_by_a_limit_ends_at_its_first_unfinished_game_and_completes_wh
         assert!(invocations >= Some(2), "n={}: {invocations:?}", n_of(line));
     }
     assert!(left(&checkpoints).is_empty() && !checkpoints.join("spill").exists());
+}
+
+/// The seconds in the clock file of game `n`.
+fn clock_of(checkpoints: &Path, n: u32) -> f64 {
+    let text = fs::read_to_string(checkpoints.join(format!("n{n:04}.clock"))).unwrap_or_else(|e| panic!("n={n}: {e}"));
+    text.trim().parse().unwrap_or_else(|e| panic!("n={n}: {text:?}: {e}"))
+}
+
+/// The wall: the head of the window, whose search runs about half a second on 4 threads (no seed, no ceiling, the
+/// matching tactics), passes a limit of 3 ms.  The range ends there with no line for it, nothing in the results file, a
+/// checkpoint and a clock for it; the games searched ahead of it keep their checkpoints; a run with the same limit
+/// walls again at the same game at once, from the clock it was left with (which is never smaller); and a run with no
+/// limit completes every game and leaves no clock behind.
+#[test]
+fn a_game_that_passes_the_wall_ends_the_range_with_no_line_and_goes_on_from_its_clock() {
+    let dir = TempDir::new("window-wall");
+    let results = dir.join("r.jsonl");
+    let checkpoints = dir.join("ckpt");
+    let mut walled = SolveOptions {
+        checkpoint_dir: Some(checkpoints.clone()),
+        game_limit: Some(Duration::from_millis(3)),
+        force_search: true,
+        use_prev: true,
+        window: 4,
+        ..matching_options(4)
+    };
+    walled.tactics.seed_incumbent = false;
+    walled.tactics.prev_cap = false;
+    let (lo, hi) = (800, 801);
+    let mut seen = Vec::new();
+    let summary = solver::solve_range_each(lo, hi, &walled, Some(&results), |game| seen.push(game.n)).unwrap();
+    let wall = summary.walled.expect("the head's search takes longer than the limit");
+    assert_eq!(wall.n, lo, "the first game of the range is the head");
+    assert!(wall.held >= Duration::from_millis(3), "{wall:?}");
+    assert!(summary.stopped_at.is_none() && summary.solved == 0 && seen.is_empty(), "{summary:?} {seen:?}");
+    assert_eq!(fs::read_to_string(&results).unwrap(), "", "nothing is recorded for the game, or any other");
+    assert!(checkpoints.join("n0800.ckpt").exists());
+    let kept = clock_of(&checkpoints, lo);
+    assert!(kept >= 0.0029 && kept <= wall.held.as_secs_f64() + 0.001, "{kept} {wall:?}");
+
+    // The same limit again: the clock is where it was left, so the game walls at once, with a clock no smaller.
+    let again = solver::solve_range_each(lo, hi, &walled, Some(&results), |_| {}).unwrap();
+    let wall_again = again.walled.expect("a clock at the limit walls the game again");
+    assert_eq!(wall_again.n, lo);
+    assert!(wall_again.held >= wall.held && clock_of(&checkpoints, lo) >= kept);
+
+    // No limit: the game resumes from its checkpoint and the range completes; no clock is left.
+    let free = SolveOptions { game_limit: None, ..walled };
+    let done = solver::solve_range_each(lo, hi, &free, Some(&results), |game| seen.push(game.n)).unwrap();
+    assert!(done.walled.is_none() && done.stopped_at.is_none(), "{done:?}");
+    assert_eq!(seen, (lo..=hi).collect::<Vec<_>>());
+    assert_eq!(lines(&results).iter().map(n_of).collect::<Vec<_>>(), (lo..=hi).collect::<Vec<_>>());
+    verify_files(std::slice::from_ref(&results), Optimal::built_in(), 1).unwrap_or_else(|e| panic!("{e}"));
+    let left: Vec<String> = fs::read_dir(&checkpoints)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|name| name != "taxman.lock")
+        .collect();
+    assert!(left.is_empty(), "{left:?}");
 }
 
 /// A table that is wrong about one game fails a range at that game, with the lines of the games before it and the game

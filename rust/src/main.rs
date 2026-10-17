@@ -3,14 +3,14 @@
 //! The subcommands are in `commands.rs`; the flag parser, the error type and the output macros they share are in
 //! `cli.rs`.  Every subcommand is a plain function of the arguments after its name.  A command
 //! that fails prints `error: ...` and exits with status 1; a bad command line prints the usage and exits with
-//! status 2; a run that SIGINT or SIGTERM stopped (see `solve`) exits with 128 plus the signal; `certify` exits with
-//! status 2 when it finds a game that beats a recorded score.  `verify-certificates` fails with status 1 on the first
-//! line that is not what it says.
+//! status 2; a run that SIGINT or SIGTERM stopped (see `solve`) exits with 128 plus the signal; a `solve` that a game
+//! passing the wall (`--game-hours`) ended exits with status 4; `certify` exits with status 2 when it finds a game that
+//! beats a recorded score.  `verify-certificates` fails with status 1 on the first line that is not what it says.
 
 mod cli;
 mod commands;
 
-use cli::{errln, outln, CliError, CliResult};
+use cli::{errln, outln, CliError, CliResult, WALL_STATUS};
 use std::process::ExitCode;
 use taxman::engine;
 use taxman::search::SearchTactics;
@@ -40,6 +40,10 @@ commands:
       --node-limit N           stop a game's search after N nodes (keeps its checkpoint)
                                SIGINT or SIGTERM stops the search the same way (exit status 130 or 143);
                                a second one kills the process.  One process at a time uses a checkpoint DIR.
+      --game-hours H           the wall: stop the range at the first game whose own search (the time it is the
+                               first of the window, summed over runs and kept in DIR/nNNNN.clock) passes H hours:
+                               every search stops with a final checkpoint, nothing is recorded for that game, the
+                               line `wall at N after H hours` is printed and the exit status is 4
       --mem-cap UNITS          search units kept in memory before spilling to disk
       --force-search           search even where the previous game or an earlier search gives the answer
       --use-prev               take the game of A-1 from optimal.json if --out FILE lacks it; the results
@@ -116,6 +120,8 @@ fn main() -> ExitCode {
             errln!("counterexample: {message}");
             ExitCode::from(2)
         }
+        // `solve` has said where on stdout.
+        Err(CliError::Wall) => ExitCode::from(WALL_STATUS),
     }
 }
 

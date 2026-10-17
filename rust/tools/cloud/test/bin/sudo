@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# A stand-in for sudo, for test/run.sh: runs the command as the user (`shutdown` is the test's own, which only logs).
+while [ "${1:-}" = -n ]; do
+    shift
+done
+exec "$@"

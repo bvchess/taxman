@@ -6,7 +6,8 @@
 //! they add is output, and the policies of a command-line run:
 //!
 //! * `solve` stops on SIGINT and SIGTERM with a final checkpoint, locks its checkpoint directory and (when it opens
-//!   it, `results::ResultsFile`) its results file, and prints one summary line per game as it is concluded;
+//!   it, `results::ResultsFile`) its results file, prints one summary line per game as it is concluded, and with
+//!   `--game-hours` ends at the first game whose own search passes the wall (exit status 4);
 //! * `regress` solves in memory and compares every score with `optimal.json`;
 //! * `bench` solves a fixed set of hard games standalone and appends the run to a history file, so that
 //!   performance can be followed from commit to commit.  Its files are found in the repository
@@ -40,7 +41,7 @@ use taxman::json::Json;
 use taxman::numtheory::Tables;
 use taxman::paths;
 use taxman::results::{build, verify_files, Build};
-use taxman::solver::{self, GameResult, Method, Prev, SolveOptions};
+use taxman::solver::{self, GameResult, Method, Prev, SolveOptions, Wall};
 
 fn failed(message: String) -> CliError {
     CliError::Failed(message)
@@ -104,7 +105,25 @@ fn stopped_line(n: u32, opts: &SolveOptions) -> String {
     format!("stopped: the search for n={n} {why} before it finished; {resume}")
 }
 
-const SOLVE_FLAGS: [&str; 2] = ["--out", WINDOW_FLAG];
+const SOLVE_FLAGS: [&str; 3] = ["--out", WINDOW_FLAG, "--game-hours"];
+
+/// The line `solve` prints when a game passes the wall, `wall at N after H hours`, then why and what is kept.  A script
+/// reads the words up to the colon (`chain.sh`).
+fn wall_line(wall: Wall, opts: &SolveOptions) -> String {
+    let hours = |time: Duration| time.as_secs_f64() / 3600.0;
+    let limit = opts.game_limit.map_or(0.0, hours);
+    let resume = if opts.checkpoint_dir.is_some() {
+        "its checkpoint and clock are kept, and nothing is recorded for it; run the same command with a larger \
+         --game-hours to go on with it"
+    } else {
+        "it was not checkpointed"
+    };
+    format!(
+        "wall at {} after {:.5} hours: its own search passed the limit of {limit} hours; {resume}",
+        wall.n,
+        hours(wall.held)
+    )
+}
 
 /// `solve N|A-B [options]`: solves one board size or a range, each from the one before (`solver::solve_range_each`).
 pub fn solve(args: &[String]) -> CliResult {
@@ -117,6 +136,7 @@ pub fn solve(args: &[String]) -> CliResult {
     let mut opts = range_options(&args)?;
     opts.force_search = args.has("--force-search");
     opts.use_prev = args.has("--use-prev");
+    opts.game_limit = args.positive_hours("--game-hours")?;
     search_options(&args, &mut opts)?;
     let out = args.value("--out").map(Path::new);
     let show = args.has("--show");
@@ -138,6 +158,10 @@ pub fn solve(args: &[String]) -> CliResult {
     }
     if let Some(n) = summary.stopped_at {
         outln!("{}", stopped_line(n, &opts));
+    }
+    if let Some(wall) = summary.walled {
+        outln!("{}", wall_line(wall, &opts));
+        return Err(CliError::Wall);
     }
     Ok(())
 }

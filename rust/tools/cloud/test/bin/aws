@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+# A stand-in for the aws CLI, for test/run.sh: the commands the cloud scripts use, over directories.  S3 is the
+# directory $FAKE_S3 (s3://bucket/key is $FAKE_S3/bucket/key), the rest of the account is the files of $FAKE_STATE, and
+# every call is appended to $FAKE_LOG.  FAKE_FAIL=NAME makes the command NAME (set-desired-capacity, ...) fail with
+# an access error.  It answers what the scripts ask and nothing more: it checks no flag.
+
+set -u
+log="${FAKE_LOG:?}"
+s3="${FAKE_S3:?}"
+state="${FAKE_STATE:?}"
+printf '%s\n' "$*" >>"$log"
+mkdir -p "$state" "$s3"
+
+service="${1:-}"
+command="${2:-}"
+shift 2 2>/dev/null || shift $#
+args=("$@")
+
+if [ "${FAKE_FAIL:-}" = "$command" ]; then
+    echo "An error occurred (AccessDenied) when calling the $command operation: not allowed" >&2
+    exit 254
+fi
+
+# s3://bucket/key to a path.
+path_of() {
+    printf '%s/%s\n' "$s3" "${1#s3://}"
+}
+
+# The value after the flag $1 among the arguments.
+flag() {
+    local i
+    for ((i = 0; i < ${#args[@]}; i++)); do
+        if [ "${args[$i]}" = "$1" ]; then
+            printf '%s\n' "${args[$((i + 1))]}"
+            return 0
+        fi
+    done
+    return 1
+}
+
+case "$service $command" in
+    "s3 cp")
+        src="${args[0]}"
+        dst="${args[1]}"
+        if [ "$src" = - ]; then
+            mkdir -p "$(dirname "$(path_of "$dst")")"
+            cat >"$(path_of "$dst")"
+        elif [ "$dst" = - ]; then
+            file="$(path_of "$src")"
+            if [ ! -f "$file" ]; then
+                echo "fatal error: An error occurred (404) when calling the HeadObject operation: Key \"${src#s3://*/}\" does not exist" >&2
+                exit 1
+            fi
+            cat "$file"
+        elif [ "${src#s3://}" != "$src" ]; then
+            cp "$(path_of "$src")" "$dst"
+        else
+            mkdir -p "$(dirname "$(path_of "$dst")")"
+            cp "$src" "$(path_of "$dst")"
+        fi
+        ;;
+    "s3 sync")
+        src="${args[0]}"
+        dst="${args[1]}"
+        rsync_args=(-a)
+        for ((i = 2; i < ${#args[@]}; i++)); do
+            case "${args[$i]}" in
+                --delete) rsync_args+=(--delete) ;;
+                --exclude) rsync_args+=(--exclude "${args[$((i + 1))]}") ;;
+            esac
+        done
+        [ "${src#s3://}" != "$src" ] && src="$(path_of "$src")"
+        [ "${dst#s3://}" != "$dst" ] && dst="$(path_of "$dst")"
+        mkdir -p "$src" "$dst"
+        rsync "${rsync_args[@]}" "$src/" "$dst/"
+        ;;
+    "s3 ls")
+        target="$(path_of "${args[0]}")"
+        if [ "${target%/}" != "$target" ]; then
+            [ -d "$target" ] && ls -1 "$target" | while read -r name; do printf '2026-10-17 01:02:03          1 %s\n' "$name"; done
+        else
+            dir="$(dirname "$target")"
+            base="$(basename "$target")"
+            [ -d "$dir" ] && ls -1 "$dir" | grep "^$base" | while read -r name; do printf '2026-10-17 01:02:03          1 %s\n' "$name"; done
+        fi
+        true
+        ;;
+    "s3 rm")
+        case " ${args[*]} " in
+            *" --recursive "*) rm -rf "$(path_of "${args[0]}")" ;;
+            *) rm -f "$(path_of "${args[0]}")" ;;
+        esac
+        ;;
+    "sts get-caller-identity")
+        echo 013764204840
+        ;;
+    "iam get-instance-profile") echo taxman-ec2 ;;
+    "iam put-role-policy") echo "policy" >"$state/role-policy" ;;
+    "iam delete-role-policy") rm -f "$state/role-policy" ;;
+    "iam list-role-policies") [ -f "$state/role-policy" ] && echo taxman-wall || echo "[]" ;;
+    "ec2 describe-instance-type-offerings") printf 'us-east-1a\tus-east-1b\tus-east-1c\n' ;;
+    "ec2 describe-spot-price-history")
+        printf '2026-10-17T01:00:00+00:00\tus-east-1a\t0.6759\n2026-10-17T01:00:00+00:00\tus-east-1b\t0.6603\n'
+        printf '2026-10-16T22:00:00+00:00\tus-east-1b\t0.7000\n'
+        ;;
+    "ec2 describe-vpcs") echo vpc-1 ;;
+    "ec2 describe-subnets")
+        flag --filters >/dev/null
+        for a in "${args[@]}"; do
+            case "$a" in Name=availability-zone,Values=*) echo "subnet-${a#Name=availability-zone,Values=}" ;; esac
+        done
+        ;;
+    "ec2 describe-launch-templates") [ -f "$state/template" ] && echo taxman-wall || true ;;
+    "ec2 create-launch-template") cp "$(flag --launch-template-data | sed 's|^file://||')" "$state/template"; echo lt-1 ;;
+    "ec2 delete-launch-template") rm -f "$state/template" ;;
+    "ec2 create-security-group") touch "$state/sg"; echo sg-123 ;;
+    "ec2 describe-security-groups") [ -f "$state/sg" ] && echo sg-123 || true ;;
+    "ec2 delete-security-group") rm -f "$state/sg" ;;
+    "ec2 describe-instances") cat "$state/instances" 2>/dev/null || true ;;
+    "ec2 describe-volumes" | "ec2 describe-spot-instance-requests") true ;;
+    "autoscaling describe-auto-scaling-groups")
+        query="$(flag --query || true)"
+        if [ ! -f "$state/asg" ]; then
+            case "$query" in *DesiredCapacity*) echo None ;; *) true ;; esac
+        else
+            case "$query" in
+                *DesiredCapacity*) cat "$state/desired"; echo i-0123 us-east-1a InService Healthy ;;
+                *) echo taxman-wall ;;
+            esac
+        fi
+        ;;
+    "autoscaling create-auto-scaling-group") cp "$(flag --mixed-instances-policy | sed 's|^file://||')" "$state/asg"; echo 0 >"$state/desired" ;;
+    "autoscaling put-scheduled-update-group-action") flag --start-time >"$state/scheduled" ;;
+    "autoscaling set-desired-capacity") flag --desired-capacity >"$state/desired" ;;
+    "autoscaling delete-auto-scaling-group") rm -f "$state/asg" "$state/desired" "$state/scheduled" ;;
+    *)
+        echo "fake aws: unexpected command: $service $command ${args[*]}" >&2
+        exit 99
+        ;;
+esac

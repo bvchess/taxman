@@ -100,13 +100,31 @@
 //! checkpoint, the incomplete line a search started after the signal gives in the range solved in order, and the
 //! range ends there.  Time and node limits are each search's own, per game and invocation, as always.
 //!
+//! # The wall
+//!
+//! `--game-hours H` ([`SolveOptions::game_limit`]) bounds how long one game's own search may take, to find the first
+//! board size that takes more than H hours on the machine (the *wall*) and stop there.  A game's own search is the
+//! time it has been the head of the window with its search running, summed over the invocations that searched it.  The
+//! chain waits for the head and for no other game; a search behind it is suspended, or shares the threads that the
+//! head leaves free, so the time it spends there is not what the game costs, and the search's elapsed time in its
+//! checkpoint (which counts it) would end a run at a game that follows a dear one.  The driver keeps the head's clock
+//! ([`clock`](super::clock)): it adds the time between its looks while the head's search runs, writes it beside the
+//! game's checkpoint every checkpoint interval and when the search ends, and reads it back when a search starts with a
+//! checkpoint to resume, so that a spot interruption, a new machine or a rerun goes on from it.
+//!
+//! When the head's clock reaches the limit the range ends, as it ends at a stop signal: every search in flight is
+//! stopped with its final checkpoint, and nothing is recorded for the head, not even an incomplete line (the
+//! games before it are recorded already); [`RangeSummary::walled`] names it and its clock.  Run again with a larger
+//! limit the head resumes from its checkpoint and its clock.
+//!
 //! # Tracing
 //!
 //! With the environment variable `TAXMAN_WINDOW_TRACE` set, the driver prints a line on stderr for each of its events,
 //! the seconds since the range began first: a setup started and done, a repeat found, a search started (its threads,
 //! whether it has a seed, its ceiling), a search's workers changed (`workers n=N a->b`: given, given back, reclaimed,
-//! or suspended at 0), a hint, a deferral, a search done, a ceiling told, a game concluded.  It is how the policy's
-//! decisions were followed on the laptop, and how they are to be followed on a machine of many threads.
+//! or suspended at 0), a hint, a deferral, a search done, a ceiling told, a game concluded, the wall reached.  It is
+//! how the policy's decisions were followed on the laptop, and how they are to be followed on a machine of many
+//! threads.
 //!
 //! [`Control::set_ceiling`]: crate::engine::Control::set_ceiling
 //! [`Control::stop`]: crate::engine::Control::stop
@@ -114,8 +132,8 @@
 mod allot;
 
 use super::{
-    ceiling, conclude_game, discard_checkpoint, set_up, shared_spill_dir, stored_prev, Before, Context, Derived,
-    Earlier, Failure, Found, GameResult, Go, Job, Outcome, Prev, RangeSummary, SearchSetUp, SetUp, SolveOptions,
+    ceiling, clock, conclude_game, discard_checkpoint, set_up, shared_spill_dir, stored_prev, Before, Context, Derived,
+    Earlier, Failure, Found, GameResult, Go, Job, Outcome, Prev, RangeSummary, SearchSetUp, SetUp, SolveOptions, Wall,
 };
 use crate::accelerate::prime_shortcut;
 use crate::engine::{self, Status, WORKER_STACK_SIZE};
@@ -219,6 +237,11 @@ struct Game {
     stage: Stage,
     /// Its own time so far: its setup, its repeat lookup and its search.
     own: Duration,
+    /// Its wall clock: the time it has been the head with its search running, over every invocation (see "The wall");
+    /// kept at zero unless `--game-hours` asks for a wall.
+    headed: Duration,
+    /// What was last written to its clock file.
+    headed_kept: Duration,
     /// The sender of its go while its thread may wait for one; dropping it cancels the game's search.
     go: Option<Sender<Go>>,
 }
@@ -419,6 +442,8 @@ struct Window<'a> {
     /// When the range began, and whether `TAXMAN_WINDOW_TRACE` asks for the trace on stderr.
     began: Instant,
     trace: bool,
+    /// When the head's clock was last brought up to date.
+    clock_at: Instant,
 }
 
 impl<'a> Window<'a> {
@@ -446,6 +471,7 @@ impl<'a> Window<'a> {
             events,
             began: Instant::now(),
             trace: std::env::var_os("TAXMAN_WINDOW_TRACE").is_some(),
+            clock_at: Instant::now(),
         }
     }
 
@@ -477,10 +503,18 @@ impl<'a> Window<'a> {
             } else {
                 received.recv().ok()
             };
+            // The time since the last look was spent with the head's search as it was before this event.
+            let now = Instant::now();
+            self.advance_clock(now);
             if let Some(event) = event {
                 self.handle(event);
             }
-            let now = Instant::now();
+            if let Some(wall) = self.walled() {
+                self.keep_clock(wall.n);
+                self.trace(format_args!("wall n={} held={:?}", wall.n, wall.held));
+                self.summary.walled = Some(wall);
+                return Ok(());
+            }
             if now >= tick {
                 self.sample();
                 self.hint();
@@ -512,7 +546,14 @@ impl<'a> Window<'a> {
             let n = self.entering;
             self.entering += 1;
             if !self.in_file(n) {
-                let game = Game { before: self.before(n), stage: Stage::Waiting, own: Duration::ZERO, go: None };
+                let game = Game {
+                    before: self.before(n),
+                    stage: Stage::Waiting,
+                    own: Duration::ZERO,
+                    headed: Duration::ZERO,
+                    headed_kept: Duration::ZERO,
+                    go: None,
+                };
                 self.games.insert(n, game);
             }
         }
@@ -844,7 +885,13 @@ impl<'a> Window<'a> {
             Known::Provisional(_) | Known::NotYet | Known::None => (None, None, None),
         };
         self.trace(format_args!("start n={n} threads={threads} seed={} cap={cap:?}", seed.is_some()));
+        let wall = self.opts.game_limit.is_some();
         let Some(game) = self.games.get_mut(&n) else { return };
+        if wall {
+            // A search that resumes from its checkpoint goes on from the clock the last invocation kept.
+            game.headed = clock::resume(self.opts, n);
+            game.headed_kept = game.headed;
+        }
         if let Some(go) = game.go.take() {
             // The game's thread waits for it.
             let _ = go.send(Go { seed, cap, threads });
@@ -892,6 +939,11 @@ impl<'a> Window<'a> {
                 self.trace(format_args!("setup-done n={n} took={took:?} kind={kind}"));
             }
             Event::Searched { n, outcome, took } => {
+                // A search that stops (a signal, a limit) is resumed with its clock; a finished one's goes with its
+                // checkpoint.
+                if !matches!(&outcome, Ok(outcome) if outcome.completed) {
+                    self.keep_clock(n);
+                }
                 let Some(game) = self.games.get_mut(&n) else { return };
                 game.own += took;
                 match (outcome, &mut game.stage) {
@@ -907,6 +959,43 @@ impl<'a> Window<'a> {
                 game.go = None;
             }
         }
+    }
+
+    /// Brings the head's wall clock up to `now` if its search runs (the time since the last look is its own search),
+    /// and keeps it in its file once a checkpoint interval has passed since it was last kept.  Does nothing without a
+    /// wall.
+    fn advance_clock(&mut self, now: Instant) {
+        let since = now.saturating_duration_since(self.clock_at);
+        self.clock_at = now;
+        if self.opts.game_limit.is_none() {
+            return;
+        }
+        let n = self.next;
+        let Some(game) = self.games.get_mut(&n) else { return };
+        if !matches!(game.stage, Stage::Search(_, Plan::Search(Search::Running(_)))) {
+            return;
+        }
+        game.headed += since;
+        if game.headed >= game.headed_kept + self.opts.checkpoint_interval {
+            self.keep_clock(n);
+        }
+    }
+
+    /// Writes game `n`'s wall clock to its file, if it has run since it was last written.
+    fn keep_clock(&mut self, n: u32) {
+        let Some(game) = self.games.get_mut(&n) else { return };
+        if game.headed > game.headed_kept {
+            game.headed_kept = game.headed;
+            clock::keep(self.opts, n, game.headed);
+        }
+    }
+
+    /// The head, if its search runs and its wall clock has reached the limit.
+    fn walled(&self) -> Option<Wall> {
+        let limit = self.opts.game_limit?;
+        let game = self.games.get(&self.next)?;
+        let running = matches!(game.stage, Stage::Search(_, Plan::Search(Search::Running(_))));
+        (running && game.headed >= limit).then_some(Wall { n: self.next, held: game.headed })
     }
 
     /// Samples every running search's engine.
