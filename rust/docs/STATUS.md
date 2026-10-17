@@ -14,16 +14,12 @@ results and how they are proven are in the [README](../README.md); the research 
   prover; games 2176-3440 within the frame model, which is exact given statement U
   ([README, "What optimal means"](../README.md#what-optimal-means)).  `optimal.json` stays at 1300; nothing is
   published.
-* 3440 is unconfirmed: a counter in the GF(2) search's workspace could wrap after about 92 million steps of one
-  worker in one game, and 3440 took 63-70% of that (fixed in 6460c86;
-  [the wrap](experiments/cheaper-gf2-nodes-same-trees-2026-10.md#later-2026-10-the-stamps-wrap-and-the-committed-chain)).
-  It is to be re-solved with the fixed build before 3441 resumes on its ceiling; no other committed game came within a
-  factor of two.
-* 3441 is unfinished: 626 million nodes after 5.9 hours on 64 threads, its checkpoint (format 4, which the present
-  build reads) in the project's bucket under `chain-2176/ckpt`
-  ([the frontier chain](experiments/the-frontier-chain-to-3440-2026-10.md)).  It was made with the forcing window of
-  80, which a header of format 4 or 5 implies, so the default's search (window `all`) resumes it only as `--tactic
-  force_window=80`.
+* 3440 is confirmed: the run to the wall re-proved it with the fixed build (the counter that could wrap,
+  [the wrap](experiments/cheaper-gf2-nodes-same-trees-2026-10.md#later-2026-10-the-stamps-wrap-and-the-committed-chain)),
+  the same score and proof in 1.76 hours and 1.36 billion nodes (5.05 hours and 3.72 billion before); its games 1..3440
+  equal the committed chain's scores and proofs, game for game (2026-10-17).
+* Past 3440: the run to the wall has proven 3441 onward (3491 by 10:45 PDT on 2026-10-17), not yet appended to
+  `results/strict.jsonl` (they will be, once both referees pass on the joined file).
 
 ## The priority: a larger n
 
