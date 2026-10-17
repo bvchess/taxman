@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Tests of the unattended-run scripts that need no cloud: chain.sh with the wall and the ledger (run.sh), wall-node.sh
 # and wall.sh, against a stand-in for the aws CLI (test/bin/aws: S3 as a directory, the group as a file) and for sudo
-# and shutdown.  Needs the release build of the solver (cd rust && cargo build --release) and rsync.
+# and shutdown.  Needs the release build of the solver (cd rust && cargo build --release; or TAXMAN_BIN names another
+# build of the same sources, say the one `cargo build --profile test` makes) and rsync.  sweep.sh's scenario also runs
+# the real verify.sh on the sweep's files, which replays the 3,440 committed games three times.
 #
-#   rust/tools/cloud/test/run.sh [SCENARIO...]     all of them, or the named (chain, ledger, node, launch)
+#   rust/tools/cloud/test/run.sh [SCENARIO...]     all of them, or the named (chain, ledger, node, launch, sweep)
 #
 # Prints `ok` or `FAIL` for each check and exits with the number of failures.  A few minutes: the chains are small.
 
@@ -12,7 +14,8 @@ set -u
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 real_cloud="$(cd "$here/.." && pwd)"
 crate="$(cd "$real_cloud/../.." && pwd)"
-[ -x "$crate/target/release/taxman" ] || {
+export TAXMAN_BIN="${TAXMAN_BIN:-$crate/target/release/taxman}"
+[ -x "$TAXMAN_BIN" ] || {
     echo "build the solver first: cd $crate && cargo build --release" >&2
     exit 2
 }
@@ -29,6 +32,7 @@ cloud="$tmp/cloud"
 mkdir -p "$cloud"
 cp "$real_cloud"/*.sh "$real_cloud/wall-policy.json" "$cloud/"
 printf '#!/usr/bin/env bash\necho "verify.sh (a stand-in): $*"\n' >"$cloud/verify.sh"
+cp "$cloud/verify.sh" "$tmp/verify.sh.stub"
 # ... and setup.sh, which installs and builds: the stand-in records how it was called and may sleep a while.
 printf '%s\n' '#!/usr/bin/env bash' \
     'echo "setup.sh: NO_PULL=${NO_PULL:-} SKIP_TESTS=${SKIP_TESTS:-}" >>"$TAXMAN_WORK/setup-stub.log"' \
@@ -439,14 +443,126 @@ print(base64.b64decode(json.load(open(sys.argv[1]))["UserData"]).decode(), end="
     check "cleanup --force does it" equals $? 0
 }
 
+# --- sweep.sh ----------------------------------------------------------------------------------------------------
+
+# The lines of the file $1 for board size $2 (completed or not), one a line.
+game_lines() {
+    grep -F -- "{\"schema\":5,\"n\":$2," "$1"
+}
+
+# Whether the sweep of the merged file $1 over $2..$3 has nothing left to search again (sweep_plan.py's count is 0).
+converged() {
+    equals "$(python3 -I "$crate/tools/sweep_plan.py" excerpt "$1" "$2" "$3" /dev/null | awk '{print $2}')" 0
+}
+
+scenario_sweep() {
+    echo "== sweep.sh: blocks, the passes over the merged file, resuming"
+    local w="$tmp/sweep" res known pid
+    # The real referees (verify.sh checks the merged file with both, and against the committed chain).
+    cp "$real_cloud/verify.sh" "$cloud/verify.sh"
+    : >"$FAKE_LOG"
+
+    # 1301..1340 in four blocks and one second a game: the first block chains from the known games (1..1300), the other
+    # blocks start standalone; the passes then search again the games that have more to give.
+    known="$tmp/known1300.jsonl"
+    head -n 1300 "$crate/results/strict.jsonl" >"$known"
+    (
+        export TAXMAN_WORK="$w" KNOWN="$known" BLOCKS=4 GAME_SECONDS=1 PROGRESS=0 MERGE_EVERY=5 S3_DEST=s3://b/sweep
+        export SAVE_EVERY=3600
+        "$cloud/sweep.sh" 1301 1340 >"$tmp/sweep.out" 2>&1
+        echo $? >"$tmp/sweep.status"
+    )
+    res="$w/results/explore.jsonl"
+    check "the sweep completes" has_line "$tmp/sweep.status" 0
+    check "the outcome says so" matches "$w/sweep.outcome" '^complete: 1301\.\.1340 in 4 blocks'
+    check "both referees accepted the merged file" matches "$tmp/sweep.out" 'both referees agree: no problem found'
+    check "the plan is four blocks that tile 1301..1340" equals "$(awk '
+        NR == 1 && $1 != 1301 {bad = 1} NR > 1 && $1 != last + 1 {bad = 1} {last = $2}
+        END {print (NR == 4 && last == 1340 && !bad) ? "ok" : "bad"}' "$w/results/explore-blocks/plan")" ok
+    check "the first block chains from the known games" matches "$res" '"n":1301,.*"prev":{"n":1300,'
+    check "a block's first game has no game before it" matches "$res" '"n":1311,.*"prev":null'
+    check "every game of the sweep says which pass made it" equals \
+        "$(grep -E '^\{"schema":5,"n":(130[1-9]|13[1-3][0-9]|1340),' "$res" | grep -v -c '"pass":')" 0
+    check "nothing is left that has more to give" converged "$res" 1301 1340
+    check "the merged file is in S3" exists "$(obj sweep/results/explore.jsonl)"
+    check "and is the one on the machine" cmp -s "$res" "$(obj sweep/results/explore.jsonl)"
+    check "the blocks are in S3 too" exists "$(obj sweep/results/explore-blocks/block-004.jsonl)"
+
+    # The same command again changes nothing.
+    cp "$res" "$tmp/explore-before.jsonl"
+    (
+        export TAXMAN_WORK="$w" KNOWN="$known" BLOCKS=4 GAME_SECONDS=1 PROGRESS=0
+        "$cloud/sweep.sh" 1301 1340 >"$tmp/sweep2.out" 2>&1
+        echo $? >"$tmp/sweep2.status"
+    )
+    check "a rerun completes" has_line "$tmp/sweep2.status" 0
+    check "and leaves the merged file as it was" cmp -s "$res" "$tmp/explore-before.jsonl"
+    (
+        export TAXMAN_WORK="$w" KNOWN="$known" GAME_SECONDS=1 PROGRESS=0
+        "$cloud/sweep.sh" 1301 1341 >"$tmp/sweep3.out" 2>&1
+    )
+    check "another range over the same files is refused" matches "$tmp/sweep3.out" 'is the plan for 1301\.\.1340'
+
+    # The boundary: block 2 begins at 1413, which standalone needs more than the limit and with the game before it, 1412,
+    # proven (which a chain has) is settled at once by the ceiling.  Pass 2 searches it again with 1412, and the games
+    # after it go on from it, as in an unbroken chain.
+    # The known file here goes past FIRST - 1 (to 1420): the games of the range it holds are not taken.
+    local w2="$tmp/sweep-boundary"
+    head -n 1420 "$crate/results/strict.jsonl" >"$tmp/known1420.jsonl"
+    mkdir -p "$w2/results/explore-blocks"
+    printf '1411 1412\n1413 1416\n' >"$w2/results/explore-blocks/plan"
+    (
+        export TAXMAN_WORK="$w2" KNOWN="$tmp/known1420.jsonl" GAME_SECONDS=0.3 PROGRESS=0 MERGE_EVERY=5
+        "$cloud/sweep.sh" 1411 1416 >"$tmp/boundary.out" 2>&1
+        echo $? >"$tmp/boundary.status"
+    )
+    res="$w2/results/explore.jsonl"
+    check "the boundary sweep completes, both referees agreeing" has_line "$tmp/boundary.status" 0
+    check "the known games past 1410 are not taken: every line of 1411..1416 is the sweep's" equals \
+        "$(grep -E '^\{"schema":5,"n":141[1-6],' "$res" | grep -v -c '"pass":')" 0
+    check "1413 was unfinished in pass 1, with no game before it" matches "$res" \
+        '"n":1413,"score":null,.*"prev":null.*"pass":1'
+    check "and completed in pass 2 by the ceiling of 1412" matches "$res" \
+        '"n":1413,"score":[0-9]*,.*"proof":"cap".*"prev":{"n":1412,.*"pass":2'
+    check "1414 repeats the search of 1413" matches "$res" '"n":1414,"score":[0-9]*,.*"proof":"same_search".*"pass":2'
+    check "1416 needs a search longer than the limit, as in a chain" matches "$res" '"n":1416,"score":null,.*"pass":2'
+    check "nothing is left that has more to give at 1411..1416" converged "$res" 1411 1416
+
+    # A SIGTERM stops it, with a line in the outcome and the games done kept; the same command goes on to the end.
+    local w3="$tmp/sweep-stop"
+    (
+        export TAXMAN_WORK="$w3" KNOWN="$known" BLOCKS=4 GAME_SECONDS=1 PROGRESS=0 MERGE_EVERY=2
+        "$cloud/sweep.sh" 1301 1340 >"$tmp/stop1.out" 2>&1
+        echo $? >"$tmp/stop1.status"
+    ) &
+    pid=$!
+    wait_for matches "$w3/results/explore-blocks/block-004.jsonl" '"n":1331,'
+    kill -TERM "$(cat "$w3/sweep.pid")"
+    wait "$pid"
+    check "a SIGTERM stops the sweep with status 143" has_line "$tmp/stop1.status" 143
+    check "and the outcome says stopped" matches "$w3/sweep.outcome" '^stopped by a signal$'
+    check "the games done are in the merged file" matches "$w3/results/explore.jsonl" '"n":1331,'
+    (
+        export TAXMAN_WORK="$w3" KNOWN="$known" GAME_SECONDS=1 PROGRESS=0
+        "$cloud/sweep.sh" 1301 1340 >"$tmp/stop2.out" 2>&1
+        echo $? >"$tmp/stop2.status"
+    )
+    check "the same command completes it, both referees agreeing" has_line "$tmp/stop2.status" 0
+    check "with every board size 1301..1340 either completed or unfinished, none missing" equals \
+        "$(for n in $(seq 1301 1340); do game_lines "$w3/results/explore.jsonl" "$n" | head -n 1; done | wc -l | tr -d ' ')" 40
+    check "and nothing left that has more to give" converged "$w3/results/explore.jsonl" 1301 1340
+    cp "$tmp/verify.sh.stub" "$cloud/verify.sh"
+}
+
 selected=("$@")
-[ "${#selected[@]}" -gt 0 ] || selected=(chain ledger node launch)
+[ "${#selected[@]}" -gt 0 ] || selected=(chain ledger node launch sweep)
 for s in "${selected[@]}"; do
     case "$s" in
         chain) scenario_chain ;;
         ledger) scenario_ledger ;;
         node) scenario_node ;;
         launch) scenario_launch ;;
+        sweep) scenario_sweep ;;
         *) echo "unknown scenario $s" >&2; exit 2 ;;
     esac
 done
