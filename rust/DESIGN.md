@@ -1268,8 +1268,13 @@ answer sees.  `cargo test` takes about half a minute after compiling, with two t
   games of the committed chain, and pass `verify_files`; with one thread any window gives the lines of a window of one
   but for the times and the build; a repeat of a game still in flight (301 of 300) names it, on a later line; a range
   stopped by a node limit ends at its first unfinished game with the lines before it in order and completes when run
-  again; a score that is not the table's fails the range at that game, with the lines before it, as a window of one
-  does.  The policy: claims served oldest first, a lone ready search takes every free thread, a busy one doubles, idle
+  again; a game that passes the wall (`game_limit`) ends the range with no line for it, its checkpoint and clock kept,
+  walls again at once under the same limit from the clock it left, and completes under none, leaving no clock (the
+  command through the binary is in `tests/cli.rs`, the clock file's unit tests in `src/solver/clock.rs`); a score that
+  is not the table's fails the range at that game, with the lines before it, as a window of one does.  The cloud
+  scripts that run the chain unattended have tests of their own that need no cloud (`tools/cloud/test/run.sh`: the
+  wall and the ledger through `chain.sh`, `wall-node.sh` through each way a run ends, `wall.sh` through a launch, a
+  stop and a clean-up, against a stand-in for the aws CLI; RUNBOOK section 12.6).  The policy: claims served oldest first, a lone ready search takes every free thread, a busy one doubles, idle
   workers go back only to another claim and after the last grant has settled, the oldest search reclaims from the
   youngest first and suspends them if need be, a suspended search claims one thread.
 * **Integrity of results** (`tests/integrity.rs`, `tests/results.rs`, `tests/solver.rs`): a previous game that is not

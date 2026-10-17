@@ -44,8 +44,9 @@ speed or of spending is worth about 310 in n; only a tighter bound in the search
 chain's launch is [RUNBOOK section 5](../tools/cloud/RUNBOOK.md#5-the-production-chain); it needs Brian's approval.
 
 **The wall** (Brian, 2026-10-16): the first n whose own search (not time spent waiting behind another game) takes
-more than 24 hours on one `c8g.16xlarge` with the run's build and settings.  The next run stops there, keeping the
-game's checkpoint, or when its budget (about $50) is spent.  On 64 threads the search loses nothing to threads (3.5
+more than 24 hours on one `c8g.16xlarge` with the run's build and settings (`solve --game-hours 24`: the hours the game
+has been the oldest of the window with its search running).  The next run stops there, keeping the game's checkpoint,
+or when its budget (about $50) is spent.  On 64 threads the search loses nothing to threads (3.5
 thousand nodes a second a thread at 3441, the same on 16, 32 and 64), so what remains is cheaper nodes and smaller
 trees.
 
@@ -80,8 +81,9 @@ What has been tried for the bound, and where it stands:
 
 ## Waiting on Brian
 
-* The run to the wall: its budget (about $50) and how it runs unattended (a spot instance that restarts itself, or
-  on demand), after the tuning campaign reports.
+* The run to the wall (decided 2026-10-16: one `c8g.16xlarge` at spot, about 74 instance-hours, about $50, a group that
+  restarts it): Brian's approval of the account changes ([RUNBOOK 12.3](../tools/cloud/RUNBOOK.md#123-what-needs-brians-approval-and-what-it-costs))
+  and of the rehearsal on a `c8g.large` (about $0.04), after the tuning campaign reports.
 * Outside review of Theorems 1, 10 and 12 by Robert Moniot.
 * Publishing (`optimal.json` past 1300, OEIS).
 
@@ -92,4 +94,6 @@ What has been tried for the bound, and where it stands:
   on subtrees of searches at the end of the chain, solved to completion on one thread
   ([the profile at the end of the chain](../bench/chain_end/README.md)).
 * The tuning campaign on one `c8g.16xlarge` (approved by Brian, up to $10), once those are merged.
-* Then, for the run: a per-game limit of 24 hours in the chain's driver, and the unattended restart.
+* For the run, built and tested against a stand-in for aws, not run on EC2: the wall in the solver (`solve
+  --game-hours`), the budget and the date across machines (the ledger in S3), and the group that restarts the machine
+  and ends by taking itself to capacity 0 ([RUNBOOK section 12](../tools/cloud/RUNBOOK.md#12-the-unattended-run-to-the-wall)).

@@ -25,7 +25,9 @@ The scaling run on a `c8g.48xlarge` ran `setup.sh` in full (without the tests) a
 `verify-certificates`, a SIGTERM stop and its resume, and, with a stand-in for the binary, a counterexample, an error, a
 crash and a deadline; `run.sh` changed for it (`run_start` and `run_reap`), and `chain.sh` ran through the change to a
 complete chain, a SIGTERM stop and a deadline.  Not run on EC2: `certify.sh`, `scaling.sh` (the calibration and the
-scaling run did by hand what it does), and nothing has run on Ubuntu.  Sections 2
+scaling run did by hand what it does), and nothing has run on Ubuntu.  `wall.sh`, `wall-node.sh` and the ledger of
+`run.sh` (section 12) ran on macOS against a stand-in for aws (`test/run.sh`) and have not run on EC2; section 12.5
+is the rehearsal that tests them there.  Sections 2
 and 3 exist to find the problems that a macOS run cannot, on a machine that costs cents.  The speed
 of a Graviton core and the scaling of the solver to 64 and 192 threads are measured (the calibration and the
 [scaling run](../../docs/experiments/scaling-to-192-threads-2026-10.md)); what is not is in section 8.
@@ -43,6 +45,7 @@ of a Graviton core and the scaling of the solver to 64 and 192 threads are measu
 * [9. The prover's proofs of opt(n), 1301 to 2175](#9-the-provers-proofs-of-optn-1301-to-2175)
 * [10. The theory track's measurements: E6 and E9(a)](#10-the-theory-tracks-measurements-e6-and-e9a)
 * [11. Certifying U (stage 4)](#11-certifying-u-stage-4)
+* [12. The unattended run to the wall](#12-the-unattended-run-to-the-wall)
 
 ## Rules for every launch
 
@@ -112,6 +115,9 @@ The files in this directory:
 | `hunt.sh UPPER_FILE` | the counterexample hunt of section 10.2: the frame solver on boards without one open source each, resumable |
 | `certify.sh LIST[:THREADS]...` | the certificates campaign (section 11): `taxman certify` over the lists of `bench/certify/lists/stage4`, several at once, resumable, with a final `verify-certificates` |
 | `spot-watch.sh` | on a spot interruption notice: stop `chain.sh`, `prover.sh`, `hunt.sh` or `certify.sh` and save |
+| `wall.sh launch\|status\|stop\|cleanup` | the unattended run to the wall (section 12): the launch template, the Auto Scaling group of one spot instance and the policy, from your machine; prints every aws command |
+| `wall-node.sh`, `wall-policy.json` | what each machine of that group does from boot to the end of the run; the one permission the machines need |
+| `test/run.sh` | tests of `chain.sh`'s wall and ledger, `wall-node.sh` and `wall.sh` against a stand-in for aws (no cloud) |
 | `Dockerfile`, `Dockerfile.dockerignore` | a Linux build-and-test image (section 2) |
 
 All state lives in one directory, `$TAXMAN_WORK` (default `~/taxman-work`): `results/strict.jsonl` (and
@@ -498,7 +504,9 @@ leave a trace after the window is gone; the output of the save is in `save.log` 
 whole command: the chain 1..N into
 `~/taxman-work/results/strict.jsonl`, all CPUs, sixteen games in flight at once, a checkpoint every 300 s and a
 progress line every 60 s.  Its variables (all optional) are documented at the top of the script: `THREADS`, `WINDOW`,
-`CHECKPOINT_INTERVAL`, `PROGRESS`, `EXTRA_ARGS`, `DEADLINE_HOURS`, `POWEROFF`, `MAX_FAILS`, `S3_DEST`, `SAVE_EVERY`.
+`CHECKPOINT_INTERVAL`, `PROGRESS`, `EXTRA_ARGS`, `GAME_HOURS` (the wall), `DEADLINE_HOURS`, `BUDGET_HOURS` and
+`RUN_UNTIL` (a budget and a date that outlive the machine, section 12), `POWEROFF`, `MAX_FAILS`, `S3_DEST`,
+`SAVE_EVERY`.
 `WINDOW` is the number of consecutive games kept in flight at once (`taxman solve --window`): game n + 1 is set up and
 searched, from n's best game so far, while n is still being proved, and the threads move to the searches that keep them
 busy, so that a machine of many threads is not left idle by one game's search.  Games are still concluded and recorded
@@ -601,7 +609,8 @@ smooth curve.
    * **The deadline.**  `~/taxman-work/deadline` is not saved, so a replacement machine starts a new deadline at its
      first start.  Give it `DEADLINE_HOURS` set to the hours that remain, so that the deadline falls where the first
      one did (the second instance of the cloud run was given the remainder, and the deadline stopped it 24 hours after
-     the first instance started).
+     the first instance started).  A run that replacements continue by themselves does not count that way: its
+     `BUDGET_HOURS` and `RUN_UNTIL` live in S3 ([section 12](#12-the-unattended-run-to-the-wall)).
 
 ### Cost guardrails
 
@@ -611,6 +620,11 @@ smooth curve.
   whenever `chain.sh` ends for any reason (needs passwordless `sudo`, as on both AMIs): the choice for an unattended
   run, since an idle machine after an error or a deadline costs as much as a busy one.  `chain.sh` saves to `S3_DEST`
   before it powers off, which matters because a shutdown terminates the instance.
+* `GAME_HOURS`: the wall.  The chain stops at the first game whose own search has passed that many hours, over every
+  run of it, with every checkpoint kept and nothing recorded for the game; the log says `wall at N after H hours` and the
+  status is 4.  `BUDGET_HOURS` (instance-hours over every machine of the run, counted in the ledger in S3) and
+  `RUN_UNTIL` (a date) stop the solver cleanly five minutes before they are reached, with status 3 like
+  `DEADLINE_HOURS`.  Section 12 puts them together with a group that restarts the machine.
 * The timer (a backstop that depends on no script), the tags and the cleanup are in
   [Rules for every launch](#rules-for-every-launch); a budget alert on the account is the other half.
 * When done: what the rules say for the end, and the S3 prefix you no longer need.
@@ -1444,3 +1458,251 @@ beside the estimate of 11.1 per phase, with the report's search time (`certify_p
 search against the plan's, and what they come to on one machine).  The "Cost" paragraph of the calibration entry is the
 model.  Then the end of the [rules for every launch](#rules-for-every-launch): terminate what is left, confirm that
 nothing of the project remains, delete the launch's security group.
+
+## 12. The unattended run to the wall
+
+The chain from n = 1 on one `c8g.16xlarge` (64 threads, window 4) at spot, with the build of a pinned commit of master,
+re-solving 1 to 3440 (to be compared with the committed `results/strict.jsonl` at home, section 6) and going on past it,
+without anyone: it stops by itself at the wall, when its budget is used, or on a date, and a spot interruption is
+mended by the machine that replaces the one taken away.  Built, tested against a stand-in for aws and **not run**: it
+waits for Brian's approval of the account changes in 12.3, and the rehearsal of 12.5 comes first.  The decision
+(Brian, 2026-10-16) and the reasons for the wall are in [docs/STATUS.md](../../docs/STATUS.md).
+
+### 12.1 How it ends
+
+The first of these ends the run; each but the last is the run's end (the machine records it, takes the group to
+capacity 0 and powers off), and none starts a machine in place of the one that ends it.
+
+| end | what it is | the log says | status of `chain.sh` |
+|---|---|---|---|
+| **the wall** | a game's own search has passed `GAME_HOURS` (24): the hours it has been the oldest game of the window with its search running, over every run of it ([DESIGN.md, "The wall"](../../DESIGN.md#the-window-games-in-flight); not the time it waited behind another game) | `wall at N after H hours` | 4 |
+| **the budget** | `BUDGET_HOURS` (74) instance-hours over every machine of the run, counted in the ledger; the solver is stopped five minutes (`LEDGER_MARGIN`) before they are used up | `stopped by the budget of 74 instance-hours` | 3 |
+| **the date** | `RUN_UNTIL`, the hard date, also stopped five minutes before it | `stopped by the date ...` | 3 |
+| the range | the chain reached `CHAIN_TO` (8191, the largest board) | `the range 1-N is complete` | 0 |
+| an error | the solver reported one, the setup or the restore failed, a ledger could not be read, more than `MAX_INSTANCES` (20) machines have started, or the node script died | the reason | 1 |
+| the operator | `wall.sh stop` | `stopped on request` | 143 |
+| *not an end:* **a spot interruption** | `spot-watch.sh` stops the chain on the notice (final checkpoint, save); the machine is taken away within two minutes and the group launches another, which restores from S3 and goes on | `an interruption, it seems` | 143 |
+
+At the wall the checkpoint of the game (and its clock) stays in S3 and no line is recorded for it; the games before it
+are in the results, each `chain.sh` having appended them as it concluded them.  The run's end is the object
+`run/ended` in S3 (the reason, the time): a machine that starts later finds it, sets the capacity to 0 again and powers
+off, which is what stops a failing end from repeating.  `wall.sh launch --continue` removes it on purpose.
+
+Four backstops depend on none of these scripts: the timer in the user data (`shutdown -h +MINUTES`, the budget and
+two hours, so that no machine outlives the whole run), a scheduled action of the group that takes it to capacity 0 at
+the date plus two hours, `MAX_INSTANCES`, and the ceiling on the spot price (`--spot-max`, dollars an hour, $1.0: above
+it no machine is launched, and the run waits).
+
+### 12.2 The parts
+
+| what | where | does |
+|---|---|---|
+| `wall.sh` | your machine | `launch`, `status`, `stop`, `cleanup`: every aws command it runs is printed (`+ aws ...`), `DRY_RUN=1` prints the changes without making them, and the files the commands take stay in `~/taxman-wall/RUN` |
+| the launch template `taxman-wall`, the security group `taxman-wall` (no inbound rule), the group `taxman-wall` | the account | one `c8g.16xlarge` (or `INSTANCE_TYPE`) at spot, lowest price first among the zones (`SpotAllocationStrategy=lowest-price`, one pool), capacity rebalancing off, `min 0, max 1`, EC2 health checks, tags `Project=taxman`, `Purpose=wall` |
+| the user data | the template | sets the timer, installs git and tmux, clones the repository, checks out the pinned commit and starts `wall-node.sh` in a tmux session `tx` as `ec2-user`; if any of that fails after five tries it records the end and takes the group to 0 |
+| `wall-node.sh` | each machine | restores the logs, then `setup.sh` (no tests; its smoke checks run), then `save.sh --restore`; starts `spot-watch.sh` and a loop that looks for `run/stop`; runs `chain.sh` with the config; decides what its status means (12.1) |
+| `run.sh`'s ledger | each machine | the budget and the date (below) |
+| `wall-policy.json` | the role `taxman-ec2` | the machines may set the capacity of this one group and read groups (12.3) |
+| `test/run.sh` | your machine | the tests of these scripts against `test/bin/aws`, a stand-in over directories |
+
+The run's state is one prefix of the project's bucket, `s3://taxman-013764204840-us-east-1/wall-RUN` (`RUN`, default
+`run1`): `results/`, `ckpt/` (with each game's `nNNNN.clock` beside its checkpoint) and `logs/` as `save.sh` writes them,
+and `run/`:
+
+| object | holds |
+|---|---|
+| `run/config` | the settings, written by `launch`: `COMMIT`, `INSTANCE_TYPE`, `CHAIN_TO`, `WINDOW`, `GAME_HOURS`, `BUDGET_HOURS`, `RUN_UNTIL` (seconds since the epoch), `THREADS`, `EXTRA_ARGS`, `CHECKPOINT_INTERVAL`, `SAVE_EVERY`, `LEDGER_MARGIN`, `MAX_INSTANCES`, `PRICE`; every machine reads it, so a budget or a date changed there (by `launch --continue`) reaches the next machine |
+| `run/ledger` | `start` (the run's first start), `boot` (the boot id of the machine that wrote it last), `base` (the instance-hours of the machines before it), `hours` (base plus its uptime), `updated` |
+| `run/boots/*` | one object a machine that started |
+| `run/ended`, `run/stop` | the end, and the request of `wall.sh stop` |
+
+**The ledger.**  A machine that starts `chain.sh` with `BUDGET_HOURS` or `RUN_UNTIL` and `S3_DEST` reads the ledger
+(none: the run begins now), takes the `hours` of the machines before it as its `base` (unless its boot id is the
+ledger's: a second `chain.sh` of the same boot), and writes `base` plus its uptime every minute and when the script ends.
+Instance-hours are uptime, which is what a spot instance is billed for to within its boot (a few seconds to a minute a
+machine); a machine killed without notice loses at most a minute of count.  The stop falls where `BUDGET_HOURS` less the
+hours counted less `LEDGER_MARGIN` falls from now, and the date's where `RUN_UNTIL` less the margin is; the earlier of
+them and `DEADLINE_HOURS` is the deadline (`timeout` stops the solver, which writes its final checkpoint).  A ledger that
+cannot be read or has no numbers stops the machine: it must not run uncounted.
+
+### 12.3 What needs Brian's approval, and what it costs
+
+Account changes (the [rules for every launch](#rules-for-every-launch)): the inline policy `taxman-wall` on the role
+`taxman-ec2`; a security group, a launch template, an Auto Scaling group and a scheduled action (all named
+`taxman-wall`); the spot instances the group launches and their volumes; the first Auto Scaling group of the account
+creates the service-linked role `AWSServiceRoleForAutoScaling`, which stays; and objects in the bucket.  `cleanup`
+deletes the group, the template, the security group and the policy; the service-linked role, the bucket and `taxman-ec2`
+stay on purpose.
+
+**The policy** is [wall-policy.json](wall-policy.json): `autoscaling:SetDesiredCapacity` on the one group (its ARN
+`arn:aws:autoscaling:us-east-1:013764204840:autoScalingGroup:*:autoScalingGroupName/taxman-wall`, the group's id
+being a `*`), and `autoscaling:DescribeAutoScalingGroups` on `*` (the action takes no resource), which the node uses
+to read that the capacity went to 0.  Nothing else: a machine cannot launch, terminate or change anything.  `launch`
+puts it with `aws iam put-role-policy --role-name taxman-ec2 --policy-name taxman-wall --policy-document
+file://rust/tools/cloud/wall-policy.json`, and `cleanup` deletes it.
+
+**The cost** is the budget: 74 instance-hours of a `c8g.16xlarge` at spot, which cost $0.66 (us-east-1b) to $0.81
+(us-east-1c) an hour on 2026-10-17, and are counted at $0.676, so about $50 ($60 at the dearest zone, never above $74
+at the ceiling of $1.0), plus a 40 GB gp3 volume ($0.005 an hour, under $1 for the run) and the bucket (a few MB of
+results and checkpoints).  `status` counts the spend as instance-hours times `PRICE` (0.676); the bill is the spot price of the hours
+the machines ran, which the console or `describe-spot-price-history` gives afterwards.
+
+### 12.4 Launch, watch, stop, clean up
+
+```
+export AWS_PROFILE=bvc AWS_DEFAULT_REGION=us-east-1                 # after: aws login --profile bvc
+git fetch && COMMIT=$(git rev-parse origin/master)                    # pushed: the machines clone it from GitHub
+export RUN=chain-wall
+DRY_RUN=1 rust/tools/cloud/wall.sh launch --commit $COMMIT --until 2026-10-27    # reads, prints what it would do
+rust/tools/cloud/wall.sh launch --commit $COMMIT --until 2026-10-27             # after Brian's yes
+```
+
+The defaults are the run: `c8g.16xlarge`, window 4, wall 24 hours, budget 74 instance-hours, the chain to 8191, the
+spot ceiling $1.0, a volume of 40 GB, zones by price.  `launch --help` is the header of the script (every option has an
+environment variable).  It prints the files (the user data, the config, the mixed instances policy) and each command
+before it runs it: the config to S3, the policy, the security group, the launch template, the group at capacity 0, the
+scheduled action, and last the capacity 1 that starts the first machine.  The first machine takes about 10 minutes to
+install, build and start the chain on 64 cores (`setup.sh` builds the solver and the prover and runs its smoke checks;
+section 3 says 5 to 10 minutes on a small instance, with the tests).
+
+```
+rust/tools/cloud/wall.sh status          # the run, the ledger, the group, the last game done, the latest progress line
+rust/tools/cloud/wall.sh stop            # clean: within 30 s the machine stops the chain (final checkpoint), saves, ends
+rust/tools/cloud/wall.sh stop --now      # at once: records the end, takes the group to 0 (the machine is terminated;
+                                         #   what it did since its last save, at most SAVE_EVERY, is lost)
+rust/tools/cloud/wall.sh cleanup         # once it has ended: delete the group, template, security group, policy; end checks
+```
+
+`status` reads S3 and the group, so it is as old as the last save (`SAVE_EVERY`, 10 minutes) and shows: whether the run
+has ended and why; the run's age; the instance-hours against the budget and the spend against its estimate; how many
+machines have started; the group's capacity and instances; the last game done with its search seconds; the latest
+progress line; the wall clock of the game in progress against `GAME_HOURS`; and the age of the last save.  To look at the
+machine: `aws ssm start-session --target INSTANCE` (the Session Manager plugin; the role has the SSM policy), then
+`sudo -u ec2-user tmux attach -t tx` (the node script and, in the window `sw`, `spot-watch.sh`).
+
+`cleanup` refuses a run that has not ended (`--force` overrides), deletes in order, waits for the instances to go, and
+ends with the checks of the rules for every launch, which must print nothing or `[]`:
+
+```
+aws ec2 describe-instances --filters Name=tag:Project,Values=taxman Name=instance-state-name,Values=pending,running,shutting-down,stopping,stopped --query 'Reservations[].Instances[].InstanceId'
+aws ec2 describe-volumes --filters Name=tag:Project,Values=taxman --query 'Volumes[].VolumeId'
+aws ec2 describe-spot-instance-requests --filters Name=tag:Project,Values=taxman Name=state,Values=open,active --query 'SpotInstanceRequests[].SpotInstanceRequestId'
+aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names taxman-wall --query 'AutoScalingGroups[].AutoScalingGroupName'
+aws ec2 describe-launch-templates --filters Name=launch-template-name,Values=taxman-wall --query 'LaunchTemplates[].LaunchTemplateName'
+aws ec2 describe-security-groups --filters Name=tag:Project,Values=taxman --query 'SecurityGroups[].GroupId'
+aws iam list-role-policies --role-name taxman-ec2 --query PolicyNames          # taxman-s3-bucket only
+```
+
+**After the end**: pull the results (`aws s3 sync s3://taxman-013764204840-us-east-1/wall-RUN/results results-from-cloud/`)
+and verify them at home as section 6 says: `verify.sh` must report that the games 1 to 3440 agree with the committed
+file with equal scores, "assumptions: none", and both referees agreeing; the games past 3440 are checked by the referees
+alone.  The checkpoint of the walled game stays in `ckpt/` (a run that goes on needs it).  **To go on** after the wall
+or the budget (a longer wall, more money): `wall.sh launch --continue --commit THE-SAME-COMMIT --until DATE --budget-hours
+H --game-hours G`, with the commit the run began with (a checkpoint is resumed only by the build that made it,
+section 5) and the budget as the new total: `--continue` removes the end and the stop, writes the config again, and
+keeps the ledger, the results and the checkpoints.
+
+### 12.5 The rehearsal (designed, not run)
+
+The whole mechanism on the smallest machine of the family, `c8g.large` (2 vCPUs; $0.024 to $0.039 an hour at spot in
+us-east-1 on 2026-10-17), with the chain to 1300 instead of 3440 and the limits tiny.  Two runs, because the first run's end (the wall) is the end of the run: one shows the wall and the end,
+the other the replacement and the budget.  A chain to 400 cannot show the wall: no game up to 1300 takes a second on
+the laptop's 8 threads except the committed chain's 1232 (1.4 s), 1287 (1.6 s) and a few near 1000, and none up to 400
+takes 10 ms.  On 2 Graviton4 threads the games 990, 992, 1025, 1232 and 1287 take 3 to 7 seconds, so a wall of 2.5
+seconds (`--game-hours 0.0007`) falls at the first of them.  The setup of `c8g.large` takes the longest: expect 5 to 8
+minutes of building before the chain starts, on every machine (`SKIP_TESTS` is on, the smoke checks run).
+
+```
+export AWS_PROFILE=bvc AWS_DEFAULT_REGION=us-east-1                 # after: aws login --profile bvc
+git fetch && COMMIT=$(git rev-parse origin/master)                    # the commit with these scripts, pushed
+small="--instance-type c8g.large --volume-gb 20 --spot-max 0.12 --until $(date -u -v+2d +%F) --margin 60 --max-instances 4"
+                                                                     # GNU date: -d '2 days'.  Check the date it prints.
+```
+
+**Run 1: the wall, and the end that takes the group to 0** (budget 0.3 hours, as designed; about 15 minutes):
+
+```
+export RUN=rehearsal-1
+DRY_RUN=1 rust/tools/cloud/wall.sh launch --commit $COMMIT $small --budget-hours 0.3 --game-hours 0.0007 --chain-to 1300
+rust/tools/cloud/wall.sh launch --commit $COMMIT $small --budget-hours 0.3 --game-hours 0.0007 --chain-to 1300
+rust/tools/cloud/wall.sh status          # every few minutes
+```
+
+It passes if `status` ends in `ENDED ...: wall at N after H hours` with N one of 990, 992, 1025, 1232, 1287 or near
+them and H at least 0.0007, within about 15 minutes of the launch, and:
+
+* `aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names taxman-wall --query
+  'AutoScalingGroups[0].DesiredCapacity'` says 0 and no instance is left (`describe-instances` of the end checks): the
+  end took the group to 0 and nothing replaced the machine.  Check again 5 minutes later.
+* `aws s3 ls s3://taxman-013764204840-us-east-1/wall-rehearsal-1/ckpt/` has `nN.ckpt` and `nN.clock`, and the last line
+  of `results/strict.jsonl` there is game N − 1 (no line for N).
+* `rust/tools/cloud/verify.sh` on the pulled results says the N − 1 board sizes agree with the committed file.
+* If the build was slow enough that the budget of 0.3 hours came first, the end says `deadline: the budget of 0.3
+  instance-hours`: that is the budget mechanism, and the wall is run again with `--budget-hours 0.6`.
+
+Then `rust/tools/cloud/wall.sh cleanup`, which ends with the checks.
+
+**Run 2: a forced replacement, and the budget** (budget 0.6 hours, about 40 minutes).  A slow chain, so that it is still
+going when the machine is terminated and when the budget ends: the matching path's tactics, with copies to S3 every 2
+minutes and checkpoints every minute:
+
+```
+export RUN=rehearsal-2
+rust/tools/cloud/wall.sh launch --commit $COMMIT $small --budget-hours 0.6 --game-hours 24 --chain-to 1300 \
+    --save-every 120 --checkpoint-interval 60 --extra-args "--tactic gf2=off --tactic lagrange=on --tactic symmetry=off"
+rust/tools/cloud/wall.sh status          # until "latest progress line" shows a game and "last save of the results" is recent
+```
+
+Once the chain is running and a save has followed it (about 13 minutes after the launch), terminate the machine, without
+a notice (the worst case: no final checkpoint, no final save):
+
+```
+I=$(aws ec2 describe-instances --filters Name=tag:Project,Values=taxman Name=tag:Purpose,Values=wall \
+    Name=instance-state-name,Values=running --query 'Reservations[].Instances[].InstanceId' --output text)
+aws ec2 terminate-instances --instance-ids $I
+aws autoscaling describe-scaling-activities --auto-scaling-group-name taxman-wall --max-items 6 \
+    --query 'Activities[].[StartTime,StatusCode,Description]' --output text      # a termination, then a launch
+rust/tools/cloud/wall.sh status          # machines started: 2; the hours go on from where the first left them
+```
+
+It passes if: the group launches a second machine without anyone (within about 3 minutes); the log in S3
+(`aws s3 cp s3://taxman-013764204840-us-east-1/wall-rehearsal-2/logs/chain.log - | grep -E 'starting|stopped|deadline'`)
+shows a second `starting the solver` whose `games done so far` is at least the first's last save, and `chain.err` shows
+the game in progress continuing from its checkpoint (a node count above zero at its first progress line); `run/ledger`
+shows `base` equal to the first machine's `hours`; and the run ends within a few minutes of 0.6 instance-hours with
+`deadline: the budget of 0.6 instance-hours`, the group at 0, no instance, and `hours` in the ledger between 0.55 and
+0.65.  Then `wall.sh cleanup`, and `aws s3 rm --recursive` on the two prefixes once the logs are read.
+
+**Cost.**  About 0.25 instance-hours for run 1 and 0.6 for run 2 at $0.024 to $0.039 an hour (0.85 hours, $0.03), a
+20 GB gp3 volume for as long (under a cent), and a few thousand requests to S3: **about $0.04 in all, and under $0.10
+at the spot ceiling of $0.12 an hour** (0.85 hours at $0.12).  The account changes are those of 12.3, with the
+spot instance of a `c8g.large` and the group's termination by `aws ec2 terminate-instances`.
+
+What the rehearsal leaves out: the 64-thread machine, the hours-long searches (the clock at the wall is tested for the
+window and its resume by the Rust tests, not for 24 hours), and the spot interruption notice itself: `terminate-instances`
+sends none, so the path through `spot-watch.sh` (a SIGTERM, the final checkpoint, the wait to be taken away) is what the
+local test `test/run.sh node` exercises with a signal; AWS Fault Injection Service can send a real notice
+(`aws:ec2:send-spot-instance-interruptions`), at the cost of an experiment template and a role, which this procedure
+does not make.
+
+### 12.6 What was tested, and what can go wrong
+
+Tested on the laptop (macOS, bash 3.2): the solver's wall by unit, integration and command-line tests
+(`cargo test --release --test window --test cli`); the ledger across machines, the wall and the date through `chain.sh`,
+`wall-node.sh` through every ending (complete, the wall, the budget, a boot loop, a denied capacity, no config, a stop
+request, an interruption) and `wall.sh` through a launch, `status`, both stops, `cleanup` and `--continue`, against the
+stand-in `test/bin/aws` (`rust/tools/cloud/test/run.sh`; it needs the release build of the solver and `rsync`); and the
+arguments of every aws command checked by the CLI's own parameter validation against an endpoint that refuses
+connections, so that nothing reached AWS.  Not tested: anything that needs AWS to answer, that is the behaviour of the
+group (the replacement, `lowest-price` across zones, `resolve:ssm` as the image of a template used by a group), the
+user data on Amazon Linux, and `tmux` with the options used there (all but the group have run on the instances of the
+earlier runs).
+
+| symptom | cause and remedy |
+|---|---|
+| `launch` stops with an error after some commands | each command's error is printed; `wall.sh cleanup --force` deletes what exists, then launch again |
+| the group has no instance and the capacity is 1 | no spot capacity at the ceiling in those zones: `aws autoscaling describe-scaling-activities --auto-scaling-group-name taxman-wall` says why; add zones or raise `--spot-max` (`cleanup`, then `launch --continue`) |
+| `status` shows `ENDED` with `boot failed` | the user data failed (install, clone, checkout, tmux); the reason names the step; fix and `launch --continue` |
+| machines keep starting | `run/boots/` counts them; the `MAX_INSTANCES`th ends the run as a boot loop; read `logs/wall-node.log` in S3 |
+| the machine is up and `status` shows nothing new for over 20 minutes | `aws ssm start-session`, `tmux attach -t tx`; `tail ~/taxman-work/logs/chain.err` |
+| `wall.sh stop` and nothing happens | the machine looks for the stop object every 30 s while the chain runs, and not during the setup; `stop --now` ends it at once |
