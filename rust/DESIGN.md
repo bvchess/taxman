@@ -800,6 +800,17 @@ the ceiling, on every thread.
 * *Stops.*  A failure is reported, and an unfinished search ends the range, only when its game is the oldest, so a run
   fails or stops at the game, and with the lines before it, where a range solved in order would.  The searches still
   in flight are then stopped with a final checkpoint (the next run resumes them), and what they found is dropped.
+* *The wall.*  `--game-hours H` (`SolveOptions::game_limit`) ends the range at the first game whose own search passes H
+  hours, to find the board size at which a machine's day is not enough.  A game's own search is the time it has been the
+  oldest game of the window with its search running, summed over the invocations that searched it: not the time it
+  waited behind an older game, which its checkpoint's elapsed time counts (a younger search is suspended while the
+  oldest keeps the threads busy, so a game that follows a dear one would arrive at its own search with that time
+  already on its clock).  The driver keeps the clock in `nNNNN.clock` beside the checkpoint, every checkpoint interval
+  and when the search stops, and reads it back when a search starts from a checkpoint; a game that restarts from its
+  beginning starts its clock again, and a finished game's clock goes with its checkpoint.  At the limit the range ends
+  as it does at a stop signal (every search in flight stopped with a final checkpoint) but records nothing for the
+  game, not an incomplete line, and `solve` prints `wall at N after H hours` and exits with status 4
+  (`RangeSummary::walled`).  Run again with a larger limit, the game goes on from its checkpoint and its clock.
 * *Trace.*  With `TAXMAN_WINDOW_TRACE` set, the driver prints its events on stderr: setups, the starts of searches with
   their seeds and ceilings, workers given and taken back, hints, deferrals and conclusions.
 

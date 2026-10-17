@@ -60,6 +60,10 @@ fn bad_command_lines_are_usage_errors() {
     assert_usage_error(&["solve", "12", "--nope"], "unknown option --nope");
     assert_usage_error(&["solve", "12", "--time-limit", "-1"], "not a number of seconds");
     assert_usage_error(&["solve", "12", "--node-limit", "many"], "cannot read");
+    assert_usage_error(&["solve", "12", "--game-hours", "0"], "is not a number of hours");
+    assert_usage_error(&["solve", "12", "--game-hours", "-1"], "is not a number of hours");
+    assert_usage_error(&["solve", "12", "--game-hours", "soon"], "--game-hours: cannot read");
+    assert_usage_error(&["regress", "--game-hours", "1"], "unknown option --game-hours");
     assert_usage_error(&["regress", "12"], "regress takes no positional arguments");
     assert_usage_error(&["bench", "many"], "not a board size");
     assert_usage_error(&["tables"], "usage: tables N K...");
@@ -571,6 +575,41 @@ fn solve_writes_its_results_skips_what_is_done_and_resumes_what_was_stopped() {
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     assert!(run.stdout.contains("optimal ok") && !run.stdout.contains("stopped"), "{}", run.stdout);
     assert!(!ckpt.join("n1000.ckpt").exists(), "a finished game removes its checkpoint");
+}
+
+/// A game that passes the wall (`--game-hours`) ends `solve` with exit status 4 and the line `wall at N after H
+/// hours` on stdout; nothing is recorded for the game, its checkpoint and clock are kept, and the same command with a
+/// larger limit finishes it (and removes the clock).  (A limit of about a millisecond is passed by any search of the
+/// game, which takes 0.2 s on one thread.)
+#[test]
+fn solve_stops_at_the_wall_with_status_4_and_goes_on_when_the_limit_is_raised() {
+    let dir = TempDir::new("solve-wall");
+    let (results, ckpt) = (dir.join("results.jsonl"), dir.join("ckpt"));
+    let args = [
+        "solve",
+        "1000",
+        "--force-search",
+        "--threads",
+        "1",
+        "--progress",
+        "0",
+        "--checkpoint-dir",
+        path(&ckpt),
+        "--out",
+        path(&results),
+    ];
+    let run = taxman(&[&args[..], &["--game-hours", "0.0000003"]].concat());
+    assert_eq!(run.code, Some(4), "{}", run.stderr);
+    assert!(run.stdout.starts_with("wall at 1000 after "), "{}", run.stdout);
+    assert!(run.stdout.contains("nothing is recorded for it"), "{}", run.stdout);
+    assert!(ckpt.join("n1000.ckpt").exists() && ckpt.join("n1000.clock").exists());
+    assert_eq!(fs::read_to_string(&results).unwrap(), "");
+
+    let run = taxman(&[&args[..], &["--game-hours", "1"]].concat());
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    assert!(run.stdout.contains("optimal ok") && !run.stdout.contains("wall"), "{}", run.stdout);
+    assert!(!ckpt.join("n1000.ckpt").exists() && !ckpt.join("n1000.clock").exists());
+    assert_eq!(fs::read_to_string(&results).unwrap().lines().count(), 1);
 }
 
 /// A results file that another process has open (here this one, appending to it as a run does) is refused by

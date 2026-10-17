@@ -66,7 +66,8 @@
 //! solved *standalone*, with no seed and no ceiling (and a note on stderr says so).  Every result is appended to
 //! the results file (one JSON object per line) as soon as it is concluded, so that a restarted run skips what is
 //! finished; the file is checked when it is opened ([`ResultsFile::open`]).  A game whose search a limit or a signal
-//! stopped is recorded as incomplete, keeps its checkpoint, and ends the range.  The games a game of the range may
+//! stopped is recorded as incomplete, keeps its checkpoint, and ends the range; so does one that passes the wall
+//! ([`SolveOptions::game_limit`]), but with no line.  The games a game of the range may
 //! repeat the search of are the file's and the range's own (a single game solved with [`solve_game`] has none).
 //!
 //! Up to [`SolveOptions::window`] consecutive games are in flight at once: game `n + 1` is set up while `n`
@@ -75,6 +76,7 @@
 //! are the same either way but for what a multi-threaded search may vary (another optimal set of promotions, the
 //! nodes, the times): `window` has the driver and the argument.
 
+mod clock;
 mod window;
 
 use crate::accelerate::{prime_shortcut, solution_for_promotions};
@@ -120,6 +122,12 @@ pub struct SolveOptions {
     /// search starts, zero above all, stops it before it does any work ([`EngineConfig::time_limit`]).
     pub time_limit: Option<Duration>,
     pub node_limit: Option<u64>,
+    /// The wall (`--game-hours`): the most a game's own search may take in all, over every invocation.  A game's own
+    /// search is the time it has been the head of the window with its search running, not the time it waited behind
+    /// another game ([`window`]'s "The wall"); the time is kept beside the game's checkpoint, so a resumed search goes
+    /// on from it.  The game that passes it ends the range with every search in flight stopped and checkpointed and
+    /// nothing recorded for it ([`RangeSummary::walled`]).
+    pub game_limit: Option<Duration>,
     /// Most queued search units kept in memory; the rest spill to disk.
     pub queue_mem_cap: usize,
     /// Where queued units spill to; by default `spill` in the checkpoint directory, else a temporary directory.
@@ -147,6 +155,7 @@ impl Default for SolveOptions {
             progress: None,
             time_limit: None,
             node_limit: None,
+            game_limit: None,
             queue_mem_cap: engine.queue_mem_cap,
             spill_dir: None,
             force_search: false,
@@ -160,6 +169,11 @@ impl SolveOptions {
     /// The checkpoint file of game `n`, if checkpointing is on.
     pub fn checkpoint_file(&self, n: u32) -> Option<PathBuf> {
         self.checkpoint_dir.as_ref().map(|dir| dir.join(format!("n{n:04}.ckpt")))
+    }
+
+    /// The file beside game `n`'s checkpoint that keeps its wall clock between invocations, if checkpointing is on.
+    pub fn clock_file(&self, n: u32) -> Option<PathBuf> {
+        self.checkpoint_dir.as_ref().map(|dir| dir.join(format!("n{n:04}.clock")))
     }
 }
 
@@ -1106,6 +1120,7 @@ pub fn discard_checkpoint(opts: &SolveOptions, n: u32) {
             let _ = writeln!(std::io::stderr(), "warning: cannot remove the checkpoint of a finished game: {e}");
         }
     }
+    clock::forget(opts, n);
 }
 
 /// Where the engine spills to, and whether the directory is the game's own, which its search removes when it is done.
@@ -1283,6 +1298,16 @@ pub struct RangeSummary {
     pub skipped: usize,
     /// The game whose search stopped at a limit; the range ends there.
     pub stopped_at: Option<u32>,
+    /// The game that passed the wall ([`SolveOptions::game_limit`]); the range ends there, with nothing recorded for it.
+    pub walled: Option<Wall>,
+}
+
+/// The game that passed the wall.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Wall {
+    pub n: u32,
+    /// What its clock said when the range stopped: its own search so far, over every invocation.
+    pub held: Duration,
 }
 
 /// The completed game of `n` in the results file, as the previous game of `n + 1`.
@@ -1367,7 +1392,7 @@ pub fn solve_range_each_with(
     if let Some(file) = &results {
         // Left by a crash between saving a result and deleting its checkpoint.
         for n in (lo..=hi).filter(|&n| file.completed(n).is_some()) {
-            if opts.checkpoint_file(n).is_some_and(|path| path.exists()) {
+            if [opts.checkpoint_file(n), opts.clock_file(n)].iter().flatten().any(|path| path.exists()) {
                 discard_checkpoint(opts, n);
             }
         }
