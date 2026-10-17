@@ -46,6 +46,7 @@ of a Graviton core and the scaling of the solver to 64 and 192 threads are measu
 * [10. The theory track's measurements: E6 and E9(a)](#10-the-theory-tracks-measurements-e6-and-e9a)
 * [11. Certifying U (stage 4)](#11-certifying-u-stage-4)
 * [12. The unattended run to the wall](#12-the-unattended-run-to-the-wall)
+* [13. The sweep](#13-the-sweep)
 
 ## Rules for every launch
 
@@ -110,13 +111,14 @@ The files in this directory:
 | `scaling.sh` | the scaling sweep (`--engine`: the engine benchmark; `--pauses`: the cost of checkpoints; `--quick`) |
 | `chain.sh N` | the production run: the chain 1..N in a loop, a window of games in flight (`WINDOW`), resumable, logged, optional deadline and power-off |
 | `verify.sh [FILE...]` | both referees on a results file, and against the committed results |
+| `sweep.sh FIRST LAST` | the sweep (section 13): FIRST..LAST in blocks of consecutive games, one thread each and a limited search a game, then passes that search again the games whose game before them has gained, into `explore.jsonl`; resumable, with `DEADLINE_HOURS`, `POWEROFF` and `S3_DEST` as the others; `../sweep_plan.py` sizes the blocks and cuts the excerpts of the passes |
 | `save.sh` | copy results, logs and checkpoints to S3 (`--restore` on a fresh machine) |
 | `prover.sh A B` | the prover's proofs of opt(n) for n = A..B (section 9): resumable passes, all CPUs; `--verify` checks the output; `--list N1,N2,...` runs `exact` on given games as a measurement (section 10.1) |
 | `certify.sh LIST[:THREADS]...` | the certificates campaign (section 11): `taxman certify` over the lists of `bench/certify/lists/stage4`, several at once, resumable, with a final `verify-certificates` |
 | `spot-watch.sh` | on a spot interruption notice: stop `chain.sh`, `prover.sh` or `certify.sh` and save |
 | `wall.sh launch\|status\|stop\|cleanup` | the unattended run to the wall (section 12): the launch template, the Auto Scaling group of one spot instance and the policy, from your machine; prints every aws command |
 | `wall-node.sh`, `wall-policy.json` | what each machine of that group does from boot to the end of the run; the one permission the machines need |
-| `test/run.sh` | tests of `chain.sh`'s wall and ledger, `wall-node.sh` and `wall.sh` against a stand-in for aws (no cloud) |
+| `test/run.sh` | tests of `chain.sh`'s wall and ledger, `wall-node.sh`, `wall.sh` and `sweep.sh` against a stand-in for aws (no cloud) |
 | `Dockerfile`, `Dockerfile.dockerignore` | a Linux build-and-test image (section 2) |
 
 All state lives in one directory, `$TAXMAN_WORK` (default `~/taxman-work`): `results/strict.jsonl` (and
@@ -1745,3 +1747,111 @@ earlier runs).
 | machines keep starting | `run/boots/` counts them; the `MAX_INSTANCES`th ends the run as a boot loop; read `logs/wall-node.log` in S3 |
 | the machine is up and `status` shows nothing new for over 20 minutes | `aws ssm start-session`, `tmux attach -t tx`; `tail ~/taxman-work/logs/chain.err` |
 | `wall.sh stop` and nothing happens | the machine looks for the stop object every 30 s while the chain runs, and not during the setup; `stop --now` ends it at once |
+
+## 13. The sweep
+
+As many proven games as the time allows over a long stretch of board sizes (Brian, 2026-10-17: 3441 to 8191), holes
+allowed, for little time and money, on one `c8g.16xlarge` at spot: `sweep.sh FIRST LAST`.  It is not the chain of
+section 5.  The chain proves every game in turn and stops at the first it cannot (3441 took 5.9 hours on 64 threads);
+the sweep gives each game a search of at most `GAME_SECONDS` (180) on one thread, goes on past the ones that do not
+finish, and keeps what does.  Built and tested on the laptop against a stand-in for aws (`test/run.sh sweep`); **not yet
+run on EC2**, and a launch needs Brian's approval with the estimate of 13.2 (the [rules for every launch](#rules-for-every-launch)).
+
+### 13.1 What it does
+
+**Pass 1.**  FIRST..LAST is split into `BLOCKS` blocks of consecutive games (default one a CPU), sized so that the
+expected work of each is about equal: a game costs its setup, which grows steeply with n (on one thread about 1 s at
+2200, 3 s at 3000, 9 s at 4000 and 48 s at 6000: `tools/sweep_plan.py` interpolates), and at most the limit of its
+search.  Each block is one `taxman solve --threads 1 --time-limit $GAME_SECONDS --keep-going` over its range, in
+increasing n, into a file of its own.  A game whose search finishes is a proof.  One that reaches the limit leaves an
+unfinished line with its best game, and the next game goes on from that game as a seed and nothing more: it gets the
+ceiling `n + opt(n - 1)`, the prime formula and a repeat of an earlier search only from a game that is proven
+([README, "Keeping going past limits"](../../README.md#keeping-going-past-limits-and-the-sweep)).  A block's first game
+has no game before it and is solved standalone, but for the first block's if `KNOWN` (default the committed
+`results/strict.jsonl`, to 3440) holds a proven game of FIRST - 1: that block's file starts as a copy of KNOWN's games,
+as one extends a chain, and the solver goes on from the last.  The blocks are merged into `explore.jsonl` every
+`MERGE_EVERY` seconds and at the end.
+
+**Passes 2, 3, ...**  A block's first game began without the game before it, which another block made.  So each pass
+searches again, with the same limit, every game that has only unfinished searches and whose game before it, as the merged
+file holds it now, has more to give than it had when the game was last tried: it is proven (the ceiling, and perhaps
+the prime formula or a repeat), or it has a better best game than the seed was, or the game had none.  A pass runs one
+`taxman solve --keep-going --retry-improved` a block that has such a game, each on one thread, over an excerpt of the
+merged file (`tools/sweep_plan.py passes`, which reads the merged file once and cuts all the excerpts: the block, the 8 board sizes before it that a repeat can repeat, and what
+their lines rest on, so that the solver's checks of its file hold), in increasing n, so that a game it has just
+proven helps the next.  Passes repeat until one finds nothing to do, which leaves the games as an unbroken chain would
+have left them, whatever it could prove with this limit (`MAX_PASSES`, default 20, bounds them).  A game that is
+searched again starts from the start: there are no checkpoints, since a game costs at most `GAME_SECONDS`.
+
+**What the files hold.**  `$TAXMAN_WORK/results/explore.jsonl`, the merge of every line of every block and pass
+(deduplicated, `awk '!seen[$0]++'`, so that merging is idempotent), and `results/explore-blocks/` beside it: `plan` (the
+blocks, kept so that a rerun finds them), `block-NNN.jsonl` (each block's file, which only grows) and `passes` (the last
+pass made).  `save.sh` copies the directory, so both reach S3.  The pass work files are in `$TAXMAN_WORK/sweep-pass/`
+(not saved; a pass that was stopped leaves its lines there, and the next start merges them first).  Each line says what
+its game had from n - 1 in `prev` and which pass made it in `options.pass`
+([README, section 5](../../README.md#what-a-game-had-from-n---1)); pass 1 is the blocks, and a pass is numbered by the
+launch of the pass (a rerun after an interruption counts as another).  `explore.jsonl` has holes and games built on
+unfinished ones: it is **not a chain and never goes into `results/strict.jsonl`**, and
+[`verify.sh`](#6-verifying-and-bringing-the-results-home) accepts it (both referees, and the agreement of its scores
+with the committed chain), which `sweep.sh` runs when the passes are done.
+
+### 13.2 What it costs
+
+The work of 3441..8191 at `GAME_SECONDS` 180, by `sweep_plan.py`'s sizes: 4,751 games, 76 core-hours of setup and at most
+238 of search, so at most **314 core-hours: 4.9 hours of 64 CPUs**, in 64 blocks of 4.83 to 4.97 core-hours each (the
+first of 95 games, 3441..3535, the last of 50, 8142..8191).  A `c8g.16xlarge` at spot was $0.66 to $0.81 an hour on
+2026-10-17 (counted at $0.676 in section 12): **about $3.3 for pass 1** at the cost of an hour, a build of about 10
+minutes, and the later passes, a fraction of the first (only the games that gained something); a deadline of 8 hours
+(`DEADLINE_HOURS`) bounds the machine at about $5.4, and the 40 GB volume is a few cents.  The estimate is an upper
+bound for pass 1 (a game that is settled by a repeat or the prime formula costs its setup alone), and the setup times
+past 4000 are extrapolated from four measured points.  What finishes in 180 s past 3441 is not measured: most searches
+will not (the cost of a game grows tenfold in about 1,040), so expect most lines unfinished, with the proofs among the
+primes and repeats after a proven game and the easy searches.
+
+### 13.3 Launch (approval first), watch, stop, results home
+
+One instance, not a group: the user data is self-running (it sets the timer, installs, clones the pinned commit, builds,
+restores what S3 holds and runs the sweep in tmux as `ec2-user`), `POWEROFF=always` shuts the machine down when the
+sweep ends, for any reason, and the timer is the backstop.  `COMMIT` is the pushed master.
+
+```
+export AWS_PROFILE=bvc AWS_DEFAULT_REGION=us-east-1                       # after: aws login --profile bvc
+aws ec2 run-instances --instance-type c8g.16xlarge ... --user-data file://sweep-user-data.sh \
+    --block-device-mappings 'DeviceName=/dev/xvda,Ebs={VolumeSize=40,VolumeType=gp3,DeleteOnTermination=true}'
+# the rest of the command is 9.4's (the image, the security group with no inbound rule, the instance profile
+# taxman-ec2, the tags, terminate on shutdown, the spot market options in the zone of the lowest price), with
+# Purpose=sweep; sweep-user-data.sh is, with COMMIT the pushed master's id:
+```
+
+```
+#!/bin/bash
+shutdown -h +540                                    # the timer: DEADLINE_HOURS below, and an hour
+dnf install -y git tmux || { shutdown -h now; exit 1; }
+sudo -u ec2-user git clone https://github.com/bvchess/taxman.git /home/ec2-user/taxman
+sudo -u ec2-user git -C /home/ec2-user/taxman checkout COMMIT
+sudo -u ec2-user -i tmux new-session -d -s tx -c /home/ec2-user/taxman \
+    'export S3_DEST=s3://taxman-013764204840-us-east-1/sweep-3441-8191
+     SKIP_TESTS=1 NO_PULL=1 rust/tools/cloud/setup.sh &&
+         { rust/tools/cloud/save.sh --restore; DEADLINE_HOURS=8 POWEROFF=always GAME_SECONDS=180 \
+               rust/tools/cloud/sweep.sh 3441 8191; }
+     sudo shutdown -h now'                          # also if the setup failed
+```
+
+`setup.sh` builds the solver with `target-cpu=native` and runs its smoke checks (about 10 minutes on 64 vCPUs); the
+chain-style commands of section 5 then apply: `tail ~/taxman-work/logs/sweep.log` (one status line every
+`STATUS_EVERY` seconds: the pass, the blocks done, the lines in the merged file), `ls ~/taxman-work/logs/sweep-*.err` for
+a block's own log, `kill -TERM $(cat ~/taxman-work/sweep.pid)` to stop cleanly (the games in progress have no line; the
+others are merged and saved), and the same command to go on after a stop or an interruption (on a replacement machine:
+`save.sh --restore` first, with the same `S3_DEST`; the plan is in the saved directory, so it finds the same blocks).
+Results home: `aws s3 sync $D/results/ results-from-cloud/`, then `rust/tools/cloud/verify.sh
+results-from-cloud/explore.jsonl`.  `taxman verify-results results-from-cloud/explore.jsonl` reports the completed
+games, the missing board sizes, the board sizes that only an unfinished search is recorded for, and the proofs.
+To spend more on the failures, search them again with a longer limit by hand, `taxman solve A-B --keep-going --retry
+--time-limit 600 --out BLOCKFILE` on a block's file, and run `sweep.sh` again: it merges the new lines, and the passes
+search again the games next to the ones that improved.  Everything else is section 5's: the end of a launch is
+the [rules for every launch](#rules-for-every-launch)'s checks, and the bucket prefix goes once the results are home.
+
+The tests of the script are `test/run.sh sweep` (with `TAXMAN_BIN` set to a non-release build, if there is none of the
+release; it runs `verify.sh`, so it replays the committed games three times) and, for the planner, `python3 -I
+tools/test_sweep_plan.py`.
+

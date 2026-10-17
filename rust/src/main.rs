@@ -41,6 +41,18 @@ commands:
       --node-limit N           stop a game's search after N nodes (keeps its checkpoint)
                                SIGINT or SIGTERM stops the search the same way (exit status 130 or 143);
                                a second one kills the process.  One process at a time uses a checkpoint DIR.
+      --keep-going             a game that a limit stops does not end the range: its best game so far is recorded
+                               as an unfinished line, and the next game goes on from it as a seed alone (no
+                               ceiling, no prime formula, nothing that rests on its being optimal); the games are
+                               solved one at a time.  A rerun passes over the games --out holds only unfinished
+                               lines of; a signal still ends the range, with nothing recorded for its game
+      --retry                  with --keep-going, search again the games --out holds only unfinished lines of
+                               (each from its checkpoint), as a pass with a longer limit does
+      --retry-improved         with --keep-going, search again only the games --out holds only unfinished lines of
+                               whose game before it now has more to give than when they were tried: it is
+                               proven, or has a better best game, or they had none (the others are passed over)
+      --pass N                 record N as the pass in the options of every line written (for a script that
+                               goes over the games more than once); it changes nothing else
       --game-hours H           the wall: stop the range at the first game whose own search (the time it is the
                                first of the window, summed over runs and kept in DIR/nNNNN.clock) passes H hours:
                                every search stops with a final checkpoint, nothing is recorded for that game, the

@@ -117,6 +117,28 @@
 //! games before it are recorded already); [`RangeSummary::walled`] names it and its clock.  Run again with a larger
 //! limit the head resumes from its checkpoint and its clock.
 //!
+//! # Past limits
+//!
+//! With [`SolveOptions::keep_going`] (`--keep-going`) a game whose search a time or node limit stops does not end the
+//! range.  Its best game so far is recorded as an unfinished line, its checkpoint is kept, and the next game goes on
+//! from that game as a seed: the seed is any promotable set, so it cannot make a result wrong.  What the unfinished
+//! game is not is proven, so the next game takes nothing that rests on its being optimal ([`Prev::proven`]): no
+//! ceiling `n + score(n − 1)` (a search needs its own exhaustion to be proven, or a ceiling from a proven game after
+//! it), no prime formula (a prime game is searched), and the tripwire that a score above that ceiling proves the
+//! game before it not optimal is not made.  A repeat of an earlier search rests on that earlier game, which is in the
+//! file as a completed one or is not repeated, so it is as before.  The games are solved one at a time, since a game
+//! that goes on from a game in flight cannot know whether to take its ceiling.
+//!
+//! A rerun passes over the games the file holds only unfinished lines of, seeding the game after the last of them
+//! with its best game (the best of its lines: a search started again can end below an earlier one), unless `retry` is
+//! set, which searches them again (each from its checkpoint, if it has one).  With `retry_improved` an unfinished game
+//! is searched again only if the game before it, as it is now (the file's, or one this run has just searched again),
+//! has more to give than it had when the unfinished line was made: it is proven and the line's was not, or its best game
+//! scores more than the line's seed, or the line had none.  That is how a script goes over games that were made in
+//! blocks apart, so that each sees the one before it: a block's first game saw none, and its first game proven gives
+//! the next the ceiling.  The passing over happens before a game enters the window (it costs no setup).  A signal still
+//! ends the range, but its game gets no line, so that a rerun resumes it instead of passing it over.
+//!
 //! # Tracing
 //!
 //! With the environment variable `TAXMAN_WINDOW_TRACE` set, the driver prints a line on stderr for each of its events,
@@ -132,13 +154,14 @@
 mod allot;
 
 use super::{
-    ceiling, clock, conclude_game, discard_checkpoint, set_up, shared_spill_dir, stored_prev, Before, Context, Derived,
-    Earlier, Failure, Found, GameResult, Go, Job, Outcome, Prev, RangeSummary, SearchSetUp, SetUp, SolveOptions, Wall,
+    ceiling, clock, conclude_game, discard_checkpoint, set_up, shared_spill_dir, stored_prev, stored_unfinished,
+    Before, Context, Derived, Earlier, Failure, Found, GameResult, Go, Job, Outcome, Prev, RangeSummary, SearchSetUp,
+    SetUp, SolveOptions, Wall,
 };
 use crate::accelerate::prime_shortcut;
 use crate::engine::{self, Status, WORKER_STACK_SIZE};
 use crate::game::Optimal;
-use crate::results::ResultsFile;
+use crate::results::{BuiltOn, ResultsFile};
 use crate::search::Problem;
 use allot::{allot, Grant, Load, Need, TICK};
 use std::collections::BTreeMap;
@@ -412,6 +435,19 @@ impl Seed<'_> {
     }
 }
 
+/// Whether an unfinished search that had `built_on` from the game of `n − 1` is to be tried again now that the game is
+/// `last` (`retry_improved`, see "Past limits"): it has more to give than it had.  With no game of `n − 1` there is
+/// nothing new; a game of `n − 1` after none is new; a proven game is new after an unproven one, and an unproven game
+/// is new if its score is higher than the seed's was.
+fn improved(last: Option<&Prev>, built_on: Option<BuiltOn>) -> bool {
+    let Some(last) = last else { return false };
+    match built_on {
+        None => true,
+        Some(on) if on.proven => false,
+        Some(on) => last.proven || last.score > on.score,
+    }
+}
+
 /// The sum of `numbers`: a game's score, of its moves, or a promotion sum.
 fn sum(numbers: &[u32]) -> u64 {
     numbers.iter().map(|&k| u64::from(k)).sum()
@@ -448,8 +484,10 @@ struct Window<'a> {
 
 impl<'a> Window<'a> {
     fn new(range: Range<'a>, opts: &'a SolveOptions, earlier: &'a mut Earlier, events: Sender<Event>) -> Self {
-        // With one thread there is none to run a second game on.
-        let width = if opts.threads <= 1 { 1 } else { opts.window.max(1) };
+        // With one thread there is none to run a second game on, and a range that keeps going past limits solves its
+        // games one after another: a game cannot go on from a game in flight until it knows whether that game is
+        // proven (see "Past limits").
+        let width = if opts.threads <= 1 || opts.keep_going { 1 } else { opts.window.max(1) };
         let last = match &range.before {
             Before::Given(prev) => Some(prev.clone()),
             Before::Run | Before::None => None,
@@ -529,10 +567,52 @@ impl<'a> Window<'a> {
         self.results.as_deref().is_some_and(|file| file.completed(n).is_some())
     }
 
+    /// The game of the results file that the range passes over at the head `n`, as the previous game of the one after
+    /// it: a completed game, or, when the range keeps going past limits, the best game of an unfinished search, which is
+    /// a seed and not a proven game.  Not one that `retry` searches again, nor one that `retry_improved` does because the
+    /// game before it, `last`, has improved.
+    fn passed_over(&self, n: u32) -> Option<Prev> {
+        let file = self.results.as_deref()?;
+        if let Some(done) = stored_prev(file, n) {
+            return Some(done);
+        }
+        if !self.opts.keep_going || self.opts.retry {
+            return None;
+        }
+        let seed = stored_unfinished(file, n)?;
+        // What the game had is what its latest attempt had, not the attempt that scored best: a search started again
+        // can end below an earlier one.
+        let latest = file.last_attempt(n)?;
+        if self.opts.retry_improved && improved(self.last.as_ref(), latest.built_on) {
+            return None;
+        }
+        Some(seed)
+    }
+
+    /// Passes over the games of the results file at the head, each the previous game of the one after it.
+    fn skip_settled(&mut self) {
+        while self.next <= self.hi {
+            let Some(stored) = self.passed_over(self.next) else { break };
+            if stored.proven {
+                self.summary.skipped += 1;
+            } else {
+                self.summary.passed_over += 1;
+            }
+            self.last = Some(stored);
+            self.next += 1;
+        }
+    }
+
     /// The previous game of game `n` as its setup knows it.
     fn before(&self, n: u32) -> Before {
         if n == self.lo {
             return self.first.clone();
+        }
+        if self.opts.keep_going {
+            // Solved one at a time, from the head: the game before it is settled, by this run or by the file, proven or
+            // not, and the setup is told which (the prime formula needs a proven game).
+            debug_assert_eq!(n, self.next, "a range that keeps going enters only the head");
+            return self.last.clone().map_or(Before::None, Before::Given);
         }
         match self.results.as_deref().and_then(|file| stored_prev(file, n - 1)) {
             Some(prev) => Before::Given(prev),
@@ -594,22 +674,29 @@ impl<'a> Window<'a> {
     /// free.  Returns whether the range has ended: every game concluded, or one that did not complete.
     fn settle(&mut self, on_game: &mut dyn FnMut(&GameResult)) -> Result<bool, String> {
         loop {
+            // A range that keeps going passes over first: whether a game is passed over depends on the game before it
+            // (`retry_improved`), which is known only once the games before it have been.
+            if self.opts.keep_going {
+                self.skip_settled();
+                self.entering = self.entering.max(self.next);
+            }
             self.enter();
             self.look_up();
-            // A game of the results file is skipped, as the previous game of the one after it.
-            while self.next <= self.hi {
-                let Some(stored) = self.results.as_deref().and_then(|file| stored_prev(file, self.next)) else {
-                    break;
-                };
-                self.last = Some(stored);
-                self.summary.skipped += 1;
-                self.next += 1;
+            if !self.opts.keep_going {
+                self.skip_settled();
             }
             if self.next > self.hi {
                 return Ok(true);
             }
             let n = self.next;
             let Some(result) = self.conclude_head(n)? else { return Ok(false) };
+            if !result.completed && self.opts.keep_going && engine::stop_signal().is_some() {
+                // A signal stopped the search, not its limit: the game gets no line (as at the wall), so that a rerun
+                // resumes it from its checkpoint rather than passing it over as one that spent its limit.
+                self.trace(format_args!("stopped n={n} by a signal"));
+                self.summary.stopped_at = Some(n);
+                return Ok(true);
+            }
             if let Some(file) = self.results.as_deref_mut() {
                 file.append(&result)?;
             }
@@ -617,12 +704,24 @@ impl<'a> Window<'a> {
             self.trace(format_args!("concluded n={n}"));
             self.summary.solved += 1;
             if !result.completed {
-                self.summary.stopped_at = Some(n);
-                return Ok(true);
+                if !self.opts.keep_going {
+                    self.summary.stopped_at = Some(n);
+                    return Ok(true);
+                }
+                // Its checkpoint stays, for a retry.  The next game goes on from its best game, as a seed.
+                self.summary.unfinished += 1;
+            } else {
+                discard_checkpoint(self.opts, n);
             }
-            discard_checkpoint(self.opts, n);
             self.earlier.add_result(&result);
-            let prev = Prev::from_result(&result);
+            let mut prev = Prev::from_result(&result);
+            if !result.completed {
+                // A search started again can end below an earlier one the file records: the better seeds the next game.
+                let file = self.results.as_deref();
+                if let Some(best) = file.and_then(|file| stored_unfinished(file, n)).filter(|b| b.score > prev.score) {
+                    prev = best;
+                }
+            }
             self.tell(n + 1, &prev);
             self.last = Some(prev);
             self.next += 1;
@@ -660,7 +759,7 @@ impl<'a> Window<'a> {
         let Some(Game { stage: Stage::Search(set, Plan::Search(Search::Running(_))), .. }) = self.games.get(&n) else {
             return;
         };
-        if let Some(ceiling) = ceiling(n, set.in_the_bag, Some(prev.score), self.opts) {
+        if let Some(ceiling) = ceiling(n, set.in_the_bag, prev.cap_score(), self.opts) {
             set.job.control().set_ceiling(ceiling);
             self.trace(format_args!("told n={n}"));
         }
@@ -875,7 +974,7 @@ impl<'a> Window<'a> {
         let seeds = set.job.seeds();
         let (seed, cap, given) = match self.known_before(n) {
             Known::Final(prev) => {
-                (seeds.then(|| prev.moves.clone()), ceiling(n, set.in_the_bag, Some(prev.score), self.opts), None)
+                (seeds.then(|| prev.moves.clone()), ceiling(n, set.in_the_bag, prev.cap_score(), self.opts), None)
             }
             Known::Provisional(before) if seeds => {
                 let moves = before.moves();
@@ -1034,6 +1133,32 @@ mod tests {
     fn status(live: usize, idle: usize, capacity: u64, idle_time: u64) -> Status {
         let (capacity, idle_time) = (ms(capacity), ms(idle_time));
         Status { live, running: live - idle, idle, queued: 0, idle_time, capacity, best: 0, nodes: 0 }
+    }
+
+    fn game(score: u64, proven: bool) -> Prev {
+        Prev {
+            moves: Vec::new(),
+            score,
+            source: super::super::PrevSource::Run,
+            proof: None,
+            assumes: Default::default(),
+            proven,
+        }
+    }
+
+    #[test]
+    fn an_unfinished_game_is_tried_again_when_the_game_before_it_has_more_to_give() {
+        let on = |score, proven| Some(BuiltOn { score, proven });
+        // Nothing before it now: nothing new, whatever it had.
+        assert!(!improved(None, None) && !improved(None, on(5, false)));
+        // It had no game before it, and now there is one, proven or not.
+        assert!(improved(Some(&game(5, false)), None) && improved(Some(&game(5, true)), None));
+        // It had a proven game: nothing can be more.
+        assert!(!improved(Some(&game(5, true)), on(5, true)) && !improved(Some(&game(9, true)), on(5, true)));
+        // It had an unproven game: a proven one is new, and an unproven one if it scores more.
+        assert!(improved(Some(&game(5, true)), on(5, false)));
+        assert!(improved(Some(&game(6, false)), on(5, false)));
+        assert!(!improved(Some(&game(5, false)), on(5, false)) && !improved(Some(&game(4, false)), on(5, false)));
     }
 
     #[test]

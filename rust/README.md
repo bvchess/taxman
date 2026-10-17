@@ -320,7 +320,7 @@ counts them.
   `--tactic` flags, or delete the file.
 * **Limits.**  `--time-limit S` and `--node-limit N` bound one game's search in one invocation (not the whole
   range).  A game stopped by a limit gets an incomplete result line (`completed` false, `best_so_far`), and the range
-  stops there, exit status 0.
+  stops there, exit status 0 (with `--keep-going` it goes on: next subsection).
 * **The wall.**  `--game-hours H` ends the range at the first game whose own search passes H hours, summed over every
   invocation and counted only while the game is the oldest of the window with its search running (not while it
   waits behind another).  Every search in flight stops with a final checkpoint, nothing is recorded for that game, not
@@ -331,6 +331,36 @@ counts them.
   checkpoint of a finished game is left over, and the next run deletes it.
 * **Memory.**  Searcher state is bounded; the shared queue of work units spills to `DIR/spill` beyond `--mem-cap` units
   (default 1048576).  The committed run never got near it: its queue peaked at 178 units.
+
+### Keeping going past limits, and the sweep
+
+```
+$ taxman solve 3441-3600 --threads 1 --time-limit 180 --keep-going --out part.jsonl
+```
+
+With `--keep-going`, a game whose search a limit stops does not end the range.  Its best game so far is recorded as an
+unfinished line (`completed` false, `best_so_far`, the moves), and the next game goes on from that game as a seed and
+nothing more, since it is not known to be optimal: the next game gets no ceiling `n + score(n - 1)` from it, no prime
+formula, and no proof that rests on it, and its line says so (`prev` has no proof; section 5, "What a game had from
+n - 1").  What does not rest on the game before it is as ever: an exhausted search is a proof, and so is a repeat of a
+completed game of the file.  The games are solved one at a time (`--window` is 1).  A rerun on the same `--out`
+passes over the games the file holds only unfinished lines of, seeding the game after the last with its best (the best of
+its lines), and solves the others.  `--retry` searches the unfinished games again instead (each from its checkpoint, if
+`--checkpoint-dir` kept one), as a second pass with a longer limit does.  `--retry-improved` searches again only the
+unfinished games whose game before it has more to give than it had when they were tried (it is proven now, or has a
+better best game than their seed, or they had none), and passes over the rest; the games it searches again go in
+increasing n, so that one it has just proven helps the next.  A signal still ends the range, but with no line for the
+game it stopped, so that a rerun resumes it.  `--pass N` records N in `options.pass` of every line the run writes, and
+changes nothing else.
+
+**The sweep** (`rust/tools/cloud/sweep.sh FIRST LAST`, [RUNBOOK section 13](tools/cloud/RUNBOOK.md#13-the-sweep))
+goes over a long stretch of board sizes for as many proven games as the time allows, holes allowed: the stretch is
+split into blocks of consecutive games of about equal expected work, one `taxman solve --keep-going` on one thread
+for each, with a limit on each game's search (`GAME_SECONDS`, 180); then passes of `--retry-improved` on the merged
+file, so that each game sees the game before it whichever block made it, until a pass changes nothing.  Its file,
+`explore.jsonl`, holds every line of every block and pass.  It is **not a chain** and never goes into
+`results/strict.jsonl`: it has board sizes with only an unfinished search, or none, and each proof in it rests only
+on the games it holds.  Both referees accept it (section 5).
 
 ### All flags of `solve`
 
@@ -347,6 +377,9 @@ counts them.
 | `--mem-cap UNITS` | work units kept in memory before spilling to disk |
 | `--force-search` | search where the previous game or an earlier search would give the answer (skips `prime_shortcut` and `same_search`) |
 | `--use-prev` | take the game of n - 1 from `optimal.json` when neither the run nor `--out` has it; a result whose proof rests on it records that it assumes it optimal |
+| `--keep-going` | a game that a limit stops does not end the range: its best game so far is an unfinished line and seeds the next game, which takes nothing that rests on its being optimal; the games are solved one at a time; a rerun passes over the unfinished games (above) |
+| `--retry`, `--retry-improved` | with `--keep-going`, search again every unfinished game of `--out`, or only those whose game before it now has more to give than when they were tried (above) |
+| `--pass N` | record N as `options.pass` of every line written (for a script that goes over the games more than once); no other effect |
 | `--show` | print each game's promotions and moves |
 
 ### The other commands
@@ -492,19 +525,19 @@ Game 249 of that run repeated the search of 248; its line has `"method":"repeat"
 | `score`, `moves`, `best_so_far` | the game and its score; for an unfinished search `score` is null and `best_so_far` (a key only such a line has) has the best so far |
 | `promotions` | the promoted numbers, ascending |
 | `method` | `trivial`, `prime`, `repeat`, `search` (how the game was found) |
-| `completed` | false only if a limit or a signal stopped the search; such a line is an unfinished-search record, and its checkpoint is kept |
+| `completed` | false only if a limit or a signal stopped the search; such a line is an unfinished-search record, and its checkpoint is kept (a `--keep-going` run writes none for a signal) |
 | `proof` | how optimality is established: `trivial`, `prime_formula`, `cap`, `exhausted`, `same_search` (section 5); null if incomplete |
 | `reached_cap` | the promotions reach `cap`, where the search stops (one started before its ceiling was known, in a window of games in flight, may have run to the end of its tree; DESIGN.md, "What a window changes in the results") |
 | `assumes` | what the proof assumes beyond the frame model, here or in the games it rests on (n - 1, or the game a repeat repeats): for a game of n - 1 taken from `optimal.json`, "the game of n - 1 in optimal.json is optimal"; `[]`: nothing |
 | `in_the_bag` | what the game with no promotions scores (null for prime shortcuts) |
-| `prev` | the game of n - 1 this one was built from: score, where it came from (`run`, `results`, `optimal`), a digest of its moves, its proof and what it assumes; null if there was none |
+| `prev` | the game of n - 1 this one was built from: score, where it came from (`run`, `results`, `optimal`), a digest of its moves, its proof and what it assumes; null if there was none.  A `run` or `results` game with no proof is the best game of an unfinished search (`--keep-going`): a seed, proven by nothing (section 5, "What a game had from n - 1") |
 | `same_search` | for a repeat, the earlier game of the file whose search it repeats: its board size, the digest of the search problem they share, the problem's best promotion sum, that game's proof and what it assumes; null otherwise |
 | `nodes`, `stats` | search steps over all invocations, and the searcher's counters (`match_bounds` is the number of node bounds computed, GF(2) or matching) |
 | `engine` | this invocation's splits, checkpoints written, units spilled, largest in-memory queue |
 | `setup` | null on a `trivial` or `prime` line, which set up no search; otherwise the frames and candidates found, `max_total` (the most promotions the freedoms allow), the greedy start, `cap` (ceiling on the promotion sum, `n + score(n-1) - in_the_bag`; null on a repeat, which ran no search to stop), and `digest`, a digest of the search problem the setup poses (DESIGN.md, "Same search"), by which a later game finds this one to repeat |
 | `seconds` | per phase, this invocation (`search_all_runs`: the search over every invocation of a resumed game) |
 | `invocations` | how many invocations ran the search (a resumed game has more than one) |
-| `threads`, `tactics`, `tactic_switches`, `limits`, `options` | what the last invocation ran with; `tactics` is `default` or the changes from the defaults, `options` the flags `--force-search` and `--use-prev` |
+| `threads`, `tactics`, `tactic_switches`, `limits`, `options` | what the last invocation ran with; `tactics` is `default` or the changes from the defaults, `options` the flags `--force-search` and `--use-prev`, and, only where given, `keep_going`, `retry`, `retry_improved` (true) and `pass` (the number `--pass` was given) |
 | `optimal_match` | true: the score equals `optimal.json`'s (a score that differs is a hard error, never written); null if the table has no game of n |
 | `build` | the commit the binary was built from, and whether its sources differed from it |
 
@@ -536,6 +569,25 @@ what a game assumes in the summary line.  What a proof rests on through the fram
 (section 1, "What optimal means"), is not recorded: it concerns the games proven by an exhausted search, a trivial
 board or a repeat, and holds for every n <= 2175 (the prover); past 2175 it is not yet certified.
 
+### What a game had from n - 1
+
+A line says it plainly in its `prev`, and in `options.pass` which pass over the games made it (a sweep goes over them
+more than once; a run with no `--pass` has none):
+
+| `prev` | what the game had from the game of n - 1 | what its proof can be |
+|---|---|---|
+| `null` | nothing: it was solved standalone (a block's first game, or the game before it is missing), with no seed and no ceiling (`setup.cap` null) | `trivial`, `exhausted`, or `same_search` on a completed game of the file |
+| `source` `run` or `results`, `proof` null | the best game of an unfinished search of n - 1, as a seed, and no more: no ceiling (`setup.cap` null), no prime formula, nothing that rests on it | the same: never `cap` or `prime_formula` |
+| `proof` given (or `source` `optimal`) | n - 1 proven (or assumed, from `optimal.json`): the seed, the ceiling `n + score(n - 1)`, the prime formula for a prime n, and repeats | any |
+
+The game of n - 1 that a `results` line names is in the same file: a completed game, or, with no proof, an earlier
+incomplete line with the score and moves it records.  A game that a retry searched again has several lines, an
+incomplete one made when n - 1 was less (or missing) and a later one made when it was more; each says what it had.  So
+a file of a sweep, with its board sizes that only an unfinished search is recorded for, reads: a completed game is
+proven by its `proof`, given what its `assumes` say (a `cap` or `prime_formula` rests on a proven `prev`, a
+`same_search` on the game it repeats, the others on nothing of n - 1); an unfinished game is a lower bound; and where
+a game and the one before it are both completed, the chain bounds hold between them.
+
 ### The verifiers
 
 * Every `solve` replays each game through `game::replay_finished`, an independent referee that shares no code with the
@@ -547,6 +599,15 @@ board or a repeat, and holds for every n <= 2175 (the prover); past 2175 it is n
   other as the solver writes them (so that a hand edit cannot drop an assumption or change a proof), that the files
   agree, and a count of games by proof kind and by what they assume.  For a repeat it sets the search problems of both
   games up again and compares them.  Opening a results file for `--out` runs the same checks.
+* **Both accept a file with holes** (a `--keep-going` run's, the sweep's `explore.jsonl`: board sizes with no line, or
+  with only incomplete ones), and check each line against what it rests on in the same file: a ceiling (`setup.cap`)
+  or a `cap` or `prime_formula` proof needs the game of n - 1 completed in the file, a repeat needs the game it
+  repeats completed on an earlier line, and an exhausted search needs nothing of n - 1.  A line built on the best game
+  of an unfinished search names an earlier incomplete line of n - 1 with that score and those moves, scores no less
+  than it, and has no ceiling and no such proof.  An incomplete line that records its game (`best_so_far`, the moves)
+  is checked to be legal, to score the `best_so_far`, and to be no better than `optimal.json`'s score.  The report
+  names the board sizes that only an unfinished search is recorded for.  A line whose game of n - 1 is not in the file
+  at all is still refused, as it was (`tests/results.rs` shows each case with both referees).
 * `python3 tools/check_results.py [FILE...]` is an independent referee in Python (standard library only, no shared
   code).  It re-derives every proof and assumption, and also checks each score against `optimal.json`, the
   Franklín-Moniot upper bound and the best-known heuristic chain in `heuristics/results`.  With no arguments it checks

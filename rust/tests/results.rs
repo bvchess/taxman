@@ -375,6 +375,95 @@ fn forged_repeats_are_refused_by_both_verifiers() {
     assert_eq!(run.status.code(), Some(0), "{}", String::from_utf8_lossy(&run.stdout));
 }
 
+/// `line`, a completed line, as the incomplete line of a search that a limit stopped at that game.
+fn stopped_at(line: &Json) -> Json {
+    let best = line.get("score").unwrap().clone();
+    let edits = [
+        ("completed", Json::Bool(false)),
+        ("score", Json::Null),
+        ("best_so_far", best),
+        ("proof", Json::Null),
+        ("assumes", Json::Null),
+    ];
+    edits.iter().fold(line.clone(), |line, (path, value)| with(&line, path, value))
+}
+
+/// A file with holes, and unfinished searches, passes both verifiers when each line stands against what it rests on in
+/// the file: a game built on the best game of an unfinished search (`solve --keep-going`) has no ceiling and no proof
+/// that rests on it, and names an earlier incomplete line that records that game.  The lines that claim otherwise are
+/// refused by both, naming the line.
+#[test]
+fn games_built_on_unfinished_searches_are_checked_by_both_verifiers() {
+    let dir = TempDir::new("unfinished-prev");
+    // 598..602 stop at a node limit, each on the best game of the one before; 603 finishes on 602's.
+    let results = dir.join("keep-going.jsonl");
+    let stopping =
+        SolveOptions { node_limit: Some(200), force_search: true, keep_going: true, ..common::matching_options(1) };
+    solver::solve_range(598, 602, &stopping, Some(&results)).unwrap();
+    let finishing = SolveOptions { node_limit: None, force_search: false, ..stopping.clone() };
+    solver::solve_range(598, 603, &finishing, Some(&results)).unwrap();
+    let kept: Vec<Json> =
+        fs::read_to_string(&results).unwrap().lines().map(|line| Json::parse(line).unwrap()).collect();
+    assert_eq!(kept.len(), 6);
+    let (finished, s) = (&kept[5], |text: &str| Json::from(text));
+    assert_eq!(finished.get("prev").and_then(|p| p.get("proof")), Some(&Json::Null));
+
+    let none = Json::array(Vec::<u32>::new());
+    let zeros = s("0000000000000000");
+    let refused = |edits: &[(&str, Json)], expected: &'static str| {
+        let line = edits.iter().fold(finished.clone(), |line, (path, value)| with(&line, path, value));
+        let file: Vec<Json> = kept[..5].iter().cloned().chain([line]).collect();
+        (file, Verdict::Refused { line: 6, n: 603, expected })
+    };
+    let mut cases = vec![(kept.clone(), Verdict::Accepted)];
+    // A ceiling (the line says its search had one) needs a proven game of n − 1.
+    cases.push(refused(&[("setup.cap", Json::from(1_000_000u32))], "needs a proven game"));
+    // The game it names is not an earlier line's: another score, other moves.
+    let other_score = Json::from(finished.get("prev").and_then(|p| p.get("score")).and_then(Json::as_u64).unwrap() + 1);
+    cases.push(refused(&[("prev.score", other_score)], "no earlier line"));
+    cases.push(refused(&[("prev.moves_digest", zeros)], "no earlier line"));
+    // An unproven game assumes nothing.
+    cases.push(refused(&[("prev.assumes", Json::array(["a statement"]))], "does not match"));
+    // The incomplete line itself: its game must score what it says.
+    let worse = Json::from(kept[2].get("best_so_far").and_then(Json::as_u64).unwrap() + 1);
+    let mut lying = kept.clone();
+    lying[2] = with(&kept[2], "best_so_far", &worse);
+    cases.push((lying, Verdict::Refused { line: 3, n: 600, expected: "best_so_far" }));
+    // The line the game names comes after it.
+    let mut swapped = kept.clone();
+    swapped.swap(4, 5);
+    cases.push((swapped, Verdict::Refused { line: 5, n: 603, expected: "no earlier line" }));
+    // An incomplete line with no game in it (made by hand) is only counted.
+    let minimal = Json::object([
+        ("schema", Json::from(taxman::results::SCHEMA)),
+        ("n", Json::from(700u32)),
+        ("completed", Json::Bool(false)),
+        ("invocations", Json::from(1u32)),
+    ]);
+    cases.push(([kept.clone(), vec![minimal]].concat(), Verdict::Accepted));
+    verifiers_agree(&dir, &cases);
+
+    // A proof that rests on the game of n − 1 cannot rest on an unfinished one: a prime game of a chain from 1, with the
+    // game before it made an unfinished line, and its record of that game made the unfinished game's.
+    let games = solver::solve_range(1, 90, &common::options(1), None).unwrap();
+    let lines: Vec<Json> = games.iter().map(GameResult::to_json).collect();
+    let i = games.iter().position(|g| g.method == Method::Prime && g.n > 40).expect("a prime game in 41..=90");
+    let unproven = [("prev.proof", Json::Null), ("prev.assumes", none)];
+    let built = unproven.iter().fold(lines[i].clone(), |line, (path, value)| with(&line, path, value));
+    let prime_on_unfinished: Vec<Json> =
+        lines[..i - 1].iter().cloned().chain([stopped_at(&lines[i - 1]), built]).collect();
+    let n = games[i].n;
+    verifiers_agree(
+        &dir,
+        &[(prime_on_unfinished, Verdict::Refused { line: i + 1, n, expected: "rests on the game of n − 1, which" })],
+    );
+    // And a game that rests on nothing of n − 1 stands on an unfinished one: the same game with the proof its
+    // search would have given needs a search, so only the file of the real run above shows it; here, the unfinished
+    // line alone, in a file whose games before it are complete, is a file with a hole.
+    let hole: Vec<Json> = lines[..i - 1].iter().cloned().chain([stopped_at(&lines[i - 1])]).collect();
+    verifiers_agree(&dir, &[(hole, Verdict::Accepted)]);
+}
+
 /// How many games of the report in the board sizes `range` have the proof, the ceiling proof, or no assumption.
 fn proofs(file: &FileReport, range: RangeInclusive<u32>, proof: Proof) -> usize {
     file.contents.games.range(range).filter(|(_, g)| g.proof == proof).count()

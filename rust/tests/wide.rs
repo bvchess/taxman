@@ -247,7 +247,14 @@ fn a_slice_of_the_chain_reproduces_the_results() {
         assert!(r.completed, "n={n}");
         assert_eq!(r.score, games[&n].0, "n={n}");
         searched += usize::from(r.method == Method::Search);
-        prev = Prev { moves: r.moves, score: r.score, source: PrevSource::Run, proof: r.proof, assumes: r.assumes };
+        prev = Prev {
+            moves: r.moves,
+            score: r.score,
+            source: PrevSource::Run,
+            proof: r.proof,
+            assumes: r.assumes,
+            proven: true,
+        };
     }
     assert!(searched >= 5, "{searched} of the 8 games were searched");
 }

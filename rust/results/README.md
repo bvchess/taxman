@@ -21,6 +21,15 @@ those tactics off, schema 1, commit e710d16); and the GF(2) study's `bench/gf2/c
 `optimal.json`'s game of 1300, schema 5, commit 716ebd9, 2 threads).  The two chains stay as their studies' data; the
 verifiers read the second beside `strict.jsonl`, and no longer read the first.
 
+**`explore.jsonl` is not a chain, and never goes into `strict.jsonl`.**  The file of a sweep
+([README, "Keeping going past limits, and the sweep"](../README.md#keeping-going-past-limits-and-the-sweep);
+`tools/cloud/sweep.sh`) merges the games of many blocks of consecutive board sizes, each given a limited search: it has
+board sizes with only an unfinished search (a lower bound, no proof) and board sizes that no block reached, games built
+on the best game of an unfinished search (no ceiling, no prime formula), and the same game's several lines.  Each
+completed game in it is proven by its own proof, given what it assumes, in the frame model; it is evidence for those
+games alone, and a game that follows a gap may rest on nothing the chain would have given it.  It is not committed
+here; a sweep's results go to a file of their own, with a notebook entry saying what they are.
+
 ## strict.jsonl
 
 The committed chain from n = 1 to n = 3440: every game is built from the one before, and nothing in it rests on
