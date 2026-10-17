@@ -290,7 +290,7 @@ mod tests {
         );
         let values: Vec<String> = t.settings().iter().map(|s| s.1.to_string()).collect();
         let expected = [
-            "on", "on", "1", "on", "on", "on", "50000", "none", "0", "off", "on", "on", "80", "exact", "all", "all",
+            "on", "on", "1", "on", "on", "on", "50000", "none", "0", "off", "on", "on", "all", "exact", "all", "all",
             "split", "on", "on", "on",
         ];
         assert_eq!(values, expected);
@@ -361,7 +361,6 @@ mod tests {
             ("force_window=0", Json::from(0u32)),
             ("force_window=120", Json::from(120u32)),
             ("force_window=25%", Json::from("25%")),
-            ("force_window=all", Json::from("all")),
             ("branching=split", Json::from("split")),
             ("strong_limit=2", Json::from(2u32)),
             ("strong_depth=40", Json::from(40u32)),
@@ -378,6 +377,12 @@ mod tests {
         t.set("strong_limit=all").unwrap();
         assert_eq!(t.description(), "default");
         assert_eq!(t.to_json().get("strong_limit"), Some(&Json::from("all")));
+        // The window of the forced members is `all` by default (it was 80 until 2026-10-16), and is not mentioned.
+        t.set("force_window=80").unwrap();
+        assert_eq!(t.description(), "force_window=80");
+        t.set("force_window=all").unwrap();
+        assert_eq!(t.description(), "default");
+        assert_eq!(t.to_json().get("force_window"), Some(&Json::from("all")));
     }
 
     #[test]

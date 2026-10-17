@@ -1,0 +1,33 @@
+== default  01:13:58
+n=3232 T=64 DONE   search   54.42 s nodes    16861150 (   310 k/s) best 242243 opt 242243 greedy 236460 cap 243039 | sta
+n=3360 T=64 DONE   search  124.84 s nodes    36357629 (   291 k/s) best 261251 opt 261251 greedy 256252 cap 261571 | sta
+n=3388 T=64 DONE   search  139.14 s nodes    41284793 (   297 k/s) best 264764 opt 264764 greedy 258623 cap 265889 | sta
+n=3179 T=64 DONE   search   66.83 s nodes    25528678 (   382 k/s) best 234875 opt 234875 greedy 231197 cap 235895 | sta
+n=3328 T=64 DONE   search  238.42 s nodes    74150544 (   311 k/s) best 254079 opt 254079 greedy 250643 cap 255359 | sta
+n=3395 T=64 DONE   search  235.52 s nodes    67714861 (   288 k/s) best 264945 opt 264945 greedy 257690 cap 265236 | sta
+n=3300 T=64 DONE   search 1523.27 s nodes   498337304 (   327 k/s) best 250914 opt 250914 greedy 244623 cap 251233 | sta
+== fw_all force_window=all 01:53:41
+n=3232 T=64 DONE   search   40.10 s nodes     9954186 (   248 k/s) best 242243 opt 242243 greedy 236460 cap 243039 | sta
+n=3360 T=64 DONE   search  103.17 s nodes    22944110 (   222 k/s) best 261251 opt 261251 greedy 256252 cap 261571 | sta
+n=3388 T=64 DONE   search  133.34 s nodes    28889059 (   217 k/s) best 264764 opt 264764 greedy 258623 cap 265889 | sta
+n=3179 T=64 DONE   search   57.75 s nodes    16461734 (   285 k/s) best 234875 opt 234875 greedy 231197 cap 235895 | sta
+n=3328 T=64 DONE   search  188.62 s nodes    38236605 (   203 k/s) best 254079 opt 254079 greedy 250643 cap 255359 | sta
+n=3395 T=64 DONE   search  214.00 s nodes    46512720 (   217 k/s) best 264945 opt 264945 greedy 257690 cap 265236 | sta
+n=3300 T=64 DONE   search 1270.08 s nodes   300414974 (   237 k/s) best 250914 opt 250914 greedy 244623 cap 251233 | sta
+== all_sl4 force_window=all strong_limit=4 02:27:09
+n=3232 T=64 DONE   search   39.34 s nodes     9836345 (   250 k/s) best 242243 opt 242243 greedy 236460 cap 243039 | sta
+n=3360 T=64 DONE   search  112.36 s nodes    25131168 (   224 k/s) best 261251 opt 261251 greedy 256252 cap 261571 | sta
+n=3388 T=64 DONE   search  123.57 s nodes    26997550 (   218 k/s) best 264764 opt 264764 greedy 258623 cap 265889 | sta
+n=3179 T=64 DONE   search   66.62 s nodes    19009375 (   285 k/s) best 234875 opt 234875 greedy 231197 cap 235895 | sta
+n=3328 T=64 DONE   search  164.74 s nodes    33695190 (   205 k/s) best 254079 opt 254079 greedy 250643 cap 255359 | sta
+n=3395 T=64 DONE   search  217.37 s nodes    47805154 (   220 k/s) best 264945 opt 264945 greedy 257690 cap 265236 | sta
+n=3300 T=64 DONE   search 1331.77 s nodes   316005204 (   237 k/s) best 250914 opt 250914 greedy 244623 cap 251233 | sta
+== all_sl4_mfo force_window=all strong_limit=4 more_forced=off 03:01:26
+n=3232 T=64 DONE   search   40.22 s nodes     9847267 (   245 k/s) best 242243 opt 242243 greedy 236460 cap 243039 | sta
+n=3360 T=64 DONE   search  115.95 s nodes    25970391 (   224 k/s) best 261251 opt 261251 greedy 256252 cap 261571 | sta
+n=3388 T=64 DONE   search  115.90 s nodes    25192220 (   217 k/s) best 264764 opt 264764 greedy 258623 cap 265889 | sta
+n=3179 T=64 DONE   search   62.84 s nodes    17945992 (   286 k/s) best 234875 opt 234875 greedy 231197 cap 235895 | sta
+n=3328 T=64 DONE   search  159.21 s nodes    32528092 (   204 k/s) best 254079 opt 254079 greedy 250643 cap 255359 | sta
+n=3395 T=64 DONE   search  199.25 s nodes    43660968 (   219 k/s) best 264945 opt 264945 greedy 257690 cap 265236 | sta
+n=3300 T=64 DONE   search 1325.62 s nodes   315930514 (   238 k/s) best 250914 opt 250914 greedy 244623 cap 251233 | sta
+end 2026-10-17T03:35:06Z

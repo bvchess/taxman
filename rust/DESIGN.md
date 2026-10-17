@@ -432,13 +432,15 @@ with three or more factors.  At the roots of 880–1300 its gap to the optimum i
   in `B` for `w2`, from difference constraints by Bellman–Ford, each round from the vertices that changed) bounds the
   intersection without each member in one pass, by weak duality; a member without which it is below `need` is
   forced, as the matching's are.  The split's bound is loose, so for the members it leaves free within the tactic
-  `force_window` (80, `gf2::FORCE_WINDOW`) of `need`, the exchange graph decides: a member is forced too when no
-  cycle through it is shorter than the slack `value − need` and the sets of other sizes lose more than that
-  (`Meet::has_cycle_within`); a member on a cycle that the search for another found within the slack is not searched,
-  since that cycle passes through it.  The searches reach the elements free in `A` from the members, and the members
-  from the elements free in `B`, through one hub each (the least distance plus `w1`, less `w2`), which keeps their
-  distances, order and cycles; their queue is a radix heap of the packed (distance, vertex) keys, which come out in
-  the binary heap's order.
+  `force_window` of `need` (all of them by default; before 2026-10-16 those within 80, `gf2::LEGACY_FORCE_WINDOW`), the
+  exchange graph decides: a member is forced too when no cycle through it is shorter than the slack `value − need` and
+  the sets of other sizes lose more than that (`Meet::has_cycle_within`); a member on a cycle that the search for
+  another found within the slack is not searched, since that cycle passes through it.  (The window `all` costs each
+  node more, every member being checked exactly, and the trees fall by more: the tuning campaign measured 0.41-0.43 of
+  the nodes for 0.60-0.63 of the CPU at the end of the chain.)  The searches reach the elements free in `A` from the
+  members, and the members from the elements free in `B`, through one hub each (the least distance plus `w1`, less
+  `w2`), which keeps their distances, order and cycles; their queue is a radix heap of the packed (distance, vertex)
+  keys, which come out in the binary heap's order.
 * **Exact strong branching.**  The member of the conflict to branch on is the one without which the intersection
   is lowest, each bound read off the exchange graph where it is certified and solved where not (in the order of the
   split's bounds, each solve stopped once it reaches both the lowest so far and `need`, a greedy lower bound tried
@@ -650,7 +652,7 @@ defaults.
 | `lagrange` | off | proven (weak duality, for any multipliers over valid nogoods; `matchbound::lagrange`) | with `nogoods`, where the node bound leaves a node open, bound it also by a Lagrangian relaxation of the searcher's nogoods kept along its path (over the matching bound), and (with `fix_forced`) force the members without which that bound would cut; the multipliers are refitted at the root as the searcher learns (section 4).  On by default until `gf2`; with `gf2` it changes no tree and costs 2-4% |
 | `gf2` | on | proven (heuristics/THEORY.md, Theorem 11; weak duality for the forced members) | bound every node by the GF(2) bound (section 4) instead of the matching bound and its refinement, branch on the conflicts of its heaviest set by exact strong branching, and (with `fix_forced`) force the members without which it would cut; the Lagrangian bound over nogoods, if on, applies after it |
 | `symmetry` | on | proven (heuristics/THEORY.md, Theorem 13) | cut a node whose completions all break a symmetric pair's inequality, and drop from a node's candidates those that no completion keeping the inequalities holds (section 4, "Prime exchanges") |
-| `force_window` | 80 | sound (a member is called forced only where the exchange graph shows every completion without it short) | with `gf2` and `fix_forced`, which members of a node's heaviest set the weight split leaves free are searched for being forced by the exchange graph: those whose split bound is less than this far above the need (`0`: none), less than a percentage of the node's slack above it (`25%`), or `all`; a wider window forces more members (a smaller tree) for more searches (section 4, "Forced members") |
+| `force_window` | all | sound (a member is called forced only where the exchange graph shows every completion without it short) | with `gf2` and `fix_forced`, which members of a node's heaviest set the weight split leaves free are searched for being forced by the exchange graph: those whose split bound is less than this far above the need (`80`; `0`: none), less than a percentage of the node's slack above it (`25%`), or `all`; a wider window forces more members (a smaller tree) for more searches (section 4, "Forced members").  `all` since 2026-10-16 (it was `80`): on subtrees of the end of the chain's searches it takes 0.60-0.63 of the CPU of 80 on one thread (0.41-0.43 of the nodes) and 64-thread proofs of 3179-3395 0.84 of the time ([the tuning campaign](docs/experiments/the-tuning-campaign-at-the-end-of-the-chain-2026-10.md)); on the one-thread chain 1..1300 it takes 5% fewer nodes and about 4.5% more time |
 | `branching` | exact | sound (every completion leaves out some member of the conflict) | with `gf2`, how a node chooses the member of its conflict to branch on: `exact` (the bound without each member, certified or solved), `forced` (each solved only as far as the need, the branch by the split's bound), `split` (the split's bound alone), `largest`; the cheaper choices take more nodes |
 | `strong_limit` | all | sound (as `branching`) | with `gf2`'s strong branching (`exact` or `forced`), the most members of a conflict whose bounds are found, the most promising by the split's bound first |
 | `strong_depth` | all | sound (as `branching`) | with `gf2`, a node with at least this many promotions branches as `deep_branching` says instead of `branching` (`all`: none does), so that the deep nodes, the most numerous, can choose more cheaply |
@@ -865,9 +867,13 @@ file it appends to.
 **What identifies a checkpoint.**  The header the search stores: a format version, the set width, n, digests of the root
 candidates, of the frames (every frame's moves, factors and freedoms, as built) and of the one-sided candidates of the
 extended problem (section 4, "Extended mode"), `max_total` and the tactics (format version 5), and in format version
-6 the tactics that tune the GF(2) search (`force_window` to `more_forced`, section 5) after them: a search whose tuning
-is the default writes version 5, which implies it, so its checkpoint is the one the builds before those tactics wrote,
-and one whose tuning is not writes version 6.  (The tactics that set how the nogoods are kept, `nogood_period`,
+6 the tactics that tune the GF(2) search (`force_window` to `more_forced`, section 5) after them: a search tuned as the
+builds before those tactics were (`force_window=80` and the other five at their defaults) writes version 5, which
+implies that tuning, so its checkpoint is the one those builds wrote, and one tuned otherwise writes version 6, the
+default's since `force_window` became `all` (2026-10-16).  So a checkpoint of version 5 (or 4) made before that day is
+of a search with the window of 80, and the default's search resumes it only as `--tactic force_window=80`, as for any
+tactic that differs; one that the default's search wrote is of version 6, and a build before the change reads it as
+the search it is.  (The tactics that set how the nogoods are kept, `nogood_period`,
 `nogood_keep` and `nogood_limit`, are in neither: they change the trees and never the answer, and a resumed search
 starts with empty tables, so the run that resumes says which.)  This build also reads version 4, the format of the builds before the
 extended problem's search, whose headers lack the digest of the one-sided candidates:
@@ -1349,11 +1355,14 @@ on the machine moves wall times by up to 3×.  What measures what:
   nodes (the bound from scratch; with its weight split and forced members; without each member of its heaviest set's
   conflict, solved, and as strong branching reads them, certified or solved), and the windows resumed with the GF(2)
   bound, which finish both searches; a window's fingerprint leaves out the GF(2) bound's counts of solves and
-  augmentations, which measure work.  The probe's fingerprint is 7e8e724717d26545, 5b83bbebf0bb2899 with `--tactic
-  lagrange=off`, and f3deaac0dbdc030a with `--tactic gf2=on`.  (The windows were made again when the search's
+  augmentations, which measure work.  The kernels and the windows search the forced members as `--tactic force_window`
+  says (the default, `all`).  The probe's fingerprint is 7e8e724717d26545, 5b83bbebf0bb2899 with `--tactic
+  lagrange=off`, and a58ade4629ab6186 with `--tactic gf2=on` (f3deaac0dbdc030a before the window became `all`, which
+  `--tactic gf2=on --tactic force_window=80` still gives).  (The windows were made again when the search's
   counters were
   renumbered and the checkpoint header went to version 4, 2026-10, and again for version 5, with the tactics they
-  record, the matching path's, and the same fingerprints; the fingerprints EXPERIMENTS quotes before version 4,
+  record, the matching path's, and the same fingerprints, and again when `force_window` became `all`, as a header of
+  version 6, with the same trees for the matching path; the fingerprints EXPERIMENTS quotes before version 4,
   36981d0eaeeae319 and 6197a47eae6cf8c8, are of the earlier windows, made before `lagrange`.)  About 5 s in all;
   `perf make-nodes` and `perf make-window` make the fixtures again, deterministically.
   For whole searches, `/usr/bin/time -l` reports the same counters per process.
@@ -1399,7 +1408,11 @@ round), in trees 2.4 times smaller.  These are without the rule of symmetric pai
 on by default since: it takes the proof of 1215 to 3,647 nodes and 0.74 G cycles, 2170 and 2172 to 55 s and 62 s,
 the chain 1..1300 on one thread to 36 s (26 s of search) and 290,503 nodes against 42 s (31 s) and 402,205 just
 before it; the one-thread proofs of the quick set and the bench set 0.75 of the nodes and 0.81 of the cycles
-(geometric means; EXPERIMENTS, "Prime exchanges in the search").  A chain from
+(geometric means; EXPERIMENTS, "Prime exchanges in the search").  The window `all` of the forced members, the default
+since 2026-10-16, takes the chain 1..1300 on one thread to 276,918 nodes against 290,503 and 24.8 s of search against
+23.7 (the small games' trees are too small for the extra searches to pay), and the trees at the end of the chain to
+0.41-0.43 of the nodes and 0.60-0.63 of the CPU ([the tuning
+campaign](docs/experiments/the-tuning-campaign-at-the-end-of-the-chain-2026-10.md)).  A chain from
 optimal.json's game of 1300 reached 2175 in 92 minutes of game time on 2 threads, and the committed chain from n = 1
 to 2175 took 27 minutes on 8 ([results/README.md](results/README.md)); its cost comes in waves that
 follow the root's GF(2) gap, with no growth that a fit over 1301–2175 resolves.  Past 2175 it grows, tenfold per about

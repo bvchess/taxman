@@ -51,20 +51,20 @@ const EXPECTED: [(u32, &str, u64, u64); 54] = [
     (600, "nogoods=off", 8507, 372),
     (600, "symmetry=off", 8507, 533),
     (640, "default", 9220, 15),
-    (660, "default", 10242, 524),
+    (660, "default", 10242, 522),
     (660, "fix_forced=off", 10242, 908),
-    (660, "nogoods=off", 10242, 618),
-    (760, "default", 14170, 182),
-    (936, "default", 20507, 385),
+    (660, "nogoods=off", 10242, 615),
+    (760, "default", 14170, 180),
+    (936, "default", 20507, 390),
     (936, "fix_forced=off", 20507, 830),
-    (936, "nogoods=off", 20507, 352),
-    (936, "lagrange=on", 20507, 385),
-    (936, "symmetry=off", 20507, 665),
-    (1000, "default", 24168, 2172),
+    (936, "nogoods=off", 20507, 344),
+    (936, "lagrange=on", 20507, 390),
+    (936, "symmetry=off", 20507, 663),
+    (1000, "default", 24168, 2026),
     (1000, "fix_forced=off", 24168, 4000),
-    (1000, "nogoods=off", 24168, 3032),
-    (1000, "lagrange=on", 24168, 2172),
-    (1000, "symmetry=off", 24168, 2657),
+    (1000, "nogoods=off", 24168, 2991),
+    (1000, "lagrange=on", 24168, 2026),
+    (1000, "symmetry=off", 24168, 2432),
     (1133, "default", 28690, 41),
     (1133, "nogoods=off", 28690, 34),
     // The matching path.  W = 8, the small end: every tactic's effect shows in a few hundred nodes.
@@ -114,8 +114,8 @@ const EXPECTED: [(u32, &str, u64, u64); 54] = [
 /// pairs, the tactics of a search with one-sided candidates, which refuses the rule).  The promotion sums are those of
 /// [`EXPECTED`]: Π⁺(∅) has the frame model's promotion sets, and the sum is the answer.  The rows `extended` are the
 /// frame model's trees, node for node, where [`EXPECTED`] has the same tactics (its rows `symmetry=off` for 600, 936
-/// and 1000); the rows `default` differ from those of [`EXPECTED`] (408 against 365 nodes at 600, 367 against 385 at
-/// 936, 2,258 against 2,172 at 1000), so what differs is what the rule of the symmetric pairs reads from the two
+/// and 1000); the rows `default` differ from those of [`EXPECTED`] (408 against 365 nodes at 600, 363 against 390 at
+/// 936, 2,107 against 2,026 at 1000), so what differs is what the rule of the symmetric pairs reads from the two
 /// models, not the search.  Both are also held to the default engine's search of the same frames and candidates
 /// ([`extended_searches`]), whatever the table says.
 const EXTENDED: [(u32, &str, u64, u64); 16] = [
@@ -125,14 +125,14 @@ const EXTENDED: [(u32, &str, u64, u64); 16] = [
     (600, "extended", 8507, 533),
     (640, "default", 9220, 15),
     (640, "extended", 9220, 21),
-    (660, "default", 10242, 547),
-    (660, "extended", 10242, 573),
-    (760, "default", 14170, 182),
-    (760, "extended", 14170, 186),
-    (936, "default", 20507, 367),
-    (936, "extended", 20507, 665),
-    (1000, "default", 24168, 2258),
-    (1000, "extended", 24168, 2657),
+    (660, "default", 10242, 545),
+    (660, "extended", 10242, 571),
+    (760, "default", 14170, 180),
+    (760, "extended", 14170, 184),
+    (936, "default", 20507, 363),
+    (936, "extended", 20507, 663),
+    (1000, "default", 24168, 2107),
+    (1000, "extended", 24168, 2432),
     (1133, "default", 28690, 41),
     (1133, "extended", 28690, 41),
 ];

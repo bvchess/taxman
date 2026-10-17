@@ -21,7 +21,9 @@ results and how they are proven are in the [README](../README.md); the research 
   factor of two.
 * 3441 is unfinished: 626 million nodes after 5.9 hours on 64 threads, its checkpoint (format 4, which the present
   build reads) in the project's bucket under `chain-2176/ckpt`
-  ([the frontier chain](experiments/the-frontier-chain-to-3440-2026-10.md)).
+  ([the frontier chain](experiments/the-frontier-chain-to-3440-2026-10.md)).  It was made with the forcing window of
+  80, which a header of format 4 or 5 implies, so the default's search (window `all`) resumes it only as `--tactic
+  force_window=80`.
 
 ## The priority: a larger n
 
@@ -63,6 +65,17 @@ What has been tried for the bound, and where it stands:
   ([A3's test](experiments/split-by-the-number-of-promotions-a3s-test-2026-10.md)).
 * **A5, decomposing across the frames: not tried** (agenda A5; high risk).
 
+## Decided
+
+* **The forcing window is `all`** (2026-10-16; it was 80).  The tuning campaign (one `c8g.16xlarge`, 3.8 hours, about
+  $2.50) measured it on subtrees of 3300, 3425, 3440 and 3441 and six whole games on one thread, and on complete
+  proofs of seven games (3179-3395, 3300) on 64 threads: 0.60-0.63 of the CPU and 0.41-0.43 of the nodes on the
+  subtrees, 0.84 of the time and 0.61 of the nodes on the proofs (by the rule above, about 80 in n), and no problem
+  more than 4% slower.  A node costs 1.4 times more and the trees fall by more.  The run to the wall has this default
+  and no other change: `strong_limit=4` and `more_forced=off` are within a few percent of it, shorter nogood periods
+  and the Lagrangian bound gain nothing, and cheaper branching at depth is 4 to 6 times worse
+  ([the campaign](experiments/the-tuning-campaign-at-the-end-of-the-chain-2026-10.md)).
+
 ## Paused
 
 * **The claim-by-claim rule** (Lemma M5⁺ claim by claim, for the certificates): until after the weekly reset
@@ -81,19 +94,20 @@ What has been tried for the bound, and where it stands:
 
 ## Waiting on Brian
 
-* The run to the wall (decided 2026-10-16: one `c8g.16xlarge` at spot, about 74 instance-hours, about $50, a group that
-  restarts it): Brian's approval of the account changes ([RUNBOOK 12.3](../tools/cloud/RUNBOOK.md#123-what-needs-brians-approval-and-what-it-costs))
-  and of the rehearsal on a `c8g.large` (about $0.04), after the tuning campaign reports.
+* Nothing for the run itself: Brian approved the rehearsal and the run (2026-10-16).  The run starts from n = 1, so the
+  checkpoint of 3441 that the forcing window of `all` would refuse is not needed.
 * Outside review of Theorems 1, 10 and 12 by Robert Moniot.
 * Publishing (`optimal.json` past 1300, OEIS).
 
 ## In flight
 
-* An engineering pass before the run: a cheaper node with identical trees (the tableaux kept per level, cheaper cycle
-  searches), settings for nogood retention, the forcing window and strong branching, and a harness that tunes them
-  on subtrees of searches at the end of the chain, solved to completion on one thread
-  ([the profile at the end of the chain](../bench/chain_end/README.md)).
-* The tuning campaign on one `c8g.16xlarge` (approved by Brian, up to $10), once those are merged.
-* For the run, built and tested against a stand-in for aws, not run on EC2: the wall in the solver (`solve
-  --game-hours`), the budget and the date across machines (the ledger in S3), and the group that restarts the machine
-  and ends by taking itself to capacity 0 ([RUNBOOK section 12](../tools/cloud/RUNBOOK.md#12-the-unattended-run-to-the-wall)).
+* The engineering pass before the run is done: a cheaper node with identical trees (the tableaux kept per level,
+  cheaper cycle searches), the knobs for nogood retention, the forcing window and strong branching, the harness that
+  tunes them on subtrees of searches at the end of the chain, and the campaign that used it (see "Decided";
+  [the profile at the end of the chain](../bench/chain_end/README.md)).
+* The run to the wall: the rehearsal of [RUNBOOK 12.5](../tools/cloud/RUNBOOK.md#125-the-rehearsal-designed-not-run) on
+  a `c8g.large` (about $0.04), then the run itself (12.4).  Built and tested against a stand-in for aws, not yet run on
+  EC2: the wall in the solver (`solve --game-hours`), the budget and the date across machines (the ledger in S3), and
+  the group that restarts the machine and ends by taking itself to capacity 0
+  ([RUNBOOK section 12](../tools/cloud/RUNBOOK.md#12-the-unattended-run-to-the-wall)).  Before the wall's data count, 3440
+  is re-solved with the fixed build by the run itself (it starts from n = 1).

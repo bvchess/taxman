@@ -315,19 +315,20 @@ impl Gf2Graph {
 // ---------------------------------------------------------------------------------------------------------
 // The bound along a search's path
 
-/// How far above `need` a member's split bound may be for [`Gf2Bound::evaluate`] to search whether it is forced
-/// after all (`Levels::force_by_cycles`).  The split's bound is often far above the exact one (half the members
-/// it leaves free that the search finds forced are within 15 of `need`, nine in ten within 53, at 1215), and the
-/// searches of the members it leaves free cost more than they save: over the quick set of one-thread proofs
-/// (936-1350) a window of 25 costs 20.6 G cycles, 40 18.2, 60 17.3, 80 16.9, 120 17.6, no window 18.0 (without
-/// the search 26.4; nodes 217,374 then 132,049, 108,856, 96,283, 89,751, 86,481, 85,349).  The default of the tactic
-/// `force_window` ([`ForceWindow`]).
-pub const FORCE_WINDOW: i64 = 80;
+/// The window of the tactic `force_window` ([`ForceWindow::Within`]) that was its default until 2026-10-16, when the
+/// default became [`ForceWindow::All`].  The split's bound is often far above the exact one (half the members it
+/// leaves free that the search finds forced are within 15 of `need`, nine in ten within 53, at 1215), and the searches
+/// of the members it leaves free cost more than they save while the trees are small: over the quick set of one-thread
+/// proofs (936-1350) a window of 25 costs 20.6 G cycles, 40 18.2, 60 17.3, 80 16.9, 120 17.6, no window 18.0 (without
+/// the search 26.4; nodes 217,374 then 132,049, 108,856, 96,283, 89,751, 86,481, 85,349).  At the end of the chain
+/// the trees are dear enough that every search pays (docs/experiments/the-tuning-campaign-at-the-end-of-the-chain-
+/// 2026-10.md).  A checkpoint's header of version 5 implies this window.
+pub const LEGACY_FORCE_WINDOW: u32 = 80;
 
 /// Which members of the heaviest set that the weight split leaves free [`Gf2Bound::evaluate`] searches for being
 /// forced after all (`Levels::force_by_cycles`; the tactic `force_window`): any choice is sound, since a member is
-/// called forced only where the search shows it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// called forced only where the search shows it.  The default is [`All`](ForceWindow::All).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ForceWindow {
     /// Those whose split bound is less than this far above `need` (0: none).
     Within(u32),
@@ -335,13 +336,8 @@ pub enum ForceWindow {
     /// `need`.
     Share(u8),
     /// All of them.
+    #[default]
     All,
-}
-
-impl Default for ForceWindow {
-    fn default() -> Self {
-        ForceWindow::Within(FORCE_WINDOW as u32)
-    }
 }
 
 impl ForceWindow {
