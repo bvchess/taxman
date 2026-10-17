@@ -13,7 +13,10 @@ thread.
 ## Files and the commands that made them
 
 `fields` is `target/release/examples/fields` (`nice -n 10 cargo build --release -j 4 --example fields`), run from
-`rust/`; `K` is `--known results/strict.jsonl`.
+`rust/`; `K` is `--known results/strict.jsonl`.  The example `fields` and the files of `examples/common/` it included
+(`dw`, `gf3`, `cores`, `lp`, `fit`, `bnb`, `frames`, `meet`; `fit.rs` specifies the format of `fits/`) were removed from
+master (2026-10-17); they build at commit 8753189 (`git checkout 8753189`, then the build command above), and `git
+show 8753189:rust/examples/common/fit.rs` shows the specification.
 
 | file | command | what it is |
 |---|---|---|

@@ -194,3 +194,8 @@ candidate relaxation's gap at the root and at the probe's 300 search nodes of 93
 the current bounds', and predict the proof's nodes by 10^(−c·Δgap) with c from the margin scans; build only a bound
 whose gap at the nodes is smaller by a share that grows with n.  (Evidence section 8 names one: a relaxation that
 sees that a move sweeps every divisor.)
+
+## Later (2026-10): the program removed from master
+
+The example `slope`, with the files of `examples/common/` it included, was removed from master on 2026-10-17.  It builds
+at commit 8753189: `git checkout 8753189`, then `cargo build --release --example slope` in `rust/`.

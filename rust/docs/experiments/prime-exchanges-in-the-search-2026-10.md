@@ -117,3 +117,8 @@ fingerprints do not move (its windows search with the tactics their checkpoints 
 2175 (a twentieth on the chain there), a constant share as the pilots found, not a lower slope.  What is left: the
 exchanges that hold only at a node (the dominance study found them in the matching trees, almost none in the GF(2)
 trees); and sums kept along the path instead of computed afresh, which would save under 1%.
+
+## Later (2026-10): the program removed from master
+
+The example `matroid`, with the files of `examples/common/` it included, was removed from master on 2026-10-17.  It
+builds at commit 8753189: `git checkout 8753189`, then `cargo build --release --example matroid` in `rust/`.

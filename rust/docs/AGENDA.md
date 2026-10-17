@@ -185,7 +185,8 @@ GF(2) bounds and optima), the decomposition bound min over μ of [heaviest GF(2)
 subgradient stalled in the per-frame study), for GF(3) plain, GF(3) Koszul, a few random signings, and the signings
 built from the cores of the GF(2) heaviest sets met on the way (a matroid added per core, as a cut would be).  Code: the
 frame matroids of `examples/matroid.rs` and a GF(3) twin of `examples/common/meet.rs` (two bits an entry); research code
-in an example, as the matroid study was.  *Metric:* the share of the root GF(2) gap closed, by band, and its trend in n;
+in an example, as the matroid study was (both files are removed from master now; they build at commit 8753189).
+*Metric:* the share of the root GF(2) gap closed, by band, and its trend in n;
 then at the 600 probe nodes (`testdata/perf`), the share of the open nodes it cuts.  *Kill:* a mean share under 20%, or
 one that falls with n as the cuts' did (−4 points per 100 n).  A pilot on the whole board first is cheaper still: the
 prover's `parity.rs` with a GF(3) twin, on 1000-1300, where section 7.2's sets come from.
@@ -561,11 +562,11 @@ the largest prime, 1297, which THEORY.md's lemma puts in every optimal set.
 `examples/wall.rs nodes --known SNAPSHOT --nodes 1 N...` (one thread, 9 minutes) over the 509 searched games of
 2176-3312 of a copy of the EC2 chain's results file (games 1..3314, taken on 2026-10-15: 64 threads on a
 `c8g.16xlarge`, the code of 55287ff, a window of 16 to about game 3310 and 4 after it, 6.4 hours for 2176..3314), and
-`examples/matroid.rs lagrange --limit 0` and `cores` for the conflicts and cores of the root's heaviest set (3 minutes);
-then the committed chain's 391 searched games of 1301-2175 solved again by that build (`taxman solve 1301-2175
---threads 1`, in order), to put the two chains' trees on one build.  The data are in
-[bench/wall/](../bench/wall/README.md) (`gaps_chain.jsonl`, `anatomy_chain.jsonl`, `resolved_1301_2175.jsonl`), the
-tables in `gap_output.md` (`gap.py` makes them), and the study is the entry
+`examples/matroid.rs lagrange --limit 0` and `cores` (removed from master since; it builds at commit 8753189) for the
+conflicts and cores of the root's heaviest set (3 minutes); then the committed chain's 391 searched games of 1301-2175
+solved again by that build (`taxman solve 1301-2175 --threads 1`, in order), to put the two chains' trees on one
+build.  The data are in [bench/wall/](../bench/wall/README.md) (`gaps_chain.jsonl`, `anatomy_chain.jsonl`,
+`resolved_1301_2175.jsonl`), the tables in `gap_output.md` (`gap.py` makes them), and the study is the entry
 [The gap past 2175](experiments/the-gap-past-2175-2026-10.md).  What it found, for sections 2, 3 and 4: the gaps (341
 to 1,443, +37 per 100 n over 1301-3312, G/n steady at 300), neither regime of section 2; the cost model on one build
 (a decade per 250 of gap, trees 0.29 times the committed chain's, the gap counting in units of n^0.3 with 0 and 0.5 as

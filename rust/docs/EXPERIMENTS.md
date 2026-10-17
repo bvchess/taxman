@@ -29,6 +29,11 @@ README](../README.md#7-glossary) and in DESIGN.md; the measurements were made wi
   kills included.
 * **Entries are records.**  An entry is not rewritten later: a later finding goes in a new entry, or in a dated section
   at the end of the old one (`## Later (YYYY-MM): ...`), and the old text stays.
+* **Removed programs.**  The example programs of finished experiments (`fields`, `matroid`, `dominance`, `slope`,
+  `repeats`, `promotions`, `diff`, `hunt` and `sacrifice`) were removed from master on 2026-10-17, with the files of
+  `examples/common/` that only they used and `tools/cloud/hunt.sh`.  An entry that used one ends with a section
+  `## Later (2026-10)` naming the commit where it builds (8753189); the register, the index and the entries keep the
+  paths and commands of their time.
 * **The register and the index point to every entry.**  An entry adds its rows to the
   [register](#register-of-everything-tried) (what was tried, the link, kept or not, the finding in a sentence or two)
   and a row to the [index](#index-of-rounds).  The docs test refuses an entry that neither links to.

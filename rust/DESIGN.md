@@ -119,13 +119,15 @@ example, the board 1..=21, is in the [README](README.md#how-the-solver-sees-the-
     "Certificates of U" below).  Game by game, the prover's barred parity bounds certify 93% of those members
     over 1301-2175 and 85% over the committed chain's 2176-3314, but close no game alone ([its
     README](prover/README.md#the-upper-part-game-by-game)); what is left needs a search that leaves the open ones
-    optional, and `examples/hunt.rs` looks for a counterexample on the boards without each of them.  That search is
-    the search of the *extended problem* Π⁺(O) (THEORY.md, Theorem M⁺; `frames::build_extended`, research code): the
-    frame model with the set O of open members optional, exact like Π_n, so that a search of it that finds nothing
-    better, the other members certified, proves opt(n) on the whole board.  The search takes it with the open members
-    as one-sided candidates (section 4, "Extended mode"; `Board::prepare_extended_with`).  It keeps the claims of
-    `unzip` that Lemma M5⁺ allows (THEORY.md), which with nothing open are all of them, so that Π⁺(∅) is Π_n itself;
-    without the claims, Π⁺(∅) is the frame model with them put back (`examples/extended.rs --no-claims`).
+    optional (a hunt for a counterexample on the boards without each of them, the example `hunt`, was prepared and never
+    run, and is removed from master; [RUNBOOK](tools/cloud/RUNBOOK.md#10-the-theory-tracks-measurements-e6-and-e9a)
+    says where it builds).  That search is the search of the *extended problem* Π⁺(O) (THEORY.md, Theorem M⁺;
+    `frames::build_extended`, research code): the frame model with the set O of open members optional, exact like
+    Π_n, so that a search of it that finds nothing better, the other members certified, proves opt(n) on the whole
+    board.  The search takes it with the open members as one-sided candidates (section 4, "Extended mode";
+    `Board::prepare_extended_with`).  It keeps the claims of `unzip` that Lemma M5⁺ allows (THEORY.md), which with
+    nothing open are all of them, so that Π⁺(∅) is Π_n itself; without the claims, Π⁺(∅) is the frame model with them
+    put back (`examples/extended.rs --no-claims`).
 
   What each proof kind needs of this, beyond the code's correctness and the games before it:
 
@@ -141,12 +143,13 @@ example, the board 1..=21, is in the [README](README.md#how-the-solver-sees-the-
   board to 100 and on random sets to 8191, against a playability oracle that shares no code with `frames` or
   `model`; `tests/model_extended.rs` checks Theorem M⁺ the same way, with sources open; `tests/bottom_layers.rs`
   checks Theorem B on every recorded and enumerated optimal set; and two exhaustive
-  searches agree with the frame model's games on small boards: `brute`, the solver's own (to 40 in the test suite, 52
-  in `examples/sacrifice validate`), and `heuristics/evaluation/certify.py` (to 62).  The sacrifice
-  bound (`sacrifice`) is an upper bound on opt(n) by a different route (games on punctured boards, where Theorem M
-  holds too, but U and Theorem B are statements about the board 1..n, so the bound rests on the upper part of each
-  punctured board); it proves game 1133 and disagrees with nothing.  [The prover's
-  README](prover/README.md) has the details of the prover.
+  searches agree with the frame model's games on small boards: `brute`, the solver's own (to 40 in the test suite, and
+  to 52 once by the example `sacrifice`, removed from master; [the
+  entry](docs/experiments/the-frame-model-by-layer-and-the-extended-problem-2026-10.md) has the run), and
+  `heuristics/evaluation/certify.py` (to 62).  The sacrifice bound (`sacrifice`) is an upper bound on opt(n) by a
+  different route (games on punctured boards, where Theorem M holds too, but U and Theorem B are statements about the
+  board 1..n, so the bound rests on the upper part of each punctured board); it proves game 1133 and disagrees with
+  nothing.  [The prover's README](prover/README.md) has the details of the prover.
 * **Given the pruning is exact.**  Every tactic is proven or sound (section 5 grades each).  The Java used two
   shortcuts that rest on conjectures (`reuse_prev` and `revise_freedoms`); the frame solver had them as tactics for a
   while, measured that they no longer paid, and removed them (EXPERIMENTS, "Which tactics earn their keep").
@@ -205,13 +208,14 @@ up:
 
 On the path of a solve are all the layers but the studies.  `examples/` holds the ladder (standalone searches of hard
 games with time limits, thread scaling, diagnostics), the probe `perf` (the hot paths from fixtures, in cycles and
-instructions), the sacrifice study, `repeats` (the games whose search repeats an earlier game's, from the setups alone,
-and what a results file spent on them), `slope` (the gaps of a game's root, and proofs with every bound lowered by a
-margin), `matroid` (the study of the GF(2) bound: at roots and nodes, as a plain branch and bound, and the search's
-proofs with it, `matroid prove`) and `wall` (what grows with n and with a tree: a game's fixed costs piece by piece, a
-node's cost at any set width, large trees with their memory and checkpoints, the frames of any board); `tests/` the
-integration tests (section 9); `tools/` the results referee in Python, the PGO build, the Java golden export and the
-cloud scripts.
+instructions), `tune` (the tuning benchmark: units of a search at the end of the chain, each solved on one thread),
+`structure` (the census of the frames' structure, board by board), `extended` (chains and problems of the extended
+problem) and `wall` (what grows with n and with a tree: a game's fixed costs piece by piece, a node's cost at any set
+width, large trees with their memory and checkpoints, the frames of any board); `tests/` the integration tests
+(section 9); `tools/` the results referee in Python, the PGO build, the Java golden export and the cloud scripts.  The
+programs of finished studies (`fields`, `matroid`, `dominance`, `slope`, `repeats`, `promotions`, `diff`, `hunt` and
+`sacrifice`) were removed from master; [the notebook](docs/EXPERIMENTS.md#how-this-notebook-is-kept) says where they
+build.
 
 **Width dispatch.**  Everything that holds sets of game numbers is generic over `const W: usize`, the number of 64-bit
 words, and the macro `with_width!` (in `bits`, used by the solver, the examples and the tests) picks the narrowest of

@@ -229,3 +229,8 @@ What it misses is large odd cores, which neither Lorea's matroid nor nogood cuts
   for, a tenth of the matching bound's gap, and should take its model-free cross-check of opt(n) well past 989.
 * *For THEORY.md*: the lemma that a playable set stays independent with the unit vectors of its members below n/2,
   and the split by the parity of Ω into two matroids, extend Theorem 7's lemma from the upper half to the whole game.
+
+## Later (2026-10): the program removed from master
+
+The example `matroid`, with the files of `examples/common/` it included, was removed from master on 2026-10-17.  It
+builds at commit 8753189: `git checkout 8753189`, then `cargo build --release --example matroid` in `rust/`.

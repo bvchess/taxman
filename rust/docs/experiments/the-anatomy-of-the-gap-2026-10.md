@@ -225,3 +225,8 @@ every node (1.26 with the root's), not a lower slope.
   winnable sets' convex hull, the frames coupled through their shared candidates by a Lagrangian decomposition, with
   an exact search per frame as the pricing problem) is the next candidate: measured in
   [the next entry](the-per-frame-bound-2026-10.md).
+
+## Later (2026-10): the program removed from master
+
+The example `matroid`, with the files of `examples/common/` it included, was removed from master on 2026-10-17.  It
+builds at commit 8753189: `git checkout 8753189`, then `cargo build --release --example matroid` in `rust/`.

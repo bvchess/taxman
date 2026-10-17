@@ -11,4 +11,6 @@ promotions](../../docs/experiments/split-by-the-number-of-promotions-a3s-test-20
   --fixtures bench/promotions` (the proof's 15,288 nodes handed the searcher 212 distinct units; all are kept):
   `promotions --known results/strict.jsonl --fixtures bench/promotions 2112`.
 
-Both are deterministic and take seconds on one thread; the commands run from `rust/`.
+Both are deterministic and take seconds on one thread; the commands run from `rust/`.  The example `promotions` was
+removed from master (2026-10-17); it builds at commit 8753189 (`git checkout 8753189`, then `cargo build --release
+--example promotions` in `rust/`).

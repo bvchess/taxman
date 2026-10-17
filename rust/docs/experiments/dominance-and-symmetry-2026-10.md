@@ -155,3 +155,9 @@ per exchange, far more than a step.
 * The pairs are found at the root in about 20 ms a game (the setup included); `root_pairs` is the definition to reuse.
 * The equal-sum exchanges of the uniqueness study are not symmetries (e.g. 425's {110, 132, 168} ↔ {98, 150, 162});
   they are coincidences of value that only the bound can rule out.
+
+## Later (2026-10): the program removed from master
+
+The examples `dominance` and `matroid`, with the files of `examples/common/` they included, were removed from master on
+2026-10-17.  They build at commit 8753189: `git checkout 8753189`, then
+`cargo build --release --example dominance --example matroid` in `rust/`.

@@ -54,3 +54,8 @@ that beats the incumbent (22,266 pairs; on these boards, whose games promote at 
 a node that the plain bound leaves open, so the test checks that closing loses nothing, not that it gains).
 
 *Cost.*  Seconds on one thread for the runs (`perf make-nodes` 2 s, the three games 5 s); nothing on EC2.
+
+## Later (2026-10): the program removed from master
+
+The example `promotions`, with the files of `examples/common/` it included, was removed from master on 2026-10-17.  It
+builds at commit 8753189: `git checkout 8753189`, then `cargo build --release --example promotions` in `rust/`.
