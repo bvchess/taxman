@@ -918,6 +918,24 @@ what a multi-threaded search may vary:
 * What may differ: the moves and promotions where a problem has several optimal sets (as between thread counts), and
   with them the next line's `prev.moves_digest`; the nodes, the search's counters, the engine's, and the times.
 
+### Past limits
+
+With `--keep-going` a game whose search a limit stops is recorded as an unfinished line (its best game so far, no
+proof) and the range goes on (`solver::SolveOptions::keep_going`; the driver is `window`, "Past limits").  What the
+next game may take from that game is what does not rest on its being optimal.  A *seed* is any promotable set the board
+can use, offered as an incumbent, so it cannot change what a search proves.  The three things that do rest on
+opt(n − 1) are the ceiling `n + opt(n − 1)` (a `cap` proof), the prime formula (Lemma B above), and the tripwire that
+a score above that ceiling proves the game before it not optimal; each is taken from a game only if `Prev::proven`,
+which is true of a completed game and of `optimal.json`'s (assumed), and false of the best game of a stopped search.
+A repeat rests on the earlier game it repeats, which is a completed game of the file or the range, never an unfinished
+one.  The check that a completed game scores no less than the game before it stays: a game of n − 1 is a game of n,
+whether optimal or not.  The lines say so: a game built on an unfinished one has `prev` with no proof, `setup.cap`
+null and no `cap` or `prime_formula` proof, and both referees refuse a line that claims one of these on it
+([README, "What a game had from n − 1"](README.md#what-a-game-had-from-n---1)).  The format of a line is the same,
+except that `options` also names `keep_going`, `retry`, `retry_improved` and `pass` where they were given.  The games of
+such a range are solved one at a time because a game that went on from a game in flight would not know whether to take
+its ceiling.
+
 ### Same search
 
 Consecutive boards often pose exactly the same search problem with another ceiling: of the 2946 games of the committed
@@ -1311,6 +1329,16 @@ shared with the unit tests: the engine's instances, the random configurations of
   (another game named, digests or promotions or the promotion sum changed, the game repeated unfinished, after the
   repeat, settling no search, or its assumptions dropped) are refused by both verifiers, and two that only setting the
   problems up again can catch are refused by `verify-results` (the Python referee accepts them, as its docstring says).
+* **Keeping going past limits** (`tests/keep_going.rs`, `tests/results.rs`, `tools/test_sweep_plan.py`,
+  `tools/cloud/test/run.sh sweep`): a range whose games all stop at a limit goes on, each game built on the best game of
+  the one before it with no ceiling; a prime game after an unfinished one is searched, and after a proven one derived; a
+  rerun passes over the unfinished games, `--retry` and `--retry-improved` search them again (the latter only where the
+  game before has gained, the rule also in a unit test of `window`), and the lines name the pass; both verifiers accept
+  a file with holes and unfinished lines, and refuse a ceiling, a `cap` or `prime_formula` proof, a changed score, moves
+  or assumptions, or a later line, for a game built on one; the sweep's planner tiles a range into blocks of equal work
+  and cuts the excerpts of the passes, and `sweep.sh` over 1301..1340 and 1411..1416 completes with both referees
+  accepting the file, is stopped by a SIGTERM and resumed, and settles a block's first game by the ceiling its
+  neighbour gives in pass 2.
 * **Repeats** (`tests/same_search.rs`): the games that repeat an earlier search are found from the setups alone, and
   a chain concludes exactly those, with the scores of a chain that searches them: from n = 1 (1..300), and from a
   results file a stopped run left; a game with a checkpoint is resumed, not repeated; a repeat assumes what the game

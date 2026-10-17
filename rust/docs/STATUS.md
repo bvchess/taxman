@@ -117,3 +117,10 @@ What has been tried for the bound, and where it stands:
   re-proven by the fixed build), and the games past 3440 are appended once verified.  The rehearsal of
   [RUNBOOK 12.5](../tools/cloud/RUNBOOK.md#125-the-rehearsal-designed-not-run) passed (the wall, a replacement, the
   budget).
+* **The sweep**, built 2026-10-17 and not run (Brian's plan: as many proven games of 3441..8191 as one cheap machine
+  gives, holes allowed): `sweep.sh FIRST LAST` splits the stretch into blocks of consecutive games, one thread and a
+  limited search a game each, goes on past the games that do not finish, and goes over the merged `explore.jsonl`
+  again until each game has seen the game before it as it is now
+  ([RUNBOOK section 13](../tools/cloud/RUNBOOK.md#13-the-sweep); `taxman solve --keep-going`).  3441..8191 at 180 s a
+  game is at most 314 core-hours: 4.9 hours of a `c8g.16xlarge`, about $3.3 at spot; a launch needs Brian's approval.
+  The file is not a chain and never goes into `strict.jsonl`.
