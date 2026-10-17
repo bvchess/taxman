@@ -12,7 +12,8 @@
 //! * *The answer is no.*  The bound is a theorem, and the frame model computes it correctly (checked against
 //!   exhaustive search, [`crate::brute`]), but it is tight on too few of the games that matter, and computing it
 //!   costs about as much as solving the game: it is no replacement for the tactic, and putting it into the
-//!   pipeline slowed the games it was tried on (numbers under "Findings"; `examples/sacrifice.rs` made them).
+//!   pipeline slowed the games it was tried on (numbers under "Findings"; the example `sacrifice` made them; removed
+//!   from master, it builds at commit 8753189).
 //! * *What stays in use.*  `tests/wide.rs` uses [`sacrifice_bound`] as an upper bound that does not come from the
 //!   search under test, to prove one result at `W = 20` (game 1133), beyond what the Java can check.  The support
 //!   for punctured boards (holes) exists for this study and for the hunt (next bullet):
@@ -20,7 +21,8 @@
 //!   [`crate::frames`].
 //! * *The hunt.*  The punctured boards also serve a search for a counterexample to a claimed optimum: [`hunt`] looks
 //!   on the board `[n] ∖ {u}` for a game that scores more than the claim, for a source `u` that the prover's bounds
-//!   could not show every better game must play (`examples/hunt.rs`), after the solver's own start there
+//!   could not show every better game must play (the example `hunt`, removed from master: it builds at commit
+//!   8753189), after the solver's own start there
 //!   ([`PuncturedOptions::start`]).  A game of the punctured board is a game of `[n]` with the same moves and score,
 //!   since a source is nobody's factor.
 //! * *Not here.*  The proof that the prime shortcut is optimal, which the solver does rely on, is with the shortcut
@@ -118,8 +120,8 @@
 //!
 //! # Findings (the negative result)
 //!
-//! Measured with `examples/sacrifice.rs` (2026-10; 2 threads; its selection of the games `reuse_prev` derived went
-//! with the tactic):
+//! Measured with the example `sacrifice` (2026-10; 2 threads; its selection of the games `reuse_prev` derived went
+//! with the tactic; the example is removed from master and builds at commit 8753189):
 //!
 //! * By exhaustive search, no frame model, `n = 2..66`: the theorem holds for every `n` and `f`.  The bound is
 //!   tight on 61 of the 65 games (58 with the rules' `opt(B_f)`), and on 20 of the 24 that are neither prime nor
@@ -573,8 +575,9 @@ mod tests {
     }
 
     /// Every board `[n]` minus one number, for n up to 36 (0.3 s; up to 40 takes 1.2 s, to 44 3.4 s and to 48 8.7 s,
-    /// the brute force being exponential).  The larger run that the module documentation cites (N <= 52) is
-    /// `cargo run --release --example sacrifice -- validate 52`.
+    /// the brute force being exponential).  The larger run that the module documentation cites (N <= 52) was
+    /// `cargo run --release --example sacrifice -- validate 52` of the example `sacrifice`, removed from master (it
+    /// builds at commit 8753189).
     #[test]
     fn small_punctured_boards_match_the_brute_force() {
         let optimal = Optimal::built_in();

@@ -325,3 +325,8 @@ with a budget that grows with the gap, not search mode (60 s costs under 0.05 of
    No run overlapped the owner's pause of the machine's low-priority jobs (14:00-14:40), which would have eaten its
    budget.
 6. `--known` already took several files (E1's code: `Known::load` gets all of them); no change was needed.
+
+## Later (2026-10): the program removed from master
+
+The example `fields`, with the files of `examples/common/` it included, was removed from master on 2026-10-17.  It
+builds at commit 8753189: `git checkout 8753189`, then `cargo build --release --example fields` in `rust/`.

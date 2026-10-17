@@ -143,9 +143,9 @@ Python 3 (standard library only) for `tools/check_results.py`.
 ```
 cd rust
 cargo build --release              # about 100 seconds on an M1 Max; the binary is target/release/taxman
-cargo build --release --examples   # also the ladder (scaling and progress harness), the probe, the sacrifice study,
-                                   # the list of repeated searches, the slope study (root gaps, margin scans) and
-                                   # the matroid study (the GF(2) intersection bound)
+cargo build --release --examples   # also the ladder (scaling and progress harness), the probe, the tuning
+                                   # benchmark, the census of the frames, the extended problem's chain and the wall
+                                   # regime's measurements
 ./target/release/taxman help
 ```
 

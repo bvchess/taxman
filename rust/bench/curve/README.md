@@ -38,7 +38,9 @@ first 2175 games of the committed `results/strict.jsonl` are a chain from n = 1 
 | `load.jsonl` | what the machine was doing apart from us, sampled before and after each invocation |
 | `slope_roots.jsonl`, `slope_proofs.jsonl`, `slope.py` | the later study of what drives the slope: `examples/slope.rs`'s root measurements of the non-prime games 880-1300 and of this study's games past 1300, its one-thread proofs (with margins), and the script that makes its tables, from `results/strict.jsonl` as of commit 2487671 (the 1..1300 chain of the older build, read from git; `--strict PATH` for another file) ([docs/EXPERIMENTS.md](../../docs/experiments/what-drives-the-slope-2026-10.md)) |
 
-Regenerate the tables with `./analysis.py > analysis_output.md` (and the slope study's with `./slope.py`).
+Regenerate the tables with `./analysis.py > analysis_output.md` (and the slope study's with `./slope.py`).  The example
+`slope`, which wrote the slope study's data, was removed from master (2026-10-17); it builds at commit 8753189 (`git
+checkout 8753189`, then `cargo build --release --example slope` in `rust/`).
 
 ## Method
 

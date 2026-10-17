@@ -93,3 +93,8 @@ say that the barred bounds alone close no game: the certificate needs a search o
 past 2175, which is what the integrated search (stage 1 next, after numbering by layer) is for.  E6 decides how far to
 build it and E9(a) is the cheap early warning if U fails; both wait for approval.  Theorem B's roles halve the
 prover's node at no cost to its proofs.
+
+## Later (2026-10): the program removed from master
+
+The example `hunt` and its script `tools/cloud/hunt.sh` were removed from master on 2026-10-17.  They build at commit
+8753189: `git checkout 8753189`, then `cargo build --release --example hunt` in `rust/`.

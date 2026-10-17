@@ -12,7 +12,9 @@ three after it, with `gap.py`) ran on master ee03872 with no change to the solve
 ## Files and the commands that made them
 
 `wall` is `target/release/examples/wall` (`nice -n 10 cargo build --release -j 4 --example wall`), run from `rust/`;
-`K` is `--known results/strict.jsonl`.
+`K` is `--known results/strict.jsonl`.  The example `matroid`, which made `anatomy_chain.jsonl`, was removed from
+master (2026-10-17); it builds at commit 8753189 (`git checkout 8753189`, then `cargo build --release --example
+matroid` in `rust/`).
 
 | file | command | what it is |
 |---|---|---|

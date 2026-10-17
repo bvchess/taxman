@@ -174,3 +174,9 @@ longest run, r2c at 1475), about $4-5; the 2170s (gap 767) and the games past 21
    the dive logs were deduplicated (every duplicate equal, the dives deterministic) and every dive equals the first
    attempt's.
 7. The core table of S3.4 (cores cached across nodes) was not built: it saves time only.
+
+## Later (2026-10): the program removed from master
+
+The examples `fields` and `matroid`, with the files of `examples/common/` they included, were removed from master on
+2026-10-17.  They build at commit 8753189: `git checkout 8753189`, then
+`cargo build --release --example fields --example matroid` in `rust/`.

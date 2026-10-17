@@ -76,9 +76,9 @@ What the evidence is, in one paragraph each:
 * **The frame model** ([DESIGN.md §2](../DESIGN.md#what-optimal-means)): its assumptions (greedy removal of
   impossible sources, `unzip`'s mandatory moves, freedoms = factors − sources, closed frames inert,
   promotions one frame forward) were validated end to end: the solver reproduces the Java's optimal.json to
-  1000 (made by the same model, so not independent), `src/brute.rs` matches it to 40 in its tests (52 in
-  `examples/sacrifice validate`), and `heuristics/evaluation/certify.py`'s brute force over pot states confirms it to
-  n = 62.  Beyond 1000 (`rust/results`), nothing independent of the frame model.
+  1000 (made by the same model, so not independent), `src/brute.rs` matches it to 40 in its tests (52 once, by the
+  example `sacrifice`, removed from master), and `heuristics/evaluation/certify.py`'s brute force over pot states
+  confirms it to n = 62.  Beyond 1000 (`rust/results`), nothing independent of the frame model.
 
 ## 2. Conjecture (★) at scale
 

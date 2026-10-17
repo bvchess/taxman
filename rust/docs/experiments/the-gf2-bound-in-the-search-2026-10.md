@@ -243,3 +243,10 @@ reproduces `results/strict.jsonl`, and the numbers of both are above.
   weights do not decrease with the element's index (the candidates by increasing number); a reweighting needs its own
   element order (the root's matroids built in it) or those two starts switched off.  The levels, the contraction and
   the split do not depend on the order.
+
+## Later (2026-10): the program removed from master
+
+The examples `matroid` and `slope`, with the files of `examples/common/` they included, were removed from master on
+2026-10-17.  They build at commit 8753189: `git checkout 8753189`, then
+`cargo build --release --example matroid --example slope` in `rust/`.  `examples/common/meet.rs`, which the entry says
+stays, went with them.

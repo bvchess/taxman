@@ -16,7 +16,7 @@ unsafe extern "C" {
 }
 
 /// The process's peak resident set size in bytes, if the system says.
-#[allow(dead_code)] // the probe and the matroid study do not read it
+#[allow(dead_code)] // the probe does not read it
 pub fn max_rss() -> Option<u64> {
     const RUSAGE_SELF: i32 = 0;
     let mut usage = Rusage { times: [[0; 2]; 2], longs: [0; 14] };

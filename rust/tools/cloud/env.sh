@@ -13,7 +13,6 @@
 #   TAXMAN_BIN    the solver binary               (default rust/target/release/taxman)
 #   LADDER_BIN    the ladder example binary       (default rust/target/release/examples/ladder)
 #   EXACT_BIN     the prover's `exact`            (default rust/prover/target/release/exact; prover.sh)
-#   HUNT_BIN      the hunt example binary         (default rust/target/release/examples/hunt; hunt.sh)
 #   RUSTFLAGS     default "-C target-cpu=native" in these scripts (a plain `cargo build` builds generic code): build
 #                 for the CPU of the machine that builds.  Build on the machine type that will run the binary.  Set it
 #                 to the empty string to build generic code.
@@ -27,7 +26,6 @@ CKPT="${CKPT:-$TAXMAN_WORK/ckpt}"
 LOGS="${LOGS:-$TAXMAN_WORK/logs}"
 TAXMAN_BIN="${TAXMAN_BIN:-$CRATE/target/release/taxman}"
 LADDER_BIN="${LADDER_BIN:-$CRATE/target/release/examples/ladder}"
-HUNT_BIN="${HUNT_BIN:-$CRATE/target/release/examples/hunt}"
 PROVER="$CRATE/prover"
 EXACT_BIN="${EXACT_BIN:-$PROVER/target/release/exact}"
 CLOUD_DIR="$_cloud_dir"

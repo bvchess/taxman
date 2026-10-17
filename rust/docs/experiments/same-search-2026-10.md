@@ -63,3 +63,8 @@ search 158.  The probe's fingerprint is unchanged (6197a47eae6cf8c8; the shortcu
 rerun of the strict chain to 1300 would skip 28% of its search time, and the frontier games that repeat cost
 nothing; it changes no score, tree or node count of a game that is searched.  Verifying a repeat sets two problems up
 again (the verifier caches them by board size), so a schema-4 chain to 1300 will take a few seconds more to open.
+
+## Later (2026-10): the program removed from master
+
+The example `repeats` was removed from master on 2026-10-17.  It builds at commit 8753189: `git checkout 8753189`, then
+`cargo build --release --example repeats` in `rust/`.

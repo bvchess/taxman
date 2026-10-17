@@ -137,11 +137,10 @@ exec > >(tee -a "$LOGS/setup.log") 2>&1
 
 # --- the build ---------------------------------------------------------------------------------------------------
 if [ "${PROVER_ONLY:-0}" != 1 ]; then
-    say "building (RUSTFLAGS='${RUSTFLAGS:-}'): the solver and the examples (ladder, sacrifice, hunt)"
+    say "building (RUSTFLAGS='${RUSTFLAGS:-}'): the solver and the examples (the ladder among them)"
     (cd "$CRATE" && cargo build --release --bins --examples)
     [ -x "$TAXMAN_BIN" ] || fail "the build did not produce $TAXMAN_BIN"
     [ -x "$LADDER_BIN" ] || fail "the build did not produce $LADDER_BIN"
-    [ -x "$HUNT_BIN" ] || fail "the build did not produce $HUNT_BIN"
 fi
 say "building the prover (its own workspace): exact, the other tools and their examples"
 (cd "$PROVER" && cargo build --release --bins --examples)

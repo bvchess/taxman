@@ -48,3 +48,8 @@ the seeds.  Rebuilt on master (numbering by layer) and rerun on one laptop threa
 minutes) to about 140: the probes, 578 pairs of 3.1 minutes on 4 threads, are 120 of them; a `c8g.16xlarge` for about 2.6
 hours with the setup, about $2 at spot, $7 on demand, deadline 5 hours.  Neither E9(a) nor E6 is launched: the owner
 deferred them to a later batch of AWS work.
+
+## Later (2026-10): the program removed from master
+
+The example `hunt` and its script `tools/cloud/hunt.sh` were removed from master on 2026-10-17.  They build at commit
+8753189: `git checkout 8753189`, then `cargo build --release --example hunt` in `rust/`.

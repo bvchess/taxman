@@ -79,3 +79,8 @@ a few percent to the search, not more: the extended problem's search, with nothi
 
 The default mode is unchanged by all of it (the same gates as 2A: the fingerprints, the suite with the tripwires,
 `regress --to 1000 --threads 1` in 9.1 s, and the chain 1..1300 on one thread line for line).
+
+## Later (2026-10): the program removed from master
+
+The example `sacrifice` was removed from master on 2026-10-17.  It builds at commit 8753189: `git checkout 8753189`,
+then `cargo build --release --example sacrifice` in `rust/`.

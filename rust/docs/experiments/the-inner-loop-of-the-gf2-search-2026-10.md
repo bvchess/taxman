@@ -204,3 +204,8 @@ of search on one thread (2170 and 2172, the dearest of 2151-2175, 65 s), so thro
 measurements to make on a 64-vCPU instance are in the report of this round (the thread scaling of 1472, 1475, 2170
 and 2172 at 1, 4, 16, 32 and 64 threads with `--seed-opt` and with `--no-seed --no-cap`; the chain from 2176 for 30
 minutes at 64 threads; the fixed time profiled at 2200; the engine's counters).
+
+## Later (2026-10): the program removed from master
+
+The example `matroid`, with the files of `examples/common/` it included, was removed from master on 2026-10-17.  It
+builds at commit 8753189: `git checkout 8753189`, then `cargo build --release --example matroid` in `rust/`.

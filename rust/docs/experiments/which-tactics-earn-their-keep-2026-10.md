@@ -278,3 +278,8 @@ Everything that exists only to read what older builds wrote, and what deleting i
   n = 1, about 18 minutes on four threads) neither verifier reads it: `tests/results.rs`'s
   `the_committed_results_pass_the_verifier` skips it, saying so, and `tools/cloud/verify.sh`, `setup.sh`'s verifier
   smoke check, `tools/profile/profile.sh` and the README's commands that extend a copy of it wait for the rerun.
+
+## Later (2026-10): the program removed from master
+
+The examples `sacrifice` and `repeats` were removed from master on 2026-10-17.  They build at commit 8753189:
+`git checkout 8753189`, then `cargo build --release --example sacrifice --example repeats` in `rust/`.

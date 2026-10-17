@@ -2,6 +2,9 @@
 """The tables of docs/experiments/dominance-and-symmetry-2026-10.md, from the data in this directory.
 
 Run from rust/: bench/dominance/dominance.py
+
+The example `dominance`, which wrote the node samples and the symmetry checks, was removed from master (2026-10-17); it
+builds at commit 8753189 (`git checkout 8753189`, then `cargo build --release --example dominance` in rust/).
 """
 import ast
 import json

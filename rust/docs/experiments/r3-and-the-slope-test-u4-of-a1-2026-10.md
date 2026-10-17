@@ -159,3 +159,9 @@ three v0 trees 0.01; nothing on EC2.
    other jobs.
 6. The exact checks in R3 are those of the root's certification (`check`), each run to its column limit as at the
    root; no cheaper variant was tried.
+
+## Later (2026-10): the program removed from master
+
+The examples `fields` and `matroid`, with the files of `examples/common/` they included, were removed from master on
+2026-10-17.  They build at commit 8753189: `git checkout 8753189`, then
+`cargo build --release --example fields --example matroid` in `rust/`.

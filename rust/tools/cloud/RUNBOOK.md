@@ -112,9 +112,8 @@ The files in this directory:
 | `verify.sh [FILE...]` | both referees on a results file, and against the committed results |
 | `save.sh` | copy results, logs and checkpoints to S3 (`--restore` on a fresh machine) |
 | `prover.sh A B` | the prover's proofs of opt(n) for n = A..B (section 9): resumable passes, all CPUs; `--verify` checks the output; `--list N1,N2,...` runs `exact` on given games as a measurement (section 10.1) |
-| `hunt.sh UPPER_FILE` | the counterexample hunt of section 10.2: the frame solver on boards without one open source each, resumable |
 | `certify.sh LIST[:THREADS]...` | the certificates campaign (section 11): `taxman certify` over the lists of `bench/certify/lists/stage4`, several at once, resumable, with a final `verify-certificates` |
-| `spot-watch.sh` | on a spot interruption notice: stop `chain.sh`, `prover.sh`, `hunt.sh` or `certify.sh` and save |
+| `spot-watch.sh` | on a spot interruption notice: stop `chain.sh`, `prover.sh` or `certify.sh` and save |
 | `wall.sh launch\|status\|stop\|cleanup` | the unattended run to the wall (section 12): the launch template, the Auto Scaling group of one spot instance and the policy, from your machine; prints every aws command |
 | `wall-node.sh`, `wall-policy.json` | what each machine of that group does from boot to the end of the run; the one permission the machines need |
 | `test/run.sh` | tests of `chain.sh`'s wall and ledger, `wall-node.sh` and `wall.sh` against a stand-in for aws (no cloud) |
@@ -1058,6 +1057,12 @@ Graviton CPU by n (the table of 9.2 is a prediction).  Then the end of the
 terminates it) and confirm that nothing is left, the launch's security group included.
 
 ## 10. The theory track's measurements: E6 and E9(a)
+
+*Removed from master (2026-10-17).*  The hunt of 10.2 (E9(a)) has no program or script on master any more: the example
+`hunt` and `tools/cloud/hunt.sh` went with the examples of finished experiments (the certificates of section 11
+superseded the hunt, which was never run; its calibrations are in `bench/hunt/`).  Both build and run at commit
+8753189: launch from a checkout of it (`git checkout 8753189`), where the rest of 10.2 holds as written.  E6 (10.1)
+runs the prover and is unaffected.
 
 Two measurements of the theory track (heuristics/THEORY.md, "The upper part"; the account is the entry
 ["The upper part game by game"](../../docs/experiments/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10.md)),

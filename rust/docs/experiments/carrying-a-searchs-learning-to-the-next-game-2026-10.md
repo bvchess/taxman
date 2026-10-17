@@ -446,3 +446,10 @@ refitted for a tenth of the budget, at 1.08.
   preloaded table, with the ladder's three options (record, check a nogood file against a root and load it, prove at a
   value) and a script for the overlap.  With the hooks off every tree must be unchanged (the probe's fingerprints, the
   tripwires and the one-thread chain 1..1300 are the gates).
+
+## Later (2026-10): the program removed from master
+
+The examples `diff` and `fields`, with the files of `examples/common/` they included, were removed from master on
+2026-10-17.  They build at commit 8753189: `git checkout 8753189`, then
+`cargo build --release --example diff --example fields` in `rust/`.  The `carry` command of the pilot of section 7 was
+in a scratch copy of `fields` and is not in that commit.

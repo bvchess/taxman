@@ -5,6 +5,9 @@ The data files here are the output of `examples/matroid.rs` (the commands are in
 them with the slope study's ../curve/slope_roots.jsonl (the matching and Lagrangian bounds of every root) and
 ../curve/slope_proofs.jsonl (the solver's one-thread proofs) and prints markdown.  Pure Python;
 `./matroid.py > matroid_output.md`.
+
+The example `matroid` was removed from master (2026-10-17); it builds at commit 8753189 (`git checkout 8753189`, then
+`cargo build --release --example matroid` in rust/).
 """
 import json
 import math
