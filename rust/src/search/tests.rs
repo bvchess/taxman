@@ -11,7 +11,7 @@ use crate::matchbound::MatchBound;
 use crate::model::test_support::*;
 use crate::model::{ConflictCache, FrameGraph, Keep, Nogoods, Scratch};
 use crate::numtheory::Tables;
-use crate::test_support::TempDir;
+use crate::test_support::{long, TempDir};
 use std::thread;
 
 fn config(threads: usize) -> EngineConfig {
@@ -434,14 +434,28 @@ fn checkpoint_and_resume_four_threads() {
 /// engine checks the node limit every 1024 nodes of a searcher), and so are those of 1000 on two threads since the
 /// window of the forced members became `all` (2,026 nodes).
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(checkpoint_and_resume_with_the_gf2_bound_of_a_small_game))]
 fn checkpoint_and_resume_with_the_gf2_bound() {
-    let n = 992;
+    let default = SearchTactics::default();
+    let cases = [(default, 1000), (SearchTactics { symmetry: false, ..default }, 1500)];
+    resume_the_gf2_search(992, &cases, &[1, 2]);
+}
+
+/// [`checkpoint_and_resume_with_the_gf2_bound`] for game 1000 (2,026 nodes by the default) on one thread, stopped
+/// every 1,000 nodes.
+#[test]
+fn checkpoint_and_resume_with_the_gf2_bound_of_a_small_game() {
+    resume_the_gf2_search(1000, &[(SearchTactics::default(), 1000)], &[1]);
+}
+
+/// The search of game `n` under each of `cases` (tactics and the node limit that stops it), on each of `threads`,
+/// stopped and resumed from its checkpoint until it finishes with the optimum.
+fn resume_the_gf2_search(n: u32, cases: &[(SearchTactics, u64)], threads: &[usize]) {
     let board = crate::board::Board::<16>::for_n(n);
     let opt = crate::game::Optimal::built_in().score(n).unwrap() - board.in_the_bag;
-    let default = SearchTactics::default();
-    for (tactics, node_limit) in [(default, 1000), (SearchTactics { symmetry: false, ..default }, 1500)] {
+    for &(tactics, node_limit) in cases {
         let p = board.prepare(tactics).unwrap();
-        for threads in [1, 2] {
+        for &threads in threads {
             let what = format!("{threads} threads, symmetry {}", tactics.symmetry);
             let dir = TempDir::new(&format!("resume-gf2-{threads}-{}", tactics.bits()));
             let ckpt = dir.0.join("ckpt.bin");

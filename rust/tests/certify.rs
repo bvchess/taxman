@@ -33,7 +33,7 @@
 
 mod common;
 
-use common::{options, path, python, results_path, taxman, Run, TempDir};
+use common::{long, options, path, python, results_path, taxman, Run, TempDir};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -217,18 +217,31 @@ fn run_certify_boards(boards: &[&str], results: &Path, out: &Path, extra: &[&str
 // ---------------------------------------------------------------------------------------------------------
 // The chain
 
+/// Every `step`th game of 600..=1300 that needs a certificate, and the games `besides`: all certified, with the data
+/// that each certificate says it was made from.
+fn certify_a_sample(step: usize, besides: &[u32], fewest: usize) {
+    let mut boards: Vec<u32> = needing(600..=1300).into_iter().step_by(step).collect();
+    boards.extend_from_slice(besides);
+    boards.sort_unstable();
+    boards.dedup();
+    assert!(boards.len() >= fewest, "{boards:?}");
+    let (nodes, seconds) = certify_all(&boards);
+    println!("{} games certified: {nodes} nodes, {seconds:.1} s", boards.len());
+}
+
+/// Every sixtieth game of 600..=1300 that needs a certificate, all certified.
+#[test]
+fn a_thin_sample_of_the_games_to_1300_that_need_a_certificate_is_certified() {
+    certify_a_sample(60, &[], 6);
+}
+
 /// Every fourth game of 600..=1300 that needs a certificate, and 1287, the one with the biggest search of them: all
 /// certified, with the data that each certificate says it was made from.  (All of them are in
 /// `every_game_that_needs_a_certificate_to_1300_is_certified`.)
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(a_thin_sample_of_the_games_to_1300_that_need_a_certificate_is_certified))]
 fn a_sample_of_the_games_to_1300_that_need_a_certificate_is_certified() {
-    let mut boards: Vec<u32> = needing(600..=1300).into_iter().step_by(4).collect();
-    boards.push(1287);
-    boards.sort_unstable();
-    boards.dedup();
-    assert!(boards.len() >= 90, "{boards:?}");
-    let (nodes, seconds) = certify_all(&boards);
-    println!("{} games certified: {nodes} nodes, {seconds:.1} s", boards.len());
+    certify_a_sample(4, &[1287], 90);
 }
 
 /// The whole of 600..=1300, one game after the other on one thread: every game that needs a certificate is certified.
@@ -244,29 +257,53 @@ fn every_game_that_needs_a_certificate_to_1300_is_certified() {
 /// Games past the table built into the binary (it ends at 1300), where the games of n − 1 and n come from the committed
 /// chain alone and the open members from the second file of bounds: a few of the cheap ones are certified too.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(a_game_past_1300_that_needs_a_certificate_is_certified))]
 fn games_past_1300_that_need_a_certificate_are_certified() {
-    let boards = [1302, 1304, 1305, 1309];
-    for n in boards {
+    games_past_1300_are_certified(&[1302, 1304, 1305, 1309]);
+}
+
+/// [`games_past_1300_that_need_a_certificate_are_certified`] for the cheapest of them, 1305.
+#[test]
+fn a_game_past_1300_that_needs_a_certificate_is_certified() {
+    games_past_1300_are_certified(&[1305]);
+}
+
+/// The games `boards` past 1300 that need a certificate are certified.
+fn games_past_1300_are_certified(boards: &[u32]) {
+    for &n in boards {
         assert!(fixtures().upper[&n].needs, "n={n} is a game that needs a certificate");
     }
-    let (nodes, seconds) = certify_all(&boards);
+    let (nodes, seconds) = certify_all(boards);
     println!("{} games certified: {nodes} nodes, {seconds:.1} s", boards.len());
 }
 
 /// The certificate as the command writes it: the fields, the sizes, the digest of the problem and no counterexample;
 /// and the summary line has the numbers of the game and its verdict.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(a_certificate_of_a_small_game_writes_the_fields_of_its_search))]
 fn a_certificate_writes_the_fields_of_its_search() {
-    let n = 1302;
-    let c = certify(n, &options(1));
+    a_certificate_writes_the_fields_of_its_search_for(1302, [682, 715, 754], 533559);
+}
+
+/// [`a_certificate_writes_the_fields_of_its_search`] for the game 600, which has four open members.
+#[test]
+fn a_certificate_of_a_small_game_writes_the_fields_of_its_search() {
+    let open = fixtures().upper[&600].open.clone();
+    assert_eq!(open.len(), 4);
+    a_certificate_writes_the_fields_of_its_search_for(600, open, 112623);
+}
+
+/// The certificate of the game `n`, whose open members are `open` and whose score is `score`, as the command writes it.
+fn a_certificate_writes_the_fields_of_its_search_for(n: u32, open: impl Into<Vec<u32>>, score: u64) {
+    let (open, c) = (open.into(), certify(n, &options(1)));
     assert_certified(&c, n);
     let json = Json::parse(&c.to_json().to_string()).unwrap();
     let number = |name: &str| json.get(name).and_then(Json::as_u64).unwrap_or_else(|| panic!("no number {name:?}"));
     assert_eq!(json.get("verdict").and_then(Json::as_str), Some("certified"));
-    assert_eq!(json.get("open").and_then(Json::as_u32_vec), Some(vec![682, 715, 754]));
+    assert_eq!(json.get("open").and_then(Json::as_u32_vec).as_ref(), Some(&open));
     assert_eq!(
         [number("n"), number("score"), number("rejected"), number("nodes"), number("threads"), number("width")],
-        [1302, c.score, u64::from(c.rejected), c.nodes, 1, c.width as u64]
+        [u64::from(n), c.score, u64::from(c.rejected), c.nodes, 1, c.width as u64]
     );
     assert_eq!(number("frames"), c.frames as u64);
     assert_eq!(number("in_the_bag"), c.in_the_bag);
@@ -275,7 +312,9 @@ fn a_certificate_writes_the_fields_of_its_search() {
     assert_eq!(json.get("digest").and_then(Json::as_str).map(str::len), Some(16));
     assert!(json.get("beaten_by").is_none() && json.get("build").is_some(), "{json}");
     let summary = c.summary_line();
-    for text in ["n=1302", "V=533559", "|O|=3", "certified", &c.nodes.to_string()] {
+    for text in
+        [&format!("n={n}"), &format!("V={score}"), &format!("|O|={}", open.len()), "certified", &c.nodes.to_string()]
+    {
         assert!(summary.contains(text), "no {text:?} in {summary:?}");
     }
     println!("{summary}");
@@ -318,9 +357,21 @@ fn assert_beaten_by_the_optimum(c: &Certificate, n: u32, planted: u64) {
 /// is `Beaten` and the game found is one that the referee accepts, scores more than the planted score, and, since the
 /// chain's score is the optimum, scores that.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(a_planted_wrong_score_of_1305_is_beaten_by_a_game_the_referee_accepts))]
 fn a_planted_wrong_score_is_beaten_by_a_game_the_referee_accepts() {
+    planted_wrong_scores_are_beaten(&[1302, 1305, 1309]);
+}
+
+/// [`a_planted_wrong_score_is_beaten_by_a_game_the_referee_accepts`] for 1305, the cheapest.
+#[test]
+fn a_planted_wrong_score_of_1305_is_beaten_by_a_game_the_referee_accepts() {
+    planted_wrong_scores_are_beaten(&[1305]);
+}
+
+/// A wrong score planted on each of the boards `boards` is beaten.
+fn planted_wrong_scores_are_beaten(boards: &[u32]) {
     let upper = &fixtures().upper;
-    for n in [1302, 1305, 1309] {
+    for &n in boards {
         let dir = TempDir::new("certify-planted");
         let (file, planted, left_out) = plant_wrong_score(&dir, n);
         let table = Optimal::built_in().with_results_files(&[file]).unwrap();
@@ -416,6 +467,10 @@ fn a_game_that_a_certificate_cannot_be_made_for_is_refused() {
 /// (the engine looks at a limit every 1,024 steps of a searcher) cuts into several pieces.
 const RESUMED: u32 = 1302;
 
+/// The game the quick stop-and-resume tests use: its search takes 1,593 nodes, which a limit of 1,000 nodes cuts in
+/// two.
+const RESUMED_QUICK: u32 = 1041;
+
 /// Checks the nodes of a search that was stopped and resumed against those of the same search uninterrupted.  The
 /// tree is the same, but a stop loses the unit of work in flight, which the resumed search does again (for 1302,
 /// 4,891 nodes in one run and 5,851 in six, and a plain `solve` of a board does the same): so the nodes over all the
@@ -431,11 +486,23 @@ fn assert_resumed_work(resumed: u64, uninterrupted: u64) {
 /// `Certified`, after at least two pieces that stopped, with the certificate of an uninterrupted search: the same
 /// problem, the same verdict, and about the same work.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(a_stopped_search_of_a_small_game_resumes_to_the_certificate_of_an_uninterrupted_one))]
 fn a_stopped_search_resumes_to_the_certificate_of_an_uninterrupted_one() {
-    let n = RESUMED;
+    a_stopped_search_resumes(RESUMED, 3_000, 2);
+}
+
+/// [`a_stopped_search_resumes_to_the_certificate_of_an_uninterrupted_one`] for a game of 1,593 nodes, stopped once.
+#[test]
+fn a_stopped_search_of_a_small_game_resumes_to_the_certificate_of_an_uninterrupted_one() {
+    a_stopped_search_resumes(RESUMED_QUICK, 1_200, 1);
+}
+
+/// The search for the game `n`, which takes more than `most_nodes` nodes, stopped by a limit of 1,000 nodes in at
+/// least `min_pieces` pieces and resumed to the certificate of an uninterrupted search.
+fn a_stopped_search_resumes(n: u32, most_nodes: u64, min_pieces: usize) {
     let whole = certify(n, &options(1));
     assert_certified(&whole, n);
-    assert!(whole.nodes > 3_000, "n={n}: {} nodes are too few for pieces of 1,000", whole.nodes);
+    assert!(whole.nodes > most_nodes, "n={n}: {} nodes are too few for pieces of 1,000", whole.nodes);
 
     let dir = TempDir::new("certify-resume");
     let ckpt = dir.join("ckpt");
@@ -458,7 +525,7 @@ fn a_stopped_search_resumes_to_the_certificate_of_an_uninterrupted_one() {
         assert!(pieces.len() < 100, "{pieces:?}: the search does not end");
     };
     println!("{}  (after {} pieces that stopped)", last.summary_line(), pieces.len());
-    assert!(pieces.len() >= 2, "n={n}: the search ended after {} pieces that stopped", pieces.len());
+    assert!(pieces.len() >= min_pieces, "n={n}: the search ended after {} pieces that stopped", pieces.len());
 
     assert_certified(&last, n);
     assert_resumed_work(last.nodes, whole.nodes);
@@ -478,8 +545,20 @@ fn a_stopped_search_resumes_to_the_certificate_of_an_uninterrupted_one() {
 /// command again and again ends with `certified`, and the checkpoint goes with the last; and a further run skips the
 /// game, which the summary says.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(the_command_stops_resumes_and_then_skips_a_small_game))]
 fn the_command_stops_resumes_and_then_skips_a_game() {
-    let n = RESUMED;
+    the_command_stops_resumes_and_then_skips(RESUMED, 3);
+}
+
+/// [`the_command_stops_resumes_and_then_skips_a_game`] for a game of 1,593 nodes, stopped once.
+#[test]
+fn the_command_stops_resumes_and_then_skips_a_small_game() {
+    the_command_stops_resumes_and_then_skips(RESUMED_QUICK, 2);
+}
+
+/// The command on the game `n`, stopped by a limit of 1,000 nodes, resumed by the same command in at least `min_runs`
+/// runs in all, and then skipping the game.
+fn the_command_stops_resumes_and_then_skips(n: u32, min_runs: usize) {
     let dir = TempDir::new("certify-resume-command");
     let (results, out, ckpt) = (results_path("strict.jsonl"), dir.join("out.jsonl"), dir.join("ckpt"));
     let flags = ["--node-limit", "1000", "--checkpoint-dir", path(&ckpt)];
@@ -506,7 +585,7 @@ fn the_command_stops_resumes_and_then_skips_a_game() {
         assert!(runs < 100, "the search does not end");
     };
     println!("{}  (in {runs} runs)", last.stdout.lines().next().unwrap());
-    assert!(runs >= 3, "the game was certified in {runs} runs");
+    assert!(runs >= min_runs, "the game was certified in {runs} runs");
     assert!(
         last.stdout.contains("certified") && last.stdout.contains(&format!("{n}..={n}: certified 1")),
         "{}",
@@ -540,28 +619,50 @@ fn the_command_stops_resumes_and_then_skips_a_game() {
 /// The command on a range: the games that do not need a certificate are passed over (they are counted), each of the
 /// others gets a `certified` line in `--out` and one on stdout, and a rerun on a longer range skips what is done.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(the_command_certifies_a_range_of_small_games_and_skips_what_is_done))]
 fn the_command_certifies_a_range_and_skips_what_is_done() {
+    // Longer, 1308 and 1309 are the new ones that need a certificate.
+    the_command_certifies_a_range_and_skips_what_is_done_over(1301..=1305, 1301..=1309);
+}
+
+/// [`the_command_certifies_a_range_and_skips_what_is_done`] over 600..=608 and then 600..=610.
+#[test]
+fn the_command_certifies_a_range_of_small_games_and_skips_what_is_done() {
+    the_command_certifies_a_range_and_skips_what_is_done_over(600..=608, 600..=610);
+}
+
+/// The command on the range `first` and then on the longer range `longer` (which starts where `first` does): each game
+/// that needs a certificate gets a line, the others are counted, and the rerun skips what is done.
+fn the_command_certifies_a_range_and_skips_what_is_done_over(first: RangeInclusive<u32>, longer: RangeInclusive<u32>) {
     let dir = TempDir::new("certify-range");
     let (results, out) = (results_path("strict.jsonl"), dir.join("out.jsonl"));
+    let (done, all) = (needing(first.clone()), needing(longer.clone()));
+    let new: Vec<u32> = all.iter().copied().filter(|n| !done.contains(n)).collect();
+    assert!(!done.is_empty() && !new.is_empty(), "{done:?} {new:?}");
+    let (lo, hi) = (*first.start(), *first.end());
+    let not_needing = (hi - lo + 1) as usize - done.len();
 
-    let run = run_certify("1301-1305", &results, &out, &[]);
+    let run = run_certify(&format!("{lo}-{hi}"), &results, &out, &[]);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
-    for n in [1302, 1304, 1305] {
+    for n in &done {
         assert!(run.stdout.contains(&format!("n={n} ")), "{}", run.stdout);
     }
-    assert_eq!(run.stdout.lines().count(), 4, "{}", run.stdout);
-    assert!(run.stdout.contains("1301..=1305: certified 3, not needing one 2"), "{}", run.stdout);
+    assert_eq!(run.stdout.lines().count(), done.len() + 1, "{}", run.stdout);
+    let tally = format!("{lo}..={hi}: certified {}, not needing one {not_needing}", done.len());
+    assert!(run.stdout.contains(&tally), "{}", run.stdout);
     assert_eq!(run.stderr, "");
-    assert_eq!(verdicts(&out), ["certified"; 3]);
-    let boards: Vec<_> = json_lines(&out).iter().map(|line| line.get("n").and_then(Json::as_u32).unwrap()).collect();
-    assert_eq!(boards, [1302, 1304, 1305]);
+    assert_eq!(verdicts(&out), vec!["certified"; done.len()]);
+    assert_eq!(boards_in_order(&out), done);
 
-    // Longer, 1308 and 1309 are the new ones that need a certificate.
-    let run = run_certify("1301-1309", &results, &out, &[]);
+    let (lo, hi) = (*longer.start(), *longer.end());
+    let not_needing = (hi - lo + 1) as usize - all.len();
+    let run = run_certify(&format!("{lo}-{hi}"), &results, &out, &[]);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
-    assert!(run.stdout.contains("1301..=1309: already in --out 3, certified 2, not needing one 4"), "{}", run.stdout);
-    assert_eq!(run.stdout.lines().count(), 3, "{}", run.stdout);
-    assert_eq!(verdicts(&out), ["certified"; 5]);
+    let tally =
+        format!("{lo}..={hi}: already in --out {}, certified {}, not needing one {not_needing}", done.len(), new.len());
+    assert!(run.stdout.contains(&tally), "{}", run.stdout);
+    assert_eq!(run.stdout.lines().count(), new.len() + 1, "{}", run.stdout);
+    assert_eq!(verdicts(&out), vec!["certified"; all.len()]);
 }
 
 /// The boards of the lines of a file `taxman certify` wrote, in order.
@@ -573,20 +674,39 @@ fn boards_in_order(file: &Path) -> Vec<u32> {
 /// need a certificate, out of order, and one that needs none, which is counted and passed over.  The lines of `--out`
 /// come in the order of the file, the tally names the list, and a rerun skips what is done.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(the_command_certifies_the_small_boards_of_a_list_in_the_order_of_the_file))]
 fn the_command_certifies_the_boards_of_a_list_in_the_order_of_the_file() {
+    the_command_certifies_the_boards_of_a_list_in_the_order_of_the_file_for([1309, 1302, 1304], 1301);
+}
+
+/// [`the_command_certifies_the_boards_of_a_list_in_the_order_of_the_file`] for 620, 600 and 616 (that pose three
+/// different problems), and the first of 600..=640 that needs none.
+#[test]
+fn the_command_certifies_the_small_boards_of_a_list_in_the_order_of_the_file() {
+    let needless = (600..=640).find(|n| !fixtures().upper[n].needs).unwrap();
+    the_command_certifies_the_boards_of_a_list_in_the_order_of_the_file_for([620, 600, 616], needless);
+}
+
+/// The command on the list of the games `needing` (out of order, with a comment and a blank line between them) and
+/// the game `needless`, which needs no certificate.
+fn the_command_certifies_the_boards_of_a_list_in_the_order_of_the_file_for(needing: [u32; 3], needless: u32) {
     let dir = TempDir::new("certify-list");
     let (results, out) = (results_path("strict.jsonl"), dir.join("out.jsonl"));
-    let text = "# three that need a certificate, out of order, and a prime that needs none\n1309\n\n1302\n  1301  \n\
-                # 1303 is for later\n1304\n";
-    let list = write_file(&dir, "boards.txt", text);
-    assert!(!fixtures().upper[&1301].needs && [1302, 1304, 1309].iter().all(|n| fixtures().upper[n].needs));
+    let [first, second, third] = needing;
+    let text = format!(
+        "# three that need a certificate, out of order, and a prime that needs none\n{first}\n\n{second}\n  \
+         {needless}  \n# 1303 is for later\n{third}\n"
+    );
+    let list = write_file(&dir, "boards.txt", &text);
+    assert!(!fixtures().upper[&needless].needs && needing.iter().all(|n| fixtures().upper[n].needs));
 
     let run = run_certify_boards(&["--list", path(&list)], &results, &out, &[]);
     assert_eq!(run.code, Some(0), "{}{}", run.stdout, run.stderr);
-    assert_eq!(boards_in_order(&out), [1309, 1302, 1304]);
+    assert_eq!(boards_in_order(&out), needing);
     assert_eq!(verdicts(&out), ["certified"; 3]);
     let stdout_boards: Vec<_> = run.stdout.lines().filter_map(|line| line.strip_prefix("n=")).collect();
-    assert!(stdout_boards[0].starts_with("1309 ") && stdout_boards[1].starts_with("1302 "), "{}", run.stdout);
+    assert!(stdout_boards[0].starts_with(&format!("{first} ")), "{}", run.stdout);
+    assert!(stdout_boards[1].starts_with(&format!("{second} ")), "{}", run.stdout);
     let tally = format!("list {} (4 boards): certified 3, not needing one 1", path(&list));
     assert_eq!(run.stdout.lines().last(), Some(tally.as_str()), "{}", run.stdout);
     assert_eq!(run.stderr, "");
@@ -604,16 +724,17 @@ fn the_command_certifies_the_boards_of_a_list_in_the_order_of_the_file() {
 /// status 1 and nothing is written; once it is closed, the command goes on with it.
 #[test]
 fn the_command_refuses_an_out_file_another_process_has_open() {
+    let n = needing(600..=640)[0].to_string();
     let dir = TempDir::new("certify-lock");
     let (results, out) = (results_path("strict.jsonl"), dir.join("out.jsonl"));
     let held = CertificateFile::open(&out).unwrap();
-    let run = run_certify("1302", &results, &out, &[]);
+    let run = run_certify(&n, &results, &out, &[]);
     assert_eq!(run.code, Some(1), "{}", run.stderr);
     assert!(run.stderr.contains("out.jsonl is in use by another process"), "{}", run.stderr);
     assert_eq!(run.stdout, "");
     assert_eq!(fs::read_to_string(&out).unwrap(), "");
     drop(held);
-    let run = run_certify("1302", &results, &out, &[]);
+    let run = run_certify(&n, &results, &out, &[]);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     assert_eq!(verdicts(&out), ["certified"]);
 }
@@ -702,14 +823,26 @@ fn certify_by_the_rule(boards: &[u32], claims: bool) -> RuleRun {
 /// 633 → 635; in 1312..=1317 three, 1312 → 1313, 1314 → 1315 and 1316 → 1317.  The same pairs in both formulations (the
 /// claims make more games pose the same problem elsewhere, as the test of all of 600..=1300 below counts).
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(the_rule_settles_repeats_in_630_to_640_as_a_search_does))]
 fn the_rule_settles_repeats_as_a_search_does() {
     for claims in [true, false] {
-        let run = certify_by_the_rule(&needing(630..=640), claims);
-        assert_eq!(run.settled, [(632, 633), (633, 635)], "claims {claims}");
+        the_rule_settles_630_to_640(claims);
         let run = certify_by_the_rule(&needing(1312..=1317), claims);
         assert_eq!(run.settled, [(1312, 1313), (1314, 1315), (1316, 1317)], "claims {claims}");
         println!("claims {claims}: {} nodes of search saved", run.nodes_saved);
     }
+}
+
+/// [`the_rule_settles_repeats_as_a_search_does`] over 630..=640, in the formulation with the claims alone.
+#[test]
+fn the_rule_settles_repeats_in_630_to_640_as_a_search_does() {
+    the_rule_settles_630_to_640(true);
+}
+
+/// The two pairs the rule settles in 630..=640 in the formulation `claims`, each as a search does.
+fn the_rule_settles_630_to_640(claims: bool) {
+    let run = certify_by_the_rule(&needing(630..=640), claims);
+    assert_eq!(run.settled, [(632, 633), (633, 635)], "claims {claims}");
 }
 
 /// The same over every game of 600..=1300 that needs a certificate, in both formulations: the rule rests each repeat
@@ -741,29 +874,52 @@ fn the_rule_over_600_to_1300() {
 /// by, and 101 with them: the same 81 and 20 more, whose problems differ without the claims and are equal with them.
 /// No two games that pose the same problem without the claims pose different ones with them.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(the_claims_change_the_problems_and_not_their_sizes_of_the_first_games_to_700))]
 fn the_claims_change_the_problems_and_not_their_sizes_and_the_rule_settles_more_games_with_them() {
-    let boards = needing(600..=1300);
-    let (without, with) = (posed_of(&boards, false), posed_of(&boards, true));
+    the_claims_change_the_problems_and_not_their_sizes(&needing(600..=1300), Some([231, 81, 101, 20]));
+}
+
+/// [`the_claims_change_the_problems_and_not_their_sizes_and_the_rule_settles_more_games_with_them`] over the games of
+/// 600..=700 that need a certificate: the sizes are the same, the committed certificates settled the pairs that the
+/// rule finds without the claims, the rule settles those and more with them, and the games gained pose different
+/// problems without the claims and the same one with them.
+#[test]
+fn the_claims_change_the_problems_and_not_their_sizes_of_the_first_games_to_700() {
+    the_claims_change_the_problems_and_not_their_sizes(&needing(600..=700), None);
+}
+
+/// Over `boards`, games that need a certificate (ascending): the claims change neither the sizes of the problems nor
+/// `in_the_bag⁺`, the pairs the rule settles without them are the committed certificates' (those among `boards`), and
+/// the rule settles all of those pairs with them, and the other pairs it settles with them pose different problems
+/// without them.  With `counts` (the problems that differ, the pairs without the claims, with them, and gained), those
+/// are the counts as well.
+fn the_claims_change_the_problems_and_not_their_sizes(boards: &[u32], counts: Option<[usize; 4]>) {
+    let (without, with) = (posed_of(boards, false), posed_of(boards, true));
     let sizes = |posed: &Posed| (posed.frames, posed.two_sided, posed.one_sided, posed.rejected, posed.in_the_bag);
-    for &n in &boards {
+    for &n in boards {
         assert_eq!(sizes(&without[&n]), sizes(&with[&n]), "n={n}: the claims change neither the sizes nor the bag");
     }
     let differ = boards.iter().filter(|n| without[n].problem != with[n].problem).count();
-    assert_eq!(differ, 231, "problems that the claims change");
 
-    let (problems_without, problems_with) = (problems_of(&boards, false), problems_of(&boards, true));
+    let (problems_without, problems_with) = (problems_of(boards, false), problems_of(boards, true));
     let (pairs_without, pairs_with) = (same_problem_pairs(&problems_without), same_problem_pairs(&problems_with));
     let committed: Vec<(u32, u32)> = json_lines(&crate_file("bench/certify/certificates_600_1300.jsonl"))
         .iter()
         .filter_map(|line| Some((field(line.get("same_problem")?, "n").as_u32()?, board_of(line)?)))
+        .filter(|(m, n)| boards.contains(m) && boards.contains(n))
         .collect();
     assert_eq!(pairs_without, committed, "the pairs the rule settled in the committed certificates");
-    assert_eq!((pairs_without.len(), pairs_with.len()), (81, 101));
     let gained: Vec<(u32, u32)> = pairs_with.iter().copied().filter(|pair| !pairs_without.contains(pair)).collect();
     assert!(pairs_without.iter().all(|pair| pairs_with.contains(pair)), "nothing the rule settled is lost");
-    assert_eq!(gained.len(), 20);
     for &(m, n) in &gained {
         assert!(problems_without[&m] != problems_without[&n] && problems_with[&m] == problems_with[&n], "{m} {n}");
+    }
+    if let Some(counts) = counts {
+        assert_eq!(
+            [differ, pairs_without.len(), pairs_with.len(), gained.len()],
+            counts,
+            "problems that the claims change"
+        );
     }
     println!("settled with the claims and not without: {gained:?}");
 }
@@ -848,13 +1004,25 @@ fn certify_across(boards: &[u32], first: bool) -> Vec<(u32, u32)> {
 /// within one, each with the digest of the problem in the formulation of the run, and each comes out as a search of the
 /// game in that formulation does.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(the_rule_settles_across_formulations_in_630_to_640_as_it_does_within_one))]
 fn the_rule_settles_across_formulations_as_it_does_within_one() {
     for boards in [needing(630..=640), needing(1312..=1317)] {
-        for first in [false, true] {
-            let pairs = same_problem_pairs(&problems_of(&boards, !first));
-            assert!(!pairs.is_empty(), "{boards:?}: games that pose the same problem");
-            assert_eq!(certify_across(&boards, first), pairs, "{boards:?}: from the claims {first} to {}", !first);
-        }
+        the_rule_settles_across_formulations_over(&boards);
+    }
+}
+
+/// [`the_rule_settles_across_formulations_as_it_does_within_one`] over 630..=640 alone.
+#[test]
+fn the_rule_settles_across_formulations_in_630_to_640_as_it_does_within_one() {
+    the_rule_settles_across_formulations_over(&needing(630..=640));
+}
+
+/// From each formulation to the other, the rule settles over `boards` exactly the pairs it settles within one.
+fn the_rule_settles_across_formulations_over(boards: &[u32]) {
+    for first in [false, true] {
+        let pairs = same_problem_pairs(&problems_of(boards, !first));
+        assert!(!pairs.is_empty(), "{boards:?}: games that pose the same problem");
+        assert_eq!(certify_across(boards, first), pairs, "{boards:?}: from the claims {first} to {}", !first);
     }
 }
 
@@ -1421,11 +1589,124 @@ fn write_lines(dir: &Path, name: &str, lines: &[Json]) -> PathBuf {
     write_file(dir, name, &lines.iter().map(|line| format!("{line}\n")).collect::<String>())
 }
 
+/// The stretch 630..=640 certified into `dir/certs.jsonl`: seven games that need a certificate, of which 633 and 635
+/// rest on the game before them (`same_problem`), the cheapest stretch with repeats.  Returns the file and the boards
+/// of its lines.
+fn certify_short_stretch(dir: &Path) -> (PathBuf, Vec<u32>) {
+    let certs = dir.join("certs.jsonl");
+    let run = run_certify("630-640", &results_path("strict.jsonl"), &certs, &[]);
+    assert_eq!(run.code, Some(0), "{}{}", run.stdout, run.stderr);
+    let lines = json_lines(&certs);
+    let boards: Vec<u32> = lines.iter().filter_map(board_of).collect();
+    let rule: Vec<u32> = lines.iter().filter(|l| l.get("same_problem").is_some()).filter_map(board_of).collect();
+    assert_eq!((boards.len(), rule), (7, vec![633, 635]));
+    (certs, boards)
+}
+
+/// The lines of a certified stretch with line `k` changed at `keys`.
+fn with_line_changed(lines: &[Json], k: usize, keys: &[&str], value: Json) -> Vec<Json> {
+    let mut doctored = lines.to_vec();
+    doctored[k] = with_value(&lines[k], keys, value);
+    doctored
+}
+
+/// The checks of [`a_file_certify_wrote_passes_and_the_summary_counts_it`] and of the first of
+/// [`doctored_lines_are_refused_naming_the_line`] on the stretch 630..=640 instead of 1312..=1317, which takes a tenth
+/// of the time to certify: the file passes with the right counts, and a line with another digest or another score than
+/// the barred bounds' is refused naming the line and the board.
+#[test]
+fn a_short_stretch_certified_passes_and_a_doctored_digest_or_score_is_refused() {
+    let dir = TempDir::new("verify-short");
+    let (certs, boards) = certify_short_stretch(&dir);
+    let (results, upper) = (results_path("strict.jsonl"), upper_files());
+    let lines = json_lines(&certs);
+    let run = run_verify(&[&certs], &results, &upper, &[]);
+    assert_eq!(run.code, Some(0), "{}{}", run.stdout, run.stderr);
+    assert_eq!(run.stderr, "");
+    let counts = "7 lines, 7 final, 0 incomplete; certified by search 5, certified by the same problem 2, beaten 0";
+    assert!(run.stdout.contains(&format!("{}: {counts}", certs.display())), "{}", run.stdout);
+    assert!(run.stdout.contains("boards certified: 7 ("), "{}", run.stdout);
+    assert!(run.stdout.contains("counterexamples: none"), "{}", run.stdout);
+
+    let wrong = with_line_changed(&lines, 2, &["digest"], Json::from("0123456789abcdef"));
+    assert_refused(&dir, "digest.jsonl", &wrong, 3, boards[2], "Π⁺(O) set up again is not the line's");
+    let score = number_at(&lines[0], &["score"]);
+    let wrong = with_line_changed(&lines, 0, &["score"], Json::from(score + 1));
+    let why = format!("its score is {}, that of the --upper files {score}", score + 1);
+    assert_refused(&dir, "score.jsonl", &wrong, 1, boards[0], &why);
+}
+
+/// The checks of [`doctored_lines_are_refused_naming_the_line`] on a game that rests on another, on the stretch
+/// 630..=640: a `same_problem` with a wrong `best` is refused, and so is one whose game has no line in the file.
+#[test]
+fn a_doctored_same_problem_of_a_short_stretch_is_refused() {
+    let dir = TempDir::new("verify-short-rule");
+    let (certs, boards) = certify_short_stretch(&dir);
+    let lines = json_lines(&certs);
+    let k = lines.iter().position(|line| line.get("same_problem").is_some()).unwrap();
+    let rests_on = number_at(&lines[k], &["same_problem", "n"]) as u32;
+    let best = number_at(&lines[k], &["same_problem", "best"]);
+    let wrong = with_line_changed(&lines, k, &["same_problem", "best"], Json::from(best + 1));
+    let why = format!("its same_problem is wrong: best {} (the certificate of n={rests_on} proved {best})", best + 1);
+    assert_refused(&dir, "best.jsonl", &wrong, k + 1, boards[k], &why);
+    let at = boards.iter().position(|&n| n == rests_on).unwrap();
+    let mut removed = lines.clone();
+    removed.remove(at);
+    let why = format!("it rests on n={rests_on}, but the file has no final line of");
+    assert_refused(&dir, "removed.jsonl", &removed, at + 1, boards[k], &why);
+}
+
+/// The checks of [`incomplete_lines_are_counted_a_torn_last_line_is_ignored_and_a_bad_line_is_refused`] on the stretch
+/// 630..=640: an `incomplete` line is counted and skipped, a torn last line is ignored, and a line that is no
+/// certificate is refused naming the file and the line.
+#[test]
+fn an_incomplete_and_a_torn_and_a_bad_line_of_a_short_stretch_are_handled() {
+    let dir = TempDir::new("verify-short-torn");
+    let (certs, _) = certify_short_stretch(&dir);
+    let (results, upper) = (results_path("strict.jsonl"), upper_files());
+    let lines = json_lines(&certs);
+    let incomplete = with_value(&lines[0], &["verdict"], Json::from("incomplete"));
+    let mut text: String = [vec![incomplete], lines.clone()].concat().iter().map(|line| format!("{line}\n")).collect();
+    text.push_str("{\"n\":641,\"verd");
+    let file = write_file(&dir, "torn.jsonl", &text);
+    let run = run_verify(&[&file], &results, &upper, &[]);
+    assert_eq!(run.code, Some(0), "{}{}", run.stdout, run.stderr);
+    let counts = "8 lines, 7 final, 1 incomplete; certified by search 5, certified by the same problem 2, beaten 0";
+    let torn = format!("{}: {counts}; a torn last line (ignored)", file.display());
+    assert!(run.stdout.contains(&torn), "{}", run.stdout);
+    assert!(run.stderr.contains(&format!("note: {}: torn last line ignored", file.display())), "{}", run.stderr);
+
+    let text: String = lines.iter().map(|line| format!("{line}\n")).collect::<String>() + "this is not json\n";
+    let file = write_file(&dir, "bad.jsonl", &text);
+    let run = run_verify(&[&file], &results, &upper, &[]);
+    assert_eq!(run.code, Some(1), "{}{}", run.stdout, run.stderr);
+    assert!(run.stderr.contains(&format!("{}: line 8: JSON syntax error", file.display())), "{}", run.stderr);
+    assert_eq!(run.stdout, "");
+}
+
+/// The check of [`a_line_whose_score_is_not_the_results_is_refused`] on the game 1305, the cheapest past the table
+/// that the results are not known by (the table ends at 1300): a score changed in the results' game, with the line
+/// right, is refused.
+#[test]
+fn a_line_whose_score_is_not_the_results_game_is_refused() {
+    let (n, dir) = (1305, TempDir::new("verify-short-score"));
+    let certs = dir.join("certs.jsonl");
+    let run = run_certify(&format!("{n}-{n}"), &results_path("strict.jsonl"), &certs, &[]);
+    assert_eq!(run.code, Some(0), "{}{}", run.stdout, run.stderr);
+    let (results, planted, _) = plant_wrong_score(&dir, n);
+    let run = run_verify(&[&certs], &results, &upper_files(), &[]);
+    assert_eq!(run.code, Some(1), "{}{}", run.stdout, run.stderr);
+    let score = fixtures().known.score(n).unwrap();
+    let message = format!("line 1: n={n}: its score is {score}, that of the results' game {planted}");
+    assert!(run.stderr.contains(&message), "{}", run.stderr);
+}
+
 /// A file of certificates `taxman certify` wrote over a stretch with repeats passes, through the binary: the summary
 /// counts its lines right (six, of which three rest on the game before them), names the boards, the build and what is
 /// taken on trust, and gives the proven end of the chain with the committed prover files: every game to 2175, the first
 /// past it needing a certificate that the files do not have.  The result is the same on two threads.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(a_short_stretch_certified_passes_and_a_doctored_digest_or_score_is_refused))]
 fn a_file_certify_wrote_passes_and_the_summary_counts_it() {
     let dir = TempDir::new("verify-passes");
     let (certs, results) = (certify_stretch(&dir), results_path("strict.jsonl"));
@@ -1467,10 +1748,23 @@ fn a_file_certify_wrote_passes_and_the_summary_counts_it() {
 /// A line whose formulation is changed to the other is refused, naming the line and the board: the problem set up again
 /// in that formulation is not the line's.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(a_file_that_mixes_the_formulations_over_609_to_611_passes_and_a_changed_formulation_is_refused))]
 fn a_file_that_mixes_the_formulations_passes_and_a_changed_formulation_is_refused() {
+    a_file_that_mixes_the_formulations_over(&[(609, 611), (667, 671)]);
+}
+
+/// [`a_file_that_mixes_the_formulations_passes_and_a_changed_formulation_is_refused`] for the stretch 609..=611 alone.
+#[test]
+fn a_file_that_mixes_the_formulations_over_609_to_611_passes_and_a_changed_formulation_is_refused() {
+    a_file_that_mixes_the_formulations_over(&[(609, 611)]);
+}
+
+/// The file that mixes the formulations over each of the stretches `stretches` (the first and last game of each) passes,
+/// and each line with its formulation flipped is refused.
+fn a_file_that_mixes_the_formulations_over(stretches: &[(u32, u32)]) {
     let dir = TempDir::new("verify-mixed");
     let results = results_path("strict.jsonl");
-    for (first, last) in [(609, 611), (667, 671)] {
+    for &(first, last) in stretches {
         let boards = needing(first..=last);
         let total = boards.len();
         let (without, with) = (problems_of(&boards, false), problems_of(&boards, true));
@@ -1545,6 +1839,7 @@ fn number_at(json: &Json, keys: &[&str]) -> u64 {
 /// with an entry in the counterexample file, a `build` without a commit, and a width that is not the one the problem
 /// takes.  (A wrong score in the results' game is in the next test.)
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(a_doctored_same_problem_of_a_short_stretch_is_refused))]
 fn doctored_lines_are_refused_naming_the_line() {
     let dir = TempDir::new("verify-doctored");
     let lines = json_lines(&certify_stretch(&dir));
@@ -1630,6 +1925,7 @@ fn doctored_lines_are_refused_naming_the_line() {
 /// A score changed in the results' game, with the line right, is refused too: the line's score is the barred bounds',
 /// but not the results'.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(a_line_whose_score_is_not_the_results_game_is_refused))]
 fn a_line_whose_score_is_not_the_results_is_refused() {
     let dir = TempDir::new("verify-results-score");
     let lines = json_lines(&certify_stretch(&dir));
@@ -1669,6 +1965,7 @@ fn a_line_whose_score_is_not_the_results_is_refused() {
 /// no certificate is refused naming the file and the line (the way the file refuses it when `certify` opens it), a
 /// torn last line is noted on stderr and ignored, and an `incomplete` line is counted and skipped.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(an_incomplete_and_a_torn_and_a_bad_line_of_a_short_stretch_are_handled))]
 fn incomplete_lines_are_counted_a_torn_last_line_is_ignored_and_a_bad_line_is_refused() {
     let dir = TempDir::new("verify-torn");
     let lines = json_lines(&certify_stretch(&dir));
@@ -1992,12 +2289,28 @@ fn the_work_list_on_600_to_1300_agrees_with_the_certificates() {
 /// counterexample; and the proven end of the chain is still 2175 (they are of games the prover proved already), the
 /// first game that is not proven being 2176.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(the_first_committed_certificates_verify))]
 fn the_committed_certificates_verify() {
-    let certs = crate_file("bench/certify/certificates_600_1300.jsonl");
-    let lines = json_lines(&certs);
+    the_committed_certificates_verify_first(377);
+}
+
+/// [`the_committed_certificates_verify`] for the first 40 lines of the file.
+#[test]
+fn the_first_committed_certificates_verify() {
+    the_committed_certificates_verify_first(40);
+}
+
+/// The first `count` lines of the committed certificates (a file that `taxman certify` could have written itself)
+/// verify, with the counts of those lines.
+fn the_committed_certificates_verify_first(count: usize) {
+    let committed = crate_file("bench/certify/certificates_600_1300.jsonl");
+    let mut lines = json_lines(&committed);
+    assert_eq!(lines.len(), 377);
+    lines.truncate(count);
+    let dir = TempDir::new("verify-committed");
+    let certs = if count == 377 { committed } else { write_lines(&dir, "first.jsonl", &lines) };
     let settled = lines.iter().filter(|line| line.get("same_problem").is_some()).count();
     let (total, searched) = (lines.len(), lines.len() - settled);
-    assert_eq!(total, 377);
 
     let run = run_verify(&[&certs], &results_path("strict.jsonl"), &committed_upper_files(), &["--threads", "2"]);
     assert_eq!(run.code, Some(0), "{}{}", run.stdout, run.stderr);

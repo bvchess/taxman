@@ -13,6 +13,8 @@ mod support;
 #[allow(unused_imports)]
 pub use binary::{path, python, taxman, Run};
 #[allow(unused_imports)]
+pub(crate) use support::long;
+#[allow(unused_imports)]
 pub use support::{Rng, TempDir};
 #[allow(unused_imports)]
 pub use taxman::playable::{peel, play_order, playable};

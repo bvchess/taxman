@@ -55,10 +55,11 @@
 mod common;
 
 use common::{
-    config, for_each_kept_subset, kept_subsets, play_order, playable, random_open_sets, random_subset, shuffle, upper,
-    upper_from_3, Rng,
+    config, for_each_kept_subset, kept_subsets, long, play_order, playable, random_open_sets, random_subset, shuffle,
+    upper, upper_from_3, Rng,
 };
 use std::collections::BTreeSet;
+use std::fmt::Debug;
 use std::ops::RangeInclusive;
 use std::time::Instant;
 use taxman::bits::Bits;
@@ -315,32 +316,64 @@ fn theorem_m_plus_with_no_open_source_with_claims() {
     check_every_board(2..=80, true, |_, _| vec![Vec::new()]);
 }
 
-/// Theorem M⁺ with three random subsets of U\*_{≥3} open, on every set of every board from 2 to 80 that has such
-/// sources.
+/// Theorem M⁺ with three random subsets of U\*_{≥3} open, on every set of every board from 2 to 48 that has such
+/// sources.  (The boards 49 to 80 are in [`theorem_m_plus_with_open_sources_49_to_80`]: the number of sets, and the
+/// time, grow with the board, and the boards past 50 take most of it.)
 #[test]
 fn theorem_m_plus_with_open_sources() {
     let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
-    check_every_board(2..=80, false, |_, from_3| random_open_sets(&mut rng, from_3, 3, 8));
+    check_every_board(2..=48, false, |_, from_3| random_open_sets(&mut rng, from_3, 3, 8));
+}
+
+/// [`theorem_m_plus_with_open_sources`] on the boards 49 to 80.
+#[test]
+#[cfg_attr(debug_assertions, ignore = long!(theorem_m_plus_with_open_sources))]
+fn theorem_m_plus_with_open_sources_49_to_80() {
+    let mut rng = Rng(0x6A09_E667_F3BC_C909);
+    check_every_board(49..=80, false, |_, from_3| random_open_sets(&mut rng, from_3, 3, 8));
 }
 
 /// [`theorem_m_plus_with_open_sources`] with the claims of `unzip`, for other random subsets.
 #[test]
 fn theorem_m_plus_with_open_sources_with_claims() {
     let mut rng = Rng(0xBF58_476D_1CE4_E5B9);
-    check_every_board(2..=80, true, |_, from_3| random_open_sets(&mut rng, from_3, 3, 8));
+    check_every_board(2..=48, true, |_, from_3| random_open_sets(&mut rng, from_3, 3, 8));
 }
 
-/// Theorem M⁺ with every source of three or more prime factors open, on every set of every board from 2 to 60.
+/// [`theorem_m_plus_with_open_sources_49_to_80`] with the claims of `unzip`.
+#[test]
+#[cfg_attr(debug_assertions, ignore = long!(theorem_m_plus_with_open_sources_with_claims))]
+fn theorem_m_plus_with_open_sources_49_to_80_with_claims() {
+    let mut rng = Rng(0xBB67_AE85_84CA_A73B);
+    check_every_board(49..=80, true, |_, from_3| random_open_sets(&mut rng, from_3, 3, 8));
+}
+
+/// Theorem M⁺ with every source of three or more prime factors open, on every set of every board from 2 to 44.  (The
+/// boards 45 to 60 are in [`theorem_m_plus_with_every_source_open_45_to_60`], and take twenty times as long.)
 #[test]
 fn theorem_m_plus_with_every_source_open() {
-    check_every_board(2..=60, false, |_, from_3| vec![from_3.to_vec()]);
+    check_every_board(2..=44, false, |_, from_3| vec![from_3.to_vec()]);
+}
+
+/// [`theorem_m_plus_with_every_source_open`] on the boards 45 to 60.
+#[test]
+#[cfg_attr(debug_assertions, ignore = long!(theorem_m_plus_with_every_source_open))]
+fn theorem_m_plus_with_every_source_open_45_to_60() {
+    check_every_board(45..=60, false, |_, from_3| vec![from_3.to_vec()]);
 }
 
 /// [`theorem_m_plus_with_every_source_open`] with the claims of `unzip`, which only the components of layers 1 and 2
 /// keep then.
 #[test]
 fn theorem_m_plus_with_every_source_open_with_claims() {
-    check_every_board(2..=60, true, |_, from_3| vec![from_3.to_vec()]);
+    check_every_board(2..=44, true, |_, from_3| vec![from_3.to_vec()]);
+}
+
+/// [`theorem_m_plus_with_every_source_open_45_to_60`] with the claims of `unzip`.
+#[test]
+#[cfg_attr(debug_assertions, ignore = long!(theorem_m_plus_with_every_source_open_with_claims))]
+fn theorem_m_plus_with_every_source_open_45_to_60_with_claims() {
+    check_every_board(45..=60, true, |_, from_3| vec![from_3.to_vec()]);
 }
 
 /// [`theorem_m_plus_with_no_open_source`] and [`theorem_m_plus_with_open_sources`] on the boards 81 to 100.
@@ -681,14 +714,28 @@ fn check_random_boards(boards: &[u32], claims: bool, sets: usize, seed: u64) -> 
     tally
 }
 
+/// Theorem M⁺ on a few random sets of the boards 300 and 600.
+#[test]
+fn theorem_m_plus_on_a_few_random_sets() {
+    check_random_boards(&[300, 600], false, 10, 0x9FB2_1C65_1E98_DF25);
+}
+
+/// [`theorem_m_plus_on_a_few_random_sets`] with the claims of `unzip`, for other random sets.
+#[test]
+fn theorem_m_plus_on_a_few_random_sets_with_claims() {
+    check_random_boards(&[300, 600], true, 10, 0x510E_527F_ADE6_82D1);
+}
+
 /// Theorem M⁺ on random sets of the boards 300, 600, 1000 and 1300.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(theorem_m_plus_on_a_few_random_sets))]
 fn theorem_m_plus_on_random_sets() {
     check_random_boards(&[300, 600, 1000, 1300], false, 100, 0xA076_1D64_78BD_642F);
 }
 
 /// [`theorem_m_plus_on_random_sets`] with the claims of `unzip`, for other random sets.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(theorem_m_plus_on_a_few_random_sets_with_claims))]
 fn theorem_m_plus_on_random_sets_with_claims() {
     check_random_boards(&[300, 600, 1000, 1300], true, 100, 0x5851_F42D_4C95_7F2D);
 }
@@ -711,6 +758,7 @@ fn theorem_m_plus_on_random_sets_past_1300_with_claims() {
 /// it can let in: 741 (374 is rejected), 1100 (578) and 1200 (605).  Greedy rejects no source of layer 3 or more on
 /// the boards to 740, nor on 1000 or 1300, so the other tests never meet one; some of the sets here have one in them.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(theorem_m_plus_with_a_few_sets_of_a_rejected_source))]
 fn theorem_m_plus_with_a_rejected_source() {
     let tally = check_random_boards(&[741, 1100, 1200], false, 100, 0x8EBC_6AF0_9C88_C6E3);
     assert!(tally.with_rejected > 0, "no set has a rejected source: {tally:?}");
@@ -719,8 +767,23 @@ fn theorem_m_plus_with_a_rejected_source() {
 /// [`theorem_m_plus_with_a_rejected_source`] with the claims of `unzip` (which the components that hold an open or a
 /// rejected source do not keep).
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(theorem_m_plus_with_a_few_sets_of_a_rejected_source_with_claims))]
 fn theorem_m_plus_with_a_rejected_source_with_claims() {
     let tally = check_random_boards(&[741, 1100, 1200], true, 100, 0x2F72_B4B7_F3A9_C5D1);
+    assert!(tally.with_rejected > 0, "no set has a rejected source: {tally:?}");
+}
+
+/// [`theorem_m_plus_with_a_rejected_source`] on the board 741 alone, the cheapest of the three, and fewer sets.
+#[test]
+fn theorem_m_plus_with_a_few_sets_of_a_rejected_source() {
+    let tally = check_random_boards(&[741], false, 20, 0x3C6E_F372_FE94_F82B);
+    assert!(tally.with_rejected > 0, "no set has a rejected source: {tally:?}");
+}
+
+/// [`theorem_m_plus_with_a_few_sets_of_a_rejected_source`] with the claims of `unzip`.
+#[test]
+fn theorem_m_plus_with_a_few_sets_of_a_rejected_source_with_claims() {
+    let tally = check_random_boards(&[741], true, 20, 0xA54F_F53A_5F1D_36F1);
     assert!(tally.with_rejected > 0, "no set has a rejected source: {tally:?}");
 }
 
@@ -1030,7 +1093,7 @@ impl<'b, const W: usize> Problem<'b, W> {
 /// of these open sets O: the empty set; U\*_{≥3} itself, up to the board 120; and five random subsets of U\*_{≥3} with
 /// 1 to 20 members (none if U\*_{≥3} is empty, and no more than it has members).  A problem with no candidate at all is
 /// skipped.
-fn check_model_on_boards(boards: RangeInclusive<u32>, draws: Draws, seed: u64) -> ModelTally {
+fn check_model_on_boards(boards: impl Iterator<Item = u32> + Clone + Debug, draws: Draws, seed: u64) -> ModelTally {
     let (mut rng, start, mut tally) = (Rng(seed), Instant::now(), ModelTally::default());
     for n in boards.clone() {
         let board = Board::<8>::for_n(n);
@@ -1076,21 +1139,36 @@ fn assert_reached(tally: &ModelTally) {
 /// What the default tests draw for each problem.
 const DRAWS: Draws = Draws { subsets: 100, chains: 40 };
 
+/// What the quick test draws: a fifth.
+const QUICK_DRAWS: Draws = Draws { subsets: DRAWS.subsets / 5, chains: DRAWS.chains / 5 };
+
+/// The model of Π⁺(O) with one-sided candidates, against the reference predicate, on a sample of the boards 2 to 300
+/// (all to 30, then every ninth) with a fifth of the draws: promoting a set at once or one member at a time, its
+/// conflicts and nogoods, narrowing and count.
+#[test]
+fn the_model_with_one_sided_candidates_on_a_sample_of_the_boards() {
+    let boards = (2..=30).chain((31..=300).step_by(9));
+    assert_reached(&check_model_on_boards(boards, QUICK_DRAWS, 0x6C07_8965_6C07_8965));
+}
+
 /// The model of Π⁺(O) with one-sided candidates, against the reference predicate, on the boards 2 to 100: promoting a
 /// set at once or one member at a time, its conflicts and nogoods, narrowing and count.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(the_model_with_one_sided_candidates_on_a_sample_of_the_boards))]
 fn the_model_with_one_sided_candidates_2_to_100() {
     assert_reached(&check_model_on_boards(2..=100, DRAWS, 0x2545_F491_4F6C_DD1D));
 }
 
 /// The same on the boards 101 to 200.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(the_model_with_one_sided_candidates_on_a_sample_of_the_boards))]
 fn the_model_with_one_sided_candidates_101_to_200() {
     assert_reached(&check_model_on_boards(101..=200, DRAWS, 0x9E37_79B1_85EB_CA87));
 }
 
 /// The same on the boards 201 to 300.
 #[test]
+#[cfg_attr(debug_assertions, ignore = long!(the_model_with_one_sided_candidates_on_a_sample_of_the_boards))]
 fn the_model_with_one_sided_candidates_201_to_300() {
     assert_reached(&check_model_on_boards(201..=300, DRAWS, 0xC2B2_AE3D_27D4_EB4F));
 }
@@ -1222,45 +1300,80 @@ fn the_search_with_no_open_source_finds_the_heaviest_set_with_claims() {
     assert_eq!(found.searches, 2 * 79);
 }
 
-/// The search of Π⁺(O) on every board from 2 to 80 that has sources of three or more prime factors, for three random
-/// subsets O of them with 1 to 8 members each, under the tactics of extended mode.
-#[test]
-fn the_search_with_open_sources_finds_the_heaviest_set() {
-    let mut rng = Rng(0x2C1B_3C6D_9E37_79B9);
-    let found = check_the_search_on_boards(2..=80, false, &[SearchTactics::extended()], |_, from_3| {
+/// The search of Π⁺(O) on every board of `boards` that has sources of three or more prime factors, for three random
+/// subsets O of them with 1 to 8 members each, drawn with `seed`, under the tactics of extended mode, in the
+/// formulation `claims` says; more than `fewest` of the searches have a source open, and most of them play one.
+fn check_the_search_with_open_sources(boards: RangeInclusive<u32>, claims: bool, seed: u64, fewest: usize) {
+    let mut rng = Rng(seed);
+    let found = check_the_search_on_boards(boards, claims, &[SearchTactics::extended()], |_, from_3| {
         random_open_sets(&mut rng, from_3, 3, 8)
     });
-    assert!(found.with_open > 100, "{found:?}");
+    assert!(found.with_open > fewest, "{found:?}");
     assert!(found.with_one_sided * 2 > found.with_open, "most answers play an open source: {found:?}");
+}
+
+/// The search of Π⁺(U\*_{≥3}), every source of three or more prime factors open, on every board of `boards`, in the
+/// formulation `claims` says; more than `fewest` boards have one to open, and most of the answers play one.
+fn check_the_search_with_every_source_open(boards: RangeInclusive<u32>, claims: bool, fewest: usize) {
+    let tactics = [SearchTactics::extended()];
+    let found = check_the_search_on_boards(boards, claims, &tactics, |_, from_3| vec![from_3.to_vec()]);
+    assert!(found.with_open > fewest, "{found:?}");
+    assert!(found.with_one_sided * 2 > found.with_open, "most answers play an open source: {found:?}");
+}
+
+/// The search of Π⁺(O) on every board from 2 to 60 that has sources of three or more prime factors, for three random
+/// subsets O of them with 1 to 8 members each, under the tactics of extended mode.  (The boards 61 to 80 are in
+/// [`the_search_with_open_sources_finds_the_heaviest_set_61_to_80`].)
+#[test]
+fn the_search_with_open_sources_finds_the_heaviest_set() {
+    check_the_search_with_open_sources(2..=60, false, 0x2C1B_3C6D_9E37_79B9, 70);
+}
+
+/// [`the_search_with_open_sources_finds_the_heaviest_set`] on the boards 61 to 80.
+#[test]
+#[cfg_attr(debug_assertions, ignore = long!(the_search_with_open_sources_finds_the_heaviest_set))]
+fn the_search_with_open_sources_finds_the_heaviest_set_61_to_80() {
+    check_the_search_with_open_sources(61..=80, false, 0x1F83_D9AB_FB41_BD6B, 30);
 }
 
 /// [`the_search_with_open_sources_finds_the_heaviest_set`] with the claims of `unzip`, for other random subsets.
 #[test]
 fn the_search_with_open_sources_finds_the_heaviest_set_with_claims() {
-    let mut rng = Rng(0x7A6D_5E2F_3C4B_1A09);
-    let found = check_the_search_on_boards(2..=80, true, &[SearchTactics::extended()], |_, from_3| {
-        random_open_sets(&mut rng, from_3, 3, 8)
-    });
-    assert!(found.with_open > 100, "{found:?}");
-    assert!(found.with_one_sided * 2 > found.with_open, "most answers play an open source: {found:?}");
+    check_the_search_with_open_sources(2..=60, true, 0x7A6D_5E2F_3C4B_1A09, 70);
 }
 
-/// The search of Π⁺(U\*_{≥3}), every source of three or more prime factors open, on every board from 2 to 60.
+/// [`the_search_with_open_sources_finds_the_heaviest_set_61_to_80`] with the claims of `unzip`.
+#[test]
+#[cfg_attr(debug_assertions, ignore = long!(the_search_with_open_sources_finds_the_heaviest_set_with_claims))]
+fn the_search_with_open_sources_finds_the_heaviest_set_61_to_80_with_claims() {
+    check_the_search_with_open_sources(61..=80, true, 0x5BE0_CD19_137E_2179, 30);
+}
+
+/// The search of Π⁺(U\*_{≥3}), every source of three or more prime factors open, on every board from 2 to 45.  (The
+/// boards 46 to 60 are in [`the_search_with_every_source_open_finds_the_heaviest_set_46_to_60`].)
 #[test]
 fn the_search_with_every_source_open_finds_the_heaviest_set() {
-    let found =
-        check_the_search_on_boards(2..=60, false, &[SearchTactics::extended()], |_, from_3| vec![from_3.to_vec()]);
-    assert!(found.with_open > 20, "{found:?}");
-    assert!(found.with_one_sided * 2 > found.with_open, "most answers play an open source: {found:?}");
+    check_the_search_with_every_source_open(2..=45, false, 15);
+}
+
+/// [`the_search_with_every_source_open_finds_the_heaviest_set`] on the boards 46 to 60.
+#[test]
+#[cfg_attr(debug_assertions, ignore = long!(the_search_with_every_source_open_finds_the_heaviest_set))]
+fn the_search_with_every_source_open_finds_the_heaviest_set_46_to_60() {
+    check_the_search_with_every_source_open(46..=60, false, 5);
 }
 
 /// [`the_search_with_every_source_open_finds_the_heaviest_set`] with the claims of `unzip`.
 #[test]
 fn the_search_with_every_source_open_finds_the_heaviest_set_with_claims() {
-    let found =
-        check_the_search_on_boards(2..=60, true, &[SearchTactics::extended()], |_, from_3| vec![from_3.to_vec()]);
-    assert!(found.with_open > 20, "{found:?}");
-    assert!(found.with_one_sided * 2 > found.with_open, "most answers play an open source: {found:?}");
+    check_the_search_with_every_source_open(2..=45, true, 15);
+}
+
+/// [`the_search_with_every_source_open_finds_the_heaviest_set_46_to_60`] with the claims of `unzip`.
+#[test]
+#[cfg_attr(debug_assertions, ignore = long!(the_search_with_every_source_open_finds_the_heaviest_set_with_claims))]
+fn the_search_with_every_source_open_finds_the_heaviest_set_46_to_60_with_claims() {
+    check_the_search_with_every_source_open(46..=60, true, 5);
 }
 
 /// [`the_search_with_every_source_open_finds_the_heaviest_set`] on the boards 61 to 69, whose sets (0.4 to 5.5 million
