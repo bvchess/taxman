@@ -109,3 +109,73 @@ wall time), and the check found **0 violations**: every game replays to its L, L
 stretch where searches do not finish; other values of `--base` and `--gap-unit`; the release build.
 
 **Commits.**  4466311 (the dual bound), 83f6405 (the ledger and its relations), then this record.
+
+## Later (2026-10-17): the first cloud attempt, stopped, and the fix
+
+**The attempt.**  `bench/ledger/cloud.sh 2176-3440` on a `c8g.16xlarge` with 64 workers (20:31 UTC), stopped by a signal
+after 9 minutes at 1,299 CPU s (0.36 core-hours, about $0.18).  The machine was 95% idle (the run used 2.3 of its 64
+CPUs), the ledger's main thread at 100% and the workers waiting on it: 390 of the 1,265 boards had their map, no search
+had finished, no board was proven ([the files](../../bench/ledger/cloud-20261017-stopped/); the 21 MB events file and
+the 8 MB ledger are not kept).
+
+**The cause, measured.**  The first map was in at 1.45 s, and the relations of that one result ran until 59.1 s: 2,863
+changes, a cascade through the boards, a game built and replayed at each step.  The 390 maps made 161,615 changes (the
+upper bound: by the ceiling 81,861, by repeats 55,543, by primes 12,001; the lower: by monotone 6,614, repeats 2,995, the
+ceiling 1,249, primes 1,163), and the relations took 528 of the 540 seconds (a median 0.17 s after a map, at most 58 s).
+The maps came one at a time, and every cascade ran on through boards that had no map of their own yet, so that each
+map's cascade made their bounds over again (a board's lower bound improved a median 9 times, up to 21), the changes
+taken in the order of a stack.  Each game made was dear.  The same on the laptop, 2176..2400 (8 workers, the non-release
+build, 360 CPU s), with the main thread timed: **17.5 s of its 53 s** applying 153 results, 16.3 s of that in 22,545
+steps of the relations, 3,729 of which made a game: the referee 8.5 s (2.3 ms a game: two plays of it, each a division
+by every number below every move), repeat games 4.8 s (7 ms: the frame model's setup), the monotone and ceiling games
+3.0 s (the ceiling's replays the whole game after each move it adds), and 1.2 s for 6,977 events written a piece at a
+time.  The 101 maps took 31 s there; on 2176..2700 the 235 maps took 91 s for 443 s of work (55 s on eight workers), no
+search finished before 91.8 s, the workers used 72% of their CPU, and the budget of 540 CPU s went to 15 searches.  What
+grows is boards times maps.
+
+**The fix** (`examples/ledger/`, `game.rs`; every bound is the bound it was, each lower one a game the referee replays):
+
+* The maps are made first, all of them on the workers, their bounds kept as they come; when the last is in the
+  relations carry them once to every board (`settle`), and then the searches start.
+* A game is made only if it can beat the target's lower bound: the prime exchange scores exactly p − q more or less than
+  the source's game, a repeat game its bag and the promotions, the game of n − 1 followed by n at most n more.  The
+  monotone and ceiling games are made (cheap now) and shown to the referee only if the sum of their moves is more than
+  the target has.  The upper bounds are the arithmetic they were.
+* The games are completed in one pass (`game::complete`: the largest legal move again and again, found going down the
+  board once, as the pot only shrinks), not by a replay after each move.
+* The referee finds a move's divisors up to its square root, and `replay_finished` plays a game once, not twice:
+  4.66 ms to 0.13 ms at n = 3400, 2.18 to 0.07 at 2300, 0.43 to 0.02 at 1000.
+* The changes go in sweeps up the boards (a chain up in one sweep, a chain down in the next), the events are buffered and
+  written after each result, a result's changes carry one stamp, and the status line and the `end` event say how long
+  the main thread was busy and how long results waited for it.
+
+**After** (the laptop, 8 workers, non-release; CPU used is of the 8 workers over the whole run):
+
+| stretch and budget | wall | maps in at | CPU used | main thread busy | searches |
+|---|---|---|---|---|---|
+| 2176..2400, 360 CPU s, before | 52 s | 31 s | 87% | 17.5 s | 53 |
+| after | 48 s | 24 s | 95% | 0.8 s (the settle 0.65 s) | 61 |
+| 2176..2700, 540 CPU s, before | 96 s | 91 s | 72% | at least 52 s | 15 |
+| after | 71 s | 58 s | 96% | 1.8 s (the settle 1.7 s) | 33 |
+| 2176..3440, 2,520 CPU s, after | 329 s | 230 s | 96% | 6.3 s (the settle 5.4 s) | 209 |
+
+* From the end of the settle to the end the workers used 96% (2176..2400), 96% (2176..2700) and 98% (2176..3440) of
+  their CPU, and the 776 results of the last run cost the main thread 0.8 s in all, about a millisecond each; results
+  waited 0.05 s in all.  The map phase used 96 to 98% of the CPUs.  The settle, 5.4 s for 1,767 changes on the whole
+  stretch (the cascade of the first map alone took 58 s in the cloud), is the one pause: most of it, probably, the
+  about 550 repeat games at 7 to 12 ms.
+* The dry run again (1301..1500, six workers, the truth hidden, [bench/ledger/dry](../../bench/ledger/dry/), whose
+  files are now this run's; the first run's are in d7390e1): all 200 boards proven, **0 violations**, **573 CPU s in
+  133 s** (595 and 145 s before), the main thread busy 0.7 s.  The workers used 97% of their CPU in the first minute;
+  the stretch ends with the long searches of a few boards (1475 alone), so the whole run's 4.3 of 6 CPUs (4.1 before) is
+  the stretch's tail, not the main thread's.
+* Tests: the referee's divisors against the sweep over every number below, and the whole fast referee against the
+  slow one on the table's games and on those games with moves swapped, dropped, repeated and replaced; `complete`
+  against the slow loop; the games the relations make from the table's games score what the lemmas say, at every n to
+  1299; a run's events show the maps, one settle, then the searches.  One expectation changed: a wrong upper bound of
+  1000 one below what the relations derive is found at 1000 or at the board the sweep reaches first.
+
+**Not done.**  The cloud run is not repeated (it needs Brian's approval).  The repeat games are still made on the main
+thread: a search that improves the game of a class of eight makes seven of them, about 70 ms.
+
+**Commits.**  c9af16a (the fix and its tests), then this record.

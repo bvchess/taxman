@@ -129,8 +129,13 @@ game past 3440 is within a few minutes of one-thread search
   The file is not a chain and never goes into `strict.jsonl`.
 * **The ledger**, built 2026-10-17 (Brian's idea: L and U for every board of a stretch at once, limited searches with
   the dual bound of a stopped search, the relations between boards proven in THEORY.md, the effort where a proof looks
-  cheapest; `examples/ledger/`).  The laptop's dry run of 1301..1500 with the truth hidden proved all 200 boards at
-  the optimum, 0 violations, for 1.33 times the one-thread chain's CPU in a third of its wall time on six workers
+  cheapest; `examples/ledger/`).  The laptop's dry run of 1301..1500 with the truth hidden proves all 200 boards at
+  the optimum, 0 violations, for 1.28 times the one-thread chain's CPU (573 s) in 30% of its wall time on six workers
   ([the entry](experiments/the-ledger-bounds-from-both-sides-2026-10.md)).  The experiment of the design, 2176..3440
-  for an hour of a `c8g.16xlarge` (about $0.9 at spot), is ready, not run, and needs Brian's approval
+  for an hour of a `c8g.16xlarge` (about $0.9 at spot), was launched once (2026-10-17) and stopped after 9 minutes
+  ($0.18): the machine was 95% idle, the ledger's main thread replaying a game at every step of each map's cascade.
+  Fixed the same day (the maps first, a game made only if it can beat the board's, a faster referee): on the laptop,
+  2176..3440 keeps the workers at 96% of their CPU with the main thread busy 6 s of 329
+  ([the fix](experiments/the-ledger-bounds-from-both-sides-2026-10.md#later-2026-10-17-the-first-cloud-attempt-stopped-and-the-fix)).
+  The experiment is ready again, not re-run, and needs Brian's approval
   ([RUNBOOK section 14](../tools/cloud/RUNBOOK.md#14-the-ledgers-experiment)).

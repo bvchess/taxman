@@ -56,6 +56,20 @@ def main(directory, chain=None):
         print(f"a stopped search's dual bound below its board's root bound: median {median(below)}, max {max(below)}")
     derived = Counter((e["side"], e["rule"]) for e in events if e["action"] == "derive")
     print("changes the relations made:", ", ".join(f"{s} {r} {c}" for (s, r), c in sorted(derived.items())))
+    settle = [e for e in events if e["action"] == "settle"]
+    if settle:
+        print(f"the maps' bounds carried at {settle[0]['t']:.1f} s: {settle[0]['changes']} changes in "
+              f"{settle[0]['seconds']:.2f} s")
+    if "main_s" in end:
+        print(f"the main thread: busy {end['main_s']:.1f} s of {end['t']:.0f} (its longest piece "
+              f"{end['main_longest_s']:.2f} s), results waited {end['waited_s']:.1f} s in all")
+    workers = start["workers"]
+    whole = (end["cpu"] - start["cpu"]) / (end["t"] - start["t"])
+    print(f"the run's CPU over its wall time: {whole:.2f} of {workers} workers ({whole / workers:.0%})")
+    after_maps = [e for e in events if e["action"] != "derive" and maps and e["t"] >= maps[-1]["t"]]
+    if len(after_maps) > 1 and after_maps[-1]["t"] > after_maps[0]["t"]:
+        used = (after_maps[-1]["cpu"] - after_maps[0]["cpu"]) / (after_maps[-1]["t"] - after_maps[0]["t"])
+        print(f"from the last map's result to the end: {used:.2f} of {workers} ({used / workers:.0%})")
     print("boards by their number of searches:", dict(sorted(Counter(e["attempts"] for e in ledger).items())))
     if chain:
         games = lines(chain)
