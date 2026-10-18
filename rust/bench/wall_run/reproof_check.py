@@ -1,9 +1,8 @@
 #!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
 """The run to the wall against the committed chain: reproof_check.py
 
-The run solved games 1..3440 again before it went on; reproof.jsonl.gz holds its lines of those games, reduced to n,
-score, method, proof, nodes, seconds, threads, invocations and the commit.  Its lines of 3441..3914 are the committed
-file's, byte for byte, so they are not repeated here.  This prints the games whose score, proof or method differ from
+The run solved games 1..3440 again before it went on; reproof.jsonl.gz holds its lines of those games, whole.  Its
+lines of 3441..3914 are the committed file's, byte for byte, so they are not repeated here.  This prints the games whose score, proof or method differ from
 results/strict.jsonl's (none), and, by range, the search seconds and nodes of the run against the committed lines
 (1..2175 is the first run, 2176..3440 the second, with the older build; 3441..3914 the run itself), and the run's
 longest games.  Standard library only.

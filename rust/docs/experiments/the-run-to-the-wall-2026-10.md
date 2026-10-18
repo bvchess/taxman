@@ -25,8 +25,9 @@ that draws on it records those games with no search and starts at 3915, where th
 *What it made.*  The 3,914 games 1..3914, each built from the one before, nothing assumed.
 
 * **1..3440 again: the same scores, proofs and methods, game for game** (3,440 of 3,440;
-  `bench/wall_run/reproof_check.py` compares the run's lines, kept in `reproof.jsonl.gz`, with the committed file's).
-  The lines differ in nodes and seconds, as the build does.  Over 2176..3440 the summed search seconds were 14.1 hours
+  `bench/wall_run/reproof_check.py` compares the run's lines, kept whole in `reproof.jsonl.gz`, with the committed
+  file's; the independent referee `tools/check_results.py` accepts them, nothing assumed).  The lines differ in nodes
+  and seconds, as the build does.  Over 2176..3440 the summed search seconds were 14.1 hours
   against the second run's 47.3 (0.30) and the nodes 7.80 billion against 17.73 (0.44); the games overlap in the
   window, so these add up to more than the time.  Game 3440 took 6,323 s (1.76 hours, 1.36 billion nodes) against
   18,184 s (5.05 hours, 3.72 billion).  Of the 165 games that the second run searched for more than a minute, the
@@ -57,5 +58,5 @@ a day at 3,740 and three days at 4,050; 35.7 hours reached 3,914.
 appended); the logs, the chart of the search times and `reproof_check.py` are in
 [bench/wall_run](../../bench/wall_run/README.md).
 
-*Not kept.*  The checkpoint of game 3915 (2.9 MB; a build other than eb84a6f cannot resume it), the 22 MB results file
-(1..3440 as reduced lines; 3441..3914 are the committed ones) and the other checkpoints.
+*Not kept.*  The checkpoint of game 3915 (2.9 MB; a build other than eb84a6f cannot resume it), the lines of the
+results file past 3440 (the committed ones) and the other checkpoints.

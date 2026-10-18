@@ -19,14 +19,14 @@ byte for byte; its checkpoints, results file and the stop marker are not kept (b
 | `logs/chain.err.gz` | gzipped | its progress lines, every 60 s for the games in flight: nodes and rate, the queue, the engine's counters (`eff`, `idle`, `lock`, splits, steals, pauses) and the nogood table's |
 | `logs/setup.log` | | `setup.sh` on the machine: the build and the smoke checks (`optimal.json` replayed, both referees on the committed files, the first 400 games, the prover on 2..400), all passing; the machine, the rustc and the commit |
 | `logs/wall-node.log`, `logs/spot-watch.log`, `logs/save.log.gz` | | the node script's events (setup, `chain.sh`, the stop request, the end), the spot-interruption watch (it watched and saw none: one machine ran all the run) and the saves to S3 every 10 minutes |
-| `reproof.jsonl.gz` | the run's own `results/strict.jsonl`, games 1..3440, each line cut to the keys `n`, `score`, `method`, `proof`, `nodes`, `seconds`, `threads`, `invocations` and the build's `commit` (the full lines are 22 MB; no script is kept for the cut) | the re-proof of 1..3440, which the committed file does not hold (it has the second run's lines there); 3441..3914 are the committed ones, so they are not repeated |
+| `reproof.jsonl.gz` | the first 3440 lines of the run's own `results/strict.jsonl`, gzipped (18 MB, 0.62 MB gzipped); `gunzip -c reproof.jsonl.gz > FILE`, then `python3 -I ../../tools/check_results.py FILE`: all checks pass (3,440 completed games, nothing assumed; `taxman verify-results FILE` is the solver's referee) | the re-proof of 1..3440, which the committed file does not hold (it has the second run's lines there); 3441..3914 are the committed ones, so they are not repeated |
 | `reproof_check.py` | `./reproof_check.py` (from anywhere; standard library) | compares `reproof.jsonl.gz` with the committed file (score, proof and method: 3,440 of 3,440 equal), and prints the search seconds and nodes by range against the committed lines (2176..3440: 14.13 hours and 7.80 G nodes against 47.33 and 17.73) and the run's longest games |
 | `plot_search_times.py`, `search_times_wall_run.svg` | `./plot_search_times.py search_times_wall_run.svg` | the search seconds of each searched game of the run (blue), against the second run's on 2176..3440 (gray), log scale; from `reproof.jsonl.gz` and the committed file.  A first picture, drawn when the run stood at game 3399 and left untracked at the repository's root, was this plot of that day's data (this script reproduces it byte for byte when cut at 3399); this one is the finished run |
 
 ## What is not kept
 
 * `results/strict.jsonl` (22 MB, games 1..3914 and the stopped game's line 3915 with `score` null): 3441..3914 are the
-  committed file's lines, byte for byte (compared when this was written), and 1..3440 are in `reproof.jsonl.gz` cut down.
+  committed file's lines, byte for byte (compared when this was written), and 1..3440 are in `reproof.jsonl.gz`.
 * `ckpt/`: the checkpoint and clock of game 3915 (2.9 MB, at 49 minutes and 138 million nodes of its search).  Only the
   build that made it, eb84a6f, can resume it (a checkpoint belongs to its build, RUNBOOK section 5), and the next run
   draws on the known games instead.
