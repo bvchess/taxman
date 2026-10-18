@@ -29,8 +29,8 @@ scaling run did by hand what it does), and nothing has run on Ubuntu.  `wall.sh`
 `run.sh` (section 12) ran on macOS against a stand-in for aws (`test/run.sh`) and on EC2, in the rehearsal of
 section 12.5 and in [the run to the wall](../../docs/experiments/the-run-to-the-wall-2026-10.md).  The build cache and
 the release suite (section 15) ran on macOS against a directory for the bucket, the stand-in for aws and a stand-in
-for cargo, and the suite's runner ran the whole solver and prover suites in the test profile; none of it has run on
-EC2.  Sections 2 and 3 exist to find the problems that a macOS run cannot, on a machine that costs cents.  The speed of
+for cargo, and the suite's runner ran the whole solver and prover suites in the test profile; both ran on EC2 on
+2026-10-18 (section 15).  Sections 2 and 3 exist to find the problems that a macOS run cannot, on a machine that costs cents.  The speed of
 a Graviton core and the scaling of the solver to 64 and 192 threads are measured (the calibration and the
 [scaling run](../../docs/experiments/scaling-to-192-threads-2026-10.md)); what is not is in section 8.
 
@@ -2019,7 +2019,8 @@ A machine that needs the solver does not build it when a machine has already bui
 release binaries of the commit from S3.  The build is the dearest part of a start (about 10 minutes, with fat LTO and
 one codegen unit, which stay: the speed of the programs matters more than build minutes), and a run that is replaced
 after an interruption pays it again on every machine.  Nothing untested is stored, so a hit starts the job at once.
-Built, and tested on the laptop (below); **not yet run on EC2**.
+Run on EC2 on 2026-10-18: the release of ca357bf for the run to 5000 (the solver's suite, 699 tests on 64 jobs in 311 s)
+and of 260e74f with the study tools for the A1 measurement, each tested before it was stored.
 
 ### 15.1 The key and the layout
 
