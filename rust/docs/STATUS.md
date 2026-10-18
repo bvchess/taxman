@@ -1,6 +1,6 @@
 # Status
 
-Updated 2026-10-17.
+Updated 2026-10-18.
 
 What is in flight, what is paused, what is decided and what waits on a decision, as of the date above.  This page is
 the only place for the current state: it is rewritten, not appended to, whenever work lands or a decision is made
@@ -74,6 +74,13 @@ search for the same time: 21%), a mean shortfall of 28 against 297; the sound se
 the nodes and 0.48 of the CPU, finder included, of the search from today's start (the optimum as the seed: 0.38 of the
 nodes).  It is in `wall finders`, `wall sound` and the ledger (below), not in the solver
 ([the entry](experiments/finders-for-good-games-that-are-not-sound-2026-10.md)).
+
+**Floors for upper bounds** (2026-10-18): a search from a floor F, an incumbent worth F with no set
+(`search::search_above`, THEORY.md Lemma F), proves "nothing weighs more than F" for an F above the optimum far more
+cheaply than the proof: on 14 games of 2265-3259 (gaps 627-1,113), proving down a quarter, a half and three quarters of
+the gap took a median 1/20,000, 1/740 and 1/26 of the full proof's nodes, the log of the nodes linear in the distance
+(a decade per 147; r² 0.996), and 10,000 steps (2 s) proved down a median 514 of 834.  It is in `wall target`, not yet
+in the ledger ([the entry](experiments/proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10.md)).
 
 ## Decided
 

@@ -1,5 +1,6 @@
 .idea
 target
+!/rust/bench/target/
 bin/taxman.jar
 .DS_Store
 *.iml

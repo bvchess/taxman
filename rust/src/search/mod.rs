@@ -195,13 +195,13 @@ pub fn search<const W: usize>(
 /// heavier than the floor becomes the incumbent as usual, and is a real game (so a lower bound on the game's optimum).
 /// If the search completes and finds none, no promotion set is heavier than `floor`
 /// ([`SearchResult::floor_held`], heuristics/THEORY.md, Lemma F): an upper bound on the game's best promotion sum,
-/// proven by a search whose tree is the one of a search from an incumbent worth `floor`, so smaller than the proof of
-/// the optimum when `floor` is above it.  `cap` and `resume` are as for [`search`]; a search that a limit stopped
-/// resumes from its checkpoint under the same floor (or a higher one is refused, a lower one is not honored).
+/// proven by the tree of a search from an incumbent worth `floor`: the proof's, when the floor is the optimum.  `cap`
+/// and `resume` are as for [`search`]; a search that a limit stopped resumes from its checkpoint under the same floor.
 ///
 /// # Errors
 ///
-/// As [`search`]'s, and for a checkpoint written under a lower floor, or none.
+/// As [`search`]'s, and for a checkpoint that holds a floor and no set under another floor or none, or whose incumbent
+/// is worth less than `floor`.
 pub fn search_above<const W: usize>(
     prepared: &Prepared<W>,
     cfg: &EngineConfig,

@@ -586,7 +586,9 @@ set, with no start made, so that nodes are pruned against the floor as against a
 heavier becomes the incumbent as usual.  A search that completes with none found has proven that nothing is heavier
 than the floor (heuristics/THEORY.md, Lemma F, the argument of the dual bound of a stopped search), which
 `SearchResult::floor_held` says.  Its tree is that of a search from an incumbent of that worth: the proof's, node for
-node, when the floor is the optimum (a search seeded with it), and smaller above it.
+node, when the floor is the optimum (a search seeded with it), and smaller above it, by a factor of about 27 for each
+quarter of the gap between the root's bound and the optimum on the games measured
+([the entry](docs/experiments/proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10.md)).
 
 ### Extended mode: one-sided candidates
 
@@ -1302,6 +1304,13 @@ shared with the unit tests: the engine's instances, the random configurations of
   carry the harness past the widths of the Java's table (n ≤ 1000).  A search below the root with the rule of symmetric
   pairs is held to the best completion that keeps their inequalities (an exhaustive oracle of its own, which prunes by
   the same bound but shares no code with the rule), which it must reach; at the root that is the optimum (Theorem 13).
+* **The floor** (`src/search/tests.rs`): on every game of the Java's that needs a search, to 400, a floor below the
+  optimum finds it, a floor at it or above completes with nothing found, and a floor at the root's bound or above ends
+  at the first check, with the default tactics and (every ninth game) on four threads, on the matching path and without
+  the rule of symmetric pairs; the floor at the optimum searches the tree of the search seeded with the optimum, step
+  for step, on games 300 to 1000; a floor at the ceiling ends the search before it starts; a stopped floor search
+  resumes under its floor and is refused under another floor or none.  With no floor nothing moves: the tripwires and
+  the probe's fingerprints are the same.
 * **Node-count tripwires** (`tests/tripwires.rs`): a pruning tactic that stops working changes no answer, so no
   assertion on answers sees it (a mutant that ignored the result of `Nogoods::ruled_out` costs 27 to 67 % more nodes).
   With one thread the tree is deterministic, so the exact node count of a fixed game under fixed tactics (n = 480 to
