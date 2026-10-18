@@ -67,6 +67,14 @@ What has been tried for the bound, and where it stands:
 game past 3440 is within a few minutes of one-thread search
 ([the entry](experiments/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10.md)).
 
+**Finders for lower bounds** (2026-10-17): a lower bound needs only a legal game, so a search that is not sound may
+find it.  Large neighbourhood search from the start incumbent (keep a random 70-90% of its promotions, search the rest
+exactly as a unit, repeat) finds the optimum of 64% of the games of 2176-3440 in 5 CPU seconds of one thread (the sound
+search for the same time: 21%), a mean shortfall of 28 against 297; the sound search seeded with its game takes 0.44 of
+the nodes and 0.48 of the CPU, finder included, of the search from today's start (the optimum as the seed: 0.38 of the
+nodes).  It is in `wall finders` and `wall sound`, not in the solver, and the ledger does not use it yet
+([the entry](experiments/finders-for-good-games-that-are-not-sound-2026-10.md)).
+
 ## Decided
 
 * **The window is 4** (2026-10-17), the default of `taxman solve --window` (it was 1) and of `chain.sh` (it was 16).

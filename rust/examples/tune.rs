@@ -52,19 +52,25 @@
 #[allow(dead_code)] // this reads and writes hex sets only; the probe reads the nodes fixtures too
 #[path = "common/fixtures.rs"]
 mod fixtures;
+#[path = "common/known.rs"]
+mod known;
+#[path = "common/rng.rs"]
+mod rng;
 
 use fixtures::{from_hex, to_hex};
+use known::{known_incumbent, survivors};
+use rng::Rng;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 use taxman::bits::Bits;
 use taxman::board::Board;
-use taxman::engine::{self, Control, Ctx, EngineConfig, Searcher, Start, Stats, Unit};
+use taxman::engine::{self, Ctx, EngineConfig, Searcher, Start, Stats, Unit};
 use taxman::game::Optimal;
 use taxman::gf2::Gf2Graph;
 use taxman::json::Json;
 use taxman::matchbound::MatchGraph;
-use taxman::search::{self, stat, NodeBound, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
+use taxman::search::{self, stat, NodeBound, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
 use taxman::tactics::Tactics;
 
 // ---------------------------------------------------------------------------------------------------------
@@ -238,19 +244,6 @@ fn read_units<const W: usize>(path: &Path, game: u32) -> Result<(Option<GameLine
 // ---------------------------------------------------------------------------------------------------------
 // Sampling the units of a checkpoint
 
-/// SplitMix64: a small, good generator, seeded.
-struct Rng(u64);
-
-impl Rng {
-    fn next(&mut self) -> u64 {
-        self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
-        let mut z = self.0;
-        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-        z ^ (z >> 31)
-    }
-}
-
 /// A uniform sample of `capacity` of the items offered (Algorithm R), each kept with its place in the sequence.
 struct Reservoir<T> {
     capacity: usize,
@@ -375,36 +368,6 @@ struct SolveOptions {
     ids: Option<Vec<String>>,
     tactics: SearchTactics,
     node_limit: Option<u64>,
-}
-
-/// The incumbent promotion set of the game's known optimum, and the optimum's promotion sum: the known game's
-/// promotions (those that are candidates here) that can all be promoted, as a search seeded with them starts.
-fn known_incumbent<const W: usize>(
-    board: &Board<W>,
-    prepared: &Prepared<W>,
-    optimal: &Optimal,
-) -> Result<Option<(Bits<W>, u64)>, String> {
-    let (Some(score), Some(moves)) = (optimal.score(board.n()), optimal.moves(board.n())) else { return Ok(None) };
-    let opt = score
-        .checked_sub(board.in_the_bag)
-        .ok_or_else(|| format!("the known game of {} scores less than the game with no promotions", board.n()))?;
-    let set = survivors(prepared, &board.seed(moves))?;
-    if set.sum() != opt {
-        return Err(format!(
-            "the known game of {} has promotions worth {} that can be promoted here, not the {opt} it scores over \
-             the bag",
-            board.n(),
-            set.sum()
-        ));
-    }
-    Ok(Some((set, opt)))
-}
-
-/// What survives of `seed` in `prepared`, the incumbent a search seeded with it starts from.
-fn survivors<const W: usize>(prepared: &Prepared<W>, seed: &Bits<W>) -> Result<Bits<W>, String> {
-    let control = Control::new();
-    search::offer_seed(prepared, &control, seed);
-    search::best_so_far(&control).ok_or_else(|| "no incumbent survives".to_owned())
 }
 
 /// Solves the units of `game` that `o` asks for, printing a line each.
@@ -572,6 +535,7 @@ fn main() {
 mod tests {
     use super::*;
     use std::time::Duration;
+    use taxman::search::Prepared;
 
     /// A game whose proof takes several thousand steps with the default tactics (3,647 from the optimum): more than
     /// the 1,024 the engine counts by, so that a node limit can stop it and a checkpoint of it holds units.
