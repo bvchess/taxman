@@ -318,3 +318,97 @@ be shorter).
 
 **Commits.**  eb9dc9c (the climbs up and their tests), 55d2b2a (the climbs down, the ways), then this record.
 
+## Later (2026-10-17): the finder in the ledger
+
+**Why.**  The finders experiment ([the entry](finders-for-good-games-that-are-not-sound-2026-10.md)) found that large
+neighbourhood search (LNS: keep a random 70-90% of the incumbent's promotions, search the rest exactly as a unit, repeat)
+reaches the optimum of 64% of the games of 2176..3440 in 5 CPU seconds of one thread, against 21% for the sound search in
+the same time, and that the sound search seeded with 1 second of its game costs 0.48 of the CPU, finder included (cheaper
+on 36 of 40 games, at worst 1.16 times).  A lower bound needs only a legal game, so the ledger may take its L(n) and its
+searches' seeds from LNS, if every game is replayed by the referee before it counts, as every lower bound already is.
+Nothing LNS finds is a proof: the upper bounds are what they were.  The next cloud run is to learn what sets up a run past
+3440 best, so the events carry what it needs to be digested.
+
+**The change** (`examples/common/lns.rs`, `examples/ledger/`; one accessor in `src/`):
+
+* LNS moved from `wall/finders.rs` to `common/lns.rs` (`Lns`, `Options`, `run_unit`), which `wall finders` and the ledger
+  share; `wall finders` plays as before (its tests pass, the random choices are drawn in the same order).  Unsound code
+  stays out of `src/`; the one line there, `Control::stopped`, tells the finder that its board was proven or the run was
+  stopped.
+* On the worker, for `--lns-seconds S` of one thread (default 1; 0 turns it off; `LNS_SECONDS` in `cloud.sh`): after a
+  board's map from the start incumbent (unless that reaches the root's bound); and before a search whose best seed has
+  changed since the finder last ran on the board, from that seed (the ledger keeps the score it left the board with,
+  `lns_score`; a climb, whose seed is a proven neighbour's game, always counts as changed, an ordinary search that only
+  doubles its limit on the same seed does not), unless the seed already reaches the ceiling.  The search is then seeded
+  with the finder's game if that is better.
+* The game goes through the same referee as a search's game (`refereed`: replayed, and its score must be the bag and the
+  promotions' sum) on the worker, and is offered as the board's L with the rule `lns` only if it beats the game the finder
+  began from; a search that began from it and found nothing better leaves the credit with the finder.  Its time counts in
+  the CPU budget (the process's) and in the board's `search_s`; the search keeps its own limit, and `seconds` in the
+  events is the search's alone.
+* Events: the `init` and `search` events have `lns_s` (the finder's seconds, 0 if it did not run), `lns_from` and
+  `lns_found` (the scores of its input and of its game, null if it did not run), `seed_from` (which game seeded the
+  search: `n-1`, `n`, `n+1` (the one that keeps the most promotions, the last of equals) or `lns`; null for a map) and
+  `below_proven` and `above_proven` (whether n − 1 and n + 1 were proven when the job started); the `start` event has
+  `lns_s`.  `ledger report` has a `finder:` line (the runs, their seconds, how many found a better game and by how much in
+  all, the boards whose final lower bound is its game and how many of those are proven), and the status line says how
+  many runs and improvements; `bench/ledger/events.py` adds the finder's line, the games that seeded the searches, and the
+  searches by whether n − 1 and n + 1 were proven.
+
+**Tests (the quick suite).**  A map is followed by the finder from the start incumbent and the game it returns replays at
+its score (1218, whose start is 204 short of the optimum); a search whose best seed is another than the finder last ran
+from runs it from that seed and is seeded with its game; the same seed again, a seed that reaches the ceiling, and no
+seconds do not run it, and a climb does; the referee refuses promotions that do not play as the game they claim (all the
+candidates at once); `finish` credits the lower bound to the finder where its game beats the search's or equals the one
+the search began from, and to the search otherwise, keeps the score the finder left (and the ledger's file keeps it), and
+the event has its fields; a run of 901..960 with the finder on proves every board at the optimum, every event has the
+fields, the finder's scores lie between its input's and the optimum, and the report counts the runs; with the finder off
+no event, board or report shows any, and the jobs the scheduler hands out are the same as with it on.  The earlier run
+tests set `lns_seconds` to 0, which also keeps them as fast as they were.
+
+**The dry runs** (the laptop, the non-release build of 4621d97 under `nice -n 10`, the truth hidden, through `cloud.sh`,
+the files in [bench/ledger/finder/](../../bench/ledger/finder/)).  1301..1500 on six workers with the finder at 1 s
+(`dry-on`) and, back to back, without it (`dry-off`, the same build and the climbs both ways); 2576..2700 on eight workers
+with a budget of 900 CPU s, four runs in the order on, off, off, on.  The earlier dry runs of these stretches are in
+[wedge and climb](#later-2026-10-17-wedge-and-climb) (another session, so another load on the laptop).
+
+| run | proven | check | CPU s | wall s | searches (s) | finder runs (s) |
+|---|---|---|---|---|---|---|
+| 1301..1500, finder 1 s | 200 of 200 | 0 violations | 612 | 122 | 113 (438) | 142 (143) |
+| finder off | 200 of 200 | 0 violations | 557 | 145 | 128 (535) | |
+| 2576..2700, finder 1 s, `mid-on-a` | 61 of 125 | 0 violations | 908 | 116 | 132 (695) | 87 (88) |
+| off, `mid-off-a` | 61 | 0 violations | 907 | 115 | 136 (783) | |
+| off, `mid-off-b` | 61 | 0 violations | 910 | 116 | 139 (784) | |
+| finder 1 s, `mid-on-b` | 61 | 0 violations | 909 | 116 | 136 (694) | 87 (88) |
+
+* **1301..1500**: every board proven at the optimum, 0 violations, with the finder in **612 CPU s and 122 s** against 557
+  and 145 without it in the same session (the earlier session's runs with the climbs took 547 to 576 CPU s and 138 to 157
+  s, and 598 CPU s and 151 s without climbs).  The finder cost 143 s and the searches fell by 97 s (438 s against 535;
+  128 searches fell to 113), the net being 10% more CPU and 16% less wall time: with the finder the workers were busy
+  5.0 of 6 against 3.8, because the stretch's tail was shorter (the long boards 1475 and 1476 cost 66 s of search with
+  the finder and 93 s without it, whose run ended with the climbs to them, 44 s and 19 s, one after the other).  Its
+  share of the lower bounds: **51 of the 200 boards, 57% of the 89 that are searched, end with its game as their lower bound**, all 51
+  proven (46 by an exhausted search, 5 at the ceiling); the other searched boards end with the search's game (26) or the
+  start's (12); 70 of its 142 runs found a better game than they began from (by 10,599 in all, a median 132).  The 89
+  runs after the maps were the ones that did it (68 improved, by 10,539, for 89 s); the 53 before searches (49 of them
+  before climbs) cost 53 s and improved the game twice, by 60.  It proves later at first, as it should: 63 boards were
+  proven at 150 CPU s against 113 without it (the maps wait for it), 172 against 187 at 450, and both end proven.
+* **2576..2700**, four runs of 900 CPU s: **61 of 125 boards proven in each**, finder on or off, 0 violations, 907 to 910
+  CPU s in 115 to 116 s (earlier runs of this stretch differed by about 5 boards for the same settings, these did not).
+  The finder's runs of 87 each are the same game for game (42 improved, by 8,738; 28 boards, 13 of them proven, end with
+  its game).  What differs is the curve: boards proven at 150, 300, 450, 600, 750 and 900 CPU s were 0, 31, 44, 46/48, 54
+  and 58/61 with the finder against 12, 37, 46/47, 56, 58 and 61 without it, the finder's 88 s going to the maps first
+  (the first proof at 26 s against 18) and its runs before the 31 searches that had one finding a better game twice (by
+  105); the searches' seconds fell by about the finder's (695 s against 783).  So on this valley the finder neither
+  proves more in 900 CPU s nor costs proofs at the end; it moves the work to the front.
+* The reading: the finder's gain is at the maps (when it improves the start incumbent it does so by a median 132, and on
+  1301..1500 its game is the optimum of 51 of the 89 boards searched), and the ledger's own seeds (the games of n − 1,
+  n and n + 1, the proven game of the board below in a climb) are already close, so that it rarely improves on them
+  before a search.  Whether it shortens the long searches of 2176..3440 and what it does for the order of the boards is
+  what the cloud run measures; `seed_from`, `lns_found` and `below_proven` of its events say it per search.
+
+**Not done.**  The cloud run with the finder and the climbs (it needs Brian's approval); a finder that scales its seconds
+with the board (the start incumbent alone costs 1 to 7 s there); skipping it before a climb.
+
+**Commits.**  4621d97 (the finder in the ledger and its tests), then this record.
+

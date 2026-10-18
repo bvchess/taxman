@@ -367,8 +367,9 @@ report DIR --known FILE`; the module comment of `examples/ledger/main.rs` has th
 whole stretch at once instead of in order: for every board a lower bound, a game it holds, and an upper bound, each
 with how it was derived, tightened by limited one-thread searches (P at once, each going on from its checkpoint, with
 its upper bound read from the checkpoint: the *dual bound*) and by the relations between boards (the ceiling, the
-prime formula, repeats, monotonicity, both ways), where a proof looks cheapest; a board is proven when its bounds
-meet.  It never reads the known optima unless it is given proven games (`--proven FILE`), so a run on a stretch the
+prime formula, repeats, monotonicity, both ways), where a proof looks cheapest, with a finder of good games (large
+neighbourhood search, which is not sound: its games are lower bounds once the referee has replayed them); a board is
+proven when its bounds meet.  It never reads the known optima unless it is given proven games (`--proven FILE`), so a run on a stretch the
 chain has proven is a fair test, which `report --known` checks.  Its files are its own, not results lines
 ([DESIGN.md, "The ledger"](DESIGN.md#the-ledger); the experiment: [the
 ledger](docs/experiments/the-ledger-bounds-from-both-sides-2026-10.md)).

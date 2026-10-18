@@ -146,6 +146,8 @@ mod counters;
 mod finders;
 #[path = "common/known.rs"]
 mod known;
+#[path = "common/lns.rs"]
+mod lns;
 #[path = "common/rng.rs"]
 mod rng;
 /// The helpers of the tests (temporary directories), shared with the other tests.
@@ -387,9 +389,9 @@ fn parse() -> Result<Options, String> {
             "--from" => o.finders.from = value("--from")?.parse().map_err(|e| format!("--from {e}"))?,
             "--cap" => o.finders.cap = Some(number("--cap", value("--cap")?)?),
             "--cpu" => o.finders.cpu = number("--cpu", value("--cpu")?)?,
-            "--seed" => o.finders.seed = number("--seed", value("--seed")?)?,
-            "--fix" => o.finders.fix = finders::fix_range(&value("--fix")?)?,
-            "--unit-nodes" => o.finders.unit_nodes = number("--unit-nodes", value("--unit-nodes")?)?,
+            "--seed" => o.finders.lns.seed = number("--seed", value("--seed")?)?,
+            "--fix" => o.finders.lns.fix = finders::fix_range(&value("--fix")?)?,
+            "--unit-nodes" => o.finders.lns.unit_nodes = number("--unit-nodes", value("--unit-nodes")?)?,
             "--extra" => o.finders.extra = number("--extra", value("--extra")?)?,
             "--pool" => o.finders.pool = value("--pool")?.parse().map_err(|e| format!("--pool {e}"))?,
             _ => texts.push(arg.clone()),

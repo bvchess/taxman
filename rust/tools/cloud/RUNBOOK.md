@@ -1897,8 +1897,14 @@ sudo -u ec2-user tmux new-session -d -s ledger -c /home/ec2-user/taxman/rust \
 **Options.**  The environment of `bench/ledger/cloud.sh` has the options (`WORKERS`, `CPU_HOURS`, `BASE`, `MAX_LIMIT`,
 `PROVEN`, and for the climbs `CLIMB`, their ways: `up`, `down`, `both` or `off`, unset the program's `both`; and
 `CLIMB_LIMIT`, their limit in seconds: unset the program's 60; `CLIMB=off` or `CLIMB_LIMIT=0` runs without climbs, as
-the second launch did).  The climbs are searches of a board next to a proven one, up from a proven board and down
-from it; the events and the report say what each way cost and proved.
+the second launch did; and `LNS_SECONDS`, the seconds of one thread the finder gets: unset the program's 1, 0 runs
+without it).  The climbs are searches of a board next to a proven one, up from a proven board and down
+from it; the events and the report say what each way cost and proved.  The finder is large neighbourhood search
+([the entry's section on it](../../docs/experiments/the-ledger-bounds-from-both-sides-2026-10.md#later-2026-10-17-the-finder-in-the-ledger)),
+which runs on a worker after a board's map and before a search whose best seed has changed; it finds a legal game, not
+a proof, and its game is a lower bound once the referee has replayed it.  Its events (`lns_s`, `lns_from`, `lns_found`,
+`seed_from`, `below_proven`, `above_proven`, on the maps and the searches) and the report's `finder:` line are what the
+run is for: what sets up a run past 3440 best.
 
 **Watch, stop, results home.**  `tail ~/ledger/run.err` (a status line a minute: the CPU spent, the boards proven, the
 searches going, the climbs of each way ended, those that proved their board and those that stopped at their limit

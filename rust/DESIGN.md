@@ -959,7 +959,11 @@ ahead of it: a board whose board below is proven, however that was proven, is se
 (`--climb-limit`), seeded with that game and capped by the ceiling it gives, and when a climb proves its board the one
 above is climbed to (a climb up); a board whose board above is proven is climbed to down, after those, seeded with that
 game but under the ledger's own, loose ceiling (`--climb` picks the ways); a climb that stops parks its board in the
-ordinary order, and a board next to one being climbed to waits for it.  A proven board of the
+ordinary order, and a board next to one being climbed to waits for it.  The *finder*, large neighbourhood search
+(`examples/common/lns.rs`, which `wall finders` measures), is not sound and proves nothing, but a lower bound needs only
+a legal game: for `--lns-seconds` seconds of a worker it runs after a board's map and before a search whose best seed
+has changed since it last ran on the board (a climb's always has), and its game, which the referee replays like every
+lower bound, is offered as the board's L and seeds the search if it is better.  A proven board of the
 ledger is proven within the frame model like a game of the chain past 2175 (given U at the boards its upper bound came
 through); the ledger is not a results file and nothing of it goes into `results/strict.jsonl`.
 

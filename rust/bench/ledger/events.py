@@ -47,6 +47,23 @@ def main(directory, chain=None):
     over = [e["seconds"] - e["limit_s"] for e in stopped]
     if over:
         print(f"a stopped search's seconds beyond its limit: median {median(over):.2f}, max {max(over):.2f}")
+    # The finder (runs before the finder have no such fields), the games that seeded the searches, and the searches by
+    # whether the boards n - 1 and n + 1 were proven when they began.
+    finder = [e for e in maps + searches if e.get("lns_found") is not None]
+    if finder:
+        better = [e["lns_found"] - e["lns_from"] for e in finder if e["lns_found"] > e["lns_from"]]
+        after_maps = sum(e["action"] == "init" for e in finder)
+        print(f"the finder: {len(finder)} runs ({sum(e['lns_s'] for e in finder):.0f} s; {after_maps} after maps), "
+              f"{len(better)} found a better game (by {sum(better)} in all, median {median(better)})")
+        print("the games that seeded the searches:", dict(Counter(e.get("seed_from") for e in searches)))
+    if searches and "below_proven" in searches[0]:
+        proven = {True: "proven", False: "not proven"}
+        for below in (True, False):
+            for above in (True, False):
+                group = [e for e in searches if e["below_proven"] == below and e["above_proven"] == above]
+                if group:
+                    print(f"searches with n-1 {proven[below]}, n+1 {proven[above]}: {len(group)}, "
+                          f"{sum(e['seconds'] for e in group):.0f} s, {sum(e['completed'] for e in group)} completed")
     root = {e["n"]: e["after"][1] for e in maps}
     lowered = [e["before"][1] - e["after"][1] for e in stopped if e["after"][1] < e["before"][1]]
     print(f"stopped searches whose dual bound lowered U: {len(lowered)}, by {sum(lowered)} in all "

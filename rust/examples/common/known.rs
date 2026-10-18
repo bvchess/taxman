@@ -1,5 +1,6 @@
 //! The known game of a board as a search incumbent, for the examples that start a search from the optimum
-//! (`#[path = "common/known.rs"] mod known;`; `tune` proves subtrees from it and `wall` measures what it saves).
+//! (`#[path = "common/known.rs"] mod known;`; `tune` proves subtrees from it and `wall` measures what it saves), and
+//! what survives of a seed in a board, from which the ledger starts its finder.
 
 use taxman::bits::Bits;
 use taxman::board::Board;

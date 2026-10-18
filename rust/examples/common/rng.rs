@@ -1,5 +1,5 @@
 //! A seeded generator, for the examples that sample (`#[path = "common/rng.rs"] mod rng;`; `tune` samples the units of
-//! a checkpoint and `wall` picks the neighbourhoods of its finders).
+//! a checkpoint and the large neighbourhood search, `common/lns.rs`, picks its neighbourhoods).
 
 /// SplitMix64: a small, good generator, seeded.
 pub struct Rng(pub u64);
@@ -14,19 +14,19 @@ impl Rng {
     }
 
     /// A number in `0..n` (`n` positive; the bias of the remainder is negligible for the small `n` used here).
-    #[allow(dead_code)] // only `wall` reads it
+    #[allow(dead_code)] // only the large neighbourhood search reads it
     pub fn below(&mut self, n: usize) -> usize {
         (self.next() % n as u64) as usize
     }
 
     /// A number in `[0, 1)`.
-    #[allow(dead_code)] // only `wall` reads it
+    #[allow(dead_code)] // only the large neighbourhood search reads it
     pub fn unit(&mut self) -> f64 {
         (self.next() >> 11) as f64 / (1u64 << 53) as f64
     }
 
     /// `items` in a random order (Fisher-Yates).
-    #[allow(dead_code)] // only `wall` reads it
+    #[allow(dead_code)] // only the large neighbourhood search reads it
     pub fn shuffle<T>(&mut self, items: &mut [T]) {
         for i in (1..items.len()).rev() {
             items.swap(i, self.below(i + 1));

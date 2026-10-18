@@ -23,10 +23,11 @@
 //!   **lns**, large neighbourhood search: keep a random share of the incumbent's promotions fixed (`--fix LO-HI`, the
 //!   share drawn from the range for each unit, default 0.7-0.9), search the rest exactly as a unit (the fixed
 //!   promotions and every other candidate), stopping after `--unit-nodes` steps (default 1,024, the engine's block),
-//!   take any better game, and repeat.  **restricted**, the sound search on a smaller set of candidates, those in the
-//!   start incumbents of `n - 1`, `n` and `n + 1` and the `--extra` (default 32) first others by `--pool` (`chosen`, the
-//!   default: the members of the heaviest set of the root's GF(2) bound first, then the larger numbers; or `value`:
-//!   the larger numbers); when it finishes with time left, it takes twice the others and goes on from its best game.
+//!   take any better game, and repeat (`common/lns.rs`, which the ledger uses too).  **restricted**, the sound search
+//!   on a smaller set of candidates, those in the start incumbents of `n - 1`, `n` and `n + 1` and the `--extra`
+//!   (default 32) first others by `--pool` (`chosen`, the default: the members of the heaviest set of the root's GF(2)
+//!   bound first, then the larger numbers; or `value`: the larger numbers); when it finishes with time left, it takes
+//!   twice the others and goes on from its best game.
 //!   **control**, the sound search itself from the start for the same CPU time.  The line adds `neighbours_cpu_s` (the
 //!   start incumbents of `n - 1` and `n + 1`, which `restricted` needs beside the budget), and for each method, under
 //!   its name: its score, `_cpu_s`, `_nodes`, `_completed` (the search finished, so its game is the best one), `_replay`
@@ -37,7 +38,7 @@
 
 use super::{beyond, chained_of, counters, root_bound, set_up, Line, Options};
 use crate::known::known_incumbent;
-use crate::rng::Rng;
+use crate::lns::{self, run_unit, Lns};
 use std::cmp::Reverse;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -46,10 +47,10 @@ use std::time::{Duration, Instant};
 use taxman::accelerate::solution_for_promotions;
 use taxman::bits::Bits;
 use taxman::board::Board;
-use taxman::engine::{self, Control, EngineConfig, Start};
+use taxman::engine::Control;
 use taxman::game::{replay_finished, Optimal};
 use taxman::matchbound::MatchGraph;
-use taxman::search::{payload_of, set_of_payload, start_incumbent, Prepared, SearchSpace, TaxSearcher, TaxUnit};
+use taxman::search::{start_incumbent, Prepared, SearchSpace, TaxUnit};
 
 // ---------------------------------------------------------------------------------------------------------
 // Options
@@ -124,12 +125,8 @@ pub struct Params {
     pub cpu: f64,
     /// CPU seconds after which `sound` stops its search (none: it goes on to the end).
     pub cap: Option<f64>,
-    /// The seed of the finders' random choices (mixed with the board size, so that each game has its own).
-    pub seed: u64,
-    /// The share of the incumbent's promotions that [`Case::lns`] keeps fixed: drawn from this range for each unit.
-    pub fix: (f64, f64),
-    /// The step limit of one unit of [`Case::lns`] (the engine counts in blocks of 1,024).
-    pub unit_nodes: u64,
+    /// How [`Case::lns`] searches, and the seed of the finders' random choices (`--seed`, `--fix`, `--unit-nodes`).
+    pub lns: lns::Options,
     /// How many candidates beyond the starts' [`Case::restricted`] begins with, and in which order it takes them.
     pub extra: usize,
     pub pool: PoolScore,
@@ -141,9 +138,7 @@ impl Default for Params {
             from: Source::Start,
             cpu: 5.0,
             cap: None,
-            seed: 1,
-            fix: (0.7, 0.9),
-            unit_nodes: 1024,
+            lns: lns::Options::default(),
             extra: 32,
             pool: PoolScore::Chosen,
         }
@@ -225,30 +220,6 @@ fn budgeted<T>(cap: Option<f64>, work: impl FnOnce(&Budget) -> T) -> (T, f64) {
     (value, budget.clock.elapsed())
 }
 
-/// What a search of one unit came to.
-struct Ran<const W: usize> {
-    /// The best game it knows: the incumbent it started from, or better.
-    set: Bits<W>,
-    nodes: u64,
-    /// The unit's subtree was searched to the end (or the incumbent was proven optimal).
-    completed: bool,
-}
-
-/// The engine on one thread searching `unit` from the incumbent `start`, to the end unless `node_limit` or `control`
-/// stops it.  A search of a unit finds the best game below it that beats `start`: a game of its own subtree.
-fn run_unit<const W: usize>(
-    space: &SearchSpace<'_, W>,
-    control: &Arc<Control>,
-    unit: TaxUnit<W>,
-    start: &Bits<W>,
-    node_limit: Option<u64>,
-) -> Ran<W> {
-    let cfg = EngineConfig { threads: 1, node_limit, control: Some(Arc::clone(control)), ..EngineConfig::default() };
-    let begin = Start::Fresh { units: vec![unit], best: start.sum(), payload: payload_of(start) };
-    let out = engine::run(&cfg, begin, b"finders", |_| TaxSearcher::new(space)).expect("the engine");
-    Ran { set: set_of_payload(&out.payload), nodes: out.stats.nodes, completed: out.completed }
-}
-
 // ---------------------------------------------------------------------------------------------------------
 // The methods
 
@@ -279,10 +250,6 @@ impl<const W: usize> Case<'_, W> {
 
     fn score(&self, set: &Bits<W>) -> u64 {
         self.board.in_the_bag + set.sum()
-    }
-
-    fn rng(&self) -> Rng {
-        Rng(self.params.seed ^ u64::from(self.n()).wrapping_mul(0xD1B5_4A32_D192_ED03))
     }
 
     /// The game a standalone `solve` starts from, and the CPU seconds it took.
@@ -316,31 +283,20 @@ impl<const W: usize> Case<'_, W> {
         Found { set: ran.set, cpu_s, nodes: ran.nodes, completed: ran.completed, notes: Vec::new() }
     }
 
-    /// Large neighbourhood search from `start`, for `cpu` CPU seconds: keeps a random share of the incumbent's
-    /// promotions fixed, searches the rest exactly (a unit of the fixed promotions and every other candidate, up to
-    /// `unit_nodes` steps), takes any better game, and repeats.
+    /// Large neighbourhood search ([`lns`]) from `start`, for `cpu` CPU seconds.
     fn lns(&self, start: &Bits<W>, cpu: f64) -> Found<W> {
-        let (params, mut rng) = (self.params, self.rng());
-        let ((set, notes, nodes), cpu_s) = budgeted(Some(cpu), |budget| {
-            let (mut best, mut nodes) = (*start, 0);
-            let (mut units, mut finished, mut improved, mut found) = (0, 0, 0, 0.0);
-            while !budget.expired() {
-                let mut members = best.to_vec();
-                rng.shuffle(&mut members);
-                let share = params.fix.0 + rng.unit() * (params.fix.1 - params.fix.0);
-                let fixed: Bits<W> =
-                    members[..(members.len() as f64 * share).round() as usize].iter().copied().collect();
-                let unit = TaxUnit { promoted: fixed, cands: self.p.candidates.difference(&fixed) };
-                let ran = run_unit(self.space, &budget.control, unit, &best, Some(params.unit_nodes));
-                (units, nodes, finished) = (units + 1, nodes + ran.nodes, finished + u64::from(ran.completed));
-                if ran.set.sum() > best.sum() {
-                    (best, improved, found) = (ran.set, improved + 1, budget.clock.elapsed());
-                }
-            }
-            let notes = vec![("units", units), ("finished", finished), ("improved", improved)];
-            (best, [notes, vec![("found_ms", (found * 1e3) as u64)]].concat(), nodes)
+        let search = Lns { p: self.p, space: self.space, options: self.params.lns };
+        let mut rng = search.options.rng(self.n());
+        let (out, cpu_s) = budgeted(Some(cpu), |budget| {
+            search.search(start, &mut rng, &budget.control, &|| budget.clock.elapsed(), &|| budget.expired())
         });
-        Found { set, cpu_s, nodes, completed: false, notes }
+        let notes = vec![
+            ("units", out.units),
+            ("finished", out.finished),
+            ("improved", out.improved),
+            ("found_ms", (out.found * 1e3) as u64),
+        ];
+        Found { set: out.set, cpu_s, nodes: out.nodes, completed: false, notes }
     }
 
     /// The candidates [`restricted`](Self::restricted) begins with: those in the start incumbents of `n - 1`, `n` and

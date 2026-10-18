@@ -471,6 +471,13 @@ impl Control {
         }
     }
 
+    /// Whether a [`stop`](Control::stop) has been given (it holds for every run the control is attached to), for a
+    /// caller that works beside a run and ends with it.
+    #[must_use]
+    pub fn stopped(&self) -> bool {
+        lock(&self.state).stop
+    }
+
     /// The number of workers the run should have from now on.  While the run goes, it starts workers until it has that
     /// many (each makes its own searcher with `make(i)`, `i` a new number) and retires workers that have no unit, or
     /// have just handed theirs over, until it has no more.  0 suspends the search: the units wait in the run's deque
