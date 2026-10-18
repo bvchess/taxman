@@ -23,7 +23,8 @@
 //! 5. computes the root's GF(2) bound (the baseline) and a Lagrangian bound over each pool of nogoods (the finder's,
 //!    the search's, both) with the multipliers fitted by `--steps` subgradient steps (default 200) of Polyak's rule
 //!    towards `SCALE · (incumbent + 1)`, the incumbent being the best game of the start, the finder and the control,
-//!    damped by a factor that halves (back at the best multipliers) after [`STALL`] steps without a lower bound.  Any
+//!    in a direction with momentum ([`MOMENTUM`]), damped by a factor that halves (back at the best multipliers) after
+//!    [`STALL`] steps without a lower bound.  Any
 //!    multipliers make a bound, so the best of the steps is reported; a fit that reaches the incumbent has proven it
 //!    optimal (`_closed_at`).  The fit runs on to `--long` steps (default 2,000, at least `--steps`; the steps do not
 //!    depend on either), to show how far the bound goes beyond the `--steps` that are reported as the answer.
@@ -34,10 +35,10 @@
 //! (nogoods learned, a repeat counting again), `_pool` (distinct ones), and for the finder `_units` (the units run),
 //! for the search `_completed`; `both_pool`; `promotable` (nogoods that promote: none, or a bug); then, for each pool
 //! `finder`, `search` and `both`, under its name: `_steps` (steps the fit took) and `_closed_at`; and for the fit's
-//! first `--steps` steps (`_bound`) and for all of them (`_long`): the Lagrangian bound as a score, `_active` (nogoods
-//! with a positive multiplier in the best multipliers), `_best_step`, `_s` (seconds) and, with a known optimum, `_share`:
-//! the share of the root gap it closes, `(upper - bound) / (upper - opt)`.  A bound below the known optimum or the
-//! incumbent is a bug, and an error after the line.
+//! first `--steps` steps (`_bound`) and for all of them (`_long`), the Lagrangian bound as a score and, under its name
+//! with `_active` (nogoods with a positive multiplier in the best multipliers), `_best_step`, `_s` (seconds) and, with
+//! a known optimum, `_share` appended: the share of the root gap it closes, `(upper - bound) / (upper - opt)`.  A bound
+//! below the known optimum or the incumbent is a bug, and an error after the line.
 
 use super::finders::{budgeted, Case, Played};
 use super::root_bound;
@@ -57,6 +58,12 @@ use taxman::search::{SearchSpace, TaxSearcher, TaxUnit};
 /// 20 within 700, 40 goes on to 1,500 and ends lower; at 200 steps the three are within 0.03 of the root gap.)
 const STALL: usize = 20;
 const LEAST_DAMPING: f64 = 1e-9;
+/// The direction of a step is the subgradient plus this share of the last direction.  Plain subgradient steps zigzag
+/// over a pool of thousands of nogoods: on 3276, 3336 and 3381 with the nogoods of 60 CPU s of the finder (10,000 to
+/// 20,000), the bound after 200 steps closed 0.26-0.31 of the root gap, less than the 0.27-0.31 that the few hundred
+/// nogoods of the sound search gave, and 0.9 or 0.95 of the last direction closed 0.32-0.41 (0.98 and above is no
+/// better; the search's pool, which plain steps fit as far as it goes, is unchanged).
+const MOMENTUM: f64 = 0.9;
 
 // ---------------------------------------------------------------------------------------------------------
 // Harvesting
@@ -214,8 +221,10 @@ fn dual<const W: usize>(
 /// Fits multipliers for `nogoods` (sets that cannot be promoted from the root) by at most `steps` steps of the
 /// subgradient method: Polyak's rule towards `SCALE · (incumbent + 1)`, damped by a factor that halves, back at the
 /// best multipliers, after [`STALL`] steps without a lower bound.  The subgradient of a nogood is how far the chosen
-/// set goes over its room, `|Q ∩ N| - (|N| - 1)`, held at zero for a multiplier at zero that it would lower.  What it
-/// has found after each number of steps in `marks` is in the result (the steps do not depend on the marks).
+/// set goes over its room, `|Q ∩ N| - (|N| - 1)`, held at zero for a multiplier at zero that it would lower; a step
+/// goes in the direction of the subgradient plus [`MOMENTUM`] of the last direction (none after a return to the best
+/// multipliers).  What it has found after each number of steps in `marks` is in the result (the steps do not depend
+/// on the marks).
 fn fit<const W: usize>(
     graph: &Gf2Graph,
     cap: u32,
@@ -229,7 +238,7 @@ fn fit<const W: usize>(
     let top = nogoods.iter().filter_map(Bits::max).max().unwrap_or(0) as usize;
     let mut shift = vec![0i64; top + 1];
     let mut lambda = vec![0i64; nogoods.len()];
-    let mut slope = vec![0i64; nogoods.len()];
+    let mut direction = vec![0.0f64; nogoods.len()];
     let mut out = Fit { first: 0, steps: 0, closed_at: None, marks: Vec::new() };
     let (mut best, mut best_chosen) = (lambda.clone(), Bits::<W>::EMPTY);
     let (mut lowest, mut best_step) = (i64::MAX, 0);
@@ -257,6 +266,7 @@ fn fit<const W: usize>(
                 (damping, stalled) = (damping / 2.0, 0);
                 lambda.copy_from_slice(&best);
                 (value, chosen) = (lowest, best_chosen);
+                direction.fill(0.0);
             }
         }
         if marks.contains(&out.steps) {
@@ -266,18 +276,20 @@ fn fit<const W: usize>(
             out.closed_at = Some(out.steps);
             break;
         }
-        let mut norm = 0;
-        for ((set, &l), g) in nogoods.iter().zip(&lambda).zip(&mut slope) {
+        let (mut slack, mut norm) = (false, 0.0);
+        for ((set, &l), d) in nogoods.iter().zip(&lambda).zip(&mut direction) {
             let over = i64::from((chosen & *set).len()) - (i64::from(set.len()) - 1);
-            *g = if l == 0 && over < 0 { 0 } else { over };
-            norm += *g * *g;
+            let slope = if l == 0 && over < 0 { 0 } else { over };
+            slack |= slope != 0;
+            *d = slope as f64 + MOMENTUM * *d;
+            norm += *d * *d;
         }
-        if norm == 0 || damping < LEAST_DAMPING {
+        if !slack || norm == 0.0 || damping < LEAST_DAMPING {
             break;
         }
-        let size = damping * (value - target + SCALE) as f64 / norm as f64;
-        for (l, &g) in lambda.iter_mut().zip(&slope) {
-            *l = (*l + (size * g as f64).round() as i64).max(0);
+        let size = damping * (value - target + SCALE) as f64 / norm;
+        for (l, &d) in lambda.iter_mut().zip(&direction) {
+            *l = (*l + (size * d).round() as i64).max(0);
         }
     }
     // A mark the fit did not reach has the state it ended in.
