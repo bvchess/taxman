@@ -366,8 +366,10 @@ on the games it holds.  Both referees accept it (section 5).
 report DIR --known FILE`; the module comment of `examples/ledger/main.rs` has the flags and the files) works on a
 whole stretch at once instead of in order: for every board a lower bound, a game it holds, and an upper bound, each
 with how it was derived, tightened by limited one-thread searches (P at once, each going on from its checkpoint, with
-its upper bound read from the checkpoint: the *dual bound*) and by the relations between boards (the ceiling, the
-prime formula, repeats, monotonicity, both ways), where a proof looks cheapest, with a finder of good games (large
+its upper bound read from the checkpoint: the *dual bound*), by searches under floors that step an open board's upper
+bound down (each costs about a tenfold more than the one before, and gives the board a line that forecasts its proof)
+and by the relations between boards (the ceiling, the prime formula, repeats, monotonicity, both ways), where a proof
+looks cheapest (the forecast), with a finder of good games (large
 neighbourhood search, which is not sound: its games are lower bounds once the referee has replayed them); a board is
 proven when its bounds meet.  It never reads the known optima unless it is given proven games (`--proven FILE`), so a run on a stretch the
 chain has proven is a fair test, which `report --known` checks.  What it finds is kept in the bounds store,

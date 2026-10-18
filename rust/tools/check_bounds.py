@@ -26,8 +26,8 @@ and across the file: where the chain has a game of a board, the file's bounds of
 
 What this referee takes on the record of the lines, because only the Rust program can compute it: that a root bound is
 the root's GF(2) bound, that a repeat's bags are the boards' and that its two boards pose the same search problem
-(`ledger verify-bounds` recomputes all three), and the bounds of searches (`exhausted`, `dual`) and given games, which it
-lists.
+(`ledger verify-bounds` recomputes all three), and the bounds of searches (`exhausted`, `dual`, `floor`), the Lagrangian
+bounds over nogoods (`nogoods`) and given games, which it lists.
 
 usage: check_bounds.py FILE [--games GAMES] [--strict FILE]
   GAMES  the output of `ledger games FILE` (a file, or - for the standard input)
@@ -52,7 +52,7 @@ KEYS = {
 }
 RELATIONS = {"monotone", "ceiling", "prime", "repeat"}
 LOWER_RULES = {"start", "search", "lns", "given"} | RELATIONS
-UPPER_RULES = {"root", "dual", "exhausted", "given"} | RELATIONS
+UPPER_RULES = {"root", "dual", "exhausted", "floor", "nogoods", "given"} | RELATIONS
 DATE = re.compile(r"\d{4}-(\d{2})-(\d{2})")
 
 
@@ -407,7 +407,7 @@ def main():
         if row["side"] == "upper":
             if row["n"] not in best or row["value"] < best[row["n"]]["value"]:
                 best[row["n"]] = row
-    for rule in ("exhausted", "dual", "given"):
+    for rule in ("exhausted", "dual", "floor", "nogoods", "given"):
         boards = sorted(n for n, row in best.items() if row["rule"] == rule)
         print(f"  on record, not recomputed: {counts[('upper', rule)]} {rule} lines; best upper bound of "
               f"{len(boards)} boards" + (f": {ranges(boards)}" if boards else ""))

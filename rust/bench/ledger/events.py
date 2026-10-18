@@ -11,6 +11,7 @@ beside it.  Standard library only.
 """
 import gzip
 import json
+import math
 import os
 import sys
 from collections import Counter
@@ -31,6 +32,7 @@ def median(values):
 def main(directory, chain=None):
     events = lines(f"{directory}/events.jsonl")
     ledger = lines(f"{directory}/ledger.jsonl")
+    ledger_by_n = {row["n"]: row for row in ledger}
     start = next(e for e in events if e["action"] == "start")
     maps = [e for e in events if e["action"] == "init"]
     searches = [e for e in events if e["action"] == "search"]
@@ -64,7 +66,26 @@ def main(directory, chain=None):
                 if group:
                     print(f"searches with n-1 {proven[below]}, n+1 {proven[above]}: {len(group)}, "
                           f"{sum(e['seconds'] for e in group):.0f} s, {sum(e['completed'] for e in group)} completed")
+    # The floor steps (runs before them have none): how they ended, what they cost, and how well the forecast of a board's
+    # proof, as its last step left it, matched the nodes of the searches that proved it (log10 of forecast over actual).
+    floors = [e for e in searches if e.get("job") == "floor"]
+    if floors:
+        print(f"floor steps: {len(floors)} of {len({e['n'] for e in floors})} boards, "
+              f"{sum(e['seconds'] for e in floors):.0f} s; outcomes {dict(Counter(e['outcome'] for e in floors))}")
+        forecast = {e["n"]: e["forecast"] for e in floors if e.get("forecast") is not None}
+        proofs = Counter()
+        for e in searches:
+            if e.get("job") in ("ordinary", "climb") and e["n"] in forecast:
+                proofs[e["n"]] += e["nodes"]
+        errors = [forecast[n] - math.log10(nodes) for n, nodes in proofs.items()
+                  if nodes > 0 and ledger_by_n[n]["proven"]]
+        if errors:
+            print(f"the forecast of the proof after the last floor step, against the nodes of the searches that proved "
+                  f"the board: {len(errors)} boards, log10 error median {median(errors):+.2f}, "
+                  f"median absolute error {median([abs(x) for x in errors]):.2f}")
     root = {e["n"]: e["after"][1] for e in maps}
+    # (A floor step that its limit stopped has no dual bound.)
+    stopped = [e for e in stopped if e["dual"] is not None]
     lowered = [e["before"][1] - e["after"][1] for e in stopped if e["after"][1] < e["before"][1]]
     print(f"stopped searches whose dual bound lowered U: {len(lowered)}, by {sum(lowered)} in all "
           f"(median {median(lowered)})")

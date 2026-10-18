@@ -252,7 +252,7 @@ fn a_run_takes_the_proven_games_it_is_given() {
 /// A scheduler of the boards 901..960, given the proven games of `proven`, with every board mapped and bounds that a
 /// map might leave (the optimum less 10 and more 400), except board 930, the cheapest board of the ordinary order (a
 /// gap of 1).  The tests set the rest of what they need by hand.
-fn climbing(dir: &Path, proven: &[u32], settings: &Settings) -> Scheduler {
+pub(crate) fn climbing(dir: &Path, proven: &[u32], settings: &Settings) -> Scheduler {
     let results = dir.join("given.jsonl");
     write_results(&results, proven);
     let (mut scheduler, _) = Scheduler::open(901, 960, dir, settings, Some(&results)).unwrap();
@@ -261,27 +261,35 @@ fn climbing(dir: &Path, proven: &[u32], settings: &Settings) -> Scheduler {
         let lower = Lower { value: lower, moves: opt_game(n), promotions: None, rule: Rule::Start, from: None };
         scheduler.book.offer_lower(n, lower, false).unwrap();
         scheduler.book.offer_upper(n, Upper { value: upper, rule: Rule::Root, from: None }, false).unwrap();
-        scheduler.book.entries.get_mut(&n).unwrap().mapped = true;
+        let entry = scheduler.book.entries.get_mut(&n).unwrap();
+        (entry.mapped, entry.root) = (true, Some(upper + 1000));
     }
     scheduler
 }
 
-fn quiet() -> Settings {
-    Settings { workers: 4, cpu_budget: 1e9, ..Settings::default() }
+/// Settings for the tests of the order of the jobs: no floor steps, so that an ordinary board is searched as it was.
+pub(crate) fn quiet() -> Settings {
+    Settings { workers: 4, cpu_budget: 1e9, floor_step: 0, ..Settings::default() }
+}
+
+/// The same with floor steps of 150 points.
+pub(crate) fn stepping() -> Settings {
+    Settings { floor_step: 150, ..quiet() }
 }
 
 /// Puts `job` among the searches on their way, as `launch` does (without the search).
-fn start(scheduler: &mut Scheduler, job: &Job) {
+pub(crate) fn start(scheduler: &mut Scheduler, job: &Job) {
     scheduler.running.insert(job.n, Running { kind: job.kind, control: Control::new() });
 }
 
 /// A search that ended: the optimal game of `n`, proven by the search if `proven`; else a search that stopped, with a
 /// game scoring 1 less than the optimum (the moves are the optimal game's: nothing here replays them) and a dual bound
 /// at the optimum, so that the gap is 1.
-fn ended(n: u32, kind: Kind, proven: bool) -> Done {
+pub(crate) fn ended(n: u32, kind: Kind, proven: bool) -> Done {
     let attempt = Attempt {
         completed: proven,
         reached_cap: false,
+        held: false,
         value: if proven { opt(n) } else { opt(n) - 1 },
         moves: opt_game(n),
         promotions: Vec::new(),
@@ -291,11 +299,20 @@ fn ended(n: u32, kind: Kind, proven: bool) -> Done {
         lns: None,
         seed_from: None,
     };
-    Done { n, kind, limit: 60.0, below_proven: false, above_proven: false, result: Ok(attempt), sent: Instant::now() }
+    Done {
+        n,
+        kind,
+        limit: 60.0,
+        below_proven: false,
+        above_proven: false,
+        floor: None,
+        result: Ok(attempt),
+        sent: Instant::now(),
+    }
 }
 
 /// Whether `job` is seeded with the game `moves`.
-fn seeded_with(job: &Job, moves: &[u32]) -> bool {
+pub(crate) fn seeded_with(job: &Job, moves: &[u32]) -> bool {
     job.seeds.iter().any(|seed| seed.moves == moves)
 }
 
@@ -512,17 +529,17 @@ fn a_run_climbs_and_parks_and_turns_the_climbs_off() {
 // The finder
 
 /// A job on board `n` for a worker: a map is a search of no time, any other a search of 20 ms.
-fn job_of(n: u32, kind: Kind, seeds: Vec<Seed>, cap: Option<u64>, lns: LnsPlan) -> Job {
+pub(crate) fn job_of(n: u32, kind: Kind, seeds: Vec<Seed>, cap: Option<u64>, lns: LnsPlan) -> Job {
     let limit = if kind == Kind::Init { Duration::ZERO } else { Duration::from_millis(20) };
-    Job { n, kind, limit, seeds, cap, below_proven: false, above_proven: false, lns }
+    Job { n, kind, limit, seeds, cap, below_proven: false, above_proven: false, lns, floor: None }
 }
 
-fn finder(seconds: f64, last: Option<u64>) -> LnsPlan {
+pub(crate) fn finder(seconds: f64, last: Option<u64>) -> LnsPlan {
     LnsPlan { seconds, last, round: 0 }
 }
 
 /// What a worker makes of `job`, with its checkpoint in `dir`.
-fn attempted(dir: &Path, job: &Job) -> Attempt {
+pub(crate) fn attempted(dir: &Path, job: &Job) -> Attempt {
     std::fs::create_dir_all(dir.join("ckpt")).unwrap();
     schedule::attempt(job, &Control::new(), dir, Duration::from_secs(60)).unwrap()
 }
@@ -657,7 +674,7 @@ fn the_finders_game_is_the_lower_bound_where_it_beats_the_search_and_the_event_s
 }
 
 /// The events of the jobs of a run (a map or a search), parsed.
-fn job_events(dir: &Path) -> Vec<Json> {
+pub(crate) fn job_events(dir: &Path) -> Vec<Json> {
     let events = std::fs::read_to_string(schedule::events_path(dir)).unwrap();
     let all = events.lines().map(|line| Json::parse(line).unwrap());
     all.filter(|e| matches!(e.get("action").and_then(Json::as_str), Some("init" | "search"))).collect()

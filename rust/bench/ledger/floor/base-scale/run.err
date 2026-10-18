@@ -1,0 +1,3 @@
+ledger: 63 s, 245 CPU s of 540: 0 of 24 proven, 4 searching; climbs up 0 ended (0 proved their board, 0 parked), down 0 ended (0 proved their board, 0 parked); finder 14 runs, 11 improved; main thread busy 0.3 s, results waited 0.0 s
+ledger: 123 s, 486 CPU s of 540: 0 of 24 proven, 4 searching; climbs up 0 ended (0 proved their board, 0 parked), down 0 ended (0 proved their board, 0 parked); finder 20 runs, 14 improved; main thread busy 0.4 s, results waited 0.0 s
+ledger: 143 s, 558 CPU s of 540: 0 of 24 proven, 0 searching; climbs up 0 ended (0 proved their board, 0 parked), down 0 ended (0 proved their board, 0 parked); finder 20 runs, 14 improved; main thread busy 0.4 s, results waited 0.0 s

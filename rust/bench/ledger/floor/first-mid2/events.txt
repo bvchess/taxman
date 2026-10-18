@@ -1,0 +1,20 @@
+boards 125, proven 118, CPU 1801 s, wall 272 s (budget spent)
+setup (the boards' facts and problems): 3.0 CPU s
+maps: 56, 119.1 s
+searches: 259 of 56 boards, 1577.3 s; completed 142 (3 at their ceiling), stopped 117
+a stopped search's seconds beyond its limit: median 0.96, max 1.10
+the finder: 106 runs (107 s; 56 after maps), 41 found a better game (by 8675 in all, median 165)
+the games that seeded the searches: {None: 92, 'n+1': 125, 'n': 39, 'n-1': 2, 'lns': 1}
+searches with n-1 proven, n+1 not proven: 37, 363 s, 21 completed
+searches with n-1 not proven, n+1 proven: 4, 28 s, 4 completed
+searches with n-1 not proven, n+1 not proven: 218, 1186 s, 117 completed
+floor steps: 92 of 45 boards, 56 s; outcomes {'held': 89, 'moot': 3}
+the forecast of the proof after the last floor step, against the nodes of the searches that proved the board: 43 boards, log10 error median -0.17, median absolute error 0.22
+stopped searches whose dual bound lowered U: 3, by 132 in all (median 33)
+a stopped search's dual bound below its board's root bound: median 85, max 303
+changes the relations made: lower ceiling 8, lower monotone 32, lower prime 15, lower repeat 61, upper ceiling 121, upper prime 53, upper repeat 182
+the maps' bounds carried at 24.1 s: 169 changes in 0.41 s
+the main thread: busy 0.6 s of 272 (its longest piece 0.41 s), results waited 0.0 s in all
+the run's CPU over its wall time: 6.62 of 8 workers (83%)
+from the last map's result to the end: 6.53 of 8 (82%)
+boards by their number of searches: {0: 69, 1: 7, 2: 6, 3: 12, 4: 10, 5: 2, 6: 4, 7: 7, 8: 4, 9: 2, 15: 1, 16: 1}

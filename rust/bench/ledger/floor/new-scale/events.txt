@@ -1,0 +1,16 @@
+boards 24, proven 0, CPU 544 s, wall 138 s (budget spent)
+setup (the boards' facts and problems): 1.7 CPU s
+maps: 12, 131.9 s
+searches: 64 of 12 boards, 393.7 s; completed 56 (5 at their ceiling), stopped 8
+a stopped search's seconds beyond its limit: median 0.05, max 0.06
+the finder: 12 runs (13 s; 12 after maps), 9 found a better game (by 2095 in all, median 246)
+the games that seeded the searches: {None: 64}
+searches with n-1 not proven, n+1 not proven: 64, 394 s, 56 completed
+floor steps: 64 of 12 boards, 394 s; outcomes {'held': 51, 'moot': 5, 'stalled': 8}
+stopped searches whose dual bound lowered U: 0, by 0 in all (median None)
+changes the relations made: lower ceiling 1, lower monotone 4, lower prime 4, lower repeat 7, upper ceiling 44, upper prime 22, upper repeat 39
+the maps' bounds carried at 37.9 s: 29 changes in 0.19 s
+the main thread: busy 0.2 s of 138 (its longest piece 0.19 s), results waited 0.0 s in all
+the run's CPU over its wall time: 3.96 of 4 workers (99%)
+from the last map's result to the end: 3.98 of 4 (99%)
+boards by their number of searches: {0: 12, 3: 1, 4: 5, 5: 2, 6: 1, 8: 2, 9: 1}

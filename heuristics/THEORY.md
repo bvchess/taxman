@@ -1758,8 +1758,9 @@ the heaviest set found.
 *In the ledger.*  Every lower bound is a finished game, so L(n) ≤
 opt(n) holds by the referee alone.  Every upper bound is a bound of
 the frame model at some board (a root bound, a dual bound, a completed
-search: each bounds in_the_bag + P\*, which is opt given U at that
-board, by the corollary of "The upper part"), carried by the lemmas,
+search, a completed search under a floor with nothing found: each bounds
+in_the_bag + P\*, which is opt given U at that board, by the corollary
+of "The upper part"), carried by the lemmas,
 which hold unconditionally but for L4's upper half (U at the board it
 is carried to).  So a board whose bounds meet is proven within the
 frame model, as the chain past 2175 is, given U at the boards its upper

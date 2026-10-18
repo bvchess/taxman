@@ -544,3 +544,184 @@ all 3,792 boards are the first lines of `results/bounds.jsonl` (8.4 MB), both re
 
 **Next.**  Stage 2: 4300..4999 for 12 hours from stage 1's state (its ledger and the checkpoints of 4400..4999 copied
 to `ledger-frontier-2`), commit afe4513.
+
+## Later (2026-10-18): floor-guided drilling
+
+**Why.**  The ordinary search of an open board doubles its limit and resumes its checkpoint, and until it finishes it
+leaves little on the upper side (the dual bound of a stopped depth-first search is the root's bound or near it); and the
+order, `level + gap / gap_unit`, has no idea what a board's proof will cost.  A search under a floor F
+([the entry](proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10.md), `search::search_above`) that
+completes having found nothing proves "nothing weighs more than F" (THEORY.md, Lemma F), and its cost is log-linear in
+the distance below the root's bound: a decade of nodes per 147 points (a median over 14 games of 2265-3259; 0.53 to
+0.89 decades per 100 a game), a quarter of the gap for 1/20,000 of the proof.  So a step leaves a proven upper bound
+behind for a small share of the proof, and two or three steps give a board its own line, a forecast of what its proof
+costs.  The goal is every game in the end, so the total cost matters, not the count early; and the leverage between
+games is the proven board below (a search with n − 1 proven costs about 2.4 times less), so the climbs stay first.
+
+**The design** (`examples/ledger/cost.rs` the line, the forecast and the plan; `schedule.rs` the jobs and their
+results; the module comment of `main.rs` has the fields, the events and the settings).
+
+* **A floor step** is the job of an open, searched board that is not climbed to and whose gap `U − L` is more than two
+  steps: `search_above` under the floor one step below U (a score; the promotion sum is that less the bag), capped by
+  U, with no seed and no finder, on one thread, limited to `--floor-slack` (4) times its forecast time (at least
+  `--base`).  It ends in one of five ways.  *Held*: it completed having found nothing, the floor is U (the upper rule
+  `floor`), and the step, with its nodes and seconds, is kept on the board (`steps`: a point of its line).  *Proved*: it
+  found sets and completed, so the last is the optimum (Lemma F): L and U are that game, which the referee replayed on
+  the worker (`refereed`) as it replays every game; the board is proven.  *Found*: its limit stopped it with a set, L
+  rises to that game (replayed), and the floor is below L now: the step is dropped, and its checkpoint, a search from
+  that set, becomes the board's own for its proof if the board has none (else it is deleted).  *Stalled*: its limit
+  stopped it with nothing, so it is **kept**: `stalled` (floor, nodes, seconds, tries) on the board and its checkpoint
+  `ckpt/nN.floor.ckpt`, apart from the board's `nN.ckpt` that the proof and the climbs use, which a floor step cannot
+  continue; the board's next job is that step again, resumed under the same floor, with the limit doubled each try; if
+  the bounds move so that the floor is not between L and U, the step is moot and the next one starts afresh (its old
+  checkpoint is deleted then).  *Moot*: a relation proved the board, or lowered U to the floor, while it went on (the
+  search then ended at the ceiling with nothing explored).  A stopped step gives no dual bound: the open units of a
+  depth-first search are the root's and near it.
+* **The step** is the same factor of cost whatever the board: `--floor-step` (150) points at the median slope, a
+  tenfold of nodes; on a board with its own line, 150 · 0.0068 / slope points, so a steeper board takes fewer.  It goes
+  down from the board's upper bound, which a relation may have lowered below the root's, so a step costs a tenfold of
+  the depth already proven.  The steps cost a share of the proof that falls by a factor of ten each step at best, and
+  a half if the last lands close to the proof; so the board goes to its proof when its gap is within *two* steps
+  (`PROOF_STEPS`), not one.  On the 14 measured games, laid on their measured costs from the root's bound
+  (`bench/ledger/floor/ladder.py`), the steps and the proof cost together a median 1.05 times the proof alone (1.06 by
+  nodes; steps of 100 points 1.14, of 200 1.01), and 1.49 (1.60) if the proof comes only when the gap is within one
+  step.  The proof is the ordinary search as before: seeded with the best game, capped by U, the finder first, resuming
+  `nN.ckpt` if the board has one.
+* **The line and the forecast** (`cost::line`, `forecast`).  log10(nodes) = intercept + slope · distance below the
+  root's bound, fitted by least squares through the board's completed steps of 100 nodes or more (the shortest trees
+  have a floor of their own), the slope pulled to the median 0.0068 as a pair of points 141 apart would pull it and
+  kept in 0.003 to 0.012; with one point, the median slope through it; with none, the median line (0.5 + 0.0068 ·
+  distance, which has 1,000 nodes prove down 370 points, 10,000 down 514 and 100,000 down 661, as measured).  A
+  stalled step lifts the line to pass no lower than its nodes.  The forecast of the proof is the line at the distance
+  from the root's bound down to the lower bound, and not less than twice the steps that the board's ordinary searches
+  and climbs have spent without finishing, so that a board whose proof keeps being stopped looks dearer each time (the
+  charge `level` made); in seconds of one thread at the board's own rate (its steps, once they have taken a second),
+  else the run's, else 1,000 a second.  On the 14 games, the forecast made from the line of the steps so far is, in
+  log10 of nodes (forecast less actual): with no point 0.59 median absolute error (the median 1.9 times too
+  dear), with one 0.35, two 0.27, three 0.13.
+* **The order**: after the maps, the climbs; the boards a proven neighbour has boosted, smallest gap first; then the
+  boards that have yet to give their line two points (`cost::exploring`: a step to take and fewer than two completed
+  steps of 100 nodes or more), each a cheap step; then the board whose forecast seconds are least.  The forecast is in
+  the events (`forecast`, log10 of nodes, and `forecast_s`) and in the status line (the boards forecast within an hour
+  of one thread, within a day, longer).  A board whose forecast is far beyond the rest waits until the cheaper work is
+  done or running.  `--floor-step 0` is the ordinary searches and the old order.  The exploring tier came from the
+  first build's dry run at 4500 (below): a board with no line is forecast by the median line, which is far off there,
+  so the few boards that had a line looked 5 decades cheaper than the rest and kept the workers.
+* **Climbs** are as they were (seeded with the proven game, capped by the ceiling, `--climb-limit`), with the two loose
+  ends of 6088c21: the games that seed a search of the board of a repeat class include those of the boards just
+  outside the class (the proven one a climb into the class goes from: `b + 1` for a climb down into `a..b`), and while
+  a climb into a class runs, the boards just outside the whole class wait (`held`; it held only the boards next to the
+  board searched).
+* **The store** accepts the upper rules `floor` and `nogoods` on record, as `exhausted` and `dual` are (a bound of the
+  frame model at its own board, `rests_on` that board): `store.rs`, the export (no change: it writes them as the
+  ledger has them), `verify-bounds` and `tools/check_bounds.py` list them among the bounds they take on their record,
+  and `results/README.md` defines them.  `nogoods` is the Lagrangian bound over checked nogoods that `wall nogoods`
+  makes; nothing in the ledger makes it.
+* **Resume.**  A ledger written before the steps goes on: `root`, `steps` and `stalled` default when absent; the root
+  of every board that is mapped, unproven and searched but has none is computed at the start (the GF(2) bound of the
+  root, 0.15 s at 5000, on the workers).  The checkpoints of its ordinary searches are **not dropped**: floor steps
+  have a checkpoint of their own, so the old one stays and is resumed when the board comes to its proof, and a board
+  whose old search was far along is forecast at least twice what it spent, so that it waits behind the cheaper boards,
+  as `level` made it wait.
+
+**Tests (the quick suite).**  `cost.rs`: the fit recovers a line and is pulled to the median slope by few points; a
+board's line and forecast come from its steps of enough nodes, a stalled step lifts the line, and ordinary searches
+that spent more than the line gives raise the forecast; the rate is the board's, the run's or a default; the step is
+150 points at the median slope, fewer or more on another, and the proof comes when the gap is within two steps; a
+stalled step is resumed while its floor is between the bounds and moot outside; a board explores until its line has
+two points of 100 nodes or more; the forecast orders boards by their lines.  `floor_tests.rs`: a step above the optimum
+completes and lowers U by the rule `floor` (the step kept on the board, the event saying so, the proof next); a step
+below the optimum finds the optimum, L is a game the referee replays, and the board is proven with no checkpoint left;
+a step stopped with a set drops its floor and hands its checkpoint to the board's proof, or deletes it where the board
+has one; a step stopped with nothing is kept and the next job is that step resumed under its floor, which completes
+where it left off; a step ended at the ceiling is moot; the jobs go in order: the climbs, the boosted board, the boards
+with no line by n, then the cheapest line, the board whose proof is a gap of 1, the dearest line, the board whose
+searches spent most; a climb into the class {925, 926} holds 924 and 927 and a climb down into it is seeded with 927's
+game; a run of 901..960 with steps of 20 proves every board at its optimum with the events and the report saying how
+each step ended; a ledger written without the three new fields, with a stopped ordinary search's checkpoint, goes on
+and proves its board.  `store_tests.rs`: the hand-made books have `floor` and `nogoods` bounds, which both referees
+accept and list.  The earlier tests of the order of the jobs run with `floor_step` 0.
+
+**The dry runs** (the laptop, the non-release builds under `nice -n 10`, the truth hidden, through `cloud.sh`; the
+commands and files are in [bench/ledger/floor/](../../bench/ledger/floor/)): `base` is the scheduler before this change
+(93056fd), `first` the build of f775cc0 and `new` the build of 26c5c71 (the same with the boards exploring first and the
+checkpoint of a step that found a set kept), each stretch run for each in turn, the new builds first.  "Searches" counts
+every job after the maps, the floor steps and climbs among them; the wall times are of a shared laptop and say little.
+
+| stretch, workers, budget | build | proven | CPU s | wall s | searches (s) | of them floor steps (s) | U − L left, summed (boards) |
+|---|---|---|---|---|---|---|---|
+| 1301..1500, 6, 2 h | base | 200 | 619 | 120 | 97 (590) | | |
+| | first | 200 | 619 | 134 | 106 (587) | 12 (2) | |
+| | new | 200 | 620 | 132 | 186 (653) | 94 (8) | |
+| 2576..2700, 8, 900 CPU s | base | 61 | 911 | 131 | 127 (867) | | 37,550 (64) |
+| | first | 69 | 909 | 117 | 177 (788) | 84 (38) | 14,543 (56) |
+| | new | 73 | 908 | 120 | 212 (807) | 124 (62) | 9,703 (52) |
+| 2576..2700, 8, 1800 CPU s | base | 118 | 1802 | 271 | 183 (1681) | | 3,400 (7) |
+| | first | 118 | 1801 | 272 | 259 (1685) | 92 (56) | 1,468 (7) |
+| | new | 116 | 1802 | 282 | 297 (1851) | 122 (62) | 1,901 (9) |
+| 3076..3200, 8, 900 CPU s | base | 0 | 911 | 119 | 109 (648) | | 132,877 (125) |
+| | first | 0 | 915 | 120 | 79 (655) | 39 (149) | 128,735 (125) |
+| | new | 0 | 906 | 128 | 195 (646) | 193 (584) | 65,806 (125) |
+| 4500..4523, 4, 540 CPU s | base | 0 | 558 | 143 | 33 (426) | | 40,043 (24) |
+| | first | 0 | 540 | 143 | 33 (435) | 33 (422) | 31,119 (24) |
+| | new | 0 | 544 | 138 | 64 (407) | 64 (394) | 26,301 (24) |
+
+Every run has **0 violations** (the check of `ledger report` against the chain on the first four stretches: every game
+replays to its L, L ≤ opt ≤ U, and every proven value is the chain's score; 4500 is past the chain).  Proven boards
+against CPU seconds on 2576..2700 at 900 CPU s (each tenth of the budget): base 0, 0, 23, 42, 44, 45, 50, 57, 59, 61;
+new 0, 0, 14, 36, 44, 48, 56, 60, 70, 73; at 1800: base 0, 44, 50, 57, 59, 68, 84, 96, 107, 118; new 0, 36, 44, 56, 65,
+82, 88, 96, 106, 116.
+
+**Findings.**
+
+* **The easy stretch is unchanged**: 1301..1500 in 619 to 620 CPU s with and without the steps (the earlier runs of the
+  finder and the climbs took 547 to 612); most of its boards have gaps within two steps and go straight to their
+  proofs, and the steps taken, 12 by the first build and 94 by the new one (which explores), cost 2 and 8 s in all.
+* **On 2576..2700 the steps bring proofs forward**: at 900 CPU s the first and the new build have proven 69 and 73
+  boards against 61 (four earlier runs of the same budget with a build before the steps, in the finder's section, each
+  had 61), and the gaps the open boards have left sum to 14,543 and 9,703 against 37,550; at 1800 CPU s all three have
+  116 to 118 of the 125 (the same 7 to 9 boards remain, with gaps of 200 and more: the walls of this stretch).  The
+  curves of boards proven against CPU: the new build is behind the base up to 700 CPU s (its exploring and first steps
+  come before any proof), ahead from 900 to 1300 (65 against 59 at 900, 82 against 68 at 1080) and level from 1440.
+  The difference at 900 CPU s is 8 to 12 boards, about the 5 boards by which the repeated runs of one build differ, and
+  each curve is one sample: the gain of the steps in proofs is real but modest here, and in the gaps it is large.  The
+  steps cost 38 to 62 s of the 900.
+* **On 3076..3200 nothing can be proven in the budget** (the maps take 320 of the 906 CPU s), and the steps spend the
+  rest on bounds: with every board exploring first, 193 steps (584 s) on all 56 boards that are searched (the rest of
+  the 125 are repeats and primes, whose bounds follow) lower U on every one, and the gaps sum to 65,806 against
+  132,877, half; the first build, with the boards that had a line keeping the workers, stepped eight boards (128,735).
+  Of the 584 s, 322 were steps that completed, 62 were steps that the bounds of a neighbour ended (moot: a step on a
+  board lowers U of its neighbours and repeats by the relations, and a step running on one of them then ends at its
+  ceiling, having explored a tree whose bound the relations had already given), and 200 were steps that the end of the
+  budget stopped, which are kept.
+* **At 4500** (a single board on one worker, then 24 boards on four, with the finder at 1 s): a step costs about 0.07 s
+  of setup beyond its search (the first four steps' searches take 0.04, 0.04, 0.10 and 0.30 s), so the steps that
+  cost 4 to 600 nodes are no matter.  The first points of the line have a slope of 0.0033 to 0.0039 a point, about half
+  the median 0.0068 of the 14 games (2265-3259): the steps of one board went down 150, 150, 150, 150, 195, 257 and 289
+  points as the line flattened, and the median line forecast a proof 5 decades too dear until a board had two points,
+  which is why the boards explore first.  On the 24 boards (12 of them searched; the rest are repeats and primes) the
+  steps lowered the gaps' sum from 40,043 to 26,301 in 540 CPU s.  A thread made 2,200 to 3,200 steps a second there.
+* **The forecast** of a board's proof after its last step, against the nodes of the searches that proved it (log10, forecast
+  less actual): a median -0.55 (59 boards) on 1301..1500, -0.33 (32) and -0.22 (52) on 2576..2700, with median absolute
+  errors of 0.55, 0.48 and 0.28: the forecast is a factor 1.7 to 3.5 too small at the median, the largest errors in the
+  proofs of a few thousand nodes, which cost more than the line gives (an intermediate build's list: 0.4 to 1.1 decades
+  too small at 8,000 to 40,000 nodes; the shortest trees have a floor of their own).  The 14 games' simulation, with
+  two points, has an error of 0.27.
+* **The limit and the stalls**: of 193 steps on 3076..3200 13 stalled, of 124 on 2576..2700 one, of 64 at 4500 eight.
+  All but one were in the last seconds of the run, where a job's limit is what is left of the budget (the board keeps
+  the stalled step, which the next stage resumes).  The one, in both runs of 2576..2700, was board 2637 at 450 points,
+  where the median line forecast 3,600 steps and the board needed more than 15,800: stopped by the limit of four times
+  the forecast (2.7 s), kept, and resumed by the board's next job.
+
+**Not done.**  The cloud run (it needs Brian's approval).  Not measured: other values of `--floor-step` and
+`--floor-slack` (the simulation on the 14 games says that a step of 100 to 200 points costs 1.01 to 1.14 times the
+proof alone, but the dry runs used 150 and 4 only); boards past 3440 beyond the 4500 probe, where the gaps are 1,200
+and more and the 14 games' median line is off (the slope there is half, and the cost of the proof of a board at 4500
+is not known: none was proven, the dearest step reached 260,000 steps); many workers on a stretch of walls, where the
+steps of the cheapest boards run side by side and coupled boards end each other's steps (11% of the step seconds on
+3076..3200); floor steps on many threads; a bias correction of the forecast (the proofs cost a median 1.7 to 3.5 times
+the forecast at these sizes).  The prior's intercept and slope are the 14 games' median; the boards that explore first
+make them matter little, but a forecast for a stretch far from 2265-3259 is the stretch's own lines, not the prior's.
+
+**Commits.**  f775cc0 (the steps, the forecast and the order, the store's rules, the tests), 26c5c71 (the boards
+exploring first, and the checkpoint of a step that found a set), then the commit of the documents and this record.

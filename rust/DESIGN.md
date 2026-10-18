@@ -963,13 +963,19 @@ game a relation makes that could raise a board's L is replayed before it counts 
 referee, or not made), and an L above a U stops the run as an error.  The maps of all the boards come first, on the
 workers, and the relations carry their bounds once, when the last is in; the main thread, which applies every result
 while the workers whose searches ended wait for it, does little for each.  The order of the searches is where a proof
-looks cheapest (least `level + gap / gap_unit`, which finds the boards proven with no help from below), with *climbs*
-ahead of it: a board whose board below its repeat class is proven, however that was proven, is searched next for a
-limit of its own (`--climb-limit`), seeded with that game and capped by the ceiling it gives, and when a climb proves
-its board, the board above its class is climbed to (a climb up); a board whose board above its repeat class is proven
-is climbed to down, after those, seeded with that game but under the ledger's own, loose ceiling (`--climb` picks the
-ways); a climb that stops parks its board in the ordinary order, and a board next to one being climbed to waits for
-it.  The *finder*, large neighbourhood search
+looks cheapest, with *climbs* ahead of it: a board whose board below its repeat class is proven, however that was
+proven, is searched next for a limit of its own (`--climb-limit`), seeded with that game and capped by the ceiling it
+gives, and when a climb proves its board, the board above its class is climbed to (a climb up); a board whose board
+above its repeat class is proven is climbed to down, after those, seeded with that game but under the ledger's own,
+loose ceiling (`--climb` picks the ways); a climb that stops parks its board in the ordinary order, and the boards just
+outside the class of one being climbed to wait for it.  An open board that is not climbed to is *stepped down* before its
+proof (`--floor-step`): a search under a floor below its upper bound (`search::search_above`, Lemma F) that, if it
+completes having found nothing, makes the floor the upper bound (the rule `floor`).  The cost of a search under a floor
+is about log-linear in the floor's distance below the root's bound, so each board has a line, fitted from its completed
+steps, which forecasts its proof; each step costs a tenfold more than the depth already proven, the board goes to its proof
+(the ordinary search, seeded and capped) when its gap is within two steps, and the boards go, after the climbs and those
+a proven neighbour has changed, by the forecast seconds of their proofs, cheapest first (`examples/ledger/cost.rs`; with no
+floor steps, by least `level + gap / gap_unit`, which finds the boards proven with no help from below).  The *finder*, large neighbourhood search
 (`examples/common/lns.rs`, which `wall finders` measures), is not sound and proves nothing, but a lower bound needs only
 a legal game: for `--lns-seconds` seconds of a worker it runs after a board's map and before a search whose best seed
 has changed since it last ran on the board (a climb's always has), and its game, which the referee replays like every

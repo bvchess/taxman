@@ -77,7 +77,8 @@ fn check(task: &Task) -> Vec<(usize, String)> {
 /// the referee (`schedule::play_all`) at its value; every root bound recomputed; every repeat's bags and search problem
 /// compared with its source's; every relation's arithmetic checked against the line it cites (a line before it, or a
 /// game of the chain `strict`), with what it rests on; and every board of the chain against the file's bounds.  The
-/// bounds of searches (`exhausted`, `dual`) and given games are taken on their record, and listed.
+/// bounds of searches (`exhausted`, `dual`, `floor`), the Lagrangian bounds over nogoods (`nogoods`) and given games
+/// are taken on their record, and listed.
 pub fn verify(path: &Path, strict: &Path, workers: usize) -> Result<(String, bool), String> {
     let (numbered, parse_problems) = Store::parse(path)?;
     let games = store::chain(strict)?;
@@ -149,7 +150,7 @@ pub fn verify(path: &Path, strict: &Path, workers: usize) -> Result<(String, boo
         count(Side::Upper, &[Rule::Root]),
         count(Side::Upper, &[Rule::Repeat]),
     );
-    for rule in [Rule::Exhausted, Rule::Dual, Rule::Given] {
+    for rule in [Rule::Exhausted, Rule::Dual, Rule::Floor, Rule::Nogoods, Rule::Given] {
         let ns: Vec<u32> = best.upper.iter().filter(|(_, l)| l.rule == rule).map(|(&n, _)| n).collect();
         let _ = writeln!(
             w,

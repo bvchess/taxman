@@ -13,6 +13,9 @@
 #   CLIMB_LIMIT the limit of a climb in seconds (the program's default, 60; 0: no climbs)
 #   LNS_SECONDS the seconds of one thread the finder (large neighbourhood search) gets after a board's map and before a
 #               search whose best seed has changed (the program's default, 1; 0: no finder)
+#   FLOOR_STEP  the points a floor step goes down below a board's upper bound, at the median slope of the cost of a search
+#               under a floor (the program's default, 150; 0: no floor steps, the ordinary searches whose limit doubles)
+#   FLOOR_SLACK a floor step's limit is this many times its forecast time (the program's default, 4)
 #   PROVEN      a results file whose proven games the run is given (default none: the truth stays hidden)
 #   BOUNDS      a bounds store (results/bounds.jsonl) whose best bounds the run starts from (default none); the run's
 #               ledger is exported to it afterwards with `ledger export` (RUNBOOK section 14)
@@ -49,7 +52,8 @@ stamp "start $range workers=$workers cpu_hours=$cpu_hours"
 # shellcheck disable=SC2086 # an option and its value, or nothing
 "$ledger" run "$range" --dir "$out/run" --workers "$workers" --cpu-hours "$cpu_hours" --base "${BASE:-2}" \
     --max-limit "${MAX_LIMIT:-3600}" ${CLIMB:+--climb "$CLIMB"} ${CLIMB_LIMIT:+--climb-limit "$CLIMB_LIMIT"} \
-    ${LNS_SECONDS:+--lns-seconds "$LNS_SECONDS"} ${PROVEN:+--proven "$PROVEN"} ${BOUNDS:+--bounds "$BOUNDS"} \
+    ${LNS_SECONDS:+--lns-seconds "$LNS_SECONDS"} ${FLOOR_STEP:+--floor-step "$FLOOR_STEP"} \
+    ${FLOOR_SLACK:+--floor-slack "$FLOOR_SLACK"} ${PROVEN:+--proven "$PROVEN"} ${BOUNDS:+--bounds "$BOUNDS"} \
     > "$out/run.out" 2> "$out/run.err"
 stamp "run done, status $?"
 "$ledger" report "$out/run" --known "$known" > "$out/report.txt" 2>&1

@@ -1,0 +1,31 @@
+boards 1301..1500: 200 in the ledger, 200 proven
+CPU 619 s (0.17 core-hours); 106 searches, 587 s of them
+climbs up: 39 among the searches, 232 s of them: 39 proved their board, 0 parked, 0 moot (the board was proven meanwhile)
+climbs down: 26 among the searches, 148 s of them: 25 proved their board, 0 parked, 1 moot (the board was proven meanwhile)
+floor steps: 12 among the searches, 2 s of them: 12 lowered U, 0 proved their board, 0 found a set and stopped, 0 stalled, 0 moot
+finder: 153 runs, 153 s of them; 69 found a better game than they began from (by 10596 in all); 51 boards end with its game as the lower bound (51 of them proven)
+proven by (lower rule, upper rule):
+  lns        ceiling    4
+  lns        exhausted  47
+  monotone   ceiling    15
+  prime      prime      17
+  repeat     repeat     79
+  search     ceiling    2
+  search     exhausted  24
+  start      ceiling    1
+  start      exhausted  11
+by the upper bound: search 82 (exhausted 82, dual 0, floor 0), relations 118 (ceiling 22, prime 17, repeat 79, monotone 0), other 0
+proven against CPU seconds:
+         62 s  0
+        124 s  27
+        186 s  84
+        247 s  112
+        309 s  132
+        371 s  145
+        433 s  161
+        495 s  183
+        557 s  191
+        619 s  200
+U - L of the 0 unproven boards: none
+U - L summed: 0
+check: 200 boards with a known optimum, 200 proven at it; 0 violations

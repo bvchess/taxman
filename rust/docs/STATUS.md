@@ -11,9 +11,8 @@ results and how they are proven are in the [README](../README.md); the research 
 ## The results
 
 * The committed chain, `results/strict.jsonl`, reaches 3440.  Games 2-2175 are proven on the whole board by the
-  prover; games 2176-3440 within the frame model, which is exact given statement U
-  ([README, "What optimal means"](../README.md#what-optimal-means)).  `optimal.json` stays at 1300; nothing is
-  published.
+  prover; games 2176-3440 within the frame model, which is exact given statement U ([README, "What optimal
+  means"](../README.md#what-optimal-means)).  `optimal.json` stays at 1300; nothing is published.
 * 3440 is confirmed: the run to the wall re-proved it with the fixed build (the counter that could wrap,
   [the wrap](experiments/cheaper-gf2-nodes-same-trees-2026-10.md#later-2026-10-the-stamps-wrap-and-the-committed-chain)),
   the same score and proof in 1.76 hours and 1.36 billion nodes (5.05 hours and 3.72 billion before); its games 1..3440
@@ -64,31 +63,30 @@ What has been tried for the bound, and where it stands:
 **The landscape past the chain** (2026-10-17): the standalone bounds of every game of 3441-8191 are measured
 ([bench/landscape/](../bench/landscape/README.md), for $1.10).  None meets, the smallest standalone gap is 1,196
 (4176-4179) and the median rises from about 1,800 at 3441-4440 to 4,600-8,300 from 5441, so with today's heuristic no
-game past 3440 is within a few minutes of one-thread search
-([the entry](experiments/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10.md)).
+game past 3440 is within a few minutes of one-thread search ([the
+entry](experiments/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10.md)).
 
 **Finders for lower bounds** (2026-10-17): a lower bound needs only a legal game, so a search that is not sound may
 find it.  Large neighbourhood search from the start incumbent (keep a random 70-90% of its promotions, search the rest
 exactly as a unit, repeat) finds the optimum of 64% of the games of 2176-3440 in 5 CPU seconds of one thread (the sound
 search for the same time: 21%), a mean shortfall of 28 against 297; the sound search seeded with its game takes 0.44 of
-the nodes and 0.48 of the CPU, finder included, of the search from today's start (the optimum as the seed: 0.38 of the
-nodes).  It is in `wall finders`, `wall sound` and the ledger (below), not in the solver
-([the entry](experiments/finders-for-good-games-that-are-not-sound-2026-10.md)).
+the nodes and 0.48 of the CPU, finder included, of the search from today's start.  It is in `wall finders`, `wall
+sound` and the ledger (below), not in the solver ([the
+entry](experiments/finders-for-good-games-that-are-not-sound-2026-10.md)).
 
 **Floors for upper bounds** (2026-10-18): a search from a floor F, an incumbent worth F with no set
 (`search::search_above`, THEORY.md Lemma F), proves "nothing weighs more than F" for an F above the optimum far more
-cheaply than the proof: on 14 games of 2265-3259 (gaps 627-1,113), proving down a quarter, a half and three quarters of
-the gap took a median 1/20,000, 1/740 and 1/26 of the full proof's nodes, the log of the nodes linear in the distance
-(a decade per 147; r² 0.996), and 10,000 steps (2 s) proved down a median 514 of 834.  It is in `wall target`, not yet
-in the ledger ([the entry](experiments/proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10.md)).
+cheaply than the proof: on 14 games of 2265-3259, proving down a quarter, a half and three quarters of the gap took a
+median 1/20,000, 1/740 and 1/26 of the full proof's nodes, the log of the nodes linear in the distance (a decade per
+147; r² 0.996).  It is in `wall target` and the ledger ([the
+entry](experiments/proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10.md)).
 
 ## Decided
 
 * **The window is 4** (2026-10-17), the default of `taxman solve --window` (it was 1) and of `chain.sh` (it was 16).
   At 64 threads a window of 16 made the games past 2225 20 to 32% slower than 1, and 4 was the best measured
   ([round B](experiments/round-b-the-chain-on-many-threads-2026-10.md); [scaling to 192
-  threads](experiments/scaling-to-192-threads-2026-10.md)).  It changes how threads are shared, never a score or a
-  proof.
+  threads](experiments/scaling-to-192-threads-2026-10.md)).  It changes how threads are shared, not a score or proof.
 * **The forcing window is `all`** (2026-10-16; it was 80).  The tuning campaign (one `c8g.16xlarge`, 3.8 hours, about
   $2.50) measured it on subtrees of 3300, 3425, 3440 and 3441 and six whole games on one thread, and on complete
   proofs of seven games (3179-3395, 3300) on 64 threads: 0.60-0.63 of the CPU and 0.41-0.43 of the nodes on the
@@ -140,9 +138,13 @@ in the ledger ([the entry](experiments/proving-an-upper-bound-part-of-the-way-se
   export`, `run --bounds`, `verify-bounds` and `tools/check_bounds.py`; [results/README](../results/README.md#boundsjsonl)).
   On 2176..3440 with the truth hidden every proven board is at the optimum: 916 of 1,265 in 48 core-hours without the
   climbs and the finder, 876 in 24 with both (the first run needed about 38 for as many).
-* **The ledger past 4400** (Brian approved up to $25, 2026-10-17): the games the run to the wall will not reach.
-  Stage 1, 4400..8191 on one `c8g.16xlarge` (360 core-hours, about $3.80): every board mapped with the finder (10 s),
-  then searches where the gap is smallest, climbs both ways (limit 1 hour).  It proved 242 boards, 4446-4475,
-  4477-4507, 4540-4542, 4554-4622, 4626-4639, 4664-4757 and 4779, all of them in 4400..4799; past 4800 the smallest
-  gap after the finder is 1,664 and nothing closed.  Its bounds of all 3,792 boards are the store's first lines, both
-  referees passing.  Stage 2 (2026-10-18, 12 hours, at most $8.20): 4300..4999 from stage 1's state.
+* **The ledger past 4400** (Brian approved up to $25, 2026-10-17): stage 1, 4400..8191 on one `c8g.16xlarge` (360
+  core-hours, about $3.80), mapped every board with the finder (10 s), then searched where the gap is smallest, climbs
+  both ways (limit 1 hour): 242 boards proven, all in 4400..4799, and past 4800 the smallest gap is 1,664; its bounds
+  are the store's first lines.  Stage 2 (2026-10-18, 12 hours, at most $8.20): 4300..4999 from stage 1's state.
+* **Floor-guided drilling** (2026-10-18, f775cc0 and 26c5c71; [the entry's
+  section](experiments/the-ledger-bounds-from-both-sides-2026-10.md#later-2026-10-18-floor-guided-drilling)): the ledger
+  steps an open board down by searches under floors (`--floor-step`, 150 points, a tenfold of cost a step; each completed
+  one lowers U), fits a line to each board's steps that forecasts its proof, and orders the boards after the climbs by it.
+  On 2576..2700 at 900 CPU s 69 and 73 boards were proven against 61; dry-run, not run in the cloud; the next stage
+  resumes stage 2's ledger with it ([RUNBOOK 14](../tools/cloud/RUNBOOK.md#14-the-ledgers-experiment)).

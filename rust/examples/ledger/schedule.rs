@@ -1,13 +1,15 @@
 //! The scheduler: limited one-thread searches of many boards at once, where a proof looks cheapest, with the
 //! relations applied after each.  The module documentation of `main.rs` says what it does and writes.
 
-use crate::book::{carry_game, facts, Book, Change, Entry, Facts, Lower, Rule, Side, Upper};
+use crate::book::{carry_game, facts, Book, Change, Entry, Facts, Lower, Rule, Side, Stalled, Step, Upper};
+use crate::cost::{self, Plan};
 use crate::counters;
 use crate::known::survivors;
 use crate::lns::{self, Lns};
 use crate::pool;
 use crate::store::{Game, Line, Store};
-use std::collections::{BTreeSet, HashMap};
+use crate::verify::root_upper;
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::panic::AssertUnwindSafe;
@@ -49,7 +51,17 @@ pub struct Settings {
     /// measurements (docs/experiments/finders-for-good-games-that-are-not-sound-2026-10.md) it has most of its gain in
     /// the first second, and a search seeded with it costs 0.48 of the CPU of the unseeded, the finder included.
     pub lns_seconds: f64,
-    /// The gap that counts as one doubling of the expected cost, in the order of the searches.
+    /// The points a floor step goes down below the board's upper bound, at the median slope of the cost of a search
+    /// under a floor (a tenfold in cost; a steeper board's line takes fewer points).  A board whose gap is more than
+    /// two steps is stepped down, each step a search under a floor (`cost.rs`), before its proof, and the boards are
+    /// ordered by the forecast cost of their proofs.  150: the first step of the measurements (10,000 nodes prove down
+    /// 514 points).  0: no floor steps, the ordinary searches whose limit doubles, ordered by `level + gap / gap_unit`.
+    pub floor_step: u64,
+    /// A floor step's limit is this many times its forecast time (at least `base`), and doubles each time the step is
+    /// stopped by it; the line fitted from a board's steps is within a factor of 2 of the next step's cost from the
+    /// second step on (the 14 games' measurements), so 4 leaves room.
+    pub floor_slack: f64,
+    /// The gap that counts as one doubling of the expected cost, in the order of the searches with no floor steps.
     pub gap_unit: f64,
     /// Seconds between writes of the ledger (and at the end).
     pub save_every: f64,
@@ -72,6 +84,8 @@ impl Default for Settings {
             climb_up: true,
             climb_down: true,
             lns_seconds: 1.0,
+            floor_step: 150,
+            floor_slack: 4.0,
             gap_unit: 175.0,
             save_every: 30.0,
             checkpoint_every: 60.0,
@@ -94,8 +108,20 @@ fn checkpoint_dir(dir: &Path) -> PathBuf {
     dir.join("ckpt")
 }
 
+/// The checkpoint of the board's ordinary searches and climbs.
 fn checkpoint_path(dir: &Path, n: u32) -> PathBuf {
     checkpoint_dir(dir).join(format!("n{n}.ckpt"))
+}
+
+/// The checkpoint of the board's floor step that its limit stopped: good only under that floor, so it is kept beside
+/// the other, whose search it does not continue.
+fn floor_checkpoint_path(dir: &Path, n: u32) -> PathBuf {
+    checkpoint_dir(dir).join(format!("n{n}.floor.ckpt"))
+}
+
+/// Deletes both checkpoints of the board `n` (the first error, if any, after trying both).
+fn remove_checkpoints(dir: &Path, n: u32) -> std::io::Result<()> {
+    engine::remove_checkpoint(&checkpoint_path(dir, n)).and(engine::remove_checkpoint(&floor_checkpoint_path(dir, n)))
 }
 
 /// Which way a climb goes from a proven board.
@@ -123,10 +149,17 @@ impl Way {
     /// down.
     fn source(self, class: &[u32]) -> u32 {
         match self {
-            Way::Up => class[0] - 1,
-            Way::Down => class[class.len() - 1] + 1,
+            Way::Up => outside(class)[0],
+            Way::Down => outside(class)[1],
         }
     }
+}
+
+/// The two boards just outside the repeat class `class` (ascending): below its smallest and above its largest.  A
+/// proven one starts a climb into the class, and its game seeds the class's searches; the other waits while a climb
+/// into the class runs.
+fn outside(class: &[u32]) -> [u32; 2] {
+    [class[0] - 1, class[class.len() - 1] + 1]
 }
 
 /// What a worker is asked to do with a board.
@@ -140,6 +173,10 @@ pub enum Kind {
     /// A climb: a search of a board next to a proven one, made as a `Search` is but ahead of every other job, for
     /// `climb_limit` seconds.  If it ends unproven the board is parked: it goes by the ordinary order from then on.
     Climb(Way),
+    /// A floor step: a search under a floor below the board's upper bound, with no seed (`search::search_above`),
+    /// resumed from its own checkpoint if the step was stopped before.  If it completes having found nothing, the floor
+    /// is the new upper bound.
+    Floor,
 }
 
 impl Kind {
@@ -147,7 +184,7 @@ impl Kind {
     fn name(self) -> &'static str {
         match self {
             Kind::Init => "init",
-            Kind::Search | Kind::Climb(_) => "search",
+            Kind::Search | Kind::Climb(_) | Kind::Floor => "search",
         }
     }
 
@@ -157,15 +194,26 @@ impl Kind {
             Kind::Init => None,
             Kind::Search => Some("ordinary"),
             Kind::Climb(_) => Some("climb"),
+            Kind::Floor => Some("floor"),
         }
     }
 
     fn way(self) -> Option<Way> {
         match self {
             Kind::Climb(way) => Some(way),
-            Kind::Init | Kind::Search => None,
+            Kind::Init | Kind::Search | Kind::Floor => None,
         }
     }
+}
+
+/// The floor a step runs under (`Kind::Floor`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Floor {
+    /// The floor, as a score (the promotion sum is that less the board's bag).
+    pub score: u64,
+    /// Whether the step goes on from the checkpoint of a stalled one under this floor (else it starts, and an old
+    /// checkpoint is deleted).
+    pub resume: bool,
 }
 
 /// A game that can seed a search: the moves of the lower bound of the board `from`, which is n − 1, n or n + 1.
@@ -229,6 +277,8 @@ pub struct Job {
     pub below_proven: bool,
     pub above_proven: bool,
     pub lns: LnsPlan,
+    /// The floor of a floor step.
+    pub floor: Option<Floor>,
 }
 
 /// What the finder did: the scores of the game it began from and of the game it found (the same if it found nothing
@@ -251,12 +301,15 @@ impl LnsRun {
 pub struct Attempt {
     pub completed: bool,
     pub reached_cap: bool,
+    /// A floor step completed having found no set: no promotion set weighs more than its floor.  Then the game is the
+    /// one with no promotions.
+    pub held: bool,
     pub value: u64,
     pub moves: Vec<u32>,
     pub promotions: Vec<u32>,
-    /// The dual bound as a score, if the search stopped.
+    /// The dual bound as a score, if an ordinary search or a climb stopped.
     pub upper: Option<u64>,
-    /// The search's steps over all its runs.
+    /// The search's steps over all its runs (those of its checkpoint's, for a floor step the stalled step's).
     pub nodes: u64,
     /// The seconds of the search (of the map, for a map), the finder's not among them.
     pub seconds: f64,
@@ -274,6 +327,8 @@ pub struct Done {
     pub limit: f64,
     pub below_proven: bool,
     pub above_proven: bool,
+    /// The floor a floor step ran under, as a score.
+    pub floor: Option<u64>,
     pub result: Result<Attempt, String>,
     pub sent: Instant,
 }
@@ -328,7 +383,8 @@ pub fn attempt(job: &Job, control: &Arc<Control>, dir: &Path, every: Duration) -
 }
 
 /// The search of `job`, with the finder before it or, for a map, after it (`LnsPlan`): the finder starts from the best
-/// seed (or the map's start incumbent), and its game seeds the search if it beats the seed.
+/// seed (or the map's start incumbent), and its game seeds the search if it beats the seed.  A floor step has neither
+/// (`step_at`).
 fn attempt_at<const W: usize>(
     job: &Job,
     control: &Arc<Control>,
@@ -339,10 +395,22 @@ fn attempt_at<const W: usize>(
     let at = |what: &str, e: String| format!("n={n}: {what}: {e}");
     let board = Board::<W>::for_n(n);
     let p = board.prepare(SearchTactics::default()).map_err(|e| at("setup", e))?;
-    let ckpt = checkpoint_path(dir, n);
     if job.kind == Kind::Init {
-        engine::remove_checkpoint(&ckpt).map_err(|e| at("an old checkpoint", e.to_string()))?;
+        remove_checkpoints(dir, n).map_err(|e| at("an old checkpoint", e.to_string()))?;
     }
+    let cap = job.cap.map(|score| score.saturating_sub(board.in_the_bag));
+    let engine_config = |ckpt: &Path| EngineConfig {
+        threads: 1,
+        progress: None,
+        time_limit: Some(job.limit),
+        checkpoint: Some((ckpt.to_path_buf(), every)),
+        control: Some(Arc::clone(control)),
+        ..EngineConfig::default()
+    };
+    if let Some(floor) = job.floor {
+        return step_at(job, floor, &board, &p, &engine_config(&floor_checkpoint_path(dir, n)), cap);
+    }
+    let ckpt = checkpoint_path(dir, n);
     let resume = job.kind != Kind::Init && ckpt.exists();
     // The best seed: the game that keeps the most promotions (the last of equals), and what survives of it.
     let best = job
@@ -351,7 +419,6 @@ fn attempt_at<const W: usize>(
         .map(|seed| (SeedFrom::of(seed.from, n), board.seed(&seed.moves)))
         .map(|(from, seed)| (from, search::seed_survivors_sum(&p, &seed), seed))
         .max_by_key(|&(_, kept, _)| kept);
-    let cap = job.cap.map(|score| score.saturating_sub(board.in_the_bag));
     let (mut seed, mut lns) = (best.as_ref().map(|(from, _, seed)| (*from, *seed)), None);
     if job.lns.seconds > 0.0 && job.kind != Kind::Init {
         let start = match &best {
@@ -369,17 +436,10 @@ fn attempt_at<const W: usize>(
             lns = Some(run);
         }
     }
-    let cfg = EngineConfig {
-        threads: 1,
-        progress: None,
-        time_limit: Some(job.limit),
-        checkpoint: Some((ckpt.clone(), every)),
-        control: Some(Arc::clone(control)),
-        ..EngineConfig::default()
-    };
     let t0 = Instant::now();
     let seed_set = seed.as_ref().map(|(_, set)| set);
-    let r = search::search(&p, &cfg, seed_set, cap, resume).map_err(|e| at("the search", e.to_string()))?;
+    let r = search::search(&p, &engine_config(&ckpt), seed_set, cap, resume)
+        .map_err(|e| at("the search", e.to_string()))?;
     let (value, moves) = refereed(&board, &r.promotions).map_err(|e| at("the search's game", e))?;
     let upper = match r.completed {
         true => None,
@@ -393,6 +453,7 @@ fn attempt_at<const W: usize>(
     Ok(Attempt {
         completed: r.completed,
         reached_cap: r.reached_cap,
+        held: false,
         value,
         moves,
         promotions: r.promotions.to_vec(),
@@ -401,6 +462,45 @@ fn attempt_at<const W: usize>(
         seconds,
         lns,
         seed_from: seed.map(|(from, _)| from),
+    })
+}
+
+/// A floor step: the search under `floor` (`search::search_above`), from the checkpoint in `cfg` if the step was
+/// stopped before and is resumed, else from scratch (an old checkpoint is deleted).  There is no seed and no finder:
+/// the floor is the start, and a set found above it is a game like any other, which the referee replays.  A stopped
+/// step gives no bound (Lemma D would give its dual bound, but the open units of a depth-first search are the root's
+/// and near it).
+fn step_at<const W: usize>(
+    job: &Job,
+    floor: Floor,
+    board: &Board<W>,
+    p: &Prepared<W>,
+    cfg: &EngineConfig,
+    cap: Option<u64>,
+) -> Result<Attempt, String> {
+    let at = |what: &str, e: String| format!("n={}: {what}: {e}", job.n);
+    let ckpt = &cfg.checkpoint.as_ref().expect("a floor step checkpoints").0;
+    let resume = floor.resume && ckpt.exists();
+    if !resume {
+        engine::remove_checkpoint(ckpt).map_err(|e| at("an old checkpoint", e.to_string()))?;
+    }
+    let t0 = Instant::now();
+    let r = search::search_above(p, cfg, floor.score.saturating_sub(board.in_the_bag), cap, resume)
+        .map_err(|e| at("the search under the floor", e.to_string()))?;
+    let (value, moves) = refereed(board, &r.promotions).map_err(|e| at("the step's game", e))?;
+    Ok(Attempt {
+        completed: r.completed,
+        reached_cap: r.reached_cap,
+        // At the ceiling the step ended without exploring its tree.
+        held: r.floor_held && !r.reached_cap,
+        value,
+        moves,
+        promotions: r.promotions.to_vec(),
+        upper: None,
+        nodes: r.stats.nodes,
+        seconds: t0.elapsed().as_secs_f64(),
+        lns: None,
+        seed_from: None,
     })
 }
 
@@ -575,6 +675,17 @@ pub fn open_book(
     if let Some(path) = bounds {
         changes.extend(start_from(&mut book, path, first, last, workers)?);
     }
+    // The root's bound of every board that will be searched and is mapped without one: a ledger from before the floor
+    // steps does not have it, nor does a board the store mapped.  (A fresh board gets it from its map.)
+    let rootless: Vec<u32> = book
+        .entries
+        .values()
+        .filter(|e| e.mapped && e.root.is_none() && !e.proven() && book.searched(e.n))
+        .map(|e| e.n)
+        .collect();
+    for (n, root) in rootless.iter().zip(pool::map(&rootless, workers, |&n| root_upper(n))) {
+        book.entries.get_mut(n).expect("a board of the ledger").root = Some(root?);
+    }
     let bounded: Vec<u32> =
         book.entries.values().filter(|e| e.lower.is_some() || e.upper.is_some()).map(|e| e.n).collect();
     changes.extend(book.propagate(bounded)?);
@@ -616,6 +727,66 @@ impl Climbs {
             Way::Down => &mut self.down,
         }
     }
+}
+
+/// The floor steps of this run that have ended: all of them, those that completed having found nothing (the floor is
+/// the new upper bound), those that completed having found a set (the board is proven), those that stopped with a set
+/// (the floor is below the lower bound now: the step is dropped), and those the limit stopped with nothing (the step
+/// is kept).  (A step whose board a relation proved meanwhile, or whose floor the upper bound fell to, is none of them.)
+#[derive(Default)]
+struct StepTally {
+    ended: u32,
+    held: u32,
+    proved: u32,
+    found: u32,
+    stalled: u32,
+}
+
+impl std::fmt::Display for StepTally {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} ended ({} lowered U, {} proved their board, {} found a set, {} stalled)",
+            self.ended, self.held, self.proved, self.found, self.stalled
+        )
+    }
+}
+
+/// The steps and the seconds of the searches of this run, from which a board with no measure of its own takes its rate.
+#[derive(Default)]
+struct Pooled {
+    nodes: u64,
+    seconds: f64,
+}
+
+impl Pooled {
+    /// The floor steps that the ledger records, from which a run that goes on from it starts.
+    fn of(book: &Book) -> Pooled {
+        book.entries.values().map(cost::spent).fold(Pooled::default(), |pooled, (nodes, seconds)| Pooled {
+            nodes: pooled.nodes + nodes,
+            seconds: pooled.seconds + seconds,
+        })
+    }
+
+    /// The steps a thread makes in a second, if the searches took a while to measure it (else 0).
+    fn rate(&self) -> f64 {
+        if self.seconds >= 10.0 {
+            self.nodes as f64 / self.seconds
+        } else {
+            0.0
+        }
+    }
+}
+
+/// How a floor step ended, for `Scheduler::end_step`: its floor (a score), whether it completed having found nothing
+/// (`held`), whether it ended at the ceiling, whether it found a set, and its steps and seconds over this run of it.
+struct StepEnd {
+    floor: u64,
+    held: bool,
+    capped: bool,
+    found: bool,
+    nodes: u64,
+    seconds: f64,
 }
 
 /// The runs of the finder in this run, and how many of them found a better game than the one they began from.
@@ -662,6 +833,8 @@ pub struct Scheduler {
     last_status: Instant,
     main: MainThread,
     climbs: Climbs,
+    steps: StepTally,
+    pooled: Pooled,
     lns: LnsTally,
 }
 
@@ -695,6 +868,7 @@ impl Scheduler {
             .open(events_path(dir))
             .map_err(|e| format!("{}: {e}", events_path(dir).display()))?;
         let now = Instant::now();
+        let pooled = Pooled::of(&book);
         let scheduler = Scheduler {
             book,
             dir: dir.to_path_buf(),
@@ -709,6 +883,8 @@ impl Scheduler {
             last_status: now,
             main: MainThread::default(),
             climbs: Climbs::default(),
+            steps: StepTally::default(),
+            pooled,
             lns: LnsTally::default(),
         };
         Ok((scheduler, changes))
@@ -826,55 +1002,101 @@ impl Scheduler {
         })
     }
 
-    /// Whether a climb is on its way to a board next to `n`: it may prove that board within its limit, and then `n`
-    /// is climbed to with its game (and, going up, its exact ceiling), so `n` has no ordinary search meanwhile.
-    fn held(&self, n: u32) -> bool {
-        [n - 1, n + 1].iter().any(|m| self.running.get(m).is_some_and(|r| matches!(r.kind, Kind::Climb(_))))
+    /// The boards that wait while a climb runs: those just outside the repeat class of a board being climbed to.  One
+    /// of them is the proven board the climb goes from; the other may be proven within the climb's limit, and then it
+    /// is climbed to with its game (and, going up, its exact ceiling), so it has no ordinary search meanwhile.
+    fn held(&self) -> HashSet<u32> {
+        let climbing = self.running.iter().filter(|(_, run)| matches!(run.kind, Kind::Climb(_)));
+        climbing.flat_map(|(&n, _)| outside(&self.book.class(n))).collect()
+    }
+
+    /// The cost the order of the ordinary searches goes by, the least first: the log of the forecast seconds of the
+    /// board's proof (`cost.rs`), with the boards that have yet to give their line two points ahead of all (they cost
+    /// a second or so, `cost::exploring`), or, with no floor steps, `level + gap / gap_unit`.
+    fn cost(&self, e: &Entry, gap: i64) -> f64 {
+        let s = &self.settings;
+        if s.floor_step == 0 {
+            return f64::from(e.level) + gap as f64 / s.gap_unit;
+        }
+        if cost::exploring(e, s.floor_step) {
+            return f64::NEG_INFINITY;
+        }
+        cost::forecast(e, self.pooled.rate()).map_or(f64::INFINITY, |forecast| forecast.log_seconds)
     }
 
     /// The next search to start, if any: a board to set up first (the map's bounds), and only when every map is in and
     /// the relations have carried them (`settle`) a climb (`next_climb`), else the boards whose bounds a proven
-    /// neighbour has just changed, smallest gap first, else the board of least `level + gap / gap_unit`.  Only one
-    /// board of a repeat class is searched, and no prime whose board before it the ledger has.  A board next to one
-    /// that is being climbed to waits (`held`).
+    /// neighbour has just changed, smallest gap first, else the board whose proof is forecast to cost the least
+    /// (`cost`).  Only one board of a repeat class is searched, and no prime whose board before it the ledger has.  A
+    /// board next to the class of one that is being climbed to waits (`held`).  The job of an ordinary board is a step
+    /// down to a floor (`cost::plan`) unless its gap is within two steps, and then it is the proof, the ordinary search
+    /// that doubles its limit.
     pub fn next_job(&self, cpu: f64) -> Option<Job> {
         let s = &self.settings;
         let key = |e: &Entry| -> (u8, f64, u32) {
             match e.gap() {
                 _ if !e.mapped => (0, 0.0, e.n),
                 Some(gap) if e.boosted => (1, gap as f64, e.n),
-                Some(gap) => (2, f64::from(e.level) + gap as f64 / s.gap_unit, e.n),
+                Some(gap) => (2, self.cost(e, gap), e.n),
                 None => unreachable!("a board mapped has both bounds"),
             }
         };
-        let ordinary =
-            self.eligible().filter(|e| !self.held(e.n)).min_by(|a, b| key(a).partial_cmp(&key(b)).expect("no NaN"))?;
+        let held = self.held();
+        let ordinary = self
+            .eligible()
+            .filter(|e| !held.contains(&e.n))
+            .map(|e| (key(e), e))
+            .min_by(|(a, _), (b, _)| a.partial_cmp(b).expect("no NaN"))?
+            .1;
         if !ordinary.mapped {
-            return Some(self.job(ordinary, Kind::Init, Duration::ZERO, Vec::new(), None));
+            return Some(self.job(ordinary, Kind::Init, Duration::ZERO, Vec::new(), None, None));
         }
         if !self.pending.is_empty() || self.maps_running() {
             return None;
         }
         // The hold keeps ordinary searches off a board; a climb to it has its proven neighbour.
-        let (kind, entry, limit) = match self.next_climb() {
-            Some((way, entry)) => (Kind::Climb(way), entry, s.climb_limit),
-            None => (Kind::Search, ordinary, s.base * 2f64.powi(ordinary.level.min(60) as i32)),
+        let (kind, entry, limit, floor) = match self.next_climb() {
+            Some((way, entry)) => (Kind::Climb(way), entry, s.climb_limit, None),
+            None => match cost::plan(ordinary, s.floor_step, self.pooled.rate()) {
+                Plan::Proof => (Kind::Search, ordinary, s.base * 2f64.powi(ordinary.level.min(60) as i32), None),
+                Plan::Step { score, resume, seconds, tries } => {
+                    let limit = (s.floor_slack * seconds).max(s.base) * 2f64.powi(tries.min(60) as i32);
+                    (Kind::Floor, ordinary, limit, Some(Floor { score, resume }))
+                }
+            },
         };
-        let n = entry.n;
         let remaining = (s.cpu_budget - cpu) / s.workers as f64;
         let limit = Duration::from_secs_f64(limit.min(s.max_limit).min(remaining.max(1.0)));
-        let seeds = [n.wrapping_sub(1), n, n + 1]
-            .iter()
-            .filter_map(|&m| {
-                self.book.entries.get(&m)?.lower.as_ref().map(|l| Seed { from: m, moves: l.moves.clone() })
-            })
-            .collect();
-        Some(self.job(entry, kind, limit, seeds, entry.upper.map(|u| u.value)))
+        // The games that seed a search: those of the boards next to it and, if it is the board of a repeat class, of
+        // the boards just outside the class (the proven one a climb into the class goes from).
+        let seeds = match floor {
+            Some(_) => Vec::new(),
+            None => {
+                let n = entry.n;
+                let [below, above] = outside(&self.book.class(n));
+                let boards: BTreeSet<u32> = [n - 1, n, n + 1, below, above].into_iter().collect();
+                boards
+                    .into_iter()
+                    .filter_map(|m| {
+                        self.book.entries.get(&m)?.lower.as_ref().map(|l| Seed { from: m, moves: l.moves.clone() })
+                    })
+                    .collect()
+            }
+        };
+        Some(self.job(entry, kind, limit, seeds, entry.upper.map(|u| u.value), floor))
     }
 
     /// The job of `kind` on the board of `entry`: what it is asked, and what the events say of its neighbours and the
     /// finder (the neighbours are proven or not as the job starts).
-    fn job(&self, entry: &Entry, kind: Kind, limit: Duration, seeds: Vec<Seed>, cap: Option<u64>) -> Job {
+    fn job(
+        &self,
+        entry: &Entry,
+        kind: Kind,
+        limit: Duration,
+        seeds: Vec<Seed>,
+        cap: Option<u64>,
+        floor: Option<Floor>,
+    ) -> Job {
         let proven = |n: Option<u32>| n.is_some_and(|n| self.book.entries.get(&n).is_some_and(Entry::proven));
         let n = entry.n;
         Job {
@@ -886,6 +1108,7 @@ impl Scheduler {
             below_proven: proven(n.checked_sub(1)),
             above_proven: proven(n.checked_add(1)),
             lns: LnsPlan { seconds: self.settings.lns_seconds, last: entry.lns_score, round: entry.attempts },
+            floor,
         }
     }
 
@@ -903,6 +1126,7 @@ impl Scheduler {
                 limit: job.limit.as_secs_f64(),
                 below_proven: job.below_proven,
                 above_proven: job.above_proven,
+                floor: job.floor.map(|floor| floor.score),
                 result,
                 sent: Instant::now(),
             });
@@ -915,13 +1139,22 @@ impl Scheduler {
         let a = done.result?;
         let n = done.n;
         let bounds = |e: &Entry| (e.lower.as_ref().map(|l| l.value), e.upper.map(|u| u.value));
-        let (before, nodes_before) = (bounds(&self.book.entries[&n]), self.book.entries[&n].nodes);
         let was_proven = self.book.entries[&n].proven();
+        // The floor step this one goes on from, if it does (a step whose floor became moot starts again), and the steps
+        // of the search over its earlier runs: the stalled step's, or the board's ordinary searches' and climbs'.
+        let resumed = self.book.entries[&n].stalled.filter(|s| done.kind == Kind::Floor && Some(s.floor) == done.floor);
+        let before = bounds(&self.book.entries[&n]);
+        let nodes_before = match done.kind {
+            Kind::Floor => resumed.map_or(0, |s| s.nodes),
+            _ => self.book.entries[&n].nodes,
+        };
         let (lower_rule, upper_rule) = match done.kind {
             Kind::Init => (Rule::Start, Rule::Root),
+            Kind::Floor if a.held => (Rule::Search, Rule::Floor),
             _ if a.completed => (Rule::Search, Rule::Exhausted),
             _ => (Rule::Search, Rule::Dual),
         };
+        let found_set = !a.promotions.is_empty();
         // The games offered as lower bounds, the lesser first (the finder's before an equal search's, which began from
         // it and so has found nothing better): a game replaces the board's only if it is better.  The finder's counts
         // only if it improved on the game it began from.  Every one has passed the referee on its worker.
@@ -945,8 +1178,15 @@ impl Scheduler {
         for lower in lowers {
             changes.extend(self.book.offer_lower(n, lower, false)?);
         }
-        // A search that reached its ceiling proves its game by the bound that was its ceiling, which stands.
-        let upper = if a.reached_cap { None } else { Some(a.upper.unwrap_or(a.value)) };
+        // The upper bound the job proved: a search that reached its ceiling proves its game by the bound that was its
+        // ceiling, which stands; a floor step that completed having found nothing proves its floor, and one that
+        // completed having found a set proves that set (Lemma F); a floor step that stopped proves nothing.
+        let upper = match done.kind {
+            _ if a.reached_cap => None,
+            Kind::Floor if a.held => done.floor,
+            Kind::Floor => a.completed.then_some(a.value),
+            _ => Some(a.upper.unwrap_or(a.value)),
+        };
         if let Some(value) = upper {
             changes.extend(self.book.offer_upper(n, Upper { value, rule: upper_rule, from: None }, false)?);
         }
@@ -958,15 +1198,22 @@ impl Scheduler {
         entry.mapped = true;
         entry.search_s += lns_s;
         entry.lns_score = a.lns.as_ref().map_or(entry.lns_score, |run| Some(run.found));
+        match done.kind {
+            // The map's dual bound is the root's bound.
+            Kind::Init => entry.root = a.upper.or(entry.root),
+            Kind::Floor => {}
+            Kind::Search | Kind::Climb(_) => entry.nodes = a.nodes,
+        }
         if done.kind != Kind::Init {
             entry.attempts += 1;
             entry.search_s += a.seconds;
-            entry.nodes = a.nodes;
             entry.boosted = false;
+            self.pooled.nodes += a.nodes.saturating_sub(nodes_before);
+            self.pooled.seconds += a.seconds;
         }
         // A climb leaves the board's level, and so the limit of its next ordinary search, as it was.
         if done.kind == Kind::Search {
-            entry.level += 1;
+            self.book.entries.get_mut(&n).expect("a board of the ledger").level += 1;
         }
         let after = bounds(&self.book.entries[&n]);
         let mut fields = vec![
@@ -1000,6 +1247,26 @@ impl Scheduler {
             fields.push(("way", Json::from(way.name())));
             fields.push(("outcome", Json::from(self.end_climb(n, way, was_proven))));
         }
+        if let Some(floor) = done.floor {
+            let distance = self.book.entries[&n].root.map(|root| root.saturating_sub(floor));
+            fields.push(("floor", Json::from(floor)));
+            fields.push(("distance", distance.map_or(Json::Null, Json::from)));
+            fields.push(("held", Json::from(a.held)));
+            let step = StepEnd {
+                floor,
+                held: a.held,
+                capped: a.reached_cap,
+                found: found_set,
+                nodes: a.nodes,
+                seconds: a.seconds,
+            };
+            fields.push(("outcome", Json::from(self.end_step(n, step, resumed, was_proven))));
+        }
+        // What the rest of the board's proof is forecast to cost, now (not for a board proven).
+        let forecast =
+            cost::forecast(&self.book.entries[&n], self.pooled.rate()).filter(|_| !self.book.entries[&n].proven());
+        fields.push(("forecast", forecast.map_or(Json::Null, |f| Json::from((f.log_nodes * 100.0).round() / 100.0))));
+        fields.push(("forecast_s", forecast.map_or(Json::Null, |f| Json::from(f.seconds().round()))));
         self.event(done.kind.name(), Some(n), fields)?;
         if done.kind == Kind::Init {
             self.pending.push(n);
@@ -1012,9 +1279,53 @@ impl Scheduler {
         // A board proven while its search went on (by a relation, which stopped the search) leaves the checkpoint
         // that the stopped search wrote.
         if self.book.entries[&n].proven() {
-            let _ = engine::remove_checkpoint(&checkpoint_path(&self.dir, n));
+            let _ = remove_checkpoints(&self.dir, n);
         }
         self.flush_events()
+    }
+
+    /// What a floor step leaves on its board, counted: `held` (it completed having found nothing: the floor is the new
+    /// upper bound, and the step is a point of the board's line), `proved` (it completed having found a set, or reached
+    /// the ceiling with one: the board is proven), `moot` (a relation proved the board while it went on, or lowered its
+    /// upper bound to the floor, which ended the step at the ceiling with nothing explored), `found` (it stopped with a
+    /// set, so the floor is below the lower bound now: the step is dropped, and its checkpoint, a search from that set,
+    /// is the board's own for the proof if it has none), or `stalled` (the limit stopped it with nothing: it is kept,
+    /// to be tried again under the same floor with its limit doubled).  `resumed`
+    /// is the stalled step it went on from.  Returns the outcome's name, as the event has it.
+    fn end_step(&mut self, n: u32, step: StepEnd, resumed: Option<Stalled>, was_proven: bool) -> &'static str {
+        let StepEnd { floor, held, capped, found, nodes, seconds } = step;
+        let entry = self.book.entries.get_mut(&n).expect("a board of the ledger");
+        let seconds = resumed.map_or(0.0, |s| s.seconds) + seconds;
+        entry.stalled = None;
+        self.steps.ended += 1;
+        if was_proven {
+            "moot"
+        } else if held {
+            entry.steps.push(Step { floor, nodes, seconds });
+            self.steps.held += 1;
+            "held"
+        } else if entry.proven() {
+            self.steps.proved += 1;
+            "proved"
+        } else if capped {
+            "moot"
+        } else if found {
+            // The step has become a search from the set it found, and the proof goes on from its checkpoint if the
+            // board has no other; else it is deleted.
+            self.steps.found += 1;
+            let (floor_checkpoint, checkpoint) = (floor_checkpoint_path(&self.dir, n), checkpoint_path(&self.dir, n));
+            if !checkpoint.exists() && fs::rename(&floor_checkpoint, &checkpoint).is_ok() {
+                entry.nodes = nodes;
+            } else {
+                let _ = engine::remove_checkpoint(&floor_checkpoint);
+            }
+            "found"
+        } else {
+            let tries = resumed.map_or(0, |s| s.tries) + 1;
+            entry.stalled = Some(Stalled { floor, nodes, seconds, tries });
+            self.steps.stalled += 1;
+            "stalled"
+        }
     }
 
     /// Counts the climb in `way` to `n` that has ended, by how the board stands: proved by the climb's search, proven by
@@ -1092,7 +1403,7 @@ impl Scheduler {
                     }
                 }
                 None if proven => {
-                    let _ = engine::remove_checkpoint(&checkpoint_path(&self.dir, n));
+                    let _ = remove_checkpoints(&self.dir, n);
                 }
                 None => {}
             }
@@ -1100,17 +1411,33 @@ impl Scheduler {
         Ok(())
     }
 
+    /// The open boards that are searched and mapped, by the forecast time of their proofs on one thread: within an
+    /// hour, within a day, longer.
+    fn forecasts(&self) -> [usize; 3] {
+        let mut counts = [0; 3];
+        let open = self.book.entries.values().filter(|e| e.mapped && !e.proven() && self.book.searched(e.n));
+        for e in open {
+            if let Some(forecast) = cost::forecast(e, self.pooled.rate()) {
+                counts[usize::from(forecast.seconds() > 3600.0) + usize::from(forecast.seconds() > 86_400.0)] += 1;
+            }
+        }
+        counts
+    }
+
     fn status(&mut self) {
         let (proven, total) = (self.proven(), self.book.entries.len());
+        let [hour, day, longer] = self.forecasts();
         eprintln!(
             "ledger: {:.0} s, {:.0} CPU s of {:.0}: {proven} of {total} proven, {} searching; climbs up {}, down {}; \
-             finder {} runs, {} improved; main thread busy {:.1} s, results waited {:.1} s",
+             floor steps {}; proofs forecast within an hour of one thread: {hour} boards, within a day: {day}, longer: \
+             {longer}; finder {} runs, {} improved; main thread busy {:.1} s, results waited {:.1} s",
             self.t0.elapsed().as_secs_f64(),
             self.cpu(),
             self.settings.cpu_budget,
             self.running.len(),
             self.climbs.up,
             self.climbs.down,
+            self.steps,
             self.lns.runs,
             self.lns.improved,
             self.main.busy,
@@ -1228,6 +1555,8 @@ pub fn run(first: u32, last: u32, dir: &Path, settings: &Settings, proven: Optio
         ("climb_up", Json::from(s.climb_up)),
         ("climb_down", Json::from(s.climb_down)),
         ("lns_s", Json::from(s.lns_seconds)),
+        ("floor_step", Json::from(s.floor_step)),
+        ("floor_slack", Json::from(s.floor_slack)),
         ("gap_unit", Json::from(s.gap_unit)),
         ("proven_file", proven.map_or(Json::Null, |p| Json::from(p.display().to_string()))),
         ("bounds_file", s.bounds.as_ref().map_or(Json::Null, |p| Json::from(p.display().to_string()))),
