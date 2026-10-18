@@ -506,10 +506,12 @@ export appended 116 lines for 58 boards (17 proven; 600 bytes a board); a second
 accept the file against the real `results/strict.jsonl`, where the 58 boards are games of the chain, and the proven
 values are its scores.  The root bounds of n = 3000, 5000 and 8000 take 0.45 CPU s in all, so `verify-bounds` on a file of
 3,800 boards is a matter of a few minutes of one thread (the games' frame setups are the most of it), and the Python referee
-replays a game of n = 3440 in 0.6 ms.
-Past the chain (4400..8191) a promotion set is about 2 kilobytes, a game of moves about 15, a cited game about 150 bytes and an
-upper bound about 220: the first export of 3,800 boards of the order of 12 megabytes (3 kilobytes a board), against 26 megabytes
-without the cited form.
+replays a game of n = 3440 in 0.6 ms.  A second dry run at larger boards, 2900..2939 for 108 CPU s (mostly maps and the
+finder; 8 boards proven, by relations, at the chain's scores): 38 boards, 76 lines, 70 kilobytes, 1,834 bytes a board; a
+promotion set 870 bytes, a game of moves 6.4 kilobytes, a cited game 140, an upper bound 182; both referees accept it
+against the real chain, `verify-bounds` in 0.4 s of 6 workers.  Past the chain (4400..8191) a promotion set is about 2
+kilobytes, a game of moves about 15, a cited game about 150 bytes and an upper bound about 220: the first export of 3,800
+boards of the order of 12 megabytes (3 kilobytes a board), against 26 megabytes without the cited form.
 
 **Not done.**  The first real export, and its commit (the lead's, after review); a run from the committed file on the
 cloud (`BOUNDS=` in `bench/ledger/cloud.sh`, which needs Brian's approval to launch).  A repeat of a game that had no
