@@ -70,15 +70,15 @@ entry](experiments/the-landscape-past-the-chain-standalone-bounds-and-searches-2
 find it.  Large neighbourhood search from the start incumbent (keep a random 70-90% of its promotions, search the rest
 exactly as a unit, repeat) finds the optimum of 64% of the games of 2176-3440 in 5 CPU seconds of one thread (the sound
 search for the same time: 21%), a mean shortfall of 28 against 297; the sound search seeded with its game takes 0.44 of
-the nodes and 0.48 of the CPU, finder included, of the search from today's start.  It is in `wall finders`, `wall
-sound` and the ledger (below), not in the solver ([the
+the nodes and 0.48 of the CPU, finder included, of the search from today's start.  It is in the ledger (below), not in
+the solver (`wall finders` and `wall sound` measured it and are removed; [the
 entry](experiments/finders-for-good-games-that-are-not-sound-2026-10.md)).
 
 **Floors for upper bounds** (2026-10-18): a search from a floor F, an incumbent worth F with no set
 (`search::search_above`, THEORY.md Lemma F), proves "nothing weighs more than F" for an F above the optimum far more
 cheaply than the proof: on 14 games of 2265-3259, proving down a quarter, a half and three quarters of the gap took a
 median 1/20,000, 1/740 and 1/26 of the full proof's nodes, the log of the nodes linear in the distance (a decade per
-147; r² 0.996).  It is in `wall target` and the ledger ([the
+147; r² 0.996).  It is in the ledger (`wall target` measured it and is removed; [the
 entry](experiments/proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10.md)).
 
 ## Decided

@@ -3,25 +3,26 @@
 //! analysis is `bench/node_choice/analyze.py`.
 //!
 //! The *strong bound* of a node (promotions `P`, candidates `C`) is the Lagrangian bound over nogoods that
-//! [`relaxed`](super::relaxed) and [`nogoods`](super::nogoods) measure, with the GF(2) bound as its inner problem,
-//! but with the multipliers fitted at the node: for the nogoods `N` live there (those whose members outside `P` are
-//! all in `C`; the others are vacuous and only loosen the bound), every completion `F` has `|F ∩ N| ≤ |N - P| - 1`,
-//! so for any multipliers `λ_N ≥ 0` the heaviest common independent set of the node's GF(2) matroids, each candidate
-//! `x` weighing `x - Σ_{N ∋ x} λ_N`, plus `Σ λ_N (|N - P| - 1)` bounds every completion (weak duality).  The fit is
-//! `--node-steps` subgradient steps (the root's, `nogoods::fit`), warm-started from the multipliers fitted at the
-//! root, and it stops at the first step whose bound is below what the node needs (the node is then *cut*).
+//! [`nogoods`](super::nogoods) fits at the root, with the GF(2) bound as its inner problem, but with the multipliers
+//! fitted at the node: for the nogoods `N` live there (those whose members outside `P` are all in `C`; the others are
+//! vacuous and only loosen the bound), every completion `F` has `|F ∩ N| ≤ |N - P| - 1`, so for any multipliers
+//! `λ_N ≥ 0` the heaviest common independent set of the node's GF(2) matroids, each candidate `x` weighing
+//! `x - Σ_{N ∋ x} λ_N`, plus `Σ λ_N (|N - P| - 1)` bounds every completion (weak duality).  The fit is `--node-steps`
+//! subgradient steps (the root's, `nogoods::fit`), warm-started from the multipliers fitted at the root, and it stops
+//! at the first step whose bound is below what the node needs (the node is then *cut*).
 //!
 //! The work is in two commands, so that the cloud can share the nodes among processes:
 //!
 //! * **choice-prepare** (`--prep DIR --known FILE N...`), once a game: the nogood pool (the nogoods that the finder
-//!   and the sound search learn from the standalone start in `--cpu` CPU seconds each, as `wall nogoods` harvests
-//!   them), the multipliers fitted at the root (`--steps` steps towards the incumbent plus one), and the nodes to
-//!   measure, written to `DIR/nNNNN.choice`.  The incumbent a node needs to beat is the game's known optimum
-//!   (`--known`), else the incumbent of the game's units in the tuning suite (`--suite`: a game of the suite that
-//!   the chain has not reached).  The nodes are those of the fixture `--fixtures DIR` has for the game (as `relaxed`
-//!   reads them) and the game's units in the suite, each source thinned to `--keep` nodes spread evenly over their
-//!   gaps among those today's bound leaves open (a node it cuts has no subtree to speak of), and `--paths` nodes on
-//!   the way to the optimum, whose best completion is known (a check of the bound's validity, not measured further).
+//!   and the sound search learn from the standalone start in `--cpu` CPU seconds each, as `nogoods::finder` and
+//!   `nogoods::control` harvest them), the multipliers fitted at the root (`--steps` steps towards the incumbent plus
+//!   one), and the nodes to measure, written to `DIR/nNNNN.choice`.  The incumbent a node needs to beat is the game's
+//!   known optimum (`--known`), else the incumbent of the game's units in the tuning suite (`--suite`: a game of the
+//!   suite that the chain has not reached).  The nodes ([`sample`](super::sample) has the sources) are those of the
+//!   fixture `--fixtures DIR` has for the game and the game's units in the suite, each source thinned to `--keep`
+//!   nodes spread evenly over their gaps among those today's bound leaves open (a node it cuts has no subtree to speak
+//!   of), and `--paths` nodes on the way to the optimum, whose best completion is known (a check of the bound's
+//!   validity, not measured further).
 //!   The line printed has the game's `n`, `incumbent`, `known`, `root` and `gap` (the root's GF(2) bound over the
 //!   incumbent), `finder_pool`, `search_pool` and `pool`, `harvest_cpu_s`, `fit_steps`, `fit_cpu_s`, `active` (nogoods
 //!   with a positive multiplier), `relaxed_root` and `share` (the root-λ bound and the share of the gap it closes),
@@ -59,9 +60,9 @@
 //! A bound below the best completion's known end, a fresh bound that is not today's, a cut of a node whose subtree
 //! holds a better set, or a set better than the known optimum is a fault, reported after the game's lines.
 
-use super::finders::{budgeted, Case, Clock, Played};
+use super::case::{budgeted, Case, Clock, Played};
 use super::nogoods::{control, finder, fit, harvesting, promotable, sorted, union, Fit, Fitting, Sink};
-use super::relaxed::{fixture_nodes, path_nodes, suite_nodes, Source};
+use super::sample::{fixture_nodes, path_nodes, suite_nodes, Source};
 use super::{root_bound, Line};
 use crate::fixtures::{from_hex, to_hex};
 use crate::known::{known_incumbent, survivors};
@@ -708,12 +709,12 @@ pub fn measure<const W: usize>(case: &Case<'_, W>) -> Result<Played, String> {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// Tests: `cargo test` runs them (the example is `test = true` in Cargo.toml)
+// Tests: `cargo test --features studies` runs them (the example is `test = true` in Cargo.toml)
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::finders::Params;
+    use crate::case::Params;
     use taxman::board::Board;
     use taxman::engine::Control;
     use taxman::game::Optimal;

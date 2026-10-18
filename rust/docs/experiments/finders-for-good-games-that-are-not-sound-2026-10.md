@@ -134,3 +134,9 @@ ledger](the-ledger-bounds-from-both-sides-2026-10.md#later-2026-10-17-the-finder
 
 **Commits.**  fa3127a (the commands `sound` and `finders`, their tests, and `examples/common/known.rs` and `rng.rs`,
 which `tune` and `wall` share); this entry adds the data and the scripts in `bench/finders/`.
+
+## Later (2026-10): the commands removed from master
+
+The commands `wall sound` and `wall finders` were removed from the tree on 2026-10-18.  They build at commit 9d9dae3
+(`git show 9d9dae3:rust/examples/wall/finders.rs`): `git checkout 9d9dae3`, then `cargo build --release --example wall`
+in `rust/`.  The finder itself stays in `examples/common/lns.rs`, which the ledger uses.

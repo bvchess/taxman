@@ -18,7 +18,7 @@
 //! landscape` computes it), searches (`search`, `dual`, `exhausted`, Lemma D for the dual bound; `floor`, Lemma F, a
 //! search under a floor that completed having found nothing: U is the floor), the finder's games (`lns`: L only),
 //! proven games given (`given`), boards with nothing to promote (`trivial`), and the Lagrangian bound over checked
-//! nogoods (`nogoods`: U only, which `wall nogoods` makes and the ledger's runs do not yet).  Every bound only
+//! nogoods (`nogoods`: U only, which nothing makes now: the removed `wall nogoods` did).  Every bound only
 //! improves: L only rises and U only falls, and a board is proven when they meet.  L > U anywhere is a violation, which
 //! [`Book::propagate`] reports as an error: a bug, or, since the U of the frame model rests on statement U, a
 //! counterexample to it.
@@ -48,7 +48,7 @@ pub enum Rule {
     /// A search under a floor F that completed having found no set (U): P* <= F (Lemma F), so U is in_the_bag + F.
     Floor,
     /// The Lagrangian bound over the nogoods of searches, each checked to fail to promote, with the GF(2) bound inside
-    /// (U): `wall nogoods` makes it; the store takes it on record.
+    /// (U): the removed `wall nogoods` made it; the store takes it on record.
     Nogoods,
     /// The game the finder found (L): large neighbourhood search, which is not sound and proves nothing; its game is a
     /// lower bound because the referee replays it.

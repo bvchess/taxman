@@ -4,8 +4,10 @@ What was measured and what it showed:
 [docs/EXPERIMENTS.md](../../../docs/experiments/seeding-the-start-from-a-neighbours-heuristic-game-2026-10.md).  The
 runs were made on the laptop on 2026-10-17, one thread each, six at once under `nice -n 10`, with the test-profile
 build of `wall` (`cargo build --profile test --example wall` in `rust/`) at commit a8ee892, from `rust/`, over
-2176-3440 against the committed chain (`results/strict.jsonl`).  Each `chain` line is defined in the module comment of
-`examples/wall.rs`; `shortfall` is the optimum less the start's score.
+2176-3440 against the committed chain (`results/strict.jsonl`).  The command `chain` was removed from master on
+2026-10-18; it builds at commit 9d9dae3 (`git checkout 9d9dae3` first), where each `chain` line is defined in the module
+comment of `examples/wall.rs`; `shortfall` is the optimum less the start's score.  (`wall start`, the command of `c`,
+is still there: `cargo build --release --features studies --example wall`.)
 
 | file | command | what it is |
 |---|---|---|

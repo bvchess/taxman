@@ -97,3 +97,9 @@ found too dear in every cheap form.
 
 **Commits.**  The command `wall relaxed` and its data are in the commit that has this entry (`wall nogoods`'s fit now
 returns its multipliers, and its harvest, fit and pool union are shared with `relaxed`).
+
+## Later (2026-10): the command removed from master
+
+The command `wall relaxed` was removed from the tree on 2026-10-18.  It builds at commit 9d9dae3 (`git show
+9d9dae3:rust/examples/wall/relaxed.rs`): `git checkout 9d9dae3`, then `cargo build --release --example wall` in `rust/`.
+The sampling of its nodes stays in `examples/wall/sample.rs`, which `wall choice-prepare` uses.

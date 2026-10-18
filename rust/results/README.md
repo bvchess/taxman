@@ -306,8 +306,8 @@ problem, played on this board).  The rules of an upper bound: `root` (the GF(2) 
 bound of a search that a limit stopped), `exhausted` (a search that explored its whole tree), `floor` (a search under
 a floor F, an incumbent worth F and no set, that completed having found nothing: no promotion set weighs more than F,
 THEORY.md Lemma F, so the bound is `in_the_bag` and F), `nogoods` (the Lagrangian bound over nogoods that were each
-checked to fail to promote, with the GF(2) bound as its inner problem, as `wall nogoods` makes it; the ledger's runs
-do not make it yet), `given`, and the relations
+checked to fail to promote, with the GF(2) bound as its inner problem, as the removed `wall nogoods` made it; nothing
+makes it now), `given`, and the relations
 `ceiling` (U(n) ≤ U(n − 1) + n), `monotone` (U(n − 1) ≤ U(n)), `prime` (U(p) = U(p − 1) + p − q, q the largest prime
 below p, both ways) and `repeat` (U(n) − bag(n) ≤ U(m) − bag(m)).  A line of 4501 might read:
 

@@ -26,7 +26,7 @@
 //!   bound of a search a limit stopped (`taxman::search::dual_bound`: the largest of its incumbent and the bounds of
 //!   its open units), or the game of a search that completed.  *Floor steps* (`floor`): U is the floor of a search
 //!   under that floor that completed having found nothing (below).  `nogoods`: U only, the Lagrangian bound over
-//!   checked nogoods that `wall nogoods` makes; the store accepts it, and nothing in the ledger produces it yet.
+//!   checked nogoods that the removed `wall nogoods` made; the store accepts it, and nothing produces it now.
 //!   *Relations* (`monotone`, `ceiling`, `prime`,
 //!   `repeat`): the bounds of one board give bounds of its neighbours, of the board past or before a prime, and of
 //!   the boards with the same search problem, applied to a fixpoint after every change (heuristics/THEORY.md, "The
@@ -86,7 +86,7 @@
 //!   run side by side.  A board just outside the repeat class of one that is being climbed to waits (no ordinary job of
 //!   it starts), as the climb may prove that board within its limit; the climb into a class is seeded with the games of
 //!   the boards just outside it, the proven one it goes from included.
-//! * **The finder** (`common/lns.rs`, which `wall finders` measures; `--lns-seconds` seconds of one thread, default
+//! * **The finder** (`common/lns.rs`; `--lns-seconds` seconds of one thread, default
 //!   1; 0: none): large neighbourhood search, which keeps a random 70-90% of a game's promotions and searches the
 //!   rest exactly, again and again.  It is not sound and proves nothing, but a lower bound needs only a legal game:
 //!   its game is offered as the board's L (`lns`) after the referee has replayed it on the worker, like every other
@@ -166,8 +166,8 @@ mod counters;
 #[allow(dead_code)] // the ledger reads only `survivors`
 #[path = "../common/known.rs"]
 mod known;
-/// The finder, shared with `wall finders`.
-#[allow(dead_code)] // `wall finders` reads the counts of units that the ledger does not
+/// The finder, shared with `wall choice-prepare`.
+#[allow(dead_code)] // `wall choice-prepare` reads another part of it than the ledger does
 #[path = "../common/lns.rs"]
 mod lns;
 #[path = "../common/rng.rs"]

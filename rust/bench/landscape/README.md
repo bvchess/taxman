@@ -4,8 +4,9 @@ What was measured and what it showed:
 [docs/EXPERIMENTS.md](../../docs/experiments/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10.md).
 This directory holds the data of that run (2026-10-17, one `c8g.16xlarge` at spot, 08:53 to 10:33 PDT, about $1.10, the
 code of commit 6f57399) and of the quick laptop measurement beside it (`ttb/`), and the scripts that make the entry's
-numbers.  `wall` is `target/release/examples/wall` and `taxman` `target/release/taxman`, run from `rust/`.  The module
-comment of `examples/wall.rs` ("landscape") defines every field of a `cal.jsonl` and `map.jsonl.gz` line.  The files
+numbers.  `wall` is `target/release/examples/wall` (`cargo build --release --features studies --example wall`) and
+`taxman` `target/release/taxman`, run from `rust/`.  The module comment of `examples/wall.rs` ("landscape") defines
+every field of a `cal.jsonl` and `map.jsonl.gz` line.  The files
 were written on the instance, synced to the project's bucket (`landscape-20261017/out`) every five minutes and at the
 end, and copied from there; the run's stdout copies of the two landscape files (`cal.out` and `map.out`, byte for
 byte the `.jsonl` files) are not kept.
@@ -42,5 +43,5 @@ each of 60 games of 1301-2175 (`games.txt`), no seed and no ceiling, 300 s at mo
 
 ## Seeding from a neighbour (`seeding/`)
 
-The start incumbents of 2176-3440 seeded from a neighbour's start incumbent (`wall chain`), against the standalone start
-and the start seeded from the proven game of n − 1: [seeding/README.md](seeding/README.md).
+The start incumbents of 2176-3440 seeded from a neighbour's start incumbent (`wall chain`, since removed), against the
+standalone start and the start seeded from the proven game of n − 1: [seeding/README.md](seeding/README.md).

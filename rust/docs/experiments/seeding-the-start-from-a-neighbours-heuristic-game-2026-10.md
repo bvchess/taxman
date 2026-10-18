@@ -134,3 +134,8 @@ search, for the neighbour's games; the proven game of n + 1 as a seed going down
 
 **Commits.**  a8ee892 (the subcommand `wall chain`, with its test, and `set_up` and `start_of` that `landscape` shares
 with it); this entry adds the data and the script in `bench/landscape/seeding/`.
+
+## Later (2026-10): the command removed from master
+
+The command `wall chain` was removed from the tree on 2026-10-18.  It builds at commit 9d9dae3 (`git show
+9d9dae3:rust/examples/wall.rs`): `git checkout 9d9dae3`, then `cargo build --release --example wall` in `rust/`.

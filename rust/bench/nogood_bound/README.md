@@ -5,8 +5,9 @@ What was measured and what it showed:
 laptop on 2026-10-18, one process a game and four at once under `nice -n 10`, with the test-profile build of `wall` and
 `perf` (`cargo build --profile test --example wall --example perf` in `rust/`: opt-level 2, debug assertions on), copied
 out of `target/` before the runs, from `rust/`, against the committed chain (`results/strict.jsonl`, which gives each
-game its optimum).  The command `relaxed` is defined in the module comment of `examples/wall/relaxed.rs`, which defines
-every field of a line.  The times are CPU seconds of the process, which was shared with other work.
+game its optimum).  The command `relaxed` was removed from master on 2026-10-18; it builds at commit 9d9dae3 (`git
+checkout 9d9dae3` first), where it is defined in the module comment of `examples/wall/relaxed.rs`, which defines every
+field of a line.  The times are CPU seconds of the process, which was shared with other work.
 
 ## Files and the commands that made them
 

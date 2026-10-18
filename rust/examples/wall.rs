@@ -11,31 +11,21 @@
 //!     [--tactic NAME=VALUE]... [--ckpt-dir DIR --every SECONDS] [--threads T] [--cores C] [--mem-cap UNITS] N
 //! cargo run --release --example wall -- start [--known FILE] N|A-B...
 //! cargo run --release --example wall -- frames N|A-B...
-//! cargo run --release --example wall -- landscape [--threads K] [--known FILE] [--out FILE] N|A-B...
-//! cargo run --release --example wall -- chain [--down] [--restart K] [--known FILE] [--out FILE] N|A-B...
-//! cargo run --release --example wall -- sound [--from start|opt|lns|restricted] [--cap S] [--cpu S] [--known FILE]
-//!     [--seed S] [--fix LO-HI] [--unit-nodes K] [--extra K] [--pool value|chosen] N|A-B...
-//! cargo run --release --example wall -- finders [--cpu S] [--known FILE] [--seed S] [--fix LO-HI] [--unit-nodes K]
-//!     [--extra K] [--pool value|chosen] N|A-B...
-//! cargo run --release --example wall -- nogoods [--cpu S] [--steps K] [--long K] [--known FILE] [--seed S]
-//!     [--fix LO-HI] [--unit-nodes K] N|A-B...
-//! cargo run --release --example wall -- target [--fractions F,F,...] [--cap S] --known FILE N|A-B...
-//! cargo run --release --example wall -- relaxed [--cpu S] [--steps K] [--fixtures DIR] [--suite FILE] [--paths K]
-//!     [--seed S] [--fix LO-HI] [--unit-nodes K] --known FILE N|A-B...
 //! cargo run --release --example wall -- choice-prepare [--cpu S] [--steps K] [--fixtures DIR] [--suite FILE]
 //!     [--keep K] [--paths K] [--seed S] [--fix LO-HI] [--unit-nodes K] --prep DIR --known FILE N|A-B...
 //! cargo run --release --example wall -- choice [--node-steps K] [--cap S] [--sub-nogoods] --prep DIR
 //!     [--results DIR --worker K] [--claims DIR] N|A-B...
 //! ```
 //!
+//! The example is a study tool: it is built with the feature `studies` (`--features studies`; Cargo.toml).
+//!
 //! Games are set up as `taxman solve` sets them up (`taxman::board::Board` at the set width `with_width!` picks for
 //! `n`, the search tactics named as for `taxman solve --tactic`).  A board with nothing to promote prints
-//! `{"n":N,"trivial":true}` and is skipped.  `--known FILE` (every command but `frames`) is a results file, such as
-//! `results/strict.jsonl`, whose completed games extend the known games beyond optimal.json (as the ladder's
-//! `--known` does), which is how a game gets its optimum, and the game of `n - 1` for its seed and ceiling.  A range
-//! `A-B` stands for every `n` in it, none filtered out (`setup`, `start`, `frames`, `landscape` and `chain`).  Each
-//! command prints one JSON object per line on stdout; a mistake in the arguments is an error on stderr and exit status
-//! 2.
+//! `{"n":N,"trivial":true}` and is skipped.  `--known FILE` (every command but `frames` and `choice`) is a results
+//! file, such as `results/strict.jsonl`, whose completed games extend the known games beyond optimal.json (as the
+//! ladder's `--known` does), which is how a game gets its optimum, and the game of `n - 1` for its seed and ceiling.  A
+//! range `A-B` stands for every `n` in it, none filtered out (every command but `nodes` and `grow`).  Each command
+//! prints one JSON object per line on stdout; a mistake in the arguments is an error on stderr and exit status 2.
 //!
 //! * **setup**: what a game of the chain costs besides its search, piece by piece, each timed `--repeat` times
 //!   (default 1) and reported as the fastest, for every `n` (primes too, `prime` says which).  The pieces: the
@@ -111,38 +101,14 @@
 //!   once, one a thread (default 1), in the order given.  Each line is printed, and with `--out FILE` appended to it,
 //!   as its game finishes, so in the order of finishing; the games that FILE has are skipped, so a run that was
 //!   interrupted goes on where it was (a line cut short at the end of FILE is cut off).
-//! * **chain**: how much a neighbour's heuristic game helps the start incumbent, for games that no chain has proven.
-//!   The games go in order on one thread (descending with `--down`), and the start incumbent of each (the `lower` of
-//!   `landscape`) is made with the promotions of the previous game's start incumbent as its seed (the games `n - 1`
-//!   going up, `n + 1` going down), which no proof stands behind: the first game and every `--restart K`th after it are
-//!   standalone, as `landscape` takes them, so that `--restart 1` is `landscape`'s `lower` game for game.  Each line
-//!   has `n`, `trivial`, `in_the_bag`, `score` (the start incumbent's), `seed` (`none` or `neighbour`),
-//!   `since_restart` (the games since the last standalone one, which is 0), `setup_s` and `start_s` (as for
-//!   `landscape`; the seed's survivors are part of `start_s`) and, from the known games, `opt` and `shortfall` (`opt`
-//!   less `score`; both null for a game with no known optimum).  With `--out FILE`, which must not exist, the lines
-//!   are written to it as well.
-//! * **sound** and **finders**: what a better start incumbent could save a sound search, and two searches for good games
-//!   that are not sound (they may miss the optimum, and nothing they find is a proof or goes into a results file),
-//!   against the sound search for the same CPU time.  `sound` runs the sound search of each game from the start
-//!   incumbent, from the known optimum or from a finder's game; `finders` runs the finders and the control on each
-//!   game.  Both are defined in `wall/finders.rs`, whose module comment has the options and the lines.
-//! * **nogoods**: whether the nogoods the finder's unit searches learn lower a game's upper bound (a Lagrangian bound
-//!   over them, the root's GF(2) bound as its inner problem), beside the nogoods of the sound search for the same CPU
-//!   time.  Defined in `wall/nogoods.rs`, whose module comment has the options and the lines.
-//! * **target**: how cheaply a search proves a game's upper bound down part of the way.  For a game with a known
-//!   optimum, a one-thread search under a floor ([`taxman::search::search_above`]) that is a share of the gap between
-//!   the root's bound and the optimum below the root's bound, for each share, and the full proof (the sound search
-//!   from the known optimum), each for at most `--cap` CPU seconds; the nodes and CPU seconds of each.  It is defined
-//!   in `wall/finders.rs` too.
-//! * **relaxed**: whether nogood multipliers fitted once at the root (over the nogoods of `nogoods`) would cut the
-//!   nodes of a proof that today's bound leaves open: the bound with the root's multipliers against today's at sampled
-//!   nodes of games with known optima.  Defined in `wall/relaxed.rs`, whose module comment has the options and the
-//!   lines.
 //! * **choice-prepare** and **choice**: at which nodes is a slow, strong bound (the Lagrangian bound over nogoods,
 //!   refitted at the node) worth computing besides today's?  `choice-prepare` makes a game's file (its nogood pool, its
 //!   root multipliers, its sampled nodes) and `choice` measures each node of the file: its gap, the strong bound and
 //!   whether it cuts, the subtree today's search makes of it, and the times.  Defined in `wall/choice.rs`, whose module
 //!   comment has the options and the lines; `bench/node_choice/` runs them in the cloud and reads the lines.
+//!
+//! The commands `chain`, `sound`, `finders`, `nogoods`, `target` and `relaxed` of the finished experiments were removed
+//! from master (docs/EXPERIMENTS.md, "How this notebook is kept", says where they build).
 //!
 //! **The sizes** (`setup`, `nodes` and `frames`): `frames` (the root's frame count), `candidates`, `max_total`
 //! (the most promotions a set can have), `members` (the distinct numbers in the moves and factors of the root's
@@ -165,30 +131,32 @@
 //! `tail_idle_s`), and the units' starts, the time to rebuild a unit's state (`rebuild_s`) and the time of the first
 //! node of the units that had one (`first_step_s`, over `first_steps` units).
 
+/// The game that `choice-prepare` and `choice` play: their options, budgets and the play of a command.
+#[path = "wall/case.rs"]
+mod case;
 /// `choice-prepare` and `choice`: the strong bound refitted at a node against the subtree today's search makes of it.
 #[path = "wall/choice.rs"]
 mod choice;
 #[path = "common/counters.rs"]
 mod counters;
-/// `sound` and `finders`: searches for good games that are not sound, and the sound search to weigh them against.
-#[path = "wall/finders.rs"]
-mod finders;
-/// `relaxed` reads the probe's `.nodes` fixtures and the tuning suite's hex sets.
-#[allow(dead_code)]
+/// `sample` reads the probe's `.nodes` fixtures and the tuning suite's hex sets.
 #[path = "common/fixtures.rs"]
 mod fixtures;
 #[path = "common/known.rs"]
 mod known;
+/// The finder, shared with the ledger.
+#[allow(dead_code)] // `wall` reads the part that harvests nogoods; the ledger reads the rest
 #[path = "common/lns.rs"]
 mod lns;
-/// `nogoods`: the Lagrangian bounds over the nogoods that the finder and the sound search learn.
+/// The nogoods that the finder and the sound search learn, and the Lagrangian bound fitted over them.
 #[path = "wall/nogoods.rs"]
 mod nogoods;
-/// `relaxed`: the bound with the root's multipliers over those nogoods at sampled nodes, against today's.
-#[path = "wall/relaxed.rs"]
-mod relaxed;
 #[path = "common/rng.rs"]
 mod rng;
+/// The nodes of a game that `choice-prepare` samples: the probe's fixtures, the tuning suite's units and nodes on the
+/// way to the optimum.
+#[path = "wall/sample.rs"]
+mod sample;
 /// The helpers of the tests (temporary directories), shared with the other tests.
 #[cfg(test)]
 #[path = "../tests/common/support.rs"]
@@ -223,48 +191,15 @@ use taxman::tactics::Tactics;
 // ---------------------------------------------------------------------------------------------------------
 // Arguments
 
-const COMMANDS: [&str; 14] = [
-    "setup",
-    "nodes",
-    "grow",
-    "start",
-    "frames",
-    "landscape",
-    "chain",
-    "sound",
-    "finders",
-    "nogoods",
-    "target",
-    "relaxed",
-    "choice-prepare",
-    "choice",
-];
+const COMMANDS: [&str; 8] = ["setup", "nodes", "grow", "start", "frames", "landscape", "choice-prepare", "choice"];
 
 /// The options, with the commands each applies to (an option given to another command is an error).
-const OPTIONS: [(&str, &[&str]); 39] = [
-    (
-        "--known",
-        &[
-            "setup",
-            "nodes",
-            "grow",
-            "start",
-            "landscape",
-            "chain",
-            "sound",
-            "finders",
-            "nogoods",
-            "target",
-            "relaxed",
-            "choice-prepare",
-        ],
-    ),
-    ("--from", &["sound"]),
-    ("--cap", &["sound", "target", "choice"]),
-    ("--fractions", &["target"]),
-    ("--fixtures", &["relaxed", "choice-prepare"]),
-    ("--suite", &["relaxed", "choice-prepare"]),
-    ("--paths", &["relaxed", "choice-prepare"]),
+const OPTIONS: [(&str, &[&str]); 32] = [
+    ("--known", &["setup", "nodes", "grow", "start", "landscape", "choice-prepare"]),
+    ("--cap", &["choice"]),
+    ("--fixtures", &["choice-prepare"]),
+    ("--suite", &["choice-prepare"]),
+    ("--paths", &["choice-prepare"]),
     ("--keep", &["choice-prepare"]),
     ("--prep", &["choice-prepare", "choice"]),
     ("--results", &["choice"]),
@@ -272,14 +207,11 @@ const OPTIONS: [(&str, &[&str]); 39] = [
     ("--claims", &["choice"]),
     ("--node-steps", &["choice"]),
     ("--sub-nogoods", &["choice"]),
-    ("--cpu", &["sound", "finders", "nogoods", "relaxed", "choice-prepare"]),
-    ("--steps", &["nogoods", "relaxed", "choice-prepare"]),
-    ("--long", &["nogoods"]),
-    ("--seed", &["sound", "finders", "nogoods", "relaxed", "choice-prepare"]),
-    ("--fix", &["sound", "finders", "nogoods", "relaxed", "choice-prepare"]),
-    ("--unit-nodes", &["sound", "finders", "nogoods", "relaxed", "choice-prepare"]),
-    ("--extra", &["sound", "finders"]),
-    ("--pool", &["sound", "finders"]),
+    ("--cpu", &["choice-prepare"]),
+    ("--steps", &["choice-prepare"]),
+    ("--seed", &["choice-prepare"]),
+    ("--fix", &["choice-prepare"]),
+    ("--unit-nodes", &["choice-prepare"]),
     ("--repeat", &["setup"]),
     ("--nodes", &["nodes", "grow"]),
     ("--seconds", &["nodes", "grow"]),
@@ -292,9 +224,7 @@ const OPTIONS: [(&str, &[&str]); 39] = [
     ("--every", &["nodes", "grow"]),
     ("--progress", &["grow"]),
     ("--threads", &["grow", "landscape"]),
-    ("--out", &["landscape", "chain"]),
-    ("--down", &["chain"]),
-    ("--restart", &["chain"]),
+    ("--out", &["landscape"]),
     ("--cores", &["grow"]),
     ("--mem-cap", &["grow"]),
 ];
@@ -337,14 +267,10 @@ struct Options {
     threads: usize,
     cores: Option<usize>,
     mem_cap: Option<usize>,
-    /// The file `landscape` appends its lines to, and `chain` writes its lines to (a new file).
+    /// The file `landscape` appends its lines to.
     out: Option<PathBuf>,
-    /// `chain` goes down from the last game of its range.
-    down: bool,
-    /// `chain` starts afresh, standalone, at every `restart`th game (never, if not given).
-    restart: Option<usize>,
-    /// The options of `sound`, `finders` and `target`.
-    finders: finders::Params,
+    /// The options of `choice-prepare` and `choice`.
+    params: case::Params,
     games: Vec<u32>,
 }
 
@@ -369,9 +295,7 @@ impl Options {
             cores: None,
             mem_cap: None,
             out: None,
-            down: false,
-            restart: None,
-            finders: finders::Params::default(),
+            params: case::Params::default(),
             games: Vec::new(),
         }
     }
@@ -390,23 +314,9 @@ fn duration(name: &str, text: String) -> Result<Duration, String> {
     Duration::try_from_secs_f64(seconds).map_err(|e| format!("{name} {seconds}: {e}"))
 }
 
-/// The board sizes of the arguments: numbers, and for `setup`, `start` and `frames` also ranges `A-B`.
+/// The board sizes of the arguments: numbers, and for every command but `nodes` and `grow` also ranges `A-B`.
 fn games(command: &str, texts: &[String]) -> Result<Vec<u32>, String> {
-    let ranges = matches!(
-        command,
-        "setup"
-            | "start"
-            | "frames"
-            | "landscape"
-            | "chain"
-            | "sound"
-            | "finders"
-            | "nogoods"
-            | "target"
-            | "relaxed"
-            | "choice-prepare"
-            | "choice"
-    );
+    let ranges = !matches!(command, "nodes" | "grow");
     let mut games = Vec::new();
     for text in texts {
         let number = |part: &str| part.parse::<u32>().map_err(|e| format!("{text}: {e}"));
@@ -481,29 +391,22 @@ fn parse() -> Result<Options, String> {
             "--cores" => o.cores = Some(number("--cores", value("--cores")?)?),
             "--mem-cap" => o.mem_cap = Some(number("--mem-cap", value("--mem-cap")?)?),
             "--out" => o.out = Some(value("--out")?.into()),
-            "--down" => o.down = true,
-            "--restart" => o.restart = Some(number("--restart", value("--restart")?)?),
-            "--from" => o.finders.from = value("--from")?.parse().map_err(|e| format!("--from {e}"))?,
-            "--cap" => o.finders.cap = Some(number("--cap", value("--cap")?)?),
-            "--fractions" => o.finders.fractions = finders::fractions(&value("--fractions")?)?,
-            "--fixtures" => o.finders.fixtures = Some(value("--fixtures")?.into()),
-            "--suite" => o.finders.suite = Some(value("--suite")?.into()),
-            "--paths" => o.finders.paths = number("--paths", value("--paths")?)?,
-            "--keep" => o.finders.keep = number::<usize>("--keep", value("--keep")?)?.max(1),
-            "--prep" => o.finders.prep = Some(value("--prep")?.into()),
-            "--results" => o.finders.results = Some(value("--results")?.into()),
-            "--worker" => o.finders.worker = number("--worker", value("--worker")?)?,
-            "--claims" => o.finders.claims = Some(value("--claims")?.into()),
-            "--node-steps" => o.finders.node_steps = number::<usize>("--node-steps", value("--node-steps")?)?.max(1),
-            "--sub-nogoods" => o.finders.sub = true,
-            "--cpu" => o.finders.cpu = number("--cpu", value("--cpu")?)?,
-            "--steps" => o.finders.steps = number::<usize>("--steps", value("--steps")?)?.max(1),
-            "--long" => o.finders.long = number("--long", value("--long")?)?,
-            "--seed" => o.finders.lns.seed = number("--seed", value("--seed")?)?,
-            "--fix" => o.finders.lns.fix = finders::fix_range(&value("--fix")?)?,
-            "--unit-nodes" => o.finders.lns.unit_nodes = number("--unit-nodes", value("--unit-nodes")?)?,
-            "--extra" => o.finders.extra = number("--extra", value("--extra")?)?,
-            "--pool" => o.finders.pool = value("--pool")?.parse().map_err(|e| format!("--pool {e}"))?,
+            "--cap" => o.params.cap = Some(number("--cap", value("--cap")?)?),
+            "--fixtures" => o.params.fixtures = Some(value("--fixtures")?.into()),
+            "--suite" => o.params.suite = Some(value("--suite")?.into()),
+            "--paths" => o.params.paths = number("--paths", value("--paths")?)?,
+            "--keep" => o.params.keep = number::<usize>("--keep", value("--keep")?)?.max(1),
+            "--prep" => o.params.prep = Some(value("--prep")?.into()),
+            "--results" => o.params.results = Some(value("--results")?.into()),
+            "--worker" => o.params.worker = number("--worker", value("--worker")?)?,
+            "--claims" => o.params.claims = Some(value("--claims")?.into()),
+            "--node-steps" => o.params.node_steps = number::<usize>("--node-steps", value("--node-steps")?)?.max(1),
+            "--sub-nogoods" => o.params.sub = true,
+            "--cpu" => o.params.cpu = number("--cpu", value("--cpu")?)?,
+            "--steps" => o.params.steps = number::<usize>("--steps", value("--steps")?)?.max(1),
+            "--seed" => o.params.lns.seed = number("--seed", value("--seed")?)?,
+            "--fix" => o.params.lns.fix = case::fix_range(&value("--fix")?)?,
+            "--unit-nodes" => o.params.lns.unit_nodes = number("--unit-nodes", value("--unit-nodes")?)?,
             _ => texts.push(arg.clone()),
         }
     }
@@ -512,9 +415,6 @@ fn parse() -> Result<Options, String> {
     }
     if o.progress.is_zero() {
         return Err("--progress must be positive".into());
-    }
-    if o.restart == Some(0) {
-        return Err("--restart must be positive".into());
     }
     if o.command == "nodes" && o.mode == Mode::Start && o.delta.is_some() {
         return Err("--delta needs --mode opt".into());
@@ -568,12 +468,8 @@ fn main() {
         landscape(&o, &optimal).unwrap_or_else(|e| fail(&e));
         return;
     }
-    if o.command == "chain" {
-        chain(&o, &optimal).unwrap_or_else(|e| fail(&e));
-        return;
-    }
-    if let Some(command) = finders::Command::named(&o.command) {
-        finders::run(command, &o, &optimal).unwrap_or_else(|e| fail(&e));
+    if let Some(command) = case::Command::named(&o.command) {
+        case::run(command, &o, &optimal).unwrap_or_else(|e| fail(&e));
         return;
     }
     for &n in &o.games {
@@ -1193,11 +1089,11 @@ fn set_up<const W: usize>(n: u32) -> (Board<W>, Option<Prepared<W>>) {
     (board, prepared)
 }
 
-/// The start incumbent of the search of `p` (`start_incumbent`: the better of the greedy set, what survives of `seed`
-/// and the matching dive, improved by the local search), with no ceiling; `seed` is the promotions of another game.
-fn start_of<const W: usize>(board: &Board<W>, p: &Prepared<W>, seed: Option<&[u32]>) -> Bits<W> {
+/// The start incumbent of the search of `p` (`start_incumbent`: the better of the greedy set and the matching dive,
+/// improved by the local search), with no seed and no ceiling.
+fn start_of<const W: usize>(p: &Prepared<W>) -> Bits<W> {
     let graph = MatchGraph::new(&p.model, &p.root);
-    start_incumbent(p, &graph, &Control::new(), 1, seed.map(|moves| board.seed(moves)).as_ref())
+    start_incumbent(p, &graph, &Control::new(), 1, None)
 }
 
 /// A game standalone: the two ends of what its search has to close, and what finding them cost.  The sums are
@@ -1302,7 +1198,7 @@ fn landscape_of<const W: usize>(n: u32) -> Landscape {
         (land.greedy_s, land.greedy, land.max_total) = (p.timings.greedy.as_secs_f64(), p.greedy.sum(), p.max_total);
 
         let t1 = Instant::now();
-        land.start = start_of(&board, &p, None).sum();
+        land.start = start_of(&p).sum();
         land.start_s = t1.elapsed().as_secs_f64();
 
         let (gf2, graph_time) = root_graph(&p);
@@ -1319,70 +1215,6 @@ fn landscape_of<const W: usize>(n: u32) -> Landscape {
 /// Game `n` standalone, at the set width `with_width!` picks for it.
 fn landscape_at(n: u32) -> Result<Landscape, String> {
     taxman::with_width!(n, W => Ok(landscape_of::<W>(n)), else Err(beyond(n)))
-}
-
-/// A game's start incumbent in a chain of neighbours: its promotions, their sum, and what finding them cost.
-struct Chained {
-    trivial: bool,
-    in_the_bag: u64,
-    set: Vec<u32>,
-    sum: u64,
-    setup_s: f64,
-    start_s: f64,
-}
-
-/// Game `n`'s start incumbent, as [`landscape_of`] makes it but seeded with `seed` if given, at the set width `W`.
-fn chained_of<const W: usize>(n: u32, seed: Option<&[u32]>) -> Chained {
-    let t0 = Instant::now();
-    let (board, prepared) = set_up::<W>(n);
-    let setup_s = t0.elapsed().as_secs_f64();
-    let t1 = Instant::now();
-    let set = prepared.map(|p| start_of(&board, &p, seed)).unwrap_or_default();
-    let start_s = t1.elapsed().as_secs_f64();
-    Chained {
-        trivial: board.is_trivial(),
-        in_the_bag: board.in_the_bag,
-        sum: set.sum(),
-        set: set.to_vec(),
-        setup_s,
-        start_s,
-    }
-}
-
-/// `chain`: the start incumbent of each game of `o.games`, in order (reversed with `--down`) on this thread, seeded
-/// with the promotions of the previous game's, except at the first and at every `--restart`th, where it is standalone.
-/// Each line is printed and, with `--out`, written to the new file it names.
-fn chain(o: &Options, optimal: &Optimal) -> Result<(), String> {
-    let open = |path: &Path| {
-        fs::OpenOptions::new().write(true).create_new(true).open(path).map_err(|e| format!("{}: {e}", path.display()))
-    };
-    let mut sink = o.out.as_deref().map(open).transpose()?;
-    let order: Vec<u32> = if o.down { o.games.iter().rev().copied().collect() } else { o.games.clone() };
-    let mut seed: Option<Vec<u32>> = None;
-    for (i, &n) in order.iter().enumerate() {
-        let since_restart = o.restart.map_or(i, |k| i % k);
-        if since_restart == 0 {
-            seed = None;
-        }
-        let step = taxman::with_width!(n, W => Ok(chained_of::<W>(n, seed.as_deref())), else Err(beyond(n)))?;
-        let (score, opt) = (step.in_the_bag + step.sum, optimal.score(n));
-        let mut line = Line::of(n);
-        line.field("trivial", step.trivial)
-            .field("in_the_bag", step.in_the_bag)
-            .field("score", score)
-            .text("seed", if seed.is_some() { "neighbour" } else { "none" })
-            .field("since_restart", since_restart)
-            .seconds("setup_s", step.setup_s)
-            .seconds("start_s", step.start_s)
-            .maybe("opt", opt)
-            .maybe("shortfall", opt.map(|opt| opt as i64 - score as i64));
-        println!("{}", line.render());
-        if let Some(file) = &mut sink {
-            writeln!(file, "{}", line.render()).map_err(|e| format!("--out: {e}"))?;
-        }
-        seed = Some(step.set);
-    }
-    Ok(())
 }
 
 /// The proof of each game that the completed lines of the results file `path` have (the last line of a game counts).
@@ -1473,7 +1305,7 @@ fn landscape(o: &Options, optimal: &Optimal) -> Result<(), String> {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// Tests: `landscape`'s (cargo test runs them: the example is `test = true` in Cargo.toml)
+// Tests: `landscape`'s (`cargo test --features studies` runs them: the example is `test = true` in Cargo.toml)
 
 #[cfg(test)]
 mod tests {
@@ -1653,54 +1485,6 @@ mod tests {
         seen.sort_unstable();
         assert_eq!(seen, (18..=36).collect::<Vec<u32>>());
         assert!(fs::read_to_string(&out).unwrap().starts_with(&more));
-    }
-
-    /// `chain` on `games` to a new file in `dir` (named `name`), with the options `set` sets: the file's lines.
-    fn chain_lines(dir: &support::TempDir, name: &str, games: Vec<u32>, set: impl FnOnce(&mut Options)) -> Vec<Json> {
-        let mut o = Options::new("chain".to_owned());
-        (o.out, o.games) = (Some(dir.join(name)), games);
-        set(&mut o);
-        chain(&o, Optimal::built_in()).expect("chain");
-        lines(&dir.join(name))
-    }
-
-    #[test]
-    fn a_chain_of_neighbours_starts_legal_games_and_a_restart_at_every_game_is_the_standalone_start() {
-        let dir = support::TempDir::new("wall-chain");
-        let games: Vec<u32> = (900..=925).collect();
-        let field = |line: &Json, name: &str| line.get(name).and_then(Json::as_i64).expect(name);
-        let seed = |line: &Json| line.get("seed").and_then(Json::as_str).expect("seed").to_owned();
-        let standalone: HashMap<u32, u64> =
-            games.iter().map(|&n| (n, landscape_at(n).expect("a board").lower())).collect();
-        let check = |lines: &[Json], order: &[u32], restart: usize| {
-            assert_eq!(board_sizes(lines), order);
-            for (i, line) in lines.iter().enumerate() {
-                let n = order[i];
-                let (score, opt) = (field(line, "score"), field(line, "opt"));
-                assert!(score <= opt && field(line, "shortfall") == opt - score, "n={n}: {line}");
-                assert_eq!(field(line, "since_restart") as usize, i % restart, "n={n}: {line}");
-                assert_eq!(seed(line), if i % restart == 0 { "none" } else { "neighbour" }, "n={n}: {line}");
-                // A game with no seed is the standalone game of `landscape`.
-                if i % restart == 0 {
-                    assert_eq!(score as u64, standalone[&n], "n={n}: {line}");
-                }
-            }
-        };
-
-        let up = chain_lines(&dir, "up.jsonl", games.clone(), |_| {});
-        check(&up, &games, games.len());
-        let down = chain_lines(&dir, "down.jsonl", games.clone(), |o| o.down = true);
-        check(&down, &games.iter().rev().copied().collect::<Vec<u32>>(), games.len());
-        let every = chain_lines(&dir, "every.jsonl", games.clone(), |o| o.restart = Some(1));
-        check(&every, &games, 1);
-        let by_seven = chain_lines(&dir, "seven.jsonl", games.clone(), |o| o.restart = Some(7));
-        check(&by_seven, &games, 7);
-        assert_eq!(field(&by_seven[0], "score"), field(&up[0], "score"));
-
-        // A run never overwrites a file.
-        let mut o = Options::new("chain".to_owned());
-        (o.out, o.games) = (Some(dir.join("up.jsonl")), vec![900]);
-        assert!(chain(&o, Optimal::built_in()).is_err());
     }
 
     #[test]
