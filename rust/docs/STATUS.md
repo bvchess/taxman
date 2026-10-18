@@ -72,7 +72,7 @@ find it.  Large neighbourhood search from the start incumbent (keep a random 70-
 exactly as a unit, repeat) finds the optimum of 64% of the games of 2176-3440 in 5 CPU seconds of one thread (the sound
 search for the same time: 21%), a mean shortfall of 28 against 297; the sound search seeded with its game takes 0.44 of
 the nodes and 0.48 of the CPU, finder included, of the search from today's start (the optimum as the seed: 0.38 of the
-nodes).  It is in `wall finders` and `wall sound`, not in the solver, and the ledger does not use it yet
+nodes).  It is in `wall finders` and `wall sound`, not in the solver; the ledger is to use it next
 ([the entry](experiments/finders-for-good-games-that-are-not-sound-2026-10.md)).
 
 ## Decided
@@ -112,45 +112,27 @@ nodes).  It is in `wall finders` and `wall sound`, not in the solver, and the le
 * Nothing for the run itself: Brian approved it (2026-10-16); periodic updates need his AWS session (12 hours each).
 * Outside review of Theorems 1, 10 and 12 by Robert Moniot.
 * Publishing (`optimal.json` past 1300, OEIS).
-* The ledger's experiment with the climbs on 2176..3440 (about an hour of a `c8g.16xlarge`, about $0.9 at spot;
-  "In flight").
 
 ## In flight
 
-* The engineering pass before the run is done: a cheaper node with identical trees (the tableaux kept per level,
-  cheaper cycle searches), the knobs for nogood retention, the forcing window and strong branching, the harness that
-  tunes them on subtrees of searches at the end of the chain, and the campaign that used it (see "Decided";
-  [the profile at the end of the chain](../bench/chain_end/README.md)).
 * **The run to the wall**, launched 2026-10-17 00:15 PDT: `RUN=to-the-wall rust/tools/cloud/wall.sh status`
   ([RUNBOOK section 12](../tools/cloud/RUNBOOK.md#12-the-unattended-run-to-the-wall)).  The chain from n = 1 with
   commit eb84a6f (`force_window=all`, the cheaper node), on one `c8g.16xlarge` at spot (at most $0.75 an hour) in an
   Auto Scaling group that replaces an interrupted machine; it ends at the wall (a game past 24 hours), at 72
   instance-hours (about $49), or on 2026-10-22.  Its games 1..3440 are compared with the committed chain (3440 is
-  re-proven by the fixed build), and the games past 3440 are appended once verified.  The rehearsal of
-  [RUNBOOK 12.5](../tools/cloud/RUNBOOK.md#125-the-rehearsal-designed-not-run) passed (the wall, a replacement, the
-  budget).
-* **The sweep**, built 2026-10-17 and not run (Brian's plan: as many proven games of 3441..8191 as one cheap machine
-  gives, holes allowed): `sweep.sh FIRST LAST` splits the stretch into blocks of consecutive games, one thread and a
-  limited search a game each, goes on past the games that do not finish, and goes over the merged `explore.jsonl`
-  again until each game has seen the game before it as it is now
-  ([RUNBOOK section 13](../tools/cloud/RUNBOOK.md#13-the-sweep); `taxman solve --keep-going`).  3441..8191 at 180 s a
-  game is at most 314 core-hours: 4.9 hours of a `c8g.16xlarge`, about $3.3 at spot; a launch needs Brian's approval.
-  The file is not a chain and never goes into `strict.jsonl`.
+  re-proven by the fixed build), and the games past 3440 are appended once verified.
+* **The sweep**, built 2026-10-17 and not run: blocks of consecutive games of 3441..8191, one thread and a limited
+  search a game each, passes over the merged `explore.jsonl` until nothing changes
+  ([RUNBOOK section 13](../tools/cloud/RUNBOOK.md#13-the-sweep); `taxman solve --keep-going`); about $3.3 at 180 s a
+  game.  The file is not a chain and never goes into `strict.jsonl`.  The ledger (next) may supersede it.
 * **The ledger**, built 2026-10-17 (Brian's idea: L and U for every board of a stretch at once, limited searches with
   the dual bound of a stopped search, the relations between boards proven in THEORY.md, the effort where a proof looks
-  cheapest; `examples/ledger/`).  The laptop's dry run of 1301..1500 with the truth hidden proves all 200 boards at
-  the optimum, 0 violations, for 1.28 times the one-thread chain's CPU (573 s) in 30% of its wall time on six workers
-  ([the entry](experiments/the-ledger-bounds-from-both-sides-2026-10.md)).  The experiment of the design, 2176..3440,
-  was launched twice (2026-10-17).  The first was stopped after 9 minutes ($0.18): the machine was 95% idle, the main
-  thread replaying a game at every step of each map's cascade; fixed the same day
-  ([the fix](experiments/the-ledger-bounds-from-both-sides-2026-10.md#later-2026-10-17-the-first-cloud-attempt-stopped-and-the-fix)).
-  The second (48 core-hours on 64 workers) proved 916 of 1,265 boards, every one at the optimum, but paid about 2.2
-  times the chain's cost on the same games, because most searches began before the board below was proven.  **Wedge
-  and climb**, built the same day: the board above a proven board, and then the board below it, is searched ahead of
-  every other job, seeded with its game, for 60 s (`--climb up|down|both|off`, `--climb-limit`; both by default, so
-  that the next cloud run says what each way costs and proves); a climb that stops parks the board in the ordinary
-  queue; a board next to a climb waits.  On the laptop 1301..1500 takes 547 to 576 CPU s against 598 without the
-  climbs, all proven at the optimum, 0 violations; 2576..2700 shows no difference beyond the noise
-  ([the entry](experiments/the-ledger-bounds-from-both-sides-2026-10.md#later-2026-10-17-wedge-and-climb)).  A cloud
-  run with the climbs is ready, not run, and needs Brian's approval
+  cheapest; `examples/ledger/`; [the entry](experiments/the-ledger-bounds-from-both-sides-2026-10.md)).  On 2176..3440
+  with the truth hidden (48 core-hours of a `c8g.16xlarge`, after a stalled first launch, fixed, and a crash at 2303,
+  fixed in `Board::seed`) it proved 916 of 1,265 boards, every one at the optimum, among them all of 2576..3075, for
+  about 2.2 times the chain's cost on the same games: most searches began before the board below was proven.  **Wedge
+  and climb** (built the same day): a board next to a proven board is searched first, seeded with its game, for 60 s
+  (`--climb up|down|both|off`, `--climb-limit`); a climb that stops parks the board; a board next to a climb waits; the
+  laptop's dry runs prove every board at the optimum.  Next (Brian approved $1, 2026-10-17): the finder in the ledger,
+  then 2176..3440 again with everything on, to learn what sets up a run past 3440 best
   ([RUNBOOK section 14](../tools/cloud/RUNBOOK.md#14-the-ledgers-experiment)).
