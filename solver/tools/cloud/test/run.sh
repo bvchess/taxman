@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Tests of the unattended-run scripts that need no cloud: chain.sh with the wall and the ledger (run.sh), wall-node.sh
 # and wall.sh, against a stand-in for the aws CLI (test/bin/aws: S3 as a directory, the group as a file) and for sudo
-# and shutdown.  Needs the release build of the solver (cd solver/frame && cargo build --release; or TAXMAN_BIN names another
-# build of the same sources, say the one `cargo build --profile test` makes) and rsync.  sweep.sh's scenario also runs
-# the real verify.sh on the sweep's files, which replays the committed games three times.
+# and shutdown.  The scenarios that run the chain (chain, ledger, node, sweep) need the release build of the solver
+# (cd solver/frame && cargo build --release; or TAXMAN_BIN names another build of the same sources, say the debug build
+# that `cargo build` makes) and rsync; launch and status need neither.  sweep.sh's scenario also runs the real verify.sh
+# on the sweep's files, which replays the committed games three times.
 #
-#   solver/tools/cloud/test/run.sh [SCENARIO...]   all of them, or the named (chain, ledger, node, launch, sweep)
+#   solver/tools/cloud/test/run.sh [SCENARIO...]   all of them, or the named (chain, ledger, node, launch, status, sweep)
 #
 # Prints `ok` or `FAIL` for each check and exits with the number of failures.  A few minutes: the chains are small.
 
@@ -15,14 +16,22 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 real_cloud="$(cd "$here/.." && pwd)"
 crate="$(cd "$real_cloud/../../frame" && pwd)"
 export TAXMAN_BIN="${TAXMAN_BIN:-$crate/target/release/taxman}"
-[ -x "$TAXMAN_BIN" ] || {
-    echo "build the solver first: cd $crate && cargo build --release" >&2
-    exit 2
-}
-command -v rsync >/dev/null 2>&1 || {
-    echo "rsync is needed (the stand-in for aws s3 sync)" >&2
-    exit 2
-}
+selected=("$@")
+[ "${#selected[@]}" -gt 0 ] || selected=(chain ledger node launch status sweep)
+for s in "${selected[@]}"; do
+    case "$s" in
+        chain | ledger | node | sweep)
+            [ -x "$TAXMAN_BIN" ] || {
+                echo "build the solver first: cd $crate && cargo build --release" >&2
+                exit 2
+            }
+            command -v rsync >/dev/null 2>&1 || {
+                echo "rsync is needed (the stand-in for aws s3 sync)" >&2
+                exit 2
+            }
+            ;;
+    esac
+done
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"; kill $(jobs -p) 2>/dev/null' EXIT
@@ -407,6 +416,9 @@ print(base64.b64decode(json.load(open(sys.argv[1]))["UserData"]).decode(), end="
         >"$tmp/dry-cache.out" 2>&1
     check "RELEASE_TESTS and REQUIRE_CACHED go into the config" matches "$tmp/dry-cache.out" '^RELEASE_TESTS=1$'
     check "both" matches "$tmp/dry-cache.out" '^REQUIRE_CACHED=1$'
+    check "the commands that only read are not printed" lacks "$tmp/dry.out" '^+ aws ec2 describe-vpcs'
+    DRY_RUN=1 "$wall" launch --verbose --commit "$commit" --until 2099-01-01 >"$tmp/dry-verbose.out" 2>&1
+    check "with --verbose they are" matches "$tmp/dry-verbose.out" '^+ aws ec2 describe-vpcs'
 
     "$wall" launch --commit "$commit" --until 2099-01-01 --zones "us-east-1b us-east-1a" >"$tmp/launch.out" 2>&1
     check "a launch succeeds" equals $? 0
@@ -440,6 +452,7 @@ print(base64.b64decode(json.load(open(sys.argv[1]))["UserData"]).decode(), end="
 
     "$wall" cleanup >"$tmp/cleanup.out" 2>&1
     check "cleanup succeeds on an ended run" equals $? 0
+    check "its end checks are printed with their commands" matches "$tmp/cleanup.out" '^+ aws ec2 describe-volumes'
     check "the group is gone" absent "$FAKE_STATE/asg"
     check "the template is gone" absent "$FAKE_STATE/template"
     check "the security group is gone" absent "$FAKE_STATE/sg"
@@ -459,6 +472,171 @@ print(base64.b64decode(json.load(open(sys.argv[1]))["UserData"]).decode(), end="
     check "cleanup refuses a run that has not ended" matches "$tmp/cleanup2.out" 'has not ended'
     "$wall" cleanup --force >"$tmp/cleanup3.out" 2>&1
     check "cleanup --force does it" equals $? 0
+}
+
+# --- wall.sh status ----------------------------------------------------------------------------------------------
+
+# The object NAME of the fake bucket.
+sobj() { printf '%s/%s/%s\n' "$FAKE_S3" "$BUCKET" "$1"; }
+
+# A run in the fake bucket, wall-NAME: a config (a window of 5, the chain to 100, the date 2026-10-22 00:00 UTC, and the
+# settings NAME=VALUE after the name) and a ledger (the run began 2026-10-18 19:40:49 UTC, counted to 22:14:07 UTC).
+fake_run() {
+    local name="$1"
+    shift
+    mkdir -p "$(sobj "wall-$name/run")" "$(sobj "wall-$name/logs")" "$(sobj "wall-$name/ckpt")" \
+        "$(sobj "wall-$name/results")"
+    printf '%s\n' COMMIT=0123456789abcdef0123456789abcdef01234567 INSTANCE_TYPE=c8g.16xlarge CHAIN_TO=100 WINDOW=5 \
+        GAME_HOURS=24 BUDGET_HOURS=36 PRICE=0.676 RUN_UNTIL=1792627200 ${@+"$@"} >"$(sobj "wall-$name/run/config")"
+    printf 'start=1792352449\nboot=b\nbase=0\nhours=2.7711\nupdated=1792361647\n' >"$(sobj "wall-$name/run/ledger")"
+}
+
+# The solver's line for each of the games 1..LAST that it recorded, in logs/chain.out of the run NAME (NAME LAST).
+fake_recorded() {
+    local n
+    for ((n = 1; n <= $2; n++)); do
+        printf 'n=%-5d score=%-9d search  nodes=%-12d 1.000 s  optimal ok  proof=exhausted\n' "$n" $((n * 10)) 0
+    done >"$(sobj "wall-$1/logs/chain.out")"
+}
+
+# A progress line of the solver (engine.rs, progress_line): the game, the time since its search began, the nodes, the
+# rate or how the search ended, and the best sum of promotions.
+progress() {
+    printf 'n=%s %s nodes %s (%s) best %s queue 3 spilled 0 | eff 99.9%% idle 0.0%% lock 0.0%% splits 1 steals 0 %s\n' \
+        "$1" "$2" "$3" "$4" "$5" 'full 0.3ms ramp 0.0% tail 0.0% rebuild 0.0% first 0.0%'
+}
+
+# Sets the modification time of the file $1 to the epoch time $2 (touch -t reads UTC here).
+stamp() {
+    TZ=UTC touch -t "$(date -u -d "@$2" +%Y%m%d%H%M.%S 2>/dev/null || date -u -r "$2" +%Y%m%d%H%M.%S)" "$1"
+}
+
+# A time in seconds since the epoch in the zone TZ, as status prints it.
+local_text() {
+    date -d "@$1" '+%Y-%m-%d %H:%M %Z' 2>/dev/null || date -r "$1" '+%Y-%m-%d %H:%M %Z'
+}
+
+scenario_status() {
+    echo "== wall.sh status: the run in progress, the games in flight, the times"
+    local wall="$cloud/wall.sh" now saved f
+    export BUCKET=taxman-013764204840-us-east-1
+    rm -rf "${FAKE_S3:?}/$BUCKET"
+    rm -rf "$FAKE_STATE"
+    now="$(date +%s)"
+
+    # A run that ended, and a prefix that is not a run: neither is in progress.  Its logs were saved on 2026-01-15, at
+    # 03:30:00 UTC (19:30 the evening before at Pacific time, standard time).
+    fake_run t-ended CHAIN_TO=40
+    fake_recorded t-ended 40
+    printf 'time=1768447800\nreason=complete: the range 1-40\n' >"$(sobj wall-t-ended/run/ended)"
+    printf 'x\n' >"$(sobj wall-t-ended/results/strict.jsonl)"
+    for f in results/strict.jsonl logs/chain.out; do stamp "$(sobj "wall-t-ended/$f")" 1768447800; done
+    mkdir -p "$(sobj chain-9/run)"
+    printf "x\n" >"$(sobj chain-9/run/config)"
+
+    # The run in progress: it has recorded 1..40, and its window of 5 holds 41..45.  The saved progress lines (the
+    # oldest game, 41, runs; 42 is suspended; 43's search is done; 44 has no line; 45's only line is from before three
+    # of 41's) and the clock of 41, which is the oldest game with its search running.
+    fake_run t-live
+    fake_recorded t-live 40
+    {
+        progress 40 9m00s 100 done 1
+        echo 'note: a line of the solver that is not a progress line'
+        progress 45 2m00s 63 240.0k/s 500
+        progress 41 1h38m00s 900000000 250.0k/s 341541
+        progress 42 1h08m00s 63 0/s 341541
+        progress 43 30m00s 4000 230.0k/s 777
+        progress 41 1h39m00s 925000000 250.0k/s 341541
+        progress 42 1h09m00s 63 0/s 341541
+        progress 43 30m30s 5000 done 777
+        progress 41 1h40m00s 1000000000 250.0k/s 341541
+        progress 42 1h10m00s 63 0/s 341541
+    } >"$(sobj wall-t-live/logs/chain.err)"
+    printf 'x\n' >"$(sobj wall-t-live/results/strict.jsonl)"
+    printf 'x\n' >"$(sobj wall-t-live/ckpt/n0041.ckpt)"
+    printf '4500.036\n' >"$(sobj wall-t-live/ckpt/n0041.clock)"
+    printf 'x\n' >"$(sobj wall-t-live/ckpt/n0042.ckpt)"
+    # The last save: the checkpoints, 261 seconds ago.  The ledger (written every minute) is newer and not a save.
+    for f in "$(sobj wall-t-live/results/strict.jsonl)" "$(sobj wall-t-live)"/logs/*; do stamp "$f" $((now - 900)); done
+    stamp "$(sobj wall-t-live/logs/chain.err)" $((now - 290))
+    for f in "$(sobj wall-t-live)"/ckpt/*; do stamp "$f" $((now - 261)); done
+    saved="$(local_text $((now - 261)))"
+
+    TZ=America/Los_Angeles env -u RUN "$wall" status >"$tmp/s1.out" 2>&1
+    check "status with no RUN succeeds" equals $? 0
+    sed 's/  */ /g' "$tmp/s1.out" >"$tmp/s1.norm"
+    check "it takes the one run in progress" matches "$tmp/s1.norm" '^run t-live (s3://'
+    check "and says that RUN was not set" matches "$tmp/s1.norm" 'the run in progress (RUN was not set)'
+    check "it does not print the aws commands" lacks "$tmp/s1.out" '^+ aws'
+    check "it recorded through 40" has_line "$tmp/s1.norm" ' recorded through 40 (score 400)'
+    check "the last save is the newest object saved, in Pacific time, and not the ledger's" matches "$tmp/s1.norm" \
+        "^ last save to S3: $saved, 4 min [0-9]* s ago$"
+    check "the oldest game runs, with the clock of the wall" has_line "$tmp/s1.norm" \
+        ' 41 1h15m00s 1h40m00s 1000000000 341541 running, 250.0k nodes/s'
+    check "a game whose threads are another's is suspended" has_line "$tmp/s1.norm" \
+        ' 42 - 1h10m00s 63 341541 suspended'
+    check "a game whose search is done waits for the game before" has_line "$tmp/s1.norm" \
+        ' 43 - 30m30s 5000 777 search done, waiting for the game before'
+    check "a game with no line has no state to tell" has_line "$tmp/s1.norm" ' 44 - - - - no recent progress line'
+    check "and a game whose last line three of another's follow" has_line "$tmp/s1.norm" \
+        ' 45 - - - - no recent progress line'
+    check "a recorded game is not in flight" lacks "$tmp/s1.norm" '^ 40 '
+    check "the games in flight are the window after the last recorded" equals \
+        "$(grep -c '^ [0-9][0-9] ' "$tmp/s1.norm")" 5
+    check "every time is in Pacific time: the date (a day and a half ahead)" matches "$tmp/s1.norm" \
+        'until 2026-10-21 17:00 PDT$'
+    check "the run's beginning" matches "$tmp/s1.norm" 'the run began 2026-10-18 12:40 PDT, '
+    check "and what the ledger counted to" matches "$tmp/s1.norm" 'counted to 2026-10-18 15:14 PDT$'
+    check "none is in UTC" lacks "$tmp/s1.out" 'UTC\|[0-9]Z'
+
+    TZ=Asia/Kolkata RUN=t-live "$wall" status >"$tmp/s2.out" 2>&1
+    check "in India the date is the 22nd, in IST" matches "$tmp/s2.out" 'until 2026-10-22 05:30 IST$'
+    check "and the run began in the small hours of the 19th" matches "$tmp/s2.out" 'the run began 2026-10-19 01:10 IST, '
+    TZ=UTC RUN=t-live "$wall" status >"$tmp/s3.out" 2>&1
+    check "in UTC it says UTC" matches "$tmp/s3.out" 'until 2026-10-22 00:00 UTC$'
+
+    TZ=America/Los_Angeles RUN=t-live "$wall" status --verbose >"$tmp/s4.out" 2>&1
+    check "--verbose prints the commands that read" matches "$tmp/s4.out" '^+ aws sts get-caller-identity'
+    check "all of them" matches "$tmp/s4.out" '^+ aws s3 ls s3://.*/wall-t-live/'
+    TZ=America/Los_Angeles RUN=t-live VERBOSE=1 "$wall" status >"$tmp/s5.out" 2>&1
+    check "so does VERBOSE=1" matches "$tmp/s5.out" '^+ aws sts get-caller-identity'
+
+    # The oldest game's search is done (it is being recorded), and a stopped search.
+    {
+        progress 41 1h41m00s 1001000000 done 341541
+        progress 44 5m00s 70 stopped 9
+    } >>"$(sobj wall-t-live/logs/chain.err)"
+    TZ=America/Los_Angeles RUN=t-live "$wall" status >"$tmp/s6.out" 2>&1
+    sed 's/  */ /g' "$tmp/s6.out" >"$tmp/s6.norm"
+    check "the oldest game, searched, is being recorded" has_line "$tmp/s6.norm" \
+        ' 41 1h15m00s 1h41m00s 1001000000 341541 search done, being recorded'
+    check "a suspended game is still current after the oldest game's last line" has_line "$tmp/s6.norm" \
+        ' 42 - 1h10m00s 63 341541 suspended'
+    check "a stopped search says so" has_line "$tmp/s6.norm" \
+        ' 44 - 5m00s 70 9 search stopped, its checkpoint kept'
+
+    # A run that ended with the range recorded: no game in flight, the end in Pacific time (standard), the save a long
+    # time ago.
+    TZ=America/Los_Angeles RUN=t-ended "$wall" status >"$tmp/s7.out" 2>&1
+    sed 's/  */ /g' "$tmp/s7.out" >"$tmp/s7.norm"
+    check "an ended run shows its end in Pacific standard time" matches "$tmp/s7.norm" \
+        '^ ENDED 2026-01-14 19:30 PST: complete: the range 1-40$'
+    check "and its last save, long ago" matches "$tmp/s7.norm" \
+        '^ last save to S3: 2026-01-14 19:30 PST, [0-9]* d [0-9]* h ago$'
+    check "and no game in flight" matches "$tmp/s7.norm" 'no game in flight: the range to 40 is recorded'
+
+    # Two runs in progress: status lists them and asks for RUN.
+    fake_run t-live2
+    env -u RUN "$wall" status >"$tmp/s8.out" 2>&1
+    check "two runs in progress is an error" equals $? 1
+    check "which says so" matches "$tmp/s8.out" 'more than one run is in progress'
+    check "and lists them" equals "$(grep -c '^    t-live2\{0,1\}$' "$tmp/s8.out")" 2
+    check "the ended run is not one of them" lacks "$tmp/s8.out" 't-ended'
+    # None: only the ended run is left.
+    rm -rf "$(sobj wall-t-live)" "$(sobj wall-t-live2)"
+    env -u RUN "$wall" status >"$tmp/s9.out" 2>&1
+    check "no run in progress is an error" equals $? 1
+    check "which says so" matches "$tmp/s9.out" 'no run is in progress'
 }
 
 # --- sweep.sh ----------------------------------------------------------------------------------------------------
@@ -572,14 +750,13 @@ scenario_sweep() {
     cp "$tmp/verify.sh.stub" "$cloud/verify.sh"
 }
 
-selected=("$@")
-[ "${#selected[@]}" -gt 0 ] || selected=(chain ledger node launch sweep)
 for s in "${selected[@]}"; do
     case "$s" in
         chain) scenario_chain ;;
         ledger) scenario_ledger ;;
         node) scenario_node ;;
         launch) scenario_launch ;;
+        status) scenario_status ;;
         sweep) scenario_sweep ;;
         *) echo "unknown scenario $s" >&2; exit 2 ;;
     esac

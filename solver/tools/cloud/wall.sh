@@ -9,8 +9,9 @@
 #   solver/tools/cloud/wall.sh stop [--now]                                  end the run (cleanly, or at once)
 #   solver/tools/cloud/wall.sh cleanup [--force]                             delete what launch made; check what is left
 #
-# Every aws command is printed, as `+ aws ...`, before it runs (reads and changes alike); DRY_RUN=1 runs the reads and
-# prints, without running, the commands that create, change or delete something.  `launch` does, in this order:
+# Every aws command that creates, changes or deletes something is printed, as `+ aws ...`, before it runs; DRY_RUN=1
+# prints those without running them.  The commands that only read are printed too with --verbose (any command takes it;
+# environment variable VERBOSE=1).  `launch` does, in this order:
 #
 #   1. writes $S3_DEST/run/config, the run's settings (the commit, the budget, the date, the wall, ...), which every
 #      machine reads
@@ -49,10 +50,14 @@
 # setup.sh: RELEASE_TESTS=1 (a machine whose cache has no tested build of the commit builds it, runs the release suite
 # and, if it passes, stores the binaries; if it fails the run ends with RELEASE_TESTS_FAILED in $S3_DEST),
 # REQUIRE_CACHED=1 (a machine whose cache has none ends the run instead of building).
-# Other environment: RUN (the name of the run; its state is $S3_DEST = s3://BUCKET/wall-RUN; default run1), BUCKET,
-# AWS_PROFILE and AWS_DEFAULT_REGION (us-east-1), DRY_RUN, AWS_CLI, and WALL_DIR (default ~/taxman-wall/RUN): where the
-# files that the commands take are written and kept (the user data, the launch template's data, the config).  The
-# group, template, policy and security group are always named taxman-wall: there is one run at a time.
+# status reads the run's state in S3 and the group: the run, the ledger, the group, and from the last save to S3 (its
+# time, in UTC, and how long ago) the last game recorded and a line for each game in flight (RUNBOOK.md, section 12.4).
+# Other environment: RUN (the name of the run; its state is $S3_DEST = s3://BUCKET/wall-RUN; default run1, except for
+# status: the one run in progress, the one whose prefix has a config and no ended object, or the runs to choose from),
+# BUCKET, AWS_PROFILE (never defaulted: export it, aws login --profile NAME) and AWS_DEFAULT_REGION (us-east-1),
+# DRY_RUN, VERBOSE, AWS_CLI, and WALL_DIR (default ~/taxman-wall/RUN): where the files that the commands take are
+# written and kept (the user data, the launch template's data, the config).  The group, template, policy and security
+# group are always named taxman-wall: there is one run at a time.
 
 set -u
 set -o pipefail
@@ -64,17 +69,23 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AWS_CLI="${AWS_CLI:-aws}"
 export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 BUCKET="${BUCKET:-taxman-013764204840-us-east-1}"
-RUN="${RUN:-run1}"
 NAME=taxman-wall
 ROLE=taxman-ec2
-S3_DEST="s3://$BUCKET/wall-$RUN"
 DRY_RUN="${DRY_RUN:-0}"
+VERBOSE="${VERBOSE:-0}"
 TAGS='{Key=Project,Value=taxman},{Key=Purpose,Value=wall}'
 IMAGE="resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64"
 
-# The files the commands take (the user data, the template, the config, ...) are written here and kept, so that a
-# command that was printed can be run again by hand.
-work="${WALL_DIR:-$HOME/taxman-wall/$RUN}"
+# The run: RUN names it, S3_DEST is its state, and `work` is where the files that the commands take (the user data, the
+# template, the config, ...) are written and kept, so that a command that was printed can be run again by hand.
+set_run() {
+    RUN="$1"
+    S3_DEST="s3://$BUCKET/wall-$RUN"
+    work="${WALL_DIR:-$HOME/taxman-wall/$RUN}"
+}
+RUN="${RUN:-}"
+RUN_PICKED=0
+if [ -n "$RUN" ]; then set_run "$RUN"; fi
 
 # --- aws, printed ------------------------------------------------------------------------------------------------
 
@@ -90,8 +101,19 @@ show() {
     printf '%s\n' "$out" >&2
 }
 
+# Prints a command that only reads, with --verbose.
+show_read() {
+    if [ "$VERBOSE" = 1 ]; then show "$@"; fi
+}
+
 # A command that only reads.
 read_aws() {
+    show_read "$@"
+    "$AWS_CLI" "$@"
+}
+
+# A command that only reads, whose output is a check that is meaningless without the command: always printed.
+check_aws() {
     show "$@"
     "$AWS_CLI" "$@"
 }
@@ -119,16 +141,23 @@ change_aws_value() {
     change_aws "$@"
 }
 
-# The object NAME of S3_DEST/run, or nothing (a read that is not printed: status asks for several).
-run_object() {
-    "$AWS_CLI" s3 cp "$S3_DEST/run/$1" - --only-show-errors 2>/dev/null
+# The text of the object PATH of S3_DEST (run/config, logs/chain.err, ...); the status of aws, and no text, if it is not
+# there.
+s3_text() {
+    show_read s3 cp "$S3_DEST/$1" - --only-show-errors
+    "$AWS_CLI" s3 cp "$S3_DEST/$1" - --only-show-errors 2>/dev/null
+}
+
+# `aws s3 ls`, its times in UTC (it prints them in the time zone of the machine otherwise).
+s3_ls() {
+    show_read s3 ls "$@"
+    TZ=UTC "$AWS_CLI" s3 ls "$@" 2>/dev/null
 }
 
 # Whether the object NAME is in S3_DEST/run.
 has_object() {
     local listing
-    show s3 ls "$S3_DEST/run/$1"
-    listing="$("$AWS_CLI" s3 ls "$S3_DEST/run/$1" 2>/dev/null)"
+    listing="$(s3_ls "$S3_DEST/run/$1")"
     printf '%s\n' "$listing" | grep -q " $1\$"
 }
 
@@ -160,14 +189,46 @@ is_number() {
     return 0
 }
 
-need_account() {
-    local account
-    account="$(read_aws sts get-caller-identity --query Account --output text)" ||
+# A span of SECONDS in words: 45 s, 4 min 30 s, 2 h 5 min, 3 d 4 h.
+span_text() {
+    awk -v s="$1" 'BEGIN {
+        if (s < 0) s = 0
+        if (s < 60) printf "%d s\n", s
+        else if (s < 3600) printf "%d min %d s\n", s / 60, s % 60
+        else if (s < 86400) printf "%d h %d min\n", s / 3600, s / 60 % 60
+        else printf "%d d %d h\n", s / 86400, s / 3600 % 24 }'
+}
+
+# Sets ACCOUNT to the account of the credentials, which must be the one the bucket carries.
+check_account() {
+    ACCOUNT="$(read_aws sts get-caller-identity --query Account --output text)" ||
         die "no AWS credentials (aws login --profile bvc, then export AWS_PROFILE=bvc)"
     case "$BUCKET" in
-        *"$account"*) log "account $account, region $AWS_DEFAULT_REGION, run $RUN: $S3_DEST" ;;
-        *) die "the bucket $BUCKET does not carry the account number $account: wrong profile?" ;;
+        *"$ACCOUNT"*) ;;
+        *) die "the bucket $BUCKET does not carry the account number $ACCOUNT: wrong profile?" ;;
     esac
+}
+
+need_account() {
+    check_account
+    log "account $ACCOUNT, region $AWS_DEFAULT_REGION, run $RUN: $S3_DEST"
+}
+
+# Takes the run in progress as the run when RUN is not set: the one run whose prefix in the bucket (wall-NAME) has a
+# config and no ended object.  If several are in progress, or none, it says so and asks for RUN=NAME.
+pick_run() {
+    local name found=""
+    for name in $(s3_ls "s3://$BUCKET/wall-" | sed -n 's|^ *PRE wall-\(.*\)/$|\1|p'); do
+        set_run "$name"
+        if has_object config && ! has_object ended; then found="$found $name"; fi
+    done
+    case "$found" in
+        '') die "no run is in progress in s3://$BUCKET (no prefix wall-NAME has a run/config and no run/ended):" \
+            "RUN=NAME names one that has ended" ;;
+        ' '*' '*) die "more than one run is in progress; RUN=NAME says which:$(printf '\n    %s' $found)" ;;
+    esac
+    set_run "${found# }"
+    RUN_PICKED=1
 }
 
 # --- launch ------------------------------------------------------------------------------------------------------
@@ -451,21 +512,116 @@ launch() {
 
 # --- status ------------------------------------------------------------------------------------------------------
 
+# The games in flight, a line each, from the progress lines of the solver (the text on stdin: logs/chain.err).  A game
+# whose search has started prints one every PROGRESS seconds, `n=3930 1h45m00s nodes 1086013550 (242.8k/s) best 341541
+# queue ...` (the time since the search began, waits included; the nodes so far; the nodes a second in the last
+# interval, or `done`, `optimal`, `stopped`, `failed` or `panicked` in the last line; the best sum of promotions so
+# far), and nothing else says where a game is: a game with no recent line has no state to tell (a setup, a prime or
+# repeated game, a search not started).  Arguments: the first and the last board size in flight, and the games' wall
+# clocks (ckpt/nNNNN.clock) as "n seconds n seconds ...".  A line is recent unless three lines of another game in
+# flight follow it (a game that still searches prints once an interval).  The state of a game is told from its last
+# line:
+#   running      the nodes grow (1000 a second or more in the last interval)
+#   suspended    the search has started, but the threads are another game's, and the nodes do not grow
+#   search done  the search has ended (`done` or `optimal`) and the game is not recorded yet: the oldest game is being
+#                recorded, any other waits for the games before it
+games_in_flight() {
+    awk -v first="$1" -v last="$2" -v clocks="$3" '
+    function duration(s) {
+        if (s < 60) return sprintf("%.1fs", s)
+        if (s < 3600) return sprintf("%dm%02ds", s / 60, s % 60)
+        return sprintf("%dh%02dm%02ds", s / 3600, s / 60 % 60, s % 60)
+    }
+    # Nodes a second, from the rate of a line: 0, 1, 236.5k, 1.20M, ...
+    function rate(text,    unit) {
+        sub("/s$", "", text)
+        unit = substr(text, length(text))
+        text = text + 0
+        if (unit == "k") text *= 1e3
+        else if (unit == "M") text *= 1e6
+        else if (unit == "G") text *= 1e9
+        return text
+    }
+    function row(n, own, elapsed, nodes, best, state) {
+        printf "  %5s  %-10s  %-10s  %13s  %7s  %s\n", n, own, elapsed, nodes, best, state
+    }
+    BEGIN {
+        first += 0
+        last += 0
+        count = split(clocks, c, " ")
+        for (i = 1; i < count; i += 2) held[c[i] + 0] = c[i + 1] + 0
+    }
+    $1 ~ /^n=[0-9]+$/ && $3 == "nodes" && $4 ~ /^[0-9]+$/ && $5 ~ /^\(.*\)$/ && $6 == "best" && $8 == "queue" {
+        n = substr($1, 3) + 0
+        how = substr($5, 2, length($5) - 2)
+        lines++
+        game[lines] = n
+        finished[lines] = (how !~ /\/s$/)
+        at[n] = lines
+        elapsed[n] = $2
+        nodes[n] = $4
+        best[n] = $7
+        last_how[n] = how
+    }
+    END {
+        row("n", "own search", "elapsed", "nodes", "best", "state")
+        for (g = first; g <= last; g++) {
+            own = (g in held) ? duration(held[g]) : "-"
+            how = (g in at) ? last_how[g] : ""
+            searching = (how != "done" && how != "optimal")
+            stale = 0
+            if (g in at && searching) {
+                split("", printed)
+                for (i = at[g] + 1; i <= lines; i++) {
+                    h = game[i]
+                    if (h != g && h >= first && h <= last && !finished[i] && ++printed[h] >= 3) stale = 1
+                }
+            }
+            if (!(g in at) || stale) {
+                row(g, own, "-", "-", "-", "no recent progress line")
+                continue
+            }
+            if (!searching) {
+                state = (g == first) ? "search done, being recorded" : "search done, waiting for the game before"
+            } else if (how == "stopped") {
+                state = "search stopped, its checkpoint kept"
+            } else if (how == "failed" || how == "panicked") {
+                state = "search " how
+            } else if (rate(how) < 1000) {
+                state = "suspended"
+            } else {
+                state = how
+                sub("/s$", " nodes/s", state)
+                state = "running, " state
+            }
+            row(g, own, elapsed[g], nodes[g], best[g], state)
+        }
+    }'
+}
+
 status() {
-    need_account
-    local config ended ledger hours start updated budget price until_epoch boots
-    config="$(run_object config)" || die "no run $RUN in $S3_DEST (nothing at $S3_DEST/run/config)"
+    check_account
+    [ -n "$RUN" ] || pick_run
+    local config ended ledger hours start updated budget price until_epoch boots window chain_to wall_hours
+    config="$(s3_text run/config)" || die "no run $RUN in $S3_DEST (nothing at $S3_DEST/run/config)"
     budget="$(printf '%s\n' "$config" | field BUDGET_HOURS)"
     price="$(printf '%s\n' "$config" | field PRICE)"
     until_epoch="$(printf '%s\n' "$config" | field RUN_UNTIL)"
+    window="$(printf '%s\n' "$config" | field WINDOW)"
+    window="${window:-4}"
+    chain_to="$(printf '%s\n' "$config" | field CHAIN_TO)"
+    chain_to="${chain_to:-8191}"
+    wall_hours="$(printf '%s\n' "$config" | field GAME_HOURS)"
     printf 'run %s  (%s)\n' "$RUN" "$S3_DEST"
-    printf '  commit %s, %s, wall %s hours, budget %s instance-hours, until %s\n' \
+    if [ "$RUN_PICKED" = 1 ]; then printf '  the run in progress (RUN was not set)\n'; fi
+    printf '  account %s, region %s\n' "$ACCOUNT" "$AWS_DEFAULT_REGION"
+    printf '  commit %s, %s, wall %s hours, window %s, budget %s instance-hours, until %s\n' \
         "$(printf '%s\n' "$config" | field COMMIT | cut -c1-12)" "$(printf '%s\n' "$config" | field INSTANCE_TYPE)" \
-        "$(printf '%s\n' "$config" | field GAME_HOURS)" "$budget" "$(epoch_date "$until_epoch")"
+        "$wall_hours" "$window" "$budget" "$(epoch_local "$until_epoch")"
 
-    ended="$(run_object ended)"
+    ended="$(s3_text run/ended)"
     if [ -n "$ended" ]; then
-        printf '  ENDED %s: %s\n' "$(epoch_date "$(printf '%s\n' "$ended" | field time)")" \
+        printf '  ENDED %s: %s\n' "$(epoch_local "$(printf '%s\n' "$ended" | field time)")" \
             "$(printf '%s\n' "$ended" | field reason)"
     elif has_object stop; then
         printf '  stop requested: the machine is stopping the chain, then ends the run\n'
@@ -473,20 +629,20 @@ status() {
         printf '  not ended\n'
     fi
 
-    ledger="$(run_object ledger)"
+    ledger="$(s3_text run/ledger)"
     if [ -n "$ledger" ]; then
         start="$(printf '%s\n' "$ledger" | field start)"
         hours="$(printf '%s\n' "$ledger" | field hours)"
         updated="$(printf '%s\n' "$ledger" | field updated)"
         awk -v start="$start" -v now="$(date +%s)" -v hours="$hours" -v budget="$budget" -v price="$price" \
-            -v began="$(epoch_date "$start")" -v seen="$(epoch_date "$updated")" 'BEGIN {
+            -v began="$(epoch_local "$start")" -v seen="$(epoch_local "$updated")" 'BEGIN {
             printf "  the run began %s, %.2f hours of wall clock ago\n", began, (now - start) / 3600
             printf "  instance-hours %.2f of %s (%.0f%%), counted to %s\n", hours, budget, 100 * hours / budget, seen
             printf "  spend about $%.2f of $%.2f, at $%s an hour\n", hours * price, budget * price, price }'
     else
         printf '  no ledger yet: no machine has started the chain\n'
     fi
-    boots="$(read_aws s3 ls "$S3_DEST/run/boots/" 2>/dev/null | wc -l | tr -d ' ')"
+    boots="$(s3_ls "$S3_DEST/run/boots/" | wc -l | tr -d ' ')"
     printf '  machines started so far: %s\n' "$boots"
 
     printf 'the group %s\n' "$NAME"
@@ -494,21 +650,50 @@ status() {
         --query 'AutoScalingGroups[0].[DesiredCapacity,Instances[].[InstanceId,AvailabilityZone,LifecycleState]]' \
         2>&1 | sed 's/^/  /'
 
+    # The chain is as old as the last save: the newest object of results/, logs/ and ckpt/ (the ledger and the rest of
+    # run/ are written on their own).
     printf 'the chain (as of the last save to S3)\n'
-    local out clocks clock hours_held
-    out="$("$AWS_CLI" s3 cp "$S3_DEST/logs/chain.out" - --only-show-errors 2>/dev/null | grep '^n=' | tail -n 1)"
-    printf '  last game done: %s\n' "${out:-none yet}"
-    out="$("$AWS_CLI" s3 cp "$S3_DEST/logs/chain.err" - --only-show-errors 2>/dev/null | tail -n 1 | cut -c1-200)"
-    printf '  latest progress line: %s\n' "$out"
-    clocks="$("$AWS_CLI" s3 ls "$S3_DEST/ckpt/" 2>/dev/null | awk '$4 ~ /\.clock$/ {print $4}')"
-    for clock in $clocks; do
-        hours_held="$("$AWS_CLI" s3 cp "$S3_DEST/ckpt/$clock" - --only-show-errors 2>/dev/null |
-            awk '{printf "%.2f", $1 / 3600}')"
-        printf '  wall clock of %s: %s of %s hours\n' "${clock%.clock}" "$hours_held" \
-            "$(printf '%s\n' "$config" | field GAME_HOURS)"
+    local listing prefix saved saved_epoch out recorded score first_n last_n clocks="" name n seconds
+    prefix="${S3_DEST#s3://$BUCKET/}"
+    listing="$(s3_ls --recursive "$S3_DEST/")"
+    saved="$(printf '%s\n' "$listing" | awk -v p="$prefix" '
+        index($4, p "/results/") == 1 || index($4, p "/logs/") == 1 || index($4, p "/ckpt/") == 1 {
+            print $1 "T" $2 "Z" }' | sort | tail -n 1)"
+    if [ -n "$saved" ]; then
+        saved_epoch="$(to_epoch "$saved")"
+        printf '  last save to S3: %s, %s ago\n' "$(epoch_local "$saved_epoch")" \
+            "$(span_text $(($(date +%s) - saved_epoch)))"
+    else
+        printf '  nothing has been saved to S3 yet\n'
+    fi
+    # The solver prints a line to chain.out for each game it records: the last is the last game of the results.
+    out="$(s3_text logs/chain.out | grep '^n=' | grep -v ' incomplete$' | tail -n 1)"
+    recorded="$(printf '%s\n' "$out" | sed -n 's/^n=\([0-9]*\) .*/\1/p')"
+    if [ -n "$recorded" ]; then
+        score="$(printf '%s\n' "$out" | sed -n 's/.* score=\([0-9]*\) .*/\1/p')"
+        printf '  recorded through %s (score %s)\n' "$recorded" "$score"
+    else
+        printf '  recorded through: no game yet\n'
+        recorded=0
+    fi
+    first_n=$((recorded + 1))
+    last_n=$((recorded + window))
+    [ "$last_n" -le "$chain_to" ] || last_n="$chain_to"
+    if [ "$first_n" -gt "$last_n" ]; then
+        printf '  no game in flight: the range to %s is recorded\n' "$chain_to"
+        return 0
+    fi
+    for name in $(printf '%s\n' "$listing" | awk -v p="$prefix/ckpt/" \
+        'index($4, p) == 1 && substr($4, length(p) + 1) ~ /^n[0-9]+[.]clock$/ {print substr($4, length(p) + 1)}'); do
+        n="${name#n}"
+        n=$((10#${n%.clock}))
+        if [ "$n" -ge "$first_n" ] && [ "$n" -le "$last_n" ]; then
+            seconds="$(s3_text "ckpt/$name" | awk '{print $1}')"
+            [ -z "$seconds" ] || clocks="$clocks $n $seconds"
+        fi
     done
-    out="$("$AWS_CLI" s3 ls "$S3_DEST/results/strict.jsonl" 2>/dev/null | awk '{print $1, $2, "UTC"}')"
-    printf '  last save of the results: %s\n' "$out"
+    printf '  games in flight (window %s; "own search" counts toward the wall of %s hours):\n' "$window" "$wall_hours"
+    s3_text logs/chain.err | games_in_flight "$first_n" "$last_n" "$clocks"
 }
 
 # --- stop --------------------------------------------------------------------------------------------------------
@@ -544,7 +729,7 @@ live_instances=(ec2 describe-instances --filters Name=tag:Project,Values=taxman
 # Waits until no instance of the project is left (for the group's machines to be gone), at most ten minutes.
 wait_for_no_instances() {
     local tries=0 left
-    show "${live_instances[@]}" --output text
+    show_read "${live_instances[@]}" --output text
     while :; do
         left="$("$AWS_CLI" "${live_instances[@]}" --output text)" || die "cannot read the instances"
         [ -z "$left" ] && return 0
@@ -581,29 +766,43 @@ cleanup() {
     change_aws iam delete-role-policy --role-name "$ROLE" --policy-name "$NAME" || log "no policy, or not deleted"
 
     printf '\nthe end checks (each must print nothing, [] or None):\n'
-    read_aws "${live_instances[@]}"
-    read_aws ec2 describe-volumes --filters Name=tag:Project,Values=taxman --query 'Volumes[].VolumeId'
-    read_aws ec2 describe-spot-instance-requests --filters Name=tag:Project,Values=taxman \
+    check_aws "${live_instances[@]}"
+    check_aws ec2 describe-volumes --filters Name=tag:Project,Values=taxman --query 'Volumes[].VolumeId'
+    check_aws ec2 describe-spot-instance-requests --filters Name=tag:Project,Values=taxman \
         Name=state,Values=open,active --query 'SpotInstanceRequests[].SpotInstanceRequestId'
-    read_aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names "$NAME" \
+    check_aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names "$NAME" \
         --query 'AutoScalingGroups[].AutoScalingGroupName'
-    read_aws ec2 describe-launch-templates --filters "Name=launch-template-name,Values=$NAME" \
+    check_aws ec2 describe-launch-templates --filters "Name=launch-template-name,Values=$NAME" \
         --query 'LaunchTemplates[].LaunchTemplateName'
-    read_aws ec2 describe-security-groups --filters Name=tag:Project,Values=taxman --query 'SecurityGroups[].GroupId'
-    read_aws iam list-role-policies --role-name "$ROLE" --query 'PolicyNames'
+    check_aws ec2 describe-security-groups --filters Name=tag:Project,Values=taxman --query 'SecurityGroups[].GroupId'
+    check_aws iam list-role-policies --role-name "$ROLE" --query 'PolicyNames'
     printf '\nthe state of the run stays in %s (results, checkpoints, logs); the bucket and the role %s are kept.\n' \
         "$S3_DEST" "$ROLE"
 }
 
 # --- main --------------------------------------------------------------------------------------------------------
 
+# --verbose goes with any command, before it or after (and VERBOSE=1 does without it).
+args=()
+for arg in "$@"; do
+    case "$arg" in
+        --verbose) VERBOSE=1 ;;
+        *) args+=("$arg") ;;
+    esac
+done
+set -- ${args[@]+"${args[@]}"}
 command="${1:-}"
 [ "$#" -gt 0 ] && shift
+# status finds the run in progress when RUN is not set; the other commands take run1.
+case "$command" in
+    launch | stop | cleanup) [ -n "$RUN" ] || set_run run1 ;;
+esac
 case "$command" in
     launch) launch "$@" ;;
     status) status ;;
     stop) stop "$@" ;;
     cleanup) cleanup "$@" ;;
     -h | --help | help) usage ;;
-    *) die "usage: wall.sh launch --commit SHA --until DATE [options] | status | stop [--now] | cleanup [--force]" ;;
+    *) die "usage: wall.sh launch --commit SHA --until DATE [options] | status | stop [--now] | cleanup [--force]" \
+        "(any command: --verbose)" ;;
 esac

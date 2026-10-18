@@ -26,6 +26,15 @@ path_of() {
     printf '%s/%s\n' "$s3" "${1#s3://}"
 }
 
+# A line of `s3 ls` for the file $1 under the name $2: its modification time in the time zone TZ, as the real one prints
+# an object's, its size and the name.
+list_object() {
+    local epoch
+    epoch="$(stat -c %Y "$1" 2>/dev/null || stat -f %m "$1")"
+    printf '%s %10s %s\n' "$(date -d "@$epoch" '+%Y-%m-%d %H:%M:%S' 2>/dev/null ||
+        date -r "$epoch" '+%Y-%m-%d %H:%M:%S')" "$(wc -c <"$1" | tr -d ' ')" "$2"
+}
+
 # The value after the flag $1 among the arguments.
 flag() {
     local i
@@ -75,13 +84,36 @@ case "$service $command" in
         rsync "${rsync_args[@]}" "$src/" "$dst/"
         ;;
     "s3 ls")
-        target="$(path_of "${args[0]}")"
-        if [ "${target%/}" != "$target" ]; then
-            [ -d "$target" ] && ls -1 "$target" | while read -r name; do printf '2026-10-17 01:02:03          1 %s\n' "$name"; done
+        # As the real one prints: a prefix as `PRE name/`, an object as its time (in the time zone TZ), its size and its
+        # name (with --recursive, its key from the bucket down).
+        recursive=0
+        where=""
+        for a in "${args[@]}"; do
+            case "$a" in --recursive) recursive=1 ;; *) where="$a" ;; esac
+        done
+        target="$(path_of "$where")"
+        bucket="${where#s3://}"
+        bucket="${bucket%%/*}"
+        if [ "$recursive" = 1 ]; then
+            if [ -d "$target" ]; then
+                find "$target" -type f | sort | while read -r file; do list_object "$file" "${file#"$s3/$bucket/"}"; done
+            fi
         else
-            dir="$(dirname "$target")"
-            base="$(basename "$target")"
-            [ -d "$dir" ] && ls -1 "$dir" | grep "^$base" | while read -r name; do printf '2026-10-17 01:02:03          1 %s\n' "$name"; done
+            if [ "${target%/}" != "$target" ]; then
+                dir="$target"
+                base=""
+            else
+                dir="$(dirname "$target")"
+                base="$(basename "$target")"
+            fi
+            if [ -d "$dir" ]; then
+                for name in $(ls -1 "$dir"); do
+                    case "$name" in "$base"*) [ ! -d "$dir/$name" ] || printf '%31s%s/\n' 'PRE ' "$name" ;; esac
+                done
+                for name in $(ls -1 "$dir"); do
+                    case "$name" in "$base"*) [ ! -f "$dir/$name" ] || list_object "$dir/$name" "$name" ;; esac
+                done
+            fi
         fi
         true
         ;;

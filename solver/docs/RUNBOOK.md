@@ -126,7 +126,7 @@ The files in this directory:
 | `prover.sh A B` | the prover's proofs of opt(n) for n = A..B (section 9): resumable passes, all CPUs; `--verify` checks the output; `--list N1,N2,...` runs `exact` on given games as a measurement (section 10.1) |
 | `certify.sh LIST[:THREADS]...` | the certificates campaign (section 11): `taxman certify` over the lists of `solver/tools/certify/lists/stage4`, several at once, resumable, with a final `verify-certificates` |
 | `spot-watch.sh` | on a spot interruption notice: stop `chain.sh`, `prover.sh` or `certify.sh` and save |
-| `wall.sh launch\|status\|stop\|cleanup` | the unattended run to the wall (section 12): the launch template, the Auto Scaling group of one spot instance and the policy, from your machine; prints every aws command |
+| `wall.sh launch\|status\|stop\|cleanup` | the unattended run to the wall (section 12): the launch template, the Auto Scaling group of one spot instance and the policy, from your machine; prints every aws command that changes something |
 | `wall-node.sh`, `wall-policy.json` | what each machine of that group does from boot to the end of the run; the one permission the machines need |
 | `test/run.sh` | tests of `chain.sh`'s wall and ledger, `wall-node.sh`, `wall.sh` and `sweep.sh` against a stand-in for aws (no cloud) |
 | `test/test_build_cache.py`, `test/test_run_tests.py`, `test/test_setup.py` | tests of the build cache (a directory for the bucket, and the stand-in for aws), of the release suite's runner (a toy crate) and of `setup.sh`'s build logic (a stand-in for cargo); no cloud, no release build |
@@ -1523,7 +1523,7 @@ it no machine is launched, and the run waits).
 
 | what | where | does |
 |---|---|---|
-| `wall.sh` | your machine | `launch`, `status`, `stop`, `cleanup`: every aws command it runs is printed (`+ aws ...`), `DRY_RUN=1` prints the changes without making them, and the files the commands take stay in `~/taxman-wall/RUN` |
+| `wall.sh` | your machine | `launch`, `status`, `stop`, `cleanup`: every aws command that changes something is printed (`+ aws ...`; `--verbose` prints the reads too), `DRY_RUN=1` prints the changes without making them, and the files the commands take stay in `~/taxman-wall/RUN` |
 | the launch template `taxman-wall`, the security group `taxman-wall` (no inbound rule), the group `taxman-wall` | the account | one `c8g.16xlarge` (or `INSTANCE_TYPE`) at spot, lowest price first among the zones (`SpotAllocationStrategy=lowest-price`, one pool), capacity rebalancing off, `min 0, max 1`, EC2 health checks, tags `Project=taxman`, `Purpose=wall` |
 | the user data | the template | sets the timer, installs git and tmux, clones the repository, checks out the pinned commit and starts `wall-node.sh` in a tmux session `tx` as `ec2-user`; if any of that fails after five tries it records the end and takes the group to 0 |
 | `wall-node.sh` | each machine | restores the logs, then `setup.sh` (the solver alone, `BUILD=--bin taxman`: from the build cache if it has the commit, tested; no tests of its own; its smoke checks run), then `save.sh --restore`; starts `spot-watch.sh` and a loop that looks for `run/stop`; runs `chain.sh` with the config; decides what its status means (12.1) |
@@ -1587,8 +1587,9 @@ solver/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL               
 The defaults are the run: `c8g.16xlarge`, window 4, wall 24 hours, budget 74 instance-hours, the chain to 8191, the
 spot ceiling $1.0, a volume of 40 GB, zones by price.  `launch --help` is the header of the script (every option has an
 environment variable).  It prints the files (the user data, the config, the mixed instances policy) and each command
-before it runs it: the config to S3, the policy, the security group, the launch template, the group at capacity 0, the
-scheduled action, and last the capacity 1 that starts the first machine.  Each machine runs `setup.sh` for the solver
+that changes something before it runs it (`--verbose` adds the reads): the config to S3, the policy, the security
+group, the launch template, the group at capacity 0, the scheduled action, and last the capacity 1 that starts the first
+machine.  Each machine runs `setup.sh` for the solver
 alone (`BUILD=--bin taxman`) and its smoke checks, and starts the chain.  With the commit's tested binaries in the build
 cache (section 15) it builds nothing, and every machine of the run, the replacements after an interruption included,
 takes the same binary; without them it builds the solver (a few minutes on 64 vCPUs, untested, nothing stored).
@@ -1605,17 +1606,42 @@ on each machine (section 15); neither is set by default.
   after a release, so that nothing untested runs for the hours of the run.
 
 ```
-solver/tools/cloud/wall.sh status          # the run, the ledger, the group, the last game done, the latest progress line
+solver/tools/cloud/wall.sh status          # the run, the ledger, the group, the games recorded and in flight
 solver/tools/cloud/wall.sh stop            # clean: within 30 s the machine stops the chain (final checkpoint), saves, ends
 solver/tools/cloud/wall.sh stop --now      # at once: records the end, takes the group to 0 (the machine is terminated;
                                          #   what it did since its last save, at most SAVE_EVERY, is lost)
 solver/tools/cloud/wall.sh cleanup         # once it has ended: delete the group, template, security group, policy; end checks
 ```
 
-`status` reads S3 and the group, so it is as old as the last save (`SAVE_EVERY`, 10 minutes) and shows: whether the run
-has ended and why; the run's age; the instance-hours against the budget and the spend against its estimate; how many
-machines have started; the group's capacity and instances; the last game done with its search seconds; the latest
-progress line; the wall clock of the game in progress against `GAME_HOURS`; and the age of the last save.  To look at the
+`status` reads S3 and the group, and shows: whether the run has ended and why; the run's age; the instance-hours against
+the budget and the spend against its estimate; how many machines have started; the group's capacity and instances; and,
+from what the machine last saved (every `SAVE_EVERY`, 10 minutes), the time of that save and how long ago it was, the
+game the results are recorded through, and a line for each game in flight
+([the window](../frame/README.md#games-in-flight)):
+
+```
+the chain (as of the last save to S3)
+  last save to S3: 2026-10-18 15:17 PDT, 5 min 24 s ago
+  recorded through 3929 (score 4854280)
+  games in flight (window 4; "own search" counts toward the wall of 24 hours):
+      n  own search  elapsed             nodes     best  state
+   3930  1h15m00s    1h45m00s       1086013550   341541  running, 242.8k nodes/s
+   3931  -           -                       -        -  no recent progress line
+   3932  -           -                       -        -  no recent progress line
+   3933  -           1h15m00s                63   341541  suspended
+```
+
+A game's state is told from its last progress line in `logs/chain.err`: `running` (1000 nodes a second or more in its
+last interval) or `suspended` (its threads are another game's); `search done` once the line says `done` or `optimal`
+and the game is not recorded yet (`being recorded` for the oldest game, else `waiting for the game before`); `search
+stopped` or `failed`.  A game with no line, or whose line three lines of another game follow, is `no recent progress
+line`: a setup, a prime or repeated game and a search not started look alike in the logs.  `own search` is the wall
+clock the oldest game keeps in `ckpt/nNNNN.clock` (up to a checkpoint interval old; `-` for a game without one),
+`elapsed` the time since its search began, waits included, and `best` the progress line's sum of promotions so far.
+Times are in the local time zone (`TZ`) with its abbreviation.  `RUN` defaults to the one run in progress (a config in
+S3 and no `ended` object; with several, `status` lists them and asks for `RUN`) and the region to us-east-1; the
+profile is never defaulted (export `AWS_PROFILE`).  The aws commands that read are printed (`+ aws ...`) only with
+`--verbose`.  To look at the
 machine: `aws ssm start-session --target INSTANCE` (the Session Manager plugin; the role has the SSM policy), then
 `sudo -u ec2-user tmux attach -t tx` (the node script and, in the window `sw`, `spot-watch.sh`).
 
@@ -1748,7 +1774,7 @@ export RUN=rehearsal-2
 solver/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --instance-type c8g.2xlarge --volume-gb 20 \
     --spot-max 0.40 --budget-hours 0.6 --game-hours 24 --chain-to 1300 --margin 60 --max-instances 4 \
     --save-every 120 --checkpoint-interval 60 --extra-args "--tactic gf2=off --tactic lagrange=on --tactic symmetry=off"
-solver/tools/cloud/wall.sh status          # until "latest progress line" shows a game and "last save of the results" is recent
+solver/tools/cloud/wall.sh status          # until a game is in flight and the last save is recent
 ```
 
 Once the chain is running and a save has followed it (about 13 minutes after the launch), terminate the machine, without
@@ -1795,9 +1821,9 @@ Tested on the laptop (macOS, bash 3.2): the solver's wall by unit, integration a
 (`cargo test --release --test window --test cli`); the ledger across machines, the wall and the date through `chain.sh`,
 `wall-node.sh` through every ending (complete, the wall, the budget, a boot loop, a denied capacity, no config, a stop
 request, an interruption) and `wall.sh` through a launch, `status`, both stops, `cleanup` and `--continue`, against the
-stand-in `test/bin/aws` (`solver/tools/cloud/test/run.sh`; it needs the release build of the solver and `rsync`); and the
-arguments of every aws command checked by the CLI's own parameter validation against an endpoint that refuses
-connections, so that nothing reached AWS.  Not tested: anything that needs AWS to answer, that is the behaviour of the
+stand-in `test/bin/aws` (`solver/tools/cloud/test/run.sh`; all but `launch` and `status` need the release build of
+the solver and `rsync`); and the arguments of every aws command checked by the CLI's own parameter validation against
+an endpoint that refuses connections, so that nothing reached AWS.  Not tested: anything that needs AWS to answer, that is the behaviour of the
 group (the replacement, `lowest-price` across zones, `resolve:ssm` as the image of a template used by a group), the
 user data on Amazon Linux, and `tmux` with the options used there (all but the group have run on the instances of the
 earlier runs).

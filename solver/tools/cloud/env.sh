@@ -66,6 +66,12 @@ epoch_date() {
     date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -r "$1" +%Y-%m-%dT%H:%M:%SZ
 }
 
+# A time in seconds since the epoch as a date in the local time zone (TZ if set, else the system's) with the zone's
+# abbreviation, as for a person: 2026-10-18 14:46 PDT.
+epoch_local() {
+    date -d "@$1" '+%Y-%m-%d %H:%M %Z' 2>/dev/null || date -r "$1" '+%Y-%m-%d %H:%M %Z'
+}
+
 # The number of CPUs the OS offers (what `taxman solve` uses when given no --threads).
 ncpu() {
     nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1
