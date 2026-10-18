@@ -10,15 +10,12 @@ results and how they are proven are in the [README](../README.md); the research 
 
 ## The results
 
-* The committed chain, `results/strict.jsonl`, reaches 3440.  Games 2-2175 are proven on the whole board by the
-  prover; games 2176-3440 within the frame model, which is exact given statement U ([README, "What optimal
+* The committed chain, `results/strict.jsonl`, reaches 3914.  Games 2-2175 are proven on the whole board by the
+  prover; games 2176-3914 within the frame model, which is exact given statement U ([README, "What optimal
   means"](../README.md#what-optimal-means)).  `optimal.json` stays at 1300; nothing is published.
-* 3440 is confirmed: the run to the wall re-proved it with the fixed build (the counter that could wrap,
-  [the wrap](experiments/cheaper-gf2-nodes-same-trees-2026-10.md#later-2026-10-the-stamps-wrap-and-the-committed-chain)),
-  the same score and proof in 1.76 hours and 1.36 billion nodes (5.05 hours and 3.72 billion before); its games 1..3440
-  equal the committed chain's scores and proofs, game for game (2026-10-17).
-* Past 3440: the run to the wall has proven 3441 onward (3491 by 10:45 PDT on 2026-10-17), not yet appended to
-  `results/strict.jsonl` (they will be, once both referees pass on the joined file).
+* The run to the wall solved 1..3440 again with the fixed build (the counter that could wrap), with the committed
+  chain's scores and proofs in all, game for game; 3440 took 1.76 hours and 1.36 billion nodes (5.05 hours and 3.72
+  billion before).  Its games 3441-3914 are appended, both referees passing.
 
 ## The priority: a larger n
 
@@ -58,6 +55,9 @@ What has been tried for the bound, and where it stands:
 * **A3, splitting by the number of promotions: closed.**  At 936, 1215 and 2112 every node's heaviest completion
   already has the root's size, so a bound by size equals the plain one
   ([A3's test](experiments/split-by-the-number-of-promotions-a3s-test-2026-10.md)).
+* **The strong bound at the nodes: closed** (2026-10-18).  Refitted at a node it cuts 92% of the open nodes with a gap
+  under 50, 19% at 100-199 and none from 300, where the cost is, and costs 164-234 GF(2) bounds: every policy of
+  computing it loses ([the entry](experiments/the-node-choice-where-the-strong-bound-pays-2026-10.md)).
 * **A5, decomposing across the frames: not tried** (agenda A5; high risk).
 
 **The landscape past the chain** (2026-10-17): the standalone bounds of every game of 3441-8191 are measured
@@ -120,12 +120,12 @@ entry](experiments/proving-an-upper-bound-part-of-the-way-searches-under-a-floor
 
 ## In flight
 
-* **The run to the wall**, launched 2026-10-17 00:15 PDT: `RUN=to-the-wall rust/tools/cloud/wall.sh status`
-  ([RUNBOOK section 12](../tools/cloud/RUNBOOK.md#12-the-unattended-run-to-the-wall)).  The chain from n = 1 with
-  commit eb84a6f (`force_window=all`, the cheaper node), on one `c8g.16xlarge` at spot (at most $0.75 an hour) in an
-  Auto Scaling group that replaces an interrupted machine; it ends at the wall (a game past 24 hours), at 72
-  instance-hours (about $49), or on 2026-10-22.  Its games 1..3440 are compared with the committed chain (3440 is
-  re-proven by the fixed build), and the games past 3440 are appended once verified.
+* **The run to 5000**, launched 2026-10-18 at commit ca357bf with `--use-prev` (the chain draws on the committed
+  chain, the bounds store and `optimal.json` and starts at 3915: [RUNBOOK
+  12.4](../tools/cloud/RUNBOOK.md#124-launch-watch-stop-clean-up)), budget 36 instance-hours.  The **run to the wall**
+  before it ([RUNBOOK section 12](../tools/cloud/RUNBOOK.md#12-the-unattended-run-to-the-wall), launched 2026-10-17 at
+  00:15 PDT with eb84a6f) was stopped at 3914 on 2026-10-18 after 35.7 instance-hours and $24.14, the wall far off: its
+  dearest game took 2.77 hours ([the entry](experiments/the-run-to-the-wall-2026-10.md)).
 * **The sweep**, built 2026-10-17 and not run: blocks of consecutive games of 3441..8191, one thread and a limited
   search a game each, passes over the merged `explore.jsonl` until nothing changes
   ([RUNBOOK section 13](../tools/cloud/RUNBOOK.md#13-the-sweep); `taxman solve --keep-going`); about $3.3 at 180 s a
