@@ -1,0 +1,2 @@
+ledger: 61 s, 479 CPU s of 600: 46 of 125 proven, 7 searching; climbs up 8 ended (8 proved their board, 0 parked), down 1 ended (1 proved their board, 0 parked); main thread busy 0.7 s, results waited 0.0 s
+ledger: 77 s, 608 CPU s of 600: 56 of 125 proven, 0 searching; climbs up 12 ended (10 proved their board, 2 parked), down 1 ended (1 proved their board, 0 parked); main thread busy 0.8 s, results waited 0.0 s

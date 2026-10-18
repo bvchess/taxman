@@ -1867,8 +1867,12 @@ game, then `ledger report --known results/strict.jsonl`, which exits with status
 the chain's optimum or a game does not replay (a bug: stop and report).  The laptop's dry run of 1301..1500 is
 [the entry](../../docs/experiments/the-ledger-bounds-from-both-sides-2026-10.md).  A first launch (2026-10-17) was stopped
 after 9 minutes with the machine 95% idle, the main thread of the ledger the bottleneck; that is fixed ([the entry's
-section on it](../../docs/experiments/the-ledger-bounds-from-both-sides-2026-10.md#later-2026-10-17-the-first-cloud-attempt-stopped-and-the-fix)),
-and a second launch needs Brian's approval (the [rules for every launch](#rules-for-every-launch)).
+section on it](../../docs/experiments/the-ledger-bounds-from-both-sides-2026-10.md#later-2026-10-17-the-first-cloud-attempt-stopped-and-the-fix)).
+A second (48 core-hours on 64 workers) proved 916 of 1,265 boards, all at the optimum, for about 2.2 times what the
+chain paid on the same games, because most searches began before the board below was proven.  The scheduler now
+climbs from each board it proves (the board above, and the board below, are searched at once, seeded with its game, for
+`CLIMB_LIMIT` seconds, 60 by default; [the entry's section on it](../../docs/experiments/the-ledger-bounds-from-both-sides-2026-10.md#later-2026-10-17-wedge-and-climb)),
+and a launch with the climbs needs Brian's approval (the [rules for every launch](#rules-for-every-launch)).
 
 **Cost.**  The build of `setup.sh` (about 10 minutes), the run (`CPU_HOURS` 64, an hour of the 64 CPUs, and the
 searches still going when it is spent, each limited to the budget left over the workers), the report (a minute):
@@ -1890,9 +1894,16 @@ sudo -u ec2-user tmux new-session -d -s ledger -c /home/ec2-user/taxman/rust \
      sudo shutdown -h now'
 ```
 
+**Options.**  The environment of `bench/ledger/cloud.sh` has the options (`WORKERS`, `CPU_HOURS`, `BASE`, `MAX_LIMIT`,
+`PROVEN`, and for the climbs `CLIMB`, their ways: `up`, `down`, `both` or `off`, unset the program's `both`; and
+`CLIMB_LIMIT`, their limit in seconds: unset the program's 60; `CLIMB=off` or `CLIMB_LIMIT=0` runs without climbs, as
+the second launch did).  The climbs are searches of a board next to a proven one, up from a proven board and down
+from it; the events and the report say what each way cost and proved.
+
 **Watch, stop, results home.**  `tail ~/ledger/run.err` (a status line a minute: the CPU spent, the boards proven, the
-searches going, and how long the main thread has been busy and results waited for it; after the maps the CPU spent
-should rise by nearly 64 a second, and if it does not, look at those two numbers before anything else) and
+searches going, the climbs of each way ended, those that proved their board and those that stopped at their limit
+(parked), and how long the main thread has been busy and results waited for it; after the maps the CPU spent should rise by nearly
+64 a second, and if it does not, look at those two numbers before anything else) and
 `~/ledger/log`.  `pkill -TERM -f 'examples/ledger run'` stops the run cleanly (each search writes
 its checkpoint, the ledger is saved) and the script goes on to the report; the same command again resumes (on a
 replacement machine, with `S3_DEST/out` copied back to `~/ledger` first).  Home: `aws s3 sync S3_DEST/out

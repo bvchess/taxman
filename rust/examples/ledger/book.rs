@@ -129,6 +129,8 @@ pub struct Entry {
     pub mapped: bool,
     /// The bounds changed through a proven neighbour since the last search: the board goes before the others.
     pub boosted: bool,
+    /// A climb to the board stopped at its limit: it goes by the ordinary order from now on, and is not climbed to again.
+    pub parked: bool,
     /// The CPU seconds of the run (all its threads, all its runs) when the board was proven.
     pub proven_cpu: Option<f64>,
 }
@@ -175,6 +177,7 @@ impl Entry {
             ("nodes", Json::from(self.nodes)),
             ("mapped", Json::from(self.mapped)),
             ("boosted", Json::from(self.boosted)),
+            ("parked", Json::from(self.parked)),
         ])
     }
 
@@ -217,6 +220,8 @@ impl Entry {
             nodes: number("nodes")?,
             mapped: field("mapped")?.as_bool().ok_or("bad \"mapped\"")?,
             boosted: field("boosted")?.as_bool().ok_or("bad \"boosted\"")?,
+            // Ledgers written before the climbs have no such field.
+            parked: line.get("parked").and_then(Json::as_bool).unwrap_or(false),
             proven_cpu: line.get("proven_cpu_s").and_then(Json::as_f64),
         })
     }

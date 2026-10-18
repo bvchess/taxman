@@ -953,7 +953,13 @@ every change, are monotonicity, the ceiling and the game below it, the prime for
 game a relation makes that could raise a board's L is replayed before it counts (one that cannot is not shown to the
 referee, or not made), and an L above a U stops the run as an error.  The maps of all the boards come first, on the
 workers, and the relations carry their bounds once, when the last is in; the main thread, which applies every result
-while the workers whose searches ended wait for it, does little for each.  A proven board of the
+while the workers whose searches ended wait for it, does little for each.  The order of the searches is where a proof
+looks cheapest (least `level + gap / gap_unit`, which finds the boards proven with no help from below), with *climbs*
+ahead of it: a board whose board below is proven, however that was proven, is searched next for a limit of its own
+(`--climb-limit`), seeded with that game and capped by the ceiling it gives, and when a climb proves its board the one
+above is climbed to (a climb up); a board whose board above is proven is climbed to down, after those, seeded with that
+game but under the ledger's own, loose ceiling (`--climb` picks the ways); a climb that stops parks its board in the
+ordinary order, and a board next to one being climbed to waits for it.  A proven board of the
 ledger is proven within the frame model like a game of the chain past 2175 (given U at the boards its upper bound came
 through); the ledger is not a results file and nothing of it goes into `results/strict.jsonl`.
 

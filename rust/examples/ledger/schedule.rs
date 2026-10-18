@@ -30,6 +30,14 @@ pub struct Settings {
     pub base: f64,
     /// The most any search is given, in seconds.
     pub max_limit: f64,
+    /// The time limit of a climb, in seconds: the search of a board next to a proven one, which that game seeds (0: no
+    /// climbs).  60 s: on the cloud run's boards a climb of 60 s on each would have cost 142 core-seconds a proof, and
+    /// the proofs a longer limit adds cost 310 (60 to 90 s), 420 (to 120 s), 870 (to 180 s) against the 1,500 to 2,600 of
+    /// the run's late ones (bench/ledger/climb_limit.txt).
+    pub climb_limit: f64,
+    /// The ways climbs go from a proven board: to the board above (up) and to the board below (down).
+    pub climb_up: bool,
+    pub climb_down: bool,
     /// The gap that counts as one doubling of the expected cost, in the order of the searches.
     pub gap_unit: f64,
     /// Seconds between writes of the ledger (and at the end).
@@ -47,6 +55,9 @@ impl Default for Settings {
             cpu_budget: 3600.0,
             base: 2.0,
             max_limit: 3600.0,
+            climb_limit: 60.0,
+            climb_up: true,
+            climb_down: true,
             gap_unit: 175.0,
             save_every: 30.0,
             checkpoint_every: 60.0,
@@ -72,58 +83,107 @@ fn checkpoint_path(dir: &Path, n: u32) -> PathBuf {
     checkpoint_dir(dir).join(format!("n{n}.ckpt"))
 }
 
+/// Which way a climb goes from a proven board.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Way {
+    /// To the board above: the proven game seeds the search, and the ceiling opt(n) <= opt(n − 1) + n, which the
+    /// relations have derived and is exact in about a third of the boards, is its ceiling.
+    Up,
+    /// To the board below: the proven game seeds the search (the game below it that Lemma L2 makes, its moves less n
+    /// and then completed, is exactly optimal for n − 1 in about 35% of the composite pairs), and the ceiling is the
+    /// ledger's, which is loose (opt(n − 1) <= opt(n)).
+    Down,
+}
+
+impl Way {
+    fn name(self) -> &'static str {
+        match self {
+            Way::Up => "up",
+            Way::Down => "down",
+        }
+    }
+
+    /// The board a climb to `n` in this way goes from, whose proof starts it.
+    fn source(self, n: u32) -> u32 {
+        match self {
+            Way::Up => n - 1,
+            Way::Down => n + 1,
+        }
+    }
+}
+
 /// What a worker is asked to do with a board.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Kind {
+pub enum Kind {
     /// The map's bounds: the search stopped before its first node (the start incumbent, standalone, and the root's
     /// bound).
     Init,
     /// A limited search, resumed from the board's checkpoint if it has one, seeded and capped by the ledger.
     Search,
+    /// A climb: a search of a board next to a proven one, made as a `Search` is but ahead of every other job, for
+    /// `climb_limit` seconds.  If it ends unproven the board is parked: it goes by the ordinary order from then on.
+    Climb(Way),
 }
 
 impl Kind {
+    /// The action of the event that ends a job of this kind.
     fn name(self) -> &'static str {
         match self {
             Kind::Init => "init",
-            Kind::Search => "search",
+            Kind::Search | Kind::Climb(_) => "search",
+        }
+    }
+
+    /// The `job` of a search event: which kind of search it was.
+    fn job(self) -> Option<&'static str> {
+        match self {
+            Kind::Init => None,
+            Kind::Search => Some("ordinary"),
+            Kind::Climb(_) => Some("climb"),
+        }
+    }
+
+    fn way(self) -> Option<Way> {
+        match self {
+            Kind::Climb(way) => Some(way),
+            Kind::Init | Kind::Search => None,
         }
     }
 }
 
 /// A search to make.
-struct Job {
-    n: u32,
-    kind: Kind,
-    limit: Duration,
+pub struct Job {
+    pub n: u32,
+    pub kind: Kind,
+    pub limit: Duration,
     /// The games whose candidates seed the search: the one that keeps the most is taken.
-    seeds: Vec<Vec<u32>>,
+    pub seeds: Vec<Vec<u32>>,
     /// The ceiling on the score.
-    cap: Option<u64>,
+    pub cap: Option<u64>,
 }
 
 /// What a search gave.
-struct Attempt {
-    completed: bool,
-    reached_cap: bool,
-    value: u64,
-    moves: Vec<u32>,
-    promotions: Vec<u32>,
+pub struct Attempt {
+    pub completed: bool,
+    pub reached_cap: bool,
+    pub value: u64,
+    pub moves: Vec<u32>,
+    pub promotions: Vec<u32>,
     /// The dual bound as a score, if the search stopped.
-    upper: Option<u64>,
+    pub upper: Option<u64>,
     /// The search's steps over all its runs.
-    nodes: u64,
-    seconds: f64,
+    pub nodes: u64,
+    pub seconds: f64,
 }
 
 /// A search that has ended, with what it was asked, and when it ended (how long its result waited for the main thread
 /// is how long its worker did).
-struct Done {
-    n: u32,
-    kind: Kind,
-    limit: f64,
-    result: Result<Attempt, String>,
-    sent: Instant,
+pub struct Done {
+    pub n: u32,
+    pub kind: Kind,
+    pub limit: f64,
+    pub result: Result<Attempt, String>,
+    pub sent: Instant,
 }
 
 /// Makes the search of `job` on its board, at the set width the board needs.
@@ -146,7 +206,7 @@ fn attempt_at<const W: usize>(
     if job.kind == Kind::Init {
         engine::remove_checkpoint(&ckpt).map_err(|e| at("an old checkpoint", e.to_string()))?;
     }
-    let resume = job.kind == Kind::Search && ckpt.exists();
+    let resume = job.kind != Kind::Init && ckpt.exists();
     let seed = job.seeds.iter().map(|moves| board.seed(moves)).max_by_key(|seed| search::seed_survivors_sum(&p, seed));
     let cap = job.cap.map(|score| score.saturating_sub(board.in_the_bag));
     let cfg = EngineConfig {
@@ -253,9 +313,40 @@ pub fn open_book(
 }
 
 /// A search on its way, as the main thread steers it.
-struct Running {
-    kind: Kind,
-    control: Arc<Control>,
+pub struct Running {
+    pub kind: Kind,
+    pub control: Arc<Control>,
+}
+
+/// The climbs of this run that have ended: all of them, those whose search proved the board, and those that stopped
+/// with it unproven (the board parked).  (A climb whose board a relation proved meanwhile is neither.)
+#[derive(Default)]
+struct Tally {
+    ended: u32,
+    proved: u32,
+    parked: u32,
+}
+
+impl std::fmt::Display for Tally {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ended ({} proved their board, {} parked)", self.ended, self.proved, self.parked)
+    }
+}
+
+/// The tallies of the climbs in each way.
+#[derive(Default)]
+struct Climbs {
+    up: Tally,
+    down: Tally,
+}
+
+impl Climbs {
+    fn of(&mut self, way: Way) -> &mut Tally {
+        match way {
+            Way::Up => &mut self.up,
+            Way::Down => &mut self.down,
+        }
+    }
 }
 
 /// What the main thread did with its time: it is the one thread that applies results, and while it is busy the workers
@@ -271,8 +362,8 @@ struct MainThread {
 }
 
 /// A run of the scheduler.
-struct Scheduler {
-    book: Book,
+pub struct Scheduler {
+    pub book: Book,
     dir: PathBuf,
     settings: Settings,
     events: BufWriter<File>,
@@ -280,13 +371,14 @@ struct Scheduler {
     /// The CPU seconds of the earlier runs, and of this process when the run began.
     cpu_before: f64,
     cpu_at_start: f64,
-    running: HashMap<u32, Running>,
+    pub running: HashMap<u32, Running>,
     /// The boards whose maps came in, whose bounds the relations have not carried to the other boards yet: that is done
     /// once, when the last map is in (`settle`).
     pending: Vec<u32>,
     last_save: Instant,
     last_status: Instant,
     main: MainThread,
+    climbs: Climbs,
 }
 
 /// The CPU seconds of the earlier runs: the last `cpu` of the events file.
@@ -300,6 +392,43 @@ fn process_cpu() -> f64 {
 }
 
 impl Scheduler {
+    /// The scheduler of the boards `first..=last` in `dir`, going on from what the directory holds, with the proven
+    /// games of `proven` if given, and the changes of bounds that setting up the book made.  The run's time and CPU
+    /// count from here.
+    pub fn open(
+        first: u32,
+        last: u32,
+        dir: &Path,
+        settings: &Settings,
+        proven: Option<&Path>,
+    ) -> Result<(Scheduler, Vec<Change>), String> {
+        let cpu_before = earlier_cpu(&events_path(dir));
+        let (cpu_at_start, t0) = (process_cpu(), Instant::now());
+        let (book, changes) = open_book(dir, first, last, proven, settings.workers)?;
+        let events = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(events_path(dir))
+            .map_err(|e| format!("{}: {e}", events_path(dir).display()))?;
+        let now = Instant::now();
+        let scheduler = Scheduler {
+            book,
+            dir: dir.to_path_buf(),
+            settings: settings.clone(),
+            events: BufWriter::new(events),
+            t0,
+            cpu_before,
+            cpu_at_start,
+            running: HashMap::new(),
+            pending: Vec::new(),
+            last_save: now,
+            last_status: now,
+            main: MainThread::default(),
+            climbs: Climbs::default(),
+        };
+        Ok((scheduler, changes))
+    }
+
     /// The CPU seconds of the run so far, its earlier runs included.
     fn cpu(&self) -> f64 {
         self.cpu_before + (process_cpu() - self.cpu_at_start)
@@ -394,11 +523,35 @@ impl Scheduler {
         self.maps_running() || (!stopping && self.eligible().any(|e| !e.mapped))
     }
 
+    /// The next climb, if any, and its way: to the board of smallest gap among those not proven, not on their way,
+    /// searched, not parked (a climb to them ended unproven) and next to a proven board, the board below them (up) or
+    /// the board above them (down); the climbs up first.  The first unproven, searched board above (or below) a proven
+    /// one is such a board, whatever boards between were settled by the relations (a board unproven but not searched
+    /// stops the climb until its own board is proven).  None if climbs are off.
+    fn next_climb(&self) -> Option<(Way, &Entry)> {
+        let s = &self.settings;
+        if s.climb_limit <= 0.0 {
+            return None;
+        }
+        [(s.climb_up, Way::Up), (s.climb_down, Way::Down)].into_iter().filter(|&(on, _)| on).find_map(|(_, way)| {
+            let next_to_proven =
+                |e: &&Entry| !e.parked && self.book.entries.get(&way.source(e.n)).is_some_and(Entry::proven);
+            self.eligible().filter(next_to_proven).min_by_key(|e| (e.gap(), e.n)).map(|e| (way, e))
+        })
+    }
+
+    /// Whether a climb is on its way to a board next to `n`: it may prove that board within its limit, and then `n`
+    /// is climbed to with its game (and, going up, its exact ceiling), so `n` has no ordinary search meanwhile.
+    fn held(&self, n: u32) -> bool {
+        [n - 1, n + 1].iter().any(|m| self.running.get(m).is_some_and(|r| matches!(r.kind, Kind::Climb(_))))
+    }
+
     /// The next search to start, if any: a board to set up first (the map's bounds), and only when every map is in and
-    /// the relations have carried them (`settle`) the boards whose bounds a proven neighbour has just changed,
-    /// smallest gap first, else the board of least `level + gap / gap_unit`.  Only one board of a repeat class is
-    /// searched, and no prime whose board before it the ledger has.
-    fn next_job(&self, cpu: f64) -> Option<Job> {
+    /// the relations have carried them (`settle`) a climb (`next_climb`), else the boards whose bounds a proven
+    /// neighbour has just changed, smallest gap first, else the board of least `level + gap / gap_unit`.  Only one
+    /// board of a repeat class is searched, and no prime whose board before it the ledger has.  A board next to one
+    /// that is being climbed to waits (`held`).
+    pub fn next_job(&self, cpu: f64) -> Option<Job> {
         let s = &self.settings;
         let key = |e: &Entry| -> (u8, f64, u32) {
             match e.gap() {
@@ -408,22 +561,29 @@ impl Scheduler {
                 None => unreachable!("a board mapped has both bounds"),
             }
         };
-        let entry = self.eligible().min_by(|a, b| key(a).partial_cmp(&key(b)).expect("no NaN"))?;
-        let n = entry.n;
-        if !entry.mapped {
+        let ordinary =
+            self.eligible().filter(|e| !self.held(e.n)).min_by(|a, b| key(a).partial_cmp(&key(b)).expect("no NaN"))?;
+        if !ordinary.mapped {
+            let n = ordinary.n;
             return Some(Job { n, kind: Kind::Init, limit: Duration::ZERO, seeds: Vec::new(), cap: None });
         }
         if !self.pending.is_empty() || self.maps_running() {
             return None;
         }
+        // The hold keeps ordinary searches off a board; a climb to it has its proven neighbour.
+        let (kind, entry, limit) = match self.next_climb() {
+            Some((way, entry)) => (Kind::Climb(way), entry, s.climb_limit),
+            None => (Kind::Search, ordinary, s.base * 2f64.powi(ordinary.level.min(60) as i32)),
+        };
+        let n = entry.n;
         let remaining = (s.cpu_budget - cpu) / s.workers as f64;
-        let limit = (s.base * 2f64.powi(entry.level.min(60) as i32)).min(s.max_limit).min(remaining.max(1.0));
+        let limit = limit.min(s.max_limit).min(remaining.max(1.0));
         let seeds = [n.wrapping_sub(1), n, n + 1]
             .iter()
             .filter_map(|m| self.book.entries.get(m)?.lower.as_ref().map(|l| l.moves.clone()))
             .collect();
         let cap = entry.upper.map(|u| u.value);
-        Some(Job { n, kind: Kind::Search, limit: Duration::from_secs_f64(limit), seeds, cap })
+        Some(Job { n, kind, limit: Duration::from_secs_f64(limit), seeds, cap })
     }
 
     /// Starts `job` on a thread of its own.
@@ -445,16 +605,17 @@ impl Scheduler {
     }
 
     /// Applies what a search gave, and the relations from it (a map's are left for `settle`, when the last map is in).
-    fn finish(&mut self, done: Done) -> Result<(), String> {
+    pub fn finish(&mut self, done: Done) -> Result<(), String> {
         self.running.remove(&done.n);
         let a = done.result?;
         let n = done.n;
         let bounds = |e: &Entry| (e.lower.as_ref().map(|l| l.value), e.upper.map(|u| u.value));
         let (before, nodes_before) = (bounds(&self.book.entries[&n]), self.book.entries[&n].nodes);
+        let was_proven = self.book.entries[&n].proven();
         let (lower_rule, upper_rule) = match done.kind {
             Kind::Init => (Rule::Start, Rule::Root),
-            Kind::Search if a.completed => (Rule::Search, Rule::Exhausted),
-            Kind::Search => (Rule::Search, Rule::Dual),
+            _ if a.completed => (Rule::Search, Rule::Exhausted),
+            _ => (Rule::Search, Rule::Dual),
         };
         let lower =
             Lower { value: a.value, moves: a.moves, promotions: Some(a.promotions), rule: lower_rule, from: None };
@@ -466,12 +627,15 @@ impl Scheduler {
         }
         let entry = self.book.entries.get_mut(&n).expect("a board of the ledger");
         entry.mapped = true;
-        if done.kind == Kind::Search {
+        if done.kind != Kind::Init {
             entry.attempts += 1;
-            entry.level += 1;
             entry.search_s += a.seconds;
             entry.nodes = a.nodes;
             entry.boosted = false;
+        }
+        // A climb leaves the board's level, and so the limit of its next ordinary search, as it was.
+        if done.kind == Kind::Search {
+            entry.level += 1;
         }
         let after = bounds(&self.book.entries[&n]);
         let mut fields = vec![
@@ -487,6 +651,13 @@ impl Scheduler {
             Json::array([l.map_or(Json::Null, Json::from), u.map_or(Json::Null, Json::from)])
         };
         fields.extend([("before", pair(before)), ("after", pair(after))]);
+        if let Some(job) = done.kind.job() {
+            fields.push(("job", Json::from(job)));
+        }
+        if let Some(way) = done.kind.way() {
+            fields.push(("way", Json::from(way.name())));
+            fields.push(("outcome", Json::from(self.end_climb(n, way, was_proven))));
+        }
         self.event(done.kind.name(), Some(n), fields)?;
         if done.kind == Kind::Init {
             self.pending.push(n);
@@ -502,6 +673,25 @@ impl Scheduler {
             let _ = engine::remove_checkpoint(&checkpoint_path(&self.dir, n));
         }
         self.flush_events()
+    }
+
+    /// Counts the climb in `way` to `n` that has ended, by how the board stands: proved by the climb's search, proven by
+    /// a relation while it went on (`was_proven`: the climb was moot), or neither, when the board is parked.  Returns
+    /// the outcome's name, as the event has it.
+    fn end_climb(&mut self, n: u32, way: Way, was_proven: bool) -> &'static str {
+        let entry = self.book.entries.get_mut(&n).expect("a board of the ledger");
+        let tally = self.climbs.of(way);
+        tally.ended += 1;
+        if was_proven {
+            "moot"
+        } else if entry.proven() {
+            tally.proved += 1;
+            "proved"
+        } else {
+            entry.parked = true;
+            tally.parked += 1;
+            "parked"
+        }
     }
 
     /// Carries the bounds of the maps that came in to the other boards, once for all of them: a map applied to the
@@ -571,12 +761,14 @@ impl Scheduler {
     fn status(&mut self) {
         let (proven, total) = (self.proven(), self.book.entries.len());
         eprintln!(
-            "ledger: {:.0} s, {:.0} CPU s of {:.0}: {proven} of {total} proven, {} searching; main thread busy {:.1} s, \
-             results waited {:.1} s",
+            "ledger: {:.0} s, {:.0} CPU s of {:.0}: {proven} of {total} proven, {} searching; climbs up {}, down {}; main \
+             thread busy {:.1} s, results waited {:.1} s",
             self.t0.elapsed().as_secs_f64(),
             self.cpu(),
             self.settings.cpu_budget,
             self.running.len(),
+            self.climbs.up,
+            self.climbs.down,
             self.main.busy,
             self.main.waited,
         );
@@ -679,29 +871,7 @@ pub fn run(first: u32, last: u32, dir: &Path, settings: &Settings, proven: Optio
     if settings.signals {
         engine::stop_on_signals().map_err(|e| format!("signals: {e}"))?;
     }
-    let cpu_before = earlier_cpu(&events_path(dir));
-    let (cpu_at_start, t0) = (process_cpu(), Instant::now());
-    let (book, changes) = open_book(dir, first, last, proven, settings.workers)?;
-    let events = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(events_path(dir))
-        .map_err(|e| format!("{}: {e}", events_path(dir).display()))?;
-    let now = Instant::now();
-    let mut scheduler = Scheduler {
-        book,
-        dir: dir.to_path_buf(),
-        settings: settings.clone(),
-        events: BufWriter::new(events),
-        t0,
-        cpu_before,
-        cpu_at_start,
-        running: HashMap::new(),
-        pending: Vec::new(),
-        last_save: now,
-        last_status: now,
-        main: MainThread::default(),
-    };
+    let (mut scheduler, changes) = Scheduler::open(first, last, dir, settings, proven)?;
     let s = settings;
     let fields = vec![
         ("first", Json::from(first)),
@@ -710,6 +880,9 @@ pub fn run(first: u32, last: u32, dir: &Path, settings: &Settings, proven: Optio
         ("cpu_budget_s", Json::from(s.cpu_budget)),
         ("base_s", Json::from(s.base)),
         ("max_limit_s", Json::from(s.max_limit)),
+        ("climb_limit_s", Json::from(s.climb_limit)),
+        ("climb_up", Json::from(s.climb_up)),
+        ("climb_down", Json::from(s.climb_down)),
         ("gap_unit", Json::from(s.gap_unit)),
         ("proven_file", proven.map_or(Json::Null, |p| Json::from(p.display().to_string()))),
     ];

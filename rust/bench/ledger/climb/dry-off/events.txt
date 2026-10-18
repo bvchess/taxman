@@ -1,0 +1,13 @@
+boards 200, proven 200, CPU 598 s, wall 151 s (all proven)
+setup (the boards' facts and problems): 1.5 CPU s
+maps: 89, 19.8 s
+searches: 179 of 89 boards, 576.3 s; completed 87 (5 at their ceiling), stopped 92
+a stopped search's seconds beyond its limit: median 0.14, max 0.24
+stopped searches whose dual bound lowered U: 52, by 3894 in all (median 74)
+a stopped search's dual bound below its board's root bound: median 90, max 223
+changes the relations made: lower ceiling 28, lower monotone 55, lower prime 37, lower repeat 194, upper ceiling 127, upper prime 59, upper repeat 257
+the maps' bounds carried at 4.1 s: 291 changes in 0.26 s
+the main thread: busy 0.7 s of 151 (its longest piece 0.26 s), results waited 0.0 s in all
+the run's CPU over its wall time: 3.95 of 6 workers (66%)
+from the last map's result to the end: 3.92 of 6 (65%)
+boards by their number of searches: {0: 111, 1: 38, 2: 25, 3: 17, 4: 6, 5: 2, 6: 1}

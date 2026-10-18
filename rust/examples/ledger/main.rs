@@ -5,7 +5,7 @@
 //!
 //! ```text
 //! cargo run --release --example ledger -- run A-B --dir DIR --cpu-hours H [--workers P] [--base S] [--max-limit S]
-//!     [--gap-unit G] [--proven FILE] [--save-every S]
+//!     [--climb up|down|both|off] [--climb-limit S] [--gap-unit G] [--proven FILE] [--save-every S]
 //! cargo run --release --example ledger -- report DIR [--known FILE]...
 //! ```
 //!
@@ -34,13 +34,28 @@
 //! * **The order** (`schedule.rs`): first the map of every board searched, all of them on the workers at once, their
 //!   bounds kept as they come, and when the last is in the relations carry them to the other boards in one go
 //!   (`settle`: a map's cascade through the boards, one map at a time, would make every board many times over);
-//!   then the boards whose bounds a proven neighbour has changed since their last search (the ceiling and the prime
-//!   formula of a board next to a proven one are exact: such a board is often proven by a search at its ceiling in a
-//!   few steps), smallest gap first; then the board of least `level + gap / gap_unit`, where `level` counts its
-//!   searches (each doubles the limit) and `--gap-unit` (default 175) is the gap worth one doubling of the cost (the
-//!   chain's steps rise a decade with about 580 of the standalone gap, `bench/landscape/`).  `--workers` searches at
-//!   once (default all CPUs).  When a board is proven, its search is stopped if one is going, and its checkpoint
-//!   deleted; a search whose U falls is given the lower ceiling.
+//!   then the climbs (below); then the boards whose bounds a proven neighbour has changed since their last search (the
+//!   ceiling and the prime formula of a board next to a proven one are exact: such a board is often proven by a search
+//!   at its ceiling in a few steps), smallest gap first; then the board of least `level + gap / gap_unit`, where
+//!   `level` counts its searches (each doubles the limit) and `--gap-unit` (default 175) is the gap worth one doubling
+//!   of the cost (the chain's steps rise a decade with about 580 of the standalone gap, `bench/landscape/`).
+//!   `--workers` searches at once (default all CPUs).  When a board is proven, its search is stopped if one is going,
+//!   and its checkpoint deleted; a search whose U falls is given the lower ceiling.
+//! * **Wedge and climb.**  The order above finds wedges: boards proven with no help from a neighbour.  A search whose
+//!   board below is proven is far cheaper (the ceiling opt(n) <= opt(n − 1) + n is exact in about a third of the
+//!   games, and the proven game is the optimum's start about 88% of the time), so the ledger *climbs* from a wedge.  A
+//!   board that is searched, not proven, not parked, and has its board below proven (however that was proven, and
+//!   however many boards between were settled by the relations) gets a climb *up* ahead of every other job: its search,
+//!   as above (so seeded with the proven game), for `--climb-limit` seconds (default 60; 0: no climbs), resumed from its
+//!   checkpoint if it has one, and not counted among its ordinary searches (its `level` and so its next limit stay).
+//!   If the climb proves the board, the board above it is climbed to next, and so on.  A board with its board *above*
+//!   proven gets a climb *down*, after the climbs up: seeded with that game (the game below it that Lemma L2 makes from
+//!   it is the optimum for n − 1 in about 35% of the composite pairs), but with the ledger's ceiling, which is loose
+//!   (opt(n − 1) <= opt(n)); a proof brings the climb to the board below it.  `--climb` picks the ways (`up`, `down`,
+//!   `both`, the default, or `off`).  If a climb stops at its limit the board is *parked* (`parked` in the ledger): it
+//!   goes by the ordinary order, with its checkpoint, and the climb from that wedge ends.  Climbs from different wedges
+//!   run side by side.  A board next to one that is being climbed to waits (no ordinary search of it starts), as the
+//!   climb may prove that board within its limit.
 //! * **The main thread** applies every result, and a worker whose search has ended waits for it: so what it does for a
 //!   result is small beside a search, `settle` aside.  A relation's upper bound is arithmetic; its lower bound is a game,
 //!   made once for each lower bound of its source, not at all when its score cannot beat the target's (the prime
@@ -52,13 +67,15 @@
 //! 30) and at the end: `n`, `in_the_bag`, `prime`, `class` (the smallest board of its repeat class, or null), `lower`
 //! (`value`, `rule`, `from`: the board a relation took it from, `moves`, `promotions`: those of a game made from
 //! promotions, else null), `upper` (`value`, `rule`, `from`), `gap`, `proven`, `proven_cpu_s` (the run's CPU seconds
-//! when it was proven), `attempts`, `level`, `search_s` and `nodes` (its searches: their seconds, and their steps
-//! over all runs), `mapped` (its own map is made) and `boosted` (a proven neighbour changed its bounds since its last
-//! search).  `events.jsonl`, one
-//! line an event, appended: each has `t` (seconds since the run began) and `cpu` (the CPU seconds of all runs); a
+//! when it was proven), `attempts`, `level`, `search_s` and `nodes` (its searches, climbs among them: their number,
+//! the number of the ordinary ones, their seconds, and their steps over all runs), `mapped` (its own map is made),
+//! `boosted` (a proven neighbour changed its bounds since its last search) and `parked` (a climb to it ended
+//! unproven).  `events.jsonl`, one line an event, appended: each has `t` (seconds since the run began) and `cpu` (the CPU seconds of all runs); a
 //! run's `start` (its settings), an `init` or `search` of board `n` (`limit_s`, `seconds`, `nodes` of this search,
 //! `completed`, `reached_cap`, `found` (the score of its game), `dual` (its dual bound, null if it completed), the
-//! bounds `before` and `after`, each [L, U]), a `derive` (a relation changed `side`, `lower` or `upper`, of board
+//! bounds `before` and `after`, each [L, U]; a search also has its `job`, `ordinary` or `climb`, and a climb its
+//! `way` (`up` or `down`, `up` if the board is next to a proven one both ways) and its `outcome`: `proved` (its search proved the board), `parked`, or `moot` (a relation had proven the board while it
+//! went on)), a `derive` (a relation changed `side`, `lower` or `upper`, of board
 //! `n` from `before` to `after`, by `rule` from the board `from`; those of a result all carry its time), a `settle`
 //! (the relations carried the `boards` of the maps to the others: `changes`, `seconds`), a `proven` board (`value`, and
 //! the rules and sources of its two bounds), and the run's `end` (`reason`, `proven`, `games`, and the main thread's
@@ -92,8 +109,8 @@ use std::path::PathBuf;
 
 fn usage() -> ! {
     eprintln!(
-        "usage: ledger run A-B --dir DIR --cpu-hours H [--workers P] [--base S] [--max-limit S] [--gap-unit G] \
-         [--proven FILE] [--save-every S]\n       ledger report DIR [--known FILE]..."
+        "usage: ledger run A-B --dir DIR --cpu-hours H [--workers P] [--base S] [--max-limit S] [--climb up|down|both|off] \
+         [--climb-limit S] [--gap-unit G] [--proven FILE] [--save-every S]\n       ledger report DIR [--known FILE]..."
     );
     std::process::exit(2)
 }
@@ -121,6 +138,16 @@ fn main() {
             "--workers" => settings.workers = number(&arg, args.next()),
             "--base" => settings.base = number(&arg, args.next()),
             "--max-limit" => settings.max_limit = number(&arg, args.next()),
+            "--climb-limit" => settings.climb_limit = number(&arg, args.next()),
+            "--climb" => {
+                (settings.climb_up, settings.climb_down) = match args.next().as_deref() {
+                    Some("up") => (true, false),
+                    Some("down") => (false, true),
+                    Some("both") => (true, true),
+                    Some("off") => (false, false),
+                    _ => usage(),
+                }
+            }
             "--gap-unit" => settings.gap_unit = number(&arg, args.next()),
             "--save-every" => settings.save_every = number(&arg, args.next()),
             flag if flag.starts_with("--") => usage(),
@@ -134,7 +161,13 @@ fn main() {
                 Some((a, b)) => (number::<u32>("A", Some(a.to_owned())), number::<u32>("B", Some(b.to_owned()))),
                 None => (number::<u32>("N", Some(range.clone())), number::<u32>("N", Some(range.clone()))),
             };
-            if first < 2 || last < first || settings.workers == 0 || settings.base <= 0.0 || settings.gap_unit <= 0.0 {
+            if first < 2
+                || last < first
+                || settings.workers == 0
+                || settings.base <= 0.0
+                || settings.climb_limit < 0.0
+                || settings.gap_unit <= 0.0
+            {
                 usage();
             }
             settings.cpu_budget = hours * 3600.0;

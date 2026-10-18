@@ -8,6 +8,9 @@
 #   WORKERS     searches at once, one thread each (default: every CPU)
 #   CPU_HOURS   the budget, in hours of CPU (default: WORKERS, an hour of every worker)
 #   BASE        the first search's limit of a board, in seconds (default 2); MAX_LIMIT the most (default 3600)
+#   CLIMB       the ways of the climbs, the searches of a board next to a proven one: up, down, both or off (the
+#               program's default, both)
+#   CLIMB_LIMIT the limit of a climb in seconds (the program's default, 60; 0: no climbs)
 #   PROVEN      a results file whose proven games the run is given (default none: the truth stays hidden)
 #   KNOWN       the results file the report checks against (default results/strict.jsonl)
 #   LEDGER_BIN  the program (default target/release/examples/ledger; a laptop's test is target/debug/examples/ledger,
@@ -39,9 +42,10 @@ sync_out() { if [ -n "${S3_DEST:-}" ]; then aws s3 sync --quiet "$out" "$S3_DEST
 syncer=$!
 
 stamp "start $range workers=$workers cpu_hours=$cpu_hours"
-# shellcheck disable=SC2086 # --proven and its file, or nothing
+# shellcheck disable=SC2086 # an option and its value, or nothing
 "$ledger" run "$range" --dir "$out/run" --workers "$workers" --cpu-hours "$cpu_hours" --base "${BASE:-2}" \
-    --max-limit "${MAX_LIMIT:-3600}" ${PROVEN:+--proven "$PROVEN"} > "$out/run.out" 2> "$out/run.err"
+    --max-limit "${MAX_LIMIT:-3600}" ${CLIMB:+--climb "$CLIMB"} ${CLIMB_LIMIT:+--climb-limit "$CLIMB_LIMIT"} \
+    ${PROVEN:+--proven "$PROVEN"} > "$out/run.out" 2> "$out/run.err"
 stamp "run done, status $?"
 "$ledger" report "$out/run" --known "$known" > "$out/report.txt" 2>&1
 status=$?

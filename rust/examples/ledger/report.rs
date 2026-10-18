@@ -92,6 +92,25 @@ pub fn report(dir: &Path, known: &[PathBuf]) -> Result<(String, bool), String> {
     let search_s: f64 = entries.iter().map(|e| e.search_s).sum();
     let _ =
         writeln!(w, "CPU {cpu:.0} s ({:.2} core-hours); {searches} searches, {search_s:.0} s of them", cpu / 3600.0);
+    // The climbs of each way (a run before the ways had only the climbs up, and no `way`).
+    for way in ["up", "down"] {
+        let text = |e: &Json, field: &str| e.get(field).and_then(Json::as_str).map(str::to_owned);
+        let climbs: Vec<&Json> = events
+            .iter()
+            .filter(|e| text(e, "job").as_deref() == Some("climb") && text(e, "way").as_deref().unwrap_or("up") == way)
+            .collect();
+        let by_outcome = |name: &str| climbs.iter().filter(|e| text(e, "outcome").as_deref() == Some(name)).count();
+        let climb_s = climbs.iter().filter_map(|e| e.get("seconds")?.as_f64()).sum::<f64>().round() as u64;
+        let _ = writeln!(
+            w,
+            "climbs {way}: {} among the searches, {climb_s} s of them: {} proved their board, {} parked, {} moot (the \
+             board was proven meanwhile)",
+            climbs.len(),
+            by_outcome("proved"),
+            by_outcome("parked"),
+            by_outcome("moot"),
+        );
+    }
 
     // How the proven boards were proven: the rules of their two bounds.
     let mut pairs: BTreeMap<(&str, &str), usize> = BTreeMap::new();
