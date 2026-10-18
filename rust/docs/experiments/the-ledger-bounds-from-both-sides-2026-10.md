@@ -677,13 +677,15 @@ new 0, 0, 14, 36, 44, 48, 56, 60, 70, 73; at 1800: base 0, 44, 50, 57, 59, 68, 8
 * **The easy stretch is unchanged**: 1301..1500 in 619 to 620 CPU s with and without the steps (the earlier runs of the
   finder and the climbs took 547 to 612); most of its boards have gaps within two steps and go straight to their
   proofs, and the steps taken, 12 by the first build and 94 by the new one (which explores), cost 2 and 8 s in all.
-* **On 2576..2700 the steps bring proofs forward**: at 900 CPU s 69 and 73 boards are proven against 61 (four earlier
-  runs of the same budget and build, in the finder's section, each had 61), and the gaps the open boards have left sum
-  to 9,703 and 14,543 against 37,550; at 1800 CPU s all three have 116 to 118 of the 125 (the same 7 to 9 boards, whose
-  gaps are 202 and more, remain: the walls of this stretch), the new builds having been ahead from 300 to 1100 CPU s.
+* **On 2576..2700 the steps bring proofs forward**: at 900 CPU s the first and the new build have proven 69 and 73
+  boards against 61 (four earlier runs of the same budget with a build before the steps, in the finder's section, each
+  had 61), and the gaps the open boards have left sum to 14,543 and 9,703 against 37,550; at 1800 CPU s all three have
+  116 to 118 of the 125 (the same 7 to 9 boards remain, with gaps of 200 and more: the walls of this stretch).  The
+  curves of boards proven against CPU: the new build is behind the base up to 700 CPU s (its exploring and first steps
+  come before any proof), ahead from 900 to 1300 (65 against 59 at 900, 82 against 68 at 1080) and level from 1440.
   The difference at 900 CPU s is 8 to 12 boards, about the 5 boards by which the repeated runs of one build differ, and
-  the curves are one sample each: the gain of the steps in proofs is real but modest here, and in the gaps it is large.
-  The steps cost 38 to 62 s of the 900.
+  each curve is one sample: the gain of the steps in proofs is real but modest here, and in the gaps it is large.  The
+  steps cost 38 to 62 s of the 900.
 * **On 3076..3200 nothing can be proven in the budget** (the maps take 320 of the 906 CPU s), and the steps spend the
   rest on bounds: with every board exploring first, 193 steps (584 s) on all 56 boards that are searched (the rest of
   the 125 are repeats and primes, whose bounds follow) lower U on every one, and the gaps sum to 65,806 against
