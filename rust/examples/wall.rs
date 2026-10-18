@@ -22,6 +22,10 @@
 //! cargo run --release --example wall -- target [--fractions F,F,...] [--cap S] --known FILE N|A-B...
 //! cargo run --release --example wall -- relaxed [--cpu S] [--steps K] [--fixtures DIR] [--suite FILE] [--paths K]
 //!     [--seed S] [--fix LO-HI] [--unit-nodes K] --known FILE N|A-B...
+//! cargo run --release --example wall -- choice-prepare [--cpu S] [--steps K] [--fixtures DIR] [--suite FILE]
+//!     [--keep K] [--paths K] [--seed S] [--fix LO-HI] [--unit-nodes K] --prep DIR --known FILE N|A-B...
+//! cargo run --release --example wall -- choice [--node-steps K] [--cap S] [--sub-nogoods] --prep DIR
+//!     [--results DIR --worker K] [--claims DIR] N|A-B...
 //! ```
 //!
 //! Games are set up as `taxman solve` sets them up (`taxman::board::Board` at the set width `with_width!` picks for
@@ -134,6 +138,11 @@
 //!   nodes of a proof that today's bound leaves open: the bound with the root's multipliers against today's at sampled
 //!   nodes of games with known optima.  Defined in `wall/relaxed.rs`, whose module comment has the options and the
 //!   lines.
+//! * **choice-prepare** and **choice**: at which nodes is a slow, strong bound (the Lagrangian bound over nogoods,
+//!   refitted at the node) worth computing besides today's?  `choice-prepare` makes a game's file (its nogood pool, its
+//!   root multipliers, its sampled nodes) and `choice` measures each node of the file: its gap, the strong bound and
+//!   whether it cuts, the subtree today's search makes of it, and the times.  Defined in `wall/choice.rs`, whose module
+//!   comment has the options and the lines; `bench/node_choice/` runs them in the cloud and reads the lines.
 //!
 //! **The sizes** (`setup`, `nodes` and `frames`): `frames` (the root's frame count), `candidates`, `max_total`
 //! (the most promotions a set can have), `members` (the distinct numbers in the moves and factors of the root's
@@ -156,6 +165,9 @@
 //! `tail_idle_s`), and the units' starts, the time to rebuild a unit's state (`rebuild_s`) and the time of the first
 //! node of the units that had one (`first_step_s`, over `first_steps` units).
 
+/// `choice-prepare` and `choice`: the strong bound refitted at a node against the subtree today's search makes of it.
+#[path = "wall/choice.rs"]
+mod choice;
 #[path = "common/counters.rs"]
 mod counters;
 /// `sound` and `finders`: searches for good games that are not sound, and the sound search to weigh them against.
@@ -211,7 +223,7 @@ use taxman::tactics::Tactics;
 // ---------------------------------------------------------------------------------------------------------
 // Arguments
 
-const COMMANDS: [&str; 12] = [
+const COMMANDS: [&str; 14] = [
     "setup",
     "nodes",
     "grow",
@@ -224,26 +236,48 @@ const COMMANDS: [&str; 12] = [
     "nogoods",
     "target",
     "relaxed",
+    "choice-prepare",
+    "choice",
 ];
 
 /// The options, with the commands each applies to (an option given to another command is an error).
-const OPTIONS: [(&str, &[&str]); 32] = [
+const OPTIONS: [(&str, &[&str]); 39] = [
     (
         "--known",
-        &["setup", "nodes", "grow", "start", "landscape", "chain", "sound", "finders", "nogoods", "target", "relaxed"],
+        &[
+            "setup",
+            "nodes",
+            "grow",
+            "start",
+            "landscape",
+            "chain",
+            "sound",
+            "finders",
+            "nogoods",
+            "target",
+            "relaxed",
+            "choice-prepare",
+        ],
     ),
     ("--from", &["sound"]),
-    ("--cap", &["sound", "target"]),
+    ("--cap", &["sound", "target", "choice"]),
     ("--fractions", &["target"]),
-    ("--fixtures", &["relaxed"]),
-    ("--suite", &["relaxed"]),
-    ("--paths", &["relaxed"]),
-    ("--cpu", &["sound", "finders", "nogoods", "relaxed"]),
-    ("--steps", &["nogoods", "relaxed"]),
+    ("--fixtures", &["relaxed", "choice-prepare"]),
+    ("--suite", &["relaxed", "choice-prepare"]),
+    ("--paths", &["relaxed", "choice-prepare"]),
+    ("--keep", &["choice-prepare"]),
+    ("--prep", &["choice-prepare", "choice"]),
+    ("--results", &["choice"]),
+    ("--worker", &["choice"]),
+    ("--claims", &["choice"]),
+    ("--node-steps", &["choice"]),
+    ("--sub-nogoods", &["choice"]),
+    ("--cpu", &["sound", "finders", "nogoods", "relaxed", "choice-prepare"]),
+    ("--steps", &["nogoods", "relaxed", "choice-prepare"]),
     ("--long", &["nogoods"]),
-    ("--seed", &["sound", "finders", "nogoods", "relaxed"]),
-    ("--fix", &["sound", "finders", "nogoods", "relaxed"]),
-    ("--unit-nodes", &["sound", "finders", "nogoods", "relaxed"]),
+    ("--seed", &["sound", "finders", "nogoods", "relaxed", "choice-prepare"]),
+    ("--fix", &["sound", "finders", "nogoods", "relaxed", "choice-prepare"]),
+    ("--unit-nodes", &["sound", "finders", "nogoods", "relaxed", "choice-prepare"]),
     ("--extra", &["sound", "finders"]),
     ("--pool", &["sound", "finders"]),
     ("--repeat", &["setup"]),
@@ -360,7 +394,18 @@ fn duration(name: &str, text: String) -> Result<Duration, String> {
 fn games(command: &str, texts: &[String]) -> Result<Vec<u32>, String> {
     let ranges = matches!(
         command,
-        "setup" | "start" | "frames" | "landscape" | "chain" | "sound" | "finders" | "nogoods" | "target" | "relaxed"
+        "setup"
+            | "start"
+            | "frames"
+            | "landscape"
+            | "chain"
+            | "sound"
+            | "finders"
+            | "nogoods"
+            | "target"
+            | "relaxed"
+            | "choice-prepare"
+            | "choice"
     );
     let mut games = Vec::new();
     for text in texts {
@@ -444,6 +489,13 @@ fn parse() -> Result<Options, String> {
             "--fixtures" => o.finders.fixtures = Some(value("--fixtures")?.into()),
             "--suite" => o.finders.suite = Some(value("--suite")?.into()),
             "--paths" => o.finders.paths = number("--paths", value("--paths")?)?,
+            "--keep" => o.finders.keep = number::<usize>("--keep", value("--keep")?)?.max(1),
+            "--prep" => o.finders.prep = Some(value("--prep")?.into()),
+            "--results" => o.finders.results = Some(value("--results")?.into()),
+            "--worker" => o.finders.worker = number("--worker", value("--worker")?)?,
+            "--claims" => o.finders.claims = Some(value("--claims")?.into()),
+            "--node-steps" => o.finders.node_steps = number::<usize>("--node-steps", value("--node-steps")?)?.max(1),
+            "--sub-nogoods" => o.finders.sub = true,
             "--cpu" => o.finders.cpu = number("--cpu", value("--cpu")?)?,
             "--steps" => o.finders.steps = number::<usize>("--steps", value("--steps")?)?.max(1),
             "--long" => o.finders.long = number("--long", value("--long")?)?,
