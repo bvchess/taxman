@@ -6,8 +6,8 @@ use super::book::{upper_by, Book, Entry, Lower, Rule, Side, Upper};
 use super::export::{self, civil_date, Options};
 use super::schedule::{self, read_ledger, Settings};
 use super::store::{self, Best, Chain, Game, Line, Store};
-use super::support::TempDir;
-use super::tests::{book_of, give, opt, opt_game, write_results};
+use super::support::{TempDir, QUICK};
+use super::tests::{book_of, give, opt, opt_game, write_results, LAST};
 use super::verify;
 use super::STRICT;
 use std::path::{Path, PathBuf};
@@ -75,10 +75,6 @@ fn partial_book(ns: &[u32], given: &[u32], found: &[u32]) -> Book {
     }
     book.propagate(ns.iter().copied()).unwrap();
     book
-}
-
-fn boards_from_900() -> Vec<u32> {
-    (900..=960).collect()
 }
 
 fn entries(book: &Book) -> Vec<Entry> {
@@ -444,41 +440,46 @@ fn all_proven_run(dir: &Path, first: u32, last: u32, proven: Option<&Path>, boun
     run_dir
 }
 
-/// A run of 901..960 with the games of 900 and 930 given (the chain's, so the export leaves them out) and the rest
-/// hidden: its export has every other board proven, a second export appends nothing, and both referees accept the file,
-/// the Python one with the games `ledger games` writes.
+/// A run of 901..`LAST` (901..960) with the games of 900 and one in the middle (930) given (the chain's, so the export
+/// leaves them out) and the rest hidden: its export has every other board proven, a second export appends nothing, and
+/// both referees accept the file, the Python one with the games `ledger games` writes.
 #[test]
 fn a_run_is_exported_and_both_referees_accept_the_file() {
     let dir = TempDir::new("store-run");
     let (strict, bounds, games) = (dir.join("strict.jsonl"), dir.join("bounds.jsonl"), dir.join("games.jsonl"));
-    write_results(&strict, &[900, 930]);
-    let run_dir = all_proven_run(&dir, 901, 960, Some(&strict), None);
+    let (middle, proven) = (if QUICK { 906 } else { 930 }, (LAST - 901) as usize);
+    write_results(&strict, &[900, middle]);
+    let run_dir = all_proven_run(&dir, 901, LAST, Some(&strict), None);
     let ledger = read_ledger(&run_dir).unwrap();
     assert!(ledger.iter().all(Entry::proven));
 
     let summary = export::export(&run_dir, &bounds, &strict, &options()).unwrap();
-    assert_eq!((summary.chain, summary.proven, summary.newly_proven.len()), (2, 59, 59), "{summary}");
-    assert_eq!((summary.boards, summary.lower_better, summary.upper_better), (59, 0, 0), "{summary}");
-    assert!(summary.to_string().contains("59 boards newly proven (901-929, 931-960)"), "{summary}");
+    assert_eq!((summary.chain, summary.proven, summary.newly_proven.len()), (2, proven, proven), "{summary}");
+    assert_eq!((summary.boards, summary.lower_better, summary.upper_better), (proven, 0, 0), "{summary}");
+    let ranges = format!("901-{}, {}-{LAST}", middle - 1, middle + 1);
+    assert!(summary.to_string().contains(&format!("{proven} boards newly proven ({ranges})")), "{summary}");
     let bytes = std::fs::read(&bounds).unwrap();
     let again = export::export(&run_dir, &bounds, &strict, &options()).unwrap();
-    assert_eq!((again.lines, again.boards, again.newly_proven.len(), again.proven), (0, 0, 0, 59));
+    assert_eq!((again.lines, again.boards, again.newly_proven.len(), again.proven), (0, 0, 0, proven));
     assert_eq!(std::fs::read(&bounds).unwrap(), bytes, "nothing appended, nothing changed");
 
     let (text, ok) = verify::verify(&bounds, &strict, 4).unwrap();
     assert!(ok, "{text}");
-    assert!(text.contains("proven (best lower bound = best upper bound): 59 boards: 901-929, 931-960"), "{text}");
+    assert!(
+        text.contains(&format!("proven (best lower bound = best upper bound): {proven} boards: {ranges}")),
+        "{text}"
+    );
     let count = verify::games(&bounds, &mut std::fs::File::create(&games).unwrap(), 4).unwrap();
-    assert!(count > 20, "{count} promotion sets");
+    assert!(count > proven / 3, "{count} promotion sets");
     let (status, report) = python(&bounds, Some(&games), &strict);
     assert_eq!(status, Some(0), "{report}");
-    assert!(report.contains("all checks passed") && report.contains("59 boards"), "{report}");
+    assert!(report.contains("all checks passed") && report.contains(&format!("{proven} boards")), "{report}");
     // Without the games the Python referee cannot replay the promotion sets, and says so.
     let (status, report) = python(&bounds, None, &strict);
     assert_eq!(status, Some(1), "{report}");
     assert!(report.contains("was not replayed"), "{report}");
     // Bytes a board: the whole file over the boards it has.
-    let per_board = bytes.len() as f64 / 59.0;
+    let per_board = bytes.len() as f64 / proven as f64;
     eprintln!(
         "{} lines, {} bytes, {per_board:.0} bytes a board",
         Store::read(&bounds).unwrap().lines.len(),
@@ -490,7 +491,24 @@ fn a_run_is_exported_and_both_referees_accept_the_file() {
 /// and the Rust referee, which recomputes what the Python one takes on record (a root bound, the bags and search
 /// problems of repeats), finds more.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is both_referees_refuse_a_sample_of_the_tampered_files_and_name_the_line"
+)]
 fn both_referees_refuse_a_tampered_file_and_name_the_line() {
+    both_referees_refuse_the_tampered_files(|_| true);
+}
+
+/// [`both_referees_refuse_a_tampered_file_and_name_the_line`] for three of its cases: the third, eighth and last (a root
+/// bound lowered, a repeat's bag changed and an upper bound below the chain's score), the first two of which the Python
+/// referee cannot find.
+#[test]
+fn both_referees_refuse_a_sample_of_the_tampered_files_and_name_the_line() {
+    both_referees_refuse_the_tampered_files(|case| case % 5 == 2);
+}
+
+/// The test of the cases `sampled` picks (by their index).
+fn both_referees_refuse_the_tampered_files(sampled: impl Fn(usize) -> bool) {
     let f = fixture("store-tamper");
     let ok = verify::verify(&f.bounds, &f.strict, 4).unwrap();
     assert!(ok.1, "{}", ok.0);
@@ -656,7 +674,10 @@ fn both_referees_refuse_a_tampered_file_and_name_the_line() {
             "n=920: the upper bound",
         ),
     ];
-    for (what, edit, python_finds, expected) in cases {
+    for (case, (what, edit, python_finds, expected)) in cases.into_iter().enumerate() {
+        if !sampled(case) {
+            continue;
+        }
         let mut lines = f.lines.clone();
         let k = edit(&mut lines);
         let path = f.dir.join("tampered.jsonl");
@@ -681,16 +702,21 @@ fn both_referees_refuse_a_tampered_file_and_name_the_line() {
 fn a_run_starts_from_the_file_and_skips_the_maps_of_boards_with_both_bounds() {
     let dir = TempDir::new("store-start");
     let (strict, bounds) = (dir.join("strict.jsonl"), dir.join("bounds.jsonl"));
-    write_results(&strict, &[900]);
-    let book = partial_book(&boards_from_900(), &[900], &[925, 950]);
+    // The stretch `first..=last`, the first board that the file has, the last board of the file and the boards that the
+    // run found: 901..960, 910, 960, and 925 and 950; in a quick run 115..124, 119, 127 and 121 (small boards, whose runs
+    // are short, with a game beside the one it cites in the repeat class of 121).
+    let (first, split, last, top, found): (u32, u32, u32, u32, &[u32]) =
+        if QUICK { (115, 119, 124, 127, &[121]) } else { (901, 910, 960, 960, &[925, 950]) };
+    write_results(&strict, &[first - 1]);
+    let book = partial_book(&(first - 1..=top).collect::<Vec<_>>(), &[first - 1], found);
     let chain = store::chain(&strict).unwrap();
     let (lines, _) = export::plan(&entries(&book), &Store::default(), &chain, &options()).unwrap();
-    // The file has the bounds of every board of 910..960 and none of 901..909.
-    let lines: Vec<Line> = lines.into_iter().filter(|l| l.n >= 910).collect();
+    // The file has the bounds of every board from `split` on and none before it.
+    let lines: Vec<Line> = lines.into_iter().filter(|l| l.n >= split).collect();
     write_lines(&bounds, &lines);
     let best = Store::read(&bounds).unwrap();
     let both = |n: u32| best.best().lower.contains_key(&n) && best.best().upper.contains_key(&n);
-    assert!((910..=960).all(both) && !(901..910).any(both));
+    assert!((split..=top).all(both) && !(first..split).any(both));
 
     let inits = |run_dir: &Path| -> Vec<u32> {
         let events = std::fs::read_to_string(schedule::events_path(run_dir)).unwrap();
@@ -700,16 +726,16 @@ fn a_run_starts_from_the_file_and_skips_the_maps_of_boards_with_both_bounds() {
             .filter_map(|e| e.get("n").and_then(Json::as_u32))
             .collect()
     };
-    let fresh = all_proven_run(&dir, 901, 960, Some(&strict), None);
-    let started = all_proven_run(&dir, 901, 960, Some(&strict), Some(&bounds));
+    let fresh = all_proven_run(&dir, first, last, Some(&strict), None);
+    let started = all_proven_run(&dir, first, last, Some(&strict), Some(&bounds));
     for run_dir in [&fresh, &started] {
         for e in read_ledger(run_dir).unwrap() {
             assert!(e.proven() && e.upper.unwrap().value == opt(e.n), "n={}", e.n);
         }
     }
     let (fresh_maps, started_maps) = (inits(&fresh), inits(&started));
-    assert!(fresh_maps.iter().any(|&n| n >= 910), "a fresh run maps boards of 910..960: {fresh_maps:?}");
-    assert!(started_maps.iter().all(|&n| n < 910), "boards of the file are not mapped: {started_maps:?}");
+    assert!(fresh_maps.iter().any(|&n| n >= split), "a fresh run maps boards of the file: {fresh_maps:?}");
+    assert!(started_maps.iter().all(|&n| n < split), "boards of the file are not mapped: {started_maps:?}");
     assert!(!started_maps.is_empty(), "the boards below the file's are");
     let events = std::fs::read_to_string(schedule::events_path(&started)).unwrap();
     assert!(events.contains("\"bounds_file\""), "the start event names the file");
@@ -727,13 +753,13 @@ fn a_run_starts_from_the_file_and_skips_the_maps_of_boards_with_both_bounds() {
     let k = line_of(&bad, alone);
     bad[k].value += 1;
     write_lines(&bounds, &bad);
-    let err = schedule::run(901, 960, &dir.join("run-bad"), &settings, Some(&strict)).unwrap_err();
+    let err = schedule::run(first, last, &dir.join("run-bad"), &settings, Some(&strict)).unwrap_err();
     assert!(err.contains(&format!("n={}: the game", bad[k].n)), "{err}");
     let mut bad = lines.clone();
     let k = line_of(&bad, |l| l.side == Side::Lower && cited.contains(&(l.n, l.value)));
     bad[k].value += 1;
     write_lines(&bounds, &bad);
-    let err = schedule::run(901, 960, &dir.join("run-worse"), &settings, Some(&strict)).unwrap_err();
+    let err = schedule::run(first, last, &dir.join("run-worse"), &settings, Some(&strict)).unwrap_err();
     assert!(err.contains("which no line before it has") || err.contains("the game"), "{err}");
 }
 
@@ -751,7 +777,7 @@ const COMMITTED: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/results/bounds.jso
 /// The lines of the committed store that the quick check verifies: an export writes its lower bounds first, so these
 /// are games replayed by the referee, and the whole file, its upper bounds with it, is the long test's (and is checked
 /// at every export).
-const QUICK_LINES: usize = 60;
+const QUICK_LINES: usize = 10;
 
 /// The first lines of the committed store pass the verifier.  A prefix of an append-only store is a store too: a line
 /// cites only lines before it, so the first `QUICK_LINES` pass as the whole file does.

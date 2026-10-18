@@ -11,6 +11,9 @@ docs listed at the end.
   record each when it ends, failures included, as the notebook's front page says (one file an entry in
   docs/experiments/, with its rows in the register and the index).
 
+* **Keep the quick check quick.**  Every change passes `tools/quick_check.py`, which fails on a slow test or a slow
+  suite; how to keep a test inside its limits is in DESIGN.md, section 9.
+
 ## Where things are
 
 * **README.md**: the guide, glossary and reading order.

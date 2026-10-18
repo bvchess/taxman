@@ -244,10 +244,11 @@ fn a_game_that_passes_the_wall_ends_the_range_with_no_line_and_goes_on_from_its_
     a_game_that_passes_the_wall_goes_on_from_its_clock(800, 801);
 }
 
-/// [`a_game_that_passes_the_wall_ends_the_range_with_no_line_and_goes_on_from_its_clock`] for the game 800 alone.
+/// [`a_game_that_passes_the_wall_ends_the_range_with_no_line_and_goes_on_from_its_clock`] for the game 740 alone, whose
+/// search is shorter.
 #[test]
 fn a_lone_game_that_passes_the_wall_ends_the_range_with_no_line_and_goes_on_from_its_clock() {
-    a_game_that_passes_the_wall_goes_on_from_its_clock(800, 800);
+    a_game_that_passes_the_wall_goes_on_from_its_clock(740, 740);
 }
 
 /// The head `lo` of the range `lo..=hi` passes a wall of 3 ms, and the range goes on from its clock.

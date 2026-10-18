@@ -735,3 +735,26 @@ fn the_vocabulary_check_finds_what_it_should() {
     assert_eq!(found, [(1, "hive"), (3, "hive"), (3, "downstream"), (4, "cap"), (4, "many cores")]);
     assert_eq!(without_link_targets("[a](b.md#c) and [d](e)"), "[a] and [d]");
 }
+
+/// The value of the constant `name` at the top of `tools/quick_check.py`.
+fn quick_check_limit(name: &str) -> f64 {
+    let script = read(crate_dir().join("tools/quick_check.py"));
+    let line = script.lines().find_map(|line| line.strip_prefix(&format!("{name} = "))).expect("a constant");
+    line.split_whitespace().next().and_then(|value| value.parse().ok()).expect("a number")
+}
+
+/// The quick check (`tools/quick_check.py`) passes its own tests, and DESIGN.md states its limits as the script has
+/// them, so that the number in the one is the number in the other.
+#[test]
+fn the_quick_check_passes_its_own_tests_and_design_states_its_limits() {
+    let tests = crate_dir().join("tools/test_quick_check.py");
+    let run = std::process::Command::new("python3").arg("-I").arg(tests).output().expect("python3 runs the tests");
+    assert!(run.status.success(), "{}{}", String::from_utf8_lossy(&run.stdout), String::from_utf8_lossy(&run.stderr));
+
+    let design = read(crate_dir().join("DESIGN.md")).replace('\n', " ");
+    let (target, limit, cpu) =
+        (quick_check_limit("TOTAL_TARGET"), quick_check_limit("TOTAL_LIMIT"), quick_check_limit("TEST_LIMIT"));
+    for stated in [format!("more than {limit} s (the target is {target} s;"), format!("more than {cpu} s of CPU")] {
+        assert!(design.contains(&stated), "DESIGN.md, section 9, does not say {stated:?}: the script's limits changed");
+    }
+}

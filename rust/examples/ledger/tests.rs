@@ -8,7 +8,7 @@ use super::report;
 use super::schedule::{
     self, read_ledger, Attempt, Done, Job, Kind, LnsPlan, LnsRun, Running, Scheduler, Seed, SeedFrom, Settings, Way,
 };
-use super::support::TempDir;
+use super::support::{TempDir, QUICK};
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -25,6 +25,10 @@ pub(crate) fn opt(n: u32) -> u64 {
 pub(crate) fn opt_game(n: u32) -> Vec<u32> {
     Optimal::built_in().moves(n).expect("a board of optimal.json").to_vec()
 }
+
+/// The last board of the stretch 901.. that the runs of the tests prove: 960, and 912 in a quick run (`QUICK`), a
+/// fifth of the work with the same climbs (up to 909 and down to 903, either side of the class 904-908).
+pub(crate) const LAST: u32 = if QUICK { 912 } else { 960 };
 
 /// A book of the boards `ns`, with no bounds but those of the trivial boards.
 pub(crate) fn book_of(ns: impl Iterator<Item = u32>) -> Book {
@@ -68,14 +72,29 @@ fn brackets(book: &Book) -> BTreeMap<(&'static str, Rule), usize> {
 /// them on the right side of the optimum and every game legal, with each relation used for both bounds; and they are
 /// exact where the lemmas are equalities (a prime after a proven board, a repeat of one).
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_relations_bracket_the_optimum_of_every_board_to_520"
+)]
 fn the_relations_bracket_the_optimum_of_every_board_to_1300() {
-    let mut book = book_of(2..=1300);
-    let given: Vec<u32> = (10..=1300).step_by(10).collect();
+    the_relations_bracket_the_optimum_of_every_board_to(1300, 2000);
+}
+
+/// [`the_relations_bracket_the_optimum_of_every_board_to_1300`] for the boards to 520, which pass the width of 512.
+#[test]
+fn the_relations_bracket_the_optimum_of_every_board_to_520() {
+    the_relations_bracket_the_optimum_of_every_board_to(520, 750);
+}
+
+/// The test of the boards 2..=`top`, which the relations must reach with more than `min_changes` changes.
+fn the_relations_bracket_the_optimum_of_every_board_to(top: u32, min_changes: usize) {
+    let mut book = book_of(2..=top);
+    let given: Vec<u32> = (10..=top).step_by(10).collect();
     for &n in &given {
         give(&mut book, n);
     }
     let changes = book.propagate(given.iter().copied()).unwrap();
-    assert!(changes.len() > 2000, "{} changes", changes.len());
+    assert!(changes.len() > min_changes, "{} changes", changes.len());
     let rules = brackets(&book);
     for e in book.entries.values() {
         assert!(e.lower.is_some() && e.upper.is_some(), "n={}: no bound", e.n);
@@ -99,8 +118,25 @@ fn the_relations_bracket_the_optimum_of_every_board_to_1300() {
 /// Loose bounds everywhere (U above the optimum by up to 48, L the game with no promotions) and a proven game every
 /// fiftieth board: what the relations derive still brackets the optimum, and tightens many of the loose bounds.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is loose_bounds_and_the_relations_bracket_the_optimum_of_1001_to_1100"
+)]
 fn loose_bounds_and_the_relations_bracket_the_optimum() {
-    let ns = 1001..=1300;
+    loose_bounds_and_the_relations_bracket_the_optimum_of(1001..=1300, (100, 30));
+}
+
+/// [`loose_bounds_and_the_relations_bracket_the_optimum`] for the boards 1001..=1100.
+#[test]
+fn loose_bounds_and_the_relations_bracket_the_optimum_of_1001_to_1100() {
+    loose_bounds_and_the_relations_bracket_the_optimum_of(1001..=1100, (30, 10));
+}
+
+/// The test of the boards `ns`, where the relations must derive more than `(lower, upper)` bounds of the two sides.
+fn loose_bounds_and_the_relations_bracket_the_optimum_of(
+    ns: std::ops::RangeInclusive<u32>,
+    (lower, upper): (usize, usize),
+) {
     let mut book = book_of(ns.clone());
     for n in ns.clone() {
         let plain = taxman::with_width!(n, W => Board::<W>::for_n(n).plain);
@@ -118,7 +154,7 @@ fn loose_bounds_and_the_relations_bracket_the_optimum() {
     let rules = brackets(&book);
     let derived =
         |side| rules.iter().filter(|((s, r), _)| *s == side && r.is_relation()).map(|(_, c)| c).sum::<usize>();
-    assert!(derived("lower") > 100 && derived("upper") > 30, "{rules:?}");
+    assert!(derived("lower") > lower && derived("upper") > upper, "{rules:?}");
 }
 
 /// The games the relations make from the optimal game of a neighbour are finished and score what the lemmas say: the
@@ -189,10 +225,10 @@ fn a_run_proves_a_stretch_at_the_optimum_and_goes_on_from_its_ledger() {
         save_every: 0.5,
         ..Settings::default()
     };
-    let reason = schedule::run(901, 960, &dir, &settings, None).unwrap();
+    let reason = schedule::run(901, LAST, &dir, &settings, None).unwrap();
     assert_eq!(reason, "all proven");
     let entries = read_ledger(&dir).unwrap();
-    assert_eq!(entries.len(), 60);
+    assert_eq!(entries.len(), (LAST - 900) as usize);
     for e in &entries {
         assert!(e.proven() && e.upper.unwrap().value == opt(e.n), "n={}: {e:?}", e.n);
     }
@@ -212,7 +248,7 @@ fn a_run_proves_a_stretch_at_the_optimum_and_goes_on_from_its_ledger() {
     assert_eq!(actions.last().map(String::as_str), Some("end"));
     assert!(!dir.join("ckpt").read_dir().unwrap().any(|_| true), "the checkpoints of proven boards are deleted");
 
-    let again = schedule::run(901, 960, &dir, &settings, None).unwrap();
+    let again = schedule::run(901, LAST, &dir, &settings, None).unwrap();
     assert_eq!(again, "all proven");
     let kept = read_ledger(&dir).unwrap();
     for (a, b) in entries.iter().zip(&kept) {
@@ -220,7 +256,7 @@ fn a_run_proves_a_stretch_at_the_optimum_and_goes_on_from_its_ledger() {
     }
     let (text, ok) = report::report(&dir, &[]).unwrap();
     assert!(ok, "{text}");
-    assert!(text.contains("60 in the ledger, 60 proven"), "{text}");
+    assert!(text.contains(&format!("{0} in the ledger, {0} proven", LAST - 900)), "{text}");
 }
 
 /// Writes a results file of the optimal games of `ns` to `path`, to give a run as proven.
@@ -478,7 +514,7 @@ fn a_run_climbs_and_parks_and_turns_the_climbs_off() {
         save_every: 0.5,
         ..Settings::default()
     };
-    assert_eq!(schedule::run(901, 960, &dir, &settings, Some(&results)).unwrap(), "all proven");
+    assert_eq!(schedule::run(901, LAST, &dir, &settings, Some(&results)).unwrap(), "all proven");
     let entries = read_ledger(&dir).unwrap();
     for e in &entries {
         assert!(e.proven() && e.upper.unwrap().value == opt(e.n), "n={}: {e:?}", e.n);
@@ -513,17 +549,21 @@ fn a_run_climbs_and_parks_and_turns_the_climbs_off() {
         assert!(report.contains(&format!("climbs {way}: {} among the searches", by_way(way))), "{report}");
     }
 
-    // One way, or none: only the climbs asked for are made.
+    // One way, or none: only the climbs asked for are made (a quick run takes 903..910, the boards that have them).
+    let (first, last) = if QUICK { (903, 910) } else { (901, LAST) };
     let climbs_of = |settings: &Settings| {
         let dir = TempDir::new("ledger-climb-run-ways");
-        assert_eq!(schedule::run(901, 960, &dir, settings, Some(&results)).unwrap(), "all proven");
+        assert_eq!(schedule::run(first, last, &dir, settings, Some(&results)).unwrap(), "all proven");
         let events = std::fs::read_to_string(schedule::events_path(&dir)).unwrap();
         (events.contains("\"way\":\"up\""), events.contains("\"way\":\"down\""), events.contains("\"job\":\"climb\""))
     };
     assert_eq!(climbs_of(&Settings { climb_down: false, ..settings.clone() }), (true, false, true));
     assert_eq!(climbs_of(&Settings { climb_up: false, ..settings.clone() }), (false, true, true));
-    assert!(!climbs_of(&Settings { climb_up: false, climb_down: false, ..settings.clone() }).2);
-    assert!(!climbs_of(&Settings { climb_limit: 0.0, ..settings }).2, "climbs are off");
+    // (A quick run leaves out the runs with the climbs off: the jobs with them off are another test's.)
+    if !QUICK {
+        assert!(!climbs_of(&Settings { climb_up: false, climb_down: false, ..settings.clone() }).2);
+        assert!(!climbs_of(&Settings { climb_limit: 0.0, ..settings }).2, "climbs are off");
+    }
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -552,18 +592,20 @@ pub(crate) fn attempted(dir: &Path, job: &Job) -> Attempt {
 #[test]
 fn the_finder_follows_a_map_and_precedes_a_search_whose_seed_it_has_not_seen() {
     let (dir, n) = (TempDir::new("ledger-finder"), 1218);
+    // The seconds of each run of the finder, which has most of its gain in the first fraction of a second.
+    let seconds = if QUICK { 0.2 } else { 0.5 };
     let referee = |run: &LnsRun| assert_eq!(replay_finished(n, &run.moves), Ok(run.found), "the finder's game");
     // 1218's start incumbent is 204 short of the optimum, which the finder reaches in a fraction of a second.
-    let map = attempted(&dir, &job_of(n, Kind::Init, Vec::new(), None, finder(0.5, None)));
+    let map = attempted(&dir, &job_of(n, Kind::Init, Vec::new(), None, finder(seconds, None)));
     let run = map.lns.as_ref().expect("the finder follows the map");
     assert_eq!(run.from, map.value, "it begins from the start incumbent");
     assert!(run.improved() && run.found <= opt(n), "from {} to {}, the optimum {}", run.from, run.found, opt(n));
-    assert!(run.seconds >= 0.5 && map.seed_from.is_none());
+    assert!(run.seconds >= seconds && map.seed_from.is_none());
     referee(run);
 
     // A search whose best seed is the start game, not the finder's game that the board has since.
     let seeded = |moves: &[u32]| vec![Seed { from: n, moves: moves.to_vec() }];
-    let before = job_of(n, Kind::Search, seeded(&map.moves), None, finder(0.5, Some(run.found)));
+    let before = job_of(n, Kind::Search, seeded(&map.moves), None, finder(seconds, Some(run.found)));
     let first = attempted(&dir, &before);
     let again = first.lns.as_ref().expect("a seed it has not seen: it runs");
     assert_eq!((again.from, first.seed_from), (map.value, Some(SeedFrom::Lns)));
@@ -571,14 +613,16 @@ fn the_finder_follows_a_map_and_precedes_a_search_whose_seed_it_has_not_seen() {
     referee(again);
 
     // A search of the board with the game the finder left it with has nothing new.
-    let same = attempted(&dir, &job_of(n, Kind::Search, seeded(&again.moves), None, finder(0.5, Some(again.found))));
+    let same =
+        attempted(&dir, &job_of(n, Kind::Search, seeded(&again.moves), None, finder(seconds, Some(again.found))));
     assert!(same.lns.is_none() && same.seed_from == Some(SeedFrom::Own));
     // A climb runs the finder all the same.
     let climb = job_of(n, Kind::Climb(Way::Up), seeded(&again.moves), None, finder(0.1, Some(again.found)));
     assert!(attempted(&dir, &climb).lns.is_some());
-    // A seed that reaches the ceiling is settled by the search at once.
-    let capped = job_of(n, Kind::Search, seeded(&again.moves), Some(again.found), finder(0.5, None));
-    let capped = attempted(&dir, &capped);
+    // A seed that reaches the ceiling is settled by the search at once (in a directory of its own: the checkpoint of
+    // the searches above may hold a game that beats the finder's).
+    let capped = job_of(n, Kind::Search, seeded(&again.moves), Some(again.found), finder(seconds, None));
+    let capped = attempted(&TempDir::new("ledger-finder-capped"), &capped);
     assert!(capped.lns.is_none() && capped.reached_cap && capped.value == again.found);
     // No seconds, no finder.
     assert!(attempted(&TempDir::new("ledger-no-finder"), &job_of(n, Kind::Init, Vec::new(), None, finder(0.0, None)))
@@ -698,7 +742,7 @@ fn a_run_with_the_finder_proves_the_stretch_and_the_events_and_the_report_say_wh
         save_every: 0.5,
         ..Settings::default()
     };
-    assert_eq!(schedule::run(901, 960, &dir, &settings, Some(&results)).unwrap(), "all proven");
+    assert_eq!(schedule::run(901, LAST, &dir, &settings, Some(&results)).unwrap(), "all proven");
     for e in read_ledger(&dir).unwrap() {
         assert!(e.proven() && e.upper.unwrap().value == opt(e.n), "n={}: {e:?}", e.n);
     }
@@ -720,7 +764,7 @@ fn a_run_with_the_finder_proves_the_stretch_and_the_events_and_the_report_say_wh
         assert!(seed.is_null() || ["n-1", "n", "n+1", "lns"].contains(&seed.as_str().unwrap()), "{e}");
         assert!(e.get("below_proven").and_then(Json::as_bool).is_some() && e.get("above_proven").is_some(), "{e}");
     }
-    assert!(runs > 10, "the finder ran {runs} times in {} jobs", jobs.len());
+    assert!(runs > (LAST - 900) as usize / 6, "the finder ran {runs} times in {} jobs", jobs.len());
     let start = std::fs::read_to_string(schedule::events_path(&dir)).unwrap();
     assert!(start.lines().next().unwrap().contains("\"lns_s\":0.05"), "the start event has the setting");
     let (report, ok) = report::report(&dir, &[]).unwrap();
@@ -744,7 +788,7 @@ fn with_no_seconds_for_the_finder_nothing_of_it_is_left_and_the_order_of_the_job
         save_every: 0.5,
         ..Settings::default()
     };
-    assert_eq!(schedule::run(901, 960, &dir, &settings, Some(&results)).unwrap(), "all proven");
+    assert_eq!(schedule::run(901, LAST, &dir, &settings, Some(&results)).unwrap(), "all proven");
     for e in read_ledger(&dir).unwrap() {
         assert!(e.lns_score.is_none() && e.lower.as_ref().unwrap().rule != Rule::Lns, "n={}: {e:?}", e.n);
     }

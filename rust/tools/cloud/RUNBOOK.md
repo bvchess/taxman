@@ -2113,10 +2113,12 @@ as many at once as there are CPUs, over all the binaries together: the tests wit
 longest first (`test-times.json`, rewritten after each run, kept in the cache), so that the longest does not start last.
 The doc tests run as `cargo test --doc`.  A failing test does not stop the others (as `--no-fail-fast`); each is run
 once more alone afterwards, to say in the report whether it fails only in company.  A test that outlasts `TEST_TIMEOUT`
-is killed and fails.  Every test in its own process is stricter than threads of one process (no shared statics, no
-leftover environment) and costs each test its own start; the suite passes that way (below).  Tests that start a thread
-per CPU themselves share the machine with all the others, so a test that depends on its speed shows it: lower
-`TEST_JOBS` to see whether that is it.
+is killed and fails.  The summary (`--summary`) names the ten tests that used the most CPU, with their seconds of CPU
+(a test's own, which do not grow when the machine is busy); `tools/quick_check.py` runs the suite without `--release`
+and judges it by them (DESIGN.md, section 9).  Every test in its own process is stricter than threads of one process
+(no shared statics, no leftover environment) and costs each test its own start; the suite passes that way (below).
+Tests that start a thread per CPU themselves share the machine with all the others, so a test that depends on its
+speed shows it: lower `TEST_JOBS` to see whether that is it.
 
 **Time**, by estimate for 64 vCPUs (measured on the laptop, below): the tests themselves about 30 to 60 seconds, the
 build of the test executables 3 to 5 minutes (the release profile, one codegen unit each: the library first, then the 35

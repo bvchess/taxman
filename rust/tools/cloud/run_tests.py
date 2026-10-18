@@ -17,8 +17,11 @@ usage: run_tests.py [options] LABEL=DIR [LABEL=DIR ...]      (DIR holds a Cargo.
   --times FILE     how long each test took in earlier runs (JSON; read if it exists, rewritten after the run): the
                    tests with no entry go first, then the longest.  Without it every test is unknown and they run in
                    the order of their binaries.
-  --report FILE    a text report: the totals, the slowest tests, and each failure with its output
-  --summary FILE   the counts as JSON (build_cache.py put reads it): crates -> passed, failed, ignored; seconds; jobs
+  --report FILE    a text report: the totals, the slowest tests and those that used the most CPU, and each failure
+                   with its output
+  --summary FILE   the counts as JSON (build_cache.py put reads it): crates -> passed, failed, ignored; seconds; jobs;
+                   and the 10 tests that used the most CPU (their seconds, and their seconds of CPU, which do not grow
+                   when the machine is busy)
   --timeout S      a test that runs longer than S seconds (default 3600) is killed and counted as failed
   --filter TEXT    only the tests whose name has TEXT in it (the times file keeps the other tests' entries)
   --no-doc         leave out the doc tests
@@ -76,6 +79,7 @@ class Outcome(NamedTuple):
     output: str  # of a test that did not pass
     passed: int  # tests (a test is one; the doc tests of a crate are as many as it has)
     failed: int
+    cpu: float = 0.0  # seconds of CPU the test used, user plus system
 
 
 live: Set[subprocess.Popen] = set()
@@ -99,29 +103,42 @@ def kill_all() -> None:
                 pass
 
 
-def run(command: List[str], cwd: Path, timeout: Optional[float]) -> Tuple[str, str, float]:
-    """Runs a command in a process group of its own; returns (status, output, seconds).  The status is `exit N`, or
-    `timed out`."""
+def run(command: List[str], cwd: Path, timeout: Optional[float]) -> Tuple[str, str, float, float]:
+    """Runs a command in a process group of its own; returns (status, output, seconds, cpu seconds).  The status is
+    `exit N`, or `timed out`.  The CPU seconds are the command's own, user plus system, with those of the processes it
+    waited for: they do not grow when the machine is busy, as the seconds do."""
     start = time.monotonic()
     env = dict(os.environ, CARGO_MANIFEST_DIR=str(cwd))
     process = subprocess.Popen(command, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                stderr=subprocess.STDOUT, start_new_session=True, text=True, errors="replace")
     with live_lock:
         live.add(process)
-    try:
-        output, _ = process.communicate(timeout=timeout)
-        status = f"exit {process.returncode}"
-    except subprocess.TimeoutExpired:
+    expired = threading.Event()
+
+    def expire() -> None:
+        expired.set()
         try:
             os.killpg(process.pid, signal.SIGKILL)
         except OSError:
             pass
-        output, _ = process.communicate()
-        status = "timed out"
+
+    timer = threading.Timer(timeout, expire) if timeout is not None else None
+    if timer:
+        timer.start()
+    try:
+        output = process.stdout.read()
+        # (Not `communicate`, which waits for the process itself and leaves its resource usage unsaid.)
+        _, wait_status, usage = os.wait4(process.pid, 0)
+        process.returncode = os.waitstatus_to_exitcode(wait_status)
+        killed = expired.is_set() and process.returncode == -signal.SIGKILL
+        status = "timed out" if killed else f"exit {process.returncode}"
     finally:
+        if timer:
+            timer.cancel()
+        process.stdout.close()
         with live_lock:
             live.discard(process)
-    return status, output, time.monotonic() - start
+    return status, output, time.monotonic() - start, usage.ru_utime + usage.ru_stime
 
 
 # --- building and listing -------------------------------------------------------------------------------------------
@@ -167,7 +184,7 @@ def build(label: str, directory: Path, options: List[str]) -> List[Binary]:
 def list_tests(binary: Binary) -> Tuple[List[Test], int]:
     """The tests of a test executable that `cargo test` would run, and the number it would leave out as ignored."""
     def names(*options: str) -> List[str]:
-        status, output, _ = run([binary.executable, "--list", *options], binary.directory, 300)
+        status, output, _, _ = run([binary.executable, "--list", *options], binary.directory, 300)
         if status != "exit 0":
             raise SuiteError(f"{binary.executable} --list {' '.join(options)}: {status}\n{output}")
         return [m.group(1) for m in map(LISTED.fullmatch, output.splitlines()) if m]
@@ -179,18 +196,18 @@ def list_tests(binary: Binary) -> Tuple[List[Test], int]:
 
 # --- running ----------------------------------------------------------------------------------------------------------
 def run_test(test: Test, timeout: float) -> Outcome:
-    status, output, seconds = run([test.binary.executable, "--exact", test.name, "--test-threads=1"],
-                                  test.binary.directory, timeout)
+    status, output, seconds, cpu = run([test.binary.executable, "--exact", test.name, "--test-threads=1"],
+                                       test.binary.directory, timeout)
     # `--exact` with a name that matches nothing runs no test and succeeds: a test that did not run did not pass.
     if status == "exit 0" and PASSED.search(output):
-        return Outcome(test.id, test.binary.label, "passed", seconds, "", 1, 0)
+        return Outcome(test.id, test.binary.label, "passed", seconds, "", 1, 0, cpu)
     return Outcome(test.id, test.binary.label, "timed out" if status == "timed out" else "failed", seconds,
-                   f"[{status}]\n{output}", 0, 1)
+                   f"[{status}]\n{output}", 0, 1, cpu)
 
 
 def run_doc_tests(label: str, directory: Path, options: List[str], jobs: int) -> Outcome:
     command = ["cargo", "test", *options, "--doc", "--no-fail-fast", "--", f"--test-threads={jobs}"]
-    status, output, seconds = run(command, directory, None)
+    status, output, seconds, cpu = run(command, directory, None)
     passed = failed = 0
     for line in output.splitlines():
         counted = RESULT_LINE.search(line)
@@ -199,7 +216,7 @@ def run_doc_tests(label: str, directory: Path, options: List[str], jobs: int) ->
             failed += int(counted.group(2))
     ok = status == "exit 0" and failed == 0
     return Outcome(f"{label}/doc", label, "passed" if ok else "failed", seconds, "" if ok else f"[{status}]\n{output}",
-                   passed, failed if failed or ok else 1)
+                   passed, failed if failed or ok else 1, cpu)
 
 
 def schedule(tests: List[Test], times: Dict[str, float]) -> List[Test]:
@@ -328,11 +345,13 @@ def main() -> int:
         counts[outcome.label]["failed"] += outcome.failed
 
     slowest = sorted(outcomes, key=lambda o: -o.seconds)[:8]
+    costliest = sorted(outcomes, key=lambda o: -o.cpu)[:10]
     lines = [f"{label}: {c['passed']} passed, {c['failed']} failed, {c['ignored']} ignored"
              for label, c in counts.items()]
     lines.append(f"{seconds:.0f} s for the tests ({time.monotonic() - started:.0f} s with the build), "
                  f"{args.jobs} at a time, {cpu:.0f} CPU seconds")
     lines.append("slowest: " + ", ".join(f"{o.id} {o.seconds:.1f} s" for o in slowest))
+    lines.append("most CPU: " + ", ".join(f"{o.id} {o.cpu:.1f} s" for o in costliest[:8]))
     for line in lines:
         say(line)
     if args.report:
@@ -343,8 +362,9 @@ def main() -> int:
             text += f" ====\n{outcome.output}"
         Path(args.report).write_text(text)
     if args.summary:
+        costly = [{"id": o.id, "seconds": round(o.seconds, 2), "cpu": round(o.cpu, 2)} for o in costliest]
         Path(args.summary).write_text(json.dumps({"crates": counts, "seconds": seconds, "cpu_seconds": cpu,
-                                                  "jobs": args.jobs, "tests": len(tests)}) + "\n")
+                                                  "jobs": args.jobs, "tests": len(tests), "costliest": costly}) + "\n")
     if args.times:
         write_times(Path(args.times), outcomes, listed, times, bool(args.filter))
     return 1 if failed else 0

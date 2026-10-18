@@ -248,7 +248,7 @@ fn certify_names_the_input_that_is_missing() {
 #[test]
 fn verify_results_reports_the_same_on_any_number_of_threads() {
     let dir = TempDir::new("verify-results");
-    let results = solve_into(&dir, "results.jsonl", "1-60");
+    let results = solve_into(&dir, "results.jsonl", "1-40");
     // The report, without the line that says how long the check took.
     let report = |threads: &str| {
         let run = taxman(&["verify-results", "--threads", threads, &results]);
@@ -256,7 +256,7 @@ fn verify_results_reports_the_same_on_any_number_of_threads() {
         run.stdout.lines().filter(|line| !line.starts_with("checked in")).collect::<Vec<_>>().join("\n")
     };
     let one = report("1");
-    assert!(one.contains("60 completed games"), "{one}");
+    assert!(one.contains("40 completed games"), "{one}");
     assert!(one.contains("same_search"), "{one}");
     assert_eq!(report("2"), one);
     assert_eq!(report("4"), one);

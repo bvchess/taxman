@@ -174,12 +174,13 @@ profile-guided build in `target/pgo/release` (0-2% fewer cycles on the M1, the s
 how, and DESIGN.md "Performance" what it gains); `examples/perf.rs` measures the hot paths.
 
 ```
-cargo test                         # the quick check: the long tests are skipped
+tools/quick_check.py               # the quick check: fmt, clippy and the tests, the long ones skipped, within time limits
+cargo test                         # the same tests, a binary at a time
 cargo test --release               # the full suite
 ```
 
-Both run as many test threads as the machine has CPUs, and neither builds the study tools (`--features studies` adds
-them and their tests).  What each takes, and when each is run, is in [DESIGN.md](DESIGN.md#9-testing).
+The tests run as many threads as the machine has CPUs, and none of these builds the study tools (`--features studies`
+adds them and their tests).  What each takes, and when each is run, is in [DESIGN.md](DESIGN.md#9-testing).
 
 The ignored tests are for large machines and long runs: `cargo test --release --test engine -- --ignored
 many_threads` (64 and 192 worker threads), `TXENGINE_STRESS=2000 cargo test --release --test engine -- --ignored
