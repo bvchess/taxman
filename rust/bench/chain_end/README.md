@@ -19,3 +19,19 @@ Commands as run: `t1`, `t2`, `t4`, `t8` = `run.sh T 130 tT`; `setupT` = `run.sh 
 The search began about 42 s after the start on one thread (12 s on eight: the start incumbent's local search is
 parallel) and its clock starts then; the cloud log's "5.9 hours" of game 3441 were 5 hours of waiting in the window
 for game 3440 and a 50-minute search.
+
+## The calibration on the cloud (2026-10-16)
+
+What it asked and found: [the entry](../../docs/experiments/the-calibration-for-the-run-to-4000-2026-10.md).  The same
+game resumed from the same checkpoint on one `c8g.16xlarge` (64 CPUs; 2026-10-16, 16:41:00Z to 17:07:23Z, commit 97db411),
+and four proofs of the ladder.  The files are in `calib-20261016/`:
+
+| file | what it is |
+|---|---|
+| `calib.sh` | the script as it ran, from `~/taxman` after `setup.sh`: `taxman solve 3441 --threads T --time-limit 180 --checkpoint-interval 300 --progress 10` for T = 1, 16, 32 and 64, each on copies of the checkpoint and of `results/strict.jsonl`, under `perf stat -d` and `/usr/bin/time -v`; then `ladder --threads T --seed-opt --known results/strict.jsonl [--tactic forget_nogoods=off] 3232 3360 3388 3179` (60 s a game) at 64 threads with the default tactics, at 64 with `forget_nogoods=off`, and at 32 with the default |
+| `out/calib.log` | its log: the machine (`lscpu`), the stages' times, the last two progress lines of each resumed run and the ladder's rows (one of its lines is the S3 download's progress, left in) |
+| `out/t1/`, `out/t16/`, `out/t32/`, `out/t64/` | for each thread count: `progress.txt` (the solver's progress line every 10 s), `perf.txt` (cycles, instructions, branch and L1 misses), `time.txt` (`/usr/bin/time -v`) and `stdout.txt` (the game's line: stopped, incomplete) |
+| `out/ladder_default64.txt`, `out/ladder_noforget64.txt`, `out/ladder_default32.txt` | the ladder's rows, a game a line (the nodes, the rate and the engine's counters; all four are `OPEN` at 60 s), each with its `.time` (`/usr/bin/time -v`) |
+
+Not kept: the checkpoint (5.3 MB) and the four copies of the chain's results file that each run wrote (`out.jsonl`, 17
+MB each), which the S3 prefix of the run held.
