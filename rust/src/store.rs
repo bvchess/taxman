@@ -126,6 +126,15 @@ impl Side {
     pub fn of(name: &str) -> Option<Side> {
         [Side::Lower, Side::Upper].into_iter().find(|side| side.name() == name)
     }
+
+    /// Whether a bound of this side worth `new` takes the place of the best so far, worth `have`: a higher lower bound,
+    /// a lower upper bound, and of equal values the later line (the rule of [`Best`]).
+    pub fn replaces(self, new: u64, have: u64) -> bool {
+        match self {
+            Side::Lower => new >= have,
+            Side::Upper => new <= have,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -527,17 +536,12 @@ impl<'a> Best<'a> {
     pub fn of(lines: impl IntoIterator<Item = &'a Line>) -> Best<'a> {
         let mut best = Best::default();
         for line in lines {
-            match line.side {
-                Side::Lower => {
-                    if best.lower.get(&line.n).is_none_or(|have| have.value <= line.value) {
-                        best.lower.insert(line.n, line);
-                    }
-                }
-                Side::Upper => {
-                    if best.upper.get(&line.n).is_none_or(|have| have.value >= line.value) {
-                        best.upper.insert(line.n, line);
-                    }
-                }
+            let side = match line.side {
+                Side::Lower => &mut best.lower,
+                Side::Upper => &mut best.upper,
+            };
+            if side.get(&line.n).is_none_or(|have| line.side.replaces(line.value, have.value)) {
+                side.insert(line.n, line);
             }
         }
         best

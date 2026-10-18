@@ -272,7 +272,7 @@ option names another):
 Of a board that several hold, the committed chain's game is taken, then the store's, then the table's.  What it does:
 
 * **A board that a source has proven is recorded with no search**: method `known`, proof `known`, no `setup`, and a
-  `known` field that cites the source (section 4; section 5, "Known games").  The game is replayed by the referee, like
+  `known` field that cites the source (section 4; section 5, "Citing a known source").  The game is replayed by the referee, like
   every game, and checked against the game before it (`score(n - 1) <= score(n) <= n + score(n - 1)`) and the table.
   `n + 1` has the game of `n` for its ceiling and seed as usual; a proof that rests on it, the ceiling's or the prime
   formula's, assumes what it does.
@@ -584,7 +584,7 @@ Game 249 of that run repeated the search of 248; its line has `"method":"repeat"
 | `in_the_bag` | what the game with no promotions scores (null for prime shortcuts and known games, which set no board up) |
 | `prev` | the game of n - 1 this one was built from: score, where it came from (`run`, `results`, `optimal`, `strict`, `bounds`), a digest of its moves, its proof and what it assumes; null if there was none.  A `run` or `results` game with no proof is the best game of an unfinished search (`--keep-going`): a seed, proven by nothing (section 5, "What a game had from n - 1") |
 | `same_search` | for a repeat, the earlier game of the file whose search it repeats: its board size, the digest of the search problem they share, the problem's best promotion sum, that game's proof and what it assumes; null otherwise |
-| `known` | a key only a line that cites a known source has (section 5, "Known games"): `{"source":"optimal"}` or `{"source":"strict"}` for a game taken from `optimal.json` or the committed chain, or `{"source":"bounds","lower":{"rule":..,"source":..},"upper":{"rule":..,"source":..}}` for the lines of the bounds store whose bound of n is the score (`lower` null when a search found the game and the upper bound stopped it) |
+| `known` | a key only a line that cites a known source has (section 5, "Citing a known source"): `{"source":"optimal"}` or `{"source":"strict"}` for a game taken from `optimal.json` or the committed chain, or `{"source":"bounds","lower":{"rule":..,"source":..},"upper":{"rule":..,"source":..}}` for the lines of the bounds store whose bound of n is the score (`lower` null when a search found the game and the upper bound stopped it) |
 | `nodes`, `stats` | search steps over all invocations, and the searcher's counters (`match_bounds` is the number of node bounds computed, GF(2) or matching) |
 | `engine` | this invocation's splits, checkpoints written, units spilled, largest in-memory queue |
 | `setup` | null on a `trivial`, `prime` or `known` line, which set up no search; otherwise the frames and candidates found, `max_total` (the most promotions the freedoms allow), the greedy start, `cap` (ceiling on the promotion sum, `n + score(n-1) - in_the_bag`; null on a repeat, which ran no search to stop), and `digest`, a digest of the search problem the setup poses (DESIGN.md, "Same search"), by which a later game finds this one to repeat |
@@ -612,7 +612,7 @@ Each completed game records how its optimality is established (`proof`):
 | `same_search` | the game's search problem (frames, candidates, `max_total`, the factor graph among their numbers) is the one an earlier game m of the file posed, and m's proof (`exhausted`, `cap` or `same_search`) settled its best promotion sum; the game is m's promotions on this board (tactic `same_search`; the argument is in [DESIGN.md](DESIGN.md#same-search)) | no: on the game m it repeats |
 | `known` | a known source (`--use-prev`) holds the game, or an upper bound of it ended the search: the line's `known` field cites the source, and what the proof assumes follows from it (below) | no: on the source |
 
-### Known games
+### Citing a known source
 
 A line of proof `known` has a `known` field that says which source it rests on:
 
@@ -681,7 +681,7 @@ a game and the one before it are both completed, the chain bounds hold between t
   against `optimal.json`, the chain from n - 1, each line's arithmetic and provenance, that its fields agree with each
   other as the solver writes them (so that a hand edit cannot drop an assumption or change a proof), that the files
   agree, and a count of games by proof kind and by what they assume.  For a repeat it sets the search problems of both
-  games up again and compares them.  For a `known` line it checks the citation against the sources ("Known games"
+  games up again and compares them.  For a `known` line it checks the citation against the sources ("Citing a known source"
   above): the table, the committed chain and the bounds store of the repository, which it reads as they are, since their
   own referees check them (`ledger verify-bounds` and `tools/check_bounds.py` the store).  Opening a results file for
   `--out` runs the same checks, with the sources `--use-prev` draws on.

@@ -228,15 +228,10 @@ impl Held {
     fn new(store: Store) -> Held {
         let (mut lower, mut upper, mut at) = (HashMap::new(), HashMap::new(), HashMap::new());
         for (i, line) in store.lines.iter().enumerate() {
-            // As `Best::of`: of equal values the later line.
-            match line.side {
-                Side::Lower if lower.get(&line.n).is_none_or(|&j: &usize| store.lines[j].value <= line.value) => {
-                    lower.insert(line.n, i);
-                }
-                Side::Upper if upper.get(&line.n).is_none_or(|&j: &usize| store.lines[j].value >= line.value) => {
-                    upper.insert(line.n, i);
-                }
-                _ => {}
+            // The best line of a board and side is the one `Best::of` picks.
+            let best: &mut HashMap<u32, usize> = if line.side == Side::Lower { &mut lower } else { &mut upper };
+            if best.get(&line.n).is_none_or(|&j| line.side.replaces(line.value, store.lines[j].value)) {
+                best.insert(line.n, i);
             }
             at.entry((line.n, line.side, line.value)).or_insert(i);
         }
