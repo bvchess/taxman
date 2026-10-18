@@ -50,6 +50,15 @@ pub struct Params {
     pub claims: Option<PathBuf>,
     pub node_steps: usize,
     pub sub: bool,
+    /// The A1 bound (`fields.rs`): the seconds of the root fit `choice-prepare` makes for a game (`--fit-seconds`; 0:
+    /// none, so no A1 bounds), the directory of fits it takes before fitting (`--fits`), whether `choice` measures the
+    /// A1 bounds (`--a1`), the pricings of the warm refit (`--a1-pricings`) and the seconds of the node's own master
+    /// (`--a1-seconds`).
+    pub fit_seconds: f64,
+    pub fits: Option<PathBuf>,
+    pub a1: bool,
+    pub a1_pricings: usize,
+    pub a1_seconds: f64,
 }
 
 impl Default for Params {
@@ -69,6 +78,11 @@ impl Default for Params {
             claims: None,
             node_steps: 50,
             sub: false,
+            fit_seconds: 0.0,
+            fits: None,
+            a1: false,
+            a1_pricings: 20,
+            a1_seconds: 30.0,
         }
     }
 }
@@ -281,6 +295,7 @@ mod tests {
         let dir = crate::support::TempDir::new("wall-choice");
         let mut o = options("choice-prepare", 0.2);
         (o.params.steps, o.params.paths, o.params.keep) = (30, 3, 6);
+        o.params.fit_seconds = 3.0;
         o.params.fixtures = Some(Path::new(env!("CARGO_MANIFEST_DIR")).join("testdata/perf"));
         o.params.prep = Some(dir.0.join("prep"));
         let prepared = line_of(Command::ChoicePrepare, 936, &o);
@@ -289,12 +304,17 @@ mod tests {
         assert!(yes(&prepared, "known") && incumbent <= root && pool > 0, "{prepared}");
         assert_eq!((number(&prepared, "fixture_kept"), number(&prepared, "path_kept")), (6, 3), "{prepared}");
         assert!(number(&prepared, "fixture_open") >= 6, "{prepared}");
-        assert!(dir.0.join("prep/n0936.choice").exists());
+        assert!(dir.0.join("prep/n0936.choice").exists() && dir.0.join("prep/n0936.fit.json").exists());
+        let (a1_bound, a1_source) = (prepared.get("a1_bound").and_then(Json::as_i64), prepared.get("a1_source"));
+        assert!(a1_bound >= Some(incumbent as i64) && a1_bound <= Some(root as i64), "{prepared}");
+        assert_eq!(a1_source.and_then(Json::as_str), Some("fitted"), "{prepared}");
 
         let mut m = options("choice", 0.0);
         m.params.prep = o.params.prep.clone();
         m.params.node_steps = 15;
         m.params.sub = true;
+        m.params.a1 = true;
+        m.params.a1_seconds = 3.0;
         m.params.results = Some(dir.0.join("out"));
         m.params.claims = Some(dir.0.join("claims"));
         let line = line_of(Command::Choice, 936, &m);
@@ -308,6 +328,15 @@ mod tests {
             let strong = unit.get("strong").unwrap();
             assert_eq!(number(unit, "pool"), pool, "{unit}");
             assert!(!strong.get("lows").and_then(Json::as_arr).unwrap().is_empty(), "{unit}");
+            let a1 = unit.get("a1").filter(|a1| !a1.is_null()).unwrap_or_else(|| panic!("a1 in {unit}"));
+            for variant in ["r2", "full"] {
+                let found = a1.get(variant).unwrap_or_else(|| panic!("{variant} in {unit}"));
+                let (bound, cut) =
+                    (found.get("bound").and_then(Json::as_i64), found.get("cut").and_then(Json::as_bool));
+                // A node on the way to the optimum is cut by nothing: its target is what its best completion reaches.
+                let cuts = (source != "path").then(|| bound < unit.get("need").and_then(Json::as_i64));
+                assert!(bound.is_some() && cut == Some(cuts.unwrap_or(false)), "{unit}");
+            }
             if source == "path" {
                 assert!(matches!(unit.get("subtree"), Some(Json::Null)) && number(unit, "lower") > 0, "{unit}");
             } else {

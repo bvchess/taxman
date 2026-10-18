@@ -11,12 +11,24 @@
 //! subgradient steps (the root's, `nogoods::fit`), warm-started from the multipliers fitted at the root, and it stops
 //! at the first step whose bound is below what the node needs (the node is then *cut*).
 //!
+//! Two more strong bounds can be measured at the same nodes, the *A1 bounds* ([`fields`](super::fields): GF(2) and
+//! signed GF(3) frame matroids coupled by multipliers that a column generation fits, with a certified bracket;
+//! docs/experiments/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10.md): **r2**, the study's warm refit (the
+//! multipliers of the game's root fit, then a column generation of at most `--a1-pricings` evaluations from the root's
+//! master columns and rank inequalities that still hold at the node, with no exact check), and **full**, the node's
+//! own master with the exact checks and the separation of the node's own cores, from the root fit's multipliers and
+//! signings, stopping at the first bound that cuts and within `--a1-seconds` (then *capped*).  Each is the lowest
+//! `⌊L⌋` it evaluated, a bound on the node's completions at any multipliers and signings, and cuts the node when it
+//! is below `need`.
+//!
 //! The work is in two commands, so that the cloud can share the nodes among processes:
 //!
 //! * **choice-prepare** (`--prep DIR --known FILE N...`), once a game: the nogood pool (the nogoods that the finder
 //!   and the sound search learn from the standalone start in `--cpu` CPU seconds each, as `nogoods::finder` and
 //!   `nogoods::control` harvest them), the multipliers fitted at the root (`--steps` steps towards the incumbent plus
-//!   one), and the nodes to measure, written to `DIR/nNNNN.choice`.  The incumbent a node needs to beat is the game's
+//!   one), with `--fit-seconds S` the A1 root fit (the file `DIR/nNNNN.fit.json`, which `choice --a1` reads: the fit
+//!   of `--fits DIR`'s `nN.json` if that has one, else the main arm of the study fitted for S seconds), and the nodes
+//!   to measure, written to `DIR/nNNNN.choice`.  The incumbent a node needs to beat is the game's
 //!   known optimum (`--known`), else the incumbent of the game's units in the tuning suite (`--suite`: a game of the
 //!   suite that the chain has not reached).  The nodes ([`sample`](super::sample) has the sources) are those of the
 //!   fixture `--fixtures DIR` has for the game and the game's units in the suite, each source thinned to `--keep`
@@ -27,7 +39,11 @@
 //!   incumbent), `finder_pool`, `search_pool` and `pool`, `harvest_cpu_s`, `fit_steps`, `fit_cpu_s`, `active` (nogoods
 //!   with a positive multiplier), `relaxed_root` and `share` (the root-λ bound and the share of the gap it closes),
 //!   and for each source the nodes there were, the open ones and the units kept: `fixture`, `fixture_open`,
-//!   `fixture_kept`, `suite`, `suite_open`, `suite_kept`, `path_kept`.
+//!   `fixture_kept`, `suite`, `suite_open`, `suite_kept`, `path_kept`; with `--fit-seconds` also `a1_source` (`file` or
+//!   `fitted`), `a1_fit_s` (the CPU seconds it took to read the fit back, checking that it gives its bound again, or
+//!   to fit it), `a1_bound` (the fit's bound at the root), `a1_share` (the share of the root's gap over the
+//!   incumbent that it closes), and for a fitted one `a1_stop` (how it ended: `Converged`, or the budget that ran
+//!   out) and `a1_lb` (the certified lower bound on its LP, 0 if none).
 //! * **choice** (`--prep DIR N...`), for each unit of the games' files, the heaviest first: its subtree, today's
 //!   bound, the strong bound and the times, as a line of JSON on stdout.  With `--results DIR --worker K` the lines
 //!   are also appended to `DIR/worker-K.jsonl`, and a unit that any file of `DIR` already has is skipped, so a run
@@ -51,6 +67,14 @@
 //!   wall seconds into the fit at the end of each step) and `s` (the fit's CPU seconds, the live filter included, the
 //!   matroids not); and `sub`: the same with the nogoods of the solve besides (`extra`: those not in the pool), or
 //!   null without `--sub-nogoods`.  That is a bound of hindsight, for what a searcher's own table could give;
+//! * `a1`, with `--a1` (else null): the A1 bounds.  `build_s` is the CPU seconds of the node's GF(2) frame matroids
+//!   as vectors, and `r2` and `full` are the two bounds, each with `bound` (the lowest `⌊L⌋` it evaluated), `cut` (it is
+//!   below `need`), `stop` (how it ended: `Target` when it cut, `Converged` or `Fitted` when it settled, `Seconds`,
+//!   `Pricings`, `Rounds` or `Breakdown` when a budget or the master ended it), `capped` (it ended before settling
+//!   and did not cut: more time might have cut), `pricings` (evaluations of `L`; `r2`'s are those after the first),
+//!   and `s`, the CPU seconds it took besides `build_s` (`r2`'s include its first evaluation, at the root fit's
+//!   multipliers, which is `tier1`, a field of `r2` alone; `full` has `rounds`, its separation rounds).  A path node's
+//!   `full` gets at most 2 CPU seconds: it cannot cut, and only its bound is checked;
 //! * the unit's solve by the engine on one thread, fresh nogood tables and the forgetting of the default (as the
 //!   example `tune` solves a unit) from the incumbent: `subtree` (the engine's steps), `completed` (false when `--cap`
 //!   stopped it),
@@ -61,6 +85,7 @@
 //! holds a better set, or a set better than the known optimum is a fault, reported after the game's lines.
 
 use super::case::{budgeted, Case, Clock, Played};
+use super::fields::{self, Found, Limits, Node, Root, SavedFit};
 use super::nogoods::{control, finder, fit, harvesting, promotable, sorted, union, Fit, Fitting, Sink};
 use super::sample::{fixture_nodes, path_nodes, suite_nodes, Source};
 use super::{root_bound, Line};
@@ -76,7 +101,7 @@ use taxman::bounds::max_additional;
 use taxman::gf2::{Gf2Bound, Gf2Graph};
 use taxman::json::Json;
 use taxman::matchbound::lagrange::SCALE;
-use taxman::model::Scratch;
+use taxman::model::{FrameSet, Scratch};
 use taxman::search::{NodeBound, TaxUnit};
 
 /// The version of the prepared file.
@@ -166,6 +191,11 @@ struct Prep<const W: usize> {
 /// The name of the file of game `n` in a prepared directory.
 fn file_name(n: u32) -> String {
     format!("n{n:04}.choice")
+}
+
+/// The name of the file of game `n`'s A1 root fit in a prepared directory.
+fn fit_name(n: u32) -> String {
+    format!("n{n:04}.fit.json")
 }
 
 impl<const W: usize> Prep<W> {
@@ -336,6 +366,9 @@ pub fn prepare<const W: usize>(case: &Case<'_, W>) -> Result<Played, String> {
             (root > incumbent.sum)
                 .then(|| format!("{:.4}", (root as i64 - relaxed_root) as f64 / (root - incumbent.sum) as f64)),
         );
+    if params.fit_seconds > 0.0 {
+        a1_fit(case, dir, (incumbent.sum, root), &mut line, &mut faults)?;
+    }
     for source in [Source::Fixture, Source::Suite] {
         let sampled = match source {
             Source::Fixture => fixture_nodes::<W>(&params.fixtures, n, incumbent.sum)?,
@@ -389,8 +422,53 @@ pub fn prepare<const W: usize>(case: &Case<'_, W>) -> Result<Played, String> {
     Ok(Played { line, faults })
 }
 
+/// The A1 root fit of the game, made for `choice --a1`: `--fits`' `nN.json` if it has one, else the study's main arm
+/// fitted within `--fit-seconds`; checked to give its bound again at the root, written to the prepared directory
+/// (`fit_name`), and described on `line`.  `(incumbent, root)`: the incumbent's promotion sum and the root's GF(2)
+/// bound.
+fn a1_fit<const W: usize>(
+    case: &Case<'_, W>,
+    dir: &Path,
+    (incumbent, root): (u64, u64),
+    line: &mut Line,
+    faults: &mut Vec<String>,
+) -> Result<(), String> {
+    let (n, p, params) = (case.n(), case.p, case.params);
+    let on_file = params.fits.as_ref().map(|fits| fits.join(format!("n{n}.json"))).filter(|path| path.exists());
+    let clock = Clock::start();
+    let (saved, how) = match &on_file {
+        Some(path) => (SavedFit::load(path)?, None),
+        None => {
+            let fitted = fields::fit_root(p, n, incumbent, root, params.fit_seconds);
+            (fitted.saved, Some((fitted.stop, fitted.lb)))
+        }
+    };
+    let fit = Root::new(saved, p, n).map_err(|e| format!("n={n}: {e}"))?;
+    let seconds = clock.elapsed();
+    let bound = fit.saved().bound;
+    if bound < incumbent as i64 {
+        faults.push(format!("n={n}: the A1 root bound {bound} is below the incumbent {incumbent}"));
+    }
+    fit.saved().save(&dir.join(fit_name(n)))?;
+    let share = (root > incumbent).then(|| format!("{:.4}", (root as i64 - bound) as f64 / (root - incumbent) as f64));
+    line.text("a1_source", if on_file.is_some() { "file" } else { "fitted" })
+        .seconds("a1_fit_s", seconds)
+        .field("a1_bound", bound)
+        .maybe("a1_share", share);
+    match how {
+        Some((stop, lb)) => line.text("a1_stop", &format!("{stop:?}")).field("a1_lb", format!("{lb:.2}")),
+        None => line.field("a1_stop", "null").field("a1_lb", "null"),
+    };
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------------------------------------
 // choice
+
+/// The seconds of the A1 warm refit, which settles in a fraction of one.
+const R2_SECONDS: f64 = 10.0;
+/// The seconds of the A1 bound of a node on the way to the optimum, which cannot cut it: only its validity is checked.
+const PATH_SECONDS: f64 = 2.0;
 
 /// The nogood pool of a game and the multipliers fitted for it at the root.
 struct Pool<'a, const W: usize> {
@@ -402,6 +480,72 @@ struct Pool<'a, const W: usize> {
 struct Tools<'a, const W: usize> {
     bound: NodeBound<'a, W>,
     scratch: Scratch<W>,
+    a1: Option<A1>,
+}
+
+/// The A1 bounds of a game (`--a1`): its root fit and the budgets.
+struct A1 {
+    root: Root,
+    limits: Limits,
+    /// The seconds the node's own master has.
+    full_seconds: f64,
+}
+
+/// An A1 bound at a node with the CPU seconds it took (besides the node's frame matroids) and whether it cut.
+struct Timed {
+    refit: Found,
+    seconds: f64,
+    cut: bool,
+}
+
+impl Timed {
+    fn json(&self) -> Json {
+        let r = &self.refit;
+        let mut fields = vec![
+            ("bound", Json::from(r.bound)),
+            ("cut", Json::from(self.cut)),
+            ("stop", Json::from(format!("{:?}", r.stop))),
+            ("capped", Json::from(r.capped())),
+            ("pricings", Json::from(r.pricings)),
+            ("s", Json::from(self.seconds)),
+        ];
+        match r.tier1 {
+            Some(tier1) => fields.push(("tier1", Json::from(tier1))),
+            None => fields.push(("rounds", Json::from(r.rounds))),
+        }
+        Json::object(fields)
+    }
+}
+
+/// The A1 bounds at a node whose bound must fall to `target` to cut it: the cost of its frame matroids, and the warm
+/// refit and the node's own master (the latter for at most `PATH_SECONDS` at a node on the way to the optimum).
+struct A1Bounds {
+    build_s: f64,
+    r2: Timed,
+    full: Timed,
+}
+
+fn a1_bounds<const W: usize>(
+    case: &Case<'_, W>,
+    a1: &A1,
+    state: &FrameSet<W>,
+    pu: &PrepUnit<W>,
+    max_add: u32,
+    target: i64,
+) -> A1Bounds {
+    let clock = Clock::start();
+    let node = Node::new(case.p, case.n(), state, &pu.unit.promoted, &pu.unit.cands, max_add, target);
+    let build_s = clock.elapsed();
+    let timed = |bound: &dyn Fn() -> Found| {
+        let clock = Clock::start();
+        let refit = bound();
+        let seconds = clock.elapsed();
+        Timed { cut: refit.bound <= target, refit, seconds }
+    };
+    let r2 = timed(&|| node.warm_refit(&a1.root, &a1.limits));
+    let seconds = if pu.lower.is_some() { a1.full_seconds.min(PATH_SECONDS) } else { a1.full_seconds };
+    let full = timed(&|| node.full(&a1.root, seconds));
+    A1Bounds { build_s, r2, full }
 }
 
 /// A fit at a node: the nogoods live there, the fit, and the CPU seconds it took.
@@ -529,6 +673,14 @@ fn measure_unit<const W: usize>(
     if let Some(lower) = pu.lower.filter(|&lower| lows.iter().any(|&low| low < lower as i64) || today < lower) {
         faults.push(format!("{at}: a bound below {lower}: today {today}, strong {lows:?}"));
     }
+    let a1 = tools.a1.as_ref().map(|a1| a1_bounds(case, a1, &state, pu, max_add, aim as i64 - 1));
+    if let (Some(a1), Some(lower)) = (&a1, pu.lower) {
+        for (name, bound) in [("r2", &a1.r2), ("full", &a1.full)] {
+            if bound.refit.bound < lower as i64 {
+                faults.push(format!("{at}: the A1 {name} bound {} is below {lower}", bound.refit.bound));
+            }
+        }
+    }
 
     let solved = pu.lower.is_none().then(|| solve(case, pu.unit, incumbent));
     let mut sub = None;
@@ -554,7 +706,13 @@ fn measure_unit<const W: usize>(
                     incumbent.sum
                 ));
             }
-            for (name, cut) in [("strong", strong.cut()), ("sub", sub.as_ref().is_some_and(|(_, r)| r.cut()))] {
+            let cuts = [
+                ("strong", strong.cut()),
+                ("sub", sub.as_ref().is_some_and(|(_, r)| r.cut())),
+                ("A1 r2", a1.as_ref().is_some_and(|a1| a1.r2.cut)),
+                ("A1 full", a1.as_ref().is_some_and(|a1| a1.full.cut)),
+            ];
+            for (name, cut) in cuts {
                 if cut {
                     faults.push(format!("{at}: the {name} bound cut a node whose subtree holds a set worth {best}"));
                 }
@@ -590,6 +748,12 @@ fn measure_unit<const W: usize>(
             let Json::Obj(mut object) = again.json() else { unreachable!("an object") };
             object.insert(0, ("extra".to_owned(), Json::from(*extra)));
             Json::Obj(object)
+        }),
+    );
+    push(
+        "a1",
+        a1.as_ref().map_or(Json::Null, |a1| {
+            Json::object([("build_s", Json::from(a1.build_s)), ("r2", a1.r2.json()), ("full", a1.full.json())])
         }),
     );
     let solved_field = |value: Option<Json>| value.unwrap_or(Json::Null);
@@ -681,7 +845,16 @@ pub fn measure<const W: usize>(case: &Case<'_, W>) -> Result<Played, String> {
     }
     let mut results = Results::open(&params.results, params.worker)?;
     let pool = Pool { sets: &prep.pool, lambda: &prep.lambda };
-    let mut tools = Tools { bound: NodeBound::new(p, graph), scratch: Scratch::new() };
+    let a1 = params
+        .a1
+        .then(|| {
+            let root = Root::load(&dir.join(fit_name(n)), p, n)
+                .map_err(|e| format!("n={n}: --a1 needs the fit that choice-prepare --fit-seconds makes: {e}"))?;
+            let limits = Limits { pricings: params.a1_pricings, seconds: R2_SECONDS };
+            Ok::<_, String>(A1 { root, limits, full_seconds: params.a1_seconds })
+        })
+        .transpose()?;
+    let mut tools = Tools { bound: NodeBound::new(p, graph), scratch: Scratch::new(), a1 };
     let mut order: Vec<&PrepUnit<W>> = prep.units.iter().collect();
     order.sort_by(|a, b| b.weight.total_cmp(&a.weight));
 
@@ -790,11 +963,19 @@ mod tests {
         assert!(!pool.is_empty());
         let fitted = fit(&Fitting::at_root(gf2, p.max_total, &pool, opt), params.steps, &[params.steps]);
         let pool = Pool { sets: &pool, lambda: &fitted.lambda };
-        let mut tools = Tools { bound: NodeBound::new(&p, gf2), scratch: Scratch::new() };
+        // The A1 root fit, short: any fit makes valid bounds.
+        let root = root_bound(&p, gf2).0.value;
+        let a1_fit = fields::fit_root(&p, n, opt, root, 3.0);
+        let a1 = A1 {
+            root: Root::new(a1_fit.saved, &p, n).expect("a fit that gives its bound again"),
+            limits: Limits { pricings: params.a1_pricings, seconds: R2_SECONDS },
+            full_seconds: 1.0,
+        };
+        let mut tools = Tools { bound: NodeBound::new(&p, gf2), scratch: Scratch::new(), a1: Some(a1) };
 
         let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("testdata/perf");
         let nodes = fixture_nodes::<W>(&Some(fixtures), n, opt).unwrap();
-        let (mut measured, mut cut_at_the_end, mut open) = (0, 0, 0);
+        let (mut measured, mut cut_at_the_end, mut cut_by_a1, mut open) = (0, 0, 0, 0);
         for (k, node) in nodes.iter().enumerate().step_by(7).take(12) {
             let unit = node.unit;
             // The node's best completion, from an incumbent of nothing: the best set below it, or its promotions alone.
@@ -848,6 +1029,23 @@ mod tests {
                     }
                     cut_at_the_end += i32::from(cut);
                 }
+                // The A1 bounds: neither is below the best completion, each cuts exactly when it is below `need`, and
+                // neither cuts a node whose completion beats the incumbent.
+                let a1 = line.get("a1").filter(|a1| !a1.is_null()).unwrap_or_else(|| panic!("a1 in {line}"));
+                for variant in ["r2", "full"] {
+                    let found = a1.get(variant).unwrap_or_else(|| panic!("a1 {variant} in {line}"));
+                    let bound = number(found, "bound");
+                    assert!(bound >= lower as i64, "node {k}, A1 {variant}: {bound} against {lower}: {line}");
+                    let cut = found.get("cut").and_then(Json::as_bool).unwrap();
+                    assert_eq!(cut, bound < need, "node {k}, A1 {variant}: {line}");
+                    if beatable {
+                        assert!(
+                            !cut,
+                            "node {k}: cut by A1 {variant} although a completion beats the incumbent: {line}"
+                        );
+                    }
+                    cut_by_a1 += i32::from(cut);
+                }
                 // The solve agrees: from an incumbent the node cannot beat it finds nothing, else the best set.
                 let completed = line.get("completed").and_then(Json::as_bool).unwrap();
                 let solved_best = number(&line, "best");
@@ -856,7 +1054,8 @@ mod tests {
             }
         }
         assert!(measured >= 12, "{measured} measurements");
-        eprintln!("choice: {measured} measurements, {open} open, {cut_at_the_end} cut by a fit");
+        assert!(cut_by_a1 > 0, "no node cut by an A1 bound");
+        eprintln!("choice: {measured} measurements, {open} open, {cut_at_the_end} cut by a fit, {cut_by_a1} by A1");
     }
 
     #[test]

@@ -12,9 +12,10 @@
 //! cargo run --release --example wall -- start [--known FILE] N|A-B...
 //! cargo run --release --example wall -- frames N|A-B...
 //! cargo run --release --example wall -- choice-prepare [--cpu S] [--steps K] [--fixtures DIR] [--suite FILE]
-//!     [--keep K] [--paths K] [--seed S] [--fix LO-HI] [--unit-nodes K] --prep DIR --known FILE N|A-B...
-//! cargo run --release --example wall -- choice [--node-steps K] [--cap S] [--sub-nogoods] --prep DIR
-//!     [--results DIR --worker K] [--claims DIR] N|A-B...
+//!     [--keep K] [--paths K] [--seed S] [--fix LO-HI] [--unit-nodes K] [--fit-seconds S] [--fits DIR]
+//!     --prep DIR --known FILE N|A-B...
+//! cargo run --release --example wall -- choice [--node-steps K] [--cap S] [--sub-nogoods] [--a1] [--a1-pricings K]
+//!     [--a1-seconds S] --prep DIR [--results DIR --worker K] [--claims DIR] N|A-B...
 //! ```
 //!
 //! The example is a study tool: it is built with the feature `studies` (`--features studies`; Cargo.toml).
@@ -102,10 +103,11 @@
 //!   as its game finishes, so in the order of finishing; the games that FILE has are skipped, so a run that was
 //!   interrupted goes on where it was (a line cut short at the end of FILE is cut off).
 //! * **choice-prepare** and **choice**: at which nodes is a slow, strong bound (the Lagrangian bound over nogoods,
-//!   refitted at the node) worth computing besides today's?  `choice-prepare` makes a game's file (its nogood pool, its
-//!   root multipliers, its sampled nodes) and `choice` measures each node of the file: its gap, the strong bound and
-//!   whether it cuts, the subtree today's search makes of it, and the times.  Defined in `wall/choice.rs`, whose module
-//!   comment has the options and the lines; `bench/node_choice/` runs them in the cloud and reads the lines.
+//!   refitted at the node, and the A1 bound of `wall/fields.rs` in two forms) worth computing besides today's?
+//!   `choice-prepare` makes a game's file (its nogood pool, its root multipliers, its A1 root fit, its sampled nodes)
+//!   and `choice` measures each node of the file: its gap, the strong bounds and whether they cut, the subtree today's
+//!   search makes of it, and the times.  Defined in `wall/choice.rs`, whose module comment has the options and the
+//!   lines; `bench/node_choice/` runs them in the cloud and reads the lines.
 //!
 //! The commands `chain`, `sound`, `finders`, `nogoods`, `target` and `relaxed` of the finished experiments were removed
 //! from master (docs/EXPERIMENTS.md, "How this notebook is kept", says where they build).
@@ -139,6 +141,9 @@ mod case;
 mod choice;
 #[path = "common/counters.rs"]
 mod counters;
+/// The A1 bound (GF(2) and signed GF(3) frame matroids, fitted multipliers) at a node, for `choice`.
+#[path = "wall/fields.rs"]
+mod fields;
 /// `sample` reads the probe's `.nodes` fixtures and the tuning suite's hex sets.
 #[path = "common/fixtures.rs"]
 mod fixtures;
@@ -194,7 +199,7 @@ use taxman::tactics::Tactics;
 const COMMANDS: [&str; 8] = ["setup", "nodes", "grow", "start", "frames", "landscape", "choice-prepare", "choice"];
 
 /// The options, with the commands each applies to (an option given to another command is an error).
-const OPTIONS: [(&str, &[&str]); 32] = [
+const OPTIONS: [(&str, &[&str]); 37] = [
     ("--known", &["setup", "nodes", "grow", "start", "landscape", "choice-prepare"]),
     ("--cap", &["choice"]),
     ("--fixtures", &["choice-prepare"]),
@@ -207,6 +212,11 @@ const OPTIONS: [(&str, &[&str]); 32] = [
     ("--claims", &["choice"]),
     ("--node-steps", &["choice"]),
     ("--sub-nogoods", &["choice"]),
+    ("--a1", &["choice"]),
+    ("--a1-pricings", &["choice"]),
+    ("--a1-seconds", &["choice"]),
+    ("--fit-seconds", &["choice-prepare"]),
+    ("--fits", &["choice-prepare"]),
     ("--cpu", &["choice-prepare"]),
     ("--steps", &["choice-prepare"]),
     ("--seed", &["choice-prepare"]),
@@ -402,6 +412,11 @@ fn parse() -> Result<Options, String> {
             "--claims" => o.params.claims = Some(value("--claims")?.into()),
             "--node-steps" => o.params.node_steps = number::<usize>("--node-steps", value("--node-steps")?)?.max(1),
             "--sub-nogoods" => o.params.sub = true,
+            "--a1" => o.params.a1 = true,
+            "--a1-pricings" => o.params.a1_pricings = number("--a1-pricings", value("--a1-pricings")?)?,
+            "--a1-seconds" => o.params.a1_seconds = number("--a1-seconds", value("--a1-seconds")?)?,
+            "--fit-seconds" => o.params.fit_seconds = number("--fit-seconds", value("--fit-seconds")?)?,
+            "--fits" => o.params.fits = Some(value("--fits")?.into()),
             "--cpu" => o.params.cpu = number("--cpu", value("--cpu")?)?,
             "--steps" => o.params.steps = number::<usize>("--steps", value("--steps")?)?.max(1),
             "--seed" => o.params.lns.seed = number("--seed", value("--seed")?)?,
