@@ -69,10 +69,10 @@ const MOMENTUM: f64 = 0.9;
 // Harvesting
 
 /// Where the searchers of a method leave the nogoods they learned.
-type Sink<const W: usize> = Mutex<HashSet<Bits<W>>>;
+pub(super) type Sink<const W: usize> = Mutex<HashSet<Bits<W>>>;
 
 /// A searcher that leaves its table in a sink after each unit it runs.
-struct Harvesting<'a, 's, const W: usize> {
+pub(super) struct Harvesting<'a, 's, const W: usize> {
     searcher: TaxSearcher<'a, W>,
     sink: &'s Sink<W>,
 }
@@ -84,7 +84,10 @@ impl<const W: usize> Searcher<TaxUnit<W>> for Harvesting<'_, '_, W> {
     }
 }
 
-fn harvesting<'a, 's, const W: usize>(space: &'a SearchSpace<'a, W>, sink: &'s Sink<W>) -> Harvesting<'a, 's, W> {
+pub(super) fn harvesting<'a, 's, const W: usize>(
+    space: &'a SearchSpace<'a, W>,
+    sink: &'s Sink<W>,
+) -> Harvesting<'a, 's, W> {
     Harvesting { searcher: TaxSearcher::new(space), sink }
 }
 
@@ -104,7 +107,7 @@ pub(super) struct Learned<const W: usize> {
 }
 
 /// The nogoods of a sink, in a fixed order.
-fn sorted<const W: usize>(sink: Sink<W>) -> Vec<Bits<W>> {
+pub(super) fn sorted<const W: usize>(sink: Sink<W>) -> Vec<Bits<W>> {
     let mut nogoods: Vec<Bits<W>> = sink.into_inner().unwrap_or_else(PoisonError::into_inner).into_iter().collect();
     nogoods.sort_by_cached_key(Bits::to_vec);
     nogoods
@@ -165,7 +168,7 @@ pub(super) fn control<const W: usize>(case: &Case<'_, W>, start: &Bits<W>) -> Le
 }
 
 /// How many of `nogoods` can be promoted from the root after all: none, unless there is a bug.
-fn promotable<const W: usize>(case: &Case<'_, W>, nogoods: &[Bits<W>]) -> usize {
+pub(super) fn promotable<const W: usize>(case: &Case<'_, W>, nogoods: &[Bits<W>]) -> usize {
     let mut scratch = Scratch::new();
     nogoods.iter().filter(|set| case.p.model.promote_all_using(&mut scratch, &case.p.root, set).is_some()).count()
 }
@@ -187,28 +190,64 @@ pub(super) struct Mark {
 
 /// What a fit found.
 pub(super) struct Fit {
-    /// The bound of the first step, with no multipliers (the root's GF(2) bound, scaled).
+    /// The bound of the first step, from the multipliers the fit began with (for a fit from none at the root, the
+    /// root's GF(2) bound, scaled).
     first: i64,
     /// The steps taken (the fit ends early when the bound proves the incumbent optimal, when the chosen set breaks no
     /// nogood, or when the damping is spent), and the step at which the bound fell below what proves the incumbent
     /// optimal, if it did.
     pub(super) steps: usize,
-    closed_at: Option<usize>,
+    pub(super) closed_at: Option<usize>,
     /// What it had found at each mark it was asked for (the final state for a mark it did not reach).
     pub(super) marks: Vec<Mark>,
     /// The multipliers of the lowest bound, one for each nogood.
     pub(super) lambda: Vec<i64>,
+    /// The lowest bound (scaled) after each step, and the seconds (wall) since the fit began at the end of each.
+    pub(super) trace: Vec<i64>,
+    pub(super) at: Vec<f64>,
+}
+
+/// What a fit is asked to lower: the heaviest common independent set of at most `cap` members of the matroids
+/// `graph`, with each member weighing its number less the multipliers of the `nogoods` that hold it, plus the
+/// multipliers times the `rooms` (a root's, or a node's).
+pub(super) struct Fitting<'a, const W: usize> {
+    pub(super) graph: &'a Gf2Graph,
+    pub(super) cap: u32,
+    pub(super) nogoods: &'a [Bits<W>],
+    /// For each nogood, the most of its members a completion may hold: `|N| - 1` at the root, and at a node with
+    /// promotions `P`, for a nogood whose members outside `P` are all candidates, `|N - P| - 1`.
+    pub(super) rooms: Vec<i64>,
+    /// The multipliers the fit begins from, one for each nogood.
+    pub(super) start: Vec<i64>,
+    /// The scaled bound the fit is to bring below, which proves what it was aimed at: `SCALE · (incumbent + 1)` at a
+    /// root, `SCALE · need` at a node (a bound below it cuts the node).
+    pub(super) target: i64,
+}
+
+impl<'a, const W: usize> Fitting<'a, W> {
+    /// The fit at the root over `nogoods`, from no multipliers, towards proving `incumbent` optimal.
+    pub(super) fn at_root(graph: &'a Gf2Graph, cap: u32, nogoods: &'a [Bits<W>], incumbent: u64) -> Self {
+        let rooms = root_rooms(nogoods);
+        Fitting { graph, cap, nogoods, rooms, start: vec![0; nogoods.len()], target: SCALE * (incumbent as i64 + 1) }
+    }
+}
+
+/// The rooms of `nogoods` at the root: a completion holds at most `|N| - 1` members of each.
+pub(super) fn root_rooms<const W: usize>(nogoods: &[Bits<W>]) -> Vec<i64> {
+    nogoods.iter().map(|set| i64::from(set.len()) - 1).collect()
 }
 
 /// The weight each multiplier of `lambda` takes off the members of its nogood of `nogoods`, by number, in `shift`
-/// (cleared first; as long as the largest number of the nogoods plus one), and the nogoods' constant at the root,
-/// `Σ λ (|N| - 1)`.
-pub(super) fn shifts<const W: usize>(nogoods: &[Bits<W>], lambda: &[i64], shift: &mut [i64]) -> i64 {
+/// (cleared first; as long as the largest number of the nogoods plus one), and the nogoods' constant,
+/// `Σ λ · room`.
+pub(super) fn shifts<const W: usize>(nogoods: &[Bits<W>], rooms: &[i64], lambda: &[i64], shift: &mut [i64]) -> i64 {
     shift.fill(0);
     let mut constant = 0;
-    for (set, &l) in nogoods.iter().zip(lambda).filter(|&(_, &l)| l > 0) {
-        set.iter().for_each(|x| shift[x as usize] += l);
-        constant += l * (i64::from(set.len()) - 1);
+    for ((set, &room), &l) in nogoods.iter().zip(rooms).zip(lambda) {
+        if l > 0 {
+            set.iter().for_each(|x| shift[x as usize] += l);
+            constant += l * room;
+        }
     }
     constant
 }
@@ -228,44 +267,38 @@ pub(super) fn reweighted_bound<const W: usize>(graph: &Gf2Graph, cap: u32, shift
     (eval.value as i64, eval.chosen.iter().map(|k| labels[k as usize - 1]).collect())
 }
 
-/// The heaviest common independent set of the root's matroids (of at most `cap` members) with the weights the
+/// The heaviest common independent set of the matroids of `fitting` (of at most `cap` members) with the weights the
 /// multipliers `lambda` leave (`SCALE · x` less the multipliers of the nogoods holding `x`), as a scaled bound with the
-/// nogoods' constant `Σ λ (|N| - 1)` added, and the set it chooses.  `shift` is scratch, as long as the largest number
-/// of the nogoods plus one.
-fn dual<const W: usize>(
-    graph: &Gf2Graph,
-    cap: u32,
-    nogoods: &[Bits<W>],
-    lambda: &[i64],
-    shift: &mut [i64],
-) -> (i64, Bits<W>) {
-    let constant = shifts(nogoods, lambda, shift);
-    let (value, chosen) = reweighted_bound(graph, cap, shift);
+/// nogoods' constant `Σ λ · room` added, and the set it chooses.  `shift` is scratch, as long as the largest number of
+/// the nogoods plus one.
+fn dual<const W: usize>(fitting: &Fitting<'_, W>, lambda: &[i64], shift: &mut [i64]) -> (i64, Bits<W>) {
+    let constant = shifts(fitting.nogoods, &fitting.rooms, lambda, shift);
+    let (value, chosen) = reweighted_bound(fitting.graph, fitting.cap, shift);
     (value + constant, chosen)
 }
 
-/// Fits multipliers for `nogoods` (sets that cannot be promoted from the root) by at most `steps` steps of the
-/// subgradient method: Polyak's rule towards `SCALE · (incumbent + 1)`, damped by a factor that halves, back at the
-/// best multipliers, after [`STALL`] steps without a lower bound.  The subgradient of a nogood is how far the chosen
-/// set goes over its room, `|Q ∩ N| - (|N| - 1)`, held at zero for a multiplier at zero that it would lower; a step
-/// goes in the direction of the subgradient plus [`MOMENTUM`] of the last direction (none after a return to the best
-/// multipliers).  What it has found after each number of steps in `marks` is in the result (the steps do not depend
-/// on the marks).
-pub(super) fn fit<const W: usize>(
-    graph: &Gf2Graph,
-    cap: u32,
-    nogoods: &[Bits<W>],
-    steps: usize,
-    marks: &[usize],
-    incumbent: u64,
-) -> Fit {
+/// Fits multipliers for the nogoods of `fitting` (sets that cannot be promoted from the root) by at most `steps` steps
+/// of the subgradient method: Polyak's rule towards its target, damped by a factor that halves, back at the best
+/// multipliers, after [`STALL`] steps without a lower bound.  The subgradient of a nogood is how far the chosen set
+/// goes over its room, `|Q ∩ N| - room`, held at zero for a multiplier at zero that it would lower; a step goes in the
+/// direction of the subgradient plus [`MOMENTUM`] of the last direction (none after a return to the best multipliers).
+/// What it has found after each number of steps in `marks` is in the result (the steps do not depend on the marks).
+pub(super) fn fit<const W: usize>(fitting: &Fitting<'_, W>, steps: usize, marks: &[usize]) -> Fit {
     let began = Instant::now();
-    let target = SCALE * (incumbent as i64 + 1);
+    let (nogoods, target) = (fitting.nogoods, fitting.target);
     let top = nogoods.iter().filter_map(Bits::max).max().unwrap_or(0) as usize;
     let mut shift = vec![0i64; top + 1];
-    let mut lambda = vec![0i64; nogoods.len()];
+    let mut lambda = fitting.start.clone();
     let mut direction = vec![0.0f64; nogoods.len()];
-    let mut out = Fit { first: 0, steps: 0, closed_at: None, marks: Vec::new(), lambda: Vec::new() };
+    let mut out = Fit {
+        first: 0,
+        steps: 0,
+        closed_at: None,
+        marks: Vec::new(),
+        lambda: Vec::new(),
+        trace: Vec::new(),
+        at: Vec::new(),
+    };
     let (mut best, mut best_chosen) = (lambda.clone(), Bits::<W>::EMPTY);
     let (mut lowest, mut best_step) = (i64::MAX, 0);
     let (mut damping, mut stalled) = (1.0f64, 0);
@@ -276,7 +309,7 @@ pub(super) fn fit<const W: usize>(
         seconds: began.elapsed().as_secs_f64(),
     };
     for step in 0..steps {
-        let (mut value, mut chosen) = dual(graph, cap, nogoods, &lambda, &mut shift);
+        let (mut value, mut chosen) = dual(fitting, &lambda, &mut shift);
         out.steps = step + 1;
         if step == 0 {
             out.first = value;
@@ -295,6 +328,8 @@ pub(super) fn fit<const W: usize>(
                 direction.fill(0.0);
             }
         }
+        out.trace.push(lowest);
+        out.at.push(began.elapsed().as_secs_f64());
         if marks.contains(&out.steps) {
             out.marks.push(mark(&best, lowest, best_step));
         }
@@ -303,8 +338,8 @@ pub(super) fn fit<const W: usize>(
             break;
         }
         let (mut slack, mut norm) = (false, 0.0);
-        for ((set, &l), d) in nogoods.iter().zip(&lambda).zip(&mut direction) {
-            let over = i64::from((chosen & *set).len()) - (i64::from(set.len()) - 1);
+        for (((set, &room), &l), d) in nogoods.iter().zip(&fitting.rooms).zip(&lambda).zip(&mut direction) {
+            let over = i64::from((chosen & *set).len()) - room;
             let slope = if l == 0 && over < 0 { 0 } else { over };
             slack |= slope != 0;
             *d = slope as f64 + MOMENTUM * *d;
@@ -365,7 +400,8 @@ pub fn of<const W: usize>(case: &Case<'_, W>) -> Played {
     line.field("both_pool", both.len()).field("promotable", wrong);
     let (steps, long) = (case.params.steps, case.params.steps.max(case.params.long));
     for (name, pool) in [("finder", &found.nogoods), ("search", &searched.nogoods), ("both", &both)] {
-        let fitted = fit(graph, case.p.max_total, pool, long, &[steps, long], incumbent.sum());
+        let fitting = Fitting::at_root(graph, case.p.max_total, pool, incumbent.sum());
+        let fitted = fit(&fitting, long, &[steps, long]);
         if fitted.first != SCALE * base as i64 {
             faults
                 .push(format!("n={n}: {name}: the first step, {}, is not the root bound {base} scaled", fitted.first));

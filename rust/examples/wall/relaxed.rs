@@ -42,7 +42,7 @@
 //! or a tighter constant above the other is an error after the game's lines.
 
 use super::finders::{Case, Clock, Played};
-use super::nogoods::{control, finder, fit, reweighted_bound, shifts, union};
+use super::nogoods::{control, finder, fit, reweighted_bound, root_rooms, shifts, union, Fitting};
 use super::{root_bound, Line};
 use crate::fixtures::{from_hex, read_nodes};
 use crate::known::known_incumbent;
@@ -58,14 +58,14 @@ use taxman::search::{NodeBound, TaxUnit};
 
 /// Where the nodes of a game come from.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Source {
+pub(super) enum Source {
     Fixture,
     Suite,
     Path,
 }
 
 impl Source {
-    fn name(self) -> &'static str {
+    pub(super) fn name(self) -> &'static str {
         match self {
             Source::Fixture => "fixture",
             Source::Suite => "suite",
@@ -75,15 +75,19 @@ impl Source {
 }
 
 /// A node to measure: where it comes from, the unit, and for a suite unit the nodes of its subtree.
-struct Sampled<const W: usize> {
-    source: Source,
-    unit: TaxUnit<W>,
-    subtree: Option<u64>,
+pub(super) struct Sampled<const W: usize> {
+    pub(super) source: Source,
+    pub(super) unit: TaxUnit<W>,
+    pub(super) subtree: Option<u64>,
 }
 
 /// The nodes of game `n` from the fixture in `dir` (none if it has no file for the game), checking that its
 /// incumbent is worth `opt`.
-fn fixture_nodes<const W: usize>(dir: &Option<PathBuf>, n: u32, opt: u64) -> Result<Vec<Sampled<W>>, String> {
+pub(super) fn fixture_nodes<const W: usize>(
+    dir: &Option<PathBuf>,
+    n: u32,
+    opt: u64,
+) -> Result<Vec<Sampled<W>>, String> {
     let Some(path) = dir.as_ref().map(|dir| dir.join(format!("n{n:04}.nodes"))).filter(|path| path.exists()) else {
         return Ok(Vec::new());
     };
@@ -99,7 +103,7 @@ fn fixture_nodes<const W: usize>(dir: &Option<PathBuf>, n: u32, opt: u64) -> Res
 }
 
 /// The units of game `n` in the tuning suite `suite` (none without one).
-fn suite_nodes<const W: usize>(suite: &Option<PathBuf>, n: u32) -> Result<Vec<Sampled<W>>, String> {
+pub(super) fn suite_nodes<const W: usize>(suite: &Option<PathBuf>, n: u32) -> Result<Vec<Sampled<W>>, String> {
     let Some(path) = suite else { return Ok(Vec::new()) };
     let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let mut out = Vec::new();
@@ -120,7 +124,7 @@ fn suite_nodes<const W: usize>(suite: &Option<PathBuf>, n: u32) -> Result<Vec<Sa
 
 /// `count` nodes on the way to the optimum `known` of `case`: `known` less a random 30 to 70% of its members promoted,
 /// the root's other candidates narrowed in the state they reach (which keeps the rest of `known`, promotable there).
-fn path_nodes<const W: usize>(case: &Case<'_, W>, known: &Bits<W>, count: usize) -> Vec<Sampled<W>> {
+pub(super) fn path_nodes<const W: usize>(case: &Case<'_, W>, known: &Bits<W>, count: usize) -> Vec<Sampled<W>> {
     let p = case.p;
     let mut rng = Rng(0x9A7E_0000 + u64::from(case.n()));
     let mut scratch = Scratch::new();
@@ -148,7 +152,7 @@ impl<const W: usize> Relaxation<W> {
     fn new(nogoods: &[Bits<W>], lambda: &[i64]) -> Self {
         let top = nogoods.iter().filter_map(Bits::max).max().unwrap_or(0) as usize;
         let mut shift = vec![0; top + 1];
-        shifts(nogoods, lambda, &mut shift);
+        shifts(nogoods, &root_rooms(nogoods), lambda, &mut shift);
         let kept = nogoods.iter().zip(lambda).filter(|&(_, &l)| l > 0).map(|(&n, &l)| (n, l)).collect();
         Relaxation { nogoods: kept, shift }
     }
@@ -181,7 +185,7 @@ pub fn of<const W: usize>(case: &Case<'_, W>) -> Result<Played, String> {
     let pool = union(&found.nogoods, &searched.nogoods);
     let clock = Clock::start();
     let steps = case.params.steps;
-    let fitted = fit(graph, p.max_total, &pool, steps, &[steps], opt);
+    let fitted = fit(&Fitting::at_root(graph, p.max_total, &pool, opt), steps, &[steps]);
     let relaxation = Relaxation::new(&pool, &fitted.lambda);
     let fit_cpu_s = clock.elapsed();
     let relaxed_root = fitted.marks[0].scaled.div_euclid(SCALE);

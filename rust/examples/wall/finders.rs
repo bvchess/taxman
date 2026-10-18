@@ -53,13 +53,13 @@
 //!   completed), `nodes` (the engine's steps) and `cpu_s`.  A floor search that finds a set heavier than the floor, or
 //!   a root bound below the optimum, is an error after the line.
 //!
-//! The commands `nogoods` (`nogoods.rs`) and `relaxed` (`relaxed.rs`) are played the same way, on the same [`Case`];
-//! they take the budgets, the start and the referee from here.
+//! The commands `nogoods` (`nogoods.rs`), `relaxed` (`relaxed.rs`), `choice-prepare` and `choice` (`choice.rs`) are
+//! played the same way, on the same [`Case`]; they take the budgets, the start and the referee from here.
 
 use super::{beyond, chained_of, counters, root_bound, set_up, Line, Options};
 use crate::known::known_incumbent;
 use crate::lns::{self, run_unit, Lns};
-use crate::{nogoods, relaxed};
+use crate::{choice, nogoods, relaxed};
 use std::cmp::Reverse;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -145,7 +145,8 @@ pub struct Params {
     pub from: Source,
     /// CPU seconds a finder runs for.
     pub cpu: f64,
-    /// CPU seconds after which `sound` stops its search, and `target` each of its (none: they go on to the end).
+    /// CPU seconds after which `sound` stops its search, `target` each of its, and `choice` each unit's solve (none:
+    /// they go on to the end).
     pub cap: Option<f64>,
     /// The shares of the gap `target` proves down: its floors are this far below the root's bound.
     pub fractions: Vec<f64>,
@@ -163,6 +164,18 @@ pub struct Params {
     pub fixtures: Option<PathBuf>,
     pub suite: Option<PathBuf>,
     pub paths: usize,
+    /// The options of `choice-prepare` and `choice` (`choice.rs`): the directory of the games' prepared files
+    /// (`--prep`), how many nodes `choice-prepare` keeps of each source (`--keep`), the directory `choice` writes its
+    /// results to and its worker's number there (`--results`, `--worker`), the directory where workers claim units
+    /// (`--claims`), the subgradient steps of a node's refit (`--node-steps`), and whether it is repeated with the
+    /// nogoods of the unit's own solve too (`--sub-nogoods`).
+    pub prep: Option<PathBuf>,
+    pub keep: usize,
+    pub results: Option<PathBuf>,
+    pub worker: usize,
+    pub claims: Option<PathBuf>,
+    pub node_steps: usize,
+    pub sub: bool,
 }
 
 impl Default for Params {
@@ -180,6 +193,13 @@ impl Default for Params {
             fixtures: None,
             suite: None,
             paths: 50,
+            prep: None,
+            keep: 40,
+            results: None,
+            worker: 0,
+            claims: None,
+            node_steps: 50,
+            sub: false,
         }
     }
 }
@@ -458,6 +478,10 @@ pub enum Command {
     Target,
     /// `wall relaxed` (`relaxed.rs`): the root's multipliers over those nogoods, at sampled nodes.
     Relaxed,
+    /// `wall choice-prepare` (`choice.rs`): a game's nogood pool, its root multipliers and its sampled nodes, in a file.
+    ChoicePrepare,
+    /// `wall choice` (`choice.rs`): the strong bound against the subtree at each node of a prepared file.
+    Choice,
 }
 
 impl Command {
@@ -469,6 +493,8 @@ impl Command {
             "nogoods" => Some(Command::Nogoods),
             "target" => Some(Command::Target),
             "relaxed" => Some(Command::Relaxed),
+            "choice-prepare" => Some(Command::ChoicePrepare),
+            "choice" => Some(Command::Choice),
             _ => None,
         }
     }
@@ -609,9 +635,10 @@ fn play<const W: usize>(command: Command, n: u32, o: &Options, optimal: &Optimal
     };
     let graph = MatchGraph::new(&p.model, &p.root);
     let mut space = SearchSpace::new(&p, &graph);
-    if matches!(command, Command::Nogoods | Command::Relaxed) {
+    if matches!(command, Command::Nogoods | Command::Relaxed | Command::ChoicePrepare) {
         // Every nogood a searcher learns is wanted, so none is forgotten (the unit searches of the finder are shorter
-        // than the period anyway; the control's table would be cleared every NOGOOD_PERIOD steps).
+        // than the period anyway; the control's table would be cleared every NOGOOD_PERIOD steps).  `choice` keeps
+        // the period: it counts the steps of a unit's solve as `tune` does.
         space.forgetting.period = None;
     }
     let case = Case { board: &board, p: &p, space: &space, params: &o.finders, optimal };
@@ -621,6 +648,8 @@ fn play<const W: usize>(command: Command, n: u32, o: &Options, optimal: &Optimal
         Command::Nogoods => Ok(nogoods::of(&case)),
         Command::Target => target_of(&case),
         Command::Relaxed => relaxed::of(&case),
+        Command::ChoicePrepare => choice::prepare(&case),
+        Command::Choice => choice::measure(&case),
     }
 }
 
@@ -779,6 +808,62 @@ mod tests {
                 assert!(number(node, "tight") <= number(node, "relaxed"), "n={n}: {node}");
             }
         }
+    }
+
+    /// Game 936 prepared for `choice` (a few of the probe's nodes and some on the way to the optimum) and measured: every
+    /// unit has its line in the worker's file, and a run again goes on where it was.
+    #[test]
+    fn a_game_prepared_for_choice_is_measured_and_a_run_again_goes_on_where_it_was() {
+        let dir = crate::support::TempDir::new("wall-choice");
+        let mut o = options("choice-prepare", 0.2);
+        (o.finders.steps, o.finders.paths, o.finders.keep) = (30, 3, 6);
+        o.finders.fixtures = Some(Path::new(env!("CARGO_MANIFEST_DIR")).join("testdata/perf"));
+        o.finders.prep = Some(dir.0.join("prep"));
+        let prepared = line_of(Command::ChoicePrepare, 936, &o);
+        let (incumbent, root, pool) =
+            (number(&prepared, "incumbent"), number(&prepared, "root"), number(&prepared, "pool"));
+        assert!(yes(&prepared, "known") && incumbent <= root && pool > 0, "{prepared}");
+        assert_eq!((number(&prepared, "fixture_kept"), number(&prepared, "path_kept")), (6, 3), "{prepared}");
+        assert!(number(&prepared, "fixture_open") >= 6, "{prepared}");
+        assert!(dir.0.join("prep/n0936.choice").exists());
+
+        let mut m = options("choice", 0.0);
+        m.finders.prep = o.finders.prep.clone();
+        m.finders.node_steps = 15;
+        m.finders.sub = true;
+        m.finders.results = Some(dir.0.join("out"));
+        m.finders.claims = Some(dir.0.join("claims"));
+        let line = line_of(Command::Choice, 936, &m);
+        assert_eq!((number(&line, "units"), number(&line, "measured")), (9, 9), "{line}");
+        let file = dir.0.join("out/worker-0.jsonl");
+        let lines: Vec<Json> =
+            std::fs::read_to_string(&file).unwrap().lines().map(|line| Json::parse(line).expect("JSON")).collect();
+        assert_eq!(lines.len(), 9);
+        for unit in &lines {
+            let source = unit.get("source").and_then(Json::as_str).unwrap();
+            let strong = unit.get("strong").unwrap();
+            assert_eq!(number(unit, "pool"), pool, "{unit}");
+            assert!(!strong.get("lows").and_then(Json::as_arr).unwrap().is_empty(), "{unit}");
+            if source == "path" {
+                assert!(matches!(unit.get("subtree"), Some(Json::Null)) && number(unit, "lower") > 0, "{unit}");
+            } else {
+                let gap = unit.get("gap").and_then(Json::as_i64);
+                assert!(yes(unit, "completed") && gap >= Some(0) && number(unit, "subtree") >= 1, "{unit}");
+                assert!(unit.get("sub").is_some_and(|sub| !sub.is_null()), "{unit}");
+            }
+        }
+
+        // Run again: every unit is in the results. With the results gone, the claims keep the units from a second worker.
+        let again = line_of(Command::Choice, 936, &m);
+        assert_eq!((number(&again, "measured"), number(&again, "skipped")), (0, 9), "{again}");
+        std::fs::remove_dir_all(dir.0.join("out")).unwrap();
+        let again = line_of(Command::Choice, 936, &m);
+        assert_eq!((number(&again, "measured"), number(&again, "elsewhere")), (0, 9), "{again}");
+        std::fs::remove_dir_all(dir.0.join("claims")).unwrap();
+        m.finders.worker = 1;
+        let again = line_of(Command::Choice, 936, &m);
+        assert_eq!(number(&again, "measured"), 9, "{again}");
+        assert!(dir.0.join("out/worker-1.jsonl").exists());
     }
 
     #[test]
