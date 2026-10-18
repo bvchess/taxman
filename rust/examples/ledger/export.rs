@@ -254,7 +254,26 @@ impl Uppers<'_> {
 /// The lines that an export of `entries` (a ledger's boards) to `store` appends, checked as the checker will check
 /// them, and what they are.  The lower bounds come first, in order of n, then the upper bounds, each after the ones it
 /// cites.  A board of the committed chain (`chain`) gets none.
+///
+/// A line goes after the line it cites, which the export finds by following the citations a board at a time: a chain of
+/// boards, each citing the next (a stretch's worth), is as deep as the stretch, so the work is done on a thread with a
+/// stack for it.
 pub fn plan(
+    entries: &[Entry],
+    store: &Store,
+    chain: &Optimal,
+    options: &Options,
+) -> Result<(Vec<Line>, Summary), String> {
+    std::thread::scope(|scope| {
+        let worker = std::thread::Builder::new().stack_size(1 << 29);
+        let work = worker.spawn_scoped(scope, || plan_deep(entries, store, chain, options));
+        work.map_err(|e| format!("the thread of the export: {e}"))?
+            .join()
+            .unwrap_or_else(|_| Err("the export panicked".into()))
+    })
+}
+
+fn plan_deep(
     entries: &[Entry],
     store: &Store,
     chain: &Optimal,

@@ -358,6 +358,30 @@ fn an_export_appends_the_improvements_only_and_a_second_export_appends_nothing()
     assert!(ok, "{text}");
 }
 
+/// A stretch's worth of boards each of which cites the next one above (upper bounds by monotonicity, down from one dual
+/// bound) is exported, each line after the line it cites, however deep the citations go.
+#[test]
+fn a_long_chain_of_citations_is_exported_in_order() {
+    let dir = TempDir::new("store-deep");
+    let strict = dir.join("strict.jsonl");
+    write_results(&strict, &[]);
+    let (first, top) = (2000, 5000);
+    let entries: Vec<Entry> = (first..=top)
+        .map(|n| {
+            let (rule, from) = if n == top { (Rule::Dual, None) } else { (Rule::Monotone, Some(n + 1)) };
+            Entry { n, upper: Some(Upper { value: 7_000_000, rule, from }), ..Entry::default() }
+        })
+        .collect();
+    let chain = store::chain(&strict).unwrap();
+    let (lines, summary) = export::plan(&entries, &Store::default(), &chain, &options()).unwrap();
+    assert_eq!((lines.len(), summary.upper_first), ((top - first + 1) as usize, lines.len()));
+    for (k, line) in lines.iter().enumerate() {
+        assert_eq!((line.n, line.side), (top - k as u32, Side::Upper), "line {k}");
+    }
+    assert_eq!(lines[1].from_value, Some(7_000_000));
+    assert!(lines.iter().all(|l| l.rests_on == [top]));
+}
+
 /// A file whose last line is torn is not appended to; a missing file is made; the old lines stay as they were.
 #[test]
 fn append_refuses_a_torn_file_and_keeps_the_lines_it_has() {
