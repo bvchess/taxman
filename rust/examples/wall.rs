@@ -13,6 +13,10 @@
 //! cargo run --release --example wall -- frames N|A-B...
 //! cargo run --release --example wall -- landscape [--threads K] [--known FILE] [--out FILE] N|A-B...
 //! cargo run --release --example wall -- chain [--down] [--restart K] [--known FILE] [--out FILE] N|A-B...
+//! cargo run --release --example wall -- sound [--from start|opt|lns|restricted] [--cap S] [--cpu S] [--known FILE]
+//!     [--seed S] [--fix LO-HI] [--unit-nodes K] [--extra K] [--pool value|chosen] N|A-B...
+//! cargo run --release --example wall -- finders [--cpu S] [--known FILE] [--seed S] [--fix LO-HI] [--unit-nodes K]
+//!     [--extra K] [--pool value|chosen] N|A-B...
 //! ```
 //!
 //! Games are set up as `taxman solve` sets them up (`taxman::board::Board` at the set width `with_width!` picks for
@@ -108,6 +112,11 @@
 //!   `landscape`; the seed's survivors are part of `start_s`) and, from the known games, `opt` and `shortfall` (`opt`
 //!   less `score`; both null for a game with no known optimum).  With `--out FILE`, which must not exist, the lines
 //!   are written to it as well.
+//! * **sound** and **finders**: what a better start incumbent could save a sound search, and two searches for good games
+//!   that are not sound (they may miss the optimum, and nothing they find is a proof or goes into a results file),
+//!   against the sound search for the same CPU time.  `sound` runs the sound search of each game from the start
+//!   incumbent, from the known optimum or from a finder's game; `finders` runs the finders and the control on each
+//!   game.  Both are defined in `wall/finders.rs`, whose module comment has the options and the lines.
 //!
 //! **The sizes** (`setup`, `nodes` and `frames`): `frames` (the root's frame count), `candidates`, `max_total`
 //! (the most promotions a set can have), `members` (the distinct numbers in the moves and factors of the root's
@@ -132,6 +141,13 @@
 
 #[path = "common/counters.rs"]
 mod counters;
+/// `sound` and `finders`: searches for good games that are not sound, and the sound search to weigh them against.
+#[path = "wall/finders.rs"]
+mod finders;
+#[path = "common/known.rs"]
+mod known;
+#[path = "common/rng.rs"]
+mod rng;
 /// The helpers of the tests (temporary directories), shared with the other tests.
 #[cfg(test)]
 #[path = "../tests/common/support.rs"]
@@ -166,11 +182,19 @@ use taxman::tactics::Tactics;
 // ---------------------------------------------------------------------------------------------------------
 // Arguments
 
-const COMMANDS: [&str; 7] = ["setup", "nodes", "grow", "start", "frames", "landscape", "chain"];
+const COMMANDS: [&str; 9] = ["setup", "nodes", "grow", "start", "frames", "landscape", "chain", "sound", "finders"];
 
 /// The options, with the commands each applies to (an option given to another command is an error).
-const OPTIONS: [(&str, &[&str]); 18] = [
-    ("--known", &["setup", "nodes", "grow", "start", "landscape", "chain"]),
+const OPTIONS: [(&str, &[&str]); 26] = [
+    ("--known", &["setup", "nodes", "grow", "start", "landscape", "chain", "sound", "finders"]),
+    ("--from", &["sound"]),
+    ("--cap", &["sound"]),
+    ("--cpu", &["sound", "finders"]),
+    ("--seed", &["sound", "finders"]),
+    ("--fix", &["sound", "finders"]),
+    ("--unit-nodes", &["sound", "finders"]),
+    ("--extra", &["sound", "finders"]),
+    ("--pool", &["sound", "finders"]),
     ("--repeat", &["setup"]),
     ("--nodes", &["nodes", "grow"]),
     ("--seconds", &["nodes", "grow"]),
@@ -234,6 +258,8 @@ struct Options {
     down: bool,
     /// `chain` starts afresh, standalone, at every `restart`th game (never, if not given).
     restart: Option<usize>,
+    /// The options of `sound` and `finders`.
+    finders: finders::Params,
     games: Vec<u32>,
 }
 
@@ -260,6 +286,7 @@ impl Options {
             out: None,
             down: false,
             restart: None,
+            finders: finders::Params::default(),
             games: Vec::new(),
         }
     }
@@ -280,7 +307,7 @@ fn duration(name: &str, text: String) -> Result<Duration, String> {
 
 /// The board sizes of the arguments: numbers, and for `setup`, `start` and `frames` also ranges `A-B`.
 fn games(command: &str, texts: &[String]) -> Result<Vec<u32>, String> {
-    let ranges = matches!(command, "setup" | "start" | "frames" | "landscape" | "chain");
+    let ranges = matches!(command, "setup" | "start" | "frames" | "landscape" | "chain" | "sound" | "finders");
     let mut games = Vec::new();
     for text in texts {
         let number = |part: &str| part.parse::<u32>().map_err(|e| format!("{text}: {e}"));
@@ -357,6 +384,14 @@ fn parse() -> Result<Options, String> {
             "--out" => o.out = Some(value("--out")?.into()),
             "--down" => o.down = true,
             "--restart" => o.restart = Some(number("--restart", value("--restart")?)?),
+            "--from" => o.finders.from = value("--from")?.parse().map_err(|e| format!("--from {e}"))?,
+            "--cap" => o.finders.cap = Some(number("--cap", value("--cap")?)?),
+            "--cpu" => o.finders.cpu = number("--cpu", value("--cpu")?)?,
+            "--seed" => o.finders.seed = number("--seed", value("--seed")?)?,
+            "--fix" => o.finders.fix = finders::fix_range(&value("--fix")?)?,
+            "--unit-nodes" => o.finders.unit_nodes = number("--unit-nodes", value("--unit-nodes")?)?,
+            "--extra" => o.finders.extra = number("--extra", value("--extra")?)?,
+            "--pool" => o.finders.pool = value("--pool")?.parse().map_err(|e| format!("--pool {e}"))?,
             _ => texts.push(arg.clone()),
         }
     }
@@ -423,6 +458,10 @@ fn main() {
     }
     if o.command == "chain" {
         chain(&o, &optimal).unwrap_or_else(|e| fail(&e));
+        return;
+    }
+    if let Some(command) = finders::Command::named(&o.command) {
+        finders::run(command, &o, &optimal).unwrap_or_else(|e| fail(&e));
         return;
     }
     for &n in &o.games {
