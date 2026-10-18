@@ -138,13 +138,13 @@ entry](experiments/proving-an-upper-bound-part-of-the-way-searches-under-a-floor
   export`, `run --bounds`, `verify-bounds` and `tools/check_bounds.py`; [results/README](../results/README.md#boundsjsonl)).
   On 2176..3440 with the truth hidden every proven board is at the optimum: 916 of 1,265 in 48 core-hours without the
   climbs and the finder, 876 in 24 with both (the first run needed about 38 for as many).
-* **The ledger past 4400** (Brian approved up to $25, 2026-10-17): stage 1, 4400..8191 on one `c8g.16xlarge` (360
-  core-hours, about $3.80), mapped every board with the finder (10 s), then searched where the gap is smallest, climbs
-  both ways (limit 1 hour): 242 boards proven, all in 4400..4799, and past 4800 the smallest gap is 1,664; its bounds
-  are the store's first lines.  Stage 2 (2026-10-18, 12 hours, at most $8.20): 4300..4999 from stage 1's state.
+* **The ledger past 4400** (Brian approved up to $25, 2026-10-17): stage 1 (4400..8191, 360 core-hours, about $3.80)
+  proved 242 boards in 4400..4799; stage 2 (2026-10-18, 4300..4999) took the store to 343.  **The chain draws on it**
+  (2026-10-18, `solve --use-prev`: a board that the store, the committed chain or `optimal.json` has proven is recorded
+  with no search, citing it; not run in the cloud; [RUNBOOK 12.4](../tools/cloud/RUNBOOK.md#124-launch-watch-stop-clean-up)).
 * **Floor-guided drilling** (2026-10-18, f775cc0 and 26c5c71; [the entry's
   section](experiments/the-ledger-bounds-from-both-sides-2026-10.md#later-2026-10-18-floor-guided-drilling)): the ledger
-  steps an open board down by searches under floors (`--floor-step`, 150 points, a tenfold of cost a step; each completed
-  one lowers U), fits a line to each board's steps that forecasts its proof, and orders the boards after the climbs by it.
-  On 2576..2700 at 900 CPU s 69 and 73 boards were proven against 61; dry-run, not run in the cloud; the next stage
-  resumes stage 2's ledger with it ([RUNBOOK 14](../tools/cloud/RUNBOOK.md#14-the-ledgers-experiment)).
+  steps an open board down by searches under floors (150 points, a tenfold of cost a step; each lowers U), fits a line
+  to each board's steps that forecasts its proof, and orders the boards by it.  On 2576..2700 at 900 CPU s 69 and 73
+  boards were proven against 61; dry-run, not run in the cloud; the next stage resumes stage 2's ledger with it
+  ([RUNBOOK 14](../tools/cloud/RUNBOOK.md#14-the-ledgers-experiment)).

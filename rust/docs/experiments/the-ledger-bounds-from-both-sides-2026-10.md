@@ -725,3 +725,51 @@ make them matter little, but a forecast for a stretch far from 2265-3259 is the 
 
 **Commits.**  f775cc0 (the steps, the forecast and the order, the store's rules, the tests), 26c5c71 (the boards
 exploring first, and the checkpoint of a step that found a set), then the commit of the documents and this record.
+
+## Later (2026-10-18): the chain draws on the known games
+
+**Why.**  The store holds 343 proven boards in 4300..4783, which the run to the wall will reach and would prove again,
+at the hours a game costs there.  Brian's brief was `taxman solve --bounds FILE`; the lead's correction was to give no new
+option and to extend the flag that already means "use what is known", `--use-prev`, to every proven game the repository
+holds: `optimal.json`, the committed chain and the store.
+
+**What was built** ([README, "Known games"](../../README.md#known-games); DESIGN.md, section 8):
+
+* *One copy of the store's format.*  The line, the file, the best bounds, the relations between boards and the referee's
+  replay of a lower bound's game moved from `examples/ledger/` to `src/store.rs`; the ledger re-exports them and keeps the
+  checks of a line against the lines before it.  `src/known.rs` reads the three sources.
+* *`--use-prev` draws on them.*  A board that a source has proven is recorded with no search (method `known`, proof
+  `known`, a `known` field citing the source); the game of n - 1 from a source gives the ceiling and the seed
+  (`prev.source` `strict` or `bounds`); a board that the store has not proven seeds its search with its lower bound's
+  game and ends it at its upper bound.  The best source is the committed chain's (it assumes nothing), then the store's,
+  then the table's.  `--force-search` leaves the boards to their searches; `regress --use-prev` keeps its old meaning.
+* *What a line assumes.*  The table's games are assumed optimal, the committed chain's assume what their lines do, and a
+  bound of the store holds wherever statement U holds at the boards its upper bound rests on, one assumption a board
+  (`statement U holds at n=B`), inherited by the games that rest on it.  A game found by a search that stopped at the
+  store's bound is proven by it, and settles its search problem for a later repeat.
+* *The referees.*  Both look the cited lines up in the sources (the repository's `rust/results`, by default) and refuse a
+  missing, changed or other line, a citation that is not there, other assumptions, and a store that was not given; neither
+  checks the sources again.  `tools/check_results.py` no longer reads `bounds.jsonl` as a file of results when it is run
+  with no argument (it did since the store was added, and failed).
+* *Schema 5 stays.*  The new key is there only on a line that has one, and the new method and proof are new names; every
+  committed file reads as it did.
+
+**Measured.**  `taxman solve 4650-4759 --use-prev` on the real store (110 proven boards, the laptop, 4 threads): 4.9 s
+(15.8 s of CPU, nearly all of it the referee's replay of the lower bounds' promotion sets at n of 4,700), 110 lines of
+proof `known` in 1.4 megabytes, assuming statement U at 83 boards in all; `taxman verify-results` takes 0.2 s on them and
+the Python referee 0.7 s.  The chain's own cost for those boards is hours (3,440 alone took 5 hours on 64 threads).  On
+boards 900..960 with a hand-made store of six proven boards, the six lines cost no nodes and the other 55 have the scores
+of the chain without it; with the store's upper bound alone, the dearest search of the range stops when it reaches the
+bound (fewer nodes), and a lower bound's game at the optimum seeds a standalone search of that board to fewer nodes than
+the unseeded one.
+
+**Not done, and what to know.**  No cloud run, and the store's open boards have not been used on a game of the wall's size:
+the seed and the ceiling are tested at 900..960 only.  A known game sets up no search problem, so the first game after a
+known stretch cannot repeat a known game's search, and searches (from the known game of n - 1, with its ceiling and seed) a
+problem that the chain would have settled by a repeat: the games 3441 and 4300 on are where that could cost, and the lines
+of the run's own searches are repeated as ever.  A chain from n = 1 with `--use-prev` re-proves nothing to 3440, so it is
+not the run that checks a build (RUNBOOK section 12.4).  `ledger run --bounds` and `solve --use-prev` take the store's
+upper bounds on its word: `ledger verify-bounds` comes first.
+
+**Commits.**  The move of the format into the library, then `--use-prev` with the known games, their referees and the
+tests (`tests/known.rs`), then the documents and this record.

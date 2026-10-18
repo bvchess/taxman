@@ -1662,7 +1662,14 @@ pub fn solve_range_each_with(
         return Err(format!("the range {lo}..={hi} is empty or starts below 1"));
     }
     let known = Known::load(optimal, &opts.known)?;
-    let mut results = results_path.map(|path| ResultsFile::open_with(path, &known, opts.threads)).transpose()?;
+    let open = |path: &Path| {
+        ResultsFile::open_with(path, &known, opts.threads).map_err(|e| match e.contains("not given to the check") {
+            // A file made with `--use-prev` has lines that cite the sources it drew on.
+            true => format!("{e} (a file with lines that cite a known source is opened with --use-prev)"),
+            false => e,
+        })
+    };
+    let mut results = results_path.map(open).transpose()?;
     if let Some(file) = &results {
         // Left by a crash between saving a result and deleting its checkpoint.
         for n in (lo..=hi).filter(|&n| file.completed(n).is_some()) {

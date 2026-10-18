@@ -1612,6 +1612,38 @@ H --game-hours G`, with the commit the run began with (a checkpoint is resumed o
 section 5) and the budget as the new total: `--continue` removes the end and the stop, writes the config again, and
 keeps the ledger, the results and the checkpoints.
 
+**Drawing on the known games.**  The chain above searches every game from n = 1, which is what re-proves 1 to 3440 with
+a build.  A run that goes on past what the repository holds needs none of that: with `--extra-args "--use-prev"`
+(`EXTRA_ARGS`; the machines run `taxman solve 1-N --use-prev ...` in the checkout of the pinned commit) the chain
+draws on the known games of that checkout's `rust/results`, which are the committed chain `strict.jsonl` (to 3440),
+the bounds store `bounds.jsonl` (the boards the ledger has proven, 4300 to 4783 at the commit of 2026-10-18) and the
+built-in `optimal.json` ([README, "Known games"](../../README.md#known-games)):
+
+```
+rust/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --extra-args "--use-prev"
+```
+
+* **Games 1 to 3440 are taken from the committed chain**, each recorded in seconds with proof `known` (so nothing in
+  that stretch is re-proven by the build; the seconds of the first minutes of the run go to replaying them).  The game
+  after the committed chain's end is searched from its game of 3440, as the run from n = 1 does.
+* **A board the store has proven is recorded with no search** (method `known`, citing the store's two lines), and the
+  game after it is searched from it, with its ceiling and seed.  The boards the store has not proven still help: the
+  lower bound's game seeds the search and the upper bound stops it, which can shorten the game that sets the wall (the
+  wall is then a game whose store bounds leave a gap, or that the store lacks).
+* **What the lines assume**: a game that rests on the store assumes statement U at the boards its upper bound rests on
+  (`"statement U holds at n=B"`), and the games that rest on it, by the ceiling or the prime formula, assume the same.  The
+  results are therefore not "assumptions: none" past the first proven board of the store; `verify.sh` counts them.
+* **Both referees check the file against the same files**: `taxman verify-results` and `tools/check_results.py` take
+  the committed chain and the store of the checkout they run in (`verify.sh` does, and `chain.sh` runs it at the end of a
+  complete range), and a line that cites a store line that the store at that checkout lacks is refused.  The store is
+  append-only, so a checkout at a later commit has every line that the pinned one had.  Run `ledger verify-bounds
+  results/bounds.jsonl` on the store first (section 14): the chain takes its bounds on its word.
+* **A resumed machine** passes the flag again (it is in `run/config`, which every machine reads), and the results file it
+  restores from S3 is checked with the same sources.  The checkpoint of a searched game is resumed as ever.
+* Without it the chain from n = 1 re-proves 1 to 3440 (1.76 hours on the machine, in the run of 2026-10-17); with it that
+  stretch costs seconds and the run checks nothing of the build against the committed chain.  It is the flag for a run
+  that goes past the repository's knowledge, and the wrong one for a run whose point is that check.
+
 ### 12.5 The rehearsal (designed, not run)
 
 *Run on 2026-10-17* (commit eb84a6f; about $0.15 in all).  A `c8g.large` (2 vCPUs, 4 GiB) cannot build the solver: its

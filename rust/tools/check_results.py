@@ -13,9 +13,10 @@ For every completed game:
   promoted    the promotions are moves, in ascending order
   fields      the fields the proof and the assumptions come from agree with each other, as the solver writes them: a
               searched or repeat game, and only such a game, has a setup, which records the digest of its search
-              problem; every game but a prime one records in_the_bag; only a search reaches its ceiling; a prime
-              game's n is prime; a trivial game promotes nothing; a repeat, and only a repeat, records the game it
-              repeats (same_search), and its setup has no `cap`
+              problem; every game but a prime or a known one records in_the_bag; only a search reaches its ceiling;
+              a prime game's n is prime; a trivial game promotes nothing; a repeat, and only a repeat, records the
+              game it repeats (same_search), and its setup has no `cap`; a known game, and a search that the bounds
+              store's upper bound ended, and only those, cite a source (`known`)
   optimal     the score is optimal.json's, where the table has the game
   chain       score(n-1) <= score(n) <= n + score(n-1), with n-1 from the same file, else from optimal.json
               (both are theorems about optimal games: a game of n-1 is a game of n, and deleting the move n from
@@ -26,9 +27,17 @@ For every completed game:
               n + score(n-1) - in_the_bag, the promotions do not exceed it, and a game records reaching the ceiling
               exactly when its promotions sum to it (where the search stops); a prime game scores n + score(n-1) - P,
               P the largest prime below n
-  provenance  the game of n-1 a line names (prev) is the file's game of n-1 (source run or results) or optimal.json's
-              (source optimal), and the line's record of it matches that game (score, FNV-1a digest of the moves,
-              proof, assumptions); the recorded proof and assumptions are the ones the rules below give
+  provenance  the game of n-1 a line names (prev) is the file's game of n-1 (source run or results), optimal.json's
+              (source optimal), the committed chain's (strict) or a board the bounds store has proven (bounds), and
+              the line's record of it matches that game (score, FNV-1a digest of the moves, proof, assumptions; not
+              the digest of a store's game, which only the Rust program can play); the recorded proof and
+              assumptions are the ones the rules below give
+  known       a line that cites a known source (`known`: optimal, strict, or bounds with the rule and run of its lower
+              and upper lines) has its citation checked: optimal.json or the committed chain (--committed) holds a
+              game of n that scores the line's score, or the bounds store (--bounds) has a lower line (if cited) and
+              an upper line of board n worth the score, of that rule and from that run.  The assumptions are those
+              of the cited lines: optimal.json's game assumed optimal, the committed line's own, and statement U at
+              each board the upper line rests on.  The sources are read as they are; their own referees check them
   unfinished  an incomplete line that records its game (best_so_far, moves, promotions) is legal, scores the
               best_so_far, has ascending promotions that are moves, and is no better than optimal.json's score; it need
               not be over.  A line whose prev has source run or results and no proof was built on such a game
@@ -48,17 +57,19 @@ m's.  The digests a line records are hashes of the problems, which only the solv
 that they agree and that the two games are consistent with sharing one problem, and `taxman verify-results` sets
 both problems up again and compares them.
 
-Proof kinds (rust/src/results.rs explains them): trivial, exhausted, cap, prime_formula, same_search.  The assumptions
-of a game are what its proof takes as given beyond the frame model: a proof by the ceiling (`cap`) or by the prime
-formula rests on the game of n-1, so it assumes what that game's proof assumes, and for a game of n-1 taken from
-optimal.json, that "the game of n-1 in optimal.json is optimal"; a repeat assumes what the game it repeats assumes;
-other proofs assume nothing.  A line of another schema than this referee reads is a problem.
+Proof kinds (rust/src/results.rs explains them): trivial, exhausted, cap, prime_formula, same_search, known.  The
+assumptions of a game are what its proof takes as given beyond the frame model: a proof by the ceiling (`cap`) or by
+the prime formula rests on the game of n-1, so it assumes what that game's proof assumes, and for a game of n-1 taken
+from optimal.json, that "the game of n-1 in optimal.json is optimal"; a repeat assumes what the game it repeats
+assumes; a known proof assumes what its source's game does; other proofs assume nothing.  A line of another schema
+than this referee reads is a problem.
 
 The report counts games by proof kind and by assumption, and the arithmetic certificates: scores equal to
 n + score(n-1) or to the prime formula, which certify a game whatever found it, given that the game of n-1 is optimal.
 
-usage: check_results.py [FILE ...] [--fm PATH] [--chain PATH]
-Without FILEs it checks rust/results/*.jsonl.  The exit status is 1 if any check fails.
+usage: check_results.py [FILE ...] [--fm PATH] [--chain PATH] [--committed PATH] [--bounds PATH]
+Without FILEs it checks rust/results/*.jsonl but the bounds store, which is not a file of results.  The exit status is 1
+if any check fails.
 """
 import argparse
 import json

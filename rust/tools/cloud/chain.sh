@@ -44,7 +44,9 @@
 #   CHECKPOINT_INTERVAL  seconds, default 300       PROGRESS  seconds between progress lines, default 60
 #                        (a checkpoint stops every worker for the slowest one's step, up to 0.4 s near n = 4000: 0.15%
 #                        of the machine at 300 s, 0.7% at 60 s; SIGTERM still writes a final one)
-#   EXTRA_ARGS           more flags for `taxman solve`, e.g. "--mem-cap 100000"
+#   EXTRA_ARGS           more flags for `taxman solve`, e.g. "--mem-cap 100000", or "--use-prev": the chain then
+#                        draws on the known games of the checkout's results/ (the committed chain to 3440, the
+#                        proven boards of the bounds store) instead of searching for them (RUNBOOK.md, section 12.4)
 #   MAX_FAILS            default 5
 #   CHAIN_TO             N, if not given as the argument (the solver goes up to 8191; RUNBOOK.md, "Past 4095")
 #   GAME_HOURS           the wall: stop at the first game whose own search has taken more than this many hours in all,

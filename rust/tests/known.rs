@@ -193,6 +193,17 @@ fn proven_boards_of_the_store_are_recorded_without_a_search_and_both_verifiers_a
     assert!(games.iter().map(|game| game.nodes).sum::<u64>() < control.iter().map(|game| game.nodes).sum::<u64>());
 
     both_accept(&out, &sources);
+
+    // A run that starts after a board the store has proven takes that game as the game before it: from the store, which
+    // is the better source than the table that has it too (the proven game assumes U where its bound rests).
+    let later = dir.join("later.jsonl");
+    let games = run(907, 912, &options(sources.clone()), &later);
+    let prev = games[0].prev.as_ref().unwrap();
+    assert_eq!((prev.source, prev.n, prev.proof), (PrevSource::Bounds, 906, Some(Proof::Known)));
+    assert_eq!(prev.assumes, Assumptions::from([assumed_u(906)]));
+    assert_eq!(games[0].method, Method::Known, "907 is proven by the store itself");
+    both_accept(&later, &sources);
+
     // The report counts them.
     let known = Known::load(Optimal::built_in(), &sources).unwrap();
     let report = verify_files_with(std::slice::from_ref(&out), &known, 1).unwrap().to_string();
@@ -479,6 +490,57 @@ fn a_store_game_that_does_not_play_or_contradicts_the_chain_stops_the_run_naming
     ])
     .unwrap_err();
     assert!(err.contains("n=910") && err.contains("less than the previous game"), "{err}");
+}
+
+/// The command line finds the sources in `rust/results` of the repository it runs in (a directory above the working
+/// directory with `src/main/resources/optimal.json`), and names no option for them: a repository made for the purpose,
+/// with a store of two boards and no committed chain.
+#[test]
+fn solve_use_prev_and_verify_results_find_the_sources_in_the_repository() {
+    let dir = TempDir::new("known-cli");
+    fs::create_dir_all(dir.join("src/main/resources")).unwrap();
+    fs::write(dir.join("src/main/resources/optimal.json"), "[]").unwrap();
+    fs::create_dir_all(dir.join("rust/results")).unwrap();
+    let store = dir.join("rust/results/bounds.jsonl");
+    write_lines(&store, &[proven_lines(905), proven_lines(906)].concat());
+    let in_repo = |args: &[&str]| {
+        let run =
+            std::process::Command::new(env!("CARGO_BIN_EXE_taxman")).args(args).current_dir(&*dir).output().unwrap();
+        (
+            run.status.code(),
+            String::from_utf8_lossy(&run.stdout).into_owned(),
+            String::from_utf8_lossy(&run.stderr).into_owned(),
+        )
+    };
+
+    let out = dir.join("out.jsonl");
+    let (code, stdout, stderr) =
+        in_repo(&["solve", "903-908", "--use-prev", "--threads", "1", "--out", common::path(&out)]);
+    assert_eq!(code, Some(0), "{stderr}");
+    // The store's boards come from the store, the others from the table; none is searched.
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert_eq!(lines.len(), 6, "{stdout}");
+    for (line, n) in lines.iter().zip(903..) {
+        let store_board = [905, 906].contains(&n);
+        let source = if store_board { "the bounds store" } else { "optimal.json" };
+        assert!(line.contains("known") && line.contains(&format!("from {source}")), "{line}");
+        assert!(line.contains(&format!("n={n} ")), "{line}");
+    }
+    assert!(stdout.contains(&assumed_u(905)) && stdout.contains(&assumed_optimal(903)), "{stdout}");
+
+    // The verifier finds the same sources; without the store it refuses the lines that cite it, saying so.
+    let (code, stdout, stderr) = in_repo(&["verify-results", common::path(&out)]);
+    assert_eq!(code, Some(0), "{stdout}{stderr}");
+    assert!(stdout.contains("proof: known 6"), "{stdout}");
+    let moved = dir.join("rust/results/bounds.jsonl.moved");
+    fs::rename(&store, &moved).unwrap();
+    let (code, _, stderr) = in_repo(&["verify-results", common::path(&out)]);
+    assert_eq!(code, Some(1));
+    assert!(stderr.contains("line 3 (n=905)") && stderr.contains("which was not given to the check"), "{stderr}");
+    // A run that resumes the file without the flag is told what to do.
+    let (code, _, stderr) = in_repo(&["solve", "903-910", "--threads", "1", "--out", common::path(&out)]);
+    assert_eq!(code, Some(1));
+    assert!(stderr.contains("opened with --use-prev"), "{stderr}");
 }
 
 #[test]
