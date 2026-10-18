@@ -89,7 +89,7 @@ impl<const W: usize> Neighbourhood<'_, W> {
         let mut scratch = Scratch::new();
         let mut best = self.fill(&mut scratch, start, &Bits::EMPTY);
         loop {
-            if reaches(&best, ceiling()) {
+            if reaches(best.sum(), ceiling()) {
                 return best;
             }
             let threads = threads();

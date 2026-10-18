@@ -369,8 +369,8 @@ fn forgetting_nogoods_often_does_not_change_answers() {
     for g in &searched_games(400) {
         let p = prepare_golden::<8>(g, SearchTactics::default());
         for (period, threads) in [(1, 1), (3, 2), (40, 1)] {
-            let r =
-                search_forgetting(&p, &config(threads), None, None, false, None, Forgetting::every(period)).unwrap();
+            let every = Forgetting::every(period);
+            let r = search_forgetting(&p, &config(threads), None, None, false, None, every, None).unwrap();
             let what = format!("n={}, forgetting every {period} steps on {threads} threads", g.n);
             assert!(r.completed && r.promotions.is_subset(&p.candidates), "{what}");
             assert_eq!(r.sum, golden_sum(g), "{what}");
@@ -415,7 +415,7 @@ fn every_policy_of_keeping_nogoods_gives_the_same_optimum_on_every(every: usize)
         let p = prepare_golden::<8>(g, SearchTactics::default());
         for forgetting in policies {
             for threads in [1, 2] {
-                let r = search_forgetting(&p, &config(threads), None, None, false, None, forgetting).unwrap();
+                let r = search_forgetting(&p, &config(threads), None, None, false, None, forgetting, None).unwrap();
                 let what = format!("n={}, {forgetting:?} on {threads} threads", g.n);
                 assert!(r.completed && r.promotions.is_subset(&p.candidates), "{what}");
                 assert_eq!(r.sum, golden_sum(g), "{what}");
@@ -573,6 +573,167 @@ fn seeds_and_caps() {
     // A worse seed changes nothing.
     let worse = search(&p, &config(1), Some(&Bits::EMPTY), None, false).unwrap();
     assert_eq!(worse.sum, optimum.sum);
+}
+
+/// The root's GF(2) bound with no incumbent: the bound the search computes at its first node, as a promotion sum.
+fn root_bound<const W: usize>(p: &Prepared<W>) -> u64 {
+    let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates);
+    let mut bound = Gf2Bound::<W>::new(&graph);
+    bound.reset(&Bits::EMPTY, &p.candidates);
+    bound.evaluate(p.max_total, None).value
+}
+
+/// The search of `p` (whose optimum is `opt`) under floors around the optimum, on `threads` threads: a floor below it
+/// finds it, a floor at it or above completes without finding anything, and a floor at the root's bound or above
+/// completes at once.
+fn floors_around_the_optimum<const W: usize>(p: &Prepared<W>, opt: u64, threads: usize, what: &str) {
+    let cfg = config(threads);
+    for floor in [opt - 1, opt - opt.min(40), opt / 2, 0] {
+        let r = search_above(p, &cfg, floor, None, false).unwrap();
+        assert!(r.completed && !r.floor_held, "{what}, floor {floor}: it finds a set above the floor");
+        assert_eq!((r.sum, r.promotions.sum()), (opt, opt), "{what}, floor {floor}");
+        assert!(r.promotions.is_subset(&p.candidates), "{what}, floor {floor}");
+        assert!(p.model.promote_all_using(&mut Scratch::new(), &p.root, &r.promotions).is_some(), "{what}");
+        assert!(r.start.is_empty() && r.found.is_some(), "{what}, floor {floor}: the floor is the start");
+    }
+    let root = root_bound(p);
+    assert!(opt <= root, "{what}: the root's bound {root} is below the optimum {opt}");
+    for floor in [opt, opt + 1, opt + (root - opt) / 2, root, root + 1] {
+        let r = search_above(p, &cfg, floor, None, false).unwrap();
+        assert!(r.completed && r.floor_held, "{what}, floor {floor}: nothing is above it");
+        assert!(r.promotions.is_empty() && r.found.is_none() && r.start.is_empty(), "{what}, floor {floor}");
+        assert_eq!(r.sum, floor, "{what}, floor {floor}: the incumbent is the floor");
+        // The first check of the search is the GF(2) bound, which the floor reaches at the root (the matching path
+        // checks its own bound first, which can be higher).
+        if floor >= root && p.tactics.gf2 {
+            assert!(r.stats.nodes <= 1, "{what}, floor {floor}: {} steps at the root's bound", r.stats.nodes);
+        }
+    }
+}
+
+/// With no set to find above the optimum the floor is the incumbent, so its tree is the proof of a search seeded
+/// with the optimum, step for step on one thread.
+fn the_tree_under_the_optimum_is_the_proof(n: u32) {
+    let board = crate::board::Board::<16>::for_n(n);
+    let p = board.prepare(SearchTactics::default()).unwrap();
+    let opt = crate::game::Optimal::built_in().score(n).unwrap() - board.in_the_bag;
+    let found = search(&p, &config(1), None, None, false).unwrap();
+    assert_eq!(found.sum, opt);
+    let seeded = search(&p, &config(1), Some(&found.promotions), None, false).unwrap();
+    let floored = search_above(&p, &config(1), opt, None, false).unwrap();
+    assert!(seeded.completed && floored.completed && floored.floor_held, "n={n}");
+    assert_eq!(seeded.start, found.promotions, "n={n}: the seed is the start");
+    assert_eq!(floored.stats.nodes, seeded.stats.nodes, "n={n}: the floor at the optimum is the proof");
+}
+
+/// A floor below the optimum finds it, a floor at the optimum or above proves there is nothing heavier, and the root's
+/// bound or more ends the search at once, on every game of the Java's that needs a search and with the default
+/// tactics (the rule of the symmetric pairs among them), on one thread.
+#[test]
+fn a_floor_below_the_optimum_finds_it_and_one_at_it_proves_nothing_is_heavier() {
+    for g in &searched_games(400) {
+        let p = prepare_golden::<8>(g, SearchTactics::default());
+        floors_around_the_optimum(&p, golden_sum(g), 1, &format!("n={}", g.n));
+    }
+}
+
+/// [`a_floor_below_the_optimum_finds_it_and_one_at_it_proves_nothing_is_heavier`] on four threads, and with each of the
+/// tactics that change the tree (the matching path, the rule off), for a few games.
+#[test]
+fn floors_hold_on_four_threads_and_under_every_search_path() {
+    let tactics = [
+        SearchTactics::default(),
+        SearchTactics { symmetry: false, ..SearchTactics::default() },
+        SearchTactics::matching(),
+        SearchTactics { symmetry: true, ..SearchTactics::matching() },
+    ];
+    for g in searched_games(400).iter().step_by(9) {
+        for tactics in tactics {
+            let p = prepare_golden::<8>(g, tactics);
+            let what = format!("n={}, gf2 {}, symmetry {}", g.n, tactics.gf2, tactics.symmetry);
+            floors_around_the_optimum(&p, golden_sum(g), 4, &what);
+        }
+    }
+}
+
+/// The floor at the optimum and the seed of the optimum are one search, on a few games of 300 to 1000.
+#[test]
+fn a_floor_at_the_optimum_searches_the_tree_of_the_search_seeded_with_it() {
+    for n in [300, 480, 600, 760, 930, 1000] {
+        the_tree_under_the_optimum_is_the_proof(n);
+    }
+}
+
+/// A floor at or above the ceiling ends the search before it starts, as a start does, and stands.
+#[test]
+fn a_floor_at_the_ceiling_ends_the_search_before_it_starts() {
+    let p = prepare_golden::<8>(&load(300), SearchTactics::default());
+    let opt = search_checked(&p, 1, "plain").sum;
+    for (floor, ceiling) in [(opt, opt), (opt + 10, opt)] {
+        let r = search_above(&p, &config(1), floor, Some(ceiling), false).unwrap();
+        assert!(r.completed && r.reached_cap && r.floor_held && r.stats.nodes == 0, "floor {floor}, ceiling {ceiling}");
+        assert_eq!((r.sum, r.promotions), (floor, Bits::EMPTY), "floor {floor}, ceiling {ceiling}");
+    }
+    // Below the ceiling the floor is searched: the optimum is the ceiling, and a floor under it finds it and stops there.
+    let r = search_above(&p, &config(1), opt - 1, Some(opt), false).unwrap();
+    assert!(r.completed && r.reached_cap && !r.floor_held && r.sum == opt, "floor {}", opt - 1);
+}
+
+/// A search under a floor that a limit stops resumes from its checkpoint under the same floor, to the same end; a
+/// checkpoint that holds the floor and no set is not resumed under another floor or none, nor the other way round, and
+/// the dual bound of the stopped search holds the floor as its incumbent.
+#[test]
+fn a_search_under_a_floor_resumes_under_the_same_floor() {
+    let n = 1000;
+    let board = crate::board::Board::<16>::for_n(n);
+    let p = board.prepare(SearchTactics::default()).unwrap();
+    let opt = crate::game::Optimal::built_in().score(n).unwrap() - board.in_the_bag;
+    let dir = TempDir::new("floor-resume");
+    let ckpt = dir.0.join("ckpt.bin");
+    // The floors: one below the optimum (it is found) and one at it (nothing is), each stopped by a limit of 1,000
+    // steps (the engine checks it every 1,024).
+    for floor in [opt - 100, opt] {
+        let whole = search_above(&p, &config(1), floor, None, false).unwrap();
+        assert!(whole.stats.nodes > 1100, "floor {floor}: {} steps, too few to stop", whole.stats.nodes);
+        let cfg = EngineConfig {
+            checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))),
+            node_limit: Some(1000),
+            ..config(1)
+        };
+        let mut result = search_above(&p, &cfg, floor, None, false).unwrap();
+        assert!(
+            !result.completed && ckpt.exists(),
+            "floor {floor}: stopped with a checkpoint ({} of {} steps)",
+            result.stats.nodes,
+            whole.stats.nodes
+        );
+        let dual = dual_bound(&p, &ckpt).unwrap();
+        assert_eq!(dual.incumbent, result.sum, "floor {floor}");
+        assert!(dual.bound() >= opt && dual.bound() <= root_bound(&p), "floor {floor}: {}", dual.bound());
+        if floor == opt {
+            assert_eq!(dual.incumbent, floor, "nothing above the floor is found");
+            for (other, what) in
+                [(Some(floor - 1), "a lower floor"), (Some(floor + 1), "a higher floor"), (None, "none")]
+            {
+                let resumed = board.prepare_for_resume(&ckpt).unwrap();
+                let refused = match other {
+                    Some(other) => search_above(&resumed, &cfg, other, None, true),
+                    None => search(&resumed, &cfg, None, None, true),
+                };
+                assert!(refused.is_err(), "the checkpoint of the floor {floor} is resumed under {what}");
+            }
+        }
+        let mut pieces = 1;
+        while !result.completed {
+            let resumed = board.prepare_for_resume(&ckpt).unwrap();
+            result = search_above(&resumed, &cfg, floor, None, true).unwrap();
+            pieces += 1;
+            assert!(pieces < 100, "no progress");
+        }
+        assert!(pieces >= 2 && !ckpt.exists(), "floor {floor}: {pieces} pieces");
+        assert_eq!((result.floor_held, result.sum), (floor == opt, opt.max(floor)), "floor {floor}");
+        assert_eq!(result.promotions.sum() == opt, floor < opt, "floor {floor}");
+    }
 }
 
 /// A start that reaches the ceiling is the incumbent as it stands: the search skips the dive and the local search,

@@ -17,6 +17,7 @@
 //!     [--seed S] [--fix LO-HI] [--unit-nodes K] [--extra K] [--pool value|chosen] N|A-B...
 //! cargo run --release --example wall -- finders [--cpu S] [--known FILE] [--seed S] [--fix LO-HI] [--unit-nodes K]
 //!     [--extra K] [--pool value|chosen] N|A-B...
+//! cargo run --release --example wall -- target [--fractions F,F,...] [--cap S] --known FILE N|A-B...
 //! ```
 //!
 //! Games are set up as `taxman solve` sets them up (`taxman::board::Board` at the set width `with_width!` picks for
@@ -117,6 +118,11 @@
 //!   against the sound search for the same CPU time.  `sound` runs the sound search of each game from the start
 //!   incumbent, from the known optimum or from a finder's game; `finders` runs the finders and the control on each
 //!   game.  Both are defined in `wall/finders.rs`, whose module comment has the options and the lines.
+//! * **target**: how cheaply a search proves a game's upper bound down part of the way.  For a game with a known
+//!   optimum, a one-thread search under a floor ([`taxman::search::search_above`]) that is a share of the gap between
+//!   the root's bound and the optimum below the root's bound, for each share, and the full proof (the sound search
+//!   from the known optimum), each for at most `--cap` CPU seconds; the nodes and CPU seconds of each.  It is defined
+//!   in `wall/finders.rs` too.
 //!
 //! **The sizes** (`setup`, `nodes` and `frames`): `frames` (the root's frame count), `candidates`, `max_total`
 //! (the most promotions a set can have), `members` (the distinct numbers in the moves and factors of the root's
@@ -184,13 +190,15 @@ use taxman::tactics::Tactics;
 // ---------------------------------------------------------------------------------------------------------
 // Arguments
 
-const COMMANDS: [&str; 9] = ["setup", "nodes", "grow", "start", "frames", "landscape", "chain", "sound", "finders"];
+const COMMANDS: [&str; 10] =
+    ["setup", "nodes", "grow", "start", "frames", "landscape", "chain", "sound", "finders", "target"];
 
 /// The options, with the commands each applies to (an option given to another command is an error).
-const OPTIONS: [(&str, &[&str]); 26] = [
-    ("--known", &["setup", "nodes", "grow", "start", "landscape", "chain", "sound", "finders"]),
+const OPTIONS: [(&str, &[&str]); 27] = [
+    ("--known", &["setup", "nodes", "grow", "start", "landscape", "chain", "sound", "finders", "target"]),
     ("--from", &["sound"]),
-    ("--cap", &["sound"]),
+    ("--cap", &["sound", "target"]),
+    ("--fractions", &["target"]),
     ("--cpu", &["sound", "finders"]),
     ("--seed", &["sound", "finders"]),
     ("--fix", &["sound", "finders"]),
@@ -260,7 +268,7 @@ struct Options {
     down: bool,
     /// `chain` starts afresh, standalone, at every `restart`th game (never, if not given).
     restart: Option<usize>,
-    /// The options of `sound` and `finders`.
+    /// The options of `sound`, `finders` and `target`.
     finders: finders::Params,
     games: Vec<u32>,
 }
@@ -309,7 +317,8 @@ fn duration(name: &str, text: String) -> Result<Duration, String> {
 
 /// The board sizes of the arguments: numbers, and for `setup`, `start` and `frames` also ranges `A-B`.
 fn games(command: &str, texts: &[String]) -> Result<Vec<u32>, String> {
-    let ranges = matches!(command, "setup" | "start" | "frames" | "landscape" | "chain" | "sound" | "finders");
+    let ranges =
+        matches!(command, "setup" | "start" | "frames" | "landscape" | "chain" | "sound" | "finders" | "target");
     let mut games = Vec::new();
     for text in texts {
         let number = |part: &str| part.parse::<u32>().map_err(|e| format!("{text}: {e}"));
@@ -388,6 +397,7 @@ fn parse() -> Result<Options, String> {
             "--restart" => o.restart = Some(number("--restart", value("--restart")?)?),
             "--from" => o.finders.from = value("--from")?.parse().map_err(|e| format!("--from {e}"))?,
             "--cap" => o.finders.cap = Some(number("--cap", value("--cap")?)?),
+            "--fractions" => o.finders.fractions = finders::fractions(&value("--fractions")?)?,
             "--cpu" => o.finders.cpu = number("--cpu", value("--cpu")?)?,
             "--seed" => o.finders.lns.seed = number("--seed", value("--seed")?)?,
             "--fix" => o.finders.lns.fix = finders::fix_range(&value("--fix")?)?,

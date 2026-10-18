@@ -581,6 +581,13 @@ made (after the greedy set and the seed, the dive and the local search), so whoe
 far before the engine starts, and the engine's start is unchanged.  Board/search setup is in
 `board::Board`: it is the one place that knows the tables → frames → prepare → ceiling and seed path.
 
+A search can instead start from a *floor* (`search::search_above`): an incumbent worth a given promotion sum and no
+set, with no start made, so that nodes are pruned against the floor as against a set of that weight and a set found
+heavier becomes the incumbent as usual.  A search that completes with none found has proven that nothing is heavier
+than the floor (heuristics/THEORY.md, Lemma F, the argument of the dual bound of a stopped search), which
+`SearchResult::floor_held` says.  Its tree is that of a search from an incumbent of that worth: the proof's, node for
+node, when the floor is the optimum (a search seeded with it), and smaller above it.
+
 ### Extended mode: one-sided candidates
 
 The search can also take the *extended problem* Π⁺(O) (THEORY.md, ["The extended

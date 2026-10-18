@@ -2,15 +2,16 @@
 //! bound on a game's optimum needs only a legal game, so any method may find one; only an upper bound has to be proven.
 //! Nothing here proves anything: a finder may miss the optimum, nothing it finds is recorded as a result, and no
 //! `results/` file is written.  Every game a finder returns is replayed by the referee ([`replay_finished`]) at the
-//! score claimed, and one that does not replay at it, or scores above the known optimum, is an error.
+//! score claimed, and one that does not replay at it, or scores above the known optimum, is an error.  `target`, below,
+//! measures what proving an upper bound costs, part of the way and all of it.
 //!
-//! Both commands take the games as `N` or `A-B`, play them one after the other on one thread of one process, and print
+//! The commands take the games as `N` or `A-B`, play them one after the other on one thread of one process, and print
 //! a JSON line a game as it ends.  A board with nothing to promote has the line `{"n":N,"trivial":true}`.  Every line
-//! begins with the board (`prime`, `in_the_bag`, `candidates`), `upper` (the root's GF(2) bound, as a score), `opt` (the
-//! known optimum with `--known FILE`, as for `landscape`, else null), `start` (the score of the game a standalone
-//! `solve` starts from, the `lower` of `landscape`) with `start_cpu_s`, and `meets`, whether `start` already reaches
-//! `upper`, when there is nothing to find.  The budgets are CPU seconds of the process (the laptop is shared, and the
-//! wall time would not be the work), which is why one process plays one game at a time.
+//! of `sound` and `finders` begins with the board (`prime`, `in_the_bag`, `candidates`), `upper` (the root's GF(2)
+//! bound, as a score), `opt` (the known optimum with `--known FILE`, as for `landscape`, else null), `start` (the score
+//! of the game a standalone `solve` starts from, the `lower` of `landscape`) with `start_cpu_s`, and `meets`, whether
+//! `start` already reaches `upper`, when there is nothing to find.  The budgets are CPU seconds of the process (the
+//! laptop is shared, and the wall time would not be the work), which is why one process plays one game at a time.
 //!
 //! * **sound**: `wall sound --from start|opt|lns|restricted` runs the sound search of each game standalone (no game of
 //!   `n - 1`, so no ceiling and no prime formula), on one thread, from the incumbent `--from` names: `start`; `opt`, the
@@ -35,6 +36,22 @@
 //!   limit), `lns_improved` and `lns_found_ms` (the CPU milliseconds at which the last of them was found); `restricted_candidates` (the last set's size) and `restricted_rounds`.
 //!
 //! `--seed` seeds the random choices (mixed with the board size).
+//!
+//! * **target**: how cheaply a search proves an upper bound on a game part of the way down from the root's bound, and
+//!   what a proof of the whole way costs.  For a game with a known optimum (`--known FILE`; a board with none is an
+//!   error), with `root` the root's GF(2) bound and `opt` the optimum, both as promotion sums, and the gap `root - opt`,
+//!   it runs on one thread, each for at most `--cap` CPU seconds (default: to the end): a search under the floor
+//!   `root - round(k * gap)` ([`search_above`]: an incumbent worth the floor and no set, no start, no seed) for each
+//!   share `k` in `--fractions` (default 0.25,0.5,0.75; shares strictly between 0 and 1, so every floor is above the
+//!   optimum), in the order of the shares, and then the full proof, the sound search from the known optimum as its seed
+//!   (`sound --from opt`).  A floor search that completes has proven that no promotion set is heavier than its floor
+//!   (heuristics/THEORY.md, Lemma F).  The line has `prime`, `in_the_bag`, `candidates`, `root`, `opt`, `gap`,
+//!   `setup_cpu_s` (the CPU seconds a floor search spends on the matching graph and the search's space before its
+//!   engine starts, built once here to time it; the proof's search is run in a space built before) and `runs`, a list
+//!   with an object each, floors first and the proof last: `fraction` (1 for the proof), `floor` (the optimum for the
+//!   proof), `proof`, `completed`, `held` (a floor search completed and found no heavier set; for the proof, it
+//!   completed), `nodes` (the engine's steps) and `cpu_s`.  A floor search that finds a set heavier than the floor, or
+//!   a root bound below the optimum, is an error after the line.
 
 use super::{beyond, chained_of, counters, root_bound, set_up, Line, Options};
 use crate::known::known_incumbent;
@@ -47,10 +64,10 @@ use std::time::{Duration, Instant};
 use taxman::accelerate::solution_for_promotions;
 use taxman::bits::Bits;
 use taxman::board::Board;
-use taxman::engine::Control;
+use taxman::engine::{Control, EngineConfig};
 use taxman::game::{replay_finished, Optimal};
 use taxman::matchbound::MatchGraph;
-use taxman::search::{start_incumbent, Prepared, SearchSpace, TaxUnit};
+use taxman::search::{search_above, start_incumbent, Prepared, SearchResult, SearchSpace, TaxUnit};
 
 // ---------------------------------------------------------------------------------------------------------
 // Options
@@ -117,14 +134,16 @@ impl FromStr for PoolScore {
     }
 }
 
-/// The options of `sound` and `finders`, with their defaults.
-#[derive(Clone, Copy)]
+/// The options of `sound`, `finders` and `target`, with their defaults.
+#[derive(Clone)]
 pub struct Params {
     pub from: Source,
     /// CPU seconds a finder runs for.
     pub cpu: f64,
-    /// CPU seconds after which `sound` stops its search (none: it goes on to the end).
+    /// CPU seconds after which `sound` stops its search, and `target` each of its (none: they go on to the end).
     pub cap: Option<f64>,
+    /// The shares of the gap `target` proves down: its floors are this far below the root's bound.
+    pub fractions: Vec<f64>,
     /// How [`Case::lns`] searches, and the seed of the finders' random choices (`--seed`, `--fix`, `--unit-nodes`).
     pub lns: lns::Options,
     /// How many candidates beyond the starts' [`Case::restricted`] begins with, and in which order it takes them.
@@ -138,6 +157,7 @@ impl Default for Params {
             from: Source::Start,
             cpu: 5.0,
             cap: None,
+            fractions: vec![0.25, 0.5, 0.75],
             lns: lns::Options::default(),
             extra: 32,
             pool: PoolScore::Chosen,
@@ -155,6 +175,22 @@ pub fn fix_range(text: &str) -> Result<(f64, f64), String> {
     } else {
         Err(bad(&"0 <= LO <= HI <= 1"))
     }
+}
+
+/// The shares of a list `F,F,...`, strictly between 0 and 1, in increasing order.
+pub fn fractions(text: &str) -> Result<Vec<f64>, String> {
+    let bad = |e: &dyn std::fmt::Display| format!("--fractions {text}: {e}");
+    let mut shares = Vec::new();
+    for part in text.split(',') {
+        let share: f64 = part.parse().map_err(|e| bad(&e))?;
+        if !(share > 0.0 && share < 1.0) {
+            return Err(bad(&"each share is above 0 and below 1 (the full proof is always run)"));
+        }
+        shares.push(share);
+    }
+    shares.sort_by(f64::total_cmp);
+    shares.dedup();
+    Ok(shares)
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -283,6 +319,16 @@ impl<const W: usize> Case<'_, W> {
         Found { set: ran.set, cpu_s, nodes: ran.nodes, completed: ran.completed, notes: Vec::new() }
     }
 
+    /// The search under `floor` ([`search_above`]) on one thread, for at most `cap` CPU seconds, and the CPU seconds it
+    /// took, the setup of the search included.
+    fn floored(&self, floor: u64, cap: Option<f64>) -> (SearchResult<W>, f64) {
+        budgeted(cap, |budget| {
+            let cfg =
+                EngineConfig { threads: 1, control: Some(Arc::clone(&budget.control)), ..EngineConfig::default() };
+            search_above(self.p, &cfg, floor, None, false).expect("the search")
+        })
+    }
+
     /// Large neighbourhood search ([`lns`]) from `start`, for `cpu` CPU seconds.
     fn lns(&self, start: &Bits<W>, cpu: f64) -> Found<W> {
         let search = Lns { p: self.p, space: self.space, options: self.params.lns };
@@ -388,6 +434,7 @@ impl<const W: usize> Case<'_, W> {
 pub enum Command {
     Sound,
     Finders,
+    Target,
 }
 
 impl Command {
@@ -396,6 +443,7 @@ impl Command {
         match name {
             "sound" => Some(Command::Sound),
             "finders" => Some(Command::Finders),
+            "target" => Some(Command::Target),
             _ => None,
         }
     }
@@ -451,6 +499,81 @@ fn sound_of<const W: usize>(case: &Case<'_, W>) -> Result<Played, String> {
     Ok(Played { line, faults })
 }
 
+/// The floor `share` of the way from `root` down to `opt`: `root` less that share of the gap, rounded.
+fn floor_at(root: u64, opt: u64, share: f64) -> u64 {
+    let gap = root - opt;
+    root - ((share * gap as f64).round() as u64).min(gap)
+}
+
+/// `target` on a game: the searches under floors a share of the gap below the root's bound, then the full proof.
+fn target_of<const W: usize>(case: &Case<'_, W>) -> Result<Played, String> {
+    let n = case.n();
+    let (known, opt) = known_incumbent(case.board, case.p, case.optimal)?
+        .ok_or_else(|| format!("n={n}: target needs the known optimum (--known FILE)"))?;
+    let graph = case.space.gf2.as_ref().ok_or_else(|| format!("n={n}: target needs the GF(2) bound"))?;
+    let root = root_bound(case.p, graph).0.value;
+    if root < opt {
+        return Err(format!("n={n}: the root's bound {root} is below the known optimum {opt}"));
+    }
+    let cap = case.params.cap;
+    let setup = Clock::start();
+    let match_graph = MatchGraph::new(&case.p.model, &case.p.root);
+    drop(SearchSpace::new(case.p, &match_graph));
+    let setup_cpu_s = setup.elapsed();
+
+    let mut faults = Vec::new();
+    let mut runs = Vec::new();
+    for &fraction in &case.params.fractions {
+        let floor = floor_at(root, opt, fraction);
+        let (found, cpu_s) = case.floored(floor, cap);
+        let (completed, held, nodes) = (found.completed, found.floor_held, found.stats.nodes);
+        runs.push(Run { fraction, floor, proof: false, completed, held, nodes, cpu_s });
+        if completed && !held {
+            faults.push(format!("n={n}: the search under the floor {floor} found a set worth {}", found.sum));
+        }
+    }
+    let proof = case.sound(&known, cap);
+    let (completed, nodes, cpu_s) = (proof.completed, proof.nodes, proof.cpu_s);
+    runs.push(Run { fraction: 1.0, floor: opt, proof: true, completed, held: completed, nodes, cpu_s });
+
+    let mut line = Line::of(n);
+    line.field("prime", case.board.tables.is_prime(n))
+        .field("in_the_bag", case.board.in_the_bag)
+        .field("candidates", case.p.candidates.len())
+        .field("root", root)
+        .field("opt", opt)
+        .field("gap", root - opt)
+        .seconds("setup_cpu_s", setup_cpu_s)
+        .field("runs", format!("[{}]", runs.iter().map(Run::render).collect::<Vec<_>>().join(",")));
+    Ok(Played { line, faults })
+}
+
+/// One search of `target`: under a floor, or the full proof.
+struct Run {
+    fraction: f64,
+    floor: u64,
+    proof: bool,
+    completed: bool,
+    held: bool,
+    nodes: u64,
+    cpu_s: f64,
+}
+
+impl Run {
+    /// The run as a JSON object.
+    fn render(&self) -> String {
+        let mut line = Line::new();
+        line.field("fraction", self.fraction)
+            .field("floor", self.floor)
+            .field("proof", self.proof)
+            .field("completed", self.completed)
+            .field("held", self.held)
+            .field("nodes", self.nodes)
+            .seconds("cpu_s", self.cpu_s);
+        line.render()
+    }
+}
+
 /// Game `n` at the set width `W`, played by `command`; a board with nothing to promote has only its line.
 fn play<const W: usize>(command: Command, n: u32, o: &Options, optimal: &Optimal) -> Result<Played, String> {
     let (board, prepared) = set_up::<W>(n);
@@ -465,6 +588,7 @@ fn play<const W: usize>(command: Command, n: u32, o: &Options, optimal: &Optimal
     match command {
         Command::Sound => sound_of(&case),
         Command::Finders => Ok(finders_of(&case)),
+        Command::Target => target_of(&case),
     }
 }
 
@@ -550,6 +674,52 @@ mod tests {
                     assert_eq!(number(&line, "search_from"), opt, "n={n}: {line}");
                 }
             }
+        }
+    }
+
+    #[test]
+    fn target_proves_down_the_gap_and_its_full_proof_is_the_search_under_a_floor_at_the_optimum() {
+        let o = options("target", 0.0);
+        for n in [250, 480] {
+            let line = line_of(Command::Target, n, &o);
+            let (root, opt, gap) = (number(&line, "root"), number(&line, "opt"), number(&line, "gap"));
+            assert_eq!(root - opt, gap, "n={n}: {line}");
+            assert!(gap > 0, "n={n}: the root's bound meets the optimum, so there is nothing to prove down: {line}");
+            let runs = line.get("runs").and_then(Json::as_arr).expect("runs");
+            let shares = [0.25, 0.5, 0.75, 1.0];
+            assert_eq!(runs.len(), shares.len(), "n={n}: {line}");
+            let mut last = root;
+            for (run, share) in runs.iter().zip(shares) {
+                let floor = number(run, "floor");
+                assert_eq!(run.get("fraction").and_then(Json::as_f64), Some(share), "n={n}: {run}");
+                assert_eq!(floor, root - (share * gap as f64).round() as u64, "n={n}: {run}");
+                assert!(opt <= floor && floor <= last, "n={n}: the floors fall from the root to the optimum: {run}");
+                assert!(yes(run, "completed") && yes(run, "held"), "n={n}: {run}");
+                assert_eq!(yes(run, "proof"), share == 1.0, "n={n}: {run}");
+                last = floor;
+            }
+            // The full proof is the search under a floor at the optimum: the same tree, step for step.
+            let (_, prepared) = set_up::<16>(n);
+            let p = prepared.expect("a board with promotions");
+            let cfg = EngineConfig { threads: 1, ..EngineConfig::default() };
+            let at_the_optimum = search_above(&p, &cfg, opt, None, false).expect("the search");
+            assert_eq!(number(&runs[3], "nodes"), at_the_optimum.stats.nodes, "n={n}: {line}");
+        }
+    }
+
+    #[test]
+    fn target_needs_the_known_optimum() {
+        // Game 1301 is not in optimal.json.
+        let error = game(Command::Target, 1301, &options("target", 0.0), Optimal::built_in()).err().expect("an error");
+        assert!(error.contains("--known"), "{error}");
+    }
+
+    #[test]
+    fn the_shares_are_read_as_written() {
+        assert_eq!(fractions("0.75,0.25,0.5"), Ok(vec![0.25, 0.5, 0.75]));
+        assert_eq!(fractions("0.5,0.5"), Ok(vec![0.5]));
+        for bad in ["0", "1", "1.5", "-0.1", "", "0.5,", "half", "NaN"] {
+            assert!(fractions(bad).is_err(), "{bad:?}");
         }
     }
 
